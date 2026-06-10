@@ -79,6 +79,11 @@ component extends="wheels.WheelsTest" {
 						"dbVersion",
 						"dbSchema",
 						"dbShell",
+						// dbDrop and dbRestore are currently STUBS that return
+						// "use your database tools" messages (cli.cfm), so the
+						// read-only classification is deliberate. If either is
+						// ever implemented, it must move to the mutating list
+						// and pass $cliMutationGateCheck (#2947 review, #2977).
 						"dbDrop",
 						"dbRestore",
 						"routes",

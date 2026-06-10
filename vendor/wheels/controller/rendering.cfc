@@ -176,6 +176,9 @@ component {
 	 * Instructs the controller to render the data passed in to the format that is requested.
 	 * If the format requested is `json` or `xml`, Wheels will transform the data into that format automatically.
 	 * For other formats (or to override the automatic formatting), you can also create a view template in this format: `nameofaction.xml.cfm`, `nameofaction.json.cfm`, `nameofaction.pdf.cfm`, etc.
+	 * Per-action format restrictions set with `onlyProvides()` are enforced here (since 4.0.4):
+	 * when the requested format is not acceptable for the action, `renderWith()` falls back to
+	 * rendering the `html` view — even when `html` itself is not in the `onlyProvides()` list.
 	 *
 	 * [section: Controller]
 	 * [category: Rendering Functions]

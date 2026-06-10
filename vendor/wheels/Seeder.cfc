@@ -25,6 +25,7 @@ component output="false" extends="wheels.Global" {
 		this.results = [];
 		this.totalCreated = 0;
 		this.totalSkipped = 0;
+		this.totalFailed = 0;
 		return this;
 	}
 
@@ -33,7 +34,12 @@ component output="false" extends="wheels.Global" {
 	 *
 	 * 1. Includes app/db/seeds.cfm (shared seeds) if it exists.
 	 * 2. Includes app/db/seeds/<environment>.cfm if it exists.
-	 * 3. Wraps execution in a transaction for atomicity.
+	 * 3. Wraps execution in a transaction for atomicity: a thrown error OR any
+	 *    seedOnce() entry that fails validation rolls back the entire run and
+	 *    returns success=false naming the failed entries. Commit-with-report was
+	 *    deliberately rejected — seedOnce() is idempotent, so a corrected rerun
+	 *    re-applies everything, and a half-applied run must never look identical
+	 *    to a fully-applied one (issue #2973).
 	 *
 	 * @environment The environment to seed for (defaults to current Wheels environment)
 	 */
@@ -50,6 +56,7 @@ component output="false" extends="wheels.Global" {
 		this.results = [];
 		this.totalCreated = 0;
 		this.totalSkipped = 0;
+		this.totalFailed = 0;
 
 		local.mainSeedFile = this.seedPath & "seeds.cfm";
 		local.envSeedFile = this.seedPath & "seeds/" & arguments.environment & ".cfm";
@@ -62,7 +69,8 @@ component output="false" extends="wheels.Global" {
 				message = "No seed files found. Create app/db/seeds.cfm to get started.",
 				results = [],
 				totalCreated = 0,
-				totalSkipped = 0
+				totalSkipped = 0,
+				totalFailed = 0
 			};
 		}
 
@@ -79,6 +87,22 @@ component output="false" extends="wheels.Global" {
 					include "#this.seedMappingPath#seeds/#arguments.environment#.cfm";
 				}
 
+				// Entries that failed validation must not commit silently: roll
+				// the whole run back and report them (see docblock for why
+				// rollback was chosen over commit-with-report).
+				if (this.totalFailed > 0) {
+					transaction action="rollback";
+					return {
+						success = false,
+						message = "Seeding failed: #this.totalFailed# #this.totalFailed == 1 ? 'entry' : 'entries'# failed validation (#$failedEntriesSummary()#). All changes were rolled back.",
+						environment = arguments.environment,
+						results = this.results,
+						totalCreated = this.totalCreated,
+						totalSkipped = this.totalSkipped,
+						totalFailed = this.totalFailed
+					};
+				}
+
 				transaction action="commit";
 			} catch (any e) {
 				transaction action="rollback";
@@ -88,7 +112,8 @@ component output="false" extends="wheels.Global" {
 					detail = e.detail,
 					results = this.results,
 					totalCreated = this.totalCreated,
-					totalSkipped = this.totalSkipped
+					totalSkipped = this.totalSkipped,
+					totalFailed = this.totalFailed
 				};
 			}
 		}
@@ -99,7 +124,8 @@ component output="false" extends="wheels.Global" {
 			environment = arguments.environment,
 			results = this.results,
 			totalCreated = this.totalCreated,
-			totalSkipped = this.totalSkipped
+			totalSkipped = this.totalSkipped,
+			totalFailed = 0
 		};
 	}
 
@@ -189,6 +215,7 @@ component output="false" extends="wheels.Global" {
 				key = local.newRecord.key()
 			};
 		} else {
+			this.totalFailed++;
 			local.result = {
 				model = arguments.modelName,
 				action = "failed",
@@ -198,6 +225,21 @@ component output="false" extends="wheels.Global" {
 
 		ArrayAppend(this.results, local.result);
 		return local.result;
+	}
+
+	/**
+	 * Internal function. Builds a "model: first error message" list for every
+	 * failed entry recorded in this run, used in the runSeeds() failure message.
+	 */
+	public string function $failedEntriesSummary() {
+		local.parts = [];
+		for (local.entry in this.results) {
+			if (local.entry.action == "failed") {
+				local.msg = ArrayLen(local.entry.errors) ? local.entry.errors[1].message : "save failed";
+				ArrayAppend(local.parts, "#local.entry.model#: #local.msg#");
+			}
+		}
+		return ArrayToList(local.parts, "; ");
 	}
 
 }

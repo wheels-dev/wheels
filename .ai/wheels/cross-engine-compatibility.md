@@ -172,7 +172,7 @@ createDynamicProxy(consumer, ["java.util.function.Consumer"]);
 
 ### `for` Loops Inside `finally` Blocks Miscompile on Lucee 7
 
-Lucee 7.0.1+100 throws `variable [local] doesn't exist` at runtime when a `for` loop declares or iterates `local`-/`var`-scoped variables inside a `finally` block. Isolated with minimal probes: bare assignments and function calls inside `finally` compile and run fine; loops do not. One probe shape even produced a JVM `Expecting a stackmap frame` bytecode-verifier error, pointing at a codegen bug in Lucee's `finally`-block compilation.
+Lucee 7.0.1+100 throws `variable [local] doesn't exist` at runtime when a `for` loop declares or iterates `local`-/`var`-scoped variables inside a `finally` block. Both loop forms are affected — `for (init; cond; step)` and `for (item in collection)`. Isolated with minimal probes: bare assignments and function calls inside `finally` compile and run fine; loops do not. One probe shape even produced a JVM `Expecting a stackmap frame` bytecode-verifier error, pointing at a codegen bug in Lucee's `finally`-block compilation.
 
 ```cfm
 // WRONG — crashes at runtime on Lucee 7

@@ -180,6 +180,10 @@ All settings are applied in `config/settings.cfm` or an environment-specific fil
 <cfset set(enableMigratorComponent=true)>
 ```
 
+:::note
+Setting `enablePublicComponent=true` outside the `development` environment shows the Tools tab, but every Tools link (`/wheels/info`, `/wheels/routes`, the test runners, migrator, packages, …) returns **404**: since Wheels 4.0.3 those handlers are gated by a development-only allowlist, regardless of this setting. Only `environment="development"` can reach them.
+:::
+
 | Setting | Default | Effect |
 |---|---|---|
 | `showDebugInformation` | `true` in `development`, `false` elsewhere | Show or hide the debug bar entirely |

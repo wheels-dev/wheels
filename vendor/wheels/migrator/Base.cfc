@@ -109,7 +109,16 @@ component extends="wheels.Global"{
 		// rather than assigning a bare local inside catch: BoxLang discards
 		// `local.X = ...` assignments made in a catch body.)
 		local.state = {tableExists = true};
-		local.quotedTable = StructKeyExists(this, "adapter") ? this.adapter.quoteTableName(arguments.table) : arguments.table;
+		// Migration.init() always sets this.adapter, so a missing adapter is a
+		// broken instantiation — fail loudly rather than silently interpolating
+		// an UNQUOTED table name into SQL (#2937 review, #2977).
+		if (!StructKeyExists(this, "adapter")) {
+			Throw(
+				type = "Wheels.Migrator.MissingAdapter",
+				message = "$getForeignKeys() requires an initialized database adapter. Instantiate migrations through Migration.init()."
+			);
+		}
+		local.quotedTable = this.adapter.quoteTableName(arguments.table);
 		try {
 			$query(
 				datasource = application[local.appKey].dataSourceName,
@@ -206,7 +215,10 @@ component extends="wheels.Global"{
 		// would otherwise issue a full table-metadata round-trip per row.
 		// $execute() drops the cache whenever a statement runs, so DDL in the
 		// same request (addColumn() etc.) is reflected on the next read.
-		local.cacheKey = LCase(application[local.appKey].dataSourceName & "|" & arguments.tableName);
+		// Key on the VERBATIM table name: the $dbinfo probe below uses original
+		// case, so case-folding the key would let `Authors` and `authors` share
+		// one slot on case-sensitive databases (#2937 review, #2977).
+		local.cacheKey = application[local.appKey].dataSourceName & "|" & arguments.tableName;
 		if (
 			StructKeyExists(request, "$wheelsMigratorColumns")
 			&& StructKeyExists(request.$wheelsMigratorColumns, local.cacheKey)
