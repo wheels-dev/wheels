@@ -751,6 +751,57 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("RateLimiter storage=database — dialect-aware schema", function() {
+
+			// Regression coverage for the bug where $ensureTable() emitted MySQL-only DDL
+			// (AUTO_INCREMENT + inline INDEX clauses) that errored silently on every other
+			// engine — SQLite (the default CI engine), PostgreSQL, SQL Server, Oracle, H2.
+			// When the CREATE TABLE failed, $dbIncrement()'s INSERT failed against the
+			// missing table, $handleError returned allowed=failOpen=false, and every
+			// request was silently fail-closed-blocked. See issue #2911.
+			//
+			// Scope: this spec asserts only that the table is created and the first
+			// request reaches the downstream handler. The separate counter-increment
+			// gap (INSERT-then-UPDATE relies on a UNIQUE(store_key) the schema doesn't
+			// enforce, so the counter never advances and rate-limit enforcement under
+			// storage="database" stays open) is tracked as a follow-up — same #2911.
+			it("creates the wheels_rate_limits table and inserts a row on the configured engine", function() {
+				// Unique store_key per test run so successive runs don't collide with prior rows.
+				var ctx = {clientKey: "rl-db-fw-" & CreateUUID()};
+				var keyFn = function(req) { return ctx.clientKey; };
+				var mw = new wheels.middleware.RateLimiter(
+					maxRequests = 10,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					storage = "database",
+					keyFunction = keyFn,
+					failOpen = false
+				);
+				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+				var shared = {callCount: 0};
+				var handler = function(required struct request) {
+					shared.callCount++;
+					return "ok";
+				};
+
+				var result = pipeline.run(request = {}, coreHandler = handler);
+
+				// Pre-fix on SQLite: result = "Rate limit exceeded" (no table → INSERT
+				// fails → handler never reached). Post-fix: result = "ok".
+				expect(result).toBe("ok");
+				expect(shared.callCount).toBe(1);
+
+				// Probe the table directly — proves $ensureTable() actually created it
+				// on this engine, independent of the $dbIncrement path.
+				var probe = QueryExecute(
+					"SELECT COUNT(*) AS cnt FROM wheels_rate_limits WHERE store_key = :key",
+					{key: {value: ctx.clientKey, cfsqltype: "cf_sql_varchar"}}
+				);
+				expect(probe.cnt).toBeGTE(1);
+			});
+
+		});
+
 		describe("RateLimiter handle() - Fixed Window via Pipeline", function() {
 
 			it("allows requests under the limit", function() {

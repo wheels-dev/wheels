@@ -18,6 +18,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+# [Unreleased]
+
+### Fixed
+
+- `RateLimiter` middleware with `storage="database"` now dispatches dialect-aware DDL when auto-creating the `wheels_rate_limits` table. Previously `$ensureTable()` emitted a single MySQL-only CREATE TABLE (`AUTO_INCREMENT` + inline `INDEX` clauses) wrapped in a swallow-all try/catch, so on every other supported engine — SQLite (the default CI engine), PostgreSQL, SQL Server, Oracle, H2 — the CREATE silently failed, the table never got created, and `$dbIncrement()`'s INSERT/UPDATE both errored against the missing table; `$handleError()` then returned `allowed=failOpen` (default `false`), and every request was quietly fail-closed-blocked behind a 429 — making `storage="database"` documented but inoperative outside MySQL. A new private `$detectDatabaseType()` helper (mirrors `vendor/wheels/Job.cfc`) probes `cfdbinfo` against the default Wheels datasource, and `$ensureTable()` now dispatches per-dialect CREATE TABLE + separate CREATE INDEX statements (each wrapped individually so "already exists" errors on re-run remain no-ops). This is the foundation for the remaining `#2911` follow-ups (atomic upsert, RMW locking, slidingWindow schema redesign), which still need a `UNIQUE(store_key)` constraint and stay out of scope for this fix.
+
+----
+
 # [4.0.3](https://github.com/wheels-dev/wheels/releases/tag/v4.0.3) => 2026-06-09
 
 > **Wheels 4.0.3** — third patch on the 4.0 line. Completes the CLI argument-parsing overhaul (`ArgSpec` consumes LuCLI's structured arguments in every command — `--no-*` negations and named-only flags now reach their parsers, and user-error paths exit non-zero) and lands the fixes from a full 24-command CLI audit; write-side commands (`migrate`, `seed`, `reload`, `generate admin`) now refuse to attach to a sibling project's server instead of running against the wrong database; PostgreSQL/CockroachDB foreign-key migrations and pre-23c Oracle `DROP TABLE`/`DROP VIEW` work again; framework helpers can no longer be invoked as controller actions from a URL; auto-derived model properties preserve database column casing; and scaffolded apps keep their reload password out of source control (`WHEELS_RELOAD_PASSWORD` in `.env`). ~45 PRs since the 4.0.2 GA (2026-05-27).
