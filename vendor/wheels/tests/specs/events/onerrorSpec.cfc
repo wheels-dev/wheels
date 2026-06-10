@@ -62,6 +62,63 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.ActionParameterMissing")).toBe(500)
 			})
 		})
+
+		// Security regression coverage (review finding T4): $runOnError
+		// interpolates $getRequestFormat() into the on-disk error-template
+		// include path (eventPath & "/onerror." & format & ".cfm"), guarded
+		// only by FileExists. Before the fix, url.format flowed through
+		// verbatim, so a traversal token such as "../../somefile" could pull
+		// any .cfm on disk into error rendering (local file inclusion).
+		// $getRequestFormat must only accept plain alphanumeric tokens and
+		// fall back to "html" for everything else. Tested via a helper that
+		// saves/restores url.format so the test harness's own ?format=json
+		// output detection is not disturbed.
+		describe("$getRequestFormat rejects unsafe format tokens (T4 LFI)", () => {
+
+			it("coerces ../ traversal tokens to html", () => {
+				expect($requestFormatFor("../../../wheels/public/layout/_header_simple")).toBe("html")
+			})
+
+			it("coerces tokens containing a slash or dot to html", () => {
+				expect($requestFormatFor("onerror.cfm/../x")).toBe("html")
+			})
+
+			it("preserves a valid alphanumeric format", () => {
+				expect($requestFormatFor("json")).toBe("json")
+			})
+
+			it("preserves another valid format", () => {
+				expect($requestFormatFor("xml")).toBe("xml")
+			})
+
+			it("falls back to html for an empty format", () => {
+				expect($requestFormatFor("")).toBe("html")
+			})
+		})
+	}
+
+	/**
+	 * Calls EventMethods.$getRequestFormat() with url.format set to the given
+	 * value, saving and restoring the pre-existing url.format around the call.
+	 * The url.format branch never touches $get("formats"), so a bare
+	 * CreateObject instance suffices (same pattern as EventInterfaceSpec).
+	 */
+	private string function $requestFormatFor(required string formatValue) {
+		var em = CreateObject("component", "wheels.events.EventMethods")
+		var hadFormat = StructKeyExists(url, "format")
+		var prior = hadFormat ? url.format : ""
+		var result = ""
+		try {
+			url.format = arguments.formatValue
+			result = em.$getRequestFormat()
+		} finally {
+			if (hadFormat) {
+				url.format = prior
+			} else {
+				StructDelete(url, "format")
+			}
+		}
+		return result
 	}
 
 	private numeric function $expectedStatusFor(required string wheelsType) {

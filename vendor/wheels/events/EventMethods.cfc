@@ -327,7 +327,17 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	public string function $getRequestFormat() {
 		local.rv = "html";
 		if (StructKeyExists(url, "format")) {
-			local.rv = url.format;
+			// Security (review finding T4): url.format is later interpolated into
+			// the on-disk error-template include path in $runOnError
+			// ("#eventPath#/onerror.#format#.cfm"), guarded only by FileExists. An
+			// unvalidated value such as "../../somefile" enables path traversal /
+			// local file inclusion of any .cfm on disk during error rendering.
+			// Only accept a plain alphanumeric token, which covers every configured
+			// format key (html, xml, json, csv, pdf, xls) and any addFormat()
+			// extension; anything else falls back to html.
+			if (ReFind("^[A-Za-z0-9]+$", url.format)) {
+				local.rv = url.format;
+			}
 		} else if ((StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "http_accept"))){
 			local.httpAccept = request.cgi.http_accept;
 			local.formats = $get("formats");
