@@ -37,11 +37,7 @@ component {
 	public function $runCsrfProtection(string action) {
 		if (StructKeyExists(variables.$class, "csrf")) {
 			local.csrf = variables.$class.csrf;
-			if (
-				(!Len(local.csrf.only) && !Len(local.csrf.except))
-				|| (Len(local.csrf.only) && ListFindNoCase(local.csrf.only, arguments.action))
-				|| (Len(local.csrf.except) && !ListFindNoCase(local.csrf.except, arguments.action))
-			) {
+			if ($appliesToAction(action = arguments.action, only = local.csrf.only, except = local.csrf.except)) {
 				$storeAuthenticityToken();
 				$flagRequestAsProtected();
 				$setAuthenticityToken();

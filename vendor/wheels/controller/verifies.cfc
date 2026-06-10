@@ -34,6 +34,20 @@ component {
 		string paramsTypes = ""
 	) {
 		$args(name = "verifies", args = arguments);
+
+		// The type lists are matched by position against their corresponding variable lists at request time, so catch length mismatches here at declaration time instead of failing with a raw array out-of-bounds error when the verification runs.
+		local.typeCheckedArguments = ["cookie", "session", "params"];
+		for (local.item in local.typeCheckedArguments) {
+			local.typesList = arguments[local.item & "Types"];
+			if (Len(local.typesList) && ListLen(local.typesList) != ListLen(arguments[local.item])) {
+				Throw(
+					type = "Wheels.InvalidVerification",
+					message = "The `#local.item#Types` argument contains #ListLen(local.typesList)# item(s) while the `#local.item#` argument contains #ListLen(arguments[local.item])# item(s).",
+					extendedInfo = "When using the `#local.item#Types` argument, supply exactly one type for each variable listed in the `#local.item#` argument."
+				);
+			}
+		}
+
 		ArrayAppend(variables.$class.verifications, Duplicate(arguments));
 	}
 
@@ -74,28 +88,37 @@ component {
 		struct sessionScope = {},
 		struct cookieScope = cookie
 	) {
-		// Only access the session scope when session management is enabled in the app.
-		// Default to the Wheels setting but get it on a per request basis if possible (from Application.cfc).
-		local.sessionManagement = $get("sessionManagement");
-		try {
-			local.sessionManagement = GetApplicationMetadata().sessionManagement;
-		} catch (any e) {
-		}
-		if (StructIsEmpty(arguments.sessionScope) && local.sessionManagement) {
-			arguments.sessionScope = session;
+		// Exit early when no verifications are declared so we don't pay for the session management probing below on every request.
+		local.verifications = verificationChain();
+		if (ArrayIsEmpty(local.verifications)) {
+			return;
 		}
 
-		local.verifications = verificationChain();
+		// Only access the session scope when session management is enabled in the app.
+		// Default to the Wheels setting but get it on a per request basis if possible (from Application.cfc).
+		// The resolved value is cached in the request scope since repeated controller processing within the same request (e.g. in the test suite) can't change it.
+		if (StructIsEmpty(arguments.sessionScope)) {
+			if (StructKeyExists(request, "$wheelsSessionManagement")) {
+				local.sessionManagement = request.$wheelsSessionManagement;
+			} else {
+				local.sessionManagement = $get("sessionManagement");
+				try {
+					local.sessionManagement = GetApplicationMetadata().sessionManagement;
+				} catch (any e) {
+				}
+				request.$wheelsSessionManagement = local.sessionManagement;
+			}
+			if (local.sessionManagement) {
+				arguments.sessionScope = session;
+			}
+		}
+
 		local.$args = "only,except,post,get,ajax,cookie,session,params,cookieTypes,sessionTypes,paramsTypes,handler";
 		local.abort = false;
 		local.iEnd = ArrayLen(local.verifications);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.element = local.verifications[local.i];
-			if (
-				(!Len(local.element.only) && !Len(local.element.except)) || (
-					Len(local.element.only) && ListFindNoCase(local.element.only, arguments.action)
-				) || (Len(local.element.except) && !ListFindNoCase(local.element.except, arguments.action))
-			) {
+			if ($appliesToAction(action = arguments.action, only = local.element.only, except = local.element.except)) {
 				if (IsBoolean(local.element.post) && ((local.element.post && !isPost()) || (!local.element.post && isPost()))) {
 					local.abort = true;
 				}
