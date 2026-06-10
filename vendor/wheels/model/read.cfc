@@ -234,7 +234,8 @@ component {
 
 			// get info from cache when available, otherwise create the generic select, from, where and order by clause.
 			// $useRequestCache governs request-level caching only — it doesn't change the generated SQL — so strip it from the shell-key args; otherwise the application-scoped SQL cache fragments into two entries (batch vs non-batch) for every model that uses both.
-			local.shellKeyArgs = Duplicate(arguments);
+			// A shallow StructCopy is sufficient (and cheaper than Duplicate) since we only remove a top-level key and $hashedKey doesn't mutate the struct.
+			local.shellKeyArgs = StructCopy(arguments);
 			StructDelete(local.shellKeyArgs, "$useRequestCache");
 			local.queryShellKey = $hashedKey(variables.wheels.class.modelName, local.shellKeyArgs);
 			local.sql = $getFromCache(local.queryShellKey, "sql");
@@ -666,7 +667,8 @@ component {
 		// Run the COUNT query once up front and pass the total to every page request below so each batch doesn't re-run it.
 		local.totalRecords = $countForBatching(argumentCollection = arguments);
 
-		// Nothing to iterate — return now so findAll isn't called with count=0 (which would re-run COUNT internally).
+		// Nothing matches so there is nothing to iterate.
+		// Returning here also avoids a redundant second COUNT (findAll only honors its `count` argument when it's greater than zero, so passing 0 would make the first page query re-run the COUNT itself).
 		if (local.totalRecords == 0) {
 			return;
 		}
@@ -748,7 +750,8 @@ component {
 		// Run the COUNT query once up front and pass the total to every page request below so each batch doesn't re-run it.
 		local.totalRecords = $countForBatching(argumentCollection = arguments);
 
-		// Nothing to iterate — return now so findAll isn't called with count=0 (which would re-run COUNT internally).
+		// Nothing matches so there is nothing to iterate.
+		// Returning here also avoids a redundant second COUNT (findAll only honors its `count` argument when it's greater than zero, so passing 0 would make the first page query re-run the COUNT itself).
 		if (local.totalRecords == 0) {
 			return;
 		}

@@ -69,6 +69,34 @@ component extends="wheels.WheelsTest" {
 				expect(StructCount(application.wheels.cache.sql)).toBe(sqlEntriesAfterRegular);
 			})
 
+			it("findEach with no matching records runs only the single up-front COUNT", () => {
+				application.wheels.cacheQueriesDuringRequest = true;
+				var result = {count = 0};
+				model("author").findEach(
+					where = "lastName = 'NoSuchAuthorXYZ'",
+					callback = function(record) {
+						result.count++;
+					}
+				);
+				// Pre-fix the empty case ran a second COUNT (findAll only honors `count` when > 0), which showed up as a second cached entry.
+				expect(StructCount(request.wheels["author"])).toBe(1);
+				expect(result.count).toBe(0);
+			})
+
+			it("findInBatches with no matching records runs only the single up-front COUNT", () => {
+				application.wheels.cacheQueriesDuringRequest = true;
+				var result = {batchCount = 0};
+				model("author").findInBatches(
+					where = "lastName = 'NoSuchAuthorXYZ'",
+					callback = function(records) {
+						result.batchCount++;
+					}
+				);
+				// Pre-fix the empty case ran a second COUNT (findAll only honors `count` when > 0), which showed up as a second cached entry.
+				expect(StructCount(request.wheels["author"])).toBe(1);
+				expect(result.batchCount).toBe(0);
+			})
+
 			it("findInBatches does not accumulate per-batch queries in the request cache", () => {
 				application.wheels.cacheQueriesDuringRequest = true;
 				var expectedTotal = model("author").count();
