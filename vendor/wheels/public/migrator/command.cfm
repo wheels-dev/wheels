@@ -149,7 +149,7 @@ $(document).ready(function() {
 		var resp = $.ajax({
 				url: url,
 				method: '#method#',
-				headers: {'X-Wheels-Csrf-Token': '#application.wheels.$migratorCsrfToken#'}
+				headers: {'X-Wheels-Csrf-Token': '#JSStringFormat(application.wheels.$migratorCsrfToken)#'}
 		})
 		.done(function(data, status, req) {
 			res.html(data);

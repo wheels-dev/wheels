@@ -386,7 +386,7 @@ var resultsCollapsed = false;
 
 // Anti-CSRF token required by the migrator command endpoint (sent in the
 // X-Wheels-Csrf-Token header on every command XHR).
-var wheelsMigratorCsrfToken = '#migratorCsrfToken#';
+var wheelsMigratorCsrfToken = '#JSStringFormat(migratorCsrfToken)#';
 
 // urlFor()-generated URL templates so the JS-rebuilt table/banner respect
 // URLRewriting and non-root context paths instead of hardcoding routes.
