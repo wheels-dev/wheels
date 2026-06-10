@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ## [Unreleased]
 
+<!-- Do not add entries here. Write a fragment file under changelog.d/
+     (see changelog.d/README.md); fragments are assembled into this file
+     at release promotion via tools/changelog-promote.sh. -->
+
 ### Added
 
 - `wheels upgrade check --strict` escalates advisory findings (the "Recommended Improvements" section) to the same hard-fail path as breaking findings, throwing `Wheels.UpgradeCheckFailed` and exiting non-zero so CI pipelines can gate on opt-in convention changes. Without `--strict`, advisories continue to report-and-pass. Under `--format=json` the emitted document's `success` field is gated on both breaking findings and the strict-advisory case, and the `strict` flag is echoed back so `jq .success` and `$?` always agree. The flag is documented in `wheels upgrade` help output (#2963).

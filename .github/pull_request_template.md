@@ -23,7 +23,7 @@ Closes #
 - [ ] **Framework Docs** -- New or updated MDX page under `web/sites/guides/src/content/docs/v4-0-0-snapshot/` with matching sidebar entry
 - [ ] **AI Reference Docs** -- New or updated file in `.ai/wheels/` directory
 - [ ] **CLAUDE.md** -- Updated if the feature changes model/controller/view conventions
-- [ ] **CHANGELOG.md** -- Entry under `[Unreleased]` section
+- [ ] **Changelog fragment** -- New `changelog.d/<slug>.<type>.md` file (do NOT edit `CHANGELOG.md` directly; see `changelog.d/README.md`)
 - [ ] **Test runner passes** -- All existing tests still pass (`/wheels/tests/core?format=json`)
 
 ## Test Plan
