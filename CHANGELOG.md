@@ -22,8 +22,8 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Added
 
-- `wheels upgrade check --strict` escalates advisory findings (the "Recommended Improvements" section) to the same hard-fail path as breaking findings, throwing `Wheels.UpgradeCheckFailed` and exiting non-zero so CI pipelines can gate on opt-in convention changes. Without `--strict`, advisories continue to report-and-pass. The flag is documented in `wheels upgrade` help output (#2963).
-- `services/ArgSpec.toInputSchema()` derives a JSON-Schema-compatible `{type:"object", properties, required, additionalProperties:false}` envelope from a command's declared positionals / flags / options, so MCP tool input schemas can be generated from the same typed declaration the CLI parser already consumes (FastMCP / Symfony JsonDescriptor pattern). `positional()` / `flag()` / `option()` now accept an optional `description` argument that flows into each emitted property (#2963).
+- `wheels upgrade check --strict` escalates advisory findings (the "Recommended Improvements" section) to the same hard-fail path as breaking findings, throwing `Wheels.UpgradeCheckFailed` and exiting non-zero so CI pipelines can gate on opt-in convention changes. Without `--strict`, advisories continue to report-and-pass. Under `--format=json` the emitted document's `success` field is gated on both breaking findings and the strict-advisory case, and the `strict` flag is echoed back so `jq .success` and `$?` always agree. The flag is documented in `wheels upgrade` help output (#2963).
+- `services/ArgSpec.toInputSchema()` derives a JSON-Schema-compatible `{type:"object", properties, required, additionalProperties:false}` envelope from a command's declared positionals / flags / options. `positional()` / `flag()` / `option()` now accept an optional `description` argument that flows into each emitted property (FastMCP / Symfony JsonDescriptor pattern). Foundation for per-tool MCP input schemas; wiring into `tools/list` is a follow-up (#2963).
 
 ### Fixed
 

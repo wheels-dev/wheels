@@ -2819,7 +2819,7 @@ component extends="modules.BaseModule" {
 				& "Options:" & nl
 				& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
 				& "  --format=json     Emit a machine-readable JSON report" & nl
-				& "  --strict          Treat advisory findings (recommended improvements) as failures." & nl
+				& "  --strict          Treat advisory findings (recommended improvements) as failures" & nl
 				& "                    Useful for CI — opt-in convention changes will gate the build." & nl
 				& nl
 				& "Exit status:" & nl
@@ -4564,6 +4564,11 @@ component extends="modules.BaseModule" {
 		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
 			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
 
+		// `success` must reflect every condition that produces a non-zero
+		// exit, otherwise `jq .success` and `$?` disagree when --strict is
+		// active with advisory-only findings (#2963 review round 1).
+		var strictAdvisoryFail = arguments.strict && arrayLen(advisories) > 0;
+
 		// JSON mode — one machine-readable document, no human report. The
 		// breaking-findings throw below still fires so pipelines can gate on
 		// the exit code without parsing stdout.
@@ -4571,7 +4576,8 @@ component extends="modules.BaseModule" {
 			out(serializeJSON({
 				"currentVersion": currentVersion,
 				"targetVersion": target,
-				"success": arrayLen(issues) == 0,
+				"success": arrayLen(issues) == 0 && !strictAdvisoryFail,
+				"strict": arguments.strict,
 				"breaking": issues,
 				"advisories": advisories,
 				"passed": passed,

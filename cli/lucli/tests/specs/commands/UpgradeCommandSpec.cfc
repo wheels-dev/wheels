@@ -118,6 +118,34 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(variables.moduleSource).toInclude("--strict");
 			});
 
+			it("gates the JSON `success` field on strict + advisories, not just breaking issues", () => {
+				// Round-1 review finding (#2963): with `--strict --format=json`
+				// on an app with advisory-only findings, JSON stdout reported
+				// `success: true` while the process exited non-zero — `jq .success`
+				// and `$?` disagreed. The fix routes `success` through a
+				// `strictAdvisoryFail` precomputation. Pin both the precomp and
+				// its consumption inside the `serializeJSON({` block so a future
+				// rewrite that forgets the gate fails the spec.
+				expect(variables.moduleSource).toInclude("strictAdvisoryFail");
+
+				var serializeIdx = reFindNoCase("out\s*\(\s*serializeJSON\s*\(\s*\{", variables.moduleSource);
+				expect(serializeIdx).toBeGT(0);
+				// Window only the JSON literal — the `}));` that closes the
+				// serializeJSON call sits within ~400 chars of its opening.
+				var jsonBlock = mid(variables.moduleSource, serializeIdx, 600);
+				expect(reFindNoCase("success.{0,80}strictAdvisoryFail", jsonBlock)).toBeGT(0);
+			});
+
+			it("includes the `strict` flag in the JSON document so consumers can explain a non-zero exit", () => {
+				// Without surfacing `strict` in the JSON body, a `success: false`
+				// document with empty `breaking[]` looks like a data inconsistency
+				// to anyone parsing stdout instead of reading the error message.
+				var serializeIdx = reFindNoCase("out\s*\(\s*serializeJSON\s*\(\s*\{", variables.moduleSource);
+				expect(serializeIdx).toBeGT(0);
+				var jsonBlock = mid(variables.moduleSource, serializeIdx, 600);
+				expect(reFindNoCase("""strict""\s*:\s*arguments\.strict", jsonBlock)).toBeGT(0);
+			});
+
 		});
 
 	}
