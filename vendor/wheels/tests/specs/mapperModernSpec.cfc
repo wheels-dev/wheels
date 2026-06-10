@@ -404,7 +404,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("throws Wheels.InvalidRegex when a normalized named group leaves a dangling backref", function() {
-				local.constraintMapper = $mapper()
+				constraintMapper = $mapper()
 					.$draw()
 					.get(name="backrefs", pattern="items/[id]", to="items##show")
 
@@ -414,7 +414,7 @@ component extends="wheels.WheelsTest" {
 				// $compileRegex rethrows it as Wheels.InvalidRegex at draw time
 				// — closing the loop on issue #2976's second acceptance criterion.
 				expect(function() {
-					local.constraintMapper.whereMatch("id", "(?<n>\d+)\k<n>")
+					constraintMapper.whereMatch("id", "(?<n>\d+)\k<n>")
 				}).toThrow("Wheels.InvalidRegex")
 			})
 
