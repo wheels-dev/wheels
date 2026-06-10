@@ -502,13 +502,26 @@ component output="false" extends="wheels.Global"{
 	/**
 	 * Invokes the onPluginActivate lifecycle hook on all loaded plugins.
 	 * Called after all plugins are loaded, mixins processed, and data stored in the application scope.
+	 *
+	 * A throwing onPluginActivate is logged and skipped so sibling plugins
+	 * still activate — mirrors the ServiceProvider isolation pattern below
+	 * (#2912). Log-and-skip only: no registry mutation, since later phases
+	 * don't iterate the plugin list for legacy hooks.
 	 */
 	public void function $invokeOnPluginActivate() {
 		local.pluginKeys = $sortedPluginKeys();
 		for (local.iPlugin in local.pluginKeys) {
 			local.plugin = variables.$class.plugins[local.iPlugin];
 			if (StructKeyExists(local.plugin, "onPluginActivate") && IsCustomFunction(local.plugin.onPluginActivate)) {
-				local.plugin.onPluginActivate(application);
+				try {
+					local.plugin.onPluginActivate(application);
+				} catch (any e) {
+					WriteLog(
+						text = "[Wheels] Plugin '#local.iPlugin#' onPluginActivate() failed: #e.message#",
+						type = "error",
+						file = "wheels"
+					);
+				}
 			}
 		}
 	}
@@ -713,6 +726,12 @@ component output="false" extends="wheels.Global"{
 	 * Invokes the onPluginLoad lifecycle hook if defined on the plugin.
 	 * Builds a context struct (not the application scope directly) to work
 	 * around Adobe CF's limitation on function members in the application scope.
+	 *
+	 * A throwing onPluginLoad is logged and skipped so sibling plugins still
+	 * load — mirrors the ServiceProvider isolation pattern in
+	 * $invokeServiceProviderRegister (#2912). The application-scope sync
+	 * step is skipped when the hook throws so a partially-mutated context
+	 * doesn't leak back into the live application scope.
 	 */
 	private void function $invokeOnPluginLoad(required string pluginKey, required any plugin) {
 		if (!StructKeyExists(arguments.plugin, "onPluginLoad") || !IsCustomFunction(arguments.plugin.onPluginLoad)) {
@@ -726,7 +745,16 @@ component output="false" extends="wheels.Global"{
 		// the entire application scope.
 		local.loadContext = StructCopy(application);
 		$installPluginLoadAPI(arguments.pluginKey, local.loadContext);
-		arguments.plugin.onPluginLoad(local.loadContext);
+		try {
+			arguments.plugin.onPluginLoad(local.loadContext);
+		} catch (any e) {
+			WriteLog(
+				text = "[Wheels] Plugin '#arguments.pluginKey#' onPluginLoad() failed: #e.message#",
+				type = "error",
+				file = "wheels"
+			);
+			return;
+		}
 		// Sync non-function keys back to the application scope. Closures
 		// injected by $installPluginLoadAPI are skipped to keep application
 		// clean. For shared keys this re-assigns the same reference (a no-op);
