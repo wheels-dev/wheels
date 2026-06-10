@@ -109,6 +109,41 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 });
                 expect(r.get("TOKEN")).toBe("abc123");
             });
+
+            it("throws ResolutionFailed when a $(cmd) substitution fails", () => {
+                // A failing credential-manager command (op not signed in,
+                // bw locked, …) must abort resolution, not silently export
+                // an empty value for the key.
+                fileWrite(variables.tempRoot & "/.kamal/secrets", "BROKEN=$(exit 1)");
+                expect(() => {
+                    new cli.lucli.services.deploy.lib.SecretResolver({
+                        projectRoot: variables.tempRoot
+                    });
+                }).toThrow(type="SecretResolver.ResolutionFailed");
+            });
+
+            it("throws ResolutionFailed when the failing command is mid-file", () => {
+                // Without errexit, bash only reports the LAST statement's
+                // status, so a mid-file failure followed by a good line
+                // would slip through.
+                fileWrite(variables.tempRoot & "/.kamal/secrets",
+                    "BROKEN=$(exit 1)" & chr(10) & "GOOD=ok");
+                expect(() => {
+                    new cli.lucli.services.deploy.lib.SecretResolver({
+                        projectRoot: variables.tempRoot
+                    });
+                }).toThrow(type="SecretResolver.ResolutionFailed");
+            });
+
+            it("throws BashUnavailable when bash cannot be launched", () => {
+                fileWrite(variables.tempRoot & "/.kamal/secrets", "FOO=bar");
+                expect(() => {
+                    new cli.lucli.services.deploy.lib.SecretResolver({
+                        projectRoot: variables.tempRoot,
+                        bashCmd: "/nonexistent/wheels-no-bash-" & createUUID()
+                    });
+                }).toThrow(type="SecretResolver.BashUnavailable");
+            });
         });
     }
 }

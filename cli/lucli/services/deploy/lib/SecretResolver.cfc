@@ -25,12 +25,19 @@
  * A present file on a machine where bash can't run throws
  * SecretResolver.BashUnavailable instead of silently resolving zero
  * secrets (which would let callers proceed with empty credentials).
+ * A failing command inside the file (e.g. `$(op read …)` when not signed
+ * in) throws SecretResolver.ResolutionFailed instead of silently
+ * exporting the key with an empty value.
  */
 component {
 
     public SecretResolver function init(struct opts = {}) {
         variables.projectRoot = arguments.opts.projectRoot ?: expandPath("./");
         variables.destination = arguments.opts.destination ?: "";
+        // Override when bash isn't reachable as plain `bash` on PATH
+        // (e.g. a non-standard Git Bash install on Windows). Also the
+        // seam the BashUnavailable spec uses.
+        variables.bashCmd = arguments.opts.bashCmd ?: "bash";
         variables.resolved = $loadAll();
         return this;
     }
@@ -76,6 +83,13 @@ component {
 
         // `set -a` exports every assignment made while sourcing; the file's
         // own stdout is discarded so it can't corrupt the record stream.
+        // `set -e` makes a failing command inside the file — most importantly
+        // an assignment whose $(cmd) substitution fails, like `$(op read …)`
+        // when not signed in — abort sourcing with a non-zero exit, so it
+        // surfaces as ResolutionFailed below instead of silently exporting
+        // the key with an empty value. (Without -e, bash only reports the
+        // status of the file's LAST statement, and even that is ignored
+        // because the script continues into the for-loop.)
         // `${!k+x}` (set-check on the indirected name) filters out candidate
         // keys bash never actually set — e.g. base64 continuation lines of a
         // quoted multi-line value that merely look like assignments.
@@ -83,7 +97,7 @@ component {
         // NUL would be the only byte guaranteed absent from env values, but
         // Lucee's chr(0) yields an empty string, so it can't be used as a
         // CFML-side delimiter; RS never appears in realistic secret values.
-        var script = "set -a; source " & $shellEscape(arguments.path) & " >/dev/null; "
+        var script = "set -ae; source " & $shellEscape(arguments.path) & " >/dev/null; "
             & "for __wheels_key in " & arrayToList(candidates, " ") & "; do "
             & "if [ -n ""${!__wheels_key+x}"" ]; then "
             & "printf '%s\037%s\036' ""$__wheels_key"" ""${!__wheels_key}""; "
@@ -144,21 +158,36 @@ component {
      * yielding zero secrets.
      */
     private struct function $runBash(required string cmd) {
-        var proc = "";
+        // stderr is redirected to a temp file rather than read from a pipe:
+        // draining stdout to EOF before touching a piped stderr deadlocks
+        // when the subprocess fills the OS stderr pipe buffer (~64 KB) —
+        // e.g. a verbose secret-manager CLI error — because bash blocks on
+        // the stderr write while we block on the stdout read. A file sink
+        // never fills, so bash always runs to completion. Secret values
+        // travel on stdout (read in-memory); only diagnostics touch disk,
+        // and the file is deleted in the finally block even when waitFor()
+        // or the throw paths interrupt the happy path.
+        var errPath = getTempFile(getTempDirectory(), "wheels-secret-err");
         try {
-            var pb = createObject("java", "java.lang.ProcessBuilder").init(["bash", "-c", arguments.cmd]);
-            proc = pb.start();
-        } catch (any e) {
-            throw(
-                type = "SecretResolver.BashUnavailable",
-                message = "Unable to launch bash to resolve .kamal/secrets: " & e.message,
-                detail = "Secret resolution requires a local bash for $(cmd) expansion. On Windows, run inside WSL or Git Bash."
-            );
+            var proc = "";
+            try {
+                var pb = createObject("java", "java.lang.ProcessBuilder").init([variables.bashCmd, "-c", arguments.cmd]);
+                pb.redirectError(createObject("java", "java.io.File").init(errPath));
+                proc = pb.start();
+            } catch (any e) {
+                throw(
+                    type = "SecretResolver.BashUnavailable",
+                    message = "Unable to launch bash to resolve .kamal/secrets: " & e.message,
+                    detail = "Secret resolution requires a local bash for $(cmd) expansion. On Windows, run inside WSL or Git Bash."
+                );
+            }
+            var out = $readStream(proc.getInputStream());
+            var exitCode = proc.waitFor();
+            var err = fileExists(errPath) ? fileRead(errPath, "UTF-8") : "";
+            return {exitCode: exitCode, out: out, err: err};
+        } finally {
+            if (fileExists(errPath)) fileDelete(errPath);
         }
-        var out = $readStream(proc.getInputStream());
-        var err = $readStream(proc.getErrorStream());
-        var exitCode = proc.waitFor();
-        return {exitCode: exitCode, out: out, err: err};
     }
 
     private string function $readStream(required any inputStream) {
