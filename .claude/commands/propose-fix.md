@@ -119,12 +119,18 @@ is enforced by code, so don't skip steps.
    Confirm the spec now passes. Also confirm no other tests in the layer
    regressed. If something else broke, fix it before proceeding.
 
-9. **Add a CHANGELOG entry.** Append one line to `CHANGELOG.md` under
-   `[Unreleased]` (present tense, no PR number — humans add the link on
-   merge). **Do not touch MDX guides, `.ai/wheels/`, or `CLAUDE.md`** —
-   those are handled separately by the `bot-update-docs.yml` workflow,
-   which runs after this PR opens. The bot's scope here is failing-spec →
-   implementation → passing-spec → CHANGELOG → PR.
+9. **Add a changelog fragment.** Write a new file
+   `changelog.d/<slug>.<type>.md` (type: `added`, `changed`, `fixed`,
+   `security`, `performance`, `deprecated`, or `removed`) containing one
+   markdown bullet line describing the change (present tense, reference
+   the issue number in parentheses). Do NOT edit `CHANGELOG.md` directly —
+   fragments are assembled into it at release promotion, and direct edits
+   recreate the `[Unreleased]`-anchor merge conflicts the fragment system
+   exists to remove (see `changelog.d/README.md`). **Do not touch MDX
+   guides, `.ai/wheels/`, or `CLAUDE.md`** — those are handled separately
+   by the `bot-update-docs.yml` workflow, which runs after this PR opens.
+   The bot's scope here is failing-spec → implementation → passing-spec →
+   changelog fragment → PR.
 
 10. **Stage, commit, and prepare the PR.**
 
