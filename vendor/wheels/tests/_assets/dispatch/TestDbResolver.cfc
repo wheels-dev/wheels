@@ -24,4 +24,15 @@ component {
 		return arguments.currentName & "_test";
 	}
 
+	// Sets the datasource and clears application.wheels.models so cached model classes re-initialize.
+	public void function applyDataSource(
+		required struct wheelsScope,
+		required string name
+	) {
+		arguments.wheelsScope.dataSourceName = arguments.name;
+		if (StructKeyExists(arguments.wheelsScope, "models")) {
+			StructClear(arguments.wheelsScope.models);
+		}
+	}
+
 }

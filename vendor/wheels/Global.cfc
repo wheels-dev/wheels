@@ -2914,9 +2914,13 @@ return local.$wheels;
 						// fallback parsing attempts for common formats
 
 						// 1) ISO YYYY-MM-DD[ hh[:mm[:ss]]]
-						if (ReFind("(?i)^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?$", local.s2)) {
-							local.parts = ReReplace(local.s2, "^(\\d{4})-(\\d{2})-(\\d{2}).*$", "\\1-\\2-\\3", "all");
-							local.timePart = ReReplace(local.s2, ".*[ T](\\d{1,2}:\\d{2}(?::\\d{2})?).*$", "\\1", "all");
+						// Single-backslash escapes: in CFML "\\d" is a literal
+						// backslash + d in the compiled regex, which never matches a
+						// digit — the branch was dead. Mirrors the already-fixed
+						// slash-format branch below (#2933 carry-forward, #2977).
+						if (ReFind("(?i)^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$", local.s2)) {
+							local.parts = ReReplace(local.s2, "^(\d{4})-(\d{2})-(\d{2}).*$", "\1-\2-\3", "all");
+							local.timePart = ReReplace(local.s2, ".*[ T](\d{1,2}:\d{2}(?::\d{2})?).*$", "\1", "all");
 							if (Len(local.timePart) AND local.timePart NEQ local.s2) {
 								// has time
 								local.dt = ParseDateTime(local.parts & " " & local.timePart);

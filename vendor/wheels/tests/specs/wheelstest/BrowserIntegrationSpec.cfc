@@ -70,6 +70,17 @@ component extends="wheels.WheelsTest" {
                     c.waitForUrl(url="**/never", seconds=5);
                 }).toThrow(type="Wheels.BrowserTimeoutUnavailable");
             });
+
+            it("waitForText() with a custom timeout but no launcher surfaces BrowserTimeoutUnavailable", () => {
+                // Routes through the same $waitOptions helper as waitFor()/
+                // waitForUrl() — covered so a refactor of that helper can't
+                // silently regress one of the three (#2934 review, #2977).
+                var c = new wheels.wheelstest.BrowserClient()
+                    .init(baseUrl="http://localhost");
+                expect(() => {
+                    c.waitForText(text="never", seconds=5);
+                }).toThrow(type="Wheels.BrowserTimeoutUnavailable");
+            });
         });
 
         describe("BrowserClient — launcher wiring", () => {

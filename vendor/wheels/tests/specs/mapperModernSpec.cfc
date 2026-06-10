@@ -369,6 +369,55 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayLen(local.matches.pos)).toBe(3)
 			})
 
+			it("rewrites Java named capture groups in constraints to non-capturing groups", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="namedArchive", pattern="archive/[year]/[month]", to="archive##show")
+						.whereMatch("year", "(?<yr>20\d{2})")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+				expect("archive/2024/05").toMatch(local.route.regex)
+
+				// Java named groups still count in the positional group arithmetic
+				// $mergeRoutePattern relies on, so they must be normalized away
+				// exactly like anonymous capturing groups — otherwise [month]
+				// would silently receive the year's value (issue #2976).
+				local.matches = ReFind(local.route.regex, "archive/2024/05", 1, true)
+				expect(ArrayLen(local.matches.pos)).toBe(3)
+			})
+
+			it("normalizes named groups but preserves lookbehinds in $nonCapturingConstraint", function() {
+				local.mapper = $mapper()
+
+				// Named capturing group opener is replaced wholesale with `(?:`.
+				expect(local.mapper.$nonCapturingConstraint("(?<yr>20\d{2})")).toBe("(?:20\d{2})")
+
+				// Lookbehinds start with `(?<` too but are NOT capturing groups —
+				// the rewrite must leave them untouched.
+				expect(local.mapper.$nonCapturingConstraint("\w+(?<!tmp)")).toBe("\w+(?<!tmp)")
+				expect(local.mapper.$nonCapturingConstraint("\w+(?<=pdf)")).toBe("\w+(?<=pdf)")
+
+				// Inside a character class, `(?<x>` is a run of literal characters.
+				expect(local.mapper.$nonCapturingConstraint("[(?<x>)]")).toBe("[(?<x>)]")
+			})
+
+			it("throws Wheels.InvalidRegex when a normalized named group leaves a dangling backref", function() {
+				constraintMapper = $mapper()
+					.$draw()
+					.get(name="backrefs", pattern="items/[id]", to="items##show")
+
+				// After normalization, `(?<n>\d+)` becomes `(?:\d+)`, so the
+				// trailing `\k<n>` backref points at a group name that no longer
+				// exists. java.util.regex.Pattern.compile() rejects this, and
+				// $compileRegex rethrows it as Wheels.InvalidRegex at draw time
+				// — closing the loop on issue #2976's second acceptance criterion.
+				expect(function() {
+					constraintMapper.whereMatch("id", "(?<n>\d+)\k<n>")
+				}).toThrow("Wheels.InvalidRegex")
+			})
+
 			it("leaves parentheses inside character classes untouched", function() {
 				local.mapper = $mapper()
 					.$draw()

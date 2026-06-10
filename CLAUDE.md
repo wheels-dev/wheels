@@ -698,6 +698,10 @@ Notes:
 - `ci` is a TYPE, not a scope — never write `refactor(ci):`.
 - DCO sign-off email must match `git config user.email` — prefer `git commit -s` over manual trailer.
 
+### Changelog entries
+
+User-facing `fix`/`feat` PRs add a **fragment file**, never a direct `CHANGELOG.md` edit: write `changelog.d/<slug>.<type>.md` (type ∈ `added,changed,deprecated,removed,fixed,security,performance`) containing the complete markdown bullet line(s). Direct `[Unreleased]` edits recreate the same-anchor merge conflicts the fragment system removes. At release cut, `tools/changelog-promote.sh <version>` assembles fragments (plus any legacy `[Unreleased]` content) into the new version section and clears the folder. See `changelog.d/README.md`.
+
 ## CLI / MCP
 
 **Canonical surface (Wheels 4.0+):** the Wheels CLI's stdio MCP server at `wheels mcp wheels`.

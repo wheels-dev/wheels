@@ -173,6 +173,22 @@ component extends="wheels.WheelsTest" {
 				assert_test(user, true)
 			})
 
+			it("if validation using uppercase word-form operator", () => {
+				// Word-form operators arrive raw in $evaluateLogicalExpression
+				// (only symbolic operators are pre-lowercased) — uppercase EQ
+				// used to hit the case-sensitive switch in $resolveOperator on
+				// Adobe CF and throw (##2977).
+				args.condition = "1 EQ 1"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("unless validation using uppercase word-form operator", () => {
+				args.unless = "1 EQ 1"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, true)
+			})
+
 			it("if validation using method invalid", () => {
 				args.condition = "isnew()"
 				user.validatesLengthOf(argumentCollection = args)
