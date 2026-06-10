@@ -96,7 +96,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation">
+<cfset local.tables = "c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation,c_o_r_e_uuidrecords">
 <!---
 	On Oracle, append CASCADE CONSTRAINTS so the drop removes incoming FK
 	references along with the table. PURGE skips the recycle bin so the
@@ -260,6 +260,16 @@ CREATE TABLE c_o_r_e_shops
 	,citycode #local.intColumnType# NULL
 	,name varchar(80) NOT NULL
 	,PRIMARY KEY(shopid)
+) #local.storageEngine#
+</cfquery>
+
+<!--- this table is for testing UUID primary key auto-generation on create --->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_uuidrecords
+(
+	uuidid char(36) NOT NULL
+	,name varchar(50) NOT NULL
+	,PRIMARY KEY(uuidid)
 ) #local.storageEngine#
 </cfquery>
 

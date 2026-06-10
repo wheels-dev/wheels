@@ -302,17 +302,9 @@ component {
 	public boolean function $update(required any parameterize, required boolean reload) {
 		// Perform update if changes have been made.
 		if (hasChanged()) {
-			// Allow explicit assignment of the createdAt/updatedAt properties if allowExplicitTimestamps is true
-			local.allowExplicitTimestamps = StructKeyExists(this, "allowExplicitTimestamps") && this.allowExplicitTimestamps;
-			if (
-				local.allowExplicitTimestamps
-				&& StructKeyExists(this, $get("timeStampOnUpdateProperty"))
-				&& Len(this[$get("timeStampOnUpdateProperty")])
-			) {
-				// leave updatedAt unmolested
-			} else if ($get("setUpdatedAtOnCreate") && variables.wheels.class.timeStampingOnUpdate) {
-				$timestampProperty(property = variables.wheels.class.timeStampOnUpdateProperty);
-			}
+			// Stamp updatedAt on every update (the `setUpdatedAtOnCreate` setting only gates the
+			// create path; it must not stop updates from bumping the timestamp).
+			$stampTimestampProperty(event = "update", enabled = variables.wheels.class.timeStampingOnUpdate);
 			local.sql = [];
 			ArrayAppend(local.sql, "UPDATE #$quotedTableName()# SET ");
 
