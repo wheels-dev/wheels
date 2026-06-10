@@ -38,6 +38,15 @@ component output="false" extends="wheels.Global" {
 	 * @environment The environment to seed for (defaults to current Wheels environment)
 	 */
 	public struct function runSeeds(string environment = get("environment")) {
+		// The environment name is interpolated into an include path below, so restrict it to
+		// safe characters (prevents path traversal like "../../../app/somefile").
+		if (!ReFind("^[A-Za-z0-9_-]+$", arguments.environment)) {
+			Throw(
+				type = "Wheels.Seeder.InvalidEnvironment",
+				message = "runSeeds(): invalid environment name '#arguments.environment#'. Environment names may only contain letters, numbers, underscores and hyphens."
+			);
+		}
+
 		this.results = [];
 		this.totalCreated = 0;
 		this.totalSkipped = 0;
@@ -136,11 +145,23 @@ component output="false" extends="wheels.Global" {
 				);
 			}
 			local.val = arguments.properties[local.prop];
-			if (IsSimpleValue(local.val)) {
-				ArrayAppend(local.whereParts, "#local.prop# = '#Replace(local.val, "'", "''", "all")#'");
+			if (!IsSimpleValue(local.val)) {
+				Throw(
+					type = "Wheels.Seeder.InvalidUniqueValue",
+					message = "seedOnce(): the value of unique property '#local.prop#' must be a simple value (string, number, date or boolean) so it can be used in the uniqueness check."
+				);
 			}
+			ArrayAppend(local.whereParts, "#local.prop# = '#Replace(local.val, "'", "''", "all")#'");
 		}
 		local.whereClause = ArrayToList(local.whereParts, " AND ");
+
+		// An empty WHERE clause would make findOne() match an arbitrary row and silently skip the seed
+		if (!Len(local.whereClause)) {
+			Throw(
+				type = "Wheels.Seeder.EmptyUniqueProperties",
+				message = "seedOnce(): uniqueProperties did not produce any uniqueness conditions. Pass at least one property name."
+			);
+		}
 
 		// Check for existing record
 		local.existing = local.modelObj.findOne(where = local.whereClause);

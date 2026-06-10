@@ -53,6 +53,19 @@ component extends="wheels.WheelsTest" {
 				expect(datecompare(r, e)).toBe(0)
 			})
 
+			it("removes the ($ampm) part key after combining date parts", () => {
+				args.formScope["published($year)"] = 2000
+				args.formScope["published($month)"] = 2
+				args.formScope["published($day)"] = 15
+				args.formScope["published($hour)"] = 3
+				args.formScope["published($minute)"] = 30
+				args.formScope["published($ampm)"] = "PM"
+				_params = dispatch.$createParams(argumentCollection = args)
+
+				expect(_params).notToHaveKey("published($ampm)")
+				expect(datecompare(CreateDateTime(2000, 2, 15, 15, 30, 0), _params.published)).toBe(0)
+			})
+
 			it("checks that URL and FORM scope map the same", () => {
 				StructInsert(args.urlScope, "user[email]", "tpetruzzi@gmail.com", true)
 				StructInsert(args.urlScope, "user[name]", "tony petruzzi", true)

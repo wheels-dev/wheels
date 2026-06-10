@@ -243,6 +243,24 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that order containing ampm implies twelveHour", () => {
+
+			it("renders the ampm select in 12-hour mode instead of throwing when twelveHour is not passed", () => {
+				_controller = g.controller(name = "dummy")
+				r = _controller.timeSelectTags(
+					name = "tselector",
+					selected = CreateDateTime(2014, 8, 4, 14, 30, 35),
+					order = "hour,minute,ampm",
+					encode = false
+				)
+
+				expect(r).toInclude('name="tselector($ampm)"')
+				expect(r).toInclude('<option selected="selected" value="PM">PM</option>')
+				// the hour select renders in 12-hour format (14:30 -> 2)
+				expect(r).toInclude('<option selected="selected" value="2">2</option>')
+			})
+		})
+
 		describe("Tests that TimeSelectTag", () => {
 			// There is only one test the original TimeSelectTag.cfc but it is only asserting 1 to be 1 so it doesn't make sense to write here
 		})

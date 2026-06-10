@@ -150,6 +150,59 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("Restricted authentication (authenticateWith)", function() {
+
+				it("tries only the named strategies", function() {
+					auth.registerStrategy(name = "pass", strategy = new wheels.tests._assets.auth.AlwaysPassStrategy());
+					auth.registerStrategy(name = "fail", strategy = new wheels.tests._assets.auth.AlwaysFailStrategy());
+
+					var result = auth.authenticateWith(request = {}, strategies = "fail");
+					expect(result.success).toBeFalse();
+					expect(result.error).toBe("Invalid credentials");
+				});
+
+				it("accepts an array of strategy names", function() {
+					auth.registerStrategy(name = "fail", strategy = new wheels.tests._assets.auth.AlwaysFailStrategy());
+					auth.registerStrategy(name = "pass", strategy = new wheels.tests._assets.auth.AlwaysPassStrategy());
+
+					var result = auth.authenticateWith(request = {}, strategies = ["pass"]);
+					expect(result.success).toBeTrue();
+					expect(result.strategy).toBe("alwaysPass");
+				});
+
+				it("skips unknown names when a registered strategy can still authenticate", function() {
+					auth.registerStrategy(name = "pass", strategy = new wheels.tests._assets.auth.AlwaysPassStrategy());
+
+					var result = auth.authenticateWith(request = {}, strategies = "ghost,pass");
+					expect(result.success).toBeTrue();
+				});
+
+				it("surfaces a wiring diagnostic when restricted to only unregistered names", function() {
+					auth.registerStrategy(name = "token", strategy = new wheels.tests._assets.auth.AlwaysPassStrategy());
+
+					var result = auth.authenticateWith(request = {}, strategies = "tokn");
+					expect(result.success).toBeFalse();
+					expect(result.statusCode).toBe(401);
+					expect(result.error).toInclude("tokn");
+					expect(result.error).toInclude("Registered strategies: token");
+				});
+
+				it("returns the zero-strategies diagnostic when nothing is registered", function() {
+					var result = auth.authenticateWith(request = {}, strategies = "token");
+					expect(result.success).toBeFalse();
+					expect(result.error).toInclude("No authentication strategies registered");
+				});
+
+				it("behaves like authenticate() when the filter is empty", function() {
+					auth.registerStrategy(name = "pass", strategy = new wheels.tests._assets.auth.AlwaysPassStrategy());
+
+					var result = auth.authenticateWith(request = {}, strategies = "");
+					expect(result.success).toBeTrue();
+					expect(result.strategy).toBe("alwaysPass");
+				});
+
+			});
+
 			describe("Header token strategy integration", function() {
 
 				it("authenticates with a valid Bearer token", function() {

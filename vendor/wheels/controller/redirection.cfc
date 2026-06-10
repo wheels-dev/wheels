@@ -112,7 +112,8 @@ component {
 					local.params = $constructParams(params = arguments.params, encode = arguments.encode);
 					if (Find("?", request.cgi.http_referer)) {
 						local.params = Replace(local.params, "?", "&");
-					} else if (Left(local.params, 1) == "&" && !Find(request.cgi.http_referer, "?")) {
+					} else if (Left(local.params, 1) == "&") {
+						// The referrer has no query string (checked above) so turn the leading "&" into a "?".
 						local.params = Replace(local.params, "&", "?", "one");
 					}
 					local.url &= local.params;

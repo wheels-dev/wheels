@@ -21,8 +21,14 @@ component {
 			variables.$datasource = application.wheels.dataSourceName;
 		}
 		variables.tableVerified = false;
-		variables.lastCleanup = 0;
+		// Start the throttle clock at instance creation so a fresh instance does
+		// not run a retention sweep on its very first publish()
+		variables.lastCleanup = GetTickCount() / 1000;
 		variables.retentionMinutes = 60;
+		// Cap on rows deleted per throttled publish-path cleanup pass
+		variables.cleanupBatchSize = 1000;
+		// True while a previous bounded pass hit its cap (backlog still draining)
+		variables.cleanupBacklog = false;
 		return this;
 	}
 
@@ -136,36 +142,84 @@ component {
 	/**
 	 * Delete events older than the specified number of minutes.
 	 *
+	 * On busy multi-server deployments prefer calling this from a scheduled task
+	 * or worker (with a maxRows bound) rather than relying solely on the
+	 * throttled publish-path sweep.
+	 *
 	 * @olderThanMinutes Delete events older than this many minutes (default: retentionMinutes).
+	 * @maxRows Maximum number of rows to delete in this pass. 0 (default) deletes all expired rows.
+	 * @return Number of rows deleted (best effort; 0 on error or when the engine doesn't report it).
 	 */
-	public void function cleanup(numeric olderThanMinutes = variables.retentionMinutes) {
+	public numeric function cleanup(
+		numeric olderThanMinutes = variables.retentionMinutes,
+		numeric maxRows = 0
+	) {
 		$ensureEventsTable();
 
+		local.cutoff = DateAdd("n", -arguments.olderThanMinutes, Now());
+
 		try {
+			if (arguments.maxRows > 0) {
+				// Bounded pass: select the oldest expired ids first, then delete only
+				// those, so the DELETE (the lock-holding statement) stays small and
+				// indexed even when a large backlog has accumulated
+				local.candidates = queryExecute(
+					"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					{
+						cutoff: {value: local.cutoff, cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: variables.$datasource, maxrows: arguments.maxRows}
+				);
+				if (local.candidates.recordCount == 0) {
+					return 0;
+				}
+				// Repeat the cutoff predicate so the blast radius stays limited to
+				// expired rows even if an application-supplied event id contains a comma
+				queryExecute(
+					"DELETE FROM wheels_events WHERE createdAt < :cutoff AND id IN (:ids)",
+					{
+						cutoff: {value: local.cutoff, cfsqltype: "cf_sql_timestamp"},
+						ids: {value: ValueList(local.candidates.id), cfsqltype: "cf_sql_varchar", list: true}
+					},
+					{datasource: variables.$datasource}
+				);
+				return local.candidates.recordCount;
+			}
+
 			queryExecute(
 				"DELETE FROM wheels_events WHERE createdAt < :cutoff",
 				{
-					cutoff: {value: DateAdd("n", -arguments.olderThanMinutes, Now()), cfsqltype: "cf_sql_timestamp"}
+					cutoff: {value: local.cutoff, cfsqltype: "cf_sql_timestamp"}
 				},
-				{datasource: variables.$datasource}
+				{datasource: variables.$datasource, result: "local.deleteResult"}
 			);
+			if (StructKeyExists(local, "deleteResult") && StructKeyExists(local.deleteResult, "recordCount")) {
+				return local.deleteResult.recordCount;
+			}
+			return 0;
 		} catch (any e) {
 			writeLog(
 				text="DatabaseAdapter cleanup error: #e.message#",
 				type="error",
 				file="wheels_channels"
 			);
+			return 0;
 		}
 	}
 
 	/**
-	 * Throttled cleanup — runs at most once every 5 minutes.
+	 * Throttled cleanup on the publish path — runs at most once every 5 minutes
+	 * (every 15 seconds while a backlog is draining) and deletes at most
+	 * cleanupBatchSize rows per pass so no single publish() blocks on a large
+	 * DELETE. Full sweeps remain available via cleanup() for scheduled tasks.
 	 */
 	private void function $maybeCleanup() {
 		local.now = GetTickCount() / 1000;
-		if (local.now - variables.lastCleanup > 300) {
+		local.interval = variables.cleanupBacklog ? 15 : 300;
+		if (local.now - variables.lastCleanup > local.interval) {
 			variables.lastCleanup = local.now;
-			cleanup();
+			local.deleted = cleanup(maxRows = variables.cleanupBatchSize);
+			variables.cleanupBacklog = local.deleted >= variables.cleanupBatchSize;
 		}
 	}
 

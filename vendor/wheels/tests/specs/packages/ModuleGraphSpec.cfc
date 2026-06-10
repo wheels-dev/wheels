@@ -223,6 +223,130 @@ component extends="wheels.WheelsTest" {
 					expect(ArrayFind(result.loadOrder, "cycleB")).toBe(0);
 				});
 
+				it("does not label a downstream dependent of a cycle as circular itself", () => {
+					var manifests = {
+						"cycleA": {
+							name: "wheels-cycleA", version: "1.0.0",
+							requires: {"wheels-cycleB": ">=1.0.0"}
+						},
+						"cycleB": {
+							name: "wheels-cycleB", version: "1.0.0",
+							requires: {"wheels-cycleA": ">=1.0.0"}
+						},
+						"downstream": {
+							name: "wheels-downstream", version: "1.0.0",
+							requires: {"wheels-cycleA": ">=1.0.0"}
+						}
+					};
+					var result = graph.resolve(manifests);
+
+					// downstream cannot load (its dependency is cycled)...
+					expect(ArrayFind(result.loadOrder, "downstream")).toBe(0);
+
+					var downstreamMessage = "";
+					var cycleMessages = [];
+					for (var err in result.errors) {
+						if (err.package == "downstream") {
+							downstreamMessage = err.message;
+						}
+						if (err.package == "cycleA" || err.package == "cycleB") {
+							ArrayAppend(cycleMessages, err.message);
+						}
+					}
+
+					// ...but its error must say it depends on a cycle, not
+					// that it IS one (previously it got the same fabricated
+					// "Circular dependency detected" message).
+					expect(Len(downstreamMessage)).toBeGT(0);
+					expect(downstreamMessage).notToInclude("Circular dependency detected");
+					expect(downstreamMessage).toInclude("circular dependency");
+					expect(downstreamMessage).toInclude("cycleA");
+					expect(downstreamMessage).toInclude("cycleB");
+
+					// The true cycle members still get the circular error.
+					expect(ArrayLen(cycleMessages)).toBe(2);
+					for (var msg in cycleMessages) {
+						expect(msg).toInclude("Circular dependency detected");
+					}
+				});
+
+				it("reports an actual closed cycle path in the arrow chain", () => {
+					var manifests = {
+						"cycleA": {
+							name: "wheels-cycleA", version: "1.0.0",
+							requires: {"wheels-cycleB": ">=1.0.0"}
+						},
+						"cycleB": {
+							name: "wheels-cycleB", version: "1.0.0",
+							requires: {"wheels-cycleA": ">=1.0.0"}
+						}
+					};
+					var result = graph.resolve(manifests);
+
+					var chainMessage = "";
+					for (var err in result.errors) {
+						if (err.package == "cycleA") {
+							chainMessage = err.message;
+						}
+					}
+					expect(Len(chainMessage)).toBeGT(0);
+
+					// The arrow chain must be a real closed loop (first node ==
+					// last node), not just an unordered listing of leftover
+					// nodes from the topological sort.
+					var arrowChain = Trim(ListLast(chainMessage, ":"));
+					var chainNodes = ListToArray(arrowChain, " ->");
+					expect(ArrayLen(chainNodes)).toBeGTE(3);
+					expect(chainNodes[1]).toBe(chainNodes[ArrayLen(chainNodes)]);
+				});
+
+			});
+
+			describe("resolve() with mutual replaces", () => {
+
+				it("keeps exactly one of two mutually-replacing packages", () => {
+					var manifests = {
+						"alpha": {
+							name: "wheels-alpha", version: "1.0.0",
+							replaces: {"wheels-beta": "*"}
+						},
+						"beta": {
+							name: "wheels-beta", version: "1.0.0",
+							replaces: {"wheels-alpha": "*"}
+						}
+					};
+					var result = graph.resolve(manifests);
+
+					// Previously BOTH packages were excluded with no error.
+					// Now the first package in sorted order wins; the other is
+					// excluded — exactly one survives, deterministically.
+					expect(ArrayFind(result.loadOrder, "alpha")).toBeGT(0);
+					expect(result.excluded).toHaveKey("beta");
+					expect(result.excluded).notToHaveKey("alpha");
+				});
+
+				it("ignores replaces declared by an already-excluded package", () => {
+					var manifests = {
+						"aaa": {
+							name: "wheels-aaa", version: "1.0.0",
+							replaces: {"wheels-bbb": "*"}
+						},
+						"bbb": {
+							name: "wheels-bbb", version: "1.0.0",
+							replaces: {"wheels-ccc": "*"}
+						},
+						"ccc": {name: "wheels-ccc", version: "1.0.0"}
+					};
+					var result = graph.resolve(manifests);
+
+					// aaa excludes bbb; bbb never loads, so its replaces
+					// declaration against ccc must not apply.
+					expect(result.excluded).toHaveKey("bbb");
+					expect(result.excluded).notToHaveKey("ccc");
+					expect(ArrayFind(result.loadOrder, "aaa")).toBeGT(0);
+					expect(ArrayFind(result.loadOrder, "ccc")).toBeGT(0);
+				});
+
 			});
 
 		});

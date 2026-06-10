@@ -69,13 +69,13 @@ component extends="wheels.WheelsTest" {
 				if (StructKeyExists(request, "test")) {
 					StructDelete(request, "test")
 				}
-				application.wheels.existingHelperFiles = "test"
+				application.wheels.helperFileCache["test"] = true
 				params = {controller = "test", action = "helperCaller"}
 				_controller = application.wo.controller("test", params)
 			})
 
 			afterEach(() => {
-				application.wheels.existingHelperFiles = ""
+				StructDelete(application.wheels.helperFileCache, "test")
 			})
 
 			it("is including global helper file", () => {

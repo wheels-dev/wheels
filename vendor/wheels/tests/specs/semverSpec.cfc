@@ -192,6 +192,47 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("SemVer constraints with a space after the operator", function() {
+
+			beforeEach(function() {
+				semver = CreateObject("component", "wheels.SemVer")
+			})
+
+			it("treats '>= X' as a range constraint, not an exact match", function() {
+				// Previously '>= 1.0.0' split into '>=' (empty target, always
+				// true) AND '1.0.0' (exact match) — silently '=1.0.0'.
+				expect(semver.satisfiesAll("1.5.0", ">= 1.0.0")).toBeTrue()
+				expect(semver.satisfiesAll("1.0.0", ">= 1.0.0")).toBeTrue()
+				expect(semver.satisfiesAll("0.9.0", ">= 1.0.0")).toBeFalse()
+			})
+
+			it("treats '^ X' as a caret range", function() {
+				// Previously '^ 1.2.3' was unsatisfiable.
+				expect(semver.satisfiesAll("1.5.0", "^ 1.2.3")).toBeTrue()
+				expect(semver.satisfiesAll("1.2.3", "^ 1.2.3")).toBeTrue()
+				expect(semver.satisfiesAll("2.0.0", "^ 1.2.3")).toBeFalse()
+			})
+
+			it("treats '~ X' as a tilde range", function() {
+				expect(semver.satisfiesAll("1.2.5", "~ 1.2.3")).toBeTrue()
+				expect(semver.satisfiesAll("1.3.0", "~ 1.2.3")).toBeFalse()
+			})
+
+			it("handles spaced operators inside compound constraints", function() {
+				expect(semver.satisfiesAll("1.5.0", ">= 1.0.0 < 2.0.0")).toBeTrue()
+				expect(semver.satisfiesAll("2.1.0", ">= 1.0.0 < 2.0.0")).toBeFalse()
+				expect(semver.satisfiesAll("1.5.0", ">=1.0.0 < 2.0.0")).toBeTrue()
+			})
+
+			it("fails closed on an operator with no target", function() {
+				expect(semver.satisfies("1.0.0", ">=")).toBeFalse()
+				expect(semver.satisfies("1.0.0", "^")).toBeFalse()
+				expect(semver.satisfies("1.0.0", "~")).toBeFalse()
+				expect(semver.satisfiesAll("1.0.0", ">=")).toBeFalse()
+				expect(semver.satisfiesAll("1.0.0", ">=1.0.0 <")).toBeFalse()
+			})
+		})
+
 		describe("SemVer format", function() {
 
 			beforeEach(function() {

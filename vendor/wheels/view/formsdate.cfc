@@ -111,14 +111,13 @@ component {
 		// when the root was object-bound. The $autoIdBound flag propagates that decision.
 		arguments.$autoIdBound = IsSimpleValue(arguments.objectName) && Len(arguments.objectName);
 
-		// in order to support 12-hour format, we have to enforce some rules
-		// if arguments.twelveHour is true, then order MUST contain ampm
-		// if the order contains ampm, then arguments.twelveHour MUST be true
-		if (ListFindNoCase(arguments.order, "hour") && arguments.twelveHour && !ListFindNoCase(arguments.order, "ampm")) {
+		// In order to support the 12-hour format we have to enforce two rules:
+		// 1. if the order contains `ampm`, then `twelveHour` MUST be true
+		// 2. if `twelveHour` is true and the order contains `hour`, then the order MUST also contain `ampm`
+		if (ListFindNoCase(arguments.order, "ampm")) {
 			arguments.twelveHour = true;
-			if (!ListFindNoCase(arguments.order, "ampm")) {
-				arguments.order = ListAppend(arguments.order, "ampm");
-			}
+		} else if (arguments.twelveHour && ListFindNoCase(arguments.order, "hour")) {
+			arguments.order = ListAppend(arguments.order, "ampm");
 		}
 
 		local.value = $formValue(argumentCollection = arguments);
@@ -305,18 +304,18 @@ component {
 				encode = arguments.encode
 			);
 		}
+		// Copy the argument struct once and only mutate the per-iteration counter key (a deep
+		// Duplicate of the full struct previously ran for every single <option> rendered).
+		local.args = Duplicate(arguments);
+		local.args.optionContent = local.optionContent;
 		if (arguments.$loopFrom < arguments.$loopTo) {
 			for (local.i = arguments.$loopFrom; local.i <= arguments.$loopTo; local.i = local.i + arguments.$step) {
-				local.args = Duplicate(arguments);
 				local.args.counter = local.i;
-				local.args.optionContent = local.optionContent;
 				local.content &= $yearMonthHourMinuteSecondSelectTagContent(argumentCollection = local.args);
 			}
 		} else {
 			for (local.i = arguments.$loopFrom; local.i >= arguments.$loopTo; local.i = local.i - arguments.$step) {
-				local.args = Duplicate(arguments);
 				local.args.counter = local.i;
-				local.args.optionContent = local.optionContent;
 				local.content &= $yearMonthHourMinuteSecondSelectTagContent(argumentCollection = local.args);
 			}
 		}

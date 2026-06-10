@@ -47,6 +47,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(out.templateName).toBe("default");
 				});
 
+				it("binds positionals across LuCLI numbering gaps (option consumed an index)", () => {
+					// `wheels new --port=3000 blog` — LuCLI numbers positionals by
+					// global token index, so the name arrives as arg2 with NO arg1.
+					// Fixed-index probing bound nothing and the supplied name was
+					// silently ignored.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "appName")
+						.option(name = "port", default = 8080, type = "numeric");
+					var out = spec.parse({"port": "3000", "arg2": "blog"});
+					expect(out.appName).toBe("blog");
+					expect(out.port).toBe(3000);
+				});
+
+				it("binds multiple gap-numbered positionals in numeric index order", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "first")
+						.positional(name = "second");
+					var out = spec.parse({"arg2": "a", "arg5": "b", "force": "true"});
+					expect(out.first).toBe("a");
+					expect(out.second).toBe("b");
+				});
+
+				it("satisfies a required positional delivered after a gap", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "appName", required = true);
+					var out = spec.parse({"arg3": "blog"});
+					expect(out.appName).toBe("blog");
+				});
+
 			});
 
 			describe("parse() — flags (the --no-X regression surface)", () => {
@@ -164,6 +193,38 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 				it("returns an empty argv for an empty collection", () => {
 					expect(new cli.lucli.services.ArgSpec().toArgv({})).toBeEmpty();
+				});
+
+				it("does not stop at a numbering gap — positionals after a flag survive", () => {
+					// `wheels g scaffold Post --force title:string body:text` arrives
+					// as {arg1, arg2, force, arg4, arg5}. The old loop stopped at the
+					// missing arg3, so scaffold silently generated the model and
+					// migration with no columns while reporting success.
+					var argv = new cli.lucli.services.ArgSpec().toArgv({
+						"arg1": "scaffold",
+						"arg2": "Post",
+						"force": "true",
+						"arg4": "title:string",
+						"arg5": "body:text"
+					});
+					expect(argv[1]).toBe("scaffold");
+					expect(argv[2]).toBe("Post");
+					expect(argv[3]).toBe("title:string");
+					expect(argv[4]).toBe("body:text");
+					expect(argv).toInclude("--force");
+				});
+
+				it("emits a gap-numbered leading positional (flag before the first positional)", () => {
+					// `wheels create --setup-h2 app myapp` style ordering: the flag
+					// consumes index 1, so the first positional is arg2.
+					var argv = new cli.lucli.services.ArgSpec().toArgv({
+						"setup-h2": "true",
+						"arg2": "app",
+						"arg3": "myapp"
+					});
+					expect(argv[1]).toBe("app");
+					expect(argv[2]).toBe("myapp");
+					expect(argv).toInclude("--setup-h2");
 				});
 
 			});

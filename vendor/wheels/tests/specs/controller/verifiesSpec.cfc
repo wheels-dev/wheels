@@ -98,6 +98,23 @@ component extends="wheels.WheelsTest" {
 
 				expect(_controller.$abortIssued()).toBeTrue()
 			})
+
+			it("throws at declaration time when a types list length does not match its variable list", () => {
+				params = {controller = "verifies", action = "actionGet"}
+				_controller = application.wo.controller("verifies", params)
+
+				expect(function() {
+					_controller.verifies(params = "username,password", paramsTypes = "string")
+				}).toThrow("Wheels.InvalidVerification")
+
+				expect(function() {
+					_controller.verifies(session = "userId", sessionTypes = "integer,string")
+				}).toThrow("Wheels.InvalidVerification")
+
+				expect(function() {
+					_controller.verifies(post = "true", cookieTypes = "string")
+				}).toThrow("Wheels.InvalidVerification")
+			})
 		})
 	}
 }

@@ -49,9 +49,11 @@ component {
 		// Database adapters (no default — adapter is selected per datasource at runtime)
 		// Bind per-project: bind("DatabaseModelAdapterInterface").to("wheels.databaseAdapters.H2.H2Model")
 
-		// DI subsystem
-		arguments.injector
-			.bind("InjectorInterface").to("wheels.Injector");
+		// Note: there is intentionally NO "InjectorInterface" binding. The live
+		// container self-registers at application.wheelsdi during init(), and a
+		// path binding here could never resolve (Injector.init() requires a
+		// binderPath that no auto-wire mapping supplies) — and if it ever did,
+		// the fresh instance would clobber application.wheelsdi.
 	}
 
 }

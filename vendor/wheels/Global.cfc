@@ -3090,6 +3090,32 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Normalizes mixin-collision records to a single
+	 * shared shape: {target, method, firstProvider, secondProvider,
+	 * acknowledged, source}. Plugins.cfc emits legacy-shaped records
+	 * ({existingPlugin, overridingPlugin}) while PackageLoader.cfc and the
+	 * cross-system merge in $loadPackages emit the shared shape directly;
+	 * all of them end up in the same application.wheels.mixinCollisions
+	 * array, which /wheels/plugins and the development debug footer consume
+	 * unconditionally — a mixed-shape array crashes those surfaces with a
+	 * "key doesn't exist" error.
+	 */
+	public array function $normalizeMixinCollisions(required array collisions) {
+		local.rv = [];
+		for (local.c in arguments.collisions) {
+			ArrayAppend(local.rv, {
+				target = local.c.target,
+				method = local.c.method,
+				firstProvider = StructKeyExists(local.c, "firstProvider") ? local.c.firstProvider : local.c.existingPlugin,
+				secondProvider = StructKeyExists(local.c, "secondProvider") ? local.c.secondProvider : local.c.overridingPlugin,
+				acknowledged = StructKeyExists(local.c, "acknowledged") ? local.c.acknowledged : false,
+				source = StructKeyExists(local.c, "source") ? local.c.source : "plugin"
+			});
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $loadPlugins() {
@@ -3111,7 +3137,14 @@ return local.$wheels;
 		application[local.appKey].incompatiblePlugins = application[local.appKey].PluginObj.getIncompatiblePlugins();
 		application[local.appKey].dependantPlugins = application[local.appKey].PluginObj.getDependantPlugins();
 		application[local.appKey].versionMismatchPlugins = application[local.appKey].PluginObj.getVersionMismatchPlugins();
-		application[local.appKey].mixinCollisions = application[local.appKey].PluginObj.getMixinCollisions();
+		// Plugins.cfc emits legacy-shaped collision records ({existingPlugin,
+		// overridingPlugin}); normalize them to the shared shape at the merge
+		// point so package- and cross-system records (which already use
+		// {firstProvider, secondProvider}) can live in the same array without
+		// crashing the consumers (/wheels/plugins and the debug footer).
+		application[local.appKey].mixinCollisions = $normalizeMixinCollisions(
+			application[local.appKey].PluginObj.getMixinCollisions()
+		);
 		application[local.appKey].mixins = application[local.appKey].PluginObj.getMixins();
 		application[local.appKey].pluginMiddleware = application[local.appKey].PluginObj.getPluginMiddleware();
 		// Invoke register(container) on ServiceProviderInterface plugins before activation
@@ -3207,8 +3240,13 @@ return local.$wheels;
 			ArrayAppend(application[local.appKey].pluginMiddleware, local.mw);
 		}
 
-		// Invoke ServiceProvider register/boot if DI container exists
-		if (IsDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PackageLoaderObj.getServiceProviders())) {
+		// Invoke ServiceProvider register/boot if DI container exists. The
+		// gate asks the loader (not just getServiceProviders()) because lazy
+		// service-hinted packages aren't instantiated yet at this point —
+		// $invokeServiceProviderRegister pulls them into the lifecycle, so a
+		// vendor tree containing only lazy service packages still needs the
+		// lifecycle invoked.
+		if (IsDefined("application.wheelsdi") && application[local.appKey].PackageLoaderObj.$hasServiceProviderWork()) {
 			application[local.appKey].PackageLoaderObj.$invokeServiceProviderRegister(application.wheelsdi);
 			application[local.appKey].PackageLoaderObj.$invokeServiceProviderBoot(application[local.appKey]);
 			// Re-sync the application-scope copy so register()/boot() failure

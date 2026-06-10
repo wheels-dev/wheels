@@ -367,4 +367,17 @@ component {
 	public boolean function isOptions() {
 		return request.cgi.request_method == "options";
 	}
+
+	/**
+	 * Internal function.
+	 * Returns whether an `only` / `except` action gating declaration applies to the supplied action.
+	 * Applies when neither list is provided, when `only` is provided and contains the action, or when `except` is provided and does not contain the action.
+	 * When both lists are provided the conditions are OR'ed, so the declaration applies when the action is in `only` or when it's missing from `except`.
+	 * Used by filters, verifications and CSRF protection.
+	 */
+	public boolean function $appliesToAction(required string action, string only = "", string except = "") {
+		return (!Len(arguments.only) && !Len(arguments.except))
+		|| (Len(arguments.only) && ListFindNoCase(arguments.only, arguments.action) > 0)
+		|| (Len(arguments.except) && !ListFindNoCase(arguments.except, arguments.action));
+	}
 }

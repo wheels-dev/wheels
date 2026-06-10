@@ -124,6 +124,20 @@ component {
 			return false;
 		}
 		local.removed = local.subscribers.remove(arguments.subscriberId);
+
+		// Prune the per-channel map once its last subscriber leaves so per-entity
+		// channel names (e.g. "user.42") don't accumulate empty maps in this
+		// app-scoped singleton for the application lifetime. The atomic two-argument
+		// remove(key, value) only removes the entry if the channel still maps to this
+		// same subscriber map, so it never discards a replacement map created by a
+		// concurrent subscribe(). Known (tiny) race: a subscriber that lands in this
+		// exact map between the isEmpty() check and the remove() is orphaned and
+		// receives no events until its connection times out and the client
+		// re-subscribes.
+		if (local.subscribers.isEmpty()) {
+			variables.channels.remove(arguments.channel, local.subscribers);
+		}
+
 		return !IsNull(local.removed);
 	}
 

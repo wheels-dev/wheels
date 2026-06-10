@@ -17,6 +17,13 @@ component {
 	variables.defaultHeaders = {};
 	variables.cookies = {};
 	variables.sendAsJson = false;
+	// Memoized views of the immutable last response, so assertion chains
+	// don't re-ToString()/re-DeserializeJSON() the body on every call.
+	// Invalidated whenever variables.lastResponse changes.
+	variables.contentCached = false;
+	variables.contentCache = "";
+	variables.jsonCached = false;
+	variables.jsonCache = "";
 
 	/**
 	 * Initialize the test client with a base URL.
@@ -29,6 +36,7 @@ component {
 		variables.defaultHeaders = {};
 		variables.cookies = {};
 		variables.sendAsJson = false;
+		$clearResponseCaches();
 		return this;
 	}
 
@@ -273,7 +281,10 @@ component {
 			if (pos == 0) {
 				$assertionError("Expected to see '#text#' in order in response body (item #i# of #ArrayLen(arguments.texts)#) but it was not found after position #lastPos#.");
 			}
-			lastPos = pos;
+			// Advance past the full match so the next text can't match
+			// inside the previous one (e.g. ["John Smith", "Smith"] must
+			// not pass against a single "John Smith" occurrence).
+			lastPos = pos + Len(text) - 1;
 		}
 		return this;
 	}
@@ -285,20 +296,26 @@ component {
 	 * @expected Optional struct of expected key/value pairs to match
 	 */
 	public TestClient function assertJson(struct expected = {}) {
-		var body = content();
-		var parsed = {};
+		var parsed = "";
 		try {
-			parsed = DeserializeJSON(body);
+			parsed = $parsedJson();
 		} catch (any e) {
-			$assertionError("Expected response to be valid JSON but could not parse it. Body: #Left(body, 200)#");
+			$assertionError("Expected response to be valid JSON but could not parse it. Body: #Left(content(), 200)#");
 		}
 		if (!StructIsEmpty(arguments.expected)) {
+			// Guard before StructKeyExists: a top-level JSON array (the normal
+			// list-API response shape) would otherwise throw an engine cast
+			// error instead of reporting a test failure.
+			if (!IsStruct(parsed)) {
+				var shape = IsArray(parsed) ? "a JSON array" : "a simple value";
+				$assertionError("Expected JSON response to be an object so keys can be matched, but it deserialized to #shape#.");
+			}
 			for (var key in arguments.expected) {
 				if (!StructKeyExists(parsed, key)) {
 					$assertionError("Expected JSON response to contain key '#key#' but it was not found.");
 				}
-				if (parsed[key] != arguments.expected[key]) {
-					$assertionError("Expected JSON key '#key#' to be '#arguments.expected[key]#' but got '#parsed[key]#'.");
+				if (!$jsonValuesMatch(parsed[key], arguments.expected[key])) {
+					$assertionError("Expected JSON key '#key#' to be '#$describeJsonValue(arguments.expected[key])#' but got '#$describeJsonValue(parsed[key])#'.");
 				}
 			}
 		}
@@ -315,12 +332,11 @@ component {
 	 * @expectedValue Expected value at that path
 	 */
 	public TestClient function assertJsonPath(required string path, any expectedValue) {
-		var body = content();
-		var parsed = {};
+		var parsed = "";
 		try {
-			parsed = DeserializeJSON(body);
+			parsed = $parsedJson();
 		} catch (any e) {
-			$assertionError("Expected response to be valid JSON for path assertion. Body: #Left(body, 200)#");
+			$assertionError("Expected response to be valid JSON for path assertion. Body: #Left(content(), 200)#");
 		}
 		var segments = ListToArray(arguments.path, ".");
 		var current = parsed;
@@ -338,8 +354,8 @@ component {
 				$assertionError("JSON path '#arguments.path#' failed: key '#segment#' not found at this level.");
 			}
 		}
-		if (current != arguments.expectedValue) {
-			$assertionError("Expected JSON path '#arguments.path#' to be '#arguments.expectedValue#' but got '#current#'.");
+		if (!$jsonValuesMatch(current, arguments.expectedValue)) {
+			$assertionError("Expected JSON path '#arguments.path#' to be '#$describeJsonValue(arguments.expectedValue)#' but got '#$describeJsonValue(current)#'.");
 		}
 		return this;
 	}
@@ -391,13 +407,19 @@ component {
 	}
 
 	/**
-	 * Get the response body as a string.
+	 * Get the response body as a string. Memoized per response — the
+	 * cache is invalidated whenever a new response arrives.
 	 */
 	public string function content() {
-		if (StructKeyExists(variables.lastResponse, "fileContent")) {
-			return ToString(variables.lastResponse.fileContent);
+		if (!variables.contentCached) {
+			if (StructKeyExists(variables.lastResponse, "fileContent")) {
+				variables.contentCache = ToString(variables.lastResponse.fileContent);
+			} else {
+				variables.contentCache = "";
+			}
+			variables.contentCached = true;
 		}
-		return "";
+		return variables.contentCache;
 	}
 
 	/**
@@ -421,7 +443,7 @@ component {
 			return {};
 		}
 		try {
-			return DeserializeJSON(body);
+			return $parsedJson();
 		} catch (any e) {
 			$assertionError("Cannot parse response body as JSON. Body: #Left(body, 200)#");
 		}
@@ -453,6 +475,7 @@ component {
 			fileContent: arguments.fileContent,
 			responseHeader: arguments.responseHeader
 		};
+		$clearResponseCaches();
 	}
 
 	// ─── Private Helpers ─────────────────────────────────────────────
@@ -473,6 +496,8 @@ component {
 		struct body = {},
 		struct headers = {}
 	) {
+		$requireLeadingSlash(arguments.path);
+
 		var fullUrl = variables.baseUrl & arguments.path;
 
 		// Append query string params to the URL
@@ -522,6 +547,7 @@ component {
 		}
 
 		variables.lastResponse = result;
+		$clearResponseCaches();
 
 		// Track cookies from response for subsequent requests (session support)
 		if (StructKeyExists(result, "responseHeader") && StructKeyExists(result.responseHeader, "Set-Cookie")) {
@@ -540,6 +566,81 @@ component {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Reject paths without a leading slash. Without this guard,
+	 * visit("users") silently produced "http://localhost:8080users",
+	 * which failed to connect and surfaced as a misleading
+	 * "Expected 200 but received 0." failure.
+	 *
+	 * @path URL path to validate
+	 */
+	private void function $requireLeadingSlash(required string path) {
+		if (Left(arguments.path, 1) != "/") {
+			Throw(
+				type = "Wheels.TestClientInvalidPath",
+				message = "TestClient paths must start with '/': " & arguments.path
+			);
+		}
+	}
+
+	/**
+	 * Parse and memoize the JSON response body. Throws if the body is not
+	 * valid JSON — callers wrap this in try/catch to report a test failure.
+	 */
+	private any function $parsedJson() {
+		if (!variables.jsonCached) {
+			variables.jsonCache = DeserializeJSON(content());
+			variables.jsonCached = true;
+		}
+		return variables.jsonCache;
+	}
+
+	/**
+	 * Invalidate the memoized body string and parsed JSON. Called whenever
+	 * variables.lastResponse changes.
+	 */
+	private void function $clearResponseCaches() {
+		variables.contentCached = false;
+		variables.contentCache = "";
+		variables.jsonCached = false;
+		variables.jsonCache = "";
+	}
+
+	/**
+	 * Compare an actual JSON value against an expected one. Simple values
+	 * use plain equality; struct/array values are compared via
+	 * SerializeJSON, because a raw != on complex values throws an engine
+	 * "can't compare complex object types" error.
+	 */
+	private boolean function $jsonValuesMatch(any actual, any expected) {
+		var actualIsNull = IsNull(arguments.actual);
+		var expectedIsNull = IsNull(arguments.expected);
+		if (actualIsNull || expectedIsNull) {
+			return actualIsNull && expectedIsNull;
+		}
+		if (IsSimpleValue(arguments.actual) && IsSimpleValue(arguments.expected)) {
+			return arguments.actual == arguments.expected;
+		}
+		if (IsSimpleValue(arguments.actual) || IsSimpleValue(arguments.expected)) {
+			return false;
+		}
+		return SerializeJSON(arguments.actual) == SerializeJSON(arguments.expected);
+	}
+
+	/**
+	 * Render a JSON value for assertion messages without crashing on
+	 * struct/array values.
+	 */
+	private string function $describeJsonValue(any jsonValue) {
+		if (IsNull(arguments.jsonValue)) {
+			return "null";
+		}
+		if (IsSimpleValue(arguments.jsonValue)) {
+			return ToString(arguments.jsonValue);
+		}
+		return SerializeJSON(arguments.jsonValue);
 	}
 
 	/**

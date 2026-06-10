@@ -124,21 +124,32 @@ component extends="Base" {
 	}
 
 	/**
+	 * Shared implementation for the typed column helpers below: resolves the
+	 * columnNames/columnName alias, stamps the column type, and adds one column
+	 * per (comma-delimited) name. `args` is the caller's arguments scope, so
+	 * type-specific options (limit, default, allowNull, precision, scale, size)
+	 * pass straight through to column().
+	 */
+	private any function $addTypedColumns(required string columnType, required struct args) {
+		$combineArguments(args = arguments.args, combine = "columnNames,columnName", required = true);
+		arguments.args.columnType = arguments.columnType;
+		local.columnNamesArray = ListToArray(arguments.args.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			arguments.args.columnName = Trim(local.columnNamesArray[local.i]);
+			column(argumentCollection = arguments.args);
+		}
+		return this;
+	}
+
+	/**
 	 * Adds integer columns to table definition.
 	 *
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
 	public any function bigInteger(string columnNames, numeric limit, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "biginteger";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "biginteger", args = arguments);
 	}
 
 	/**
@@ -148,15 +159,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function binary(string columnNames, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "binary";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "binary", args = arguments);
 	}
 
 	/**
@@ -166,15 +169,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function boolean(string columnNames, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "boolean";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "boolean", args = arguments);
 	}
 
 	/**
@@ -184,15 +179,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function date(string columnNames, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "date";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "date", args = arguments);
 	}
 
 	/**
@@ -202,15 +189,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function datetime(string columnNames, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "datetime";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "datetime", args = arguments);
 	}
 
 	/**
@@ -220,15 +199,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function decimal(string columnNames, string default, boolean allowNull, numeric precision, numeric scale) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "decimal";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "decimal", args = arguments);
 	}
 
 	/**
@@ -238,15 +209,11 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function float(string columnNames, string default = "", boolean allowNull = "true") {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "float";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		// NOTE: the default=""/allowNull="true" parameter defaults are a
+		// long-standing outlier among these helpers — preserved as-is for
+		// backward compatibility (addColumnOptions renders default="" as
+		// DEFAULT NULL).
+		return $addTypedColumns(columnType = "float", args = arguments);
 	}
 
 	/**
@@ -256,15 +223,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function integer(string columnNames, numeric limit, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "integer";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "integer", args = arguments);
 	}
 
 	/**
@@ -274,15 +233,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function string(string columnNames, any limit, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "string";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "string", args = arguments);
 	}
 
 	/**
@@ -292,15 +243,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function char(string columnNames, any limit, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "char";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "char", args = arguments);
 	}
 
 	/**
@@ -317,15 +260,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function text(string columnNames, string default, boolean allowNull, string size) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "text";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "text", args = arguments);
 	}
 
 	/**
@@ -335,15 +270,10 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function uniqueidentifier(string columnNames, string default = "newid()", boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "uniqueidentifier";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		// NOTE: the default="newid()" parameter default is MSSQL syntax — this
+		// helper is only registered by the MicrosoftSQLServer adapter, so the
+		// outlier default is preserved as-is.
+		return $addTypedColumns(columnType = "uniqueidentifier", args = arguments);
 	}
 
 	/**
@@ -353,15 +283,7 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function time(string columnNames, string default, boolean allowNull) {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		arguments.columnType = "time";
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		return $addTypedColumns(columnType = "time", args = arguments);
 	}
 
 	/**
@@ -371,14 +293,9 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function timestamp(string columnNames, string default, boolean allowNull, string columnType = "datetime") {
-		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		local.columnNamesArray = ListToArray(arguments.columnNames);
-		local.iEnd = ArrayLen(local.columnNamesArray);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(local.columnNamesArray[local.i]);
-			column(argumentCollection = arguments);
-		}
-		return this;
+		// columnType is caller-overridable here (defaults to "datetime") —
+		// unlike the sibling helpers, which stamp a fixed type.
+		return $addTypedColumns(columnType = arguments.columnType, args = arguments);
 	}
 
 	/**

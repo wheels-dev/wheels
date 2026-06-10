@@ -17,17 +17,6 @@ component output=false extends="wheels.Global"{
 		local.sqlArray = args.sql;
 		local.sqlLen   = arrayLen(sqlArray);
 
-		// Detect datasource info once
-		local.ds = args.queryAttributes;
-		local.dsInfo = ( structKeyExists(ds, "DATASOURCE") && len(ds.DATASOURCE) )
-			? $dbinfo(type="version", datasource=ds.DATASOURCE)
-			: $dbinfo(
-				type     = "version",
-				datasource = application.wheels.dataSourceName,
-				username   = application.wheels.dataSourceUserName,
-				password   = application.wheels.dataSourcePassword
-			);
-
 		// Build query
 		cfquery(attributeCollection = args.queryAttributes) {
 			local.pos = 1;
@@ -54,7 +43,10 @@ component output=false extends="wheels.Global"{
 						if (args.parameterize) {
 							cfqueryParam(attributeCollection = qp);
 						} else {
-							writeOutput("(" & preserveSingleQuotes(part.value) & ")");
+							// No inner parentheses here — the outer pair above / below
+							// already wraps the list ("IN ((1,2,3))" is a row-constructor
+							// syntax error on every supported database).
+							writeOutput(preserveSingleQuotes(part.value));
 						}
 						writeOutput(")");
 					}
@@ -79,18 +71,7 @@ component output=false extends="wheels.Global"{
 
 			// LIMIT / OFFSET logic
 			if (args.limit) {
-				if (findNoCase("Oracle", dsInfo.database_productname)) {
-					if (args.offset) {
-						writeOutput("OFFSET " & args.offset & " ROWS" & newLine & "FETCH NEXT " & args.limit & " ROWS ONLY");
-					} else {
-						writeOutput("FETCH FIRST " & args.limit & " ROWS ONLY");
-					}
-				} else {
-					writeOutput("LIMIT " & args.limit);
-					if (args.offset) {
-						writeOutput(newLine & "OFFSET " & args.offset);
-					}
-				}
+				writeOutput($limitOffsetClause(limit = args.limit, offset = args.offset));
 			}
 
 			// Comment block
@@ -609,6 +590,20 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Returns the SQL clause used to limit (and optionally offset) query results.
+	 * Individual database adapters override this when their dialect differs (e.g. Oracle
+	 * uses OFFSET/FETCH). The adapter type already identifies the database product, so
+	 * no per-query metadata probe is needed to choose the syntax.
+	 */
+	public string function $limitOffsetClause(required numeric limit, required numeric offset) {
+		local.rv = "LIMIT " & arguments.limit;
+		if (arguments.offset) {
+			local.rv &= Chr(13) & Chr(10) & "OFFSET " & arguments.offset;
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Remove the maxRows argument and add a limit argument instead.
 	 * The args argument is the original arguments passed in by reference so we just modify it without passing it back.
 	 */
@@ -636,13 +631,23 @@ component output=false extends="wheels.Global"{
 		local.hasGroupBy = false;
 		local.havingPos = 0;
 		local.iEnd = ArrayLen(arguments.args.sql);
+
+		// Cheap GROUP BY scan first — the rewrite below is only needed when a GROUP BY
+		// is present, so skip the per-fragment aggregate regex entirely otherwise.
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			if (IsSimpleValue(arguments.args.sql[local.i]) && Left(arguments.args.sql[local.i], 8) == "GROUP BY") {
 				local.hasGroupBy = true;
 				local.havingPos = local.i + 1;
 			}
+		}
+		if (!local.hasGroupBy) {
+			return;
+		}
+
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			if (IsSimpleValue(arguments.args.sql[local.i]) && $isAggregateFunction(arguments.args.sql[local.i])) {
 				local.hasAggregate = true;
+				break;
 			}
 		}
 		if (local.hasGroupBy && local.hasAggregate) {
@@ -731,14 +736,13 @@ component output=false extends="wheels.Global"{
 		}
 
 		// Overloaded arguments are settings for the query.
-		local.orgArgs = Duplicate(arguments);
-		StructDelete(local.orgArgs, "sql");
-		StructDelete(local.orgArgs, "parameterize");
-		StructDelete(local.orgArgs, "$debugName");
-		StructDelete(local.orgArgs, "limit");
-		StructDelete(local.orgArgs, "offset");
-		StructDelete(local.orgArgs, "$primaryKey");
-		StructAppend(local.queryAttributes, local.orgArgs);
+		// Copy only the non-excluded keys by reference — Duplicate(arguments) would
+		// deep-clone the entire SQL fragment array (including param structs) per query.
+		for (local.key in arguments) {
+			if (!ListFindNoCase("sql,parameterize,$debugName,limit,offset,$primaryKey", local.key)) {
+				local.queryAttributes[local.key] = arguments[local.key];
+			}
+		}
 		return $executeQuery(
 			queryAttributes = local.queryAttributes,
 			sql = arguments.sql,
