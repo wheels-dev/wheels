@@ -36,6 +36,9 @@ on them is green. ~5 minutes/day max.
    to publish if it sees TBD on the target version, and also fails if a `----`
    separator would make the release-notes awk bleed into the previous version's
    notes (recurring footgun — see #2606, #2768; now guarded in `release.yml`).
+   Do the rename **on develop** (PR it, like #2891) *before* cutting the
+   release branch — renaming only on the release branch leaves develop's
+   `[Unreleased]` entries stale and forces a back-port commit later (#2824).
 3. **Verify `wheels.json` version** matches what you want to release.
    `wheels.json` is the canonical version source since the 4.0 rebrand (the
    workflows read it; `box.json` is legacy and may be absent or empty). After
@@ -58,9 +61,30 @@ gh pr create --base main --head release/X.Y.Z-to-main \
   --title "Release X.Y.Z" --body "Cut X.Y.Z. See CHANGELOG."
 
 # 2. Merge with "Create a merge commit" (NOT squash — preserves develop
-#    history on main).
+#    history on main). Requires the repo setting "Allow merge commits"
+#    (Settings → General → Pull requests) — enabled as of 2026-06-09. The
+#    repo was squash-only at the 4.0.2 cut, which forced #2819 to squash
+#    and poisoned the next promotion (see below).
 gh pr merge --merge --delete-branch
 ```
+
+#### If the develop→main PR reports conflicts
+
+A past squash-merged release (e.g. 4.0.2 / #2819) leaves main's history
+disjoint from develop's: every file touched both in that release and since
+then 3-way-conflicts, even though develop is strictly newer (24 files at the
+4.0.3 cut). Don't resolve those by hand — develop's tree IS the release.
+Record main as a parent without changing the tree:
+
+```bash
+git checkout -b release/X.Y.Z-to-main origin/develop
+git merge -s ours origin/main -m "Merge main into release branch (ours): develop is authoritative"
+git diff HEAD origin/develop    # MUST print nothing — verify before pushing
+```
+
+The resulting PR shows exactly the develop-vs-main content diff, merges
+conflict-free, and — merged with a merge commit — permanently heals the
+divergence. The 4.0.3 cut (#2892) did exactly this.
 
 The push-to-main from that merge triggers `release.yml`, which builds the
 artifacts and calls `softprops/action-gh-release` with `tag_name: vX.Y.Z`,
@@ -70,10 +94,13 @@ by the ruleset anyway.
 
 The tag push triggers:
 - `release.yml` builds artifacts, publishes to `wheels-dev/wheels/releases`
-- `release.yml`'s "Dispatch downstream package managers" step then fires
-  three `repository_dispatch` events via `DOWNSTREAM_DISPATCH_TOKEN` (a PAT):
+- `release.yml`'s dispatch steps then fire `repository_dispatch` events via
+  PATs (`DOWNSTREAM_DISPATCH_TOKEN`, `LINUX_REPO_DISPATCH_TOKEN`):
   - `wheels-released` → `wheels-dev/homebrew-wheels` (brew formula bump)
-  - `wheels-released` → `wheels-dev/chocolatey-wheels` (choco package bump)
+  - `wheels-released` → `wheels-dev/scoop-wheels` (scoop manifest bump —
+    chocolatey was retired for the v4 Windows install; see scoop-wheels#4)
+  - `wheels-released` → `wheels-dev/apt-wheels` / `wheels-dev/yum-wheels`
+    (Linux repo metadata regen for apt.wheels.dev / yum.wheels.dev)
   - `bump-develop` → `wheels-dev/wheels` itself (this repo) — only for
     `CHANNEL=stable` (snapshots and RCs don't bump develop)
 - `bump-develop-version.yml` fires on the `bump-develop` dispatch and opens
