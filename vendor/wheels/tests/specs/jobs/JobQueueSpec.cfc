@@ -147,6 +147,7 @@ component extends="wheels.WheelsTest" {
 				expect(local.result).toBeStruct();
 				expect(local.result).toHaveKey("processed");
 				expect(local.result).toHaveKey("failed");
+				expect(local.result).toHaveKey("skipped");
 				expect(local.result).toHaveKey("errors");
 			});
 
@@ -164,6 +165,66 @@ component extends="wheels.WheelsTest" {
 
 				expect(local.result).toBeStruct();
 				expect(local.result).toHaveKey("processed");
+			});
+		});
+
+		describe("Job Claim Guard", function() {
+
+			beforeEach(function() {
+				// Clean up any leftover test jobs from prior runs
+				try { queryExecute("DELETE FROM wheels_jobs WHERE queue = 'test_claim_guard'", {}, {datasource = application.wheels.dataSourceName}); }
+				catch (any e) { /* table may not exist */ }
+			});
+
+			it("does not execute a job already claimed by another worker", function() {
+				// Enqueue using a concrete subclass so jobClass resolves correctly
+				local.testJob = new app.jobs.ProcessOrdersJob();
+				local.enqueued = local.testJob.enqueue(data = {}, queue = "test_claim_guard");
+				expect(local.enqueued).toHaveKey("persisted");
+				expect(local.enqueued.persisted).toBeTrue();
+
+				// Simulate a concurrent worker having already claimed the job
+				queryExecute(
+					"UPDATE wheels_jobs SET status = 'processing' WHERE id = :id",
+					{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				// Build the job row as processQueue's SELECT would have seen it pre-claim
+				local.jobRow = {
+					id = local.enqueued.id,
+					jobClass = "app.jobs.ProcessOrdersJob",
+					queue = "test_claim_guard",
+					data = "{}",
+					attempts = 0,
+					maxRetries = 3
+				};
+
+				local.job = new wheels.Job();
+				prepareMock(local.job);
+				makePublic(local.job, "$processJob");
+				local.jobResult = local.job.$processJob(jobRow = local.jobRow);
+
+				// The lost claim must be reported as skipped, not executed
+				expect(local.jobResult).toHaveKey("skipped");
+				expect(local.jobResult.skipped).toBeTrue();
+				expect(local.jobResult.success).toBeFalse();
+
+				// The already-claimed row must be untouched: still processing, attempts not incremented
+				local.row = queryExecute(
+					"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.row.status).toBe("processing");
+				expect(local.row.attempts).toBe(0);
+
+				// Clean up
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE queue = 'test_claim_guard'",
+					{},
+					{datasource = application.wheels.dataSourceName}
+				);
 			});
 		});
 

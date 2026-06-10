@@ -209,7 +209,7 @@ component {
 	 * @limit Maximum number of jobs to process in this batch.
 	 */
 	public struct function processQueue(string queue = "", numeric limit = 10) {
-		local.result = {processed = 0, failed = 0, errors = []};
+		local.result = {processed = 0, failed = 0, skipped = 0, errors = []};
 		local.params = {
 			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
@@ -235,6 +235,11 @@ component {
 
 		for (local.row in local.jobs) {
 			local.jobResult = $processJob(local.row);
+			if (StructKeyExists(local.jobResult, "skipped") && local.jobResult.skipped) {
+				// Another worker claimed the job between our SELECT and the claim UPDATE
+				local.result.skipped++;
+				continue;
+			}
 			if (local.jobResult.success) {
 				local.result.processed++;
 			} else {
@@ -250,20 +255,30 @@ component {
 	 * Internal: Process a single job row.
 	 */
 	private struct function $processJob(required struct jobRow) {
-		local.result = {success = false, error = ""};
+		local.result = {success = false, skipped = false, error = ""};
 
-		// Mark as processing
+		// Mark as processing using optimistic locking: the status guard ensures only
+		// one concurrent worker can claim the job. Use the result option to get the
+		// affected-row count from the same connection that executed the UPDATE. A
+		// separate verification SELECT can fail on BoxLang + PostgreSQL when the
+		// connection pool hands out a different connection that cannot see the
+		// uncommitted UPDATE.
 		try {
 			queryExecute(
 				"UPDATE wheels_jobs
 				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
-				WHERE id = :id",
+				WHERE id = :id AND status = 'pending'",
 				{
 					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 				},
-				{datasource = variables.$datasource}
+				{datasource = variables.$datasource, result = "local.updateResult"}
 			);
+			if ((local.updateResult.recordCount ?: 0) == 0) {
+				// Another worker already claimed this job — skip without executing
+				local.result.skipped = true;
+				return local.result;
+			}
 		} catch (any e) {
 			local.result.error = "Failed to lock job #arguments.jobRow.id#: #e.message#";
 			return local.result;
