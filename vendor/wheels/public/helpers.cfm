@@ -208,24 +208,32 @@ public struct function $$findMatchingRoutes(
 			ArrayAppend(local.matches, local.route);
 	}
 
-	local.alternativeMatchingMethodsForURL = "";
-
-	for (local.route in application.wheels.routes) {
-		if (!StructKeyExists(local.route, "regex"))
-			local.route.regex = application.wheels.mapper.$patternToRegex(local.route.pattern);
-
-		if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/"))
-			local.alternativeMatchingMethodsForURL = ListAppend(local.alternativeMatchingMethodsForURL, local.route.methods);
-	}
-
 	if (!ArrayLen(local.matches)) {
+		// The alternative-verbs scan is only consumed on this no-match path,
+		// so it runs here instead of on every invocation — the unconditional
+		// scan also performed lazy .regex writes onto application-scope route
+		// structs from the request thread (#2961 P14).
+		local.alternativeMatchingMethodsForURL = "";
+
+		for (local.route in application.wheels.routes) {
+			if (!StructKeyExists(local.route, "regex"))
+				local.route.regex = application.wheels.mapper.$patternToRegex(local.route.pattern);
+
+			if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/"))
+				local.alternativeMatchingMethodsForURL = ListAppend(local.alternativeMatchingMethodsForURL, local.route.methods);
+		}
+
 		if (Len(local.alternativeMatchingMethodsForURL)) {
 			ArrayAppend(
 				local.errors,
 				{
 					type = "Wheels.RouteNotFound",
 					message = "Incorrect HTTP Verb for route",
-					extendedInfo = "The `#arguments.path#` path does not allow `#EncodeForHTML(arguments.requestMethod)#` requests, only `#UCase(local.alternativeMatchingMethodsForURL)#` requests. Ensure you are using the correct HTTP Verb and that your `config/routes.cfm` file is configured correctly."
+					// EncodeForHTML on the path: this message is rendered by
+					// routetester.cfm / routetesterprocess.cfm and the raw
+					// user-supplied path was a reflected-XSS sink — the 404
+					// branch below already encodes it (#2961 SEC-8).
+					extendedInfo = "The `#EncodeForHTML(arguments.path)#` path does not allow `#EncodeForHTML(arguments.requestMethod)#` requests, only `#UCase(local.alternativeMatchingMethodsForURL)#` requests. Ensure you are using the correct HTTP Verb and that your `config/routes.cfm` file is configured correctly."
 				}
 			);
 		} else {
