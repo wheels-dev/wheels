@@ -12,6 +12,6 @@ t = createTable(name='posts');
 	t.string(columnNames='slug', limit=255, allowNull=false);
 	t.text(columnNames='body');
 	t.boolean(columnNames='published', default=false, allowNull=false);
-	t.references(referenceNames='author');
+	t.references(columnNames='author');
 	t.timestamps();
 t.create();
