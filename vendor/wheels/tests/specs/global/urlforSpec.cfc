@@ -155,17 +155,17 @@ component extends="wheels.WheelsTest" {
 					.wildcard(mapKey = true)
 					.end()
 				g.$setNamedRoutePositions()
-				
+
 				// Test with special characters in parameters
 				htmlParam = "<strong>bold</strong>"
 				ampParam = "first&second"
 				quotesParam = 'quotes"in"param'
-				
+
 				// Test with encode=false
 				r1 = g.urlFor(controller = "example", action = "show", key = htmlParam, encode = false)
 				r2 = g.urlFor(controller = "example", action = "show", key = ampParam, encode = false)
 				r3 = g.urlFor(controller = "example", action = "show", key = quotesParam, encode = false)
-				
+
 				// Expected unencoded results
 				if (application.wheels.URLRewriting eq 'On') {
 					expect(r1).toBe("/example/show/<strong>bold</strong>")
@@ -180,6 +180,89 @@ component extends="wheels.WheelsTest" {
 					expect(r2).toBe("/index.cfm/example/show/first&second")
 					expect(r3).toBe('/index.cfm/example/show/quotes"in"param')
 				}
+			})
+
+			describe("controller/action route lookup cache (issue 2955)", () => {
+
+				beforeEach(() => {
+					_originalUrlForCache = StructKeyExists(application.wheels, "urlForCache") ? StructCopy(application.wheels.urlForCache) : {}
+				})
+
+				afterEach(() => {
+					if (StructKeyExists(application.wheels, "urlForCache")) {
+						StructClear(application.wheels.urlForCache)
+						StructAppend(application.wheels.urlForCache, _originalUrlForCache)
+					}
+				})
+
+				it("memo lives in application scope so it survives across requests", () => {
+					mapper = $mapper()
+					mapper
+						.$draw()
+						.get(name = "hit_cache", pattern = "hit-cache", to = "hits##show")
+						.end()
+					g.$setNamedRoutePositions()
+
+					expect(StructKeyExists(application.wheels, "urlForCache")).toBeTrue()
+					initialKeys = StructCount(application.wheels.urlForCache)
+
+					g.urlFor(controller = "hits", action = "show")
+
+					expect(StructCount(application.wheels.urlForCache)).toBeGT(initialKeys)
+				})
+
+				it("negative-caches misses so wildcard-only apps don't re-scan", () => {
+					mapper = $mapper()
+					mapper
+						.$draw()
+						.wildcard(mapKey = true)
+						.end()
+					g.$setNamedRoutePositions()
+
+					g.urlFor(controller = "noSuchController", action = "noSuchAction")
+
+					missKey = ""
+					for (cacheKey in application.wheels.urlForCache) {
+						if (cacheKey contains "noSuchController" && cacheKey contains "noSuchAction") {
+							missKey = cacheKey
+							break
+						}
+					}
+
+					expect(missKey).notToBe("")
+					expect(application.wheels.urlForCache[missKey]).toBe("")
+				})
+
+				it("invalidates the cache when a new route is added via the mapper", () => {
+					mapper = $mapper()
+					mapper
+						.$draw()
+						.get(name = "before", pattern = "before", to = "first##show")
+						.end()
+					g.$setNamedRoutePositions()
+					g.urlFor(controller = "first", action = "show")
+
+					expect(StructCount(application.wheels.urlForCache)).toBeGT(0)
+
+					mapper2 = $mapper()
+					mapper2
+						.$draw()
+						.get(name = "after", pattern = "after", to = "second##show")
+						.end()
+
+					expect(StructCount(application.wheels.urlForCache)).toBe(0)
+				})
+
+				it("invalidates the cache when routes are reloaded via $lockedLoadRoutes", () => {
+					if (!StructKeyExists(application.wheels, "urlForCache")) {
+						application.wheels.urlForCache = {}
+					}
+					application.wheels.urlForCache["stale##entry"] = "stale_route_name"
+
+					g.$lockedLoadRoutes()
+
+					expect(StructKeyExists(application.wheels.urlForCache, "stale##entry")).toBeFalse()
+				})
 			})
 		})
 	}

@@ -20,6 +20,10 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ## [Unreleased]
 
+### Performance
+
+- `URLFor()` controller/action route lookup is now memoized in application scope with negative caching, instead of a per-request memo that only cached matches. The previous memo was rebuilt on every request and was never written on a miss, so wildcard-`[controller]` apps — where `$addRoute` strips the `controller` key, guaranteeing no match — re-scanned the entire route table for every `linkTo` / `urlFor` / `redirectTo` call, on every request. The new `application.wheels.urlForCache` survives across requests and caches both hits and misses (empty-string sentinel) for O(1) lookup. Invalidation is plumbed through both `$lockedLoadRoutes` (route reload) and `$addRoute` (any mutation, including test-suite manipulation), so a previously negative-cached `(controller, action)` pair that a newly-added route now matches can never serve a stale miss (#2955)
+
 ### Fixed
 
 - `Job.processQueue()`'s private `$processJob` now guards the claim `UPDATE` with `AND status = 'pending'` and verifies the affected-row count via the `queryExecute` `result` option on the same statement, mirroring the matrix-proven `JobWorker.cfc::$claimJob` idiom (a separate verification `SELECT` breaks on BoxLang + PostgreSQL when the connection pool hands out a different connection that cannot see the uncommitted UPDATE). Pre-fix, two concurrent claimers — overlapping `processQueue()` callers, or `processQueue` racing the CLI worker — could both claim the same job and both run `perform()` (duplicate emails/charges, with `attempts` double-incremented). A lost claim now early-returns `{success = false, skipped = true}` before job instantiation, tenant-context setup, and `perform()`; `processQueue()` counts lost claims under a new additive `skipped` result key (#2899)
