@@ -96,9 +96,12 @@ component extends="wheels.WheelsTest" {
     }
 
     function afterAll() {
-        // Launcher + Browser are process-scoped; the application-scoped
-        // launcher is released when the Lucee app scope clears. We just
-        // drop our local handle.
+        // Launcher + Browser are application-scoped and shared across spec
+        // CFCs in the run. CFML has no destructors, so scope-clear alone
+        // would leak them — Application.cfc's onApplicationEnd (which fires
+        // on applicationStop() reloads and app timeout) calls
+        // BrowserLauncher.release() to close browsers, the node driver
+        // process, and the URLClassLoader. Here we just drop our local handle.
         variables.$browser = "";
     }
 
@@ -133,8 +136,11 @@ component extends="wheels.WheelsTest" {
             beforeEach(function() { me.$startBrowserContext(); });
 
             aroundEach(function(spec, suite) {
+                // Skip path: do NOT execute the spec body. Specs don't need
+                // hand-written `if (this.browserTestSkipped) return;` guards —
+                // a forgotten guard used to hit the UnwiredBrowserGuard
+                // sentinel and fail in CI instead of skipping.
                 if (me.browserTestSkipped) {
-                    arguments.spec.body();
                     return;
                 }
                 try {
@@ -157,6 +163,16 @@ component extends="wheels.WheelsTest" {
      */
     public void function $startBrowserContext() {
         if (this.browserTestSkipped) return;
+
+        // A spec that overrides beforeAll() without calling super.beforeAll()
+        // leaves $browser unwired (empty string); calling newContext() on it
+        // would produce a cryptic string-method error.
+        if (!isObject(variables.$browser)) {
+            throw(
+                type="Wheels.BrowserTest.NotWired",
+                message="No Browser has been acquired for this spec. If your spec overrides beforeAll(), call super.beforeAll() first so the launcher and Browser are wired."
+            );
+        }
 
         var contextOpts = $buildContextOptions();
 
@@ -228,7 +244,7 @@ component extends="wheels.WheelsTest" {
                     throw(
                         type="Wheels.BrowserNotInstalled",
                         message="Playwright JAR missing: " & p
-                            & ". Run tools/install-playwright.sh to set up browser testing."
+                            & ". Run `wheels browser setup` to set up browser testing."
                     );
                 }
             }

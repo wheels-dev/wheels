@@ -142,7 +142,9 @@ component {
 	) {
 		$args(name = "imageTag", reserved = "src", args = arguments);
 
-		// Ugly fix due to the fact that id can't be passed along to cfinvoke.
+		// Workaround: an `id` key clashes with reserved attribute handling in the internal
+		// invocation layer used by the caching code below ($doubleCheckedLock -> $invoke -> cfinvoke),
+		// so it's renamed to `wheelsId` while the tag is generated and renamed back further down.
 		if (StructKeyExists(arguments, "id")) {
 			arguments.wheelsId = arguments.id;
 			StructDelete(arguments, "id");
@@ -169,9 +171,11 @@ component {
 			local.rv = $imageTag(argumentCollection = arguments);
 		}
 
-		// Ugly fix continued.
+		// Workaround continued: rename the generated `wheelsid` attribute back to `id`.
+		// Match only at an attribute-name boundary (whitespace before, `="` after) so that
+		// attribute values that happen to contain the text "wheelsid" are left untouched.
 		if (StructKeyExists(arguments, "wheelsId")) {
-			local.rv = ReplaceNoCase(local.rv, "wheelsId", "id");
+			local.rv = REReplaceNoCase(local.rv, "(\s)wheelsid(="")", "\1id\2", "one");
 		}
 
 		return local.rv;
@@ -208,7 +212,7 @@ component {
 				local.file &= $get("imagePath") & "/" & SpanExcluding(arguments.source, "?");
 			}
 			if ($get("showErrorInformation") && arguments.required) {
-				if (local.localFile && !FileExists(local.file)) {
+				if (!FileExists(local.file)) {
 					Throw(
 						type = "Wheels.ImageFileNotFound",
 						message = "Wheels could not find `#local.file#` on the local file system.",

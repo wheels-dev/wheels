@@ -114,6 +114,17 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Override Base adapter's function.
+	 * Oracle does not support LIMIT/OFFSET — use the OFFSET/FETCH syntax (12c+) instead.
+	 */
+	public string function $limitOffsetClause(required numeric limit, required numeric offset) {
+		if (arguments.offset) {
+			return "OFFSET " & arguments.offset & " ROWS" & Chr(13) & Chr(10) & "FETCH NEXT " & arguments.limit & " ROWS ONLY";
+		}
+		return "FETCH FIRST " & arguments.limit & " ROWS ONLY";
+	}
+
+	/**
+	 * Override Base adapter's function.
 	 */
 	public string function $generatedKey() {
 		return "lastId";

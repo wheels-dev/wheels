@@ -100,6 +100,18 @@ component output="false" {
 	}
 
 	public void function onApplicationEnd( struct ApplicationScope ) {
+		// Release the application-scoped browser-test launcher (headless browser,
+		// node driver process, URLClassLoader handles on the Playwright JARs)
+		// before the scope is discarded. CFML has no destructors, so without this
+		// every applicationStop() reload cycle would orphan those processes.
+		if (StructKeyExists(arguments.applicationScope, "$wheelsBrowserLauncher")) {
+			try {
+				arguments.applicationScope.$wheelsBrowserLauncher.release();
+			} catch (any e) {
+				// Best-effort cleanup — never block application shutdown.
+			}
+		}
+
 		application.wo.$include(
 			template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
 			argumentCollection = arguments

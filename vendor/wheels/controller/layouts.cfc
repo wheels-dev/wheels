@@ -47,13 +47,21 @@ component {
 				if (StructCount(local.layout) eq StructCount(arguments)) {
 					local.oneKeyIsDifferent = false;
 					for (local.key in arguments) {
-						if (local.layout[local.key] neq arguments[key]) {
+						// Iterating the arguments scope can yield declared-but-unset keys (null-valued on Lucee / Adobe), for which StructKeyExists() returns false.
+						// Treat a key as equal when it is unset on both sides, and as different when it is set on only one side (e.g. one declaration using `only` and another using `except`) or when both are set with different values.
+						local.keyInArguments = StructKeyExists(arguments, local.key);
+						local.keyInLayout = StructKeyExists(local.layout, local.key);
+						if (
+							local.keyInArguments neq local.keyInLayout
+							|| (local.keyInArguments && local.layout[local.key] neq arguments[local.key])
+						) {
 							local.oneKeyIsDifferent = true;
+							break;
 						}
 					}
 					if (!local.oneKeyIsDifferent) {
 						local.layoutInArray = true;
-						local.layoutPostionInArray = local.i;
+						local.layoutPositionInArray = local.i;
 					}
 				}
 			}
@@ -63,7 +71,7 @@ component {
 
 		// If this layout was is in the array, we need to delete it to respect the order of declaration
 		if (local.layoutInArray) {
-			ArrayDeleteAt(variables.$class.layouts, local.layoutPostionInArray);
+			ArrayDeleteAt(variables.$class.layouts, local.layoutPositionInArray);
 		}
 	}
 
@@ -123,31 +131,21 @@ component {
 			local.include = local.viewPath;
 			if (IsBoolean(arguments.$layout)) {
 				local.layoutFileExists = false;
-				if (
-					!ListFindNoCase(application.wheels.existingLayoutFiles, variables.params.controller)
-					&& !ListFindNoCase(application.wheels.nonExistingLayoutFiles, variables.params.controller)
-				) {
+				if (!StructKeyExists(application.wheels.layoutFileCache, variables.params.controller)) {
 					local.file = local.viewPath & "/" & LCase(variables.params.controller) & "/layout.cfm";
 					if (FileExists(ExpandPath(local.file))) {
 						local.layoutFileExists = true;
 					}
 					if ($get("cacheFileChecking")) {
-						if (local.layoutFileExists) {
-							application.wheels.existingLayoutFiles = ListAppend(
-								application.wheels.existingLayoutFiles,
-								variables.params.controller
-							);
-						} else {
-							application.wheels.nonExistingLayoutFiles = ListAppend(
-								application.wheels.nonExistingLayoutFiles,
-								variables.params.controller
-							);
-						}
+						application.wheels.layoutFileCache[variables.params.controller] = local.layoutFileExists;
 					}
 				}
 				if (
-					ListFindNoCase(application.wheels.existingLayoutFiles, variables.params.controller)
-					|| local.layoutFileExists
+					local.layoutFileExists
+					|| (
+						StructKeyExists(application.wheels.layoutFileCache, variables.params.controller)
+						&& application.wheels.layoutFileCache[variables.params.controller]
+					)
 				) {
 					local.include &= "/" & variables.params.controller & "/" & "layout.cfm";
 				} else {

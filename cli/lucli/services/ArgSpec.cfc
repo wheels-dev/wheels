@@ -84,13 +84,19 @@ component {
 			result[optName] = variables.named[optName]["default"];
 		}
 
-		// 2. Bind positionals from coll.arg1, arg2, ... in declaration order.
+		// 2. Bind positionals in declaration order. LuCLI numbers positionals
+		//    by GLOBAL token index, so a named option/flag between positionals
+		//    leaves a numbering gap (`wheels new --port=3000 blog` arrives as
+		//    {port="3000", arg2="blog"} — there is no arg1). Collect every
+		//    arg<N> key and sort numerically instead of probing literal
+		//    arg1..argN; fixed-index probing made gap-following positionals
+		//    silently bind nothing (the appName above was ignored).
+		var positionalIndices = $positionalIndices(arguments.coll);
 		var positionalCount = arrayLen(variables.positionals);
 		for (var i = 1; i <= positionalCount; i++) {
 			var pSpec = variables.positionals[i];
-			var collKey = "arg" & i;
-			if (structKeyExists(arguments.coll, collKey)) {
-				result[pSpec.name] = $coerce(arguments.coll[collKey], pSpec.type);
+			if (i <= arrayLen(positionalIndices)) {
+				result[pSpec.name] = $coerce(arguments.coll["arg" & positionalIndices[i]], pSpec.type);
 			} else if (pSpec.required) {
 				throw(
 					type = "Wheels.CLI.MissingArgument",
@@ -135,13 +141,14 @@ component {
 	public array function toArgv(required struct coll) {
 		var result = [];
 
-		// Positionals in arg1..argN order. Stops at the first index gap,
-		// mirroring the legacy argsFromCollection — dispatchers always pass
-		// the sub-verb as the leading positional, so a gap never elides one.
-		var i = 1;
-		while (structKeyExists(arguments.coll, "arg" & i)) {
-			arrayAppend(result, arguments.coll["arg" & i]);
-			i++;
+		// Positionals in numeric arg<N> order. LuCLI numbers positionals by
+		// global token index, so a flag between two positionals leaves a gap
+		// (arg1, arg2, arg4, ...). The previous loop stopped at the first gap
+		// and silently dropped every positional after a flag — `wheels g
+		// scaffold Post --force title:string body:text` lost both columns.
+		// Collect-and-sort heals the gaps (mirrors parseTestArgs).
+		for (var idx in $positionalIndices(arguments.coll)) {
+			arrayAppend(result, arguments.coll["arg" & idx]);
 		}
 
 		// Named keys, re-prefixed. --no-X for false preserves the negation.
@@ -160,6 +167,24 @@ component {
 		}
 
 		return result;
+	}
+
+	/**
+	 * Collect the numeric index of every positional (arg<N>) key in the
+	 * collection, sorted ascending. LuCLI numbers positionals by global token
+	 * index — a named option/flag consumes an index without producing an
+	 * arg<N> key — so consumers must never assume the indices are contiguous
+	 * or start at 1.
+	 */
+	private array function $positionalIndices(required struct coll) {
+		var indices = [];
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				arrayAppend(indices, val(mid(key, 4, len(key))));
+			}
+		}
+		arraySort(indices, "numeric");
+		return indices;
 	}
 
 	private any function $coerce(required any v, required string type) {

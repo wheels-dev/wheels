@@ -129,6 +129,16 @@ component extends="wheels.WheelsTest" {
 				local.result = _controller.$formatSSEEvent(data = "");
 				expect(local.result).toInclude("data: ");
 			});
+
+			it("preserves blank lines in multi-line data", function() {
+				local.input = "line one" & Chr(10) & Chr(10) & "line two";
+				local.result = _controller.$formatSSEEvent(data = local.input);
+				// The blank line must survive as an empty data: field so the client
+				// reconstructs "line one\n\nline two" instead of "line one\nline two"
+				expect(local.result).toBe(
+					"data: line one" & Chr(10) & "data: " & Chr(10) & "data: line two" & Chr(10) & Chr(10)
+				);
+			});
 		});
 
 		describe("SSE Newline Injection Prevention", function() {

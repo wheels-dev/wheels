@@ -102,10 +102,19 @@ component output="false" {
 		local.rv = ReReplace(local.rv, "\[(\*?\w+)\]", ":::\1:::", "all");
 
 		// Replace known variable keys using constraints.
+		// Constraint patterns are rewritten to use non-capturing groups because route
+		// variables are extracted from the compiled regex by group position (see
+		// $mergeRoutePattern in Dispatch.cfc) — an extra capturing group inside a
+		// constraint would silently shift every subsequent variable's value.
 		local.constraints = StructCopy(arguments.constraints);
 		StructAppend(local.constraints, variables.constraints, false);
 		for (local.key in local.constraints) {
-			local.rv = ReReplaceNoCase(local.rv, ":::#local.key#:::", "(#local.constraints[local.key]#)", "all");
+			local.rv = ReReplaceNoCase(
+				local.rv,
+				":::#local.key#:::",
+				"(#$nonCapturingConstraint(local.constraints[local.key])#)",
+				"all"
+			);
 		}
 
 		// Replace remaining variables with default regex.
@@ -115,6 +124,66 @@ component output="false" {
 		// Escape any forward slashes.
 		local.rv = ReReplace(local.rv, "(\/|\\\/)", "\/", "all");
 
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * Rewrites unescaped capturing groups (`(`) in a constraint pattern to non-capturing
+	 * groups (`(?:`). Route variables are extracted from the compiled route regex by group
+	 * position, so a capturing group inside a constraint (e.g., `whereMatch("size", "[0-9]+(px|em)")`)
+	 * would shift every subsequent variable to the wrong value or crash param extraction.
+	 * Parentheses inside character classes (e.g., `[\w()-]+`) are literal characters, not
+	 * groups, so the scanner tracks unescaped bracket depth and leaves them untouched
+	 * (rewriting them would silently widen the class to also match `?` and `:`).
+	 */
+	public string function $nonCapturingConstraint(required string pattern) {
+		local.rv = "";
+		local.length = Len(arguments.pattern);
+		local.backslashCount = 0;
+		local.charClassDepth = 0;
+		local.classJustOpened = false;
+		for (local.i = 1; local.i <= local.length; local.i++) {
+			local.char = Mid(arguments.pattern, local.i, 1);
+			if (local.char == "\") {
+				local.backslashCount++;
+				local.rv &= local.char;
+				local.classJustOpened = false;
+				continue;
+			}
+			local.escaped = local.backslashCount % 2 != 0;
+			local.backslashCount = 0;
+			if (!local.escaped && local.char == "[") {
+				// Unescaped `[` opens a character class (Java regex allows nested classes too).
+				local.charClassDepth++;
+				local.rv &= local.char;
+				local.classJustOpened = true;
+				continue;
+			}
+			if (!local.escaped && local.char == "]" && local.charClassDepth > 0 && !local.classJustOpened) {
+				// Unescaped `]` closes the innermost character class — unless it is the first
+				// member of a just-opened class (`[]]` or `[^]]`), which Java treats as a literal.
+				local.charClassDepth--;
+				local.rv &= local.char;
+				continue;
+			}
+			if (
+				!local.escaped
+				&& local.char == "("
+				&& local.charClassDepth == 0
+				&& (local.i == local.length || Mid(arguments.pattern, local.i + 1, 1) != "?")
+			) {
+				// Unescaped capturing group outside any character class: make it non-capturing.
+				local.rv &= "(?:";
+			} else {
+				local.rv &= local.char;
+			}
+			// `^` directly after the class opener negates the class, keeping the next
+			// character in first-member position; anything else ends that position.
+			if (!(local.classJustOpened && !local.escaped && local.char == "^")) {
+				local.classJustOpened = false;
+			}
+		}
 		return local.rv;
 	}
 
@@ -148,7 +217,8 @@ component output="false" {
 
 		// Validate the regex compiles correctly (do not store the Java Pattern object
 		// in the route struct because Duplicate() cannot deep-copy Java objects reliably
-		// across all CFML engines, and route structs are duplicated at match time).
+		// across all CFML engines, and route structs are copied at match time with their
+		// non-simple members duplicated — see $copyRouteForRequest in Dispatch.cfc).
 		$compileRegex(argumentCollection = arguments);
 
 		// Determine if this is a static route (no variables in the pattern).

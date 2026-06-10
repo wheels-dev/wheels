@@ -115,7 +115,8 @@ component extends="Base" {
 	 */
 	public void function dropTable(required string name) {
 		local.appKey = $appKey();
-		local.adapterName = $getDBType();
+		// init() already resolved the engine — no need to re-sniff via $getDBType().
+		local.adapterName = this.adapter.adapterName();
 		if (application[local.appKey].serverName != "lucee" && local.adapterName != "SQLite") {
 			local.foreignKeys = $getForeignKeys(arguments.name);
 			local.foreignKeysArray = ListToArray(local.foreignKeys);
@@ -410,6 +411,7 @@ component extends="Base" {
 	 *
 	 * @table The table name to perform the index operation on
 	 * @columnNames One or more column names to index, comma separated
+	 * @columnName Singular alias for `columnNames` (matches the convention every other migrator helper follows). Pass one or the other — not both.
 	 * @unique If true will create a unique index constraint
 	 * @indexName The name of the index to add: Defaults to table name + underscore + first column name
 	 */
@@ -417,9 +419,16 @@ component extends="Base" {
 		required string table,
 		string columnNames,
 		boolean unique = "false",
-		string indexName = objectCase("#arguments.table#_#ListFirst(arguments.columnNames)#")
+		string indexName = ""
 	) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
+		// Compute the default index name here, AFTER $combineArguments has
+		// resolved the columnName alias — a parameter-default expression would
+		// dereference arguments.columnNames before the alias resolves and throw
+		// an undefined-key error on the documented columnName path.
+		if (!Len(arguments.indexName)) {
+			arguments.indexName = objectCase("#arguments.table#_#ListFirst(arguments.columnNames)#");
+		}
 		$execute(this.adapter.addIndex(argumentCollection = arguments));
 		announce("Added index to column(s) #arguments.columnNames# in table #arguments.table#");
 	}
@@ -467,16 +476,20 @@ component extends="Base" {
 		local.columnNames = "";
 		local.placeholders = "";
 		local.params = [];
+		// One metadata probe per record (cached per request inside $getColumns)
+		// — previously each timestamp check below issued its own full
+		// table-column round-trip.
+		local.tableColumns = $getColumns(arguments.table);
 		if (
 			!StructKeyExists(arguments, application[local.appKey].timeStampOnCreateProperty)
-			&& ListFindNoCase($getColumns(arguments.table), application[local.appKey].timeStampOnCreateProperty)
+			&& ListFindNoCase(local.tableColumns, application[local.appKey].timeStampOnCreateProperty)
 		) {
 			arguments[application[local.appKey].timeStampOnCreateProperty] = $timestamp();
 		}
 		if (
 			application[local.appKey].setUpdatedAtOnCreate
 			&& !StructKeyExists(arguments, application[local.appKey].timeStampOnUpdateProperty)
-			&& ListFindNoCase($getColumns(arguments.table), application[local.appKey].timeStampOnUpdateProperty)
+			&& ListFindNoCase(local.tableColumns, application[local.appKey].timeStampOnUpdateProperty)
 		) {
 			arguments[application[local.appKey].timeStampOnUpdateProperty] = $timestamp();
 		}

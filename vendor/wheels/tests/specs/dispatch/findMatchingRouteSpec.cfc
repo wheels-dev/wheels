@@ -289,6 +289,45 @@ component extends="wheels.WheelsTest" {
 				expect(route.name).toBe("users")
 				expect(route.methods).toBe("get")
 			})
+
+			it("returns a static-route copy whose nested members are not shared with the route table", () => {
+				request.cgi["request_method"] = "GET"
+				route = d.$findMatchingRoute(path = "users")
+				route.constraints["injected"] = "x"
+				rematch = d.$findMatchingRoute(path = "users")
+
+				expect(rematch.constraints).notToHaveKey("injected")
+			})
+
+			it("returns a regex-route copy whose nested members are not shared with the route table", () => {
+				request.cgi["request_method"] = "GET"
+				route = d.$findMatchingRoute(path = "users/1")
+				route.constraints["injected"] = "x"
+				rematch = d.$findMatchingRoute(path = "users/1")
+
+				expect(rematch.constraints).notToHaveKey("injected")
+			})
+
+			it("stashes the regex match result for reuse by $mergeRoutePattern", () => {
+				request.cgi["request_method"] = "GET"
+				route = d.$findMatchingRoute(path = "users/1")
+
+				expect(route).toHaveKey("regexMatch")
+
+				_params = d.$mergeRoutePattern(params = {}, route = route, path = "users/1")
+				expect(_params).toHaveKey("key")
+				expect(_params.key).toBe("1")
+			})
+
+			it("merges route pattern variables when no stashed match result is present", () => {
+				request.cgi["request_method"] = "GET"
+				route = d.$findMatchingRoute(path = "users/1")
+				StructDelete(route, "regexMatch")
+
+				_params = d.$mergeRoutePattern(params = {}, route = route, path = "users/1")
+				expect(_params).toHaveKey("key")
+				expect(_params.key).toBe("1")
+			})
 		})
 	}
 }

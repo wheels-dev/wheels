@@ -51,7 +51,9 @@ component {
 
 		local.encodeExcept = "";
 		if (!StructKeyExists(arguments, "href")) {
-			local.args = Duplicate(arguments);
+			// Shallow copy is enough here (we only add/override top-level keys for URLFor);
+			// Duplicate() would deep-clone model objects passed as `key` on every link.
+			local.args = StructCopy(arguments);
 			local.args.$encodeForHtmlAttribute = true;
 			if (local.args.encode == "attributes") {
 				local.args.encode = true;
@@ -130,7 +132,8 @@ component {
 			}
 		}
 		arguments.method = local.method;
-		local.args = Duplicate(arguments);
+		// Shallow copy for the same reason as in linkTo() above.
+		local.args = StructCopy(arguments);
 		local.args.$encodeForHtmlAttribute = true;
 		if (local.args.encode == "attributes") {
 			local.args.encode = true;
@@ -284,23 +287,7 @@ component {
 		}
 
 		// Encode all prepend / append type arguments if specified.
-		if (IsBoolean(arguments.encode) && arguments.encode && $get("encodeHtmlTags")) {
-			if (Len(arguments.prepend)) {
-				arguments.prepend = EncodeForHTML($canonicalize(arguments.prepend));
-			}
-			if (Len(arguments.prependToPage)) {
-				arguments.prependToPage = EncodeForHTML($canonicalize(arguments.prependToPage));
-			}
-			if (Len(arguments.append)) {
-				arguments.append = EncodeForHTML($canonicalize(arguments.append));
-			}
-			if (Len(arguments.appendToPage)) {
-				arguments.appendToPage = EncodeForHTML($canonicalize(arguments.appendToPage));
-			}
-			if (Len(arguments.anchorDivider)) {
-				arguments.anchorDivider = EncodeForHTML($canonicalize(arguments.anchorDivider));
-			}
-		}
+		$encodeArgsForHtml(args = arguments, keys = "prepend,prependToPage,append,appendToPage,anchorDivider");
 
 		if (arguments.showSinglePage || local.totalPages > 1) {
 			// Strip event handlers from appendToPage (parallel to prependToPage sanitization in the loop)
@@ -534,11 +521,14 @@ component {
 				local.str = ReReplaceNoCase(local.str, local.punctuationRegEx, "", "all");
 
 				// Make sure that links beginning with "www." have a protocol.
-				if (Left(local.str, 4) == "www." && !Len(arguments.protocol)) {
-					arguments.protocol = "http://";
+				// Computed per match (not stored on `arguments`) so a www-form URL doesn't
+				// prefix subsequent absolute URLs in the same text with "http://".
+				local.protocol = arguments.protocol;
+				if (Left(local.str, 4) == "www." && !Len(local.protocol)) {
+					local.protocol = "http://";
 				}
 
-				arguments.href = arguments.protocol & local.str;
+				arguments.href = local.protocol & local.str;
 				local.element = $element(
 					name = "a",
 					content = local.str,
@@ -572,7 +562,15 @@ component {
 			local.match = reFindNoCase('&##x([0-9a-f]+);', local.result, local.pos, true);
 			if (local.match.pos[1] == 0) break;
 			local.hex = Mid(local.result, local.match.pos[2], local.match.len[2]);
-			local.char = Chr(InputBaseN(local.hex, 16));
+			// Cap the code point to the valid Unicode range (1..0x10FFFF) so overlong or
+			// out-of-range references can't crash Chr(); invalid entities are left untouched.
+			local.digits = ReReplace(local.hex, "^0+", "");
+			local.codePoint = (Len(local.digits) && Len(local.digits) <= 6) ? InputBaseN(local.digits, 16) : 0;
+			if (local.codePoint < 1 || local.codePoint > 1114111) {
+				local.pos = local.match.pos[1] + local.match.len[1];
+				continue;
+			}
+			local.char = Chr(local.codePoint);
 			// Lucee 7 doesn't allow Left(str, 0); guard against match at position 1
 			local.prefix = local.match.pos[1] > 1 ? Left(local.result, local.match.pos[1] - 1) : "";
 			local.result = local.prefix & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
@@ -584,7 +582,14 @@ component {
 			local.match = reFind('&##(\d+);', local.result, local.pos, true);
 			if (local.match.pos[1] == 0) break;
 			local.dec = Mid(local.result, local.match.pos[2], local.match.len[2]);
-			local.char = Chr(Int(local.dec));
+			// Same range cap as the hex branch above (1..0x10FFFF = 1114111).
+			local.digits = ReReplace(local.dec, "^0+", "");
+			local.codePoint = (Len(local.digits) && Len(local.digits) <= 7) ? Int(local.digits) : 0;
+			if (local.codePoint < 1 || local.codePoint > 1114111) {
+				local.pos = local.match.pos[1] + local.match.len[1];
+				continue;
+			}
+			local.char = Chr(local.codePoint);
 			local.prefix = local.match.pos[1] > 1 ? Left(local.result, local.match.pos[1] - 1) : "";
 			local.result = local.prefix & local.char & Mid(local.result, local.match.pos[1] + local.match.len[1], Len(local.result));
 			local.pos = local.match.pos[1] + Len(local.char);
@@ -597,10 +602,10 @@ component {
 			return arguments.params;
 		}
 		local.queryString = "";
-		for (key in arguments.params) {
-			local.value = arguments.params[key];
+		for (local.key in arguments.params) {
+			local.value = arguments.params[local.key];
 			if (!isNull(local.value) && local.value != "") {
-				local.queryString &= (Len(local.queryString) ? "&" : "") & key & "=" & encodeForUrl(local.value);
+				local.queryString &= (Len(local.queryString) ? "&" : "") & encodeForUrl(local.key) & "=" & encodeForUrl(local.value);
 			}
 		}
 		return local.queryString;

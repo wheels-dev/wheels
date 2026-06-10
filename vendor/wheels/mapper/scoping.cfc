@@ -108,7 +108,9 @@ component {
 		string package = arguments.name,
 		string path = hyphenize(arguments.name)
 	) {
-		return scope(name = arguments.name, package = arguments.package, path = arguments.path, $call = "namespace");
+		// Forward all arguments so scope() options like middleware and binding are
+		// not silently dropped.
+		return scope(argumentCollection = arguments, $call = "namespace");
 	}
 
 	/**
@@ -121,7 +123,9 @@ component {
 	 * @package Subfolder (package) to reference for controllers. This defaults to the value provided for `name`.
 	 */
 	public struct function package(required string name, string package = arguments.name) {
-		return scope(name = arguments.name, package = arguments.package, $call = "package");
+		// Forward all arguments so scope() options like middleware and binding are
+		// not silently dropped.
+		return scope(argumentCollection = arguments, $call = "package");
 	}
 
 	/**
@@ -165,20 +169,16 @@ component {
 		struct constraints,
 		any callback
 	) {
+		// Forward every passed argument so scope() options like middleware and
+		// binding are not silently dropped. Only `callback` is consumed by group()
+		// itself. (api() and version() delegate here, so they inherit this too.)
 		local.args = {};
+		for (local.key in arguments) {
+			if (local.key != "callback" && StructKeyExists(arguments, local.key) && !IsNull(arguments[local.key])) {
+				local.args[local.key] = arguments[local.key];
+			}
+		}
 		local.args.$call = "group";
-
-		if (StructKeyExists(arguments, "name")) {
-			local.args.name = arguments.name;
-		}
-
-		if (StructKeyExists(arguments, "path")) {
-			local.args.path = arguments.path;
-		}
-
-		if (StructKeyExists(arguments, "constraints")) {
-			local.args.constraints = arguments.constraints;
-		}
 
 		scope(argumentCollection = local.args);
 

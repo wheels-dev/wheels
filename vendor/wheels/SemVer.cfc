@@ -88,9 +88,25 @@ component output="false" {
 			local.operator = Left(local.c, 1);
 			local.targetStr = Trim(Mid(local.c, 2, Len(local.c) - 1));
 		} else if (Left(local.c, 1) == "^") {
-			return $satisfiesCaret(local.ver, Trim(Mid(local.c, 2, Len(local.c) - 1)));
+			local.caretTarget = Trim(Mid(local.c, 2, Len(local.c) - 1));
+			if (!Len(local.caretTarget)) {
+				// Operator with no target is malformed — fail closed.
+				return false;
+			}
+			return $satisfiesCaret(local.ver, local.caretTarget);
 		} else if (Left(local.c, 1) == "~") {
-			return $satisfiesTilde(local.ver, Trim(Mid(local.c, 2, Len(local.c) - 1)));
+			local.tildeTarget = Trim(Mid(local.c, 2, Len(local.c) - 1));
+			if (!Len(local.tildeTarget)) {
+				// Operator with no target is malformed — fail closed.
+				return false;
+			}
+			return $satisfiesTilde(local.ver, local.tildeTarget);
+		}
+		// An operator with an empty target (e.g. a bare ">=") is malformed —
+		// fail closed instead of parsing the empty target as 0.0.0, which
+		// would make the constraint match almost everything.
+		if (Len(local.operator) && !Len(local.targetStr)) {
+			return false;
 		}
 		// Default: exact match
 		if (!Len(local.operator)) {
@@ -117,7 +133,9 @@ component output="false" {
 	/**
 	 * Evaluates whether a version satisfies ALL constraints in a space-separated string.
 	 * Each constraint is ANDed: ">=1.0.0 <2.0.0" means version must satisfy both.
-	 * Wildcard "*" always returns true.
+	 * A space between an operator and its target is tolerated: ">= 1.0.0" is
+	 * read as ">=1.0.0", not as two separate constraints. Wildcard "*" always
+	 * returns true.
 	 *
 	 * @version The version to check (string or parsed struct)
 	 * @constraints Space-separated constraint expressions
@@ -130,7 +148,26 @@ component output="false" {
 		}
 		local.ver = IsStruct(arguments.version) ? arguments.version : this.parse(arguments.version);
 		local.parts = ListToArray(local.c, " ");
-		for (local.part in local.parts) {
+		// Merge an operator-only token with the following token so constraints
+		// written with a space after the operator (">= 1.0.0", "^ 1.2.3") keep
+		// their range semantics. Without this, ">= 1.0.0" split into ">="
+		// (empty target) AND "1.0.0" (exact match) — silently turning a range
+		// constraint into an exact match. A trailing operator with no target
+		// falls through to satisfies(), which fails closed on it.
+		local.merged = [];
+		local.i = 1;
+		local.partCount = ArrayLen(local.parts);
+		while (local.i <= local.partCount) {
+			local.token = local.parts[local.i];
+			if (local.i < local.partCount && REFind("^(>=|<=|[><=^~])$", local.token)) {
+				local.token &= local.parts[local.i + 1];
+				local.i += 2;
+			} else {
+				local.i += 1;
+			}
+			ArrayAppend(local.merged, local.token);
+		}
+		for (local.part in local.merged) {
 			if (!this.satisfies(local.ver, local.part)) {
 				return false;
 			}

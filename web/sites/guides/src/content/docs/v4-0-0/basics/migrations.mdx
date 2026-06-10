@@ -42,7 +42,11 @@ wheels --version
 `wheels migrate info` and `wheels migrate doctor` are read-only and still probe common ports as a fallback, so they work without an explicit port config.
 </Aside>
 
-The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly — the schema either moves fully or not at all.
+The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly on databases that support transactional DDL — but that support varies, so read the caution below before relying on it.
+
+<Aside type="caution" title="DDL auto-commit on MySQL and Oracle">
+On MySQL and Oracle, DDL statements (`CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`, …) implicitly commit the surrounding transaction. A multi-statement migration that fails midway on those databases leaves the statements that already ran committed — partial schema the transaction wrapper cannot undo. PostgreSQL, SQL Server, and SQLite support transactional DDL, so the all-or-nothing guarantee holds there. On MySQL/Oracle, prefer small single-purpose migrations, and if one does die halfway, use `wheels migrate doctor` and the reconciliation subcommands below to get the tracking table and schema back in line.
+</Aside>
 
 ## Reconciliation subcommands
 

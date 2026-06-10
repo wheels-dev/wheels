@@ -48,8 +48,7 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 		variables.$class.formats = {};
 		variables.$class.formats.default = "html";
 		variables.$class.formats.actions = {};
-		variables.$class.formats.existingTemplates = "";
-		variables.$class.formats.nonExistingTemplates = "";
+		variables.$class.formats.templateCache = {};
 
 		// Storage for declared service injections (populated by inject() in config)
 		variables.$class.services = [];
@@ -78,31 +77,27 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 		local.template = $get("viewPath") & "/" & LCase(ListChangeDelims(arguments.name, '/', '.')) & "/helpers.cfm";
 
 		// Check if the file exists on the file system if we have not already checked in a previous request.
-		// When the file is not found in either the existing or nonexisting list we know that we have not yet checked for it.
+		// When the controller is not present in the cache we know that we have not yet checked for it.
 		local.helperFileExists = false;
-		if (
-			!ListFindNoCase(application.wheels.existingHelperFiles, arguments.name)
-			&& !ListFindNoCase(application.wheels.nonExistingHelperFiles, arguments.name)
-		) {
+		if (!StructKeyExists(application.wheels.helperFileCache, arguments.name)) {
 			if (FileExists(ExpandPath(local.template))) {
 				local.helperFileExists = true;
 			}
 			if ($get("cacheFileChecking")) {
-				if (local.helperFileExists) {
-					application.wheels.existingHelperFiles = ListAppend(application.wheels.existingHelperFiles, arguments.name);
-				} else {
-					application.wheels.nonExistingHelperFiles = ListAppend(
-						application.wheels.nonExistingHelperFiles,
-						arguments.name
-					);
-				}
+				application.wheels.helperFileCache[arguments.name] = local.helperFileExists;
 			}
 		}
 
 		// Include controller specific helper file if it exists.
 		if (
 			Len(arguments.name)
-			&& (ListFindNoCase(application.wheels.existingHelperFiles, arguments.name) || local.helperFileExists)
+			&& (
+				local.helperFileExists
+				|| (
+					StructKeyExists(application.wheels.helperFileCache, arguments.name)
+					&& application.wheels.helperFileCache[arguments.name]
+				)
+			)
 		) {
 			$include(template = local.template);
 		}

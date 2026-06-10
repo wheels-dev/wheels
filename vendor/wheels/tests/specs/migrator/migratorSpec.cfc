@@ -208,9 +208,12 @@ component extends="wheels.WheelsTest" {
 				application.wheels.levelsTableName = "wheels_levels";
 				application.wheels.createMigratorTable = true;
 
-				// Trigger the migrator's bootstrap path (it lazy-creates the
-				// system tables when neither variant exists).
-				migrator.getCurrentMigrationVersion();
+				// Trigger the migrator's bootstrap path via a mutating entry
+				// point (it lazy-creates the system tables when neither
+				// variant exists). Read helpers like getCurrentMigrationVersion
+				// are pure and intentionally do NOT bootstrap —
+				// MigratorRobustnessSpec covers that contract.
+				migrator.migrateTo("0");
 
 				var info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables");
 				var tables = ValueList(info.table_name);

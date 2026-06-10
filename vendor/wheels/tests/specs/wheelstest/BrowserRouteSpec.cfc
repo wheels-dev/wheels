@@ -7,14 +7,12 @@ component extends="wheels.wheelstest.BrowserTest" {
             browserDescribe("visitRoute", () => {
 
                 it("navigates to a named route", () => {
-                    if (this.browserTestSkipped) return;
                     this.browser
                         .visitRoute(route="browserTestHome")
                         .assertSee("Welcome to the browser test fixture");
                 });
 
                 it("navigates to dashboard route", () => {
-                    if (this.browserTestSkipped) return;
                     this.browser
                         .loginAs("alice@example.com")
                         .visitRoute(route="browserTestDashboard")
@@ -26,14 +24,12 @@ component extends="wheels.wheelstest.BrowserTest" {
             browserDescribe("assertRouteIs", () => {
 
                 it("passes when on the correct route", () => {
-                    if (this.browserTestSkipped) return;
                     this.browser
                         .visitRoute(route="browserTestHome")
                         .assertRouteIs(route="browserTestHome");
                 });
 
                 it("fails with descriptive message when on wrong route", () => {
-                    if (this.browserTestSkipped) return;
                     this.browser
                         .visitRoute(route="browserTestHome");
                     try {
@@ -50,7 +46,6 @@ component extends="wheels.wheelstest.BrowserTest" {
             browserDescribe("$resolveRoute", () => {
 
                 it("resolves a named route to a path", () => {
-                    if (this.browserTestSkipped) return;
                     this.browser
                         .visitRoute(route="browserTestLogin")
                         .assertUrlContains("/_browser/login");

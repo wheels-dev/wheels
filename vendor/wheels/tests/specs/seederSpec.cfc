@@ -69,6 +69,18 @@ component extends="wheels.WheelsTest" {
 					expect(local.result.success).toBeTrue();
 				});
 
+				it("throws when the environment name contains path traversal characters", () => {
+					expect(function() {
+						seeder.runSeeds(environment = "../../../app/somefile");
+					}).toThrow("Wheels.Seeder.InvalidEnvironment");
+				});
+
+				it("throws when the environment name contains other unsafe characters", () => {
+					expect(function() {
+						seeder.runSeeds(environment = "testing/extra");
+					}).toThrow("Wheels.Seeder.InvalidEnvironment");
+				});
+
 			});
 
 			describe("seedOnce()", () => {
@@ -81,6 +93,26 @@ component extends="wheels.WheelsTest" {
 							properties = {firstName: "Test"}
 						);
 					}).toThrow("Wheels.Seeder.MissingProperty");
+				});
+
+				it("throws when a unique property value is not a simple value", () => {
+					expect(function() {
+						seeder.seedOnce(
+							modelName = "author",
+							uniqueProperties = "firstName",
+							properties = {firstName: {nested: "struct"}, lastName: "Test"}
+						);
+					}).toThrow("Wheels.Seeder.InvalidUniqueValue");
+				});
+
+				it("throws when uniqueProperties yields no uniqueness conditions", () => {
+					expect(function() {
+						seeder.seedOnce(
+							modelName = "author",
+							uniqueProperties = "",
+							properties = {firstName: "Test"}
+						);
+					}).toThrow("Wheels.Seeder.EmptyUniqueProperties");
 				});
 
 				it("creates a new record when no match exists", () => {

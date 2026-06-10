@@ -29,6 +29,16 @@ component extends="cli.lucli.Module" {
 		return structuredArgs(arguments.callerArgs);
 	}
 
+	/**
+	 * Calls structuredArgs WITHOUT reseeding variables.__arguments — pins the
+	 * consume-once contract: a prior delegation stash (create/generate app →
+	 * new) must not replay into a later zero-arg call. One-shot CLI runs hid
+	 * the leak; the persistent stdio MCP server did not.
+	 */
+	public struct function $structuredArgsWithoutReseed(struct callerArgs = {}) {
+		return structuredArgs(arguments.callerArgs);
+	}
+
 	public struct function $parseNewArgs(required struct coll) {
 		return parseNewArgs(arguments.coll);
 	}

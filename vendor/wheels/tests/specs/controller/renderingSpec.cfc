@@ -76,7 +76,7 @@ component extends="wheels.WheelsTest" {
 			it("is rendering with default layout in controller folder", () => {
 				tempFile = ExpandPath("/wheels/tests/_assets/views/test/layout.cfm")
 				FileWrite(tempFile, "<cfoutput>start:controllerlayout##includeContent()##end:controllerlayout</cfoutput>")
-				application.wheels.existingLayoutFiles = "test"
+				application.wheels.layoutFileCache["test"] = true
 				_controller.renderView()
 				r = _controller.response()
 
@@ -84,7 +84,7 @@ component extends="wheels.WheelsTest" {
 				expect(r).toInclude("start:controllerlayout")
 				expect(r).toInclude("end:controllerlayout")
 
-				application.wheels.existingLayoutFiles = ""
+				StructDelete(application.wheels.layoutFileCache, "test")
 				FileDelete(tempFile)
 			})
 

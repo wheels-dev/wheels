@@ -69,19 +69,27 @@ component output="false" {
 		local.sortResult = $topologicalSort(local.validNodes, local.adjacency);
 
 		if (ArrayLen(local.sortResult.cycle) > 0) {
-			// Report cycle errors for all packages in the cycle
-			for (local.node in local.sortResult.cycle) {
+			// Kahn's algorithm leaves both true cycle members AND their
+			// downstream dependents unprocessed. Distinguish them so a package
+			// that merely requires a cycled package is reported as a casualty
+			// of the cycle, not mislabeled as a circular dependency itself.
+			// (Unprocessed nodes were never added to sortResult.order, so no
+			// removal from the load order is needed.)
+			local.classified = $classifyCycleNodes(local.sortResult.cycle, local.adjacency);
+			for (local.node in local.classified.members) {
 				ArrayAppend(local.result.errors, {
 					package = local.node,
-					message = "Circular dependency detected: " & ArrayToList(local.sortResult.cycle, " -> ")
+					message = "Circular dependency detected: " & ArrayToList(
+						$findCyclePath(local.node, local.adjacency, local.classified.memberSet),
+						" -> "
+					)
 				});
 			}
-			// Remove cycled packages from load order
-			for (local.node in local.sortResult.cycle) {
-				local.idx = ArrayFind(local.sortResult.order, local.node);
-				if (local.idx > 0) {
-					ArrayDeleteAt(local.sortResult.order, local.idx);
-				}
+			for (local.node in local.classified.dependents) {
+				ArrayAppend(local.result.errors, {
+					package = local.node,
+					message = "Cannot load: depends on package(s) involved in a circular dependency (#ArrayToList(local.classified.members, ", ")#)"
+				});
 			}
 		}
 
@@ -99,7 +107,20 @@ component output="false" {
 	private struct function $processReplacements(required struct manifests, required struct nameToDir) {
 		local.excluded = {};
 
-		for (local.dirName in arguments.manifests) {
+		// Process packages in sorted directory-name order so the outcome is
+		// deterministic regardless of struct iteration order, and skip the
+		// replaces declarations of packages that have already been excluded —
+		// an excluded package never loads, so its declarations must not apply.
+		// This also resolves mutual replaces (A replaces B AND B replaces A):
+		// the first package in sorted order wins and the other is excluded,
+		// instead of both being silently removed from the load order.
+		local.sortedDirs = StructKeyArray(arguments.manifests);
+		ArraySort(local.sortedDirs, "textnocase");
+
+		for (local.dirName in local.sortedDirs) {
+			if (StructKeyExists(local.excluded, local.dirName)) {
+				continue;
+			}
 			local.m = arguments.manifests[local.dirName];
 			if (!StructKeyExists(local.m, "replaces") || !IsStruct(local.m.replaces)) {
 				continue;
@@ -142,6 +163,9 @@ component output="false" {
 	 * Edges point from dependency to dependent: if A requires B, edge is B -> A.
 	 * This means packages with no incoming edges (no dependencies) are processed first.
 	 *
+	 * In-degrees are computed by $topologicalSort (restricted to the valid
+	 * nodes), so this function intentionally does not track them.
+	 *
 	 * @return  Struct with: adjacency (struct of arrays), validNodes (array), errors (array)
 	 */
 	private struct function $buildAdjacencyList(
@@ -151,8 +175,6 @@ component output="false" {
 	) {
 		// adjacency: dirName -> array of dirNames that depend on it
 		local.adjacency = {};
-		// inDegree: dirName -> count of dependencies
-		local.inDegree = {};
 		local.validNodes = [];
 		local.errors = [];
 		local.failedNodes = {};
@@ -160,7 +182,6 @@ component output="false" {
 		// Initialize all active packages as nodes
 		for (local.dirName in arguments.activeManifests) {
 			local.adjacency[local.dirName] = [];
-			local.inDegree[local.dirName] = 0;
 		}
 
 		// Process requires
@@ -222,7 +243,6 @@ component output="false" {
 
 				// Add edge: reqDir -> dirName (dependency loads before dependent)
 				ArrayAppend(local.adjacency[local.reqDir], local.dirName);
-				local.inDegree[local.dirName] = local.inDegree[local.dirName] + 1;
 			}
 		}
 
@@ -259,7 +279,6 @@ component output="false" {
 
 				// Soft edge: sugDir -> dirName
 				ArrayAppend(local.adjacency[local.sugDir], local.dirName);
-				local.inDegree[local.dirName] = local.inDegree[local.dirName] + 1;
 			}
 		}
 
@@ -272,10 +291,136 @@ component output="false" {
 
 		return {
 			adjacency = local.adjacency,
-			inDegree = local.inDegree,
 			validNodes = local.validNodes,
 			errors = local.errors
 		};
+	}
+
+	/**
+	 * Splits the unprocessed nodes left over from Kahn's algorithm into true
+	 * cycle members (nodes that can reach themselves following edges within
+	 * the unprocessed set) and downstream dependents (nodes that merely
+	 * depend, directly or transitively, on a cycle member and therefore never
+	 * reached in-degree zero).
+	 *
+	 * @cycleNodes  Array of unprocessed node names from $topologicalSort
+	 * @adjacency   Struct of node -> array of dependent nodes
+	 * @return      Struct with: members (sorted array), dependents (sorted array), memberSet (struct)
+	 */
+	private struct function $classifyCycleNodes(required array cycleNodes, required struct adjacency) {
+		local.unprocessedSet = {};
+		for (local.node in arguments.cycleNodes) {
+			local.unprocessedSet[local.node] = true;
+		}
+
+		local.members = [];
+		local.dependents = [];
+		local.memberSet = {};
+
+		for (local.node in arguments.cycleNodes) {
+			if ($canReachSelf(local.node, arguments.adjacency, local.unprocessedSet)) {
+				ArrayAppend(local.members, local.node);
+				local.memberSet[local.node] = true;
+			} else {
+				ArrayAppend(local.dependents, local.node);
+			}
+		}
+
+		ArraySort(local.members, "textnocase");
+		ArraySort(local.dependents, "textnocase");
+
+		return {
+			members = local.members,
+			dependents = local.dependents,
+			memberSet = local.memberSet
+		};
+	}
+
+	/**
+	 * Returns true when the given node can reach itself following adjacency
+	 * edges restricted to the allowed node set — i.e. the node is part of a
+	 * dependency cycle. Iterative DFS.
+	 */
+	private boolean function $canReachSelf(
+		required string startNode,
+		required struct adjacency,
+		required struct allowedSet
+	) {
+		local.stack = [];
+		local.visited = {};
+
+		if (StructKeyExists(arguments.adjacency, arguments.startNode)) {
+			for (local.next in arguments.adjacency[arguments.startNode]) {
+				if (StructKeyExists(arguments.allowedSet, local.next)) {
+					ArrayAppend(local.stack, local.next);
+				}
+			}
+		}
+
+		while (ArrayLen(local.stack) > 0) {
+			local.current = local.stack[ArrayLen(local.stack)];
+			ArrayDeleteAt(local.stack, ArrayLen(local.stack));
+			if (local.current == arguments.startNode) {
+				return true;
+			}
+			if (StructKeyExists(local.visited, local.current)) {
+				continue;
+			}
+			local.visited[local.current] = true;
+			if (StructKeyExists(arguments.adjacency, local.current)) {
+				for (local.next in arguments.adjacency[local.current]) {
+					if (StructKeyExists(arguments.allowedSet, local.next)) {
+						ArrayAppend(local.stack, local.next);
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Finds an actual cycle path starting and ending at the given node,
+	 * following edges restricted to verified cycle members. Returns an array
+	 * like ["a", "b", "a"] suitable for rendering as "a -> b -> a". Falls
+	 * back to a single-element array if no path is found (which cannot happen
+	 * for a node $classifyCycleNodes verified as a cycle member).
+	 *
+	 * Iterative DFS; each stack frame carries the path taken to reach it so
+	 * no arrays are mutated across function boundaries (Adobe CF passes
+	 * arrays by value).
+	 */
+	private array function $findCyclePath(
+		required string startNode,
+		required struct adjacency,
+		required struct memberSet
+	) {
+		local.stack = [{node = arguments.startNode, path = [arguments.startNode]}];
+		local.visited = {};
+
+		while (ArrayLen(local.stack) > 0) {
+			local.frame = local.stack[ArrayLen(local.stack)];
+			ArrayDeleteAt(local.stack, ArrayLen(local.stack));
+			if (!StructKeyExists(arguments.adjacency, local.frame.node)) {
+				continue;
+			}
+			for (local.next in arguments.adjacency[local.frame.node]) {
+				if (local.next == arguments.startNode) {
+					local.completed = Duplicate(local.frame.path);
+					ArrayAppend(local.completed, local.next);
+					return local.completed;
+				}
+				if (!StructKeyExists(arguments.memberSet, local.next) || StructKeyExists(local.visited, local.next)) {
+					continue;
+				}
+				local.visited[local.next] = true;
+				local.nextPath = Duplicate(local.frame.path);
+				ArrayAppend(local.nextPath, local.next);
+				ArrayAppend(local.stack, {node = local.next, path = local.nextPath});
+			}
+		}
+
+		return [arguments.startNode];
 	}
 
 	/**
@@ -350,7 +495,9 @@ component output="false" {
 			}
 		}
 
-		// Any remaining nodes with in-degree > 0 are in a cycle
+		// Any remaining nodes with in-degree > 0 are either true cycle members
+		// or downstream dependents of one — resolve() classifies them via
+		// $classifyCycleNodes before reporting.
 		local.cycle = [];
 		if (local.processed < ArrayLen(arguments.validNodes)) {
 			for (local.node in arguments.validNodes) {

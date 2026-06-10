@@ -124,13 +124,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// Expose the extracted subdomain so the resolver can use it
 		arguments.request.$tenantSubdomain = local.subdomain;
 
-		// If a custom resolver is provided, pass the request to it
-		if (!IsSimpleValue(variables.resolver)) {
-			return variables.resolver(arguments.request);
-		}
-
-		// Without a resolver, return just the subdomain as the ID (user must provide dataSource via resolver)
-		return {};
+		// Delegate to the resolver (if configured). Without a resolver there is
+		// no way to map the subdomain to a dataSource, so the tenant stays unresolved.
+		return $invokeResolver(arguments.request);
 	}
 
 	/**
@@ -159,18 +155,23 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// Expose the extracted header value so the resolver can use it
 		arguments.request.$tenantHeaderValue = local.headerValue;
 
-		// If a custom resolver is provided, pass the request to it
-		if (!IsSimpleValue(variables.resolver)) {
-			return variables.resolver(arguments.request);
-		}
-
-		return {};
+		return $invokeResolver(arguments.request);
 	}
 
 	/**
 	 * Delegate entirely to the user-provided resolver closure.
 	 */
 	private struct function $resolveFromCustom(required struct request) {
+		return $invokeResolver(arguments.request);
+	}
+
+	/**
+	 * Invoke the user-provided resolver closure with consistent result handling
+	 * shared by all strategies. Returns an empty struct when no resolver is
+	 * configured or when the resolver returns a non-struct value (such as
+	 * `false`, the not-resolved sentinel).
+	 */
+	private struct function $invokeResolver(required struct request) {
 		if (!IsSimpleValue(variables.resolver)) {
 			local.result = variables.resolver(arguments.request);
 			if (IsStruct(local.result)) {

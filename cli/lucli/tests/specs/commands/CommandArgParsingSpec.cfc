@@ -71,6 +71,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(c.sqlite).toBe("false");
 			});
 
+			it("consumes __arguments once — stale argv must not replay on a later zero-arg call", () => {
+				// The stdio MCP server is a persistent process: after a delegating
+				// call stashes argv (create/generate app -> new), a later zero-arg
+				// tool call (e.g. wheels_test()) must see an EMPTY collection, not
+				// a replay of the stale stash.
+				var first = probe.$structuredArgs({}, ["blog"]);
+				expect(first.arg1).toBe("blog");
+				var second = probe.$structuredArgsWithoutReseed({});
+				expect(second).toBeEmpty();
+			});
+
 		});
 
 		describe("parseNewArgs", () => {
@@ -118,6 +129,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// the old getArgs() arg1-gate, which dropped named-only args and fell
 				// through to the usage guide.
 				expect(probe.$parseNewArgs({sqlite: "false"}).isEmpty).toBeFalse();
+			});
+
+			it("binds the app name across a LuCLI numbering gap (option before the name)", () => {
+				// `wheels new --port=3000 blog` — LuCLI numbers positionals by
+				// global token index, so the name arrives as arg2 with no arg1.
+				// Fixed-index probing ignored the supplied name and threw
+				// Wheels.InvalidArguments.
+				var o = probe.$parseNewArgs({port: "3000", arg2: "blog"});
+				expect(o.appName).toBe("blog");
+				expect(o.port).toBe(3000);
+			});
+
+			it("binds the app name across a flag-induced gap (--setup-h2 blog)", () => {
+				var o = probe.$parseNewArgs({"setup-h2": "true", arg2: "blog"});
+				expect(o.appName).toBe("blog");
+				expect(o.setupH2).toBeTrue();
 			});
 
 		});
@@ -210,6 +237,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var o = probe.$parseUpgradeArgs({arg1: "oops", "dry-run": "true", to: "4.0.0"});
 				expect(o.sawDryRun).toBeTrue();
 				expect(o.sawTo).toBeTrue();
+			});
+
+			it("reads --format=json for machine-readable CI output", () => {
+				var o = probe.$parseUpgradeArgs({arg1: "check", format: "json"});
+				expect(o.format).toBe("json");
+				expect(probe.$parseUpgradeArgs({arg1: "check"}).format).toBe("");
 			});
 
 		});
