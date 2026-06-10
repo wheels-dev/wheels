@@ -126,7 +126,7 @@ component extends="wheels.migrator.Base"{
 		}
 		if (
 			StructKeyExists(arguments.options, 'type') && ListFindNoCase(
-				"binary,date,datetime,time,timestamp,text,string",
+				"binary,char,date,datetime,time,timestamp,text,string",
 				arguments.options.type
 			)
 		) {

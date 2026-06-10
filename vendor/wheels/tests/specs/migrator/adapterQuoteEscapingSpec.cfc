@@ -25,6 +25,10 @@ component extends="wheels.WheelsTest" {
 				expect(variables.adapter.quote(value = "O'Brien's", options = {type: "string"})).toBe("'O''Brien''s'");
 			});
 
+			it("escapes every embedded single quote for char types", () => {
+				expect(variables.adapter.quote(value = "O'Brien", options = {type: "char"})).toBe("'O''Brien'");
+			});
+
 			it("escapes every embedded single quote for text types", () => {
 				expect(variables.adapter.quote(value = "it's a 'quoted' default", options = {type: "text"})).toBe(
 					"'it''s a ''quoted'' default'"
