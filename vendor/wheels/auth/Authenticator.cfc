@@ -53,6 +53,33 @@ component implements="wheels.auth.AuthenticatorInterface" output="false" {
 	 * @return An AuthResult struct.
 	 */
 	public struct function authenticate(required struct request) {
+		return $authenticate(arguments.request, "");
+	}
+
+	/**
+	 * Authenticate the incoming request using only the named strategies.
+	 *
+	 * Used by AuthMiddleware's per-route strategy restriction so the restricted
+	 * path shares this component's diagnostics (zero registered strategies,
+	 * unknown strategy names) and AuthResult construction. Strategies are tried
+	 * in the order listed; only those whose `supports()` returns true are
+	 * attempted. Kept as a separate method (rather than an extra argument on
+	 * authenticate()) so the AuthenticatorInterface signature stays untouched.
+	 *
+	 * @request Struct containing route params, CGI info, and middleware-added data.
+	 * @strategies Comma-delimited list or array of registered strategy names to restrict to. Empty tries all.
+	 * @return An AuthResult struct.
+	 */
+	public struct function authenticateWith(required struct request, any strategies = "") {
+		return $authenticate(arguments.request, arguments.strategies);
+	}
+
+	/**
+	 * Shared authentication core for authenticate() and authenticateWith().
+	 *
+	 * @strategyFilter Comma-delimited list or array of strategy names to restrict to (empty = all).
+	 */
+	private struct function $authenticate(required struct request, any strategyFilter = "") {
 		// Diagnostic check: zero registered strategies is almost always a wiring bug.
 		// Distinguish it from "strategies registered but none claim this request"
 		// so a misconfigured services.cfm or a missing onApplicationStart hook
@@ -65,8 +92,48 @@ component implements="wheels.auth.AuthenticatorInterface" output="false" {
 			);
 		}
 
+		// Normalize the optional strategy filter to an array.
+		local.filter = [];
+		if (IsArray(arguments.strategyFilter)) {
+			local.filter = arguments.strategyFilter;
+		} else if (IsSimpleValue(arguments.strategyFilter) && Len(arguments.strategyFilter)) {
+			local.filter = ListToArray(arguments.strategyFilter);
+		}
+
 		// Determine which strategies to try and in what order
-		local.toTry = $buildStrategyOrder(arguments.request);
+		if (ArrayLen(local.filter)) {
+			// Restricted: try only the named strategies, in the caller's order.
+			// Unknown names are skipped so a list mixing a typo with a valid
+			// name still authenticates — but when the restriction leaves
+			// nothing to try AND unknown names were given, surface the wiring
+			// bug (misspelled name or registerStrategy() never ran) instead of
+			// a generic 401.
+			local.toTry = [];
+			local.unknown = [];
+			for (local.name in local.filter) {
+				local.trimmedName = Trim(local.name);
+				if (!hasStrategy(local.trimmedName)) {
+					ArrayAppend(local.unknown, local.trimmedName);
+					continue;
+				}
+				local.candidate = {name = local.trimmedName, strategy = variables.strategyMap[local.trimmedName]};
+				if (local.candidate.strategy.supports(arguments.request)) {
+					ArrayAppend(local.toTry, local.candidate);
+				}
+			}
+
+			if (ArrayLen(local.toTry) == 0 && ArrayLen(local.unknown)) {
+				local.unknownList = ArrayToList(local.unknown, ", ");
+				local.registeredList = ArrayToList(getStrategyNames(), ", ");
+				return $authResult(
+					success = false,
+					error = "Authentication was restricted to unregistered strategy name(s): #local.unknownList#. Registered strategies: #local.registeredList#. Check the strategies list passed to AuthMiddleware (or authenticateWith()) for typos, and confirm registerStrategy() runs for each name on this Authenticator instance.",
+					statusCode = 401
+				);
+			}
+		} else {
+			local.toTry = $buildStrategyOrder(arguments.request);
+		}
 
 		if (ArrayLen(local.toTry) == 0) {
 			return $authResult(
