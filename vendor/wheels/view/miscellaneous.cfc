@@ -365,6 +365,30 @@ component {
 	}
 
 	/**
+	 * Internal function. HTML-encodes the listed prepend / append style keys on a helper's
+	 * argument struct (in place, the struct is passed by reference) when the helper's `encode`
+	 * argument and the global `encodeHtmlTags` setting are both enabled. Centralizes the block
+	 * previously duplicated (with drift) across the form, error, and pagination helpers.
+	 */
+	public void function $encodeArgsForHtml(required struct args, required string keys) {
+		if (
+			StructKeyExists(arguments.args, "encode")
+			&& IsBoolean(arguments.args.encode)
+			&& arguments.args.encode
+			&& $get("encodeHtmlTags")
+		) {
+			local.keysArray = ListToArray(arguments.keys);
+			local.iEnd = ArrayLen(local.keysArray);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				local.key = local.keysArray[local.i];
+				if (StructKeyExists(arguments.args, local.key) && Len(arguments.args[local.key])) {
+					arguments.args[local.key] = EncodeForHTML($canonicalize(arguments.args[local.key]));
+				}
+			}
+		}
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public string function $tag(

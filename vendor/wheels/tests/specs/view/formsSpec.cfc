@@ -928,28 +928,38 @@ component extends="wheels.WheelsTest" {
 				expect(e).toBe(r)
 			})
 
-			it("works with PUT method", () => {
+			it("rewrites PUT to post plus a _method field even without a route match", () => {
 				args.method = "put"
 				argsction = _controller.urlfor(argumentCollection = args)
-				e = '<form action="#argsction#" method="put">' & _controller.authenticityTokenField()
+				e = '<form action="#argsction#" method="post">' & _controller.authenticityTokenField() & '<input name="_method" type="hidden" value="put">'
 				r = _controller.startFormTag(argumentcollection = args)
 
 				expect(e).toBe(r)
 			})
 
-			it("works with PATCH method", () => {
+			it("rewrites PATCH to post plus a _method field even without a route match", () => {
 				args.method = "patch"
 				argsction = _controller.urlfor(argumentCollection = args)
-				e = '<form action="#argsction#" method="patch">' & _controller.authenticityTokenField()
+				e = '<form action="#argsction#" method="post">' & _controller.authenticityTokenField() & '<input name="_method" type="hidden" value="patch">'
 				r = _controller.startFormTag(argumentcollection = args)
 
 				expect(e).toBe(r)
 			})
 
-			it("works with DELETE method", () => {
+			it("rewrites DELETE to post plus a _method field even without a route match", () => {
 				args.method = "delete"
 				argsction = _controller.urlfor(argumentCollection = args)
-				e = '<form action="#argsction#" method="delete">' & _controller.authenticityTokenField()
+				e = '<form action="#argsction#" method="post">' & _controller.authenticityTokenField() & '<input name="_method" type="hidden" value="delete">'
+				r = _controller.startFormTag(argumentcollection = args)
+
+				expect(e).toBe(r)
+			})
+
+			it("never renders a non-get/post method attribute when no controller, action, or route is passed", () => {
+				args.method = "delete"
+				StructDelete(args, "controller")
+				argsction = _controller.urlfor(argumentCollection = args)
+				e = '<form action="#argsction#" method="post">' & _controller.authenticityTokenField() & '<input name="_method" type="hidden" value="delete">'
 				r = _controller.startFormTag(argumentcollection = args)
 
 				expect(e).toBe(r)
@@ -988,6 +998,48 @@ component extends="wheels.WheelsTest" {
 				r = '<form action="#argsction#" method="post">' & _controller.authenticityTokenField()
 
 				expect(e).toBe(r)
+			})
+		})
+
+		describe("Tests that $option", () => {
+
+			beforeEach(() => {
+				_controller = g.controller(name = "dummy")
+			})
+
+			it("does not treat a single-select bound value containing a comma as a list", () => {
+				r = _controller.$option(objectValue = "Doe,John", optionValue = "Doe", optionText = "Doe", encode = false)
+
+				expect(r).notToInclude("selected")
+			})
+
+			it("marks the exact match selected for single selects", () => {
+				r = _controller.$option(objectValue = "Doe,John", optionValue = "Doe,John", optionText = "Doe John", encode = false)
+
+				expect(r).toInclude('selected="selected"')
+			})
+
+			it("treats the bound value as a list for multiple selects", () => {
+				r = _controller.$option(objectValue = "1,3", optionValue = "3", optionText = "Three", encode = false, multiple = true)
+
+				expect(r).toInclude('selected="selected"')
+			})
+
+			it("uses exact comparison in a single selectTag bound to a comma value", () => {
+				opts = [{value = "Doe", text = "Doe"}, {value = "Doe,John", text = "Doe John"}]
+				r = _controller.selectTag(name = "person", selected = "Doe,John", options = opts, encode = false)
+
+				expect(r).toInclude('<option selected="selected" value="Doe,John">Doe John</option>')
+				expect(r).notToInclude('<option selected="selected" value="Doe">Doe</option>')
+			})
+
+			it("still selects every listed value in a multiple selectTag", () => {
+				opts = [{value = "1", text = "One"}, {value = "2", text = "Two"}, {value = "3", text = "Three"}]
+				r = _controller.selectTag(name = "nums", selected = "1,3", options = opts, multiple = true, encode = false)
+
+				expect(r).toInclude('<option selected="selected" value="1">One</option>')
+				expect(r).toInclude('<option selected="selected" value="3">Three</option>')
+				expect(r).notToInclude('<option selected="selected" value="2">Two</option>')
 			})
 		})
 
