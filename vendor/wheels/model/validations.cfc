@@ -962,7 +962,11 @@ component {
 		}
 		local.leftOperand = IsNumeric(local.tokens[1]) ? JavaCast("double", local.tokens[1]) : local.tokens[1];
 		local.rightOperand = IsNumeric(local.tokens[3]) ? JavaCast("double", local.tokens[3]) : local.tokens[3];
-		return $resolveOperator(local.leftOperand, local.rightOperand, local.tokens[2]);
+		// LCase keeps word-form operators ("1 EQ 0") compatible with the
+		// case-sensitive switch in $resolveOperator on Adobe CF — symbolic
+		// operators are already lowercased by $normalizeConditionOperators,
+		// but word-form ones arrive raw (#2977).
+		return $resolveOperator(local.leftOperand, local.rightOperand, LCase(local.tokens[2]));
 	}
 
 	/**

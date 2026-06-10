@@ -30,6 +30,9 @@ component {
 	/**
 	 * Use this in an individual controller action to define which formats the action will respond with.
 	 * This can be used to define provides behavior in individual actions or to override a global setting set with `provides` in the controller's `config()`.
+	 * Restrictions are enforced (since 4.0.4): `renderWith()` falls back to the `html` view for a
+	 * format outside the list, and the automatic render in `$callAction()` skips view rendering for
+	 * non-acceptable, non-html formats.
 	 *
 	 * [section: Controller]
 	 * [category: Provides Functions]
