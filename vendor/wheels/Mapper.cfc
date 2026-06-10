@@ -148,7 +148,8 @@ component output="false" {
 
 		// Validate the regex compiles correctly (do not store the Java Pattern object
 		// in the route struct because Duplicate() cannot deep-copy Java objects reliably
-		// across all CFML engines, and route structs are duplicated at match time).
+		// across all CFML engines, and route structs are copied at match time with their
+		// non-simple members duplicated — see $copyRouteForRequest in Dispatch.cfc).
 		$compileRegex(argumentCollection = arguments);
 
 		// Determine if this is a static route (no variables in the pattern).
