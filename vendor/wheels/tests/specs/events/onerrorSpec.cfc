@@ -62,6 +62,48 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.ActionParameterMissing")).toBe(500)
 			})
 		})
+
+		// Security regression: $getRequestFormat must reject non-alphanumeric url.format (LFI via $runOnError's error-template include path).
+		describe("$getRequestFormat rejects unsafe format tokens (T4 LFI)", () => {
+
+			it("coerces ../ traversal tokens to html", () => {
+				expect($requestFormatFor("../../../wheels/public/layout/_header_simple")).toBe("html")
+			})
+
+			it("coerces tokens containing a slash or dot to html", () => {
+				expect($requestFormatFor("onerror.cfm/../x")).toBe("html")
+			})
+
+			it("preserves a valid alphanumeric format", () => {
+				expect($requestFormatFor("json")).toBe("json")
+			})
+
+			it("preserves another valid format", () => {
+				expect($requestFormatFor("xml")).toBe("xml")
+			})
+
+			it("falls back to html for an empty format", () => {
+				expect($requestFormatFor("")).toBe("html")
+			})
+		})
+	}
+
+	private string function $requestFormatFor(required string formatValue) {
+		var em = CreateObject("component", "wheels.events.EventMethods")
+		var hadFormat = StructKeyExists(url, "format")
+		var prior = hadFormat ? url.format : ""
+		var result = ""
+		try {
+			url.format = arguments.formatValue
+			result = em.$getRequestFormat()
+		} finally {
+			if (hadFormat) {
+				url.format = prior
+			} else {
+				StructDelete(url, "format")
+			}
+		}
+		return result
 	}
 
 	private numeric function $expectedStatusFor(required string wheelsType) {
