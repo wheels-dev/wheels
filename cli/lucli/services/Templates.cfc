@@ -548,7 +548,7 @@ component {
 			var label = variables.helpers.capitalize(prop.name);
 			if (arrayFindNoCase(foreignKeys, prop.name)) {
 				// findAll() returns a flat query — association objects are not
-				// reachable inside <cfloop query>, so posts.author.name throws.
+				// reachable inside a query-driven cfloop, so posts.author.name throws.
 				// Keep the friendly label but render the raw FK column value.
 				label = variables.helpers.capitalize(left(prop.name, len(prop.name) - 2));
 			}
@@ -581,7 +581,7 @@ component {
 		var cells = [];
 
 		// findAll() returns a flat query — association objects are not reachable
-		// inside <cfloop query>, so FK columns render their raw value (e.g.
+		// inside a query-driven cfloop, so FK columns render their raw value (e.g.
 		// authorId); the table header still shows the association label.
 		for (var prop in arguments.properties) {
 			var cellCode = '<td>' & chr(10);
