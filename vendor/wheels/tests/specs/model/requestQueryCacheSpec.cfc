@@ -56,6 +56,19 @@ component extends="wheels.WheelsTest" {
 				expect(result.count).toBe(expectedTotal);
 			})
 
+			it("does not fragment the application-scoped SQL cache by request-cache flag", () => {
+				// The application-scoped SQL cache (category "sql") encodes only the SQL structure.
+				// $useRequestCache governs request-level caching and produces no SQL output, so it must NOT participate in the shell key — otherwise every model that uses both batch and non-batch finders accumulates two SQL entries per shape.
+				StructClear(application.wheels.cache.sql);
+				application.wheels.cacheQueriesDuringRequest = true;
+				model("author").$clearRequestCache();
+				model("author").findAll(where = "lastName = 'Djurner'", order = "firstName");
+				var sqlEntriesAfterRegular = StructCount(application.wheels.cache.sql);
+				// Same SQL shape via the batch-finders' opt-out flag — must reuse the existing shell entry.
+				model("author").findAll(where = "lastName = 'Djurner'", order = "firstName", $useRequestCache = false);
+				expect(StructCount(application.wheels.cache.sql)).toBe(sqlEntriesAfterRegular);
+			})
+
 			it("findInBatches does not accumulate per-batch queries in the request cache", () => {
 				application.wheels.cacheQueriesDuringRequest = true;
 				var expectedTotal = model("author").count();
