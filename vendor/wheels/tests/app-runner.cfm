@@ -31,6 +31,8 @@
     // passes useTestDB=true by default for `wheels test`; users opt out
     // via --no-test-db. See finding #10 in
     // docs/superpowers/plans/2026-04-29-fresh-vm-onboarding-findings.md.
+    // The swap goes through applyDataSource() so cached model classes re-initialize against the test datasource.
+    local.dbResolver = new wheels.tests._assets.dispatch.TestDbResolver();
     local.originalDataSource = application.wheels.dataSourceName;
     local.targetDataSource = local.originalDataSource;
     local.swappedDataSource = false;
@@ -39,7 +41,10 @@
         local.registered = GetApplicationMetaData().datasources;
         if (StructKeyExists(local.registered, local.candidate)) {
             local.targetDataSource = local.candidate;
-            application.wheels.dataSourceName = local.candidate;
+            local.dbResolver.applyDataSource(
+                wheelsScope = application.wheels,
+                name = local.candidate
+            );
             local.swappedDataSource = true;
         }
     }
@@ -129,10 +134,12 @@
             writeOutput(result);
         }
     } finally {
-        // Restore the original datasource so subsequent requests see the
-        // dev DB again. Runs even if a spec throws or `abort` fires.
+        // Restore the original datasource (via applyDataSource() so test-run cached model classes are invalidated).
         if (local.swappedDataSource) {
-            application.wheels.dataSourceName = local.originalDataSource;
+            local.dbResolver.applyDataSource(
+                wheelsScope = application.wheels,
+                name = local.originalDataSource
+            );
         }
     }
 </cfscript>
