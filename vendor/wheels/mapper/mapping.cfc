@@ -24,6 +24,17 @@ component {
 	 * [category: Routing]
 	 */
 	public struct function end() {
+		// Guard against unbalanced end() calls: once the scope stack is empty there
+		// is no open block left to close, so fail with a clear DSL error instead of
+		// a raw array-index engine error.
+		if (ArrayIsEmpty(variables.scopeStack)) {
+			Throw(
+				type = "Wheels.InvalidRoute",
+				message = "Unbalanced `end()` call in the route configuration.",
+				detail = "Each `end()` closes one block opened by `mapper()`, `scope()`, `namespace()`, `package()`, `group()`, `resource()`, or `resources()`. This `end()` has no matching open block, so remove the extra `end()`."
+			);
+		}
+
 		local.formatPattern = "";
 
 		if (StructKeyExists(variables.scopeStack[1], "mapFormat") && variables.scopeStack[1].mapFormat) {
