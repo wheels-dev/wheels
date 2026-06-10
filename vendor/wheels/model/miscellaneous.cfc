@@ -310,7 +310,7 @@ component {
 				local.parts = ListToArray(local.rv.value, "/-");
 				if (ArrayLen(local.parts) == 3 && IsNumeric(local.parts[1]) && IsNumeric(local.parts[2]) && IsNumeric(local.parts[3])) {
 					try {
-						local.rv.value = $engineAdapter().parseAmbiguousSlashDate(local.parts[1], local.parts[2], local.parts[3]);
+						local.rv.value = $parseSlashDate(d1 = local.parts[1], d2 = local.parts[2], year = local.parts[3]);
 					} catch (any e) {
 						local.rv.value = CreateDate(local.parts[3], local.parts[1], local.parts[2]);
 					}

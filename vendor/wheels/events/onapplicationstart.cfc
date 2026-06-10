@@ -106,8 +106,8 @@ component {
 		application.$wheels.models = {};
 		application.$wheels.helperFileCache = {};
 		application.$wheels.layoutFileCache = {};
-		application.$wheels.existingObjectFiles = "";
-		application.$wheels.nonExistingObjectFiles = "";
+		application.$wheels.existingObjectFiles = {};
+		application.$wheels.nonExistingObjectFiles = {};
 		application.$wheels.directoryFiles = {};
 		application.$wheels.routes = [];
 		application.$wheels.middleware = [];

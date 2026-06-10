@@ -161,9 +161,12 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("checks adobe valid", () => {
-				expect(len(g.$checkMinimumVersion(version="11,0,18,314030", engine="Adobe ColdFusion"))).toBe(0)
-				expect(len(g.$checkMinimumVersion(version="2016,0,10,314028", engine="Adobe ColdFusion"))).toBe(0)
+				// Adobe ColdFusion 2018 is the minimum supported Adobe engine
 				expect(len(g.$checkMinimumVersion(version="2018,0,03,314033", engine="Adobe ColdFusion"))).toBe(0)
+				expect(len(g.$checkMinimumVersion(version="2018,0,10,314028", engine="Adobe ColdFusion"))).toBe(0)
+				expect(len(g.$checkMinimumVersion(version="2021,0,0,323925", engine="Adobe ColdFusion"))).toBe(0)
+				expect(len(g.$checkMinimumVersion(version="2023,0,0,330468", engine="Adobe ColdFusion"))).toBe(0)
+				expect(len(g.$checkMinimumVersion(version="2025,0,0,330068", engine="Adobe ColdFusion"))).toBe(0)
 			})
 
 			it("checks adobe invalid", () => {
@@ -180,6 +183,9 @@ component extends="wheels.WheelsTest" {
 				expect(len(g.$checkMinimumVersion(version="10,0,23,302580", engine="Adobe ColdFusion"))).toBeGT(0)
 				expect(len(g.$checkMinimumVersion(version="11,0,3,282462", engine="Adobe ColdFusion"))).toBeGT(0)
 				expect(len(g.$checkMinimumVersion(version="11,0,12,302575", engine="Adobe ColdFusion"))).toBeGT(0)
+				// CF 11 and 2016 are end-of-life and no longer supported
+				expect(len(g.$checkMinimumVersion(version="11,0,18,314030", engine="Adobe ColdFusion"))).toBeGT(0)
+				expect(len(g.$checkMinimumVersion(version="2016,0,10,314028", engine="Adobe ColdFusion"))).toBeGT(0)
 			})
 
 			it("checks rustcfml accepts any version", () => {
