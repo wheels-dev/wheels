@@ -167,7 +167,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("keeps live application references intact after onPluginLoad", function() {
-				originalPluginComponentPath = application.wheels.pluginComponentPath
+				var originalPluginComponentPath = application.wheels.pluginComponentPath
 				StructDelete(application, "$wheelstestLifecycleLog")
 
 				// A struct placed in the application scope before plugins load.
@@ -192,7 +192,7 @@ component extends="wheels.WheelsTest" {
 					}
 					application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/lifecycle"
 
-					PluginObj = $pluginObj(config)
+					var PluginObj = $pluginObj(config)
 
 					// Mutating through the pre-load reference must be visible through
 					// the application scope — they are the same struct.
