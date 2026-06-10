@@ -51,6 +51,7 @@ function down() {
 component extends="[extends]" hint="Add status column to orders" {
 
 	function up() {
+		var state = {};
 		transaction {
 			try {
 				addColumn(table="orders", columnType="string", columnName="status", limit=50, default="pending");
@@ -73,6 +74,7 @@ component extends="[extends]" hint="Add status column to orders" {
 	}
 
 	function down() {
+		var state = {};
 		transaction {
 			try {
 				removeColumn(table="orders", columnName="status");

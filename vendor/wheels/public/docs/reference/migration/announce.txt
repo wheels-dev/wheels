@@ -27,7 +27,7 @@ function up() {
 	var state = {};
 	transaction {
 		try {
-			addColumn(table="users", columnType="string", columnName="apiKey", limit=64, null=true);
+			addColumn(table="users", columnType="string", columnName="apiKey", limit=64, allowNull=true);
 			announce("Added apiKey column to users");
 
 			addIndex(table="users", columnNames="apiKey", unique=true);
