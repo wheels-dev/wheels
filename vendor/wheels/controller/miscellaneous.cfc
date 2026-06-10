@@ -2,11 +2,12 @@ component {
 	/**
 	 * Sends an email using a template and an optional layout to wrap it in.
 	 * Besides the Wheels-specific arguments documented here, you can also pass in any argument that is accepted by the `cfmail` tag as well as your own arguments to be used by the view.
+	 * Note that only arguments whose names match a known `cfmail` attribute are passed through to `cfmail`; every other argument is made available to the email view as a variable instead.
 	 *
 	 * [section: Controller]
 	 * [category: Miscellaneous Functions]
 	 *
-	 * @template The path to the email template or two paths if you want to send a multipart email. if the `detectMultipart` argument is `false`, the template for the text version should be the first one in the list. This argument is also aliased as `templates`.
+	 * @template The path to the email template or two paths if you want to send a multipart email (a maximum of two templates, one text and one html version, is supported). if the `detectMultipart` argument is `false`, the template for the text version should be the first one in the list. This argument is also aliased as `templates`.
 	 * @from Email address to send from.
 	 * @to List of email addresses to send the email to.
 	 * @subject The subject line of the email.
@@ -36,7 +37,21 @@ component {
 		);
 		local.deliver = Duplicate(arguments.deliver);
 		local.nonPassThruArgs = "writetofile,template,templates,layout,layouts,file,files,detectMultipart,deliver";
-		local.mailTagArgs = "from,to,bcc,cc,charset,debug,failto,group,groupcasesensitive,mailerid,mailparams,maxrows,mimeattach,password,port,priority,query,replyto,server,spoolenable,startrow,subject,timeout,type,username,useSSL,useTLS,wraptext,remove";
+		local.mailTagArgs = "from,to,bcc,cc,charset,debug,encrypt,encryptionalgorithm,failto,group,groupcasesensitive,keyalias,keypassword,keystore,keystorepassword,mailerid,mailparams,maxrows,mimeattach,password,port,priority,query,recipientcert,replyto,server,sign,spoolenable,startrow,subject,timeout,type,username,useSSL,useTLS,wraptext,remove";
+
+		// Coerce a zero-length layout to `false` (no layout) so the layout list below always has at least one entry.
+		if (!Len(arguments.layout)) {
+			arguments.layout = false;
+		}
+
+		// Multipart emails support a maximum of two templates (one text and one html version).
+		if (ListLen(arguments.template) > 2) {
+			Throw(
+				type = "Wheels.IncorrectArguments",
+				message = "The `template` argument passed to `sendEmail` contains #ListLen(arguments.template)# templates but a maximum of `2` (one text and one html version) is supported.",
+				extendedInfo = "Pass in one template for a single part email or two templates for a multipart (text and html) email."
+			);
+		}
 
 		// If two templates but only one layout was passed in we set the same layout to be used on both.
 		if (ListLen(arguments.template) > 1 && ListLen(arguments.layout) == 1) {
@@ -44,8 +59,15 @@ component {
 		}
 
 		// Set the variables that should be available to the email view template (i.e. the custom named arguments passed in by the developer).
+		// We snapshot what we touch so the controller's `variables` scope can be restored after rendering (otherwise the custom arguments would leak into, or overwrite parts of, the rest of the request).
+		local.customViewVariables = [];
+		local.shadowedVariables = {};
 		for (local.key in arguments) {
 			if (!ListFindNoCase(local.nonPassThruArgs, local.key) && !ListFindNoCase(local.mailTagArgs, local.key)) {
+				if (StructKeyExists(variables, local.key)) {
+					local.shadowedVariables[local.key] = variables[local.key];
+				}
+				ArrayAppend(local.customViewVariables, local.key);
 				variables[local.key] = arguments[local.key];
 				StructDelete(arguments, local.key);
 			}
@@ -66,16 +88,32 @@ component {
 			if (ArrayIsEmpty(arguments.mailparts)) {
 				ArrayAppend(arguments.mailparts, local.mailpart);
 			} else {
-				// Make sure the text version is the first one in the array.
-				local.existingContentCount = ListLen(arguments.mailparts[1].tagContent, "<");
-				local.newContentCount = ListLen(local.content, "<");
-				if (local.newContentCount < local.existingContentCount) {
-					ArrayPrepend(arguments.mailparts, local.mailpart);
+				if (arguments.detectMultipart) {
+					// Make sure the text version is the first one in the array.
+					local.existingContentCount = ListLen(arguments.mailparts[1].tagContent, "<");
+					local.newContentCount = ListLen(local.content, "<");
+					if (local.newContentCount < local.existingContentCount) {
+						ArrayPrepend(arguments.mailparts, local.mailpart);
+					} else {
+						ArrayAppend(arguments.mailparts, local.mailpart);
+					}
 				} else {
+					// When multipart detection is turned off we preserve the order that the templates were passed in (text version first).
 					ArrayAppend(arguments.mailparts, local.mailpart);
 				}
 				arguments.mailparts[1].type = "text";
 				arguments.mailparts[2].type = "html";
+			}
+		}
+
+		// Restore the controller's `variables` scope now that the email templates have been rendered.
+		local.iEnd = ArrayLen(local.customViewVariables);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.key = local.customViewVariables[local.i];
+			if (StructKeyExists(local.shadowedVariables, local.key)) {
+				variables[local.key] = local.shadowedVariables[local.key];
+			} else {
+				StructDelete(variables, local.key);
 			}
 		}
 
@@ -94,6 +132,9 @@ component {
 				} else {
 					arguments.type = "text";
 				}
+			} else if (!StructKeyExists(arguments, "type")) {
+				// Match the default of the `cfmail` tag itself when multipart detection is turned off.
+				arguments.type = "text";
 			}
 			local.rv[arguments.type] = arguments.tagContent;
 		} else {
@@ -132,9 +173,14 @@ component {
 		StructAppend(local.rv, arguments);
 		StructDelete(local.rv, "tagContent");
 
-		// Write the email body to file.
+		// Write the email body to file (the text and html versions separated by a blank line when both exist).
+		// Plain concatenation is used because CFML list functions treat each character of a multi-character delimiter as a separate delimiter.
 		if (Len(local.writeToFile)) {
-			local.output = ListAppend(local.rv.text, local.rv.html, "#Chr(13)##Chr(10)##Chr(13)##Chr(10)#");
+			if (Len(local.rv.text) && Len(local.rv.html)) {
+				local.output = local.rv.text & Chr(13) & Chr(10) & Chr(13) & Chr(10) & local.rv.html;
+			} else {
+				local.output = local.rv.text & local.rv.html;
+			}
 			$file(action = "write", file = "#local.writeToFile#", output = "#local.output#");
 		}
 
@@ -175,6 +221,20 @@ component {
 		boolean deliver
 	) {
 		$args(name = "sendFile", args = arguments);
+
+		// Strip null bytes and check for path traversal after URL-decoding and normalizing backslashes so encoded variants are caught as well (same guard as `$generateIncludeTemplatePath`).
+		arguments.file = Replace(arguments.file, Chr(0), "", "all");
+		arguments.directory = Replace(arguments.directory, Chr(0), "", "all");
+		if (
+			Find("..", Replace(URLDecode(arguments.file), "\", "/", "all"))
+			|| Find("..", Replace(URLDecode(arguments.directory), "\", "/", "all"))
+		) {
+			Throw(
+				type = "Wheels.InvalidPath",
+				message = "The `file` or `directory` argument passed to `sendFile` contains invalid path characters.",
+				extendedInfo = "These arguments must not contain `..` (including URL-encoded variants) so that files outside the intended folder cannot be accessed."
+			);
+		}
 
 		// Check whether the resource is a ram resource or physical file.
 		if (!ListFirst(arguments.file, "://") == "ram") {
@@ -258,6 +318,9 @@ component {
 		if (Len(arguments.name)) {
 			local.name = arguments.name;
 		}
+
+		// Strip CR / LF / double quotes / backslashes from the display name so it cannot break out of the quoted `filename` parameter in the `Content-Disposition` header.
+		local.name = ReReplace(local.name, "[\r\n""\\]", "", "all");
 
 		local.mime = arguments.type;
 		if (!Len(local.mime)) {
