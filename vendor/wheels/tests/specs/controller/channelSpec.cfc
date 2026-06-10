@@ -119,6 +119,25 @@ component extends="wheels.WheelsTest" {
 				expect(removed).toBeFalse();
 			});
 
+			it("unsubscribe prunes the channel when the last subscriber leaves", function() {
+				var id = engine.subscribe(channel = "prune.me", callback = function(e) {});
+				expect(engine.getChannels()).toInclude("prune.me");
+
+				engine.unsubscribe("prune.me", id);
+
+				expect(engine.getChannels()).notToInclude("prune.me");
+			});
+
+			it("unsubscribe keeps the channel while other subscribers remain", function() {
+				var firstId = engine.subscribe(channel = "keep.me", callback = function(e) {});
+				engine.subscribe(channel = "keep.me", callback = function(e) {});
+
+				engine.unsubscribe("keep.me", firstId);
+
+				expect(engine.getChannels()).toInclude("keep.me");
+				expect(engine.subscriberCount("keep.me")).toBe(1);
+			});
+
 			it("error in one subscriber does not affect others", function() {
 				var results = {count: 0};
 
@@ -220,6 +239,69 @@ component extends="wheels.WheelsTest" {
 			it("$getChannelEngine defaults to memory adapter", function() {
 				var engine = _controller.$getChannelEngine();
 				expect(engine).toBeInstanceOf("wheels.Channel");
+			});
+		});
+
+		describe("$subscribeDatabase cursor handling", function() {
+
+			beforeEach(function() {
+				params = {controller = "dummy", action = "dummy"};
+				_controller = g.controller("dummy", params);
+			});
+
+			it("advances the poll cursor past filtered events", function() {
+				// MockBox writes its generated method stubs to /testbox/system/stubs
+				// (webroot-relative) and removes them after mixing in — make sure the
+				// directory exists
+				var stubDir = ExpandPath("/testbox/system/stubs");
+				if (!DirectoryExists(stubDir)) {
+					DirectoryCreate(stubDir, true);
+				}
+
+				// First poll returns two events whose type does NOT match the filter;
+				// second poll must resume after the newest of them, not re-fetch them
+				var firstPoll = QueryNew(
+					"id,channel,event,data,createdAt",
+					"varchar,varchar,varchar,varchar,timestamp",
+					[
+						{id: "evt-1", channel: "test.cursor", event: "ignored", data: "a", createdAt: Now()},
+						{id: "evt-2", channel: "test.cursor", event: "ignored", data: "b", createdAt: Now()}
+					]
+				);
+				var emptyPoll = QueryNew(
+					"id,channel,event,data,createdAt",
+					"varchar,varchar,varchar,varchar,timestamp",
+					[]
+				);
+
+				var fakeAdapter = createStub();
+				fakeAdapter.$("poll").$results(firstPoll, emptyPoll);
+
+				var fakeWriter = createStub();
+				fakeWriter.$("checkError").$results(false, true);
+
+				prepareMock(_controller);
+				_controller.$(method = "initSSEStream", returns = fakeWriter);
+				_controller.$(method = "$getChannelEngine", returns = fakeAdapter);
+				_controller.$(method = "sendSSEEvent");
+				_controller.$(method = "sendSSEComment");
+				_controller.$(method = "closeSSEStream");
+
+				_controller.$subscribeDatabase(
+					channel = "test.cursor",
+					eventFilter = ["wanted"],
+					lastEventId = "start-id",
+					pollInterval = 0.01,
+					timeout = 30,
+					heartbeatInterval = 60
+				);
+
+				var pollLog = fakeAdapter.$callLog().poll;
+				expect(ArrayLen(pollLog)).toBeGTE(2);
+				// The cursor must have advanced past the filtered events
+				expect(pollLog[2].lastEventId).toBe("evt-2");
+				// Filtered events must not be delivered to the client
+				expect(ArrayLen(_controller.$callLog().sendSSEEvent)).toBe(0);
 			});
 		});
 
