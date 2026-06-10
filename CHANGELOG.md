@@ -22,7 +22,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Fixed
 
-- `onlyProvides()` per-action format restrictions now take effect. `$acceptableFormats()` read the top-level `variables.$class.formats` struct (whose keys are only `default` / `actions` / `existingTemplates` / `nonExistingTemplates`) instead of the `.actions` sub-struct that `onlyProvides()` writes to, so the per-action lookup never matched and every `onlyProvides()` call was a silent no-op since introduction — controllers happily rendered whatever format the request asked for. The read path now checks `formats.actions[action]` (with the `action` argument declared optional so bare calls stay safe); `renderWith()` coerces a non-acceptable requested format to html, and the `$callAction` auto-render block skips view rendering for non-acceptable non-html formats. **Behavior change by design** — apps that relied on the silent no-op will now see restrictions enforced (#2901)
+- `onlyProvides()` per-action format restrictions now take effect. `$acceptableFormats()` was reading the top-level `variables.$class.formats` struct instead of the `.actions` sub-struct that `onlyProvides()` writes to, making every per-action restriction a silent no-op since introduction. **Behavior change by design** — apps that relied on the silent no-op will now see restrictions enforced (#2901)
 
 ----
 

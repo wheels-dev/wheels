@@ -790,6 +790,7 @@ component extends="wheels.WheelsTest" {
 				}
 				_controller.onlyProvides(formats = "json", action = "noViewAction")
 
+				captured = ""
 				try {
 					_controller.$callAction(action = "noViewAction")
 					captured = _controller.response()
