@@ -25,6 +25,7 @@ component output="false" extends="wheels.Global" {
 		this.results = [];
 		this.totalCreated = 0;
 		this.totalSkipped = 0;
+		this.totalFailed = 0;
 		return this;
 	}
 
@@ -34,6 +35,15 @@ component output="false" extends="wheels.Global" {
 	 * 1. Includes app/db/seeds.cfm (shared seeds) if it exists.
 	 * 2. Includes app/db/seeds/<environment>.cfm if it exists.
 	 * 3. Wraps execution in a transaction for atomicity.
+	 *
+	 * Partial-failure policy: if any `seedOnce()` call records `action="failed"`
+	 * (validation failure on save), the wrapping transaction is rolled back —
+	 * successful entries from earlier in the same run are NOT persisted. The
+	 * return struct carries `success=false`, names the failing models in
+	 * `message`, and surfaces the per-entry errors in `results`. This makes
+	 * `wheels seed` exit non-zero so half-applied seeds can't silently land in
+	 * CI or in shared dev environments. seedOnce() is idempotent, so the
+	 * caller can fix the offending entry and re-run safely.
 	 *
 	 * @environment The environment to seed for (defaults to current Wheels environment)
 	 */
@@ -50,6 +60,7 @@ component output="false" extends="wheels.Global" {
 		this.results = [];
 		this.totalCreated = 0;
 		this.totalSkipped = 0;
+		this.totalFailed = 0;
 
 		local.mainSeedFile = this.seedPath & "seeds.cfm";
 		local.envSeedFile = this.seedPath & "seeds/" & arguments.environment & ".cfm";
@@ -62,7 +73,8 @@ component output="false" extends="wheels.Global" {
 				message = "No seed files found. Create app/db/seeds.cfm to get started.",
 				results = [],
 				totalCreated = 0,
-				totalSkipped = 0
+				totalSkipped = 0,
+				totalFailed = 0
 			};
 		}
 
@@ -79,6 +91,30 @@ component output="false" extends="wheels.Global" {
 					include "#this.seedMappingPath#seeds/#arguments.environment#.cfm";
 				}
 
+				// Partial-failure path: any seedOnce() that recorded action="failed"
+				// invalidates the whole run. Roll back so we don't commit a
+				// half-applied seed; surface the failed models in the message so
+				// the CLI and CI can name them.
+				if (this.totalFailed > 0) {
+					transaction action="rollback";
+					local.failedModels = [];
+					for (local.r in this.results) {
+						if (StructKeyExists(local.r, "action") && local.r.action == "failed") {
+							ArrayAppend(local.failedModels, local.r.model);
+						}
+					}
+					local.entryWord = (this.totalFailed == 1) ? "entry" : "entries";
+					return {
+						success = false,
+						message = "Seeding failed: #this.totalFailed# #local.entryWord# failed validation (#ArrayToList(local.failedModels, ", ")#). Transaction rolled back; no records persisted.",
+						environment = arguments.environment,
+						results = this.results,
+						totalCreated = 0,
+						totalSkipped = this.totalSkipped,
+						totalFailed = this.totalFailed
+					};
+				}
+
 				transaction action="commit";
 			} catch (any e) {
 				transaction action="rollback";
@@ -88,7 +124,8 @@ component output="false" extends="wheels.Global" {
 					detail = e.detail,
 					results = this.results,
 					totalCreated = this.totalCreated,
-					totalSkipped = this.totalSkipped
+					totalSkipped = this.totalSkipped,
+					totalFailed = this.totalFailed
 				};
 			}
 		}
@@ -99,7 +136,8 @@ component output="false" extends="wheels.Global" {
 			environment = arguments.environment,
 			results = this.results,
 			totalCreated = this.totalCreated,
-			totalSkipped = this.totalSkipped
+			totalSkipped = this.totalSkipped,
+			totalFailed = this.totalFailed
 		};
 	}
 
@@ -189,6 +227,7 @@ component output="false" extends="wheels.Global" {
 				key = local.newRecord.key()
 			};
 		} else {
+			this.totalFailed++;
 			local.result = {
 				model = arguments.modelName,
 				action = "failed",

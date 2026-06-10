@@ -81,6 +81,34 @@ component extends="wheels.WheelsTest" {
 					}).toThrow("Wheels.Seeder.InvalidEnvironment");
 				});
 
+				it("returns success=false and rolls back when a seedOnce() entry fails validation", () => {
+					// Pre-cleanup so a prior failed test run can't poison the assertion below.
+					local.stale = model("author").findOne(where="lastName = 'SeederRollbackMarker'");
+					if (IsObject(local.stale)) {
+						local.stale.delete();
+					}
+
+					local.s = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/withfailure/"
+					);
+					local.result = local.s.runSeeds(environment = "testing");
+
+					expect(local.result.success).toBeFalse();
+					expect(local.result.totalFailed).toBeGTE(1);
+					expect(local.result.message).toInclude("failed");
+					// The successful author entry was rolled back, so totalCreated reflects the post-rollback state.
+					expect(local.result.totalCreated).toBe(0);
+
+					// Verify nothing was actually persisted — the successful entry must have been rolled back.
+					local.lingering = model("author").findOne(where="lastName = 'SeederRollbackMarker'");
+					expect(IsObject(local.lingering)).toBeFalse();
+				});
+
+				it("initializes totalFailed alongside totalCreated and totalSkipped", () => {
+					local.s = CreateObject("component", "wheels.Seeder").init();
+					expect(local.s.totalFailed).toBe(0);
+				});
+
 			});
 
 			describe("seedOnce()", () => {

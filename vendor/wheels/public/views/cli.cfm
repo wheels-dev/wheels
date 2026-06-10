@@ -890,6 +890,7 @@ function runDbSeed(struct seedParams = {}) {
 			result.environment = environment;
 			result.totalCreated = conventionResult.totalCreated;
 			result.totalSkipped = conventionResult.totalSkipped;
+			result.totalFailed = structKeyExists(conventionResult, "totalFailed") ? conventionResult.totalFailed : 0;
 			result.results = conventionResult.results;
 			if (structKeyExists(conventionResult, "detail")) {
 				result.detail = conventionResult.detail;
