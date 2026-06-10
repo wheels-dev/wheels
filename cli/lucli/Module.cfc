@@ -186,6 +186,7 @@ component extends="modules.BaseModule" {
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
 			"browser",  // multi-step browser testing flow
+			"mcpToolSpecs", // per-tool inputSchema registry read by LuCLI — not itself a tool
 			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
 			// unit-test them directly (the cli/CLAUDE.md "public for specs"
 			// carve-out) — they are not commands and must never surface as MCP
@@ -220,6 +221,94 @@ component extends="modules.BaseModule" {
 		}
 
 		return hidden;
+	}
+
+	/**
+	 * MCP tool input schemas, keyed by tool name. Read by LuCLI's MCP server
+	 * per the same optional-convention mechanism as mcpHiddenTools(), so the
+	 * stdio `tools/list` advertisement carries a populated inputSchema.
+	 *
+	 * Why this exists (#2963): Module command functions declare no formal
+	 * parameters — they consume LuCLI's structured argCollection — so the
+	 * runtime's signature-derived schema is `{properties: {}}` with
+	 * `additionalProperties: false`, which tells MCP clients the tools take
+	 * no arguments at all. Each entry below is built from the SAME ArgSpec
+	 * builder the command's parse helper uses, so the CLI parse surface and
+	 * the MCP advertisement cannot drift.
+	 *
+	 * Commands still on hand-rolled token parsing (generate, migrate, db,
+	 * deploy, routes, info, reload, validate, create — tracked by #2861)
+	 * gain entries here as they migrate to ArgSpec.
+	 */
+	public struct function mcpToolSpecs() {
+		return {
+			"analyze" = analyzeArgSpec().toInputSchema(),
+			"destroy" = destroyArgSpec().toInputSchema(),
+			"doctor"  = verboseFlagSpec().toInputSchema(),
+			"notes"   = notesArgSpec().toInputSchema(),
+			"seed"    = seedArgSpec().toInputSchema(),
+			"stats"   = verboseFlagSpec().toInputSchema(),
+			"test"    = testArgSpec().toInputSchema(),
+			"upgrade" = upgradeArgSpec().toInputSchema()
+		};
+	}
+
+	// ─────────────────────────────────────────────────
+	//  ArgSpec builders — one per command, shared by the
+	//  command's parse helper and mcpToolSpecs() so the
+	//  CLI parse surface and the MCP tools/list schema
+	//  cannot drift (#2963). Descriptions flow into the
+	//  schema via ArgSpec.toInputSchema().
+	// ─────────────────────────────────────────────────
+
+	private any function seedArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "environment", default = "", description = "Environment whose seed files run (defaults to the app's current environment)")
+			.option(name = "mode", default = "auto", description = "Seeding mode: auto (detect), convention (app/db/seeds.cfm), or generate (random test data)")
+			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate");
+	}
+
+	private any function testArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "filter",    default = "", description = "Spec filter — a dotted directory or bundle path (e.g. tests.specs.models)")
+			.option(name = "directory", default = "", description = "Documented alias for --filter")
+			.option(name = "reporter",  default = "simple", description = "Output format: simple, json, or tap")
+			.option(name = "db",        default = "sqlite", description = "Database the suite runs against")
+			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
+			.flag(name = "ci",      default = false, description = "CI mode output")
+			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
+			.flag(name = "test-db", default = true, description = "Swap to the dedicated test datasource for the run (disable with --no-test-db)");
+	}
+
+	private any function analyzeArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "target", default = "all", description = "Analysis target (default: all)");
+	}
+
+	private any function destroyArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "type", default = "", description = "What to remove: resource, model, controller, or view")
+			.positional(name = "name", default = "", description = "Name of the artifact to remove")
+			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
+	}
+
+	private any function verboseFlagSpec() {
+		return new services.ArgSpec()
+			.flag(name = "verbose", default = false, description = "Print detailed output");
+	}
+
+	private any function notesArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "annotations", default = "TODO,FIXME,OPTIMIZE", description = "Comma-delimited annotation markers to scan for")
+			.option(name = "custom", default = "", description = "Additional custom annotation markers (comma-delimited)");
+	}
+
+	private any function upgradeArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "subcommand", default = "", description = "Only `check` is supported — scans the app for breaking changes (read-only)")
+			.option(name = "to", default = "", description = "Target Wheels version to check against (defaults to latest)")
+			.option(name = "format", default = "", description = "Set to json for machine-readable output")
+			.flag(name = "strict", default = false, description = "Escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -559,11 +648,7 @@ component extends="modules.BaseModule" {
 	 * shorthand for `--mode=generate`.
 	 */
 	private struct function parseSeedArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "environment", default = "")
-			.option(name = "mode", default = "auto")
-			.flag(name = "generate", default = false)
-			.parse(arguments.coll);
+		var parsed = seedArgSpec().parse(arguments.coll);
 		return {
 			environment = parsed.environment,
 			mode = parsed.generate ? "generate" : parsed.mode
@@ -593,16 +678,7 @@ component extends="modules.BaseModule" {
 	 * space form as a bare flag + a separate positional, not a named value (#2861).
 	 */
 	private struct function parseTestArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "filter",    default = "")
-			.option(name = "directory", default = "")
-			.option(name = "reporter",  default = "simple")
-			.option(name = "db",        default = "sqlite")
-			.flag(name = "verbose", default = false)
-			.flag(name = "ci",      default = false)
-			.flag(name = "core",    default = false)
-			.flag(name = "test-db", default = true)
-			.parse(arguments.coll);
+		var parsed = testArgSpec().parse(arguments.coll);
 
 		// `--directory` is a documented alias for `--filter` (tutorial ch. 7).
 		var filter = len(parsed.directory) ? parsed.directory : parsed.filter;
@@ -1683,9 +1759,7 @@ component extends="modules.BaseModule" {
 	 * target so the "not in a project" guard only fires for the bare form.
 	 */
 	private struct function parseAnalyzeArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.positional(name = "target", default = "all")
-			.parse(arguments.coll);
+		var parsed = analyzeArgSpec().parse(arguments.coll);
 		return {
 			target = lCase(parsed.target),
 			hasTarget = structKeyExists(arguments.coll, "arg1")
@@ -1828,9 +1902,10 @@ component extends="modules.BaseModule" {
 	 * migration unchanged — ArgSpec only replaced the hand-rolled token split.
 	 */
 	private struct function parseDestroyArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.flag(name = "force", default = false)
-			.parse(arguments.coll);
+		// The builder also declares the <type>/<name> positionals (for the MCP
+		// schema); the smart legacy-order reorder below still reads them from
+		// the raw collection, so only parsed.force is consumed here.
+		var parsed = destroyArgSpec().parse(arguments.coll);
 
 		// Collect positionals from every arg<n> value in numeric order. LuCLI
 		// numbers positionals by global token index, so a leading `--force`
@@ -1986,9 +2061,7 @@ component extends="modules.BaseModule" {
 	 * so a short flag arrives as a positional arg<n> value.
 	 */
 	private boolean function parseVerboseFlag(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.flag(name = "verbose", default = false)
-			.parse(arguments.coll);
+		var parsed = verboseFlagSpec().parse(arguments.coll);
 		if (parsed.verbose) {
 			return true;
 		}
@@ -2666,10 +2739,7 @@ component extends="modules.BaseModule" {
 	 * consumes them directly.
 	 */
 	private struct function parseNotesArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "annotations", default = "TODO,FIXME,OPTIMIZE")
-			.option(name = "custom", default = "")
-			.parse(arguments.coll);
+		var parsed = notesArgSpec().parse(arguments.coll);
 		return { annotations = parsed.annotations, custom = parsed.custom };
 	}
 
@@ -2766,12 +2836,7 @@ component extends="modules.BaseModule" {
 	 * bare `--to` to to=true and `--to=x` to to=x — either way the key exists).
 	 */
 	private struct function parseUpgradeArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.positional(name = "subcommand", default = "")
-			.option(name = "to", default = "")
-			.option(name = "format", default = "")
-			.flag(name = "strict", default = false)
-			.parse(arguments.coll);
+		var parsed = upgradeArgSpec().parse(arguments.coll);
 		return {
 			isCheck = lCase(parsed.subcommand) == "check",
 			targetVersion = parsed.to,
@@ -4711,6 +4776,10 @@ component extends="modules.BaseModule" {
 		}
 
 		var testsFailed = false;
+		// Struct (not a bare local) so the catch-block write persists on
+		// BoxLang — local assignments inside catch are discarded there
+		// (CLAUDE.md cross-engine invariant 11).
+		var runState = {crashed = false};
 
 		try {
 			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
@@ -4755,7 +4824,9 @@ component extends="modules.BaseModule" {
 				// testing.mdx documents a non-zero exit on failure. CLI audit H6.
 				testsFailed = ((result.totalFail ?: 0) + (result.totalError ?: 0)) > 0;
 			} else {
-				// Could be an HTML error page
+				// Could be an HTML error page. Either way no result document was
+				// produced — the run crashed, which must exit non-zero (#2963).
+				runState.crashed = true;
 				if (reFindNoCase("<html", httpResult)) {
 					out("Server returned HTML instead of JSON — possible error page.", "red");
 					out("Check server logs or visit the test URL directly.", "yellow");
@@ -4765,6 +4836,7 @@ component extends="modules.BaseModule" {
 				}
 			}
 		} catch (any e) {
+			runState.crashed = true;
 			out("Test execution failed: #e.message#", "red");
 		}
 
@@ -4773,6 +4845,11 @@ component extends="modules.BaseModule" {
 		// tests failed, silently green-lighting broken builds. CLI audit H6.
 		if (testsFailed) {
 			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		}
+		// A crash during the HTTP/parse phase printed red but exited 0 — the
+		// throw above only covers FAILING tests, not CRASHED runs (#2963).
+		if (runState.crashed) {
+			throw(type = "Wheels.TestRunFailed", message = "Test run crashed before producing results — see the output above.");
 		}
 
 		return "";
