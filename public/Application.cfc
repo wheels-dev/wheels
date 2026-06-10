@@ -185,7 +185,18 @@ component output="false" {
 			application.wheels.environment != "development" &&
 			(application.wheels.allowIPBasedDebugAccess)
 		) {
-			local.clientIP = CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR;
+			// Client IP comes from the socket address. X-Forwarded-For is client-controlled
+			// and trivially spoofed, so it is only consulted when the app explicitly opts in
+			// via set(debugAccessTrustProxy=true) behind a trusted reverse proxy.
+			local.clientIP = Trim(CGI.REMOTE_ADDR);
+			if (
+				StructKeyExists(application.wheels, "debugAccessTrustProxy")
+				&& application.wheels.debugAccessTrustProxy
+				&& Len(Trim(CGI.HTTP_X_FORWARDED_FOR))
+			) {
+				// Rightmost entry is the one appended by the trusted proxy nearest the app.
+				local.clientIP = Trim(ListLast(CGI.HTTP_X_FORWARDED_FOR));
+			}
 			local.allowedIPs = application.wheels.debugAccessIPs;
 
 			if (arrayContains(local.allowedIPs, local.clientIP)) {
