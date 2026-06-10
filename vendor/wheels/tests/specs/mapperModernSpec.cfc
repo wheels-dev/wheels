@@ -394,6 +394,11 @@ component extends="wheels.WheelsTest" {
 				// Named capturing group opener is replaced wholesale with `(?:`.
 				expect(local.mapper.$nonCapturingConstraint("(?<yr>20\d{2})")).toBe("(?:20\d{2})")
 
+				// Nested named groups: the scanner must resume right after the outer
+				// `>` and re-detect the inner opener at the very next character.
+				expect(local.mapper.$nonCapturingConstraint("(?<outer>(?<inner>\d{2})\-\d{2})"))
+					.toBe("(?:(?:\d{2})\-\d{2})")
+
 				// Lookbehinds start with `(?<` too but are NOT capturing groups —
 				// the rewrite must leave them untouched.
 				expect(local.mapper.$nonCapturingConstraint("\w+(?<!tmp)")).toBe("\w+(?<!tmp)")
