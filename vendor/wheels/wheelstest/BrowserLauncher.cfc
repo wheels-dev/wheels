@@ -95,24 +95,6 @@ component {
         return $resolveInstallDir(envVar=envVar, homeDir=getUserHome());
     }
 
-    public string function $jarPath(
-        required string installDir,
-        required string version
-    ) {
-        return arguments.installDir & "/lib/playwright-" & arguments.version & ".jar";
-    }
-
-    public boolean function $verifyInstall(required string jarPath) {
-        if (!fileExists(arguments.jarPath)) {
-            throw(
-                type="Wheels.BrowserNotInstalled",
-                message="Playwright JAR not found at " & arguments.jarPath
-                    & ". Run `wheels browser:install` to set up browser testing."
-            );
-        }
-        return true;
-    }
-
     /**
      * Returns the path to the user's home directory. Override-friendly for tests.
      */
@@ -197,6 +179,11 @@ component {
 
     /**
      * Returns the Browser for the given engine, creating and caching it on first call.
+     * Cache hits are probed for liveness (a crashed browser would otherwise
+     * poison the application-scoped cache for the application lifetime), and
+     * creation is double-check locked like $ensureLauncher so concurrent
+     * first calls can't both run Playwright.create()/launch() and orphan
+     * an instance.
      *
      * @engine One of: chromium, firefox, webkit
      */
@@ -208,10 +195,54 @@ component {
             );
         }
 
-        if (structKeyExists(variables.$browsers, arguments.engine)) {
-            return variables.$browsers[arguments.engine];
+        var cached = $liveCachedBrowser(engine=arguments.engine);
+        if (isObject(cached)) {
+            return cached;
         }
 
+        lock name="wheelsBrowserLauncherAcquire" type="exclusive" timeout="60" {
+            // Re-check inside the lock — another thread may have launched
+            // while we were waiting.
+            cached = $liveCachedBrowser(engine=arguments.engine);
+            if (isObject(cached)) {
+                return cached;
+            }
+            return $launchBrowser(engine=arguments.engine);
+        }
+    }
+
+    /**
+     * Returns the cached Browser for `engine` when it is still connected.
+     * Evicts the cache entry and returns "" when missing or dead, so the
+     * caller relaunches instead of handing out a dead handle.
+     *
+     * Public (with $ prefix indicating "internal but accessible") so the
+     * liveness/eviction behavior is reachable from tests.
+     */
+    public any function $liveCachedBrowser(required string engine) {
+        if (!structKeyExists(variables.$browsers, arguments.engine)) {
+            return "";
+        }
+        var cached = variables.$browsers[arguments.engine];
+        var alive = false;
+        try {
+            alive = cached.isConnected();
+        } catch (any e) {
+            // Probe failure (driver process gone, proxy broken) counts as dead.
+        }
+        if (alive) {
+            return cached;
+        }
+        structDelete(variables.$browsers, arguments.engine);
+        return "";
+    }
+
+    /**
+     * Launches (and caches) a Browser for the given engine. Callers must
+     * hold the wheelsBrowserLauncherAcquire lock — acquireBrowser() is the
+     * only intended entry point.
+     */
+    private any function $launchBrowser(required string engine) {
         // Swap TCCL to our URLClassLoader for the duration of Playwright calls —
         // Playwright's DriverJar uses TCCL to find bundled driver resources, and
         // default TCCL (AppClassLoader) doesn't have driver-bundle.jar.
@@ -256,7 +287,7 @@ component {
             throw(
                 type="Wheels.BrowserLaunchFailed",
                 message="Failed to launch " & arguments.engine & ": " & rootCause
-                    & ". If Playwright is not installed, run: bash tools/install-playwright.sh",
+                    & ". If Playwright is not installed, run `wheels browser setup` to set up browser testing.",
                 detail=e.detail ?: ""
             );
         }
