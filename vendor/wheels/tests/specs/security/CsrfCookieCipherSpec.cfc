@@ -1,7 +1,9 @@
 /**
- * Tests that the CSRF cookie cipher defaults to authenticated AES/GCM (bare "AES"
- * resolves to insecure ECB mode) and that cookies written under the legacy bare
- * "AES" default remain readable via the decrypt fallback.
+ * Tests that the CSRF cookie cipher defaults to an IV-based AES mode (bare "AES"
+ * resolves to insecure ECB mode) — authenticated AES/GCM where the engine supports
+ * it through Encrypt()/Decrypt(), random-IV CBC otherwise (e.g. Lucee) — and that
+ * cookies written under the legacy bare "AES" default remain readable via the
+ * decrypt fallback.
  */
 component extends="wheels.WheelsTest" {
 
@@ -22,8 +24,13 @@ component extends="wheels.WheelsTest" {
 				application.wheels.csrfCookieEncryptionSecretKey = $originalKey;
 			});
 
-			it("defaults to AES/GCM/NoPadding instead of ECB", function() {
-				expect(application.wheels.csrfCookieEncryptionAlgorithm).toBe("AES/GCM/NoPadding");
+			it("defaults to an IV-based AES mode instead of bare AES (ECB)", function() {
+				// AES/GCM/NoPadding where the engine supports it through Encrypt()/Decrypt(),
+				// AES/CBC/PKCS5Padding otherwise (e.g. Lucee rejects GCM with
+				// "AlgorithmParameterSpec not of GCMParameterSpec").
+				expect(
+					ListFind("AES/GCM/NoPadding,AES/CBC/PKCS5Padding", application.wheels.csrfCookieEncryptionAlgorithm)
+				).toBeGT(0);
 			});
 
 			it("round-trips a value encrypted with the configured algorithm", function() {

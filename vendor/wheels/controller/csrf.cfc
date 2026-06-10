@@ -252,7 +252,8 @@ component {
 	 * Internal function.
 	 * Decrypts an encrypted CSRF cookie value using the configured algorithm, falling
 	 * back to the legacy bare "AES" (ECB) algorithm so cookies issued before the
-	 * AES/GCM/NoPadding default remain readable across the upgrade. Returns an empty
+	 * engine-aware IV-based default (AES/GCM/NoPadding or AES/CBC/PKCS5Padding, see
+	 * events/init/security.cfm) remain readable across the upgrade. Returns an empty
 	 * string when the value cannot be decrypted with either algorithm.
 	 */
 	public string function $decryptCsrfCookieValue(required string encryptedValue, required string encryptionKey) {
