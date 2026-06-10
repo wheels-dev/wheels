@@ -63,21 +63,27 @@ component {
 					if (Len(local.appendToKey)) {
 						for (local.item in ListToArray(local.appendToKey)) {
 							if (IsDefined(local.item)) {
-								scopeMap = {
-									"request": request,
-									"arguments": arguments,
-									"application": application,
-									"session": session,
-									"variables": variables
-								};
+								// Build the scope lookup once (and keep it in the local scope so it doesn't leak into the controller's variables scope).
+								if (!StructKeyExists(local, "scopeMap")) {
+									local.scopeMap = {
+										"request": request,
+										"arguments": arguments,
+										"application": application,
+										"session": session,
+										"variables": variables
+									};
+								}
 
 								// Extract scope name and variable name from local.item
-								local.scopeName = listFirst(local.item, ".");
-								local.varName = listLast(local.item, ".");
-								if (structKeyExists(scopeMap, local.scopeName) && structKeyExists(scopeMap[local.scopeName], local.varName)) {
-									local.key &= scopeMap[local.scopeName][local.varName];
+								local.scopeName = ListFirst(local.item, ".");
+								local.varName = ListLast(local.item, ".");
+								if (
+									StructKeyExists(local.scopeMap, local.scopeName)
+									&& StructKeyExists(local.scopeMap[local.scopeName], local.varName)
+								) {
+									local.key &= local.scopeMap[local.scopeName][local.varName];
 								} else {
-									throw(type = "Wheels.KeyNotFound", message = "The `#local.item#` argument was not found.");
+									Throw(type = "Wheels.KeyNotFound", message = "The `#local.item#` argument was not found.");
 								}
 							}
 						}

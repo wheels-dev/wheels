@@ -49,7 +49,7 @@ component {
 		// Only remove specific actions from the cache list
 		local.filtered = [];
 		for (local.i = 1; local.i <= ArrayLen(variables.$class.cachableActions); local.i++) {
-			local.cachableAction = variables.$class.cachableActions[i];
+			local.cachableAction = variables.$class.cachableActions[local.i];
 			if (!ListFindNoCase(arguments.action, local.cachableAction.action)) {
 				ArrayAppend(local.filtered, local.cachableAction);
 			}

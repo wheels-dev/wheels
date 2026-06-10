@@ -104,11 +104,9 @@ component {
 		}
 		application.$wheels.controllers = {};
 		application.$wheels.models = {};
-		application.$wheels.existingHelperFiles = "";
-		application.$wheels.existingLayoutFiles = "";
+		application.$wheels.helperFileCache = {};
+		application.$wheels.layoutFileCache = {};
 		application.$wheels.existingObjectFiles = "";
-		application.$wheels.nonExistingHelperFiles = "";
-		application.$wheels.nonExistingLayoutFiles = "";
 		application.$wheels.nonExistingObjectFiles = "";
 		application.$wheels.directoryFiles = {};
 		application.$wheels.routes = [];
