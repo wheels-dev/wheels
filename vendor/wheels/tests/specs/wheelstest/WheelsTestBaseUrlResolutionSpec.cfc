@@ -39,6 +39,15 @@ component extends="wheels.WheelsTest" {
                 expect($detectTestBaseUrlFromCgi({})).toBe("");
             });
 
+            it("falls back to localhost when server_name is empty or missing", () => {
+                // Without this guard a blank cgi.server_name would build
+                // "http://:8585" and point the HTTP test client at an
+                // unreachable origin.
+                var fakeCgi = {server_port: "8585", server_name: "", https: "off"};
+                expect($detectTestBaseUrlFromCgi(fakeCgi)).toBe("http://localhost:8585");
+                expect($detectTestBaseUrlFromCgi({server_port: "8585"})).toBe("http://localhost:8585");
+            });
+
             it("honors this.testClientBaseUrl as the highest-precedence override", () => {
                 try {
                     this.testClientBaseUrl = "http://override.example:9999";
