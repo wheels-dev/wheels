@@ -100,18 +100,27 @@ component {
 		local.args.collectionPath = arguments.path;
 
 		// Consider only / except REST routes for resources.
-		// Allow arguments.only to override local.args.only.
+		// Allow arguments.only to override local.args.actions.
+		// Normalize (trim + lowercase) each item so values like "Index" or " show" still match.
 		if (StructKeyExists(arguments, "only")) {
-			local.args.actions = LCase(arguments.only);
+			local.args.actions = $normalizeRestActions(arguments.only);
 		}
 
-		// Remove unwanted routes from local.args.only.
+		// Remove unwanted routes from local.args.actions.
+		// Filter with array operations on normalized values so case or whitespace
+		// differences (e.g. except="Delete" or except="new, delete") cannot leave
+		// an excluded (potentially destructive) route registered.
 		if (StructKeyExists(arguments, "except") && ListLen(arguments.except) > 0) {
-			local.except = ListToArray(arguments.except);
-			local.iEnd = ArrayLen(local.except);
+			local.except = ListToArray($normalizeRestActions(arguments.except));
+			local.actions = ListToArray(local.args.actions);
+			local.remaining = [];
+			local.iEnd = ArrayLen(local.actions);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.args.actions = ReReplace(local.args.actions, "\b#local.except[local.i]#\b(,?|$)", "");
+				if (!ArrayFindNoCase(local.except, local.actions[local.i])) {
+					ArrayAppend(local.remaining, local.actions[local.i]);
+				}
 			}
+			local.args.actions = ArrayToList(local.remaining);
 		}
 
 		// If controller name was passed, use it.
@@ -247,5 +256,37 @@ component {
 	 */
 	public struct function collection() {
 		return scope(path = variables.scopeStack[1].collectionPath, $call = "collection");
+	}
+
+	/**
+	 * Internal function.
+	 * Normalizes a comma-delimited list of REST action names used by the `only` /
+	 * `except` arguments: trims and lowercases each item and drops empty entries so
+	 * filtering matches reliably. When `showErrorInformation` is enabled (i.e. in
+	 * development), unknown action names throw instead of being silently ignored.
+	 */
+	public string function $normalizeRestActions(required string actions) {
+		local.validActions = "index,new,create,show,edit,update,delete";
+		local.items = ListToArray(arguments.actions);
+		local.rv = [];
+		local.iEnd = ArrayLen(local.items);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.item = LCase(Trim(local.items[local.i]));
+			if (!Len(local.item)) {
+				continue;
+			}
+			if (!ListFindNoCase(local.validActions, local.item)) {
+				if ($get("showErrorInformation")) {
+					Throw(
+						type = "Wheels.InvalidResource",
+						message = "`#local.item#` is not a valid REST action name for the `only` / `except` arguments.",
+						detail = "Valid action names are: #local.validActions#."
+					);
+				}
+				continue;
+			}
+			ArrayAppend(local.rv, local.item);
+		}
+		return ArrayToList(local.rv);
 	}
 }
