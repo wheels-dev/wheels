@@ -281,6 +281,35 @@ component extends="wheels.Testbox" {
 				expect("users/status/deleted").notToMatch(local.route.regex)
 			})
 
+			it("whereIn escapes regex metacharacters in values", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="fileShow", pattern="files/[file]", to="files##show")
+						.whereIn("file", "readme.txt,changelog.md")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+				expect("files/readme.txt").toMatch(local.route.regex)
+				expect("files/changelog.md").toMatch(local.route.regex)
+				// An unescaped "." would let any character match here.
+				expect("files/readmextxt").notToMatch(local.route.regex)
+			})
+
+			it("whereIn trims whitespace around values", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="byStatus", pattern="status/[status]", to="users##byStatus")
+						.whereIn("status", "active, inactive , pending")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+				expect("status/active").toMatch(local.route.regex)
+				expect("status/inactive").toMatch(local.route.regex)
+				expect("status/pending").toMatch(local.route.regex)
+			})
+
 			it("whereMatch applies a custom regex", function() {
 				local.mapper = $mapper()
 					.$draw()
@@ -306,6 +335,38 @@ component extends="wheels.Testbox" {
 				local.route = local.routes[1]
 				expect(local.route.constraints.userId).toBe("\d+")
 				expect(local.route.constraints.postId).toBe("\d+")
+			})
+
+			it("whereMatch with an invalid regex throws Wheels.InvalidRegex at draw time", function() {
+				constraintMapper = $mapper()
+					.$draw()
+					.get(name="user", pattern="users/[id]", to="users##show")
+
+				expect(function() {
+					constraintMapper.whereMatch("id", "[0-9+")
+				}).toThrow("Wheels.InvalidRegex")
+
+				// The route must not be left with a broken regex after the failed apply.
+				local.routes = constraintMapper.getRoutes()
+				expect("users/123").toMatch(local.routes[1].regex)
+			})
+
+			it("rewrites capturing groups in constraints to non-capturing groups", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="archive", pattern="archive/[year]/[month]", to="archive##show")
+						.whereMatch("year", "(20\d{2})")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+				expect("archive/2024/05").toMatch(local.route.regex)
+
+				// The compiled regex must expose exactly one capture group per route
+				// variable; an extra group from the constraint would shift positional
+				// param extraction in Dispatch's $mergeRoutePattern.
+				local.matches = ReFind(local.route.regex, "archive/2024/05", 1, true)
+				expect(ArrayLen(local.matches.pos)).toBe(3)
 			})
 
 			it("throws error when no routes exist", function() {

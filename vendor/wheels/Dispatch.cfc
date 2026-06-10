@@ -483,7 +483,13 @@ component output="false" extends="wheels.Global"{
 	public struct function $mergeRoutePattern(required struct params, required struct route, required string path) {
 		local.rv = arguments.params;
 		local.matches = ReFindNoCase(arguments.route.regex, arguments.path, 1, true);
-		local.iEnd = ArrayLen(local.matches.pos);
+
+		// Bound the loop by the number of route variables. Constraint patterns are
+		// normalized to non-capturing groups at draw time, but this guard ensures an
+		// unexpected extra capturing group can never push extraction past the variable
+		// list (wrong values or a ListGetAt out-of-bounds crash).
+		local.variableCount = StructKeyExists(arguments.route, "foundVariables") ? ListLen(arguments.route.foundVariables) : 0;
+		local.iEnd = Min(ArrayLen(local.matches.pos), local.variableCount + 1);
 		for (local.i = 2; local.i <= local.iEnd; local.i++) {
 			local.key = ListGetAt(arguments.route.foundVariables, local.i - 1);
 			local.rv[local.key] = Mid(arguments.path, local.matches.pos[local.i], local.matches.len[local.i]);

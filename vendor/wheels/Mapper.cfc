@@ -102,10 +102,19 @@ component output="false" {
 		local.rv = ReReplace(local.rv, "\[(\*?\w+)\]", ":::\1:::", "all");
 
 		// Replace known variable keys using constraints.
+		// Constraint patterns are rewritten to use non-capturing groups because route
+		// variables are extracted from the compiled regex by group position (see
+		// $mergeRoutePattern in Dispatch.cfc) — an extra capturing group inside a
+		// constraint would silently shift every subsequent variable's value.
 		local.constraints = StructCopy(arguments.constraints);
 		StructAppend(local.constraints, variables.constraints, false);
 		for (local.key in local.constraints) {
-			local.rv = ReReplaceNoCase(local.rv, ":::#local.key#:::", "(#local.constraints[local.key]#)", "all");
+			local.rv = ReReplaceNoCase(
+				local.rv,
+				":::#local.key#:::",
+				"(#$nonCapturingConstraint(local.constraints[local.key])#)",
+				"all"
+			);
 		}
 
 		// Replace remaining variables with default regex.
@@ -115,6 +124,39 @@ component output="false" {
 		// Escape any forward slashes.
 		local.rv = ReReplace(local.rv, "(\/|\\\/)", "\/", "all");
 
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * Rewrites unescaped capturing groups (`(`) in a constraint pattern to non-capturing
+	 * groups (`(?:`). Route variables are extracted from the compiled route regex by group
+	 * position, so a capturing group inside a constraint (e.g., `whereMatch("size", "[0-9]+(px|em)")`)
+	 * would shift every subsequent variable to the wrong value or crash param extraction.
+	 */
+	public string function $nonCapturingConstraint(required string pattern) {
+		local.rv = "";
+		local.length = Len(arguments.pattern);
+		local.backslashCount = 0;
+		for (local.i = 1; local.i <= local.length; local.i++) {
+			local.char = Mid(arguments.pattern, local.i, 1);
+			if (local.char == "\") {
+				local.backslashCount++;
+				local.rv &= local.char;
+				continue;
+			}
+			if (
+				local.char == "("
+				&& local.backslashCount % 2 == 0
+				&& (local.i == local.length || Mid(arguments.pattern, local.i + 1, 1) != "?")
+			) {
+				// Unescaped capturing group: make it non-capturing.
+				local.rv &= "(?:";
+			} else {
+				local.rv &= local.char;
+			}
+			local.backslashCount = 0;
+		}
 		return local.rv;
 	}
 

@@ -140,7 +140,7 @@ component {
 	}
 
 	/**
-	 * Create a route that matches the root of its current context. This mapper can be used for the application's web root (or home page), or it can generate a route for the root of a namespace or other path scoping mapper.
+	 * Create a route that matches the root of its current context. This mapper can be used for the application's web root (or home page), or it can generate a route for the root of a namespace or other path scoping mapper. The route only responds to the `GET` verb unless you explicitly pass a `method` (or `methods`) argument.
 	 *
 	 * [section: Configuration]
 	 * [category: Routing]
@@ -166,15 +166,19 @@ component {
 			local.pattern = "/";
 		}
 
+		// Restrict the root route to GET unless the caller explicitly passed method/methods.
+		// Without this, a route registered with no methods key matches every HTTP verb.
+		if (!StructKeyExists(arguments, "method") && !StructKeyExists(arguments, "methods")) {
+			arguments.method = "get";
+		}
+
 		// If arguments.to is not passed in, we check for the existence of app/views/home/index.cfm if found we set that as the root
 		// else we set wheels##wheels as the root.
 		if (!structKeyExists(arguments, "to")) {
 			if (fileExists(application.AppDir & "views/home/index.cfm")) {
 				arguments.to = "home##index";
-				arguments.method = "get";
 			} else {
 				arguments.to = "wheels##wheels";
-				arguments.method = "get";
 			}
 		}
 
@@ -188,7 +192,8 @@ component {
 	 * [section: Configuration]
 	 * [category: Routing]
 	 *
-	 * @method List of HTTP methods (verbs) to generate the wildcard routes for. We strongly recommend leaving the default value of `get` and using other routing mappers if you need to `POST` to a URL endpoint. For better readability, you can also pass this argument as `methods` if you're listing multiple methods.
+	 * @method List of HTTP methods (verbs) to generate the wildcard routes for. We strongly recommend leaving the default value of `get` and using other routing mappers if you need to `POST` to a URL endpoint. Pass an empty string to generate the wildcard routes for all verbs (`get`, `post`, `put`, `patch`, and `delete`).
+	 * @methods Alias for `method`, provided for better readability when listing multiple methods. Takes precedence over `method` when both are passed.
 	 * @action Default action to specify if the value for the `[action]` placeholder is not provided.
 	 * @mapKey Whether or not to enable a `[key]` matcher, enabling a `[controller]/[action]/[key]` pattern.
 	 * @mapFormat Whether or not to add an optional `.[format]` pattern to the end of the generated routes. This is useful for providing formats via URL like `json`, `xml`, `pdf`, etc.
@@ -197,12 +202,18 @@ component {
 		string method = "get",
 		string action = "index",
 		boolean mapKey = false,
-		boolean mapFormat = false
+		boolean mapFormat = false,
+		string methods
 	) {
-		if (StructKeyExists(arguments, "methods") && Len(arguments.methods)) {
-			local.methods = arguments.methods;
-		} else if (Len(arguments.method)) {
-			local.methods = ListToArray(arguments.method);
+		// Accept either `method` or `methods` (mirroring $match's aliasing), with `methods`
+		// taking precedence. An empty string generates the wildcard routes for all verbs.
+		if (StructKeyExists(arguments, "methods")) {
+			local.methodList = arguments.methods;
+		} else {
+			local.methodList = arguments.method;
+		}
+		if (Len(local.methodList)) {
+			local.methods = ListToArray(local.methodList);
 		} else {
 			local.methods = ["get", "post", "put", "patch", "delete"];
 		}
@@ -538,9 +549,17 @@ component {
 	 * @values A comma-delimited list of allowed values (e.g., `"active,inactive,pending"`).
 	 */
 	public struct function whereIn(required string variableName, required string values) {
-		local.pattern = Replace(arguments.values, ",", "|", "all");
-		local.pattern = Replace(local.pattern, " ", "", "all");
-		return $applyConstraintToLastRoute(arguments.variableName, "(?:#local.pattern#)");
+		// The values are literal strings, not regex source: trim each item and escape regex
+		// metacharacters so values like "readme.txt" match exactly instead of widening the
+		// constraint (an unescaped "." would match any character).
+		local.escaped = [];
+		for (local.item in ListToArray(arguments.values)) {
+			local.item = Trim(local.item);
+			if (Len(local.item)) {
+				ArrayAppend(local.escaped, ReReplace(local.item, "([\\\^\$\.\|\?\*\+\(\)\[\]\{\}])", "\\\1", "all"));
+			}
+		}
+		return $applyConstraintToLastRoute(arguments.variableName, "(?:#ArrayToList(local.escaped, "|")#)");
 	}
 
 	/**
@@ -562,10 +581,8 @@ component {
 	 * Supports comma-delimited variable names to constrain multiple variables at once.
 	 */
 	public struct function $applyConstraintToLastRoute(required string variableName, required string pattern) {
-		// Use this.getRoutes() to access routes via the Mapper's own method,
-		// which returns variables.routes from the Mapper's scope. This avoids
-		// both application-scope access issues on Adobe CF and potential mixin
-		// scope issues where `variables` may not reference the Mapper's state.
+		// getRoutes() returns the Mapper's variables.routes array by reference, so the
+		// constraint updates below apply to the live route registrations.
 		local.routes = this.getRoutes();
 		local.routeCount = ArrayLen(local.routes);
 		if (local.routeCount == 0) {
@@ -581,8 +598,8 @@ component {
 		local.lastRoute = local.routes[local.routeCount];
 		local.lastRouteName = StructKeyExists(local.lastRoute, "name") ? local.lastRoute.name : "";
 
-		local.variables = ListToArray(arguments.variableName);
-		for (local.varName in local.variables) {
+		local.variableNames = ListToArray(arguments.variableName);
+		for (local.varName in local.variableNames) {
 			local.varName = Trim(local.varName);
 
 			// Walk backward through routes to find all variants of the same named route.
@@ -597,13 +614,18 @@ component {
 
 				// Only update if this variable exists in the route's pattern.
 				if (Find("[#local.varName#]", local.route.pattern)) {
-					if (!StructKeyExists(local.route, "constraints")) {
-						local.route.constraints = {};
-					}
-					local.route.constraints[local.varName] = arguments.pattern;
+					local.newConstraints = StructKeyExists(local.route, "constraints") ? StructCopy(local.route.constraints) : {};
+					local.newConstraints[local.varName] = arguments.pattern;
 
-					// Recompile the regex with the new constraint.
-					local.route.regex = $patternToRegex(local.route.pattern, local.route.constraints);
+					// Recompile the regex with the new constraint and validate it before
+					// touching the route, so an invalid constraint pattern fails here at
+					// draw time with Wheels.InvalidRegex instead of throwing a raw
+					// PatternSyntaxException on every request that scans this route.
+					local.newRegex = $patternToRegex(local.route.pattern, local.newConstraints);
+					$compileRegex(regex = local.newRegex, pattern = local.route.pattern, name = local.routeName);
+
+					local.route.constraints = local.newConstraints;
+					local.route.regex = local.newRegex;
 
 					// Write modified route back to the local array reference.
 					local.routes[local.i] = local.route;
@@ -619,11 +641,7 @@ component {
 		// Sync routes back to application scope. On Lucee/BoxLang, routes
 		// are pass-by-reference so this is redundant but harmless. On Adobe CF,
 		// this ensures the application-scoped copy reflects the modifications.
-		local.appKey = "wheels";
-		if (StructKeyExists(application, "$wheels")) {
-			local.appKey = "$wheels";
-		}
-		application[local.appKey].routes = local.routes;
+		application[$appKey()].routes = local.routes;
 
 		return this;
 	}
