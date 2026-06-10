@@ -166,6 +166,45 @@ component extends="wheels.WheelsTest" {
 				StructDelete(application, "$wheelstestLifecycleLog")
 			})
 
+			it("keeps live application references intact after onPluginLoad", function() {
+				var originalPluginComponentPath = application.wheels.pluginComponentPath
+				StructDelete(application, "$wheelstestLifecycleLog")
+
+				// A struct placed in the application scope before plugins load.
+				// The onPluginLoad context must be a shallow copy: the old
+				// Duplicate(application) implementation wrote a deep clone back
+				// over this key, forking it from any variable still holding the
+				// original reference (di-packages:10).
+				var marker = {value = "original"}
+				application.$wheelstestSharedRef = marker
+
+				// try/finally so a failing assertion can't leak $wheelstestSharedRef
+				// (or the mutated pluginComponentPath) into subsequent tests.
+				try {
+					var config = {
+						path = "wheels",
+						fileName = "Plugins",
+						method = "$init",
+						pluginPath = "/wheels/tests/_assets/plugins/lifecycle",
+						deletePluginDirectories = false,
+						overwritePlugins = false,
+						loadIncompatiblePlugins = true
+					}
+					application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/lifecycle"
+
+					var PluginObj = $pluginObj(config)
+
+					// Mutating through the pre-load reference must be visible through
+					// the application scope — they are the same struct.
+					marker.value = "mutated"
+					expect(application.$wheelstestSharedRef.value).toBe("mutated")
+				} finally {
+					application.wheels.pluginComponentPath = originalPluginComponentPath
+					StructDelete(application, "$wheelstestSharedRef")
+					StructDelete(application, "$wheelstestLifecycleLog")
+				}
+			})
+
 			it("does not inject lifecycle hooks as mixins", function() {
 				originalPluginComponentPath = application.wheels.pluginComponentPath
 				StructDelete(application, "$wheelstestLifecycleLog")
