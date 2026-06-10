@@ -6,10 +6,15 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		// Shared carrier struct: sibling closures (beforeEach/afterEach) must not
+		// share state through bare unscoped names (CLAUDE.md anti-pattern 10) —
+		// they read the outer struct reference and mutate its fields instead.
+		var state = {originalMixins = {}}
+
 		describe("$initializeMixins component classification", () => {
 
 			beforeEach(() => {
-				originalMixins = application.wheels.mixins
+				state.originalMixins = application.wheels.mixins
 				application.wheels.mixins = {
 					controller = {"$wheelstestClassificationProbe" = "controller"},
 					model = {"$wheelstestClassificationProbe" = "model"}
@@ -17,7 +22,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			afterEach(() => {
-				application.wheels.mixins = originalMixins
+				application.wheels.mixins = state.originalMixins
 			})
 
 			it("classifies a model whose name contains 'Controller' as a model", () => {
@@ -27,7 +32,10 @@ component extends="wheels.WheelsTest" {
 				)
 				var scopeStruct = {}
 				scopeStruct["this"] = target
-				new wheels.Plugins().$initializeMixins(scopeStruct)
+				// CreateObject skips init() so the plugin-loading constructor side effects
+				// (e.g. $checkPluginsDeprecation appending to application.wheels.deprecationWarnings)
+				// do not leak across this spec.
+				CreateObject("component", "wheels.Plugins").$initializeMixins(scopeStruct)
 				expect(scopeStruct).toHaveKey("$wheelstestClassificationProbe")
 				expect(scopeStruct.$wheelstestClassificationProbe).toBe("model")
 			})
@@ -39,7 +47,7 @@ component extends="wheels.WheelsTest" {
 				)
 				var scopeStruct = {}
 				scopeStruct["this"] = target
-				new wheels.Plugins().$initializeMixins(scopeStruct)
+				CreateObject("component", "wheels.Plugins").$initializeMixins(scopeStruct)
 				expect(scopeStruct).toHaveKey("$wheelstestClassificationProbe")
 				expect(scopeStruct.$wheelstestClassificationProbe).toBe("controller")
 			})
