@@ -11,6 +11,8 @@ brew tap wheels-dev/wheels
 brew install wheels
 ```
 
+Homebrew 5.1+ asks you to trust third-party taps on first use — run `brew trust wheels-dev/wheels` once if prompted.
+
 **Windows (Chocolatey):**
 
 ```powershell
