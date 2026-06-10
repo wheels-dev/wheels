@@ -63,16 +63,7 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
-		// Security regression coverage (review finding T4): $runOnError
-		// interpolates $getRequestFormat() into the on-disk error-template
-		// include path (eventPath & "/onerror." & format & ".cfm"), guarded
-		// only by FileExists. Before the fix, url.format flowed through
-		// verbatim, so a traversal token such as "../../somefile" could pull
-		// any .cfm on disk into error rendering (local file inclusion).
-		// $getRequestFormat must only accept plain alphanumeric tokens and
-		// fall back to "html" for everything else. Tested via a helper that
-		// saves/restores url.format so the test harness's own ?format=json
-		// output detection is not disturbed.
+		// Security regression: $getRequestFormat must reject non-alphanumeric url.format (LFI via $runOnError's error-template include path).
 		describe("$getRequestFormat rejects unsafe format tokens (T4 LFI)", () => {
 
 			it("coerces ../ traversal tokens to html", () => {
@@ -97,12 +88,6 @@ component extends="wheels.WheelsTest" {
 		})
 	}
 
-	/**
-	 * Calls EventMethods.$getRequestFormat() with url.format set to the given
-	 * value, saving and restoring the pre-existing url.format around the call.
-	 * The url.format branch never touches $get("formats"), so a bare
-	 * CreateObject instance suffices (same pattern as EventInterfaceSpec).
-	 */
 	private string function $requestFormatFor(required string formatValue) {
 		var em = CreateObject("component", "wheels.events.EventMethods")
 		var hadFormat = StructKeyExists(url, "format")
