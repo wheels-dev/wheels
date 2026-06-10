@@ -215,27 +215,13 @@ component {
 	 * Create an INSERT statement and run to create the record.
 	 */
 	public boolean function $create(required any parameterize, required boolean reload) {
-		// Allow explicit assignment of the createdAt/updatedAt properties if allowExplicitTimestamps is true
-		local.allowExplicitTimestamps = StructKeyExists(this, "allowExplicitTimestamps") && this.allowExplicitTimestamps;
-
-		if (
-			local.allowExplicitTimestamps
-			&& StructKeyExists(this, $get("timeStampOnCreateProperty"))
-			&& Len(this[$get("timeStampOnCreateProperty")])
-		) {
-			// leave createdat unmolested
-		} else if (variables.wheels.class.timeStampingOnCreate) {
-			$timestampProperty(property = variables.wheels.class.timeStampOnCreateProperty);
-		}
-		if (
-			local.allowExplicitTimestamps
-			&& StructKeyExists(this, $get("timeStampOnUpdateProperty"))
-			&& Len(this[$get("timeStampOnUpdateProperty")])
-		) {
-			// leave updatedat unmolested
-		} else if ($get("setUpdatedAtOnCreate") && variables.wheels.class.timeStampingOnUpdate) {
-			$timestampProperty(property = variables.wheels.class.timeStampOnUpdateProperty);
-		}
+		// Stamp createdAt/updatedAt (updatedAt only when `setUpdatedAtOnCreate` allows it).
+		// The shared helper also honors explicitly assigned values when allowExplicitTimestamps is true.
+		$stampTimestampProperty(event = "create", enabled = variables.wheels.class.timeStampingOnCreate);
+		$stampTimestampProperty(
+			event = "update",
+			enabled = $get("setUpdatedAtOnCreate") && variables.wheels.class.timeStampingOnUpdate
+		);
 
 		local.pks = listToArray(primaryKeys());
 		local.uuidBasedKeys = [];
@@ -247,33 +233,25 @@ component {
 			local.key = trim(local.key);
 			local.columnMeta = this.columnDataForProperty(local.key);
 
+			// Use a single definition of "has a value" for both the explicitly-set check and the
+			// UUID generation guard below (an empty string previously skipped generation entirely).
+			local.keyHasValue = StructKeyExists(this, local.key) && !IsNull(this[local.key]) && Len(this[local.key]);
+
 			// Check if the primary key was explicitly set by the user
-			if (structKeyExists(this, local.key) && len(this[local.key])) {
+			if (local.keyHasValue) {
 				local.primaryKeyExplicitlySet = true;
 			}
 
-			if ($isUUIDColumn(local.columnMeta)) {
+			if (!local.keyHasValue && $isUUIDColumn(local.columnMeta)) {
 				arrayAppend(local.uuidBasedKeys, local.key);
 			}
 		}
 
+		// Generate values for blank UUID-based keys. Uniqueness is left to the primary key
+		// constraint: with random UUIDs a collision is practically impossible (~2^-122), so
+		// probing the table with a SELECT before every insert was redundant.
 		for (local.key in local.uuidBasedKeys) {
-			if (!structKeyExists(this, local.key) || isNull(this[local.key])) {
-				local.newUUID = generateUUID();
-
-				while (true) {
-					local.exists = this.findOne(
-						where = "#local.key# = '#local.newUUID#'"
-					);
-
-					if (!local.exists) {
-						this[local.key] = local.newUUID;
-						break;
-					} else {
-						local.newUUID = generateUUID();
-					}
-				}
-			}
+			this[local.key] = generateUUID();
 		}
 
 		// Start by adding column names and values for the properties that exist on the object to two arrays.
@@ -344,12 +322,16 @@ component {
 	}
 
 	/**
-	 * Determines if a column is likely intended to store UUID value
+	 * Determines if a column is likely intended to store a UUID value.
+	 * Requires an explicitly reported 36-character size: a missing size previously made every
+	 * unsized char/varchar/text column a UUID candidate.
 	 */
 	public boolean function $isUUIDColumn(required struct columnMeta) {
 		return (
 			listFindNoCase("uniqueidentifier,char,varchar,uuid,raw,text", arguments.columnMeta.dataType)
-			&& (arguments.columnMeta.size == 36 || isNull(arguments.columnMeta.size))
+			&& StructKeyExists(arguments.columnMeta, "size")
+			&& !IsNull(arguments.columnMeta.size)
+			&& arguments.columnMeta.size == 36
 		);
 	}
 

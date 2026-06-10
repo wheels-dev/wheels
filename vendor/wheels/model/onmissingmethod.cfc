@@ -393,35 +393,16 @@ component {
 						local.method = "deleteOne";
 						arguments.missingMethodArguments.where = local.where;
 					} else if (local.name == "setObject") {
-						// single argument, must be either the key or the object
-						if (StructCount(arguments.missingMethodArguments) == 1) {
-							if (IsObject(arguments.missingMethodArguments[1])) {
-								local.componentReference = arguments.missingMethodArguments[1];
-								local.method = "update";
-							} else {
-								arguments.missingMethodArguments.key = arguments.missingMethodArguments[1];
-								local.method = "updateByKey";
-							}
-							StructClear(arguments.missingMethodArguments);
-						} else {
-							// multiple arguments so ensure that either 'key' or the association name exists (local.key)
-							if (
-								StructKeyExists(arguments.missingMethodArguments, local.key)
-								&& IsObject(arguments.missingMethodArguments[local.key])
-							) {
-								local.componentReference = arguments.missingMethodArguments[local.key];
-								local.method = "update";
-								StructDelete(arguments.missingMethodArguments, local.key);
-							} else if (StructKeyExists(arguments.missingMethodArguments, "key")) {
-								local.method = "updateByKey";
-							} else {
-								Throw(
-									type = "Wheels.IncorrectArguments",
-									message = "The `#local.key#` or `key` named argument is required.",
-									extendedInfo = "When using multiple arguments for #local.name#() you must supply an object using the argument `#local.key#` or a key using the argument `key`, e.g. #local.name#(#local.key#=post) or #local.name#(key=post.id)."
-								);
-							}
-						}
+						local.resolved = $resolveAssociationTarget(
+							missingMethodArguments = arguments.missingMethodArguments,
+							componentReference = local.componentReference,
+							argumentName = local.key,
+							methodName = local.name,
+							objectMethod = "update",
+							keyMethod = "updateByKey"
+						);
+						local.method = local.resolved.method;
+						local.componentReference = local.resolved.componentReference;
 						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
 					}
 				} else if (local.info.type == "hasMany") {
@@ -449,101 +430,44 @@ component {
 						local.method = "findAll";
 						arguments.missingMethodArguments.where = local.where;
 					} else if (local.name == "addObject") {
-						// single argument, must be either the key or the object
-						if (StructCount(arguments.missingMethodArguments) == 1) {
-							if (IsObject(arguments.missingMethodArguments[1])) {
-								local.componentReference = arguments.missingMethodArguments[1];
-								local.method = "update";
-							} else {
-								arguments.missingMethodArguments.key = arguments.missingMethodArguments[1];
-								local.method = "updateByKey";
-							}
-							StructClear(arguments.missingMethodArguments);
-						} else {
-							// multiple arguments so ensure that either 'key' or the singularized association name exists (local.singularKey)
-							if (
-								StructKeyExists(arguments.missingMethodArguments, local.singularKey)
-								&& IsObject(arguments.missingMethodArguments[local.singularKey])
-							) {
-								local.componentReference = arguments.missingMethodArguments[local.singularKey];
-								local.method = "update";
-								StructDelete(arguments.missingMethodArguments, local.singularKey);
-							} else if (StructKeyExists(arguments.missingMethodArguments, "key")) {
-								local.method = "updateByKey";
-							} else {
-								Throw(
-									type = "Wheels.IncorrectArguments",
-									message = "The `#local.singularKey#` or `key` named argument is required.",
-									extendedInfo = "When using multiple arguments for #local.name#() you must supply an object using the argument `#local.singularKey#` or a key using the argument `key`, e.g. #local.name#(#local.singularKey#=post) or #local.name#(key=post.id)."
-								);
-							}
-						}
+						local.resolved = $resolveAssociationTarget(
+							missingMethodArguments = arguments.missingMethodArguments,
+							componentReference = local.componentReference,
+							argumentName = local.singularKey,
+							methodName = local.name,
+							objectMethod = "update",
+							keyMethod = "updateByKey"
+						);
+						local.method = local.resolved.method;
+						local.componentReference = local.resolved.componentReference;
 						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
 					} else if (local.name == "removeObject") {
-						// single argument, must be either the key or the object
-						if (StructCount(arguments.missingMethodArguments) == 1) {
-							if (IsObject(arguments.missingMethodArguments[1])) {
-								local.componentReference = arguments.missingMethodArguments[1];
-								local.method = "update";
-							} else {
-								arguments.missingMethodArguments.key = arguments.missingMethodArguments[1];
-								local.method = "updateByKey";
-							}
-							StructClear(arguments.missingMethodArguments);
-						} else {
-							// multiple arguments so ensure that either 'key' or the singularized object name exists (local.singularKey)
-							if (
-								StructKeyExists(arguments.missingMethodArguments, local.singularKey)
-								&& IsObject(arguments.missingMethodArguments[local.singularKey])
-							) {
-								local.componentReference = arguments.missingMethodArguments[local.singularKey];
-								local.method = "update";
-								StructDelete(arguments.missingMethodArguments, local.singularKey);
-							} else if (StructKeyExists(arguments.missingMethodArguments, "key")) {
-								local.method = "updateByKey";
-							} else {
-								Throw(
-									type = "Wheels.IncorrectArguments",
-									message = "The `#local.singularKey#` or `key` named argument is required.",
-									extendedInfo = "When using multiple arguments for #local.name#() you must supply an object using the argument `#local.singularKey#` or a key using the argument `key`, e.g. #local.name#(#local.singularKey#=post) or #local.name#(key=post.id)."
-								);
-							}
-						}
+						local.resolved = $resolveAssociationTarget(
+							missingMethodArguments = arguments.missingMethodArguments,
+							componentReference = local.componentReference,
+							argumentName = local.singularKey,
+							methodName = local.name,
+							objectMethod = "update",
+							keyMethod = "updateByKey"
+						);
+						local.method = local.resolved.method;
+						local.componentReference = local.resolved.componentReference;
 						$setForeignKeyValues(
 							missingMethodArguments = arguments.missingMethodArguments,
 							keys = local.info.foreignKey,
 							setToNull = true
 						);
 					} else if (local.name == "deleteObject") {
-						// single argument, must be either the key or the object
-						if (StructCount(arguments.missingMethodArguments) == 1) {
-							if (IsObject(arguments.missingMethodArguments[1])) {
-								local.componentReference = arguments.missingMethodArguments[1];
-								local.method = "delete";
-							} else {
-								arguments.missingMethodArguments.key = arguments.missingMethodArguments[1];
-								local.method = "deleteByKey";
-							}
-							StructClear(arguments.missingMethodArguments);
-						} else {
-							// multiple arguments so ensure that either 'key' or the singularized object name exists (local.singularKey)
-							if (
-								StructKeyExists(arguments.missingMethodArguments, local.singularKey)
-								&& IsObject(arguments.missingMethodArguments[local.singularKey])
-							) {
-								local.componentReference = arguments.missingMethodArguments[local.singularKey];
-								local.method = "delete";
-								StructDelete(arguments.missingMethodArguments, local.singularKey);
-							} else if (StructKeyExists(arguments.missingMethodArguments, "key")) {
-								local.method = "deleteByKey";
-							} else {
-								Throw(
-									type = "Wheels.IncorrectArguments",
-									message = "The `#local.singularKey#` or `key` named argument is required.",
-									extendedInfo = "When using multiple arguments for #local.name#() you must supply an object using the argument `#local.singularKey#` or a key using the argument `key`, e.g. #local.name#(#local.singularKey#=post) or #local.name#(key=post.id)."
-								);
-							}
-						}
+						local.resolved = $resolveAssociationTarget(
+							missingMethodArguments = arguments.missingMethodArguments,
+							componentReference = local.componentReference,
+							argumentName = local.singularKey,
+							methodName = local.name,
+							objectMethod = "delete",
+							keyMethod = "deleteByKey"
+						);
+						local.method = local.resolved.method;
+						local.componentReference = local.resolved.componentReference;
 						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
 					} else if (local.name == "hasObjects") {
 						local.method = "exists";
@@ -640,5 +564,56 @@ component {
 				arguments.missingMethodArguments[local.item] = this[primaryKeys(local.i)];
 			}
 		}
+	}
+
+	/**
+	 * Internal function. Resolves the "key or object" argument convention shared by the dynamic
+	 * association methods (setObject, addObject, removeObject and deleteObject). Mutates
+	 * `missingMethodArguments` in place and returns a struct with the method to invoke plus the
+	 * component reference to invoke it on (the supplied object when one was passed, otherwise
+	 * the `componentReference` given in the arguments).
+	 */
+	public struct function $resolveAssociationTarget(
+		required struct missingMethodArguments,
+		required any componentReference,
+		required string argumentName,
+		required string methodName,
+		required string objectMethod,
+		required string keyMethod
+	) {
+		local.rv = {};
+		local.rv.method = "";
+		local.rv.componentReference = arguments.componentReference;
+
+		if (StructCount(arguments.missingMethodArguments) == 1) {
+			// Single argument, must be either the key or the object.
+			if (IsObject(arguments.missingMethodArguments[1])) {
+				local.rv.componentReference = arguments.missingMethodArguments[1];
+				local.rv.method = arguments.objectMethod;
+			} else {
+				arguments.missingMethodArguments.key = arguments.missingMethodArguments[1];
+				local.rv.method = arguments.keyMethod;
+			}
+			StructClear(arguments.missingMethodArguments);
+		} else {
+			// Multiple arguments so ensure that either `key` or the association argument exists.
+			if (
+				StructKeyExists(arguments.missingMethodArguments, arguments.argumentName)
+				&& IsObject(arguments.missingMethodArguments[arguments.argumentName])
+			) {
+				local.rv.componentReference = arguments.missingMethodArguments[arguments.argumentName];
+				local.rv.method = arguments.objectMethod;
+				StructDelete(arguments.missingMethodArguments, arguments.argumentName);
+			} else if (StructKeyExists(arguments.missingMethodArguments, "key")) {
+				local.rv.method = arguments.keyMethod;
+			} else {
+				Throw(
+					type = "Wheels.IncorrectArguments",
+					message = "The `#arguments.argumentName#` or `key` named argument is required.",
+					extendedInfo = "When using multiple arguments for #arguments.methodName#() you must supply an object using the argument `#arguments.argumentName#` or a key using the argument `key`, e.g. #arguments.methodName#(#arguments.argumentName#=post) or #arguments.methodName#(key=post.id)."
+				);
+			}
+		}
+		return local.rv;
 	}
 }
