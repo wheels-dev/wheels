@@ -23,7 +23,7 @@ There are two ways to make an AI assistant useful inside a framework. The first 
 
 The second is to teach the assistant the same vocabulary the framework already uses with humans. You don't ship "AI code generation"; you ship a CLI with `wheels generate model Post title:string`, and then you let the assistant *call that CLI directly* — with the same arguments, the same templates, the same validation — when a developer types "make me a Post model with a title." The model writes nothing. The framework writes everything, the same way it always has. The model just decides which command to run.
 
-Wheels 4.0 ships the second one. The mechanism is the Model Context Protocol, the transport is stdio, and the implementation is small enough to fit in your head: a single `Module.cfc` whose public functions become tools by reflection, with a one-line override to hide the ones that don't make sense over an RPC. This post walks the architecture and then builds a commenting feature end-to-end through Claude Code talking to that surface.
+Wheels 4.0 ships the second one. The mechanism is the Model Context Protocol, the transport is stdio, and the implementation is small enough to fit in your head: a single `Module.cfc` whose public functions become tools by reflection, with a declared denylist to hide the ones that don't make sense over an RPC. This post walks the architecture and then builds a commenting feature end-to-end through Claude Code talking to that surface.
 
 ## The shape of the integration
 
@@ -42,20 +42,25 @@ The AI editor spawns `wheels mcp wheels` as a subprocess and speaks newline-deli
 
 `wheels mcp wheels` is two pieces of vocabulary glued together: `wheels mcp` is LuCLI's generic MCP dispatcher (the binary's runtime is LuCLI, shipped under the `wheels` brand), and the trailing `wheels` is the *module name* to expose. LuCLI loads `cli/lucli/Module.cfc`, scans its public functions, and turns each one into a tool whose name is `<module>_<function>` — `wheels_generate`, `wheels_migrate`, `wheels_test`. The MCP protocol — `initialize`, `tools/list`, `tools/call`, the JSON-RPC framing — is all handled by the LuCLI runtime. The Wheels codebase contributes the functions, not the protocol.
 
-This is the design choice worth noticing first: the MCP server is not a separate codebase you maintain alongside the CLI. It *is* the CLI. Anything you can do as a developer typing `wheels migrate latest` is something Claude can do by calling `wheels_migrate(action="latest")`. New CLI features become MCP features automatically, with no schema to write and no router to update.
+This is the design choice worth noticing first: the MCP server is not a separate codebase you maintain alongside the CLI. It *is* the CLI. Anything you can do as a developer typing `wheels migrate latest` is something Claude can do by calling the `wheels_migrate` tool with the same `latest` token. New CLI features become MCP features automatically, with no schema to write and no router to update.
 
 ## Setup, end to end
 
 ```bash title="your shell"
-wheels mcp setup
+wheels mcp
 ```
 
-That command writes two files into your project root:
+That's a help command, not a wizard — it writes nothing and prints everything you need:
 
-- `.mcp.json` — picked up by Claude Code and any generic MCP-aware IDE.
-- `.opencode.json` — picked up by OpenCode.
+```text
+MCP is built into the Wheels CLI. Run:
+  wheels mcp wheels
 
-The Claude Code config is tiny:
+Configure in Claude Code (.mcp.json):
+  {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
+```
+
+Paste that snippet into a `.mcp.json` at your project root (pretty-printed, if you like):
 
 ```json title=".mcp.json"
 {
@@ -70,31 +75,45 @@ The Claude Code config is tiny:
 
 That's the whole thing — a command and its arguments. Claude Code reads it on startup, spawns `wheels mcp wheels`, and starts speaking JSON-RPC over the subprocess's stdio. There's no installation step, no API key, no auth handshake. If the `wheels` binary is on your `PATH` and the project has a `vendor/wheels/` checkout, you have a working MCP integration.
 
-Claude Code, Cursor, Continue, and Windsurf all read the same `.mcp.json` — there's no per-IDE wrapper shape to configure. The setup command writes the two files and stops there; the IDE-specific config you'll see in some older docs is for tools that don't speak the standard MCP config format and need an entry in their own settings file. None of these four falls into that bucket.
+The project-root `.mcp.json` is Claude Code's convention. Other MCP clients point at the same server definition — `wheels` plus `["mcp", "wheels"]` — from their own config locations: Cursor from its settings, OpenCode from a `.opencode.json` you also write by hand (its wrapper shape appears later in this post). The server definition never changes; only the file it lives in does.
 
-Restart your editor after running the setup command. On first start, the editor will spawn the subprocess and call `initialize` and `tools/list` — and the tools panel should now list `wheels_generate`, `wheels_migrate`, and the rest.
+Before restarting your editor, smoke-test the server with the one-shot helper the guide documents:
+
+```bash title="your shell"
+wheels mcp wheels --once tools/list
+```
+
+That runs a single MCP method and exits — no long-lived stdio session — printing the JSON-RPC response that lists every exposed tool. If the tools are in that output, the editor will find them too. Restart it; on first start it spawns the subprocess and calls `initialize` and `tools/list` — and the tools panel should now list `wheels_generate`, `wheels_migrate`, and the rest.
 
 ## What gets exposed (and what doesn't)
 
-Tool discovery is a one-line CFML reflection step. LuCLI walks `Module.cfc`, finds every `public string function ...()`, reads its `hint:` annotation for the description, and emits a tool entry. The tool name is the module name (`wheels`) joined to the function name with an underscore.
+Tool discovery is a one-line CFML reflection step. LuCLI walks `Module.cfc`, finds every public function — the return type doesn't matter — reads its `hint:` annotation for the description, and emits a tool entry. The tool name is the module name (`wheels`) joined to the function name with an underscore.
 
 A handful of functions don't belong over RPC, though, and the framework names them explicitly:
 
 ```cfm title="cli/lucli/Module.cfc"
 public array function mcpHiddenTools() {
-    return [
+    var hidden = [
+        "main",     // bare `wheels` no-args dispatch target
         "mcp",      // meta command — prints MCP setup instructions
         "d",        // alias for destroy
+        "g",        // alias for generate
         "new",      // scaffolds a whole new Wheels project
         "console",  // interactive CFML REPL — not usable over stdio
         "start",    // dev server lifecycle (stateful)
         "stop",     // dev server lifecycle (stateful)
-        "browser"   // multi-step browser testing flow
+        "browser",  // multi-step browser testing flow
+        "mcpToolSpecs",  // per-tool inputSchema registry — not itself a tool
+        "$normalizeTestFilter",      // internal helpers, public only
+        "$resolveAppTestDataSource"  // so the spec suite can reach them
     ];
+    // ...plus a structural sweep: every public function whose name
+    // starts with "$" is appended via getMetaData(this).
+    return hidden;
 }
 ```
 
-Each exclusion has a reason that maps to a property of the tool. `start` and `stop` manage long-lived processes, which are awkward over a single JSON-RPC call. `console` needs a bidirectional interactive terminal; stdio MCP gives you one direction per message. `new` creates a whole project hierarchy and isn't something a model should fire mid-session without an explicit out-of-band confirmation. `mcp` itself is hidden because calling it over RPC would let one MCP server spawn another, which is a recursion you don't want.
+Each exclusion has a reason that maps to a property of the tool. `start` and `stop` manage long-lived processes, which are awkward over a single JSON-RPC call. `console` needs a bidirectional interactive terminal; stdio MCP gives you one direction per message. `new` creates a whole project hierarchy and isn't something a model should fire mid-session without an explicit out-of-band confirmation. `mcp` itself is hidden because calling it over RPC would let one MCP server spawn another, which is a recursion you don't want. The aliases (`d`, `g`) would just duplicate `wheels_destroy` and `wheels_generate`, and `mcpToolSpecs` is a registry LuCLI reads, not a command anyone runs. The trailing sweep is defense-in-depth: the `$`-prefixed functions are internal helpers kept public only so the test suite can reach them, and the `getMetaData()` pass guarantees a future `$helper` added without a denylist update can't quietly leak into `tools/list`.
 
 After the exclusions, the surface looks like this:
 
@@ -104,7 +123,7 @@ After the exclusions, the surface looks like this:
 | `wheels_showHelp` | Print the CLI's top-level help text. |
 | `wheels_generate` | Create models, controllers, migrations, scaffolds, tests, helpers. |
 | `wheels_destroy` | Remove generated components, cascading by default. |
-| `wheels_migrate` | Run migrations (`latest`, `up`, `down`, `info`). |
+| `wheels_migrate` | Run migrations (`latest`, `up`, `down`, `info`, plus `doctor`, `forget`, `pretend`). |
 | `wheels_seed` | Run convention-based seed scripts. |
 | `wheels_db` | Database utilities (reset, status, version). |
 | `wheels_packages` | List, search, and add packages from the registry. |
@@ -116,7 +135,7 @@ After the exclusions, the surface looks like this:
 | `wheels_validate` | Configuration + model validation. |
 | `wheels_doctor` | Diagnose setup issues. |
 | `wheels_stats` | Project statistics (model/controller/route counts). |
-| `wheels_notes` | Find `TODO` / `FIXME` / `HACK` comments. |
+| `wheels_notes` | Find `TODO` / `FIXME` / `OPTIMIZE` annotations (`--annotations` customizes the list). |
 | `wheels_upgrade` | Read-only breaking-change scanner. |
 | `wheels_create` | Programmatic app creation (the non-interactive sibling of `new`). |
 | `wheels_deploy` | Deployment orchestration (the `wheels deploy` family). |
@@ -140,13 +159,16 @@ Claude reads the surface (it called `tools/list` on session start), recognises t
   "method": "tools/call",
   "params": {
     "name": "wheels_generate",
-    "arguments": { "type": "model", "name": "Comment",
-                   "attributes": "postId:integer,author:string,body:text" }
+    "arguments": { "arg1": "model", "arg2": "Comment",
+                   "arg3": "postId:integer", "arg4": "author:string",
+                   "arg5": "body:text" }
   }
 }
 ```
 
-`Module.generate()` runs, the codegen service substitutes templates, and you see `created app/models/Comment.cfc` plus a `*_create_comments.cfc` migration land on disk. The response back over stdout is a JSON-RPC result wrapping the CLI's stdout output as a single text content block:
+Those `arg1`/`arg2`/... keys are not an accident. LuCLI hands the arguments object to the module as the same structured collection a shell invocation produces — bare tokens keyed by position — so this call is exactly `wheels generate model Comment postId:integer author:string body:text`, one token per key. Commands that have migrated to the ArgSpec parser also accept named keys (you'll see `wheels_test` do it below); `generate` and `migrate` still parse their tokens by hand, so positional keys are the safe currency.
+
+`Module.generate()` runs, the codegen service substitutes templates, and you see `create  app/models/Comment.cfc` plus a `*_create_comments_table.cfc` migration land on disk. The response back over stdout is a JSON-RPC result wrapping the CLI's stdout output as a single text content block:
 
 ```json
 {
@@ -154,7 +176,7 @@ Claude reads the surface (it called `tools/list` on session start), recognises t
   "id": 1,
   "result": {
     "content": [
-      { "type": "text", "text": "created  app/models/Comment.cfc\ncreated  app/migrator/migrations/20260529140100_create_comments.cfc" }
+      { "type": "text", "text": "  create  app/models/Comment.cfc\n  create  app/migrator/migrations/20260529140100_create_comments_table.cfc" }
     ]
   }
 }
@@ -164,7 +186,7 @@ Claude reads the response, sees the migration filename, and continues. Next it e
 
 ```json
 { "method": "tools/call",
-  "params": { "name": "wheels_migrate", "arguments": { "action": "latest" } } }
+  "params": { "name": "wheels_migrate", "arguments": { "arg1": "latest" } } }
 ```
 
 Migration runs, the `comments` table appears in the DB. Then:
@@ -172,16 +194,15 @@ Migration runs, the `comments` table appears in the DB. Then:
 ```json
 { "method": "tools/call",
   "params": { "name": "wheels_generate",
-              "arguments": { "type": "test", "name": "CommentAssociationSpec",
-                             "target": "models" } } }
+              "arguments": { "arg1": "test", "arg2": "model", "arg3": "Comment" } } }
 ```
 
-A spec file gets generated under `tests/specs/models/`. Claude writes the actual assertions into it (`expect(post.commentCount()).toBe(2)`), then runs the test suite:
+A `CommentSpec.cfc` gets generated under `tests/specs/models/`. Claude writes the actual assertions into it (`expect(post.commentCount()).toBe(2)`), then runs the test suite — and `test` is one of the ArgSpec-migrated commands, so a named key binds directly:
 
 ```json
 { "method": "tools/call",
   "params": { "name": "wheels_test",
-              "arguments": { "filter": "CommentAssociationSpec" } } }
+              "arguments": { "filter": "tests.specs.models" } } }
 ```
 
 If the test passes, Claude reports back to the developer. If it fails, Claude reads the error output (still text content, still over stdio), patches the model or the spec, and re-runs. The loop is conversational because the protocol is conversational — every tool call returns text, every text is something the model can read and act on.
@@ -196,7 +217,7 @@ That's how you end up with two surfaces that drift. The CLI gains a `wheels gene
 
 The reflection approach skips that drift by construction. `Module.cfc` is the CLI. It is also the MCP server. There is no second copy of "what generate accepts" to keep in sync. The tools/list response is regenerated every time the subprocess starts; the descriptions come from the same `hint:` comments humans read when they run `wheels generate --help`. If a generator gains a new component type, the MCP tool gains the same type at the same moment, with no extra work.
 
-The cost is that the MCP schema is a little less expressive than a hand-curated one would be. Tool descriptions are one-line `hint:` strings rather than richly-typed JSONSchema with enums and per-parameter examples. In practice, that ceiling hasn't bitten — models are fine with one-liners and a couple of canonical examples in the system prompt — but it's the honest trade. If you ever need richer schemas you can add explicit annotations to individual functions and let the reflection layer prefer them; nothing in the design forces every tool to live at the same level of detail.
+The cost — through 4.0.3, anyway — was that the MCP schema was less expressive than a hand-curated one. Tool descriptions were one-line `hint:` strings, and because the module's functions declare no formal parameters (they consume LuCLI's structured argument collection), the advertised `inputSchema` was an empty `properties` map. Models coped — one-liners plus a couple of canonical examples go a long way — but it was the honest ceiling. That ceiling has since been raised, and in exactly the way the design predicts: develop (shipping in 4.0.4) wires the same `ArgSpec` declarations the commands already parse with into `tools/list`, via `ArgSpec.toInputSchema()` and a `mcpToolSpecs()` registry on the module. Eight commands advertise typed, described, defaulted parameters today; the hand-rolled token parsers (`generate`, `migrate`, and friends) gain entries as they migrate to ArgSpec. Nobody writes a schema by hand — the CLI's own argument vocabulary is the schema source, so the parse surface and the advertisement can't drift.
 
 ## The deprecated HTTP endpoint
 
@@ -204,13 +225,13 @@ If you've used the MCP integration in a 3.x build, you may remember a different 
 
 The reason for the shift is the same as the reason for the design choice above: the HTTP endpoint was a parallel surface that had to be kept in sync. Tool schemas in `vendor/wheels/public/mcp/McpServer.cfc` were hand-written, separate from the CLI's behaviour, and drifted. The stdio surface deletes the parallel surface entirely; the CLI *is* the MCP server, and the MCP server *is* the CLI.
 
-If you have a `.mcp.json` or `.opencode.json` from a 3.x project that points at `http://localhost:<port>/wheels/mcp`, re-run `wheels mcp setup --force` to overwrite it with the stdio form.
+If you have a `.mcp.json` or `.opencode.json` from a 3.x project that points at `http://localhost:<port>/wheels/mcp`, replace the stanza with the stdio form — the same snippet `wheels mcp` prints.
 
 ## What changed while writing this post
 
-Drafting the post turned up two pieces of config drift in the setup command's own templates. Both fixed in the same PR.
+Drafting the post turned up two pieces of drift around the MCP config. The first was fixed in the same PR as this post; the second has since been fixed — but only halfway, which makes it the better story.
 
-`wheels mcp setup` writes two files: `.mcp.json` and `.opencode.json`. The first one — the one Claude Code reads — was correct, pointing at the canonical `{"command": "wheels", "args": ["mcp", "wheels"]}` stdio surface. The second one, the OpenCode template, was not. It still pointed at the deprecated HTTP endpoint:
+The repo ships the MCP config as templates in two places — `cli/src/templates/` (the CommandBox-era CLI's setup templates) and `app/snippets/` (the app skeleton's snippet copies). The `.mcp.json` template — the shape Claude Code reads — was correct in both, pointing at the canonical `{"command": "wheels", "args": ["mcp", "wheels"]}` stdio surface. The OpenCode template was not. It still pointed at the deprecated HTTP endpoint:
 
 ```json
 {
@@ -225,7 +246,7 @@ Drafting the post turned up two pieces of config drift in the setup command's ow
 }
 ```
 
-Two problems. First, the URL is the deprecated endpoint that emits a warning every time it's called and is scheduled for removal. Second, the `{PORT}` placeholder is a literal string — the setup command writes the template verbatim without substituting it, so an OpenCode user running `wheels mcp setup` ends up with a `.opencode.json` that contains the literal characters `{PORT}` in the URL. It does not resolve to anything. The OpenCode MCP plumbing tries to connect to a host called `{PORT}` and fails.
+Two problems. First, the URL is the deprecated endpoint that emits a warning every time it's called and is scheduled for removal. Second, the `{PORT}` placeholder is a literal string — nothing ever substitutes it, so an OpenCode user copying the template ends up with a `.opencode.json` that contains the literal characters `{PORT}` in the URL. It does not resolve to anything. The OpenCode MCP plumbing tries to connect to a host called `{PORT}` and fails.
 
 The fix is the same shape OpenCode supports for any stdio MCP server — `type: "local"` plus a `command` array:
 
@@ -237,10 +258,10 @@ The fix is the same shape OpenCode supports for any stdio MCP server — `type: 
 }
 ```
 
-This shape was already in `tools/build/base/.opencode.json` (the canonical reference copy used by the monorepo's build), and the CHANGELOG entry from when the stdio shift landed actually claimed the templates had been updated everywhere. They hadn't — two files (`cli/src/templates/OpenCodeConfig.json` and `app/snippets/OpenCodeConfig.json`) were missed. Both are now corrected, and a future `wheels mcp setup` run gives OpenCode users a working stdio config on the first try.
+This shape was already in `tools/build/base/.opencode.json` (the canonical reference copy used by the monorepo's build), and the CHANGELOG entry from when the stdio shift landed actually claimed the templates had been updated everywhere. They hadn't — two files (`cli/src/templates/OpenCodeConfig.json` and `app/snippets/OpenCodeConfig.json`) were missed. Both are now corrected, and an OpenCode user copying the template gets a working stdio config on the first try.
 
-The second piece of drift is smaller and worth flagging without fixing in this PR. The `mcp()` meta function in `Module.cfc` prints "For OpenCode, Cursor, and other AI IDEs, see: docs/command-line-tools/commands/mcp/mcp-configuration-guide.md" — and that file doesn't exist. The same path is referenced from the deprecation notice in `vendor/wheels/public/views/mcp.cfm`. Two places point at a guide that was planned but never written. The author-facing v4 MCP integration coverage currently lives at `web/sites/guides/.../v4-0-1-snapshot/command-line-tools/mcp-integration.mdx` — a fine place for it — but the CLI runtime and the deprecation warning both advertise a different filename. Fixing the references (or writing the missing guide and aligning the references to it) is its own follow-up.
+The second piece of drift is smaller, and its current state is the more instructive part. When this post was first drafted, the `mcp()` meta function in `Module.cfc` printed "For OpenCode, Cursor, and other AI IDEs, see: docs/command-line-tools/commands/mcp/mcp-configuration-guide.md" — a guide that was planned but never written. The CLI side has since been fixed in the 4.0.3-era audit sweep: `wheels mcp` now prints the live guide URL (`https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration`). But the deprecated HTTP endpoint kept the stale pointer — the deprecation notice in `vendor/wheels/public/views/mcp.cfm` and the hand-written `McpServer.cfc` both still advertise the phantom path, in the file comments and in the warning they write to the log. The surface that's deprecated *because* it drifted is, fittingly, the one place the fix didn't reach. Aligning those references is its own follow-up.
 
 Neither of these is a code-path bug. They're documentation-and-templates drift, the same shape as the package-system fixes from the previous post. The pattern keeps holding: writing the article forces you to actually walk every path a reader will walk, and the parts where the docs disagree with the code are exactly the parts where the next person was going to get stuck.
 
-The next post in the series picks up the other surface where 4.0 quietly changed posture: *Beyond findAll — scopes, enums, and the chainable query builder*. Coming Thursday.
+The next post in the series picks up the other surface where 4.0 quietly changed posture: *Beyond findAll — scopes, enums, and the chainable query builder*. Coming next.

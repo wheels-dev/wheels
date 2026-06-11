@@ -56,7 +56,7 @@ The interesting property is composition. Stack two scopes and they merge:
 posts = model("Post").published().recent().findAll();
 ```
 
-`recent` only declared `order` and `maxRows`. `published` only declared `where` and `order`. The chain merges WHERE clauses with `AND`, takes the *last* `order` declared (so `recent` wins — its `order` is also `publishedAt DESC` here, but the rule is "later overrides"), and takes the most restrictive `maxRows`. There's no separate "scope merger" object — `ScopeChain.$mergeSpecs()` walks the accumulated specs in order and rolls them up before handing to the finder. You can read the implementation in a few minutes; there's no magic.
+`recent` only declared `order` and `maxRows`. `published` only declared `where` and `order`. The chain merges WHERE clauses with `AND`, *appends* `order` fragments in declaration order (so `published`'s fragment sorts first — both happen to be `publishedAt DESC` here, but the rule is "earlier fragments take precedence"), takes the last `select` declared, and takes the most restrictive `maxRows`. There's no separate "scope merger" object — `ScopeChain.$mergeSpecs()` walks the accumulated specs in order and rolls them up before handing to the finder. You can read the implementation in a few minutes; there's no magic.
 
 ### Dynamic scopes take parameters
 
@@ -77,7 +77,7 @@ private struct function scopeByAuthor(required numeric authorId) {
 }
 ```
 
-`byAuthor(42)` invokes the handler with the argument, the handler returns a spec struct, and the chain absorbs it the same way it absorbs a static scope. The `whereParams` array is the safe path for user input: the ScopeChain resolves the `?` placeholder with a quoted, type-checked value rather than string-interpolating it. The codebase also runs a sanitisation pass on handler arguments — strips null bytes, SQL comments, `UNION`/`EXEC`/`SLEEP` keywords — but that's defence in depth, not a substitute for proper parameterisation. If your handler still does `where: "role = '#arguments.role#'"`, you're a `'; DROP TABLE` away from a bad day even with the sanitiser in front. Use `whereParams`.
+`byAuthor(42)` invokes the handler with the argument, the handler returns a spec struct, and the chain absorbs it the same way it absorbs a static scope. The `whereParams` array is the safe path for user input: the ScopeChain resolves the `?` placeholder with a quoted, escaped value (re-parameterized into `cfqueryparam` downstream) rather than string-interpolating it. The codebase also runs a sanitisation pass on handler arguments — strips null bytes, SQL comments, `UNION`/`EXEC`/`SLEEP` keywords — but that's defence in depth, not a substitute for proper parameterisation. If your handler still does `where: "role = '#arguments.role#'"`, you're a `'; DROP TABLE` away from a bad day even with the sanitiser in front. Use `whereParams`.
 
 The defaults are reasonable: `whereParams` is treated as positional, and the type strings are the standard `CF_SQL_*` constants. Inside the handler, you can run any logic you want — branch on the argument, look up another model — as long as you return a struct with the finder-argument shape.
 
@@ -125,7 +125,7 @@ The struct form coerces every stored value to a string before the underlying sco
 
 A few sharp edges worth knowing:
 
-- **Value-name collisions.** An enum value named `name` or `update` will register a scope called `name()` or `update()` on the model. There's no guard against collisions with method names you've defined. If you write `enum(property="action", values="create,update,delete")`, you've shadowed `update()` and `delete()` on every query chain rooted at the model. Pick value names that don't double as verbs the framework uses.
+- **Value-name collisions.** An enum value named `name` or `update` will register a scope called `name()` or `update()` on the model. There's no guard against collisions with method names you've defined. If you write `enum(property="action", values="create,update,delete")`, the collision is silent and cuts both ways: at the model root the real `update()` and `delete()` win and your scopes are unreachable; on a chain the scopes shadow the methods. No guard fires in either direction. Pick value names that don't double as verbs the framework uses.
 - **Invalid characters in stored values.** The framework rejects single quotes, semicolons, comment markers, and other SQL-injection-shaped characters in enum stored values at registration time, throwing `Wheels.InvalidEnumValue`. The values you provide are baked into auto-generated scope SQL, so this is a registration-time check, not a runtime one. It only fires if you write something like `values={oops: "it's fine"}`.
 - **Validation fires on save, not on assignment.** `post.status = "wat"` doesn't throw — it sets the property. `post.valid()` is what surfaces the inclusion failure (`errorsOn("status")` returns a validation error). If you want to fail on assignment, you'd add your own setter; the enum machinery doesn't intercept the write.
 
@@ -149,7 +149,7 @@ Three calling conventions for `where`:
 - **`.where("column", value)`** — equality, auto-quoted: `column = '<quoted>'`.
 - **`.where("column", operator, value)`** — operator in the middle: `column > <quoted>`, `column LIKE <quoted>`, and so on.
 
-Auto-quoting goes through the database adapter's `$quoteValue()` and is preceded by a *type check* against the property's declared type. If the column is declared `integer` and the value isn't a valid integer literal, the builder throws before any SQL is built. That closes the classic injection vector where `"0 OR 1=1"` slipped through the unquoted numeric path. The same goes for `float`, `boolean`, and `date` — payloads get rejected at the type check, not at the SQL parser.
+Auto-quoting goes through the database adapter's `$quoteValue()` and is preceded by a *type check* against the property's declared type. If the column is declared `integer` and the value isn't a valid integer literal, the builder throws before any SQL is built. That closes the classic injection vector where `"0 OR 1=1"` slipped through the unquoted numeric path. The same goes for `float` and `boolean` — those payloads get rejected at the type check; everything else, dates included, is escaped and quoted on its way into the SQL.
 
 The full method surface, in addition to `where`:
 
@@ -171,7 +171,7 @@ The full method surface, in addition to `where`:
 Terminal methods materialise the chain:
 
 - **`.get()` / `.findAll()`** — returns a query of all matching rows.
-- **`.first()` / `.findOne()`** — returns the first row as a model instance, or null.
+- **`.first()` / `.findOne()`** — returns the first row as a model instance, or `false`.
 - **`.count()`** — returns the integer count.
 - **`.exists()`** — returns true/false.
 - **`.updateAll(...)`** — bulk update, returns rows affected.
@@ -242,15 +242,15 @@ ORDER BY publishedAt DESC
 LIMIT 20
 ```
 
-Each clause comes from a different layer, but the layers don't know about each other. The scope returns a spec; the dynamic scope returns a spec with whereParams; the builder appends WHERE conditions to an array. `$buildFinderArgs()` walks both lists in order, merges the WHERE strings with `AND`, takes the latest `orderBy`, and hands the result struct to `findAll()`. It's the same finder you'd call directly — the chainable surface is sugar around the existing implementation, not a parallel one.
+Each clause comes from a different layer, but the layers don't know about each other. The scope returns a spec; the dynamic scope returns a spec with whereParams; the builder appends WHERE conditions to an array. `$buildFinderArgs()` walks both lists in order, merges the WHERE strings with `AND`, appends the `order` fragments in chain order, and hands the result struct to `findAll()`. It's the same finder you'd call directly — the chainable surface is sugar around the existing implementation, not a parallel one.
 
 ## What changed while writing this post
 
-While testing edge cases for the builder section, I tried `model("Post").whereIn("id", [])` to see what the framework did with an empty array. The answer was: nothing good. It produced literal SQL `id IN ()`, which is malformed in every database Wheels supports — Postgres, MySQL, SQL Server, SQLite, H2 — and surfaces as a generic syntax error from the JDBC driver. No framework-shaped error, no pointer to the line in your code that built the empty array.
+While testing edge cases for the builder section, I tried `model("Post").whereIn("id", [])` to see what the framework did with an empty array. The answer was: nothing good. It produced literal SQL `id IN ()`, which is malformed in every engine Wheels supports and surfaces as a generic syntax error from the JDBC driver. No framework-shaped error, no pointer to the line in your code that built the empty array.
 
 Empty inputs to `WHERE IN` aren't an exotic edge case. They're what you get whenever the values come from another query, a form filter, or any computation that might return zero results. The Rails community converged on this pattern in 2016, Sequel matches it, Django matches it, Laravel Eloquent matches it: an empty `IN` matches no rows, and an empty `NOT IN` matches every row. It's what the SQL spec implies and what every other framework's users expect.
 
-Wheels now does the same. `whereIn("id", [])` sets an `$alwaysEmpty` flag on the builder; every terminal — `.count()`, `.first()`, `.findAll()`, `.exists()`, `.updateAll()`, `.deleteAll()`, `.findEach()`, `.findInBatches()` — short-circuits before going through the finder, returning the appropriate zero-row sentinel (`0`, `false`, an empty query, or no callback invocation). `whereNotIn("id", [])` is a no-op: it appends no clause, so the chain proceeds normally and every other row matches. The chains compose cleanly — `.where("status", "active").whereIn("id", []).count()` still returns `0` because the terminal sees the flag first; `.where("status", "active").whereNotIn("id", []).count()` returns the count of active rows because `whereNotIn` of nothing excludes nothing. Fourteen new specs in `queryBuilderSpec.cfc` lock the behaviour in: every patched terminal, the empty-array and empty-list inputs to both `whereIn` and `whereNotIn`, composition with `where`, and the documented `select()` / `include()` silent-ignore on the short-circuit path. The reference table in the query-builder guide notes the short-circuit so you don't have to read the source to confirm it.
+Wheels now does the same. `whereIn("id", [])` sets an `$alwaysEmpty` flag on the builder; every terminal — `.count()`, `.first()`, `.findAll()`, `.exists()`, `.updateAll()`, `.deleteAll()`, `.findEach()`, `.findInBatches()` — short-circuits before going through the finder, returning the appropriate zero-row sentinel (`0`, `false`, an empty query, or no callback invocation). `whereNotIn("id", [])` is a no-op: it appends no clause, so the chain proceeds normally and every other row matches. The chains compose cleanly — `.where("status", "active").whereIn("id", []).count()` still returns `0` because the terminal sees the flag first; `.where("status", "active").whereNotIn("id", []).count()` returns the count of active rows because `whereNotIn` of nothing excludes nothing. Fourteen new specs in `queryBuilderSpec.cfc` lock the behaviour in: every patched terminal, the empty-array and empty-list inputs to both `whereIn` and `whereNotIn`, composition with `where`, and the documented `select()` silent-ignore on the short-circuit path. The reference table in the query-builder guide notes the short-circuit so you don't have to read the source to confirm it.
 
 The first cut of this fix tried the more obvious approach: append `1 = 0` and `1 = 1` as raw SQL clauses, the way Rails docs describe it. That broke immediately. Wheels' WHERE-clause parser in `vendor/wheels/model/sql.cfc` runs a property-extraction regex over every clause it sees — even ones like `1 = 0` that don't have a property — and threw `Wheels.ColumnNotFound` on the literal `1`. The fix that shipped is the one that works alongside the parser instead of around it: short-circuit at the terminal so the parser never sees a column-less clause. Either approach is correct on the SQL side; only one composes with the rest of the framework.
 
@@ -262,4 +262,4 @@ There are a few related rough edges I didn't fix in this PR but that are worth n
 - **No `defaultScope()` / `unscoped()`.** Rails lets you declare a model-wide default scope (e.g. "always filter out soft-deleted rows") with an escape hatch (`unscoped`). Wheels doesn't have either. Soft-delete is the obvious motivating case; if your model has a `deletedAt` and you want every query to filter on `WHERE deletedAt IS NULL`, you currently scatter `.whereNull("deletedAt")` through every call site or write a wrapper. Not a bug — just a missing affordance.
 - **Enum value-name collisions are unchecked.** `enum(property="action", values="create,update,delete")` will silently shadow the model's own `update()` and `delete()` chain methods. The framework could refuse to register an enum value whose name matches an existing method; today it doesn't. Pick value names that aren't verbs.
 
-The next post in the series is the last one: *From Empty Directory to Deployed SaaS — end-to-end with generators, multi-tenancy, jobs, browser tests, and `wheels deploy`*. That one's a longer post. Coming Saturday.
+The next post in the series is the last one: *From Empty Directory to Deployed SaaS — end-to-end with generators, multi-tenancy, jobs, browser tests, and `wheels deploy`*. That one's a longer post. Coming soon.

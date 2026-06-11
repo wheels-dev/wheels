@@ -35,10 +35,10 @@ vendor/
   wheels/                # framework core — excluded from discovery
   wheels-hotwire/        # installed package
     package.json
-    WheelsHotwire.cfc
+    Hotwire.cfc
   wheels-sentry/         # installed package
     package.json
-    WheelsSentry.cfc
+    Sentry.cfc
     lib/SentryClient.cfc
 ```
 
@@ -48,7 +48,7 @@ That's the whole runtime model. Everything else — version constraints, depende
 
 ## Build one, end to end
 
-Let's build `wheels-greeter`, a deliberately tiny package that adds a `greet(name)` method to every controller. Three files:
+Let's build `wheels-greeter`, a deliberately tiny package that adds a `greet(name)` method to every controller. Two files:
 
 ```text
 vendor/wheels-greeter/
@@ -106,13 +106,13 @@ sqlserver, mysql, postgresql, h2, test
 
 Plus two special values: `global` (inject into all targets) and `none` (opt out entirely). Each name maps to a specific framework component, and a method declared for that target becomes available on instances of that component.
 
-Most packages target `controller`, and that's not laziness — it's a deliberate consequence of how Wheels renders views. Wheels views execute *inside the controller's `variables` scope*, which means a method mixed into the controller is callable from the view too. There is no separate `view` mixin target because there doesn't need to be one. `wheels-basecoat`'s form helpers, `wheels-i18n`'s `t()` and `t.pluralize()`, `wheels-seo-suite`'s `metaTagsFor()` — all of these are controller mixins, and you call them from your `.cfm` templates as if they were view helpers, because at runtime they are.
+Most packages target `controller`, and that's not laziness — it's a deliberate consequence of how Wheels renders views. Wheels views execute *inside the controller's `variables` scope*, which means a method mixed into the controller is callable from the view too. There is no separate `view` mixin target because there doesn't need to be one. `wheels-basecoat`'s form helpers, `wheels-i18n`'s `t()` and `tp()`, `wheels-seo-suite`'s `whlsSeoMetaTags()` — all of these are controller mixins, and you call them from your `.cfm` templates as if they were view helpers, because at runtime they are.
 
-The `model` target works the same way for `Model` instances — useful when you're shipping behaviour like `wheels-i18n`'s translatable-attribute support, which needs to hook into the model lifecycle. The `mapper` target lets a package add custom routing primitives. The four database adapter targets (`sqlserver`, `mysql`, `postgresql`, `h2`) let a package extend a specific engine's SQL generation. `base` is the lowest-level shared utility class — almost always the wrong choice; reach for it when you need a method available on *every* framework component including ones you weren't thinking about.
+The `model` target works the same way for `Model` instances — useful when you're shipping behaviour that needs to hook into the model lifecycle — auditing, say, or translatable attributes. The `mapper` target lets a package add custom routing primitives. The four database adapter targets (`sqlserver`, `mysql`, `postgresql`, `h2`) let a package extend a specific engine's SQL generation. `base` is the lowest-level shared utility class — almost always the wrong choice; reach for it when you need a method available on *every* framework component including ones you weren't thinking about.
 
 `global` is the legacy default. Wheels 3.x plugins implicitly registered every public method on every target unless they fought against it, and that's exactly why "where is `currentUser()` defined?" became a hard question. Packages **default to `none`** — a manifest with no `provides.mixins` field contributes no mixins. You have to declare what you're providing and where you want it. That's the same opt-in posture the rest of the framework moved to in 4.0 ([the rate-limiter post](/posts/skip-the-plugin-rate-limited-api/) got into the same theme from a different angle), and the consequence is the same: there is a finite, named set of methods on a controller, and you can answer the provenance question by reading manifests instead of running grep.
 
-Typos and unsupported targets fail loudly. If you write `"mixins": "controler"` (one `l`), the loader throws `Wheels.PackageInvalidMixinTarget` at load time, names the bad value, and lists the valid set. If you try to use `view` because that's what made sense in your head, same thing — it's not in the allowlist, the package fails, and the log tells you `controller` is the target you wanted.
+Typos and unsupported targets fail loudly. If you write `"mixins": "controler"` (one `l`), the loader throws `Wheels.PackageInvalidMixinTarget` at load time, names the bad value, and lists the valid set. If you try to use `view` because that's what made sense in your head, same thing — it's not in the allowlist, the package fails, and the log lists the valid set — and `controller` is the one you wanted.
 
 ## Per-method overrides
 
@@ -198,7 +198,7 @@ A package can override the auto-derivation by setting `mapping` explicitly in th
 
 Inside a package, code uses the alias like a static CFML mapping:
 
-```cfm title="vendor/wheels-sentry/WheelsSentry.cfc"
+```cfm title="vendor/wheels-sentry/Sentry.cfc"
 component output="false" {
     public any function init() {
         variables.client = new wheelsSentry.lib.SentryClient();
@@ -258,7 +258,7 @@ The failure modes the loader specifically handles:
 - **Required package missing** — dependent is excluded, with a "Required package not found" entry. The independent half of the graph loads normally.
 - **Circular dependencies** — every package in the cycle is excluded with a clear graph-error log entry.
 - **Duplicate mapping alias** — the second claimant is rolled back; its mixins, service providers, and middleware are all unregistered cleanly.
-- **Exception during `init()`** — caught, logged with stack, package skipped. Mixins are never partially applied.
+- **Exception during `init()`** — caught, logged with the message and detail, package skipped. Mixins are never partially applied.
 
 After a deploy, the application log records — for each package — either "Package 'X' v1.2.3 loaded (controller mixins)" or "Package 'X' skipped: ...". That log is the source of truth for what activated. Two related getters help you inspect the same state at runtime: `application.wheels.PackageLoaderObj.getFailedPackages()` returns the failures, and `getMixinCollisions()` returns the cross-package method overwrites — same method registered on the same target by two different packages — even when the overwrite was acknowledged via `provides.overrides`. (Overrides suppress the warning log but still record the collision so you can see what's happening.)
 
@@ -287,10 +287,10 @@ The default registry is `wheels-dev/wheels-packages`; override with `WHEELS_PACK
 
 Two things drifted between the docs and the code while I was drafting, and both got fixed in the same week the article landed.
 
-The first was the dependency field name. Both the public `Packages` guide and `CLAUDE.md` documented the manifest field as `dependencies`, in three separate places. The loader has always read `requires`. The drift came from the legacy-plugin shape: 3.x plugins declared `"dependencies": {...}` in `box.json`, and when the new system was designed the manifest field was renamed to `requires` so dependents and replacements and suggestions could share a consistent vocabulary. The example manifests in the docs never got updated. Anyone copying the example would have ended up with a package that loaded but ignored its declared dependency entirely — no error, no warning, just silent breakage if the dependency happened to be missing. Both docs are now corrected to use `requires`, and the example manifests round out with `replaces` and `suggests` so the full graph syntax is in one place.
+The first was the dependency field name. Both the public `Packages` guide and `CLAUDE.md` documented the manifest field as `dependencies`, in three separate places. The loader has always read `requires`. The drift came from the legacy-plugin shape: 3.x plugins declared `"dependencies": {...}` in `box.json`, and when the new system was designed the manifest field was renamed to `requires` so dependents and replacements and suggestions could share a consistent vocabulary. The example manifests in the docs never got updated. Anyone copying the example would have ended up with a package that loaded but ignored its declared dependency entirely — no error, no warning, just silent breakage if the dependency happened to be missing. The field reference now documents `requires`, `replaces`, and `suggests` together.
 
 The second was the `wheelsVersion` constraint. The guide described mismatches as "logged" — accurate but soft. The actual behaviour is a hard skip: an incompatible package is excluded from the load order before its CFC is ever instantiated, recorded in `failedPackages`, and the log entry names both the constraint and the running version. "Logged" undersells the consequence; if your package requires `>=4.0` and you deploy it onto a 3.x app, it does not partial-load, it doesn't degrade gracefully, it simply isn't there. The guide now says so, in those words. Knowing the difference matters when you're debugging "why isn't my mixin showing up after I installed the package" — the answer is sometimes "you didn't install it; the version gate refused it" and the framework will tell you that, but only if you know the gate exists.
 
 Neither of these is a code change — both are documentation fixes — but they're the kind of drift that costs an hour the first time you hit it, and they're the reason a piece like this is worth writing. Anything you have to write down to be sure of is something the next person was going to have to figure out from scratch.
 
-The next post in the series — *Wheels + Claude: building a feature via the stdio MCP* — picks up the same theme on a different surface: what the framework's tools look like when the consumer is a model rather than a developer. Coming Tuesday.
+The next post in the series — *Wheels + Claude: building a feature via the stdio MCP* — picks up the same theme on a different surface: what the framework's tools look like when the consumer is a model rather than a developer. Coming next.
