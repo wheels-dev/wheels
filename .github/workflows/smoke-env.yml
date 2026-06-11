@@ -19,6 +19,7 @@ on:
       - 'app/**'
       - 'tools/ci/smoke-env.sh'
       - '.github/workflows/smoke-env.yml'
+      - 'tools/ci/lucee.ci.json'
 
 permissions:
   contents: read
@@ -65,6 +66,8 @@ jobs:
       - name: Force ${{ matrix.wheels_env }} environment
         run: |
           sed -i 's/set(environment = "[a-z]*")/set(environment = "${{ matrix.wheels_env }}")/' config/environment.cfm
+          grep -qF 'set(environment = "${{ matrix.wheels_env }}")' config/environment.cfm || {
+            echo "::error::environment.cfm substitution failed — pattern drift?"; exit 1; }
           grep -n 'set(environment' config/environment.cfm
 
       - name: Start Lucee server
