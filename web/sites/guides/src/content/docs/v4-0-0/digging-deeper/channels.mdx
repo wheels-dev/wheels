@@ -55,7 +55,8 @@ A subscribe action, a route to it, a publish call, and a view tag.
 ```cfm title="app/controllers/Notifications.cfc"
 component extends="Controller" {
     function stream() {
-        subscribeToChannel(channel = "user.#params.userId#");
+        // Derive the channel server-side — don't trust a client-supplied channel name
+        subscribeToChannel(channel = "user.#session.userId#");
     }
 }
 ```
@@ -85,8 +86,10 @@ component extends="Model" {
 In the view, `channelSSETag()` emits a `<script>` tag that opens an `EventSource` against the subscribe endpoint:
 
 ```cfm title="app/views/orders/index.cfm (excerpt)"
-#channelSSETag(channel="user.#params.userId#", route="notificationStream")#
+#channelSSETag(channel="user.#session.userId#", route="notificationStream")#
 ```
+
+The tag sends its `channel` argument to the endpoint as a `channel` URL parameter, but the `stream()` action above deliberately ignores it and derives the channel from the session — a client editing the URL can't subscribe to another user's notifications. An endpoint that serves more than one channel can subscribe with `subscribeToChannel(channel = params.channel)` instead, after validating the subscription — see [`channelSSETag()`](#channelssetag).
 
 The generated script relays incoming events as `wheels:sse` [CustomEvents](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent) on `document`, with `{data, event, id}` in `e.detail`:
 
