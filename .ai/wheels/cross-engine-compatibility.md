@@ -347,6 +347,27 @@ public void function $myTagWrapper() {
 
 **Reference fix**: [#2756](https://github.com/wheels-dev/wheels/pull/2756) — adds `$responseCommitted()` and applies the defensive shape to `$header()` and `$content()`.
 
+### Bare `cfabort;` in Script Context (All Adobe CF Versions)
+
+Adobe CF (2018, 2021, 2023, 2025) does not recognize `cfabort` as a CFScript keyword. Instead it resolves it as a variable name, throwing `Variable CFABORT is undefined` at runtime. Lucee accepts the bare form without error.
+
+```cfm
+// WRONG — crashes every Adobe CF version
+cfabort;
+
+// RIGHT — portable script keyword (all engines)
+abort;
+
+// ALSO RIGHT — parenthesized tag-in-script form
+cfabort();
+```
+
+**Why**: Adobe's CFScript parser distinguishes between a handful of registered script keywords (`abort`, `exit`, `throw`, `rethrow`, …) and user variable names. `cfabort` was never a registered script keyword on Adobe — it was only ever the CFML tag name. Lucee is more permissive and accepts the bare form. Use the script keyword `abort;` everywhere in `vendor/wheels/` CFScript code.
+
+**Detection**: the structural guard in `vendor/wheels/tests/specs/dispatch/BareCfabortStatementSpec.cfc` scans the framework source (comments stripped per Anti-Pattern #14) and fails the dispatch test suite if any bare `cfabort;` statement reappears.
+
+**Reference fix**: [#3029](https://github.com/wheels-dev/wheels/issues/3029) / [#3032](https://github.com/wheels-dev/wheels/pull/3032) — the single occurrence in `vendor/wheels/Dispatch.cfc` (the public-component 404 branch) caused every Adobe install with `enablePublicComponent=false` to return a 500 error instead of the intended clean 404.
+
 ## Database-Specific Gotchas
 
 ### H2 Database (Test Default)
