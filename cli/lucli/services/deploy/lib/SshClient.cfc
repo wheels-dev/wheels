@@ -97,12 +97,20 @@ component {
 	 *                password throw shape, just for arbitrary remote failures.
 	 *                Regression #2696 — deploy verbs used to discard the result
 	 *                struct and silently treat any nonzero exit as success.
+	 *       - stdin  string, default "". If non-empty, written UTF-8 to the
+	 *                remote process's stdin and then closed (EOF) before the
+	 *                output streams are drained. This is how secrets reach
+	 *                stdin-reading commands like `docker login
+	 *                --password-stdin` without ever entering the command
+	 *                string — keeping them out of dry-run output, exception
+	 *                summaries, and the remote process table (#2956).
 	 *
 	 * @return struct {exitCode, stdout, stderr, durationMs}
 	 */
 	public struct function run(required string cmd, struct opts = {}) {
 		var useSudo = (arguments.opts.sudo ?: false) && variables.$opts.user != "root";
 		var raise = arguments.opts.raise ?: false;
+		var stdinData = arguments.opts.stdin ?: "";
 		var effectiveCmd = useSudo ? "sudo -n " & arguments.cmd : arguments.cmd;
 		var loader = variables.$loader;
 		var hostRef = variables.$host;
@@ -116,6 +124,15 @@ component {
 			var sess = sshjRef.startSession();
 			try {
 				var command = sess.exec(effectiveCmd);
+				// Feed stdin BEFORE draining stdout/stderr: commands like
+				// `docker login --password-stdin` block on stdin until EOF,
+				// so the stream must be written, flushed, and closed first.
+				if (len(stdinData)) {
+					var os = command.getOutputStream();
+					os.write(charsetDecode(stdinData, "UTF-8"));
+					os.flush();
+					os.close();
+				}
 				// Drain both streams before join() to avoid blocking on a full pipe buffer.
 				// We read via JDK streams rather than commons-io — sshj 0.39.0 doesn't
 				// ship IOUtils and we'd rather not bundle another JAR just for this.

@@ -383,6 +383,12 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		if (StructKeyExists(application.wheels.adapterCache, variables.wheels.class.dataSource)) {
 			local.cached = application.wheels.adapterCache[variables.wheels.class.dataSource];
 			$set(adapterName = local.cached.name);
+			// Persist per class too: the $set() above rewrites the GLOBAL
+			// "adapterName" setting on every model class init, so in a
+			// multi-datasource app the global holds whichever model class
+			// initialized most recently. $dialectName() reads this per-class
+			// copy so each model resolves its OWN datasource's dialect.
+			variables.wheels.class.adapterName = local.cached.name;
 			return CreateObject("component", "wheels.databaseAdapters.#local.cached.namespace#.#local.cached.name#").$init(
 				dataSource = variables.wheels.class.dataSource,
 				username = variables.wheels.class.username,
@@ -462,6 +468,8 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			name: local.adapterName
 		};
 		$set(adapterName = local.adapterName);
+		// Per-class copy — see the adapter-cache branch above for why.
+		variables.wheels.class.adapterName = local.adapterName;
 		return CreateObject("component", "wheels.databaseAdapters.#local.adapterNamespace#.#local.adapterName#").$init(
 			dataSource = variables.wheels.class.dataSource,
 			username = variables.wheels.class.username,

@@ -90,6 +90,21 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		required boolean parameterize,
 		string $primaryKey = ""
 	) {
+		// Same-batch identity retrieval for engines whose query result carries no
+		// driver-supplied generated key (currently BoxLang). SCOPE_IDENTITY() is
+		// batch-scoped, so it must ride in the INSERT's own batch; Base.$executeQuery
+		// passes the resulting resultset to $identitySelect as returningIdentity
+		// (the same plumbing the CockroachDB adapter uses for RETURNING). Bulk paths
+		// pass no primary-key hint and are skipped.
+		if (
+			$isBoxLangEngine()
+			&& Len(Trim(arguments.$primaryKey))
+			&& IsSimpleValue(arguments.sql[1])
+			&& Left(arguments.sql[1], 11) == "INSERT INTO"
+		) {
+			ArrayAppend(arguments.sql, ";SELECT SCOPE_IDENTITY() AS lastId");
+		}
+
 		if (StructKeyExists(arguments, "maxrows") && arguments.maxrows > 0) {
 			if (arguments.maxrows > 0) {
 				arguments.sql[1] = ReplaceNoCase(arguments.sql[1], "SELECT ", "SELECT TOP #arguments.maxrows# ", "one");
@@ -137,12 +152,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.firstSelect = $columnAlias(list = $tableName(list = local.thirdSelect, action = "remove"), action = "keep");
 
 			// We need to add columns from the inner order clause to the select clauses in the inner two queries.
+			// Strip identifier quotes once up front (and keep the stripped list in sync with appends below)
+			// instead of re-stripping the whole select list on every loop iteration.
+			local.thirdSelectStripped = $stripIdentifierQuotes(local.thirdSelect);
 			local.iEnd = ListLen(local.thirdOrder);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.item = ReReplace(ReReplace(ListGetAt(local.thirdOrder, local.i), " ASC\b", ""), " DESC\b", "");
 				// Strip identifier quotes for comparison since SELECT may have different quoting than ORDER BY
 				local.itemStripped = $stripIdentifierQuotes(local.item);
-				local.thirdSelectStripped = $stripIdentifierQuotes(local.thirdSelect);
 				if (!ListFindNoCase(local.thirdSelectStripped, local.itemStripped) && !ListFindNoCase(local.thirdSelect, local.item)) {
 					// The test "order_clause_with_paginated_include_and_ambiguous_columns" passes in a complex order (CASE WHEN registration IN ('foo') THEN 0 ELSE 1 END DESC).
 					// This gets moved up to the SELECT clause to support pagination.
@@ -153,6 +170,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 					}
 
 					local.thirdSelect = ListAppend(local.thirdSelect, local.item);
+					local.thirdSelectStripped = ListAppend(local.thirdSelectStripped, $stripIdentifierQuotes(local.item));
 				}
 				if (local.containsGroup) {
 					local.item = ReReplace(local.item, "[[:space:]]AS[[:space:]][A-Za-z1-9]+", "", "all");
@@ -190,7 +208,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			if (local.containsGroup) {
 				local.afterWhere = "GROUP BY " & local.thirdGroup & " ";
 			}
-			local.afterWhere = "ORDER BY " & local.thirdOrder & ") AS tmp1 ORDER BY " & local.secondOrder & ") AS tmp2 ORDER BY " & local.firstOrder;
+			local.afterWhere &= "ORDER BY " & local.thirdOrder & ") AS tmp1 ORDER BY " & local.secondOrder & ") AS tmp2 ORDER BY " & local.firstOrder;
 			ArrayDeleteAt(arguments.sql, 1);
 			ArrayDeleteAt(arguments.sql, 1);
 			ArrayDeleteAt(arguments.sql, ArrayLen(arguments.sql));
@@ -262,73 +280,51 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Override Base adapter's function.
+	 * Override Base adapter's $identitySelect hook.
 	 */
-	public any function $identitySelect(
+	public any function $lastIdLookup(
 		required struct queryAttributes,
 		required struct result,
 		required string primaryKey,
-		any returningIdentity = ""
+		any returningIdentity = "",
+		required string insertSql
 	) {
-		var query = {};
-		local.sql = Trim(arguments.result.sql);
-		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
-			local.startPar = Find("(", local.sql) + 1;
-			local.endPar = Find(")", local.sql);
-			local.columnList = "";
-			if (local.endPar) {
-				local.rawColumns = Mid(local.sql, local.startPar, (local.endPar - local.startPar));
-
-				// BoxLang compatibility fix - ReplaceList behaves differently
-				if (StructKeyExists(server, "boxlang")) {
-					// For BoxLang, use regex to properly parse column names
-					local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
-					local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
-					local.columnList = Trim(local.columnList);
-				} else {
-					// Original Lucee/ACF behavior
-					local.columnList = ReplaceList(
-						local.rawColumns,
-						"#Chr(10)#,#Chr(13)#, ",
-						",,"
-					);
-				}
-			}
-			// Strip identifier quotes from column list for comparison
-			local.columnList = $stripIdentifierQuotes(local.columnList);
-			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
-				local.rv = {};
-
-				// Prefer the driver-supplied generated key: mssql-jdbc retrieves it in the
-				// insert's own batch, so it is both scope-safe and trigger-safe — a trigger
-				// that inserts into another identity table cannot leak its key in here.
-				// StructKeyExists is case-insensitive, so Lucee's lowercase `generatedkey`
-				// result key matches. ListFirst because multi-row inserts can return a list.
-				if (StructKeyExists(arguments.result, "generatedKey") && Len(arguments.result.generatedKey)) {
-					local.rv[$generatedKey()] = ListFirst(arguments.result.generatedKey);
-					return local.rv;
-				}
-
-				// Last resort — only runs when the driver supplied no generated key
-				// (currently BoxLang + SQL Server). @@IDENTITY is session-scoped and can
-				// return a trigger-generated identity instead of ours. The order is NOT
-				// flipped to prefer SCOPE_IDENTITY() because a standalone
-				// `SELECT SCOPE_IDENTITY()` executes in its own scope (a batch is a scope)
-				// and returns NULL — the documented BoxLang empty-value behavior — so the
-				// reorder would just add a wasted round-trip per insert and still resolve
-				// via @@IDENTITY. Same-batch retrieval for this fallback is tracked in a
-				// follow-up issue.
-				query = $query(sql = "SELECT @@IDENTITY AS lastId", argumentCollection = arguments.queryAttributes);
-
-				// Fallback to SCOPE_IDENTITY() if @@IDENTITY returned nothing (other CFML engines).
-				if (!Len(query.lastId)) {
-					query = $query(sql = "SELECT SCOPE_IDENTITY() AS lastId", argumentCollection = arguments.queryAttributes);
-				}
-
-				local.rv[$generatedKey()] = query.lastId;
-				return local.rv;
-			}
+		// Prefer the driver-supplied generated key: mssql-jdbc retrieves it in the
+		// insert's own batch, so it is both scope-safe and trigger-safe — a trigger
+		// that inserts into another identity table cannot leak its key in here.
+		// StructKeyExists is case-insensitive, so Lucee's lowercase `generatedkey`
+		// result key matches. ListFirst because multi-row inserts can return a list.
+		if (StructKeyExists(arguments.result, "generatedKey") && Len(arguments.result.generatedKey)) {
+			return ListFirst(arguments.result.generatedKey);
 		}
+
+		// Same-batch retrieval: when the engine surfaces no driver key, $querySetup
+		// appended `;SELECT SCOPE_IDENTITY() AS lastId` to the INSERT's own batch
+		// (SCOPE_IDENTITY() is batch-scoped, so it must ride along — a standalone
+		// `SELECT SCOPE_IDENTITY()` executes in its own scope and returns NULL).
+		// Base.$executeQuery pipes the batch's resultset in here as returningIdentity.
+		if (
+			IsQuery(arguments.returningIdentity)
+			&& arguments.returningIdentity.recordCount
+			&& ListFindNoCase(arguments.returningIdentity.columnList, "lastId")
+			&& Len(arguments.returningIdentity.lastId[1])
+		) {
+			return arguments.returningIdentity.lastId[1];
+		}
+
+		// Absolute last resort — only reached when the multi-statement batch did not
+		// surface a usable resultset on this engine/driver combo. @@IDENTITY is
+		// session-scoped and can return a trigger-generated identity from another
+		// table, but keeping it means a same-batch miss degrades to the pre-fix
+		// behavior instead of losing the key entirely.
+		local.query = $query(sql = "SELECT @@IDENTITY AS lastId", argumentCollection = arguments.queryAttributes);
+
+		// Fallback to SCOPE_IDENTITY() if @@IDENTITY returned nothing (other CFML engines).
+		if (!Len(local.query.lastId)) {
+			local.query = $query(sql = "SELECT SCOPE_IDENTITY() AS lastId", argumentCollection = arguments.queryAttributes);
+		}
+
+		return local.query.lastId;
 	}
 
 	/**

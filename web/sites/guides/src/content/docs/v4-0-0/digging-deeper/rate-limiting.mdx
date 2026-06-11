@@ -104,6 +104,26 @@ set(middleware = [
 
 The middleware auto-creates a `wheels_rate_limits` table on first use (it probes for the table and creates it with engine-appropriate DDL when missing). All nodes read and write to the same table, so the budget is shared. Database storage is slower per request than memory — use it only when you need shared state.
 
+### Engine support
+
+Counter updates and cross-node locking use each engine's native primitives, detected automatically from the datasource:
+
+| Engine | Counter increment | Cross-node locking |
+|---|---|---|
+| MySQL / MariaDB | Native atomic upsert (`ON DUPLICATE KEY UPDATE`) | `SELECT ... FOR UPDATE` |
+| PostgreSQL | Native atomic upsert (`ON CONFLICT ... DO UPDATE`) | `SELECT ... FOR UPDATE` |
+| SQLite | Native atomic upsert (`ON CONFLICT ... DO UPDATE`) | In-process lock only |
+| SQL Server | Unique-constraint-backed insert-retry | `WITH (UPDLOCK, ROWLOCK)` |
+| Oracle | Unique-constraint-backed insert-retry | `SELECT ... FOR UPDATE` |
+| H2 | Unique-constraint-backed insert-retry | `SELECT ... FOR UPDATE` |
+| Unrecognized engines | Unique-constraint-backed insert-retry | In-process lock only |
+
+Every row in `wheels_rate_limits` carries a globally unique `store_key` (enforced by a unique index), so the fixed-window counter is created-or-incremented race-free, and the sliding-window and token-bucket strategies run their read-modify-write sequences inside a transaction holding a row lock. On SQLite and unrecognized engines the serialization comes from an in-process lock instead of a SQL row lock — correct on a single node, but not a multi-node guarantee. For multi-node deployments use one of the engines with a real row lock.
+
+<Aside type="note">
+  **Upgrading from 4.0.x:** the `wheels_rate_limits` schema gained a `row_type` discriminator, a `client_key` lookup column, and a unique `store_key` index. The middleware upgrades the auto-created table automatically on first use after deploying the new version — the old table is dropped and recreated (every row is ephemeral, so in-flight counters reset once, bounded to one window) and the upgrade is logged to the `wheels_ratelimiter` log.
+</Aside>
+
 ## Custom key function
 
 By default each client is keyed by IP address. For token-authenticated APIs you usually want to key by the API token so a client behind a shared NAT doesn't share a budget with unrelated traffic:

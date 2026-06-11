@@ -18,8 +18,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("--label role=db");
                 expect(cmd).toInclude("--publish 5432:5432");
                 expect(cmd).toInclude("--volume data:/var/lib/postgresql/data");
-                expect(cmd).toInclude("-e POSTGRES_USER=demo");
+                expect(cmd).toInclude("-e 'POSTGRES_USER=demo'");
                 expect(cmd).toInclude("postgres:16");
+            });
+
+            it("run() escapes env values containing shell metacharacters", () => {
+                var tmp = getTempFile(getTempDirectory(), "yml");
+                fileWrite(tmp, "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                    & "accessories: {evil: {image: 'alpine:3', host: 1.2.3.5, "
+                    & "env: {clear: {GREETING: 'hello $(whoami); rm -rf /'}}}}");
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(tmp);
+                var cmd = new cli.lucli.services.deploy.commands.AccessoryCommands(cfg)
+                    .run(cfg.accessory("evil"));
+                expect(cmd).toInclude("-e 'GREETING=hello $(whoami); rm -rf /'");
+                expect(cmd).notToInclude("-e GREETING");
+            });
+
+            it("run() rejects env.secret with a clear error instead of silently dropping it", () => {
+                var fullCfg = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml"));
+                var state = {threw: false, message: ""};
+                try {
+                    new cli.lucli.services.deploy.commands.AccessoryCommands(fullCfg)
+                        .run(fullCfg.accessory("mysql"));
+                } catch (Wheels.Deploy.EnvSecretUnsupported e) {
+                    state.threw = true;
+                    state.message = e.message;
+                }
+                expect(state.threw).toBeTrue();
+                expect(state.message).toInclude("MYSQL_ROOT_PASSWORD");
             });
 
             it("start() starts the accessory container", () => {

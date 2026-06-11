@@ -432,6 +432,20 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 				</div>
 			</div>
 		</cfif>
+		<!---
+			Controller configuration warnings collected via $warnIfConfigSkipsSuper()
+			(controllers overriding config() without calling super.config()).
+		--->
+		<cfif StructKeyExists(application.wheels, "controllerConfigWarnings") AND ArrayLen(application.wheels.controllerConfigWarnings)>
+			<div class="wdb-section">
+				<div class="wdb-section-title" style="color:##f9e2af;">Configuration Warnings</div>
+				<div style="color:##f9e2af;font-size:12px;">
+					<cfloop array="#application.wheels.controllerConfigWarnings#" index="local.cw">
+						<p>#EncodeForHTML(local.cw.message)#</p>
+					</cfloop>
+				</div>
+			</div>
+		</cfif>
 	</div>
 </div>
 

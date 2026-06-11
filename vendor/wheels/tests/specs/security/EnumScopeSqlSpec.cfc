@@ -75,19 +75,18 @@ component extends="wheels.WheelsTest" {
 				expect(merged.where).toInclude("createdAt > '2024-01-01'")
 			})
 
-			it("sanitizes dangerous SQL keywords in scope handler arguments", () => {
+			it("escapes quotes in scope handler arguments without rewriting keywords", () => {
 				var m = g.model("author")
 				var result = m.$sanitizeScopeHandlerArgs({"1": "admin' UNION SELECT password FROM users --"})
 
-				expect(result["1"]).notToInclude("UNION")
-				expect(result["1"]).notToInclude("--")
+				expect(result["1"]).toBe("admin'' UNION SELECT password FROM users --")
 			})
 
-			it("sanitizes SLEEP and BENCHMARK time-based injection in scope handler args", () => {
+			it("leaves keyword-only scope handler args unchanged (no quotes to escape)", () => {
 				var m = g.model("author")
 				var result = m.$sanitizeScopeHandlerArgs({"1": "1 OR SLEEP(5)"})
 
-				expect(result["1"]).notToInclude("SLEEP")
+				expect(result["1"]).toBe("1 OR SLEEP(5)")
 			})
 
 		})

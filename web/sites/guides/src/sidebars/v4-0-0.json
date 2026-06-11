@@ -65,6 +65,7 @@
       { "label": "Sending Email", "link": "/v4-0-0/digging-deeper/sending-email/" },
       { "label": "File Uploads & Downloads", "link": "/v4-0-0/digging-deeper/file-uploads-and-downloads/" },
       { "label": "Server-Sent Events", "link": "/v4-0-0/digging-deeper/server-sent-events/" },
+      { "label": "Channels", "link": "/v4-0-0/digging-deeper/channels/" },
       { "label": "Internationalization", "link": "/v4-0-0/digging-deeper/internationalization/" },
       { "label": "Multi-tenancy", "link": "/v4-0-0/digging-deeper/multi-tenancy/" },
       { "label": "Packages", "link": "/v4-0-0/digging-deeper/packages/" },

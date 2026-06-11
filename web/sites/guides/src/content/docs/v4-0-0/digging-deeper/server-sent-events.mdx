@@ -30,7 +30,7 @@ SSE (Server-Sent Events) is a one-way channel from server to client over plain H
 - **SSE:** server → client only, plain HTTP, built-in auto-reconnect, passes through every proxy and firewall that speaks HTTP.
 - **WebSockets:** bidirectional, separate `ws://` protocol, richer feature set but harder to deploy behind a reverse proxy and requires its own connection lifecycle.
 
-Use SSE when the client only needs to listen — notifications, live dashboards, progress bars, log tailing, incremental search results. Reach for WebSockets when the client also needs to push.
+Use SSE when the client only needs to listen — notifications, live dashboards, progress bars, log tailing, incremental search results. Reach for WebSockets when the client also needs to push — but note that Wheels itself ships no WebSocket layer; for the higher-level pub/sub option built on SSE (and the full story on what does and doesn't exist), see [Channels](/v4-0-0/digging-deeper/channels/).
 
 ## One-shot SSE response
 
@@ -187,6 +187,11 @@ Plan for this during deployment — cross-link to the upcoming Deployment guide 
 ## Related guides
 
 <CardGrid>
+  <LinkCard
+    title="Channels"
+    description="The pub/sub layer built on these primitives: publish from anywhere, subscribe from controllers."
+    href="/v4-0-0/digging-deeper/channels/"
+  />
   <LinkCard
     title="Controllers and Actions"
     description="The foundation: how actions render. SSE is just one more render option on top of that pipeline."

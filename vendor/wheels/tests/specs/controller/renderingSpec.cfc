@@ -536,7 +536,146 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.RenderingError")
 			})
 		})
-		
+
+		describe("Tests that renderwith json type coercion", () => {
+
+			beforeEach(() => {
+				params = {controller = "test", action = "test2", format = "json"}
+				cfheader(statuscode = 200);
+				_controller = application.wo.controller("test", params)
+				_controller.provides("json")
+			})
+
+			afterEach(() => {
+				application.wo.$header(name = "content-type", value = "text/html", charset = "utf-8")
+			})
+
+			it("forces extra named args marked string to serialize as JSON strings", () => {
+				row1 = {}
+				row1["zip"] = "01234"
+				row2 = {}
+				row2["zip"] = "99999"
+				rows = [row1, row2]
+				data = _controller.renderWith(data = rows, layout = false, returnAs = "string", zip = "string")
+
+				expect(data).toInclude('"zip":"01234"')
+				expect(data).toInclude('"zip":"99999"')
+				// No marker bytes (raw or JSON-escaped) may leak into the payload.
+				expect(Find(Chr(7), data)).toBe(0)
+				expect(data).notToInclude("\u0007")
+			})
+
+			it("preserves BEL bytes in data values when no coercion is requested", () => {
+				row1 = {}
+				row1["note"] = "alert" & Chr(7) & "bell"
+				rows = [row1]
+				data = _controller.renderWith(data = rows, layout = false, returnAs = "string")
+				parsed = DeserializeJSON(data)
+
+				expect(Find(Chr(7), parsed[1]["note"])).toBeGT(0)
+			})
+
+			it("preserves BEL bytes elsewhere in the payload when string coercion is requested", () => {
+				row1 = {}
+				row1["zip"] = "01234"
+				row1["note"] = "a" & Chr(7) & "b"
+				rows = [row1]
+				data = _controller.renderWith(data = rows, layout = false, returnAs = "string", zip = "string")
+				parsed = DeserializeJSON(data)
+
+				expect(data).toInclude('"zip":"01234"')
+				expect(Find(Chr(7), parsed[1]["note"])).toBeGT(0)
+			})
+
+			it("forces extra named args marked integer to serialize without decimal point", () => {
+				row1 = {}
+				row1["total"] = JavaCast("double", 5)
+				rows = [row1]
+				data = _controller.renderWith(data = rows, layout = false, returnAs = "string", total = "integer")
+
+				expect(data).toInclude('"total":5')
+				expect(data).notToInclude('"total":5.0')
+			})
+
+			it("does not rewrite nested same-named keys when coercing integers", () => {
+				row1 = {}
+				row1["total"] = JavaCast("double", 5)
+				child = {}
+				child["total"] = JavaCast("double", 7)
+				row1["child"] = child
+				rows = [row1]
+				data = _controller.renderWith(data = rows, layout = false, returnAs = "string", total = "integer")
+				parsed = DeserializeJSON(data)
+
+				expect(data).notToInclude('"total":5.0')
+				// The nested same-named key must serialize exactly as the engine does
+				// natively (the legacy per-key regex also rewrote nested keys, e.g. 7.0 -> 7
+				// on engines that emit a .0 suffix for doubles).
+				probeChild = {}
+				probeChild["total"] = JavaCast("double", 7)
+				expect(data).toInclude(SerializeJSON(probeChild))
+				expect(parsed[1]["child"]["total"]).toBe(7)
+			})
+
+			it("coerces top-level struct data keys marked integer", () => {
+				payload = {}
+				payload["total"] = JavaCast("double", 5)
+				data = _controller.renderWith(data = payload, layout = false, returnAs = "string", total = "integer")
+
+				expect(data).toInclude('"total":5')
+				expect(data).notToInclude('"total":5.0')
+			})
+
+			it("coerces top-level struct data keys marked string", () => {
+				payload = {}
+				payload["zip"] = "01234"
+				payload["note"] = "a" & Chr(7) & "b"
+				data = _controller.renderWith(data = payload, layout = false, returnAs = "string", zip = "string")
+				parsed = DeserializeJSON(data)
+
+				expect(data).toInclude('"zip":"01234"')
+				// No marker residue may remain in the coerced value. Whether a surviving
+				// BEL byte serializes as a raw byte or as a backslash-u escape is a
+				// Lucee-build detail, so assert on the round-tripped values rather than
+				// the payload text (text checks would contradict BEL survival below).
+				expect(Find(Chr(7), parsed["zip"])).toBe(0)
+				expect(parsed["zip"]).toBe("01234")
+				// Legitimate BEL bytes inside other string values must survive the strip.
+				expect(Find(Chr(7), parsed["note"])).toBeGT(0)
+			})
+
+			it("skips rows that do not contain the coerced key", () => {
+				row1 = {}
+				row1["zip"] = "01234"
+				row2 = {}
+				row2["other"] = "x"
+				rows = [row1, row2]
+				data = _controller.renderWith(data = rows, layout = false, returnAs = "string", zip = "string")
+
+				expect(data).toInclude('"zip":"01234"')
+				expect(data).toInclude('"other":"x"')
+			})
+
+			it("does not treat the status argument as a coercion directive", () => {
+				row1 = {}
+				row1["zip"] = "01234"
+				rows = [row1]
+				data = _controller.renderWith(data = rows, layout = false, returnAs = "string", status = 201, zip = "string")
+
+				expect(application.wo.$statusCode()).toBe(201)
+				expect(data).toInclude('"zip":"01234"')
+			})
+
+			it("leaves non-integral numeric values untouched under integer coercion", () => {
+				row1 = {}
+				row1["total"] = JavaCast("double", 5.25)
+				rows = [row1]
+				data = _controller.renderWith(data = rows, layout = false, returnAs = "string", total = "integer")
+
+				expect(data).toInclude('"total":5.25')
+			})
+		})
+
 		describe("Tests that specified_layouts", () => {
 
 			beforeEach(() => {

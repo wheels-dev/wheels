@@ -138,8 +138,12 @@ adapter.publish(channel = "orders", event = "created", data = SerializeJSON(orde
 var events = adapter.poll(channel = "orders", since = DateAdd("n", -5, Now()));
 var events = adapter.poll(channel = "orders", lastEventId = "evt-123");
 
-// Manual cleanup (automatic cleanup runs every 5 minutes)
+// Manual cleanup. A throttled sweep also runs on the publish path: at most
+// once every 5 minutes (every 15s while a backlog drains), bounded to 1000
+// oldest expired rows per pass. Busy multi-server deployments should run a
+// scheduled full sweep instead of relying on it.
 adapter.cleanup(olderThanMinutes = 30);
+adapter.cleanup(olderThanMinutes = 60, maxRows = 10000);  // bounded pass; returns rows deleted
 ```
 
 #### Database Table: `wheels_events`
@@ -158,10 +162,10 @@ Indexes: `(channel, createdAt)`, `(createdAt)`.
 
 ## JavaScript Client
 
-Include `wheels-sse.js` (located at `/wheels/assets/js/wheels-sse.js`) for a zero-dependency EventSource client with auto-reconnect.
+`wheels-sse.js` is a zero-dependency EventSource client with auto-reconnect. It is NOT served at any URL by the framework — copy it from `vendor/wheels/public/assets/js/wheels-sse.js` into your app (e.g. `public/javascripts/wheels-sse.js`) and include it with `javaScriptIncludeTag("wheels-sse")` or a plain script tag.
 
 ```html
-<script src="/wheels/assets/js/wheels-sse.js"></script>
+<script src="/javascripts/wheels-sse.js"></script>
 <script>
 // Basic usage
 const sse = new WheelsSSE('/notifications/stream', {

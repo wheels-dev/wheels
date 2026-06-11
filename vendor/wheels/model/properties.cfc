@@ -751,34 +751,25 @@ component {
 	}
 
 	/**
-	 * Sanitizes arguments passed to dynamic scope handler functions so that
-	 * string interpolation in WHERE clauses is safe against SQL injection.
+	 * Escapes simple-value arguments passed to dynamic scope handler functions so that
+	 * QUOTED string interpolation in WHERE clauses (`where = "col = '##args.x##'"`) is safe:
+	 * the quoted literal is subsequently re-extracted by `$whereClause`'s RESQLWhere pass
+	 * and bound via cfqueryparam, so escaping the quotes is sufficient to keep the value
+	 * inside the literal. Values are never keyword-filtered or rewritten beyond escaping —
+	 * "Union Pacific" round-trips unchanged.
 	 *
-	 * WARNING: For best security, scope handlers should use parameterized queries
-	 * rather than string interpolation. This sanitization is a safety net, not a
-	 * replacement for proper parameterization.
+	 * WARNING: escaping does NOT make UNQUOTED interpolation (`where = "age > ##args.age##"`)
+	 * safe. Handlers that interpolate unquoted must validate/cast the value themselves, or
+	 * better, return `whereParams` in the scope spec for full parameterization (supported by
+	 * `ScopeChain.$mergeSpecs()` — see the enum scope implementation in this file).
 	 *
-	 * @args The struct of arguments to sanitize (typically missingMethodArguments).
+	 * @args The struct of arguments to escape (typically missingMethodArguments).
 	 */
 	public struct function $sanitizeScopeHandlerArgs(required struct args) {
 		local.sanitized = {};
 		for (local.key in arguments.args) {
 			local.val = arguments.args[local.key];
 			if (IsSimpleValue(local.val)) {
-				// Strip null bytes
-				local.val = Replace(local.val, Chr(0), "", "all");
-				// Strip SQL comment/statement markers before escaping
-				local.val = Replace(local.val, "--", "", "all");
-				local.val = Replace(local.val, "/*", "", "all");
-				local.val = Replace(local.val, "*/", "", "all");
-				local.val = Replace(local.val, ";", "", "all");
-				// Strip dangerous SQL keywords that could be used for injection.
-				// Word-boundary matching prevents false positives in normal values.
-				local.val = REReplaceNoCase(local.val, "\b(UNION|EXEC|EXECUTE|BENCHMARK|SLEEP|WAITFOR|DELAY)\b", "", "all");
-				local.val = REReplaceNoCase(local.val, "\bxp_\w*", "", "all");
-				local.val = REReplaceNoCase(local.val, "\bINTO\s+OUTFILE\b", "", "all");
-				local.val = REReplaceNoCase(local.val, "\bLOAD_FILE\s*\(", "(", "all");
-				local.val = REReplaceNoCase(local.val, "\bCHAR\s*\(", "(", "all");
 				local.sanitized[local.key] = $escapeSqlValue(local.val);
 			} else {
 				local.sanitized[local.key] = local.val;

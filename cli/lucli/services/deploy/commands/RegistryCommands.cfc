@@ -9,13 +9,21 @@ component extends="Base" {
         return this;
     }
 
-    public string function login(required struct opts) {
+    /**
+     * Deliberate divergence from Kamal's `docker login -p sensitive(...)`:
+     * the password is never part of the command string. It travels to the
+     * remote host over the SSH exec-channel's stdin (SshClient `opts.stdin`)
+     * and is consumed by `docker login --password-stdin`, so it can't leak
+     * through dry-run output, exception summaries, or the remote process
+     * table (##2956).
+     */
+    public string function login() {
         var reg = variables.config.registry();
         return docker(
             "login",
             reg.server(),
             "-u", reg.username(),
-            "-p", arguments.opts.password ?: ""
+            "--password-stdin"
         );
     }
 
