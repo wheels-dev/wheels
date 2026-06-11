@@ -1,6 +1,9 @@
 # /review-pr
 
-Reviewer A. Review the given pull request as a senior Wheels maintainer would.
+The Reviewer. Review the given pull request as a senior Wheels maintainer
+would. This is the pipeline's single quality gate: there is no second
+reviewer critiquing this review afterwards, so the adversarial self-review
+in step 4 is load-bearing — it replaces the retired Reviewer B pass.
 
 ## Rails
 
@@ -29,7 +32,10 @@ below. Highlights for this command:
    contains the marker `<!-- wheels-bot:review-a:<pr>:<head-sha> -->` for the
    `<head-sha>` you were passed, exit silently — there is nothing to do.
    Always take the marker SHA from the `<head-sha>` argument; don't compute
-   it yourself (issue #2848).
+   it yourself (issue #2848). (The marker keeps the legacy `review-a` name
+   for continuity with reviews posted before the single-reviewer
+   consolidation — the skip-check gate and the workflow guard both grep for
+   it.)
 
 2. **Gather context.** Read in this order, then build a mental model:
    - `gh pr view <pr-number>` — title, body, author, base, head, labels
@@ -101,7 +107,36 @@ below. Highlights for this command:
    - CSRF on state-changing actions
    - Secret leakage (.env, credentials in fixtures)
 
-4. **Write the review.** Use `gh pr review <pr-number> --comment` for the
+4. **Adversarial self-review.** Before writing the review body, switch
+   sides: treat your own draft findings the way a hostile second reviewer
+   would. This step inherits the retired Reviewer B's anti-sycophancy and
+   false-positive mandate — there is no downstream critique pass to catch
+   what you let through here.
+
+   For **each** finding from step 3, actively attempt to refute it against
+   the actual code:
+   - Re-read the cited lines (`Read` the file at the cited location — not
+     just the diff hunk). Is the claim accurate as written? E.g. "this
+     could SQL inject" is refuted if the code uses parameter binding or the
+     query builder.
+   - Is the flagged idiom actually a documented pattern in `.ai/wheels/` or
+     `CLAUDE.md`? If so, the finding is a false positive — drop it.
+   - Does the convention you're insisting on actually exist in this repo?
+     `git grep` for prior art. If you can't find it, drop the finding.
+   - Can you cite concrete evidence (a quoted line, a doc path) for the
+     claim? **Drop any finding you cannot evidence.**
+
+   Then audit the other direction:
+   - Re-scan the diff once for anything obvious you skipped — cross-engine
+     compat issues, tests that exist but don't exercise the change,
+     commitlint violations, security issues you glossed over.
+   - Sycophancy check: are you approving without citing evidence, or
+     softening a real correctness issue into a "nit"? Don't.
+   - Verify the verdict is consistent with the surviving findings'
+     severity: a correctness/security/cross-engine finding is incompatible
+     with `approve`; a clean diff is incompatible with `request changes`.
+
+5. **Write the review.** Use `gh pr review <pr-number> --comment` for the
    summary plus `gh api` to attach line comments — or use a single
    `gh pr review` invocation with `--body` containing line-anchored Markdown
    if line comments are not feasible.
@@ -112,12 +147,12 @@ below. Highlights for this command:
    visible to humans and counts as a public review. If you need to verify
    syntax or auth, use `gh auth status` or `gh pr view`; do not exercise
    `gh pr review` until you have the final body ready. A post-submission
-   guard in `bot-review-a.yml` auto-dismisses any wheels-bot review missing
+   guard in `bot-review.yml` auto-dismisses any wheels-bot review missing
    the canonical marker or shorter than 200 characters (issue #2558) — do
    not rely on it as a safety net.
 
    The review body must:
-   - Open with `## Wheels Bot — Reviewer A`
+   - Open with `## Wheels Bot — Reviewer`
    - Have a one-paragraph **TL;DR** that names the PR's purpose and your
      overall verdict (`approve` / `request changes` / `comment`)
    - Group findings under `### Correctness`, `### Conventions`,
@@ -137,9 +172,11 @@ below. Highlights for this command:
    - `--approve` only when the diff is genuinely clean — bias toward
      `--comment` if uncertain. Do not approve as a courtesy.
 
-5. **Self-check before submitting.**
+6. **Self-check before submitting.**
    - Have you cited specific files + lines for every finding? (No vague
      handwaving.)
+   - Did every finding survive the step-4 refutation attempt? (Anything you
+     couldn't evidence must already be gone.)
    - Is your TL;DR consistent with your findings? (Don't say "looks good"
      above a list of correctness issues.)
    - Did you cite at least one piece of evidence (a quoted line, a

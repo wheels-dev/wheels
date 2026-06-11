@@ -27,7 +27,7 @@ jobs:
     # (framework-design path). Low-confidence stays manual.
     # Medium fires because propose-fix's own step-4 safety net (sensitive
     # areas: security / migrations / deploy / DI / cross-engine) aborts
-    # before any PR is opened — Reviewer A and B catch the rest.
+    # before any PR is opened — the Reviewer catches the rest.
     # workflow_dispatch is preserved for manual reruns.
     # The bot-identity check is load-bearing: prevents humans from
     # triggering propose-fix by quoting a marker in a comment reply.
@@ -69,8 +69,47 @@ jobs:
           marker-pattern: 'wheels-bot:fix:${{ env.ISSUE_NUMBER }}|wheels-bot:fix-held:${{ env.ISSUE_NUMBER }}'
           github-token: ${{ steps.app-token.outputs.token }}
 
-      - name: Compute branch slug
+      # Campaign guard: session-driven campaign PRs race bot drafts (4 bot
+      # drafts were superseded by human/session PRs on 2026-06-10 alone); the
+      # human/session branch wins. Skip the (expensive) model invocation when
+      # either signal shows a human is already on the issue:
+      #   (a) a `peter/issue-<N>-*` campaign branch exists on origin, or
+      #   (b) an open non-bot PR references "#<N>" in its body.
+      # Logs only — no issue comment, so a later manual dispatch can still run
+      # once the human effort is abandoned.
+      - name: Campaign guard
         if: steps.gate.outputs.skip == 'false'
+        id: campaign
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::issue number must be numeric, got: $ISSUE_NUMBER"
+            exit 1
+          fi
+          # (a) session-driven campaign branch for this issue already on origin
+          if [ -n "$(git ls-remote --heads origin "peter/issue-${ISSUE_NUMBER}-*")" ]; then
+            echo "::notice::Campaign guard: branch peter/issue-${ISSUE_NUMBER}-* exists on origin — skipping bot draft (the human/session branch wins)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # (b) an open non-bot PR whose body references this issue. The
+          # --search narrows server-side; jq re-verifies the body actually
+          # contains "#<N>" and that the author is not a bot.
+          open_nonbot=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "${ISSUE_NUMBER} in:body" \
+            --json number,author,body \
+            --jq "[.[] | select(.author.is_bot | not) | select(.body | contains(\"#${ISSUE_NUMBER}\"))] | length")
+          if [ "${open_nonbot}" != "0" ]; then
+            echo "::notice::Campaign guard: ${open_nonbot} open non-bot PR(s) reference #${ISSUE_NUMBER} — skipping bot draft (the human/session PR wins)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Compute branch slug
+        if: steps.gate.outputs.skip == 'false' && steps.campaign.outputs.skip == 'false'
         id: branch
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -86,21 +125,21 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
 
       - name: Configure git + create branch
-        if: steps.gate.outputs.skip == 'false'
+        if: steps.gate.outputs.skip == 'false' && steps.campaign.outputs.skip == 'false'
         run: |
           git config user.name "wheels-bot[bot]"
           git config user.email "wheels-bot[bot]@users.noreply.github.com"
           git checkout -b "${{ steps.branch.outputs.name }}"
 
       - name: Set up Wheels test environment
-        if: steps.gate.outputs.skip == 'false'
+        if: steps.gate.outputs.skip == 'false' && steps.campaign.outputs.skip == 'false'
         uses: ./.github/actions/setup-wheels-test-env
         with:
           port: '60007'
           install-playwright: 'false'
 
       - name: Run Propose Fix
-        if: steps.gate.outputs.skip == 'false'
+        if: steps.gate.outputs.skip == 'false' && steps.campaign.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
           # This workflow fires from wheels-bot[bot] comments containing
@@ -111,13 +150,14 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
             /propose-fix ${{ env.ISSUE_NUMBER }}
+          # Model policy: judging gate = fable, coding stages = opus, janitorial = sonnet.
           claude_args: |
-            --model claude-opus-4-7
+            --model claude-opus-4-8
             --max-turns 1000
             --allowedTools "Bash(gh:*),Bash(git:*),Bash(bash tools/test-local.sh*),Bash(curl:*),Read,Edit,Write,Grep,Glob"
 
       - name: Push branch
-        if: steps.gate.outputs.skip == 'false'
+        if: steps.gate.outputs.skip == 'false' && steps.campaign.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |

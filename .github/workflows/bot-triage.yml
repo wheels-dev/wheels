@@ -70,7 +70,8 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
             /triage-issue ${{ github.event.issue.number || inputs.issue_number }}
+          # Model policy: judging gate = fable, coding stages = opus, janitorial = sonnet.
           claude_args: |
-            --model claude-opus-4-7
+            --model claude-opus-4-8
             --max-turns 200
             --allowedTools "Bash(gh:*),Bash(git status),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Read,Grep,Glob"

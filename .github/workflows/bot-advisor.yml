@@ -1,16 +1,16 @@
 name: Wheels Bot — Senior Advisor
 
-# Fires when Reviewer A and Reviewer B fail to converge after the
-# inner-loop cap (B emits a `:terminal` marker). The advisor reads the
-# full exchange + the disputed code + canonical references, then issues
-# a tie-breaking verdict using Opus's deeper reasoning. Output is a
-# comment + convergence marker that drops back into the existing flow:
-# converged-approve ends the loop; converged-changes triggers
-# bot-address-review.yml.
-#
-# This is the only stage in the pipeline that runs Opus on a non-coding
-# task. The cost is justified because the advisor's verdict overrides
-# a deadlock — it must be right.
+# LEGACY auto-fire path: this stage was the deadlock-breaker for the
+# Reviewer A / Reviewer B convergence loop, fired by B's `:terminal`
+# marker. That loop was retired per maintainer decision 2026-06-11
+# (single-pass Reviewer; see bot-review.yml), so no pipeline stage emits
+# the trigger marker anymore — the issue_comment path below is inert and
+# retained only so historical PRs that already carry a terminal marker
+# can still be advised via a manual rerun. The bot-identity gate keeps
+# humans from forging the trigger by quoting the marker. A follow-up may
+# repurpose or remove this stage; until then it is effectively
+# workflow_dispatch-only (and the prompt itself exits unless a terminal
+# marker exists on the PR).
 on:
   issue_comment:
     types: [created]
@@ -33,7 +33,8 @@ jobs:
     name: Senior advisor
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Auto-fires only on B's terminal marker (cap reached). The
+    # Auto-fires only on a (legacy) Reviewer B terminal marker — no longer
+    # produced since the A/B loop was retired; see the header comment. The
     # bot-identity check is load-bearing.
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
@@ -109,7 +110,8 @@ jobs:
           # channel the PR number already uses.
           prompt: |
             /advise-on-deadlock ${{ env.PR_NUMBER }} ${{ steps.pr.outputs.sha }}
+          # Model policy: judging gate = fable, coding stages = opus, janitorial = sonnet.
           claude_args: |
-            --model claude-opus-4-7
+            --model claude-opus-4-8
             --max-turns 500
             --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"

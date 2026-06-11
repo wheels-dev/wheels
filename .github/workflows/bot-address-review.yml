@@ -1,22 +1,32 @@
 name: Wheels Bot — Address Review
 
-# Fires when Reviewer B posts a converged-changes verdict, signaling that
-# A and B have aligned on "this PR needs changes." The bot reads the
-# consensus, applies the changes to the PR's existing branch, and pushes.
-# The new commit triggers a fresh Reviewer A run on the new SHA — the
-# convergence loop restarts on the updated PR state. Bounded by an
-# outer-loop cap (5 implementation rounds per PR; enforced in the prompt).
+# OPT-IN implementer for reviewer findings. This stage no longer auto-fires:
+# the converged-changes marker that used to trigger it died with the A/B
+# critique loop (retired per maintainer decision 2026-06-11), and the
+# auto-fire push chain had landed a broken spec on a PR (#3005). A human now
+# opts a PR in by either:
+#   * applying the `bot-address-review` label to the PR, or
+#   * dispatching this workflow manually with the PR number.
+# The bot reads the most recent wheels-bot review on the PR's current head
+# SHA, applies the actionable findings, and pushes to the PR's existing
+# branch. The new commit triggers a fresh Reviewer run on the new SHA.
 #
 # This is a *coding* stage — Opus model, broad allowlist with the test
-# runner, mirrors propose-fix's setup. Different from review-a/review-b
-# which are analytical and stay on Sonnet.
+# runner, mirrors propose-fix's setup. Different from the Reviewer, which is
+# analytical.
+#
+# Fork-PR note: `pull_request: labeled` runs from a fork carry no vars or
+# secrets, so the WHEELS_BOT_ENABLED gate reads empty and the job skips —
+# fail-closed by construction (this stage pushes to the PR branch, which it
+# could not do for a fork anyway).
 on:
-  issue_comment:
-    types: [created]
+  pull_request:
+    types: [labeled]
+    branches: [develop]
   workflow_dispatch:
     inputs:
       pr-number:
-        description: 'PR number whose converged-changes verdict to address'
+        description: 'PR number whose reviewer findings to address'
         required: true
         type: string
 
@@ -24,7 +34,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: wheels-bot-address-review-${{ github.event.issue.number || inputs.pr-number }}
+  group: wheels-bot-address-review-${{ github.event.pull_request.number || inputs.pr-number }}
   cancel-in-progress: false
 
 jobs:
@@ -32,19 +42,18 @@ jobs:
     name: Address review
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Auto-fires on B's converged-changes marker. The bot-identity check
-    # is load-bearing: prevents humans from quoting the marker in a reply
-    # to trigger this stage.
+    # Opt-in only: the maintainer-applied `bot-address-review` label (only
+    # users with write access can label) or a manual dispatch. No marker
+    # auto-fire path remains.
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
       && (
         github.event_name == 'workflow_dispatch'
-        || (github.event_name == 'issue_comment'
-            && github.event.comment.user.login == 'wheels-bot[bot]'
-            && contains(github.event.comment.body, 'wheels-bot:converged-changes:'))
+        || (github.event_name == 'pull_request'
+            && github.event.label.name == 'bot-address-review')
       )
     env:
-      PR_NUMBER: ${{ github.event.issue.number || inputs.pr-number }}
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
       WHEELS_CI: "true"
     steps:
       - name: Generate App token
@@ -66,13 +75,14 @@ jobs:
           fi
           # Resolve the head ref (for the branch checkout below) AND the head
           # SHA (threaded into the prompt as <head-sha>) in a single `gh pr
-          # view`, so the marker SHA is captured once here instead of being
-          # re-derived by the model mid-session — the #2848 race. Unlike
-          # bot-advisor.yml the checkout stays branch-name-keyed: this stage
-          # commits and pushes back, and a detached-HEAD SHA checkout would
-          # break `git push origin HEAD`. The captured SHA is therefore the
-          # head at run start — exactly the marker's <sha-before> (the head
-          # before this stage's own commit).
+          # view`, so the marker SHA is captured once here — at run start,
+          # exactly once — instead of being re-derived by the model
+          # mid-session (the #2848 race). Unlike bot-advisor.yml the checkout
+          # stays branch-name-keyed: this stage commits and pushes back, and a
+          # detached-HEAD SHA checkout would break `git push origin HEAD`. The
+          # captured SHA is therefore the head at run start — exactly the
+          # marker's <sha-before> (the head before this stage's own commit),
+          # and the SHA whose wheels-bot review the prompt consumes.
           info=$(gh pr view "$PR_NUMBER" --repo wheels-dev/wheels --json headRefName,headRefOid)
           ref=$(echo "$info" | python3 -c "import json,sys; print(json.load(sys.stdin)['headRefName'])")
           sha=$(echo "$info" | python3 -c "import json,sys; print(json.load(sys.stdin)['headRefOid'])")
@@ -122,8 +132,8 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
-          # Triggered by wheels-bot[bot]'s Reviewer B comment with a
-          # converged-changes marker. Allow that identity.
+          # The labeled trigger is human-applied, but keep the bot identities
+          # allowed for consistency with the rest of the pipeline.
           allowed_bots: 'wheels-bot[bot],github-actions[bot]'
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.app-token.outputs.token }}
@@ -139,8 +149,9 @@ jobs:
           # the same channel the PR number already uses.
           prompt: |
             /address-review ${{ env.PR_NUMBER }} ${{ steps.pr.outputs.sha }}
+          # Model policy: judging gate = fable, coding stages = opus, janitorial = sonnet.
           claude_args: |
-            --model claude-opus-4-7
+            --model claude-opus-4-8
             --max-turns 1000
             --allowedTools "Bash(gh:*),Bash(git:*),Bash(bash tools/test-local.sh*),Bash(curl:*),Read,Edit,Write,Grep,Glob"
 

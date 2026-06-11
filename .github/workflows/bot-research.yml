@@ -72,7 +72,8 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
             /research-frameworks ${{ env.ISSUE_NUMBER }}
+          # Model policy: judging gate = fable, coding stages = opus, janitorial = sonnet.
           claude_args: |
-            --model claude-opus-4-7
+            --model claude-opus-4-8
             --max-turns 400
             --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git show:*),Bash(git grep:*),WebFetch,WebSearch,Read,Grep,Glob"

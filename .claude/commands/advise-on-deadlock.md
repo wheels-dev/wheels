@@ -1,18 +1,21 @@
 # /advise-on-deadlock
 
-Senior advisor for the wheels-bot review chain. Fires only when
-Reviewer A and Reviewer B fail to converge on a recommendation after
-the inner loop's 10-round cap (B emits a `:terminal` marker). Read
+> **LEGACY.** The Reviewer A / Reviewer B convergence loop this command
+> arbitrated was retired per maintainer decision 2026-06-11 (single-pass
+> Reviewer; see `bot-review.yml` and `/review-pr`). No pipeline stage emits
+> the `:terminal` trigger marker anymore, and the `converged-*` markers this
+> command produces no longer auto-fire `bot-address-review.yml` (that stage
+> is opt-in via the `bot-address-review` label). This command is retained
+> only for manual reruns against historical PRs that already carry a
+> terminal marker; step 2's deadlock check makes it exit silently
+> everywhere else.
+
+Senior advisor for the retired wheels-bot review loop. Fired only when
+Reviewer A and Reviewer B failed to converge on a recommendation after
+the inner loop's 10-round cap (B emitted a `:terminal` marker). Read
 the full exchange, identify the specific disputed points, and issue a
 tie-breaking verdict using deeper reasoning than the analytical
 reviewers brought.
-
-This is the only stage in the pipeline that runs **Opus on a
-non-coding task**. The reasoning depth is justified because the
-advisor's verdict overrides the analytical reviewers' deadlock and
-drops back into the existing convergence flow — the advisor either
-ends the loop (`converged-approve`) or triggers `bot-address-review.yml`
-(`converged-changes`).
 
 ## Rails
 
@@ -155,7 +158,8 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
    - `<!-- wheels-bot:converged-approve:<pr>:<head-sha> -->` if verdict is
      `approve`
    - `<!-- wheels-bot:converged-changes:<pr>:<head-sha> -->` if verdict is
-     `changes` (triggers `bot-address-review.yml`)
+     `changes` (no longer auto-fires anything — a human opts the PR into
+     `bot-address-review.yml` via the `bot-address-review` label)
 
 10. **Self-check before posting.**
     - [ ] Each ruling cites a concrete file:line, doc path, or both —

@@ -293,8 +293,8 @@ Wheels 3.0 includes these core dependencies (automatically managed):
 ## Wheels Bot
 
 Issues and PRs on this repo are processed by an automated Claude-powered bot
-(`wheels-bot[bot]`). Five stages: triage, cross-framework research,
-propose-fix, Reviewer A, Reviewer B. See
+(`wheels-bot[bot]`). Core stages: triage, cross-framework research,
+propose-fix, and a single-pass Reviewer. See
 [`docs/contributing/wheels-bot.md`](docs/contributing/wheels-bot.md) for the
 full reference, or [`CLAUDE.md`](CLAUDE.md#wheels-bot) for a quick summary.
 
@@ -304,7 +304,7 @@ processing for that issue/PR immediately. Any human comment to the bot
 asking it to stop is also honored.
 
 **To interpret bot output**: every bot comment / review opens with a clear
-H2 header (`## Wheels Bot — Triage`, `## Wheels Bot — Reviewer A`, etc.) and
+H2 header (`## Wheels Bot — Triage`, `## Wheels Bot — Reviewer`, etc.) and
 ends with an HTML-comment marker. Bot-authored draft PRs are clearly
 labelled and require a human approving review on `develop` before merge.
 

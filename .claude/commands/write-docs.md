@@ -177,7 +177,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
     Pages updated: <list>
     Screenshots needed: <count, or "none">
 
-    A human review is required before merge. Reviewer A and Reviewer B
+    A human review is required before merge. The Reviewer
     will weigh in shortly.
 
     <!-- wheels-bot:write-docs:<issue-number> -->

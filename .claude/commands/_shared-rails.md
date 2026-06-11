@@ -78,8 +78,7 @@ existing comments for the marker that matches your stage and key. If found,
 ## Output format
 
 - Start every comment / review with a clear H2 header naming the stage:
-  `## Wheels Bot — Triage`, `## Wheels Bot — Reviewer A`,
-  `## Wheels Bot — Reviewer B (round N)`,
+  `## Wheels Bot — Triage`, `## Wheels Bot — Reviewer`,
   `## Wheels Bot — Cross-Framework Research`.
 - End with the appropriate marker on its own line.
 - No emoji unless the team's existing style uses them (CFML repo norms — minimal).

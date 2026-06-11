@@ -199,7 +199,7 @@ is enforced by code, so don't skip steps.
     Spec: `<path/to/spec.cfc>` — failing → passing
     Implementation: `<path(s)>`
 
-    A human review is required before merge. Reviewer A and Reviewer B
+    A human review is required before merge. The Reviewer
     will weigh in shortly. Doc updates (MDX guides, `.ai/wheels/`,
     `CLAUDE.md`) are handled separately by `bot-update-docs.yml`.
 
