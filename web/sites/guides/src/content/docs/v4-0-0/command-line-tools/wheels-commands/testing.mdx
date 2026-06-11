@@ -45,7 +45,7 @@ Run the Wheels BDD test suite. Auto-detects core tests when `vendor/wheels/tests
 #### Synopsis
 
 ``` title="synopsis"
-wheels test [--filter=<dir>] [--db=<engine>] [--verbose] [--ci] [--core] [flags]
+wheels test [--filter=<dir>] [--db=<engine>] [--verbose] [--ci] [--core] [--base-path=<path>] [flags]
 ```
 
 A bare positional argument is treated as the filter directory — `wheels test models` is equivalent to `wheels test --filter=models`.
@@ -62,6 +62,7 @@ A bare positional argument is treated as the filter directory — `wheels test m
 | `--ci` | CI mode: tightens exit codes and output for GitHub Actions and similar runners. |
 | `--core` | Run framework self-tests (`vendor/wheels/tests/specs/`) instead of your app suite. App tests are the default; `--core` is the explicit opt-in. |
 | `--no-test-db` | Disable the auto-swap to `<datasource>_test`. App tests run against your dev datasource, with whatever data is already in it. |
+| `--base-path=<path>` | URL prefix the app is mounted under (e.g. `/myapp`). Auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` in `config/settings.cfm` when omitted. Leave unset for root-mounted apps (the default). |
 
 #### `--db` is for `--core` runs only
 
