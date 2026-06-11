@@ -170,9 +170,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		}
 
 		// Copy HTTP headers.
-		if (!StructKeyExists(request, "$wheelsHeader")) {
-			request.$wheelsHeaders = GetHTTPRequestData().headers;
-		}
+		$initializeRequestHeaders();
 
 		// Soft-reload of app/global/*.cfm when bare ?reload=true is hit in dev
 		// and any tracked include has a newer mtime. The password-gated
@@ -290,6 +288,21 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			&& request.CGI.request_method eq "OPTIONS"
 		) {
 			abort;
+		}
+	}
+
+	/**
+	 * Internal function. Memoizes HTTP request headers in request.$wheelsHeaders.
+	 * Reuses the GetHTTPRequestData() result stored by $initializeRequestScope()
+	 * so the request body is not materialized a second time per request.
+	 */
+	public void function $initializeRequestHeaders() {
+		if (!StructKeyExists(request, "$wheelsHeaders")) {
+			if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "httpRequestData")) {
+				request.$wheelsHeaders = request.wheels.httpRequestData.headers;
+			} else {
+				request.$wheelsHeaders = GetHTTPRequestData().headers;
+			}
 		}
 	}
 
