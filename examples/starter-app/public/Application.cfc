@@ -208,14 +208,33 @@ component output="false" {
 				|| (StructKeyExists(url, "password") && url.password == application.wheels.reloadPassword)
 			)
 		) {
-			application.wo.$debugPoint("total,reload");
-			if (StructKeyExists(url, "lock") && !url.lock) {
-				this.$handleRestartAppRequest();
+			// Loop-break for an explicit environment switch (?reload=<env>): once the
+			// restart this redirect came from has applied the switch,
+			// application.wheels.environment already equals url.reload. Because
+			// $buildRedirectUrl() now preserves reload+password on a switch, restarting
+			// again would loop forever — so skip applicationStop() and serve the request
+			// normally. A boolean ?reload=true never matches and restarts as before.
+			// Trade-off: ?reload=<current-env> is a no-op; use ?reload=true to force a
+			// same-environment restart (issue #3030).
+			if (
+				!IsBoolean(url.reload)
+				&& Len(url.reload)
+				&& StructKeyExists(application, "wheels")
+				&& StructKeyExists(application.wheels, "environment")
+				&& application.wheels.environment == url.reload
+			) {
+				// Switch already applied by the restart that produced this redirect —
+				// fall through to normal request processing below.
 			} else {
-				local.executeArgs = {"componentReference" = "application"};
-				application.wo.$simpleLock(name = local.lockName, execute = "$handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
+				application.wo.$debugPoint("total,reload");
+				if (StructKeyExists(url, "lock") && !url.lock) {
+					this.$handleRestartAppRequest();
+				} else {
+					local.executeArgs = {"componentReference" = "application"};
+					application.wo.$simpleLock(name = local.lockName, execute = "$handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
+				}
+				return false; // Stop processing this request after restart
 			}
-			return false; // Stop processing this request after restart
 		}
 
 		// Run the rest of the request start code.
@@ -329,6 +348,17 @@ component output="false" {
 			local.url = cgi.script_name;
 		}
 
+		// An explicit environment switch (?reload=<env>, a non-boolean value) must
+		// survive the post-applicationStop() redirect: the framework's env switch in
+		// wheels/events/onapplicationstart.cfc only fires when URL.reload is present on
+		// the request that starts the new application — which is this redirect. Stripping
+		// reload+password (the anti-loop default for ?reload=true) made the switch
+		// unreachable (issue #3030). Preserve them for a switch; keep stripping for a
+		// boolean reload. The gate's loop-break in onRequestStart() stops the preserved
+		// params from looping.
+		local.isEnvironmentSwitch = StructKeyExists(url, "reload") && Len(url.reload) && !IsBoolean(url.reload);
+		local.stripKeys = local.isEnvironmentSwitch ? "lock" : "reload,password,lock";
+
 		// Process query string parameters, removing reload-related ones
 		if (StructKeyExists(cgi, "query_string") && Len(cgi.query_string)) {
 			local.oldQueryString = ListToArray(cgi.query_string, "&");
@@ -340,7 +370,7 @@ component output="false" {
 				local.key = ListFirst(local.keyValue, "=");
 				
 				// Remove reload-related parameters
-				if (!ListFindNoCase("reload,password,lock", local.key)) {
+				if (!ListFindNoCase(local.stripKeys, local.key)) {
 					ArrayAppend(local.newQueryString, local.keyValue);
 				}
 			}
