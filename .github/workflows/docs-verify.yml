@@ -45,6 +45,12 @@ jobs:
         uses: Homebrew/actions/setup-homebrew@master
 
       - name: Install Wheels CLI
+        env:
+          # Homebrew 5.x's Linux sandbox needs a rootless bwrap, which
+          # ubuntu-latest runners don't provide (and 24.04's unprivileged
+          # userns restrictions make it unreliable even when installed).
+          # The ephemeral runner is already isolation enough for CI.
+          HOMEBREW_NO_SANDBOX_LINUX: "1"
         run: |
           brew tap wheels-dev/wheels || true
           # Homebrew 5.1+ refuses to load formulae from untrusted third-party
