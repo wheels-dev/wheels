@@ -433,6 +433,37 @@ component {
 
 	/**
 	 * Internal function.
+	 * Returns true when a select-list item contains SQL control characters or a
+	 * parenthesized subquery — the patterns $orderByClause and $groupByClause already
+	 * reject but the select clause currently passes through verbatim (SEC-21).
+	 */
+	public boolean function $isSuspiciousSelectItem(required string item) {
+		return Find(";", arguments.item) > 0
+		|| Find("--", arguments.item) > 0
+		|| Find("/*", arguments.item) > 0
+		|| ReFindNoCase("\(\s*SELECT(\s|\()", arguments.item) > 0;
+	}
+
+	/**
+	 * Internal function.
+	 * SEC-21 deprecation window: logs a development-mode warning for suspicious
+	 * select= items instead of rejecting them, so existing apps keep working while
+	 * being nudged off raw SQL in select=. Returns true when a warning was logged.
+	 */
+	public boolean function $warnOnUnvalidatedSelectItem(required string item) {
+		if (get("environment") != "development" || !$isSuspiciousSelectItem(arguments.item)) {
+			return false;
+		}
+		WriteLog(
+			type = "warning",
+			file = "wheels",
+			text = "[Wheels] The select= item `#arguments.item#` contains SQL control characters or a subquery. Dotted/aliased select items are currently passed through unvalidated; a future Wheels release will reject items containing `;`, `--`, `/*`, or subqueries (use a calculated property instead, and never pass request input to select=)."
+		);
+		return true;
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public string function $createSQLFieldList(
 		required string clause,
@@ -499,6 +530,14 @@ component {
 					In case "." or " AS " is passed in the column name item, append that as it is in the select query and then move onto the next iteration.
 				*/
 				if (Find(".", local.iItem) || Find(" AS ", local.iItem)) {
+					// SEC-21 deprecation window: dotted/aliased select items pass through
+					// unvalidated (unlike ORDER BY / GROUP BY). Warn in development mode when
+					// an item looks like raw SQL so apps can migrate before a future release
+					// rejects these. GROUP BY items are already rejected in $groupByClause
+					// before reaching this function, so gate on the select clause only.
+					if (arguments.clause == "select") {
+						$warnOnUnvalidatedSelectItem(local.iItem);
+					}
 					local.rv = ListAppend(local.rv, local.iItem);
 					continue;
 				}
