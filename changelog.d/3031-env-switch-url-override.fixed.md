@@ -1,0 +1,1 @@
+- An explicit `set(allowEnvironmentSwitchViaUrl=true)` is now honored in production-like environments, so the documented override of the URL-based environment-switch hardening works again (previously explicit-true was indistinguishable from the default and always discarded) (#3031)

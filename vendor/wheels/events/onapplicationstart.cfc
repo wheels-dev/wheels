@@ -305,7 +305,13 @@ component {
 		// and the registrations silently never run. (Note: Lucee 7's tag scanner reads
 		// CFC comments before compilation and treats literal cf-tags as unclosed errors,
 		// so this comment deliberately avoids putting the angle-bracketed form inline.)
+		// Capture the computed default, then overwrite the setting with a non-boolean
+		// sentinel before settings.cfm loads. This lets us tell an explicit
+		// set(allowEnvironmentSwitchViaUrl=true) apart from the framework default of
+		// true (issue #3031) — value-comparison cannot, so the documented prod-like
+		// override was previously unexpressible. Resolved back to a real boolean below.
 		local.envSwitchDefault = application.$wheels.allowEnvironmentSwitchViaUrl;
+		application.$wheels.allowEnvironmentSwitchViaUrl = "$wheelsUnset";
 		application.wo.$includeConfig(template = "/config/settings.cfm");
 		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
 			application.wo.$includeConfig(template = "/config/#application.$wheels.environment#/settings.cfm");
@@ -341,15 +347,17 @@ component {
 			application.$wheels.subpath = local.configuredSubpath;
 		}
 
-		// In production-like environments, disable URL-based environment switching by default.
-		// Developers can override by explicitly calling set(allowEnvironmentSwitchViaUrl=true) in settings.cfm.
-		if (
-			ListFindNoCase("production,testing,maintenance", application.$wheels.environment)
-			&& application.$wheels.allowEnvironmentSwitchViaUrl == local.envSwitchDefault
-			&& local.envSwitchDefault
-		) {
-			application.$wheels.allowEnvironmentSwitchViaUrl = false;
-		}
+		// Resolve the sentinel set above back into a real boolean. In production-like
+		// environments URL-based environment switching is disabled by default; the
+		// developer can still override it by explicitly calling
+		// set(allowEnvironmentSwitchViaUrl=true) in settings.cfm, which is honored
+		// because the sentinel makes explicit-true distinguishable from the default
+		// (issue #3031).
+		application.$wheels.allowEnvironmentSwitchViaUrl = application.wo.$resolveEnvironmentSwitchViaUrl(
+			settingValue = application.$wheels.allowEnvironmentSwitchViaUrl,
+			defaultValue = local.envSwitchDefault,
+			environment = application.$wheels.environment
+		);
 
 		// Warn if reloadPassword is empty — URL-based reload and environment switching are disabled.
 		if (!Len(application.$wheels.reloadPassword)) {

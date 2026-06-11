@@ -2437,6 +2437,37 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Resolves the effective `allowEnvironmentSwitchViaUrl`
+	 * setting after `config/settings.cfm` has loaded (issue #3031).
+	 *
+	 * `onapplicationstart` writes a non-boolean sentinel into the setting before
+	 * including settings.cfm, so an explicit `set(allowEnvironmentSwitchViaUrl=true|false)`
+	 * is always distinguishable from "the developer never touched it":
+	 *
+	 *   - Explicit boolean  → honored in every environment, so the documented
+	 *     production-like override (`set(allowEnvironmentSwitchViaUrl=true)`) works.
+	 *   - Sentinel (untouched) → fall back to the computed default, hardened to
+	 *     `false` in production-like environments (`production,testing,maintenance`).
+	 *
+	 * Always returns a real boolean so downstream readers (the across-reload carry
+	 * at onapplicationstart.cfc:23-24 and the environment revert at :222) are safe.
+	 * Returning the value keeps the helper pure for unit testing.
+	 */
+	public boolean function $resolveEnvironmentSwitchViaUrl(
+		required any settingValue,
+		required boolean defaultValue,
+		required string environment
+	) {
+		if (IsBoolean(arguments.settingValue)) {
+			return arguments.settingValue;
+		}
+		if (ListFindNoCase("production,testing,maintenance", arguments.environment)) {
+			return false;
+		}
+		return arguments.defaultValue;
+	}
+
+	/**
 	 * Internal function. Derives `webPath`, `rootPath`, `rootcomponentPath`,
 	 * and `wheelsComponentPath` from either an explicit URL `subpath`
 	 * (issue #2968 — subfolder installs where `cgi.script_name` does not
