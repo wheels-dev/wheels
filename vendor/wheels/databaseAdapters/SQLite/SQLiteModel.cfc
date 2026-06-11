@@ -83,48 +83,22 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return $performQuery(argumentCollection = arguments);
 	}
 
-    public any function $identitySelect(
-        required struct queryAttributes,
-        required struct result,
-        required string primaryKey,
-        any returningIdentity = ""
-    ) {
-        var query = {};
-        var local = {};
-
-        // Trim SQL of the executed statement
-        local.sql = Trim(arguments.result.sql);
-
-        // Only run if it was an INSERT statement and no generated key is already present
-        if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
-
-            // Extract columns list if present
-            local.startPar = Find("(", local.sql) + 1;
-            local.endPar = Find(")", local.sql);
-            local.columnList = "";
-            if (local.startPar > 1 && local.endPar > local.startPar) {
-                local.columnList = ReplaceList(
-                    Mid(local.sql, local.startPar, (local.endPar - local.startPar)),
-                    "#Chr(10)#,#Chr(13)#, ",
-                    ",,"
-                );
-            }
-            
-            // Strip identifier quotes from column list for comparison
-            local.columnList = $stripIdentifierQuotes(local.columnList);
-            // If the primary key column wasn't part of the INSERT, we fetch last inserted ID
-            if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
-                local.rv = {};
-                query = $query(
-                    sql = "SELECT last_insert_rowid() AS lastId",
-                    argumentCollection = arguments.queryAttributes
-                );
-                local.rv[$generatedKey()] = query.lastId;
-                return local.rv;
-            }
-        }
-    }
-
+	/**
+	 * Override Base adapter's $identitySelect hook.
+	 */
+	public any function $lastIdLookup(
+		required struct queryAttributes,
+		required struct result,
+		required string primaryKey,
+		any returningIdentity = "",
+		required string insertSql
+	) {
+		local.query = $query(
+			sql = "SELECT last_insert_rowid() AS lastId",
+			argumentCollection = arguments.queryAttributes
+		);
+		return local.query.lastId;
+	}
 
 	/**
 	 * SQLite uses file-level locking and does not support advisory locks.

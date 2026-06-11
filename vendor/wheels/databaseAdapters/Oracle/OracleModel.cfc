@@ -131,100 +131,126 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Override Base adapter's function.
+	 * Resolve the system-generated sequence backing an identity column (Oracle
+	 * 12c+) via the user_tab_identity_cols catalog view. Returns an empty string
+	 * when the column is not identity-backed, the catalog view is unavailable
+	 * (pre-12c), or any resolved name fails the identifier whitelist.
+	 * Not memoized on purpose: the schema can be reset out-of-band, and this
+	 * path only runs on engines that surface no driver generated key.
 	 */
-	public any function $identitySelect(
+	public string function $identitySequenceName(
+		required string tableName,
+		required string columnName,
+		required struct queryAttributes
+	) {
+		local.seq = "";
+		local.tbl = UCase(ReReplace(arguments.tableName, '^"|"$', "", "all"));
+		local.col = UCase(ReReplace(arguments.columnName, '^"|"$', "", "all"));
+		// $query has no parameter binding — whitelist identifiers before interpolating.
+		// (## is the CFML escape for a literal # — Oracle identifiers may contain it.)
+		if (!REFind("^[A-Z][A-Z0-9_$##]*$", local.tbl) || !REFind("^[A-Z][A-Z0-9_$##]*$", local.col)) {
+			return "";
+		}
+		try {
+			local.q = $query(
+				sql = "SELECT sequence_name FROM user_tab_identity_cols WHERE table_name = '#local.tbl#' AND column_name = '#local.col#'",
+				argumentCollection = arguments.queryAttributes
+			);
+			if (local.q.recordCount && Len(local.q.sequence_name)) {
+				local.seq = local.q.sequence_name;
+			}
+		} catch (any e) {
+			// Catalog view absent (pre-12c) — fall through to the legacy lookup.
+			// Deliberately no local assignments in here (BoxLang catch-scope invariant).
+		}
+		if (Len(local.seq) && !REFind("^[A-Za-z][A-Za-z0-9_$##]*$", local.seq)) {
+			return "";
+		}
+		return local.seq;
+	}
+
+	/**
+	 * Override Base adapter's $identitySelect hook.
+	 */
+	public any function $lastIdLookup(
 		required struct queryAttributes,
 		required struct result,
 		required string primaryKey,
-		any returningIdentity = ""
+		any returningIdentity = "",
+		required string insertSql
 	) {
-		var query = {};
-		local.sql = Trim(arguments.result.sql);
-		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
-			local.startPar = Find("(", local.sql) + 1;
-			local.endPar = Find(")", local.sql);
-			local.columnList = "";
-			if (local.endPar) {
-				local.rawColumns = Mid(local.sql, local.startPar, (local.endPar - local.startPar));
+		local.tbl = SpanExcluding(Right(arguments.insertSql, Len(arguments.insertSql) - 12), " ");
 
-				// BoxLang compatibility fix - ReplaceList behaves differently
-				if (StructKeyExists(server, "boxlang")) {
-					// For BoxLang, use regex to properly parse column names
-					local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
-					local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
-					local.columnList = Trim(local.columnList);
-				} else {
-					// Original Lucee/ACF behavior
-					local.columnList = ReplaceList(
-						local.rawColumns,
-						"#Chr(10)#,#Chr(13)#, ",
-						",,"
-					);
-				}
+		// Resolve a driver-supplied key first. CFML engines set
+		// Statement.RETURN_GENERATED_KEYS on INSERTs (see $bulkInsertSQL), so the
+		// Oracle JDBC driver returns the inserted row's ROWID. Lucee surfaces it
+		// as result.generatedKey (StructKeyExists is case-insensitive so the
+		// lowercase `generatedkey` key matches); ACF surfaces it as result.rowid.
+		// ListFirst because multi-row inserts can return a list.
+		local.generated = "";
+		if (StructKeyExists(arguments.result, "generatedKey") && Len(arguments.result.generatedKey)) {
+			local.generated = ListFirst(arguments.result.generatedKey);
+		} else if (StructKeyExists(arguments.result, "rowid") && Len(arguments.result.rowid)) {
+			local.generated = arguments.result.rowid;
+		}
+		if (Len(local.generated)) {
+			// Some driver/engine combos return the identity value itself.
+			if (IsNumeric(local.generated)) {
+				return local.generated;
 			}
-			// Strip identifier quotes from column list for comparison
-			local.columnList = $stripIdentifierQuotes(local.columnList);
-			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
-				local.rv = {};
-				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
-
-				// Resolve a driver-supplied key first. CFML engines set
-				// Statement.RETURN_GENERATED_KEYS on INSERTs (see $bulkInsertSQL), so the
-				// Oracle JDBC driver returns the inserted row's ROWID. Lucee surfaces it
-				// as result.generatedKey (StructKeyExists is case-insensitive so the
-				// lowercase `generatedkey` key matches); ACF surfaces it as result.rowid.
-				// ListFirst because multi-row inserts can return a list.
-				local.generated = "";
-				if (StructKeyExists(arguments.result, "generatedKey") && Len(arguments.result.generatedKey)) {
-					local.generated = ListFirst(arguments.result.generatedKey);
-				} else if (StructKeyExists(arguments.result, "rowid") && Len(arguments.result.rowid)) {
-					local.generated = arguments.result.rowid;
-				}
-				if (Len(local.generated)) {
-					// Some driver/engine combos return the identity value itself.
-					if (IsNumeric(local.generated)) {
-						local.rv[$generatedKey()] = local.generated;
-						return local.rv;
-					}
-					// Standard extended ROWID: 18 base-64 chars. The value originates from
-					// the JDBC driver — not user input — but $query has no parameter
-					// binding, so gate strictly before interpolating; UROWIDs and anything
-					// unexpected fall through to the legacy query below. This exact-row
-					// lookup targets OUR insert, so it is race-free under concurrent
-					// inserts (unlike MAX(ROWID)).
-					if (REFind("^[A-Za-z0-9/+]{18}$", local.generated) == 1) {
-						query = $query(
-							sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# WHERE ROWID = CHARTOROWID('#local.generated#')",
-							argumentCollection = arguments.queryAttributes
-						);
-						if (query.recordCount && Len(query.lastId)) {
-							local.rv[$generatedKey()] = query.lastId;
-							return local.rv;
-						}
-					}
-				}
-
-				// Legacy heuristic, kept only for engines that surface no generated key
-				// (e.g. current BoxLang). ROWID is physical location, not insertion order,
-				// so MAX(ROWID) races under concurrent inserts and can return another
-				// session's row. Replacing this with CURRVAL on the identity sequence is
-				// tracked in a follow-up issue.
-				query = $query(
-					sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# WHERE ROWID = (SELECT MAX(ROWID) FROM #local.tbl#)",
+			// Standard extended ROWID: 18 base-64 chars. The value originates from
+			// the JDBC driver — not user input — but $query has no parameter
+			// binding, so gate strictly before interpolating; UROWIDs and anything
+			// unexpected fall through to the fallbacks below. This exact-row
+			// lookup targets OUR insert, so it is race-free under concurrent
+			// inserts (unlike MAX(ROWID)).
+			if (REFind("^[A-Za-z0-9/+]{18}$", local.generated) == 1) {
+				local.query = $query(
+					sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# WHERE ROWID = CHARTOROWID('#local.generated#')",
 					argumentCollection = arguments.queryAttributes
 				);
-				local.rv[$generatedKey()] = query.lastId;
-				return local.rv;
+				if (local.query.recordCount && Len(local.query.lastId)) {
+					return local.query.lastId;
+				}
 			}
 		}
+
+		// No usable driver key (e.g. current BoxLang): read CURRVAL on the identity
+		// column's backing sequence. CURRVAL is session-scoped, so unlike MAX(ROWID)
+		// it cannot return another session's key under concurrent inserts.
+		local.seq = $identitySequenceName(
+			tableName = local.tbl,
+			columnName = ListFirst(arguments.primaryKey),
+			queryAttributes = arguments.queryAttributes
+		);
+		if (Len(local.seq)) {
+			local.query = $query(
+				sql = "SELECT #local.seq#.CURRVAL AS lastId FROM DUAL",
+				argumentCollection = arguments.queryAttributes
+			);
+			if (local.query.recordCount && Len(local.query.lastId)) {
+				return local.query.lastId;
+			}
+		}
+
+		// Legacy heuristic, kept only for pre-12c schemas with no discoverable
+		// identity sequence. ROWID is physical location, not insertion order, so
+		// MAX(ROWID) races under concurrent inserts and can return another
+		// session's row.
+		local.query = $query(
+			sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# WHERE ROWID = (SELECT MAX(ROWID) FROM #local.tbl#)",
+			argumentCollection = arguments.queryAttributes
+		);
+		return local.query.lastId;
 	}
 
 	/**
 	 * Override Base adapter's function.
+	 * RANDOM() is not an Oracle function (ORA-00904) — DBMS_RANDOM.VALUE is the
+	 * Oracle-native ORDER BY expression for findAll(order="random").
 	 */
 	public string function $randomOrder() {
-		return "RANDOM()";
+		return "DBMS_RANDOM.VALUE";
 	}
 
 	/**

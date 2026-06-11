@@ -120,50 +120,24 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLModel" output=fa
 	}
 
 	/**
-	 * Retrieve the last inserted primary key value.
-	 * Tries multiple strategies: result.generatedKey (Lucee), result.query (ACF),
-	 * and the returningIdentity query result from the RETURNING clause.
+	 * Override the PostgreSQL adapter's $identitySelect hook.
+	 * Tries result.generatedKey (Lucee) and the returningIdentity query result
+	 * from the RETURNING clause appended in $querySetup. Never round-trips to
+	 * the database: CockroachDB does not support pg_get_serial_sequence() /
+	 * currval(), so when neither source is present nothing is published.
 	 */
-	public any function $identitySelect(
+	public any function $lastIdLookup(
 		required struct queryAttributes,
 		required struct result,
 		required string primaryKey,
-		any returningIdentity = ""
+		any returningIdentity = "",
+		required string insertSql
 	) {
-		var query = {};
-		local.sql = Trim(arguments.result.sql);
-		if (Left(local.sql, 11) != "INSERT INTO" || StructKeyExists(arguments.result, $generatedKey())) {
-			return;
+		if (StructKeyExists(arguments.result, "generatedKey")) {
+			return ListFirst(arguments.result.generatedKey);
 		}
-
-		local.startPar = Find("(", local.sql) + 1;
-		local.endPar = Find(")", local.sql);
-		local.columnList = "";
-		if (local.endPar) {
-			local.rawColumns = Mid(local.sql, local.startPar, (local.endPar - local.startPar));
-			if (StructKeyExists(server, "boxlang")) {
-				local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
-				local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
-				local.columnList = Trim(local.columnList);
-			} else {
-				local.columnList = ReplaceList(local.rawColumns, "#Chr(10)#,#Chr(13)#, ", ",,");
-			}
-		}
-
-		// Strip identifier quotes for comparison
-		local.columnList = $stripIdentifierQuotes(local.columnList);
-
-		if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
-			local.rv = {};
-			if (StructKeyExists(arguments.result, "generatedKey")) {
-				query.id = ListFirst(arguments.result.generatedKey);
-			} else if (IsQuery(arguments.returningIdentity) && arguments.returningIdentity.recordCount) {
-				query.id = arguments.returningIdentity[arguments.primaryKey][1];
-			}
-			if (StructKeyExists(query, "id")) {
-				local.rv[$generatedKey()] = query.id;
-				return local.rv;
-			}
+		if (IsQuery(arguments.returningIdentity) && arguments.returningIdentity.recordCount) {
+			return arguments.returningIdentity[arguments.primaryKey][1];
 		}
 	}
 
