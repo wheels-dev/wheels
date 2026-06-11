@@ -47,6 +47,9 @@ jobs:
       - name: Install Wheels CLI
         run: |
           brew tap wheels-dev/wheels || true
+          # Homebrew 5.1+ refuses to load formulae from untrusted third-party
+          # taps; trust must be granted explicitly (no-op on older brew).
+          brew trust wheels-dev/wheels || true
           brew install wheels
 
       - name: Patch wheels wrapper JAVA_HOME for Linux
