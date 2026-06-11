@@ -274,38 +274,84 @@ component {
 				}
 				switch (local.contentType) {
 					case "json":
-						local.namedArgs = {};
-						if (StructCount(arguments) > 8) {
-							local.namedArgs = $namedArguments(
-								argumentCollection = arguments,
-								$defined = "data,controller,action,template,layout,cache,returnAs,hideDebugInformation"
-							);
+						// Build the coercion-directive set from the function's own parameter
+						// metadata (see redirectTo() in redirection.cfc for prior art) so newly
+						// declared parameters can never leak in as type directives. The previous
+						// hardcoded 8-name list went stale when the `status` parameter was added.
+						local.functionInfo = GetMetadata(variables.renderWith);
+						local.declaredParams = "";
+						local.iEnd = ArrayLen(local.functionInfo.parameters);
+						for (local.i = 1; local.i <= local.iEnd; local.i++) {
+							local.declaredParams = ListAppend(local.declaredParams, local.functionInfo.parameters[local.i].name);
 						}
+						local.namedArgs = {};
+						if (StructCount(arguments) > ListLen(local.declaredParams)) {
+							local.namedArgs = $namedArguments(argumentCollection = arguments, $defined = local.declaredParams);
+						}
+						local.markersInserted = false;
 						for (local.key in local.namedArgs) {
+							if (!IsSimpleValue(local.namedArgs[local.key])) {
+								continue;
+							}
 							if (local.namedArgs[local.key] == "string") {
+								// Force to string by wrapping in a non-printable marker (BEL) that we
+								// strip again after serialization. This is a deliberate cross-engine
+								// SerializeJSON workaround: a plain pre-serialization cast is not
+								// reliably type-preserving on all engines. Rows that don't contain
+								// the key are skipped (the previous code threw on them).
 								if (IsArray(arguments.data)) {
 									local.iEnd = ArrayLen(arguments.data);
 									for (local.i = 1; local.i <= local.iEnd; local.i++) {
-										// Force to string by wrapping in non printable character (that we later remove again).
-										arguments.data[local.i][local.key] = Chr(7) & arguments.data[local.i][local.key] & Chr(7);
+										if (IsStruct(arguments.data[local.i]) && StructKeyExists(arguments.data[local.i], local.key)) {
+											arguments.data[local.i][local.key] = Chr(7) & arguments.data[local.i][local.key] & Chr(7);
+											local.markersInserted = true;
+										}
 									}
+								} else if (IsStruct(arguments.data) && StructKeyExists(arguments.data, local.key)) {
+									arguments.data[local.key] = Chr(7) & arguments.data[local.key] & Chr(7);
+									local.markersInserted = true;
+								}
+							} else if (local.namedArgs[local.key] == "integer") {
+								// Force to integer pre-serialization: integral numeric values are cast
+								// to a Java long, which serializes without a ".0" suffix on every
+								// engine. This replaces the old post-serialization regex pass, which
+								// rewrote nested same-named keys anywhere in the document and
+								// re-scanned the whole payload once per directive key.
+								if (IsArray(arguments.data)) {
+									local.iEnd = ArrayLen(arguments.data);
+									for (local.i = 1; local.i <= local.iEnd; local.i++) {
+										if (
+											IsStruct(arguments.data[local.i])
+											&& StructKeyExists(arguments.data[local.i], local.key)
+											&& IsNumeric(arguments.data[local.i][local.key])
+											&& arguments.data[local.i][local.key] == Int(arguments.data[local.i][local.key])
+										) {
+											arguments.data[local.i][local.key] = JavaCast("long", arguments.data[local.i][local.key]);
+										}
+									}
+								} else if (
+									IsStruct(arguments.data)
+									&& StructKeyExists(arguments.data, local.key)
+									&& IsNumeric(arguments.data[local.key])
+									&& arguments.data[local.key] == Int(arguments.data[local.key])
+								) {
+									arguments.data[local.key] = JavaCast("long", arguments.data[local.key]);
 								}
 							}
 						}
 						local.content = SerializeJSON(arguments.data);
-						if (Find(Chr(7), local.content)) {
-							local.content = Replace(local.content, Chr(7), "", "all");
-						}
-						for (local.key in local.namedArgs) {
-							if (local.namedArgs[local.key] == "integer") {
-								// Force to integer by removing the .0 part of the number.
-								local.content = ReReplaceNoCase(
-									local.content,
-									'([{|,]"' & local.key & '":[0-9]*)\.0([}|,"])',
-									"\1\2",
-									"all"
-								);
-							}
+						if (local.markersInserted) {
+							// Strip only the quote-adjacent marker bytes we inserted above, in both
+							// the raw form and the JSON-escaped form (Lucee 7 escapes control
+							// characters as \u0007 when serializing). Unlike the previous global
+							// Replace(content, Chr(7), "", "all") this leaves legitimate BEL bytes
+							// inside data values intact. Residual edge: a legitimate BEL (or literal
+							// "\u0007" text) as the very first/last character of a string value is
+							// still stripped, but only in renders that requested string coercion.
+							local.content = Replace(local.content, '"' & Chr(7), '"', "all");
+							local.content = Replace(local.content, Chr(7) & '"', '"', "all");
+							local.content = Replace(local.content, '"\u0007', '"', "all");
+							local.content = Replace(local.content, '\u0007"', '"', "all");
 						}
 						break;
 					case "xml":
