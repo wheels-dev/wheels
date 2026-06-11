@@ -1,0 +1,1 @@
+- Struct-form `enum(property=..., values={name: storedValue})` now validates against the stored values rather than the name keys, so rows that satisfy the auto-generated scopes and `is<Name>()` checkers also pass `valid()` (#3014)

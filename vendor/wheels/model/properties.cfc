@@ -907,10 +907,14 @@ component {
 		}
 		variables.wheels.class.enums[arguments.property] = local.enumDef;
 
-		// Auto-register inclusion validation for this property
+		// Build inclusion from stored values (not name keys) so valid() agrees with scopes and is*() — ##3014.
+		local.inclusionList = "";
+		for (local.enumName in ListToArray(local.enumDef.names)) {
+			local.inclusionList = ListAppend(local.inclusionList, local.enumDef.values[local.enumName]);
+		}
 		validatesInclusionOf(
 			properties = arguments.property,
-			list = StructKeyList(local.enumDef.values),
+			list = local.inclusionList,
 			allowBlank = true
 		);
 
