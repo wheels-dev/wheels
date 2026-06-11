@@ -386,8 +386,8 @@ The CommandBox-based `wheels-cli` module (invoked as `box wheels upgrade`, `box 
 
 ```bash title="your shell"
 brew install wheels-dev/wheels/wheels
-wheels upgrade check
-brew upgrade wheels
+wheels upgrade check   # scan for breaking changes
+wheels upgrade apply   # swap vendor/wheels/ from the CLI bundle (creates backup)
 ```
 
 Homebrew 5.1+ asks you to trust third-party taps on first use — run `brew trust wheels-dev/wheels` once if prompted.

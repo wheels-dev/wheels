@@ -1,6 +1,6 @@
 ---
 title: "Upgrade"
-description: wheels upgrade check — scan an existing project for known breaking changes against the current release (or a pinned target), without touching any files.
+description: wheels upgrade — check for breaking changes before upgrading (check), or swap vendor/wheels/ from the CLI bundle (apply).
 type: reference
 sidebar:
   order: 10
@@ -8,21 +8,23 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-`wheels upgrade` is a **read-only scanner**. It compares the framework version installed in `vendor/wheels/` against a target release, then greps the project for patterns that are known to break between major versions. It does **not** swap out `vendor/wheels/`, edit `box.json`, rewrite your code, or install anything. That part of the upgrade happens through your package manager — the CLI just tells you what will be waiting for you on the other side.
+`wheels upgrade` has two verbs. `wheels upgrade check` is a **read-only scanner** — it compares the framework version installed in `vendor/wheels/` against a target release, then greps the project for patterns that are known to break between major versions. `wheels upgrade apply` performs the actual framework swap, replacing `vendor/wheels/` with the copy bundled inside the installed CLI. Neither verb edits `box.json`, rewrites your code, or installs packages.
 
 **You'll use this for:**
 
-- Previewing a major-version bump (2 → 3, 3 → 4) before you pull the trigger.
-- Confirming an upgrade is "clean" — same major version, no code changes expected.
-- Pinning the scan to a specific target with `--to=<version>` when you're not chasing the latest release.
+- Previewing a major-version bump (2 → 3, 3 → 4) before you pull the trigger — `check`.
+- Confirming an upgrade is "clean" — same major version, no code changes expected — `check`.
+- Pinning the scan to a specific target with `--to=<version>` when you're not chasing the latest release — `check`.
+- Swapping `vendor/wheels/` from the CLI bundle without a manual zip dance — `apply`.
 
 ### Synopsis
 
 ``` title="Synopsis"
 wheels upgrade check [--to=<version>] [--format=json] [--strict]
+wheels upgrade apply [--to=<version>] [--nobackup]
 ```
 
-Calling `wheels upgrade` with no subcommand (or any subcommand other than `check`) prints usage and exits. The only verb the command currently understands is `check`.
+Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0.
 
 ### What it does
 
@@ -45,15 +47,13 @@ None that the command enforces — but in practice:
 - **Run your tests.** Rerun the test suite after the framework swap, not after this command — `wheels upgrade check` does not exercise anything, it only greps.
 - **Internet access** is required when you don't pass `--to=`. The command fetches the latest release tag from GitHub.
 
-### Flags
+### Flags — `check`
 
 | Flag | Description |
 |---|---|
 | `--to=<version>` | Target version to scan against (e.g. `--to=4.0.0`). When omitted, the command queries GitHub for the latest release tag. If the GitHub call fails and no `--to=` is given, the command aborts. |
 | `--format=json` | Emit a single machine-readable JSON report instead of the human output — for CI pipelines. Breaking findings (and advisory findings when `--strict` is set) still exit non-zero. |
 | `--strict` | Escalate advisory findings (the "Recommended Improvements" section) to the same hard-fail path as breaking findings. The command throws `Wheels.UpgradeCheckFailed` and exits non-zero so CI can gate on opt-in convention changes. Without this flag, advisories are reported but never fail the check. Mirrors Django's `--fail-level WARNING` / Mix's `--warnings-as-errors`. |
-
-That is the complete flag surface. The command does not accept `--force`, `--dry-run`, `--check`, `--backup`, or any apply-style switch — there is nothing to apply.
 
 ### Example
 
@@ -124,25 +124,76 @@ Each grep scan covers the file types relevant to that check (`.cfc` and `.cfm` f
 The scanner catches the patterns that are most commonly missed during a major upgrade — it is not a full migration checklist. Read the release notes for the target version alongside the scan output.
 </Aside>
 
+### `wheels upgrade apply`
+
+`wheels upgrade apply` replaces the app's `vendor/wheels/` with the copy of the framework bundled inside the installed CLI binary. Before any file is touched, the command announces the plan — printing the reserved backup path and the exact one-liner to recover if the swap is interrupted:
+
+```text title="illustrative — pre-swap announcement"
+Backing up vendor/wheels -> vendor/wheels.bak-20260611-141502
+If this is interrupted, restore with:
+  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+```
+
+After the swap, it reports the version transition and backup location:
+
+```text title="illustrative — swap summary"
+3.5.1 -> 4.0.2
+Backed up to: vendor/wheels.bak-20260611-141502
+```
+
+Safety checks run before any mutation:
+- Source (CLI-bundled) and target (`vendor/wheels/`) must each sniff as a valid Wheels framework directory — a generic `box.json` is not sufficient.
+- The command refuses to run inside the Wheels repo checkout itself (source = target).
+- The command refuses outside a Wheels app (no `vendor/wheels/`).
+
+#### Flags — `apply`
+
+| Flag | Description |
+|---|---|
+| `--to=<version>` | Assert that the CLI's bundled framework is exactly this version. Errors if the bundled version does not match — `--to` on `apply` is a safety assertion, not a download trigger. Use `wheels upgrade check --to=<version>` to scan before applying. |
+| `--nobackup` | Skip the backup. The old `vendor/wheels/` is deleted before the new copy is placed. Useful when disk space is a concern or you have your own rollback strategy (git). |
+
+#### Example
+
+```bash title="typical upgrade sequence"
+wheels upgrade check          # scan for breaking changes first
+wheels upgrade apply          # swap vendor/wheels/ with automatic backup
+```
+
+```bash title="no-backup apply"
+wheels upgrade apply --nobackup
+```
+
 ### What gets updated
 
-Nothing. The scanner is read-only. To actually move to a new release:
+**`check` verb:** Nothing — the scanner is read-only.
 
-- **Homebrew:** `brew upgrade wheels` — replaces the `wheels` CLI binary.
-- **Project `vendor/wheels/`:** swap the directory manually, or regenerate the app skeleton against the new release and port your `app/` into it.
+**`apply` verb:** `vendor/wheels/` is replaced with the framework bundled in the installed CLI. By default, the old copy is moved to a timestamped `vendor/wheels.bak-*` directory before the swap, so recovery is a single `mv`.
 
-Framework upgrades live outside the CLI by design. `wheels upgrade check` is the safety net you run before and after.
+To also update the CLI binary itself:
+- **Homebrew:** `brew upgrade wheels`
+- **Scoop:** `scoop update wheels`
+
+After each CLI upgrade, run `wheels upgrade apply` to update your app's vendored framework copy.
 
 ### Rollback
 
-Because the command writes no files, there is nothing to roll back. If you proceed with the actual upgrade and it goes sideways, the standard git recovery applies to your project:
+**`check` verb:** Because the command writes no files, there is nothing to roll back.
 
-```bash title="illustrative"
+**`apply` verb:** The old `vendor/wheels/` is moved to a timestamped backup before the swap. The pre-swap announcement prints the exact recovery command — copy it before the swap completes if you want it on hand:
+
+```bash title="recovery — from pre-swap announcement"
+rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+```
+
+If you passed `--nobackup`, recover from git instead:
+
+```bash title="git restore"
 git restore vendor/wheels/
 git clean -fd vendor/wheels/
 ```
 
-Or revert the commit that introduced the new `vendor/wheels/` tree. The CLI binary itself is managed by your package manager — `brew` keeps the previous cellar around for `brew switch`-style rollback.
+Or revert the commit that recorded the new `vendor/wheels/` tree. The CLI binary itself is managed by your package manager — `brew` keeps the previous cellar around for `brew switch`-style rollback.
 
 ### Related commands
 
