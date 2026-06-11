@@ -101,6 +101,29 @@ component output="false" {
 
 	function onApplicationStart() {
 		application.env = duplicate(this.env);
+
+		// Consume the single-use reload-password handoff left by
+		// $handleRestartAppRequest() for environment-switch restarts (issue #3030).
+		// The framework's switch code in wheels/events/onapplicationstart.cfc runs
+		// before config/settings.cfm is loaded and gets the configured password via
+		// carryover from application.wheels.reloadPassword — which applicationStop()
+		// destroys. Seeding this.wheels.reloadPassword here restores that carryover
+		// on the post-restart cold start ($init copies this.wheels into
+		// application.wheels before the carryover check).
+		local.handoffKey = "$wheelsReloadPasswordHandoff_" & this.name;
+		if (StructKeyExists(server, local.handoffKey)) {
+			local.handoff = server[local.handoffKey];
+			StructDelete(server, local.handoffKey);
+			if (
+				IsStruct(local.handoff)
+				&& StructKeyExists(local.handoff, "reloadPassword")
+				&& StructKeyExists(local.handoff, "expiresAt")
+				&& DateCompare(Now(), local.handoff.expiresAt) < 0
+			) {
+				this.wheels.reloadPassword = local.handoff.reloadPassword;
+			}
+		}
+
 		application.wheelsdi = new wheels.Injector("wheels.Bindings");
 
 		/* wheels/global object */
@@ -220,9 +243,25 @@ component output="false" {
 			}
 		}
 
+		// Loop-break for URL environment switches (issue #3030): $buildRedirectUrl()
+		// keeps ?reload=<environment>&password=... on the post-restart redirect so the
+		// framework's switch code (vendor/wheels/events/onapplicationstart.cfc) can see
+		// them on the request that starts the new application. When that redirected
+		// request arrives here the switch has already been applied, so firing another
+		// applicationStop() would redirect forever. If the requested environment is
+		// already active, skip the restart and serve the request normally.
+		// Trade-off: ?reload=<current-environment> is a no-op — use ?reload=true for a
+		// same-environment restart.
+		local.environmentSwitchAlreadyApplied = StructKeyExists(url, "reload")
+			&& !IsBoolean(url.reload)
+			&& StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "environment")
+			&& application.wheels.environment == url.reload;
+
 		// Reload application properly using applicationStop() if requested.
 		if (
 			StructKeyExists(url, "reload")
+			&& !local.environmentSwitchAlreadyApplied
 			&& (
 				!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "reloadPassword")
 				|| !Len(application.wheels.reloadPassword)
@@ -377,6 +416,32 @@ component output="false" {
 
 	public void function $handleRestartAppRequest() {
 		local.redirectUrl = this.$buildRedirectUrl();
+
+		// Environment-switch restarts (?reload=<environment>) need the configured
+		// reloadPassword available when the NEW application starts: the switch code
+		// in wheels/events/onapplicationstart.cfc runs before config/settings.cfm is
+		// loaded and normally reads the password via carryover from the live
+		// application scope, which applicationStop() destroys. Hand it across the
+		// restart via a single-use, short-lived server-scope entry consumed by
+		// onApplicationStart() (issue #3030). The value is the app's own configured
+		// password (the request's password was already verified against it by the
+		// reload gate), and the server scope is only reachable by code running on
+		// this engine — the same trust domain as config/settings.cfm itself.
+		if (
+			StructKeyExists(url, "reload")
+			&& !IsBoolean(url.reload)
+			&& Len(url.reload)
+			&& StructKeyExists(url, "password")
+			&& StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "reloadPassword")
+			&& Len(application.wheels.reloadPassword)
+		) {
+			server["$wheelsReloadPasswordHandoff_" & this.name] = {
+				reloadPassword: application.wheels.reloadPassword,
+				expiresAt: DateAdd("n", 1, Now())
+			};
+		}
+
 		applicationStop();
 		location(url = local.redirectUrl, addToken = false);
 	}
@@ -390,6 +455,30 @@ component output="false" {
 			local.url = cgi.script_name;
 		}
 
+		// For a plain restart (?reload=true) every reload-related parameter is
+		// stripped so the redirected request cannot trigger another restart. For an
+		// environment switch (?reload=<environment>) the framework needs URL.reload
+		// and URL.password present on the request that starts the new application
+		// (vendor/wheels/events/onapplicationstart.cfc), so those two survive the
+		// redirect; the restart loop is broken in onRequestStart instead, which
+		// skips the restart once the requested environment is active (issue #3030).
+		// Only preserve when the switch can actually be applied (a non-empty
+		// reloadPassword is configured and the request carries a password) —
+		// otherwise the new application could never switch and the preserved
+		// parameters would redirect forever.
+		local.stripParams = "reload,password,lock";
+		if (
+			StructKeyExists(url, "reload")
+			&& !IsBoolean(url.reload)
+			&& Len(url.reload)
+			&& StructKeyExists(url, "password")
+			&& StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "reloadPassword")
+			&& Len(application.wheels.reloadPassword)
+		) {
+			local.stripParams = "lock";
+		}
+
 		if (StructKeyExists(cgi, "query_string") && Len(cgi.query_string)) {
 			local.oldQueryString = ListToArray(cgi.query_string, "&");
 			local.newQueryString = [];
@@ -399,7 +488,7 @@ component output="false" {
 				local.keyValue = local.oldQueryString[local.i];
 				local.key = ListFirst(local.keyValue, "=");
 
-				if (!ListFindNoCase("reload,password,lock", local.key)) {
+				if (!ListFindNoCase(local.stripParams, local.key)) {
 					ArrayAppend(local.newQueryString, local.keyValue);
 				}
 			}
