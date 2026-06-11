@@ -305,10 +305,13 @@ component extends="modules.BaseModule" {
 
 	private any function upgradeArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "subcommand", default = "", description = "Only `check` is supported — scans the app for breaking changes (read-only)")
-			.option(name = "to", default = "", description = "Target Wheels version to check against (defaults to latest)")
+			.positional(name = "subcommand", default = "", description = "`check` scans for breaking changes (read-only); bare `upgrade` applies the framework swap")
+			.option(name = "to", default = "", description = "Target Wheels version — for check, the version to scan against; for apply, must match the bundled version")
 			.option(name = "format", default = "", description = "Set to json for machine-readable output")
-			.flag(name = "strict", default = false, description = "Escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them");
+			.flag(name = "strict", default = false, description = "Escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
+			.flag(name = "dry-run", default = false, description = "Apply mode: preview the from -> to swap and backup path without writing anything")
+			.flag(name = "nobackup", default = false, description = "Apply mode: skip the vendor/wheels.bak-* backup before the swap")
+			.flag(name = "skip-check", default = false, description = "Apply mode: skip the preflight breaking-change scan");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2838,7 +2841,9 @@ component extends="modules.BaseModule" {
 	private struct function parseUpgradeArgs(required struct coll) {
 		var parsed = upgradeArgSpec().parse(arguments.coll);
 		return {
+			subcommand = parsed.subcommand,
 			isCheck = lCase(parsed.subcommand) == "check",
+			isHelp = lCase(parsed.subcommand) == "help",
 			targetVersion = parsed.to,
 			format = parsed.format,
 			// #2963: --strict escalates advisory findings to a hard failure
@@ -2846,6 +2851,11 @@ component extends="modules.BaseModule" {
 			// recommendations, not just breaking changes. Mirrors Django
 			// --fail-level WARNING / Mix --warnings-as-errors.
 			strict = parsed.strict,
+			// #3035: apply-mode flags. Bare `wheels upgrade` swaps the app's
+			// vendor/wheels for the framework bundled in the CLI.
+			dryRun = parsed["dry-run"],
+			noBackup = parsed.nobackup,
+			skipCheck = parsed["skip-check"],
 			sawTo = structKeyExists(arguments.coll, "to"),
 			sawDryRun = structKeyExists(arguments.coll, "dry-run")
 		};
@@ -2874,44 +2884,169 @@ component extends="modules.BaseModule" {
 	public string function upgrade() {
 		var opts = parseUpgradeArgs(structuredArgs(arguments));
 
-		if (!opts.isCheck) {
-			var nl = chr(10);
-			var help = "Usage: wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
-				& nl
-				& "Scans your app for breaking changes between Wheels versions." & nl
-				& "This command is read-only — it does not modify vendor/wheels/." & nl
-				& nl
-				& "Options:" & nl
-				& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
-				& "  --format=json     Emit a machine-readable JSON report" & nl
-				& "  --strict          Treat advisory findings (recommended improvements) as failures" & nl
-				& "                    Useful for CI — opt-in convention changes will gate the build." & nl
-				& nl
-				& "Exit status:" & nl
-				& "  Non-zero when breaking changes are found. With --strict, advisory findings" & nl
-				& "  also fail the check; without --strict, advisories never affect the exit code." & nl
-				& nl
-				& "Unsupported flags:" & nl
-				& "  --dry-run is not supported — the command is already read-only," & nl
-				& "                              so there is no dry-run mode to opt into." & nl
-				& nl
-				& "To actually install a new Wheels version, run:" & nl
-				& "  brew upgrade wheels       (macOS / Homebrew)" & nl
-				& "  scoop update wheels       (Windows / Scoop)" & nl;
+		// `wheels upgrade check` — read-only breaking-change scanner (unchanged).
+		if (opts.isCheck) {
+			return runUpgradeCheck(opts.targetVersion, opts.format, opts.strict);
+		}
 
-			// Nudge the two common misfires from the legacy help text toward the
-			// right invocation explicitly (detected during parse).
-			if (opts.sawDryRun || opts.sawTo) {
-				help &= nl & "Did you mean: wheels upgrade check"
-					& (opts.sawTo ? " --to=<version>" : "")
-					& " ?" & nl;
-			}
-
+		// `wheels upgrade help` or an unknown subcommand — print usage. Any
+		// non-empty subcommand that isn't `check` falls here so a typo never
+		// triggers the destructive swap.
+		if (opts.isHelp || len(trim(opts.subcommand))) {
+			var help = upgradeHelp(opts.isHelp ? "" : opts.subcommand);
 			out(help, "yellow");
 			return help;
 		}
 
-		return runUpgradeCheck(opts.targetVersion, opts.format, opts.strict);
+		// Bare `wheels upgrade` — #3035 apply mode: swap the app's vendored
+		// vendor/wheels/ for the framework bundled inside the installed CLI.
+		return runUpgradeApply(opts);
+	}
+
+	/**
+	 * Usage banner for `wheels upgrade`. Covers both the read-only `check`
+	 * sub-verb and the bare-verb apply mode. `--strict` is documented here so
+	 * it stays discoverable without reading the source.
+	 */
+	private string function upgradeHelp(string unknownSubcommand = "") {
+		var nl = chr(10);
+		var help = "";
+		if (len(trim(arguments.unknownSubcommand))) {
+			help &= "Unknown subcommand: " & arguments.unknownSubcommand & nl & nl;
+		}
+		help &= "Usage:" & nl
+			& "  wheels upgrade                 Apply: swap vendor/wheels/ for the CLI's bundled framework" & nl
+			& "  wheels upgrade check           Scan the app for breaking changes (read-only)" & nl
+			& nl
+			& "Apply options:" & nl
+			& "  --to=<version>    Require the bundled framework to be exactly this version, else abort" & nl
+			& "  --dry-run         Preview the from -> to swap and backup path without writing" & nl
+			& "  --nobackup        Skip the vendor/wheels.bak-<timestamp> backup before swapping" & nl
+			& "  --skip-check      Skip the preflight breaking-change scan" & nl
+			& nl
+			& "Check options:" & nl
+			& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
+			& "  --format=json     Emit a machine-readable JSON report" & nl
+			& "  --strict          Treat advisory findings (recommended improvements) as failures" & nl
+			& "                    Useful for CI — opt-in convention changes will gate the build." & nl
+			& nl
+			& "Apply mode backs up the existing vendor/wheels/ to vendor/wheels.bak-<timestamp>" & nl
+			& "(roll back with a single mv). It refuses outside a Wheels app and when source and" & nl
+			& "target resolve to the same directory." & nl;
+		return help;
+	}
+
+	/**
+	 * Apply mode for `wheels upgrade` (#3035). Swaps the app's vendored
+	 * vendor/wheels/ for the framework bundled inside the installed CLI,
+	 * backing the old copy up to vendor/wheels.bak-<timestamp> first.
+	 *
+	 * The heavy lifting lives in the pure FrameworkSwap.plan()/apply() service
+	 * so the safety rails and the swap are independently testable; this method
+	 * only resolves source/target, formats output, and runs the preflight.
+	 */
+	private string function runUpgradeApply(required struct opts) {
+		var swap = new services.FrameworkSwap();
+		var source = resolveBundledFrameworkSource();
+		var target = variables.projectRoot & "/vendor/wheels";
+
+		// yyyymmdd-HHmmss backup suffix; injected so the plan is deterministic.
+		var ts = now();
+		var stamp = dateFormat(ts, "yyyymmdd") & "-" & timeFormat(ts, "HHmmss");
+
+		var plan = swap.plan(
+			target = target,
+			source = source,
+			requestedTo = arguments.opts.targetVersion,
+			timestamp = stamp
+		);
+
+		if (!plan.ok) {
+			out(plan.reason, "red");
+			throw(type = "Wheels.UpgradeApplyRefused", message = plan.reason);
+		}
+
+		if (arguments.opts.dryRun) {
+			out("Dry run — no changes made.", "yellow");
+			out("Would upgrade Wheels #plan.fromVersion# -> #plan.toVersion#", "green");
+			out("  source: #plan.sourcePath#");
+			out("  target: #plan.targetPath#");
+			if (!arguments.opts.noBackup) {
+				out("  backup: #plan.backupPath#");
+			}
+			return "dry-run";
+		}
+
+		// Preflight breaking-change scan (advisory) — surface issues before the
+		// swap, but never block: the backup dir is the user's rollback. Opt out
+		// with --skip-check.
+		if (!arguments.opts.skipCheck) {
+			try {
+				runUpgradeCheck(plan.toVersion, "text", false);
+			} catch (any e) {
+				out("Preflight check reported issues (see above); continuing — your", "yellow");
+				out("previous framework is preserved in the backup directory.", "yellow");
+			}
+		}
+
+		var result = swap.apply(plan = plan, backup = !arguments.opts.noBackup);
+
+		out("Upgraded Wheels #result.fromVersion# -> #result.toVersion#", "green");
+		if (result.backedUp) {
+			out("Previous framework backed up to:", "green");
+			out("  #result.backupPath#");
+			out("Roll back with: rm -rf vendor/wheels && mv '#result.backupPath#' vendor/wheels");
+		}
+		out("Run 'wheels reload' (or restart the server) to load the new framework.", "yellow");
+		return "ok";
+	}
+
+	/**
+	 * Resolve the framework source to install in apply mode (#3035): the
+	 * vendor/wheels/ bundled with the installed CLI. Mirrors
+	 * resolveFrameworkSource() — WHEELS_FRAMEWORK_PATH override first, then walk
+	 * up from the module's own install location — but deliberately OMITS the
+	 * project-root candidate, because the project root is the swap *target*.
+	 * Returns "" when no bundled source can be located (plan() then refuses).
+	 */
+	private string function resolveBundledFrameworkSource() {
+		// 1. Explicit override wins, same as resolveFrameworkSource.
+		var override = "";
+		try {
+			var envValue = createObject("java", "java.lang.System").getenv("WHEELS_FRAMEWORK_PATH");
+			if (!isNull(envValue)) {
+				override = envValue;
+			}
+		} catch (any e) {
+			// Env var not accessible — treat as unset.
+		}
+		if (len(trim(override))) {
+			if ($safeDirExists(override)) {
+				return $normalizePath(override);
+			}
+			throw(
+				type = "Wheels.FrameworkPathInvalid",
+				message = "WHEELS_FRAMEWORK_PATH is set to '#override#' but that directory does not exist."
+			);
+		}
+
+		// 2. Walk up from the module root to find the bundled vendor/wheels.
+		if (len(variables.moduleRoot)) {
+			var File = createObject("java", "java.io.File");
+			var dir = variables.moduleRoot;
+			for (var i = 0; i < 6; i++) {
+				var candidate = $normalizePath(File.init(dir).getCanonicalPath());
+				var frameworkCandidate = candidate & "/vendor/wheels";
+				if ($safeDirExists(frameworkCandidate)) {
+					return frameworkCandidate;
+				}
+				var parent = File.init(candidate).getParent();
+				if (isNull(parent) || parent == candidate) break;
+				dir = parent;
+			}
+		}
+
+		return "";
 	}
 
 	// ─────────────────────────────────────────────────
