@@ -1,0 +1,1 @@
+- Fixed the public-component 404 branch in the dispatcher crashing on every Adobe CF engine with `Variable CFABORT is undefined`. The branch used a bare `cfabort;` statement (Lucee-only); it now uses the portable `abort;` keyword, so `GET /` and `GET /wheels/*` return a clean `404 Not Found` on Adobe in `testing`/`production` as they already did on Lucee (#3029).

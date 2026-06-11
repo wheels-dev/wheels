@@ -397,7 +397,10 @@ component output="false" extends="wheels.Global"{
 				cfheader(statuscode=404);
 				cfcontent(type="text/plain");
 				writeOutput("Not Found");
-				cfabort;
+				// Use the script keyword `abort;` — a bare `cfabort;` is
+				// Lucee-only and crashes every Adobe engine with
+				// `Variable CFABORT is undefined`. See issue #3029.
+				abort;
 			} else {
 				// BoxLang compatibility: Check for null action parameter
 				if (IsNull(local.params.action) || !Len(local.params.action)) {
