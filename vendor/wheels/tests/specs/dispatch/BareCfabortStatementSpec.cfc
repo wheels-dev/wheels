@@ -33,20 +33,40 @@ component extends="wheels.WheelsTest" {
 
 			it("vendor/wheels framework code never uses a bare `cfabort;` (Adobe parses it as an undefined variable)", () => {
 				var root = ExpandPath("/wheels");
+				// Normalize once: ExpandPath can return backslashes on Windows, so
+				// the skip needle below must use the same separators as the
+				// forward-slash-normalized haystack or the tests-tree skip never
+				// matches and the spec scans (and self-flags) its own source.
+				var normalizedRoot = Replace(root, "\", "/", "all");
+
+				// A bare abort statement is just as fatal inside a script block in
+				// a .cfm file (public/views/**, events/**), so scan both
+				// extensions. Two passes are cross-engine-safer than a
+				// pipe-delimited filter.
 				var files = DirectoryList(
 					path = root,
 					recurse = true,
 					filter = "*.cfc",
 					type = "file"
 				);
+				ArrayAppend(
+					files,
+					DirectoryList(
+						path = root,
+						recurse = true,
+						filter = "*.cfm",
+						type = "file"
+					),
+					true
+				);
 
-				expect(ArrayLen(files)).toBeGT(0, "No framework CFCs found to scan.");
+				expect(ArrayLen(files)).toBeGT(0, "No framework source files found to scan.");
 
 				var offenders = [];
 				for (var filePath in files) {
 					// Tests legitimately discuss cfabort in strings/comments and
 					// don't ship to runtime; skip the spec tree.
-					if (FindNoCase("#root#/tests/", Replace(filePath, "\", "/", "all"))) {
+					if (FindNoCase("#normalizedRoot#/tests/", Replace(filePath, "\", "/", "all"))) {
 						continue;
 					}
 
