@@ -619,6 +619,133 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		cfcontent(type = mime, variable = imgData);
 	}
 
+	/**
+	 * Serves a bundled dev-UI static asset (JS/CSS/fonts) from
+	 * /wheels/public/assets/ with immutable cache headers. The dev-UI pages
+	 * previously inlined ~1MB of JS/CSS into every response via cfinclude
+	 * (issue #2959); this action lets the browser cache those assets at
+	 * versioned URLs instead. Same canonicalize-and-confine shape as
+	 * guideImage(), except subdirectory paths are allowed
+	 * (css/woff_files/icons.woff2) while traversal stays blocked.
+	 */
+	function assets() {
+		$blockInProduction();
+		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
+		var assetPath = $resolveDevAssetPath(file);
+		if (!Len(assetPath)) {
+			cfheader(statusCode = 404);
+			WriteOutput("Asset not found");
+			return;
+		}
+		var mime = $devAssetMimeType(assetPath);
+		cfheader(name = "Cache-Control", value = "public, max-age=31536000, immutable");
+		cfheader(name = "Content-Type", value = mime);
+		cffile(action = "readBinary", file = assetPath, variable = "assetData");
+		cfcontent(type = mime, variable = assetData);
+	}
+
+	/**
+	 * Resolves a webroot-relative dev-UI asset path (e.g.
+	 * `css/semantic.min.css`, `css/woff_files/icons.woff2`) to a canonical
+	 * absolute path confined to /wheels/public/assets/. Unlike guideImage()
+	 * this keeps subdirectory components, so the confinement relies on the
+	 * charset check, the `..` rejection, AND the canonical-prefix compare.
+	 * Returns "" for traversal payloads, absolute/backslash paths,
+	 * disallowed extensions, and missing files.
+	 */
+	public string function $resolveDevAssetPath(required string file) {
+		if (!Len(Trim(arguments.file))) {
+			return "";
+		}
+		// Reject traversal, backslashes, absolute paths, and anything outside a
+		// conservative charset before touching the filesystem.
+		if (
+			Find("..", arguments.file)
+			|| Left(arguments.file, 1) == "/"
+			|| ReFind("[^A-Za-z0-9_\-./]", arguments.file)
+		) {
+			return "";
+		}
+		// Extension allowlist: only known static asset types are servable —
+		// prevents serving stray source files dropped under assets/.
+		if (!ListFindNoCase("css,js,woff,woff2,ttf,eot,svg,png,jpg,jpeg,gif,map", ListLast(arguments.file, "."))) {
+			return "";
+		}
+		var assetsDir = ExpandPath("/wheels/public/assets/");
+		var assetPath = assetsDir & arguments.file;
+		try {
+			var canonicalAssets = CreateObject("java", "java.io.File").init(assetsDir).getCanonicalPath();
+			var canonicalPath = CreateObject("java", "java.io.File").init(assetPath).getCanonicalPath();
+		} catch (any e) {
+			return "";
+		}
+		var separator = CreateObject("java", "java.io.File").separator;
+		if (Right(canonicalAssets, 1) != separator) {
+			canonicalAssets &= separator;
+		}
+		if (CompareNoCase(Left(canonicalPath, Len(canonicalAssets)), canonicalAssets) != 0) {
+			return "";
+		}
+		if (!FileExists(canonicalPath)) {
+			return "";
+		}
+		return canonicalPath;
+	}
+
+	/**
+	 * Maps a dev-UI asset filename to its MIME type. Falls back to
+	 * application/octet-stream for anything not in the serving allowlist.
+	 */
+	public string function $devAssetMimeType(required string file) {
+		switch (LCase(ListLast(arguments.file, "."))) {
+			case "css":
+				return "text/css";
+			case "js":
+				return "application/javascript";
+			case "map":
+				return "application/json";
+			case "woff2":
+				return "font/woff2";
+			case "woff":
+				return "font/woff";
+			case "ttf":
+				return "font/ttf";
+			case "eot":
+				return "application/vnd.ms-fontobject";
+			case "svg":
+				return "image/svg+xml";
+			case "png":
+				return "image/png";
+			case "jpg":
+			case "jpeg":
+				return "image/jpeg";
+			case "gif":
+				return "image/gif";
+			default:
+				return "application/octet-stream";
+		}
+	}
+
+	/**
+	 * Builds a versioned URL for a bundled dev-UI asset, served by the
+	 * wheelsAssets route with immutable cache headers. The framework version
+	 * works as the cache-buster because these assets only change with a
+	 * framework upgrade. encode=false because the path segment contains
+	 * literal slashes (values are hardcoded framework paths, never user
+	 * input) — EncodeForURL would emit %2F, which servlet containers reject
+	 * in paths by default. Lives on the component (not helpers.cfm) so the
+	 * layout can call it from every Public.cfc include chain AND specs can
+	 * call it on an instance.
+	 */
+	public string function devAssetUrl(required string relativePath) {
+		return urlFor(
+			route = "wheelsAssets",
+			file = arguments.relativePath,
+			params = "v=" & application.wheels.version,
+			encode = false
+		);
+	}
+
 	function mcp() {
 		$blockInProduction();
 		include "/wheels/public/views/mcp.cfm";
