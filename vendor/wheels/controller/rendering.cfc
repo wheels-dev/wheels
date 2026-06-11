@@ -278,14 +278,17 @@ component {
 						// metadata (see redirectTo() in redirection.cfc for prior art) so newly
 						// declared parameters can never leak in as type directives. The previous
 						// hardcoded 8-name list went stale when the `status` parameter was added.
+						// The declared-name list is built only when the arity guard indicates
+						// extra named args are present, so the common directive-free render path
+						// pays only for GetMetadata + ArrayLen.
 						local.functionInfo = GetMetadata(variables.renderWith);
-						local.declaredParams = "";
-						local.iEnd = ArrayLen(local.functionInfo.parameters);
-						for (local.i = 1; local.i <= local.iEnd; local.i++) {
-							local.declaredParams = ListAppend(local.declaredParams, local.functionInfo.parameters[local.i].name);
-						}
 						local.namedArgs = {};
-						if (StructCount(arguments) > ListLen(local.declaredParams)) {
+						if (StructCount(arguments) > ArrayLen(local.functionInfo.parameters)) {
+							local.declaredParams = "";
+							local.iEnd = ArrayLen(local.functionInfo.parameters);
+							for (local.i = 1; local.i <= local.iEnd; local.i++) {
+								local.declaredParams = ListAppend(local.declaredParams, local.functionInfo.parameters[local.i].name);
+							}
 							local.namedArgs = $namedArguments(argumentCollection = arguments, $defined = local.declaredParams);
 						}
 						local.markersInserted = false;

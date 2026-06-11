@@ -626,6 +626,22 @@ component extends="wheels.WheelsTest" {
 				expect(data).notToInclude('"total":5.0')
 			})
 
+			it("coerces top-level struct data keys marked string", () => {
+				payload = {}
+				payload["zip"] = "01234"
+				payload["note"] = "a" & Chr(7) & "b"
+				data = _controller.renderWith(data = payload, layout = false, returnAs = "string", zip = "string")
+				parsed = DeserializeJSON(data)
+
+				expect(data).toInclude('"zip":"01234"')
+				// Neither raw nor JSON-escaped marker bytes should leak into the payload.
+				expect(data).notToInclude(Chr(7))
+				expect(data).notToInclude(Chr(92) & "u0007")
+				expect(parsed["zip"]).toBe("01234")
+				// Legitimate BEL bytes inside other string values must survive the strip.
+				expect(Find(Chr(7), parsed["note"])).toBeGT(0)
+			})
+
 			it("skips rows that do not contain the coerced key", () => {
 				row1 = {}
 				row1["zip"] = "01234"
