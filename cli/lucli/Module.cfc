@@ -305,7 +305,7 @@ component extends="modules.BaseModule" {
 
 	private any function upgradeArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "subcommand", default = "", description = "Omit to apply the upgrade (swap vendor/wheels/ with the CLI's bundled framework, backup first); `check` scans for breaking changes (read-only)")
+			.positional(name = "subcommand", default = "", description = "Explicit verb required: `check` scans for breaking changes (read-only); `apply` swaps vendor/wheels/ with the CLI's bundled framework (backup first). Omitted/empty prints usage and never modifies files")
 			.option(name = "to", default = "", description = "Target Wheels version. check: version to scan against (default: latest). apply: must match the CLI's bundled framework version")
 			.option(name = "format", default = "", description = "check only: set to json for machine-readable output")
 			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
@@ -443,7 +443,7 @@ component extends="modules.BaseModule" {
 		help &= "  notes               Find TODO / FIXME / OPTIMIZE comments (--annotations to customize)" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
 		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
-		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans first" & nl;
+		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  mcp                 Configure Wheels MCP server for AI assistants" & nl;
@@ -2832,16 +2832,18 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Parse `wheels upgrade` arguments. The `subcommand` positional selects
-	 * the mode: "" (bare) applies the framework swap, `check` runs the
-	 * read-only scan, `help` prints usage. `--to=<version>` selects the
-	 * target. The `saw*` fields drive the apply-mode refusals and the "did
-	 * you mean" nudges; they match both `--x` and `--x=value` (LuCLI maps a
-	 * bare `--x` to x=true and `--x=v` to x=v — either way the key exists).
+	 * the mode: `check` runs the read-only scan, `apply` performs the
+	 * framework swap, `help` prints usage, and "" (bare) prints the usage
+	 * steer — the destructive path always requires the explicit verb.
+	 * `--to=<version>` selects the target. The `saw*` fields drive the
+	 * apply-mode refusals and the "did you mean" nudges; they match both
+	 * `--x` and `--x=value` (LuCLI maps a bare `--x` to x=true and `--x=v`
+	 * to x=v — either way the key exists).
 	 *
 	 * The MCP surface (#2963) advertises `subcommand` as a named property,
 	 * so accept it by name as well as positionally — a tool call sending
-	 * {subcommand: "check"} must never fall through to the destructive
-	 * apply path just because no arg1 key exists.
+	 * {subcommand: "check"} must never fall through to another verb just
+	 * because no arg1 key exists.
 	 */
 	private struct function parseUpgradeArgs(required struct coll) {
 		var parsed = upgradeArgSpec().parse(arguments.coll);
@@ -2862,6 +2864,7 @@ component extends="modules.BaseModule" {
 		return {
 			subcommand = sub,
 			isCheck = sub == "check",
+			isApply = sub == "apply",
 			wantsHelp = sub == "help" || sub == "-h"
 				|| (structKeyExists(arguments.coll, "help") && isSimpleValue(arguments.coll.help) && arguments.coll.help == "true")
 				|| (structKeyExists(arguments.coll, "h") && isSimpleValue(arguments.coll.h) && arguments.coll.h == "true"),
@@ -2881,16 +2884,24 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * hint: Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans for breaking changes first (read-only)
+	 * hint: Upgrade the Wheels framework in your app (vendor/wheels/) — `check` scans for breaking changes (read-only), `apply` performs the swap
 	 *
-	 * Bare `wheels upgrade` performs the framework swap (#3035): it replaces
-	 * the app's vendor/wheels/ with the framework bundled inside the
-	 * installed CLI, parking the old copy at vendor/wheels.bak-<timestamp>/
-	 * unless --nobackup. Recovery is a single mv. Only the CLI's bundled
+	 * `wheels upgrade apply` performs the framework swap (#3035): it
+	 * replaces the app's vendor/wheels/ with the framework bundled inside
+	 * the installed CLI, parking the old copy at vendor/wheels.bak-<timestamp>/
+	 * unless --nobackup. Recovery is a single mv (announced, with the exact
+	 * backup path, before anything is touched). Only the CLI's bundled
 	 * framework is available as a source for now — pair it with your package
 	 * manager (`brew upgrade wheels`, `brew install wheels-be`, `scoop update
 	 * wheels`) to choose what gets bundled. Downloading arbitrary --to=
 	 * targets is the planned follow-up.
+	 *
+	 * Bare `wheels upgrade` deliberately does nothing: it prints concise
+	 * usage steering at the two verbs and exits 0. Destructive commands
+	 * deserve an explicit verb, and MCP clients calling wheels_upgrade with
+	 * {} must never mutate — requiring `apply` fixes that transport-
+	 * independently, and exit 0 matches the pre-apply-mode bare behavior so
+	 * existing CI invocations see usage text, not a new failure.
 	 *
 	 * `wheels upgrade check` keeps the read-only scan: it reports code paths
 	 * that will break against a target framework version without modifying
@@ -2900,8 +2911,8 @@ component extends="modules.BaseModule" {
 	 * supported — `check` is the preview.)
 	 *
 	 * Examples:
-	 *   wheels upgrade                             - apply the swap, with backup
-	 *   wheels upgrade --nobackup                  - apply without the backup
+	 *   wheels upgrade apply                       - apply the swap, with backup
+	 *   wheels upgrade apply --nobackup            - apply without the backup
 	 *   wheels upgrade check                       - scan against the latest stable release
 	 *   wheels upgrade check --to=4.0.0            - scan against a specific target version
 	 *   wheels upgrade check --format=json         - machine-readable report (CI pipelines)
@@ -2918,25 +2929,34 @@ component extends="modules.BaseModule" {
 			return runUpgradeCheck(opts.targetVersion, opts.format, opts.strict);
 		}
 
-		// ── Apply mode. Every refusal below fires before any file mutation.
+		// Bare `wheels upgrade` (no verb) is deliberately inert: print the
+		// usage steer and exit 0. Destructive commands deserve an explicit
+		// verb, and MCP clients calling wheels_upgrade with {} must never
+		// mutate vendor/wheels/ — requiring `apply` fixes that transport-
+		// independently (#3039 review). Exit 0 matches the pre-apply-mode
+		// bare behavior, so no CI surprise.
+		if (!len(opts.subcommand)) {
+			return $printUpgradeUsageSteer();
+		}
 
-		// A positional that isn't check/help is a typo'd subcommand. The
-		// check-only-era command treated any unknown shape as "print usage,
-		// exit 0"; now that the bare verb mutates vendor/wheels/, an
-		// unrecognized token must hard-stop instead of silently applying.
-		if (len(opts.subcommand)) {
+		// ── Apply verb. Every refusal below fires before any file mutation.
+
+		// A positional that isn't check/apply/help is a typo'd subcommand.
+		// A typo'd verb must hard-stop rather than exit 0 looking like it
+		// did something (`wheels upgrade chekc` in a script should fail
+		// loudly, not print usage and report success).
+		if (!opts.isApply) {
 			out("Unknown upgrade subcommand: #opts.subcommand#", "red");
 			$printUpgradeHelp();
 			throw(
 				type = "Wheels.InvalidArguments",
-				message = "Unknown upgrade subcommand '#opts.subcommand#' — use `wheels upgrade` (apply) or `wheels upgrade check` (read-only scan)."
+				message = "Unknown upgrade subcommand '#opts.subcommand#' — use `wheels upgrade apply` (swap the framework) or `wheels upgrade check` (read-only scan)."
 			);
 		}
 
 		// Check-only flags on the apply verb almost always mean the user
-		// wanted the scan. `wheels upgrade --strict` was a harmless usage
-		// printout before apply mode existed — it must not start mutating
-		// vendor/wheels/ now. --dry-run is not supported on either verb;
+		// wanted the scan — nudge toward it instead of mutating
+		// vendor/wheels/. --dry-run is not supported on either verb;
 		// `check` is the preview.
 		if (opts.sawDryRun || opts.sawStrict || opts.sawFormat) {
 			var offending = opts.sawDryRun ? "--dry-run" : (opts.sawStrict ? "--strict" : "--format");
@@ -2977,20 +2997,22 @@ component extends="modules.BaseModule" {
 	private string function $printUpgradeHelp() {
 		var nl = chr(10);
 		var help = "Usage:" & nl
-			& "  wheels upgrade [--to=<version>] [--nobackup]" & nl
 			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
+			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
 			& nl
 			& "Upgrade the Wheels framework in your app (vendor/wheels/)." & nl
 			& nl
 			& "Subcommands:" & nl
-			& "  (none)            Apply the upgrade — replace vendor/wheels/ with" & nl
-			& "                    the CLI's bundled framework. Backs up the existing" & nl
-			& "                    vendor/wheels/ as vendor/wheels.bak-<timestamp>/" & nl
-			& "                    unless --nobackup." & nl
 			& "  check             Scan the app for known breaking changes between" & nl
 			& "                    your current framework version and the target." & nl
 			& "                    Read-only — does not modify any files. Exits" & nl
 			& "                    non-zero when breaking changes are found." & nl
+			& "  apply             Apply the upgrade — replace vendor/wheels/ with" & nl
+			& "                    the CLI's bundled framework. Backs up the existing" & nl
+			& "                    vendor/wheels/ as vendor/wheels.bak-<timestamp>/" & nl
+			& "                    unless --nobackup." & nl
+			& "  (none)            Print usage. Bare `wheels upgrade` never modifies" & nl
+			& "                    files — the swap requires the explicit `apply` verb." & nl
 			& nl
 			& "Options:" & nl
 			& "  --to=<version>    Target Wheels version. For check, defaults to the" & nl
@@ -3009,14 +3031,35 @@ component extends="modules.BaseModule" {
 			& "Examples:" & nl
 			& "  wheels upgrade check                 - scan against latest stable" & nl
 			& "  wheels upgrade check --to=4.0.0      - scan against a specific version" & nl
-			& "  wheels upgrade                       - apply the swap, with backup" & nl
-			& "  wheels upgrade --nobackup            - apply, skipping the backup" & nl
+			& "  wheels upgrade apply                 - apply the swap, with backup" & nl
+			& "  wheels upgrade apply --nobackup      - apply, skipping the backup" & nl
 			& nl
 			& "The CLI binary itself is upgraded by your package manager:" & nl
 			& "  brew upgrade wheels       (macOS / Homebrew)" & nl
 			& "  scoop update wheels       (Windows / Scoop)" & nl;
 		out(help, "yellow");
 		return help;
+	}
+
+	/**
+	 * Concise usage steer for bare `wheels upgrade` (no subcommand). The
+	 * bare verb is deliberately inert — see upgrade()'s dispatch comment —
+	 * so this prints just enough to route the user to `check` or `apply`
+	 * and exits 0 (matching the pre-apply-mode bare behavior).
+	 */
+	private string function $printUpgradeUsageSteer() {
+		var nl = chr(10);
+		var usage = "wheels upgrade needs an explicit subcommand (nothing was changed):" & nl
+			& nl
+			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
+			& "      Scan the app for breaking changes (read-only)." & nl
+			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
+			& "      Replace vendor/wheels/ with the CLI's bundled framework" & nl
+			& "      (backs up to vendor/wheels.bak-<timestamp>/ first)." & nl
+			& nl
+			& "Run `wheels upgrade help` for full usage." & nl;
+		out(usage, "yellow");
+		return usage;
 	}
 
 	// ─────────────────────────────────────────────────
@@ -4796,10 +4839,10 @@ component extends="modules.BaseModule" {
 			}
 
 			out("");
-			// The framework swap is `wheels upgrade` (apply mode, #3035) —
+			// The framework swap is `wheels upgrade apply` (#3035) —
 			// `brew upgrade wheels` only updates the CLI binary, never the
 			// app's vendored framework copy.
-			out("Apply with: wheels upgrade");
+			out("Apply with: wheels upgrade apply");
 		}
 
 		// Throw after the full report flushes — breaking findings exit
@@ -4854,10 +4897,10 @@ component extends="modules.BaseModule" {
 		var vendorDir = variables.projectRoot & "/vendor/wheels";
 		if (!$safeDirExists(vendorDir)) {
 			out("No vendor/wheels/ found at #vendorDir#", "red");
-			out("Run 'wheels upgrade' from an existing app's root, or scaffold a new app with 'wheels new <name>'.");
+			out("Run 'wheels upgrade apply' from an existing app's root, or scaffold a new app with 'wheels new <name>'.");
 			throw(
 				type = "Wheels.UpgradeApplyFailed",
-				message = "No vendor/wheels/ found at #vendorDir# — run `wheels upgrade` from a Wheels app root."
+				message = "No vendor/wheels/ found at #vendorDir# — run `wheels upgrade apply` from a Wheels app root."
 			);
 		}
 
@@ -4877,7 +4920,7 @@ component extends="modules.BaseModule" {
 		if (len(arguments.targetVersion) && arguments.targetVersion != bundledVersion) {
 			out("Requested --to=#arguments.targetVersion# but the CLI's bundled framework is #len(bundledVersion) ? bundledVersion : 'unknown'#.", "yellow");
 			out("Either:");
-			out("  - Install a CLI that bundles your target (brew upgrade wheels / scoop update wheels), then re-run wheels upgrade.");
+			out("  - Install a CLI that bundles your target (brew upgrade wheels / scoop update wheels), then re-run wheels upgrade apply.");
 			out("  - Or omit --to= to apply the bundled framework directly.");
 			throw(
 				type = "Wheels.UpgradeApplyFailed",
@@ -4889,7 +4932,35 @@ component extends="modules.BaseModule" {
 		out("Target:  #vendorDir#");
 		out("");
 
-		var result = upgrader.applyUpgrade(sourceDir, vendorDir, arguments.doBackup);
+		// Announce the full plan — the exact backup destination and the
+		// recovery one-liner — BEFORE any mutation (#3039 review). If the
+		// copy is interrupted or dies partway, the user is already holding
+		// the restore command instead of fishing an unannounced backup out
+		// of a stack trace. The reserved path is passed into applyUpgrade()
+		// so the announcement and the actual backup always agree.
+		var plan = "";
+		var backupPath = "";
+		if (arguments.doBackup) {
+			backupPath = upgrader.reserveBackupPath(vendorDir);
+			plan = "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
+				& "If this is interrupted, restore with:" & nl
+				& "  rm -rf ""#vendorDir#"" && mv ""#backupPath#"" ""#vendorDir#""" & nl;
+		} else {
+			plan = "Replacing vendor/wheels WITHOUT a backup (--nobackup) — the current copy is not recoverable if the swap fails." & nl;
+		}
+		out(plan);
+
+		var result = {};
+		try {
+			result = upgrader.applyUpgrade(sourceDir, vendorDir, arguments.doBackup, backupPath);
+		} catch (Wheels.FrameworkUpgrader.CopyFailed e) {
+			// The service's message names the partial-state target and the
+			// backup to restore from (or the re-vendor instructions when
+			// --nobackup) — print it, then exit non-zero via the standard
+			// apply-failure type (print-then-throw, #2941).
+			out(e.message, "red");
+			throw(type = "Wheels.UpgradeApplyFailed", message = e.message);
+		}
 
 		if (!result.success) {
 			out(result.error, "red");
@@ -4904,7 +4975,7 @@ component extends="modules.BaseModule" {
 		}
 		if (len(result.backupDir)) {
 			summary &= "Backup:  #result.backupDir#" & nl;
-			summary &= "Recover with:  rm -rf #vendorDir# && mv #result.backupDir# #vendorDir#" & nl;
+			summary &= "Recover with:  rm -rf ""#vendorDir#"" && mv ""#result.backupDir#"" ""#vendorDir#""" & nl;
 		}
 
 		// Surface root-level manifest files the user may want to review
@@ -4918,7 +4989,9 @@ component extends="modules.BaseModule" {
 		}
 
 		out(summary, "green");
-		return summary;
+		// Return value carries the pre-swap plan too, so callers (and the
+		// dispatch specs) see the full command output in order.
+		return plan & nl & summary;
 	}
 
 	/**

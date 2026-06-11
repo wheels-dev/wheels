@@ -17,13 +17,65 @@ component {
 
 	/**
 	 * Quick sniff test — does this look like a Wheels framework directory?
-	 * Used to refuse swaps that would blow away an unrelated directory.
+	 * Used to refuse swaps that would blow away an unrelated directory, on
+	 * both sides: the source (don't vendor a random folder into the app)
+	 * and the target (don't back up / delete something that isn't a
+	 * framework).
+	 *
+	 * A bare box.json is not evidence enough (#3039 review) — every
+	 * CommandBox-era CFML project has one. Require a wheels.json with a
+	 * parseable non-empty `version`, or a box.json whose `version` is
+	 * non-empty and whose `name`/`slug` (when present) identify a wheels
+	 * artifact. A version-only box.json (no name/slug) is accepted — old
+	 * framework drops shipped exactly that shape.
 	 */
 	public boolean function looksLikeWheelsFramework(required string dir) {
 		if (!directoryExists(arguments.dir)) return false;
-		if (fileExists(arguments.dir & "/wheels.json")) return true;
-		if (fileExists(arguments.dir & "/box.json")) return true;
+		var manifest = {};
+		if (fileExists(arguments.dir & "/wheels.json")) {
+			manifest = $readManifest(arguments.dir & "/wheels.json");
+			if (structKeyExists(manifest, "version") && isSimpleValue(manifest.version) && len(trim(manifest.version))) {
+				return true;
+			}
+		}
+		if (fileExists(arguments.dir & "/box.json")) {
+			manifest = $readManifest(arguments.dir & "/box.json");
+			if (!structKeyExists(manifest, "version") || !isSimpleValue(manifest.version) || !len(trim(manifest.version))) {
+				return false;
+			}
+			var identifiers = [];
+			if (structKeyExists(manifest, "name") && isSimpleValue(manifest.name)) {
+				arrayAppend(identifiers, manifest.name);
+			}
+			if (structKeyExists(manifest, "slug") && isSimpleValue(manifest.slug)) {
+				arrayAppend(identifiers, manifest.slug);
+			}
+			if (arrayLen(identifiers) == 0) {
+				return true;
+			}
+			for (var identifier in identifiers) {
+				if (findNoCase("wheels", identifier)) {
+					return true;
+				}
+			}
+		}
 		return false;
+	}
+
+	/**
+	 * Read and parse a JSON manifest. Returns an empty struct when the file
+	 * is unreadable, malformed, or not a JSON object.
+	 */
+	private struct function $readManifest(required string path) {
+		try {
+			var data = deserializeJSON(fileRead(arguments.path));
+			if (isStruct(data)) {
+				return data;
+			}
+		} catch (any e) {
+			// Malformed JSON — callers treat an empty struct as "no evidence".
+		}
+		return {};
 	}
 
 	/**
@@ -37,13 +89,9 @@ component {
 			manifestPath = arguments.dir & "/box.json";
 			if (!fileExists(manifestPath)) return "";
 		}
-		try {
-			var data = deserializeJSON(fileRead(manifestPath));
-			if (isStruct(data) && structKeyExists(data, "version")) {
-				return data.version;
-			}
-		} catch (any e) {
-			// Malformed JSON — treat as unknown version, callers can decide.
+		var data = $readManifest(manifestPath);
+		if (structKeyExists(data, "version") && isSimpleValue(data.version)) {
+			return data.version;
 		}
 		return "";
 	}
@@ -52,7 +100,11 @@ component {
 	 * Replace `vendorDir` with the contents of `sourceDir`. Both must be
 	 * Wheels framework directories (or vendorDir may be absent — fresh
 	 * install). When `doBackup` is true the existing vendorDir is renamed
-	 * to `<vendorDir>.bak-<timestamp>` before the copy.
+	 * to `<vendorDir>.bak-<timestamp>` before the copy. Callers that want
+	 * to announce the backup destination BEFORE invoking the swap can
+	 * reserve it via reserveBackupPath() and pass it in as `backupPath` —
+	 * the announced path and the actual backup are then guaranteed to
+	 * agree. When `backupPath` is empty the path is reserved here.
 	 *
 	 * Returns a struct describing the outcome:
 	 *   - success     : boolean — did the swap complete?
@@ -60,11 +112,18 @@ component {
 	 *   - error       : string  — human-readable error on failure, "" on success
 	 *   - oldVersion  : string  — version read from vendorDir BEFORE the swap
 	 *   - newVersion  : string  — version read from vendorDir AFTER the swap
+	 *
+	 * Throws Wheels.FrameworkUpgrader.CopyFailed when the copy step fails
+	 * AFTER the destructive backup-rename/delete already ran — the message
+	 * names the partial-state target and the backup to restore from (or,
+	 * with no backup, says the old tree is gone and how to re-vendor).
+	 * Validation refusals before any mutation come back as result.error.
 	 */
 	public struct function applyUpgrade(
 		required string sourceDir,
 		required string vendorDir,
-		boolean doBackup = true
+		boolean doBackup = true,
+		string backupPath = ""
 	) {
 		var result = {
 			success: false,
@@ -80,7 +139,7 @@ component {
 			return result;
 		}
 		if (!looksLikeWheelsFramework(arguments.sourceDir)) {
-			result.error = "Source does not look like a Wheels framework directory (no wheels.json or box.json): " & arguments.sourceDir;
+			result.error = "Source does not look like a Wheels framework directory (need a wheels.json or box.json whose version and name identify a Wheels framework): " & arguments.sourceDir;
 			return result;
 		}
 
@@ -120,13 +179,13 @@ component {
 		// 4. If vendorDir already exists, sniff it before destroying anything.
 		if (directoryExists(arguments.vendorDir)) {
 			if (!looksLikeWheelsFramework(arguments.vendorDir)) {
-				result.error = "Target directory exists but does not look like a Wheels framework (no wheels.json or box.json): " & arguments.vendorDir;
+				result.error = "Target directory exists but does not look like a Wheels framework (need a wheels.json or box.json whose version and name identify a Wheels framework): " & arguments.vendorDir;
 				return result;
 			}
 			result.oldVersion = readFrameworkVersion(arguments.vendorDir);
 
 			if (arguments.doBackup) {
-				result.backupDir = $reserveBackupPath(arguments.vendorDir);
+				result.backupDir = len(trim(arguments.backupPath)) ? arguments.backupPath : reserveBackupPath(arguments.vendorDir);
 				$renameDirectory(arguments.vendorDir, result.backupDir);
 			} else {
 				directoryDelete(arguments.vendorDir, true);
@@ -134,9 +193,25 @@ component {
 		}
 
 		// 5. Copy the source into the target. directoryCopy with recurse=true
-		//    mirrors source's contents into vendorDir.
-		directoryCreate(arguments.vendorDir, true);
-		directoryCopy(arguments.sourceDir, arguments.vendorDir, true);
+		//    mirrors source's contents into vendorDir. From here on the old
+		//    tree is already renamed away (or deleted) — a failure must not
+		//    surface as a bare stack trace over an unannounced partial state
+		//    (#3039 review), so name the recovery path explicitly.
+		try {
+			directoryCreate(arguments.vendorDir, true);
+			directoryCopy(arguments.sourceDir, arguments.vendorDir, true);
+		} catch (any e) {
+			if (len(result.backupDir)) {
+				throw(
+					type = "Wheels.FrameworkUpgrader.CopyFailed",
+					message = "Copying the new framework failed partway (#e.message#). ""#arguments.vendorDir#"" is in a partial state — restore the backup with: rm -rf ""#arguments.vendorDir#"" && mv ""#result.backupDir#"" ""#arguments.vendorDir#"""
+				);
+			}
+			throw(
+				type = "Wheels.FrameworkUpgrader.CopyFailed",
+				message = "Copying the new framework failed partway (#e.message#) and no backup exists (--nobackup) — the old ""#arguments.vendorDir#"" tree is gone. Fix the cause above, then re-run `wheels upgrade apply` to re-vendor the framework from the CLI bundle."
+			);
+		}
 
 		result.newVersion = readFrameworkVersion(arguments.vendorDir);
 		result.success = true;
@@ -146,8 +221,11 @@ component {
 	/**
 	 * Build a unique backup path of the form <vendorDir>.bak-<yyyymmdd>-<HHmmss>,
 	 * appending a counter if a collision exists (concurrent or rapid re-runs).
+	 * Public so callers can announce the exact backup destination (and the
+	 * recovery one-liner) before invoking applyUpgrade — pass the reserved
+	 * path back in via `backupPath` so the plan and the swap can't disagree.
 	 */
-	private string function $reserveBackupPath(required string vendorDir) {
+	public string function reserveBackupPath(required string vendorDir) {
 		var ts = dateFormat(now(), "yyyymmdd") & "-" & timeFormat(now(), "HHmmss");
 		var candidate = arguments.vendorDir & ".bak-" & ts;
 		var counter = 1;

@@ -136,10 +136,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("wheels upgrade", () => {
 
-			// Bare `wheels upgrade` is the apply verb as of #3035, so the
-			// no-arg invocation is no longer a harmless usage printout —
-			// against this suite's empty vendor/wheels stub it must refuse
-			// (the stub has no wheels.json/box.json to sniff). Deeper
+			// The swap requires the explicit `apply` verb (#3039 review):
+			// bare `wheels upgrade` prints usage steering and exits 0, so
+			// an MCP wheels_upgrade call with {} can never mutate. Deeper
 			// dispatch coverage lives in UpgradeApplyCommandSpec.
 
 			it("shows help when called with the help subcommand", () => {
@@ -152,8 +151,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(true).toBeTrue();
 			});
 
-			it("bare verb refuses to apply over the empty vendor/wheels stub", () => {
-				expect(() => mod.upgrade()).toThrow(type = "Wheels.UpgradeApplyFailed");
+			it("bare verb prints usage steering and never mutates", () => {
+				var result = mod.upgrade();
+				expect(result).toInclude("wheels upgrade check");
+				expect(result).toInclude("wheels upgrade apply");
+			});
+
+			it("apply verb refuses over the empty vendor/wheels stub", () => {
+				// The stub has no wheels.json/box.json to sniff, so apply
+				// must refuse before touching it.
+				expect(() => mod.upgrade(arg1 = "apply")).toThrow(type = "Wheels.UpgradeApplyFailed");
 			});
 
 		});

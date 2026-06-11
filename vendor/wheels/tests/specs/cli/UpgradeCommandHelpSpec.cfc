@@ -5,14 +5,15 @@
  * History: issue #2629 fixed the original drift — the help claimed an
  * upgrader while the runtime only honoured the read-only
  * `wheels upgrade check` scanner — by rewording every public-facing
- * description down to the scanner-only reality. Issue #3035 then inverted
- * that reality: bare `wheels upgrade` now performs the framework swap
- * (replacing the app's vendor/wheels/ with the CLI's bundled framework,
- * backup first), while `check` keeps the read-only scan. The same
- * alignment rules apply in the new direction: the showHelp() summary, the
- * docblock hint, and the usage output must all advertise the apply verb
- * AND the check scan — without resurrecting the old "this command is
- * read-only" claims.
+ * description down to the scanner-only reality. Issue #3035 then added
+ * the framework swap (replacing the app's vendor/wheels/ with the CLI's
+ * bundled framework, backup first), and the #3039 review put it behind
+ * the explicit `apply` verb: bare `wheels upgrade` prints usage and never
+ * mutates, `wheels upgrade apply` performs the swap, `check` keeps the
+ * read-only scan. The same alignment rules apply: the showHelp() summary,
+ * the docblock hint, and the usage output must all advertise BOTH verbs —
+ * without resurrecting the old "this command is read-only" claims and
+ * without claiming the bare verb applies anything.
  */
 component extends="wheels.WheelsTest" {
 
@@ -27,14 +28,14 @@ component extends="wheels.WheelsTest" {
 				expect(fileExists(modulePath)).toBeTrue("Missing file: " & modulePath);
 			});
 
-			it("showHelp() summary line advertises the apply verb", () => {
+			it("showHelp() summary line advertises the upgrade capability", () => {
 				var source = fileRead(modulePath);
 
-				// Since #3035 the bare verb performs the swap, so the summary
+				// Since #3035 the command can perform the swap, so the summary
 				// must say so (the #2629-era scanner-only summary is stale).
 				expect(source contains "Upgrade the Wheels framework in your app").toBeTrue(
 					"showHelp() should summarise `wheels upgrade` as upgrading the framework "
-					& "copy inside the app (vendor/wheels/) — that's what the bare verb does "
+					& "copy inside the app (vendor/wheels/) — that's what the `apply` verb does "
 					& "as of ##3035."
 				);
 			});
@@ -45,6 +46,19 @@ component extends="wheels.WheelsTest" {
 				expect(source contains "wheels upgrade check").toBeTrue(
 					"upgrade() should advertise the `check` subcommand in its usage output "
 					& "so users can preview breaking changes before applying."
+				);
+			});
+
+			it("usage output advertises the explicit apply verb", () => {
+				var source = fileRead(modulePath);
+
+				// #3039 review: the swap is behind `wheels upgrade apply` —
+				// bare `wheels upgrade` prints usage and never mutates, so
+				// the help must steer users at the explicit verb.
+				expect(source contains "wheels upgrade apply").toBeTrue(
+					"upgrade() should advertise the `apply` subcommand in its usage output — "
+					& "the swap requires the explicit verb as of the ##3039 review "
+					& "(bare `wheels upgrade` is a usage printout, not the apply path)."
 				);
 			});
 
@@ -79,7 +93,7 @@ component extends="wheels.WheelsTest" {
 				var source = fileRead(modulePath);
 
 				expect(source contains "runUpgradeApply").toBeTrue(
-					"Module.cfc should dispatch the bare verb to runUpgradeApply() (##3035)."
+					"Module.cfc should dispatch the `apply` verb to runUpgradeApply() (##3035/##3039)."
 				);
 				expect(source contains "wheels.bak-").toBeTrue(
 					"The apply path should reference the vendor/wheels.bak-<timestamp> "
@@ -119,14 +133,19 @@ component extends="wheels.WheelsTest" {
 						var hintLine = mid(source, hintStart, hintLen);
 
 						// Inverted from the #2629-era assertion: the hint MUST
-						// now promise the upgrade (that's what the bare verb
-						// does) and still surface check as the read-only scan.
+						// now promise the upgrade (that's what `apply` does)
+						// and surface both explicit verbs — check as the
+						// read-only scan, apply as the swap (#3039 review).
 						expect(reFindNoCase("\bupgrade\s+the\s+wheels\s+framework\b", hintLine) > 0).toBeTrue(
-							"upgrade() hint should advertise the apply verb — bare `wheels upgrade` "
-							& "performs the framework swap as of ##3035."
+							"upgrade() hint should advertise the upgrade capability — "
+							& "`wheels upgrade apply` performs the framework swap as of ##3035/##3039."
 						);
 						expect(findNoCase("check", hintLine) > 0).toBeTrue(
 							"upgrade() hint should still mention the read-only `check` scan."
+						);
+						expect(findNoCase("apply", hintLine) > 0).toBeTrue(
+							"upgrade() hint should mention the explicit `apply` verb — bare "
+							& "`wheels upgrade` no longer performs the swap (##3039 review)."
 						);
 					}
 				}

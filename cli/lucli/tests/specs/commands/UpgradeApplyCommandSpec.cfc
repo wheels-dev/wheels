@@ -1,10 +1,11 @@
 /**
- * Behavioral specs for `wheels upgrade` dispatch — apply vs check mode
+ * Behavioral specs for `wheels upgrade` dispatch — explicit verb
  * selection, help paths, and the refusals that fire before any file
- * mutation. Covers issue #3035 (PR1 of the apply-mode plan): bare
- * `wheels upgrade` previously printed usage and pointed at
- * `brew upgrade wheels`, which upgrades the CLI binary but never the
- * app's vendored framework copy.
+ * mutation. Covers issue #3035 (PR1 of the apply-mode plan) plus the
+ * #3039 review hardening: the swap requires the explicit `apply` verb.
+ * Bare `wheels upgrade` prints concise usage steering at the two verbs
+ * and exits 0 — destructive commands deserve an explicit verb, and MCP
+ * clients calling wheels_upgrade with {} must never mutate.
  *
  * The actual file swap is exercised by FrameworkUpgraderSpec — Module.cfc
  * here is the thin dispatch layer that decides which service call to make.
@@ -38,6 +39,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	private string function seededVersion() {
 		var manifest = deserializeJSON(fileRead(variables.tempRoot & "/vendor/wheels/wheels.json"));
 		return manifest.version;
+	}
+
+	private array function listBackups() {
+		return directoryList(variables.tempRoot & "/vendor", false, "name", "wheels.bak-*");
 	}
 
 	function run() {
@@ -75,39 +80,64 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result).toInclude("wheels upgrade");
 				});
 
-				it("documents bare `wheels upgrade` as the apply verb and check as the scan", () => {
+				it("documents the explicit verbs: apply swaps, check scans, bare prints usage", () => {
 					var result = mod.upgrade(arg1 = "help");
+					expect(result).toInclude("wheels upgrade apply");
+					expect(result).toInclude("wheels upgrade check");
 					expect(result).toInclude("Apply the upgrade");
-					expect(result).toInclude("check");
 					expect(result).toInclude("--to=");
 					expect(result).toInclude("--nobackup");
 				});
 			});
 
+			describe("wheels upgrade (bare verb) — usage steer, never the swap", () => {
+
+				// #3039 review: the bare verb is deliberately inert. Exit 0
+				// matches the pre-apply-mode behavior (no CI surprise), and
+				// an MCP wheels_upgrade call with {} must never mutate.
+
+				it("prints usage steering at check/apply without mutating vendor/wheels/", () => {
+					seedVendorWheels();
+					var result = mod.upgrade();
+					expect(result).toInclude("wheels upgrade check");
+					expect(result).toInclude("wheels upgrade apply");
+					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
+					expect(arrayLen(listBackups())).toBe(0);
+				});
+
+				it("steers to usage even when apply flags are present without the verb", () => {
+					seedVendorWheels();
+					var result = mod.upgrade(nobackup = true);
+					expect(result).toInclude("wheels upgrade apply");
+					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
+					expect(arrayLen(listBackups())).toBe(0);
+				});
+			});
+
 			describe("wheels upgrade argument refusals (before any mutation)", () => {
 
-				it("rejects --dry-run with a pointer at `wheels upgrade check`", () => {
+				it("rejects --dry-run on the apply verb with a pointer at `wheels upgrade check`", () => {
 					seedVendorWheels();
-					expect(() => mod.upgrade(argumentCollection = {"dry-run": "true"})).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => mod.upgrade(argumentCollection = {"arg1": "apply", "dry-run": "true"})).toThrow(type = "Wheels.InvalidArguments");
 					// vendor/wheels/ untouched.
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 				});
 
 				it("rejects check-only flags on the apply verb (--strict)", () => {
 					seedVendorWheels();
-					expect(() => mod.upgrade(strict = true)).toThrow(regex = "wheels upgrade check");
+					expect(() => mod.upgrade(arg1 = "apply", strict = true)).toThrow(regex = "wheels upgrade check");
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 				});
 
 				it("rejects check-only flags on the apply verb (--format=json)", () => {
 					seedVendorWheels();
-					expect(() => mod.upgrade(format = "json")).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => mod.upgrade(arg1 = "apply", format = "json")).toThrow(type = "Wheels.InvalidArguments");
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 				});
 
 				it("rejects an unknown flag instead of silently applying", () => {
 					seedVendorWheels();
-					expect(() => mod.upgrade(bogus = true)).toThrow(regex = "bogus");
+					expect(() => mod.upgrade(arg1 = "apply", bogus = true)).toThrow(regex = "bogus");
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 				});
 
@@ -118,36 +148,36 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				});
 			});
 
-			describe("wheels upgrade (bare verb — apply mode) refusals", () => {
+			describe("wheels upgrade apply refusals", () => {
 
 				it("refuses when no vendor/wheels/ exists in the project", () => {
 					// scaffoldTempProject does not create vendor/wheels/.
-					expect(() => mod.upgrade()).toThrow(type = "Wheels.UpgradeApplyFailed");
+					expect(() => mod.upgrade(arg1 = "apply")).toThrow(type = "Wheels.UpgradeApplyFailed");
 					// And nothing was created.
 					expect(directoryExists(variables.tempRoot & "/vendor/wheels")).toBeFalse();
 				});
 
 				it("refuses when --to= does not match the CLI's bundled framework version", () => {
 					seedVendorWheels(version = "4.0.0-SNAPSHOT+1687");
-					expect(() => mod.upgrade(to = "99.99.99")).toThrow(type = "Wheels.UpgradeApplyFailed");
+					expect(() => mod.upgrade(arg1 = "apply", to = "99.99.99")).toThrow(type = "Wheels.UpgradeApplyFailed");
 					// Side effect check: the seeded manifest is untouched.
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 				});
 			});
 
-			describe("wheels upgrade (bare verb — apply mode) swap", () => {
+			describe("wheels upgrade apply — the swap", () => {
 
 				it("swaps vendor/wheels/ with the bundled framework and backs the old copy up", () => {
 					seedVendorWheels(version = "0.0.1-spec-fixture");
 					fileWrite(variables.tempRoot & "/vendor/wheels/marker.txt", "old-framework");
-					var result = mod.upgrade();
+					var result = mod.upgrade(arg1 = "apply");
 
 					// Live copy now carries the bundled framework.
 					expect(seededVersion()).toBe(variables.bundledVersion);
 					expect(fileExists(variables.tempRoot & "/vendor/wheels/marker.txt")).toBeFalse();
 
 					// Old copy parked under vendor/wheels.bak-<timestamp>.
-					var backups = directoryList(variables.tempRoot & "/vendor", false, "name", "wheels.bak-*");
+					var backups = listBackups();
 					expect(arrayLen(backups)).toBe(1);
 					expect(reFindNoCase("^wheels\.bak-\d{8}-\d{6}", backups[1])).toBeGT(0);
 					expect(fileRead(variables.tempRoot & "/vendor/" & backups[1] & "/marker.txt")).toBe("old-framework");
@@ -157,13 +187,43 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result).toInclude("Backup");
 				});
 
+				it("announces the exact backup destination and recovery command before the swap summary", () => {
+					// #3039 review: the plan — backup destination + quoted
+					// recovery one-liner — must be part of the output BEFORE
+					// the swap runs, so an interrupt leaves the user holding
+					// the restore command.
+					seedVendorWheels(version = "0.0.1-spec-fixture");
+					var result = mod.upgrade(arg1 = "apply");
+
+					var backups = listBackups();
+					expect(arrayLen(backups)).toBe(1);
+					// The announced destination is the directory the backup
+					// actually landed in (reserved up front, passed through).
+					expect(result).toInclude("Backing up vendor/wheels -> vendor/" & backups[1]);
+					expect(result).toInclude("If this is interrupted, restore with:");
+					expect(result).toInclude('rm -rf "');
+					expect(result).toInclude('/vendor/wheels" && mv "');
+					// And it precedes the post-swap summary in the output.
+					expect(find("Backing up vendor/wheels", result)).toBeGT(0);
+					expect(find("Framework upgraded:", result)).toBeGT(find("Backing up vendor/wheels", result));
+				});
+
 				it("accepts --to= matching the bundled version and skips the backup with --nobackup", () => {
 					seedVendorWheels(version = "0.0.1-spec-fixture");
-					mod.upgrade(to = variables.bundledVersion, nobackup = true);
+					mod.upgrade(arg1 = "apply", to = variables.bundledVersion, nobackup = true);
 
 					expect(seededVersion()).toBe(variables.bundledVersion);
-					var backups = directoryList(variables.tempRoot & "/vendor", false, "name", "wheels.bak-*");
-					expect(arrayLen(backups)).toBe(0);
+					expect(arrayLen(listBackups())).toBe(0);
+				});
+
+				it("dispatches apply when the MCP surface sends `subcommand` as a named key", () => {
+					// MCP clients call wheels_upgrade with named properties
+					// from the advertised inputSchema (#2963) — the explicit
+					// {subcommand: "apply"} opt-in is the only MCP shape that
+					// may mutate.
+					seedVendorWheels(version = "0.0.1-spec-fixture");
+					mod.upgrade(subcommand = "apply");
+					expect(seededVersion()).toBe(variables.bundledVersion);
 				});
 			});
 
