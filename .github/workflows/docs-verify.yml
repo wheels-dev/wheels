@@ -4,10 +4,10 @@ on:
   pull_request:
     branches: [develop]
     paths:
-      - 'web/sites/guides/src/content/docs/v4-0-0-snapshot/**'
+      - 'web/sites/guides/src/content/docs/v4-0-0/**'
       - 'web/sites/guides/scripts/verify-docs/**'
       - 'web/sites/guides/package.json'
-      - 'web/sites/guides/src/sidebars/v4-0-0-snapshot.json'
+      - 'web/sites/guides/src/sidebars/v4-0-0.json'
       - '.github/workflows/docs-verify.yml'
 
 jobs:
