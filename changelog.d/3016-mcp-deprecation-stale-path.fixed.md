@@ -1,0 +1,1 @@
+- Deprecated `/wheels/mcp` HTTP transport's runtime warnings (log message, CLI-disabled-tool error, and legacy `wheels mcp setup` output) now point to the live integration guide (`https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration`) instead of the phantom `docs/command-line-tools/commands/mcp/mcp-configuration-guide.md` path that #2888 missed (#3016)
