@@ -738,6 +738,19 @@ component {
 
 	/**
 	 * Internal function.
+	 * Returns the SQL dialect name for THIS model's datasource (e.g. "MySQL",
+	 * "PostgreSQL", "SQLite") by stripping the "Model" suffix from the cached
+	 * adapter name assigned in $assignAdapter(). Replaces the former
+	 * Migration.adapter.adapterName() probe, which instantiated
+	 * wheels.migrator.Migration on every WHERE build and — worse — probed the
+	 * app DEFAULT datasource's dialect even for models on a custom datasource.
+	 */
+	public string function $dialectName() {
+		return ReReplace(get("adapterName"), "Model$", "");
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public array function $addWhereClause(
 		required array sql,
@@ -748,9 +761,9 @@ component {
 		struct useIndex = {}
 	) {
 		// Issue#1273: Added this section to allow included tables to be referenced in the query
-		local.migration = CreateObject("component", "wheels.migrator.Migration").init();
+		local.dialect = $dialectName();
 		local.tempSql = "";
-		if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2,MicrosoftSQLServer,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2,MicrosoftSQLServer,Oracle,SQLite', local.dialect) && structKeyExists(arguments, "sql")){
 			local.tempSql = arguments.sql;
 		}
 		local.whereClause = $whereClause(
@@ -766,13 +779,13 @@ component {
 			local.expandedAssociations = $expandedAssociations(include=arguments.include);
 			if(ArrayLen(local.expandedAssociations)){
 				local.resolvedTableName = variables.wheels.class.adapter.$quoteIdentifier(local.expandedAssociations[1].tableName);
-				if(ListFind('PostgreSQL,CockroachDB', local.migration.adapter.adapterName())){
+				if(ListFind('PostgreSQL,CockroachDB', local.dialect)){
 					ArrayAppend(arguments.sql, "FROM #local.resolvedTableName#");
 				}
-				else if(ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName())){
+				else if(ListFind('MicrosoftSQLServer', local.dialect)){
 					ArrayAppend(arguments.sql, "FROM #$quotedTableName()#");
 				}
-				else if(ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName())){
+				else if(ListFind('H2,Oracle,SQLite', local.dialect)){
 					ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #local.resolvedTableName#");
 				}
 			}
@@ -789,6 +802,8 @@ component {
 	 */
 	public array function $whereClause(required string where, string include = "", boolean includeSoftDeletes = "false", sql = "", boolean softDelete = "true", useIndex = {}) {
 		local.rv = [];
+		// hoisted: the soft-delete section at the bottom of this function also reads the dialect
+		local.dialect = $dialectName();
 		if (Len(arguments.where)) {
 			// setup an array containing class info for current class and all the ones that should be included
 			local.classes = [];
@@ -802,8 +817,7 @@ component {
 			// table and column names (see the join-building loop in $expandedAssociations). The
 			// include parameter is validated against registered associations before reaching here.
 			local.joinclause = "";
-			local.migration = CreateObject("component", "wheels.migrator.Migration").init();
-			if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
+			if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
 				for(local.i = 1; local.i<= arrayLen(local.classes); i++){
 					if(structKeyExists(local.classes[local.i], "JOIN")){
 						local.joinclause &= local.classes[local.i].JOIN.Split("ON")[2];
@@ -811,7 +825,7 @@ component {
 				}
 				ArrayAppend(local.rv, "WHERE #local.joinclause# AND");
 			}
-			else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
+			else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
 				for(local.i = 1; local.i<= arrayLen(local.classes); i++){
 					if(structKeyExists(local.classes[local.i], "JOIN")){
 						local.joinclause &= local.classes[local.i].JOIN;
@@ -819,7 +833,7 @@ component {
 				}
 				ArrayAppend(local.rv, "#local.joinclause# WHERE ");
 			}
-			else if(arguments.include != "" && ListFind('Oracle,SQLite', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
+			else if(arguments.include != "" && ListFind('Oracle,SQLite', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
 				ArrayAppend(local.rv, "WHERE");
 				ArrayAppend(local.rv, local.classes[2].JOIN.Split("ON")[2] & " AND");
 			}
@@ -961,7 +975,7 @@ component {
 			local.addToWhere = Replace(local.addToWhere, ",", " AND ", "all");
 			if (Len(local.addToWhere)) {
 				if (Len(arguments.where)) {
-					if(!(ListFind('Oracle,SQLite', local.migration.adapter.adapterName()) && (isArray(arguments.sql) && left(arguments.sql[1], 6) == 'UPDATE'))){
+					if(!(ListFind('Oracle,SQLite', local.dialect) && (isArray(arguments.sql) && left(arguments.sql[1], 6) == 'UPDATE'))){
 						ArrayInsertAt(local.rv, local.wherePos, " (");
 					}
 					ArrayAppend(local.rv, ") AND (");

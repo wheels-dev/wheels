@@ -151,5 +151,19 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 		})
+
+		describe("Tests that dialect name", () => {
+
+			it("derives the SQL dialect from the model adapter name without instantiating Migration", () => {
+				var m = g.model("post");
+
+				// valid because the test app's models use the default datasource
+				expect(m.$dialectName()).toBe(
+					CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName()
+				);
+				expect(ReFind("Model$", m.$dialectName())).toBe(0);
+			})
+
+		})
 	}
 }
