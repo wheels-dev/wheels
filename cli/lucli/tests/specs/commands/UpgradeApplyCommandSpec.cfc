@@ -216,6 +216,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(arrayLen(listBackups())).toBe(0);
 				});
 
+				it("skips the backup when LuCLI normalizes --no-backup to backup=""false""", () => {
+					// LuCLI converts the conventional `--no-backup` negation into
+					// the named-arg shape `backup = "false"` before dispatch.
+					// parseUpgradeArgs() must honour this alongside the documented
+					// --nobackup spelling.
+					seedVendorWheels(version = "0.0.1-spec-fixture");
+					mod.upgrade(argumentCollection = {"arg1": "apply", "backup": "false"});
+
+					expect(seededVersion()).toBe(variables.bundledVersion);
+					expect(arrayLen(listBackups())).toBe(0);
+				});
+
 				it("dispatches apply when the MCP surface sends `subcommand` as a named key", () => {
 					// MCP clients call wheels_upgrade with named properties
 					// from the advertised inputSchema (#2963) — the explicit
