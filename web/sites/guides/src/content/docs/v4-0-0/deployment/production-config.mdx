@@ -48,7 +48,7 @@ What switching to `production` changes, automatically:
 - `showDebugInformation` → `false` — the floating debug panel is hidden (`debugging.cfm:26-28`).
 - `cacheActions`, `cacheImages`, `cachePages`, `cachePartials`, `cacheQueries` → all `true` (`vendor/wheels/events/init/caching.cfm:15-21`).
 - `redirectAfterReload` → `true` — the reload URL 302s after success (`vendor/wheels/events/init/security.cfm:43-45`).
-- URL-based environment switching is disabled unless you explicitly re-enable it (`onapplicationstart.cfc:276-284`).
+- URL-based environment switching is disabled unless you explicitly re-enable it (`onapplicationstart.cfc:350-360`).
 - Migrations refuse to run `down` (`onapplicationstart.cfc:252-254` inverts only for development).
 
 You do not set any of those manually. Setting `environment` to `production` is the switch.
@@ -135,7 +135,7 @@ Each deploy target exports `WHEELS_ENV` before the CFML server boots. `config/en
 
 `?reload=true&password=<reloadPassword>` re-runs `onApplicationStart`. `?reload=production&password=<reloadPassword>` switches the running app into production (`onapplicationstart.cfc:147-175`).
 
-Wheels disables URL-based switching **automatically** in production, testing, and maintenance environments unless you explicitly `set(allowEnvironmentSwitchViaUrl=true)` in your per-env settings (`onapplicationstart.cfc:276-284`). Leave it disabled. A cached reload password plus URL switching plus production is a bad combination.
+Wheels disables URL-based switching **automatically** in production, testing, and maintenance environments unless you explicitly `set(allowEnvironmentSwitchViaUrl=true)` in your per-env settings (`onapplicationstart.cfc:350-360`). Leave it disabled. A cached reload password plus URL switching plus production is a bad combination.
 
 The reload password uses a constant-time comparison (`onapplicationstart.cfc:157-160`) and rate-limits failed attempts (`onapplicationstart.cfc:177-192`). Rotate it on every production deploy anyway — it's trivial to rotate and the value ends up in nginx logs if someone misconfigures TLS termination.
 
