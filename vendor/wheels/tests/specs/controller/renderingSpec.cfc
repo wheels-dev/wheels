@@ -634,9 +634,11 @@ component extends="wheels.WheelsTest" {
 				parsed = DeserializeJSON(data)
 
 				expect(data).toInclude('"zip":"01234"')
-				// Neither raw nor JSON-escaped marker bytes should leak into the payload.
-				expect(data).notToInclude(Chr(7))
-				expect(data).notToInclude(Chr(92) & "u0007")
+				// No marker residue may remain in the coerced value. Whether a surviving
+				// BEL byte serializes as a raw byte or as a backslash-u escape is a
+				// Lucee-build detail, so assert on the round-tripped values rather than
+				// the payload text (text checks would contradict BEL survival below).
+				expect(Find(Chr(7), parsed["zip"])).toBe(0)
 				expect(parsed["zip"]).toBe("01234")
 				// Legitimate BEL bytes inside other string values must survive the strip.
 				expect(Find(Chr(7), parsed["note"])).toBeGT(0)
