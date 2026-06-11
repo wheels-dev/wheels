@@ -61,6 +61,14 @@ component extends="wheels.WheelsTest" {
 				expect(application.wo.$trustedClientIp(remoteAddr = "10.0.0.5", forwardedFor = "")).toBe("10.0.0.5");
 				expect(application.wo.$trustedClientIp(remoteAddr = "10.0.0.5", forwardedFor = "   ")).toBe("10.0.0.5");
 			});
+
+			it("reads bare cgi scope defaults when called with no arguments", () => {
+				// Exercises the default-argument branches in Global.cfc:2406-2410 that the
+				// explicit-arg tests above bypass. Confirms the no-arg path is reachable and
+				// reads bare `cgi.*` (not `request.cgi.*`) for both remoteAddr and forwardedFor.
+				application.wheels.trustProxyHeaders = false;
+				expect(application.wo.$trustedClientIp()).toBe(Trim(cgi.remote_addr));
+			});
 		});
 
 		describe("isSecure() proxy gating", () => {
