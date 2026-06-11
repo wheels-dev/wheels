@@ -739,13 +739,23 @@ component {
 	/**
 	 * Internal function.
 	 * Returns the SQL dialect name for THIS model's datasource (e.g. "MySQL",
-	 * "PostgreSQL", "SQLite") by stripping the "Model" suffix from the cached
-	 * adapter name assigned in $assignAdapter(). Replaces the former
-	 * Migration.adapter.adapterName() probe, which instantiated
+	 * "PostgreSQL", "SQLite") by stripping the "Model" suffix from the adapter
+	 * name persisted on the model class at $assignAdapter() time. Replaces the
+	 * former Migration.adapter.adapterName() probe, which instantiated
 	 * wheels.migrator.Migration on every WHERE build and — worse — probed the
 	 * app DEFAULT datasource's dialect even for models on a custom datasource.
+	 * Deliberately NOT get("adapterName"): $assignAdapter() rewrites that
+	 * GLOBAL setting on every model class init (including adapter-cache hits),
+	 * so in a multi-datasource app it holds the adapter of whichever model
+	 * class initialized most recently — order-dependent and wrong for any
+	 * model whose datasource differs from the last-initialized one. The
+	 * global remains only as a fallback for table-less models, which never
+	 * run $assignAdapter().
 	 */
 	public string function $dialectName() {
+		if (StructKeyExists(variables.wheels.class, "adapterName")) {
+			return ReReplace(variables.wheels.class.adapterName, "Model$", "");
+		}
 		return ReReplace(get("adapterName"), "Model$", "");
 	}
 
