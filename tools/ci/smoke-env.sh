@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Environment-mode smoke probes (issue #3023 regression net).
-# Boots nothing itself: point it at an already-running app via BASE_URL,
-# tell it which environment that app believes it is in via SMOKE_ENV.
+# Boots nothing itself: point it at an already-running app via BASE_URL.
+# SMOKE_ENV is a log label only; all probes assume a non-development environment.
 #
 #   BASE_URL=http://localhost:60007 SMOKE_ENV=production bash tools/ci/smoke-env.sh
 #
@@ -15,13 +15,20 @@ FAILURES=0
 # Markers that must NEVER appear in any non-development response body:
 # engine stack traces, raw CFML errors, debug output, the generic error
 # template leaking on routes that should be plain 404s.
-TRACE_MARKERS='coldfusion\.runtime|lucee\.runtime|Variable [A-Z]+ is undefined|Error Occurred While Processing Request|<!-- wheels-debug|id="wheels-debugbar"'
+TRACE_MARKERS='coldfusion\.runtime|lucee\.runtime|Variable [A-Z][A-Z0-9_]* is undefined|Error Occurred While Processing Request|<!-- wheels-debug|id="wheels-debugbar"'
+
+# Fail fast and unambiguously when the app is unreachable — without this,
+# curl status 000 satisfies the NOT-302 and non-5xx assertions vacuously.
+if ! curl -sS -o /dev/null --connect-timeout 5 --max-time 15 "$BASE_URL/"; then
+  echo "FAIL probe=connectivity url=$BASE_URL/ (server unreachable; skipping probes)"
+  exit 1
+fi
 
 probe() { # name url expected_status body_must_match body_must_not_match
   local name="$1" url="$2" expect="$3" must="$4" mustnot="$5"
   local body status
   body=$(mktemp)
-  status=$(curl -s -o "$body" -w '%{http_code}' --max-time 60 "$url")
+  status=$(curl -sS -o "$body" -w '%{http_code}' --connect-timeout 5 --max-time 60 "$url")
   local ok=1
   [ "$status" = "$expect" ] || ok=0
   if [ -n "$must" ] && ! grep -qE "$must" "$body"; then ok=0; fi
@@ -39,15 +46,18 @@ probe() { # name url expected_status body_must_match body_must_not_match
 
 # 1. Root route renders without server error and without debug/trace leakage.
 #    (Any 2xx/3xx/404 is acceptable app behavior; 5xx is not.)
-status=$(curl -s -o /tmp/smoke-root -w '%{http_code}' --max-time 60 "$BASE_URL/")
+root_body=$(mktemp)
+status=$(curl -sS -o "$root_body" -w '%{http_code}' --connect-timeout 5 --max-time 60 "$BASE_URL/")
 case "$status" in
-  5*) echo "FAIL probe=root-no-5xx got status=$status"; FAILURES=$((FAILURES+1));;
-  *)  if grep -qE "$TRACE_MARKERS" /tmp/smoke-root; then
-        echo "FAIL probe=root-no-trace-markers (status=$status)"; FAILURES=$((FAILURES+1))
+  5*) echo "FAIL probe=root-no-5xx url=$BASE_URL/ got status=$status"; FAILURES=$((FAILURES+1));;
+  000) echo "FAIL probe=root-no-5xx url=$BASE_URL/ (status=000, request failed)"; FAILURES=$((FAILURES+1));;
+  *)  if grep -qE "$TRACE_MARKERS" "$root_body"; then
+        echo "FAIL probe=root-no-trace-markers url=$BASE_URL/ (status=$status)"; FAILURES=$((FAILURES+1))
       else
         echo "PASS probe=root ($status, clean)"
       fi;;
 esac
+rm -f "$root_body"
 
 # 2. Public component is OFF outside development and aborts CLEANLY (issue #3029):
 #    plain 404 + "Not Found", no error template, no stack trace, on every engine.
@@ -58,22 +68,20 @@ probe "unknown-route-404" "$BASE_URL/smoke-nonexistent-route-$$" "404" "" "$TRAC
 
 # 4. Reload without a password must be refused: the reload path responds 302
 #    (applicationStop + redirect); a refusal renders normally. Assert NOT 302.
-status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$BASE_URL/?reload=true")
-if [ "$status" = "302" ]; then
-  echo "FAIL probe=reload-unauthenticated-refused (got 302 = reload executed without password)"
-  FAILURES=$((FAILURES+1))
-else
-  echo "PASS probe=reload-unauthenticated-refused ($status)"
-fi
+status=$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 60 "$BASE_URL/?reload=true")
+case "$status" in
+  302) echo "FAIL probe=reload-unauthenticated-refused url=$BASE_URL/?reload=true (got 302 = reload executed without password)"; FAILURES=$((FAILURES+1));;
+  000) echo "FAIL probe=reload-unauthenticated-refused (status=000, request failed)"; FAILURES=$((FAILURES+1));;
+  *)   echo "PASS probe=reload-unauthenticated-refused ($status)";;
+esac
 
 # 5. Wrong password must also be refused.
-status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$BASE_URL/?reload=true&password=definitely-wrong-$$")
-if [ "$status" = "302" ]; then
-  echo "FAIL probe=reload-wrong-password-refused (got 302)"
-  FAILURES=$((FAILURES+1))
-else
-  echo "PASS probe=reload-wrong-password-refused ($status)"
-fi
+status=$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 60 "$BASE_URL/?reload=true&password=definitely-wrong-$$")
+case "$status" in
+  302) echo "FAIL probe=reload-wrong-password-refused url=$BASE_URL/?reload=true&password=... (got 302)"; FAILURES=$((FAILURES+1));;
+  000) echo "FAIL probe=reload-wrong-password-refused (status=000, request failed)"; FAILURES=$((FAILURES+1));;
+  *)   echo "PASS probe=reload-wrong-password-refused ($status)";;
+esac
 
 echo "smoke-env: env=$SMOKE_ENV failures=$FAILURES"
 exit $FAILURES
