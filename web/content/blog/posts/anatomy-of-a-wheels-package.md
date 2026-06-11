@@ -2,15 +2,14 @@
 title: Anatomy of a Wheels Package
 slug: anatomy-of-a-wheels-package
 publishedAt: '2026-06-11T18:34:00.000Z'
-updatedAt: '2026-06-11T18:34:45.000Z'
+updatedAt: '2026-06-11T18:47:36.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
   - packages
   - mixins
   - plugins
-categories:
-  - '[]'
+categories: []
 excerpt: >-
   Wheels 4.0 replaces plugins with a package system that treats your
   filesystem as the registry. This post takes a small package from empty
@@ -57,9 +56,9 @@ vendor/wheels-greeter/
   WheelsGreeter.cfc
 ```
 
-The manifest:
+The manifest, `vendor/wheels-greeter/package.json`:
 
-```json title="vendor/wheels-greeter/package.json"
+```json
 {
     "name": "wheels-greeter",
     "version": "0.1.0",
@@ -71,9 +70,9 @@ The manifest:
 }
 ```
 
-The entry CFC. The loader's convention is to look for a `.cfc` whose filename matches the directory name (`wheels-greeter.cfc`); if that's missing it falls back to the first `.cfc` in the directory, which is how PascalCase entry filenames like `WheelsGreeter.cfc` work without ceremony:
+The entry CFC, `vendor/wheels-greeter/WheelsGreeter.cfc`. The loader's convention is to look for a `.cfc` whose filename matches the directory name (`wheels-greeter.cfc`); if that's missing it falls back to the first `.cfc` in the directory, which is how PascalCase entry filenames like `WheelsGreeter.cfc` work without ceremony:
 
-```cfm title="vendor/wheels-greeter/WheelsGreeter.cfc"
+```cfm
 component output="false" {
 
     public any function init() {
@@ -86,9 +85,9 @@ component output="false" {
 }
 ```
 
-Reload the app — `?reload=true&password=...` or `wheels reload` from the CLI — and every controller has a `greet()` method. From a view (because views run inside the controller's `variables` scope):
+Reload the app — `?reload=true&password=...` or `wheels reload` from the CLI — and every controller has a `greet()` method. From a view, `app/views/pages/home.cfm` (because views run inside the controller's `variables` scope):
 
-```cfm title="app/views/pages/home.cfm"
+```cfm
 <h1>#greet(params.name ?: "world")#</h1>
 ```
 
@@ -117,9 +116,9 @@ Typos and unsupported targets fail loudly. If you write `"mixins": "controler"` 
 
 ## Per-method overrides
 
-A package can declare one default in the manifest and then opt individual methods out of it (or into a different target) by annotating the method with a `mixin` metadata attribute. The loader reads the annotation via `GetMetadata()` and overrides the package-level default for that method only.
+A package can declare one default in the manifest and then opt individual methods out of it (or into a different target) by annotating the method with a `mixin` metadata attribute. The loader reads the annotation via `GetMetadata()` and overrides the package-level default for that method only. Here's `vendor/wheels-greeter/WheelsGreeter.cfc` again, grown two methods:
 
-```cfm title="vendor/wheels-greeter/WheelsGreeter.cfc"
+```cfm
 component output="false" {
 
     public any function init() {
@@ -156,7 +155,9 @@ A package can declare three kinds of relationships to other packages, and each m
 - **`replaces`** — exclusion. If the named package is present and satisfies the version range, it is *excluded* from loading and this package supplants it. Useful for migration paths — a new package can declare it replaces an older one, and an install of the new one cleanly takes over.
 - **`suggests`** — soft dependency. Influences load order (the suggested package, if present, loads first) but doesn't cause this package to fail if the suggested package isn't installed.
 
-```json title="vendor/wheels-greeter-pro/package.json"
+All three together, in a hypothetical `vendor/wheels-greeter-pro/package.json`:
+
+```json
 {
     "name": "wheels-greeter-pro",
     "version": "1.0.0",
@@ -197,9 +198,9 @@ The loader computes the alias as the lower-camel-case form of the package `name`
 
 A package can override the auto-derivation by setting `mapping` explicitly in the manifest — useful when the camelCase form clashes with something else in your app or when the derivation produces a name you don't like. The override must match the CFML identifier regex `[A-Za-z_][A-Za-z0-9_]*`; an invalid value or an empty string fails the package at load time. When two packages compute (or declare) the same alias, the first-loaded one keeps its alias and the second is recorded in `failedPackages` with a `Duplicate package mapping alias` error that names both claimants. The second package's mixins, service providers, and middleware are all rolled back — never partially applied — and you fix it by setting a unique `mapping` in the second package's manifest.
 
-Inside a package, code uses the alias like a static CFML mapping:
+Inside a package, code uses the alias like a static CFML mapping — here's `vendor/wheels-sentry/Sentry.cfc`:
 
-```cfm title="vendor/wheels-sentry/Sentry.cfc"
+```cfm
 component output="false" {
     public any function init() {
         variables.client = new wheelsSentry.lib.SentryClient();
@@ -212,9 +213,9 @@ That `new wheelsSentry.lib.SentryClient()` works because the alias is registered
 
 ## When you need a lifecycle: service providers
 
-Some packages need more than mixins. They register services with the DI container, wire event listeners, set up scheduled jobs, or do startup work that depends on other packages already being loaded. For those, the package implements `wheels.ServiceProviderInterface` — a two-method contract:
+Some packages need more than mixins. They register services with the DI container, wire event listeners, set up scheduled jobs, or do startup work that depends on other packages already being loaded. For those, the package implements `wheels.ServiceProviderInterface` — a two-method contract. Here's `vendor/wheels-greeter/WheelsGreeter.cfc` one last time, grown into a provider:
 
-```cfm title="vendor/wheels-greeter/WheelsGreeter.cfc"
+```cfm
 component implements="wheels.ServiceProviderInterface" output="false" {
 
     public any function init() {
@@ -267,7 +268,7 @@ After a deploy, the application log records — for each package — either "Pac
 
 Most of the time, you'll install packages via the CLI rather than copying directories. The install commands resolve names against the `wheels-dev/wheels-packages` registry, verify the tarball's sha256 against the manifest entry, and extract into `vendor/<name>/`:
 
-```bash title="your shell"
+```bash
 wheels packages list                      # browse the registry
 wheels packages search hotwire            # match name/description/tags
 wheels packages show wheels-sentry        # detail page + versions
