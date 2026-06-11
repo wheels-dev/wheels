@@ -24,25 +24,22 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("warns only in development mode", () => {
-				// $warnOnUnvalidatedSelectItem reads get("environment"), which on a
-				// fully-initialized app resolves through $appKey() == "$wheels" and reads
-				// from application.$wheels.environment (see
-				// .ai/wheels/cross-engine-compatibility.md § $appKey() Returns "$wheels").
-				// Set both scopes so the override takes effect, and run both assertions
+				// $warnOnUnvalidatedSelectItem reads get("environment"), which resolves
+				// through $appKey(): "$wheels" on a fully-initialized app, plain "wheels"
+				// in the core-test harness where application["$wheels"] doesn't exist.
+				// Resolve the key dynamically — hard-coding application["$wheels"] throws
+				// "key [$wheels] doesn't exist" in the harness. Run both assertions
 				// inside try/finally so a non-"development" baseline doesn't break us.
 				var m = application.wo.model("post");
-				var saved = application.wheels.environment;
-				var savedAppKey = application["$wheels"].environment;
+				var appKey = m.$appKey();
+				var saved = application[appKey].environment;
 				try {
-					application.wheels.environment = "development";
-					application["$wheels"].environment = "development";
+					application[appKey].environment = "development";
 					expect(m.$warnOnUnvalidatedSelectItem("(SELECT secret FROM users) AS x")).toBeTrue();
-					application.wheels.environment = "production";
-					application["$wheels"].environment = "production";
+					application[appKey].environment = "production";
 					expect(m.$warnOnUnvalidatedSelectItem("(SELECT secret FROM users) AS x")).toBeFalse();
 				} finally {
-					application.wheels.environment = saved;
-					application["$wheels"].environment = savedAppKey;
+					application[appKey].environment = saved;
 				}
 			});
 
