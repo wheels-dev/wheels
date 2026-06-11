@@ -838,6 +838,10 @@ component {
 						local.joinclause &= local.classes[local.i].joinOnConditions;
 					}
 				}
+				if(!Len(local.joinclause)){
+					Throw(type="Wheels.UpdateAll.EmptyJoinConditions",
+						message="updateAll(include=) produced no join conditions for dialect #local.dialect#");
+				}
 				ArrayAppend(local.rv, "WHERE #local.joinclause# AND");
 			}
 			else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
@@ -856,6 +860,10 @@ component {
 						}
 						local.joinclause &= local.classes[local.i].joinOnConditions;
 					}
+				}
+				if(!Len(local.joinclause)){
+					Throw(type="Wheels.UpdateAll.EmptyJoinConditions",
+						message="updateAll(include=) produced no join conditions for dialect #local.dialect#");
 				}
 				ArrayAppend(local.rv, "WHERE");
 				ArrayAppend(local.rv, local.joinclause & " AND");

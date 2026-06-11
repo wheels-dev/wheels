@@ -24,15 +24,26 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("warns only in development mode", () => {
+				// $warnOnUnvalidatedSelectItem reads get("environment"), which on a
+				// fully-initialized app resolves through $appKey() == "$wheels" and reads
+				// from application.$wheels.environment (see
+				// .ai/wheels/cross-engine-compatibility.md § $appKey() Returns "$wheels").
+				// Set both scopes so the override takes effect, and run both assertions
+				// inside try/finally so a non-"development" baseline doesn't break us.
 				var m = application.wo.model("post");
 				var saved = application.wheels.environment;
-				application.wheels.environment = "production";
+				var savedAppKey = application["$wheels"].environment;
 				try {
+					application.wheels.environment = "development";
+					application["$wheels"].environment = "development";
+					expect(m.$warnOnUnvalidatedSelectItem("(SELECT secret FROM users) AS x")).toBeTrue();
+					application.wheels.environment = "production";
+					application["$wheels"].environment = "production";
 					expect(m.$warnOnUnvalidatedSelectItem("(SELECT secret FROM users) AS x")).toBeFalse();
 				} finally {
 					application.wheels.environment = saved;
+					application["$wheels"].environment = savedAppKey;
 				}
-				expect(m.$warnOnUnvalidatedSelectItem("(SELECT secret FROM users) AS x")).toBeTrue();
 			});
 
 			it("still passes the item through unchanged (warn-only, no enforcement)", () => {
