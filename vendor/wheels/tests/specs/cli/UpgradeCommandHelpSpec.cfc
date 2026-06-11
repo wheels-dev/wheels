@@ -1,16 +1,18 @@
 /**
- * Regression: cli/lucli/Module.cfc's `upgrade` command surface advertises an
- * upgrader that doesn't exist. The main `showHelp()` summary line claims the
- * command will "Upgrade the Wheels framework version in your project," while
- * the runtime dispatcher only honours `wheels upgrade check [--to=<version>]`
- * — a read-only scanner that points users at `brew upgrade wheels` for the
- * actual install. Users running `wheels upgrade --dry-run` or
- * `wheels upgrade --to=4.0.0` (both flags implied by the misleading summary)
- * land on a terse usage line and are left guessing.
+ * Regression: cli/lucli/Module.cfc's `upgrade` command surface must match
+ * what the command actually does.
  *
- * Issue #2629. The fix is to align every public-facing description of
- * `wheels upgrade` with the scanner-only reality: the showHelp summary, the
- * docblock hint, and the function's own usage output.
+ * History: issue #2629 fixed the original drift — the help claimed an
+ * upgrader while the runtime only honoured the read-only
+ * `wheels upgrade check` scanner — by rewording every public-facing
+ * description down to the scanner-only reality. Issue #3035 then inverted
+ * that reality: bare `wheels upgrade` now performs the framework swap
+ * (replacing the app's vendor/wheels/ with the CLI's bundled framework,
+ * backup first), while `check` keeps the read-only scan. The same
+ * alignment rules apply in the new direction: the showHelp() summary, the
+ * docblock hint, and the usage output must all advertise the apply verb
+ * AND the check scan — without resurrecting the old "this command is
+ * read-only" claims.
  */
 component extends="wheels.WheelsTest" {
 
@@ -25,53 +27,38 @@ component extends="wheels.WheelsTest" {
 				expect(fileExists(modulePath)).toBeTrue("Missing file: " & modulePath);
 			});
 
-			it("showHelp() summary line no longer claims to perform an upgrade", () => {
+			it("showHelp() summary line advertises the apply verb", () => {
 				var source = fileRead(modulePath);
 
-				// The legacy phrasing implies the command performs the
-				// upgrade itself. It doesn't — it's a read-only scanner.
-				expect(source contains "upgrade             Upgrade the Wheels framework version in your project").toBeFalse(
-					"showHelp() still summarises `wheels upgrade` as an upgrader. "
-					& "The command is read-only — describe it as scanning for breaking changes."
+				// Since #3035 the bare verb performs the swap, so the summary
+				// must say so (the #2629-era scanner-only summary is stale).
+				expect(source contains "Upgrade the Wheels framework in your app").toBeTrue(
+					"showHelp() should summarise `wheels upgrade` as upgrading the framework "
+					& "copy inside the app (vendor/wheels/) — that's what the bare verb does "
+					& "as of ##3035."
 				);
 			});
 
-			it("showHelp() summary line describes the command as a scanner", () => {
-				var source = fileRead(modulePath);
-
-				// One of these phrasings should be present in the
-				// showHelp() summary block for the `upgrade` entry.
-				var summariesScanner = source contains "Scan for breaking changes before upgrading"
-					|| source contains "Check for breaking changes before upgrading";
-
-				expect(summariesScanner).toBeTrue(
-					"showHelp() should describe `wheels upgrade` as scanning or checking for "
-					& "breaking changes — that's what the command actually does. Add a scanner-"
-					& "oriented summary line for the `upgrade` entry."
-				);
-			});
-
-			it("upgrade() usage output mentions the required `check` subcommand", () => {
+			it("usage output still advertises the read-only check subcommand", () => {
 				var source = fileRead(modulePath);
 
 				expect(source contains "wheels upgrade check").toBeTrue(
 					"upgrade() should advertise the `check` subcommand in its usage output "
-					& "so users who run `wheels upgrade --dry-run` or `wheels upgrade --to=...` "
-					& "discover the right invocation."
+					& "so users can preview breaking changes before applying."
 				);
 			});
 
-			it("upgrade() usage output points users at the real upgrade path", () => {
+			it("usage output points at the package manager for the CLI binary itself", () => {
 				var source = fileRead(modulePath);
 
 				expect(source contains "brew upgrade wheels").toBeTrue(
-					"upgrade() should tell users that the actual framework upgrade is performed "
-					& "by `brew upgrade wheels` (or the equivalent package manager), not by "
-					& "this command."
+					"upgrade() should tell users that the CLI binary is upgraded by "
+					& "`brew upgrade wheels` (or the equivalent package manager) — apply mode "
+					& "only swaps the framework copy the CLI bundles."
 				);
 			});
 
-			it("upgrade() usage output explicitly notes that --dry-run is not supported", () => {
+			it("usage output explicitly notes that --dry-run is not supported", () => {
 				var source = fileRead(modulePath);
 
 				// Either an explicit `--dry-run is not supported` line, or
@@ -83,13 +70,24 @@ component extends="wheels.WheelsTest" {
 					|| source contains "no --dry-run";
 
 				expect(mentionsDryRunGap).toBeTrue(
-					"The usage block in upgrade() should call out that `--dry-run` is not "
-					& "supported. The flag is implied by the misleading legacy summary; "
-					& "naming the gap in the usage output is what keeps users unstuck."
+					"The help surface should call out that `--dry-run` is not supported — "
+					& "`wheels upgrade check` is the read-only preview."
 				);
 			});
 
-			it("upgrade() docblock hint matches the scanner-only reality", () => {
+			it("the apply path exists with the backup convention", () => {
+				var source = fileRead(modulePath);
+
+				expect(source contains "runUpgradeApply").toBeTrue(
+					"Module.cfc should dispatch the bare verb to runUpgradeApply() (##3035)."
+				);
+				expect(source contains "wheels.bak-").toBeTrue(
+					"The apply path should reference the vendor/wheels.bak-<timestamp> "
+					& "backup convention so the help/recovery output stays truthful."
+				);
+			});
+
+			it("upgrade() docblock hint matches the apply-first reality", () => {
 				var source = fileRead(modulePath);
 
 				// Anchor on the function declaration first, then walk
@@ -120,9 +118,15 @@ component extends="wheels.WheelsTest" {
 						var hintLen = (hintEnd > hintStart) ? (hintEnd - hintStart) : (len(source) - hintStart + 1);
 						var hintLine = mid(source, hintStart, hintLen);
 
-						expect(reFindNoCase("\bupgrade\s+the\s+wheels\s+framework\b", hintLine) > 0).toBeFalse(
-							"upgrade() hint still promises to `upgrade the Wheels framework`. "
-							& "It's a scanner — phrase the hint as `Scan ...` or `Check ...`."
+						// Inverted from the #2629-era assertion: the hint MUST
+						// now promise the upgrade (that's what the bare verb
+						// does) and still surface check as the read-only scan.
+						expect(reFindNoCase("\bupgrade\s+the\s+wheels\s+framework\b", hintLine) > 0).toBeTrue(
+							"upgrade() hint should advertise the apply verb — bare `wheels upgrade` "
+							& "performs the framework swap as of ##3035."
+						);
+						expect(findNoCase("check", hintLine) > 0).toBeTrue(
+							"upgrade() hint should still mention the read-only `check` scan."
 						);
 					}
 				}

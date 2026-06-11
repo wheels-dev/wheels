@@ -136,22 +136,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("wheels upgrade", () => {
 
-			it("shows help when called with no args", () => {
-				mod.__arguments = [];
-				mod.upgrade();
+			// Bare `wheels upgrade` is the apply verb as of #3035, so the
+			// no-arg invocation is no longer a harmless usage printout —
+			// against this suite's empty vendor/wheels stub it must refuse
+			// (the stub has no wheels.json/box.json to sniff). Deeper
+			// dispatch coverage lives in UpgradeApplyCommandSpec.
+
+			it("shows help when called with the help subcommand", () => {
+				var result = mod.upgrade(arg1 = "help");
+				expect(result).toInclude("wheels upgrade");
+			});
+
+			it("accepts check subcommand with --to flag", () => {
+				mod.upgrade(arg1 = "check", to = "3.0.0");
 				expect(true).toBeTrue();
 			});
 
-			it("accepts check subcommand", () => {
-				mod.__arguments = ["check"];
-				mod.upgrade();
-				expect(true).toBeTrue();
-			});
-
-			it("accepts --to flag", () => {
-				mod.__arguments = ["check", "--to=3.0.0"];
-				mod.upgrade();
-				expect(true).toBeTrue();
+			it("bare verb refuses to apply over the empty vendor/wheels stub", () => {
+				expect(() => mod.upgrade()).toThrow(type = "Wheels.UpgradeApplyFailed");
 			});
 
 		});

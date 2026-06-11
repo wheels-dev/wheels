@@ -305,10 +305,11 @@ component extends="modules.BaseModule" {
 
 	private any function upgradeArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "subcommand", default = "", description = "Only `check` is supported — scans the app for breaking changes (read-only)")
-			.option(name = "to", default = "", description = "Target Wheels version to check against (defaults to latest)")
-			.option(name = "format", default = "", description = "Set to json for machine-readable output")
-			.flag(name = "strict", default = false, description = "Escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them");
+			.positional(name = "subcommand", default = "", description = "Omit to apply the upgrade (swap vendor/wheels/ with the CLI's bundled framework, backup first); `check` scans for breaking changes (read-only)")
+			.option(name = "to", default = "", description = "Target Wheels version. check: version to scan against (default: latest). apply: must match the CLI's bundled framework version")
+			.option(name = "format", default = "", description = "check only: set to json for machine-readable output")
+			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
+			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -442,7 +443,7 @@ component extends="modules.BaseModule" {
 		help &= "  notes               Find TODO / FIXME / OPTIMIZE comments (--annotations to customize)" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
 		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
-		help &= "  upgrade             Scan for breaking changes before upgrading Wheels (read-only)" & nl;
+		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans first" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  mcp                 Configure Wheels MCP server for AI assistants" & nl;
@@ -2830,15 +2831,40 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Parse `wheels upgrade` arguments. `subcommand` (positional) must be
-	 * "check"; `--to=<version>` selects the target. `sawTo` / `sawDryRun` drive
-	 * the "did you mean" nudge and match both `--to` and `--to=x` (LuCLI maps a
-	 * bare `--to` to to=true and `--to=x` to to=x — either way the key exists).
+	 * Parse `wheels upgrade` arguments. The `subcommand` positional selects
+	 * the mode: "" (bare) applies the framework swap, `check` runs the
+	 * read-only scan, `help` prints usage. `--to=<version>` selects the
+	 * target. The `saw*` fields drive the apply-mode refusals and the "did
+	 * you mean" nudges; they match both `--x` and `--x=value` (LuCLI maps a
+	 * bare `--x` to x=true and `--x=v` to x=v — either way the key exists).
+	 *
+	 * The MCP surface (#2963) advertises `subcommand` as a named property,
+	 * so accept it by name as well as positionally — a tool call sending
+	 * {subcommand: "check"} must never fall through to the destructive
+	 * apply path just because no arg1 key exists.
 	 */
 	private struct function parseUpgradeArgs(required struct coll) {
 		var parsed = upgradeArgSpec().parse(arguments.coll);
+
+		var sub = parsed.subcommand;
+		if (!len(sub) && structKeyExists(arguments.coll, "subcommand") && isSimpleValue(arguments.coll.subcommand)) {
+			sub = arguments.coll.subcommand;
+		}
+		sub = lCase(trim(sub));
+
+		// --nobackup is the documented spelling, but LuCLI normalizes the
+		// conventional negation `--no-backup` to backup=false — honor both.
+		var doBackup = !parsed.nobackup;
+		if (structKeyExists(arguments.coll, "backup") && isSimpleValue(arguments.coll.backup) && arguments.coll.backup == "false") {
+			doBackup = false;
+		}
+
 		return {
-			isCheck = lCase(parsed.subcommand) == "check",
+			subcommand = sub,
+			isCheck = sub == "check",
+			wantsHelp = sub == "help" || sub == "-h"
+				|| (structKeyExists(arguments.coll, "help") && isSimpleValue(arguments.coll.help) && arguments.coll.help == "true")
+				|| (structKeyExists(arguments.coll, "h") && isSimpleValue(arguments.coll.h) && arguments.coll.h == "true"),
 			targetVersion = parsed.to,
 			format = parsed.format,
 			// #2963: --strict escalates advisory findings to a hard failure
@@ -2846,72 +2872,151 @@ component extends="modules.BaseModule" {
 			// recommendations, not just breaking changes. Mirrors Django
 			// --fail-level WARNING / Mix --warnings-as-errors.
 			strict = parsed.strict,
+			doBackup = doBackup,
 			sawTo = structKeyExists(arguments.coll, "to"),
-			sawDryRun = structKeyExists(arguments.coll, "dry-run")
+			sawDryRun = structKeyExists(arguments.coll, "dry-run"),
+			sawStrict = structKeyExists(arguments.coll, "strict"),
+			sawFormat = structKeyExists(arguments.coll, "format")
 		};
 	}
 
 	/**
-	 * hint: Scan your app for breaking changes before upgrading Wheels (read-only)
+	 * hint: Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans for breaking changes first (read-only)
 	 *
-	 * This command does NOT perform the upgrade. It only scans the current app
-	 * for code paths that will break against a target framework version. The
-	 * actual framework swap is performed by your package manager
-	 * (`brew upgrade wheels`, `scoop update wheels`, or the equivalent).
+	 * Bare `wheels upgrade` performs the framework swap (#3035): it replaces
+	 * the app's vendor/wheels/ with the framework bundled inside the
+	 * installed CLI, parking the old copy at vendor/wheels.bak-<timestamp>/
+	 * unless --nobackup. Recovery is a single mv. Only the CLI's bundled
+	 * framework is available as a source for now — pair it with your package
+	 * manager (`brew upgrade wheels`, `brew install wheels-be`, `scoop update
+	 * wheels`) to choose what gets bundled. Downloading arbitrary --to=
+	 * targets is the planned follow-up.
 	 *
-	 * Despite occasional appearances in older help output, `--dry-run` is not
-	 * supported — the command is already read-only by design.
-	 *
-	 * Breaking findings throw Wheels.UpgradeCheckFailed after the report is
-	 * printed, so the command exits non-zero and can gate CI. Advisory
-	 * (opt-in recommendation) findings never affect the exit code.
+	 * `wheels upgrade check` keeps the read-only scan: it reports code paths
+	 * that will break against a target framework version without modifying
+	 * any files. Breaking findings throw Wheels.UpgradeCheckFailed after the
+	 * report is printed, so the command exits non-zero and can gate CI.
+	 * --strict escalates advisory findings the same way. (--dry-run is not
+	 * supported — `check` is the preview.)
 	 *
 	 * Examples:
+	 *   wheels upgrade                             - apply the swap, with backup
+	 *   wheels upgrade --nobackup                  - apply without the backup
 	 *   wheels upgrade check                       - scan against the latest stable release
 	 *   wheels upgrade check --to=4.0.0            - scan against a specific target version
 	 *   wheels upgrade check --format=json         - machine-readable report (CI pipelines)
 	 */
 	public string function upgrade() {
-		var opts = parseUpgradeArgs(structuredArgs(arguments));
+		var coll = structuredArgs(arguments);
+		var opts = parseUpgradeArgs(coll);
 
-		if (!opts.isCheck) {
-			var nl = chr(10);
-			var help = "Usage: wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
-				& nl
-				& "Scans your app for breaking changes between Wheels versions." & nl
-				& "This command is read-only — it does not modify vendor/wheels/." & nl
-				& nl
-				& "Options:" & nl
-				& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
-				& "  --format=json     Emit a machine-readable JSON report" & nl
-				& "  --strict          Treat advisory findings (recommended improvements) as failures" & nl
-				& "                    Useful for CI — opt-in convention changes will gate the build." & nl
-				& nl
-				& "Exit status:" & nl
-				& "  Non-zero when breaking changes are found. With --strict, advisory findings" & nl
-				& "  also fail the check; without --strict, advisories never affect the exit code." & nl
-				& nl
-				& "Unsupported flags:" & nl
-				& "  --dry-run is not supported — the command is already read-only," & nl
-				& "                              so there is no dry-run mode to opt into." & nl
-				& nl
-				& "To actually install a new Wheels version, run:" & nl
-				& "  brew upgrade wheels       (macOS / Homebrew)" & nl
-				& "  scoop update wheels       (Windows / Scoop)" & nl;
-
-			// Nudge the two common misfires from the legacy help text toward the
-			// right invocation explicitly (detected during parse).
-			if (opts.sawDryRun || opts.sawTo) {
-				help &= nl & "Did you mean: wheels upgrade check"
-					& (opts.sawTo ? " --to=<version>" : "")
-					& " ?" & nl;
-			}
-
-			out(help, "yellow");
-			return help;
+		if (opts.wantsHelp) {
+			return $printUpgradeHelp();
 		}
 
-		return runUpgradeCheck(opts.targetVersion, opts.format, opts.strict);
+		if (opts.isCheck) {
+			return runUpgradeCheck(opts.targetVersion, opts.format, opts.strict);
+		}
+
+		// ── Apply mode. Every refusal below fires before any file mutation.
+
+		// A positional that isn't check/help is a typo'd subcommand. The
+		// check-only-era command treated any unknown shape as "print usage,
+		// exit 0"; now that the bare verb mutates vendor/wheels/, an
+		// unrecognized token must hard-stop instead of silently applying.
+		if (len(opts.subcommand)) {
+			out("Unknown upgrade subcommand: #opts.subcommand#", "red");
+			$printUpgradeHelp();
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown upgrade subcommand '#opts.subcommand#' — use `wheels upgrade` (apply) or `wheels upgrade check` (read-only scan)."
+			);
+		}
+
+		// Check-only flags on the apply verb almost always mean the user
+		// wanted the scan. `wheels upgrade --strict` was a harmless usage
+		// printout before apply mode existed — it must not start mutating
+		// vendor/wheels/ now. --dry-run is not supported on either verb;
+		// `check` is the preview.
+		if (opts.sawDryRun || opts.sawStrict || opts.sawFormat) {
+			var offending = opts.sawDryRun ? "--dry-run" : (opts.sawStrict ? "--strict" : "--format");
+			var nudge = "wheels upgrade check"
+				& (opts.sawTo ? " --to=<version>" : "")
+				& (opts.sawStrict ? " --strict" : "")
+				& (opts.sawFormat ? " --format=json" : "");
+			out("#offending# is only available on the read-only scan.", "yellow");
+			out("Did you mean: #nudge# ?", "yellow");
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "#offending# is not supported by the apply verb — did you mean `#nudge#`?"
+			);
+		}
+
+		// Unknown named keys hard-stop too. ArgSpec ignores them by design
+		// (fine for read-only commands, kept for `check` above), but a
+		// destructive verb must not run alongside a flag the user typo'd.
+		var knownKeys = "to,format,strict,nobackup,backup,subcommand,help,h,dry-run";
+		for (var key in coll) {
+			if (reFindNoCase("^arg\d+$", key) || listFindNoCase(knownKeys, key)) {
+				continue;
+			}
+			out("Unknown argument: --#key#", "red");
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown argument '--#key#' — run `wheels upgrade help` for usage."
+			);
+		}
+
+		return runUpgradeApply(opts.targetVersion, opts.doBackup);
+	}
+
+	/**
+	 * Help block for `wheels upgrade help` / `--help`. Extracted so the
+	 * help short-circuit and the unknown-subcommand error path stay in sync.
+	 */
+	private string function $printUpgradeHelp() {
+		var nl = chr(10);
+		var help = "Usage:" & nl
+			& "  wheels upgrade [--to=<version>] [--nobackup]" & nl
+			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
+			& nl
+			& "Upgrade the Wheels framework in your app (vendor/wheels/)." & nl
+			& nl
+			& "Subcommands:" & nl
+			& "  (none)            Apply the upgrade — replace vendor/wheels/ with" & nl
+			& "                    the CLI's bundled framework. Backs up the existing" & nl
+			& "                    vendor/wheels/ as vendor/wheels.bak-<timestamp>/" & nl
+			& "                    unless --nobackup." & nl
+			& "  check             Scan the app for known breaking changes between" & nl
+			& "                    your current framework version and the target." & nl
+			& "                    Read-only — does not modify any files. Exits" & nl
+			& "                    non-zero when breaking changes are found." & nl
+			& nl
+			& "Options:" & nl
+			& "  --to=<version>    Target Wheels version. For check, defaults to the" & nl
+			& "                    latest stable release. For apply, must match the" & nl
+			& "                    CLI's bundled framework version." & nl
+			& "  --nobackup        Apply only: skip the vendor/wheels.bak-<timestamp>/" & nl
+			& "                    backup. Useful when vendor/wheels/ is tracked in git." & nl
+			& "  --strict          Check only: treat advisory findings as failures" & nl
+			& "                    (non-zero exit) so CI can gate on them." & nl
+			& "  --format=json     Check only: emit a machine-readable JSON report." & nl
+			& nl
+			& "Unsupported flags:" & nl
+			& "  --dry-run is not supported — run `wheels upgrade check` for the" & nl
+			& "                              read-only preview, then apply." & nl
+			& nl
+			& "Examples:" & nl
+			& "  wheels upgrade check                 - scan against latest stable" & nl
+			& "  wheels upgrade check --to=4.0.0      - scan against a specific version" & nl
+			& "  wheels upgrade                       - apply the swap, with backup" & nl
+			& "  wheels upgrade --nobackup            - apply, skipping the backup" & nl
+			& nl
+			& "The CLI binary itself is upgraded by your package manager:" & nl
+			& "  brew upgrade wheels       (macOS / Homebrew)" & nl
+			& "  scoop update wheels       (Windows / Scoop)" & nl;
+		out(help, "yellow");
+		return help;
 	}
 
 	// ─────────────────────────────────────────────────
@@ -4691,7 +4796,10 @@ component extends="modules.BaseModule" {
 			}
 
 			out("");
-			out("Upgrade with: brew upgrade wheels");
+			// The framework swap is `wheels upgrade` (apply mode, #3035) —
+			// `brew upgrade wheels` only updates the CLI binary, never the
+			// app's vendored framework copy.
+			out("Apply with: wheels upgrade");
 		}
 
 		// Throw after the full report flushes — breaking findings exit
@@ -4718,6 +4826,169 @@ component extends="modules.BaseModule" {
 		}
 
 		return "";
+	}
+
+	// ── Upgrade Apply (bundled-source swap, #3035) ───
+
+	/**
+	 * Perform the framework swap: copy the CLI's bundled vendor/wheels/
+	 * over the project's vendor/wheels/, backing up the existing copy
+	 * first unless the user opted out.
+	 *
+	 * Scope (PR1, #3035): only the CLI's bundled framework is supported
+	 * as a source, so `--to=<version>` is an assertion — a value that
+	 * doesn't match the bundled version is a hard error. Downloading
+	 * arbitrary --to= targets (via ReleaseChannel) is the PR2 follow-up.
+	 *
+	 * Every refusal throws Wheels.UpgradeApplyFailed AFTER printing the
+	 * guidance, mirroring validate()'s print-then-throw convention so the
+	 * process exits non-zero (#2941) without losing the human-readable
+	 * explanation.
+	 */
+	private string function runUpgradeApply(string targetVersion = "", boolean doBackup = true) {
+		var nl = chr(10);
+
+		// resolveProjectRoot() falls back to cwd when no vendor/wheels/ is
+		// found walking up, so "is this a Wheels app?" is decided by the
+		// vendor/wheels/ probe below — not by projectRoot being empty.
+		var vendorDir = variables.projectRoot & "/vendor/wheels";
+		if (!$safeDirExists(vendorDir)) {
+			out("No vendor/wheels/ found at #vendorDir#", "red");
+			out("Run 'wheels upgrade' from an existing app's root, or scaffold a new app with 'wheels new <name>'.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "No vendor/wheels/ found at #vendorDir# — run `wheels upgrade` from a Wheels app root."
+			);
+		}
+
+		var sourceDir = $resolveBundledFrameworkSource();
+		if (!len(sourceDir)) {
+			out("Could not locate the CLI's bundled framework — the CLI install may be incomplete.", "red");
+			out("Tried (in order): the WHEELS_FRAMEWORK_PATH env var, then walking up from the module's own location.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "Could not locate the CLI's bundled framework (tried WHEELS_FRAMEWORK_PATH, then the module's own install tree)."
+			);
+		}
+
+		var upgrader = new services.FrameworkUpgrader();
+		var bundledVersion = upgrader.readFrameworkVersion(sourceDir);
+
+		if (len(arguments.targetVersion) && arguments.targetVersion != bundledVersion) {
+			out("Requested --to=#arguments.targetVersion# but the CLI's bundled framework is #len(bundledVersion) ? bundledVersion : 'unknown'#.", "yellow");
+			out("Either:");
+			out("  - Install a CLI that bundles your target (brew upgrade wheels / scoop update wheels), then re-run wheels upgrade.");
+			out("  - Or omit --to= to apply the bundled framework directly.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "--to=#arguments.targetVersion# does not match the CLI's bundled framework version (#bundledVersion#). Downloading arbitrary versions is not supported yet — see ##3035."
+			);
+		}
+
+		out("Source:  #sourceDir#");
+		out("Target:  #vendorDir#");
+		out("");
+
+		var result = upgrader.applyUpgrade(sourceDir, vendorDir, arguments.doBackup);
+
+		if (!result.success) {
+			out(result.error, "red");
+			throw(type = "Wheels.UpgradeApplyFailed", message = result.error);
+		}
+
+		var summary = "";
+		if (len(result.oldVersion)) {
+			summary &= "Framework upgraded: #result.oldVersion# -> #result.newVersion#" & nl;
+		} else {
+			summary &= "Framework installed: #result.newVersion#" & nl;
+		}
+		if (len(result.backupDir)) {
+			summary &= "Backup:  #result.backupDir#" & nl;
+			summary &= "Recover with:  rm -rf #vendorDir# && mv #result.backupDir# #vendorDir#" & nl;
+		}
+
+		// Surface root-level manifest files the user may want to review
+		// after the upgrade — version refs, dependencies, etc.
+		var rootFiles = $collectRootManifestSuggestions();
+		if (arrayLen(rootFiles)) {
+			summary &= nl & "Files that may carry a framework version reference to review:" & nl;
+			for (var f in rootFiles) {
+				summary &= "  - " & f & nl;
+			}
+		}
+
+		out(summary, "green");
+		return summary;
+	}
+
+	/**
+	 * Resolve the CLI's bundled framework source for apply mode. This
+	 * deliberately bypasses the project-root candidate that
+	 * resolveFrameworkSource() prefers — the project's vendor/wheels/ is
+	 * what we're upgrading, so it can never be the source.
+	 */
+	private string function $resolveBundledFrameworkSource() {
+		// 1. WHEELS_FRAMEWORK_PATH env var (same explicit-override semantics
+		//    as resolveFrameworkSource — an invalid path hard-fails rather
+		//    than silently falling through, see GH #2215).
+		var override = "";
+		try {
+			var javaSystem = createObject("java", "java.lang.System");
+			var envValue = javaSystem.getenv("WHEELS_FRAMEWORK_PATH");
+			if (!isNull(envValue)) {
+				override = envValue;
+			}
+		} catch (any e) {
+			// Env var not accessible in this runtime — treat as unset.
+		}
+		if (len(trim(override))) {
+			if ($safeDirExists(override)) {
+				return $normalizePath(override);
+			}
+			throw(
+				type = "Wheels.FrameworkPathInvalid",
+				message = "WHEELS_FRAMEWORK_PATH is set to '#override#' but that directory does not exist. Unset the variable to fall back to the CLI's bundled framework."
+			);
+		}
+
+		// 2. Walk up from moduleRoot looking for vendor/wheels/. On a brew
+		//    install moduleRoot is ~/.wheels/modules/wheels/, so the very
+		//    first candidate (./vendor/wheels) is the bundled framework; in
+		//    a repo checkout (cli/lucli/) the walk lands on the checkout's
+		//    own vendor/wheels/.
+		if (len(variables.moduleRoot)) {
+			var File = createObject("java", "java.io.File");
+			var dir = variables.moduleRoot;
+			for (var i = 0; i < 6; i++) {
+				var canonical = $normalizePath(File.init(dir).getCanonicalPath());
+				var candidate = canonical & "/vendor/wheels";
+				if ($safeDirExists(candidate)) {
+					return candidate;
+				}
+				var parent = File.init(canonical).getParent();
+				if (isNull(parent) || parent == canonical) break;
+				dir = parent;
+			}
+		}
+
+		return "";
+	}
+
+	/**
+	 * List root-level manifest / config files that may carry a wheels
+	 * version reference the user wants to review after an upgrade.
+	 * Filters to files that actually exist so the printed notice is
+	 * actionable.
+	 */
+	private array function $collectRootManifestSuggestions() {
+		var candidates = ["box.json", "wheels.json", "config/settings.cfm"];
+		var existing = [];
+		for (var rel in candidates) {
+			if (fileExists(variables.projectRoot & "/" & rel)) {
+				arrayAppend(existing, rel);
+			}
+		}
+		return existing;
 	}
 
 	// ── Test Execution ───────────────────────────────
