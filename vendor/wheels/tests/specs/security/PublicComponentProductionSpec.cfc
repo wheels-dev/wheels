@@ -149,6 +149,7 @@ component extends="wheels.WheelsTest" {
 					"guides",
 					"ai",
 					"guideImage",
+					"assets",
 					"mcp"
 				];
 

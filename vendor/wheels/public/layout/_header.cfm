@@ -4,40 +4,6 @@ if (!IsDefined("pageHeader")) {
 	include "../helpers.cfm";
 }
 
-// Css Path
-request.wheelsInternalAssetPath = application.wheels.webpath & "wheels/public/assets";
-
-// Inline the Semantic UI icon font as a data URI. The framework's dev pages
-// inline semantic.min.css into a <style> block, so its relative URLs to
-// `themes/default/assets/fonts/icons.woff2` resolve against the page URL
-// (e.g. /wheels/guides) and 404 — every <i class="...icon"> renders as an
-// empty box. Cached at application scope; falls back silently if the font
-// can't be read. See issue ##2421.
-// Wrapped in cflock to guard the check-then-act on application scope
-// against parallel first-request initialization. Without the lock a
-// second thread that wins the StructKeyExists race after the first
-// thread's initial assignment but before its file-read completes
-// reads an empty data URI and skips the @font-face block — the exact
-// symptom this PR is fixing. Same double-checked locking pattern as
-// BrowserTest.cfc::$ensureLauncher(). The value is built into a
-// local variable and assigned to application scope only once, so
-// readers never see an intermediate empty-string state.
-if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
-	lock name="wheelsIconsFontInit" type="exclusive" timeout="10" {
-		if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
-			local.iconsFontPath = ExpandPath("/wheels/public/assets/css/woff_files/icons.woff2");
-			local.dataUri = "";
-			if (FileExists(local.iconsFontPath)) {
-				try {
-					local.dataUri = "data:font/woff2;base64," & ToBase64(FileReadBinary(local.iconsFontPath));
-				} catch (any e) {
-				}
-			}
-			application.wheels.iconsFontDataUri = local.dataUri;
-		}
-	}
-}
-
 // Opt the request into the dev debug bar emitted at onrequestend.
 // Public.cfc handlers <cfinclude> these views directly (bypassing
 // renderView, which is what normally flips this flag), so without this
@@ -147,24 +113,33 @@ if (StructKeyExists(url, "refresh")) {
 		<cfif StructKeyExists(variables, "_refresh")>
 			<meta http-equiv="refresh" content="#_refresh#">
 		</cfif>
-		<script>
-			<cfinclude template="/wheels/public/assets/js/jquery.min.js">
-			<cfinclude template="/wheels/public/assets/js/semantic.min.js">
-			<cfinclude template="/wheels/public/assets/js/marked.min.js">
-			<cfinclude template="/wheels/public/assets/js/highlight.min.js">
-		</script>
+		<!--- Dev-UI assets are served from the wheelsAssets route with immutable
+			cache headers and a framework-version cache-buster instead of being
+			inlined (~1MB per render) into every page. See issue 2959.
+			Scripts stay plain synchronous tags (no defer/async) and jquery must
+			load before semantic — views emit inline jQuery calls later in the
+			body. --->
+		<link rel="stylesheet" href="#devAssetUrl('css/semantic.min.css')#">
+		<link rel="stylesheet" href="#devAssetUrl('css/highlight_default.min.css')#">
+		<script src="#devAssetUrl('js/jquery.min.js')#"></script>
+		<script src="#devAssetUrl('js/semantic.min.js')#"></script>
+		<script src="#devAssetUrl('js/marked.min.js')#"></script>
+		<script src="#devAssetUrl('js/highlight.min.js')#"></script>
 		<style>
-			<cfinclude template="/wheels/public/assets/css/semantic.min.css">
-			<cfinclude template="/wheels/public/assets/css/highlight_default.min.css">
-			<cfif Len(application.wheels.iconsFontDataUri)>
+			<!--- semantic.min.css's own `Icons` @font-face points at relative
+				`themes/default/assets/fonts/icons.*` paths that don't exist on
+				disk and only lists .eot/.svg sources no modern browser loads,
+				so every icon renders as an empty box without this override
+				(issue 2421). This declaration comes after the semantic.min.css
+				link in document order, so it wins the cascade — same mechanism
+				as the data-URI fix it replaces, ~53KB lighter per page. --->
 			@font-face {
 				font-family: 'Icons';
-				src: url("#application.wheels.iconsFontDataUri#") format('woff2');
+				src: url("#devAssetUrl('css/woff_files/icons.woff2')#") format('woff2');
 				font-weight: normal;
 				font-style: normal;
 				font-display: block;
 			}
-			</cfif>
 			.h-100 {height:100%;}
 			.forcescroll { overflow-y: scroll; max-height: 40rem; }
 			.margin-top { margin-top: 5em; }
