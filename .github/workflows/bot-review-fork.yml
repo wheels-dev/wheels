@@ -1,10 +1,10 @@
-name: Wheels Bot — Reviewer A (fork PRs)
+name: Wheels Bot — Reviewer (fork PRs)
 
-# Fork PRs cannot use the standard `pull_request` Reviewer A path: GitHub does
+# Fork PRs cannot use the standard `pull_request` Reviewer path: GitHub does
 # not pass `vars` OR `secrets` to `pull_request` runs from a forked repository,
 # so the bot's `vars.WHEELS_BOT_ENABLED == 'true'` gate fails closed (the var
 # reads as empty) and the App token / ANTHROPIC_API_KEY would be absent anyway.
-# This workflow runs the *initial* Reviewer A review for maintainer-labeled
+# This workflow runs the Reviewer's single-pass review for maintainer-labeled
 # fork PRs via `pull_request_target`, which executes in the BASE-repo context
 # where vars + secrets are available.
 #
@@ -22,12 +22,11 @@ name: Wheels Bot — Reviewer A (fork PRs)
 #   * persist-credentials:false keeps no token in .git/config.
 #   * Gated on a maintainer-applied `bot-review` label: only users with write
 #     access can apply labels, so a human vets the fork diff before the bot runs.
-#   * Reviewer A's tool surface is read-only (gh + read-only git + Read/Grep/Glob).
+#   * The Reviewer's tool surface is read-only (gh + read-only git + Read/Grep/Glob).
 #
-# Downstream: when Reviewer A submits its review here, the existing
-# `bot-review-b.yml` (pull_request_review) and the `bot-review-a.yml`
-# issue_comment convergence path take over — both hardened in the same PR to
-# check out base, never the fork ref.
+# Downstream: the review submitted here is the pipeline's single quality gate.
+# (The former Reviewer B critique loop and its issue_comment convergence path
+# were retired per maintainer decision 2026-06-11 — see bot-review.yml.)
 
 on:
   pull_request_target:
@@ -35,25 +34,26 @@ on:
     branches: [develop]
 
 permissions:
-  # Keep the default GITHUB_TOKEN read-only (mirrors bot-review-a.yml). All
+  # Keep the default GITHUB_TOKEN read-only (mirrors bot-review.yml). All
   # writes — posting the review, dismissing bogus reviews — go through the
   # App token, not this token. Minimizing the default token is extra
   # defense-in-depth for the pull_request_target context.
   contents: read
 
 concurrency:
-  # Shared with bot-review-a.yml so a fork review and an internal review for the
-  # same PR number can never overlap. A PR is either fork or internal, so in
-  # practice only one of the two workflows ever matches.
+  # Shared with bot-review.yml (the group key retains the legacy "review-a"
+  # name) so a fork review and an internal review for the same PR number can
+  # never overlap. A PR is either fork or internal, so in practice only one
+  # of the two workflows ever matches.
   group: wheels-bot-review-a-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   review:
-    # Distinct from bot-review-a.yml's "Reviewer A": both workflows trigger for
+    # Distinct from bot-review.yml's "Reviewer": both workflows trigger for
     # a labeled fork PR (the pull_request one skips on the absent vars gate,
     # this one runs), so distinct check names keep the UI unambiguous.
-    name: Reviewer A (fork)
+    name: Reviewer (fork)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Fork PRs only, and only once a maintainer has applied the `bot-review`
@@ -122,7 +122,7 @@ jobs:
           marker-pattern: 'wheels-bot:review-a:${{ steps.pr.outputs.pr_num }}:${{ steps.pr.outputs.sha }}'
           github-token: ${{ steps.app-token.outputs.token }}
 
-      - name: Run Reviewer A
+      - name: Run Reviewer
         if: steps.gate.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
@@ -131,16 +131,17 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
             /review-pr ${{ steps.pr.outputs.pr_num }} ${{ steps.pr.outputs.sha }}
+          # Model policy: judging gate = fable, coding stages = opus, janitorial = sonnet.
           claude_args: |
-            --model claude-sonnet-4-6
+            --model claude-fable-5
             --max-turns 250
             --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"
 
-      # Post-submission guard (issue #2558), mirrored from bot-review-a.yml.
+      # Post-submission guard (issue #2558), mirrored from bot-review.yml.
       # Auto-dismisses any wheels-bot review on this SHA that is too short or
       # missing the canonical marker (e.g. a CLI-probe placeholder). Runs on
       # always() so it still fires if the Claude step failed mid-session.
-      - name: Validate Reviewer A output
+      - name: Validate Reviewer output
         if: always() && steps.gate.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -166,10 +167,10 @@ jobs:
             body_len=${#body}
 
             if [[ "$body_len" -lt 200 ]] || ! grep -q 'wheels-bot:review-a' <<<"$body"; then
-              echo "::warning::Dismissing bogus Reviewer A review id=${id} len=${body_len}"
+              echo "::warning::Dismissing bogus Reviewer review id=${id} len=${body_len}"
               gh api -X PUT \
                 "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews/${id}/dismissals" \
-                -f message="Auto-dismissed by Reviewer A guard: body is shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See wheels-dev/wheels#2558 for context."
+                -f message="Auto-dismissed by the Reviewer guard: body is shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See wheels-dev/wheels#2558 for context."
               dismissed=$((dismissed + 1))
             fi
           done < <(echo "$reviews" | jq -c '.[]')
@@ -181,9 +182,9 @@ jobs:
 
             if [[ "$existing" == "0" ]]; then
               short_sha=${HEAD_SHA:0:7}
-              gh pr comment "$PR_NUMBER" --body "## Wheels Bot — Reviewer A guard
+              gh pr comment "$PR_NUMBER" --body "## Wheels Bot — Reviewer guard
 
-          Detected and dismissed ${dismissed} bogus Reviewer A review(s) on commit \`${short_sha}\`. Cause: review body shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See [wheels-dev/wheels#2558](https://github.com/wheels-dev/wheels/issues/2558) for context.
+          Detected and dismissed ${dismissed} bogus Reviewer review(s) on commit \`${short_sha}\`. Cause: review body shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See [wheels-dev/wheels#2558](https://github.com/wheels-dev/wheels/issues/2558) for context.
 
           <!-- ${guard_marker} -->"
             else

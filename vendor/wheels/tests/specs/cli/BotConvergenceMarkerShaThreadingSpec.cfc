@@ -117,6 +117,24 @@ component extends="wheels.WheelsTest" {
 					);
 				});
 
+				it("scopes the address-held skip gate to the resolved head SHA output", () => {
+					expect(fileExists(addressReview)).toBeTrue("Missing file: " & addressReview);
+					var content = fileRead(addressReview);
+					expect(
+						reFindNoCase(
+							"marker-pattern:\s*'wheels-bot:address-held:\$\{\{\s*env\.PR_NUMBER\s*\}\}:\$\{\{\s*steps\.pr\.outputs\.sha\s*\}\}'",
+							content
+						) > 0
+					).toBeTrue(
+						"bot-address-review.yml's address-held skip gate must interpolate "
+						& "${{ steps.pr.outputs.sha }} so the pattern matches the SHA-suffixed "
+						& "`wheels-bot:address-held:<pr>:<head-sha>` marker the prompt emits. "
+						& "A SHA-less prefix permanently no-ops every future label opt-in on "
+						& "the PR, and the branch-name output (`outputs.head`) never matches "
+						& "anything (PR ##3022 review finding)."
+					);
+				});
+
 			});
 
 			describe("convergence-loop prompts emit the marker from the passed SHA", () => {

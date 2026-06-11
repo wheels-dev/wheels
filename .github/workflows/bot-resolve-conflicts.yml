@@ -130,8 +130,9 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
             /resolve-conflicts ${{ env.PR_NUMBER }}
+          # Model policy: judging gate = fable, coding stages = opus, janitorial = sonnet.
           claude_args: |
-            --model claude-opus-4-7
+            --model claude-opus-4-8
             --max-turns 400
             --allowedTools "Bash(gh:*),Bash(git:*),Read,Edit,Write,Grep,Glob"
 

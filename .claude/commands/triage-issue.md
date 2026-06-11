@@ -173,7 +173,7 @@ below. Highlights for this command:
    auto-fire propose-fix workflow. Propose-fix has its own step-4 safety
    net for sensitive areas (security / middleware / migrations / deploy /
    DI / cross-engine) — it posts a `fix-held` marker instead of opening a
-   PR. Reviewer A and B will critique whatever propose-fix produces. Only
+   PR. The Reviewer will critique whatever propose-fix produces. Only
    `low` stays manual.
 
    **Auto-downgrade rules** (force at least one level lower — these
