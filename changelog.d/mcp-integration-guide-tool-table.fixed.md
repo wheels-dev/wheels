@@ -1,0 +1,1 @@
+- MCP integration guide tool table now lists all 18 exposed tools; adds `wheels_deploy` and `wheels_packages`, and the hidden-tools list now includes `g` and `main`.
