@@ -94,11 +94,13 @@ component extends="Base" {
     }
 
     private array function $envArgs(required any role) {
+        var env = variables.config.env();
+        $rejectEnvSecrets(env);
         var parts = [];
-        var clear = variables.config.env().clear();
+        var clear = env.clear();
         for (var k in clear) {
             arrayAppend(parts, "-e");
-            arrayAppend(parts, "#k#=#clear[k]#");
+            arrayAppend(parts, shellEscape(k & "=" & clear[k]));
         }
         return parts;
     }
