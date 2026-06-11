@@ -860,65 +860,70 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	}
 
 	/**
-	 * Ensure the per-client anchor row ("a:" prefix) exists for the sliding window
-	 * strategy. The anchor is the single lockable row that serializes the
-	 * delete-count-insert sequence across nodes via $dbRowLockSelect(). Uses the
-	 * engine's insert-if-absent form where one exists; elsewhere a plain INSERT with
-	 * the duplicate-key violation swallowed (the row already existing is the goal).
+	 * Insert a wheels_rate_limits row if no row with the same store key exists yet,
+	 * without ever surfacing the duplicate-key violation to the enclosing
+	 * transaction. Uses the engine's insert-if-absent form where one exists
+	 * (MySQL/MariaDB, PostgreSQL, SQLite); elsewhere a plain INSERT with the
+	 * violation swallowed. The conditional forms are load-bearing on PostgreSQL,
+	 * not style: there ANY raised statement error — even one caught in CFML —
+	 * aborts the open transaction (SQLSTATE 25P02), dooming every follow-up
+	 * statement including the re-read that recovers from losing a first-insert
+	 * race. The engines on the try/catch branch (SQL Server, Oracle, H2,
+	 * unrecognized) all survive a failed statement with the transaction intact.
 	 */
-	private void function $dbEnsureAnchor(required string clientKey) {
+	private void function $dbEnsureRow(
+		required string storeKey,
+		required string clientKey,
+		required string rowType,
+		required numeric counter,
+		required date expiresAt
+	) {
 		local.params = {
-			storeKey: {value: "a:" & arguments.clientKey, cfsqltype: "cf_sql_varchar"},
+			storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"},
 			clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"},
-			expiresAt: {value: DateAdd("s", variables.windowSeconds, Now()), cfsqltype: "cf_sql_timestamp"}
+			rowType: {value: arguments.rowType, cfsqltype: "cf_sql_varchar"},
+			counter: {value: arguments.counter, cfsqltype: "cf_sql_integer"},
+			expiresAt: {value: arguments.expiresAt, cfsqltype: "cf_sql_timestamp"}
 		};
 		local.dbType = $detectDatabaseType();
 		if (local.dbType == "mysql") {
 			QueryExecute(
-				"INSERT INTO wheels_rate_limits (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, 'anchor', 0, :expiresAt) ON DUPLICATE KEY UPDATE counter = counter",
+				"INSERT INTO wheels_rate_limits (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, :rowType, :counter, :expiresAt) ON DUPLICATE KEY UPDATE counter = counter",
 				local.params,
 				$queryOptions()
 			);
 		} else if (ListFindNoCase("postgresql,sqlite", local.dbType)) {
 			QueryExecute(
-				"INSERT INTO wheels_rate_limits (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, 'anchor', 0, :expiresAt) ON CONFLICT (store_key) DO NOTHING",
+				"INSERT INTO wheels_rate_limits (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, :rowType, :counter, :expiresAt) ON CONFLICT (store_key) DO NOTHING",
 				local.params,
 				$queryOptions()
 			);
 		} else {
 			try {
 				QueryExecute(
-					"INSERT INTO wheels_rate_limits (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, 'anchor', 0, :expiresAt)",
+					"INSERT INTO wheels_rate_limits (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, :rowType, :counter, :expiresAt)",
 					local.params,
 					$queryOptions()
 				);
 			} catch (any e) {
-				// Duplicate key — a concurrent request created the anchor first. Fine.
+				// Duplicate key — a concurrent request created the row first. Fine.
 			}
 		}
 	}
 
 	/**
-	 * Insert the first token bucket row for a client. Returns false when the insert
-	 * trips the UNIQUE store_key index (lost the first-insert race to a concurrent
-	 * node) so the caller can re-read the winning row instead.
+	 * Ensure the per-client anchor row ("a:" prefix) exists for the sliding window
+	 * strategy. The anchor is the single lockable row that serializes the
+	 * delete-count-insert sequence across nodes via $dbRowLockSelect().
 	 */
-	private boolean function $dbTryInsertBucket(required string storeKey, required string clientKey) {
-		try {
-			QueryExecute(
-				"INSERT INTO wheels_rate_limits (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, 'bucket', :tokens, :now)",
-				{
-					storeKey: {value: arguments.storeKey, cfsqltype: "cf_sql_varchar"},
-					clientKey: {value: arguments.clientKey, cfsqltype: "cf_sql_varchar"},
-					tokens: {value: variables.maxRequests - 1, cfsqltype: "cf_sql_integer"},
-					now: {value: Now(), cfsqltype: "cf_sql_timestamp"}
-				},
-				$queryOptions()
-			);
-			return true;
-		} catch (any e) {
-			return false;
-		}
+	private void function $dbEnsureAnchor(required string clientKey) {
+		$dbEnsureRow(
+			storeKey = "a:" & arguments.clientKey,
+			clientKey = arguments.clientKey,
+			rowType = "anchor",
+			counter = 0,
+			expiresAt = DateAdd("s", variables.windowSeconds, Now())
+		);
 	}
 
 	/**
@@ -1004,11 +1009,16 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Database-backed token bucket check.
 	 * The bucket row ("b:" prefix) is read under a transaction with a cross-node row
 	 * lock plus an in-process cflock, so the refill-and-consume read-modify-write is
-	 * serialized per client (see $dbRowLockSelect for engine lock support). Losing
-	 * the first-insert race trips the UNIQUE store_key index and falls back to
-	 * re-reading the winning row. Results route through the local.outcome struct:
-	 * catch-block writes to bare local.X don't persist on BoxLang, struct-field
-	 * writes do.
+	 * serialized per client (see $dbRowLockSelect for engine lock support). A cold
+	 * bucket is created FULL via the never-raising insert-if-absent helper
+	 * ($dbEnsureRow) and then read back under the row lock, so the creator and a
+	 * node that lost the first-insert race take the same path: lock whatever row
+	 * exists now, refill, consume. The conditional insert is what keeps the
+	 * recovery reachable on PostgreSQL — a raised duplicate-key violation there
+	 * aborts the open transaction (SQLSTATE 25P02) even when CFML catches it, and
+	 * the re-read would throw "current transaction is aborted" instead of locking
+	 * the winning row. Results route through the local.outcome struct: catch-block
+	 * writes to bare local.X don't persist on BoxLang, struct-field writes do.
 	 */
 	private struct function $dbTokenBucket(required string clientKey, required numeric now, required numeric refillRate, required numeric resetAt) {
 		if (!$ensureTable()) {
@@ -1027,47 +1037,51 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 				transaction action="begin" {
 					try {
 						local.qBucket = $dbRowLockSelect(local.bucketKey);
-						local.created = false;
 						if (!local.qBucket.recordCount) {
-							// First request — create the bucket with maxRequests - 1 tokens.
-							local.created = $dbTryInsertBucket(local.bucketKey, arguments.clientKey);
-							if (!local.created) {
-								// Lost the first-insert race to a concurrent node — the
-								// UNIQUE index turned it into a caught constraint
-								// violation. Re-read once, now locking the winning row.
-								local.qBucket = $dbRowLockSelect(local.bucketKey);
-								if (!local.qBucket.recordCount) {
-									throw(
-										type = "Wheels.RateLimiter.StoreUnavailable",
-										message = "The wheels_rate_limits bucket row could not be created or read."
-									);
-								}
+							// First request — create the bucket FULL (counter holds the
+							// tokens, expires_at carries the last-refill time) via the
+							// insert-if-absent helper, then lock whatever row exists
+							// afterwards: ours, or a concurrent node's that won the
+							// first-insert race. Creating full instead of pre-consumed
+							// lets the refill-and-consume below treat both cases
+							// identically — a fresh bucket reads as elapsed 0 ->
+							// maxRequests tokens and consumes one, the same end state
+							// the old insert-at-maxRequests-minus-one produced.
+							$dbEnsureRow(
+								storeKey = local.bucketKey,
+								clientKey = arguments.clientKey,
+								rowType = "bucket",
+								counter = variables.maxRequests,
+								expiresAt = Now()
+							);
+							local.qBucket = $dbRowLockSelect(local.bucketKey);
+							if (!local.qBucket.recordCount) {
+								throw(
+									type = "Wheels.RateLimiter.StoreUnavailable",
+									message = "The wheels_rate_limits bucket row could not be created or read."
+								);
 							}
 						}
 
-						if (local.created) {
-							local.outcome.remaining = variables.maxRequests - 1;
-						} else {
-							// Calculate token refill on the existing (locked) row.
-							local.elapsed = $secondsSince(local.qBucket.expires_at);
-							local.currentTokens = Min(variables.maxRequests, local.qBucket.counter + (local.elapsed * arguments.refillRate));
+						// Calculate token refill on the locked row.
+						local.elapsed = $secondsSince(local.qBucket.expires_at);
+						local.currentTokens = Min(variables.maxRequests, local.qBucket.counter + (local.elapsed * arguments.refillRate));
 
-							if (local.currentTokens < 1) {
-								local.outcome.allowed = false;
-								local.outcome.remaining = 0;
-							} else {
-								local.currentTokens -= 1;
-								local.outcome.remaining = Int(local.currentTokens);
-								QueryExecute(
-									"UPDATE wheels_rate_limits SET counter = :tokens, expires_at = :now WHERE store_key = :storeKey",
-									{
-										tokens: {value: Int(local.currentTokens), cfsqltype: "cf_sql_integer"},
-										now: {value: Now(), cfsqltype: "cf_sql_timestamp"},
-										storeKey: {value: local.bucketKey, cfsqltype: "cf_sql_varchar"}
-									},
-									$queryOptions()
-								);
-							}
+						if (local.currentTokens < 1) {
+							local.outcome.allowed = false;
+							local.outcome.remaining = 0;
+						} else {
+							local.currentTokens -= 1;
+							local.outcome.remaining = Int(local.currentTokens);
+							QueryExecute(
+								"UPDATE wheels_rate_limits SET counter = :tokens, expires_at = :now WHERE store_key = :storeKey",
+								{
+									tokens: {value: Int(local.currentTokens), cfsqltype: "cf_sql_integer"},
+									now: {value: Now(), cfsqltype: "cf_sql_timestamp"},
+									storeKey: {value: local.bucketKey, cfsqltype: "cf_sql_varchar"}
+								},
+								$queryOptions()
+							);
 						}
 						transaction action="commit";
 					} catch (any dbError) {

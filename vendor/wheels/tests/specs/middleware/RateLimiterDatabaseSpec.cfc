@@ -541,6 +541,97 @@ component extends="wheels.WheelsTest" {
 				expect(qBucket.cnt).toBe(1);
 			});
 
+			it("tokenBucket cold start leaves the bucket one token below capacity", function() {
+				var clientKey = "tb-db-cold-#CreateUUID()#";
+				var keyFn = function(req) {
+					return clientKey;
+				};
+				var mw = new wheels.middleware.RateLimiter(
+					maxRequests = 5,
+					windowSeconds = 3600,
+					strategy = "tokenBucket",
+					storage = "database",
+					keyFunction = keyFn
+				);
+				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+				var handler = function(required struct request) {
+					return "ok";
+				};
+
+				expect(pipeline.run(request = {}, coreHandler = handler)).toBe("ok");
+
+				// The cold-start path creates the bucket FULL and then consumes one
+				// token under the row lock — the stored counter must come out at
+				// maxRequests - 1, the same end state the previous
+				// insert-at-maxRequests-minus-one code produced.
+				var qBucket = QueryExecute(
+					"SELECT counter FROM wheels_rate_limits WHERE store_key = :storeKey",
+					{storeKey: {value: "b:" & clientKey, cfsqltype: "cf_sql_varchar"}},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(qBucket.recordCount).toBe(1);
+				expect(qBucket.counter).toBe(4);
+			});
+
+			it("$dbEnsureRow leaves an existing row intact without raising into the open transaction", function() {
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 5,
+					windowSeconds = 60,
+					strategy = "tokenBucket",
+					storage = "database"
+				);
+				prepareMock(limiter);
+				makePublic(limiter, "$ensureTable");
+				makePublic(limiter, "$dbEnsureRow");
+				expect(limiter.$ensureTable()).toBeTrue();
+
+				var storeKey = "b:ensure-row-#CreateUUID()#";
+				var dsOpts = {datasource: application.wheels.dataSourceName};
+
+				// First call creates the row — this stands in for the concurrent
+				// node that wins the first-insert race.
+				limiter.$dbEnsureRow(
+					storeKey = storeKey,
+					clientKey = "ensure-row-client",
+					rowType = "bucket",
+					counter = 3,
+					expiresAt = Now()
+				);
+
+				// Losing the race must be invisible to the enclosing transaction:
+				// the duplicate insert may neither raise (on PostgreSQL even a
+				// caught constraint violation aborts the transaction — SQLSTATE
+				// 25P02 — which made the lost-race recovery re-read unreachable)
+				// nor overwrite the winner's row. The SELECT inside the same
+				// transaction stands in for that recovery re-read.
+				var state = {threw: false, rowTotal: -1, counterValue: -1};
+				try {
+					transaction action="begin" {
+						limiter.$dbEnsureRow(
+							storeKey = storeKey,
+							clientKey = "ensure-row-client",
+							rowType = "bucket",
+							counter = 99,
+							expiresAt = Now()
+						);
+						var qReread = QueryExecute(
+							"SELECT COUNT(*) AS cnt, MAX(counter) AS counterValue FROM wheels_rate_limits WHERE store_key = :storeKey",
+							{storeKey: {value: storeKey, cfsqltype: "cf_sql_varchar"}},
+							dsOpts
+						);
+						state.rowTotal = qReread.cnt;
+						state.counterValue = qReread.counterValue;
+						transaction action="commit";
+					}
+				} catch (any e) {
+					state.threw = true;
+				}
+
+				expect(state.threw).toBeFalse();
+				expect(state.rowTotal).toBe(1);
+				expect(state.counterValue).toBe(3);
+			});
+
 		});
 	}
 
