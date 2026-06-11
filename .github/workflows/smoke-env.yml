@@ -24,6 +24,7 @@ on:
       - 'tools/ci/smoke-env.sh'
       - '.github/workflows/smoke-env.yml'
       - 'tools/ci/lucee.ci.json'
+      - '.github/actions/setup-wheels-test-env/**'
 
 permissions:
   contents: read
