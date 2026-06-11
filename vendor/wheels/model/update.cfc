@@ -73,14 +73,14 @@ component {
 		} else {
 			arguments.sql = [];
 			// Issue#1273: Added this section to allow included tables to be referenced in the query
-			local.migration = CreateObject("component", "wheels.migrator.Migration").init();
+			local.dialect = $dialectName();
 			local.indexHint = this.$indexHint(
 				useIndex = arguments.useIndex,
 				modelName = variables.wheels.class.modelName,
 				adapterName = get("adapterName")
 			);
-			
-			if (ListFind('MySQL', local.migration.adapter.adapterName())){
+
+			if (ListFind('MySQL', local.dialect)){
 				local.list = "";
 				local.associations = [];
 				local.associations = $expandedAssociations(
@@ -98,14 +98,14 @@ component {
 				}
 
 			}
-			else if (ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName())){
+			else if (ListFind('MicrosoftSQLServer', local.dialect)){
 				if (Len(local.indexHint)) {
 					ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# #local.indexHint# SET");
 				} else {
 					ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# SET");
 				}
 			}
-			else if (ListFind('PostgreSQL,CockroachDB,H2,Oracle,SQLite', local.migration.adapter.adapterName())){
+			else if (ListFind('PostgreSQL,CockroachDB,H2,Oracle,SQLite', local.dialect)){
 				ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# SET");
 			}
 			local.pos = 0;
@@ -131,7 +131,7 @@ component {
 				includeSoftDeletes = arguments.includeSoftDeletes
 			);
 			arguments.sql = $addWhereClauseParameters(sql = arguments.sql, where = arguments.where);
-			if (ListFind('H2', local.migration.adapter.adapterName()) && arguments.include != ""){
+			if (ListFind('H2', local.dialect) && arguments.include != ""){
 				arrayAppend(arguments.sql, ")");
 			}
 			local.rv = invokeWithTransaction(method = "$updateAll", argumentCollection = arguments);
