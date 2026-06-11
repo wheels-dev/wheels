@@ -274,6 +274,7 @@ component extends="modules.BaseModule" {
 			.option(name = "directory", default = "", description = "Documented alias for --filter")
 			.option(name = "reporter",  default = "simple", description = "Output format: simple, json, or tap")
 			.option(name = "db",        default = "sqlite", description = "Database the suite runs against")
+			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
 			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
 			.flag(name = "ci",      default = false, description = "CI mode output")
 			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
@@ -713,7 +714,8 @@ component extends="modules.BaseModule" {
 			core = parsed.core,
 			db = parsed.db,
 			dbExplicit = structKeyExists(arguments.coll, "db"),
-			useTestDB = parsed["test-db"]
+			useTestDB = parsed["test-db"],
+			basePath = parsed["base-path"]
 		};
 	}
 
@@ -731,6 +733,7 @@ component extends="modules.BaseModule" {
 		var db = opts.db;
 		var dbExplicit = opts.dbExplicit;
 		var useTestDB = opts.useTestDB;
+		var basePath = opts.basePath;
 
 		// Default to APP mode unless --core is set explicitly. The previous
 		// auto-detection ("if vendor/wheels/tests/ exists, default to core")
@@ -749,7 +752,7 @@ component extends="modules.BaseModule" {
 		// expects. Onboarding finding #2.
 		filter = $normalizeTestFilter(filter, coreTests);
 
-		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit);
+		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit, basePath);
 	}
 
 	/**
@@ -4731,14 +4734,21 @@ component extends="modules.BaseModule" {
 		string db = "sqlite",
 		boolean ciMode = false,
 		boolean useTestDB = true,
-		boolean dbExplicit = false
+		boolean dbExplicit = false,
+		string basePath = ""
 	) {
 		var serverPort = $requireRunningServer([
 			"Start one with: wheels start",
 			"Or use: bash tools/test-local.sh (auto-manages server)"
 		]);
 
-		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
+		// Subfolder-mounted apps (`set(subpath="/myapp")`, #2985/#3026) serve the
+		// test runner under a URL prefix the rewrite layer expects — without it
+		// the request never routes to the app. Resolve the prefix from the
+		// explicit --base-path flag, else WHEELS_SUBPATH, else the subpath
+		// setting in config/settings.cfm; root-mounted apps resolve to "".
+		var resolvedBasePath = $resolveTestBasePath(basePath);
+		var testPath = $buildTestRunnerPath(coreTests, resolvedBasePath);
 
 		// Print the suite type with a truthful datasource label. Issue #2489:
 		// the previous output echoed `--db` even for app tests where the
@@ -6332,6 +6342,78 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Resolve the URL base path the app is mounted under, for the test-runner
+	 * request. Precedence (issue #3026): an explicit value (the --base-path
+	 * flag) wins; otherwise the WHEELS_SUBPATH environment variable; otherwise
+	 * a `set(subpath="...")` call scanned out of config/settings.cfm (CFML
+	 * comments stripped first — Anti-Pattern 14). Root-mounted apps resolve to
+	 * "". The returned value is normalized (leading slash, no trailing slash)
+	 * so callers can prefix it directly onto the runner path.
+	 */
+	public string function $resolveTestBasePath(string explicit = "") {
+		// 1. Explicit flag wins over any derivation.
+		if (len(trim(arguments.explicit))) {
+			return $normalizeBasePath(arguments.explicit);
+		}
+
+		// 2. WHEELS_SUBPATH environment variable — mirrors how the framework
+		//    reads it in $resolveFrameworkPaths()/$get("subpath").
+		try {
+			var envValue = createObject("java", "java.lang.System").getenv("WHEELS_SUBPATH");
+			if (!isNull(envValue) && len(trim(envValue))) {
+				return $normalizeBasePath(envValue);
+			}
+		} catch (any e) {}
+
+		// 3. set(subpath="...") in config/settings.cfm. Strip comments first so a
+		//    commented-out call can't false-match (Anti-Pattern 14). The word
+		//    boundary keeps `coreTestSubpath`-style siblings from matching.
+		var settingsFile = variables.projectRoot & "/config/settings.cfm";
+		if (fileExists(settingsFile)) {
+			var settingsContent = stripCfmlComments(fileRead(settingsFile));
+			var settingsMatch = reFindNoCase('\bsubpath\b\s*=\s*"([^"]*)"', settingsContent, 1, true);
+			if (arrayLen(settingsMatch.match) > 1 && len(trim(settingsMatch.match[2]))) {
+				return $normalizeBasePath(settingsMatch.match[2]);
+			}
+		}
+
+		return "";
+	}
+
+	/**
+	 * Normalize a URL base path to a leading slash with no trailing slash,
+	 * mirroring the framework's $resolveFrameworkPaths() in
+	 * vendor/wheels/Global.cfc. Empty/whitespace input and a bare root slash
+	 * both resolve to "" (root mount — no prefix to add).
+	 */
+	public string function $normalizeBasePath(required string raw) {
+		var normalized = trim(arguments.raw);
+		if (!len(normalized)) {
+			return "";
+		}
+		if (left(normalized, 1) != "/") {
+			normalized = "/" & normalized;
+		}
+		// Strip trailing slash(es). Guard the Len > 1 floor so we never call
+		// Left(str, 0), which crashes Lucee 7 (CLAUDE.md cross-engine invariant 8).
+		while (len(normalized) > 1 && right(normalized, 1) == "/") {
+			normalized = left(normalized, len(normalized) - 1);
+		}
+		// A bare "/" means the app is at the server root — no prefix.
+		return normalized == "/" ? "" : normalized;
+	}
+
+	/**
+	 * Build the test-runner request path, prefixed by the (normalized) base
+	 * path. Core tests hit /wheels/core/tests; app tests hit /wheels/app/tests.
+	 * issue #3026.
+	 */
+	public string function $buildTestRunnerPath(boolean coreTests = false, string basePath = "") {
+		var prefix = $normalizeBasePath(arguments.basePath);
+		return prefix & (arguments.coreTests ? "/wheels/core/tests" : "/wheels/app/tests");
+	}
+
+	/**
 	 * Check if a port is responding to HTTP requests
 	 */
 	private boolean function isPortOpen(required numeric port) {
@@ -6750,6 +6832,7 @@ component extends="modules.BaseModule" {
 	private string function browserTest(array args = []) {
 		var format = "text";
 		var verboseOutput = false;
+		var basePath = "";
 		// Default to the APP's browser specs (tests/specs/browser/) — not the
 		// framework's internal browser specs. Onboarding finding F11 reported
 		// `wheels browser test` running 0 tests because it pointed at
@@ -6766,6 +6849,8 @@ component extends="modules.BaseModule" {
 				format = valueAfterEquals(arg);
 			} else if (reFindNoCase("^--directory=", arg)) {
 				directory = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--base-path=", arg)) {
+				basePath = valueAfterEquals(arg);
 			} else if (!arg.startsWith("--")) {
 				directory = arg;
 			}
@@ -6816,7 +6901,12 @@ component extends="modules.BaseModule" {
 		// core test runner (`/wheels/core/tests`). The latter only knows
 		// about specs under `vendor/wheels/tests/specs/`. Apps live under
 		// `tests/specs/`, mounted by the app runner. F11.
-		var testUrl = "http://localhost:#serverPort#/wheels/app/tests?db=sqlite&format=json&directory=#directory#";
+		//
+		// Prefix the subfolder base path (#3026) so browser tests reach the
+		// runner on a subpath-mounted app the same way `wheels test` does.
+		var resolvedBasePath = $resolveTestBasePath(basePath);
+		var runnerPath = $buildTestRunnerPath(false, resolvedBasePath);
+		var testUrl = "http://localhost:#serverPort##runnerPath#?db=sqlite&format=json&directory=#directory#";
 
 		try {
 			var httpResult = makeHttpRequest(testUrl);

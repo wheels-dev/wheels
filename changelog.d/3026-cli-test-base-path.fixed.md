@@ -1,0 +1,1 @@
+- `wheels test` (and `wheels browser test`) now honour the `subpath` setting for subfolder-mounted apps via a new `--base-path` flag, auto-deriving the prefix from `WHEELS_SUBPATH` or `set(subpath=...)` when omitted, so the test runner is reachable under a URL prefix instead of always assuming a root mount (#3026)
