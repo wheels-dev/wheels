@@ -55,4 +55,11 @@
 		// Only when true is X-Forwarded-For consulted when resolving the client IP for
 		// debug access. Leave false unless the app sits behind a trusted reverse proxy.
 		application.$wheels.debugAccessTrustProxy = false;
+
+		// Trusted proxy settings.
+		// Only when true are X-Forwarded-* headers honored framework-wide: X-Forwarded-Proto in
+		// isSecure(), and X-Forwarded-For (rightmost hop) for maintenance-mode IP exceptions and
+		// reload rate-limit keying. Leave false unless the app sits behind a trusted reverse proxy
+		// that overwrites — never appends to — these headers.
+		application.$wheels.trustProxyHeaders = false;
 </cfscript>

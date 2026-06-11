@@ -150,7 +150,11 @@ component {
 		if (!StructKeyExists(application, "$reloadRateLimit")) {
 			application.$reloadRateLimit = {};
 		}
-		local.reloadRateLimitKey = cgi.REMOTE_ADDR;
+		// Key on the trusted client IP: the socket address unless the running app's
+		// trustProxyHeaders setting opted into X-Forwarded-For (rightmost hop). On a cold
+		// start application.wheels does not exist yet, so trust resolves to false and the
+		// key falls back to the socket address.
+		local.reloadRateLimitKey = application.wo.$trustedClientIp();
 		local.reloadRateLimited = false;
 		if (StructKeyExists(application.$reloadRateLimit, local.reloadRateLimitKey)) {
 			local.rl = application.$reloadRateLimit[local.reloadRateLimitKey];

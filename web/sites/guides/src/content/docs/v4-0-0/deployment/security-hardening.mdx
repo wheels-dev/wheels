@@ -205,10 +205,39 @@ set(dataSourcePassword=env("DB_PASSWORD"));
 
 ## Trusted proxies and client IP
 
-Wheels does **not** trust `X-Forwarded-For` by default. `cgi.remote_addr` is the last-hop address — your load balancer, not the end user. Two framework surfaces touch this:
+Wheels does **not** trust `X-Forwarded-*` headers by default. They are ordinary request headers — any client can send them — so `cgi.remote_addr` (the last-hop socket address, i.e. your load balancer behind a proxy) is what security decisions use, and nothing in Wheels *trusts* a forwarded header until you explicitly opt in. Three independent opt-ins exist, one per surface:
 
-- **`RateLimiter` middleware.** Opt into proxy trust explicitly with `trustProxy=true`. The default is `false` "for security" (`vendor/wheels/middleware/RateLimiter.cfc` line 20, 51). Your proxy **must** strip any incoming `X-Forwarded-For` and append the real client, otherwise attackers can spoof an arbitrary IP and bypass rate limits.
-- **Application-level logging.** Nothing in Wheels reads `X-Forwarded-For` automatically for `cgi.remote_addr`. If you want the real client IP in logs, configure your reverse proxy to overwrite `CF.REMOTE_ADDR` at the connector (`mod_cfml`, Tuckey rewriter, nginx `proxy_set_header`) before the request reaches the engine.
+### `trustProxyHeaders` — framework-wide header trust
+
+`set(trustProxyHeaders=true)` (default `false`) governs the framework's own use of forwarded headers across three surfaces:
+
+- **`isSecure()`.** With trust off, only the engine's `server_port_secure` flag counts — a client-supplied `X-Forwarded-Proto: https` is ignored, so a direct-HTTP client can't spoof secure-cookie, CSRF, or HTTPS-redirect decisions. With trust on, `X-Forwarded-Proto: https` from your TLS-terminating proxy makes `isSecure()` return `true`.
+- **Maintenance-mode IP exceptions.** `set(ipExceptions="...")` is matched against the socket address by default, or against the rightmost `X-Forwarded-For` hop when trust is on. The exception list comes from config only — the legacy `?except=` URL parameter has been removed (it let any anonymous client rewrite the exception list for everyone).
+- **Reload rate-limit keying.** Failed `?reload=` password attempts are counted per trusted client IP, so with trust on, clients behind a shared proxy no longer share one lockout bucket.
+
+```cfm {test:compile} title="config/production/settings.cfm — app behind a TLS-terminating reverse proxy"
+<cfscript>
+set(trustProxyHeaders=true);
+</cfscript>
+```
+
+Only enable this behind a reverse proxy that **overwrites** — never appends to — `X-Forwarded-For` and `X-Forwarded-Proto`. The rightmost `X-Forwarded-For` entry is the one appended by the trusted proxy nearest the app; earlier entries are client-supplied and spoofable. If your proxy appends instead of overwriting, an attacker controls the rightmost hop too.
+
+### `debugAccessTrustProxy` — debug-UI IP allowlisting
+
+`set(allowIPBasedDebugAccess=true)` plus `set(debugAccessIPs=["203.0.113.7"])` enables the debug panel and public component for specific client IPs outside the `development` environment. The allowlist matches the socket address unless you also `set(debugAccessTrustProxy=true)` (default `false`), which switches matching to the rightmost `X-Forwarded-For` hop under the same proxy-overwrite contract.
+
+```cfm {test:compile} title="config/settings.cfm — debug access for an ops IP behind a proxy"
+<cfscript>
+set(allowIPBasedDebugAccess=true);
+set(debugAccessIPs=["203.0.113.7"]);
+set(debugAccessTrustProxy=true);
+</cfscript>
+```
+
+### `RateLimiter` middleware — `trustProxy`
+
+Opt into proxy trust explicitly with `trustProxy=true`. The default is `false` "for security" (`vendor/wheels/middleware/RateLimiter.cfc` line 20, 51). Your proxy **must** strip any incoming `X-Forwarded-For` and append the real client, otherwise attackers can spoof an arbitrary IP and bypass rate limits.
 
 ```cfm {test:compile} title="config/settings.cfm — rate limiter with trusted proxy"
 <cfscript>
@@ -225,6 +254,8 @@ set(middleware = [
 ```
 
 `proxyStrategy="last"` takes the rightmost IP in `X-Forwarded-For` (added by the nearest trusted proxy). Use `"first"` only if your proxy chain guarantees the client is always the leftmost entry.
+
+For **application-level logging**, nothing in Wheels rewrites `cgi.remote_addr`. If you want the real client IP in logs, configure your reverse proxy to overwrite the remote address at the connector (`mod_cfml`, Tuckey rewriter, nginx `proxy_set_header`) before the request reaches the engine.
 
 ## Rate limiting
 
@@ -275,6 +306,7 @@ For dependency and engine monitoring:
 - [ ] `Cors` middleware with an explicit origin allowlist if serving cross-origin
 - [ ] `showErrorInformation=false` and `showDebugInformation=false` in production
 - [ ] `trustProxy` set correctly on `RateLimiter` for your proxy topology
+- [ ] `trustProxyHeaders=true` only when behind a reverse proxy that overwrites `X-Forwarded-*` headers
 - [ ] Lucee/Adobe security bulletins subscribed
 
 ## Related guides
