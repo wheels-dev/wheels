@@ -1,5 +1,10 @@
 component {
 
+	// Boot-time sentinel meaning "the developer has not explicitly set
+	// allowEnvironmentSwitchViaUrl". Must never escape $init(): the setting is
+	// resolved back to a real boolean by $resolveAllowEnvironmentSwitchViaUrl()
+	// right after the config/settings.cfm includes (issue #3031).
+	variables.$envSwitchUnset = "__wheels_unset__";
 
 	public void function $init(struct keys = {}) {
 
@@ -140,8 +145,14 @@ component {
 		application.$wheels.rootcomponentPath = local.paths.rootcomponentPath;
 		application.$wheels.wheelsComponentPath = local.paths.wheelsComponentPath;
 
-		// Check old environment to see whether we're allowed to switch configuration
-		application.$wheels.allowEnvironmentSwitchViaUrl = true;
+		// Check old environment to see whether we're allowed to switch configuration.
+		// The setting boots as a non-boolean sentinel (NOT `true`) so that an explicit
+		// set(allowEnvironmentSwitchViaUrl=true) in config/settings.cfm is distinguishable
+		// from "the developer never set it" — see $resolveAllowEnvironmentSwitchViaUrl()
+		// below, which runs right after the settings includes and always resolves the
+		// setting back to a real boolean (issue #3031). The sentinel only ever exists
+		// between here and that resolution point within a single application start.
+		application.$wheels.allowEnvironmentSwitchViaUrl = variables.$envSwitchUnset;
 		if (StructKeyExists(local, "allowEnvironmentSwitchViaUrl") && !local.allowEnvironmentSwitchViaUrl) {
 			application.$wheels.allowEnvironmentSwitchViaUrl = false;
 		}
@@ -218,8 +229,15 @@ component {
 			}
 		}
 
-		// If we're not allowed to switch, override and replace with the old environment
-		if (!application.$wheels.allowEnvironmentSwitchViaUrl && StructKeyExists(local, "oldEnvironment")) {
+		// If we're not allowed to switch, override and replace with the old environment.
+		// At this point the setting can still be the boot sentinel (= "not explicitly
+		// set", which historically meant `true` here), so only an explicit or
+		// carried-over boolean false blocks the switch.
+		if (
+			IsBoolean(application.$wheels.allowEnvironmentSwitchViaUrl)
+			&& !application.$wheels.allowEnvironmentSwitchViaUrl
+			&& StructKeyExists(local, "oldEnvironment")
+		) {
 			application.$wheels.environment = local.oldEnvironment;
 		}
 
@@ -298,14 +316,12 @@ component {
 		application.$wheels.initialized = true;
 
 		// Load general developer settings first, then override with environment specific ones.
-		// Track the initial default so we can detect if the developer explicitly overrides it.
 		// $includeConfig captures any output the file produces and warns via the application
 		// log if non-empty — usually the signal that a config/*.cfm file is missing its
 		// cfscript wrapper, in which case the engine parses cfscript-style code as markup
 		// and the registrations silently never run. (Note: Lucee 7's tag scanner reads
 		// CFC comments before compilation and treats literal cf-tags as unclosed errors,
 		// so this comment deliberately avoids putting the angle-bracketed form inline.)
-		local.envSwitchDefault = application.$wheels.allowEnvironmentSwitchViaUrl;
 		application.wo.$includeConfig(template = "/config/settings.cfm");
 		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
 			application.wo.$includeConfig(template = "/config/#application.$wheels.environment#/settings.cfm");
@@ -341,15 +357,16 @@ component {
 			application.$wheels.subpath = local.configuredSubpath;
 		}
 
-		// In production-like environments, disable URL-based environment switching by default.
-		// Developers can override by explicitly calling set(allowEnvironmentSwitchViaUrl=true) in settings.cfm.
-		if (
-			ListFindNoCase("production,testing,maintenance", application.$wheels.environment)
-			&& application.$wheels.allowEnvironmentSwitchViaUrl == local.envSwitchDefault
-			&& local.envSwitchDefault
-		) {
-			application.$wheels.allowEnvironmentSwitchViaUrl = false;
-		}
+		// Resolve allowEnvironmentSwitchViaUrl to a real boolean now that the developer's
+		// settings have loaded. If it is still the boot sentinel the framework default
+		// applies: disabled in production-like environments, enabled everywhere else.
+		// An explicit boolean from config/settings.cfm — including explicit `true`, which
+		// used to be indistinguishable from the default and silently discarded — is
+		// honored as-is in every environment (issue #3031).
+		application.$wheels.allowEnvironmentSwitchViaUrl = $resolveAllowEnvironmentSwitchViaUrl(
+			settingValue = application.$wheels.allowEnvironmentSwitchViaUrl,
+			environment = application.$wheels.environment
+		);
 
 		// Warn if reloadPassword is empty — URL-based reload and environment switching are disabled.
 		if (!Len(application.$wheels.reloadPassword)) {
@@ -470,5 +487,24 @@ component {
 			}
 			$location(url = local.url, addToken = false);
 		}
+	}
+
+	/**
+	 * Resolves the allowEnvironmentSwitchViaUrl setting to a real boolean after the
+	 * config/settings.cfm includes have run. Any explicit boolean the developer set is
+	 * honored as-is in every environment — this is what makes the documented production
+	 * override set(allowEnvironmentSwitchViaUrl=true) actually work (issue #3031).
+	 * A non-boolean value means the developer never touched the setting (it still holds
+	 * the boot sentinel), so the framework default applies: disabled in production-like
+	 * environments, enabled everywhere else.
+	 */
+	public boolean function $resolveAllowEnvironmentSwitchViaUrl(
+		required any settingValue,
+		required string environment
+	) {
+		if (IsBoolean(arguments.settingValue)) {
+			return arguments.settingValue;
+		}
+		return !ListFindNoCase("production,testing,maintenance", arguments.environment);
 	}
 }

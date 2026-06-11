@@ -261,6 +261,118 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("$normalizeBasePath (issue 3026)", () => {
+
+			it("returns empty string for empty or whitespace input", () => {
+				expect(mod.$normalizeBasePath("")).toBe("");
+				expect(mod.$normalizeBasePath("   ")).toBe("");
+			});
+
+			it("adds a leading slash when missing", () => {
+				expect(mod.$normalizeBasePath("myapp")).toBe("/myapp");
+			});
+
+			it("leaves an already-leading-slash value intact", () => {
+				expect(mod.$normalizeBasePath("/myapp")).toBe("/myapp");
+			});
+
+			it("strips a single trailing slash", () => {
+				expect(mod.$normalizeBasePath("/myapp/")).toBe("/myapp");
+				expect(mod.$normalizeBasePath("myapp/")).toBe("/myapp");
+			});
+
+			it("strips multiple trailing slashes", () => {
+				expect(mod.$normalizeBasePath("/myapp///")).toBe("/myapp");
+			});
+
+			it("treats a bare root slash as no prefix", () => {
+				expect(mod.$normalizeBasePath("/")).toBe("");
+			});
+
+		});
+
+		describe("$buildTestRunnerPath (issue 3026)", () => {
+
+			it("returns the root-mounted app path when no base path is given", () => {
+				expect(mod.$buildTestRunnerPath(false, "")).toBe("/wheels/app/tests");
+			});
+
+			it("returns the root-mounted core path when coreTests is true", () => {
+				expect(mod.$buildTestRunnerPath(true, "")).toBe("/wheels/core/tests");
+			});
+
+			it("prefixes the base path onto the app runner path", () => {
+				expect(mod.$buildTestRunnerPath(false, "/myapp")).toBe("/myapp/wheels/app/tests");
+			});
+
+			it("prefixes the base path onto the core runner path", () => {
+				expect(mod.$buildTestRunnerPath(true, "/myapp")).toBe("/myapp/wheels/core/tests");
+			});
+
+			it("normalizes an un-normalized base path before prefixing", () => {
+				expect(mod.$buildTestRunnerPath(false, "myapp/")).toBe("/myapp/wheels/app/tests");
+			});
+
+		});
+
+		describe("$resolveTestBasePath (issue 3026)", () => {
+
+			it("returns empty when no flag, env, or subpath setting is present", () => {
+				var sandbox = $scaffold(settingsBody = "");
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("")).toBe("");
+				$tearDown(sandbox);
+			});
+
+			it("normalizes and returns an explicit flag value", () => {
+				var sandbox = $scaffold(settingsBody = "");
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("wheelsproject1/")).toBe("/wheelsproject1");
+				$tearDown(sandbox);
+			});
+
+			it("derives the base path from set(subpath=...) in config/settings.cfm", () => {
+				var sandbox = $scaffold(settingsBody = 'set(subpath="/myapp");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("")).toBe("/myapp");
+				$tearDown(sandbox);
+			});
+
+			it("normalizes a derived subpath lacking a leading slash", () => {
+				var sandbox = $scaffold(settingsBody = 'set(subpath="myapp");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("")).toBe("/myapp");
+				$tearDown(sandbox);
+			});
+
+			it("lets an explicit flag win over a settings-derived subpath", () => {
+				var sandbox = $scaffold(settingsBody = 'set(subpath="/fromsettings");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("/fromflag")).toBe("/fromflag");
+				$tearDown(sandbox);
+			});
+
+			it("ignores a commented-out subpath setting", () => {
+				var body =
+					"// set(subpath=" & chr(34) & "/commented" & chr(34) & ");" & chr(10) &
+					"set(subpath=" & chr(34) & "/active" & chr(34) & ");";
+				var sandbox = $scaffold(settingsBody = body);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("")).toBe("/active");
+				$tearDown(sandbox);
+			});
+
+		});
+
+		describe("test command base-path wiring (issue 3026)", () => {
+
+			it("exposes --base-path on the test ArgSpec and MCP tool schema", () => {
+				var schema = mod.mcpToolSpecs()["test"];
+				expect(schema.properties).toHaveKey("base-path");
+			});
+
+		});
+
 	}
 
 	/**
