@@ -863,13 +863,22 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Insert a wheels_rate_limits row if no row with the same store key exists yet,
 	 * without ever surfacing the duplicate-key violation to the enclosing
 	 * transaction. Uses the engine's insert-if-absent form where one exists
-	 * (MySQL/MariaDB, PostgreSQL, SQLite); elsewhere a plain INSERT with the
-	 * violation swallowed. The conditional forms are load-bearing on PostgreSQL,
-	 * not style: there ANY raised statement error — even one caught in CFML —
-	 * aborts the open transaction (SQLSTATE 25P02), dooming every follow-up
-	 * statement including the re-read that recovers from losing a first-insert
-	 * race. The engines on the try/catch branch (SQL Server, Oracle, H2,
-	 * unrecognized) all survive a failed statement with the transaction intact.
+	 * (MySQL/MariaDB, PostgreSQL, SQLite, SQL Server); elsewhere a plain INSERT
+	 * with the violation swallowed. The conditional forms are load-bearing on
+	 * PostgreSQL and SQL Server, not style: on PostgreSQL ANY raised statement
+	 * error — even one caught in CFML — aborts the open transaction
+	 * (SQLSTATE 25P02), dooming every follow-up statement including the re-read
+	 * that recovers from losing a first-insert race. On SQL Server with
+	 * `SET XACT_ABORT ON` (a non-default but common enterprise/DBA setting), a
+	 * UNIQUE constraint violation dooms the transaction in the same way, so
+	 * the subsequent $dbRowLockSelect would throw error 3930 against a doomed
+	 * transaction and the outer catch would fall back to fail-open. The SQL
+	 * Server branch therefore uses MERGE INTO ... WITH (HOLDLOCK) ... WHEN NOT
+	 * MATCHED THEN INSERT, which serializes concurrent insert-if-absent attempts
+	 * via a key-range lock and never raises a duplicate-key error in normal
+	 * operation. The remaining try/catch branch covers Oracle, H2, and
+	 * unrecognized engines, which all survive a failed statement with the
+	 * transaction intact under their default settings.
 	 */
 	private void function $dbEnsureRow(
 		required string storeKey,
@@ -895,6 +904,12 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		} else if (ListFindNoCase("postgresql,sqlite", local.dbType)) {
 			QueryExecute(
 				"INSERT INTO wheels_rate_limits (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, :rowType, :counter, :expiresAt) ON CONFLICT (store_key) DO NOTHING",
+				local.params,
+				$queryOptions()
+			);
+		} else if (local.dbType == "sqlserver") {
+			QueryExecute(
+				"MERGE INTO wheels_rate_limits WITH (HOLDLOCK) AS target USING (SELECT :storeKey AS store_key) AS source ON target.store_key = source.store_key WHEN NOT MATCHED THEN INSERT (store_key, client_key, row_type, counter, expires_at) VALUES (:storeKey, :clientKey, :rowType, :counter, :expiresAt);",
 				local.params,
 				$queryOptions()
 			);
