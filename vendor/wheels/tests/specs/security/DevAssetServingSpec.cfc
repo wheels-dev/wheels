@@ -58,6 +58,26 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it("returns empty for URL-encoded traversal payloads", () => {
+					// The charset allowlist [^A-Za-z0-9_\-./] rejects `%`, so a
+					// raw-undecoded payload that slipped past a buggy decoder
+					// upstream still gets blocked here. Parallels the
+					// guideImage-era PathTraversalSpec coverage.
+					var publicCfc = createObject("component", "wheels.Public").$init();
+					var payloads = [
+						"%2e%2e/etc/passwd",
+						"%2E%2E%2Fetc%2Fpasswd",
+						"css/%2e%2e/Public.cfc",
+						"%2fetc/passwd"
+					];
+					for (var payload in payloads) {
+						expect(publicCfc.$resolveDevAssetPath(payload)).toBe(
+							"",
+							"Expected URL-encoded traversal payload `" & payload & "` to be rejected."
+						);
+					}
+				});
+
 				it("returns empty for empty, absolute, and backslash inputs", () => {
 					var publicCfc = createObject("component", "wheels.Public").$init();
 					expect(publicCfc.$resolveDevAssetPath("")).toBe("", "Expected empty input to be rejected.");
