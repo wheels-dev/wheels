@@ -37,6 +37,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(variables.lock.lockPath()).toBe("/tmp/kamal_deploy_lock_demo");
             });
 
+            it("acquire() escapes single quotes in the user", () => {
+                var cmd = variables.lock.acquire({user: "o'brien", message: "x"});
+                expect(cmd).toInclude("ln -s");
+                expect(cmd).toInclude("o'\''brien");
+                expect(cmd).toInclude("/tmp/kamal_deploy_lock_demo");
+            });
+
             it("acquire() without a message is still valid (defaults to empty)", () => {
                 var cmd = variables.lock.acquire({user: "deploy"});
                 expect(cmd).toInclude("ln -s");

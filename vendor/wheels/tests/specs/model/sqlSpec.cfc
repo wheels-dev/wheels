@@ -151,5 +151,37 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 		})
+
+		describe("Tests that dialect name", () => {
+
+			it("derives the SQL dialect from the model adapter name without instantiating Migration", () => {
+				var m = g.model("post");
+
+				// valid because the test app's models use the default datasource
+				expect(m.$dialectName()).toBe(
+					CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName()
+				);
+				expect(ReFind("Model$", m.$dialectName())).toBe(0);
+			})
+
+			it("reads the adapter name persisted on the model class, not the global setting", () => {
+				var m = g.model("post");
+				var realDialect = m.$dialectName();
+				var originalGlobal = application.wheels.adapterName;
+				try {
+					// simulate a model class on a DIFFERENT datasource initializing afterwards:
+					// $assignAdapter() rewrites the global adapterName setting on every class
+					// init (including adapter-cache hits), so in a multi-datasource app the
+					// global holds the most-recently-initialized class's adapter — it must not
+					// leak into this model's dialect resolution
+					application.wheels.adapterName = "BogusEngineModel";
+					expect(m.$dialectName()).toBe(realDialect);
+					expect(m.$dialectName()).notToBe("BogusEngine");
+				} finally {
+					application.wheels.adapterName = originalGlobal;
+				}
+			})
+
+		})
 	}
 }

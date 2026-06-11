@@ -15,8 +15,8 @@ component extends="Base" {
             "buildx", "build",
             "--push",
             "--tag", variables.config.absoluteImage(arguments.version),
-            "--file", b.dockerfile(),
-            b.context()
+            "--file", shellEscape(b.dockerfile()),
+            shellEscape(b.context())
         );
     }
 
@@ -50,8 +50,8 @@ component extends="Base" {
             "buildx", "build",
             "--load",
             "--tag", variables.config.image() & ":dirty",
-            "--file", b.dockerfile(),
-            b.context()
+            "--file", shellEscape(b.dockerfile()),
+            shellEscape(b.context())
         );
     }
 

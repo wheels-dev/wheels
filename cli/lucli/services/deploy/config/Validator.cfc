@@ -37,7 +37,17 @@ component {
 				$raise(arguments.filePath, "unknown top-level key: '#k#'");
 			}
 		}
+		// Service / role / accessory names are interpolated raw into lock
+		// paths, container names, and `--filter label=service=...` pipelines
+		// (some piped to `xargs docker rm -f`), so they must be format-
+		// validated rather than quoted (##2956).
+		$validateName(arguments.parsed.service, "service", arguments.filePath);
 		$validateServers(arguments.parsed.servers, arguments.filePath);
+		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {
+			for (var accName in arguments.parsed.accessories) {
+				$validateName(accName, "accessory", arguments.filePath);
+			}
+		}
 	}
 
 	public void function $validateServers(required any servers, required string filePath) {
@@ -45,6 +55,7 @@ component {
 			for (var host in arguments.servers) $validateHost(host, arguments.filePath);
 		} else if (isStruct(arguments.servers)) {
 			for (var role in arguments.servers) {
+				$validateName(role, "role", arguments.filePath);
 				var entry = arguments.servers[role];
 				if (isArray(entry)) {
 					for (var host in entry) $validateHost(host, arguments.filePath);
@@ -61,6 +72,21 @@ component {
 		var colonCount = arrayLen(listToArray(arguments.host, ":", false, true)) - 1;
 		if (colonCount > 1 && left(arguments.host, 1) != "[") {
 			$raise(arguments.filePath, "invalid host: '#arguments.host#'");
+		}
+	}
+
+	/**
+	 * Docker-compliant name check (same shape Docker enforces for container
+	 * names): leading alphanumeric, then alphanumerics, underscores, dots,
+	 * and hyphens only. Anything else could inject into the remote shell
+	 * via the unquoted interpolation sites listed in validate().
+	 */
+	public void function $validateName(required string name, required string kind, required string filePath) {
+		if (!reFind("^[a-zA-Z0-9][a-zA-Z0-9_.-]*$", arguments.name)) {
+			$raise(
+				arguments.filePath,
+				"invalid #arguments.kind# name: '#arguments.name#' (must match [a-zA-Z0-9][a-zA-Z0-9_.-]*)"
+			);
 		}
 	}
 

@@ -2383,6 +2383,60 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Returns whether the application has opted into trusting `X-Forwarded-*`
+	 * headers via `set(trustProxyHeaders=true)`. Guarded so it is safe to call on a cold start
+	 * before `application.wheels` exists (resolves to `false`, i.e. do not trust).
+	 */
+	public boolean function $trustProxyHeaders() {
+		return StructKeyExists(application, "wheels")
+		&& StructKeyExists(application.wheels, "trustProxyHeaders")
+		&& IsBoolean(application.wheels.trustProxyHeaders)
+		&& application.wheels.trustProxyHeaders;
+	}
+
+	/**
+	 * Internal function. Resolves the trusted client IP for security decisions.
+	 * Returns `REMOTE_ADDR` (the socket address) unless `trustProxyHeaders` is enabled and
+	 * `X-Forwarded-For` is non-empty, in which case the rightmost hop is used — that is the entry
+	 * appended by the trusted proxy nearest the app; earlier entries are client-supplied and
+	 * spoofable. For this to be safe the proxy must overwrite — never append to — the incoming
+	 * header.
+	 */
+	public string function $trustedClientIp(string remoteAddr, string forwardedFor) {
+		if (!StructKeyExists(arguments, "remoteAddr")) {
+			arguments.remoteAddr = cgi.remote_addr;
+		}
+		if (!StructKeyExists(arguments, "forwardedFor")) {
+			arguments.forwardedFor = cgi.http_x_forwarded_for;
+		}
+		local.rv = Trim(arguments.remoteAddr);
+		if ($trustProxyHeaders() && Len(Trim(arguments.forwardedFor))) {
+			local.rv = Trim(ListLast(arguments.forwardedFor));
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Returns whether the current client is exempt from maintenance mode.
+	 * The exception list comes from config only (`set(ipExceptions="...")`). A list containing
+	 * letters is matched against the user agent (legacy behavior preserved verbatim); otherwise
+	 * it is matched against the trusted client IP.
+	 */
+	public boolean function $maintenanceModeExempt(
+		required string exceptions,
+		required string userAgent,
+		required string clientIp
+	) {
+		if (!Len(arguments.exceptions)) {
+			return false;
+		}
+		if (ReFindNoCase("[a-z]", arguments.exceptions)) {
+			return ListFindNoCase(arguments.exceptions, arguments.userAgent) > 0;
+		}
+		return ListFind(arguments.exceptions, arguments.clientIp) > 0;
+	}
+
+	/**
 	 * Internal function. Derives `webPath`, `rootPath`, `rootcomponentPath`,
 	 * and `wheelsComponentPath` from either an explicit URL `subpath`
 	 * (issue #2968 — subfolder installs where `cgi.script_name` does not

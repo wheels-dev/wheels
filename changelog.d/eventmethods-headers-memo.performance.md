@@ -1,0 +1,1 @@
+- `$runOnRequestStart` no longer re-materializes `GetHTTPRequestData()` on every request: the `request.$wheelsHeaders` memo guard checked a misspelled singular key, and headers are now reused from the `request.wheels.httpRequestData` snapshot taken at request start (#2961)

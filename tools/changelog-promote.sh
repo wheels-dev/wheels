@@ -21,7 +21,15 @@ python3 - "$@" <<'PYEOF'
 import datetime
 import pathlib
 import re
+import signal
 import sys
+
+# Piping --preview into head/less closes stdout early; restore the default
+# SIGPIPE action so we exit silently like cat/grep instead of spraying a
+# BrokenPipeError traceback. Safe for the promote path: all file mutations
+# happen before the summary prints.
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 FRAG_DIR = pathlib.Path("changelog.d")
 CHANGELOG = pathlib.Path("CHANGELOG.md")

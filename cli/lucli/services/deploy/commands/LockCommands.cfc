@@ -29,12 +29,14 @@ component extends="Base" {
     public string function acquire(required struct opts) {
         var user = arguments.opts.user ?: "unknown";
         var message = arguments.opts.message ?: "";
-        // $(hostname) and $(date ...) resolved by the remote shell; message
-        // is escaped by surrounding the whole target in single quotes so
-        // shell metacharacters don't blow up the ln command. Inner single
-        // quotes in message are closed and re-opened ( "'\''").
+        // $(hostname) and $(date ...) resolved by the remote shell; user and
+        // message are escaped by surrounding the whole target in single
+        // quotes so shell metacharacters don't blow up the ln command.
+        // Inner single quotes in either value are closed and re-opened
+        // ( "'\''").
+        var safeUser = replace(user, "'", "'\''", "all");
         var safeMessage = replace(message, "'", "'\''", "all");
-        var target = "'" & user & "@$(hostname)/$(date --iso-8601=seconds)/" & safeMessage & "'";
+        var target = "'" & safeUser & "@$(hostname)/$(date --iso-8601=seconds)/" & safeMessage & "'";
         return "ln -s " & target & " " & lockPath();
     }
 

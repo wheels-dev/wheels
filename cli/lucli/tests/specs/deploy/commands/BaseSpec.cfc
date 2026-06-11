@@ -27,6 +27,23 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(base.appendIf(true, ["--force"])).toBe("--force");
                 expect(base.appendIf(false, ["--force"])).toBe("");
             });
+
+            it("shellEscape() single-quotes a value", () => {
+                expect(base.shellEscape("abc")).toBe("'abc'");
+            });
+
+            it("shellEscape() neutralizes embedded single quotes", () => {
+                expect(base.shellEscape("a'b")).toBe("'a'\''b'");
+            });
+
+            it("shellEscape() handles empty string", () => {
+                expect(base.shellEscape("")).toBe("''");
+            });
+
+            it("shellEscape() makes $( ) and backticks inert", () => {
+                expect(base.shellEscape("$(rm -rf /)")).toBe("'$(rm -rf /)'");
+                expect(base.shellEscape("`whoami`")).toBe("'`whoami`'");
+            });
         });
     }
 }

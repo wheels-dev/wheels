@@ -68,6 +68,34 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("rm -f /tmp/kamal-maintenance-demo");
             });
 
+            it("run() escapes env values containing spaces and metacharacters", () => {
+                var tmp = getTempFile(getTempDirectory(), "yml");
+                fileWrite(tmp, "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                    & "env: {clear: {GREETING: 'hello world; $(whoami)'}}");
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(tmp);
+                var cmd = new cli.lucli.services.deploy.commands.AppCommands(cfg)
+                    .run(cfg.roles()[1], "v1");
+                expect(cmd).toInclude("-e 'GREETING=hello world; $(whoami)'");
+                expect(cmd).notToInclude("-e GREETING");
+            });
+
+            it("run() rejects env.secret with a clear error instead of silently dropping it", () => {
+                var tmp = getTempFile(getTempDirectory(), "yml");
+                fileWrite(tmp, "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                    & "env: {secret: [DATABASE_PASSWORD]}");
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(tmp);
+                var state = {threw: false, message: ""};
+                try {
+                    new cli.lucli.services.deploy.commands.AppCommands(cfg)
+                        .run(cfg.roles()[1], "v1");
+                } catch (Wheels.Deploy.EnvSecretUnsupported e) {
+                    state.threw = true;
+                    state.message = e.message;
+                }
+                expect(state.threw).toBeTrue();
+                expect(state.message).toInclude("DATABASE_PASSWORD");
+            });
+
             it("remove() chains docker stop and docker rm", () => {
                 var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
                     .remove(variables.cfg.roles()[1], "v9");

@@ -54,6 +54,23 @@ component extends="wheels.WheelsTest" {
 					expect(result.lastname).toBe("Petruzzi");
 				})
 
+				it("round-trips values containing SQL keywords through a handler scope", () => {
+					transaction action="begin" {
+						model("author").create(firstName = "Test", lastName = "Union Pacific");
+						var result = model("authorScoped").byLastName("Union Pacific").findAll();
+						transaction action="rollback";
+					}
+					expect(result.recordcount).toBe(1);
+				})
+
+				it("does not match rows for a quoted injection attempt passed to a handler scope", () => {
+					var result = model("authorScoped").byLastName("x'; DROP TABLE c_o_r_e_authors; --").findAll();
+					expect(result.recordcount).toBe(0);
+
+					// the table is intact and still queryable afterwards
+					expect(model("author").count()).toBeGT(0);
+				})
+
 			})
 
 			describe("terminal methods", () => {

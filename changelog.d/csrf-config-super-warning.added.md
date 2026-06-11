@@ -1,0 +1,1 @@
+- Development-mode warning (debug bar + wheels log) when a controller overrides `config()` without calling `super.config()`, which silently drops the base controller's `protectsFromForgery()` CSRF wiring and other inherited setup such as filters and verifies ([#2960](https://github.com/wheels-dev/wheels/issues/2960))
