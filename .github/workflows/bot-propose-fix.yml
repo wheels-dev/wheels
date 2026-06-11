@@ -75,8 +75,9 @@ jobs:
       # either signal shows a human is already on the issue:
       #   (a) a `peter/issue-<N>-*` campaign branch exists on origin, or
       #   (b) an open non-bot PR references "#<N>" in its body.
-      # Logs only — no issue comment, so a later manual dispatch can still run
-      # once the human effort is abandoned.
+      # Logs only — no issue comment. Manual workflow_dispatch bypasses the
+      # guard entirely: a maintainer dispatching by hand is explicit intent,
+      # including over a lingering stale campaign branch.
       - name: Campaign guard
         if: steps.gate.outputs.skip == 'false'
         id: campaign
@@ -84,6 +85,11 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "::notice::Campaign guard bypassed: manual dispatch is explicit maintainer intent."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
             echo "::error::issue number must be numeric, got: $ISSUE_NUMBER"
             exit 1
@@ -95,12 +101,14 @@ jobs:
             exit 0
           fi
           # (b) an open non-bot PR whose body references this issue. The
-          # --search narrows server-side; jq re-verifies the body actually
-          # contains "#<N>" and that the author is not a bot.
+          # --search narrows server-side; jq re-verifies the body references
+          # "#<N>" with a trailing non-digit boundary (plain contains() would
+          # let issue 123 match a body referencing #1234) and that the author
+          # is not a bot. ISSUE_NUMBER is regex-safe: validated ^[0-9]+$ above.
           open_nonbot=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
             --search "${ISSUE_NUMBER} in:body" \
             --json number,author,body \
-            --jq "[.[] | select(.author.is_bot | not) | select(.body | contains(\"#${ISSUE_NUMBER}\"))] | length")
+            --jq "[.[] | select(.author.is_bot | not) | select(.body | test(\"#${ISSUE_NUMBER}([^0-9]|\$)\"))] | length")
           if [ "${open_nonbot}" != "0" ]; then
             echo "::notice::Campaign guard: ${open_nonbot} open non-bot PR(s) reference #${ISSUE_NUMBER} — skipping bot draft (the human/session PR wins)."
             echo "skip=true" >> "$GITHUB_OUTPUT"

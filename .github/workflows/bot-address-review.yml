@@ -110,9 +110,12 @@ jobs:
         with:
           target-type: pr
           target-number: ${{ env.PR_NUMBER }}
-          # Skip if address-held already engaged for this PR. The prompt
-          # does deeper round counting (outer-loop cap of 5).
-          marker-pattern: 'wheels-bot:address-held:${{ env.PR_NUMBER }}'
+          # Skip if address-held already engaged for this PR *at this head
+          # SHA* (the prompt emits the marker SHA-suffixed; matching the
+          # SHA-less prefix would permanently no-op every future label opt-in
+          # on the PR). The prompt does deeper round counting (outer-loop cap
+          # of 5).
+          marker-pattern: 'wheels-bot:address-held:${{ env.PR_NUMBER }}:${{ steps.pr.outputs.head }}'
           github-token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure git
