@@ -150,7 +150,11 @@ component {
 		if (!StructKeyExists(application, "$reloadRateLimit")) {
 			application.$reloadRateLimit = {};
 		}
-		local.reloadRateLimitKey = cgi.REMOTE_ADDR;
+		// Key on the trusted client IP: the socket address unless the running app's
+		// trustProxyHeaders setting opted into X-Forwarded-For (rightmost hop). On a cold
+		// start application.wheels does not exist yet, so trust resolves to false and the
+		// key falls back to the socket address.
+		local.reloadRateLimitKey = application.wo.$trustedClientIp();
 		local.reloadRateLimited = false;
 		if (StructKeyExists(application.$reloadRateLimit, local.reloadRateLimitKey)) {
 			local.rl = application.$reloadRateLimit[local.reloadRateLimitKey];
@@ -180,7 +184,7 @@ component {
 				writeLog(
 					file="wheels_security",
 					type="warning",
-					text="Environment switched to '" & URL.reload & "' via URL from " & cgi.REMOTE_ADDR
+					text="Environment switched to '" & URL.reload & "' via URL from " & local.reloadRateLimitKey
 				);
 			} catch (any e) {
 				// Fail silently if logging fails
@@ -201,7 +205,7 @@ component {
 			}
 			application.$reloadRateLimit[local.reloadRateLimitKey].count++;
 			try {
-				writeLog(file="wheels_security", type="warning", text="Reload password rejected from #cgi.REMOTE_ADDR#");
+				writeLog(file="wheels_security", type="warning", text="Reload password rejected from #local.reloadRateLimitKey#");
 			} catch (any e) {
 			}
 		}
@@ -209,7 +213,7 @@ component {
 		// Log successful reload
 		if (local.reloadPasswordMatched) {
 			try {
-				writeLog(file="wheels_security", type="information", text="Reload accepted from #cgi.REMOTE_ADDR# (environment: #URL.reload#)");
+				writeLog(file="wheels_security", type="information", text="Reload accepted from #local.reloadRateLimitKey# (environment: #URL.reload#)");
 			} catch (any e) {
 			}
 		}

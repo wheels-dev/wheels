@@ -133,8 +133,8 @@ component extends="Controller" {
 ## Important Notes
 - Returns `false` for HTTP connections (port 80)
 - Returns `true` for HTTPS connections (port 443)
-- Works behind load balancers and reverse proxies
-- Consider proxy headers (X-Forwarded-Proto) in deployment
+- Works behind load balancers and reverse proxies when `set(trustProxyHeaders=true)` is configured
+- `X-Forwarded-Proto` is **not** honored by default; enable with `set(trustProxyHeaders=true)` behind a trusted proxy that overwrites forwarded headers
 - Test both HTTP and HTTPS scenarios during development
 
 ## Common Patterns

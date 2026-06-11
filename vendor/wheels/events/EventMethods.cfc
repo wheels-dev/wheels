@@ -220,26 +220,18 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		}
 
 		if (application.wheels.environment == "maintenance") {
-			if (StructKeyExists(url, "except")) {
-				application.wheels.ipExceptions = url.except;
-			}
-			local.makeException = false;
-			if (Len(application.wheels.ipExceptions)) {
-				if (ReFindNoCase("[a-z]", application.wheels.ipExceptions)) {
-					if (ListFindNoCase(application.wheels.ipExceptions, cgi.http_user_agent)) {
-						local.makeException = true;
-					}
-				} else {
-					local.ipAddress = cgi.remote_addr;
-					if (Len(request.cgi.http_x_forwarded_for)) {
-						local.ipAddress = request.cgi.http_x_forwarded_for;
-					}
-					if (ListFind(application.wheels.ipExceptions, local.ipAddress)) {
-						local.makeException = true;
-					}
-				}
-			}
-			if (!local.makeException) {
+			// Exceptions come from config only (set(ipExceptions="...")). The legacy ?except=
+			// URL parameter let any anonymous client rewrite the exception list for everyone
+			// (issue #2953), so request data is no longer written into the application scope.
+			// The client IP is the socket address unless the app opted into X-Forwarded-For
+			// (rightmost hop) via set(trustProxyHeaders=true).
+			if (
+				!$maintenanceModeExempt(
+					exceptions = application.wheels.ipExceptions,
+					userAgent = cgi.http_user_agent,
+					clientIp = $trustedClientIp()
+				)
+			) {
 				$header(statusCode = 503);
 
 				// Set the content to be displayed in maintenance mode to a request variable and exit the function.

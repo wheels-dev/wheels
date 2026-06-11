@@ -356,12 +356,17 @@ component {
 
 	/**
 	 * Returns whether Wheels is communicating over a secure port.
+	 * `X-Forwarded-Proto` is client-controlled and is only honored when the app has opted into
+	 * proxy trust via `set(trustProxyHeaders=true)` behind a trusted reverse proxy.
 	 *
 	 * [section: Controller]
 	 * [category: Miscellaneous Functions]
 	 */
 	public boolean function isSecure() {
-		return request.cgi.http_x_forwarded_proto == "https" || request.cgi.server_port_secure == "true";
+		if (request.cgi.server_port_secure == "true") {
+			return true;
+		}
+		return $trustProxyHeaders() && request.cgi.http_x_forwarded_proto == "https";
 	}
 
 	/**
