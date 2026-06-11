@@ -75,6 +75,8 @@ Every public function in the Wheels Module is auto-discovered as an MCP tool, pr
 | `wheels_notes` | Surface `TODO`, `FIXME`, `HACK`, `OPTIMIZE` annotations from the codebase. |
 | `wheels_create` | Create an application (currently only `wheels create app <name>`; forwards to `wheels new`). |
 | `wheels_upgrade` | Scan the project for breaking changes against a target framework version (read-only). |
+| `wheels_deploy` | Kamal-style production deploys (full deploy, rollback, config, setup, bootstrap, exec). |
+| `wheels_packages` | Search, show, add, update, and remove Wheels packages; manage the registry cache. |
 
 ### Tools deliberately hidden
 
@@ -86,6 +88,8 @@ A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenT
 - `browser` — multi-step browser testing flow with its own subcommand tree.
 - `mcp` — the meta command itself; exposing it would let an agent recursively launch MCP servers.
 - `d` — short alias for `destroy`, excluded to avoid a duplicate tool entry (the canonical `wheels_destroy` is exposed).
+- `g` — short alias for `generate`, excluded for the same duplicate-entry reason as `d`.
+- `main` — the bare `wheels` no-args dispatch target; it is not a subcommand.
 - Any function whose name begins with `$` — internal helpers kept `public` only so unit tests can reach them (a CFML testing carve-out). `mcpHiddenTools()` discovers these structurally via `getMetaData(this)`, so a future `$helper` added to the module cannot accidentally surface as a callable MCP tool without a manual denylist update.
 
 If you need one of these behaviours from an AI IDE, invoke it via a shell tool — don't try to expose it as an MCP tool.
