@@ -7,9 +7,15 @@ component extends="Model" {
 		scope(name = "orderedByFirstName", order = "firstname ASC");
 		scope(name = "firstThree", maxRows = 3);
 		scope(name = "byLastName", handler = "scopeByLastName");
+		scope(name = "captureLastName", handler = "scopeCaptureLastName");
 	}
 
 	private struct function scopeByLastName(required string lastName) {
+		return {where: "lastname = '#arguments.lastName#'"};
+	}
+
+	private struct function scopeCaptureLastName(required string lastName) {
+		request.capturedScopeHandlerArg = arguments.lastName;
 		return {where: "lastname = '#arguments.lastName#'"};
 	}
 
