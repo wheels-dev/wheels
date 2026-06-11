@@ -143,11 +143,51 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Reports whether the current CFML engine is BoxLang. Centralized here so
+	 * the adapters' engine-conditional branches (column-list parsing, identity
+	 * retrieval) share one probe — and so test doubles can override it without
+	 * application state ($engineAdapter() requires an initialized app).
+	 */
+	public boolean function $isBoxLangEngine() {
+		return StructKeyExists(server, "boxlang");
+	}
+
+	/**
+	 * Extract the column list from a rendered INSERT statement (the names
+	 * between the first parenthesis pair), normalized to a plain comma list:
+	 * whitespace and newlines removed, identifier quotes stripped.
+	 * Returns an empty string when no complete parenthesis pair is found.
+	 */
+	public string function $parseInsertColumnList(required string sql) {
+		local.startPar = Find("(", arguments.sql) + 1;
+		local.endPar = Find(")", arguments.sql);
+		local.columnList = "";
+		if (local.startPar > 1 && local.endPar > local.startPar) {
+			local.rawColumns = Mid(arguments.sql, local.startPar, (local.endPar - local.startPar));
+			if ($isBoxLangEngine()) {
+				// BoxLang's ReplaceList behaves differently — use regex to parse the column names.
+				local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
+				local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
+				local.columnList = Trim(local.columnList);
+			} else {
+				// Original Lucee / Adobe CF behavior.
+				local.columnList = ReplaceList(local.rawColumns, "#Chr(10)#,#Chr(13)#, ", ",,");
+			}
+		}
+		// Strip identifier quotes from the column list for comparison.
+		return $stripIdentifierQuotes(local.columnList);
+	}
+
+	/**
 	 * Called after a query has executed.
 	 * If the query was an INSERT and the generated auto-incrementing primary key is not in the result we get it manually.
 	 * If the primary key was part of the INSERT (i.e. it wasn't auto-incrementing) we don't need to check it though.
 	 * This process is typically needed on non-supported databases (example: H2) and drivers (example: jTDS).
 	 * We return void or a struct containing the key name / value.
+	 *
+	 * Template method: the shared INSERT / already-present-key / bulk-path /
+	 * key-in-column-list guards live here; the engine-specific retrieval is
+	 * delegated to the $lastIdLookup hook each adapter overrides.
 	 */
 	public any function $identitySelect(
 		required struct queryAttributes,
@@ -155,25 +195,66 @@ component output=false extends="wheels.Global"{
 		required string primaryKey,
 		any returningIdentity = ""
 	) {
-		local.query = {};
 		local.sql = Trim(arguments.result.sql);
-		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
-			local.startPar = Find("(", local.sql) + 1;
-			local.endPar = Find(")", local.sql);
-			local.columnList = ReplaceList(
-				Mid(local.sql, local.startPar, (local.endPar - local.startPar)),
-				"#Chr(10)#,#Chr(13)#, ",
-				",,"
-			);
-			// Strip identifier quotes from column list for comparison
-			local.columnList = $stripIdentifierQuotes(local.columnList);
-			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
-				local.rv = {};
-				query = $query(sql = "SELECT LAST_INSERT_ID() AS lastId", argumentCollection = arguments.queryAttributes);
-				local.rv[$generatedKey()] = query.lastId;
-				return local.rv;
-			}
+		if (Left(local.sql, 11) != "INSERT INTO" || StructKeyExists(arguments.result, $generatedKey())) {
+			return;
 		}
+
+		// Bulk operations (insertAll / upsertAll) invoke the shared query path
+		// without a primary-key hint, because the caller does not consume a
+		// generated key. Skip the lookup entirely in that case — it would be a
+		// wasted round-trip at best, and on PostgreSQL it would emit
+		// `pg_get_serial_sequence(..., '')`, which Postgres rejects with
+		// `column "" of relation "..." does not exist`.
+		if (!Len(arguments.primaryKey)) {
+			return;
+		}
+
+		// If the primary key was part of the INSERT it wasn't auto-generated.
+		if (ListFindNoCase($parseInsertColumnList(local.sql), ListFirst(arguments.primaryKey))) {
+			return;
+		}
+
+		// Hook contract: return a simple value (possibly empty) to publish it
+		// under $generatedKey(); return nothing to publish nothing.
+		local.id = $lastIdLookup(
+			queryAttributes = arguments.queryAttributes,
+			result = arguments.result,
+			primaryKey = arguments.primaryKey,
+			returningIdentity = arguments.returningIdentity,
+			insertSql = local.sql
+		);
+		if (!StructKeyExists(local, "id")) {
+			return;
+		}
+		local.rv = {};
+		local.rv[$generatedKey()] = local.id;
+		return local.rv;
+	}
+
+	/**
+	 * Engine-specific hook used by the $identitySelect template to retrieve the
+	 * generated key after an INSERT. Adapters override this with their own
+	 * retrieval strategy (sequence CURRVAL, same-batch resultset, driver key…).
+	 *
+	 * Contract: return a simple value (possibly empty) to publish it under
+	 * $generatedKey(); return nothing (void) to publish nothing.
+	 *
+	 * @queryAttributes Struct of cfquery attributes (datasource etc.) for follow-up queries.
+	 * @result The cfquery result struct from the INSERT.
+	 * @primaryKey Primary key column name(s).
+	 * @returningIdentity Resultset produced by the INSERT's own batch, when one exists.
+	 * @insertSql The trimmed SQL of the executed INSERT statement.
+	 */
+	public any function $lastIdLookup(
+		required struct queryAttributes,
+		required struct result,
+		required string primaryKey,
+		any returningIdentity = "",
+		required string insertSql
+	) {
+		local.query = $query(sql = "SELECT LAST_INSERT_ID() AS lastId", argumentCollection = arguments.queryAttributes);
+		return local.query.lastId;
 	}
 
 	/**
