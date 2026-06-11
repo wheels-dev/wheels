@@ -2,8 +2,6 @@
 title: Channels
 description: Pub/sub messaging over Server-Sent Events — publish from anywhere, subscribe from controllers, no WebSocket server required.
 type: howto
-sidebar:
-  order: 7.5
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -57,10 +55,7 @@ A subscribe action, a route to it, a publish call, and a view tag.
 ```cfm title="app/controllers/Notifications.cfc"
 component extends="Controller" {
     function stream() {
-        subscribeToChannel(
-            channel = "user.#params.userId#",
-            events = "notification,alert"
-        );
+        subscribeToChannel(channel = "user.#params.userId#");
     }
 }
 ```
@@ -80,7 +75,7 @@ component extends="Model" {
     private function notifyUser() {
         publish(
             channel = "user.#this.userId#",
-            event = "notification",
+            event = "message",
             data = SerializeJSON({title: "Order received", orderId: this.id})
         );
     }
@@ -102,9 +97,7 @@ document.addEventListener('wheels:sse', (e) => {
 });
 ```
 
-<Aside type="caution">
-  The script `channelSSETag()` generates wires only the browser's default `onmessage` handler, which fires for events whose type is `message`. Events published with any other `event` type (like `notification` above) arrive as named SSE events and are not relayed to `document`. Either publish with `event="message"` when using `channelSSETag()`, or skip the helper and use the [JavaScript client](#javascript-client) or a plain `EventSource` with `addEventListener('notification', ...)`.
-</Aside>
+That's it — publish with the default `message` event type, render `channelSSETag()` once per page, listen for `wheels:sse` on `document`. Named event types and per-event listeners are covered under [`channelSSETag()`](#channelssetag) and the [JavaScript client](#javascript-client) below.
 
 ## Configuration
 
@@ -156,6 +149,10 @@ adapter.cleanup(olderThanMinutes = 60, maxRows = 10000);
 
 `cleanup()` returns the number of rows deleted. `maxRows = 0` (the default) deletes all expired rows in one pass.
 
+<Aside type="note">
+  `$getChannelEngine()` is a `$`-prefixed internal helper — its signature may change across minor versions. If you'd prefer an API not marked internal, instantiate the adapter directly: `CreateObject("component", "wheels.channel.DatabaseAdapter").init()` — `cleanup()` works the same on both.
+</Aside>
+
 ## API reference
 
 ### publish()
@@ -192,7 +189,7 @@ With the memory adapter, the action subscribes in-process and streams events as 
 
 ### channelSSETag()
 
-Generate a `<script>` tag that opens an `EventSource` against a subscribe endpoint and relays events as `wheels:sse` CustomEvents on `document` (see [the caution above](#quick-start) about named event types).
+Generate a `<script>` tag that opens an `EventSource` against a subscribe endpoint and relays events as `wheels:sse` CustomEvents on `document`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -203,6 +200,10 @@ Generate a `<script>` tag that opens an `EventSource` against a subscribe endpoi
 | `events` | string | `""` | Comma-delimited event types (added as an `events` URL parameter) |
 
 You must pass either `route` or `controller` — otherwise it throws `Wheels.Channel.MissingEndpoint`. Note that the channel and events arrive at your action as URL parameters; your action decides what to do with them (typically `subscribeToChannel(channel=params.channel, events=params.events ?: "")` after validating the client may subscribe).
+
+<Aside type="caution">
+  The script `channelSSETag()` generates wires only the browser's default `onmessage` handler, which fires for events whose type is `message`. Events published with any other `event` type (like `notification`) arrive as named SSE events and are not relayed to `document`. To listen for named event types, either publish with `event="message"` when using `channelSSETag()`, or skip the helper and use the [JavaScript client](#javascript-client) or a plain `EventSource` with `addEventListener('notification', ...)`.
+</Aside>
 
 ## JavaScript client
 
