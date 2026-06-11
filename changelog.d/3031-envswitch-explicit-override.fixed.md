@@ -1,0 +1,1 @@
+- Explicit `set(allowEnvironmentSwitchViaUrl=true)` in `config/settings.cfm` is now honored in production-like environments (production, testing, maintenance). It used to be indistinguishable from the framework default and was silently discarded, making the documented override impossible (#3031)
