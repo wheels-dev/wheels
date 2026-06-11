@@ -62,9 +62,11 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
 
 2. **Read the reviewer's findings.** Fetch the PR's reviews via
    `gh pr view <pr-number> --json reviews`. Find the **most recent**
-   `wheels-bot[bot]` review whose `commit_id` equals `<head-sha>` and whose
-   state is `CHANGES_REQUESTED`, or `COMMENTED` with concrete findings in
-   the body. That review's findings are your work list.
+   `wheels-bot[bot]` review whose `.commit.oid` equals `<head-sha>` (note:
+   `gh pr view` exposes `commit.oid` — `commit_id` is the REST shape from
+   `gh api`, and matching on it silently finds nothing) and whose state is
+   `CHANGES_REQUESTED`, or `COMMENTED` with concrete findings in the body.
+   That review's findings are your work list.
 
    - If no wheels-bot review exists on `<head-sha>`, exit silently with a
      brief log line — there is nothing to address at this SHA (the label

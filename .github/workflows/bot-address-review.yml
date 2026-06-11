@@ -42,9 +42,10 @@ jobs:
     name: Address review
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Opt-in only: the maintainer-applied `bot-address-review` label (only
-    # users with write access can label) or a manual dispatch. No marker
-    # auto-fire path remains.
+    # Opt-in only: the maintainer-applied `bot-address-review` label
+    # (labeling requires triage access or higher — keep the triage role
+    # restricted, since this stage pushes commits) or a manual dispatch.
+    # No marker auto-fire path remains.
     if: |
       vars.WHEELS_BOT_ENABLED == 'true'
       && (
@@ -115,7 +116,7 @@ jobs:
           # SHA-less prefix would permanently no-op every future label opt-in
           # on the PR). The prompt does deeper round counting (outer-loop cap
           # of 5).
-          marker-pattern: 'wheels-bot:address-held:${{ env.PR_NUMBER }}:${{ steps.pr.outputs.head }}'
+          marker-pattern: 'wheels-bot:address-held:${{ env.PR_NUMBER }}:${{ steps.pr.outputs.sha }}'
           github-token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure git

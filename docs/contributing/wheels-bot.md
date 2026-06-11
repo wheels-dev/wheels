@@ -215,7 +215,8 @@ single-reviewer consolidation still satisfy the skip-check gate.
 ### 7. Address Review (`bot-address-review.yml`) — opt-in
 
 **This stage never auto-fires.** A human opts a PR in by either applying
-the `bot-address-review` label (only users with write access can label)
+the `bot-address-review` label (labeling requires triage access or
+higher — this stage pushes commits, so keep the triage role restricted)
 or dispatching the workflow manually with the PR number. The previous
 auto-fire on Reviewer B's `converged-changes` marker was removed along
 with the loop — an unsupervised push chain had landed a broken spec on a
