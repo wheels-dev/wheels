@@ -15,10 +15,6 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("accepts the stored VALUE (not the name) on valid() — the same value scopes filter on", () => {
-				// Reporter example: enum(property="priority", values={low: 0, medium: 1, high: 2})
-				// The auto-registered inclusion validation must accept the stored value (0),
-				// because that is what the auto-generated scope queries for and what is<Name>()
-				// compares against. Use Author.lastName as a varchar carrier column.
 				var m = g.model("author")
 				m.enum(property="lastName", values={low: 0, medium: 1, high: 2})
 
@@ -28,6 +24,15 @@ component extends="wheels.WheelsTest" {
 
 				var errors = instance.errorsOn("lastName")
 				expect(ArrayLen(errors)).toBe(0)
+			})
+
+			it("rejects the enum NAME string (struct form) — stored value is what matters", () => {
+				var m = g.model("author")
+				m.enum(property="lastName", values={low: 0, medium: 1, high: 2})
+
+				var instance = m.new(firstName="Test")
+				instance.lastName = "low"
+				expect(instance.valid()).toBeFalse()
 			})
 
 			it("rejects values that are neither names nor stored values", () => {
@@ -40,8 +45,6 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("the value that passes validation is the same value is<Name>() returns true for", () => {
-				// Without this, the three sides of enum() — validation, scopes, checkers —
-				// can't all agree about what a row stores.
 				var m = g.model("author")
 				m.enum(property="lastName", values={low: 0, medium: 1, high: 2})
 
@@ -57,18 +60,14 @@ component extends="wheels.WheelsTest" {
 				m.enum(property="lastName", values={low: 0, medium: 1, high: 2})
 				var scopes = m.$classData().scopes
 
-				// The scope queries lastName = '0' — the stored value.
 				expect(scopes.low.whereParams[1].value).toBe("0")
 
-				// Validation must accept the same value the scope queries for.
 				var instance = m.new(firstName="Test")
 				instance.lastName = scopes.low.whereParams[1].value
 				expect(instance.valid()).toBeTrue()
 			})
 
 			it("list-form enum (names == values) still validates correctly", () => {
-				// Regression guard: the list-form path's behaviour must not change, because
-				// names and stored values are identical there.
 				var m = g.model("author")
 				m.enum(property="lastName", values="alpha,beta,gamma")
 

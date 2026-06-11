@@ -916,14 +916,7 @@ component {
 		}
 		variables.wheels.class.enums[arguments.property] = local.enumDef;
 
-		// Auto-register inclusion validation for this property.
-		// The list must derive from the STORED VALUES (not the name keys), so that
-		// rows hold values the auto-generated scope filters on and the is<Name>()
-		// checkers compare against. For the list form, names == values so the
-		// behaviour is unchanged. For the struct form `enum(property="priority",
-		// values={low: 0, medium: 1, high: 2})`, validation now accepts 0/1/2 —
-		// the same values the scope WHERE clause and isLow()/isMedium()/isHigh()
-		// already reference. See issue ##3014.
+		// Build inclusion from stored values (not name keys) so valid() agrees with scopes and is*() — ##3014.
 		local.inclusionList = "";
 		for (local.enumName in ListToArray(local.enumDef.names)) {
 			local.inclusionList = ListAppend(local.inclusionList, local.enumDef.values[local.enumName]);
