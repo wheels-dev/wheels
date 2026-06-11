@@ -1,0 +1,368 @@
+---
+title: Channels
+description: Pub/sub messaging over Server-Sent Events — publish from anywhere, subscribe from controllers, no WebSocket server required.
+type: howto
+sidebar:
+  order: 7.5
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to use Wheels channels — a pub/sub layer on top of [Server-Sent Events](/v4-0-0/digging-deeper/server-sent-events/). You'll publish named events from anywhere in your app, stream them to subscribed browsers from a controller action, pick the right adapter for your deployment, and wire up the JavaScript client.
+
+**You'll learn:**
+
+- What channels add on top of the low-level SSE API
+- Where Wheels stands on WebSockets — and why channels are SSE-only by design
+- How to publish with `publish()` and subscribe with `subscribeToChannel()`
+- When to use the memory adapter versus the database adapter
+- How to deliver the `WheelsSSE` JavaScript client to the browser (it is not auto-served)
+
+<Aside type="note">
+  You should already know how the low-level SSE API works. See [Server-Sent Events](/v4-0-0/digging-deeper/server-sent-events/).
+</Aside>
+
+## What channels add
+
+The SSE guide covers the raw primitives: `renderSSE()` for one-shot events and `initSSEStream()` / `sendSSEEvent()` / `closeSSEStream()` for hand-rolled streams. With those, you write the delivery loop yourself.
+
+Channels layer pub/sub on top. You publish a named event to a named channel from anywhere — a model callback, a background job, another controller — and any browser subscribed to that channel receives it. The framework runs the long-lived connection loop, the event filtering, the heartbeats, and the `Last-Event-ID` resume handling for you. The low-level SSE API keeps working unchanged; channels are built on it, not a replacement for it.
+
+Three pieces make up the surface:
+
+- `publish(channel, event, data)` — a global function. Callable from controllers, models, jobs, and anywhere else global helpers are available.
+- `subscribeToChannel(...)` — a controller mixin. Call it from an action to turn that action into a long-lived SSE endpoint streaming the channel's events.
+- `channelSSETag(...)` — a view helper that emits a small `<script>` tag opening an `EventSource` against your subscribe action.
+
+Everything flows one way: server to client.
+
+## The WebSocket story
+
+Wheels does not ship WebSocket support. There is no bidirectional channel, no binary framing, no presence tracking, and no `cfwebsocket` integration. Channels are one-directional — server to client — over SSE, and that is a deliberate design choice, not a stopgap:
+
+- **Plain HTTP.** SSE rides an ordinary long-lived GET request. Every proxy, load balancer, and firewall that speaks HTTP passes it through; WebSockets need their own upgrade handshake and protocol support at every hop.
+- **Free reconnection.** The browser's `EventSource` reconnects automatically and resends `Last-Event-ID` so you can resume. With WebSockets you write that yourself.
+- **Auth you already have.** Same-origin SSE requests carry your session cookie. No separate token handshake for a second protocol.
+
+AdonisJS made the same call with its Transmit package — SSE-only, no WebSocket server — for the same reasons.
+
+For the client-to-server direction, use what you already have: an ordinary HTTP POST. The action saves whatever it needs to and calls `publish()` to fan the result out to subscribers. The [chat room pattern](#chat-room) below is exactly this — and it covers most "I need WebSockets" use cases.
+
+Native WebSocket support is being scoped on the roadmap — follow [issue #2962](https://github.com/wheels-dev/wheels/issues/2962).
+
+## Quick start
+
+A subscribe action, a route to it, a publish call, and a view tag.
+
+```cfm title="app/controllers/Notifications.cfc"
+component extends="Controller" {
+    function stream() {
+        subscribeToChannel(
+            channel = "user.#params.userId#",
+            events = "notification,alert"
+        );
+    }
+}
+```
+
+```cfm title="config/routes.cfm (excerpt)"
+.get(name = "notificationStream", pattern = "notifications/stream", to = "notifications##stream")
+```
+
+Publish from anywhere — here, a model callback:
+
+```cfm title="app/models/Order.cfc"
+component extends="Model" {
+    function config() {
+        afterCreate("notifyUser");
+    }
+
+    private function notifyUser() {
+        publish(
+            channel = "user.#this.userId#",
+            event = "notification",
+            data = SerializeJSON({title: "Order received", orderId: this.id})
+        );
+    }
+}
+```
+
+In the view, `channelSSETag()` emits a `<script>` tag that opens an `EventSource` against the subscribe endpoint:
+
+```cfm title="app/views/orders/index.cfm (excerpt)"
+#channelSSETag(channel="user.#params.userId#", route="notificationStream")#
+```
+
+The generated script relays incoming events as `wheels:sse` [CustomEvents](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent) on `document`, with `{data, event, id}` in `e.detail`:
+
+```javascript title="illustrative — browser JS"
+document.addEventListener('wheels:sse', (e) => {
+    const payload = JSON.parse(e.detail.data);
+    showToast(payload.title);
+});
+```
+
+<Aside type="caution">
+  The script `channelSSETag()` generates wires only the browser's default `onmessage` handler, which fires for events whose type is `message`. Events published with any other `event` type (like `notification` above) arrive as named SSE events and are not relayed to `document`. Either publish with `event="message"` when using `channelSSETag()`, or skip the helper and use the [JavaScript client](#javascript-client) or a plain `EventSource` with `addEventListener('notification', ...)`.
+</Aside>
+
+## Configuration
+
+Set the default adapter in your settings file:
+
+```cfm title="config/settings.cfm (excerpt)"
+set(channelAdapter = "memory");   // or "database"
+```
+
+When `channelAdapter` is not set, the default is `"memory"`. Both `publish()` and `subscribeToChannel()` also accept a per-call `adapter` argument that overrides the global setting — useful when one high-traffic channel needs persistence and the rest don't.
+
+## Adapters
+
+### Memory (default)
+
+In-process pub/sub backed by a `ConcurrentHashMap`. Delivery is instant — `publish()` invokes each subscriber's callback synchronously on the publishing request, and the subscriber's streaming loop flushes it to the browser.
+
+- Best for: single-server deployments and development.
+- No persistence: an event published while a channel has no connected subscribers is gone. There is no replay, so `Last-Event-ID` resume cannot recover events missed while disconnected.
+- Single-server only: subscribers on server A never see events published on server B.
+- Empty channels are pruned automatically when their last subscriber disconnects, so per-entity channel names like `user.42` don't accumulate over the application's lifetime.
+
+### Database
+
+Persists every event to a `wheels_events` table, which is auto-created on first use (no migration needed). Subscribers poll the table — every `pollInterval` seconds (default 2) — so events published on any server reach subscribers on every server.
+
+- Best for: multi-server deployments, and anywhere you want resume/replay (events persist, so `Last-Event-ID` recovery works across reconnects).
+- Latency is bounded by the poll interval rather than instant.
+- Events are retained for 60 minutes by default.
+
+The table schema:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | VARCHAR(36), primary key | Event UUID |
+| `channel` | VARCHAR(255) | Channel name |
+| `event` | VARCHAR(255) | Event type |
+| `data` | TEXT / CLOB | Event payload |
+| `createdAt` | DATETIME / TIMESTAMP | When the event was published |
+
+Indexes: `(channel, createdAt)` and `(createdAt)`.
+
+Expired events are swept opportunistically on the publish path: at most once every 5 minutes (every 15 seconds while a backlog is draining), deleting at most 1,000 of the oldest expired rows per pass so no single `publish()` call blocks on a large `DELETE`. On busy multi-server deployments, don't rely solely on that — run a full sweep from a scheduled task or worker:
+
+```cfm title="illustrative — scheduled task body"
+var adapter = $getChannelEngine("database");
+adapter.cleanup(olderThanMinutes = 60, maxRows = 10000);
+```
+
+`cleanup()` returns the number of rows deleted. `maxRows = 0` (the default) deletes all expired rows in one pass.
+
+## API reference
+
+### publish()
+
+Publish an event to a channel. Available anywhere global helpers are — controllers, models, jobs, views.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `channel` | string | required | Channel name (e.g. `"user.42"`, `"orders"`) |
+| `event` | string | required | Event type (e.g. `"notification"`, `"update"`) |
+| `data` | string | required | Event payload (typically JSON via `SerializeJSON()`) |
+| `adapter` | string | `""` | `"memory"` or `"database"`; empty falls back to the `channelAdapter` setting |
+
+The return struct depends on the adapter:
+
+- **memory:** `{id, channel, event, subscriberCount, timestamp}` — `subscriberCount` is how many subscribers the event was delivered to.
+- **database:** `{id, channel, event, persisted}` — `persisted` is `false` if the insert failed (the error is logged to `wheels_channels.log`, not thrown).
+
+### subscribeToChannel()
+
+Call from a controller action to open a long-lived SSE connection streaming a channel's events until the client disconnects or the timeout elapses. When the connection ends, the browser's `EventSource` reconnects automatically and the next request resumes — `subscribeToChannel()` reads the `Last-Event-ID` request header on its own when `lastEventId` isn't passed.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `channel` | string | required | Channel to subscribe to |
+| `events` | string | `""` | Comma-delimited event types to deliver; empty delivers all |
+| `lastEventId` | string | `""` | Resume after this event ID; auto-detected from the `Last-Event-ID` header when empty |
+| `adapter` | string | `""` | Per-call adapter override |
+| `pollInterval` | numeric | `2` | Seconds between table polls (database adapter only) |
+| `timeout` | numeric | `300` | Maximum connection duration in seconds |
+| `heartbeatInterval` | numeric | `15` | Seconds between keep-alive comment pings |
+
+With the memory adapter, the action subscribes in-process and streams events as they're published. With the database adapter, it polls `wheels_events` every `pollInterval` seconds.
+
+### channelSSETag()
+
+Generate a `<script>` tag that opens an `EventSource` against a subscribe endpoint and relays events as `wheels:sse` CustomEvents on `document` (see [the caution above](#quick-start) about named event types).
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `channel` | string | required | Channel name (added as a `channel` URL parameter) |
+| `route` | string | `""` | Named route for the SSE endpoint |
+| `controller` | string | `""` | Controller name, used with `action` when no `route` is given |
+| `action` | string | `"stream"` | Action name |
+| `events` | string | `""` | Comma-delimited event types (added as an `events` URL parameter) |
+
+You must pass either `route` or `controller` — otherwise it throws `Wheels.Channel.MissingEndpoint`. Note that the channel and events arrive at your action as URL parameters; your action decides what to do with them (typically `subscribeToChannel(channel=params.channel, events=params.events ?: "")` after validating the client may subscribe).
+
+## JavaScript client
+
+Wheels ships `WheelsSSE`, a zero-dependency `EventSource` wrapper with typed listeners, `Last-Event-ID` tracking, and exponential-backoff reconnection.
+
+<Aside type="caution">
+  The file is **not served at any URL** by the framework. Copy it from `vendor/wheels/public/assets/js/wheels-sse.js` into your app — for example to `public/javascripts/wheels-sse.js` — and include it yourself. The plain `EventSource` API or `channelSSETag()` work without it.
+</Aside>
+
+```cfm title="app/views/layout.cfm (excerpt)"
+#javaScriptIncludeTag("wheels-sse")#
+```
+
+```javascript title="illustrative — browser JS"
+const sse = new WheelsSSE('/notifications/stream', {
+    channel: 'user.42',
+    events: ['notification', 'alert'],
+    onMessage: (data, event, id) => console.log(event, data)
+});
+
+// Typed listeners for named event types
+sse.on('notification', (data, id) => {
+    showNotification(data.title, data.body);
+});
+
+// Later
+sse.off('notification', handler);
+sse.close();
+
+// Static factory
+const orders = WheelsSSE.subscribe('/orders/stream', {channel: 'orders'});
+```
+
+`channel`, `events`, and `lastEventId` are appended to the URL as query parameters. Event data is `JSON.parse`d when possible; otherwise handlers receive the raw string.
+
+### Constructor options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `channel` | string | `""` | Channel name (added as a URL parameter) |
+| `events` | string[] | `[]` | Event types to filter (added as a URL parameter) |
+| `lastEventId` | string | `""` | Resume from this event ID |
+| `reconnectInterval` | number | `1000` | Initial reconnect delay (ms) |
+| `maxReconnectInterval` | number | `30000` | Maximum reconnect delay (ms) |
+| `reconnectDecay` | number | `2` | Backoff multiplier per attempt |
+| `maxRetries` | number | `0` | Maximum reconnect attempts (`0` = unlimited) |
+| `onOpen` | function | `null` | Called when the connection opens |
+| `onError` | function | `null` | Called on connection error |
+| `onMessage` | function | `null` | Called for every event: `(data, event, id)` |
+
+### Methods
+
+- `on(event, callback)` — add a typed event listener. Returns `this` for chaining.
+- `off(event, callback)` — remove a listener. Returns `this`.
+- `close()` — disconnect and stop reconnecting.
+- `lastEventId` (getter) — the last event ID received.
+
+### Reconnect behavior
+
+On connection error the client closes the source and retries: the delay starts at `reconnectInterval`, multiplies by `reconnectDecay` each attempt, and caps at `maxReconnectInterval`. A successful connection resets the backoff. With `maxRetries = 0` it retries forever; any other value stops after that many attempts.
+
+## Usage patterns
+
+### Per-user notifications
+
+One channel per user; publish from wherever the event originates.
+
+```cfm title="app/controllers/Notifications.cfc"
+component extends="Controller" {
+    function stream() {
+        subscribeToChannel(channel = "user.#session.userId#");
+    }
+}
+```
+
+```cfm title="illustrative — publish from a job or callback"
+publish(
+    channel = "user.#user.id#",
+    event = "notification",
+    data = SerializeJSON({title: "Order shipped", orderId: order.id})
+);
+```
+
+### Chat room
+
+The client-to-server direction is a plain POST: the `send` action persists the message and publishes it to everyone subscribed to the room. No WebSocket required.
+
+```cfm title="app/controllers/Chat.cfc"
+component extends="Controller" {
+    function messages() {
+        subscribeToChannel(
+            channel = "chat.room.#params.roomId#",
+            events = "message,typing"
+        );
+    }
+
+    function send() {
+        model("Message").create(
+            roomId = params.roomId,
+            userId = session.userId,
+            text = params.text
+        );
+        publish(
+            channel = "chat.room.#params.roomId#",
+            event = "message",
+            data = SerializeJSON({user: session.userName, text: params.text})
+        );
+        renderNothing();
+    }
+}
+```
+
+### Dashboard metrics on the database adapter
+
+A background job publishes metrics; dashboards on every server in the cluster pick them up. A longer poll interval and timeout suit slow-moving data.
+
+```cfm title="app/controllers/Dashboards.cfc"
+component extends="Controller" {
+    function metrics() {
+        subscribeToChannel(
+            channel = "dashboard.metrics",
+            adapter = "database",
+            pollInterval = 5,
+            timeout = 600
+        );
+    }
+}
+```
+
+```cfm title="illustrative — inside a background job's perform()"
+publish(
+    channel = "dashboard.metrics",
+    event = "metrics",
+    data = SerializeJSON(calculateMetrics()),
+    adapter = "database"
+);
+```
+
+## Authentication and deployment
+
+A subscribe action is an ordinary controller action — gate it with [filters](/v4-0-0/digging-deeper/authorization-and-filters/) exactly like anything else. Remember that the browser's `EventSource` can't set custom headers, so token-in-header schemes don't apply; the SSE guide's [authentication section](/v4-0-0/digging-deeper/server-sent-events/#authentication-on-sse) covers the workable alternatives (same-origin session cookies being the default for a Wheels app subscribing to its own channels).
+
+Channel subscriptions are long-lived requests, so the same deployment rules apply as for raw SSE streams: bump the request timeout for endpoints meant to outlive your engine's default (see [Long-lived connections and timeouts](/v4-0-0/digging-deeper/server-sent-events/#long-lived-connections-and-timeouts)) and make sure your reverse proxy doesn't buffer `text/event-stream` responses (see [Through reverse proxies](/v4-0-0/digging-deeper/server-sent-events/#through-reverse-proxies)).
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Server-Sent Events"
+    description="The transport channels are built on: one-shot events, hand-rolled streams, proxies, and auth."
+    href="/v4-0-0/digging-deeper/server-sent-events/"
+  />
+  <LinkCard
+    title="Background Jobs"
+    description="The natural publisher: jobs do the slow work and publish progress to a channel."
+    href="/v4-0-0/digging-deeper/background-jobs/"
+  />
+  <LinkCard
+    title="Authorization & Filters"
+    description="Gate subscribe actions with the same filters you use everywhere else."
+    href="/v4-0-0/digging-deeper/authorization-and-filters/"
+  />
+</CardGrid>
