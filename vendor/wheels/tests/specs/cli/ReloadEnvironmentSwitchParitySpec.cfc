@@ -9,7 +9,7 @@
  * needs URL.reload + URL.password present on the request that starts the new
  * application, so the switch code was unreachable through the stock flow.
  *
- * The fix has three cooperating parts, and ALL FOUR same-lineage copies of
+ * The fix has four cooperating parts, and ALL FOUR same-lineage copies of
  * public/Application.cfc must carry them:
  *
  *   1. $buildRedirectUrl() preserves reload + password (still strips lock)
@@ -30,8 +30,18 @@
  *      applicationStop() destroys — verified live on Lucee 7, where the
  *      preserved parameters alone produced an endless 302 chain with the
  *      environment stuck on development.
+ *   4. Both the preserve (1) and the handoff (3) honor
+ *      allowEnvironmentSwitchViaUrl: when switching is explicitly disallowed —
+ *      set(allowEnvironmentSwitchViaUrl=false) or the framework's
+ *      production/testing/maintenance auto-disable — the request degrades to
+ *      the strip-everything plain restart. This gate MUST live pre-restart in
+ *      the template: after applicationStop() the framework cannot enforce the
+ *      flag itself (the revert in wheels/events/onapplicationstart.cfc needs
+ *      carryover state the restart destroys, and the cold-start default is
+ *      allow). A missing flag counts as allowed, matching the framework's
+ *      carryover default.
  *
- * Structural spec (no runtime): reads each copy and asserts the three parts
+ * Structural spec (no runtime): reads each copy and asserts the four parts
  * are wired. Modeled on ApplicationCfcInjectorAssignmentSpec.cfc.
  */
 component extends="wheels.WheelsTest" {
@@ -125,6 +135,33 @@ component extends="wheels.WheelsTest" {
 							& "environment is already active — without this the preserved parameters "
 							& "redirect forever because redirectAfterReload defaults to false "
 							& "(issue ##3030)."
+						);
+					});
+
+					it("honors allowEnvironmentSwitchViaUrl on the preserve and handoff paths in " & relPath, () => {
+						var absolute = repoRoot & "/" & relPath;
+						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
+						var content = fileRead(absolute);
+
+						// Both the redirect-preserve condition ($buildRedirectUrl) and the
+						// password-handoff condition ($handleRestartAppRequest) must consult
+						// the flag. After applicationStop() the framework cannot enforce it
+						// (the revert in wheels/events/onapplicationstart.cfc needs carryover
+						// state the restart destroys, and the cold-start default is allow),
+						// so this pre-restart gate is the only place the configured
+						// off-switch — including the production/testing/maintenance
+						// auto-disable — can hold. A disallowed switch must degrade to the
+						// strip-all plain restart, never preserve the parameters.
+						var flagGuard = '!StructKeyExists\(application\.wheels,\s*"allowEnvironmentSwitchViaUrl"\)\s*\|\|\s*application\.wheels\.allowEnvironmentSwitchViaUrl';
+						expect(
+							ArrayLen(reMatch(flagGuard, content)) >= 2
+						).toBeTrue(
+							relPath & " must gate BOTH the reload+password preserve "
+							& "($buildRedirectUrl) and the reloadPassword handoff "
+							& "($handleRestartAppRequest) on allowEnvironmentSwitchViaUrl so "
+							& "set(allowEnvironmentSwitchViaUrl=false) and the production "
+							& "auto-disable degrade an environment switch to the strip-all "
+							& "plain restart (issues ##3030/##3031)."
 						);
 					});
 

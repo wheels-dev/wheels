@@ -427,6 +427,14 @@ component output="false" {
 		// password (the request's password was already verified against it by the
 		// reload gate), and the server scope is only reachable by code running on
 		// this engine — the same trust domain as config/settings.cfm itself.
+		// Skipped when allowEnvironmentSwitchViaUrl is explicitly disabled (covers
+		// both set(allowEnvironmentSwitchViaUrl=false) and the framework's
+		// production/testing/maintenance auto-disable): after applicationStop()
+		// the framework cannot enforce the flag itself — its revert in
+		// wheels/events/onapplicationstart.cfc needs carryover state the restart
+		// destroys — so this pre-restart gate is the only place the off-switch
+		// holds. A missing flag counts as allowed, matching the framework's
+		// carryover default.
 		if (
 			StructKeyExists(url, "reload")
 			&& !IsBoolean(url.reload)
@@ -435,6 +443,10 @@ component output="false" {
 			&& StructKeyExists(application, "wheels")
 			&& StructKeyExists(application.wheels, "reloadPassword")
 			&& Len(application.wheels.reloadPassword)
+			&& (
+				!StructKeyExists(application.wheels, "allowEnvironmentSwitchViaUrl")
+				|| application.wheels.allowEnvironmentSwitchViaUrl
+			)
 		) {
 			server["$wheelsReloadPasswordHandoff_" & this.name] = {
 				reloadPassword: application.wheels.reloadPassword,
@@ -465,7 +477,14 @@ component output="false" {
 		// Only preserve when the switch can actually be applied (a non-empty
 		// reloadPassword is configured and the request carries a password) —
 		// otherwise the new application could never switch and the preserved
-		// parameters would redirect forever.
+		// parameters would redirect forever. The same goes for
+		// allowEnvironmentSwitchViaUrl: when switching is explicitly disallowed
+		// (set(allowEnvironmentSwitchViaUrl=false) or the framework's
+		// production/testing/maintenance auto-disable) the parameters are
+		// stripped and the request degrades to a plain restart — the framework
+		// cannot enforce the flag on the post-applicationStop() cold start, so
+		// it must be enforced here, pre-restart. A missing flag counts as
+		// allowed, matching the framework's carryover default.
 		local.stripParams = "reload,password,lock";
 		if (
 			StructKeyExists(url, "reload")
@@ -475,6 +494,10 @@ component output="false" {
 			&& StructKeyExists(application, "wheels")
 			&& StructKeyExists(application.wheels, "reloadPassword")
 			&& Len(application.wheels.reloadPassword)
+			&& (
+				!StructKeyExists(application.wheels, "allowEnvironmentSwitchViaUrl")
+				|| application.wheels.allowEnvironmentSwitchViaUrl
+			)
 		) {
 			local.stripParams = "lock";
 		}
