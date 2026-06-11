@@ -1286,7 +1286,7 @@ Provide migration code following Wheels conventions."
 		// intact for existing clients.
 		return "Error: CLI-backed tools are disabled on the deprecated /wheels/mcp HTTP endpoint. "
 			& "Use the stdio MCP server instead ('wheels mcp wheels'; see "
-			& "docs/command-line-tools/commands/mcp/mcp-configuration-guide.md). "
+			& "https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration). "
 			& "Requested command: " & arguments.command;
 	}
 
