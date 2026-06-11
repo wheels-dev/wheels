@@ -1,0 +1,148 @@
+name: Smoke (non-dev environments)
+
+# Regression net for discussion #3023 / issues #3029, #3030, #3031: boots the
+# demo app with config/environment.cfm forced to production and testing and
+# asserts non-development request behavior (clean 404s, no stack traces, reload
+# refused without the password) via tools/ci/smoke-env.sh.
+#
+# The setup + server-boot steps are copied verbatim from pr.yml's fast-test job
+# (minus the Playwright/browser-test steps — the probes are plain curl checks).
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - 'vendor/wheels/**'
+      - 'public/**'
+      - 'config/**'
+      - 'app/**'
+      - 'tools/ci/smoke-env.sh'
+      - '.github/workflows/smoke-env.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: "Smoke: ${{ matrix.wheels_env }} (Lucee 7)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        wheels_env: [production, testing]
+    env:
+      LUCLI_VERSION: "0.3.7"
+      WHEELS_CI: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install LuCLI
+        run: |
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
+            -o /usr/local/bin/lucli
+          chmod +x /usr/local/bin/lucli
+          lucli --version
+
+      - name: Create test databases
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
+          sqlite3 wheelstestdb.db "SELECT 1;"
+          sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+
+      - name: Download SQLite JDBC driver
+        run: |
+          curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar" \
+            -o /tmp/sqlite-jdbc.jar
+
+      - name: Force ${{ matrix.wheels_env }} environment
+        run: |
+          sed -i 's/set(environment = "[a-z]*")/set(environment = "${{ matrix.wheels_env }}")/' config/environment.cfm
+          grep -n 'set(environment' config/environment.cfm
+
+      - name: Start Lucee server
+        run: |
+          cp tools/ci/lucee.ci.json lucee.json
+
+          # Start server (downloads Lucee Express on first run)
+          nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
+          echo $! > /tmp/lucli-server.pid
+
+          echo "Waiting for Lucee to start..."
+          for i in $(seq 1 120); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+              echo "Lucee is up (attempt ${i})"
+              break
+            fi
+            if ! kill -0 $(cat /tmp/lucli-server.pid) 2>/dev/null; then
+              echo "::error::LuCLI server process died"
+              cat /tmp/lucli-server.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Install SQLite JDBC into Lucee
+        run: |
+          # Find where LuCLI placed the Lucee Express lib directory
+          LUCEE_LIB=$(find ~/.lucli/express -path "*/lib/ext" -type d 2>/dev/null | head -1)
+          if [ -z "$LUCEE_LIB" ]; then
+            LUCEE_LIB=$(find ~/.lucli/express -maxdepth 2 -name "lib" -type d 2>/dev/null | head -1)
+          fi
+          if [ -n "$LUCEE_LIB" ]; then
+            cp /tmp/sqlite-jdbc.jar "$LUCEE_LIB/"
+            echo "SQLite JDBC installed to: $LUCEE_LIB"
+          else
+            echo "::error::Could not find Lucee lib directory"
+            find ~/.lucli/express -type d | head -20
+            exit 1
+          fi
+
+          # Stop server fully and restart to pick up the new JDBC driver
+          kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          lucli server stop 2>/dev/null || true
+          # Wait for port to be freed
+          for i in $(seq 1 15); do
+            if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:60007/" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          # Also kill any lingering java processes on the port
+          fuser -k 60007/tcp 2>/dev/null || true
+          sleep 2
+
+          nohup lucli server run --port=60007 --force > /tmp/lucli-server.log 2>&1 &
+          echo $! > /tmp/lucli-server.pid
+
+          echo "Waiting for Lucee to restart..."
+          for i in $(seq 1 60); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+              echo "Lucee restarted with SQLite JDBC"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run smoke probes
+        run: |
+          BASE_URL="http://localhost:60007" SMOKE_ENV="${{ matrix.wheels_env }}" bash tools/ci/smoke-env.sh
+
+      - name: Debug server logs
+        if: failure()
+        run: cat /tmp/lucli-server.log 2>/dev/null || true
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/lucli-server.pid ]; then
+            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          fi
+          lucli server stop 2>/dev/null || true
