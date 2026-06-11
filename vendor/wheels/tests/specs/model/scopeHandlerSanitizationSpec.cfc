@@ -132,24 +132,24 @@ component extends="wheels.WheelsTest" {
 
 		describe("scope handler args are sanitized on every invocation path (##3013)", () => {
 
-			// Dirty input that the sanitizer transforms: '--' stripped → "foobar".
-			// If sanitization runs, the handler sees "foobar"; if it is bypassed it sees "foo--bar".
+			// Quote-bearing input that the escape-only sanitizer transforms: ' doubled → "O''Brien".
+			// If sanitization runs, the handler sees "O''Brien"; if it is bypassed it sees the raw "O'Brien".
 			it("sanitizes args on the model-root path", () => {
 				request.capturedScopeHandlerArg = "";
-				application.wo.model("authorScoped").captureLastName("foo--bar");
-				expect(request.capturedScopeHandlerArg).toBe("foobar");
+				application.wo.model("authorScoped").captureLastName("O'Brien");
+				expect(request.capturedScopeHandlerArg).toBe("O''Brien");
 			});
 
 			it("sanitizes args on the ScopeChain (scope-on-scope) path", () => {
 				request.capturedScopeHandlerArg = "";
-				application.wo.model("authorScoped").withLastNameDjurner().captureLastName("foo--bar");
-				expect(request.capturedScopeHandlerArg).toBe("foobar");
+				application.wo.model("authorScoped").withLastNameDjurner().captureLastName("O'Brien");
+				expect(request.capturedScopeHandlerArg).toBe("O''Brien");
 			});
 
 			it("sanitizes args on the QueryBuilder (where → scope) path", () => {
 				request.capturedScopeHandlerArg = "";
-				application.wo.model("authorScoped").where("1=1").captureLastName("foo--bar");
-				expect(request.capturedScopeHandlerArg).toBe("foobar");
+				application.wo.model("authorScoped").where("1=1").captureLastName("O'Brien");
+				expect(request.capturedScopeHandlerArg).toBe("O''Brien");
 			});
 
 		});
