@@ -89,6 +89,11 @@ Nothing in that block is invented. Each key is defined in `vendor/wheels/events/
 | `csrfCookieEncryptionSecretKey` | `""` | `events/init/security.cfm:5` |
 | `errorEmailToAddress`, `errorEmailFromAddress` | `""` | `events/init/debugging.cfm:8-9` |
 | `URLRewriting` | detected from CGI | `onapplicationstart.cfc:207-215` |
+| `subpath` | `""` | `onapplicationstart.cfc:307-342` |
+
+<Aside type="note" title="Subfolder deployments">
+  If your app is mounted under a URL prefix — `/myapp/`, `/team/site/`, or similar — via a reverse proxy or IIS subfolder, set `subpath` in `config/settings.cfm` (not the per-environment file, since the mount point is the same in every environment): `set(subpath="/myapp")`. Alternatively, export `WHEELS_SUBPATH=/myapp` in the process environment — useful in CommandBox `server.json` `envVars` or an IIS `web.config` `environmentVariables` block. Link, form, and asset helpers that read `application.wheels.webPath` pick up the prefix automatically; without this setting, `cgi.script_name` may not reflect the public mount point and all generated URLs will be missing the prefix.
+</Aside>
 
 <Aside type="caution">
   `csrfCookieEncryptionSecretKey` is mandatory in production when `csrfStore="cookie"` — Wheels throws `Wheels.Security.MissingCsrfKey` at first CSRF check if it's empty (`vendor/wheels/controller/csrf.cfc:152-161`). Auto-generation is blocked in production on purpose: a regenerated key invalidates every outstanding session token.

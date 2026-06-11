@@ -125,15 +125,20 @@ component {
 		application.$wheels.cache.query = {};
 		application.$wheels.cacheLastCulledAt = Now();
 
-		// Set up paths to various folders in the framework.
-		application.$wheels.webPath = Replace(
-			request.cgi.script_name,
-			Reverse(SpanExcluding(Reverse(request.cgi.script_name), "/")),
-			""
-		);
-		application.$wheels.rootPath = "/" & ListChangeDelims(application.$wheels.webPath, "/", "/");
-		application.$wheels.rootcomponentPath = ListChangeDelims(application.$wheels.webPath, ".", "/");
-		application.$wheels.wheelsComponentPath = ListAppend(application.$wheels.rootcomponentPath, "wheels", ".");
+		// Set up paths to various folders in the framework. When the app
+		// is deployed under a URL subpath (issue #2968), cgi.script_name
+		// may not match the public mount point — typical with CommandBox
+		// single-site → IIS subfolder migrations or reverse proxies that
+		// fold `/public/` out of the URL. The default derivation runs
+		// first so paths exist for any code that consumes them between
+		// here and the config/settings.cfm include below; the override
+		// (`set(subpath="/wheelsproject1")` or `WHEELS_SUBPATH` env var)
+		// is reapplied after settings.cfm loads.
+		local.paths = application.wo.$resolveFrameworkPaths(scriptName = request.cgi.script_name);
+		application.$wheels.webPath = local.paths.webPath;
+		application.$wheels.rootPath = local.paths.rootPath;
+		application.$wheels.rootcomponentPath = local.paths.rootcomponentPath;
+		application.$wheels.wheelsComponentPath = local.paths.wheelsComponentPath;
 
 		// Check old environment to see whether we're allowed to switch configuration
 		application.$wheels.allowEnvironmentSwitchViaUrl = true;
@@ -300,6 +305,36 @@ component {
 		application.wo.$includeConfig(template = "/config/settings.cfm");
 		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
 			application.wo.$includeConfig(template = "/config/#application.$wheels.environment#/settings.cfm");
+		}
+
+		// Re-derive framework paths now that settings.cfm has loaded. Detection
+		// priority for the URL subpath (issue #2968):
+		//   1. set(subpath="/wheelsproject1") in config/settings.cfm
+		//   2. WHEELS_SUBPATH environment variable (CommandBox / IIS deploys)
+		//   3. existing cgi.script_name derivation (no-op when both are empty)
+		// `server.system.environment` is the cross-engine-safe env read; Lucee's
+		// `getSystemSetting()` is not portable.
+		local.configuredSubpath = "";
+		if (StructKeyExists(application.$wheels, "subpath") && Len(Trim(application.$wheels.subpath))) {
+			local.configuredSubpath = application.$wheels.subpath;
+		} else if (
+			StructKeyExists(server, "system")
+			&& StructKeyExists(server.system, "environment")
+			&& StructKeyExists(server.system.environment, "WHEELS_SUBPATH")
+			&& Len(Trim(server.system.environment.WHEELS_SUBPATH))
+		) {
+			local.configuredSubpath = server.system.environment.WHEELS_SUBPATH;
+		}
+		if (Len(local.configuredSubpath)) {
+			local.paths = application.wo.$resolveFrameworkPaths(
+				scriptName = request.cgi.script_name,
+				subpath = local.configuredSubpath
+			);
+			application.$wheels.webPath = local.paths.webPath;
+			application.$wheels.rootPath = local.paths.rootPath;
+			application.$wheels.rootcomponentPath = local.paths.rootcomponentPath;
+			application.$wheels.wheelsComponentPath = local.paths.wheelsComponentPath;
+			application.$wheels.subpath = local.configuredSubpath;
 		}
 
 		// In production-like environments, disable URL-based environment switching by default.

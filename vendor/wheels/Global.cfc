@@ -2383,6 +2383,40 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Derives `webPath`, `rootPath`, `rootcomponentPath`,
+	 * and `wheelsComponentPath` from either an explicit URL `subpath`
+	 * (issue #2968 — subfolder installs where `cgi.script_name` does not
+	 * reflect the public mount) or, when no subpath is given, the existing
+	 * `cgi.script_name` derivation. Returning a struct keeps the helper
+	 * pure so it can be unit-tested in isolation.
+	 */
+	public struct function $resolveFrameworkPaths(required string scriptName, string subpath = "") {
+		local.rv = {};
+		local.normalized = Trim(arguments.subpath);
+		if (Len(local.normalized) && Left(local.normalized, 1) != "/") {
+			local.normalized = "/" & local.normalized;
+		}
+		// Strip trailing slash(es) without falling through to Left(str, 0),
+		// which crashes Lucee 7 (see CLAUDE.md § "Cross-Engine Invariants").
+		while (Len(local.normalized) > 1 && Right(local.normalized, 1) == "/") {
+			local.normalized = Left(local.normalized, Len(local.normalized) - 1);
+		}
+		if (Len(local.normalized)) {
+			local.rv.webPath = local.normalized == "/" ? "/" : local.normalized & "/";
+		} else {
+			local.rv.webPath = Replace(
+				arguments.scriptName,
+				Reverse(SpanExcluding(Reverse(arguments.scriptName), "/")),
+				""
+			);
+		}
+		local.rv.rootPath = "/" & ListChangeDelims(local.rv.webPath, "/", "/");
+		local.rv.rootcomponentPath = ListChangeDelims(local.rv.webPath, ".", "/");
+		local.rv.wheelsComponentPath = ListAppend(local.rv.rootcomponentPath, "wheels", ".");
+		return local.rv;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $abortInvalidRequest() {
