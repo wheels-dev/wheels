@@ -778,15 +778,22 @@ component {
 			// Resolve include via $expandedAssociations to get safe table names (prevents SQL injection)
 			local.expandedAssociations = $expandedAssociations(include=arguments.include);
 			if(ArrayLen(local.expandedAssociations)){
-				local.resolvedTableName = variables.wheels.class.adapter.$quoteIdentifier(local.expandedAssociations[1].tableName);
+				// list EVERY included table — hard-indexing [1] dropped all includes after the first
+				local.resolvedTableNames = "";
+				for (local.i = 1; local.i <= ArrayLen(local.expandedAssociations); local.i++) {
+					local.resolvedTableNames = ListAppend(
+						local.resolvedTableNames,
+						variables.wheels.class.adapter.$quoteIdentifier(local.expandedAssociations[local.i].tableName)
+					);
+				}
 				if(ListFind('PostgreSQL,CockroachDB', local.dialect)){
-					ArrayAppend(arguments.sql, "FROM #local.resolvedTableName#");
+					ArrayAppend(arguments.sql, "FROM #local.resolvedTableNames#");
 				}
 				else if(ListFind('MicrosoftSQLServer', local.dialect)){
 					ArrayAppend(arguments.sql, "FROM #$quotedTableName()#");
 				}
 				else if(ListFind('H2,Oracle,SQLite', local.dialect)){
-					ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #local.resolvedTableName#");
+					ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #local.resolvedTableNames#");
 				}
 			}
 		}
@@ -816,17 +823,25 @@ component {
 			// constructed internally by $expandedAssociations() using $quoteIdentifier() for all
 			// table and column names (see the join-building loop in $expandedAssociations). The
 			// include parameter is validated against registered associations before reaching here.
+			// for UPDATE-with-include the joined tables' ON conditions move into the WHERE
+			// clause; use the joinOnConditions exposed by $expandedAssociations (position
+			// arithmetic on " ON ") and join multiple includes with AND — the former
+			// Split("ON") truncated joins containing the ON substring and the classes[2]
+			// hard-index dropped every include after the first
 			local.joinclause = "";
 			if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
-				for(local.i = 1; local.i<= arrayLen(local.classes); i++){
-					if(structKeyExists(local.classes[local.i], "JOIN")){
-						local.joinclause &= local.classes[local.i].JOIN.Split("ON")[2];
+				for(local.i = 1; local.i <= ArrayLen(local.classes); local.i++){
+					if(StructKeyExists(local.classes[local.i], "joinOnConditions") && Len(local.classes[local.i].joinOnConditions)){
+						if(Len(local.joinclause)){
+							local.joinclause &= " AND ";
+						}
+						local.joinclause &= local.classes[local.i].joinOnConditions;
 					}
 				}
 				ArrayAppend(local.rv, "WHERE #local.joinclause# AND");
 			}
 			else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
-				for(local.i = 1; local.i<= arrayLen(local.classes); i++){
+				for(local.i = 1; local.i <= ArrayLen(local.classes); local.i++){
 					if(structKeyExists(local.classes[local.i], "JOIN")){
 						local.joinclause &= local.classes[local.i].JOIN;
 					}
@@ -834,8 +849,16 @@ component {
 				ArrayAppend(local.rv, "#local.joinclause# WHERE ");
 			}
 			else if(arguments.include != "" && ListFind('Oracle,SQLite', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
+				for(local.i = 1; local.i <= ArrayLen(local.classes); local.i++){
+					if(StructKeyExists(local.classes[local.i], "joinOnConditions") && Len(local.classes[local.i].joinOnConditions)){
+						if(Len(local.joinclause)){
+							local.joinclause &= " AND ";
+						}
+						local.joinclause &= local.classes[local.i].joinOnConditions;
+					}
+				}
 				ArrayAppend(local.rv, "WHERE");
-				ArrayAppend(local.rv, local.classes[2].JOIN.Split("ON")[2] & " AND");
+				ArrayAppend(local.rv, local.joinclause & " AND");
 			}
 			else {
 				ArrayAppend(local.rv, "WHERE");
@@ -1378,6 +1401,12 @@ component {
 			local.entry = StructCopy(local.classAssociations[local.name]);
 			local.entry.join = local.classAssociations[local.name].joinVariants[local.joinVariantKey];
 			StructDelete(local.entry, "joinVariants");
+			// expose the ON conditions separately for UPDATE-with-include WHERE building:
+			// position arithmetic on the " ON " the builder writes verbatim above — replaces
+			// the former case-sensitive Split("ON") that corrupted joins whose quoted
+			// identifiers contain the ON substring (e.g. uppercase H2 schemas)
+			local.onPos = Find(" ON ", local.entry.join);
+			local.entry.joinOnConditions = local.onPos GT 0 ? Mid(local.entry.join, local.onPos + 4, Len(local.entry.join)) : "";
 			ArrayAppend(local.rv, local.entry);
 		}
 		return local.rv;
