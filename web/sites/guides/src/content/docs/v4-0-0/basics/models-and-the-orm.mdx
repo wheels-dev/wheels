@@ -100,6 +100,8 @@ component extends="Controller" {
 
 Pagination is built into `findAll`: pass `page` and `perPage` and the framework runs a count query, a primary-key query, and a hydration query behind the scenes. Pair with the view pagination helpers (`paginationNav()`) to render navigation.
 
+The `select=` argument limits which columns are returned. Items that contain a statement separator (`;`), comment marker (`--` / `/*`), or a subquery throw `Wheels.InvalidSelectClause` — never pass request input there. For computed columns, declare a calculated property with `property()` in `config()` instead of embedding raw SQL. If you need a raw expression you've audited and it contains no request input, pass `allowRawSelect=true` on the same call.
+
 ## Creating records
 
 Two patterns, chosen by whether you need to inspect or mutate the record before it's saved.

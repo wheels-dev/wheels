@@ -251,6 +251,25 @@ For new migrator helpers or anywhere you accept a column-name argument: declare 
 
 `t.references()` also respects `useUnderscoreReferenceColumns` (boolean, framework default `false`, `wheels new` template default `true`) — when true it produces `<name>_id` / `<name>_type` columns matching Wheels model `belongsTo` defaults.
 
+### 16. Raw SQL in `select=` throws `Wheels.InvalidSelectClause` — use calculated properties or `allowRawSelect=true`
+
+**Source:** [#3153](https://github.com/wheels-dev/wheels/issues/3153) — SEC-21 policy enforcement (5.0). `findAll(select=...)` / `findOne(select=...)` throw `Wheels.InvalidSelectClause` when any select item contains a statement separator (`;`), comment marker (`--` / `/*`), or a parenthesized subquery. Plain columns, `table.column`, `expr AS alias`, and aggregate functions pass unchecked.
+
+```cfm
+// WRONG — throws Wheels.InvalidSelectClause
+model("Post").findAll(select="id,(SELECT secret FROM users) AS x");
+model("Post").findAll(select="title; DROP TABLE posts --");
+
+// RIGHT — declare a calculated property in config()
+property(name="commentCount", sql="(SELECT COUNT(*) FROM c WHERE postId = posts.id)");
+model("Post").findAll(select="id,commentCount");
+
+// ESCAPE HATCH — only for audited, request-input-free expressions
+model("Post").findAll(select="id,(SELECT 1) AS flag", allowRawSelect=true);
+```
+
+Never pass request input to `select=` even with `allowRawSelect=true` — the flag bypasses the denylist check but does not prevent SQL injection.
+
 ## Wheels Conventions
 
 - **config()**: All model associations/validations/callbacks and controller filters/verifies go in `config()`.
