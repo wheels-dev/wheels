@@ -195,7 +195,7 @@ component extends="Controller" {
 
 Signature: `sendFile(file, name, type, disposition, directory, deleteFile, deliver)`. Defaults worth knowing:
 
-- `file` is resolved relative to the `filePath` setting, which defaults to `files/` under the app root. Pass `directory="/var/uploads"` to serve from outside the app.
+- `file` is resolved relative to the `filePath` setting, which defaults to `files/` under the app root. Pass an absolute `directory` (e.g. `directory="/var/uploads"`) to serve from outside the app — absolute paths are used verbatim on all engines.
 - `name` overrides what the browser shows in the Save dialog. Use it to hide storage filenames from the client.
 - `type` overrides the auto-detected MIME type.
 - `disposition` is `"attachment"` by default (force download) — pass `"inline"` to render in-browser for PDFs and images.
