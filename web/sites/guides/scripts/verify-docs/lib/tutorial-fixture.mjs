@@ -2,6 +2,7 @@ import { readFile, writeFile, appendFile, mkdir, rm, stat } from 'node:fs/promis
 import { join, dirname, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runExec } from './exec.mjs';
+import { scrubFixturePorts } from './fixtures.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(join(here, '..', 'fixtures', 'blog-tutorial'));
@@ -37,6 +38,12 @@ export async function resetFixture() {
       `wheels new failed (exit ${result.code}):\n${result.stderr || result.stdout}`,
     );
   }
+  // Same hazard as the per-block cli fixtures: the scaffold pins port 8080,
+  // so a stray local listener there would make any pre-server tutorial cli
+  // block attach to a foreign process instead of refusing. ensureServer()
+  // re-rewrites lucee.json to the live port before `wheels start`, so this
+  // only changes the window before the dev server exists.
+  await scrubFixturePorts(ROOT);
 }
 
 export async function writeFixtureFile(relPath, body) {

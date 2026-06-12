@@ -23,6 +23,14 @@ component extends="Controller" {
 }
 ```
 
-```bash {test:cli step=1 cmd="wheels reload"}
+{/* This block runs BEFORE step-2 starts the dev server, so the only
+    deterministic outcome is the documented no-running-server refusal.
+    resetFixture() scrubs the scaffold's pinned port 8080 onto a closed
+    ephemeral port (#3170 review), which makes the refusal independent of
+    whatever the contributor has listening on 8080/60000/3000/8500 —
+    previously this block could attach to a stray local listener and was
+    one of the known soft-failures the docs-verify workflow tolerates. */}
+
+```bash {test:cli step=1 cmd="wheels reload" asserts-output="No running Wheels server" asserts-exit=1}
 wheels reload
 ```

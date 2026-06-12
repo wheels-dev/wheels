@@ -236,3 +236,23 @@ Without `WHEELS_FRAMEWORK_PATH`, `wheels new` prints a framework-not-found
 error and exits 0 anyway; the harness detects the missing fixture directory
 and throws with a pointer back to this doc rather than surfacing a
 misleading `spawn … ENOENT` on the next child process.
+
+### Local listeners on port 8080 (and other common ports)
+
+`wheels new` pins port 8080 in every scaffold's `lucee.json`, and the CLI's
+server detection trusts an open pinned port unconditionally. The harness
+therefore rewrites every fixture's `lucee.json` to closed ephemeral ports
+right after `wheels new` (`scrubFixturePorts` in `lib/fixtures.mjs`), so the
+documented no-running-server refusal blocks (`wheels routes`,
+`wheels migrate info`, `wheels seed`) stay deterministic even when the repo's
+demo app, `docker-compose.dev.yml`, or any unrelated service occupies 8080.
+
+One residual gap on **released** CLIs up to 4.0.3: read-side commands
+(`wheels routes` on 4.0.3; any command behind the read-side gate once #3080
+ships) fall back to probing the common ports 8080/60000/3000/8500 even when
+the project pins a different port, so a stray listener there can still turn
+that refusal block red locally (symptom: `Failed to parse routes response`
+instead of the refusal text). Free those ports or point `WHEELS_BIN` at a
+CLI that includes the pinned-port fix (`detectServerPort` skips the probe
+whenever the project pins a port — shipped together with this harness
+change). CI is unaffected: the module overlay always carries the fix.

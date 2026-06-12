@@ -7080,6 +7080,12 @@ component extends="modules.BaseModule" {
 	 * target the server bound to this project's own config, never a
 	 * sibling app squatting 8080 (issue #2878).
 	 *
+	 * The common-port probe also only runs when the project pins NO port
+	 * at all: a pinned-but-closed port resolves to "not running" instead
+	 * of probing, because any listener on a common port is provably not
+	 * this project's server (#3170 review — a stray 8080 listener was
+	 * inverting the docs-verify refusal blocks).
+	 *
 	 * `commonPorts` is a test seam — the spec injects a known port to
 	 * simulate a sibling app deterministically. Production callers always
 	 * get the historical fallback list.
@@ -7095,13 +7101,26 @@ component extends="modules.BaseModule" {
 		boolean requireProjectConfig = false,
 		array commonPorts = [8080, 60000, 3000, 8500]
 	) {
+		// Tracks whether this project pins its own port (lucee.json `port`
+		// or .env PORT). A pinned-but-closed port must NOT fall through to
+		// the common-port probe below: anything answering on 8080/3000/…
+		// is by definition NOT this project's server (the project told us
+		// where its server lives), so attaching would be the exact
+		// cross-project hazard #2878 closed for write-side commands. The
+		// probe stays available only for legacy projects with no port
+		// config at all.
+		var projectPinsPort = false;
+
 		// 1. Check lucee.json
 		var luceeJson = variables.projectRoot & "/lucee.json";
 		if (fileExists(luceeJson)) {
 			try {
 				var config = deserializeJSON(fileRead(luceeJson));
-				if (structKeyExists(config, "port") && isPortOpen(config.port)) {
-					return config.port;
+				if (structKeyExists(config, "port") && isNumeric(config.port)) {
+					projectPinsPort = true;
+					if (isPortOpen(config.port)) {
+						return config.port;
+					}
 				}
 			} catch (any e) {
 				// ignore parse errors
@@ -7114,6 +7133,7 @@ component extends="modules.BaseModule" {
 			var envContent = fileRead(envFile);
 			var portMatch = reFindNoCase("PORT\s*=\s*(\d+)", envContent, 1, true);
 			if (arrayLen(portMatch.match) > 1 && isNumeric(portMatch.match[2])) {
+				projectPinsPort = true;
 				var port = val(portMatch.match[2]);
 				if (isPortOpen(port)) return port;
 			}
@@ -7127,7 +7147,16 @@ component extends="modules.BaseModule" {
 			return false;
 		}
 
-		// 4. Try common ports (read-side only).
+		// 3.5. A pinned-but-closed port means "this project's server is not
+		//      running" — skip the probe (see the projectPinsPort comment
+		//      above). This also keeps the #3080 fallback-attach warning
+		//      truthful: the probe now only ever fires when no project-bound
+		//      port exists.
+		if (projectPinsPort) {
+			return false;
+		}
+
+		// 4. Try common ports (read-side only, no pinned port).
 		for (var fallbackPort in arguments.commonPorts) {
 			if (isPortOpen(fallbackPort)) return fallbackPort;
 		}
@@ -7170,7 +7199,7 @@ component extends="modules.BaseModule" {
 			type="Wheels.ServerNotRunning",
 			message=arguments.requireProjectConfig
 				? "No running Wheels server detected for this project (set 'port' in lucee.json or PORT in .env, then start with: wheels start)"
-				: "No running Wheels server detected on any expected port (checked lucee.json, .env, 8080/60000/3000/8500)"
+				: "No running Wheels server detected on any expected port (checked lucee.json, .env, and — when no project port is pinned — common ports 8080/60000/3000/8500)"
 		);
 	}
 

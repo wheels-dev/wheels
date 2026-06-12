@@ -54,6 +54,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	/**
+	 * Allocate an OS-assigned ephemeral port and release it immediately:
+	 * the returned port is (with overwhelming likelihood) closed, which is
+	 * exactly what the pinned-but-closed specs need. TOCTOU window between
+	 * close and the probe is acceptable for a spec.
+	 */
+	private numeric function $reserveClosedPort() {
+		var socket = createObject("java", "java.net.ServerSocket").init(0);
+		var reservedPort = socket.getLocalPort();
+		socket.close();
+		return reservedPort;
+	}
+
+	/**
 	 * Capture the requireProjectConfig flag runMigration() hands to
 	 * $requireRunningServer() for a given migrate action (#3080). The mocked
 	 * guard throws so the command aborts before any HTTP probing — the call
@@ -116,6 +129,64 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					);
 					expect(detected).toBeFalse();
 				} finally {
+					siblingSocket.close();
+				}
+			});
+
+			it("skips the common-port probe when lucee.json pins a port nothing listens on", () => {
+				// #3170 review: a scaffolded project always pins its port in
+				// lucee.json. When that port is closed the server is simply
+				// not running — read-side detection must NOT probe common
+				// ports, where a stray listener (the repo demo app, a docker
+				// dev stack, a random python http.server on 8080) is provably
+				// some OTHER project's process.
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var siblingPort = siblingSocket.getLocalPort();
+					var closedPort = $reserveClosedPort();
+					fileWrite(tempRoot & "/lucee.json", serializeJSON({port: closedPort}));
+
+					var detected = mod.detectServerPort(commonPorts = [siblingPort]);
+					expect(detected).toBeFalse();
+				} finally {
+					if (fileExists(tempRoot & "/lucee.json")) {
+						fileDelete(tempRoot & "/lucee.json");
+					}
+					siblingSocket.close();
+				}
+			});
+
+			it("skips the common-port probe when .env pins a PORT nothing listens on", () => {
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var siblingPort = siblingSocket.getLocalPort();
+					var closedPort = $reserveClosedPort();
+					fileWrite(tempRoot & "/.env", "PORT=" & closedPort);
+
+					var detected = mod.detectServerPort(commonPorts = [siblingPort]);
+					expect(detected).toBeFalse();
+				} finally {
+					if (fileExists(tempRoot & "/.env")) {
+						fileDelete(tempRoot & "/.env");
+					}
+					siblingSocket.close();
+				}
+			});
+
+			it("still probes common ports when lucee.json exists without a port key", () => {
+				// Guard against over-reach: only an explicit pinned port may
+				// disable the legacy read-side probe.
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var siblingPort = siblingSocket.getLocalPort();
+					fileWrite(tempRoot & "/lucee.json", serializeJSON({name: "noportapp"}));
+
+					var detected = mod.detectServerPort(commonPorts = [siblingPort]);
+					expect(detected).toBe(siblingPort);
+				} finally {
+					if (fileExists(tempRoot & "/lucee.json")) {
+						fileDelete(tempRoot & "/lucee.json");
+					}
 					siblingSocket.close();
 				}
 			});

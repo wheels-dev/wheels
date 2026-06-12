@@ -1,7 +1,70 @@
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runExec } from './exec.mjs';
+
+function reserveClosedPort() {
+  return new Promise((resolve, reject) => {
+    const srv = createServer();
+    srv.unref();
+    srv.on('error', reject);
+    srv.listen(0, () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+/**
+ * Rewrite a freshly-scaffolded app's pinned ports to OS-assigned ephemeral
+ * ports that nothing listens on, and strip any PORT-style keys from .env.
+ *
+ * Why: `wheels new` pins port 8080 in lucee.json — the same port the repo's
+ * own demo app, docker-compose.dev.yml, and plenty of unrelated local
+ * services occupy. The CLI's server detection trusts an OPEN pinned port
+ * unconditionally, so a stray 8080 listener makes the documented
+ * no-running-server refusals (`wheels routes` / `wheels migrate info` /
+ * `wheels seed` in migrations/seeding/routing.mdx) attach to a foreign
+ * process and go red locally (#3170 review). A closed ephemeral port makes
+ * "no server running" deterministic regardless of what else the contributor
+ * has listening. (The branch CLI additionally refuses the common-port probe
+ * whenever a project pins a port; released CLIs ≤ 4.0.3 still probe
+ * 8080/60000/3000/8500 for read-side commands — see VALIDATION.md.)
+ */
+export async function scrubFixturePorts(appRoot) {
+  const cfgPath = join(appRoot, 'lucee.json');
+  let raw;
+  try {
+    raw = await readFile(cfgPath, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      throw new Error(`lucee.json not found in fixture at ${cfgPath} — wheels new may have changed its layout`);
+    }
+    throw err;
+  }
+  const cfg = JSON.parse(raw);
+  cfg.port = await reserveClosedPort();
+  cfg.shutdownPort = await reserveClosedPort();
+  await writeFile(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
+
+  // The scaffold's .env carries no PORT today; strip defensively so a
+  // future template change can't re-open the same hole via the .env arm
+  // of the CLI's port detection.
+  const envPath = join(appRoot, '.env');
+  let env;
+  try {
+    env = await readFile(envPath, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return;
+    throw err;
+  }
+  const scrubbed = env
+    .split('\n')
+    .filter((line) => !/^\s*[A-Za-z0-9_]*PORT\s*=/i.test(line))
+    .join('\n');
+  if (scrubbed !== env) await writeFile(envPath, scrubbed, 'utf8');
+}
 
 /**
  * Creates a fresh SQLite-backed Wheels app in a tmp directory.
@@ -59,6 +122,7 @@ export async function createFixture(name = 'fixture') {
           `--- wheels stdout ---\n${result.stdout || ''}`,
         );
       }
+      await scrubFixturePorts(expected);
       return expected;
     }
     await rm(parent, { recursive: true, force: true });
