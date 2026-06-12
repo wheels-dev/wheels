@@ -260,34 +260,58 @@ component {
 			if (!Len(local.folder)) {
 				local.folder = local.relativeRoot & $get("filePath");
 			}
-			if (Left(local.folder, Len(local.root)) == local.root) {
-				local.folder = RemoveChars(local.folder, 1, Len(local.root));
-			}
-			local.fullPath = Replace(local.folder, "\", "/", "all");
-			local.fullPath = ListAppend(local.fullPath, arguments.file, "/");
-			// https://github.com/wheels-dev/wheels/issues/873 Don't expand path if already contains root
-			if (local.fullPath DOES NOT CONTAIN Replace(local.root, "\", "/", "all")) {
-				//added this section for the "/wheels" mapping to work correctly
-				if (local.fullPath CONTAINS "/wheels") {
-					local.startPos = findNoCase("/wheels", local.fullPath);
-					
-					// Prefer /vendor/wheels if available
-					local.vendorWheelsPos = findNoCase("/vendor/wheels/", local.fullPath);
-					if (local.vendorWheelsPos > 0) {
-						local.startPos = local.vendorWheelsPos + len("/vendor");
-					}
 
-					if (local.startPos > 0) {
-						local.fullPath = ExpandPath(mid(local.fullPath, local.startPos, len(local.fullPath) - local.startPos + 1));
+			// https://github.com/wheels-dev/wheels/issues/3077 — when the caller supplies an
+			// absolute `directory` (the documented "must be a full path … outside of the web
+			// root" contract) use it verbatim: build `fullPath` from the directory + file and
+			// skip both the `/wheels` mapping rewrite and the `ExpandPath()` fallback below.
+			// Those rewrites assume a relative, mapping-based path and otherwise (1) web-root-
+			// prefix the absolute path on Adobe CF — where `ExpandPath()` resolves against the
+			// web root rather than returning an absolute path unchanged as Lucee does — and
+			// (2) substring-hijack any directory containing "/wheels" (e.g. /var/www/wheels).
+			// The `..`-traversal guard above still applies to both arguments.
+			local.normalizedDir = Replace(arguments.directory, "\", "/", "all");
+			local.isAbsoluteDirectory = Len(arguments.directory) && (
+				Left(local.normalizedDir, 1) == "/" || REFind("^[A-Za-z]:", local.normalizedDir)
+			);
+
+			if (local.isAbsoluteDirectory) {
+				if (Len(local.normalizedDir) > 1 && Right(local.normalizedDir, 1) == "/") {
+					local.normalizedDir = Left(local.normalizedDir, Len(local.normalizedDir) - 1);
+				}
+				local.directory = local.normalizedDir;
+				local.file = arguments.file;
+				local.fullPath = local.directory & "/" & local.file;
+			} else {
+				if (Left(local.folder, Len(local.root)) == local.root) {
+					local.folder = RemoveChars(local.folder, 1, Len(local.root));
+				}
+				local.fullPath = Replace(local.folder, "\", "/", "all");
+				local.fullPath = ListAppend(local.fullPath, arguments.file, "/");
+				// https://github.com/wheels-dev/wheels/issues/873 Don't expand path if already contains root
+				if (local.fullPath DOES NOT CONTAIN Replace(local.root, "\", "/", "all")) {
+					//added this section for the "/wheels" mapping to work correctly
+					if (local.fullPath CONTAINS "/wheels") {
+						local.startPos = findNoCase("/wheels", local.fullPath);
+
+						// Prefer /vendor/wheels if available
+						local.vendorWheelsPos = findNoCase("/vendor/wheels/", local.fullPath);
+						if (local.vendorWheelsPos > 0) {
+							local.startPos = local.vendorWheelsPos + len("/vendor");
+						}
+
+						if (local.startPos > 0) {
+							local.fullPath = ExpandPath(mid(local.fullPath, local.startPos, len(local.fullPath) - local.startPos + 1));
+							local.fullPath = Replace(local.fullPath, "\", "/", "all");
+							local.file = ListLast(local.fullPath, "/");
+							local.directory = Reverse(ListRest(Reverse(local.fullPath), "/"));
+						}
+					} else{
+						local.fullPath = ExpandPath(local.fullPath);
 						local.fullPath = Replace(local.fullPath, "\", "/", "all");
 						local.file = ListLast(local.fullPath, "/");
 						local.directory = Reverse(ListRest(Reverse(local.fullPath), "/"));
 					}
-				} else{
-					local.fullPath = ExpandPath(local.fullPath);
-					local.fullPath = Replace(local.fullPath, "\", "/", "all");
-					local.file = ListLast(local.fullPath, "/");
-					local.directory = Reverse(ListRest(Reverse(local.fullPath), "/"));
 				}
 			}
 

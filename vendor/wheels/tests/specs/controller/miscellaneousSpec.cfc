@@ -208,6 +208,59 @@ component extends="wheels.WheelsTest" {
 				expect(r.name).toBe("weirdname.png")
 			})
 
+			it("serves a file from an absolute directory outside the web root", () => {
+				// https://github.com/wheels-dev/wheels/issues/3077 — an absolute `directory`
+				// outside the web root must be used verbatim, not re-resolved via ExpandPath
+				// (which web-root-prefixes the path on Adobe CF).
+				local.outsideDir = GetTempDirectory() & "dlprobe3077_outside"
+				if (!DirectoryExists(local.outsideDir)) {
+					DirectoryCreate(local.outsideDir, true)
+				}
+				local.target = local.outsideDir & "/secret.txt"
+				FileWrite(local.target, "secret payload")
+				try {
+					args.file = "secret.txt"
+					args.directory = local.outsideDir
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(Replace(r.file, "\", "/", "all")).toInclude("dlprobe3077_outside/secret.txt")
+					expect(r.name).toBe("secret.txt")
+				} finally {
+					if (FileExists(local.target)) {
+						FileDelete(local.target)
+					}
+					if (DirectoryExists(local.outsideDir)) {
+						DirectoryDelete(local.outsideDir, true)
+					}
+				}
+			})
+
+			it("does not rewrite an absolute directory containing the '/wheels' substring", () => {
+				// https://github.com/wheels-dev/wheels/issues/3077 — the `/wheels` mapping
+				// fallback substring-matched ANY absolute path containing "/wheels"
+				// (e.g. /var/www/wheels/uploads), silently rewriting it.
+				local.wheelsDir = GetTempDirectory() & "wheels3077-dl"
+				if (!DirectoryExists(local.wheelsDir)) {
+					DirectoryCreate(local.wheelsDir, true)
+				}
+				local.target = local.wheelsDir & "/secret.txt"
+				FileWrite(local.target, "secret payload")
+				try {
+					args.file = "secret.txt"
+					args.directory = local.wheelsDir
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(Replace(r.file, "\", "/", "all")).toInclude("wheels3077-dl/secret.txt")
+				} finally {
+					if (FileExists(local.target)) {
+						FileDelete(local.target)
+					}
+					if (DirectoryExists(local.wheelsDir)) {
+						DirectoryDelete(local.wheelsDir, true)
+					}
+				}
+			})
+
 			it("is specifying a directory", () => {
 				// Skip this test temporarily to debug in CI
 				skip("Temporarily skipping to debug path issues in CI");
