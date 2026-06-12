@@ -396,13 +396,18 @@ component output="false" {
 	}
 
 	public string function $buildRedirectUrl() {
-		// Determine the base URL
+		// Determine the base URL. NOTE: this local must NOT be named `url` —
+		// `url` is a reserved scope and the unscoped `url.*` reads below
+		// (StructKeyExists(url, "reload"), ...) bind to a string local named
+		// `url` on Adobe CF before the URL scope, throwing a ScopeCastException
+		// (HTTP 500) before applicationStop(). See CLAUDE.md anti-pattern ##11
+		// and issue ##3053.
 		if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
-			local.url = cgi.path_info;
+			local.redirectUrl = cgi.path_info;
 		} else if (StructKeyExists(cgi, "path_info")) {
-			local.url = "/";
+			local.redirectUrl = "/";
 		} else {
-			local.url = cgi.script_name;
+			local.redirectUrl = cgi.script_name;
 		}
 
 		// For a plain restart (?reload=true) every reload-related parameter is
@@ -459,11 +464,11 @@ component output="false" {
 			// Add query string to URL if any parameters remain
 			if (ArrayLen(local.newQueryString)) {
 				local.queryString = ArrayToList(local.newQueryString, "&");
-				local.url = "#local.url#?#local.queryString#";
+				local.redirectUrl = "#local.redirectUrl#?#local.queryString#";
 			}
 		}
 
-		return local.url;
+		return local.redirectUrl;
 	}
 
 	/**
