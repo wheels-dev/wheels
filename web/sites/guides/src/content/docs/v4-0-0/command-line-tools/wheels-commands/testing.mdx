@@ -58,7 +58,7 @@ A bare positional argument is treated as the filter directory — `wheels test m
 | `--directory=<dir>` | Alias for `--filter` (tutorial chapter 7). When both are supplied, `--directory` wins. |
 | `--db=<engine>` | Database engine for `--core` matrix runs only. Ignored for app tests (with a warning) — see [below](#testing-against-different-engines). |
 | `--reporter=<name>` | `simple` (default, colourful), `json` (raw runner JSON), `tap` (TAP v13 for CI consumers). |
-| `--verbose`, `-v` | Accepted but currently inert — output is identical to a plain run; no per-spec output is printed for passing specs. Wiring tracked in [#3113](https://github.com/wheels-dev/wheels/issues/3113). |
+| `--verbose`, `-v` | Print the full bundle → suite → spec tree (one `[PASS]`/`[FAIL]` line per spec) instead of only the summary line. Applies to the default `simple` reporter. The launcher consumes the flag globally, so any position works (`wheels test --verbose`, `wheels test -v`, `wheels -v test`). CLI binaries built on a LuCLI runtime that predates the [#3113](https://github.com/wheels-dev/wheels/issues/3113) launcher fix drop the signal before it reaches the test command and print the plain summary. |
 | `--ci` | CI mode: emits one GitHub Actions `::error` workflow-command annotation per failed or errored spec, so failures surface inline in CI logs and PR-check panels. Exit code is non-zero on failure regardless. |
 | `--core` | Run framework self-tests (`vendor/wheels/tests/specs/`) instead of your app suite. App tests are the default; `--core` is the explicit opt-in. |
 | `--no-test-db` | Disable the auto-swap to `<datasource>_test`. App tests run against your dev datasource, with whatever data is already in it. |
