@@ -26,7 +26,10 @@ component {
             user: $currentUser(),
             message: arguments.opts.message ?: "manual acquire"
         });
-        $dispatchAny($allHosts(cfg), cmd, dryRun);
+        // The deploy flow holds the lock on EVERY host (##2957 DEP-1), so a
+        // manual acquire must match — locking a single host would let a
+        // concurrent deploy that probes another host proceed.
+        $acquireLockAllOrNothing($uniqueHosts($allHosts(cfg)), cmd, lock, dryRun);
         return $renderResult(arguments.opts, "Acquired deploy lock for " & cfg.service());
     }
 
@@ -37,7 +40,9 @@ component {
         var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
         // rm -f is idempotent; surfacing a failure here only obscures the
         // operator's intent ("clear the lock if it's there"). #2696.
-        $dispatchAny($allHosts(cfg), lock.release(), dryRun, true);
+        // Fan out to every host — the lock lives fleet-wide (##2957 DEP-1),
+        // so clearing one host would strand stale locks on the rest.
+        $dispatch($uniqueHosts($allHosts(cfg)), lock.release(), dryRun, true);
         return $renderResult(arguments.opts, "Released deploy lock for " & cfg.service());
     }
 
@@ -48,8 +53,9 @@ component {
         var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
         // readlink exits nonzero when the lock file is missing — which is
         // exactly what the operator wants to learn from `status`. Treat that
-        // as advisory output, not a thrown error. #2696.
-        $dispatchAny($allHosts(cfg), lock.status(), dryRun, true);
+        // as advisory output, not a thrown error. #2696. Checked on every
+        // host since the lock lives fleet-wide (##2957 DEP-1).
+        $dispatch($uniqueHosts($allHosts(cfg)), lock.status(), dryRun, true);
         return $renderResult(arguments.opts, "Checked deploy lock status for " & cfg.service());
     }
 
@@ -73,18 +79,90 @@ component {
         return out;
     }
 
-    private void function $dispatchAny(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
+    /**
+     * All-or-nothing lock acquisition across every host, in config order,
+     * with rollback of already-acquired locks on the first failure.
+     *
+     * MIRROR: DeployMainCli.$acquireLockAllOrNothing is the deploy-flow
+     * twin of this contract (##2957 DEP-1) — keep them in lockstep.
+     */
+    private void function $acquireLockAllOrNothing(
+        required array hosts,
+        required string acquireCmd,
+        required any lock,
+        required boolean dryRun
+    ) {
         if (arguments.dryRun) {
-            if (arrayLen(arguments.hosts)) {
-                arrayAppend(variables.dryRunBuffer, "[" & arguments.hosts[1] & "] " & arguments.cmd);
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.acquireCmd);
             }
             return;
         }
-        // Lock ops target just one host (the lock file lives on one path; any host works).
-        // #2696: acquire stays strict (contention should surface); release/status tolerate.
+        var c = arguments.acquireCmd;
+        // Shared struct so the callback can record progress — closures can't
+        // reliably mutate outer scalars across engines (anti-pattern ##10).
+        var state = {acquired: [], lastHost: ""};
+        try {
+            variables.sshPool.sequential(arguments.hosts, function(ssh, host) {
+                state.lastHost = host;
+                ssh.run(c, {raise: true});
+                arrayAppend(state.acquired, host);
+            });
+        } catch (any e) {
+            $rollbackAcquiredLocks(state.acquired, arguments.lock);
+            throw(
+                type = "Wheels.Deploy.LockAcquireFailed",
+                message = "Could not acquire the deploy lock on " & state.lastHost
+                    & " — another deploy may hold it. Rolled back "
+                    & arrayLen(state.acquired) & " already-acquired lock(s). "
+                    & "Inspect with 'wheels deploy lock status'; clear a stale lock with "
+                    & "'wheels deploy lock release'. Cause: " & e.message,
+                detail = e.detail ?: ""
+            );
+        }
+    }
+
+    /**
+     * Best-effort release of the locks a partially-failed acquire already
+     * placed. A rollback failure must never shadow the LockAcquireFailed
+     * the caller is about to throw.
+     */
+    private void function $rollbackAcquiredLocks(required array hosts, required any lock) {
+        if (!arrayLen(arguments.hosts)) return;
+        var releaseCmd = arguments.lock.release();
+        try {
+            variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+                ssh.run(releaseCmd, {raise: false});
+            });
+        } catch (any e) {
+            // Swallowed deliberately — the acquire error is the one the
+            // operator needs to see.
+        }
+    }
+
+    /** Order-preserving dedupe — a host serving several roles appears once. */
+    private array function $uniqueHosts(required array hosts) {
+        var seen = {};
+        var out = [];
+        for (var h in arguments.hosts) {
+            if (!structKeyExists(seen, h)) {
+                seen[h] = true;
+                arrayAppend(out, h);
+            }
+        }
+        return out;
+    }
+
+    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
+            }
+            return;
+        }
         var c = arguments.cmd;
         var doRaise = !arguments.allowFail;
-        variables.sshPool.onAny(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
     }
 
     private string function $currentUser() {

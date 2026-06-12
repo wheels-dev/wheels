@@ -84,10 +84,16 @@ component {
 
         $fireHook(hooks, "pre-deploy", hookEnv, dryRun);
 
+        // The lock lives on EVERY host (deduped — a host serving two roles
+        // must not contend with itself) so a concurrent deploy collides with
+        // it no matter which host it probes (##2957 DEP-1).
+        var lockHosts = $uniqueHosts(hosts);
+
         try {
-            $dispatchAny(
-                hosts,
+            $acquireLockAllOrNothing(
+                lockHosts,
                 lock.acquire({user: $currentUser(), message: "deploy " & ver}),
+                lock,
                 dryRun
             );
 
@@ -110,7 +116,9 @@ component {
                 // original deploy exception inside this finally block. rm -f
                 // is idempotent; if it genuinely fails on a remote, the deploy
                 // already has a real error to surface from the try body.
-                $dispatchAny(hosts, lock.release(), dryRun, true);
+                // Release fans out to the exact hosts the lock was acquired
+                // on, so no host is left holding a stale lock (##2957 DEP-1b).
+                $dispatch(lockHosts, lock.release(), dryRun, true);
             }
 
             hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
@@ -450,9 +458,96 @@ component {
     }
 
     /**
+     * All-or-nothing deploy-lock acquisition (##2957 DEP-1).
+     *
+     * The lock only provides mutual exclusion if a concurrent deploy is
+     * guaranteed to collide with it. The old $dispatchAny acquire was
+     * first-success-wins: contention on host 1 was swallowed by
+     * SshPool.onAny and a fresh lock was acquired on host 2, so two deploys
+     * could run side by side on any multi-host fleet. Instead: acquire on
+     * EVERY host, in deterministic (config) order, sequentially — two
+     * concurrent deploys probe hosts in the same order, so exactly one wins
+     * the first host and the other aborts there. On a partial failure, roll
+     * back ONLY the locks already acquired (the contended host's lock
+     * belongs to the other deploy) and surface the per-host error.
+     *
+     * MIRROR: DeployLockCli.$acquireLockAllOrNothing implements the same
+     * contract for the manual lock verbs — keep them in lockstep.
+     */
+    private void function $acquireLockAllOrNothing(
+        required array hosts,
+        required string acquireCmd,
+        required any lock,
+        required boolean dryRun
+    ) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.acquireCmd);
+            }
+            return;
+        }
+        var c = arguments.acquireCmd;
+        // Shared struct so the callback can record progress — closures can't
+        // reliably mutate outer scalars across engines (anti-pattern ##10).
+        var state = {acquired: [], lastHost: ""};
+        try {
+            variables.sshPool.sequential(arguments.hosts, function(ssh, host) {
+                state.lastHost = host;
+                ssh.run(c, {raise: true});
+                arrayAppend(state.acquired, host);
+            });
+        } catch (any e) {
+            $rollbackAcquiredLocks(state.acquired, arguments.lock);
+            throw(
+                type = "Wheels.Deploy.LockAcquireFailed",
+                message = "Could not acquire the deploy lock on " & state.lastHost
+                    & " — another deploy may hold it. Rolled back "
+                    & arrayLen(state.acquired) & " already-acquired lock(s). "
+                    & "Inspect with 'wheels deploy lock status'; clear a stale lock with "
+                    & "'wheels deploy lock release'. Cause: " & e.message,
+                detail = e.detail ?: ""
+            );
+        }
+    }
+
+    /**
+     * Best-effort release of the locks a partially-failed acquire already
+     * placed. A rollback failure must never shadow the LockAcquireFailed
+     * the caller is about to throw.
+     */
+    private void function $rollbackAcquiredLocks(required array hosts, required any lock) {
+        if (!arrayLen(arguments.hosts)) return;
+        var releaseCmd = arguments.lock.release();
+        try {
+            variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+                ssh.run(releaseCmd, {raise: false});
+            });
+        } catch (any e) {
+            // Swallowed deliberately — the acquire error is the one the
+            // operator needs to see; stale locks are recoverable via
+            // `wheels deploy lock release`.
+        }
+    }
+
+    /** Order-preserving dedupe — a host serving several roles appears once. */
+    private array function $uniqueHosts(required array hosts) {
+        var seen = {};
+        var out = [];
+        for (var h in arguments.hosts) {
+            if (!structKeyExists(seen, h)) {
+                seen[h] = true;
+                arrayAppend(out, h);
+            }
+        }
+        return out;
+    }
+
+    /**
      * Dispatch a single command to "any one" host — used for operations
-     * that only need to happen once across the fleet (lock acquire/release,
-     * proxy boot check). FakeSshPool.onAny records exactly one call.
+     * that only need to happen once across the fleet (proxy boot check).
+     * NOT suitable for the deploy lock: onAny swallows per-host failures,
+     * which is exactly the multi-host lock bypass fixed in ##2957 DEP-1.
+     * FakeSshPool.onAny records exactly one call.
      */
     private void function $dispatchAny(
         required array hosts,
