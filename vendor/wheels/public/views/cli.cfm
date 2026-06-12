@@ -473,9 +473,10 @@ try {
 
 			case "dbSeed":
 				// The seed orchestration lives in the page-level
-				// runDbSeed() UDF (defined alongside generateTestData
-				// below). Extracted so `dbSetup` can compose seeding
-				// without re-entering the dispatcher (issue ##2959).
+				// runDbSeed() UDF below. Generate mode delegates to
+				// wheels.Seeder.generateSeeds(). Extracted so `dbSetup`
+				// can compose seeding without re-entering the dispatcher
+				// (issue ##2959).
 				local.seedResult = runDbSeed(request.wheels.params);
 				StructAppend(data, local.seedResult, true);
 				break;
@@ -907,68 +908,19 @@ function runDbSeed(struct seedParams = {}) {
 				result.detail = conventionResult.detail;
 			}
 		} else {
-			result.mode = "generate";
+			// Generate mode delegates to Seeder.generateSeeds(), which fixes
+			// both #3082 defects: it iterates $classData().properties as the
+			// STRUCT it is (the old inline loop treated it as an array of
+			// property structs and threw on every model), and it reports
+			// overall success=false when any model fails — so the CLI surfaces
+			// a non-zero exit instead of printing "Seeding completed." (#3082).
 			var count = structKeyExists(sp, "count") ? val(sp.count) : 10;
 			var modelsArg = structKeyExists(sp, "models") ? sp.models : "";
-			result.seeded = [];
-
-			var modelList = [];
-			if (len(modelsArg)) {
-				modelList = listToArray(modelsArg);
-			} else {
-				var modelPath = expandPath("/app/models");
-				if (directoryExists(modelPath)) {
-					var modelFiles = directoryList(modelPath, false, "name", "*.cfc");
-					for (var file in modelFiles) {
-						if (left(file, 1) != "_") {
-							arrayAppend(modelList, listFirst(file, "."));
-						}
-					}
-				}
-			}
-
-			for (var modelName in modelList) {
-				try {
-					var modelInstance = model(modelName);
-					var seededCount = 0;
-					var properties = [];
-					if (structKeyExists(modelInstance, "$classData") && structKeyExists(modelInstance.$classData(), "properties")) {
-						properties = modelInstance.$classData().properties;
-					}
-					for (var i = 1; i <= count; i++) {
-						var record = {};
-						for (var prop in properties) {
-							if (prop.name != "id" && !listFindNoCase("createdAt,updatedAt,deletedAt", prop.name)) {
-								record[prop.name] = generateTestData(prop.name, prop.type, i);
-							}
-						}
-						var newRecord = modelInstance.new(record);
-						if (newRecord.save()) {
-							seededCount++;
-						}
-					}
-					arrayAppend(result.seeded, {
-						model = modelName,
-						count = seededCount,
-						success = true
-					});
-				} catch (any modelError) {
-					arrayAppend(result.seeded, {
-						model = modelName,
-						count = 0,
-						success = false,
-						error = modelError.message
-					});
-				}
-			}
-
-			var totalSeeded = 0;
-			for (var seedEntry in result.seeded) {
-				if (seedEntry.success) {
-					totalSeeded += seedEntry.count;
-				}
-			}
-			result.message = "Database seeding completed. Created #totalSeeded# records across #arrayLen(result.seeded)# models.";
+			var generateSeeder = structKeyExists(application.wheels, "seeder")
+				? application.wheels.seeder
+				: CreateObject("component", "wheels.Seeder").init();
+			var generateResult = generateSeeder.generateSeeds(models = modelsArg, count = count);
+			StructAppend(result, generateResult, true);
 		}
 	} catch (any e) {
 		result.success = false;
@@ -978,108 +930,6 @@ function runDbSeed(struct seedParams = {}) {
 	return result;
 }
 
-// Helper function to generate test data based on property name and type
-function generateTestData(required string propertyName, string propertyType = "string", numeric index = 1) {
-	// Common patterns for property names
-	local.name = lCase(arguments.propertyName);
-	
-	// Email fields
-	if (findNoCase("email", local.name)) {
-		return "test#arguments.index#@example.com";
-	}
-	
-	// Name fields
-	if (findNoCase("firstname", local.name) || local.name == "fname") {
-		local.firstNames = ["John", "Jane", "Bob", "Alice", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"];
-		return local.firstNames[(arguments.index - 1) mod arrayLen(local.firstNames) + 1];
-	}
-	
-	if (findNoCase("lastname", local.name) || local.name == "lname") {
-		local.lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"];
-		return local.lastNames[(arguments.index - 1) mod arrayLen(local.lastNames) + 1];
-	}
-	
-	if (local.name == "name" || findNoCase("username", local.name)) {
-		return "TestUser#arguments.index#";
-	}
-	
-	// Phone fields
-	if (findNoCase("phone", local.name) || findNoCase("mobile", local.name)) {
-		return "555-#numberFormat(1000 + arguments.index, '0000')#";
-	}
-	
-	// Address fields
-	if (findNoCase("address", local.name) || findNoCase("street", local.name)) {
-		return "#arguments.index# Test Street";
-	}
-	
-	if (findNoCase("city", local.name)) {
-		local.cities = ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego"];
-		return local.cities[(arguments.index - 1) mod arrayLen(local.cities) + 1];
-	}
-	
-	if (findNoCase("state", local.name) || findNoCase("province", local.name)) {
-		local.states = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"];
-		return local.states[(arguments.index - 1) mod arrayLen(local.states) + 1];
-	}
-	
-	if (findNoCase("zip", local.name) || findNoCase("postal", local.name)) {
-		return numberFormat(10000 + arguments.index, "00000");
-	}
-	
-	// URL fields
-	if (findNoCase("url", local.name) || findNoCase("website", local.name)) {
-		return "https://example#arguments.index#.com";
-	}
-	
-	// Password fields
-	if (findNoCase("password", local.name)) {
-		return "TestPass#arguments.index#!";
-	}
-	
-	// Boolean fields
-	if (arguments.propertyType == "boolean" || findNoCase("active", local.name) || findNoCase("enabled", local.name) || findNoCase("published", local.name)) {
-		return (arguments.index mod 2) == 1;
-	}
-	
-	// Numeric fields
-	if (arguments.propertyType == "integer" || arguments.propertyType == "numeric") {
-		if (findNoCase("age", local.name)) {
-			return 20 + (arguments.index mod 50);
-		}
-		if (findNoCase("price", local.name) || findNoCase("cost", local.name) || findNoCase("amount", local.name)) {
-			return (arguments.index * 10) + 0.99;
-		}
-		if (findNoCase("quantity", local.name) || findNoCase("count", local.name)) {
-			return arguments.index * 5;
-		}
-		return arguments.index;
-	}
-	
-	// Date fields
-	if (arguments.propertyType == "date" || arguments.propertyType == "datetime" || findNoCase("date", local.name) || findNoCase("birthday", local.name) || findNoCase("dob", local.name)) {
-		return dateAdd("d", -arguments.index, now());
-	}
-	
-	// Text/description fields
-	if (arguments.propertyType == "text" || findNoCase("description", local.name) || findNoCase("content", local.name) || findNoCase("body", local.name)) {
-		return "This is test content #arguments.index#. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
-	}
-	
-	// Title fields
-	if (findNoCase("title", local.name) || findNoCase("subject", local.name)) {
-		return "Test Title #arguments.index#";
-	}
-	
-	// Status fields
-	if (findNoCase("status", local.name)) {
-		local.statuses = ["pending", "active", "completed", "cancelled"];
-		return local.statuses[(arguments.index - 1) mod arrayLen(local.statuses) + 1];
-	}
-	
-	// Default string value
-	return "#arguments.propertyName# Test #arguments.index#";
-}
 </cfscript>
 <cfcontent reset="true" type="application/json"><cfoutput>#SerializeJSON(data)#</cfoutput>
 <cfabort>
