@@ -242,7 +242,8 @@ component output="false" extends="wheels.Global" {
 	 * CLI printed "Seeding completed." with exit 0.
 	 *
 	 * @models Comma-delimited list of model names. When blank, every *.cfc under
-	 *         /app/models (excluding _-prefixed files) is used.
+	 *         /app/models (excluding _-prefixed files and the framework's
+	 *         parent Model.cfc base class) is used.
 	 * @count  Number of rows to generate per model.
 	 */
 	public struct function generateSeeds(string models = "", numeric count = 10) {
@@ -251,6 +252,10 @@ component output="false" extends="wheels.Global" {
 			mode = "generate",
 			seeded = [],
 			totalCreated = 0,
+			// Generate mode never skips rows, but the CLI bridge contract
+			// requires the key: Module.cfc::runSeed() prints
+			// `#result.totalSkipped# skipped` whenever totalCreated exists.
+			totalSkipped = 0,
 			totalFailed = 0,
 			message = ""
 		};
@@ -317,7 +322,8 @@ component output="false" extends="wheels.Global" {
 	/**
 	 * Internal function. Resolves the model list for generateSeeds(): an
 	 * explicit comma-delimited list when provided (blank entries trimmed away),
-	 * otherwise every *.cfc model file under /app/models.
+	 * otherwise every *.cfc model file under /app/models except _-prefixed
+	 * files and the framework's parent Model.cfc base class.
 	 */
 	public array function $resolveGenerateModels(string models = "") {
 		var list = [];
@@ -333,7 +339,12 @@ component output="false" extends="wheels.Global" {
 		if (DirectoryExists(modelPath)) {
 			var modelFiles = DirectoryList(modelPath, false, "name", "*.cfc");
 			for (var file in modelFiles) {
-				if (Left(file, 1) != "_") {
+				// Skip the framework's parent Model.cfc — every scaffolded app
+				// ships it as the base class for its models, it has no backing
+				// table, and model("Model") throws Wheels.TableNotFound. Same
+				// exclusion as the CLI's model enumeration (Analysis.cfc and
+				// Module.cfc both skip it).
+				if (Left(file, 1) != "_" && file != "Model.cfc") {
 					ArrayAppend(list, ListFirst(file, "."));
 				}
 			}

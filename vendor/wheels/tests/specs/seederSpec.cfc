@@ -232,6 +232,12 @@ component extends="wheels.WheelsTest" {
 					expect(local.result.success).toBeTrue();
 					expect(local.result.mode).toBe("generate");
 					expect(local.result.totalCreated).toBe(2);
+					// CLI bridge contract: Module.cfc::runSeed() prints
+					// `#result.totalSkipped# skipped` whenever totalCreated exists,
+					// so generate results MUST carry the key (always 0 — generate
+					// mode never skips) or a successful run throws in the CLI.
+					expect(StructKeyExists(local.result, "totalSkipped")).toBeTrue();
+					expect(local.result.totalSkipped).toBe(0);
 					expect(local.result.totalFailed).toBe(0);
 					expect(ArrayLen(local.result.seeded)).toBe(1);
 					expect(local.result.seeded[1].model).toBe("Author");
@@ -281,6 +287,28 @@ component extends="wheels.WheelsTest" {
 					expect(local.result.success).toBeFalse();
 					expect(local.result.totalCreated).toBe(0);
 					expect(local.result.message).toInclude("No models");
+				});
+
+				it("auto-scan excludes the framework's parent Model.cfc base class", () => {
+					// Every scaffolded app ships app/models/Model.cfc as the base
+					// class for its models. It has no backing table, so including
+					// it in the auto-scan makes model('Model') throw
+					// Wheels.TableNotFound and — under the honesty rule — forces
+					// every blank-models `wheels seed --generate` run to fail on a
+					// conventional app. Mirrors the CLI's own enumeration, which
+					// skips Model.cfc (Analysis.cfc / Module.cfc).
+					local.gen = CreateObject("component", "wheels.Seeder").init();
+					local.resolved = local.gen.$resolveGenerateModels("");
+					expect(ArrayFindNoCase(local.resolved, "Model")).toBe(0);
+				});
+
+				it("keeps explicitly requested model names verbatim", () => {
+					// The Model.cfc exclusion applies only to the auto-scan; an
+					// explicit list is the caller's responsibility and passes
+					// through untouched.
+					local.gen = CreateObject("component", "wheels.Seeder").init();
+					local.resolved = local.gen.$resolveGenerateModels(" Author , User ");
+					expect(local.resolved).toBe(["Author", "User"]);
 				});
 
 			});
