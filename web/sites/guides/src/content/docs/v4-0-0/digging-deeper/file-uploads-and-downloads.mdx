@@ -41,7 +41,7 @@ The rendered tag is `<form enctype="multipart/form-data" method="post" ...>` wit
 
 ## Receiving the upload
 
-Wheels does not unwrap the multipart body into a struct on `params`. The form field arrives as a server-side path to a temp file that Lucee parked for you; you take ownership of it with `<cffile action="upload">`. That tag populates a `cffile` struct with details about the uploaded file (server name, client name, size, content type, extension):
+Wheels does not unwrap the multipart body into a struct on `params`. The form field arrives as a server-side path to a temp file that Lucee parked for you; you take ownership of it with `<cffile action="upload">`. That tag populates a `cffile` struct with details about the uploaded file (server name, client name, size, content type, extension). The `fileField` attribute must be the exact form-field name that `fileField()` rendered — `user[avatar]`, with brackets, not the dotted `user.avatar`:
 
 ```cfm {test:compile} title="app/controllers/Users.cfc"
 component extends="Controller" {
@@ -51,7 +51,7 @@ component extends="Controller" {
         local.uploadDir = expandPath("/var/uploads/tmp/");
         cffile(
             action="upload",
-            fileField="user.avatar",
+            fileField="user[avatar]",
             destination=local.uploadDir,
             nameconflict="makeunique"
         );
@@ -60,7 +60,9 @@ component extends="Controller" {
         user.avatarTempPath = local.uploadDir & cffile.serverFile;
         user.avatarClientName = cffile.clientFile;
         user.avatarSize = cffile.fileSize;
-        user.avatarContentType = cffile.contentType;
+        // cffile.contentType is the major type only ("image") — append the
+        // subtype to get the full MIME type ("image/png") for validation.
+        user.avatarContentType = cffile.contentType & "/" & cffile.contentSubType;
 
         if (user.save()) {
             redirectTo(route="user", key=user.id);
@@ -124,11 +126,11 @@ component extends="Controller" {
         user = model("User").new(params.user);
 
         local.tmpDir = expandPath("/var/uploads/tmp/");
-        cffile(action="upload", fileField="user.avatar", destination=local.tmpDir, nameconflict="makeunique");
+        cffile(action="upload", fileField="user[avatar]", destination=local.tmpDir, nameconflict="makeunique");
         user.avatarTempPath = local.tmpDir & cffile.serverFile;
         user.avatarClientName = cffile.clientFile;
         user.avatarSize = cffile.fileSize;
-        user.avatarContentType = cffile.contentType;
+        user.avatarContentType = cffile.contentType & "/" & cffile.contentSubType;
 
         if (!user.save()) {
             fileDelete(user.avatarTempPath);
@@ -195,7 +197,7 @@ component extends="Controller" {
 
 Signature: `sendFile(file, name, type, disposition, directory, deleteFile, deliver)`. Defaults worth knowing:
 
-- `file` is resolved relative to the `filePath` setting, which defaults to `files/` under the app root. Pass an absolute `directory` (e.g. `directory="/var/uploads"`) to serve from outside the app — absolute paths are used verbatim on all engines.
+- `file` is resolved relative to the `filePath` setting, which defaults to `files/` under the web root (`public/files/` in the default app layout). Pass an absolute `directory` (e.g. `directory="/var/uploads"`) to serve from outside the web root — absolute paths that exist on disk are used verbatim on all engines ([#3077](https://github.com/wheels-dev/wheels/issues/3077)). A leading-slash path that does not exist on disk (e.g. `directory="/reports/"`) keeps its historical meaning and resolves relative to the web root.
 - `name` overrides what the browser shows in the Save dialog. Use it to hide storage filenames from the client.
 - `type` overrides the auto-detected MIME type.
 - `disposition` is `"attachment"` by default (force download) — pass `"inline"` to render in-browser for PDFs and images.
@@ -207,13 +209,13 @@ Signature: `sendFile(file, name, type, disposition, directory, deleteFile, deliv
 
 `cfcontent` streams through the servlet output buffer rather than reading the whole file into memory, so `sendFile()` handles multi-hundred-megabyte artifacts without blowing the heap. That said, the request thread is tied up for the entire transfer. For files in the gigabyte range — video, backups, big archives — offload to a CDN or a pre-signed S3 URL so your app server isn't the bottleneck.
 
-If you need range requests (HTTP 206, so browsers can resume a download or seek inside a video), `cfcontent` doesn't emit them. Drop to the raw servlet response via `getPageContext().getResponse()` and stream manually, or front the app with nginx and let it serve the file directly with `X-Accel-Redirect`.
+Range requests (HTTP 206, so browsers can resume a download or seek inside a video) are engine-dependent. On Lucee — the stock CommandBox dev stack — `sendFile()` responses honor `Range` headers out of the box: clients get `206 Partial Content` with `Content-Range` and `Accept-Ranges`. Adobe ColdFusion ignores the header and returns the full `200` body. If you need portable range support, drop to the raw servlet response via `getPageContext().getResponse()` and stream manually, or front the app with nginx and let it serve the file directly with `X-Accel-Redirect`.
 
 ## Security
 
 Uploads and downloads are where apps leak the most. The short list:
 
-- **Sanitize filenames.** Strip `..`, path separators, null bytes, and shell metacharacters from anything the client sent. Better: don't use the client filename on disk at all — generate a UUID or content hash and keep the original only in a column for the download dialog.
+- **Sanitize filenames.** Strip `..`, path separators, null bytes, and shell metacharacters from anything the client sent. Better: don't use the client filename on disk at all — generate a UUID or content hash and keep the original only in a column for the download dialog. On the download side the framework gives you a baseline: `sendFile()` rejects `..` traversal in both `file` and `directory` (throwing `Wheels.InvalidPath`, including URL-encoded and backslash variants; null bytes are stripped) and strips CR/LF, quotes, and backslashes from the `name` before emitting `Content-Disposition`. Treat your own sanitization as defence in depth on top of that, not as the only line.
 - **Verify content server-side.** Don't trust `contentType` from the browser. For images, `isImageFile()` parses the bytes. For PDFs, check magic bytes (`%PDF`). For anything else, a library that actually parses the format beats a string comparison on the header.
 - **Serve from a separate origin.** Put user uploads on `uploads.example.com`, not the main app domain. A malicious SVG uploaded to the app origin can run JavaScript in your users' sessions; on a separate origin, the same-origin policy contains it. Set `Content-Disposition: attachment` as belt-and-braces so the browser downloads rather than renders.
 - **Authorize every download.** Don't hand out predictable URLs like `/uploads/42/avatar.png` from the web root. Route downloads through a controller action that checks ownership, then emits `sendFile()`. Short-lived signed URLs are fine for object-storage backends.

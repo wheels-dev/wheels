@@ -30,7 +30,7 @@ Wheels reads `dataSourceName` from `config/settings.cfm` at application start an
 set(dataSourceName = "myapp_dev");
 ```
 
-The name you set here must match a datasource registered with your CFML engine. In Lucee that's configured in `lucee.json` (or `/lucee/admin/` for server-scope datasources); in Adobe it's in the admin UI. Check your engine's documentation for the registration shape — Wheels only cares that the name resolves to a working connection.
+The name you set here must match a datasource registered with your CFML engine. In Lucee that's configured in `lucee.json` (or `/lucee/admin/` for server-scope datasources); in Adobe it's in the admin UI. Check your engine's documentation for the registration shape — Wheels only cares that the name resolves to a working connection. In development, a name that doesn't resolve surfaces as a `Wheels.DataSourceNotFound` error page naming the datasource (served with HTTP 404).
 
 `config/settings.cfm` is the shared file loaded in every environment. The next section shows how to override it per environment.
 
@@ -54,13 +54,17 @@ Any model can point at a different datasource by calling `dataSource()` in `conf
 component extends="Model" {
     function config() {
         dataSource("legacy_reporting");
-        tableName("vw_legacy_users");
+        table("vw_legacy_users");
         setPrimaryKey("user_id");
     }
 }
 ```
 
 The typical legacy case is all three overrides at once: a non-default datasource, a non-convention table name (often a view), and a non-`id` primary key. The rest of the model still behaves like any other — associations, validations, finders, and the query builder all use the datasource you've declared.
+
+<Aside type="caution">
+  The table-name **setter** is `table()`. `tableName()` is a zero-argument getter — calling `tableName("vw_legacy_users")` silently ignores the argument, the model resolves the conventional table name instead, and the first query throws `Wheels.TableNotFound` ([#3079](https://github.com/wheels-dev/wheels/issues/3079)).
+</Aside>
 
 `dataSource()` also accepts `username` and `password` arguments for databases that need per-model credentials:
 
@@ -88,7 +92,7 @@ set(dataSourceName = "myapp_primary");
 component extends="Model" {
     function config() {
         dataSource("myapp_replica");
-        tableName("users");
+        table("users");
         setPrimaryKey("id");
     }
 }
@@ -102,7 +106,7 @@ A framework-level read/write split is under consideration for a future release. 
 
 Wheels gives you three ways to wrap work in a transaction. Which one you pick depends on how many statements you're coordinating.
 
-**Single model method.** Every persistence method — `save`, `create`, `update`, `delete` — accepts a `transaction` argument. Pass `"rollback"` to run the statement inside a transaction and always roll it back (useful for dry-runs and tests) or `"commit"` (the default when `transactionMode` is set) to commit normally.
+**Single model method.** Every persistence method — `save`, `create`, `update`, `delete` — accepts a `transaction` argument. Pass `"rollback"` to run the statement inside a transaction and always roll it back (useful for dry-runs and tests) or `"commit"` (the default — persistence methods default their `transaction` argument to the `transactionMode` setting, whose framework default is `"commit"`) to commit normally.
 
 ```cfm {test:compile}
 component extends="Controller" {
@@ -125,6 +129,8 @@ component extends="Controller" {
 }
 ```
 
+The invoked method must return a boolean — `invokeWithTransaction()` throws `Methods invoked using invokeWithTransaction must return a boolean value` otherwise. Returning `true` commits; returning `false` rolls the transaction back, even with `transaction="commit"`. Make sure `settleOutstandingCharges()` ends with `return true;` on its success path.
+
 **Multiple statements, multiple models.** Use a native CFML `transaction{}` block. Everything inside runs against the same connection and commits or rolls back as a unit. An uncaught exception inside rolls back automatically; an explicit rollback uses `transaction action="rollback"`.
 
 ```cfm {test:compile}
@@ -141,7 +147,7 @@ component extends="Controller" {
 }
 ```
 
-Transactions commit when the block exits cleanly and roll back on any thrown exception. All statements in a transaction must run against the same datasource — cross-database transactions aren't a thing the engine can give you.
+Transactions commit when the block exits cleanly and roll back on any thrown exception. All statements in a transaction must run against the same datasource — cross-database transactions aren't a thing the engine can give you. Adobe ColdFusion enforces this with an error (`Datasource names for all the database tags within the cftransaction tag must be the same.`); Lucee 7 does not — it runs the statements against both datasources but provides no cross-database atomicity, so the failure mode is silent.
 
 ## Raw queries
 
@@ -159,9 +165,9 @@ component extends="Model" {
 }
 ```
 
-The `?` placeholder plus the `parameters` array gets you parameter binding through `cfqueryparam`. Never concatenate user input into the SQL string — that's the canonical SQL-injection gap. A hardening walkthrough lands in Phase 2b; until then the rule is: if a value comes from `params`, `session`, or any request-scoped source, it goes through a placeholder, not through string interpolation.
+The `?` placeholder plus the `parameters` array gets you parameter binding through `cfqueryparam`. Never concatenate user input into the SQL string — that's the canonical SQL-injection gap. The rule is: if a value comes from `params`, `session`, or any request-scoped source, it goes through a placeholder, not through string interpolation.
 
-For queries that return model instances rather than a raw query result, stay with `findAll(where="...")` or the [query builder](/v4-0-0/basics/query-builder-and-scopes/). Raw `queryExecute()` is for the cases where you genuinely want a query object, not an array of objects.
+For model instances, use `findOne()`/`findByKey()` or `findAll(returnAs="objects")` — plain `findAll()` already returns a query result by default, so reach for raw `queryExecute()` only when neither the ORM nor the [query builder](/v4-0-0/basics/query-builder-and-scopes/) can express the SQL you need.
 
 ## Connection pooling
 
@@ -175,7 +181,9 @@ Wheels 4.0 has database adapters for:
 - **MySQL / MariaDB** — fully supported, broad production use.
 - **Microsoft SQL Server** — fully supported, common in enterprise shops.
 - **SQLite** — great for development and testing, production-fine for small apps.
-- **H2** — embedded, great for tests that need a fresh database per run.
+- **H2** — embedded, great for tests that need a fresh database per run (Lucee-only in the CI matrix).
+- **CockroachDB** — distributed SQL, PostgreSQL wire-compatible, with its own adapter.
+- **Oracle** — supported with its own adapter (runs as a soft-fail leg in the CI matrix).
 
 The Wheels 4.0 core test suite runs on Lucee 7 + SQLite for day-to-day development; the full CI matrix covers additional engines and databases. SQLite is the reference — if something works there but not on your target database, that's a bug worth filing.
 
