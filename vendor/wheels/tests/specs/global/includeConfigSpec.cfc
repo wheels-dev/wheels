@@ -17,7 +17,7 @@ component extends="wheels.WheelsTest" {
 			mapping: "/wheels/tests/_tmp/includeconfig"
 		};
 
-		describe("$includeConfig — config-template failures must not crash app start (issue ##3063)", () => {
+		describe("$includeConfig — config-template failures fail closed with a named error (issue ##3063)", () => {
 
 			beforeEach(() => {
 				if (DirectoryExists(ctx.baseDir)) {
@@ -36,29 +36,64 @@ component extends="wheels.WheelsTest" {
 				StructDelete(request, "$includeConfigSpecRan");
 			});
 
-			it("does not propagate a failure thrown by a config template", () => {
-				// Reproduces the #3063 class of failure: a config/*.cfm file that
+			it("rethrows a config-template failure as Wheels.ConfigIncludeFailed", () => {
+				// Reproduces the ##3063 class of failure: a config/*.cfm file that
 				// fails to compile or run (on Adobe CF a top-level `var di = ...` in
 				// config/services.cfm is a compile error) is included during
-				// onApplicationStart. Before the fix the failure cascaded out of
-				// $includeConfig, aborting application start and surfacing as a
-				// masked app-wide HTTP 500. A runtime throw stands in for the
-				// engine-specific compile error so the regression is portable.
-				// Referencing an undefined variable throws at runtime on every
-				// engine — a portable stand-in for the engine-specific compile
-				// failure, and it avoids nested quotes in the fixture body.
+				// onApplicationStart. The contract is fail-closed in EVERY
+				// environment: the failure must surface as a NAMED, located error —
+				// not the old masked app-wide 500, and not a silent boot on
+				// framework defaults. A runtime throw (undefined-variable
+				// reference) stands in for the engine-specific compile error so
+				// the regression is portable to every CI engine.
 				FileWrite(
 					ctx.baseDir & "/badconfig.cfm",
 					"<cfscript>writeOutput(undefinedConfigVarXyz);</cfscript>"
 				);
-				$assert.notThrows(function() {
+				expect(function() {
 					ctx.g.$includeConfig(template = ctx.mapping & "/badconfig.cfm");
-				});
+				}).toThrow("Wheels.ConfigIncludeFailed");
 			});
 
-			it("still executes a valid config template body after the fix", () => {
-				// Guards against the hardening swallowing the happy path: a healthy
-				// config file must still run, so its registrations take effect.
+			it("names the failing template and preserves the original engine error (##3063 acceptance)", () => {
+				// The whole point of ##3063: the developer must see WHAT broke,
+				// WHERE, and WHY. The named error's message must carry the failing
+				// template path plus the original engine message, and the original
+				// exception type must survive into detail — a clear, located error
+				// instead of the masked `Element WHEELS.ENGINEADAPTER is undefined`
+				// secondary failure that used to hide the real cause.
+				//
+				// Cross-engine invariant ##11: `local.X = ...` inside catch does not
+				// persist on BoxLang, so capture into a shared struct.
+				FileWrite(
+					ctx.baseDir & "/badconfig.cfm",
+					"<cfscript>writeOutput(undefinedConfigVarXyz);</cfscript>"
+				);
+				var state = {caught = false, type = "", message = "", detail = ""};
+				try {
+					ctx.g.$includeConfig(template = ctx.mapping & "/badconfig.cfm");
+				} catch (any e) {
+					state.caught = true;
+					state.type = e.type;
+					state.message = e.message;
+					state.detail = e.detail;
+				}
+				expect(state.caught).toBeTrue("expected $includeConfig to rethrow, but it returned normally (fail-open)");
+				expect(state.type).toBe("Wheels.ConfigIncludeFailed");
+				// Message names the failing template…
+				expect(state.message).toInclude(ctx.mapping & "/badconfig.cfm");
+				// …and carries the original engine message (every engine names the
+				// undefined variable in its message).
+				expect(state.message).toInclude("undefinedConfigVarXyz");
+				// Original exception type is preserved in detail.
+				expect(Len(state.detail)).toBeGT(0);
+				expect(state.detail).toInclude("Original exception type:");
+			});
+
+			it("still executes a valid config template body (happy path unchanged)", () => {
+				// Guards against the fail-closed contract breaking the happy path:
+				// a healthy config file must still run, so its registrations take
+				// effect, and must NOT throw.
 				FileWrite(
 					ctx.baseDir & "/goodconfig.cfm",
 					"<cfscript>request.$includeConfigSpecRan = true;</cfscript>"
@@ -70,10 +105,11 @@ component extends="wheels.WheelsTest" {
 				expect(request.$includeConfigSpecRan).toBeTrue();
 			});
 
-			it("recovers and keeps loading later config after one file fails", () => {
-				// A failing file must not poison subsequent $includeConfig calls —
-				// the environment-specific services.cfm include should still run
-				// even if the base file blew up.
+			it("a failing include does not poison a later, healthy include", () => {
+				// $includeConfig holds no state between calls: after a failing file
+				// throws (and the caller decides what to do with it), a subsequent
+				// healthy include must still work. Note this is NOT log-and-continue
+				// — the first call throws; app start would normally abort there.
 				FileWrite(
 					ctx.baseDir & "/badconfig.cfm",
 					"<cfscript>writeOutput(undefinedConfigVarXyz);</cfscript>"
@@ -82,8 +118,10 @@ component extends="wheels.WheelsTest" {
 					ctx.baseDir & "/goodconfig.cfm",
 					"<cfscript>request.$includeConfigSpecRan = true;</cfscript>"
 				);
-				$assert.notThrows(function() {
+				expect(function() {
 					ctx.g.$includeConfig(template = ctx.mapping & "/badconfig.cfm");
+				}).toThrow("Wheels.ConfigIncludeFailed");
+				$assert.notThrows(function() {
 					ctx.g.$includeConfig(template = ctx.mapping & "/goodconfig.cfm");
 				});
 				expect(StructKeyExists(request, "$includeConfigSpecRan")).toBeTrue();

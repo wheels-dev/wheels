@@ -61,7 +61,7 @@ local.di.map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton();
 
 Both are singletons — one instance per app lifetime. The authenticator holds its strategy registry in instance state, so a singleton is the correct scope.
 
-Wire the session strategy into the authenticator on app init. A cold reload registers it once; the `hasStrategy` check keeps a second reload from stacking duplicates:
+Wire the session strategy into the authenticator on app init. The `hasStrategy` check just avoids needlessly re-registering on a warm reload — duplicates can't stack either way, because `registerStrategy()` replaces any existing entry with the same name:
 
 ```cfm {test:compile} title="config/app.cfm or equivalent init hook"
 if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
@@ -340,7 +340,7 @@ component extends="wheels.Controller" {
     private function authenticate() {
         var result = service("authenticator").authenticate(request);
         if (!result.success) {
-            if (request.format ?: "html" == "json") {
+            if ((request.format ?: "html") == "json") {
                 renderWith(data={error: result.error}, status=result.statusCode);
             } else {
                 flashInsert(error="Please log in first");

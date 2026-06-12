@@ -6,4 +6,85 @@ sidebar:
   order: 3
 ---
 
-Placeholder — content lands in Phase 2.
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The Basics covers the everyday surface of a Wheels app — the routing, controller, view, and model work you'll do on every feature. Each page is a task-oriented how-to. They're ordered to follow a request through the framework, but every page stands alone — jump to whichever matches what you're building right now.
+
+**You'll find:**
+
+- Routing, controllers, and the seven REST actions
+- Views, layouts, partials, and every form helper
+- Validations and rendering errors back to the user
+- Models, finders, associations, and the chainable query builder
+- Migrations, seeding, and multi-datasource setups
+
+## All Basics guides
+
+<CardGrid>
+  <LinkCard
+    title="Routing"
+    href="/v4-0-0/basics/routing/"
+    description="Define routes — resources, nested resources, namespaced routes, custom patterns, and route helpers."
+  />
+  <LinkCard
+    title="Controllers and Actions"
+    href="/v4-0-0/basics/controllers-and-actions/"
+    description="Writing a controller, the seven REST actions, filters, params, rendering, redirect, and flash."
+  />
+  <LinkCard
+    title="Views, Layouts, Partials"
+    href="/v4-0-0/basics/views-layouts-partials/"
+    description="Rendering templates, the default layout, extracting partials, and how controller data reaches the view."
+  />
+  <LinkCard
+    title="Forms and Form Helpers"
+    href="/v4-0-0/basics/forms-and-form-helpers/"
+    description="Every form helper Wheels ships — object-bound and tag-style — plus data-auto-id for stable test selectors."
+  />
+  <LinkCard
+    title="Validation and Error Display"
+    href="/v4-0-0/basics/validation-and-errors/"
+    description="Built-in validations, when they fire, the errors API, and rendering errors inline."
+  />
+  <LinkCard
+    title="Models and the ORM"
+    href="/v4-0-0/basics/models-and-the-orm/"
+    description="Defining a model, finders, persistence, and lifecycle callbacks — the everyday ORM surface."
+  />
+  <LinkCard
+    title="Associations"
+    href="/v4-0-0/basics/associations/"
+    description="Modeling relationships — hasMany, belongsTo, hasOne, nested creation, eager loading, cascade deletes."
+  />
+  <LinkCard
+    title="Migrations"
+    href="/v4-0-0/basics/migrations/"
+    description="Writing and running schema migrations — column types, indexes, foreign keys, and rollbacks."
+  />
+  <LinkCard
+    title="Seeding"
+    href="/v4-0-0/basics/seeding/"
+    description="Populate development and production databases with default records — idempotently."
+  />
+  <LinkCard
+    title="Query Builder and Scopes"
+    href="/v4-0-0/basics/query-builder-and-scopes/"
+    description="Chainable query builder, reusable scopes, enum declarations, and batch processing."
+  />
+  <LinkCard
+    title="Database and Multiple Datasources"
+    href="/v4-0-0/basics/database-and-multiple-datasources/"
+    description="Configuring the default datasource, per-model overrides, transactions, and raw queries."
+  />
+  <LinkCard
+    title="Shared Development Databases"
+    href="/v4-0-0/basics/shared-development-databases/"
+    description="Reconciling the migration tracking table when several developers share one dev database."
+  />
+</CardGrid>
+
+## See also
+
+- [Start Here](/v4-0-0/start-here/) — install Wheels and build your first app with the tutorial
+- [Core Concepts](/v4-0-0/core-concepts/) — the explanations behind what these guides show you how to do
+- [Digging Deeper](/v4-0-0/digging-deeper/) — authentication, jobs, caching, uploads, and the rest of the advanced surface

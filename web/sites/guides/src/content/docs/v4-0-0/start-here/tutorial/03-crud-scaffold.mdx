@@ -270,11 +270,16 @@ The `binding=true` arg turns on **route model binding**. When a request hits `/p
 
 Core Wheels lives in `vendor/wheels/`. Optional features ship as separate packages — standalone repositories maintained under `wheels-dev/` and indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry. Installing one means getting its files into `vendor/<name>/`. On app boot, `PackageLoader.cfc` walks `vendor/*/package.json` and wires each package's mixins, services, and middleware into the framework.
 
-Three first-party packages ship today:
+Six first-party packages ship today:
 
-- **`hotwire`** — Turbo Drive for SPA-like page transitions, Turbo Frames for partial updates, Turbo Streams for server-pushed DOM changes. No app code changes needed for Turbo Drive — activation alone makes link clicks feel instant.
-- **`basecoat`** — Tailwind-based UI components for forms, buttons, and layouts.
-- **`sentry`** — error tracking integration.
+- **`wheels-hotwire`** — Turbo Drive for SPA-like page transitions, Turbo Frames for partial updates, Turbo Streams for server-pushed DOM changes. No app code changes needed for Turbo Drive — activation alone makes link clicks feel instant.
+- **`wheels-basecoat`** — shadcn/ui-quality UI components for forms, buttons, and layouts.
+- **`wheels-sentry`** — error tracking integration.
+- **`wheels-i18n`** — internationalization.
+- **`wheels-seo-suite`** — SEO tooling.
+- **`wheels-legacy-adapter`** — 3.x → 4.x compatibility shims.
+
+Browse them all with `wheels packages list`. This tutorial uses the first two.
 
 Conceptually, installing Hotwire looks like this:
 

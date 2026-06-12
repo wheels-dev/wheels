@@ -57,11 +57,11 @@ Single-command health report for the migration tracking table. Lists orphan trac
 
 ##### `forget`
 
-Deletes a stale tracking row: `wheels migrate forget <version> --yes`. Dry-run by default; `--yes` is required to mutate. Refuses if a matching local migration file exists, or if the version isn't in the tracking table.
+Deletes a stale tracking row: `wheels migrate forget <version> --yes`. Dry-run by default; `--yes` is required to mutate. Refuses if a matching local migration file exists, or if the version isn't in the tracking table. Refusals exit non-zero.
 
 ##### `pretend`
 
-Records a version as applied without running its `up()`: `wheels migrate pretend <version> --yes`. Dry-run by default; `--yes` is required to mutate. Refuses if the version is already applied or has no matching file.
+Records a version as applied without running its `up()`: `wheels migrate pretend <version> --yes`. Dry-run by default; `--yes` is required to mutate. Refuses if the version is already applied or has no matching file. Refusals exit non-zero.
 
 ##### `rename-system-tables`
 
@@ -73,7 +73,7 @@ Migrates legacy framework bookkeeping tables to their current `wheels_`-prefixed
 wheels migrate latest
 ```
 
-Prints `Running migration: latest...` in cyan, dispatches the run to the server, and reports completion with a message like `Migration latest completed.` in green. Migration errors are caught and reported as `Migration failed: <message>`.
+Prints `Running migration: latest...` in cyan, dispatches the run to the server, and reports completion with a message like `Migration latest completed.` in green. Migration errors are caught and reported as `Migration failed: <message>` — and the command exits non-zero, so a `wheels migrate latest && ...` CI gate does not proceed as if the schema moved.
 
 <Aside type="note" title="Generating migration files">
 `wheels migrate` only applies migrations — it does not create them. To stamp out a new migration file, use `wheels generate migration` (blank) or `wheels generate property` (add-column). See [Code Generation](../code-generation/).
@@ -142,7 +142,7 @@ Runs pending migrations and reseeds the database in one shot. Destructive in the
 wheels db reset --force
 ```
 
-Prints `Running migrations...`, dispatches `wheels migrate latest`, then prints `Running seeds...` and dispatches `wheels seed`. Ends with `Database reset complete.` in green.
+Prints `Running migrations...`, dispatches `wheels migrate latest`, then prints `Running seeds...` and dispatches `wheels seed`. Ends with `Database reset complete.` in green. A migration or seed failure exits non-zero so the error is visible in scripts and CI.
 
 ##### `status`
 

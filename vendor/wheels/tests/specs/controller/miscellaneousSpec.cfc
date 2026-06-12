@@ -208,6 +208,90 @@ component extends="wheels.WheelsTest" {
 				expect(r.name).toBe("weirdname.png")
 			})
 
+			it("serves a file from an absolute directory outside the web root", () => {
+				// https://github.com/wheels-dev/wheels/issues/3077 — an absolute `directory`
+				// outside the web root must be used verbatim, not re-resolved via ExpandPath
+				// (which web-root-prefixes the path on Adobe CF).
+				local.outsideDir = GetTempDirectory() & "dlprobe3077_outside"
+				if (!DirectoryExists(local.outsideDir)) {
+					DirectoryCreate(local.outsideDir, true)
+				}
+				local.target = local.outsideDir & "/secret.txt"
+				FileWrite(local.target, "secret payload")
+				try {
+					args.file = "secret.txt"
+					args.directory = local.outsideDir
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(Replace(r.file, "\", "/", "all")).toInclude("dlprobe3077_outside/secret.txt")
+					expect(r.name).toBe("secret.txt")
+				} finally {
+					if (FileExists(local.target)) {
+						FileDelete(local.target)
+					}
+					if (DirectoryExists(local.outsideDir)) {
+						DirectoryDelete(local.outsideDir, true)
+					}
+				}
+			})
+
+			it("does not rewrite an absolute directory containing the '/wheels' substring", () => {
+				// https://github.com/wheels-dev/wheels/issues/3077 — the `/wheels` mapping
+				// fallback substring-matched ANY absolute path containing "/wheels"
+				// (e.g. /var/www/wheels/uploads), silently rewriting it.
+				local.wheelsDir = GetTempDirectory() & "wheels3077-dl"
+				if (!DirectoryExists(local.wheelsDir)) {
+					DirectoryCreate(local.wheelsDir, true)
+				}
+				local.target = local.wheelsDir & "/secret.txt"
+				FileWrite(local.target, "secret payload")
+				try {
+					args.file = "secret.txt"
+					args.directory = local.wheelsDir
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(Replace(r.file, "\", "/", "all")).toInclude("wheels3077-dl/secret.txt")
+				} finally {
+					if (FileExists(local.target)) {
+						FileDelete(local.target)
+					}
+					if (DirectoryExists(local.wheelsDir)) {
+						DirectoryDelete(local.wheelsDir, true)
+					}
+				}
+			})
+
+			it("still resolves a leading-slash webroot-relative directory against the web root", () => {
+				// Regression guard for the long-standing webroot-relative idiom
+				// (`directory="/reports/"`): a root-anchored path that does NOT exist on
+				// disk must fall through to the legacy `ExpandPath()` resolution instead
+				// of being treated as a verbatim filesystem path (which would miss the
+				// file and throw). On Adobe CF this idiom was historically the only
+				// working form of `directory`, so it must keep working.
+				local.relDir = "dlprobe3077_rel"
+				local.absDir = ExpandPath("/" & local.relDir)
+				if (!DirectoryExists(local.absDir)) {
+					DirectoryCreate(local.absDir, true)
+				}
+				local.target = local.absDir & "/report.txt"
+				FileWrite(local.target, "webroot-relative payload")
+				try {
+					args.file = "report.txt"
+					args.directory = "/" & local.relDir & "/"
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(Replace(r.file, "\", "/", "all")).toInclude("dlprobe3077_rel/report.txt")
+					expect(r.name).toBe("report.txt")
+				} finally {
+					if (FileExists(local.target)) {
+						FileDelete(local.target)
+					}
+					if (DirectoryExists(local.absDir)) {
+						DirectoryDelete(local.absDir, true)
+					}
+				}
+			})
+
 			it("is specifying a directory", () => {
 				// Skip this test temporarily to debug in CI
 				skip("Temporarily skipping to debug path issues in CI");

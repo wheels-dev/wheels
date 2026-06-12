@@ -77,13 +77,13 @@ The canonical way to install a Wheels package is `wheels packages add <name>`. T
 
    You should see `Basecoat.cfc`, `package.json`, `README.md`, and a `tests/` directory.
 
-3. Restart the server so `onApplicationStart` re-fires and `PackageLoader` discovers the new package:
+3. Restart the application so `onApplicationStart` re-fires and `PackageLoader` discovers the new package:
 
    ```bash title="your shell"
-   wheels stop && wheels start
+   wheels reload
    ```
 
-   `wheels reload` alone won't do — the package loader runs from `onApplicationStart`, which only fires on a full server boot.
+   `wheels reload` works because an authorized reload stops and restarts the application, re-running `onApplicationStart` — and with it the package loader. A full `wheels stop && wheels start` (which the install message suggests) does the same thing, just more heavily. (The CLI message claiming only a stop/start activates a package is outdated — tracked in [#3110](https://github.com/wheels-dev/wheels/issues/3110).)
 
 </Steps>
 
@@ -294,11 +294,11 @@ Three things to verify:
 
 ## Troubleshooting
 
-**`No matching function [UIBUTTON] found`** — the package didn't activate. Most common cause: you ran `wheels reload` instead of `wheels stop && wheels start`. PackageLoader runs in `onApplicationStart` which a full restart triggers; reload doesn't.
+**`No matching function [UIBUTTON] found`** — the package didn't activate. Both `wheels reload` and `wheels stop && wheels start` re-run `PackageLoader` (an authorized reload restarts the application, re-firing `onApplicationStart`), so the usual cause is a reload that silently no-op'd — a wrong or missing reload password — or the package landing somewhere other than `vendor/`. Run `wheels stop && wheels start` to rule out the password variable, and `ls vendor/wheels-basecoat` to confirm the files are there.
 
 **`No matching function [$UIBUILDID] found`** (or `[$UILUCIDEICON]`) — the package activated but its internal helpers can't be found. Fixed in `wheels-basecoat 1.0.3`. Older versions declared the `$`-prefixed helpers `private`, but Wheels' `PackageLoader` only carries PUBLIC methods across the mixin boundary, so public callers like `uiField` couldn't reach them. Run `wheels packages update wheels-basecoat --yes && wheels stop && wheels start`.
 
-**`No version of 'wheels-basecoat' satisfies runtime '0.0.0-dev'`** — the framework can't read its own version. Likely on a Wheels release older than `4.0.0-SNAPSHOT+1670` (the snapshot that includes the runtime-detection fix). Upgrade with `brew upgrade wheels` or `choco upgrade wheels` and re-run.
+**`No version of 'wheels-basecoat' satisfies runtime '0.0.0-dev'`** — the framework can't read its own version. Likely on a Wheels release older than `4.0.0-SNAPSHOT+1670` (the snapshot that includes the runtime-detection fix). Upgrade with `brew upgrade wheels` (macOS/Linux) or `scoop update wheels` (Windows) and re-run.
 
 **Page renders unstyled** — the bundled CSS isn't being served. Check `public/assets/basecoat/basecoat.min.css` exists (re-run the `cp -r vendor/wheels-basecoat/assets/basecoat public/assets/basecoat` step if not) and `curl -I http://localhost:8080/assets/basecoat/basecoat.min.css` returns 200.
 
