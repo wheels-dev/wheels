@@ -219,6 +219,37 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).toInclude('extends="Controller"');
 				});
 
+				it("splits a comma-joined action token into separate actions (##3112)", () => {
+					var result = codegen.generateController(
+						name = "Authors",
+						actions = ["index,show"],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/controllers/Authors.cfc");
+					// The bug: one element "index,show" emitted as `function index,show()`
+					expect(content).notToInclude("index,show");
+					expect(content).toInclude("function index()");
+					expect(content).toInclude("function show()");
+				});
+
+				it("returns the normalized action list so callers render correct views (##3112)", () => {
+					var result = codegen.generateController(
+						name = "Editors",
+						actions = ["index, show ,create"],
+						force = true
+					);
+					expect(result.actions).toBe(["index", "show", "create"]);
+				});
+
+				it("de-duplicates and trims actions from comma tokens (##3112)", () => {
+					var result = codegen.generateController(
+						name = "Curators",
+						actions = ["index", "show,index"],
+						force = true
+					);
+					expect(result.actions).toBe(["index", "show"]);
+				});
+
 			});
 
 			describe("validateName()", () => {
