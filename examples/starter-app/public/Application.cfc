@@ -367,8 +367,18 @@ component output="false" {
 	}
 
 	public void function onError( any Exception, string EventName ) {
-		application.wheelsdi = new wheels.Injector("wheels.Bindings");
-		application.wo = application.wheelsdi.getInstance("global");
+		// Only rebuild the DI container when it never came up (e.g. the
+		// Injector failed during onApplicationStart). Injector.init()
+		// self-registers at application.wheelsdi, so an unguarded
+		// construction here would replace the live container on every
+		// error page — wiping all config/services.cfm registrations and
+		// cached singletons (issue ##3061).
+		if (!StructKeyExists(application, "wheelsdi")) {
+			application.wheelsdi = new wheels.Injector("wheels.Bindings");
+		}
+		if (!StructKeyExists(application, "wo")) {
+			application.wo = application.wheelsdi.getInstance("global");
+		}
 
 		// In case the error was caused by a timeout we have to add extra time for error handling.
 		// We have to check if onErrorRequestTimeout exists since errors can be triggered before the application.wheels struct has been created.
