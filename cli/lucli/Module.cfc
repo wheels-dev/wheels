@@ -834,24 +834,77 @@ component extends="modules.BaseModule" {
 		// See onboarding finding F5.
 		$purgeServerCfclasses();
 
+		// Response honesty (#3059): a SUCCESSFUL reload is ALWAYS a 302 — the
+		// framework's reload gate restarts the app and then location()-redirects
+		// (public/Application.cfc :: $handleRestartAppRequest). Redirects stay
+		// OFF so the raw status is the verdict: following the success-redirect
+		// would collapse a real reload (302 -> 200 at `/`) into the same 200 a
+		// wrong-password page render produces. Failures print-then-throw per
+		// the #2941 exit-code convention so `wheels reload && ...` gates work.
+		var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
+		var reloadState = { statusCode = 0 };
 		try {
-			var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
-			var httpResult = makeHttpRequest(reloadUrl);
-			out("Application reloaded successfully.", "green");
-			// Surface the hot-vs-cold reload contract — Wheels does NOT
-			// re-fire onApplicationStart on `?reload=true`. Users editing
-			// app/events/onapplicationstart.cfm or config/services.cfm need
-			// a full restart. See finding #8 in the 2026-04-29 fresh-VM
-			// triage.
-			out("Note: onApplicationStart does NOT re-fire. For init-code edits, run `wheels stop && wheels start`.", "cyan");
-			verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
+			reloadState.statusCode = makeHttpRequestWithStatus(reloadUrl, false).statusCode;
 		} catch (any e) {
 			out("Failed to reload: #e.message#", "red");
 			if (!len(password)) {
 				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
 			}
+			throw(
+				type = "Wheels.ReloadFailed",
+				message = "Reload request to localhost:#serverPort# failed: #e.message#"
+			);
 		}
+
+		var verdict = $evaluateReloadResponse(reloadState.statusCode);
+		if (!verdict.success) {
+			out(verdict.message, "red");
+			if (!len(password)) {
+				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
+			}
+			verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
+			throw(type = "Wheels.ReloadFailed", message = verdict.message);
+		}
+
+		out("Application reloaded successfully.", "green");
+		// Surface the hot-vs-cold reload contract — Wheels does NOT
+		// re-fire onApplicationStart on `?reload=true`. Users editing
+		// app/events/onapplicationstart.cfm or config/services.cfm need
+		// a full restart. See finding #8 in the 2026-04-29 fresh-VM
+		// triage.
+		out("Note: onApplicationStart does NOT re-fire. For init-code edits, run `wheels stop && wheels start`.", "cyan");
+		verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
 		return "";
+	}
+
+	/**
+	 * Verdict for a `?reload=true` response status (#3059).
+	 *
+	 * The framework's reload gate restarts the app and then redirects via
+	 * location(), so a successful reload is always a 3xx (302 in practice).
+	 * A 2xx means the warm-path gate fell through and the page was served
+	 * normally — the reload password didn't match, nothing restarted (404
+	 * is the same fall-through on an app without a root route). 4xx/5xx
+	 * means the endpoint itself errored (e.g. the #3053 Adobe regression).
+	 *
+	 * Public ONLY so ReloadCommandSpec can unit-test it (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — hidden from MCP via the structural
+	 * $-prefix sweep in mcpHiddenTools().
+	 */
+	public struct function $evaluateReloadResponse(required numeric statusCode) {
+		if (arguments.statusCode >= 300 && arguments.statusCode < 400) {
+			return { success = true, message = "" };
+		}
+		if (arguments.statusCode >= 400) {
+			return {
+				success = false,
+				message = "Reload failed: the server returned HTTP #arguments.statusCode#. The application was NOT reloaded — check the server's error output."
+			};
+		}
+		return {
+			success = false,
+			message = "Reload was not triggered: the server served the page normally (HTTP #arguments.statusCode#) instead of answering with the reload redirect (302). The application was NOT reloaded — check the reload password."
+		};
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1506,9 +1559,18 @@ component extends="modules.BaseModule" {
 				case "/reload":
 					out("Reloading application...", "cyan");
 					try {
+						// Same 302-vs-200 honesty contract as the reload
+						// command (#3059) — but interactive, so failures
+						// print red instead of throwing.
 						var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
-						makeHttpRequest(reloadUrl);
-						out("Application reloaded.", "green");
+						var reloadVerdict = $evaluateReloadResponse(
+							makeHttpRequestWithStatus(reloadUrl, false).statusCode
+						);
+						if (reloadVerdict.success) {
+							out("Application reloaded.", "green");
+						} else {
+							out(reloadVerdict.message, "red");
+						}
 					} catch (any e) {
 						out("Reload failed: #e.message#", "red");
 					}
@@ -6913,9 +6975,28 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function makeHttpRequest(required string requestUrl) {
+		return makeHttpRequestWithStatus(arguments.requestUrl).body;
+	}
+
+	/**
+	 * GET `requestUrl` and return BOTH the final status code and the body:
+	 * `{statusCode: numeric, body: string}`. Callers that need to act on the
+	 * HTTP status (reload's 302-vs-200 contract, #3059) use this directly;
+	 * everything else keeps the body-only makeHttpRequest() wrapper above.
+	 *
+	 * `followRedirects=false` surfaces the raw 3xx instead of the post-
+	 * redirect response — required by reload(), where following the
+	 * success-redirect would make a real reload (302 -> 200 at `/`)
+	 * indistinguishable from the wrong-password page render (200).
+	 */
+	private struct function makeHttpRequestWithStatus(
+		required string requestUrl,
+		boolean followRedirects = true
+	) {
 		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
 		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("GET");
+		conn.setInstanceFollowRedirects(javacast("boolean", arguments.followRedirects));
 		conn.setConnectTimeout(5000);
 		conn.setReadTimeout(120000);
 
@@ -6925,7 +7006,7 @@ component extends="modules.BaseModule" {
 		// Scanner.init(null) NPEs on Lucee and surfaces as a useless "null"
 		// error message (#2947 review, #2977). No body — return empty.
 		if (isNull(inputStream)) {
-			return "";
+			return { statusCode = responseCode, body = "" };
 		}
 		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
@@ -6933,7 +7014,7 @@ component extends="modules.BaseModule" {
 			response &= scanner.nextLine() & chr(10);
 		}
 		scanner.close();
-		return trim(response);
+		return { statusCode = responseCode, body = trim(response) };
 	}
 
 	/**
