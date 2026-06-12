@@ -108,6 +108,10 @@ Headers set by middleware on the way out (security headers, CORS, request ID). T
 
 **`beforeAction` filters run after `config()`.** That's why they can rely on injected services (`this.emailService`) — the DI container has already resolved them.
 
+<Aside type="caution">
+  Known issue: until [#3061](https://github.com/wheels-dev/wheels/issues/3061) is fixed, any uncaught error — even a stray 404 error page — re-creates the DI container, silently wiping every `config/services.cfm` registration. The next request that relies on an injected service then fails, breaking this guarantee until the application is reloaded.
+</Aside>
+
 **View rendering is inside the request, not after it.** Helpers and views see the same `params`, `flash`, and `session` the action saw. A view is not a separate subprocess.
 
 **`redirectTo()` in a filter skips everything below.** Auth check fails → `redirectTo("login")` → no action, no view, just a 302 response. Filters can short-circuit cleanly.
