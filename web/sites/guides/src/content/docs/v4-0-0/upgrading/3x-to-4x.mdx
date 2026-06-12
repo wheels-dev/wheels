@@ -139,7 +139,7 @@ The `SecurityHeaders` middleware (#2036) emits `Strict-Transport-Security: max-a
 The CSRF encryption key is auto-generated if empty (#2054), but cookies rotate on every deploy when that happens. Set a stable key.
 
 ```cfm {test:compile} title="config/settings.cfm"
-set(csrfEncryptionKey = env("WHEELS_CSRF_KEY"));
+set(csrfCookieEncryptionSecretKey = env("WHEELS_CSRF_KEY"));
 ```
 
 JWT verification now validates the `alg` claim and uses constant-time signature comparison (#2079, #2086). Tokens forged with `alg: none` or mismatched algorithms are rejected.
@@ -164,7 +164,7 @@ Without this line, every boot will log the following warning even if `reloadPass
 WARN  Wheels: reloadPassword is empty — URL-based environment switching and application reload are disabled until a password is set in config/settings.cfm
 ```
 
-The `env()` helper is the canonical pattern for flowing `.env` values into framework settings. Use the same approach for `csrfEncryptionKey` and other security settings.
+The `env()` helper is the canonical pattern for flowing `.env` values into framework settings. Use the same approach for `csrfCookieEncryptionSecretKey` and other security settings.
 
 #### `config/environment.cfm` has the same load-order gap
 
@@ -478,7 +478,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 
 ## Common issues
 
-- **"CSRF token invalid" on forms after upgrade.** Either the encryption key rotated (set `csrfEncryptionKey` explicitly) or a third-party embed is hitting `SameSite`. See #2035, #2054.
+- **"CSRF token invalid" on forms after upgrade.** Either the encryption key rotated (set `csrfCookieEncryptionSecretKey` explicitly when using `csrfStore="cookie"`) or a third-party embed is hitting `SameSite`. See #2035, #2054.
 - **Requests return 403 with no CORS header.** `allowOrigins` isn't set. See #2039.
 - **CORS preflight rejected after switching from global settings to the middleware.** The `Cors` constructor's `allowHeaders` default (`Content-Type,Authorization,X-Requested-With`) does not include `X-Auth-Token`, `X-Requested-By`, or `Origin` — all present in the legacy `accessControlAllowHeaders` global default. Pass the missing headers explicitly. See [Migrating from global settings to the middleware](#migrating-from-global-settings-to-the-middleware).
 - **Rate limiter counts wrong behind your load balancer.** `trustProxy` defaults to `false` now. See #2024, #2088.
