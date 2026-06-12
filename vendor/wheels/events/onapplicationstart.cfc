@@ -485,7 +485,22 @@ component {
 				local.queryString = ArrayToList(local.newQueryString, "&");
 				local.url = "#local.url#?#local.queryString#";
 			}
-			$location(url = local.url, addToken = false);
+			// Defer the actual redirect to EventMethods.$runOnRequestStart (issue #3054).
+			// Two reasons this block must not redirect directly:
+			// 1. This component is a plain `component {` with no extends and no mixins,
+			//    so framework helpers like $location() (vendor/wheels/Global.cfc) are not
+			//    in scope — the bare $location() that used to sit here threw "No matching
+			//    function [$LOCATION] found" during the post-switch cold start.
+			// 2. Even a resolvable cflocation is wrong here: it aborts the request while
+			//    onApplicationStart is still running, the engine then discards the
+			//    half-started application, and the next request cold-starts from
+			//    config/environment.cfm — silently reverting URL environment switches
+			//    into production/maintenance (the two environments that auto-enable
+			//    redirectAfterReload, see events/init/orm.cfm). Verified on Lucee 7.
+			// The request scope survives into $runOnRequestStart, which runs in this
+			// same request after the application (including a switched environment)
+			// has been fully initialized and persisted, so aborting there is safe.
+			request.wheels.redirectAfterReloadUrl = local.url;
 		}
 	}
 

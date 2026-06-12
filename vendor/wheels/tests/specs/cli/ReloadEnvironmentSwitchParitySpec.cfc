@@ -43,6 +43,15 @@
  *
  * Structural spec (no runtime): reads each copy and asserts the four parts
  * are wired. Modeled on ApplicationCfcInjectorAssignmentSpec.cfc.
+ *
+ * Issue ##3053 addendum: the ##3030 fix read the URL scope unscoped
+ * (StructKeyExists(url, "reload"), url.reload, ...) inside $buildRedirectUrl,
+ * which had ALWAYS declared a string local named url. On Adobe CF unscoped
+ * name resolution finds the local before the URL scope, so every password
+ * reload and environment switch dereferenced a string and returned HTTP 500
+ * (CLAUDE.md anti-pattern ##11 — reserved scope names). The local is renamed
+ * to redirectPath; the fifth it-block below pins the rename and fails if any
+ * local/var declaration named url reappears anywhere in these files.
  */
 component extends="wheels.WheelsTest" {
 
@@ -199,6 +208,60 @@ component extends="wheels.WheelsTest" {
 							relPath & " must seed this.wheels.reloadPassword from the handoff so the "
 							& "framework's reloadPassword carryover works on the cold start "
 							& "(issue ##3030)."
+						);
+					});
+
+					it("never shadows the url scope with a local named url in " & relPath, () => {
+						var absolute = repoRoot & "/" & relPath;
+						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
+						var content = fileRead(absolute);
+
+						// Pin the renamed, non-reserved local that carries the redirect
+						// target through $buildRedirectUrl (issue ##3053).
+						expect(
+							reFind("local\.redirectPath\s*=\s*cgi\.path_info", content) > 0
+						).toBeTrue(
+							relPath & " must carry the redirect target in local.redirectPath "
+							& "(issue ##3053)."
+						);
+						expect(
+							content contains "return local.redirectPath;"
+						).toBeTrue(
+							relPath & " must return local.redirectPath from $buildRedirectUrl "
+							& "(issue ##3053)."
+						);
+
+						// No local/var declaration (or any other use) named url may exist
+						// anywhere in the file: this lineage reads the URL scope unscoped in
+						// onRequestStart, $handleRestartAppRequest AND $buildRedirectUrl, and
+						// on Adobe CF a local named url shadows the URL scope, turning every
+						// password reload into an HTTP 500 (issue ##3053, CLAUDE.md
+						// anti-pattern ##11 — reserved scope names). Line-anchored scan that
+						// skips comment lines (CLAUDE.md anti-pattern ##14).
+						var offenders = [];
+						var sourceLines = ListToArray(content, Chr(10), true);
+						var lineCount = ArrayLen(sourceLines);
+						for (var lineNo = 1; lineNo <= lineCount; lineNo++) {
+							var line = Trim(sourceLines[lineNo]);
+							if (!Len(line)) {
+								continue;
+							}
+							// Skip line comments and block-comment lines (open/continuation).
+							if (Left(line, 2) == "//" || Left(line, 2) == "/*" || Left(line, 1) == "*") {
+								continue;
+							}
+							if (
+								reFindNoCase("local\.url[^a-z0-9_]", line & " ") > 0
+								|| reFindNoCase("var[ #Chr(9)#]+url[ #Chr(9)#=;]", line & " ") > 0
+							) {
+								ArrayAppend(offenders, "line " & lineNo & ": " & line);
+							}
+						}
+						expect(ArrayLen(offenders) == 0).toBeTrue(
+							relPath & " declares or uses a local named url, which shadows the "
+							& "URL scope on Adobe CF and breaks every password reload "
+							& "(issue ##3053, CLAUDE.md anti-pattern ##11). Offending "
+							& ArrayToList(offenders, " | ")
 						);
 					});
 
