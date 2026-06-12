@@ -107,6 +107,8 @@ Model finders return query objects, not arrays. Loop accordingly.
 .end()
 ```
 
+`scope()`, `namespace()`, `package()`, and `controller()` also accept `callback=` and auto-close the scope when the callback returns — use the same callback form for these too (#3072).
+
 ### 4. HTML5 Form Helpers Exist — Use Them
 ```cfm
 #emailField(objectName="user", property="email")#
@@ -348,8 +350,9 @@ Resolves `params.key` into a model instance before the action runs. Lands in `pa
 ```cfm
 .resources(name="users", binding=true)                // params.user
 .resources(name="posts", binding="BlogPost")          // params.blogPost
-.scope(path="/api", binding=true)                     // all nested resources bound
-.end()
+.scope(path="/api", binding=true, callback=function(map) {  // all nested resources bound
+    map.resources("users");
+})
 set(routeModelBinding=true);                          // global, in config/settings.cfm
 ```
 
@@ -405,9 +408,9 @@ set(middleware = [
 
 // config/routes.cfm — route-scoped
 mapper()
-    .scope(path="/api", middleware=["app.middleware.ApiAuth"])
-        .resources("users")
-    .end()
+    .scope(path="/api", middleware=["app.middleware.ApiAuth"], callback=function(map) {
+        map.resources("users");
+    })
 .end();
 ```
 
