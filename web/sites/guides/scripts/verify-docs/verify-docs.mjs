@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 import { readdir, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { extractExamples } from './lib/extract.mjs';
 import { printReport } from './lib/report.mjs';
+import { loadAllowlist, applyAllowlist, bodyHash } from './lib/allowlist.mjs';
 import { runCli } from './drivers/cli.mjs';
 import { runCompile } from './drivers/compile.mjs';
 import { TutorialSession } from './drivers/tutorial.mjs';
 import { enrichWithSidebarOrder, partitionAndOrder } from './lib/orchestrator.mjs';
 
 const DEFAULT_TARGET = 'src/content/docs/v4-0-0';
+const HERE = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_ALLOWLIST = join(HERE, 'expected-failures.json');
 
 async function collectMdx(target) {
   const s = await stat(target);
@@ -29,7 +33,16 @@ async function collectMdx(target) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const isFullDefaultRun = args.length === 0;
   const targets = args.length > 0 ? args.map((p) => resolve(p)) : [resolve(DEFAULT_TARGET)];
+
+  let allowlist;
+  try {
+    allowlist = await loadAllowlist(process.env.VERIFY_DOCS_ALLOWLIST || DEFAULT_ALLOWLIST);
+  } catch (err) {
+    console.error(`verify-docs: ${err.message}`);
+    process.exit(2);
+  }
 
   const files = [];
   for (const t of targets) files.push(...(await collectMdx(t)));
@@ -82,7 +95,13 @@ async function main() {
     if (session) await session.stopServer();
   }
 
-  const failures = printReport([...perBlockResults, ...cumulativeResults]);
+  const results = [...perBlockResults, ...cumulativeResults];
+  for (const r of results) r.bodyHash = bodyHash(r.body);
+  // Orphan-entry warnings only make sense when the whole tree was scanned;
+  // a single-file run would flag every entry for the other 186 files.
+  const { warnings } = applyAllowlist(results, allowlist, { checkOrphans: isFullDefaultRun });
+
+  const failures = printReport(results, warnings);
   process.exit(failures > 0 ? 1 : 0);
 }
 
