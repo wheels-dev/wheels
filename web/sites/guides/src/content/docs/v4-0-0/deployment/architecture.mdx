@@ -48,7 +48,7 @@ The values above are what the code is written against, but three rows don't hold
 
 - **Audit log** — `/tmp/kamal-audit.log` is never written; the audit `record()` command builder has no call sites.
 - **Docker network** — containers are run with `--network kamal`, but `docker network create kamal` is never issued, so on a host not previously managed by Ruby Kamal the network doesn't exist.
-- **Proxy config dir** — the path is built as `/home/<user>/.config/kamal-proxy/`, which resolves to `/home/root` for the default `root` SSH user; root's home is actually `/root`, where Ruby Kamal puts it.
+- **Proxy config dir** — the path is built as `/home/<user>/.config/kamal-proxy/`, which resolves to `/home/root` for the default `root` SSH user; root's home is actually `/root` — and Ruby Kamal mounts a named Docker volume (`kamal-proxy-config`) rather than a host home path, so the bind mount diverges from Kamal either way.
 </Aside>
 
 Two choices in that table warrant commentary.
