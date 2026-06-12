@@ -113,12 +113,16 @@ component {
                 }
             } finally {
                 // Tolerate release failures so they can never shadow the
-                // original deploy exception inside this finally block. rm -f
-                // is idempotent; if it genuinely fails on a remote, the deploy
-                // already has a real error to surface from the try body.
-                // Release fans out to the exact hosts the lock was acquired
-                // on, so no host is left holding a stale lock (##2957 DEP-1b).
-                $dispatch(lockHosts, lock.release(), dryRun, true);
+                // original deploy exception inside this finally block — and
+                // "tolerate" must cover transport failures, not just exit
+                // codes: allowFail only maps to {raise: false}, while a host
+                // that died mid-deploy (the correlated case) makes the
+                // release's startSession throw out of onEach and REPLACE the
+                // in-flight deploy error. Per-host best-effort dispatch
+                // confines each failure to its host, so every healthy host
+                // is still released (##2957 DEP-1b). rm -f is idempotent;
+                // skipped hosts are logged for manual cleanup.
+                $logSkippedLockReleases($dispatchPerHostTolerant(lockHosts, lock.release(), dryRun));
             }
 
             hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
@@ -513,19 +517,71 @@ component {
     /**
      * Best-effort release of the locks a partially-failed acquire already
      * placed. A rollback failure must never shadow the LockAcquireFailed
-     * the caller is about to throw.
+     * the caller is about to throw. Host-granular: one unreachable host
+     * must not stop the rollback from clearing the remaining healthy hosts.
      */
     private void function $rollbackAcquiredLocks(required array hosts, required any lock) {
         if (!arrayLen(arguments.hosts)) return;
-        var releaseCmd = arguments.lock.release();
-        try {
-            variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
-                ssh.run(releaseCmd, {raise: false});
-            });
-        } catch (any e) {
-            // Swallowed deliberately — the acquire error is the one the
-            // operator needs to see; stale locks are recoverable via
-            // `wheels deploy lock release`.
+        // $dispatchPerHostTolerant never throws — per-host failures are
+        // swallowed deliberately; the acquire error is the one the operator
+        // needs to see. Stale locks are recoverable via
+        // `wheels deploy lock release`.
+        $dispatchPerHostTolerant(arguments.hosts, arguments.lock.release(), false);
+    }
+
+    /**
+     * Per-host best-effort dispatch. allowFail-style onEach is NOT enough
+     * for tolerant fan-out: the real SshPool.onEach pre-resolves a
+     * connection for EVERY host before submitting any task, so a single
+     * unreachable host throws before the command runs anywhere, and a
+     * transport failure inside a task (dead cached connection) is rethrown
+     * from future.get() regardless of {raise: false}. Dispatching each host
+     * in its own sequential([host]) call with a per-host try/catch confines
+     * every failure mode — connect and transport alike — to its host.
+     *
+     * @return array of {host, message} structs for hosts that failed.
+     *
+     * MIRROR: DeployLockCli.$dispatchPerHostTolerant is the manual-verb
+     * twin of this helper — keep them in lockstep.
+     */
+    private array function $dispatchPerHostTolerant(
+        required array hosts,
+        required string cmd,
+        required boolean dryRun
+    ) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
+            }
+            return [];
+        }
+        var c = arguments.cmd;
+        var failed = [];
+        for (var h in arguments.hosts) {
+            try {
+                variables.sshPool.sequential([h], function(ssh, host) {
+                    ssh.run(c, {raise: false});
+                });
+            } catch (any e) {
+                arrayAppend(failed, {host: h, message: e.message});
+            }
+        }
+        return failed;
+    }
+
+    /**
+     * Surface (but never throw) the hosts a best-effort lock release could
+     * not reach. Mirrors the post-deploy-failure hook logging (#3087):
+     * visibility without shadowing whatever error is already in flight.
+     * Lives in a helper because loops inside `finally` miscompile on
+     * Lucee 7 (cross-engine invariant 12).
+     */
+    private void function $logSkippedLockReleases(required array failed) {
+        for (var f in arguments.failed) {
+            writeOutput(
+                "[lock:release] " & f.host & ": " & f.message
+                    & " (ignored — run 'wheels deploy lock release' when the host is back)" & chr(10)
+            );
         }
     }
 

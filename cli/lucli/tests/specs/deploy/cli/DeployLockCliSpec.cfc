@@ -115,6 +115,67 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(hosts).toBe(["10.0.0.1", "10.0.0.2"]);
             });
 
+            // Regression suite for the ##2957 review: release/status fanned out
+            // via SshPool.onEach, which pre-resolves a connection for EVERY
+            // host before running anything — one dead host aborted the whole
+            // verb with zero commands executed. That turned the prescribed
+            // stale-lock recovery path ("clear a stale lock with 'wheels
+            // deploy lock release'") into a dead-end exactly when a host died
+            // mid-deploy, the most plausible cause of fleet-wide stale locks.
+
+            it("release skips an unreachable host and still clears the lock on the rest", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                fake.failConnection("10.0.0.1", "Connection refused");
+                var cli = new cli.lucli.services.deploy.cli.DeployLockCli(fake);
+                var out = cli.release({configPath: variables.multiHostFixture});
+                var releaseHosts = [];
+                for (var c in fake.calls()) {
+                    if (findNoCase("rm -f ", c.cmd ?: "")) arrayAppend(releaseHosts, c.host);
+                }
+                expect(releaseHosts).toBe(["10.0.0.2"]);
+                // The summary names the skipped host so the operator knows the
+                // release there is still pending.
+                expect(out).toInclude("Released deploy lock");
+                expect(out).toInclude("WARNING");
+                expect(out).toInclude("10.0.0.1");
+                expect(out).toInclude("Connection refused");
+            });
+
+            it("status reports an unreachable host as advisory output instead of throwing", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                fake.failConnection("10.0.0.2");
+                var cli = new cli.lucli.services.deploy.cli.DeployLockCli(fake);
+                var out = cli.status({configPath: variables.multiHostFixture});
+                var statusHosts = [];
+                for (var c in fake.calls()) {
+                    if (findNoCase("readlink ", c.cmd ?: "")) arrayAppend(statusHosts, c.host);
+                }
+                expect(statusHosts).toBe(["10.0.0.1"]);
+                expect(out).toInclude("Checked deploy lock status");
+                expect(out).toInclude("WARNING");
+                expect(out).toInclude("10.0.0.2");
+            });
+
+            it("a transport-dead release still proceeds when the failure is a dead session, not a dead connect", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.multiHostFixture);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                // Host 1's connection is cached-but-dead: the connect succeeds,
+                // the rm -f session throws a transport error despite raise=false.
+                fake.expect("10.0.0.1", lockCmds.release(), {transportError: "Broken pipe"});
+                var cli = new cli.lucli.services.deploy.cli.DeployLockCli(fake);
+                var out = cli.release({configPath: variables.multiHostFixture});
+                var releaseHosts = [];
+                for (var c in fake.calls()) {
+                    if (findNoCase("rm -f ", c.cmd ?: "")) arrayAppend(releaseHosts, c.host);
+                }
+                // Host 1's release was attempted (recorded) before the session
+                // died; host 2's still went through.
+                expect(releaseHosts).toBe(["10.0.0.1", "10.0.0.2"]);
+                expect(out).toInclude("WARNING");
+                expect(out).toInclude("10.0.0.1");
+            });
+
             it("dry-run buffers output instead of dispatching", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var cli = new cli.lucli.services.deploy.cli.DeployLockCli(fake);

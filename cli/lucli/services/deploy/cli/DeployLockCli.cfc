@@ -41,9 +41,16 @@ component {
         // rm -f is idempotent; surfacing a failure here only obscures the
         // operator's intent ("clear the lock if it's there"). #2696.
         // Fan out to every host — the lock lives fleet-wide (##2957 DEP-1),
-        // so clearing one host would strand stale locks on the rest.
-        $dispatch($uniqueHosts($allHosts(cfg)), lock.release(), dryRun, true);
-        return $renderResult(arguments.opts, "Released deploy lock for " & cfg.service());
+        // so clearing one host would strand stale locks on the rest — but
+        // per host, best-effort: fleet-wide stale locks most plausibly
+        // exist BECAUSE a host died mid-deploy, so the recovery path must
+        // keep working around an unreachable host instead of aborting on it.
+        var failed = $dispatchPerHostTolerant($uniqueHosts($allHosts(cfg)), lock.release(), dryRun);
+        return $renderResult(
+            arguments.opts,
+            "Released deploy lock for " & cfg.service()
+                & $skippedHostsSuffix(failed, "the lock was NOT released there; re-run 'wheels deploy lock release' when the host is back")
+        );
     }
 
     public string function status(required struct opts) {
@@ -54,9 +61,14 @@ component {
         // readlink exits nonzero when the lock file is missing — which is
         // exactly what the operator wants to learn from `status`. Treat that
         // as advisory output, not a thrown error. #2696. Checked on every
-        // host since the lock lives fleet-wide (##2957 DEP-1).
-        $dispatch($uniqueHosts($allHosts(cfg)), lock.status(), dryRun, true);
-        return $renderResult(arguments.opts, "Checked deploy lock status for " & cfg.service());
+        // host since the lock lives fleet-wide (##2957 DEP-1) — and the same
+        // advisory contract covers an unreachable host: report it, don't throw.
+        var failed = $dispatchPerHostTolerant($uniqueHosts($allHosts(cfg)), lock.status(), dryRun);
+        return $renderResult(
+            arguments.opts,
+            "Checked deploy lock status for " & cfg.service()
+                & $skippedHostsSuffix(failed, "the lock state there is unknown")
+        );
     }
 
     private string function $renderResult(required struct opts, required string summary) {
@@ -125,19 +137,15 @@ component {
     /**
      * Best-effort release of the locks a partially-failed acquire already
      * placed. A rollback failure must never shadow the LockAcquireFailed
-     * the caller is about to throw.
+     * the caller is about to throw. Host-granular: one unreachable host
+     * must not stop the rollback from clearing the remaining healthy hosts.
      */
     private void function $rollbackAcquiredLocks(required array hosts, required any lock) {
         if (!arrayLen(arguments.hosts)) return;
-        var releaseCmd = arguments.lock.release();
-        try {
-            variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
-                ssh.run(releaseCmd, {raise: false});
-            });
-        } catch (any e) {
-            // Swallowed deliberately — the acquire error is the one the
-            // operator needs to see.
-        }
+        // $dispatchPerHostTolerant never throws — per-host failures are
+        // swallowed deliberately; the acquire error is the one the operator
+        // needs to see.
+        $dispatchPerHostTolerant(arguments.hosts, arguments.lock.release(), false);
     }
 
     /** Order-preserving dedupe — a host serving several roles appears once. */
@@ -153,16 +161,59 @@ component {
         return out;
     }
 
-    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
+    /**
+     * Per-host best-effort dispatch. allowFail-style onEach is NOT enough
+     * for tolerant fan-out: the real SshPool.onEach pre-resolves a
+     * connection for EVERY host before submitting any task, so a single
+     * unreachable host throws before the command runs anywhere, and a
+     * transport failure inside a task (dead cached connection) is rethrown
+     * from future.get() regardless of {raise: false}. Dispatching each host
+     * in its own sequential([host]) call with a per-host try/catch confines
+     * every failure mode — connect and transport alike — to its host.
+     *
+     * @return array of {host, message} structs for hosts that failed.
+     *
+     * MIRROR: DeployMainCli.$dispatchPerHostTolerant is the deploy-flow
+     * twin of this helper — keep them in lockstep.
+     */
+    private array function $dispatchPerHostTolerant(
+        required array hosts,
+        required string cmd,
+        required boolean dryRun
+    ) {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) {
                 arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             }
-            return;
+            return [];
         }
         var c = arguments.cmd;
-        var doRaise = !arguments.allowFail;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
+        var failed = [];
+        for (var h in arguments.hosts) {
+            try {
+                variables.sshPool.sequential([h], function(ssh, host) {
+                    ssh.run(c, {raise: false});
+                });
+            } catch (any e) {
+                arrayAppend(failed, {host: h, message: e.message});
+            }
+        }
+        return failed;
+    }
+
+    /**
+     * Render the unreachable-host warning appended to a verb's summary.
+     * Empty string when nothing failed.
+     */
+    private string function $skippedHostsSuffix(required array failed, required string consequence) {
+        if (!arrayLen(arguments.failed)) return "";
+        var parts = [];
+        for (var f in arguments.failed) {
+            arrayAppend(parts, f.host & " (" & f.message & ")");
+        }
+        return chr(10) & "WARNING: skipped " & arrayLen(arguments.failed)
+            & " unreachable host(s): " & arrayToList(parts, "; ")
+            & " — " & arguments.consequence & ".";
     }
 
     private string function $currentUser() {
