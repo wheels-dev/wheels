@@ -12,14 +12,14 @@ Stop and remove app containers for the given version. Scoped to one version — 
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy app remove --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+wheels deploy app remove --release=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | **Required.** |
+| `--release=<v>` | **Required.** |
 | `--role=<name>` | Limit to one role. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
@@ -39,5 +39,5 @@ Prefer [`wheels deploy prune`](/v4-0-0/command-line-tools/commands/deploy/prune/
 ## Example
 
 ```bash title="illustrative — requires deploy infrastructure"
-wheels deploy app remove --version=abc1234
+wheels deploy app remove --release=abc1234
 ```

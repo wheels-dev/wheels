@@ -12,14 +12,14 @@ sidebar:
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy app details --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+wheels deploy app details --release=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | **Required.** |
+| `--release=<v>` | **Required.** |
 | `--role=<name>` | Limit to one role. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print the commands without executing. |
@@ -33,5 +33,5 @@ For a broader sweep that shows every service-labelled container regardless of ve
 ## Example
 
 ```bash title="example"
-wheels deploy app details --version=abc1234
+wheels deploy app details --release=abc1234
 ```
