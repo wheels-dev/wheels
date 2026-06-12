@@ -1,10 +1,11 @@
 name: Smoke (non-dev environments)
 
-# Lucee-leg regression net for discussion #3023 / issues #3030, #3031 (and any
-# future engine-agnostic non-dev request regression): boots the demo app with
-# config/environment.cfm forced to production and testing and asserts
+# Lucee-leg regression net for discussion #3023 / issues #3030, #3031, #3053
+# (and any future engine-agnostic non-dev request regression): boots the demo
+# app with config/environment.cfm forced to production and testing and asserts
 # non-development request behavior (clean 404s, no stack traces, reload refused
-# without the password) via tools/ci/smoke-env.sh.
+# without the password, authorized reload answers 302) via
+# tools/ci/smoke-env.sh.
 #
 # Scope note: this job runs Lucee 7 only. The Adobe-only failure class from
 # issue #3029 (engine error-template leakage in non-dev environments) is NOT
@@ -40,6 +41,10 @@ jobs:
         wheels_env: [production, testing]
     env:
       WHEELS_CI: "true"
+      # Enables smoke probe 6 (authorized reload must 302, issue #3053). Must
+      # match the demo app's set(reloadPassword=...) in config/settings.cfm —
+      # not a secret, the CI app is throwaway.
+      SMOKE_RELOAD_PASSWORD: "wheels-dev"
     steps:
       - uses: actions/checkout@v5
 
