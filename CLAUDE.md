@@ -218,6 +218,8 @@ if (len(resolved)) header("Access-Control-Allow-Origin", resolved);
 
 Pair with `Vary: Origin` whenever the response varies by request origin ([#2724](https://github.com/wheels-dev/wheels/pull/2724)).
 
+Running `set(allowCorsRequests=true)` alongside a `wheels.middleware.Cors` instance no longer duplicates headers — the global path defers to the middleware automatically ([#3114](https://github.com/wheels-dev/wheels/issues/3114)) and writes a one-time `wheels.log` warning. Remove the six `allowCorsRequests` / `accessControlAllow*` settings from `config/settings.cfm` once the middleware is configured.
+
 ### 14. Strip CFML Comments Before Source-Scanning
 **Source:** [#2595](https://github.com/wheels-dev/wheels/pull/2595) — `wheels validate` checked for `extends="Model"` with raw `findNoCase()` and was satisfied by a commented-out `// component extends="Model"` line, missing real missing-inheritance bugs.
 

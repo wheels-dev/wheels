@@ -89,12 +89,7 @@ All six CORS settings (`allowCorsRequests` and the five `accessControlAllow*` se
 
 **Precedence when both are active**
 
-The two paths can coexist, but they produce split behavior:
-
-- **OPTIONS requests**: the global setting fires first in `onRequestStart` and calls `abort` — the middleware never runs. CORS headers come from the global setting's configuration.
-- **All other requests**: both paths run. The middleware fires after `onRequestStart`, so its `cfheader` calls overwrite what the global setting emitted. The middleware wins.
-
-Unless you intentionally want this asymmetry, running both simultaneously is not recommended. Pick one.
+As of [#3114](https://github.com/wheels-dev/wheels/issues/3114), Wheels handles this safely. When a `wheels.middleware.Cors` instance is registered in the pipeline, the global `onRequestStart` path detects it and steps aside — skipping both `$setCORSHeaders` and the global OPTIONS abort — so the middleware is the single source of truth for CORS headers and preflight on every request type. A one-time warning is written to `wheels.log` prompting you to clean up the now-redundant setting. Once you see it, remove the six `allowCorsRequests` / `accessControlAllow*` settings from `config/settings.cfm`.
 
 **Recommendation**
 
