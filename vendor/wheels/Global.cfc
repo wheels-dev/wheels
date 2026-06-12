@@ -4136,7 +4136,7 @@ return local.$wheels;
 					text = "CORS configuration conflict: both allowCorsRequests=true and a wheels.middleware.Cors "
 						& "instance are active. The legacy global CORS path is deferring to the middleware to avoid "
 						& "duplicate Access-Control-Allow-* headers. Disable allowCorsRequests once the Cors middleware "
-						& "is configured. (#3114)"
+						& "is configured. (##3114)"
 				);
 			}
 		}
