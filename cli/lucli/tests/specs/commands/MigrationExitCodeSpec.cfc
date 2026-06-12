@@ -116,8 +116,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					// runMigration("latest") -> $requireRunningServer throws.
 					// The pre-fix dbReset catch printed red and returned ""
 					// (exit 0); the fix rethrows so the refusal reaches $?.
-					mod.__arguments = ["reset", "--force"];
-					expect(() => mod.db()).toThrow();
+					//
+					// arg1=/arg2= exercises the callerArgs path through
+					// structuredArgs() — the same mechanism DbCommandSpec's
+					// throwing spec uses. The instance-level `__arguments`
+					// stash is NOT reliable here: set externally it lands in
+					// the component's `this` scope, but structuredArgs()'s
+					// unscoped read resolves the variables scope in the
+					// in-server suite, so db() would see zero args and print
+					// usage help instead of dispatching reset.
+					expect(() => mod.db(arg1 = "reset", arg2 = "--force"))
+						.toThrow(type = "Wheels.ServerNotRunning");
 				});
 
 			});
