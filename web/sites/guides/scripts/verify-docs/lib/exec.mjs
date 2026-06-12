@@ -26,7 +26,14 @@ function resolveWheels() {
   return 'wheels';
 }
 
-const RESOLVED_WHEELS = resolveWheels();
+/**
+ * Exported for the one spawn site that cannot go through runExec(): the
+ * long-running tutorial dev server (drivers/tutorial.mjs ensureServer()),
+ * which needs the raw child handle. It must spawn this same resolved
+ * binary, or the attestation line would name one binary while tutorial
+ * asserts-http blocks are served by whatever `wheels` is on PATH.
+ */
+export const RESOLVED_WHEELS = resolveWheels();
 
 /**
  * One-line attestation of WHICH `wheels` binary this run exercises:

@@ -122,6 +122,11 @@ startup (`lib/exec.mjs`, `resolveWheels()`), in this order:
 3. Homebrew bin dirs (`/opt/homebrew/bin`, `/usr/local/bin`,
    `/home/linuxbrew/.linuxbrew/bin`).
 
+This covers the long-lived tutorial dev server too: `{test:tutorial}`
+`asserts-http` blocks boot the fixture app by spawning the same resolved
+binary (`drivers/tutorial.mjs`, `ensureServer()`), not a fresh `PATH`
+lookup — so `WHEELS_BIN` redirects it like every other spawn.
+
 `verify-docs.mjs` prints an attestation line at run start stating the
 resolved path, how it was resolved, and the binary's `--version` output:
 
