@@ -13,6 +13,7 @@ component {
 	 * @shallowPath Shallow path prefix.
 	 * @shallowName Shallow name prefix.
 	 * @constraints Variable patterns to use for matching.
+	 * @callback A callback function to define nested routes within this scope. If provided, the scope is automatically closed when the callback completes.
 	 */
 	public struct function scope(
 		string name,
@@ -25,8 +26,19 @@ component {
 		struct constraints,
 		any middleware,
 		any binding,
+		any callback,
 		string $call = "scope"
 	) {
+		// Consume `callback` before it can land on the scope stack. Mirrors group():
+		// without this, the extra named argument was silently dropped — the callback
+		// never ran (its routes 404'd) and nothing closed the scope, so every route
+		// declared after inherited this scope's path and middleware. namespace(),
+		// package(), and controller() forward here, so they inherit this support too.
+		if (StructKeyExists(arguments, "callback")) {
+			local.callback = arguments.callback;
+			StructDelete(arguments, "callback");
+		}
+
 		// Set shallow path and prefix if not in a resource.
 		if (!ListFindNoCase("resource,resources", variables.scopeStack[1].$call)) {
 			if (!StructKeyExists(arguments, "shallowPath") && StructKeyExists(arguments, "path")) {
@@ -89,6 +101,15 @@ component {
 			StructAppend(arguments, variables.scopeStack[1], false);
 		}
 		ArrayPrepend(variables.scopeStack, arguments);
+
+		// If a callback was provided, execute it to declare the nested routes and
+		// auto-close the scope — keeping namespace()/package()/controller() consistent
+		// with group()/resources(). Use IsCustomFunction (as group() does) so the same
+		// closure shape works across Lucee, Adobe, and BoxLang.
+		if (StructKeyExists(local, "callback") && IsCustomFunction(local.callback)) {
+			local.callback(this);
+			end();
+		}
 
 		return this;
 	}
