@@ -9,10 +9,12 @@ sidebar:
 
 Install Docker on every host. Idempotent — re-runs on already-installed hosts are no-ops.
 
+Invoke it through the **flat alias** `wheels deploy bootstrap`. The nested `wheels deploy server bootstrap` form is shadowed at the shell — the CLI's picocli root owns a top-level `server` command for Lucee instance management and prints its help instead ([#2677](https://github.com/wheels-dev/wheels/issues/2677), fixed by the flat alias in [#2690](https://github.com/wheels-dev/wheels/pull/2690)). The nested form remains only for direct callers that bypass the shell, such as MCP.
+
 ## Synopsis
 
 ```txt title="synopsis"
-wheels deploy server bootstrap [--destination=<name>] [--dry-run]
+wheels deploy bootstrap [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
@@ -35,5 +37,5 @@ The convenience script runs as root (or via `sudo`). For production hardening, i
 ## Example
 
 ```bash title="example"
-wheels deploy server bootstrap
+wheels deploy bootstrap
 ```

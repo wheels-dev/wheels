@@ -12,19 +12,19 @@ sidebar:
 ## Synopsis
 
 ``` title="Synopsis"
-wheels deploy accessory start --name=<name|all> [--destination=<name>] [--dry-run]
+wheels deploy accessory start <name|all> [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--name=<name>` | **Required.** Accessory name, or `all`. |
+| `<name>` | **Required positional.** Accessory name, or `all` to fan out. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
 
 ## Example
 
 ```bash title="Start a named accessory"
-wheels deploy accessory start --name=db
+wheels deploy accessory start db
 ```

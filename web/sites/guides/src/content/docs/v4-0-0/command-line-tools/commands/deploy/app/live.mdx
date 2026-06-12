@@ -14,14 +14,14 @@ Clear the server-side maintenance marker, resuming traffic. Pair with [`app main
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy app live --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+wheels deploy app live --release=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | **Required** by the same parser as the other app verbs. |
+| `--release=<v>` | **Required** by the same parser as the other app verbs. |
 | `--role=<name>` | Limit to one role. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print the commands without executing. |
@@ -37,5 +37,5 @@ The Phase 2 port uses a marker-file convention rather than `kamal-proxy`'s nativ
 ## Example
 
 ```bash title="illustrative — requires deployment infrastructure"
-wheels deploy app live --version=abc1234
+wheels deploy app live --release=abc1234
 ```
