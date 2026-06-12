@@ -68,10 +68,8 @@ accessories:
 - `env.clear:` values become `docker run -e` flags on the accessory container.
 - `volumes:` persists `/var/lib/postgresql/data` to the host so the database survives `docker rm`.
 
-<Aside type="caution" title="env.secret and files: are not delivered yet">
-  Two Kamal accessory features are parsed but not implemented in the current Phase 1 CLI:
-
-  - `env.secret:` — secret values from `.kamal/secrets` are not delivered to accessory containers ([#2956](https://github.com/wheels-dev/wheels/issues/2956)/[#2957](https://github.com/wheels-dev/wheels/issues/2957)). For something like `POSTGRES_PASSWORD` you currently have to provision the value another way (e.g. a host-managed env file or volume).
+<Aside type="caution" title="env.secret needs a 4.0.4+ CLI; files: is not delivered">
+  - `env.secret:` — on CLIs built from `develop` (4.0.4+), secret values from `.kamal/secrets` are delivered to accessory containers via a host-side env file (`.kamal/apps/<service>/env/accessories/<name>.env`, `600` permissions, referenced by `--env-file`) when the accessory is booted or rebooted ([#2957](https://github.com/wheels-dev/wheels/issues/2957)). On the released 4.0.3 CLI these entries are silently dropped — provision values like `POSTGRES_PASSWORD` another way there (e.g. a host-managed env file or volume).
   - `files:` — Kamal's "upload local paths into the container filesystem" mechanism is accepted by the config validator but no upload ever happens ([#3088](https://github.com/wheels-dev/wheels/issues/3088)). Initialization scripts and certs need to be placed on the host yourself and mounted via `volumes:`.
 </Aside>
 
@@ -135,6 +133,6 @@ When you do want to change an accessory — a Redis version bump, a Postgres con
   <LinkCard
     title="Secrets"
     href="/v4-0-0/deployment/secrets/"
-    description="How .kamal/secrets works today, and why env.secret delivery is still pending."
+    description="How .kamal/secrets works and how env.secret values reach containers."
   />
 </CardGrid>

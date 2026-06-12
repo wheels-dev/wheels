@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page is for teams already running Ruby Kamal who want to replace `kamal` with `wheels deploy`. The short version: your `.kamal/secrets` and `.kamal/hooks/*` work unchanged, and `config/deploy.yml` largely does too, with two schema exceptions — ERB inside `deploy.yml`, and a set of Kamal top-level keys the validator rejects because the port doesn't implement them — and one Phase 1 functional gap: `env.secret` delivery to containers is not implemented yet ([#2956](https://github.com/wheels-dev/wheels/issues/2956)/[#2957](https://github.com/wheels-dev/wheels/issues/2957)), so configs that rely on it aren't ready to migrate. Keep reading for the full story.
+This page is for teams already running Ruby Kamal who want to replace `kamal` with `wheels deploy`. The short version: your `.kamal/secrets` and `.kamal/hooks/*` work unchanged, and `config/deploy.yml` largely does too, with two schema exceptions — ERB inside `deploy.yml`, and a set of Kamal top-level keys the validator rejects because the port doesn't implement them — and a version caveat: `env.secret` delivery to containers requires a CLI built from `develop` (4.0.4+) — the released 4.0.3 silently drops those entries ([#2957](https://github.com/wheels-dev/wheels/issues/2957)). Keep reading for the full story.
 
 **You'll learn:**
 

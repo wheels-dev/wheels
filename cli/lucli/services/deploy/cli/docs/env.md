@@ -26,7 +26,11 @@ and `secret` (resolved from `.kamal/secrets` at deploy time).
 ## `.kamal/secrets` — plain-text file, out of git
 
 `.kamal/secrets` is a simple KEY=value file. Deploy reads it locally, then
-ships values into containers via `--env`. Never check it in.
+ships `env.secret` values to each host as an env file
+(`.kamal/apps/<service>/env/...`, created with 600 permissions) that
+`docker run` references via `--env-file` — secret values never appear on a
+command line. `env.clear` values ride as escaped `-e` pairs. Never check
+`.kamal/secrets` in.
 
     # .kamal/secrets
     DATABASE_URL=postgres://user:pass@db/app

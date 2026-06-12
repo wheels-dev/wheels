@@ -82,6 +82,18 @@ component {
         // --target. Resolved from proxy.app_port (default 80); see #3089.
         var appPort = cfg.proxy().appPort();
 
+        // env.secret delivery (#2957): render the env-file content ONCE,
+        // before the lock or any remote call, so an unresolvable secret
+        // fails fast locally (Wheels.Deploy.EnvSecretMissing) without
+        // acquiring — and then stranding — the deploy lock. Values come
+        // from the SecretResolver the loader already built; they reach the
+        // host only via SFTP (uploadString), never argv.
+        var secretNames = cfg.env().secret();
+        var envFileContent = "";
+        if (arrayLen(secretNames)) {
+            envFileContent = app.env_file_content(secretNames, $resolvedSecrets());
+        }
+
         $fireHook(hooks, "pre-deploy", hookEnv, dryRun);
 
         try {
@@ -97,6 +109,16 @@ component {
 
                 for (var role in cfg.roles()) {
                     for (var host in role.hosts()) {
+                        if (arrayLen(secretNames)) {
+                            $deliverEnvFile(
+                                [host],
+                                app.ensure_env_file(role),
+                                envFileContent,
+                                app.env_file_path(role),
+                                secretNames,
+                                dryRun
+                            );
+                        }
                         $dispatch([host], app.run(role, ver), dryRun);
                         $dispatch(
                             [host],
@@ -446,6 +468,51 @@ component {
         var doRaise = !arguments.allowFail;
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
             ssh.run(c, {raise: doRaise});
+        });
+    }
+
+    /**
+     * Resolved key→value map from the SecretResolver the loader built for
+     * the most recent load(). Empty struct when no resolver exists (e.g. a
+     * loader injected with one in tests that never loaded).
+     */
+    private struct function $resolvedSecrets() {
+        var resolver = variables.loader.secretResolver();
+        return isObject(resolver) ? resolver.all() : {};
+    }
+
+    /**
+     * Deliver env.secret content to `remotePath` on each host (#2957):
+     *   1. dispatch ensure-cmd (mkdir + touch + chmod 600) so the file is
+     *      permission-locked BEFORE any content lands,
+     *   2. SFTP the content via uploadString — values never enter argv,
+     *      dry-run output, or exception command summaries.
+     * Under dryRun, records the upload by path and secret NAMES only.
+     */
+    private void function $deliverEnvFile(
+        required array hosts,
+        required string ensureCmd,
+        required string content,
+        required string remotePath,
+        required array secretNames,
+        required boolean dryRun
+    ) {
+        $dispatch(arguments.hosts, arguments.ensureCmd, arguments.dryRun);
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(
+                    variables.dryRunBuffer,
+                    "[" & h & "] upload env file " & arguments.remotePath
+                        & " (" & arrayLen(arguments.secretNames) & " secret(s): "
+                        & arrayToList(arguments.secretNames, ", ") & " — values not shown)"
+                );
+            }
+            return;
+        }
+        var c = arguments.content;
+        var p = arguments.remotePath;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+            ssh.uploadString(c, p);
         });
     }
 

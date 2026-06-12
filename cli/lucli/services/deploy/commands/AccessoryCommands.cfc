@@ -87,15 +87,49 @@ component extends="Base" {
         return parts;
     }
 
+    /**
+     * env.clear values ride as escaped -e pairs; env.secret values NEVER
+     * enter argv — run() references the remote env file (written with 600
+     * perms by the orchestration layer before this command is dispatched)
+     * via --env-file instead (##2957).
+     */
     private array function $envArgs(required any accessory) {
         var env = arguments.accessory.env();
-        $rejectEnvSecrets(env);
         var parts = [];
         var clear = env.clear();
         for (var k in clear) {
             arrayAppend(parts, "-e");
             arrayAppend(parts, shellEscape(k & "=" & clear[k]));
         }
+        if (arrayLen(env.secret())) {
+            arrayAppend(parts, "--env-file");
+            arrayAppend(parts, env_file_path(arguments.accessory));
+        }
         return parts;
+    }
+
+    /**
+     * Remote env-file path for an accessory, relative to the SSH user's
+     * home. Namespaced by service and destination, mirroring Kamal's
+     * .kamal/apps/<service[-destination]>/env/accessories/<name>.env layout.
+     */
+    public string function env_file_path(required any accessory) {
+        return $envAccessoriesDir() & "/" & arguments.accessory.name() & ".env";
+    }
+
+    /**
+     * Preparation command for the accessory env file: mkdir + touch +
+     * chmod 600 BEFORE the secret content is uploaded over SFTP (##2957).
+     */
+    public string function ensure_env_file(required any accessory) {
+        return $ensureEnvFileCmd($envAccessoriesDir(), env_file_path(arguments.accessory));
+    }
+
+    private string function $envAccessoriesDir() {
+        var ns = variables.config.service();
+        if (len(variables.config.destination())) {
+            ns &= "-" & variables.config.destination();
+        }
+        return ".kamal/apps/" & ns & "/env/accessories";
     }
 }
