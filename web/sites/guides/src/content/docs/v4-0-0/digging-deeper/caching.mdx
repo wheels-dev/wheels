@@ -43,7 +43,7 @@ component extends="Controller" {
 Rules:
 
 - `caches()` accepts either `action="name"` or `actions="one,two,three"` — same argument, aliased.
-- `time` defaults to 60 minutes (`defaultCacheTime`). Pass a number to override.
+- `time` defaults to 60 minutes. Pass a number to override. (The separate `defaultCacheTime` setting governs `cache=true` on finders and `renderView()`/`renderPartial()` — `caches()` carries its own hardcoded 60, so `set(defaultCacheTime=15)` won't change it.)
 - Caches are **skipped automatically** when the request has a flash message or a non-empty `form` scope. Wheels assumes a flash or form submission means the user just did something — serving them yesterday's HTML would be wrong.
 - Omit `action` entirely (`caches()`) and every action in the controller is cacheable.
 
@@ -142,7 +142,9 @@ Query caching is ideal when:
 
 ## Where cache entries live
 
-Wheels keeps cache entries in `application.wheels.cache` — an in-memory struct on the CFML application scope, split into categories (`action`, `partial`, `query`, `image`, `main`). Reads are struct lookups; writes are struct writes. No external service required.
+Wheels keeps cache entries in `application.wheels.cache` — an in-memory struct on the CFML application scope, split into categories (`action`, `page`, `partial`, `sql`, `image`, `main`, plus a legacy `query` category that nothing writes to). Reads are struct lookups; writes are struct writes. No external service required.
+
+One exception: `findAll(cache=N)` / `findByKey(cache=N)` results do **not** live in this struct. Cached finder results are stored in the CFML engine's native query cache (via `cachedWithin`); only the generated SQL shell lands in the `sql` category.
 
 | Property | Default | Meaning |
 | --- | --- | --- |
@@ -197,7 +199,7 @@ For caches keyed by query arguments (the automatic `findAll(cache=N)` flavor), i
    ```
 
    Now the model callback can call `$removeFromCache(key="posts-listing")` surgically.
-3. **Clear the whole category.** `$clearCache(category="query")` is a blunt instrument but fast to reason about when in doubt.
+3. **Bust the engine's query cache with a reload.** `$clearCache(category="query")` does **not** invalidate finder caches — as noted above, `findAll(cache=N)` results live in the CFML engine's native query cache, not in `application.wheels.cache`. The blunt instruments that actually work are `?reload=true&password=...` (which rotates the cache-key comment Wheels embeds in every cached query's SQL, invalidating all engine-cached results) or an application restart.
 
 ## Per-user keys
 
@@ -240,7 +242,7 @@ Configure edge caching at the deploy layer, not in Wheels. The [Deployment](/v4-
 
 Three ways to confirm what you're seeing:
 
-1. **Disable caching temporarily** — `set(cacheActions=false)` in `config/environments/development.cfm` is the default; flipping it on in development reproduces production behavior when you're investigating a stale-read bug.
+1. **Disable caching temporarily** — `cacheActions=false` is already the development default (the framework sets it; no config file needed). Flipping it on with `set(cacheActions=true)` in `config/development/settings.cfm` reproduces production behavior when you're investigating a stale-read bug.
 2. **Pass `time=0`** to force re-rendering while you leave the `caches()` declaration in place:
 
    ```cfm {test:compile} title="app/controllers/Posts.cfc (debugging)"
@@ -251,7 +253,7 @@ Three ways to confirm what you're seeing:
        }
    }
    ```
-3. **Clear caches on reload.** `?reload=true&password=...` flushes query and template caches automatically (`clearQueryCacheOnReload`, `clearTemplateCacheOnReload`). Combine with a custom admin action that calls `application.wo.$clearCache()` when you need to purge the full cache without a restart.
+3. **Clear caches on reload.** `?reload=true&password=...` flushes query and template caches automatically (`clearQueryCacheOnReload`, `clearTemplateCacheOnReload`). Combine with a custom admin action that calls `application.wo.$clearCache()` when you need to purge the full cache without a restart. Note: when `reloadPassword` is empty, `?reload=true` currently restarts the app with no password at all — set a non-empty `reloadPassword` anywhere that matters (see [#3062](https://github.com/wheels-dev/wheels/issues/3062)).
 
 ## Related guides
 
