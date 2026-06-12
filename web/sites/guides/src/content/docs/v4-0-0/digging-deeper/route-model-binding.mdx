@@ -65,6 +65,10 @@ mapper()
 
 The singular model name is derived from the controller name: `posts` (controller) → `Post` (model class) → `params.post` (instance key). Binding is skipped for `index`, `new`, and `create` — those actions have no `params.key` to resolve against.
 
+<Aside type="tip">
+  With `binding=true`, if the convention-derived model class doesn't exist — for example, the resource routes to a controller without a backing model — the dispatcher silently skips binding. Health checks, static pages, and API gateways keep working without extra configuration.
+</Aside>
+
 ## Global default
 
 If you want binding turned on everywhere without editing each resource, flip the application-wide default in `config/settings.cfm`:
@@ -104,8 +108,8 @@ mapper()
 
 `binding="BlogPost"` resolves the `BlogPost` model and stores the instance under `params.blogPost` (the lowercase-initial form of the class name). The `binding` argument accepts `true`, `false`, or a simple string — any non-boolean string is treated as the model class to load.
 
-<Aside type="tip">
-  If the model class doesn't exist (for example, the resource is routing to a controller that doesn't have a backing model), the dispatcher silently skips binding instead of throwing. This keeps non-model resources — health checks, static pages, API gateways — working without extra configuration.
+<Aside type="caution">
+  An explicit model name like `binding="BlogPost"` behaves differently from `binding=true`. If the named class can't be resolved, dispatch throws — a named binding that fails to resolve is a configuration error, not a silent skip. If your app throws on the first request to a resource with a string binding, check the class name and its CFML mapping. (With `binding=true` the convention-derived class is optional — the dispatcher skips binding if no matching class exists.)
 </Aside>
 
 ## Scope-level binding

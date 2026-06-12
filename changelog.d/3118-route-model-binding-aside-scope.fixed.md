@@ -1,0 +1,1 @@
+- Corrects the route-model-binding guide: the "silently skips" aside now applies only to convention-derived `binding=true`, where no matching model class is a normal case (health checks, static pages). A new caution under the explicit-name section clarifies that `binding="ModelName"` throws when the named class can't be resolved — a configuration error, not a silent skip.
