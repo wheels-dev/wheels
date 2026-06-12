@@ -261,6 +261,37 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 
+			it("still resolves a leading-slash webroot-relative directory against the web root", () => {
+				// Regression guard for the long-standing webroot-relative idiom
+				// (`directory="/reports/"`): a root-anchored path that does NOT exist on
+				// disk must fall through to the legacy `ExpandPath()` resolution instead
+				// of being treated as a verbatim filesystem path (which would miss the
+				// file and throw). On Adobe CF this idiom was historically the only
+				// working form of `directory`, so it must keep working.
+				local.relDir = "dlprobe3077_rel"
+				local.absDir = ExpandPath("/" & local.relDir)
+				if (!DirectoryExists(local.absDir)) {
+					DirectoryCreate(local.absDir, true)
+				}
+				local.target = local.absDir & "/report.txt"
+				FileWrite(local.target, "webroot-relative payload")
+				try {
+					args.file = "report.txt"
+					args.directory = "/" & local.relDir & "/"
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(Replace(r.file, "\", "/", "all")).toInclude("dlprobe3077_rel/report.txt")
+					expect(r.name).toBe("report.txt")
+				} finally {
+					if (FileExists(local.target)) {
+						FileDelete(local.target)
+					}
+					if (DirectoryExists(local.absDir)) {
+						DirectoryDelete(local.absDir, true)
+					}
+				}
+			})
+
 			it("is specifying a directory", () => {
 				// Skip this test temporarily to debug in CI
 				skip("Temporarily skipping to debug path issues in CI");

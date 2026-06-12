@@ -269,16 +269,20 @@ component {
 			// prefix the absolute path on Adobe CF — where `ExpandPath()` resolves against the
 			// web root rather than returning an absolute path unchanged as Lucee does — and
 			// (2) substring-hijack any directory containing "/wheels" (e.g. /var/www/wheels).
+			// The verbatim branch is additionally gated on `DirectoryExists()`: a leading "/"
+			// is also the long-standing webroot-relative idiom (`directory="/reports/"`), so a
+			// root-anchored path that does NOT exist on disk falls through to the legacy
+			// `ExpandPath()` resolution below and keeps resolving against the web root.
 			// The `..`-traversal guard above still applies to both arguments.
 			local.normalizedDir = Replace(arguments.directory, "\", "/", "all");
-			local.isAbsoluteDirectory = Len(arguments.directory) && (
-				Left(local.normalizedDir, 1) == "/" || REFind("^[A-Za-z]:", local.normalizedDir)
-			);
+			if (Len(local.normalizedDir) > 1 && Right(local.normalizedDir, 1) == "/") {
+				local.normalizedDir = Left(local.normalizedDir, Len(local.normalizedDir) - 1);
+			}
+			local.isAbsoluteDirectory = Len(local.normalizedDir)
+				&& (Left(local.normalizedDir, 1) == "/" || REFind("^[A-Za-z]:", local.normalizedDir))
+				&& DirectoryExists(local.normalizedDir);
 
 			if (local.isAbsoluteDirectory) {
-				if (Len(local.normalizedDir) > 1 && Right(local.normalizedDir, 1) == "/") {
-					local.normalizedDir = Left(local.normalizedDir, Len(local.normalizedDir) - 1);
-				}
 				local.directory = local.normalizedDir;
 				local.file = arguments.file;
 				local.fullPath = local.directory & "/" & local.file;
