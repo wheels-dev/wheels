@@ -49,7 +49,7 @@ set(middleware = [
 With no other arguments you get: `strategy="fixedWindow"`, `storage="memory"`, and keying by client IP. Every client gets 60 requests per 60 seconds.
 
 <Aside type="note">
-  On a fresh app the root welcome page is served by the internal Wheels controller, which the dispatcher handles before the middleware pipeline runs — `GET /` never counts against a budget. Test rate limiting against one of your own controller routes.
+  Requests handled by the internal Wheels controller — the `/wheels` GUI routes, or a root route left pointing at the built-in welcome page instead of one of your controllers — bypass the middleware pipeline and never count against a budget. Test rate limiting against one of your own controller routes.
 </Aside>
 
 ## Sliding window
