@@ -128,8 +128,8 @@ component extends="wheels.Controller" {
 
 1. **View** — add a hidden token field to any `POST`/`PUT`/`PATCH`/`DELETE` form with `authenticityTokenField()` (view helper in `vendor/wheels/view/csrf.cfc`, line 26). Form helpers like `startFormTag()` insert it automatically for non-GET forms.
 2. **View (AJAX)** — add `csrfMetaTags()` to your layout `<head>` (line 10 of the same file). It emits two `<meta>` tags your JavaScript reads to send the token as an `X-CSRF-Token` header.
-3. **Controller pipeline** — before each action runs, `$runCsrfProtection(action)` (`vendor/wheels/controller/csrf.cfc` line 37) checks the `only`/`except` filters, calls `$verifyAuthenticityToken()` (line 63), and throws, aborts, or ignores per the `with` setting.
-4. **Verification** — `$isVerifiedRequest()` (line 82) short-circuits on GET/HEAD/OPTIONS; otherwise it matches `params.authenticityToken` against the session-stored token (`CsrfVerifyToken`) or the cookie-stored token depending on `application.wheels.csrfStore` (session by default, see `vendor/wheels/events/init/security.cfm` line 3).
+3. **Controller pipeline** — before each action runs, `$runCsrfProtection(action)` (`vendor/wheels/controller/csrf.cfc` line 37) checks the `only`/`except` filters, calls `$verifyAuthenticityToken()` (line 59), and throws, aborts, or ignores per the `with` setting.
+4. **Verification** — `$isVerifiedRequest()` (line 78) short-circuits on GET/HEAD/OPTIONS; otherwise it matches `params.authenticityToken` against the session-stored token (`CsrfVerifyToken`) or the cookie-stored token depending on `application.wheels.csrfStore` (session by default, see `vendor/wheels/events/init/security.cfm` line 3).
 
 ### Disable per-action for API endpoints
 
@@ -152,7 +152,9 @@ For an entire JSON API under `/api`, inherit from a controller that calls `prote
 
 ## Reload password
 
-`reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, both are disabled and Wheels logs a security warning on boot (`vendor/wheels/events/onapplicationstart.cfc` line 287-290). If it's set, attempts log to `wheels_security.log` with the source IP (line 189, 197) and rate-limit by IP (line 135).
+`reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, URL environment switching is disabled — but plain `?reload=true` currently remains open to **any** anonymous client, so always set a password. The security warning Wheels logs on boot (`vendor/wheels/events/onapplicationstart.cfc` lines 371-374) claims both are disabled; that overstatement and the open gate are tracked in [#3062](https://github.com/wheels-dev/wheels/issues/3062).
+
+If it's set, rejected and accepted attempts log to `wheels_security.log` with the trusted client IP (lines 219 and 227 of the same file), and failed attempts rate-limit by IP — 5 failures in 5 minutes locks the source out (lines 160-178). One scoping caveat: that code runs during application startup, so it only fires on requests that themselves trigger a cold start. A wrong-password `?reload=true` against an already-running app is served normally with no log entry and no rate-limit count.
 
 ```cfm {test:compile} title="config/settings.cfm"
 <cfscript>
@@ -165,7 +167,7 @@ Rotate it in every environment. The scaffolded template already reads this from 
 
 ### What it protects (and what it doesn't)
 
-The reload password defends a single threat: **a remote attacker who can reach your app over HTTP** otherwise being able to call `/?reload=true` and clobber app state, or `/?reload=production` and switch environments at will. With the password set, those URLs return 403 unless the attacker also knows the secret.
+The reload password defends a single threat: **a remote attacker who can reach your app over HTTP** otherwise being able to call `/?reload=true` and clobber app state, or `/?reload=production` and switch environments at will. With the password set, a request with a missing or wrong password is served normally (HTTP 200) without reloading — no `403` is returned, and nothing in the response reveals that the attempt was noticed (the gate in `public/Application.cfc` simply falls through to normal request serving; the only `403`s on this surface live on the CLI command gate in `vendor/wheels/Public.cfc`).
 
 What it explicitly does **not** gate:
 
