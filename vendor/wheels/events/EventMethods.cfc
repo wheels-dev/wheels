@@ -99,7 +99,13 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 						$header(name = "Content-Type", value = "text/xml");
 						local.rv = $toXml(local.wheelsError);
 					} else {
-						// Default HTML error display
+						// Default HTML error display. The shared _header_simple.cfm
+						// partial defaults its <title> to "Wheels" (the fresh-install
+						// welcome page, #3175); override it here so error screens keep
+						// their error-specific title.
+						if (StructKeyExists(request, "wheels") && IsStruct(request.wheels)) {
+							request.wheels.pageTitle = "Wheels - Error";
+						}
 						if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
 							local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_header_simple.cfm");
 						}

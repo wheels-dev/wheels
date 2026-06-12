@@ -1,0 +1,1 @@
+- The fresh-install welcome page no longer renders a browser tab titled `Wheels - Error`; `_header_simple.cfm` now defaults its `<title>` to `Wheels` and the error handler overrides it for error screens (#3175)

@@ -30,13 +30,30 @@ if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
 		}
 	}
 }
+
+// Page <title> for this shared chrome. Defaults to "Wheels" — the
+// fresh-install welcome page (congratulations.cfm) leaves it at the
+// default. The error handler (EventMethods.$runOnError) sets
+// request.wheels.pageTitle = "Wheels - Error" before including this
+// partial so error screens keep their error-specific title.
+// Issue ##3175: the title was hardcoded to "Wheels - Error", so every
+// successful first boot rendered a browser tab titled "Error".
+local.simpleHeaderTitle = "Wheels";
+if (
+	StructKeyExists(request, "wheels")
+	&& IsStruct(request.wheels)
+	&& StructKeyExists(request.wheels, "pageTitle")
+	&& Len(Trim(request.wheels.pageTitle))
+) {
+	local.simpleHeaderTitle = request.wheels.pageTitle;
+}
 </cfscript>
 <cfoutput>
 <!--- cfformat-ignore-start --->
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Wheels - Error</title>
+	<title>#EncodeForHTML(local.simpleHeaderTitle)#</title>
 	<meta charset="utf-8">
 	<meta name="robots" content="noindex,nofollow">
 	<style>
