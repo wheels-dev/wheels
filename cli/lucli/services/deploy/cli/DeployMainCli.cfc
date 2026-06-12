@@ -56,6 +56,15 @@ component {
 
     public string function deploy(required struct opts) {
         arrayClear(variables.dryRunBuffer);
+        return $deploy(arguments.opts);
+    }
+
+    /**
+     * Deploy body, shared by deploy() and setup(). Does NOT clear the
+     * dry-run buffer — the public verbs do, so setup()'s pre-deploy
+     * bootstrap commands survive into dryRunOutput().
+     */
+    private string function $deploy(required struct opts) {
         var cfg = variables.loader.load(
             arguments.opts.configPath,
             {destination: arguments.opts.destination ?: ""}
@@ -66,6 +75,7 @@ component {
         var app = new modules.wheels.services.deploy.commands.AppCommands(cfg);
         var proxy = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var builder = new modules.wheels.services.deploy.commands.BuilderCommands(cfg);
+        var dockerCmds = new modules.wheels.services.deploy.commands.DockerCommands(cfg);
         var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
         var hooks = new modules.wheels.services.deploy.commands.HookCommands(
             cfg,
@@ -93,16 +103,31 @@ component {
 
             try {
                 $dispatch(hosts, builder.pull(ver), dryRun);
-                $dispatchAny(hosts, proxy.details() & " || " & proxy.boot(), dryRun);
+                // Fresh-host bootstrap (#2957 DEP-5c): every `docker run`
+                // below joins --network kamal, so the network must exist
+                // before the first consumer. ensure_network is idempotent.
+                $dispatch(hosts, dockerCmds.ensure_network("kamal"), dryRun);
+                // Boot (or start) kamal-proxy on EVERY proxy-fronted host
+                // (#2957 DEP-5a/5b). The old `details() || boot()` guard
+                // never booted anything — `docker ps` exits 0 regardless —
+                // and was dispatched to only one host via $dispatchAny.
+                var proxyHosts = $proxyHosts(cfg);
+                if (arrayLen(proxyHosts)) {
+                    $dispatch(proxyHosts, proxy.start_or_run(), dryRun);
+                }
 
                 for (var role in cfg.roles()) {
                     for (var host in role.hosts()) {
                         $dispatch([host], app.run(role, ver), dryRun);
-                        $dispatch(
-                            [host],
-                            proxy.deploy(role, app.container_name(role, ver) & ":" & appPort),
-                            dryRun
-                        );
+                        // Only proxy-fronted roles register with kamal-proxy —
+                        // job/worker roles serve no traffic (#2957).
+                        if (role.runningProxy()) {
+                            $dispatch(
+                                [host],
+                                proxy.deploy(role, app.container_name(role, ver) & ":" & appPort),
+                                dryRun
+                            );
+                        }
                     }
                 }
             } finally {
@@ -179,9 +204,34 @@ component {
         );
     }
 
+    /**
+     * One-time server bootstrap + first deploy (Kamal `setup` semantics):
+     * create the kamal docker network on every accessory host, boot each
+     * accessory on its hosts, then run a full deploy (which bootstraps the
+     * network + proxy on the app hosts). Previously a literal alias for
+     * deploy(), so fresh hosts never got their accessories (#2957).
+     */
     public string function setup(required struct opts) {
-        // Phase 2 will add accessory boot; for Phase 1 this equals deploy.
-        return deploy(arguments.opts);
+        arrayClear(variables.dryRunBuffer);
+        var cfg = variables.loader.load(
+            arguments.opts.configPath,
+            {destination: arguments.opts.destination ?: ""}
+        );
+        var dryRun = arguments.opts.dryRun ?: false;
+
+        if (arrayLen(cfg.accessories())) {
+            var dockerCmds = new modules.wheels.services.deploy.commands.DockerCommands(cfg);
+            var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
+            for (var acc in cfg.accessories()) {
+                // Accessories join --network kamal too, and may live on
+                // hosts outside the app roles — ensure the network there
+                // before the accessory container runs (#2957 DEP-5c).
+                $dispatch(acc.hosts(), dockerCmds.ensure_network("kamal"), dryRun);
+                $dispatch(acc.hosts(), accCmds.run(acc), dryRun);
+            }
+        }
+
+        return $deploy(arguments.opts);
     }
 
     /**
@@ -451,8 +501,8 @@ component {
 
     /**
      * Dispatch a single command to "any one" host — used for operations
-     * that only need to happen once across the fleet (lock acquire/release,
-     * proxy boot check). FakeSshPool.onAny records exactly one call.
+     * that only need to happen once across the fleet (lock acquire/release).
+     * FakeSshPool.onAny records exactly one call.
      */
     private void function $dispatchAny(
         required array hosts,
@@ -540,6 +590,22 @@ component {
         var out = [];
         for (var role in arguments.cfg.roles()) {
             for (var h in role.hosts()) arrayAppend(out, h);
+        }
+        return out;
+    }
+
+    /**
+     * Distinct hosts of every proxy-fronted role (Role.runningProxy()),
+     * in declaration order. Each of these needs its own kamal-proxy
+     * container (#2957 DEP-5b).
+     */
+    private array function $proxyHosts(required any cfg) {
+        var out = [];
+        for (var role in arguments.cfg.roles()) {
+            if (!role.runningProxy()) continue;
+            for (var h in role.hosts()) {
+                if (!arrayContains(out, h)) arrayAppend(out, h);
+            }
         }
         return out;
     }

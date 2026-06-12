@@ -2244,7 +2244,7 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy rollback v1              - roll back to version v1
 	 *   wheels deploy config                   - print resolved config as YAML
 	 *   wheels deploy init                     - create config stub
-	 *   wheels deploy setup                    - full setup (Phase 2 adds accessories)
+	 *   wheels deploy setup                    - one-time bootstrap (network + accessories) + deploy
 	 *   wheels deploy bootstrap                - install Docker on every host
 	 *   wheels deploy exec "uname -a"          - run a command on every host
 	 *   wheels deploy version                  - show version pinning
