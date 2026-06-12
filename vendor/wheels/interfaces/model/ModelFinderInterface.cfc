@@ -57,6 +57,7 @@ interface {
 		boolean returnIncluded,
 		boolean callbacks,
 		boolean includeSoftDeletes,
+		boolean allowRawSelect,
 		struct useIndex,
 		string dataSource
 	);
@@ -74,6 +75,7 @@ interface {
 	 * @parameterize Use cfqueryparam.
 	 * @returnAs Return format.
 	 * @includeSoftDeletes Include soft-deleted records.
+	 * @allowRawSelect Opt an audited raw-SQL select= expression out of the SEC-21 policy.
 	 * @useIndex Database index hint.
 	 * @dataSource Override datasource.
 	 */
@@ -88,6 +90,7 @@ interface {
 		any parameterize,
 		string returnAs,
 		boolean includeSoftDeletes,
+		boolean allowRawSelect,
 		struct useIndex,
 		string dataSource
 	);

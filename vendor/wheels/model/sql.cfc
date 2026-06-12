@@ -411,14 +411,16 @@ component {
 		required string select,
 		required string include,
 		boolean includeSoftDeletes = "false",
-		required string returnAs
+		required string returnAs,
+		boolean allowRawSelect = false
 	) {
 		local.rv = $createSQLFieldList(
 			clause = "select",
 			list = arguments.select,
 			include = arguments.include,
 			includeSoftDeletes = arguments.includeSoftDeletes,
-			returnAs = arguments.returnAs
+			returnAs = arguments.returnAs,
+			allowRawSelect = arguments.allowRawSelect
 		);
 		
 		// Look for " AS " followed by text containing multiple dots (namespaced aliases)
@@ -446,20 +448,22 @@ component {
 
 	/**
 	 * Internal function.
-	 * SEC-21 deprecation window: logs a development-mode warning for suspicious
-	 * select= items instead of rejecting them, so existing apps keep working while
-	 * being nudged off raw SQL in select=. Returns true when a warning was logged.
+	 * SEC-21 enforcement (5.0): rejects raw-SQL select= items instead of merely
+	 * warning (the 4.x deprecation window). Throws Wheels.InvalidSelectClause when an
+	 * item contains a statement separator, comment marker, or subquery — mirroring the
+	 * Wheels.InvalidOrderClause / Wheels.InvalidGroupClause throws in $orderByClause and
+	 * $groupByClause. Pass allowRawSelect=true to opt a deliberately audited expression
+	 * out of the check (the value-free escape hatch). Returns void on safe input.
 	 */
-	public boolean function $warnOnUnvalidatedSelectItem(required string item) {
-		if (get("environment") != "development" || !$isSuspiciousSelectItem(arguments.item)) {
-			return false;
+	public void function $validateSelectItem(required string item, boolean allowRawSelect = false) {
+		if (arguments.allowRawSelect || !$isSuspiciousSelectItem(arguments.item)) {
+			return;
 		}
-		WriteLog(
-			type = "warning",
-			file = "wheels",
-			text = "[Wheels] The select= item `#arguments.item#` contains SQL control characters or a subquery. Dotted/aliased select items are currently passed through unvalidated; a future Wheels release will reject items containing `;`, `--`, `/*`, or subqueries (use a calculated property instead, and never pass request input to select=)."
+		Throw(
+			type = "Wheels.InvalidSelectClause",
+			message = "Raw SQL is not allowed in the select clause.",
+			extendedInfo = "The select item `#arguments.item#` contains a statement separator (`;`), comment marker (`--` / `/*`), or a subquery. Define a calculated property with property() in config() and reference it by name, or pass allowRawSelect=true if you have audited the expression and it contains no request input."
 		);
-		return true;
 	}
 
 	/**
@@ -471,7 +475,8 @@ component {
 		required string include,
 		required string returnAs,
 		boolean includeSoftDeletes = "false",
-		boolean useExpandedColumnAliases = "#application.wheels.useExpandedColumnAliases#"
+		boolean useExpandedColumnAliases = "#application.wheels.useExpandedColumnAliases#",
+		boolean allowRawSelect = false
 	) {
 		// setup an array containing class info for current class and all the ones that should be included
 		local.classes = [];
@@ -530,13 +535,13 @@ component {
 					In case "." or " AS " is passed in the column name item, append that as it is in the select query and then move onto the next iteration.
 				*/
 				if (Find(".", local.iItem) || Find(" AS ", local.iItem)) {
-					// SEC-21 deprecation window: dotted/aliased select items pass through
-					// unvalidated (unlike ORDER BY / GROUP BY). Warn in development mode when
-					// an item looks like raw SQL so apps can migrate before a future release
-					// rejects these. GROUP BY items are already rejected in $groupByClause
-					// before reaching this function, so gate on the select clause only.
+					// SEC-21 enforcement (5.0): dotted/aliased select items used to pass
+					// through unvalidated (unlike ORDER BY / GROUP BY). Now reject raw SQL —
+					// statement separators, comment markers, subqueries — unless the caller
+					// opts in with allowRawSelect=true. GROUP BY items are already rejected in
+					// $groupByClause before reaching this function, so gate on select only.
 					if (arguments.clause == "select") {
-						$warnOnUnvalidatedSelectItem(local.iItem);
+						$validateSelectItem(item = local.iItem, allowRawSelect = arguments.allowRawSelect);
 					}
 					local.rv = ListAppend(local.rv, local.iItem);
 					continue;

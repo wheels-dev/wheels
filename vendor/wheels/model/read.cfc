@@ -24,6 +24,7 @@ component {
 	 * @returnIncluded When `returnAs` is set to `objects`, you can set this argument to `false` to prevent returning objects fetched from associations specified in the `include` argument. This is useful when you only need to include associations for use in the `WHERE` clause only and want to avoid the performance hit that comes with object creation.
 	 * @callbacks Set to `false` to disable callbacks for this method.
 	 * @includeSoftDeletes Set to `true` to include soft-deleted records in the queries that this method runs.
+	 * @allowRawSelect Set to `true` to opt a deliberately audited `select=` expression out of the SEC-21 raw-SQL policy. Without it, `select=` items containing a statement separator (`;`), comment marker (`--` / `/*`), or a subquery throw `Wheels.InvalidSelectClause`. Only pass `true` for expressions you control that contain no request input; for reusable computed columns prefer a calculated property declared with `property()` in `config()`.
 	 * @useIndex If you want to specify table index hints, pass in a structure of index names using your model names as the structure keys. Eg: `{user="idx_users", post="idx_posts"}`. This feature is only supported by MySQL and SQL Server.
 	 * @dataSource Override the default datasource
 	 */
@@ -46,6 +47,7 @@ component {
 		boolean returnIncluded,
 		boolean callbacks = "true",
 		boolean includeSoftDeletes = "false",
+		boolean allowRawSelect = "false",
 		struct useIndex = {},
 		string dataSource = variables.wheels.class.dataSource,
 		numeric $limit = "0",
@@ -247,7 +249,8 @@ component {
 						select = arguments.select,
 						include = arguments.include,
 						includeSoftDeletes = arguments.includeSoftDeletes,
-						returnAs = arguments.returnAs
+						returnAs = arguments.returnAs,
+						allowRawSelect = arguments.allowRawSelect
 					)
 				);
 				ArrayAppend(
@@ -464,6 +467,7 @@ component {
 	 * @parameterize [see:findAll].
 	 * @returnAs [see:findAll].
 	 * @includeSoftDeletes [see:findAll].
+	 * @allowRawSelect [see:findAll].
 	 * @useIndex [see:findAll].
 	 * @dataSource [see:findAll].
 	 */
@@ -478,6 +482,7 @@ component {
 		any parameterize,
 		string returnAs,
 		boolean includeSoftDeletes = "false",
+		boolean allowRawSelect = "false",
 		struct useIndex = {},
 		string dataSource = variables.wheels.class.dataSource
 	) {
