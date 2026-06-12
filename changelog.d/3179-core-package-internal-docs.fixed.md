@@ -1,0 +1,1 @@
+- Exclude internal-only `docs/superpowers/` and `docs/plans/` working trees from the published wheels-core artifact so AI planning specs, draft PR/ISSUE files, and patches no longer ship into every app's `vendor/wheels/docs/` (#3179).

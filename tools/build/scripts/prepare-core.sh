@@ -38,6 +38,13 @@ rm -rf "${BUILD_DIR}/wheels/docs"
 mkdir -p "${BUILD_DIR}/wheels/docs"
 cp -r docs/* "${BUILD_DIR}/wheels/docs/"
 
+# Exclude internal-only working trees from the published artifact (issue #3179).
+# docs/superpowers/ (AI planning specs, draft PR.md/ISSUE.md files, patches) and
+# docs/plans/ are working documents, not user documentation — they must not ship
+# into every app's vendor/wheels/docs/ on install. Pinned by
+# vendor/wheels/tests/specs/security/PackageDocsHygieneSpec.cfc.
+rm -rf "${BUILD_DIR}/wheels/docs/superpowers" "${BUILD_DIR}/wheels/docs/plans"
+
 # Copy template files. The package now ships TWO manifests:
 #
 #   wheels.json — the new Wheels-native manifest (slim schema, what the framework
