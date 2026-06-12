@@ -224,7 +224,11 @@ component extends="wheels.WheelsTest" {
 
 				it("creates fake records for the requested model and reports honest success", () => {
 					// Capture existing Author ids so cleanup only removes our rows.
-					local.beforeIds = ValueList(model("Author").findAll(select = "id").id);
+					// Adobe CF's compiler only accepts a plain `query.column` reference inside
+					// ValueList(); a chained expression is a COMPILE error that crashes the
+					// whole bundle. Assign the query to a variable first.
+					local.beforeQuery = model("Author").findAll(select = "id");
+					local.beforeIds = ValueList(local.beforeQuery.id);
 
 					local.gen = CreateObject("component", "wheels.Seeder").init();
 					local.result = local.gen.generateSeeds(models = "Author", count = 2);
@@ -248,7 +252,8 @@ component extends="wheels.WheelsTest" {
 					// $classData().properties STRUCT as if it were an array of property
 					// structs, threw on every model, and created zero rows while still
 					// reporting success (issue #3082).
-					local.afterIds = ValueList(model("Author").findAll(select = "id").id);
+					local.afterQuery = model("Author").findAll(select = "id");
+					local.afterIds = ValueList(local.afterQuery.id);
 					expect(ListLen(local.afterIds) - ListLen(local.beforeIds)).toBe(2);
 
 					// Clean up only the rows we generated.

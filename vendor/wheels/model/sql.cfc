@@ -1287,40 +1287,56 @@ component {
 			// create a reference to the associated class
 			local.associatedClass = model(local.classAssociations[local.name].modelName);
 
-			if (!Len(local.classAssociations[local.name].foreignKey)) {
-				// cfformat-ignore-start
-				if (local.classAssociations[local.name].type == "belongsTo") {
-					local.classAssociations[local.name].foreignKey = local.associatedClass.$classData().modelName & Replace(local.associatedClass.$classData().keys, ",", ",#local.associatedClass.$classData().modelName#", "all");
-				} else {
-					local.classAssociations[local.name].foreignKey = local.class.$classData().modelName & Replace(local.class.$classData().keys, ",", ",#local.class.$classData().modelName#", "all");
+			// fill in the context-independent association metadata under a double-checked named
+			// lock so a concurrent first hit cannot interleave partial writes into the shared
+			// application-scoped association struct (same pattern as the JOIN-variant memo
+			// below); the lock is only taken before the marker exists so the hot path stays
+			// lock-free, and the values are derived solely from class data so filling them
+			// once per application lifetime is equivalent to the previous per-call rewrite
+			if (!StructKeyExists(local.classAssociations[local.name], "expandedMetadataFilled")) {
+				lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
+					if (!StructKeyExists(local.classAssociations[local.name], "expandedMetadataFilled")) {
+						if (!Len(local.classAssociations[local.name].foreignKey)) {
+							// cfformat-ignore-start
+							if (local.classAssociations[local.name].type == "belongsTo") {
+								local.classAssociations[local.name].foreignKey = local.associatedClass.$classData().modelName & Replace(local.associatedClass.$classData().keys, ",", ",#local.associatedClass.$classData().modelName#", "all");
+							} else {
+								local.classAssociations[local.name].foreignKey = local.class.$classData().modelName & Replace(local.class.$classData().keys, ",", ",#local.class.$classData().modelName#", "all");
+							}
+							// cfformat-ignore-end
+						}
+						if (!Len(local.classAssociations[local.name].joinKey)) {
+							if (local.classAssociations[local.name].type == "belongsTo") {
+								local.classAssociations[local.name].joinKey = local.associatedClass.$classData().keys;
+							} else {
+								local.classAssociations[local.name].joinKey = local.class.$classData().keys;
+							}
+						}
+						local.classAssociations[local.name].tableName = local.associatedClass.$classData().tableName;
+						local.classAssociations[local.name].columnList = local.associatedClass.$classData().columnList;
+						local.classAssociations[local.name].properties = local.associatedClass.$classData().properties;
+						local.classAssociations[local.name].propertyList = local.associatedClass.$classData().propertyList;
+
+						/*
+							To fix the issue below:
+							https://github.com/wheels-dev/wheels/issues/580
+
+							Add aliasedPropertyList in the associated class that will be used to check the duplicate column
+						*/
+						local.classAssociations[local.name].aliasedPropertyList = local.associatedClass.$classData().aliasedPropertyList;
+
+						local.classAssociations[local.name].calculatedProperties = local.associatedClass.$classData().calculatedProperties;
+						local.classAssociations[local.name].calculatedPropertyList = local.associatedClass.$classData().calculatedPropertyList;
+						// TODO: deprecate the lists above in favour of these structs to avoid listFind
+						local.classAssociations[local.name].columnStruct = local.associatedClass.$classData().columnStruct;
+						local.classAssociations[local.name].propertyStruct = local.associatedClass.$classData().propertyStruct;
+
+						// the marker is written last so readers that skip the lock only ever
+						// observe a fully-populated metadata set
+						local.classAssociations[local.name].expandedMetadataFilled = true;
+					}
 				}
-				// cfformat-ignore-end
 			}
-			if (!Len(local.classAssociations[local.name].joinKey)) {
-				if (local.classAssociations[local.name].type == "belongsTo") {
-					local.classAssociations[local.name].joinKey = local.associatedClass.$classData().keys;
-				} else {
-					local.classAssociations[local.name].joinKey = local.class.$classData().keys;
-				}
-			}
-			local.classAssociations[local.name].tableName = local.associatedClass.$classData().tableName;
-			local.classAssociations[local.name].columnList = local.associatedClass.$classData().columnList;
-			local.classAssociations[local.name].properties = local.associatedClass.$classData().properties;
-			local.classAssociations[local.name].propertyList = local.associatedClass.$classData().propertyList;
-
-			/*
-				To fix the issue below:
-				https://github.com/wheels-dev/wheels/issues/580
-
-				Add aliasedPropertyList in the associated class that will be used to check the duplicate column
-			*/
-			local.classAssociations[local.name].aliasedPropertyList = local.associatedClass.$classData().aliasedPropertyList;
-
-			local.classAssociations[local.name].calculatedProperties = local.associatedClass.$classData().calculatedProperties;
-			local.classAssociations[local.name].calculatedPropertyList = local.associatedClass.$classData().calculatedPropertyList;
-			// TODO: deprecate the lists above in favour of these structs to avoid listFind
-			local.classAssociations[local.name].columnStruct = local.associatedClass.$classData().columnStruct;
-			local.classAssociations[local.name].propertyStruct = local.associatedClass.$classData().propertyStruct;
 
 			// the JOIN string depends on the calling context (soft-delete handling and whether the
 			// table needs to be aliased), so memoize it per context variant instead of globally
