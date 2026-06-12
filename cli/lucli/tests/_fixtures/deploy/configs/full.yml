@@ -34,5 +34,5 @@ accessories:
     port: 6379
     directories:
       - data:/data
-
-readiness_delay: 0
+# readiness_delay: 0 removed: the key has no runtime reader and is rejected by the
+# trimmed allowlist (#3088) - unimplemented Kamal keys now fail validation loudly.

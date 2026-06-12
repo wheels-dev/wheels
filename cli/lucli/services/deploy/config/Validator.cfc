@@ -12,12 +12,14 @@
 component {
 
 	public any function init() {
+		// Only keys the runtime actually reads (Config.cfc accessors + the
+		// commands/ consumers behind them). Keys Kamal supports but this port
+		// doesn't implement yet (boot, logging, retain_containers, hooks, …)
+		// are deliberately ABSENT so they fail loudly instead of being
+		// accepted-and-ignored (##3088).
 		variables.allowedKeys = [
 			"service", "image", "servers", "registry", "builder", "env",
-			"ssh", "proxy", "boot", "healthcheck", "hooks", "accessories",
-			"volumes", "labels", "logging", "retain_containers",
-			"minimum_version", "asset_path", "require_destination",
-			"allow_empty_roles", "run_directory", "readiness_delay"
+			"ssh", "proxy", "accessories"
 		];
 		// Pre-build a case-insensitive struct lookup so the hot path doesn't
 		// depend on arrayContainsNoCase (not available on every engine).
@@ -34,7 +36,10 @@ component {
 		$requireKey(arguments.parsed, "servers", arguments.filePath);
 		for (var k in arguments.parsed) {
 			if (!structKeyExists(variables.allowedLookup, lCase(k))) {
-				$raise(arguments.filePath, "unknown top-level key: '#k#'");
+				$raise(
+					arguments.filePath,
+					"unknown top-level key: '#k#' (allowed keys: #arrayToList(variables.allowedKeys, ', ')#)"
+				);
 			}
 		}
 		// Service / role / accessory names are interpolated raw into lock
@@ -69,7 +74,10 @@ component {
 	public void function $validateHost(required string host, required string filePath) {
 		// A bare host or user@host is fine; user@host:port has 1 colon; IPv6
 		// literals must be bracketed ([::1]:22) — anything else is ambiguous.
-		var colonCount = arrayLen(listToArray(arguments.host, ":", false, true)) - 1;
+		// Count colons directly: listToArray(includeEmptyFields=false)
+		// collapses adjacent/leading delimiters, so '::1:22' under-counted to
+		// 1 colon and slipped through (##3086).
+		var colonCount = len(arguments.host) - len(replace(arguments.host, ":", "", "all"));
 		if (colonCount > 1 && left(arguments.host, 1) != "[") {
 			$raise(arguments.filePath, "invalid host: '#arguments.host#'");
 		}
