@@ -66,7 +66,7 @@ The canonical way to install a Wheels package is `wheels packages add <name>`. T
 
    ```text title="expected output"
    Installed wheels-basecoat@<version> → /your/path/blog/vendor/wheels-basecoat
-   Run `wheels stop && wheels start` to activate it.
+   Run `wheels reload` (or restart) to activate it.
    ```
 
 2. Verify the install:
@@ -77,13 +77,13 @@ The canonical way to install a Wheels package is `wheels packages add <name>`. T
 
    You should see `Basecoat.cfc`, `package.json`, `README.md`, and a `tests/` directory.
 
-3. Restart the server so `onApplicationStart` re-fires and `PackageLoader` discovers the new package:
+3. Reload or restart the server so `onApplicationStart` re-fires and `PackageLoader` discovers the new package:
 
    ```bash title="your shell"
-   wheels stop && wheels start
+   wheels reload
    ```
 
-   `wheels reload` alone won't do — the package loader runs from `onApplicationStart`, which only fires on a full server boot.
+   An authorized `wheels reload` calls `applicationStop()`, so the next request re-fires `onApplicationStart` in full — which runs `PackageLoader`. `wheels stop && wheels start` also works if you prefer a full cold restart.
 
 </Steps>
 
@@ -294,9 +294,9 @@ Three things to verify:
 
 ## Troubleshooting
 
-**`No matching function [UIBUTTON] found`** — the package didn't activate. Most common cause: you ran `wheels reload` instead of `wheels stop && wheels start`. PackageLoader runs in `onApplicationStart` which a full restart triggers; reload doesn't.
+**`No matching function [UIBUTTON] found`** — the package didn't activate. Most common cause: the reload password was missing or wrong, so the restart was silently skipped. Run `wheels reload` (with the correct password configured) or `wheels stop && wheels start` to force `onApplicationStart` to re-fire and `PackageLoader` to pick up the new package.
 
-**`No matching function [$UIBUILDID] found`** (or `[$UILUCIDEICON]`) — the package activated but its internal helpers can't be found. Fixed in `wheels-basecoat 1.0.3`. Older versions declared the `$`-prefixed helpers `private`, but Wheels' `PackageLoader` only carries PUBLIC methods across the mixin boundary, so public callers like `uiField` couldn't reach them. Run `wheels packages update wheels-basecoat --yes && wheels stop && wheels start`.
+**`No matching function [$UIBUILDID] found`** (or `[$UILUCIDEICON]`) — the package activated but its internal helpers can't be found. Fixed in `wheels-basecoat 1.0.3`. Older versions declared the `$`-prefixed helpers `private`, but Wheels' `PackageLoader` only carries PUBLIC methods across the mixin boundary, so public callers like `uiField` couldn't reach them. Run `wheels packages update wheels-basecoat --yes` then `wheels reload` (or restart).
 
 **`No version of 'wheels-basecoat' satisfies runtime '0.0.0-dev'`** — the framework can't read its own version. Likely on a Wheels release older than `4.0.0-SNAPSHOT+1670` (the snapshot that includes the runtime-detection fix). Upgrade with `brew upgrade wheels` or `choco upgrade wheels` and re-run.
 
