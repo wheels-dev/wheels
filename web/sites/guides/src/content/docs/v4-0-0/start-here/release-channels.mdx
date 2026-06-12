@@ -42,7 +42,7 @@ Wheels 4.0.0-snapshot.1787 (bleeding-edge)
 Java 21.0.11
 ```
 
-Note the command is `wheels version` (no dashes). The flag form `wheels --version` prints a `Wheels Version: <version>` line plus ASCII art, with **no** channel parenthetical.
+Note the command is `wheels version` (no dashes). The flag form `wheels --version` varies by install method — Homebrew stable and manual JAR installs print a `Wheels Version: <version>` banner plus ASCII art with no channel, while the apt/yum and Homebrew bleeding-edge package wrappers print a one-line `wheels <version> (<channel>)`. `wheels version` is the form that reports the channel reliably everywhere.
 
 If you see `(development)` instead, you're running from a dev checkout (cloned source repo) rather than an installed package — which is its own thing and not covered here.
 
