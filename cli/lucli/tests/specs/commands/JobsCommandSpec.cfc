@@ -25,6 +25,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// Create vendor/wheels stub
 		directoryCreate(tempRoot & "/vendor/wheels", true, true);
 
+		// scaffoldTempProject() copies the repo's lucee.json (which carries a
+		// `port`) into the temp project. Strip the port so detectServerPort()
+		// can never resolve a live server for this project — the "work refuses
+		// to run without a project-bound server port" case must
+		// deterministically take the ServerNotRunning refusal path
+		// (requireProjectConfig=true refuses the common-port fallback). Without
+		// this, a dev server bound to the configured port (the local CLI
+		// harness default) makes runJobsWork() enter its poll loop for real:
+		// the empty queue idles into sleep() forever (maxJobs=0), hanging the
+		// suite — or worse, processes real jobs from a unit spec. Mirrors
+		// MigrationExitCodeSpec.
+		fileWrite(tempRoot & "/lucee.json", "{}");
+
 		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 	}
 
