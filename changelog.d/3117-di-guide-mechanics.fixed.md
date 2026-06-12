@@ -1,0 +1,1 @@
+- Fix two incorrect statements in the DI usage guide: singleton cache is keyed by binding name (not component path), and binding name lookup is case-insensitive on all supported engines.
