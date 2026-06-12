@@ -485,7 +485,7 @@ component {
 				local.queryString = ArrayToList(local.newQueryString, "&");
 				local.url = "#local.url#?#local.queryString#";
 			}
-			$location(url = local.url, addToken = false);
+			application.wo.$location(url = local.url, addToken = false);
 		}
 	}
 
