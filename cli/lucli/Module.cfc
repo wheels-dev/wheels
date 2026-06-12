@@ -1384,7 +1384,8 @@ component extends="modules.BaseModule" {
 		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
-		out("Tools are prefixed with the module name: wheels_generate, wheels_migrate, etc.");
+		out("Tool names match the command names: generate, migrate, etc. (unprefixed");
+		out("in tools/list — the server entry in .mcp.json namespaces them per client).");
 		out("Stateful/interactive commands (start, stop, new, console, ...) are hidden");
 		out("from MCP tools/list via mcpHiddenTools() — they remain CLI-only.");
 		return "";
