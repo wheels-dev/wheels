@@ -180,6 +180,106 @@ component extends="wheels.WheelsTest" {
 			});
 		});
 
+		describe("scope()/namespace()/package() callback form", function() {
+			beforeEach(function(currentSpec) {
+				m = new wheels.Mapper();
+				m.$init();
+			});
+
+			afterEach(function(currentSpec) {
+				StructDelete(variables, "m");
+			});
+
+			// Helper: find the first registered route with the given name.
+			$findRoute = function(required array routes, required string routeName) {
+				for (var route in arguments.routes) {
+					if (StructKeyExists(route, "name") && route.name == arguments.routeName) {
+						return route;
+					}
+				}
+				return {};
+			};
+
+			it("scope() runs the callback and registers its routes under the scope path", function() {
+				m.$draw()
+					.scope(path = "limited", callback = function(map) {
+						map.get(name = "limitedIndex", to = "limited##index");
+					})
+					.end();
+				var routes = m.getRoutes();
+				var found = $findRoute(routes, "limitedIndex");
+				expect(found).toHaveKey("pattern");
+				expect(found.pattern).toBe("/limited/limited-index");
+				expect(found.controller).toBe("limited");
+			});
+
+			it("scope() auto-closes so routes declared after it are not swallowed", function() {
+				m.$draw()
+					.scope(path = "limited", callback = function(map) {
+						map.get(name = "limitedIndex", to = "limited##index");
+					})
+					.get(name = "publicIndex", to = "public##index")
+					.end();
+				var routes = m.getRoutes();
+				var publicRoute = $findRoute(routes, "publicIndex");
+				// Without auto-close, publicIndex would inherit the "/limited" prefix.
+				expect(publicRoute).toHaveKey("pattern");
+				expect(publicRoute.pattern).toBe("/public-index");
+			});
+
+			it("scope() middleware does not leak onto routes declared after the scope", function() {
+				m.$draw()
+					.scope(path = "limited", middleware = ["RateLimiter"], callback = function(map) {
+						map.get(name = "limitedIndex", to = "limited##index");
+					})
+					.get(name = "publicIndex", to = "public##index")
+					.end();
+				var routes = m.getRoutes();
+				var scoped = $findRoute(routes, "limitedIndex");
+				var leaked = $findRoute(routes, "publicIndex");
+				expect(scoped).toHaveKey("middleware");
+				expect(scoped.middleware[1]).toBe("RateLimiter");
+				// The middleware must not bleed onto the public route.
+				var hasMiddleware = StructKeyExists(leaked, "middleware") && ArrayLen(leaked.middleware) > 0;
+				expect(hasMiddleware).toBeFalse();
+			});
+
+			it("namespace() runs the callback and prefixes both package and path", function() {
+				m.$draw()
+					.namespace(name = "admin", callback = function(map) {
+						map.get(name = "dashboard", to = "dashboard##index");
+					})
+					.get(name = "home", to = "pages##home")
+					.end();
+				var routes = m.getRoutes();
+				var dashboard = $findRoute(routes, "adminDashboard");
+				expect(dashboard).toHaveKey("pattern");
+				expect(dashboard.pattern).toBe("/admin/dashboard");
+				expect(dashboard.controller).toBe("admin.Dashboard");
+				// Auto-close guarantee: the home route stays public.
+				var home = $findRoute(routes, "home");
+				expect(home).toHaveKey("pattern");
+				expect(home.pattern).toBe("/home");
+			});
+
+			it("package() runs the callback and adds the package without a URL prefix", function() {
+				m.$draw()
+					.package(name = "admin", callback = function(map) {
+						map.get(name = "dashboard", to = "dashboard##index");
+					})
+					.get(name = "home", to = "pages##home")
+					.end();
+				var routes = m.getRoutes();
+				var dashboard = $findRoute(routes, "adminDashboard");
+				expect(dashboard).toHaveKey("controller");
+				expect(dashboard.controller).toBe("admin.Dashboard");
+				expect(dashboard.pattern).toBe("/dashboard");
+				var home = $findRoute(routes, "home");
+				expect(home).toHaveKey("pattern");
+				expect(home.pattern).toBe("/home");
+			});
+		});
+
 		describe("end() scope-stack underflow", function() {
 			beforeEach(function(currentSpec) {
 				m = new wheels.Mapper();
