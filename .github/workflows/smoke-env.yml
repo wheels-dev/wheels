@@ -1,17 +1,21 @@
 name: Smoke (non-dev environments)
 
-# Lucee-leg regression net for discussion #3023 / issues #3030, #3031, #3053
-# (and any future engine-agnostic non-dev request regression): boots the demo
-# app with config/environment.cfm forced to production and testing and asserts
+# Regression net for discussion #3023 / issues #3029, #3030, #3031, #3053 (and
+# any future non-dev request regression): boots the demo app with
+# config/environment.cfm forced to production and testing and asserts
 # non-development request behavior (clean 404s, no stack traces, reload refused
 # without the password, authorized reload answers 302) via
 # tools/ci/smoke-env.sh.
 #
-# Scope note: this job runs Lucee 7 only. The Adobe-only failure class from
-# issue #3029 (engine error-template leakage in non-dev environments) is NOT
-# gated here — the cfabort idiom itself is pinned structurally by
-# vendor/wheels/tests/specs/security/BareCfabortGuardSpec.cfc, and the Adobe
-# smoke leg is tracked in issue #3047.
+# Two engine families, same probes:
+#   smoke       — Lucee 7 via the setup-wheels-test-env composite (LuCLI).
+#   smoke-adobe — Adobe 2023 via the compat-matrix Docker engine
+#                 (compose service adobe2023, tools/docker/adobe2023/).
+#                 This is the executed gate for the Adobe-only failure class
+#                 from issue #3029 (engine error-template leakage in non-dev
+#                 environments — issue #3047); the bare-cfabort idiom itself
+#                 is additionally pinned structurally by
+#                 vendor/wheels/tests/specs/security/BareCfabortGuardSpec.cfc.
 
 on:
   pull_request:
@@ -26,6 +30,8 @@ on:
       - '.github/workflows/smoke-env.yml'
       - 'tools/ci/lucee.ci.json'
       - '.github/actions/setup-wheels-test-env/**'
+      - 'compose.yml'
+      - 'tools/docker/adobe2023/**'
 
 permissions:
   contents: read
@@ -79,3 +85,170 @@ jobs:
           if [ -f /tmp/lucli-server.pid ]; then
             kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
           fi
+
+  # Adobe leg (issue #3047): the #3029 failure class (bare `cfabort;` → Adobe
+  # error template + HTTP 500 on `/` and `/wheels/info` in non-dev
+  # environments) only manifests on Adobe engines — the Lucee job above stays
+  # green on the pre-fix tree. Boots the same adobe2023 Docker engine the
+  # weekly compat-matrix builds (engine images are not registry-pullable, but
+  # the `docker compose build` is ~90s in CI and the engine is serving in
+  # ~4 min — measured on compat-matrix run 27081098861). No database
+  # containers: the probes never touch the datasource, and the harness
+  # datasource is pointed at SQLite (driver jar ships in
+  # tools/docker/adobe2023/lib/) so nothing depends on an absent DB server.
+  smoke-adobe:
+    name: "Smoke: ${{ matrix.wheels_env }} (Adobe 2023)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        wheels_env: [production, testing]
+    env:
+      WHEELS_CI: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      # Must run before `docker compose up`: config/environment.cfm reaches the
+      # container through the ./:/wheels-test-suite bind mount and is read once
+      # at application start, so the app cold-boots directly into the matrix
+      # environment. (Same step as the Lucee job above.)
+      - name: Force ${{ matrix.wheels_env }} environment
+        run: |
+          sed -i 's/set(environment = "[a-z]*")/set(environment = "${{ matrix.wheels_env }}")/' config/environment.cfm
+          grep -qF 'set(environment = "${{ matrix.wheels_env }}")' config/environment.cfm || {
+            echo "::error::environment.cfm substitution failed — pattern drift?"; exit 1; }
+          grep -n 'set(environment' config/environment.cfm
+
+      # The adobe2023 CFConfig's wheelstestdb_sqlite datasource points at
+      # /wheels-test-suite/wheelstestdb.db — i.e. these files at the repo root
+      # via the bind mount. Same recipe as setup-wheels-test-env.
+      - name: Create SQLite test databases
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
+          sqlite3 wheelstestdb.db "SELECT 1;"
+          sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+
+      # compose.yml bind-mounts tools/docker/adobe2023/settings.cfm over
+      # config/settings.cfm, and that harness file defaults the app datasource
+      # to wheelstestdb_sqlserver — a container this job does not start. The
+      # probes never query the database, but the app's default datasource
+      # should exist and be reachable so no lazily-triggered DB touch can 500
+      # a probe. Must run before `docker compose up` (sed -i replaces the
+      # inode that the bind mount captures at container start).
+      - name: Point the Adobe harness datasource at SQLite
+        run: |
+          sed -i 's/wheelstestdb_sqlserver/wheelstestdb_sqlite/' tools/docker/adobe2023/settings.cfm
+          # The harness settings ship an EMPTY reloadPassword, which leaves
+          # ?reload=true open to anonymous restarts — probe 4 would see a 302.
+          # Stage a real password so probes 4/5 (refusal) and 6 (authorized
+          # reload answers 302 — the #3053 Adobe regression path) all engage.
+          sed -i 's/set(reloadPassword="")/set(reloadPassword="wheels-dev")/' tools/docker/adobe2023/settings.cfm
+          grep -qF 'set(reloadPassword="wheels-dev")' tools/docker/adobe2023/settings.cfm || {
+            echo "::error::settings.cfm reloadPassword substitution failed — pattern drift?"; exit 1; }
+          grep -qF 'set(dataSourceName="wheelstestdb_sqlite")' tools/docker/adobe2023/settings.cfm || {
+            echo "::error::settings.cfm datasource substitution failed — pattern drift?"; exit 1; }
+          grep -in 'datasourcename' tools/docker/adobe2023/settings.cfm
+
+      # Build + boot mirrors compat-matrix.yml's "Start CF engine" step
+      # (retry absorbs transient external download failures; the build is
+      # idempotent, only `up -d` runs after success). No --no-cache: hosted
+      # runners start with an empty build cache anyway.
+      - name: Build and start Adobe 2023
+        run: |
+          set -e
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          until docker compose build adobe2023; do
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
+              exit 1
+            fi
+            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 30
+          done
+          docker compose up -d adobe2023
+
+      # Adapted from compat-matrix.yml's readiness loop: restart on container
+      # crash, accept 200/302/404 (in non-dev the root route is a clean 404 —
+      # the public welcome page is development-only), keep the last HTTP code
+      # so timeout diagnostics distinguish "never bound" from "5xx".
+      - name: Wait for Adobe 2023 to be ready
+        run: |
+          CONTAINER="wheels-adobe2023-1"
+          PORT=62023
+          MAX_WAIT=60
+          WAIT_COUNT=0
+          RESTARTS=0
+          MAX_RESTARTS=3
+          LAST_HTTP_CODE="000"
+          READY=0
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+
+            CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "missing")
+            if [ "$CONTAINER_STATUS" = "exited" ] || [ "$CONTAINER_STATUS" = "dead" ] || [ "$CONTAINER_STATUS" = "missing" ]; then
+              RESTARTS=$((RESTARTS + 1))
+              if [ "$RESTARTS" -le "$MAX_RESTARTS" ]; then
+                echo "Container $CONTAINER has status '$CONTAINER_STATUS' — restarting (attempt $RESTARTS/$MAX_RESTARTS)..."
+                docker compose up -d adobe2023
+                sleep 10
+                continue
+              else
+                echo "::error::Container $CONTAINER failed to start after $MAX_RESTARTS restart attempts"
+                docker logs "$CONTAINER" 2>&1 | tail -100
+                exit 1
+              fi
+            fi
+
+            # curl -w "%{http_code}" always prints a code (000 if no response);
+            # no `|| echo` fallback or codes concatenate to "000000".
+            LAST_HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" 2>/dev/null || true)
+            LAST_HTTP_CODE=${LAST_HTTP_CODE:-000}
+            if echo "$LAST_HTTP_CODE" | grep -qE "^(200|302|404)$"; then
+              echo "Adobe 2023 is ready (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT)"
+              READY=1
+              break
+            fi
+
+            if [ $((WAIT_COUNT % 10)) -eq 0 ]; then
+              echo "  attempt $WAIT_COUNT/$MAX_WAIT: container=$CONTAINER_STATUS, http=$LAST_HTTP_CODE"
+            fi
+            sleep 5
+          done
+
+          if [ "$READY" -ne 1 ]; then
+            echo "::error::Adobe 2023 not ready after ${MAX_WAIT} attempts (last HTTP code: $LAST_HTTP_CODE)"
+            if [ "$LAST_HTTP_CODE" = "000" ]; then
+              echo "::notice::No HTTP response received — engine likely never bound to port $PORT."
+            else
+              echo "::notice::HTTP $LAST_HTTP_CODE received — engine bound but the app is returning errors."
+              echo "=== Final response body (first 500 bytes) ==="
+              curl -s --max-time 5 "http://localhost:${PORT}/" 2>/dev/null | head -c 500 || true
+              echo
+              echo "=== /end response body ==="
+            fi
+            echo "=== Container logs (last 200 lines) ==="
+            docker logs "$CONTAINER" 2>&1 | tail -200
+            echo "=== /end logs ==="
+            exit 1
+          fi
+
+          # Warm-up: make sure Wheels onApplicationStart has fully completed
+          # before probing (compat-matrix does the same before its test runs).
+          curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/" || true
+          sleep 2
+
+      - name: Run smoke probes
+        run: |
+          BASE_URL="http://localhost:62023" SMOKE_ENV="${{ matrix.wheels_env }}" \
+            SMOKE_RELOAD_PASSWORD="wheels-dev" bash tools/ci/smoke-env.sh
+
+      - name: Debug container logs
+        if: failure()
+        run: docker logs wheels-adobe2023-1 2>&1 | tail -200 || true
+
+      - name: Stop container
+        if: always()
+        run: docker compose stop adobe2023 2>/dev/null || true
