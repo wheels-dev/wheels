@@ -27,13 +27,13 @@ When a request arrives at your Wheels app, it passes through eight stages on the
 HTTP request
     │
     ▼
-(1) Middleware              — before any controller exists
+(1) Dispatch + route match  — pick controller + action; unmatched URLs 404 here
     │
     ▼
-(2) Dispatch + route match  — pick controller + action
+(2) Middleware              — before any controller exists
     │
     ▼
-(3) Controller instantiation — config() runs, filters registered
+(3) Controller instantiation — filters registered, services resolved
     │
     ▼
 (4) beforeAction filters    — load records, enforce auth
@@ -53,19 +53,21 @@ HTTP request
 
 ## Stage by stage
 
-### 1. Middleware
+### 1. Dispatch and route match
 
-Runs before the controller is instantiated. Each middleware gets the request struct and a `next` function. It can inspect, mutate, short-circuit, or pass through. Ordering is significant — middleware registered first sees the request first and sees the response last.
+The router walks `config/routes.cfm` top-to-bottom, first match wins. A match resolves to a controller name, an action name, and a set of route params (including `params.key` from `[key]` segments). Route model binding (when `binding=true` on a resource) loads `params.<singular>` from the database here — before your action runs. An unmatched URL throws `Wheels.RouteNotFound` (a 404) right here — nothing further in the pipeline runs for it.
+
+### 2. Middleware
+
+Runs after the route has matched but before the controller is instantiated. Each middleware gets the request struct (which carries the matched route and params) and a `next` function. It can inspect, mutate, short-circuit, or pass through. Ordering is significant — middleware registered first sees the request first and sees the response last.
+
+One carve-out: a CORS preflight (`OPTIONS`) request is handed to the `Cors` middleware *before* route matching, so preflights succeed even for routes that only declare `GET`/`POST`.
 
 Typical uses: rate limiting, CORS, security headers, request IDs, auth gate, logging.
 
-### 2. Dispatch and route match
-
-The router walks `config/routes.cfm` top-to-bottom, first match wins. A match resolves to a controller name, an action name, and a set of route params (including `params.key` from `:key` segments). Route model binding (when `binding=true` on a resource) loads `params.<singular>` from the database here — before your action runs.
-
 ### 3. Controller instantiation
 
-Wheels constructs the controller component. Its `config()` method runs once, registering filters and injecting services from the DI container. Anything in `config()` is per-request setup, not per-action.
+Wheels constructs the controller object for this request. Its `config()` method — where filters are registered and services injected — runs **once per application lifetime** (on the first request after a start or reload) and the result is cached. What happens per-request is instance initialization and DI service *resolution*: the services you declared in `config()` are looked up from the container fresh for each request.
 
 ### 4. beforeAction filters
 
@@ -77,7 +79,7 @@ Your code. Reads params, calls models, orchestrates the response. Sets instance 
 
 ### 6. afterAction filters
 
-Rare. Use for logging, analytics, cleanup. The response body is already determined by this point.
+Rare. Use for logging, analytics, cleanup. The action's render has already produced the response body by this point, but it is not locked in — an afterAction filter that calls `renderText()` or `renderView()` *replaces* it. Avoid render calls in after-filters unless replacing the body is exactly what you want.
 
 ### 7. View rendering
 
@@ -91,10 +93,10 @@ Headers set by middleware on the way out (security headers, CORS, request ID). T
 
 | Hook | File | Runs |
 |------|------|------|
-| Middleware | `app/middleware/*.cfc`, registered in `config/settings.cfm` | Stage 1, every request |
-| Routes | `config/routes.cfm` | Stage 2 (defined once at boot) |
+| Routes | `config/routes.cfm` | Stage 1 (defined once at boot) |
+| Middleware | `app/middleware/*.cfc`, registered in `config/settings.cfm` | Stage 2, every matched request — unmatched URLs 404 before middleware runs |
 | DI registration | `config/services.cfm` | Once at boot |
-| Controller filters | `config()` in `app/controllers/*.cfc` | Stage 3, per-request |
+| Controller filters | `config()` in `app/controllers/*.cfc` | Stage 3, once per app start/reload (cached) |
 | Filter logic | Private methods in controller | Stages 4 and 6 |
 | Action | Public method in controller | Stage 5 |
 | View | `app/views/<controller>/<action>.cfm` | Stage 7 |
@@ -102,9 +104,13 @@ Headers set by middleware on the way out (security headers, CORS, request ID). T
 
 ## Why the order matters
 
-**Middleware runs before the controller exists.** That's why rate limiting and auth checks go there — they can reject a request without paying the cost of instantiating a controller.
+**Middleware runs before the controller exists.** That's why rate limiting and auth checks go there — they can reject a request without paying the cost of instantiating a controller. But middleware runs *after* route matching, so it only sees matched requests; an unmatched URL 404s before any middleware fires.
 
 **`beforeAction` filters run after `config()`.** That's why they can rely on injected services (`this.emailService`) — the DI container has already resolved them.
+
+<Aside type="caution">
+  Known issue: until [#3061](https://github.com/wheels-dev/wheels/issues/3061) is fixed, any uncaught error — even a stray 404 error page — re-creates the DI container, silently wiping every `config/services.cfm` registration. The next request that relies on an injected service then fails, breaking this guarantee until the application is reloaded.
+</Aside>
 
 **View rendering is inside the request, not after it.** Helpers and views see the same `params`, `flash`, and `session` the action saw. A view is not a separate subprocess.
 
@@ -114,17 +120,17 @@ Headers set by middleware on the way out (security headers, CORS, request ID). T
 
 Common symptoms and which stage caused them:
 
-- **`Route not found`** — stage 2 (dispatch) couldn't match the URL against `routes.cfm`. Check order: resources before root before wildcard.
-- **`Component X has no public method Y`** — stage 5. The action isn't declared on the controller, or the controller wasn't reloaded (`wheels reload`).
-- **`params.post is undefined` in show/edit/update/delete** — stage 2 route model binding wasn't enabled. Set `binding=true` on the resource, or set the global `routeModelBinding=true` in `config/settings.cfm`. Wheels prints a dev-mode warning hinting at this.
-- **Blank page but `curl -I` shows 200** — stage 7 couldn't find the view file. The path is `app/views/<controller>/<action>.cfm` all lowercase.
+- **`Could not find a route that matched this request.` (`Wheels.RouteNotFound`)** — stage 1 (dispatch) couldn't match the URL against `routes.cfm`. Check order: resources before root before wildcard.
+- **`Could not find the view page for the <action> action` for an action you never meant to render** — the action isn't declared on the controller, or the controller wasn't reloaded (`wheels reload`). A missing action doesn't error at stage 5; it falls through to auto-render and surfaces at stage 7 as a missing view (`Wheels.ViewNotFound`, HTTP 404).
+- **`params.post is undefined` in show/edit/update/delete** — stage 1 route model binding wasn't enabled. Set `binding=true` on the resource, or set the global `routeModelBinding=true` in `config/settings.cfm`. Wheels prints a dev-mode warning hinting at this.
+- **404 with `Wheels.ViewNotFound` for an action that exists** — stage 7 couldn't find the view file. The path is `app/views/<controller>/<action>.cfm` all lowercase. A missing view is never a blank 200 — it's a loud 404: the full error page in development, the generic 404 page in production.
 - **Redirect happens but you expected a render** — a filter (stage 4) or the action itself called `redirectTo()` and short-circuited. Check the filters list in `config()`.
-- **CORS error in browser, curl works fine** — stage 1 Cors middleware isn't registered, or its `allowOrigins` doesn't include the browser's origin.
+- **CORS error in browser, curl works fine** — stage 2 Cors middleware isn't registered, or its `allowOrigins` doesn't include the browser's origin.
 
 ## See also
 
 - [MVC in Wheels](/v4-0-0/core-concepts/mvc-in-wheels/) — where each layer lives and what it owns
-- [How Routing Works](/v4-0-0/core-concepts/how-routing-works/) — stage 2 in depth
-- [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/) — stage 1 in depth
+- [How Routing Works](/v4-0-0/core-concepts/how-routing-works/) — stage 1 in depth
+- [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/) — stage 2 in depth
 - [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/) — what `config()` resolves
 - [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/) — the hands-on how-to for stages 3-6
