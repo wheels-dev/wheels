@@ -58,6 +58,8 @@ Run it with `wheels seed`. The seeder opens a transaction, includes `app/db/seed
 
 Under the hood, it calls `model("<ModelName>").findOne(where="<uniqueProperty>='<value>'")` first. If the record exists, the call increments `totalSkipped` and returns silently. If not, it calls `model(...).new(properties).save()` and increments `totalCreated`. Re-running is always safe: no duplicates, no errors, no surprises.
 
+There's a third outcome: when `save()` fails validation, the entry is recorded as failed and the whole run rolls back — as of 4.0.4, with `success=false` and a non-zero exit so the failure is visible. (On 4.0.3 the run also rolled back, but silently, while still reporting the created counts.)
+
 The `properties` struct is what gets persisted on creation, so include every non-nullable column the model needs — not just the unique ones. The `uniqueProperties` list is only the subset used for the lookup.
 
 ## Environment-specific seeds
@@ -93,10 +95,11 @@ The commands you'll actually use day-to-day:
 
 - `wheels seed` — run convention seeds, auto-detecting the current environment
 - `wheels seed --environment=production` — run seeds for a specific environment regardless of where the app thinks it's running
-- `wheels generate seed` — scaffold `app/db/seeds.cfm` if it doesn't already exist
-- `wheels generate seed --all` — scaffold `seeds.cfm` plus `seeds/development.cfm` and `seeds/production.cfm` stubs
+- `wheels generate snippets seed-data` — write `seeds.cfm` and `seeds-development.cfm` starter templates to `app/snippets/`; copy them into place (`app/db/seeds.cfm` and `app/db/seeds/development.cfm`) to activate them
 
-There's also `wheels seed --generate`, which bypasses your seed files and generates random fake records for every model. It's legacy behaviour from before `seedOnce()` existed and rarely what you want — prefer explicit `seedOnce()` calls where you control the data.
+There is no `wheels generate seed` command — it errors with `Unknown generator type: seed`. The snippets generator above is the scaffold path.
+
+You may also see references to `wheels seed --generate`, a legacy flag from before `seedOnce()` existed that bypasses your seed files and generates random fake records for every model. It's currently non-functional: every model errors internally, zero rows are created, and the command still reports success ([#3082](https://github.com/wheels-dev/wheels/issues/3082)). Don't use it — write explicit `seedOnce()` calls where you control the data.
 
 ## Multiple `seedOnce` calls in one file
 
