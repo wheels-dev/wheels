@@ -1384,7 +1384,8 @@ component extends="modules.BaseModule" {
 		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
-		out("Tools are prefixed with the module name: wheels_generate, wheels_migrate, etc.");
+		out("Tool names match the command names: generate, migrate, etc. (unprefixed");
+		out("in tools/list — the server entry in .mcp.json namespaces them per client).");
 		out("Stateful/interactive commands (start, stop, new, console, ...) are hidden");
 		out("from MCP tools/list via mcpHiddenTools() — they remain CLI-only.");
 		return "";
@@ -3941,6 +3942,39 @@ component extends="modules.BaseModule" {
 
 	// ── Migration Execution ──────────────────────────
 
+	/**
+	 * True when migrator output carries the failed-step signature that
+	 * Migrator.$runMigrationStep() emits — "Error migrating to <version>."
+	 * migrateTo() concatenates that line into its returned string instead of
+	 * throwing, so the /wheels/cli bridge reports success:true and the CLI's
+	 * parseCliResponse() success->exit-code mapping never trips. Detecting the
+	 * signature lets a failed up()/down() reach the exit code — the
+	 * migrate-side sibling of the #2973/#2987 seeder honesty fix (#3081).
+	 *
+	 * Anchored on the literal label plus a numeric version so normal progress
+	 * lines ("Migrating from 0 up to N.") never match. Public ONLY so the CLI
+	 * specs can reach it (cli/CLAUDE.md "public for specs" carve-out); the
+	 * mcpHiddenTools() structural $-prefix sweep keeps it off the MCP surface.
+	 */
+	public boolean function $migrationOutputIndicatesFailure(required string output) {
+		return reFindNoCase("Error migrating(\s+to)?\s+[0-9]+\.", arguments.output) > 0;
+	}
+
+	/**
+	 * True when a /wheels/cli migration-style response should map to a non-zero
+	 * CLI exit: either an explicit success:false (forget/pretend refusals such
+	 * as "not found in the tracking table" or "matching local file exists", or
+	 * a bridge-surfaced error) OR the subtler honesty gap where the bridge
+	 * reports success:true while migrateTo() folded a failed step into the
+	 * message. Public for specs; hidden from MCP via the structural sweep (#3081).
+	 */
+	public boolean function $cliMigrationResponseFailed(required struct response) {
+		if (!(arguments.response.success ?: true)) {
+			return true;
+		}
+		return $migrationOutputIndicatesFailure(arguments.response.message ?: "");
+	}
+
 	private string function runMigration(required string action) {
 		var serverPort = $requireRunningServer(
 			hints = [
@@ -3982,6 +4016,20 @@ component extends="modules.BaseModule" {
 		// parseCliResponse throws Wheels.Cli.CommandFailed on success:false —
 		// the previous code silently treated it as success. See issue #2315.
 		var result = parseCliResponse(httpResult, "Migration #action#");
+
+		// Honesty gap (#3081): migrateTo() folds a failed up()/down() step into
+		// its returned message ("Error migrating to <version>.") instead of
+		// throwing, so the bridge reports success:true and parseCliResponse()
+		// above doesn't trip. Detect that signature for the schema-mutating
+		// actions so a failed migration reaches the exit code — the migrate-side
+		// sibling of the #2973/#2987 seeder honesty fix.
+		if (mutatingAction && $migrationOutputIndicatesFailure(result.message ?: "")) {
+			out(result.message ?: "", "red");
+			throw(
+				type    = "MigrationError",
+				message = "Migration #arguments.action# failed — a migration step reported an error (see output above)."
+			);
+		}
 
 		// For `doctor`, switch the output color to yellow when the report
 		// signals unhealthy state (orphans or pending migrations). Green
@@ -4061,14 +4109,24 @@ component extends="modules.BaseModule" {
 		}
 
 		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response"};
-		var success = parsed.success ?: false;
 		var msg = parsed.message ?: "";
 
-		if (success) {
-			out(msg, "green");
-		} else {
-			out(msg, "red");
+		// Honesty gap (#3081): forget/pretend refusals ("not found in the
+		// tracking table", "matching local file exists", "already applied",
+		// "no matching file") come back as success:false but previously printed
+		// red and returned "" — exit 0, indistinguishable from a real mutation
+		// in a script. Throw so the refusal reaches the exit code. The
+		// informational dry-run branches above (missing <version> / missing
+		// --yes) still return "" (exit 0) because they precede the server call.
+		if ($cliMigrationResponseFailed(parsed)) {
+			out(Len(msg) ? msg : "#verb# refused.", "red");
+			throw(
+				type    = "MigrationError",
+				message = Len(msg) ? msg : "#verb# refused — no change made."
+			);
 		}
+
+		out(msg, "green");
 		return "";
 	}
 
@@ -4209,7 +4267,12 @@ component extends="modules.BaseModule" {
 			runMigration("latest");
 		} catch (any e) {
 			out("Migration failed: #e.message#", "red");
-			return "";
+			// #3081: a refusal (e.g. ServerNotRunning) or a failed migration
+			// must reach the exit code — swallowing it (return "") made
+			// `db reset --force` report success while the schema never moved.
+			// `wheels migrate latest` and `wheels seed` already exit non-zero
+			// on the same refusal; this aligns `db reset` with them.
+			rethrow;
 		}
 
 		// Step 2: Seed (unless skipped)

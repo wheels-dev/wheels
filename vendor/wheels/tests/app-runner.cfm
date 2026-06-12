@@ -21,8 +21,13 @@
     // into compiling arbitrary CFCs (e.g. ?directory=vendor.wheels.lib).
     // Extracted to TestDirectoryResolver so the regression spec for
     // issue #2489 can exercise the regex without spinning up HTTP.
+    //
+    // resolveScope() additionally records whether a present-but-rejected
+    // directory was silently swapped for the default, so a green total from
+    // the wrong scope is detectable in the JSON payload (issue #3083).
     local.dirResolver = new wheels.tests._assets.dispatch.TestDirectoryResolver();
-    local.testDirectory = local.dirResolver.resolveDirectory(url);
+    local.testScope = local.dirResolver.resolveScope(url);
+    local.testDirectory = local.testScope.resolved;
 
     // Resolve the target datasource. When url.useTestDB=true and a
     // <dataSourceName>_test datasource is registered, swap to it for
@@ -101,6 +106,14 @@
         arraySort(local.sortedBundles, "textNoCase");
         testBox.setBundles(local.sortedBundles);
 
+        // Surface a rejected directory or a 0-bundle discovery so neither
+        // silently reports green for the wrong scope (issue #3083).
+        local.bundlesDiscovered = ArrayLen(local.sortedBundles);
+        local.scopeWarnings = local.dirResolver.scopeWarnings(
+            scope = local.testScope,
+            bundlesDiscovered = local.bundlesDiscovered
+        );
+
         if (!StructKeyExists(url, "format") || url.format == "html") {
             result = testBox.run(reporter = "wheels.wheelstest.system.reports.JSONReporter");
             decoded = DeserializeJSON(result);
@@ -110,7 +123,12 @@
             // app tests are typically requested over JSON (CLI/CI). Users hitting
             // the URL in a browser still get a structured response they can read.
             cfcontent(type="application/json");
-            writeOutput(result);
+            writeOutput(local.dirResolver.injectScopeMetadata(
+                resultJson = result,
+                scope = local.testScope,
+                bundlesDiscovered = local.bundlesDiscovered,
+                warnings = local.scopeWarnings
+            ));
         } else if (url.format == "json") {
             result = testBox.run(reporter = "wheels.wheelstest.system.reports.JSONReporter");
             decoded = DeserializeJSON(result);
@@ -123,7 +141,12 @@
             }
             cfcontent(type="application/json");
             cfheader(name="Access-Control-Allow-Origin", value="*");
-            writeOutput(result);
+            writeOutput(local.dirResolver.injectScopeMetadata(
+                resultJson = result,
+                scope = local.testScope,
+                bundlesDiscovered = local.bundlesDiscovered,
+                warnings = local.scopeWarnings
+            ));
         } else if (url.format == "txt") {
             result = testBox.run(reporter = "wheels.wheelstest.system.reports.TextReporter");
             cfcontent(type = "text/plain");

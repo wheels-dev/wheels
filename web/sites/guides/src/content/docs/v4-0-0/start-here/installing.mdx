@@ -105,10 +105,6 @@ The two are mutually exclusive — both expose the `wheels` binary. You install 
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
 
-   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
-   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
-   </Aside>
-
 </Steps>
 
 </TabItem>
@@ -154,10 +150,6 @@ The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x relea
    ```
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
-
-   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
-   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
-   </Aside>
 
 </Steps>
 
@@ -216,10 +208,6 @@ The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerpri
    ```
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
-
-   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
-   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
-   </Aside>
 
 </Steps>
 

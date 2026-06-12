@@ -81,15 +81,32 @@ The `wheels test` command accepts a `--reporter=<name>` flag. The CLI always req
 | `--ci` | Accepted for forward-compatibility — currently changes nothing; every run already exits non-zero on failure |
 | `--verbose` / `-v` | Adds the full bundle/suite/spec tree to the output |
 
-For machine-readable results you can also call the test runner URL directly and post-process the JSON. That is exactly what `tools/ci/run-tests.sh` does in this repo: it `curl`s `/wheels/core/tests?db=sqlite&format=json`, parses the totals in Python, and emits a JUnit XML file that `actions/upload-artifact` ingests for the GitHub summary.
+For machine-readable results you can also call the test runner URL directly and post-process the JSON. That is exactly what `tools/ci/run-tests.sh` does in this repo: it `curl`s `/wheels/core/tests?db=sqlite&format=json`, parses the totals in Python, emits a JUnit XML file that `actions/upload-artifact` ingests for the GitHub summary, and fails the build when the payload reports a rejected `directory=` scope or a 0-bundle discovery.
 
 ```bash title="tools/ci/run-tests.sh (excerpt)"
 curl -s -o "$RESULT_FILE" --max-time 600 \
   "http://localhost:${PORT}/wheels/core/tests?db=sqlite&format=json"
 
-# Parse totals with Python, then emit JUnit XML
-python3 -c "import json; d=json.load(open('$RESULT_FILE')); \
-  print(f\"{d['totalPass']} pass, {d['totalFail']} fail, {d['totalError']} error\")"
+# Scope-visibility guard (issue #3083): the runner reports a rejected
+# directory= (silently swapped for the full default suite) and 0-bundle
+# discoveries in the JSON payload. Surface any warnings[] and fail hard on
+# either signal — a green total from the wrong scope must not pass CI.
+python3 -c "
+import json
+d = json.load(open('$RESULT_FILE'))
+for w in d.get('warnings', []):
+    print('::warning::' + str(w))
+" 2>/dev/null || true
+DIR_REJECTED=$(python3 -c "import json; d=json.load(open('$RESULT_FILE')); print('true' if d.get('directoryRejected') else 'false')" 2>/dev/null || echo "false")
+BUNDLES_DISCOVERED=$(python3 -c "import json; d=json.load(open('$RESULT_FILE')); print(int(d.get('bundlesDiscovered', -1)))" 2>/dev/null || echo "-1")
+if [ "$DIR_REJECTED" = "true" ]; then
+  echo "::error::Test runner rejected the requested directory= scope and ran the full default suite instead (directoryRejected=true)"
+  CORE_OK=false
+fi
+if [ "$BUNDLES_DISCOVERED" = "0" ]; then
+  echo "::error::Test runner discovered 0 bundles for the resolved scope — the run was vacuously green (bundlesDiscovered=0)"
+  CORE_OK=false
+fi
 ```
 
 <Aside type="tip">

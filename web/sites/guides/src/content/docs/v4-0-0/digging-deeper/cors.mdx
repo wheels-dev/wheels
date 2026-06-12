@@ -114,7 +114,7 @@ mapper()
 
 Routes under `/api` get the Cors middleware. `resources("pages")` and everything outside the scope do not. Scope-level middleware composes with global middleware — both run.
 
-Close the scope with `.end()` before declaring routes outside it — `scope()` does not take a `callback` argument. A callback passed to it is silently ignored (the routes inside it never register), and the unclosed scope leaks its path prefix and middleware onto every subsequent route ([#3072](https://github.com/wheels-dev/wheels/issues/3072)).
+Close the scope with `.end()` before declaring routes outside it — an unclosed scope leaks its path prefix and middleware onto every subsequent route. Alternatively, pass the scoped routes as a `callback=` argument (`.scope(path="/api", middleware=[...], callback=function(map) { map.resources("posts"); })`) — `scope()` runs the callback and closes the scope automatically when it returns ([#3072](https://github.com/wheels-dev/wheels/issues/3072)). On releases before that fix (4.0.3 and earlier), `scope()` silently ignored `callback=`, so use the explicit `.end()` form there.
 
 <Aside type="caution">
   The preflight short-circuit that prevents unmatched `OPTIONS` requests from reaching the route table applies only when `Cors` is registered in the **global** pipeline via `config/settings.cfm`. Route-scoped `Cors` declared inside `.scope()` in `config/routes.cfm` does not benefit: route matching runs before route-scoped middleware executes, so a browser preflight to a path that only declares `POST` will 404 with `Wheels.RouteNotFound` unless `Cors` is also in the global pipeline.

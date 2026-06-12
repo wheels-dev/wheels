@@ -9,30 +9,32 @@ sidebar:
 
 Run a command on every host. Filter to one host with `--host=`.
 
+Invoke it through the **flat alias** `wheels deploy exec`. The nested `wheels deploy server exec` form is shadowed at the shell — the CLI's picocli root owns a top-level `server` command and prints its help instead ([#2677](https://github.com/wheels-dev/wheels/issues/2677), fixed by the flat alias in [#2690](https://github.com/wheels-dev/wheels/pull/2690)). The nested form remains only for direct callers that bypass the shell, such as MCP.
+
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy server exec --cmd=<command> [--host=<host>] [--destination=<name>] [--dry-run]
+wheels deploy exec <command> [--host=<host>] [--destination=<name>] [--dry-run]
 ```
 
-## Flags
+## Arguments and flags
 
-| Flag | Description |
+| Argument / flag | Description |
 |------|-------------|
-| `--cmd=<command>` | **Required.** Shell command to run remotely. Throws `DeployServerCli.MissingCommand` if absent. |
+| `<command>` | **Required positional.** Shell command to run remotely. Every positional token after `exec` is joined into one command, so quoting is optional for simple commands — still quote anything with shell metacharacters (pipes, redirects) so your local shell does not interpret them first. Throws `DeployServerCli.MissingCommand` if absent — there is no `--cmd=` flag (the parser ignores it). |
 | `--host=<host>` | Limit to one host. Must match a host declared in `deploy.yml` — throws `DeployServerCli.UnknownHost` otherwise. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print the command without executing. |
 
 ## Behavior
 
-SSHes in parallel (or to one host) and runs `--cmd` verbatim. Output is prefixed by host.
+SSHes in parallel (or to one host) and runs the command verbatim. Output is prefixed by host.
 
 Useful for smoke-testing connectivity, reading environment details, or running one-off diagnostic commands without writing a hook.
 
 ## Example
 
 ```bash title="illustrative — requires live SSH hosts"
-wheels deploy server exec --cmd="uptime"
-wheels deploy server exec --cmd="docker ps" --host=192.0.2.10
+wheels deploy exec uptime
+wheels deploy exec "docker ps" --host=192.0.2.10
 ```

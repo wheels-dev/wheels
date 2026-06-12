@@ -205,7 +205,7 @@ mapper()
 </cfscript>
 ```
 
-Declare the scoped routes between `.scope()` and its matching `.end()`, then close the scope before any routes that shouldn't share the limit. `scope()` does not take a `callback` argument — a callback passed to it is silently ignored, and without the `.end()` every subsequent route (including `.wildcard()`) nests under `/login`, breaking the rest of the app's routing ([#3072](https://github.com/wheels-dev/wheels/issues/3072)).
+Declare the scoped routes between `.scope()` and its matching `.end()`, then close the scope before any routes that shouldn't share the limit — without the `.end()` every subsequent route (including `.wildcard()`) nests under `/login`, breaking the rest of the app's routing. `scope()` also accepts a `callback=` argument that declares the scoped routes and closes the scope automatically when it returns ([#3072](https://github.com/wheels-dev/wheels/issues/3072)). On releases before that fix (4.0.3 and earlier), `callback=` was silently ignored, so use the explicit `.end()` form there.
 
 Global middleware from `config/settings.cfm` still runs — it composes with the scope-level one. The pattern is: a permissive global limit (say 60/min) plus a tight limit on sensitive routes (5/min on login) so a brute-force attempt trips the narrow limit long before the broad one.
 

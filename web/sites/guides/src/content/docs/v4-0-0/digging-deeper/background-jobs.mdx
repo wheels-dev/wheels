@@ -1,6 +1,6 @@
 ---
 title: Background Jobs
-description: Queue work for asynchronous processing — retries, priority queues, and the worker process.
+description: Queue work for asynchronous processing — retries, priority queues, and draining the queue on a schedule.
 type: howto
 sidebar:
   order: 3
@@ -8,13 +8,13 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page shows you how to move slow work out of the request cycle. You'll define a job class, enqueue it from a controller, run a worker process to drain the queue, configure retries with exponential backoff, and route urgent work through a high-priority queue.
+This page shows you how to move slow work out of the request cycle. You'll define a job class, enqueue it from a controller, drain the queue with `processQueue()` on a schedule, configure retries with exponential backoff, and route urgent work through a high-priority queue.
 
 **You'll learn:**
 
 - How to define a job by extending `wheels.Job` and implementing `perform()`
 - How to enqueue jobs immediately, after a delay, or at a specific time
-- How to run `wheels jobs work` as a long-lived worker
+- How to drain queues with `processQueue()` from a scheduled task or cron-driven script
 - How retries and backoff work, and how to tune them
 - How priority queues let critical work jump the line
 - How to monitor, retry, and purge jobs in production
@@ -64,7 +64,7 @@ component extends="Controller" {
     function create() {
         user = model("User").new(params.user);
         if (user.save()) {
-            // Immediate — runs on the next worker poll
+            // Immediate — runs on the next processQueue() poll
             job = new app.jobs.SendWelcomeEmailJob();
             job.enqueue(data={userId: user.id});
 
@@ -84,31 +84,45 @@ component extends="Controller" {
 }
 ```
 
-`enqueue()`, `enqueueIn()`, and `enqueueAt()` all return a struct with the persisted row's `id`. The controller keeps responding fast — the actual email send happens when a worker picks the row up.
+`enqueue()`, `enqueueIn()`, and `enqueueAt()` all return a struct with the persisted row's `id`. The controller keeps responding fast — the actual email send happens when the next `processQueue()` poll picks the row up.
 
-## Run the worker
+## Process the queue
 
-The worker is a long-lived process that polls the `wheels_jobs` table and runs any `pending` job whose `runAt` has arrived. Start it from the CLI:
+<Aside type="caution">
+  **There is no `wheels jobs` CLI yet.** Earlier 4.0 docs described `wheels jobs work|status|retry|monitor|purge` commands, but the released CLI has no `jobs` command — invoking one errors. A worker CLI is tracked in [#3090](https://github.com/wheels-dev/wheels/issues/3090). Until it ships, drive the queue with the programmatic API on `wheels.Job`, shown below.
+</Aside>
 
-```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
-wheels --version
+Processing is a poll: `processQueue()` picks up every `pending` job whose `runAt` has arrived, runs each one, and returns counts. Call it from anything that runs on a schedule — a CFML scheduled task, a cron-invoked script, or a controller action behind an admin route that your scheduler hits:
+
+```cfm {test:compile} title="app/controllers/admin/Jobs.cfc (fragment)"
+component extends="Controller" {
+    function drain() {
+        worker = new wheels.Job();
+        result = worker.processQueue(queue="mailers", limit=10);
+        // result = {processed: n, failed: n, skipped: n, errors: [...]}
+        renderWith(data=result);
+    }
+}
 ```
 
-The commands themselves need a running app and database, so they don't smoke-test in docs — here's the shape:
+- `processQueue()` — process all queues, up to 10 jobs per call (the default `limit`).
+- `processQueue(queue="mailers")` — only drain the `mailers` queue.
+- `processQueue(limit=100)` — bigger batch for one-shot catch-ups.
 
-- `wheels jobs work` — process all queues; loops until Ctrl-C.
-- `wheels jobs work --queue=mailers` — only drain the `mailers` queue.
-- `wheels jobs work --queue=mailers --interval=3` — poll every 3 seconds instead of the 5-second default.
-- `wheels jobs work --max-jobs=100` — stop after 100 jobs (useful for one-shot batches).
-- `wheels jobs work --quiet` — suppress per-job output, only log errors.
+In production, schedule the call at whatever cadence matches your latency tolerance — every minute is plenty for emails. Run it from multiple schedulers for parallelism: the base class uses optimistic row locking, so two pollers won't process the same job twice (a row claimed between the SELECT and the claim shows up in the `skipped` count).
 
-In production, run the worker under a process supervisor (systemd, Docker's restart policy, Kamal's accessory containers) so it restarts if it crashes. Run multiple worker processes for parallelism — the base class uses optimistic row locking, so two workers won't process the same job twice.
+Check queue health without tailing logs — `queueStats()` returns per-status counts:
 
-Check queue health without tailing logs:
-
-- `wheels jobs status` — table of pending / processing / completed / failed per queue.
-- `wheels jobs status --queue=mailers` — just one queue.
-- `wheels jobs status --format=json` — machine-readable output for CI smoke tests or scraping.
+```cfm {test:compile} title="queue health"
+component extends="Controller" {
+    function status() {
+        stats = (new wheels.Job()).queueStats();                    // all queues
+        mailerStats = (new wheels.Job()).queueStats(queue="mailers"); // one queue
+        // {pending: n, processing: n, completed: n, failed: n, total: n}
+        renderWith(data=stats);
+    }
+}
+```
 
 ## Retries and backoff
 
@@ -131,59 +145,68 @@ component extends="wheels.Job" {
 }
 ```
 
-The backoff formula is `Min(this.baseDelay * 2^attempt, this.maxDelay)`. With the defaults (`baseDelay=2`, `maxDelay=3600`), you get retries at roughly 4s, 8s, 16s, 32s, 64s — small failures resolve quickly, while a stubborn outage stops hammering the external service once it hits the cap.
+The backoff formula is `Min(this.baseDelay * 2^attempt, this.maxDelay)`, where `attempt` is the number of the attempt that just failed (1 for the first run). Note that `maxRetries` counts total attempts, not retries: with the example's settings (`maxRetries=5`, `baseDelay=2`, `maxDelay=3600`) the job runs at most five times — the first run plus four retries at roughly 4s, 8s, 16s, and 32s — and the fifth failure moves it to `failed`. Transient failures resolve quickly, and `maxDelay` caps the gap so a job configured with many attempts stops hammering the external service. (The framework default is `maxRetries=3`: the first run plus retries at 4s and 8s.)
 
 Because retries are automatic, your `perform()` must be **idempotent**. If the first attempt charged the card but failed to record the success, the second attempt must notice and skip. Store an idempotency key on the model and check it at the top of `perform()`.
 
-To kick failed jobs back into the queue — after you've fixed the bug, say — use the retry command:
+To kick failed jobs back into the queue — after you've fixed the bug, say — call `retryFailed()`:
 
-```bash title="your shell"
-wheels jobs retry                       # retry every failed job
-wheels jobs retry --queue=mailers       # only the mailers queue
-wheels jobs retry --limit=10            # cap at 10 jobs
+```cfm {test:compile} title="retry failed jobs"
+component extends="Controller" {
+    function retryAll() {
+        worker = new wheels.Job();
+        worker.retryFailed();                   // retry every failed job
+        worker.retryFailed(queue="mailers");    // only the mailers queue
+        redirectTo(back=true);
+    }
+}
 ```
 
-Retry resets `attempts` to zero and flips `status` back to `pending`.
+Retry resets `attempts` to zero, clears the stored error, and flips `status` back to `pending` — the next `processQueue()` poll picks the rows up.
 
 ## Priority queues
 
-Different queues can run at different cadences. Give the worker a comma-separated list in priority order and it drains the first queue before falling through to the next:
+Two levers control which work runs first. Within a single `processQueue()` call, jobs run in `priority DESC, runAt ASC` order — set `this.priority` in `config()` (higher first) or pass `priority=` at enqueue time and urgent rows jump the line. Across queues, drain them in the order you care about:
 
-```bash title="your shell"
-wheels jobs work --queue=critical,default,low
+```cfm {test:compile} title="drain in priority order"
+component extends="Controller" {
+    function drain() {
+        worker = new wheels.Job();
+        worker.processQueue(queue="critical", limit=50);
+        worker.processQueue(queue="default", limit=20);
+        worker.processQueue(queue="low", limit=5);
+        renderText("ok");
+    }
+}
 ```
 
-The worker processes every `pending` job in `critical` first, then `default`, then `low`. Queues are just string labels on the `wheels_jobs.queue` column — create as many as you need. A typical split:
+Every `pending` job in `critical` (up to the limit) goes first, then `default`, then `low`. Queues are just string labels on the `wheels_jobs.queue` column — create as many as you need. A typical split:
 
 - `critical` — payment retries, password resets, anything user-visible.
 - `default` — welcome emails, webhooks, routine follow-ups.
 - `low` — nightly analytics rollups, cleanup, anything that can wait.
 
-You can also bias ordering within a queue with `this.priority` in `config()` (higher first), but queue-based separation is simpler to reason about.
+Per-job `priority` is the finer instrument; queue-based separation is simpler to reason about. Use queues for cadence, `priority` for jumping the line within one.
 
 ## Monitoring in production
 
-For an interactive dashboard, run:
+There's no dashboard yet — it lands with the worker CLI tracked in [#3090](https://github.com/wheels-dev/wheels/issues/3090). The building block that exists today is `queueStats()`. Expose it from a small admin endpoint and point whatever you already use — Prometheus, Datadog, a custom scrape — at the JSON:
 
-```bash title="your shell"
-wheels jobs monitor                     # refresh every 3 seconds
-wheels jobs monitor --interval=5        # slower refresh
-wheels jobs monitor --queue=mailers     # one queue only
+```cfm {test:compile} title="app/controllers/admin/Jobs.cfc (fragment)"
+component extends="Controller" {
+    function metrics() {
+        renderWith(data=(new wheels.Job()).queueStats());
+    }
+}
 ```
 
-The dashboard shows per-queue counts, throughput over the last 60 minutes, error rate, and recent job activity. It also reports any jobs recovered from stuck `processing` state (worker crashed mid-job).
-
-For headless metrics, pipe `wheels jobs status --format=json` into whatever you already use — Prometheus, Datadog, a custom scrape:
-
-```bash title="your shell"
-wheels jobs status --format=json
-```
+Alert on two signals: `failed` growing, and `pending` not shrinking between polls. The first means a job class is throwing past its retries; the second means nothing is draining the queue.
 
 ## The jobs table
 
 Jobs persist to a `wheels_jobs` table keyed by UUID. The base class auto-creates it the first time `enqueue()` or `processQueue()` runs — no migration needed. Columns: `id`, `jobClass`, `queue`, `data` (JSON), `priority`, `status` (`pending`/`processing`/`completed`/`failed`), `attempts`, `maxRetries`, `lastError`, `runAt`, `completedAt`, `failedAt`, `createdAt`, `updatedAt`. See `vendor/wheels/Job.cfc` (`$ensureJobTable`) for the exact schema — it adapts column types per database (MySQL, PostgreSQL, SQL Server, H2, SQLite, Oracle).
 
-You never need to touch the table directly. Query it through the CLI commands or `queueStats()`:
+You never need to touch the table directly. Query it through `queueStats()`:
 
 ```cfm {test:compile} title="programmatic stats"
 component extends="Controller" {
@@ -228,16 +251,23 @@ Testing `perform()` in isolation keeps the spec fast and avoids the complexity o
 
 ## Purging old rows
 
-Completed and failed rows accumulate forever unless you prune them. The purge command takes days and status flags:
+Completed and failed rows accumulate forever unless you prune them. `purgeCompleted()` deletes completed rows older than a cutoff:
 
-```bash title="your shell"
-wheels jobs purge                                 # completed jobs older than 7 days
-wheels jobs purge --completed --older-than=30     # completed older than 30 days
-wheels jobs purge --failed --older-than=90        # failed jobs older than 90 days
-wheels jobs purge --completed --failed --queue=mailers
+```cfm {test:compile} title="prune the table"
+component extends="Controller" {
+    function purge() {
+        worker = new wheels.Job();
+        worker.purgeCompleted();                          // completed jobs older than 7 days
+        worker.purgeCompleted(days=30);                   // completed older than 30 days
+        worker.purgeCompleted(days=30, queue="mailers");  // one queue only
+        renderText("ok");
+    }
+}
 ```
 
-Run it from a cron or scheduled task. A weekly purge of completed rows older than 30 days keeps the table small without losing recent history for debugging.
+It only touches `status='completed'` rows — failed rows persist until you clear them yourself, which is deliberate: they're your error log. Retry them with `retryFailed()` or delete them with your own SQL once you've extracted what you need from `lastError`.
+
+Run the purge from a cron or scheduled task. A weekly purge of completed rows older than 30 days keeps the table small without losing recent history for debugging.
 
 ## Common patterns
 
@@ -267,7 +297,7 @@ Run it from a cron or scheduled task. A weekly purge of completed rows older tha
   />
   <LinkCard
     title="Environments and Configuration"
-    description="Where to tune worker intervals and retry caps per environment (dev, staging, production)."
+    description="Where to tune polling cadence and retry caps per environment (dev, staging, production)."
     href="/v4-0-0/core-concepts/environments-and-configuration/"
   />
 </CardGrid>
