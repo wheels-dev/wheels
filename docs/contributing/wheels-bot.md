@@ -201,6 +201,30 @@ The review posts as a `gh pr review` with verdict
 `approve` / `request-changes` / `comment` and findings grouped under
 Correctness, Conventions, Cross-engine, Tests, Docs, Commits, Security.
 
+**Verdict supersession (issue #3048).** A reviewer's `CHANGES_REQUESTED`
+stays active on GitHub until the same reviewer approves or the review is
+dismissed — a later comment-state review does not clear it. The prompt
+therefore mandates: when a still-active wheels-bot `CHANGES_REQUESTED`
+exists on the PR and the re-review finds zero blocking issues
+(Correctness / Cross-engine / Security / commitlint / TDD), the review
+is submitted as **approve**, with each previously-blocking finding and
+its resolution enumerated in the body — never as comment, which would
+wedge the PR behind the stale block until manual dismissal. A re-review
+that still has blocking findings keeps using request-changes, and
+first-pass verdict policy is unchanged (bias toward comment). Fork PRs
+are exempt: the bot never approves a fork PR — an approval could satisfy
+a required-approving-review branch rule for code no maintainer has
+accepted — so the fork path keeps comment-state verdicts and the
+maintainer who applied the `bot-review` label dismisses the stale review
+by hand. The approval gate on the bot's *own* PRs is also unaffected:
+GitHub forbids authors approving their own pull requests, so a bot
+approval can never satisfy `required_approving_review_count` on a
+wheels-bot-authored PR (the prompt carries a 422 comment-fallback for
+that case). The post-submission review guard needs no change either — an
+approval is a review on the SHA, carries the same `wheels-bot:review-a`
+marker, and `APPROVED` is one of the two states the guard already
+validates and can dismiss.
+
 Because no second reviewer critiques this review afterwards, the prompt
 includes an explicit **adversarial self-review** before posting: for each
 finding the model attempts to refute it against the actual code (the
