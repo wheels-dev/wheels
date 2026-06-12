@@ -105,7 +105,7 @@ mapper()
 `binding="BlogPost"` resolves the `BlogPost` model and stores the instance under `params.blogPost` (the lowercase-initial form of the class name). The `binding` argument accepts `true`, `false`, or a simple string — any non-boolean string is treated as the model class to load.
 
 <Aside type="tip">
-  If the model class doesn't exist (for example, the resource is routing to a controller that doesn't have a backing model), the dispatcher silently skips binding instead of throwing. This keeps non-model resources — health checks, static pages, API gateways — working without extra configuration.
+  The silent skip applies only to **conventional** binding (`binding=true`): when the convention-derived model class doesn't exist (for example, the resource is routing to a controller that doesn't have a backing model), the dispatcher skips binding instead of throwing. This keeps non-model resources — health checks, static pages, API gateways — working without extra configuration. An **explicit** name is different: if `binding="BlogPost"` names a model class that can't be resolved, the dispatcher rethrows the failure as a configuration error — you asked for that class by name, so a typo should surface, not vanish.
 </Aside>
 
 ## Scope-level binding

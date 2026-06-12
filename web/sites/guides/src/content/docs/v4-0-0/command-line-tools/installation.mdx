@@ -191,7 +191,7 @@ The package-manager installs do extra work on your behalf that this path skips. 
 - **`LUCLI_HOME` isolation.** Package installs export `LUCLI_HOME=$HOME/.wheels` so installed modules live in `~/.wheels/modules/wheels/` and stay out of the way of any other LuCLI work. Standalone LuCLI uses `~/.lucli/modules/wheels/` — fine on its own, but a previously installed `wheels` module (e.g. v3.1.0 from the older registry entry) will shadow your new install unless you pass `--force`.
 - **JDK resolution.** Package installs probe for a Java 21 install and export `JAVA_HOME` inside their `wheels` wrapper. Standalone LuCLI uses whatever `java` is on your `PATH` — if that's a different major version, the runtime will refuse to start. Make sure `java -version` reports 21.x before installing.
 - **First-run SQLite shim.** The package wrappers auto-stage `sqlite-jdbc-*.jar` into Lucee Express's `lib/ext/` so `wheels start` against a SQLite datasource works out of the box. With a bare LuCLI install you'll need to drop the JAR there yourself the first time you create a SQLite-backed app.
-- **Channel awareness.** `wheels --version` from a packaged install reports `(stable)` or `(bleeding-edge)`. From a bare LuCLI install, the module reports its own version but there's no channel marker — you have to remember which tarball URL you installed from.
+- **Channel awareness.** `wheels version` from a packaged install reports `(stable)` or `(bleeding-edge)`. From a bare LuCLI install, the module reports its own version but there's no channel marker — you have to remember which tarball URL you installed from.
 - **No `scoop update` / `brew upgrade` story.** Upgrades are manual: re-run `lucli modules install wheels --force --url=…` with a newer release URL.
 
 This path exists for people who already run LuCLI for other modules and don't want a second binary on `PATH`. For everyone else, the Scoop / Homebrew / Linux package paths are the better default.
@@ -208,12 +208,17 @@ wheels --version
 You should see something like:
 
 ``` title="illustrative — example version output"
-Wheels 4.0.0-SNAPSHOT+1523 (snapshot)
-LuCLI 0.3.7
-Java 21.0.8
+Wheels Version: 4.0.3
 ```
 
-The three-line format tells you the Wheels Module version, the underlying LuCLI version, and the JVM the wrapper picked up. If any of those lines is missing or reports an unexpected value, jump to troubleshooting below.
+followed by the Wheels ASCII-art banner. The richer check is `wheels version` (no dashes), which reports the release channel and the JVM the wrapper picked up:
+
+``` title="illustrative — example wheels version output"
+Wheels 4.0.3 (stable)
+Java 21.0.11
+```
+
+If either line is missing or reports an unexpected value — say a Java major version other than 21 — jump to troubleshooting below.
 
 Running `wheels` with no arguments is also a quick sanity check — it prints the same Wheels help banner as `wheels --help`. (`wheels help` falls through to LuCLI's own generic help rather than the Wheels banner, so prefer `wheels --help`.) If you see a `Component [modules.wheels.Module] has no function with name [main]` error instead, you are running a build that predates this fix — upgrade to the latest 4.0.x release to restore the expected behavior.
 
@@ -233,7 +238,7 @@ On Linux, the `.deb`/`.rpm` package installs `/usr/bin/wheels`, which should be 
 
 ### Conflict with a standalone LuCLI install sharing `~/.lucli/`
 
-The wheels formula deliberately isolates runtime state under `~/.wheels/` (via `LUCLI_HOME`) so a standalone `lucli` install — which uses `~/.lucli/` — stays out of the way. If you previously had LuCLI installed directly and see odd module-resolution errors, check that the wrapper set `LUCLI_HOME` correctly (`wheels system env` will dump the resolved environment) and that `~/.wheels/modules/wheels/` contains a current `Module.cfc` and `.module-version` file.
+The wheels formula deliberately isolates runtime state under `~/.wheels/` (via `LUCLI_HOME`) so a standalone `lucli` install — which uses `~/.lucli/` — stays out of the way. If you previously had LuCLI installed directly and see odd module-resolution errors, check that the wrapper set `LUCLI_HOME` correctly (`wheels system paths` prints the resolved home directory and where it came from) and that `~/.wheels/modules/wheels/` contains a current `Module.cfc` and `.module-version` file.
 
 ### Windows: `there is no Resource provider available with the name [c]`
 

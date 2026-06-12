@@ -29,6 +29,20 @@ Wheels failed to initialize. Check the server log for details.
 
 **Note:** Before the #2774 fix, this failure cascaded into a second `[WO] does not exist` exception that hid the real cause. If you see the old cascade on a version that predates this fix (i.e. 4.0.1 or earlier), the underlying cause is always a failed `onApplicationStart` — see above.
 
+### "key [ENGINEADAPTER] doesn't exist" / "Element WHEELS.ENGINEADAPTER is undefined" in dev error page
+**Error (on-page or in server log):**
+```
+key [ENGINEADAPTER] doesn't exist          (Lucee)
+Element WHEELS.ENGINEADAPTER is undefined  (Adobe CF)
+```
+
+**Cause:** An exception during `onApplicationStart` (e.g. `Wheels.Cors.InvalidConfiguration` from an invalid `config/settings.cfm` value) triggered `onError`, which itself crashed because three request-lifecycle helpers — `$getRequestTimeout()`, `$statusCode()`, and `$contentType()` — read `application.wheels.engineAdapter` directly after gating on `$hasEngineAdapter()`. That gate checks both `application.wheels` and the startup-staging struct `application.$wheels`, but the subsequent read assumed the adapter had been promoted to `application.wheels`. When only the `$wheels` branch matched (the failed-startup state), the read threw and replaced the original exception (fixed in [#3108](https://github.com/wheels-dev/wheels/pull/3108)).
+
+**Resolution:**
+The `[ENGINEADAPTER]` crash is a symptom — the real error happened during startup. Check the server log for the original `onApplicationStart` exception; common causes include invalid middleware configuration, a missing CFML mapping, or a syntax error in `config/settings.cfm` or `config/routes.cfm`.
+
+After upgrading past the #3108 fix, `onError` surfaces the original startup exception directly.
+
 ## Common Association Errors
 
 ### "Missing argument name" in hasMany()

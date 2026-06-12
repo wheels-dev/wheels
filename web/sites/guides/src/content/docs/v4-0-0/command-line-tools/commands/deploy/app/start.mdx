@@ -12,14 +12,14 @@ sidebar:
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy app start --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+wheels deploy app start --release=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | **Required.** Must match an existing container's version label. |
+| `--release=<v>` | **Required.** Must match an existing container's version label. |
 | `--role=<name>` | Limit to one role. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print the commands without executing. |
@@ -28,10 +28,10 @@ wheels deploy app start --version=<v> [--role=<name>] [--destination=<name>] [--
 
 Emits `docker start <service>-<role>-<version>` on every host in the targeted role(s). Fails per-host if the container doesn't exist.
 
-Does not touch the proxy. For traffic to flow to started containers, follow up with `wheels deploy rollback --version=<v>`.
+Does not touch the proxy. For traffic to flow to started containers, follow up with `wheels deploy rollback <v>`.
 
 ## Example
 
 ```bash title="example"
-wheels deploy app start --version=abc1234
+wheels deploy app start --release=abc1234
 ```

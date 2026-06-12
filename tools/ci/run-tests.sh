@@ -57,6 +57,27 @@ if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; then
 
   echo "Results: ${PASS} passed, ${FAIL} failed, ${ERROR} errors"
 
+  # Scope-visibility guard (issue #3083): the runner reports a rejected
+  # directory= (silently swapped for the full default suite) and 0-bundle
+  # discoveries in the JSON payload. Surface any warnings[] and fail hard on
+  # either signal — a green total from the wrong scope must not pass CI.
+  python3 -c "
+import json
+d = json.load(open('$RESULT_FILE'))
+for w in d.get('warnings', []):
+    print('::warning::' + str(w))
+" 2>/dev/null || true
+  DIR_REJECTED=$(python3 -c "import json; d=json.load(open('$RESULT_FILE')); print('true' if d.get('directoryRejected') else 'false')" 2>/dev/null || echo "false")
+  BUNDLES_DISCOVERED=$(python3 -c "import json; d=json.load(open('$RESULT_FILE')); print(int(d.get('bundlesDiscovered', -1)))" 2>/dev/null || echo "-1")
+  if [ "$DIR_REJECTED" = "true" ]; then
+    echo "::error::Test runner rejected the requested directory= scope and ran the full default suite instead (directoryRejected=true)"
+    CORE_OK=false
+  fi
+  if [ "$BUNDLES_DISCOVERED" = "0" ]; then
+    echo "::error::Test runner discovered 0 bundles for the resolved scope — the run was vacuously green (bundlesDiscovered=0)"
+    CORE_OK=false
+  fi
+
   # Generate JUnit XML for GitHub annotations
   python3 -c "
 import json, sys

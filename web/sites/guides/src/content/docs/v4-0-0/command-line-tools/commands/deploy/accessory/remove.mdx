@@ -18,19 +18,19 @@ Volumes persist after `accessory remove`. Data survives. If you want a truly cle
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy accessory remove --name=<name|all> [--destination=<name>] [--dry-run]
+wheels deploy accessory remove <name|all> [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--name=<name>` | **Required.** Accessory name, or `all`. |
+| `<name>` | **Required positional.** Accessory name, or `all` to fan out. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
 
 ## Example
 
 ```bash title="example"
-wheels deploy accessory remove --name=redis
+wheels deploy accessory remove redis
 ```
