@@ -2416,8 +2416,11 @@ component extends="modules.BaseModule" {
 			// branch below is retained for Kamal parity and direct callers
 			// (MCP, internal tests) that don't go through LuCLI's picocli root.
 			case "bootstrap":
+				// #2957 DEP-7: build the pool from deploy.yml's ssh: block like
+				// every other verb — a bare `new SshPool()` here meant the only
+				// CLI-reachable bootstrap form ignored ssh.user/port/keys.
 				var bootstrapCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return bootstrapCli.bootstrap(opts);
 			case "exec":
@@ -2430,8 +2433,9 @@ component extends="modules.BaseModule" {
 					arrayAppend(execCmdParts, positional[ei]);
 				}
 				opts.cmd = arrayToList(execCmdParts, " ");
+				// #2957 DEP-7: same ssh-config seeding as the nested `server` branch.
 				var execCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return execCli.exec(opts);
 			case "server":

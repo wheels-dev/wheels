@@ -77,6 +77,7 @@ component {
         var builder = new modules.wheels.services.deploy.commands.BuilderCommands(cfg);
         var dockerCmds = new modules.wheels.services.deploy.commands.DockerCommands(cfg);
         var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
+        var auditor = new modules.wheels.services.deploy.commands.AuditorCommands(cfg);
         var hooks = new modules.wheels.services.deploy.commands.HookCommands(
             cfg,
             {projectRoot: variables.projectRoot}
@@ -102,6 +103,11 @@ component {
             );
 
             try {
+                // #2957 DEP-6b: write the on-server audit trail that the
+                // `audit` verb tails. Records bracket the work (started /
+                // completed) and are dispatched allowFail — observability
+                // must never fail a deploy.
+                $dispatch(hosts, auditor.record("started deploy of version " & ver), dryRun, true);
                 $dispatch(hosts, builder.pull(ver), dryRun);
                 // Fresh-host bootstrap (#2957 DEP-5c): every `docker run`
                 // below joins --network kamal, so the network must exist
@@ -130,6 +136,7 @@ component {
                         }
                     }
                 }
+                $dispatch(hosts, auditor.record("completed deploy of version " & ver), dryRun, true);
             } finally {
                 // Tolerate release failures so they can never shadow the
                 // original deploy exception inside this finally block. rm -f
@@ -196,6 +203,10 @@ component {
                 arrayAppend(hostList, host);
             }
         }
+        // #2957 DEP-6b: rollbacks are exactly what an operator greps the audit
+        // log for later. allowFail — never let the log line fail the rollback.
+        var auditor = new modules.wheels.services.deploy.commands.AuditorCommands(cfg);
+        $dispatch(hostList, auditor.record("rolled back to version " & arguments.opts.version), dryRun, true);
 
         return $renderResult(
             arguments.opts,
@@ -222,12 +233,15 @@ component {
         if (arrayLen(cfg.accessories())) {
             var dockerCmds = new modules.wheels.services.deploy.commands.DockerCommands(cfg);
             var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
+            var auditor = new modules.wheels.services.deploy.commands.AuditorCommands(cfg);
             for (var acc in cfg.accessories()) {
                 // Accessories join --network kamal too, and may live on
                 // hosts outside the app roles — ensure the network there
                 // before the accessory container runs (#2957 DEP-5c).
                 $dispatch(acc.hosts(), dockerCmds.ensure_network("kamal"), dryRun);
                 $dispatch(acc.hosts(), accCmds.run(acc), dryRun);
+                // #2957 DEP-6b: audit trail for setup's accessory phase.
+                $dispatch(acc.hosts(), auditor.record("booted accessory " & acc.name()), dryRun, true);
             }
         }
 
@@ -248,11 +262,15 @@ component {
         var cmd = "tail -n " & tail & " /tmp/kamal-audit.log";
         var hosts = $allHosts(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
-        $dispatch(hosts, cmd, dryRun);
+        // #2957 DEP-6a: surface the actual log content, not just a summary.
+        var lines = $dispatchCollect(hosts, cmd, dryRun);
         return $renderResult(
             arguments.opts,
-            "Tailed audit log (last " & tail & " lines) on "
-                & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+            $withRemoteOutput(
+                "Tailed audit log (last " & tail & " lines) on "
+                    & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", "),
+                lines
+            )
         );
     }
 
@@ -295,21 +313,26 @@ component {
         var proxyCmds = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var hosts = $allHosts(cfg);
 
+        // #2957 DEP-6a: read verbs surface the remote stdout, host-prefixed.
+        var lines = [];
         // app details: docker ps filtered by service label
-        $dispatch(hosts, appCmds.containers(), dryRun);
+        for (var l in $dispatchCollect(hosts, appCmds.containers(), dryRun)) arrayAppend(lines, l);
         // proxy details: docker ps filtered by kamal-proxy name
-        $dispatch(hosts, proxyCmds.details(), dryRun);
+        for (var l in $dispatchCollect(hosts, proxyCmds.details(), dryRun)) arrayAppend(lines, l);
         // accessory details (if any)
         if (arrayLen(cfg.accessories())) {
             var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
             for (var acc in cfg.accessories()) {
-                $dispatch(acc.hosts(), accCmds.details(acc), dryRun);
+                for (var l in $dispatchCollect(acc.hosts(), accCmds.details(acc), dryRun)) arrayAppend(lines, l);
             }
         }
         return $renderResult(
             arguments.opts,
-            "Collected app + proxy + accessory details from "
-                & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+            $withRemoteOutput(
+                "Collected app + proxy + accessory details from "
+                    & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", "),
+                lines
+            )
         );
     }
 
@@ -497,6 +520,51 @@ component {
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
             ssh.run(c, {raise: doRaise});
         });
+    }
+
+    /**
+     * Dispatch a command and collect the remote output, host-prefixed
+     * (`[host] line`), in host order. Used by read verbs (`audit`,
+     * `details`) so live mode surfaces what the remote actually said
+     * instead of just a host-count summary (#2957 DEP-6a). Runs hosts
+     * sequentially — read output should arrive in a predictable order,
+     * and serial execution keeps the collection single-threaded.
+     * Falls back to stderr when a tolerated (allowFail) command produced
+     * no stdout, so e.g. "No such file" diagnostics still reach the user.
+     */
+    private array function $dispatchCollect(
+        required array hosts,
+        required string cmd,
+        required boolean dryRun,
+        boolean allowFail = false
+    ) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
+            }
+            return [];
+        }
+        var c = arguments.cmd;
+        var doRaise = !arguments.allowFail;
+        // Closures can't write outer locals reliably — collect via a shared struct.
+        var ctx = {lines: []};
+        variables.sshPool.sequential(arguments.hosts, function(ssh, host) {
+            var res = ssh.run(c, {raise: doRaise});
+            var text = trim(res.stdout ?: "");
+            if (!len(text)) text = trim(res.stderr ?: "");
+            if (!len(text)) return;
+            text = replace(text, chr(13), "", "all");
+            for (var line in listToArray(text, chr(10))) {
+                arrayAppend(ctx.lines, "[" & host & "] " & line);
+            }
+        });
+        return ctx.lines;
+    }
+
+    /** Append the remote output block to a live-mode summary (no-op when empty). */
+    private string function $withRemoteOutput(required string summary, required array lines) {
+        if (!arrayLen(arguments.lines)) return arguments.summary;
+        return arguments.summary & chr(10) & arrayToList(arguments.lines, chr(10));
     }
 
     /**
