@@ -73,7 +73,7 @@ With the server still running in the background:
 wheels test posts
 ```
 
-The trailing positional scopes the test run to specs whose path matches the filter string. The scaffold generated a `PostsSpec.cfc` under `tests/specs/`, so the filter narrows the run to just that file's specs. Omit it to run everything. A run with failing or erroring specs exits non-zero; a fully-passing run exits `0`.
+The trailing positional is a directory scope, not a filename match — `posts` expands to `tests.specs.posts`. The scaffold generated `PostSpec.cfc` under `tests/specs/models/` and `PostsControllerSpec.cfc` under `tests/specs/controllers/`, so on a fresh scaffold the `posts` scope matches neither directory and the run reports `0 passed`. Use `wheels test models` or `wheels test controllers` to scope to the generated specs — though note that plain `wheels test` also reports `0 passed` here, because the generated specs are empty `describe` stubs until you write expectations into them. A run with failing or erroring specs exits non-zero; a run with no failures exits `0`.
 
 ## 7. What's next
 
