@@ -229,10 +229,6 @@ Include multiple associations by comma-separating: `include="comments,author"`. 
 
 ## Many-to-many (through a join model)
 
-<Aside type="caution">
-  **`shortcut` is currently broken in 4.0.x.** Declaring `hasMany(name="...", shortcut="...")` poisons the association's expansion: the shortcut method, the plain join-rows method, *and* `findAll(include=...)` for that association all throw `Wheels.AssociationNotFound` at runtime. Track the fix in [#3109](https://github.com/wheels-dev/wheels/issues/3109). Until it lands, declare the plain `hasMany` join-model associations (no `shortcut`) and traverse the join model explicitly — `user.userRoles(include="role")` — or query the far side with an explicit join.
-</Aside>
-
 Wheels handles many-to-many through a real join model plus the `shortcut` argument on `hasMany`. If a User has many Roles via a UserRole join table, model the relationship as three classes:
 
 ```cfm {test:compile}
