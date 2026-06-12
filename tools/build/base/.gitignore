@@ -1,2 +1,8 @@
 /vendor/*/
 /db/**
+# Keep the conventional db/ directory in the published template so SQLite/H2
+# file paths under db/ work without a manual `mkdir`. CommandBox `package
+# publish` honors this .gitignore, so without the re-include the `/db/**` rule
+# above strips db/ from the artifact entirely (issue #3174). End-user db files
+# stay ignored; only the directory marker ships.
+!/db/.keep
