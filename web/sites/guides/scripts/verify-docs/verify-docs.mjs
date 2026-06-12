@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { wheelsBinaryAttestation } from './lib/exec.mjs';
 import { extractExamples } from './lib/extract.mjs';
 import { printReport } from './lib/report.mjs';
 import { runCli } from './drivers/cli.mjs';
@@ -28,6 +29,9 @@ async function collectMdx(target) {
 }
 
 async function main() {
+  // State up front WHICH wheels binary this run attests to (#3042).
+  console.log(`verify-docs: ${await wheelsBinaryAttestation()}`);
+
   const args = process.argv.slice(2);
   const targets = args.length > 0 ? args.map((p) => resolve(p)) : [resolve(DEFAULT_TARGET)];
 

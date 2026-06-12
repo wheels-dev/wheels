@@ -29,6 +29,28 @@ function resolveWheels() {
 const RESOLVED_WHEELS = resolveWheels();
 
 /**
+ * One-line attestation of WHICH `wheels` binary this run exercises:
+ * the resolved path, how it was resolved, and its `--version` output.
+ * A green run only attests to the binary named here — on CI the
+ * docs-verify workflow installs the released brew CLI, so cli blocks
+ * attest to that release, not the checkout, unless WHEELS_BIN points
+ * at a branch-built CLI (issue #3042).
+ */
+export async function wheelsBinaryAttestation() {
+  const source = process.env.WHEELS_BIN ? 'WHEELS_BIN' : 'PATH discovery';
+  const r = await runExec('wheels', ['--version']);
+  const firstLine = `${r.stdout}\n${r.stderr}`
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line !== '');
+  const version =
+    r.code === 0 && firstLine
+      ? firstLine
+      : `--version failed (exit ${r.code}${firstLine ? `: ${firstLine}` : ''})`;
+  return `wheels binary: ${RESOLVED_WHEELS} (via ${source}) — ${version}`;
+}
+
+/**
  * Launches `program` with the given argv array. Never invokes a shell.
  * Returns `{ code, stdout, stderr }`. `code` is the process exit code, or -1
  * on spawn error (stderr will contain the Node error message in that case).
