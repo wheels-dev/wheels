@@ -2292,7 +2292,7 @@ return local.$wheels;
 	 */
 	public string function $statusCode() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getStatusCode();
+			return $engineAdapter().getStatusCode();
 		}
 		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "lucee") || StructKeyExists(server, "boxlang")) {
@@ -2309,7 +2309,7 @@ return local.$wheels;
 	 */
 	public string function $contentType() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getContentType();
+			return $engineAdapter().getContentType();
 		}
 		// Fallback when adapter not yet initialized
 		local.rv = "";
@@ -2540,7 +2540,7 @@ return local.$wheels;
 	 */
 	public numeric function $getRequestTimeout() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getRequestTimeout();
+			return $engineAdapter().getRequestTimeout();
 		}
 		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "boxlang")) {
