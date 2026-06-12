@@ -3,6 +3,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     function beforeAll() {
         variables.fixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml");
         variables.proxyFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-proxy.yml");
+        variables.multiRoleFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml");
+        variables.accessoriesFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-accessories.yml");
     }
 
     function run() {
@@ -709,6 +711,104 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).notToInclude(":3000");
             });
 
+            // Regression suite for #2957 (Wave 2a) — fresh-host bootstrap.
+            // (DEP-5a) the proxy boot guard was `details() || boot()`; details()
+            // is `docker ps --filter ...` which exits 0 whether or not the proxy
+            // exists, so boot() was unreachable and kamal-proxy never started on
+            // a fresh host. (DEP-5b) the guard was dispatched to ONE host via
+            // $dispatchAny while every proxy-fronted host needs its own proxy.
+            // (DEP-5c) `docker network create kamal` had zero call sites while
+            // app/proxy/accessory runs all require `--network kamal`. setup()
+            // was literally `return deploy(opts)` — no accessory boot. And
+            // proxy.deploy fired for EVERY role, including non-fronted job roles.
+
+            it("deploy boots kamal-proxy via docker start || docker run, not the dead docker ps guard (##2957 DEP-5a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cmds = $cmds(fake);
+                expect($anyInclude(cmds, "docker start kamal-proxy || docker run")).toBeTrue();
+                expect($anyInclude(cmds, "docker ps --filter name=kamal-proxy || ")).toBeFalse();
+            });
+
+            it("deploy creates the kamal network before any --network kamal consumer (##2957 DEP-5c)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cmds = $cmds(fake);
+                var networkIdx = 0; var consumerIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!networkIdx && findNoCase("docker network create kamal", cmds[i])) networkIdx = i;
+                    if (!consumerIdx && findNoCase("--network kamal", cmds[i])) consumerIdx = i;
+                }
+                expect(networkIdx).toBeGT(0);
+                expect(consumerIdx).toBeGT(networkIdx);
+            });
+
+            it("deploy boots the proxy on EVERY proxy-fronted host, not just one (##2957 DEP-5b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.multiRoleFixture, version: "v1"});
+                var bootHosts = $hostsFor(fake, "docker start kamal-proxy || docker run");
+                // full.yml: web role = 1.1.1.1 + 1.1.1.2; workers = 1.1.1.3 + 1.1.1.4.
+                expect(bootHosts).toInclude("1.1.1.1");
+                expect(bootHosts).toInclude("1.1.1.2");
+                expect(bootHosts).notToInclude("1.1.1.3");
+                expect(bootHosts).notToInclude("1.1.1.4");
+            });
+
+            it("deploy gates kamal-proxy deploy to proxy-fronted roles only (##2957)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.multiRoleFixture, version: "v1"});
+                var proxyDeployHosts = $hostsFor(fake, "kamal-proxy deploy");
+                expect(proxyDeployHosts).toInclude("1.1.1.1");
+                expect(proxyDeployHosts).toInclude("1.1.1.2");
+                expect(proxyDeployHosts).notToInclude("1.1.1.3");
+                expect(proxyDeployHosts).notToInclude("1.1.1.4");
+                // ...while the app containers still run on every role's hosts.
+                var runHosts = $hostsFor(fake, "docker run --detach --restart unless-stopped --name app-");
+                expect(runHosts).toInclude("1.1.1.3");
+                expect(runHosts).toInclude("1.1.1.4");
+            });
+
+            it("setup boots accessories before the app deploy; plain deploy does not (##2957 setup!=deploy)", () => {
+                // setup: accessory containers run, before the app container.
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.setup({configPath: variables.accessoriesFixture, version: "v1"});
+                var cmds = $cmds(fake);
+                var accIdx = 0; var appIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!accIdx && findNoCase("--name demo-db", cmds[i])) accIdx = i;
+                    if (!appIdx && findNoCase("--name demo-web-v1", cmds[i])) appIdx = i;
+                }
+                expect(accIdx).toBeGT(0);
+                expect($anyInclude(cmds, "--name demo-redis")).toBeTrue();
+                expect(appIdx).toBeGT(accIdx);
+                // The accessory host (1.2.3.5) gets the network created too.
+                expect($hostsFor(fake, "docker network create kamal")).toInclude("1.2.3.5");
+
+                // plain deploy: no accessory boot.
+                var fake2 = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc2 = new cli.lucli.services.deploy.cli.DeployMainCli(fake2);
+                dc2.deploy({configPath: variables.accessoriesFixture, version: "v1"});
+                var cmds2 = $cmds(fake2);
+                expect($anyInclude(cmds2, "--name demo-db")).toBeFalse();
+                expect($anyInclude(cmds2, "--name demo-redis")).toBeFalse();
+            });
+
+            it("setup --dry-run buffers network create + accessory boot + proxy boot + app run (##2957)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.setup({configPath: variables.accessoriesFixture, version: "v1", dryRun: true});
+                expect(arrayLen(fake.calls())).toBe(0);
+                expect(out).toInclude("docker network create kamal");
+                expect(out).toInclude("--name demo-db");
+                expect(out).toInclude("docker start kamal-proxy || docker run");
+                expect(out).toInclude("--name demo-web-v1");
+            });
+
             // Regression for #2671 — git's stderr ("fatal: not a git repository...") used to leak through as the version string.
             it("$gitShortSha() returns 'unknown' when run outside a git repo", () => {
                 var nonGitDir = getTempDirectory() & "/wheels-2671-main-" & createUUID();
@@ -732,5 +832,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     private boolean function $anyInclude(required array arr, required string needle) {
         for (var s in arguments.arr) if (findNoCase(arguments.needle, s)) return true;
         return false;
+    }
+
+    private array function $cmds(required any fake) {
+        var out = [];
+        for (var c in arguments.fake.calls()) arrayAppend(out, c.cmd ?: "");
+        return out;
+    }
+
+    /** Distinct hosts that received a command containing needle, in call order. */
+    private array function $hostsFor(required any fake, required string needle) {
+        var out = [];
+        for (var c in arguments.fake.calls()) {
+            if (findNoCase(arguments.needle, c.cmd ?: "") && !arrayContains(out, c.host ?: "")) {
+                arrayAppend(out, c.host ?: "");
+            }
+        }
+        return out;
     }
 }

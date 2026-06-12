@@ -66,6 +66,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var cmd = new cli.lucli.services.deploy.commands.ProxyCommands(variables.cfg).restart();
                 expect(cmd).toBe("docker restart kamal-proxy");
             });
+
+            // #2957 DEP-5a — the old fresh-host guard was `details() || boot()`,
+            // but details() is `docker ps --filter ...` which exits 0 whether or
+            // not the proxy exists, so boot() was unreachable. Kamal's
+            // Proxy#start_or_run (`docker start kamal-proxy || docker run ...`)
+            // is the correct shape: start succeeds when the container exists
+            // (running or stopped), run fires only on a truly fresh host.
+            it("start_or_run() falls back from docker start to a full docker run (##2957)", () => {
+                var px = new cli.lucli.services.deploy.commands.ProxyCommands(variables.cfg);
+                var cmd = px.start_or_run();
+                expect(cmd).toBe(px.start() & " || " & px.boot());
+                expect(cmd).toInclude("docker start kamal-proxy || docker run");
+                expect(cmd).notToInclude("docker ps");
+            });
         });
     }
 }

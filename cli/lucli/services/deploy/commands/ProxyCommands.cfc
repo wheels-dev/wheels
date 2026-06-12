@@ -71,6 +71,19 @@ component extends="Base" {
         return docker("start", variables.PROXY_CONTAINER_NAME);
     }
 
+    /**
+     * Fresh-host-safe boot, mirroring Kamal's Proxy#start_or_run
+     * (`combine start, run, by: "||"`): `docker start` succeeds when the
+     * container already exists (running start is a no-op, stopped start
+     * resumes it), and the full `docker run` fires only on a truly fresh
+     * host. The previous guard — `details() || boot()` — never reached
+     * boot() because `docker ps --filter` exits 0 whether or not anything
+     * matches (#2957 DEP-5a).
+     */
+    public string function start_or_run() {
+        return start() & " || " & boot();
+    }
+
     public string function stop() {
         return docker("stop", variables.PROXY_CONTAINER_NAME);
     }
