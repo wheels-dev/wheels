@@ -428,6 +428,29 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		// The LuCLI picocli root defines -v/--verbose as GLOBAL options and
+		// consumes them wherever they sit on the command line, so the token
+		// never reaches parseTestArgs() ("wheels test --verbose" forwards only
+		// "test" to the module — verified live in issue 3113). The runtime
+		// conveys the flag through init(verboseEnabled=...) instead, and
+		// test() must honor it for --verbose to have any observable effect.
+		describe("$resolveTestVerbosity (--verbose / -v consumed by the LuCLI root, issue 3113)", () => {
+
+			it("is false for a plain run", () => {
+				expect(mod.$resolveTestVerbosity(false)).toBeFalse();
+			});
+
+			it("honors the runtime verboseEnabled flag set by a root-consumed --verbose / -v", () => {
+				var vmod = new cli.lucli.Module(cwd = variables.tempRoot, verboseEnabled = true);
+				expect(vmod.$resolveTestVerbosity(false)).toBeTrue();
+			});
+
+			it("honors a --verbose token that does reach the module's own parser", () => {
+				expect(mod.$resolveTestVerbosity(true)).toBeTrue();
+			});
+
+		});
+
 	}
 
 	/**

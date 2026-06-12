@@ -741,7 +741,7 @@ component extends="modules.BaseModule" {
 		var filter = opts.filter;
 		var reporter = opts.reporter;
 		var format = opts.format;
-		var verboseOutput = opts.verbose;
+		var verboseOutput = $resolveTestVerbosity(opts.verbose);
 		var ciMode = opts.ci;
 		var coreTests = opts.core;
 		var db = opts.db;
@@ -767,6 +767,25 @@ component extends="modules.BaseModule" {
 		filter = $normalizeTestFilter(filter, coreTests);
 
 		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit, basePath);
+	}
+
+	/**
+	 * Resolve the effective verbose flag for `wheels test`. The LuCLI picocli
+	 * root defines `-v`/`--verbose` as GLOBAL options and consumes them
+	 * wherever they appear on the command line — `wheels test --verbose`
+	 * forwards only `test` to the module (verified live, issue #3113), so
+	 * `parseTestArgs()` can never see the token on a normal install. The
+	 * runtime conveys the flag through `init(verboseEnabled=...)` instead
+	 * (LuCLI's executeModule.cfs passes `verboseEnabled=verbose`), which
+	 * BaseModule stores as `variables.verboseEnabled`. Honor both sources:
+	 * the parsed token still wins for direct/programmatic invocations that
+	 * deliver it.
+	 *
+	 * Public `$`-prefixed so specs can exercise it (cli/CLAUDE.md carve-out);
+	 * hidden from MCP by the `mcpHiddenTools()` structural sweep.
+	 */
+	public boolean function $resolveTestVerbosity(boolean parsedVerbose = false) {
+		return arguments.parsedVerbose || (variables.verboseEnabled ?: false);
 	}
 
 	/**
