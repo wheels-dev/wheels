@@ -5185,7 +5185,7 @@ component extends="modules.BaseModule" {
 						break;
 					case "simple":
 					default:
-						displayTestResults(result, verboseOutput, resolvedDir);
+						displayTestResults(result, verboseOutput, resolvedDir, ciMode);
 				}
 
 				// Record failure so the command can exit non-zero AFTER the output
@@ -5349,7 +5349,8 @@ component extends="modules.BaseModule" {
 	private void function displayTestResults(
 		required any result,
 		boolean verboseOutput = false,
-		string testDirectory = ""
+		string testDirectory = "",
+		boolean ciMode = false
 	) {
 		if (!isStruct(result)) {
 			out(serializeJSON(result));
@@ -5457,6 +5458,105 @@ component extends="modules.BaseModule" {
 				}
 			}
 		}
+
+		// CI mode (--ci): emit GitHub Actions-style error annotations so each
+		// failure/error surfaces inline in CI logs and PR-check annotations.
+		// testing.mdx documents --ci as tightening output for GitHub Actions
+		// and similar runners; before #3113 the flag was parsed and threaded
+		// through to here but never consumed — byte-identical to a plain run.
+		if (arguments.ciMode) {
+			for (var annotation in $buildCiAnnotations(arguments.result)) {
+				out(annotation);
+			}
+		}
+	}
+
+	/**
+	 * Build GitHub Actions workflow-command annotations (one `::error` line per
+	 * failed or errored spec) from a TestBox result memento. Returns an empty
+	 * array when nothing failed. Pure (no I/O) so it is unit-testable without a
+	 * live server — the `--ci` consumer added for issue #3113.
+	 *
+	 * Format: `::error title=<spec>::<message>`. Message/title are encoded per
+	 * the workflow-command rules (newlines → %0A, % → %25, and `:`/`,` in the
+	 * title) so a multi-line failMessage stays a single annotation line.
+	 */
+	public array function $buildCiAnnotations(required any result) {
+		var annotations = [];
+		if (!isStruct(arguments.result)) {
+			return annotations;
+		}
+
+		// Walk bundle → suite (recursively) → spec, collecting failures. Mirror
+		// the emitTapResults() walker: the closure references itself by name and
+		// appends to a parent struct field (not a bare array) so the mutation is
+		// seen by reference — the established pattern on the CLI's bundled Lucee.
+		var ctx = {failures: []};
+		var walkSuite = function(suite) {
+			for (var spec in (suite.specStats ?: [])) {
+				var status = spec.status ?: "";
+				if (status == "Failed" || status == "Error") {
+					var message = "";
+					if (status == "Failed") {
+						message = spec.failMessage ?: "";
+					} else if (structKeyExists(spec, "error") && isStruct(spec.error)) {
+						message = spec.error.message ?: "";
+					}
+					arrayAppend(ctx.failures, {name: (spec.name ?: "(unnamed spec)"), message: message});
+				}
+			}
+			// Suite-level failure with no specs (compile error, beforeAll threw).
+			if (
+				arrayIsEmpty(suite.specStats ?: [])
+				&& listFindNoCase("Failed,Error", suite.status ?: "")
+			) {
+				arrayAppend(ctx.failures, {
+					name: (suite.name ?: "(unnamed suite)") & " (suite-level)",
+					message: suite.globalException ?: ""
+				});
+			}
+			for (var inner in (suite.suiteStats ?: [])) {
+				walkSuite(inner);
+			}
+		};
+		for (var bundle in (arguments.result.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				walkSuite(suite);
+			}
+		}
+
+		for (var failure in ctx.failures) {
+			arrayAppend(
+				annotations,
+				"::error title=" & $encodeAnnotationProperty(failure.name)
+					& "::" & $encodeAnnotationData(failure.message)
+			);
+		}
+		return annotations;
+	}
+
+	/**
+	 * Encode a GitHub Actions workflow-command data segment (the message after
+	 * `::`). Percent must be escaped first, then carriage returns dropped and
+	 * line feeds collapsed to %0A so the annotation stays one line.
+	 */
+	private string function $encodeAnnotationData(required string value) {
+		var encoded = replace(arguments.value, "%", "%25", "all");
+		encoded = replace(encoded, chr(13), "", "all");
+		encoded = replace(encoded, chr(10), "%0A", "all");
+		return encoded;
+	}
+
+	/**
+	 * Encode a GitHub Actions workflow-command property value (e.g. `title=`).
+	 * Properties additionally escape `:` and `,` so they don't terminate the
+	 * property list.
+	 */
+	private string function $encodeAnnotationProperty(required string value) {
+		var encoded = $encodeAnnotationData(arguments.value);
+		encoded = replace(encoded, ":", "%3A", "all");
+		encoded = replace(encoded, ",", "%2C", "all");
+		return encoded;
 	}
 
 	private void function displaySuite(required struct suite, string indent = "") {

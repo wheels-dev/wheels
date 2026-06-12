@@ -373,6 +373,121 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("--ci annotation builder ($buildCiAnnotations, issue 3113)", () => {
+
+			it("returns an empty array when nothing failed", () => {
+				var anns = mod.$buildCiAnnotations($passingResult());
+				expect(anns).toBeArray();
+				expect(arrayLen(anns)).toBe(0);
+			});
+
+			it("emits one ::error annotation per failed and errored spec", () => {
+				var anns = mod.$buildCiAnnotations($mixedResult());
+				expect(arrayLen(anns)).toBe(2);
+				var joined = arrayToList(anns, chr(10));
+				expect(joined).toInclude("::error ");
+				expect(joined).toInclude("fails a thing");
+				expect(joined).toInclude("expected true to be false");
+				expect(joined).toInclude("errors a thing");
+				expect(joined).toInclude("boom NPE");
+			});
+
+			it("encodes newlines and percent signs in the annotation message", () => {
+				var result = $failingResult("line1" & chr(10) & "50% off");
+				var anns = mod.$buildCiAnnotations(result);
+				expect(anns[1]).toInclude("line1%0A");
+				expect(anns[1]).toInclude("50%25 off");
+				// The raw newline must not survive — annotations are single-line.
+				expect(anns[1]).notToInclude(chr(10));
+			});
+
+		});
+
+		describe("--ci / --verbose observable output (issue 3113)", () => {
+
+			it("a plain run prints neither a per-spec tree nor CI annotations", () => {
+				var cap = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+				var printed = cap.renderResults($passingResult(), false, false);
+				expect(printed).notToInclude("[PASS]");
+				expect(printed).notToInclude("::error");
+			});
+
+			it("--verbose prints per-spec PASS lines", () => {
+				var cap = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+				var printed = cap.renderResults($passingResult(), true, false);
+				expect(printed).toInclude("[PASS]");
+				expect(printed).toInclude("passes a thing");
+			});
+
+			it("--ci prints GitHub Actions error annotations for failures", () => {
+				var cap = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+				var printed = cap.renderResults($mixedResult(), false, true);
+				expect(printed).toInclude("::error");
+				expect(printed).toInclude("fails a thing");
+			});
+
+		});
+
+	}
+
+	/**
+	 * A TestBox result memento where every spec passed. Shaped like the
+	 * JSONReporter getMemento() the CLI deserializes from /wheels/*/tests.
+	 */
+	private struct function $passingResult() {
+		return {
+			totalPass: 1, totalFail: 0, totalError: 0, totalDuration: 12,
+			bundleStats: [{
+				name: "tests.specs.FooSpec",
+				suiteStats: [{
+					name: "Foo feature",
+					status: "Passed",
+					specStats: [{ name: "passes a thing", status: "Passed" }],
+					suiteStats: []
+				}]
+			}]
+		};
+	}
+
+	/**
+	 * A result with one pass, one failure, and one error spec.
+	 */
+	private struct function $mixedResult() {
+		return {
+			totalPass: 1, totalFail: 1, totalError: 1, totalDuration: 34,
+			bundleStats: [{
+				name: "tests.specs.FooSpec",
+				suiteStats: [{
+					name: "Foo feature",
+					status: "Failed",
+					specStats: [
+						{ name: "passes a thing", status: "Passed" },
+						{ name: "fails a thing", status: "Failed", failMessage: "expected true to be false" },
+						{ name: "errors a thing", status: "Error", error: { message: "boom NPE" } }
+					],
+					suiteStats: []
+				}]
+			}]
+		};
+	}
+
+	/**
+	 * A result with a single failure carrying the given fail message — used
+	 * to exercise annotation message encoding.
+	 */
+	private struct function $failingResult(required string failMessage) {
+		return {
+			totalPass: 0, totalFail: 1, totalError: 0, totalDuration: 5,
+			bundleStats: [{
+				name: "tests.specs.FooSpec",
+				suiteStats: [{
+					name: "Foo feature",
+					status: "Failed",
+					specStats: [{ name: "fails a thing", status: "Failed", failMessage: arguments.failMessage }],
+					suiteStats: []
+				}]
+			}]
+		};
 	}
 
 	/**
