@@ -53,10 +53,10 @@ The built-in session flow is what Tutorial Part 6b walks you through. Register o
 ### Register the authenticator and strategy
 
 ```cfm {test:compile} title="config/services.cfm"
-var di = injector();
+local.di = injector();
 
-di.map("authenticator").to("wheels.auth.Authenticator").asSingleton();
-di.map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton();
+local.di.map("authenticator").to("wheels.auth.Authenticator").asSingleton();
+local.di.map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton();
 ```
 
 Both are singletons — one instance per app lifetime. The authenticator holds its strategy registry in instance state, so a singleton is the correct scope.
