@@ -1,0 +1,185 @@
+---
+title: Installing with CommandBox
+description: Use CommandBox and ForgeBox to install Wheels 4 — framework packages, server management, and the limits of the CommandBox workflow.
+type: howto
+sidebar:
+  order: 7
+---
+
+import { Aside, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+CommandBox is a supported way to install and serve Wheels 4. This page documents what works, what does not, and how to complete the gaps left by a raw `box install`.
+
+**You'll learn:**
+
+- Which ForgeBox packages Wheels publishes and what each one installs
+- How to go from `box install` to a running app, including the manual edits the installer leaves to you
+- Which `wheels` CLI commands are unavailable in a CommandBox-only workflow
+- How to map a 2.x/3.x CommandBox workflow to Wheels 4
+
+## Where CommandBox fits
+
+CommandBox has two roles in a Wheels 4 project:
+
+- **Package fetcher** — `box install` pulls Wheels framework artifacts from ForgeBox into your project directory.
+- **Server manager** — `box server start` boots a CFML engine (Lucee, Adobe CF, or BoxLang) on demand, reading configuration from `server.json`.
+
+CommandBox is **not** a replacement for the `wheels` binary. The `wheels` CLI (a separate LuCLI-based tool installed via Homebrew, Scoop, or apt/yum) handles generators, database migrations, tests, the interactive console, the MCP server, and the `wheels packages` registry. None of those are reachable through CommandBox.
+
+If you are starting fresh and want the full developer workflow with the least setup, the [Installing Wheels](/v4-0-0/start-here/installing/) guide is the recommended path.
+
+## ForgeBox packages
+
+Wheels 4 publishes four packages to ForgeBox on every stable release:
+
+| Package | `box install` slug | What it installs |
+|---|---|---|
+| Wheels Base Template | `wheels-base-template` | Full app skeleton + `wheels-core` in `vendor/wheels/` |
+| Wheels Core | `wheels-core` | Framework source only (`vendor/wheels/`) |
+| Wheels CLI | `wheels-cli` | Legacy CommandBox CLI module — **deprecated**, does not support 4.x features |
+| Wheels Starter App | `wheels-starter-app` | Minimal starter without the base-template scaffolding |
+
+For a brand-new app, `wheels-base-template` is the right starting point. It pulls `wheels-core` as a dependency and produces the modern 4.0 directory layout with a pre-configured `server.json`.
+
+## Install the framework
+
+<Steps>
+
+1. **Create a project directory and install the base template:**
+
+   ```bash title="CommandBox shell or your shell"
+   mkdir myApp && cd myApp
+   box install wheels-base-template
+   ```
+
+   CommandBox resolves the current stable version (4.0.3 at time of writing), downloads the template archive, and extracts it. `wheels-core` is pulled transitively and lands in `vendor/wheels/`.
+
+2. **Edit the placeholder values in `server.json`.**
+
+   The template archive ships with raw token placeholders that the `wheels new` command substitutes automatically. A direct `box install` skips that substitution, so you must edit them by hand before starting the server.
+
+   Open `server.json` and replace:
+
+   | Placeholder | Replace with |
+   |---|---|
+   | `\|appName\|` | Your application name, e.g. `myApp` |
+   | `\|cfmlEngine\|` | The engine you want, e.g. `lucee@6` or `adobe@2025` |
+
+   A minimal edited `server.json` looks like:
+
+   ```json title="server.json"
+   {
+     "name": "myApp",
+     "cfengine": "lucee@6",
+     "webroot": "public"
+   }
+   ```
+
+3. **Edit the placeholder values in `config/settings.cfm`.**
+
+   Open `config/settings.cfm` and replace:
+
+   | Placeholder | Replace with |
+   |---|---|
+   | `\|datasourceName\|` | Your datasource name, e.g. `myapp` |
+   | `\|reloadPassword\|` | A reload password, e.g. a short random string |
+
+4. **Configure a datasource** in your CFML engine's administrator, or use an in-process datasource definition. The datasource name must match what you set in step 3.
+
+5. **Start the server:**
+
+   ```bash title="your shell"
+   box server start
+   ```
+
+   First run downloads the CFML engine if CommandBox has not cached it yet (~100–500 MB depending on the engine). Once started, the app is available at the port shown in the CommandBox output (default `8080`).
+
+6. **Verify the app is running** by opening `http://localhost:8080` in a browser. You should see the Wheels welcome page.
+
+</Steps>
+
+<Aside type="note" title="Vendoring the framework into an existing app">
+If you have an existing app and only need to update or add the framework source, install `wheels-core` directly:
+
+```bash
+box install wheels-core
+```
+
+This places the framework in `vendor/wheels/` without touching the rest of your project.
+</Aside>
+
+## Serve and reload
+
+Once the server is running, the standard CommandBox commands apply:
+
+```bash title="your shell"
+box server stop
+box server restart
+box server info
+```
+
+To reload the Wheels application without restarting the server, send the reload request directly:
+
+```
+http://localhost:8080/?reload=true&password=<your-reload-password>
+```
+
+Use the reload password you set in `config/settings.cfm` during setup.
+
+To pin or change the CFML engine, update the `cfengine` field in `server.json` and restart the server. See [CFML Engines](/v4-0-0/start-here/cfml-engines/) for the supported values and engine-specific notes.
+
+## What is not available through CommandBox
+
+The following capabilities require the `wheels` binary (LuCLI-based) and are not reachable through a CommandBox-only workflow:
+
+| Capability | `wheels` CLI command | CommandBox equivalent |
+|---|---|---|
+| App scaffolding | `wheels new myApp` | `box install wheels-base-template` (with manual edits) |
+| Code generation | `wheels generate model/controller/scaffold` | None |
+| Database migrations | `wheels migrate latest` | None |
+| Interactive console | `wheels console` | None |
+| Test runner | `wheels test` | None |
+| MCP server | `wheels mcp wheels` | None |
+| Wheels packages registry | `wheels packages add/list/search` | None |
+| Deploy | `wheels deploy` | None |
+
+If your workflow needs any of the above, install the `wheels` binary alongside CommandBox — they are independent tools and do not conflict. The `wheels` CLI communicates with a running server over HTTP, so it works with a CommandBox-managed server just as well as with the bundled Lucee runtime.
+
+<Aside type="caution" title="wheels-cli on ForgeBox is deprecated">
+The `wheels-cli` ForgeBox package is the legacy CommandBox module from the 2.x/3.x era. It does not understand the 4.x directory layout, generators, or commands. Installing it will not give you a functional 4.x CLI. Use the standalone `wheels` binary instead. The legacy module is scheduled for removal in Wheels 5. See [Upgrading from 3.x to 4.0](/v4-0-0/upgrading/3x-to-4x/) for the migration path.
+</Aside>
+
+## Coming from 2.x/3.x CommandBox workflows
+
+If you built a Wheels 2.x or 3.x app using CommandBox as your primary tool, here is the direct mapping to Wheels 4:
+
+| 3.x CommandBox workflow | Wheels 4 equivalent |
+|---|---|
+| `box install wheels-cli` (CommandBox module) | Install the `wheels` binary (brew/scoop/apt/yum) |
+| `wheels generate app myApp` (CommandBox) | `wheels new myApp` (standalone CLI) |
+| `box server start` | `box server start` (unchanged) or `wheels start` (bundled Lucee) |
+| `wheels migrate` (CommandBox) | `wheels migrate latest` (standalone CLI, talks to running server) |
+| `box install <forgebox-plugin>` | `wheels packages add <name>` (Wheels packages registry) |
+| `box publish` (ForgeBox) | Submit to the [Wheels packages registry](https://github.com/wheels-dev/wheels-packages) |
+
+The framework itself is backward-compatible with the `box server start` workflow — that part is unchanged. The difference is how you interact with the running server for development tasks.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Installing Wheels"
+    href="/v4-0-0/start-here/installing/"
+    description="Install the standalone wheels CLI — the recommended path for new projects."
+  />
+  <LinkCard
+    title="CFML Engines"
+    href="/v4-0-0/start-here/cfml-engines/"
+    description="Run Wheels on Lucee, Adobe ColdFusion, or BoxLang."
+  />
+  <LinkCard
+    title="Upgrading from 3.x to 4.0"
+    href="/v4-0-0/upgrading/3x-to-4x/"
+    description="The breaking-change map for existing Wheels 3.x apps."
+  />
+</CardGrid>
