@@ -120,10 +120,12 @@ component extends="wheels.WheelsTest" {
 		})
 	}
 
-	// Reads the committed response status across engines. getStatus() is part
-	// of the Servlet 3.0+ HttpServletResponse contract, honored by Lucee, Adobe,
-	// and BoxLang.
+	// Reads the committed response status via the engine-adapter abstraction.
+	// Raw GetPageContext().getResponse().getStatus() is wrong on Adobe CF,
+	// which requires getFusionContext() to reach the response object (see
+	// AdobeAdapter.getResponse()). $statusCode() is the matrix-proven pattern
+	// used for exact-status assertions in renderingSpec.cfc.
 	private numeric function $responseStatus() {
-		return GetPageContext().getResponse().getStatus()
+		return application.wo.$statusCode()
 	}
 }
