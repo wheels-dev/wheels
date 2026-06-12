@@ -78,8 +78,8 @@ The `wheels test` command accepts a `--reporter=<name>` flag. The CLI always req
 | `--reporter=simple` (default) | Human-readable summary: `N passed (Xs)` on green, plus failure details on red |
 | `--reporter=json` | Emits the raw JSON result document — pipe it to `jq` or a post-processor |
 | `--reporter=tap` | Emits TAP version 13 (`1..N`, `ok` / `not ok` lines) for TAP-consuming CI tooling |
-| `--ci` | Accepted for forward-compatibility — currently changes nothing; every run already exits non-zero on failure |
-| `--verbose` / `-v` | Adds the full bundle/suite/spec tree to the output |
+| `--ci` | Emits one GitHub Actions `::error` workflow-command annotation per failed or errored spec, so failures appear inline in CI logs and PR-check panels. Exit code is non-zero on failure regardless. |
+| `--verbose` / `-v` | Accepted but currently inert — output is identical to a plain run; the per-spec tree wiring is tracked in [#3113](https://github.com/wheels-dev/wheels/issues/3113) |
 
 For machine-readable results you can also call the test runner URL directly and post-process the JSON. That is exactly what `tools/ci/run-tests.sh` does in this repo: it `curl`s `/wheels/core/tests?db=sqlite&format=json`, parses the totals in Python, emits a JUnit XML file that `actions/upload-artifact` ingests for the GitHub summary, and fails the build when the payload reports a rejected `directory=` scope or a 0-bundle discovery.
 

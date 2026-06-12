@@ -55,7 +55,7 @@ wheels test --reporter=tap
 # Target a specific test database — only meaningful with --core
 wheels test --core --db=mysql
 
-# Accepted for forward-compat — every run already exits non-zero on failures
+# CI mode: emits GitHub Actions ::error annotations per failed/errored spec
 wheels test --ci
 ```
 
