@@ -24,6 +24,58 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("image: acme/demo");
             });
 
+            // Regression for #3085 — config() loaded the YAML without forwarding
+            // opts.destination, so `wheels deploy config --destination=X` printed
+            // the un-overlaid base config while every other verb applied the overlay.
+            it("config() applies the destination overlay (##3085)", () => {
+                var base = getTempFile(getTempDirectory(), "yml");
+                fileWrite(
+                    base,
+                    "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [192.0.2.10]"
+                        & "#chr(10)#registry: {username: u, password: [X]}"
+                );
+                // Yaml.deepMerge replaces arrays whole, so the overlay's servers
+                // list fully supersedes the base list — exactly the shape from
+                // the issue repro.
+                var overlay = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .$overlayPathFor(base, "staging");
+                fileWrite(overlay, "servers:#chr(10)#  - 192.0.2.99");
+                try {
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    var out = dc.config({configPath: base, destination: "staging"});
+                    expect(out).toInclude("192.0.2.99");
+                    expect(out).notToInclude("192.0.2.10");
+                } finally {
+                    fileDelete(base);
+                    fileDelete(overlay);
+                }
+            });
+
+            it("config() without a destination dumps the base config unchanged", () => {
+                var base = getTempFile(getTempDirectory(), "yml");
+                fileWrite(
+                    base,
+                    "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [192.0.2.10]"
+                        & "#chr(10)#registry: {username: u, password: [X]}"
+                );
+                var overlay = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .$overlayPathFor(base, "staging");
+                fileWrite(overlay, "servers:#chr(10)#  - 192.0.2.99");
+                try {
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    var out = dc.config({configPath: base});
+                    expect(out).toInclude("192.0.2.10");
+                    expect(out).notToInclude("192.0.2.99");
+                } finally {
+                    fileDelete(base);
+                    fileDelete(overlay);
+                }
+            });
+
             it("deploy --dry-run emits commands without touching SshPool", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
