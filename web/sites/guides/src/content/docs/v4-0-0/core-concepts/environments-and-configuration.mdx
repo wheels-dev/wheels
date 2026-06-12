@@ -87,9 +87,10 @@ A running app can switch environments without a redeploy: request `?reload=<envi
 
 The gate is `allowEnvironmentSwitchViaUrl`. Any explicit boolean you `set()` is honored in every environment. If you never touch it, the default is `false` in `production`, `testing`, and `maintenance`, and `true` everywhere else. Leave it disabled in production.
 
-Two caveats, tracked as open issues:
+In development, the debug bar's Environment panel offers the same switch as quick-switch links: they render when a `reloadPassword` is configured and switching via the URL is allowed, and clicking one prompts for the reload password (it is never embedded in the page).
 
-- The debug bar's environment quick-switch links are currently broken ([#3060](https://github.com/wheels-dev/wheels/issues/3060)) — use the URL form above.
+One caveat, tracked as an open issue:
+
 - The `wheels reload` CLI command can report success even when the reload didn't take effect ([#3059](https://github.com/wheels-dev/wheels/issues/3059)) — verify with the URL form.
 
 ## Secrets handling

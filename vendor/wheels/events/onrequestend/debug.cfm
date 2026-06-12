@@ -301,12 +301,20 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 				<dd>
 					<span class="wdb-env-dot" style="background:#local.envColor#;"></span>
 					#capitalize($get("environment"))#
-					<cfif NOT Len($get("reloadPassword"))>
+					<!---
+						Quick-switch links render only when switching can actually work:
+						since ##2082 the ?reload=<env> switch requires a non-empty
+						reloadPassword (plus a matching password parameter) and is gated
+						by allowEnvironmentSwitchViaUrl. The password is never embedded
+						in the page — wdbEnvSwitch() prompts for it at click time and
+						builds the documented ?reload=<env>&password=... request.
+					--->
+					<cfif Len($get("reloadPassword")) AND $get("allowEnvironmentSwitchViaUrl")>
 						<cfset local.environments = "development,testing,maintenance,production">
 						&mdash;
 						<cfloop list="#local.environments#" index="local.ei">
 							<cfif $get("environment") IS NOT local.ei>
-								<a href="#EncodeForHTMLAttribute(local.baseReloadURL & local.ei)#" style="color:##89b4fa;font-size:11px;margin-left:4px;">#capitalize(local.ei)#</a>
+								<a href="##" data-wdb-reload="#EncodeForHTMLAttribute(local.baseReloadURL & local.ei)#" onclick="return wdbEnvSwitch(this);" title="Switch to #capitalize(local.ei)# (prompts for the reload password)" style="color:##89b4fa;font-size:11px;margin-left:4px;">#capitalize(local.ei)#</a>
 							</cfif>
 						</cfloop>
 					</cfif>
@@ -544,6 +552,14 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 		document.getElementById('wheels-debugbar').style.display='';
 		document.getElementById('wdb-minimized').style.display='none';
 		try{sessionStorage.removeItem('wdb-hidden');}catch(e){}
+	};
+	window.wdbEnvSwitch=function(el){
+		var target=el.getAttribute('data-wdb-reload');
+		if(!target)return false;
+		var pw=window.prompt('Enter the reload password to switch environments:');
+		if(pw===null||pw==='')return false;
+		window.location.href=target+'&password='+encodeURIComponent(pw);
+		return false;
 	};
 	try{if(sessionStorage.getItem('wdb-hidden')==='1')wdbMinimize();}catch(e){}
 })();
