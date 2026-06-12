@@ -4101,6 +4101,61 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal. Returns true when a `wheels.middleware.Cors` instance (or its
+	 * component path) is registered in `application.wheels.middleware`. When it
+	 * is, the dispatch-level Cors middleware is the single source of truth for
+	 * CORS headers and OPTIONS preflight, so the legacy global path
+	 * (`$setCORSHeaders` + the `onRequestStart` OPTIONS abort) must step aside.
+	 * Running both stacks duplicate `Access-Control-Allow-*` headers; a
+	 * duplicate `Access-Control-Allow-Origin` makes browsers reject the
+	 * response per the Fetch spec. Mirrors the detection in
+	 * `Dispatch.$computePreflightCapable()`. (#3114)
+	 */
+	public boolean function $corsMiddlewareActive() {
+		if (
+			!StructKeyExists(application, "wheels")
+			|| !StructKeyExists(application.wheels, "middleware")
+			|| !IsArray(application.wheels.middleware)
+		) {
+			return false;
+		}
+		for (local.mw in application.wheels.middleware) {
+			if (IsSimpleValue(local.mw)) {
+				if (local.mw == "wheels.middleware.Cors") {
+					return true;
+				}
+			} else if (IsObject(local.mw) && IsInstanceOf(local.mw, "wheels.middleware.Cors")) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Internal. Logs a one-time warning when the legacy global CORS path is
+	 * suppressed in favour of a registered `wheels.middleware.Cors` instance,
+	 * so operators notice the redundant `allowCorsRequests=true` setting. (#3114)
+	 */
+	public void function $warnGlobalCorsDeferred() {
+		if (StructKeyExists(application.wheels, "$corsGlobalDeferredWarned")) {
+			return;
+		}
+		cflock(name = "wheels.corsGlobalDeferred.#application.applicationName#", type = "exclusive", timeout = 5) {
+			if (!StructKeyExists(application.wheels, "$corsGlobalDeferredWarned")) {
+				application.wheels.$corsGlobalDeferredWarned = true;
+				cflog(
+					type = "warning",
+					file = "wheels",
+					text = "CORS configuration conflict: both allowCorsRequests=true and a wheels.middleware.Cors "
+						& "instance are active. The legacy global CORS path is deferring to the middleware to avoid "
+						& "duplicate Access-Control-Allow-* headers. Disable allowCorsRequests once the Cors middleware "
+						& "is configured. (##3114)"
+				);
+			}
+		}
+	}
+
+	/**
 	 * Restore the application scope modified by the test runner
 	 */
 	public void function $restoreTestRunnerApplicationScope() {
