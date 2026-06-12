@@ -259,7 +259,7 @@ For new migrator helpers or anywhere you accept a column-name argument: declare 
 component extends="Model" {
     function config() {
         // Table/key (only if non-conventional)
-        table("tbl_users");        // setter is table(); tableName() is a getter — tableName("x") is a silent no-op (#3079)
+        table("tbl_users");        // setter is table(); tableName() is a getter — tableName("x") throws Wheels.InvalidArgument in dev/testing, no-op in production (#3079)
         setPrimaryKey("userId");
 
         // Associations — all named params when using options
