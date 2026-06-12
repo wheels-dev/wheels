@@ -52,6 +52,17 @@
  * (CLAUDE.md anti-pattern ##11 — reserved scope names). The local is renamed
  * to redirectPath; the fifth it-block below pins the rename and fails if any
  * local/var declaration named url reappears anywhere in these files.
+ *
+ * Second ##3053 addendum (the ##3051 Adobe smoke legs caught it): the reload
+ * gate and the shared-application-name branch invoke their handlers through
+ * $simpleLock with componentReference = "application" — a component PATH that
+ * Global.cfc's $invoke hands to cfinvoke. On case-sensitive filesystems Adobe
+ * CF resolves CFC names by exact case then all-lowercase, so the lowercase
+ * literal never matches Application.cfc and every authorized reload dies with
+ * HTTP 500 "Could not find the ColdFusion component or interface application".
+ * It passed every pre-merge check because macOS bind mounts (and Lucee's
+ * resolver) are case-insensitive — the environment was a red herring; the
+ * filesystem was the variable. The sixth it-block pins the case-exact literal.
  */
 component extends="wheels.WheelsTest" {
 
@@ -262,6 +273,63 @@ component extends="wheels.WheelsTest" {
 							& "URL scope on Adobe CF and breaks every password reload "
 							& "(issue ##3053, CLAUDE.md anti-pattern ##11). Offending "
 							& ArrayToList(offenders, " | ")
+						);
+					});
+
+					it("references the Application component case-exactly in " & relPath, () => {
+						var absolute = repoRoot & "/" & relPath;
+						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
+						var content = fileRead(absolute);
+
+						// Both $simpleLock dispatch sites (the shared-application-name
+						// branch in onSessionStart and the reload gate in onRequestStart)
+						// must reference the component as "Application" -- matching
+						// Application.cfc exactly. Adobe CF resolves CFC names on
+						// case-sensitive filesystems by exact case then all-lowercase,
+						// so the lowercase literal never matches and every authorized
+						// reload returns HTTP 500 "Could not find the ColdFusion
+						// component or interface application" (issue ##3053 follow-up;
+						// caught by the ##3051 Adobe smoke legs). reMatch is
+						// case-sensitive, which is exactly what this pin needs.
+						expect(
+							ArrayLen(reMatch('"componentReference"\s*=\s*"Application"', content)) >= 2
+						).toBeTrue(
+							relPath & " must dispatch BOTH the onSessionStart "
+							& "shared-application-name branch and the onRequestStart reload "
+							& "gate with componentReference set to the case-exact "
+							& """Application"" literal so Adobe CF can resolve "
+							& "Application.cfc on case-sensitive filesystems "
+							& "(issue ##3053 follow-up)."
+						);
+
+						// And no dispatch site may carry a differently-cased literal.
+						// Line-anchored scan that skips comment lines (CLAUDE.md
+						// anti-pattern ##14) so prose mentioning the lowercase form
+						// stays legal.
+						var caseOffenders = [];
+						var specLines = ListToArray(content, Chr(10), true);
+						var specLineCount = ArrayLen(specLines);
+						for (var specLineNo = 1; specLineNo <= specLineCount; specLineNo++) {
+							var specLine = Trim(specLines[specLineNo]);
+							if (!Len(specLine)) {
+								continue;
+							}
+							if (Left(specLine, 2) == "//" || Left(specLine, 2) == "/*" || Left(specLine, 1) == "*") {
+								continue;
+							}
+							var literalMatches = reMatchNoCase('"componentReference"\s*=\s*"application"', specLine);
+							for (var literalMatch in literalMatches) {
+								if (Find('"Application"', literalMatch) == 0) {
+									ArrayAppend(caseOffenders, "line " & specLineNo & ": " & specLine);
+								}
+							}
+						}
+						expect(ArrayLen(caseOffenders) == 0).toBeTrue(
+							relPath & " dispatches with a miscased Application component "
+							& "reference, which Adobe CF cannot resolve on case-sensitive "
+							& "filesystems -- every authorized reload becomes an HTTP 500 "
+							& "(issue ##3053 follow-up). Offending "
+							& ArrayToList(caseOffenders, " | ")
 						);
 					});
 

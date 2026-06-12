@@ -175,6 +175,40 @@ Blocks that cannot or should not compile:
 someAPI.callThat.doesntExistYet();
 ```
 
+## Which `wheels` binary the harness runs
+
+Every spawned `wheels` command resolves to one binary, picked once at
+startup (`lib/exec.mjs`, `resolveWheels()`), in this order:
+
+1. `WHEELS_BIN` — absolute path to a `wheels` binary; takes precedence
+   over everything else when set.
+2. `command -v wheels` — whatever is first on `PATH`.
+3. Homebrew bin dirs (`/opt/homebrew/bin`, `/usr/local/bin`,
+   `/home/linuxbrew/.linuxbrew/bin`).
+
+This covers the long-lived tutorial dev server too: `{test:tutorial}`
+`asserts-http` blocks boot the fixture app by spawning the same resolved
+binary (`drivers/tutorial.mjs`, `ensureServer()`), not a fresh `PATH`
+lookup — so `WHEELS_BIN` redirects it like every other spawn.
+
+`verify-docs.mjs` prints an attestation line at run start stating the
+resolved path, how it was resolved, and the binary's `--version` output:
+
+```
+verify-docs: wheels binary: /opt/homebrew/bin/wheels (via PATH discovery) — ...
+```
+
+A green run only attests to the binary named on that line.
+
+**CI implication:** `.github/workflows/docs-verify.yml` installs the
+**released** brew CLI and does not set `WHEELS_BIN`, so a green CI run of
+`{test:cli}` / `{test:compile}` / `{test:tutorial}` blocks attests to the
+released CLI — not to a CLI built from the PR's checkout. Wiring CI to a
+branch-built CLI (so a CLI behavior change in a PR can flip a cli block
+red) is tracked in [#3042](https://github.com/wheels-dev/wheels/issues/3042).
+To attest to a locally built CLI, point `WHEELS_BIN` at it before running
+the harness.
+
 ## Running the harness locally
 
 The drivers spawn `wheels new` into a temp directory per test. `wheels new`

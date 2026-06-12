@@ -157,7 +157,12 @@ component output="false" {
 
 		// Fix for shared application name (issue 359).
 		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "eventpath")) {
-			local.executeArgs = {"componentReference" = "application"};
+			// Case-exact "Application" (the file is Application.cfc): on case-sensitive
+			// filesystems Adobe CF resolves CFC names by exact case then all-lowercase,
+			// so a lowercase reference never matches Application.cfc and throws "Could
+			// not find the ColdFusion component or interface application" (issue #3053
+			// follow-up). Lucee matches case-insensitively either way.
+			local.executeArgs = {"componentReference" = "Application"};
 
 			application.wo.$simpleLock(name = local.lockName, execute = "onApplicationStart", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 		}
@@ -275,7 +280,10 @@ component output="false" {
 			if (StructKeyExists(url, "lock") && !url.lock) {
 				this.$handleRestartAppRequest();
 			} else {
-				local.executeArgs = {"componentReference" = "application"};
+				// Case-exact "Application" — see the matching comment in onSessionStart().
+				// A lowercase reference turns every authorized reload into an HTTP 500 on
+				// Adobe CF + case-sensitive filesystems (issue #3053 follow-up).
+				local.executeArgs = {"componentReference" = "Application"};
 				application.wo.$simpleLock(name = local.lockName, execute = "$handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 			}
 			return false;
