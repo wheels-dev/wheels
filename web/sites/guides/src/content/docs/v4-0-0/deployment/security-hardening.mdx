@@ -152,9 +152,9 @@ For an entire JSON API under `/api`, inherit from a controller that calls `prote
 
 ## Reload password
 
-`reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, URL environment switching is disabled — but plain `?reload=true` currently remains open to **any** anonymous client, so always set a password. The security warning Wheels logs on boot (`vendor/wheels/events/onapplicationstart.cfc` lines 371-374) claims both are disabled; that overstatement and the open gate are tracked in [#3062](https://github.com/wheels-dev/wheels/issues/3062).
+`reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, **both are disabled**: the reload gate in `public/Application.cfc` fails closed and requires a non-empty configured password plus a matching `password` parameter before it will restart anything, mirroring the environment-switch leg in `vendor/wheels/events/onapplicationstart.cfc`. The security warning Wheels logs on boot when the password is blank states exactly that. (Before [#3062](https://github.com/wheels-dev/wheels/issues/3062) a blank password left plain `?reload=true` open to any anonymous client — an internet-reachable restart-DoS — so still set a real password anywhere reload should work.)
 
-If it's set, rejected and accepted attempts log to `wheels_security.log` with the trusted client IP (lines 219 and 227 of the same file), and failed attempts rate-limit by IP — 5 failures in 5 minutes locks the source out (lines 160-178). One scoping caveat: that code runs during application startup, so it only fires on requests that themselves trigger a cold start. A wrong-password `?reload=true` against an already-running app is served normally with no log entry and no rate-limit count.
+If it's set, rejected and accepted attempts log to `wheels_security.log` with the trusted client IP, and failed attempts rate-limit by IP — 5 failures in 5 minutes locks the source out, with the correct password refused for the rest of the window. Both the cold-start path (`vendor/wheels/events/onapplicationstart.cfc`) and the warm-application gate (`public/Application.cfc`) log and count attempts against the same shared per-IP bucket, so brute-forcing the reload password against a running app is visible and throttled too (also [#3062](https://github.com/wheels-dev/wheels/issues/3062); before that fix only cold starts were monitored).
 
 ```cfm {test:compile} title="config/settings.cfm"
 <cfscript>
@@ -167,7 +167,7 @@ Rotate it in every environment. The scaffolded template already reads this from 
 
 ### What it protects (and what it doesn't)
 
-The reload password defends a single threat: **a remote attacker who can reach your app over HTTP** otherwise being able to call `/?reload=true` and clobber app state, or `/?reload=production` and switch environments at will. With the password set, a request with a missing or wrong password is served normally (HTTP 200) without reloading — no `403` is returned, and nothing in the response reveals that the attempt was noticed (the gate in `public/Application.cfc` simply falls through to normal request serving; the only `403`s on this surface live on the CLI command gate in `vendor/wheels/Public.cfc`).
+The reload password defends a single threat: **a remote attacker who can reach your app over HTTP** otherwise being able to call `/?reload=true` and clobber app state, or `/?reload=production` and switch environments at will. With the password set, a request with a missing or wrong password is served normally (HTTP 200) without reloading — no `403` is returned, and nothing in the response reveals that the attempt was noticed (the gate in `public/Application.cfc` simply falls through to normal request serving; the only `403`s on this surface live on the CLI command gate in `vendor/wheels/Public.cfc`). Server-side, though, the attempt is recorded: a `wheels_security.log` warning with the source IP, plus a bump to the per-IP rate-limit bucket.
 
 What it explicitly does **not** gate:
 

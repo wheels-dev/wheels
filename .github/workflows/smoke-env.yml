@@ -139,13 +139,13 @@ jobs:
       - name: Point the Adobe harness datasource at SQLite
         run: |
           sed -i 's/wheelstestdb_sqlserver/wheelstestdb_sqlite/' tools/docker/adobe2023/settings.cfm
-          # The harness settings ship an EMPTY reloadPassword, which leaves
-          # ?reload=true open to anonymous restarts — probe 4 would see a 302.
-          # Stage a real password so probes 4/5 (refusal) and 6 (authorized
-          # reload answers 302 — the #3053 Adobe regression path) all engage.
-          sed -i 's/set(reloadPassword="")/set(reloadPassword="wheels-dev")/' tools/docker/adobe2023/settings.cfm
+          # The harness settings ship reloadPassword="wheels-dev" (issue #3062:
+          # an empty password disables URL reload entirely, so the harness
+          # carries a real throwaway value). Probes 4/5 (refusal) and 6
+          # (authorized reload answers 302 — the #3053 Adobe regression path)
+          # all rely on it; fail fast if the harness file drifts.
           grep -qF 'set(reloadPassword="wheels-dev")' tools/docker/adobe2023/settings.cfm || {
-            echo "::error::settings.cfm reloadPassword substitution failed — pattern drift?"; exit 1; }
+            echo "::error::settings.cfm reloadPassword drifted from wheels-dev — probes 4/5/6 would misfire"; exit 1; }
           grep -qF 'set(dataSourceName="wheelstestdb_sqlite")' tools/docker/adobe2023/settings.cfm || {
             echo "::error::settings.cfm datasource substitution failed — pattern drift?"; exit 1; }
           grep -in 'datasourcename' tools/docker/adobe2023/settings.cfm
