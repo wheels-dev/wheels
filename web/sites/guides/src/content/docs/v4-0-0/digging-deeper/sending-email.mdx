@@ -68,12 +68,16 @@ Every argument `cfmail` accepts is available here: `server`, `port`, `username`,
 
 ## Organize sends in `app/mailers/`
 
-For anything beyond a one-liner, move the send call out of the controller and into a mailer component. Mailers are plain CFCs — no framework base class — that wrap `sendEmail()` behind a named method:
+For anything beyond a one-liner, move the send call out of the controller and into a mailer component. Mailers are plain CFCs — no framework base class — that expose named methods wrapping `sendEmail()`. Because `sendEmail()` is a controller method, each mailer method creates a fully-initialized controller instance via `new wheels.Global().controller()`:
 
 ```cfm {test:compile} title="app/mailers/UserMailer.cfc"
 component {
     public any function sendWelcome(required any user) {
-        return new wheels.Controller().sendEmail(
+        local.mailer = new wheels.Global().controller(
+            name="UserMailer",
+            params={controller: "userMailer", action: "sendWelcome"}
+        );
+        return local.mailer.sendEmail(
             template="/mailers/user/welcome",
             layout="/mailers/layout",
             from="no-reply@example.com",
@@ -84,7 +88,11 @@ component {
     }
 
     public any function sendPasswordReset(required any user, required string token) {
-        return new wheels.Controller().sendEmail(
+        local.mailer = new wheels.Global().controller(
+            name="UserMailer",
+            params={controller: "userMailer", action: "sendPasswordReset"}
+        );
+        return local.mailer.sendEmail(
             template="/mailers/user/password_reset",
             layout="/mailers/layout",
             from="no-reply@example.com",
@@ -96,6 +104,10 @@ component {
     }
 }
 ```
+
+<Aside type="note">
+  Use `new wheels.Global().controller()`, not `new wheels.Controller()` directly. A bare `new wheels.Controller()` skips framework initialization and leaves the instance without the `params` struct that `sendEmail()` requires internally — it throws on every engine. The `Global.cfc` factory fully initializes the instance, including wiring up `variables.params`.
+</Aside>
 
 Put the views under `app/views/mailers/user/welcome.cfm` and `app/views/mailers/user/password_reset.cfm`. The leading slash on `template=` makes the path absolute (rooted at `app/views/`) so the mailer works regardless of which controller triggered it.
 

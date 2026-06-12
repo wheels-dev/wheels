@@ -1,0 +1,1 @@
+- Corrects the `app/mailers/` pattern in the Sending Email guide: replaces `new wheels.Controller().sendEmail()` — which throws on every engine due to missing `variables.params` — with `new wheels.Global().controller(name, params).sendEmail()`, the supported factory that fully initializes the instance (#3078).
