@@ -19,7 +19,7 @@ Disk cleanup. Three verbs with increasing scope.
 
 ## Retention policy
 
-`retain_containers:` in `deploy.yml` (default 5) controls how many old containers per host are kept. Prune verbs never touch the current live container or anything within the retention window. Older items are fair game.
+The `--keep=<n>` flag on `prune all` and `prune containers` controls how many old containers per host are kept (default 5). There is no `deploy.yml` key for this — Kamal's `retain_containers:` is rejected by the config validator (`unknown top-level key`); pass `--keep` on the command line instead. Prune verbs never touch the current live container or anything within the retention window. Older items are fair game.
 
 ## When to prune
 
