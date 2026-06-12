@@ -37,7 +37,10 @@ component {
     }
 
     public string function config(required struct opts) {
-        var cfg = variables.loader.load(arguments.opts.configPath);
+        var cfg = variables.loader.load(
+            arguments.opts.configPath,
+            {destination: arguments.opts.destination ?: ""}
+        );
         var yaml = new modules.wheels.services.deploy.lib.Yaml();
         var rolesMap = $roleHosts(cfg);
         return yaml.dump({
