@@ -106,7 +106,7 @@ wheels generate controller <Name> [action ...]
 
 #### Description
 
-Writes `app/controllers/<Name>.cfc` with a stub method per action name you pass. For each action that isn't `create`, `update`, `delete`, or `destroy`, the generator also writes `app/views/<name>/<action>.cfm`. Passing no actions creates an empty controller with no view files.
+Writes `app/controllers/<Name>.cfc` with a stub method per action name you pass. For each action that isn't `create`, `update`, `delete`, or `destroy`, the generator also writes `app/views/<name>/<action>.cfm`. Passing no actions creates an empty controller with no view files. Action names may be space-separated or comma-separated — `index,show` is equivalent to `index show`.
 
 #### Example
 

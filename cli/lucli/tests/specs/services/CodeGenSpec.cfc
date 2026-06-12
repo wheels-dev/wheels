@@ -219,6 +219,52 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).toInclude('extends="Controller"');
 				});
 
+				it("splits a comma-joined action token into separate actions (##3112)", () => {
+					var result = codegen.generateController(
+						name = "Authors",
+						actions = ["index,show"],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/controllers/Authors.cfc");
+					// The bug: one element "index,show" emitted as `function index,show()`
+					expect(content).notToInclude("index,show");
+					expect(content).toInclude("function index()");
+					expect(content).toInclude("function show()");
+				});
+
+				it("returns the normalized action list so callers render correct views (##3112)", () => {
+					var result = codegen.generateController(
+						name = "Editors",
+						actions = ["index, show ,create"],
+						force = true
+					);
+					expect(result.actions).toBe(["index", "show", "create"]);
+				});
+
+				it("de-duplicates and trims actions from comma tokens (##3112)", () => {
+					var result = codegen.generateController(
+						name = "Curators",
+						actions = ["index", "show,index"],
+						force = true
+					);
+					expect(result.actions).toBe(["index", "show"]);
+				});
+
+				it("returns an empty action list when no actions are passed so callers write no views", () => {
+					var result = codegen.generateController(
+						name = "Stubs",
+						actions = [],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/controllers/Stubs.cfc");
+					// The controller body still gets the default index() stub...
+					expect(content).toInclude("function index()");
+					// ...but result.actions stays empty so the caller writes no view
+					// files, preserving the documented "no actions => empty controller
+					// with no view files" behavior (PR ##3131 review).
+					expect(result.actions).toBeEmpty();
+				});
+
 			});
 
 			describe("validateName()", () => {

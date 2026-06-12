@@ -3253,6 +3253,13 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		// Use the normalized action list from the generator (comma-joined tokens like
+		// "index,show" are split into discrete actions) so view files match the
+		// controller methods instead of being named "index,show.cfm" (#3112). When no
+		// actions were passed result.actions is empty — documented behavior is an
+		// empty controller with no view files, so the view loop below writes nothing.
+		actions = result.actions;
+
 		// Create view files for non-mutation actions
 		var viewDir = variables.projectRoot & "/app/views/#lCase(controllerName)#";
 		ensureDirectory(viewDir);
