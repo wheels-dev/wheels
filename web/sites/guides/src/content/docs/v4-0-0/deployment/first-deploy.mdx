@@ -18,7 +18,7 @@ This page takes an existing Wheels app and ships it to one or more Linux servers
 - How to verify the rollout, tail logs, and roll back if something breaks
 
 <Aside type="note" title="Assumptions">
-  You have a Wheels app that already builds into a working Docker image. You have at least one Linux server you can reach over SSH as a user with passwordless `sudo`, or as root. Docker can be installed later with `wheels deploy server bootstrap` — you don't need it preinstalled. You have a container registry (Docker Hub, GHCR, ECR, or self-hosted) you can push to.
+  You have a Wheels app that already builds into a working Docker image. You have at least one Linux server you can reach over SSH as a user with passwordless `sudo`, or as root. Docker can be installed later with `wheels deploy bootstrap` — you don't need it preinstalled. You have a container registry (Docker Hub, GHCR, ECR, or self-hosted) you can push to.
 </Aside>
 
 ## Before you start
@@ -27,7 +27,7 @@ Three quick checks before running anything:
 
 - **SSH works.** `ssh deploy@your-host "uname -a"` succeeds without a password prompt.
 - **Registry login works.** `docker login <registry>` succeeds locally.
-- **Your app has a `Dockerfile`.** It builds and runs locally (`docker build . && docker run <image>`). If not, write the `Dockerfile` first — `wheels deploy` doesn't generate one.
+- **Your app has a working `Dockerfile`.** It builds and runs locally (`docker build . && docker run <image>`). If you don't have one yet, `wheels deploy init` generates a starter `Dockerfile` in step 1 (and refuses to overwrite an existing one unless you pass `--force`) — but verify the generated one actually builds your app before deploying.
 
 ## Walk-through
 
@@ -41,10 +41,12 @@ Three quick checks before running anything:
    wheels deploy init
    ```
 
-   Creates two files:
+   Creates four files:
 
    - `config/deploy.yml` — the deploy manifest. Under git.
    - `.kamal/secrets` — secret values. **Never under git.** Add `.kamal/secrets` to `.gitignore` immediately.
+   - `Dockerfile` — a starter production Dockerfile. If one already exists, `init` refuses to overwrite it unless you pass `--force`.
+   - `.dockerignore` — keeps build context lean.
 
    A `.kamal/hooks/` directory is also created for optional local hook scripts. It's empty and safe to leave that way.
 
@@ -88,7 +90,8 @@ Three quick checks before running anything:
    # Registry — matches registry.password[0] in deploy.yml
    KAMAL_REGISTRY_PASSWORD=$(op read op://Production/Registry/password)
 
-   # App-level secrets — referenced under env.secret in deploy.yml
+   # App-level secrets — will feed env.secret once container delivery
+   # lands (#2956/#2957); harmless to stage here in the meantime
    DATABASE_URL=$(op read op://Production/App/database-url)
    WHEELS_RELOAD_PASSWORD=$(op read op://Production/App/reload-password)
    ```
@@ -106,22 +109,27 @@ Three quick checks before running anything:
      clear:
        WHEELS_ENV: production
        WHEELS_DATASOURCE_CLASS: com.mysql.cj.jdbc.Driver
-     secret:
-       - DATABASE_URL
-       - WHEELS_RELOAD_PASSWORD
    ```
 
-   `clear:` values are baked into `deploy.yml` and safe under git. `secret:` names pull from `.kamal/secrets`. At deploy time, `wheels deploy` translates both into `docker run -e` flags.
+   `clear:` values are baked into `deploy.yml` and safe under git. At deploy time, `wheels deploy` translates them into `docker run -e` flags.
+
+   <Aside type="caution" title="env.secret is not yet supported">
+     Kamal's `env.secret:` block — naming `.kamal/secrets` keys to be passed into the app container — is **not delivered to containers yet**. The released 4.0.3 CLI silently drops `env.secret` entries; CLIs built from `develop` reject the block outright with `Wheels.Deploy.EnvSecretUnsupported` so the gap can't bite silently. Secret delivery to app containers is tracked in [#2956](https://github.com/wheels-dev/wheels/issues/2956) and [#2957](https://github.com/wheels-dev/wheels/issues/2957). Until it lands, get secrets into the container another way (bake non-secrets into the image, or mount an env file you manage yourself). `.kamal/secrets` still works for its other consumer: `registry.password` resolution at `docker login` time.
+   </Aside>
 
 5. **Bootstrap Docker on the host (first time only).**
 
    If Docker is already installed on the target, skip this step. Otherwise:
 
-   ```bash {test:cli cmd="wheels deploy server bootstrap"}
-   wheels deploy server bootstrap
+   ```bash title="Install Docker on every host (requires reachable hosts)"
+   wheels deploy bootstrap
    ```
 
    Runs `which docker || curl -fsSL https://get.docker.com | sh` on every host. Idempotent — safe to run on a host that already has Docker. Fails fast if SSH or `sudo` isn't configured correctly.
+
+   <Aside type="note" title="Use the flat verb">
+     Use `wheels deploy bootstrap`, not `wheels deploy server bootstrap`. The CLI runtime registers its own top-level `server` subcommand (Lucee instance management), so the nested form prints that unrelated help text and never reaches the deploy module ([#2677](https://github.com/wheels-dev/wheels/issues/2677)).
+   </Aside>
 
 6. **Run setup once.**
 
@@ -129,7 +137,15 @@ Three quick checks before running anything:
    wheels deploy setup
    ```
 
-   `setup` is the first-run verb. It runs the full deploy flow *and* boots `kamal-proxy` and any accessories you've declared. On subsequent deploys you use `wheels deploy` (without `setup`) because the proxy and accessories are already running.
+   `setup` is the first-run verb. In the current Phase 1 CLI it is an alias for `wheels deploy` — it does **not** yet boot `kamal-proxy` or any accessories you've declared (full first-run orchestration is tracked in [#2957](https://github.com/wheels-dev/wheels/issues/2957)). Boot those explicitly before (or right after) your first deploy:
+
+   ```bash title="First-run orchestration (run explicitly for now)"
+   wheels deploy proxy boot
+   wheels deploy accessory boot all
+   wheels deploy setup
+   ```
+
+   On subsequent deploys you use `wheels deploy` — the proxy and accessories are already running.
 
    Expect a few minutes on the first run — Docker pulls the base images for `kamal-proxy`, any accessories, and your app. Output is prefixed with `[host]` so you can see what each server is doing in parallel.
 
@@ -140,10 +156,10 @@ Three quick checks before running anything:
    Check the container state:
 
    ```bash title="Check container state"
-   wheels deploy app details
+   wheels deploy app containers
    ```
 
-   Prints `docker ps` output filtered by your service label, for every host. You should see one running container per host per role.
+   Prints `docker ps` output filtered by your service label, for every host. You should see one running container per host per role. (`wheels deploy details` gives the wider view — app, proxy, and accessories. `wheels deploy app details` is a different verb: it requires `--release=<version>` and reports a single container's `docker inspect` status.)
 
 8. **Make a change and redeploy.**
 
@@ -155,7 +171,7 @@ Three quick checks before running anything:
 
    Same command, no `setup`. The rolling flow kicks in: new image builds, pushes, pulls to every host, then the proxy cuts traffic over host-by-host. Zero downtime — `kamal-proxy` drains in-flight requests to the old container before switching.
 
-   The version label is the short git sha by default. Override with `--version=<tag>` if you tag releases differently.
+   The version label is the short git sha by default. Override with `--release=<tag>` if you tag releases differently. (`--release` rather than `--version` because the CLI runtime's root parser claims `--version` for itself.)
 
 </Steps>
 
@@ -178,12 +194,12 @@ If something looks wrong, `wheels deploy details` is always the first stop.
 Every deploy tags its container with the version label (git sha by default). To roll back, you point `wheels deploy rollback` at a previous version:
 
 ```bash title="Roll back to a previous version"
-wheels deploy rollback --version=abc1234
+wheels deploy rollback abc1234
 ```
 
-Finds containers tagged `abc1234` on every host, starts them, and asks the proxy to switch traffic back. The old containers usually still exist on-host — `wheels deploy` doesn't prune aggressively — so rollback is fast. If you've pruned, the rollback fails at the "no such container" step; re-deploy from that sha instead.
+The version is a positional argument, same as Ruby Kamal's `kamal rollback VERSION`. Don't write `--version=abc1234` — the CLI runtime's root parser intercepts `--version` before the deploy module sees it and the command fails ([#2674](https://github.com/wheels-dev/wheels/issues/2674)).
 
-Scoped rollouts and rollbacks are supported via `--hosts=` and `--role=` flags, useful when you want to test a change on one host before fanning out.
+Finds containers tagged `abc1234` on every host, starts them, and asks the proxy to switch traffic back. The old containers usually still exist on-host — `wheels deploy` doesn't prune aggressively — so rollback is fast. If you've pruned, the rollback fails at the "no such container" step; re-deploy from that sha instead.
 
 ## Troubleshooting
 

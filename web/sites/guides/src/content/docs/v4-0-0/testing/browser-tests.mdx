@@ -38,7 +38,7 @@ wheels browser setup
 
 The installer resolves seven JARs from Maven Central (Playwright client, driver, driver-bundle, transitive deps) and caches them under a per-project install directory. Subsequent runs skip the download when hashes match. Pass `--force` to re-download. Chromium is the only engine the browser DSL wires today — Firefox and WebKit are not yet selectable.
 
-If Playwright isn't installed when a spec runs, `BrowserTest.beforeAll` catches the missing-JAR error, sets `this.browserTestSkipped = true`, and the suite stays green. That's the safety net for CI cold starts and fresh dev machines — but every `it` in a browser spec still needs to check the flag.
+If Playwright isn't installed when a spec runs, `BrowserTest.beforeAll` catches the missing-JAR error, sets `this.browserTestSkipped = true`, and the suite stays green. That's the safety net for CI cold starts and fresh dev machines. Inside `browserDescribe()` blocks the skip is automatic — its `aroundEach` returns early when the flag is set, so specs don't need a hand-written guard. Only `it` blocks inside a plain `describe()` need to check `this.browserTestSkipped` themselves.
 
 ## A minimal browser spec
 
@@ -50,7 +50,6 @@ component extends="wheels.wheelstest.BrowserTest" {
     function run() {
         browserDescribe("Home page", () => {
             it("loads the home page", () => {
-                if (this.browserTestSkipped) return;
                 this.browser
                     .visitUrl("http://localhost:8080/")
                     .assertTitleContains("My App");
@@ -63,7 +62,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 Two things to note in every browser spec:
 
 1. **`extends="wheels.wheelstest.BrowserTest"`** — not `wheels.WheelsTest`. The browser base class adds the Playwright lifecycle hooks on top of BDD.
-2. **`if (this.browserTestSkipped) return;`** — the first line of every `it`. When Playwright JARs aren't installed, or when the CI gate (`WHEELS_CI=true` without `WHEELS_BROWSER_CI_ENABLE=true`) is active, `beforeAll` sets the flag. Without the guard, the spec would crash on the first `this.browser` call instead of staying green.
+2. **Use `browserDescribe()`, not plain `describe()`.** When Playwright JARs aren't installed, or when the CI gate (`WHEELS_CI=true` without `WHEELS_BROWSER_CI_ENABLE=true`) is active, `beforeAll` sets `this.browserTestSkipped` — and `browserDescribe`'s `aroundEach` skips each `it` automatically. If you put browser `it` blocks inside a plain `describe()` instead, you must guard them yourself with `if (this.browserTestSkipped) return;` or they crash on the first `this.browser` call.
 
 ## `browserDescribe` vs `describe`
 
@@ -74,13 +73,11 @@ component extends="wheels.wheelstest.BrowserTest" {
     function run() {
         browserDescribe("Isolated per-it state", () => {
             it("starts with no cookies", () => {
-                if (this.browserTestSkipped) return;
                 this.browser.visitUrl("http://localhost:8080/")
                     .clearCookies()
                     .assertSee("Sign in");
             });
             it("also starts with no cookies", () => {
-                if (this.browserTestSkipped) return;
                 // Fresh context; the previous test's state is gone.
                 this.browser.visitUrl("http://localhost:8080/")
                     .assertSee("Sign in");
@@ -106,7 +103,6 @@ component extends="wheels.wheelstest.BrowserTest" {
     function run() {
         browserDescribe("Navigation", () => {
             it("follows a route and comes back", () => {
-                if (this.browserTestSkipped) return;
                 this.browser
                     .visitRoute(route="posts")
                     .click("a.post-link")
@@ -152,7 +148,6 @@ component extends="wheels.wheelstest.BrowserTest" {
     function run() {
         browserDescribe("Scoped form", () => {
             it("fills the signin form, not the signup form", () => {
-                if (this.browserTestSkipped) return;
                 this.browser
                     .visitUrl("http://localhost:8080/sign-in")
                     .within("form##signin", (scoped) => {
@@ -176,7 +171,7 @@ component extends="wheels.wheelstest.BrowserTest" {
 
 ## The DSL — auth fixtures
 
-`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. That route is mounted automatically in test mode. The default handler writes `session.userId = 1` and `session.userEmail = identifier` — enough for simple apps. If your app stores a richer session shape (e.g. `session.member = { id, email, firstName, lastName }`), add one line to `config/settings.cfm`:
+`loginAs(identifier)` takes a single string (email, username, or whatever your app uses to identify a user) and navigates to `/_browser/login-as?identifier=...`. In your own app that route is mounted when `set(loadBrowserTestFixtures=true)` is on (default `false`) and the environment is `testing` or `development`. The default handler writes `session.userId = 1` and `session.userEmail = identifier` — enough for simple apps. If your app stores a richer session shape (e.g. `session.member = { id, email, firstName, lastName }`), add one line to `config/settings.cfm`:
 
 ```cfm title="config/settings.cfm"
 set(browserLoginAsHandler = "AuthFixture##loginAs");
@@ -189,7 +184,6 @@ component extends="wheels.wheelstest.BrowserTest" {
     function run() {
         browserDescribe("Authenticated dashboard", () => {
             it("shows the user's posts", () => {
-                if (this.browserTestSkipped) return;
                 this.browser
                     .loginAs("alice@example.com")
                     .visitRoute(route="posts")
@@ -212,7 +206,6 @@ component extends="wheels.wheelstest.BrowserTest" {
     function run() {
         browserDescribe("Delete confirmation", () => {
             it("accepts the native confirm dialog", () => {
-                if (this.browserTestSkipped) return;
                 this.browser
                     .visitRoute(route="post", key=42)
                     .acceptDialog()
@@ -276,14 +269,13 @@ These return a value instead of `this`, so they end the chain.
 
 ## Targeting form fields with `data-auto-id`
 
-Wheels form helpers emit two selector hooks on every field — a camelCase `id="postTitle"` for browser URL hashes, and an underscored `data-auto-id="post_title"` for test selectors. The underscored form is stable against rename refactors; use it in browser specs.
+Wheels form helpers emit two selector hooks on every field — a dashed `id="post-title"` for DOM labels and CSS, and an underscored `data-auto-id="post_title"` for test selectors. The underscored form is stable against rename refactors; use it in browser specs.
 
 ```cfm {test:compile} title="tests/specs/browser/NewPostSpec.cfc"
 component extends="wheels.wheelstest.BrowserTest" {
     function run() {
         browserDescribe("Create a post", () => {
             it("submits the new-post form", () => {
-                if (this.browserTestSkipped) return;
                 this.browser
                     .loginAs("alice@example.com")
                     .visitRoute(route="newPost")
@@ -304,10 +296,10 @@ See [View & Form Tests](/v4-0-0/testing/view-and-form-tests/) for the same `data
 
 Most of the DSL is engine-agnostic — Playwright drives a real Chromium regardless of which CFML engine is running your app. The exceptions:
 
-- **Dialogs** — `acceptDialog`, `dismissDialog`, `dialogMessage` use `createDynamicProxy` to register a listener on Playwright's Java-side `Dialog` interface. That API is Lucee-only. On Adobe CF and BoxLang, calls throw `Wheels.DialogSupportMissing`. Wrap dialog-driven specs in an engine check (`if (server.coldfusion.productname != "Lucee") return;`) if you run the suite across engines.
-- **`loginAs`** — relies on the `/_browser/login-as` fixture route, which is mounted automatically in test mode from `vendor/wheels/tests/routes.cfm`. If your app clears or replaces the route table in another spec, `BrowserTest.beforeAll` re-includes the fixture routes so browser specs stay self-contained.
+- **Dialogs** — `acceptDialog`, `dismissDialog`, `dialogMessage` use `createDynamicProxy` to register a listener on Playwright's Java-side `Dialog` interface. That API is Lucee-only. On Adobe CF and BoxLang, calls throw `Wheels.BrowserDialogNotSupported`. Wrap dialog-driven specs in an engine check (`if (server.coldfusion.productname != "Lucee") return;`) if you run the suite across engines.
+- **`loginAs`** — relies on the `/_browser/login-as` fixture route. Nothing restores that route automatically: if another spec clears or replaces the route table (a `$clearRoutes()`-style spec), `loginAs` and every `/_browser/*` request will 404 until the routes reload. Make any spec that manipulates the route table restore it before browser specs run.
 
-See the cross-engine notes in [`CLAUDE.md`](https://github.com/cfwheels/cfwheels/blob/develop/CLAUDE.md) for the full list of Lucee/Adobe/BoxLang divergences.
+See the cross-engine notes in [`CLAUDE.md`](https://github.com/wheels-dev/wheels/blob/develop/CLAUDE.md) for the full list of Lucee/Adobe/BoxLang divergences.
 
 ## Debugging failing specs
 
