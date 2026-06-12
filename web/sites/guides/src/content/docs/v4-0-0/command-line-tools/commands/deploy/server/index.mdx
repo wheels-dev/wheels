@@ -9,9 +9,11 @@ sidebar:
 
 Host-level operations that don't fit in the app/proxy/accessory model.
 
+From the shell, use the **flat aliases** `wheels deploy exec` and `wheels deploy bootstrap`. The nested `wheels deploy server <verb>` form is shadowed by the CLI's own top-level `server` command (Lucee instance management) and prints that command's help instead ([#2677](https://github.com/wheels-dev/wheels/issues/2677), [#2690](https://github.com/wheels-dev/wheels/pull/2690)). The nested form remains for direct callers that bypass the shell, such as MCP.
+
 ## Verbs
 
-| Verb | Purpose |
-|------|---------|
-| [`exec`](/v4-0-0/command-line-tools/commands/deploy/server/exec/) | Run a command on every host (optionally filtered). |
-| [`bootstrap`](/v4-0-0/command-line-tools/commands/deploy/server/bootstrap/) | Install Docker on a fresh host (idempotent). |
+| Verb | Shell form | Purpose |
+|------|------------|---------|
+| [`exec`](/v4-0-0/command-line-tools/commands/deploy/server/exec/) | `wheels deploy exec <command>` | Run a command on every host (optionally filtered). |
+| [`bootstrap`](/v4-0-0/command-line-tools/commands/deploy/server/bootstrap/) | `wheels deploy bootstrap` | Install Docker on a fresh host (idempotent). |

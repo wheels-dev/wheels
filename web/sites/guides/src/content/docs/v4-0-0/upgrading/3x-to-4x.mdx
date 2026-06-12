@@ -87,14 +87,20 @@ All six CORS settings (`allowCorsRequests` and the five `accessControlAllow*` se
 | `Access-Control-Max-Age` | No | Yes |
 | Available since | Wheels 2.x | Wheels 3.0 |
 
-**Precedence when both are active**
+**What happens when both are active**
 
-As of [#3114](https://github.com/wheels-dev/wheels/issues/3114), Wheels handles this safely. When a `wheels.middleware.Cors` instance is registered in the pipeline, the global `onRequestStart` path detects it and steps aside — skipping both `$setCORSHeaders` and the global OPTIONS abort — so the middleware is the single source of truth for CORS headers and preflight on every request type. A one-time warning is written to `wheels.log` prompting you to clean up the now-redundant setting. Once you see it, remove the six `allowCorsRequests` / `accessControlAllow*` settings from `config/settings.cfm`.
+The two paths used to be independent and **additive** — both layers emitted their own `Access-Control-Allow-*` lines (`cfheader` stacks rather than replaces), and an origin allowed by **both** layers — exactly the origins a migrating app cares about — received duplicate `Access-Control-Allow-Origin` headers, which the Fetch spec makes browsers reject ([#3114](https://github.com/wheels-dev/wheels/issues/3114)). `curl` looked fine; browsers failed the CORS check.
+
+As of the [#3114](https://github.com/wheels-dev/wheels/issues/3114) fix, Wheels arbitrates this automatically. When a `wheels.middleware.Cors` instance is registered in the pipeline, the global `onRequestStart` path detects it and steps aside — skipping both `$setCORSHeaders` and the global OPTIONS `abort` — so the middleware is the single source of truth for CORS headers and preflight on every request type. A one-time warning is written to `wheels.log` prompting you to clean up the now-redundant setting.
+
+One caveat: the middleware pipeline does not run on the public root/congrats page (a bare `.root(method="get")` route). Under the old additive behavior that page carried the global headers; now that the global path defers whenever the middleware is registered, it gets no CORS headers at all. If you need CORS on a route the pipeline doesn't cover, use the global setting alone (without the middleware).
+
+Even with the arbitration in place, do not run both deliberately — it is a safety net for the migration window, not a supported configuration. The moment you configure the `Cors` middleware, remove `set(allowCorsRequests=true)` (and the `accessControlAllow*` settings) in the same change.
 
 **Recommendation**
 
 - Apps using the global setting: leave it. It works in 4.0 without changes.
-- Apps using the middleware: add `allowOrigins` explicitly (see the breaking change above).
+- Apps using the middleware: add `allowOrigins` explicitly (see the breaking change above) and make sure the global setting is off.
 - New CORS configuration: prefer the middleware — it supports per-route scoping and has a secure deny-all default.
 
 #### Migrating from global settings to the middleware
@@ -131,11 +137,17 @@ The `SecurityHeaders` middleware (#2036) emits `Strict-Transport-Security: max-a
 
 **CHANGELOG:** `Breaking: Reload password must be non-empty for environment switching in production` (#2082) and the Security section item for `CSRF key enforced in production` (#2079).
 
-The CSRF encryption key is auto-generated if empty (#2054), but cookies rotate on every deploy when that happens. Set a stable key.
+This item applies only when you store CSRF tokens in cookies (`set(csrfStore="cookie")`) — the default store is `session`, which needs no key. With the cookie store, an empty key is auto-generated outside production (#2054) with a `wheels_security` warning, but cookies rotate on every deploy when that happens; in production the framework throws `Wheels.Security.MissingCsrfKey` instead of auto-generating. Set a stable key.
+
+The setting name is `csrfCookieEncryptionSecretKey` — that is the only name the framework reads:
 
 ```cfm {test:compile} title="config/settings.cfm"
-set(csrfEncryptionKey = env("WHEELS_CSRF_KEY"));
+set(csrfCookieEncryptionSecretKey = env("WHEELS_CSRF_KEY"));
 ```
+
+<Aside type="caution">
+  `wheels upgrade check` (through 4.0.3) recommends `set(csrfEncryptionKey = ...)` — a setting name the framework never consults. Following that fix text adds an inert setting and keeps the rotate-on-deploy behavior. Use `csrfCookieEncryptionSecretKey` as shown above. Tracked in [#3115](https://github.com/wheels-dev/wheels/issues/3115).
+</Aside>
 
 JWT verification now validates the `alg` claim and uses constant-time signature comparison (#2079, #2086). Tokens forged with `alg: none` or mismatched algorithms are rejected.
 
@@ -159,7 +171,7 @@ Without this line, every boot will log the following warning even if `reloadPass
 WARN  Wheels: reloadPassword is empty — URL-based environment switching and application reload are disabled until a password is set in config/settings.cfm
 ```
 
-The `env()` helper is the canonical pattern for flowing `.env` values into framework settings. Use the same approach for `csrfEncryptionKey` and other security settings.
+The `env()` helper is the canonical pattern for flowing `.env` values into framework settings. Use the same approach for `csrfCookieEncryptionSecretKey` and other security settings.
 
 #### `config/environment.cfm` has the same load-order gap
 
@@ -243,7 +255,7 @@ component extends="wheels.WheelsTest" {
 
 See the [Testing guide](/v4-0-0/testing/) for matchers and the phantom-matcher list.
 
-There is also a `wheels.Testbox` shim — a pure alias of `wheels.WheelsTest` retained for specs written before the rename. It adds no behavior. Deprecated since 4.0 with a removal target of 5.0; `wheels upgrade check` flags `extends="wheels.Testbox"` alongside `wheels.Test`, and both should migrate to `wheels.WheelsTest`.
+There is also a `wheels.Testbox` shim — a pure alias of `wheels.WheelsTest` retained for specs written before the rename. It adds no behavior. Deprecated since 4.0 with a removal target of 5.0; both it and `wheels.Test` should migrate to `wheels.WheelsTest`. Note: the released 4.0.3 `wheels upgrade check` only flags `extends="wheels.Test"`; the combined rule that also flags `extends="wheels.Testbox"` lives on `develop` and ships in a post-4.0.3 release.
 
 ### 9. Tests directory renamed: `tests/specs/functions/` → `tests/specs/functional/`
 
@@ -371,7 +383,15 @@ See [Packages](/v4-0-0/digging-deeper/packages/) for manifest fields, per-method
 
 ### In-dev-server HTTP MCP endpoint
 
-**CHANGELOG:** `Deprecated: In-dev-server HTTP MCP endpoint at /wheels/mcp — superseded by the LuCLI stdio MCP server (wheels mcp wheels).` Migrate with `wheels mcp setup --force`.
+**CHANGELOG:** `Deprecated: In-dev-server HTTP MCP endpoint at /wheels/mcp — superseded by the LuCLI stdio MCP server (wheels mcp wheels).`
+
+There is no `wheels mcp setup` command — migrate by adding the stdio server to your `.mcp.json` manually:
+
+```json title=".mcp.json"
+{"mcpServers": {"wheels": {"command": "wheels", "args": ["mcp", "wheels"]}}}
+```
+
+Note that bare `wheels mcp` does not print this snippet on the released launcher (it errors with "missing module name"); see the [MCP integration guide](/v4-0-0/command-line-tools/mcp-integration/) for editor-specific variants.
 
 ### Legacy CommandBox `wheels-cli` module
 
@@ -397,7 +417,7 @@ The `/_browser/home`, `/_browser/login`, `/_browser/dashboard`, `/_browser/login
 
 - **You never used `/_browser/*` yourself** — no action. These routes were only ever meaningful when you ran Wheels' own browser specs against the dev server, and Wheels-generated app scaffolds (`wheels new`) never included them. Your `config/routes.cfm` stays as-is.
 - **You ran Wheels browser specs against a running dev server** — opt in by adding `set(loadBrowserTestFixtures=true);` to `config/settings.cfm` (or to your `testing`/`development` env override). The framework then mounts the `/_browser/*` routes automatically. The setting defaults to `false` and production/maintenance/staging environments always skip the mount.
-- **You defined your own `/_browser/*` routes in `config/routes.cfm`** (rare — Wheels 4.0 snapshot only) — either keep them (your routes win), or delete them and opt in via `loadBrowserTestFixtures=true` to use the framework copies. The framework registers before `config/routes.cfm` is loaded, so any same-named app route overrides the fixture.
+- **You defined your own `/_browser/*` routes in `config/routes.cfm`** (rare — Wheels 4.0 snapshot only) — with the fixtures enabled, your copies are dead code: the framework registers the fixture routes *before* `config/routes.cfm` is loaded, and Wheels routing is first-registration-wins, so a same-pattern app route can **not** override a fixture. Delete your copies. If what you actually need is a custom login flow for browser specs, use `set(browserLoginAsHandler="YourController##yourAction")` instead of shadowing `/_browser/login-as`.
 
 ## Removed in 4.0
 
@@ -454,7 +474,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 1. Run the test suite.
 
    ```bash title="your shell"
-   bash tools/test-local.sh
+   wheels test
    ```
 
 2. Run `wheels doctor` to surface config and environment issues.
@@ -473,7 +493,7 @@ These are additive in 4.0 and worth adopting during the upgrade window:
 
 ## Common issues
 
-- **"CSRF token invalid" on forms after upgrade.** Either the encryption key rotated (set `csrfEncryptionKey` explicitly) or a third-party embed is hitting `SameSite`. See #2035, #2054.
+- **"CSRF token invalid" on forms after upgrade.** Either the cookie encryption key rotated (cookie store only — set `csrfCookieEncryptionSecretKey` explicitly) or a third-party embed is hitting `SameSite`. See #2035, #2054, #3115.
 - **Requests return 403 with no CORS header.** `allowOrigins` isn't set. See #2039.
 - **CORS preflight rejected after switching from global settings to the middleware.** The `Cors` constructor's `allowHeaders` default (`Content-Type,Authorization,X-Requested-With`) does not include `X-Auth-Token`, `X-Requested-By`, or `Origin` — all present in the legacy `accessControlAllowHeaders` global default. Pass the missing headers explicitly. See [Migrating from global settings to the middleware](#migrating-from-global-settings-to-the-middleware).
 - **Rate limiter counts wrong behind your load balancer.** `trustProxy` defaults to `false` now. See #2024, #2088.

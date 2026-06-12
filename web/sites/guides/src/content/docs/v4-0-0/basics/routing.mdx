@@ -104,8 +104,22 @@ mapper()
 
 URLs become `/admin/posts`, `/admin/posts/:key`, and so on; the controller class is `admin/Posts.cfc`. The outer `.resources("posts")` still serves the public `/posts` URLs — namespaces don't replace the non-namespaced routes, they sit alongside them.
 
+`namespace()` (and `scope()`, `package()`, `controller()`) also accept a `callback=` argument, mirroring `resources()`: the routes declared inside the callback register under the namespace, and the scope closes automatically when the callback returns — no `.end()` needed:
+
+```cfm {test:compile}
+<cfscript>
+mapper()
+    .namespace(name="admin", callback=function(map) {
+        map.resources("posts");
+    })
+    .resources("posts")
+    .wildcard()
+.end();
+</cfscript>
+```
+
 <Aside type="caution">
-  Unlike `resources()`, `namespace()` (and `scope()`) does **not** support a `callback=` argument. Passing one is silently ignored: the routes inside the callback never register, and because the scope is never closed, every route declared afterward gets swallowed into the namespace — the public `/posts` above would 404. Always close a namespace with `.end()`. Tracked in [#3072](https://github.com/wheels-dev/wheels/issues/3072).
+  With the explicit form, always close a namespace with `.end()` — an unclosed scope swallows every route declared afterward into the namespace, so the public `/posts` above would 404. And on releases before the [#3072](https://github.com/wheels-dev/wheels/issues/3072) fix (4.0.3 and earlier), `namespace()` and `scope()` silently ignored `callback=` — the callback's routes never registered and the scope never closed. Use the explicit `.end()` form on those versions.
 </Aside>
 
 Controllers that live in `app/controllers/admin/` must extend the base controller with its full path — `extends="app.controllers.Controller"`. The bare `extends="Controller"` fails to resolve from the subfolder on Lucee (`invalid component definition, can't find component [Controller]`).

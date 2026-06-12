@@ -43,7 +43,7 @@ Closest conceptual neighbor. Both descended from the same Rails-era design.
 | View layer | ERB / Haml / etc. | `.cfm` templates (inline expressions via `#...#`) |
 | Hotwire | Bundled (Turbo Drive / Frames / Streams) | Via `wheels-hotwire` package (opt-in activation) |
 | Testing | Minitest / RSpec | WheelsTest (BDD, `describe`/`it`) |
-| Jobs | Active Job + Sidekiq/etc. | Built-in job queue (`wheels jobs work`) |
+| Jobs | Active Job + Sidekiq/etc. | Built-in DB-backed job queue (`wheels.Job` / `processQueue()`); worker CLI tracked in [#3090](https://github.com/wheels-dev/wheels/issues/3090) |
 
 If you know Rails, the tutorial will feel familiar in pacing and idioms. The differences that bite most often:
 

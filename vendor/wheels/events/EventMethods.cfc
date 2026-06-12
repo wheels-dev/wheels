@@ -70,7 +70,10 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 				if (StructKeyExists(local, "wheelsError")) {
 					// Map Wheels error types to HTTP status codes. Any
 					// `Wheels.*NotFound` (RouteNotFound, RecordNotFound,
-					// ViewNotFound, etc) is a 404; everything else is a 500.
+					// ViewNotFound, etc) is a 404, as is `Wheels.ActionNotAllowed`
+					// — the action-dispatch gate blocks framework helpers and
+					// $-prefixed internals by treating them as missing actions
+					// (#2845, #3075); everything else is a 500.
 					// Set the status BEFORE writing the body so the response
 					// header is committed at the right code regardless of
 					// when the servlet engine flushes (HTML-format Wheels
@@ -82,7 +85,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 					// reset the response, so we re-assert the status here.
 					if (
 						StructKeyExists(local.wheelsError, "type")
-						&& ReFindNoCase("^Wheels\.[A-Za-z]*NotFound$", local.wheelsError.type)
+						&& ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", local.wheelsError.type)
 					) {
 						$header(statusCode = 404);
 					} else {

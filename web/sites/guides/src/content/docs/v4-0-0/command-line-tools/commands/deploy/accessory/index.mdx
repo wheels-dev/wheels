@@ -7,7 +7,7 @@ sidebar:
   order: 40
 ---
 
-Sidecar container lifecycle. Every accessory verb takes a `--name` (or `all` for fan-out) and targets the pinned host(s) for that accessory.
+Sidecar container lifecycle. Every accessory verb takes the accessory name as a **positional argument** (or `all` for fan-out) and targets the pinned host(s) for that accessory: `wheels deploy accessory boot db`.
 
 ## Verbs
 
@@ -22,15 +22,15 @@ Sidecar container lifecycle. Every accessory verb takes a `--name` (or `all` for
 | [`logs`](/v4-0-0/command-line-tools/commands/deploy/accessory/logs/) | Tail accessory logs. |
 | [`remove`](/v4-0-0/command-line-tools/commands/deploy/accessory/remove/) | Stop + remove the container. |
 
-## Common flags
+## Common arguments and flags
 
-| Flag | Description |
+| Argument / flag | Description |
 |------|-------------|
-| `--name=<name>` | **Required.** Accessory name, or `all` to fan out. |
+| `<name>` | **Required positional.** Accessory name, or `all` to fan out. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
 
-Missing `--name` throws `DeployAccessoryCli.MissingName`.
+Omitting the name throws `DeployAccessoryCli.MissingName`. There is no `--name=` flag — the deploy parser ignores it, so `--name=db` also ends in `DeployAccessoryCli.MissingName`.
 
 ## Relationship to `wheels deploy`
 

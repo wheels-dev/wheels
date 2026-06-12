@@ -12,17 +12,19 @@ sidebar:
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy app boot --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+wheels deploy app boot --release=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | **Required.** Version to boot. Throws `DeployAppCli.MissingVersion` if absent. |
+| `--release=<v>` | **Required.** Version to boot. Throws `DeployAppCli.MissingVersion` if absent. |
 | `--role=<name>` | Limit to one role. Default: every role. |
 | `--destination=<name>` | Overlay `deploy.<name>.yml`. |
 | `--dry-run` | Print the `docker run` commands without executing. |
+
+A literal `--version=` flag does not work — the CLI's picocli root intercepts it before deploy dispatch ([#2674](https://github.com/wheels-dev/wheels/issues/2674)). Prefer non-numeric release labels: a purely numeric value like `--release=1` currently hangs ([#3111](https://github.com/wheels-dev/wheels/issues/3111)).
 
 ## Behavior
 
@@ -42,6 +44,6 @@ docker run --detach --restart unless-stopped \
 ## Example
 
 ```bash title="example"
-wheels deploy app boot --version=abc1234
-wheels deploy app boot --version=abc1234 --role=job
+wheels deploy app boot --release=abc1234
+wheels deploy app boot --release=abc1234 --role=job
 ```

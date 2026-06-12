@@ -68,7 +68,7 @@ Two routes, depending on what you already have installed.
 If you already have Adobe CF installed (e.g. the dev edition from [coldfusion.adobe.com](https://www.adobe.com/products/coldfusion-family.html)), point its web root at your Wheels app's `public/` directory and configure the datasource through the CF Administrator. The framework requires no engine-specific setup beyond having a registered datasource.
 
 <Aside type="note">
-The `wheels start`, `wheels stop`, `wheels reload`, and `wheels test` commands all assume the Lucee Express bundled with the CLI. On Adobe CF you'll use `box server start/stop/restart` instead, and reload via `?reload=true&password=<your-password>` directly. Generators (`wheels generate ...`) are pure file-system operations and work the same regardless of engine.
+The `wheels start`, `wheels stop`, `wheels reload`, and `wheels test` commands all assume the Lucee Express bundled with the CLI. On Adobe CF you'll use `box server start/stop/restart` instead, and reload via `?reload=true&password=<your-password>` directly. Generators (`wheels generate ...`) are pure file-system operations and work the same regardless of engine — with one exception: `wheels generate admin` introspects your database schema through a running server bound to the project, and refuses to run without one.
 </Aside>
 
 ## Running Wheels on BoxLang
@@ -82,7 +82,7 @@ box server start cfengine=boxlang@latest port=8080
 ```
 
 <Aside type="note">
-The `wheels start`, `wheels stop`, `wheels reload`, and `wheels test` commands all assume the Lucee Express bundled with the CLI — they do not interact with BoxLang. BoxLang developers manage their server through CommandBox (`box server start/stop/restart`) and reload via `?reload=true&password=<your-password>` directly. Generators (`wheels generate ...`) are pure file-system operations and work the same regardless of engine.
+The `wheels start`, `wheels stop`, `wheels reload`, and `wheels test` commands all assume the Lucee Express bundled with the CLI — they do not interact with BoxLang. BoxLang developers manage their server through CommandBox (`box server start/stop/restart`) and reload via `?reload=true&password=<your-password>` directly. Generators (`wheels generate ...`) are pure file-system operations and work the same regardless of engine — with one exception: `wheels generate admin` introspects your database schema through a running server bound to the project, and refuses to run without one.
 </Aside>
 
 Wheels' BoxLang compatibility is verified per release in the same CI matrix as Lucee and Adobe CF. Cross-engine gotchas worth knowing about live in [`.ai/wheels/cross-engine-compatibility.md`](https://github.com/wheels-dev/wheels/blob/develop/.ai/wheels/cross-engine-compatibility.md) — most are about minor differences in struct/array semantics under closures.

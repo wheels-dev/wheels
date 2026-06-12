@@ -102,7 +102,7 @@ Every helper also accepts the standard Wheels form options — `label`, `labelPl
 See `vendor/wheels/view/formsobject.cfc` for the full argument surface.
 
 <Aside type="note">
-  **`checkBox` emits two inputs.** A single checkbox only submits its `name` when it's checked, which means unchecking a box sends no value at all and the controller never learns the user cleared it. `checkBox` works around this by also rendering a hidden `<input type="hidden" name="..." value="0">` just before the real checkbox. On submit, the last value wins: checked → `1`, unchecked → `0`. The underlying model always sees one of the two.
+  **`checkBox` emits two inputs.** A single checkbox only submits its `name` when it's checked, which means unchecking a box sends no value at all and the controller never learns the user cleared it. `checkBox` works around this by also rendering a hidden companion *after* the real checkbox, under a marker name — `<input type="hidden" name="post[published]($checkbox)" value="0">`. On submit, Wheels' dispatcher detects the `($checkbox)` key and applies its `uncheckedValue` only when the real field is absent from the form post: checked → `1`, unchecked → `0`. The underlying model always sees one of the two.
 </Aside>
 
 <Aside type="note">
@@ -162,7 +162,7 @@ The summary block only renders when the object has errors — on a new-form rend
 
 Wheels does not ship a standalone `label()` helper. Labels are a first-class argument on every object-bound form helper via `label=` and `labelPlacement=`:
 
-- `textField(objectName="post", property="title", label="Post title")` — wraps the input in a `<label for="post-title">Post title</label>` with `labelPlacement` controlling whether the text comes `before` (default), `after`, or `around` the input.
+- `textField(objectName="post", property="title", label="Post title")` — wraps the input in a `<label for="post-title">Post title</label>` with `labelPlacement` controlling whether the text comes `around` (default), `before`, or `after` the input.
 - `label=false` suppresses the auto-label — use this when you want to write the `<label>` tag by hand (for icons, extra classes, or explicit `for` attributes).
 
 The third and most common pattern is in the canonical example above: skip the `label` argument entirely and wrap the helper call inside a raw `<label>` element in your markup. The browser associates the label with the input via containment, no `for="..."` attribute needed.

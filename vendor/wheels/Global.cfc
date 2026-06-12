@@ -211,18 +211,22 @@ return local.$wheels;
 	 * Includes a config file like /config/settings.cfm or /config/services.cfm
 	 * during application start, capturing any output it produces.
 	 *
-	 * If the captured output is non-empty — almost always a sign that the file
-	 * is missing a cfscript wrapper, so Lucee/Adobe parse the body as markup
-	 * and any cfscript-style code becomes literal output text that never
-	 * executes — log a clear warning pointing the developer at the most likely
-	 * cause, and discard the output so it doesn't leak into the response of
-	 * whichever request happened to trigger onApplicationStart (which would
-	 * otherwise manifest as raw `var di = ...` text spilling onto every page
-	 * until the next cold restart).
+	 * If the file fails to compile or run, the failure is logged and rethrown
+	 * as a named `Wheels.ConfigIncludeFailed` error that carries the failing
+	 * template path and the original engine message (original type/detail are
+	 * preserved in `detail`). This is deliberate fail-closed behavior in EVERY
+	 * environment: an app whose config did not load must not boot on framework
+	 * defaults and serve traffic. The named error propagates out of
+	 * onApplicationStart by design, and renders on the development error page
+	 * now that onError no longer masks application-start errors.
 	 *
-	 * The function never throws on output; missing-wrapper mistakes are
-	 * recoverable (the file just registered nothing) and a hard error during
-	 * onApplicationStart is worse than a warning + downstream failure.
+	 * If the include succeeds but the captured output is non-empty — almost
+	 * always a sign that the file is missing a cfscript wrapper, so Lucee/Adobe
+	 * parse the body as markup and any cfscript-style code becomes literal
+	 * output text that never executes — log a clear warning pointing the
+	 * developer at the most likely cause, and discard the output so it doesn't
+	 * leak into the response of whichever request happened to trigger
+	 * onApplicationStart.
 	 *
 	 * Note for maintainers: deliberately avoids putting any literal cf-tags
 	 * in this docblock — Lucee 7's tag scanner reads CFC comments before
@@ -238,28 +242,37 @@ return local.$wheels;
   		};
 			// cfformat-ignore-end
 		} catch (any e) {
-			// A compile-time or runtime failure in a config template must NOT cascade
-			// out of onApplicationStart — that aborts application start and surfaces as
-			// a masked, app-wide HTTP 500 whose onError fallback then fails secondarily,
-			// hiding the real cause. The canonical trigger is Adobe CF rejecting a
-			// top-level `var di = injector();` in config/services.cfm (a compile error on
-			// Adobe, accepted on Lucee), which took down every request at boot (issue
-			// #3063). Log the offending template by name and continue: the file's
-			// registrations simply did not run, which is a recoverable, debuggable state
-			// — exactly the trade-off the output-leak branch below already makes.
+			// Fail closed: a compile-time or runtime failure in a config template is a
+			// boot-blocking configuration error in EVERY environment. Booting anyway
+			// would silently run the app on framework defaults (no DI registrations,
+			// default settings, …) and serve traffic fail-open — strictly worse than
+			// a hard stop. Log the offending template, then rethrow a NAMED, located
+			// error that says what broke, where, and why — instead of the old masked,
+			// app-wide HTTP 500 whose secondary onError failure hid the real cause
+			// (the canonical trigger is Adobe CF rejecting a top-level
+			// `var di = injector();` in config/services.cfm — a compile error on
+			// Adobe, accepted on Lucee — issue #3063). The throw is unconditional:
+			// no environment branching, no swallowed path.
 			try {
 				writeLog(
 					file = "wheels",
 					type = "error",
 					text = "Wheels: " & arguments.template & " failed to compile or run during"
-						& " onApplicationStart and was skipped — the application started without"
-						& " this file's configuration (any registrations in it did not execute)."
+						& " onApplicationStart — application start was aborted (fail-closed)."
 						& " Error: " & e.message
 				);
 			} catch (any logErr) {
 				// Logging is best-effort during application start.
 			}
-			return;
+			Throw(
+				type = "Wheels.ConfigIncludeFailed",
+				message = "Failed to include config template '" & arguments.template & "': " & e.message,
+				detail = "Original exception type: " & e.type & "."
+					& (StructKeyExists(e, "detail") && Len(e.detail) ? " " & e.detail : "")
+					& " Application start was aborted because this config file could not be"
+					& " loaded — fix the file and restart (booting without it would run the"
+					& " application on framework defaults)."
+			);
 		}
 		if (Len(Trim(local.$wheelsConfigOutput))) {
 			local.preview = Left(Trim(local.$wheelsConfigOutput), 200);
@@ -2292,7 +2305,7 @@ return local.$wheels;
 	 */
 	public string function $statusCode() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getStatusCode();
+			return $engineAdapter().getStatusCode();
 		}
 		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "lucee") || StructKeyExists(server, "boxlang")) {
@@ -2309,7 +2322,7 @@ return local.$wheels;
 	 */
 	public string function $contentType() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getContentType();
+			return $engineAdapter().getContentType();
 		}
 		// Fallback when adapter not yet initialized
 		local.rv = "";
@@ -2540,7 +2553,7 @@ return local.$wheels;
 	 */
 	public numeric function $getRequestTimeout() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getRequestTimeout();
+			return $engineAdapter().getRequestTimeout();
 		}
 		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "boxlang")) {

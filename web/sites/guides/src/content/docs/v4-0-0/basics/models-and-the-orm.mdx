@@ -162,7 +162,7 @@ For a key-only delete without loading the record, use `model("Post").deleteByKey
 
 ## Lifecycle callbacks
 
-Callbacks register a `private` method to run at a specific point in the record's lifecycle. The method takes no arguments (the record is `this`), returns nothing, and can mutate any property on `this` before the write happens. Return `false` from a `before*` callback to cancel the operation.
+Callbacks register a method to run at a specific point in the record's lifecycle. For the write-cycle callbacks the method takes no arguments (the record is `this`), returns nothing, and can mutate any property on `this` before the write happens. Return `false` from a `before*` callback to cancel the operation. (`afterFind` is the exception — see below.)
 
 | Callback | When it fires |
 |----------|---------------|
@@ -177,7 +177,7 @@ Callbacks register a `private` method to run at a specific point in the record's
 | `beforeUpdate` / `afterUpdate` | Around UPDATE only |
 | `beforeDelete` / `afterDelete` | Around DELETE |
 
-Register callbacks in `config()` — `beforeSave("methodName")` or `beforeSave(methods="one,two")` when you want several. The methods themselves must be `private` and live on the same component.
+Register callbacks in `config()` — `beforeSave("methodName")` or `beforeSave(methods="one,two")` when you want several. The methods live on the same component and should be `private` — invocation is internal, so `public` also works, but a public callback method leaks onto the model's callable API.
 
 ```cfm {test:compile}
 component extends="Model" {
@@ -200,7 +200,24 @@ component extends="Model" {
 
 The ordering is strict: `beforeValidation` → validation runs → `afterValidation` → `beforeSave` → (`beforeCreate` or `beforeUpdate`) → SQL write → (`afterCreate` or `afterUpdate`) → `afterSave`. If any `before*` callback returns `false`, the chain stops and the write is skipped.
 
-`afterFind` is the one callback that fires without a write: it runs once per row returned by a finder, which makes it the right place for decorating loaded records with derived values.
+`afterFind` is the one callback that fires without a write: it runs once per record returned by a finder, which makes it the right place for decorating loaded records with derived values. Its contract differs by what the finder returns:
+
+- **Object-returning finders** (`findOne`, `findByKey`, `findAll(returnAs="objects")`) — the callback receives the record's properties as named arguments. You can mutate `this` directly, or return a struct — the returned keys are applied back onto the object via `setProperties()`.
+- **Query-returning finders** (`findAll` by default) — there is no object per row. The callback receives the row's columns as named arguments and decorates by *returning a struct*; any keys you return are merged back into the row (new keys become new query columns). Mutating `this` does nothing here.
+
+Both modes receive named arguments and both honor a returned struct, so the portable pattern — one callback that decorates objects and query rows alike — is to compute from `arguments` and return a struct:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        afterFind("setFullName");
+    }
+
+    private function setFullName() {
+        return {fullName: arguments.firstName & " " & arguments.lastName};
+    }
+}
+```
 
 ## Custom methods
 

@@ -12,14 +12,14 @@ sidebar:
 ## Synopsis
 
 ```sh title="synopsis"
-wheels deploy accessory boot --name=<name|all> [--destination=<name>] [--dry-run]
+wheels deploy accessory boot <name|all> [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--name=<name>` | **Required.** Accessory name, or `all`. |
+| `<name>` | **Required positional.** Accessory name, or `all` to fan out. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
 
@@ -30,6 +30,6 @@ For each targeted accessory, emits `docker run` with the image, env, volumes, an
 ## Example
 
 ```bash title="example"
-wheels deploy accessory boot --name=db
-wheels deploy accessory boot --name=all
+wheels deploy accessory boot db
+wheels deploy accessory boot all
 ```
