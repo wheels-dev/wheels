@@ -37,6 +37,15 @@ below. Highlights for this command:
    consolidation — the skip-check gate and the workflow guard both grep for
    it.)
 
+   While you have this JSON, also note whether any wheels-bot review
+   (`author.login` is `wheels-bot` — `gh pr view` output drops the `[bot]`
+   suffix) has state `CHANGES_REQUESTED`. Step 5's supersede-to-approve
+   rule keys off this. A review a human already dismissed reports
+   `DISMISSED`, not `CHANGES_REQUESTED`, so matching the latter finds only
+   a still-active merge block. (Such a review is necessarily on an earlier
+   commit — a wheels-bot review on the current head would have carried the
+   marker and ended this session above.)
+
 2. **Gather context.** Read in this order, then build a mental model:
    - `gh pr view <pr-number>` — title, body, author, base, head, labels
    - `gh pr diff <pr-number>` — the full diff
@@ -136,8 +145,9 @@ below. Highlights for this command:
      severity: a correctness/security/cross-engine finding is incompatible
      with `approve`; a clean diff is incompatible with `request changes`.
 
-5. **Write the review.** Use `gh pr review <pr-number> --comment` for the
-   summary plus `gh api` to attach line comments — or use a single
+5. **Write the review.** Use `gh pr review <pr-number>` (with the verdict
+   flag chosen below — `--approve` / `--request-changes` / `--comment`) for
+   the summary plus `gh api` to attach line comments — or use a single
    `gh pr review` invocation with `--body` containing line-anchored Markdown
    if line comments are not feasible.
 
@@ -167,10 +177,54 @@ below. Highlights for this command:
    Submit verdict:
    - `--request-changes` if any **Correctness**, **Cross-engine**, or
      **Security** finding fires, OR if commitlint / TDD violations are
-     present
-   - `--comment` if only minor convention / docs nits
-   - `--approve` only when the diff is genuinely clean — bias toward
-     `--comment` if uncertain. Do not approve as a courtesy.
+     present. This rule wins on every pass: a re-review that still has a
+     blocking finding uses `--request-changes` no matter what any earlier
+     round said.
+   - **Supersede-to-approve rule (issue #3048).** GitHub keeps a
+     reviewer's `CHANGES_REQUESTED` active until the *same* reviewer
+     approves or the review is dismissed — a comment-state re-review does
+     NOT clear it. Posting `--comment` after an earlier wheels-bot
+     `--request-changes` therefore leaves the PR merge-blocked until a
+     human manually dismisses the stale review (this wedged #3043 and
+     #3044). So when BOTH of these hold:
+       (a) no blocking finding fires — nothing under Correctness /
+           Cross-engine / Security and no commitlint / TDD violation
+           (minor convention / docs nits are fine; keep them in the
+           body), AND
+       (b) step 1's review read found a wheels-bot review with state
+           `CHANGES_REQUESTED` (still active — dismissed ones report
+           `DISMISSED`),
+     you MUST submit with `--approve`; `--comment` is not an option here.
+     In the body, list each previously-blocking finding and the evidence
+     it is resolved (file + line of the fix). That audit trail is
+     mandatory — it is what a human reads to trust the upgrade, and it
+     keeps the body comfortably above the guard's 200-character floor.
+     Two exceptions:
+       - **Fork PRs never get `--approve`.** Check
+         `gh pr view <pr-number> --json isCrossRepository` — when `true`,
+         submit `--comment` stating that all blocking findings are
+         resolved and that a maintainer must dismiss the stale
+         `CHANGES_REQUESTED` review to unblock the PR. Rationale: a bot
+         approval can satisfy a required-approving-review branch rule,
+         and an outside contribution must never become mergeable on the
+         bot's say-so alone. A maintainer is already in the loop on fork
+         PRs (the `bot-review` label that triggered this review is
+         maintainer-applied), so the manual dismissal is an acceptable
+         cost there.
+       - **422 fallback.** If GitHub rejects the `--approve` submission
+         (HTTP 422 — e.g. the PR author is wheels-bot itself; GitHub
+         forbids authors approving their own PRs), resubmit the same
+         body once with `--comment`. A rejected call creates no review,
+         so the resubmission is still the session's single visible
+         review and does not violate the one-review-per-session rule.
+   - Otherwise (first pass, or no still-active wheels-bot
+     `CHANGES_REQUESTED`): `--comment` if only minor convention / docs
+     nits; `--approve` only when the diff is genuinely clean — bias
+     toward `--comment` if uncertain. Do not approve as a courtesy. The
+     conservative first-pass default is deliberate and unchanged: a
+     first-pass `--comment` blocks nothing, so it costs nothing — the
+     supersede rule above exists only because a comment cannot clear an
+     active `CHANGES_REQUESTED`.
 
 6. **Self-check before submitting.**
    - Have you cited specific files + lines for every finding? (No vague
@@ -181,6 +235,10 @@ below. Highlights for this command:
      above a list of correctness issues.)
    - Did you cite at least one piece of evidence (a quoted line, a
      `.ai/wheels/` reference) for each non-trivial claim?
+   - If step 1 found a still-active wheels-bot `CHANGES_REQUESTED` and you
+     have zero blocking findings: is your event `--approve` (or the
+     documented fork / 422 fallback)? A `--comment` here re-wedges the PR
+     behind the stale block (issue #3048).
    - Is the marker present?
 
    If any check fails, redo the review body before submitting.

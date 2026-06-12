@@ -83,5 +83,23 @@ case "$status" in
   *)   echo "PASS probe=reload-wrong-password-refused ($status)";;
 esac
 
+# 6. Authorized reload restarts cleanly (issue #3053): with the correct
+#    password the reload gate must run applicationStop() and answer with the
+#    302 restart redirect — not a 5xx (reserved-scope shadowing in
+#    $buildRedirectUrl broke this on every Adobe CF engine) and not a 200
+#    (gate silently skipped). Opt-in via SMOKE_RELOAD_PASSWORD because the
+#    probe genuinely restarts the application — keep it LAST so the restart
+#    cannot perturb the other probes.
+if [ -n "${SMOKE_RELOAD_PASSWORD:-}" ]; then
+  status=$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 60 "$BASE_URL/?reload=true&password=$SMOKE_RELOAD_PASSWORD")
+  case "$status" in
+    302) echo "PASS probe=reload-authorized-restarts (302)";;
+    000) echo "FAIL probe=reload-authorized-restarts (status=000, request failed)"; FAILURES=$((FAILURES+1));;
+    *)   echo "FAIL probe=reload-authorized-restarts url=$BASE_URL/?reload=true&password=*** (expected 302, got $status)"; FAILURES=$((FAILURES+1));;
+  esac
+else
+  echo "SKIP probe=reload-authorized-restarts (SMOKE_RELOAD_PASSWORD unset)"
+fi
+
 echo "smoke-env: env=$SMOKE_ENV failures=$FAILURES"
 exit $FAILURES
