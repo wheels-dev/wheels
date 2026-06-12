@@ -13,7 +13,7 @@ Define the URL surface of your app in `config/routes.cfm`. This page shows how t
 **You'll learn:**
 
 - How to define a single route with `get`, `post`, `patch`, `delete`
-- How `resources()` produces seven REST routes in one line
+- How `resources()` produces the seven REST actions in one line
 - How to nest resources and namespace an admin section
 - How to constrain placeholder patterns with regex
 - Which helper reads which route at call time
@@ -39,7 +39,7 @@ mapper()
 
 ## Resource routes
 
-`resources()` is where most routing happens. One call generates seven REST routes plus the named helpers that go with them.
+`resources()` is where most routing happens. One call generates routes for the seven REST actions plus the named helpers that go with them.
 
 ```cfm {test:compile}
 <cfscript>
@@ -51,7 +51,7 @@ mapper()
 </cfscript>
 ```
 
-This gives you `GET /posts`, `GET /posts/new`, `POST /posts`, `GET /posts/:key`, `GET /posts/:key/edit`, `PATCH /posts/:key`, and `DELETE /posts/:key` — plus the named routes `posts`, `newPost`, `post`, and `editPost`. `binding=true` turns on route model binding: the member actions (`show`, `edit`, `update`, `delete`) see a pre-loaded `params.post` instance without calling `findByKey` themselves.
+This gives you `GET /posts`, `GET /posts/new`, `POST /posts`, `GET /posts/:key`, `GET /posts/:key/edit`, `PATCH/PUT /posts/:key` (both verbs map to `update`), and `DELETE /posts/:key` — plus the named routes `posts`, `newPost`, `post`, and `editPost`. Each route is also registered with a `.[format]` twin (`/posts.json`, `/posts/:key.xml`, …), so the actual table holds more rows than seven. `binding=true` turns on route model binding: the member actions (`show`, `edit`, `update`, `delete`) see a pre-loaded `params.post` instance without calling `findByKey` themselves.
 
 ## Trim the resource with `only` or `except`
 
@@ -88,14 +88,14 @@ The nested resource produces `POST /posts/:postKey/comments → comments##create
 
 ## Namespaced sections
 
-Group a set of controllers under a shared URL prefix and a subfolder. `.namespace(name="admin")` prefixes URLs with `/admin` and loads controllers from `app/controllers/admin/`.
+Group a set of controllers under a shared URL prefix and a subfolder. `.namespace("admin")` prefixes URLs with `/admin` and loads controllers from `app/controllers/admin/`. Declare the namespaced routes between the `.namespace()` call and a matching `.end()`:
 
 ```cfm {test:compile}
 <cfscript>
 mapper()
-    .namespace(name="admin", callback=function(map) {
-        map.resources("posts");
-    })
+    .namespace("admin")
+        .resources("posts")
+    .end()
     .resources("posts")
     .wildcard()
 .end();
@@ -104,9 +104,15 @@ mapper()
 
 URLs become `/admin/posts`, `/admin/posts/:key`, and so on; the controller class is `admin/Posts.cfc`. The outer `.resources("posts")` still serves the public `/posts` URLs — namespaces don't replace the non-namespaced routes, they sit alongside them.
 
+<Aside type="caution">
+  Unlike `resources()`, `namespace()` (and `scope()`) does **not** support a `callback=` argument. Passing one is silently ignored: the routes inside the callback never register, and because the scope is never closed, every route declared afterward gets swallowed into the namespace — the public `/posts` above would 404. Always close a namespace with `.end()`. Tracked in [#3072](https://github.com/wheels-dev/wheels/issues/3072).
+</Aside>
+
+Controllers that live in `app/controllers/admin/` must extend the base controller with its full path — `extends="app.controllers.Controller"`. The bare `extends="Controller"` fails to resolve from the subfolder on Lucee (`invalid component definition, can't find component [Controller]`).
+
 ## Constrain pattern placeholders
 
-Pattern placeholders are written as `[name]`. By default any non-slash string matches. Pass a `constraints` struct to restrict a placeholder to a regex.
+Pattern placeholders are written as `[name]`. By default a placeholder matches any string without a slash or dot (`[^\./]+` — dots are reserved for the optional `.[format]` suffix). Pass a `constraints` struct to restrict a placeholder to a regex.
 
 ```cfm {test:compile}
 <cfscript>
