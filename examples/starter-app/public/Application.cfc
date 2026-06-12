@@ -134,7 +134,12 @@ component output="false" {
 
 		// Fix for shared application name (issue 359).
 		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "eventpath")) {
-			local.executeArgs = {"componentReference" = "application"};
+			// Case-exact "Application" (the file is Application.cfc): on case-sensitive
+			// filesystems Adobe CF resolves CFC names by exact case then all-lowercase,
+			// so a lowercase reference never matches Application.cfc and throws "Could
+			// not find the ColdFusion component or interface application" (issue #3053
+			// follow-up). Lucee matches case-insensitively either way.
+			local.executeArgs = {"componentReference" = "Application"};
 
 			application.wo.$simpleLock(name = local.lockName, execute = "onApplicationStart", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 		}
@@ -250,7 +255,10 @@ component output="false" {
 			if (StructKeyExists(url, "lock") && !url.lock) {
 				this.$handleRestartAppRequest();
 			} else {
-				local.executeArgs = {"componentReference" = "application"};
+				// Case-exact "Application" — see the matching comment in onSessionStart().
+				// A lowercase reference turns every authorized reload into an HTTP 500 on
+				// Adobe CF + case-sensitive filesystems (issue #3053 follow-up).
+				local.executeArgs = {"componentReference" = "Application"};
 				application.wo.$simpleLock(name = local.lockName, execute = "$handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 			}
 			return false; // Stop processing this request after restart
@@ -396,13 +404,18 @@ component output="false" {
 	}
 
 	public string function $buildRedirectUrl() {
+		// The local carrying the redirect target must NOT be named "url": this
+		// function reads the URL scope unscoped below (StructKeyExists(url, ...)),
+		// and on Adobe CF an unscoped url resolves to a local of that name first,
+		// turning every password reload into an HTTP 500 (issue #3053, CLAUDE.md
+		// anti-pattern #11 — reserved scope names).
 		// Determine the base URL
 		if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
-			local.url = cgi.path_info;
+			local.redirectPath = cgi.path_info;
 		} else if (StructKeyExists(cgi, "path_info")) {
-			local.url = "/";
+			local.redirectPath = "/";
 		} else {
-			local.url = cgi.script_name;
+			local.redirectPath = cgi.script_name;
 		}
 
 		// For a plain restart (?reload=true) every reload-related parameter is
@@ -459,11 +472,11 @@ component output="false" {
 			// Add query string to URL if any parameters remain
 			if (ArrayLen(local.newQueryString)) {
 				local.queryString = ArrayToList(local.newQueryString, "&");
-				local.url = "#local.url#?#local.queryString#";
+				local.redirectPath = "#local.redirectPath#?#local.queryString#";
 			}
 		}
 
-		return local.url;
+		return local.redirectPath;
 	}
 
 	/**

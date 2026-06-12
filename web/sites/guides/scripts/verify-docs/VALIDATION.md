@@ -9,15 +9,40 @@ and `{test:compile}`.
 
 ## `{test:compile}`
 
-The body is handed to `wheels cfml <body>`. Pass if exit code 0. Fail if
-non-zero. Requires [LuCLI PR #1](https://github.com/lucee/LuCLI) which
-makes `wheels cfml` exit non-zero on execution failures.
+The contract is **parse/compile, never execute**. Doc snippets are
+fragments — models without an app, `set()` calls without a config file,
+`describe()` without a test runner — so executing them in a bare engine
+can only fail on missing context (see issue
+[#3041](https://github.com/wheels-dev/wheels/issues/3041)). Instead the
+driver wraps each body by sniffed kind so the engine compiles it without
+running it, then invokes `wheels cfml <wrapped>`. Pass if exit code 0.
 
-On older LuCLI versions (where `wheels cfml` always exits 0 regardless
-of CFML errors), the driver falls back to a pattern-match validator —
-currently only a bracket-balance check. The mode is detected once per
-harness run via a probe (`wheels cfml 'throw()'` — if it exits 0,
-fallback; if non-zero, native).
+Wrap kinds (`drivers/compile.mjs`):
+
+- **component** — the body declares `component`/`interface` in script
+  syntax. The declaration header is stripped and each declaration's inner
+  body is wrapped in its own never-invoked function shell. The engine
+  compiles the whole script before executing anything, so syntax errors
+  fail while framework functions (`validatesPresenceOf`, `hasMany`, …)
+  are never resolved. *Limitation:* typos in the header itself (e.g. the
+  `extends` target) are not checked; top-level `property` declarations
+  are neutralized before wrapping.
+- **tag** — the body starts with `<` (tag CFML, view templates, or an
+  author-supplied `<cfscript>` wrapper). The engine wraps inline code in
+  `<cfscript>…</cfscript>`, so the driver closes that wrapper and emits
+  the body inside `<cfif false>…</cfif>`: compiled in template context
+  (catching mismatched tags, bad expressions inside `<cfoutput>`, …),
+  never executed, and never double-wrapped in `<cfscript>`.
+- **script** — everything else (config fragments, spec fragments, plain
+  script). Wrapped in a single never-invoked function shell. `var` at the
+  top level is legal inside the shell, matching how the framework runs
+  `config/services.cfm` and friends.
+
+The native path needs `wheels cfml` to exit non-zero on errors (wheels
+CLI 4.0.3+). On older CLIs where `wheels cfml` always exits 0, the
+driver falls back to a bracket-balance check. The mode is detected once
+per harness run via a probe (`wheels cfml 'throw(message="probe")'` —
+exit 0 ⇒ fallback; non-zero ⇒ native).
 
 ```cfm {test:compile}
 component extends="Model" {
@@ -27,12 +52,51 @@ component extends="Model" {
 }
 ```
 
-**Fallback-mode caveat:** The bracket check catches obvious typos but
-does NOT validate CFML syntax or semantics. A block like
-`hasMany("comments", dependent="delete")` (mixed positional + named
-args — a real Wheels anti-pattern) passes the fallback but would fail
-a real parse. This is acceptable: fallback buys you typo detection
-while we wait for PR #1 to land.
+**What this does and does not verify:** a passing block is syntactically
+valid CFML in its declared shape — it parses and compiles. It is NOT
+executed, so semantic mistakes (mixed positional + named args, phantom
+helper names, wrong argument values) still pass. Behavioral verification
+belongs to `{test:cli}` / `{test:tutorial}` blocks.
+
+**Fallback-mode caveat:** the bracket check catches obvious typos but
+does not validate CFML syntax at all. Treat fallback results as
+advisory.
+
+## Expected failures (allowlist)
+
+`scripts/verify-docs/expected-failures.json` masks known-failing blocks
+so CI can gate the live tree while individual blocks are being fixed.
+Override the file path with `VERIFY_DOCS_ALLOWLIST`. Shape:
+
+```json
+{
+  "entries": [
+    {
+      "file": "src/content/docs/v4-0-0/basics/routing.mdx",
+      "bodySha256": "0123abcd4567",
+      "reason": "fragment needs surrounding app context; rewrite pending",
+      "issue": "#3041"
+    }
+  ]
+}
+```
+
+- `file` — path suffix of the page (conventionally relative to
+  `web/sites/guides/`).
+- `bodySha256` — first 12 hex chars of the sha256 of the block body.
+  Every failing block's hash is printed in the report, so entries are
+  copy-pasteable. Keying on content (not line numbers) keeps entries
+  stable across unrelated page edits and forces re-verification the
+  moment the block changes.
+- `reason` — required, non-empty.
+- `issue` — required, `#NNNN` or a GitHub issue/PR URL.
+
+Allowlisted failures are reported in their own section and do not affect
+the exit code. An entry whose block now **passes** produces a stale-entry
+warning; on full-tree runs, entries matching no block at all produce an
+orphan warning. Both warnings ask you to delete the entry. An invalid
+allowlist file (missing reason, bad issue ref, malformed JSON) makes the
+harness exit 2 before running anything.
 
 ## `{test:cli cmd="..."}`
 
@@ -110,6 +174,40 @@ Blocks that cannot or should not compile:
 ```cfm title="illustrative — do not type"
 someAPI.callThat.doesntExistYet();
 ```
+
+## Which `wheels` binary the harness runs
+
+Every spawned `wheels` command resolves to one binary, picked once at
+startup (`lib/exec.mjs`, `resolveWheels()`), in this order:
+
+1. `WHEELS_BIN` — absolute path to a `wheels` binary; takes precedence
+   over everything else when set.
+2. `command -v wheels` — whatever is first on `PATH`.
+3. Homebrew bin dirs (`/opt/homebrew/bin`, `/usr/local/bin`,
+   `/home/linuxbrew/.linuxbrew/bin`).
+
+This covers the long-lived tutorial dev server too: `{test:tutorial}`
+`asserts-http` blocks boot the fixture app by spawning the same resolved
+binary (`drivers/tutorial.mjs`, `ensureServer()`), not a fresh `PATH`
+lookup — so `WHEELS_BIN` redirects it like every other spawn.
+
+`verify-docs.mjs` prints an attestation line at run start stating the
+resolved path, how it was resolved, and the binary's `--version` output:
+
+```
+verify-docs: wheels binary: /opt/homebrew/bin/wheels (via PATH discovery) — ...
+```
+
+A green run only attests to the binary named on that line.
+
+**CI implication:** `.github/workflows/docs-verify.yml` installs the
+**released** brew CLI and does not set `WHEELS_BIN`, so a green CI run of
+`{test:cli}` / `{test:compile}` / `{test:tutorial}` blocks attests to the
+released CLI — not to a CLI built from the PR's checkout. Wiring CI to a
+branch-built CLI (so a CLI behavior change in a PR can flip a cli block
+red) is tracked in [#3042](https://github.com/wheels-dev/wheels/issues/3042).
+To attest to a locally built CLI, point `WHEELS_BIN` at it before running
+the harness.
 
 ## Running the harness locally
 

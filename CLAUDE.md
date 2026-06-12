@@ -121,13 +121,14 @@ Model finders return query objects, not arrays. Loop accordingly.
 ```
 
 ### 5. Migration Seed Data — Direct SQL Only
-Parameter binding in `execute()` is unreliable. Use inline SQL.
+`execute()` accepts only a SQL string — there is no `parameters` argument (`Migration.cfc`: `execute(required string sql)`). Use inline SQL.
 ```cfm
 // WRONG
 execute(sql="INSERT INTO roles (name) VALUES (?)", parameters=[{value="admin"}]);
 
-// RIGHT — and use NOW() for database-agnostic dates (MySQL/PG/MSSQL/H2/SQLite)
-execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
+// RIGHT — and use CURRENT_TIMESTAMP for database-agnostic dates (MySQL/PG/MSSQL/H2/SQLite).
+// NOW() fails on SQLite (the `wheels new` default DB) and SQL Server; no adapter rewrites it.
+execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
 ```
 
 ### 6. Route Order Matters
@@ -149,7 +150,7 @@ function authenticate() { ... }
 private function authenticate() { ... }
 ```
 
-Conversely, public **framework helpers** mixed onto every controller (`env`, `model`, `redirectTo`, `linkTo`, the `is*` request predicates, the flash helpers, …) are auto-excluded from the routable surface. At app start `application.wheels.protectedControllerMethods` is built from the `wheels.Global` + `wheels.controller.*` + `wheels.view.*` mixin surface (the same `getMetaData().functions` set `$integrateComponents` mixes in), and `$callAction()` throws `Wheels.ActionNotAllowed` → 404 for any action whose name matches one. So a helper can't be invoked as an action — but you also **can't name a user action after a framework helper** (it 404s instead of dispatching). The standard REST action names (`index`, `show`, `new`, `edit`, `create`, `update`, `delete`) are not helpers, so they're unaffected ([#2845](https://github.com/wheels-dev/wheels/pull/2845)).
+Conversely, public **framework helpers** mixed onto every controller (`env`, `model`, `redirectTo`, `linkTo`, the `is*` request predicates, the flash helpers, …) are auto-excluded from the routable surface. At app start `application.wheels.protectedControllerMethods` is built from the `wheels.Global` + `wheels.controller.*` + `wheels.view.*` mixin surface (the same `getMetaData().functions` set `$integrateComponents` mixes in), and `$callAction()` throws `Wheels.ActionNotAllowed` for any action whose name matches one — intended to fall through to the 404 path, but it currently surfaces as HTTP 500 in every environment ([#3075](https://github.com/wheels-dev/wheels/issues/3075)). So a helper can't be invoked as an action — but you also **can't name a user action after a framework helper** (it errors instead of dispatching). The standard REST action names (`index`, `show`, `new`, `edit`, `create`, `update`, `delete`) are not helpers, so they're unaffected ([#2845](https://github.com/wheels-dev/wheels/pull/2845)).
 
 ### 9. Always cfparam View Variables
 Every variable passed from controller to view needs a cfparam at the top of the view file.
@@ -258,7 +259,7 @@ For new migrator helpers or anywhere you accept a column-name argument: declare 
 component extends="Model" {
     function config() {
         // Table/key (only if non-conventional)
-        tableName("tbl_users");
+        table("tbl_users");        // setter is table(); tableName() is a getter — tableName("x") is a silent no-op (#3079)
         setPrimaryKey("userId");
 
         // Associations — all named params when using options
@@ -422,10 +423,16 @@ new wheels.middleware.RateLimiter()                                            /
 new wheels.middleware.RateLimiter(maxRequests=100, windowSeconds=120, strategy="slidingWindow")
 new wheels.middleware.RateLimiter(maxRequests=50, windowSeconds=60, strategy="tokenBucket")
 new wheels.middleware.RateLimiter(storage="database")                          // auto-creates wheels_rate_limits
-new wheels.middleware.RateLimiter(keyFunction=function(req) {                  // rate-limit per API key
-    return req.cgi.http_x_api_key ?: "anonymous";
-})
+// rate-limit per API key — hoist the closure first: an inline function literal
+// as a constructor named arg crashes Adobe CF (Cross-Engine Invariant 5)
+var apiKeyFn = function(req) {
+    var apiKey = cgi.http_x_api_key;
+    return Len(apiKey) ? apiKey : "anonymous";
+};
+new wheels.middleware.RateLimiter(keyFunction=apiKeyFn)
 ```
+
+The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method}` — it has **no `cgi` key** ([#3074](https://github.com/wheels-dev/wheels/issues/3074)), so `req.cgi.*` silently collapses every client into one bucket. Read the real `cgi` scope directly, and guard with `Len()` (a missing header reads as empty string, not undefined, so `?:` never fires).
 
 Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` or `database`. Emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. Returns `429` with `Retry-After` when exceeded.
 
@@ -649,14 +656,7 @@ result = (new wheels.Job()).processQueue(queue="mailers", limit=10);
 stats = (new wheels.Job()).queueStats();
 ```
 
-Worker CLI:
-```bash
-wheels jobs work --queue=mailers --interval=3
-wheels jobs status [--format=json]
-wheels jobs retry --queue=mailers
-wheels jobs purge --completed --failed --older-than=30
-wheels jobs monitor
-```
+Worker CLI: none yet — `wheels jobs work|status|retry|purge|monitor` do not exist (`cli/lucli/Module.cfc` has no `jobs` command; invoking one errors — [#3090](https://github.com/wheels-dev/wheels/issues/3090)). Drive queues programmatically via `processQueue()` / `queueStats()` (above), e.g. from a scheduled task or cron-invoked script.
 
 Backoff: `this.baseDelay = 2`, `this.maxDelay = 3600` in `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`. The `wheels_jobs` table is auto-created on first enqueue/processing — no migration needed.
 

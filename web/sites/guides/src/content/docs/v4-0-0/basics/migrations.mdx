@@ -39,10 +39,10 @@ wheels --version
 <Aside type="caution" title="Write commands require a project-bound server">
 `wheels migrate latest`, `migrate up`, `migrate down`, `migrate forget`, `migrate pretend`, `migrate rename-system-tables`, `wheels seed`, and `wheels db reset` (which runs migrate + seed) only connect to a server whose port is explicitly configured for this project — via the `port` field in `lucee.json` (created by `wheels new`, or set manually) or the `PORT` variable in `.env`. They refuse the common-port fallback (8080, etc.) to prevent silently targeting a sibling app's server when you work on multiple projects. If you see `Wheels.ServerNotRunning`, run `wheels start` in this project's directory first.
 
-`wheels migrate info` and `wheels migrate doctor` are read-only and still probe common ports as a fallback, so they work without an explicit port config.
+`wheels migrate info` and `wheels migrate doctor` are read-only, but they currently go through the same project-bound check — there is no common-port fallback for them either, so they too need the explicit port config ([#3080](https://github.com/wheels-dev/wheels/issues/3080) tracks whether the read-side fallback comes back).
 </Aside>
 
-The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly on databases that support transactional DDL — but that support varies, so read the caution below before relying on it.
+The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly on databases that support transactional DDL — but that support varies, so read the caution below before relying on it. One more caveat for scripts and CI: a failed migration is loud in the command output but the CLI currently still exits `0`, so don't gate a pipeline on the exit code alone ([#3081](https://github.com/wheels-dev/wheels/issues/3081)).
 
 <Aside type="caution" title="DDL auto-commit on MySQL and Oracle">
 On MySQL and Oracle, DDL statements (`CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`, …) implicitly commit the surrounding transaction. A multi-statement migration that fails midway on those databases leaves the statements that already ran committed — partial schema the transaction wrapper cannot undo. PostgreSQL, SQL Server, and SQLite support transactional DDL, so the all-or-nothing guarantee holds there. On MySQL/Oracle, prefer small single-purpose migrations, and if one does die halfway, use `wheels migrate doctor` and the reconciliation subcommands below to get the tracking table and schema back in line.
@@ -66,7 +66,7 @@ The generator scaffolds a CFC with `up()` and `down()` stubs and drops it in `ap
 wheels generate migration CreatePosts
 ```
 
-That produces a file named like `20260420143000_create_posts_table.cfc`. The prefix is `YYYYMMDDHHMMSS` — generated from the clock at creation time — and the runner applies migrations in filename order, so the timestamp is what puts your change after everyone else's. Never rename or reorder migration files after they've been committed: the history in `wheels_migrator_versions` keys on the timestamp prefix, and a renamed file looks like a brand-new migration to the runner.
+That produces a file named like `20260420143000_CreatePosts.cfc` — the name you typed is used verbatim. The prefix is `YYYYMMDDHHMMSS` — generated from your local clock at creation time — and the runner applies migrations in filename order, so the timestamp is what puts your change after everyone else's. Never rename or reorder migration files after they've been committed: the history in `wheels_migrator_versions` keys on the timestamp prefix, and a renamed file looks like a brand-new migration to the runner.
 
 ## Writing a migration — full example
 
@@ -94,7 +94,7 @@ Three things to note:
 
 1. `createTable("posts")` returns a table-builder object. Every column method — `t.string`, `t.integer`, `t.datetime` — mutates that builder. Nothing hits the database until `t.create()`.
 2. `t.timestamps()` creates `createdAt`, `updatedAt`, **and** a soft-delete column (`deletedAt`). Don't also add those columns by hand — you'll get duplicate-column errors. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/) for how Wheels populates them automatically on save.
-3. The column-builder methods use `columnNames` (plural) and `allowNull` — not `columnName` and `null`. A single call can create several same-typed columns at once: `t.string(columnNames="firstName,lastName", limit=60)`.
+3. The column-builder methods use `columnNames` (plural) and `allowNull`. Every helper also accepts `columnName` (singular) as an alias, but `columnNames` is the preferred form; the nullable flag is always `allowNull` — `null` is never accepted. A single call can create several same-typed columns at once: `t.string(columnNames="firstName,lastName", limit=60)`.
 
 ## Column types
 
@@ -105,7 +105,7 @@ These are the column-builder methods defined on `TableDefinition`. Every one tak
 | `t.string(columnNames=, limit=, allowNull=, default=)` | VARCHAR | `limit` defaults to 255 |
 | `t.char(columnNames=, limit=)` | CHAR | fixed-width string |
 | `t.text(columnNames=, size=)` | TEXT / MEDIUMTEXT / LONGTEXT | `size` is MySQL-only |
-| `t.integer(columnNames=, limit=, allowNull=, default=)` | INT | `limit=8` maps to BIGINT on MySQL |
+| `t.integer(columnNames=, limit=, allowNull=, default=)` | INT | `limit` is a display width, not a size bump — for BIGINT use `t.bigInteger()` |
 | `t.bigInteger(columnNames=)` | BIGINT | |
 | `t.float(columnNames=)` | FLOAT | |
 | `t.decimal(columnNames=, precision=, scale=)` | DECIMAL | use for money |
@@ -232,12 +232,12 @@ component extends="wheels.migrator.Migration" hint="Remove deprecated teaser" {
 
 Real seed data — users, roles, reference lookups — belongs in `app/db/seeds.cfm` where it runs idempotently via `seedOnce()`. See [Seeding](/v4-0-0/basics/seeding/) for that path. Don't use migrations for seed data in long-lived projects: a `INSERT` in a migration runs exactly once, so editing the inserted row later means writing another migration to update it, and fresh clones of the repo end up with whatever the most recent migration wrote.
 
-That said, you'll occasionally want a migration to backfill data for a schema change — for example, populating a new column from an existing one. When you do, use inline SQL with `NOW()` for timestamps. Parameter binding in `execute()` is unreliable across databases, and database-specific date functions (`CURRENT_TIMESTAMP`, `GETDATE()`, `SYSDATETIME()`) don't port. `NOW()` works across MySQL, PostgreSQL, SQL Server, H2, and SQLite.
+That said, you'll occasionally want a migration to backfill data for a schema change — for example, populating a new column from an existing one. When you do, use inline SQL: `execute()` takes a single SQL string and nothing else — there is no parameters argument, so there's no binding to reach for. For timestamps, use `CURRENT_TIMESTAMP`, which works across MySQL, PostgreSQL, SQL Server, H2, and SQLite. `NOW()` does not port: SQLite — the default database for `wheels new` apps — fails with `no such function: NOW`, and SQL Server has no native `NOW()` either. Other database-specific date functions (`GETDATE()`, `SYSDATETIME()`) don't port at all.
 
 ```cfm {test:compile}
 component extends="wheels.migrator.Migration" hint="Seed admin role" {
     function up() {
-        execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
+        execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
     }
 
     function down() {
@@ -273,7 +273,7 @@ The throw is the honest signal: "you can't walk past this point backward." If yo
 
 ## Filename format
 
-Generated migration files are named `<YYYYMMDDHHMMSS>_<snake_case_name>.cfc` — a 14-digit UTC-ish timestamp, an underscore, then the name you passed to `wheels generate migration`. The timestamp determines the order the runner applies them. Don't hand-edit the prefix; if you need to reorder after a merge conflict, regenerate the file and move your body into it.
+Generated migration files are named `<YYYYMMDDHHMMSS>_<NameAsTyped>.cfc` — a 14-digit timestamp from your local clock, an underscore, then the name you passed to `wheels generate migration`, written exactly as you typed it (no snake_casing, no added suffix). The snake_case shape you may also see in `app/migrator/migrations/` — `20260420143000_create_posts_table.cfc` — comes from the *model* generator: `wheels g model Post` scaffolds a `create_posts_table` migration alongside the model. The timestamp determines the order the runner applies them. Don't hand-edit the prefix; if you need to reorder after a merge conflict, regenerate the file and move your body into it.
 
 ## Related guides
 

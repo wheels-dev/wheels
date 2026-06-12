@@ -114,7 +114,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("documents --strict in the upgrade() help banner", () => {
-				// The help text users read when running bare `wheels upgrade`
+				// The help text users read when running `wheels upgrade help`
 				// must surface the new flag — otherwise it's discoverable only
 				// by reading the source.
 				expect(variables.moduleSource).toInclude("--strict");

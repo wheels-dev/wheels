@@ -52,7 +52,6 @@ You don't want to repeat `server`, `username`, `password` on every `sendEmail()`
 ```cfm {test:compile}
 // config/settings.cfm
 set(functionName="sendEmail",
-    from="no-reply@example.com",
     server="smtp.example.com",
     port=587,
     useTLS=true,
@@ -60,20 +59,26 @@ set(functionName="sendEmail",
     password=env("SMTP_PASSWORD"));
 ```
 
-Every argument `cfmail` accepts is available here: `server`, `port`, `username`, `password`, `useSSL`, `useTLS`, `from`, `replyto`, `failto`, `subject`, and more. Pulling secrets from `env()` keeps credentials out of source control.
+Every optional argument `cfmail` accepts is available here: `server`, `port`, `username`, `password`, `useSSL`, `useTLS`, `replyto`, `failto`, and more. Pulling secrets from `env()` keeps credentials out of source control.
+
+Don't set defaults for `from`, `to`, or `subject`, though — those three are *required* parameters of `sendEmail()`, and your CFML engine enforces them before Wheels gets a chance to apply configured defaults. A `from` default set here is never used; omitting `from=` at a call site throws a missing-parameter error on every engine even with the default configured. Always pass `from=` (and `to=`, `subject=`) explicitly.
 
 <Aside type="caution">
-  Wheels does not define a `mailerSettings` struct. SMTP connection arguments go through the `sendEmail` function defaults (above) or via your CFML engine's mail service configuration. Anything you can pass to `cfmail`, you can set as a `sendEmail` default.
+  Wheels does not define a `mailerSettings` struct. SMTP connection arguments go through the `sendEmail` function defaults (above) or via your CFML engine's mail service configuration. Anything you can pass to `cfmail`, you can set as a `sendEmail` default — except `from`, `to`, and `subject`, which are required at every call site as described above.
 </Aside>
 
 ## Organize sends in `app/mailers/`
 
-For anything beyond a one-liner, move the send call out of the controller and into a mailer component. Mailers are plain CFCs — no framework base class — that wrap `sendEmail()` behind a named method:
+For anything beyond a one-liner, move the send call out of the controller and into a mailer component. Mailers are plain CFCs — no framework base class — that wrap `sendEmail()` behind a named method. Because `sendEmail()` is a controller function and needs a request-capable controller instance (one with a `params` struct), each mailer method obtains one through the `controller()` factory:
 
 ```cfm {test:compile} title="app/mailers/UserMailer.cfc"
 component {
     public any function sendWelcome(required any user) {
-        return new wheels.Controller().sendEmail(
+        local.mailer = new wheels.Global().controller(
+            name="Mailer",
+            params={controller: "mailer", action: "sendWelcome"}
+        );
+        return local.mailer.sendEmail(
             template="/mailers/user/welcome",
             layout="/mailers/layout",
             from="no-reply@example.com",
@@ -84,7 +89,11 @@ component {
     }
 
     public any function sendPasswordReset(required any user, required string token) {
-        return new wheels.Controller().sendEmail(
+        local.mailer = new wheels.Global().controller(
+            name="Mailer",
+            params={controller: "mailer", action: "sendPasswordReset"}
+        );
+        return local.mailer.sendEmail(
             template="/mailers/user/password_reset",
             layout="/mailers/layout",
             from="no-reply@example.com",
@@ -96,6 +105,10 @@ component {
     }
 }
 ```
+
+<Aside type="caution">
+  Don't instantiate the controller directly: `new wheels.Controller().sendEmail(...)` throws on every engine ("Component [wheels.Controller] has no accessible Member with name [PARAMS]" on Lucee, "Element PARAMS is undefined" on Adobe) because a bare controller instance has no `params` struct — the rendering pipeline dereferences it even for absolute template paths. The `controller(name, params)` factory builds a request-capable instance. Hardening `sendEmail()` for out-of-request senders is tracked in [#3078](https://github.com/wheels-dev/wheels/issues/3078).
+</Aside>
 
 Put the views under `app/views/mailers/user/welcome.cfm` and `app/views/mailers/user/password_reset.cfm`. The leading slash on `template=` makes the path absolute (rooted at `app/views/`) so the mailer works regardless of which controller triggered it.
 
@@ -130,7 +143,7 @@ Pass `onlyPath=false` to `linkTo()` inside email templates — a relative path l
 
 ## Send in a background job
 
-`sendEmail()` runs synchronously. On a signup form that means the user's browser waits for SMTP to hand off the message before the redirect fires — adds hundreds of milliseconds on a good day, seconds when the mail server hiccups. Push the send into a job:
+`sendEmail()` runs synchronously: the template render, message composition, and spool/handoff all happen inside the request before the redirect fires. By default both Lucee and Adobe spool the message to disk rather than waiting for the SMTP handoff, so the cost is usually the render and compose — but with spooling disabled, or a slow template, the user's browser eats that latency on every signup. Push the send into a job:
 
 ```cfm {test:compile} title="app/jobs/SendWelcomeEmailJob.cfc"
 component extends="wheels.Job" {
@@ -194,7 +207,7 @@ Most mail clients prefer the HTML part when both are present; the plain-text par
 
 ## Attachments
 
-Pass `file=` (or its alias `files=`) with one or more paths. Paths without a slash are resolved relative to `application.wheels.filePath` (defaults to `files/` at the app root):
+Pass `file=` (or its alias `files=`) with one or more paths. Paths without any directory separator (`/` or `\`) are resolved relative to the `filePath` setting — default `files`, which expands relative to the **web root**, so `public/files/` in the standard app template:
 
 ```cfm {test:compile}
 sendEmail(
@@ -202,7 +215,7 @@ sendEmail(
     from="billing@example.com",
     to=user.email,
     subject="Your invoice",
-    file="invoices/#user.id#-2026-04.pdf",
+    file="#user.id#-2026-04.pdf",
     user=user
 );
 ```
@@ -215,12 +228,12 @@ sendEmail(
     from="billing@example.com",
     to=user.email,
     subject="Your invoice and receipt",
-    files="invoices/#user.id#.pdf,receipts/#user.id#.pdf",
+    files="invoice-#user.id#.pdf,receipt-#user.id#.pdf",
     user=user
 );
 ```
 
-Absolute paths and URLs work too (`/var/app/pdfs/invoice.pdf`, `https://cdn.example.com/logo.png`) — anything `cfmailparam`'s `file` attribute accepts is valid.
+A path that *does* contain a separator skips the `filePath` resolution entirely and reaches `cfmailparam` unchanged — so a relative path like `invoices/123.pdf` resolves against the JVM working directory at delivery time, which is almost never what you want. For files outside `public/files/`, build an absolute path yourself (e.g. `file="#ExpandPath('../storage/invoices/#user.id#.pdf')#"`). Absolute paths and URLs work too (`/var/app/pdfs/invoice.pdf`, `https://cdn.example.com/logo.png`) — anything `cfmailparam`'s `file` attribute accepts is valid.
 
 ## Per-environment SMTP
 
@@ -237,7 +250,6 @@ set(functionName="sendEmail",
 
 ```cfm {test:compile} title="config/production/settings.cfm"
 set(functionName="sendEmail",
-    from="no-reply@example.com",
     server="smtp.postmarkapp.com",
     port=587,
     useTLS=true,
