@@ -432,7 +432,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 	/**
 	 * A TestBox result memento where every spec passed. Shaped like the
-	 * JSONReporter getMemento() the CLI deserializes from /wheels/*/tests.
+	 * JSONReporter getMemento() the CLI deserializes from /wheels/app|core/tests.
 	 */
 	private struct function $passingResult() {
 		return {
