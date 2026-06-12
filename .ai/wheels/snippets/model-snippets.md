@@ -8,7 +8,7 @@ Common model patterns and code snippets for Wheels applications.
 component extends="Model" {
     function config() {
         // Table mapping (if different from convention)
-        table("custom_table_name");
+        tableName("custom_table_name");
 
         // Associations
         hasMany("comments");
