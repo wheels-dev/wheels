@@ -1,0 +1,76 @@
+name: Smoke (non-dev environments)
+
+# Lucee-leg regression net for discussion #3023 / issues #3030, #3031 (and any
+# future engine-agnostic non-dev request regression): boots the demo app with
+# config/environment.cfm forced to production and testing and asserts
+# non-development request behavior (clean 404s, no stack traces, reload refused
+# without the password) via tools/ci/smoke-env.sh.
+#
+# Scope note: this job runs Lucee 7 only. The Adobe-only failure class from
+# issue #3029 (engine error-template leakage in non-dev environments) is NOT
+# gated here — the cfabort idiom itself is pinned structurally by
+# vendor/wheels/tests/specs/security/BareCfabortGuardSpec.cfc, and the Adobe
+# smoke leg is tracked in issue #3047.
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - 'vendor/wheels/**'
+      - 'public/**'
+      - 'config/**'
+      - 'app/**'
+      - 'tools/ci/smoke-env.sh'
+      - '.github/workflows/smoke-env.yml'
+      - 'tools/ci/lucee.ci.json'
+      - '.github/actions/setup-wheels-test-env/**'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: "Smoke: ${{ matrix.wheels_env }} (Lucee 7)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        wheels_env: [production, testing]
+    env:
+      WHEELS_CI: "true"
+    steps:
+      - uses: actions/checkout@v5
+
+      # Must run before the server boots: the app cold-boots directly into the
+      # matrix environment (in-place reload does not re-read environment.cfm).
+      - name: Force ${{ matrix.wheels_env }} environment
+        run: |
+          sed -i 's/set(environment = "[a-z]*")/set(environment = "${{ matrix.wheels_env }}")/' config/environment.cfm
+          grep -qF 'set(environment = "${{ matrix.wheels_env }}")' config/environment.cfm || {
+            echo "::error::environment.cfm substitution failed — pattern drift?"; exit 1; }
+          grep -n 'set(environment' config/environment.cfm
+
+      # Canonical boot harness (JDK 21, LuCLI, SQLite DBs, JDBC, server start +
+      # restart) — the same composite the bot workflows use, instead of a third
+      # inline copy of pr.yml's boot block. Probes are plain curl, no browser.
+      - name: Set up Wheels test environment
+        uses: ./.github/actions/setup-wheels-test-env
+        with:
+          install-playwright: 'false'
+
+      - name: Run smoke probes
+        run: |
+          BASE_URL="http://localhost:60007" SMOKE_ENV="${{ matrix.wheels_env }}" bash tools/ci/smoke-env.sh
+
+      - name: Debug server logs
+        if: failure()
+        run: cat /tmp/lucli-server.log 2>/dev/null || true
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/lucli-server.pid ]; then
+            kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
+          fi
