@@ -6,7 +6,7 @@ sidebar:
   order: 7
 ---
 
-Routing is the stage between a URL arriving and a controller method running. The algorithm is small enough to keep in your head, the expansion rules are fixed, and the order of declarations is the order of matching — which makes routing failures easy to reason about once you know the shape.
+Routing is the stage between a URL arriving and a controller method running. The algorithm is small enough to keep in your head, the expansion rules are fixed, and the precedence rules are mechanical — static paths first, then declaration order — which makes routing failures easy to reason about once you know the shape.
 
 **You'll learn:**
 
@@ -18,13 +18,18 @@ Routing is the stage between a URL arriving and a controller method running. The
 
 ## The match algorithm
 
-The router walks `config/routes.cfm` top-to-bottom on every request. The first route whose HTTP method and URL pattern both match the request wins — and that's the match, even if a more specific route appears later. There is no scoring, no backtracking, no "best fit."
+Routes are compiled at boot into an in-memory table, and the router resolves each request in two steps:
 
-Resource and namespaced declarations are not matched as a unit. They expand at boot time into plain routes that sit in the same ordered list as your hand-written `.get()` and `.post()` calls. A `.resources("posts")` is seven entries in the table, registered in a fixed order. The wildcard route catches anything that falls through and maps `/controller/action` conventionally — a legacy pattern kept for upgrade paths. Named routes are the preferred way to wire URLs.
+1. **Static routes first.** Routes whose patterns contain no placeholders (`/posts/featured`, `/about`) live in an exact-path index and are checked with an O(1) lookup before anything else. A literal path always beats a placeholder route, no matter where either was declared. If two routes register the same static pattern, the first one declared wins.
+2. **Placeholder routes in declaration order.** Everything that isn't a static match falls through to an ordered top-to-bottom scan of the placeholder routes. The first route whose HTTP method and URL pattern both match wins — even if a more specific placeholder route appears later. There is no scoring, no backtracking, no "best fit."
+
+The static-first step means declaration order does **not** decide static-vs-placeholder conflicts — only placeholder-vs-placeholder ones. This is a deliberate performance index, though it contradicts the framework's older pure first-match-wins description; [#3073](https://github.com/wheels-dev/wheels/issues/3073) tracks reconciling the two.
+
+Resource and namespaced declarations are not matched as a unit. They expand at boot time into plain routes that sit in the same table as your hand-written `.get()` and `.post()` calls. A `.resources("posts")` registers an entry per REST action, in a fixed order. The wildcard route catches anything that falls through and maps `/controller/action` conventionally — a legacy pattern kept for upgrade paths. Named routes are the preferred way to wire URLs.
 
 ## What `.resources("posts")` expands to
 
-One call generates seven routes. The names in the right column are what you pass to `linkTo`, `redirectTo`, and `urlFor`.
+One call generates the seven REST actions below. Each row is also registered with a `.[format]` twin (`/posts.json`, `/posts/:key.xml`, …) for content negotiation, so the actual table holds twice as many rows. The names in the right column are what you pass to `linkTo`, `redirectTo`, and `urlFor`.
 
 | HTTP method | Path | Controller#action | Named route |
 |-------------|------|-------------------|-------------|
@@ -42,9 +47,9 @@ Two routes can share a named route because the helpers disambiguate by HTTP verb
 
 Route order is almost always the cause when a URL matches the wrong action. Four rules cover every case:
 
-- Specific routes come before generic ones. A literal path beats a pattern with a placeholder.
+- A literal path beats a pattern with a placeholder — this is enforced by the router itself (the static-route index resolves first), not a convention you have to maintain by ordering.
 - `.resources(...)` declarations come before `.root(...)`, which comes before `.wildcard()`. The wildcard is always last.
-- A custom `.get(pattern="/posts/featured", to="posts##featured")` must come **before** `.resources("posts")`, or `/posts/featured` matches the `show` route with `params.key = "featured"` instead.
+- A custom `.get(pattern="/posts/featured", to="posts##featured")` routes `/posts/featured` to `featured` whether it's declared before or after `.resources("posts")` — the static index wins over the placeholder `show` route in both orders. Declaring it first is still good style: it keeps the intent visible and matches the placeholder-vs-placeholder rule, where order genuinely decides.
 - Order within a named-route group doesn't matter for URL generation. Named routes are a keyed lookup — the name is the key, not the position.
 
 ```cfm title="illustrative — config/routes.cfm"

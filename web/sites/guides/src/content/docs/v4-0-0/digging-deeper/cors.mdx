@@ -28,7 +28,7 @@ This page shows you how to let a browser on `https://client.example.com` call yo
 
 CORS — Cross-Origin Resource Sharing — is a browser-enforced rule. A script running on origin A (scheme + host + port, e.g. `https://client.example.com`) cannot read responses from a different origin B unless B explicitly opts in with `Access-Control-*` response headers. Server-to-server HTTP calls don't have CORS; it's purely a browser-side policy enforced for JavaScript `fetch`, `XMLHttpRequest`, and `EventSource`.
 
-The `wheels.middleware.Cors` middleware writes those opt-in headers onto every matching response and short-circuits preflight `OPTIONS` requests with a 204-shaped empty body.
+The `wheels.middleware.Cors` middleware writes those opt-in headers onto every matching response and short-circuits preflight `OPTIONS` requests with an empty-body response (HTTP 200).
 
 ## Enable the middleware
 
@@ -62,7 +62,7 @@ These are the constructor arguments on `wheels.middleware.Cors`, verified agains
 | `allowCredentials` | `false`                                            | When `true`, browsers may include cookies and `Authorization` headers. Forbids `allowOrigins="*"`.  |
 | `maxAge`           | `86400` (24 hours)                                 | `Access-Control-Max-Age` — how long the browser may cache the preflight response.                   |
 
-Matching is **exact string comparison** on the incoming `Origin` header. There is no wildcard-subdomain support: `https://*.myapp.com` is not a valid entry. Enumerate every origin you need — scheme + host + port, nothing more, nothing less.
+Matching is an **exact match** on the incoming `Origin` header, compared case-insensitively. There is no wildcard-subdomain support: `https://*.myapp.com` is not a valid entry. Enumerate every origin you need — scheme + host + port, nothing more, nothing less.
 
 <Aside type="caution">
   **Migrating from 3.x global settings?** The `allowHeaders` default above (`"Content-Type,Authorization,X-Requested-With"`) is narrower than the legacy `accessControlAllowHeaders` global-setting default, which also included `X-Auth-Token`, `X-Requested-By`, and `Origin`. A like-for-like swap silently drops those headers. See [Upgrading from 3.x — CORS allow-list defaults drift](/v4-0-0/upgrading/3x-to-4x/#migrating-from-global-settings-to-the-middleware) for the side-by-side comparison and the explicit-constructor-args fix.
@@ -73,7 +73,7 @@ Matching is **exact string comparison** on the incoming `Origin` header. There i
 Before any non-simple cross-origin request (anything that uses a custom header, a non-GET/POST/HEAD method, or a non-simple content type), the browser sends a preflight `OPTIONS` request asking "may I?" The Cors middleware handles this for you:
 
 - If the `Origin` is in `allowOrigins` (or `allowOrigins` is `"*"`), the middleware writes `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, optionally `Access-Control-Allow-Credentials`, plus `Access-Control-Max-Age`, and returns an empty response without running your controller.
-- If the `Origin` is not in the allowlist, the middleware still short-circuits the `OPTIONS` request with an empty body but **omits the `Access-Control-Allow-*` headers**. The browser sees no opt-in and blocks the subsequent real request.
+- If the `Origin` is not in the allowlist, the middleware still short-circuits the `OPTIONS` request with an empty body but **omits the `Access-Control-Allow-*` headers**. The browser sees no opt-in and blocks the subsequent real request. (`Access-Control-Max-Age` is emitted on every `OPTIONS` response, including disallowed origins.)
 
 You do not write an `options` action on your controllers. The middleware owns `OPTIONS` entirely.
 
@@ -89,7 +89,7 @@ Three rules come with it:
 
 ## Per-route Cors
 
-Most real apps want strict CORS only on `/api` and not on the HTML pages. Pass middleware to a `scope()` block and the rules apply only to routes declared inside the callback:
+Most real apps want strict CORS only on `/api` and not on the HTML pages. Pass middleware to a `scope()` block and the rules apply only to the routes declared before the scope's closing `.end()`:
 
 ```cfm {test:compile} title="config/routes.cfm"
 <cfscript>
@@ -101,12 +101,11 @@ mapper()
                 allowOrigins="https://client.myapp.com",
                 allowCredentials=true
             )
-        ],
-        callback=function(map) {
-            map.resources("posts");
-            map.resources("comments");
-        }
+        ]
     )
+        .resources("posts")
+        .resources("comments")
+    .end()
     .resources("pages")
     .wildcard()
 .end();
@@ -114,6 +113,8 @@ mapper()
 ```
 
 Routes under `/api` get the Cors middleware. `resources("pages")` and everything outside the scope do not. Scope-level middleware composes with global middleware — both run.
+
+Close the scope with `.end()` before declaring routes outside it — an unclosed scope leaks its path prefix and middleware onto every subsequent route. Alternatively, pass the scoped routes as a `callback=` argument (`.scope(path="/api", middleware=[...], callback=function(map) { map.resources("posts"); })`) — `scope()` runs the callback and closes the scope automatically when it returns ([#3072](https://github.com/wheels-dev/wheels/issues/3072)). On releases before that fix (4.0.3 and earlier), `scope()` silently ignored `callback=`, so use the explicit `.end()` form there.
 
 <Aside type="caution">
   The preflight short-circuit that prevents unmatched `OPTIONS` requests from reaching the route table applies only when `Cors` is registered in the **global** pipeline via `config/settings.cfm`. Route-scoped `Cors` declared inside `.scope()` in `config/routes.cfm` does not benefit: route matching runs before route-scoped middleware executes, so a browser preflight to a path that only declares `POST` will 404 with `Wheels.RouteNotFound` unless `Cors` is also in the global pipeline.
@@ -139,7 +140,7 @@ When a cross-origin request fails, work through this checklist:
        -H "Access-Control-Request-Headers: Content-Type" \
        -v https://api.myapp.com/posts
   ```
-- **Match the origin exactly.** Origins are strings, compared character-for-character. `https://myapp.com` is not `http://myapp.com`, not `https://www.myapp.com`, not `https://myapp.com:8080`. All four are distinct origins.
+- **Match the origin exactly.** Origins are strings, compared exactly (case-insensitively). `https://myapp.com` is not `http://myapp.com`, not `https://www.myapp.com`, not `https://myapp.com:8080`. All four are distinct origins.
 
 ## Common pitfalls
 

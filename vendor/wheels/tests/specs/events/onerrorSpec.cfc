@@ -54,6 +54,15 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.DataSourceNotFound")).toBe(404)
 			})
 
+			// GH ##3075: the action-dispatch gate ($callAction) blocks framework
+			// helpers and $-prefixed internals by throwing Wheels.ActionNotAllowed.
+			// #2845 and CLAUDE.md Anti-Pattern 8 promise that resolves to a 404,
+			// but the *NotFound-only regex sent it to 500. ActionNotAllowed is now
+			// an explicit member of the 404 set alongside the *NotFound family.
+			it("maps Wheels.ActionNotAllowed to HTTP 404 (##3075)", () => {
+				expect($expectedStatusFor("Wheels.ActionNotAllowed")).toBe(404)
+			})
+
 			it("maps a generic Wheels error type to HTTP 500 (##2319)", () => {
 				expect($expectedStatusFor("Wheels.UnknownThingHappened")).toBe(500)
 			})
@@ -107,7 +116,9 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private numeric function $expectedStatusFor(required string wheelsType) {
-		if (ReFindNoCase("^Wheels\.[A-Za-z]*NotFound$", arguments.wheelsType)) {
+		// Mirrors the status map in EventMethods.$runOnError. Keep the regex in
+		// sync with that source — a rename or narrowing there must break here.
+		if (ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.wheelsType)) {
 			return 404
 		}
 		return 500

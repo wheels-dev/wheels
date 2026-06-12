@@ -54,7 +54,7 @@ it("shows expected content and hides drafts", () => {
 });
 ```
 
-`assertSee` is a substring match — the text must appear somewhere in the body. `assertDontSee` confirms absence. Both are case-sensitive.
+`assertSee` is a substring match — the text must appear somewhere in the body. `assertDontSee` confirms absence. Both are case-insensitive (as is `assertSeeInOrder`).
 
 ```cfm {test:compile} title="tests/specs/views/PostsIndexSpec.cfc"
 it("renders posts in reverse chronological order", () => {
@@ -159,12 +159,13 @@ it("re-renders the form with inline validation errors", () => {
     $testClient()
         .post("/posts", {"post[title]": "", "post[body]": "Body text"})
         .assertOk()
-        .assertSee("can&##39;t be empty")
+        .assertSee("Title can")
+        .assertSee("t be empty")
         .assertSee("data-auto-id=""post_title""");
 });
 ```
 
-The `&##39;` is the HTML-encoded apostrophe Wheels emits in error messages — `"can't be empty"` becomes `"can&##39;t be empty"` after encoding. Assert on the encoded form, not the raw text, because that's what's in the response body.
+Wheels HTML-encodes the apostrophe in error messages — `"can't be empty"` arrives in the body as `"can&##x27;t be empty"` (the hex entity, on both Lucee and Adobe). Asserting the raw `"can't be empty"` fails because that string isn't in the response. The split assertion above sidesteps the encoding entirely and is the recommended pattern. If you'd rather pin the encoded form exactly, write `assertSee("can&##x27;t be empty")` — the doubled `##` is the CFML escape for a literal `#` in a string.
 
 ## Browser tests vs `assertSee`
 
@@ -178,7 +179,7 @@ If you have a browser test that covers the same flow end-to-end, most view-outpu
 
 - **Static pages** — marketing copy, error pages, the login form. No JavaScript, no state; a substring assertion proves everything the spec needs to prove.
 - **Form-helper regression checks** — the `data-auto-id` attribute must keep emitting, the error-display partial must keep rendering errors. A view spec catches a helper refactor that breaks the convention in milliseconds; a browser spec would take seconds and obscure the root cause.
-- **Error-message presence** — `assertSee("can&##39;t be empty")` after a bad POST is faster than driving a browser through the form.
+- **Error-message presence** — `assertSee("can&##x27;t be empty")` after a bad POST is faster than driving a browser through the form.
 
 Anything that requires a real DOM, real JavaScript, or real user interaction — Turbo Streams landing correctly, modal dialogs opening, a client-side validator firing — belongs in a browser test.
 

@@ -48,6 +48,10 @@ set(middleware = [
 
 With no other arguments you get: `strategy="fixedWindow"`, `storage="memory"`, and keying by client IP. Every client gets 60 requests per 60 seconds.
 
+<Aside type="note">
+  Requests handled by the internal Wheels controller — the `/wheels` GUI routes, or a root route left pointing at the built-in welcome page instead of one of your controllers — bypass the middleware pipeline and never count against a budget. Test rate limiting against one of your own controller routes.
+</Aside>
+
 ## Sliding window
 
 Swap the strategy for smoother enforcement:
@@ -135,14 +139,15 @@ set(middleware = [
         maxRequests=1000,
         windowSeconds=60,
         keyFunction=function(req) {
-            return req.cgi.http_x_api_key ?: "anonymous";
+            var apiKey = cgi.http_x_api_key;
+            return Len(apiKey) ? apiKey : "anonymous";
         }
     )
 ]);
 </cfscript>
 ```
 
-The closure receives the request struct and returns a unique-per-client string. Fall back to a constant like `"anonymous"` so unauthenticated traffic still hits some limit — otherwise an attacker who omits the header accumulates counter entries under whatever empty-string key your code returns.
+The closure receives the middleware request context — a struct of `params`, `route`, `pathInfo`, and `method` — and returns a unique-per-client string. The context does not carry a `cgi` key ([#3074](https://github.com/wheels-dev/wheels/issues/3074)), so read headers from the engine's `cgi` scope directly, as above. Note the `Len()` guard: a missing header reads as an **empty string** in the `cgi` scope, not undefined, so `cgi.http_x_api_key ?: "anonymous"` would never fall back. Fall back to a constant like `"anonymous"` so unauthenticated traffic still hits some limit — otherwise every header-less request shares whatever empty-string key your code returns: one merged budget you never intended.
 
 <Aside type="tip">
   Keys longer than `maxKeyLength` (default 128) are auto-replaced with a SHA-256 hash to bound memory. You don't need to truncate keys yourself.
@@ -190,16 +195,17 @@ mapper()
                 maxRequests=5,
                 windowSeconds=60
             )
-        ],
-        callback=function(map) {
-            map.post(name="authenticate", pattern="/", to="sessions##create");
-        }
+        ]
     )
+        .post(name="authenticate", pattern="/", to="sessions##create")
+    .end()
     .resources("users")
     .wildcard()
 .end();
 </cfscript>
 ```
+
+Declare the scoped routes between `.scope()` and its matching `.end()`, then close the scope before any routes that shouldn't share the limit — without the `.end()` every subsequent route (including `.wildcard()`) nests under `/login`, breaking the rest of the app's routing. `scope()` also accepts a `callback=` argument that declares the scoped routes and closes the scope automatically when it returns ([#3072](https://github.com/wheels-dev/wheels/issues/3072)). On releases before that fix (4.0.3 and earlier), `callback=` was silently ignored, so use the explicit `.end()` form there.
 
 Global middleware from `config/settings.cfm` still runs — it composes with the scope-level one. The pattern is: a permissive global limit (say 60/min) plus a tight limit on sensitive routes (5/min on login) so a brute-force attempt trips the narrow limit long before the broad one.
 

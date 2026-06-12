@@ -47,10 +47,13 @@ If you terminate TLS in a reverse proxy that already stamps `X-Request-Id` (ngin
 component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
     public string function handle(required struct request, required any next) {
-        local.inbound = request.cgi.http_x_request_id ?: "";
+        // Read the real `cgi` scope. The middleware request context only
+        // carries {params, route, pathInfo, method} — it has no `cgi` key,
+        // so `request.cgi.http_x_request_id` would always be empty.
+        local.inbound = cgi.http_x_request_id ?: "";
         local.id = Len(local.inbound) ? local.inbound : CreateUUID();
 
-        request.wheels.requestId = local.id;
+        $writeRequestId(local.id);
         local.response = arguments.next(arguments.request);
 
         try {
@@ -58,6 +61,17 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
         } catch (any e) {}
 
         return local.response;
+    }
+
+    // Write via a helper with no `request` parameter in scope: inside
+    // handle(), the `required struct request` parameter shadows the request
+    // scope on Adobe CF, so a bare `request.wheels.requestId = ...` there
+    // would write to the passed struct instead of the scope.
+    private void function $writeRequestId(required string requestId) {
+        if (!StructKeyExists(request, "wheels")) {
+            request.wheels = {};
+        }
+        request.wheels.requestId = arguments.requestId;
     }
 }
 ```
@@ -95,7 +109,9 @@ component output="false" {
             "level": arguments.level,
             "message": arguments.message,
             "requestId": request.wheels.requestId ?: "",
-            "environment": get("environment")
+            // Bare get() isn't available in a plain component — it's a
+            // framework mixin. Read the application scope directly.
+            "environment": application.wheels.environment ?: ""
         };
         StructAppend(local.payload, arguments.context, true);
 
@@ -111,8 +127,8 @@ component output="false" {
 Register it in the DI container so every controller and model can reach it:
 
 ```cfm {test:compile} title="config/services.cfm"
-var di = injector();
-di.map("log").to("app.lib.Log").asSingleton();
+local.di = injector();
+local.di.map("log").to("app.lib.Log").asSingleton();
 ```
 
 Then from a controller:
@@ -157,6 +173,12 @@ Wheels does not provide a built-in health check route. Add one — every load ba
 ```cfm {test:compile} title="app/controllers/Health.cfc"
 component extends="Controller" {
 
+    function config() {
+        // Without provides(), renderWith() falls back to the HTML view
+        // (which doesn't exist) and the endpoint 500s.
+        provides("html,json");
+    }
+
     function index() {
         local.checks = {
             "database": $checkDatabase(),
@@ -164,15 +186,18 @@ component extends="Controller" {
         };
 
         local.healthy = local.checks.database.ok;
-        local.status = local.healthy ? 200 : 503;
+        local.statusCode = local.healthy ? 200 : 503;
 
+        // The argument is `status` — renderWith() has no `statusCode`
+        // argument, and an unknown argument would be swallowed, returning
+        // HTTP 200 to the load balancer even on the degraded path.
         renderWith(
             data = {
                 "status": local.healthy ? "ok" : "degraded",
                 "checks": local.checks,
                 "requestId": request.wheels.requestId ?: ""
             },
-            statusCode = local.status
+            status = local.statusCode
         );
     }
 
@@ -286,7 +311,7 @@ Every event captured during that request then carries the user context.
 
 ### What it doesn't cover
 
-- **Background jobs** — `Job.cfc` writes failures to the `wheels_jobs` log file (`vendor/wheels/Job.cfc` lines 345 and 368) but does not push them to Sentry. If you want Sentry visibility on job failures, wrap `perform()` in a `try/catch` inside each job and call `application.sentry.captureException()` on the rescue path.
+- **Background jobs** — `Job.cfc` writes failures to the `wheels_jobs` log file (see the retry and permanent-failure `writeLog` calls in `vendor/wheels/Job.cfc`) but does not push them to Sentry. If you want Sentry visibility on job failures, wrap `perform()` in a `try/catch` inside each job and call `application.sentry.captureException()` on the rescue path.
 - **Middleware** — exceptions thrown inside middleware bypass controller mixins. Use `application.sentry.captureException()` directly if you need coverage there.
 
 ## Metrics and APM
@@ -305,7 +330,7 @@ A small set of signals covers almost every production incident a Wheels app will
 
 - **5xx rate** — from the reverse proxy access log or the APM agent. Alert when the ratio of 5xx responses crosses a threshold (1% over five minutes is a reasonable starting point).
 - **Response time p95** — the tail, not the average. A p95 creeping from 200 ms to 1.5 s signals a problem before the average moves.
-- **Job queue depth** — `wheels jobs status` reports pending, processing, and failed counts per queue. Alert on pending counts that don't drain or failed counts that grow.
+- **Job queue depth** — `(new wheels.Job()).queueStats()` reports pending, processing, and failed counts per queue; expose it from a (protected) controller action or a scheduled task that pushes the numbers to your metrics pipeline. Alert on pending counts that don't drain or failed counts that grow. (There is no `wheels jobs status` CLI command — a worker CLI is tracked in [#3090](https://github.com/wheels-dev/wheels/issues/3090).)
 - **Database connection pool saturation** — engine-specific metric. Lucee exposes datasource stats; Adobe does too. A pool pinned at its ceiling means requests are queuing to talk to the database.
 - **Health check failing** — your load balancer's view of app reachability. One pod occasionally failing is noise; all pods failing is an outage.
 - **Sentry error rate** — alert when the rate of captured exceptions for a release exceeds a baseline, or when a new error fingerprint appears post-deploy.

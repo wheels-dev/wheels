@@ -27,10 +27,10 @@ That indirection lets you swap implementations without rewriting consumers. A te
 Registrations live in `config/services.cfm`. Environment-specific overrides live in `config/<environment>/services.cfm` and load after the base file, so `config/testing/services.cfm` can replace production bindings with test doubles.
 
 ```cfm title="illustrative — config/services.cfm"
-var di = injector();
-di.map("emailService").to("app.lib.EmailService").asSingleton();
-di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
-di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+local.di = injector();
+local.di.map("emailService").to("app.lib.EmailService").asSingleton();
+local.di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+local.di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
 ```
 
 `map()` and `bind()` are equivalent — `bind()` just reads better when the name you're registering represents an interface or abstraction. The file loads once at application start and again on `wheels reload`; it is not consulted per request.

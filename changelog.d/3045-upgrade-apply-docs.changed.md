@@ -1,0 +1,1 @@
+- Docs: upgrade guide, release-channels, and 3x-to-4x migration guide updated to document `wheels upgrade apply` as the framework-swap verb alongside `wheels upgrade check` (#3045)

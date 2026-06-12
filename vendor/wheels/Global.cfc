@@ -231,11 +231,36 @@ return local.$wheels;
 	 * @template Mapping-relative path like "/config/services.cfm".
 	 */
 	public void function $includeConfig(required string template) {
-		// cfformat-ignore-start
-  	savecontent variable="local.$wheelsConfigOutput" {
-  	  include "#LCase(arguments.template)#"
-  	};
-		// cfformat-ignore-end
+		try {
+			// cfformat-ignore-start
+  		savecontent variable="local.$wheelsConfigOutput" {
+  		  include "#LCase(arguments.template)#"
+  		};
+			// cfformat-ignore-end
+		} catch (any e) {
+			// A compile-time or runtime failure in a config template must NOT cascade
+			// out of onApplicationStart — that aborts application start and surfaces as
+			// a masked, app-wide HTTP 500 whose onError fallback then fails secondarily,
+			// hiding the real cause. The canonical trigger is Adobe CF rejecting a
+			// top-level `var di = injector();` in config/services.cfm (a compile error on
+			// Adobe, accepted on Lucee), which took down every request at boot (issue
+			// #3063). Log the offending template by name and continue: the file's
+			// registrations simply did not run, which is a recoverable, debuggable state
+			// — exactly the trade-off the output-leak branch below already makes.
+			try {
+				writeLog(
+					file = "wheels",
+					type = "error",
+					text = "Wheels: " & arguments.template & " failed to compile or run during"
+						& " onApplicationStart and was skipped — the application started without"
+						& " this file's configuration (any registrations in it did not execute)."
+						& " Error: " & e.message
+				);
+			} catch (any logErr) {
+				// Logging is best-effort during application start.
+			}
+			return;
+		}
 		if (Len(Trim(local.$wheelsConfigOutput))) {
 			local.preview = Left(Trim(local.$wheelsConfigOutput), 200);
 			local.scriptOpen = Chr(60) & "cfscript" & Chr(62);
@@ -2267,7 +2292,7 @@ return local.$wheels;
 	 */
 	public string function $statusCode() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getStatusCode();
+			return $engineAdapter().getStatusCode();
 		}
 		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "lucee") || StructKeyExists(server, "boxlang")) {
@@ -2284,7 +2309,7 @@ return local.$wheels;
 	 */
 	public string function $contentType() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getContentType();
+			return $engineAdapter().getContentType();
 		}
 		// Fallback when adapter not yet initialized
 		local.rv = "";
@@ -2515,7 +2540,7 @@ return local.$wheels;
 	 */
 	public numeric function $getRequestTimeout() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getRequestTimeout();
+			return $engineAdapter().getRequestTimeout();
 		}
 		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "boxlang")) {

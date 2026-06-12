@@ -171,10 +171,25 @@ component {
 	/**
 	 * Returns the name of the database table that this model is mapped to.
 	 *
+	 * This is a getter and takes no arguments — the table setter is `table()`.
+	 * Calling `tableName()` with an argument has always been a silent no-op (CFML
+	 * accepts the extra argument and the model keeps its convention table), a trap
+	 * some 4.0-era docs taught as a setter. When error information is shown
+	 * (development / testing — the same gate `exists()` uses above) it now fails
+	 * loud; in production it stays a no-op so an upgrade never breaks a running
+	 * app. See issue #3079.
+	 *
 	 * [section: Model Class]
 	 * [category: Miscellaneous Functions]
 	 */
 	public string function tableName() {
+		if (StructCount(arguments) && $get("showErrorInformation")) {
+			Throw(
+				type = "Wheels.InvalidArgument",
+				message = "`tableName()` is a getter and takes no arguments. To set the database table for this model, call `table()` in `config()` instead, e.g. `table(""my_table"")`.",
+				detail = "Passing a name to `tableName()` has always been a silent no-op (the model keeps its convention table), so it now fails loud in development. The table setter is `table()`. See issue ##3079."
+			);
+		}
 		if ($get("lowerCaseTableNames")) {
 			return LCase(variables.wheels.class.tableName);
 		} else {

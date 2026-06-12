@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-This is the complete `deploy.yml` schema. `wheels deploy` loads `config/deploy.yml` on every invocation, validates it against this schema, and hands it to every subcommand. Unknown top-level keys fail fast with a line-scoped error; required keys that are missing fail with a pointer to the file.
+This is the complete `deploy.yml` schema. `wheels deploy` loads `config/deploy.yml` on every invocation, validates it against this schema, and hands it to every subcommand. Unknown top-level keys and missing required keys fail fast with an error prefixed by the config file's absolute path (messages are not line-scoped).
 
 <Aside type="note" title="You should already know">
 You've read [Your First Deploy](/v4-0-0/deployment/first-deploy/) and understand the shape of a working deploy. This page is the dry reference — no narrative, just the schema.
@@ -16,7 +16,7 @@ You've read [Your First Deploy](/v4-0-0/deployment/first-deploy/) and understand
 
 ## Required keys
 
-Three keys are required. Omitting any of them stops the loader with `deploy.yml: missing required key: '<name>'`.
+Three keys are required. Omitting any of them stops the loader with `<path to deploy.yml>: missing required key: '<name>'`.
 
 | Key | Type | Purpose |
 |-----|------|---------|
@@ -34,6 +34,10 @@ healthcheck, hooks, accessories, volumes, labels, logging,
 retain_containers, minimum_version, asset_path, require_destination,
 allow_empty_roles, run_directory, readiness_delay
 ```
+
+<Aside type="caution" title="Allowlisted ≠ implemented">
+The validator accepts every key above, but a number of them are parsed and then **never read by the runtime**: `boot`, `logging`, `retain_containers`, `minimum_version`, `asset_path`, `require_destination`, `allow_empty_roles`, `run_directory`, `readiness_delay`, `hooks.path`, plus several sub-keys under `builder`, `ssh`, `proxy`, and role maps. Setting them has no effect today. Each one is flagged in its section below; the umbrella issue is [#3088](https://github.com/wheels-dev/wheels/issues/3088).
+</Aside>
 
 ## `service`
 
@@ -80,7 +84,7 @@ servers:
     - 192.0.2.11
 ```
 
-Any number of roles. The `web` role is special — it's the only one the proxy routes public traffic to. Other roles (`job`, `worker`, `sidekiq`) are started and stopped like `web` but don't receive a `kamal-proxy deploy` call.
+Any number of roles. The `web` role is the one meant to receive public traffic through the proxy; other roles (`job`, `worker`, `sidekiq`) are started and stopped like `web`. Known defect: the current CLI issues the `kamal-proxy deploy` cutover call for *every* role, not just `web`, so non-web roles also get registered with the proxy ([#2957](https://github.com/wheels-dev/wheels/issues/2957)).
 
 ### Roles with options
 
@@ -101,12 +105,12 @@ servers:
 ```
 
 - `hosts:` — required when using the map shape.
-- `env:` — merges over the top-level `env:`. See [`env`](#env).
-- `options:` — additional `docker run` flags (`memory`, `cpus`, `user`, `publish`, etc.).
-- `labels:` — extra labels attached to the container, on top of the four Wheels adds (`service`, `role`, `destination`, `version`).
 - `cmd:` — overrides the container entrypoint for this role. Useful when one image runs as `web` under one command and as `job` under another.
+- `env:` — parsed but **currently ignored**: only the top-level `env:` is applied to containers; per-role overrides never reach `docker run` ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+- `options:` — parsed but **currently ignored**: no extra `docker run` flags (`memory`, `cpus`, etc.) are emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+- `labels:` — parsed but **currently ignored**: containers only get the four labels Wheels adds (`service`, `role`, `destination`, `version`) ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
-Host strings accept `user@host`, `host:port`, and `user@host:port`. IPv6 literals must be bracketed (`[::1]:22`). Multiple colons without brackets are rejected.
+Host strings accept `user@host`, `host:port`, and `user@host:port`. IPv6 literals must be bracketed (`[::1]:22`). Multiple colons without brackets are meant to be rejected, but the validator currently under-counts adjacent colons, so malformed strings like `'::1:22'` slip through ([#3086](https://github.com/wheels-dev/wheels/issues/3086)) — always bracket IPv6 literals yourself.
 
 ## `registry`
 
@@ -144,34 +148,28 @@ builder:
 
 - `context:` — build context. Default `.`.
 - `dockerfile:` — path relative to context. Default `Dockerfile`.
-- `arch:` — target architectures. Single-arch defaults to whatever the host running the build is. Multi-arch requires `docker buildx` (which `wheels deploy build create` sets up for you).
-- `args:` — map of `--build-arg` values.
-- `remote:` — SSH URL of a remote builder. Faster than local QEMU emulation when you're on an arm64 Mac building amd64 images.
+- `arch:` — parsed but **currently ignored**: no `--platform` flag is emitted, so builds target whatever the host running the build is ([#3088](https://github.com/wheels-dev/wheels/issues/3088)). `wheels deploy build create` does set up a `docker buildx` builder.
+- `args:` — parsed but **currently ignored**: no `--build-arg` flags are emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+- `remote:` — parsed but **currently ignored**: the build always runs locally; no remote builder endpoint is used ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
 ## `env`
 
-Environment variables for app containers, split into `clear` (baked into `deploy.yml`, safe under git) and `secret` (resolved from `.kamal/secrets` at deploy time).
+Environment variables for app containers. `clear` values are baked into `deploy.yml` (safe under git) and passed to `docker run -e` at deploy time.
 
 ```yaml title="config/deploy.yml (illustrative — do not type)"
 env:
   clear:
     WHEELS_ENV: production
     WHEELS_LOG_TO_STDOUT: "1"
-  secret:
-    - DATABASE_URL
-    - WHEELS_RELOAD_PASSWORD
 ```
 
-Per-role overrides merge over the top level.
-
-| Layer | Wins over |
-|-------|-----------|
-| role `clear` | role `secret`, top-level `clear`, top-level `secret` |
-| role `secret` | top-level `clear`, top-level `secret` |
-| top-level `clear` | top-level `secret` |
-| top-level `secret` | — |
-
 Changes to `env` take effect on next deploy only; running containers keep their original values.
+
+<Aside type="caution" title="env.secret is not yet supported">
+Kamal's `env.secret` list (secret keys resolved from `.kamal/secrets` and delivered to the container) is **not implemented**. On the released 4.0.3 CLI, `secret:` entries are silently dropped — the variables never reach the container. On current develop builds the loader fails fast with `Wheels.Deploy.EnvSecretUnsupported` instead of dropping them. Track secret delivery in [#2956](https://github.com/wheels-dev/wheels/issues/2956).
+
+Per-role `env:` overrides are also not implemented — only the top-level `env.clear` map reaches `docker run` ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+</Aside>
 
 ## `ssh`
 
@@ -187,13 +185,13 @@ ssh:
   keys_only: false
 ```
 
-- `user:` — SSH user. Defaults to the current local user. If not root, `wheels deploy` wraps root-requiring commands with `sudo -n`.
+- `user:` — SSH user. Defaults to `root`. If not root, `wheels deploy` wraps root-requiring commands with `sudo -n`.
 - `port:` — TCP port. Default 22.
-- `proxy:` — bastion host. Maps to OpenSSH's `ProxyJump`; every connection first hops through this host.
+- `proxy:` — parsed but **currently ignored**: `ProxyJump`-style bastion hops are not implemented; every connection goes direct ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 - `keys:` — array of private key file paths. The first entry is passed to the SSH pool. Tilde (`~/`) is expanded against the JVM `user.home` because sshj reads key files via `java.io.File` and does not expand the shell shortcut. Omit to fall back to `ssh-agent`.
-- `keys_only:` — if true, disables agent-based auth and requires explicit `keys:`.
+- `keys_only:` — parsed but **currently ignored** ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
-SSH config picks up your usual `~/.ssh/config`, `~/.ssh/known_hosts`, and `ssh-agent` — you don't re-declare that here.
+Host key verification reads your `~/.ssh/known_hosts`. Your `~/.ssh/config` is **not** read — the bundled sshj client doesn't parse OpenSSH client config, so per-host users, identities, and `ProxyJump` directives there have no effect. Declare connection settings in this `ssh:` block instead.
 
 ## `proxy`
 
@@ -214,11 +212,15 @@ proxy:
 ```
 
 - `host:` — the public hostname. Used for TLS SNI and Let's Encrypt issuance.
-- `app_port:` — port the app listens on inside the container. Default 3000. Wheels apps typically bind whatever `wheels start` binds; make sure the `Dockerfile` EXPOSE matches.
+- `app_port:` — port the app listens on inside the container. The config default is `80`, and `wheels deploy init` scaffolds `8080`.
 - `ssl:` — if true, `kamal-proxy` requests a Let's Encrypt cert for `host` on first boot. Set false if you terminate TLS in front of the proxy.
-- `healthcheck:` — new container must return 2xx at `healthcheck.path` within `healthcheck.timeout` seconds or the proxy refuses to cut traffic over.
-- `forward_headers:` — if true, `X-Forwarded-For`, `X-Forwarded-Proto`, and related headers pass through. Turn on when the app trusts them.
-- `buffering:` — enable request/response buffering. Useful for slow clients on fast backends.
+- `healthcheck:` — new container must return 2xx at `healthcheck.path` within `healthcheck.timeout` seconds (defaults: `/up`, 30) or the proxy refuses to cut traffic over.
+- `forward_headers:` — parsed but **currently ignored**; not forwarded to the proxy ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+- `buffering:` — parsed but **currently ignored** ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+
+<Aside type="caution" title="app_port is currently ignored — the proxy target is hardcoded to 3000">
+`wheels deploy` and `wheels deploy rollback` currently hardcode the `kamal-proxy deploy` target to `<container>:3000`, regardless of `app_port` — and regardless of the `8080` the init template writes. Until [#3089](https://github.com/wheels-dev/wheels/issues/3089) is fixed, your container must listen on port 3000 for the traffic cutover to work.
+</Aside>
 
 ## `accessories`
 
@@ -245,6 +247,8 @@ accessories:
       - config/init.sql:/docker-entrypoint-initdb.d/init.sql
 ```
 
+Two caveats on the example shapes: `files:` is accepted but **never uploaded** — no copy step or docker flag is emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)) — and accessory `env.secret` entries are subject to the same not-yet-implemented secret delivery as the top-level [`env`](#env) key ([#2956](https://github.com/wheels-dev/wheels/issues/2956)).
+
 See [Accessories](/v4-0-0/deployment/accessories/) for the full walk-through.
 
 ## `volumes`, `labels`
@@ -263,7 +267,7 @@ Role-level `volumes` and `labels` merge over these.
 
 ## `hooks`
 
-Path override for the `.kamal/hooks/` directory. Rarely used; the default is fine.
+Path override for the `.kamal/hooks/` directory. **Currently ignored**: the key passes validation but is never read — hook scripts are always loaded from `.kamal/hooks/` ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
 ```yaml title="config/deploy.yml (illustrative — do not type)"
 hooks:
@@ -278,22 +282,19 @@ Legacy top-level healthcheck config (pre-kamal-proxy). New deploys should config
 
 ## `boot`
 
-Controls the rolling boot sequence.
+In Kamal, controls the rolling boot sequence (`limit:` for parallelism, `wait:` for pauses between hosts). **Currently ignored**: `wheels deploy` never reads `boot.limit` or `boot.wait` — it always deploys hosts one at a time, sequentially, with no pause ([#3088](https://github.com/wheels-dev/wheels/issues/3088); the rolling-boot orchestration work is tracked under [#2957](https://github.com/wheels-dev/wheels/issues/2957)).
 
-```yaml title="config/deploy.yml (illustrative — do not type)"
+```yaml title="config/deploy.yml (accepted but currently ignored)"
 boot:
   limit: 25%
   wait: 2
 ```
 
-- `limit:` — how many hosts boot in parallel. Default 1 (strict sequential). Set to `25%` or an absolute number to parallelize.
-- `wait:` — seconds to pause between each host's completion and the next host's start. Default 0.
-
 ## `logging`
 
-Docker logging driver and options. Passed through to `docker run --log-driver` / `--log-opt`.
+In Kamal, the Docker logging driver and options, passed through as `docker run --log-driver` / `--log-opt`. **Currently ignored**: no logging flags are ever emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
-```yaml title="config/deploy.yml (illustrative — do not type)"
+```yaml title="config/deploy.yml (accepted but currently ignored)"
 logging:
   driver: json-file
   options:
@@ -303,68 +304,47 @@ logging:
 
 ## `retain_containers`
 
-How many old containers to keep on each host for rollback. Default 5. Older ones are pruned during `wheels deploy prune all`.
+In Kamal, how many old containers to keep on each host for rollback. **The config key is currently ignored** ([#3088](https://github.com/wheels-dev/wheels/issues/3088)): `wheels deploy prune all` always keeps the 5 most recent containers unless you pass `--keep=<n>` on the command line.
 
-```yaml title="config/deploy.yml (illustrative — do not type)"
+```yaml title="config/deploy.yml (accepted but currently ignored — use prune --keep=<n> instead)"
 retain_containers: 10
 ```
 
 ## `minimum_version`
 
-Require the CLI to be at least this version. Causes a fail-fast error if the installed `wheels` CLI is older.
-
-```yaml title="config/deploy.yml (illustrative — do not type)"
-minimum_version: "4.0.0"
-```
+In Kamal, requires the CLI to be at least this version. **Currently ignored**: no version gate runs, even with an impossible value like `"99.0.0"` ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
 ## `asset_path`
 
-Path inside the container for long-lived static assets. Used by the asset-swap path for zero-downtime JS/CSS rotation.
-
-```yaml title="config/deploy.yml (illustrative — do not type)"
-asset_path: /app/public/assets
-```
+In Kamal, the in-container path used for zero-downtime JS/CSS asset rotation. **Currently ignored** ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
 ## `require_destination`
 
-If true, every command must pass `--destination=<name>`. Guards against deploying the wrong environment by default.
-
-```yaml title="config/deploy.yml (illustrative — do not type)"
-require_destination: true
-```
+In Kamal, forces every command to pass `--destination=<name>`. **Currently ignored** — commands run fine without a destination regardless of this key ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
 ## `allow_empty_roles`
 
-If true, a role with an empty `hosts:` list doesn't fail validation. Useful when a role is temporarily scaled to zero.
-
-```yaml title="config/deploy.yml (illustrative — do not type)"
-allow_empty_roles: true
-```
+In Kamal, lets a role with an empty `hosts:` list pass validation. **Currently ignored** ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
 ## `run_directory`
 
-Working directory inside the container. Default is the image's configured `WORKDIR`. Override when the image ships without one.
-
-```yaml title="config/deploy.yml (illustrative — do not type)"
-run_directory: /app
-```
+In Kamal, the working directory inside the container. **Currently ignored** — the image's configured `WORKDIR` is always used ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
 ## `readiness_delay`
 
-Seconds to wait after `docker run` before asking the proxy to cut over. Default 0. Set when your app needs a head start before the health check starts succeeding (database migrations running in-container on boot, for example).
-
-```yaml title="config/deploy.yml (illustrative — do not type)"
-readiness_delay: 5
-```
+In Kamal, seconds to wait after `docker run` before asking the proxy to cut over. **Currently ignored** ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 
 ## Variable interpolation
 
-`deploy.yml` supports a single, deliberately small interpolation form: `${UPPER_SNAKE}` env-var tokens. This is the same syntax Ruby Kamal supports natively, with the same lookup order:
+`deploy.yml` supports a single, deliberately small interpolation form: `${UPPER_SNAKE}` env-var tokens. This is the same syntax Ruby Kamal supports natively. Lookup order:
 
-1. CLI `--env` overrides (test/CI shims).
-2. `.kamal/secrets` (and `.kamal/secrets.<destination>` when `--destination` is set).
-3. `System.getenv(VAR)` on the machine running `wheels deploy`.
-4. Empty string for unset vars.
+1. `.kamal/secrets` (and `.kamal/secrets.<destination>` when `--destination` is set).
+2. `System.getenv(VAR)` on the machine running `wheels deploy`.
+3. Empty string for unset vars.
+
+<Aside type="caution" title="Secrets are read from config/.kamal/secrets here">
+The interpolator resolves the secrets file relative to `deploy.yml`'s **own directory** — so for the standard `config/deploy.yml` layout it reads `config/.kamal/secrets`, and the project-root `.kamal/secrets` the rest of the CLI uses is never consulted. Until [#3084](https://github.com/wheels-dev/wheels/issues/3084) is fixed, `${VAR}` tokens only resolve from `config/.kamal/secrets` or the process environment.
+</Aside>
 
 ```yaml title="config/deploy.yml (illustrative — do not type)"
 service: ${APP_NAME}
@@ -401,10 +381,13 @@ proxy:
   host: staging.example.com
 ```
 
+One caveat: the `wheels deploy config` inspection verb currently ignores `--destination` and always prints the base file ([#3085](https://github.com/wheels-dev/wheels/issues/3085)). To see an overlay applied, use a verb that does resolve it, e.g. `wheels deploy details --destination=staging --dry-run`.
+
 ## Validation errors
 
-Three classes of error, all emitted as `deploy.yml: <message>`:
+Errors are emitted as `<absolute path to deploy.yml>: <message>` — the prefix is the full file path, and messages are never line-scoped:
 
 - `missing required key: '<name>'` — one of `service`, `image`, `servers` is absent.
 - `unknown top-level key: '<name>'` — typo or unsupported key. Cross-check against the allowlist above.
-- `invalid host: '<string>'` — host string has more than one colon without IPv6 brackets.
+- `invalid host: '<string>'` — host string has more than one colon without IPv6 brackets. (Known gap: adjacent colons are under-counted, so strings like `'::1:22'` currently pass — [#3086](https://github.com/wheels-dev/wheels/issues/3086).)
+- `invalid <kind> name: '<name>' (must match [a-zA-Z0-9][a-zA-Z0-9_.-]*)` — a service, role, or accessory name contains shell-unsafe characters. Develop builds only (added after 4.0.3 by [#3008](https://github.com/wheels-dev/wheels/pull/3008) for [#2956](https://github.com/wheels-dev/wheels/issues/2956)).
