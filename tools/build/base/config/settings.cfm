@@ -9,8 +9,8 @@
 	/*
 		If you leave these settings commented out, wheels will set the data source name to the same name as the folder the application resides in.
 	*/
-	set(coreTestDataSourceName="|datasourceName|");
-	set(dataSourceName="|datasourceName|");
+	// set(coreTestDataSourceName="myDatasource");
+	// set(dataSourceName="myDatasource");
 	// set(dataSourceUserName="");
 	// set(dataSourcePassword="");
 
@@ -22,8 +22,9 @@
 	*/
 	set(URLRewriting="On");
 
-	// Reload your application with ?reload=true&password=|reloadPassword|
-	set(reloadPassword="|reloadPassword|");
+	// Reload your application with ?reload=true&password=<your WHEELS_RELOAD_PASSWORD>
+	// The secret is read from .env (git-ignored) so it never lands in version control.
+	set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""));
 
 	// CLI-Appends-Here
 </cfscript>

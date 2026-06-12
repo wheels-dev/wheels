@@ -7,6 +7,8 @@
 		this.sessionTimeout = CreateTimeSpan(0,0,5,0);
 	*/
 
-	this.name = "|appName|";
+	// Leave this commented to let Wheels derive the application name from the
+	// folder it lives in. Uncomment and set a literal name to override.
+	// this.name = "MyAppName";
 	// CLI-Appends-Here
 </cfscript>

@@ -1,5 +1,4 @@
 {
-	"name":"|appName|",
 	"web":{
 			"host":"localhost",
 			"webroot": "public",
@@ -9,7 +8,7 @@
 			}
 	},
 	"app":{
-			"cfengine":"|cfmlEngine|",
+			"cfengine":"lucee@7",
       "libDirs":"app/lib"
 	}
 }
