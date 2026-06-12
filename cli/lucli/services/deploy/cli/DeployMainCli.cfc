@@ -78,6 +78,9 @@ component {
             KAMAL_HOSTS: arrayToList(hosts, ",")
         };
         var deployStart = getTickCount();
+        // Port the app listens on inside the container — the kamal-proxy
+        // --target. Resolved from proxy.app_port (default 80); see #3089.
+        var appPort = cfg.proxy().appPort();
 
         $fireHook(hooks, "pre-deploy", hookEnv, dryRun);
 
@@ -97,7 +100,7 @@ component {
                         $dispatch([host], app.run(role, ver), dryRun);
                         $dispatch(
                             [host],
-                            proxy.deploy(role, app.container_name(role, ver) & ":3000"),
+                            proxy.deploy(role, app.container_name(role, ver) & ":" & appPort),
                             dryRun
                         );
                     }
@@ -115,7 +118,19 @@ component {
         } catch (any e) {
             hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
             hookEnv.KAMAL_ERROR = e.message;
-            $fireHook(hooks, "post-deploy-failure", hookEnv, dryRun);
+            // post-deploy-failure is best-effort notification on an
+            // already-failed path: a flaky hook must never shadow the
+            // original deploy error (mirrors the allowFail lock release in
+            // the finally block above). Log the hook failure and rethrow
+            // the original exception. See #3087.
+            try {
+                $fireHook(hooks, "post-deploy-failure", hookEnv, dryRun);
+            } catch (any hookError) {
+                writeOutput(
+                    "[hook:post-deploy-failure] " & hookError.message
+                        & " (ignored — surfacing the original deploy error)" & chr(10)
+                );
+            }
             rethrow;
         }
 
@@ -142,13 +157,15 @@ component {
         var app = new modules.wheels.services.deploy.commands.AppCommands(cfg);
         var proxy = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
+        // Same proxy-target resolution as deploy() — see #3089.
+        var appPort = cfg.proxy().appPort();
         var hostList = [];
         for (var role in cfg.roles()) {
             for (var host in role.hosts()) {
                 $dispatch([host], app.start(role, arguments.opts.version), dryRun);
                 $dispatch(
                     [host],
-                    proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":3000"),
+                    proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":" & appPort),
                     dryRun
                 );
                 arrayAppend(hostList, host);

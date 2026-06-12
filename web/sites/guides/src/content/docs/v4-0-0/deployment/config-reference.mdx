@@ -197,7 +197,7 @@ Configuration for `kamal-proxy`, the singleton reverse proxy on every host.
 ```yaml title="config/deploy.yml (illustrative — do not type)"
 proxy:
   host: app.example.com
-  app_port: 3000
+  app_port: 8080
   ssl: true
   healthcheck:
     path: /up
@@ -209,15 +209,11 @@ proxy:
 ```
 
 - `host:` — the public hostname. Used for TLS SNI and Let's Encrypt issuance.
-- `app_port:` — port the app listens on inside the container. The config default is `80`, and `wheels deploy init` scaffolds `8080`.
+- `app_port:` — port the app listens on inside the container; `wheels deploy` and `wheels deploy rollback` route traffic to it via the kamal-proxy target (`--target <container>:<app_port>`). The config default is `80` (matching Kamal), and `wheels deploy init` scaffolds `8080` to match its generated Dockerfile.
 - `ssl:` — if true, `kamal-proxy` requests a Let's Encrypt cert for `host` on first boot. Set false if you terminate TLS in front of the proxy.
 - `healthcheck:` — new container must return 2xx at `healthcheck.path` within `healthcheck.timeout` seconds (defaults: `/up`, 30) or the proxy refuses to cut traffic over.
 - `forward_headers:` — parsed but **currently ignored**; not forwarded to the proxy ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 - `buffering:` — parsed but **currently ignored** ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
-
-<Aside type="caution" title="app_port is currently ignored — the proxy target is hardcoded to 3000">
-`wheels deploy` and `wheels deploy rollback` currently hardcode the `kamal-proxy deploy` target to `<container>:3000`, regardless of `app_port` — and regardless of the `8080` the init template writes. Until [#3089](https://github.com/wheels-dev/wheels/issues/3089) is fixed, your container must listen on port 3000 for the traffic cutover to work.
-</Aside>
 
 ## `accessories`
 

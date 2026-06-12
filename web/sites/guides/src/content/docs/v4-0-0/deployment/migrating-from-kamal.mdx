@@ -38,7 +38,7 @@ The on-server state managed by `wheels deploy` and Ruby Kamal is identical by de
 | Hook env prefix | `KAMAL_*` (not `WHEELS_*`) |
 | Secret file | `.kamal/secrets`, `.kamal/secrets.<destination>` |
 
-Why keep the `KAMAL_*` prefix? Because every hook anyone has ever written for Ruby Kamal uses it. Renaming would break every user's existing scripts for zero benefit. One honesty note: the env block is a **subset** of Ruby Kamal's — `KAMAL_VERSION`, `KAMAL_HOSTS`, `KAMAL_PERFORMER`, `KAMAL_DESTINATION`, `KAMAL_RUNTIME`, and `KAMAL_ERROR` are set; `KAMAL_ROLE`, `KAMAL_SERVICE`, and the rest are not. Hooks reading only the supported subset port unchanged; also make `post-deploy-failure` hooks exit 0 — a non-zero exit currently masks the original deploy error ([#3087](https://github.com/wheels-dev/wheels/issues/3087)). See [Hooks](/v4-0-0/deployment/hooks/) for the full table.
+Why keep the `KAMAL_*` prefix? Because every hook anyone has ever written for Ruby Kamal uses it. Renaming would break every user's existing scripts for zero benefit. One honesty note: the env block is a **subset** of Ruby Kamal's — `KAMAL_VERSION`, `KAMAL_HOSTS`, `KAMAL_PERFORMER`, `KAMAL_DESTINATION`, `KAMAL_RUNTIME`, and `KAMAL_ERROR` are set; `KAMAL_ROLE`, `KAMAL_SERVICE`, and the rest are not. Hooks reading only the supported subset port unchanged. See [Hooks](/v4-0-0/deployment/hooks/) for the full table.
 
 Why keep the `.kamal/` directory name? Because you can sit on both tools during evaluation — `kamal deploy` and `wheels deploy` read the same secrets and the same hooks. Switch back and forth freely; nothing on the server changes.
 
