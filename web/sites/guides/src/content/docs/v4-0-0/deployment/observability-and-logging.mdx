@@ -47,10 +47,12 @@ If you terminate TLS in a reverse proxy that already stamps `X-Request-Id` (ngin
 component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
     public string function handle(required struct request, required any next) {
-        // Read the real `cgi` scope. The middleware request context only
-        // carries {params, route, pathInfo, method} — it has no `cgi` key,
-        // so `request.cgi.http_x_request_id` would always be empty.
-        local.inbound = cgi.http_x_request_id ?: "";
+        // The middleware request context carries a `cgi` member with every
+        // inbound header under its CGI-style `http_*` name (since 4.0.4 —
+        // issue 3074; on earlier versions it only carried
+        // {params, route, pathInfo, method}, so read the engine `cgi` scope
+        // directly there).
+        local.inbound = arguments.request.cgi.http_x_request_id ?: "";
         local.id = Len(local.inbound) ? local.inbound : CreateUUID();
 
         $writeRequestId(local.id);

@@ -139,7 +139,7 @@ set(middleware = [
         maxRequests=1000,
         windowSeconds=60,
         keyFunction=function(req) {
-            var apiKey = cgi.http_x_api_key;
+            var apiKey = req.cgi.http_x_api_key ?: "";
             return Len(apiKey) ? apiKey : "anonymous";
         }
     )
@@ -147,7 +147,11 @@ set(middleware = [
 </cfscript>
 ```
 
-The closure receives the middleware request context — a struct of `params`, `route`, `pathInfo`, and `method` — and returns a unique-per-client string. The context does not carry a `cgi` key ([#3074](https://github.com/wheels-dev/wheels/issues/3074)), so read headers from the engine's `cgi` scope directly, as above. Note the `Len()` guard: a missing header reads as an **empty string** in the `cgi` scope, not undefined, so `cgi.http_x_api_key ?: "anonymous"` would never fall back. Fall back to a constant like `"anonymous"` so unauthenticated traffic still hits some limit — otherwise every header-less request shares whatever empty-string key your code returns: one merged budget you never intended.
+The closure receives the middleware request context — a struct of `params`, `route`, `pathInfo`, `method`, and `cgi` — and returns a unique-per-client string. The `cgi` member carries the standard CGI keys plus every inbound HTTP header under its CGI-style `http_*` name, so arbitrary headers like `X-Api-Key` resolve per client. Keep the `Len()` guard: a client can send the header with an empty value, which reads as an empty string, not undefined. Fall back to a constant like `"anonymous"` so unauthenticated traffic still hits some limit — otherwise every header-less request shares whatever empty-string key your code returns: one merged budget you never intended.
+
+<Aside type="caution">
+  **Before 4.0.4** the context had no `cgi` member ([#3074](https://github.com/wheels-dev/wheels/issues/3074)) — `req.cgi.*` silently missed and every client collapsed into one bucket. On those versions read the engine's `cgi` scope directly inside the closure (`var apiKey = cgi.http_x_api_key;`), where a missing header also reads as an empty string, so the `Len()` guard is still what triggers the fallback.
+</Aside>
 
 <Aside type="tip">
   Keys longer than `maxKeyLength` (default 128) are auto-replaced with a SHA-256 hash to bound memory. You don't need to truncate keys yourself.
