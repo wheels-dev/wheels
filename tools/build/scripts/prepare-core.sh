@@ -145,5 +145,25 @@ if [ -f "${BUILDINFO_CFC}" ]; then
     fi
 fi
 
+# Sanity check: PackageLoader.cfc must detect dev builds STRUCTURALLY (prefix
+# `@build.` + suffix `@`), never via a literal `@build.version@` comparison.
+# The global `sed s/@build.version@/<version>/g` above (line ~59) rewrites every
+# literal version placeholder in this artifact. If such a literal sat in
+# $normalizeWheelsVersion()'s guard it would now read `local.raw == "<version>"`,
+# normalising the real runtime version to "0.0.0" and silently disabling
+# wheelsVersion constraint enforcement for every package on every released build
+# (issue #3178). After substitution the only place "${VERSION}" should appear in
+# a `local.raw ==` comparison is nowhere — the guard is structural. Fail loud if
+# the fragile literal has crept back in.
+PACKAGELOADER_CFC="${BUILD_DIR}/wheels/PackageLoader.cfc"
+if [ -f "${PACKAGELOADER_CFC}" ]; then
+    if grep -qF "local.raw == \"${VERSION}\"" "${PACKAGELOADER_CFC}"; then
+        echo "ERROR: PackageLoader.cfc contains a stamped self-version sentinel (local.raw == \"${VERSION}\")." >&2
+        echo "       Release stamping clobbered the dev-build guard — wheelsVersion enforcement would be disabled on every released build (issue #3178)." >&2
+        echo "       Use the structural Left/Right placeholder check that BuildInfo.cfc::isDev() uses instead of a literal comparison." >&2
+        exit 1
+    fi
+fi
+
 echo "Wheels Core prepared for ForgeBox publishing!"
 echo "Directory: ${BUILD_DIR}/wheels/"

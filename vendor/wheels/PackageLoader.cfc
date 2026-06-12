@@ -1359,14 +1359,29 @@ component output="false" {
 
 	/**
 	 * Returns the runtime Wheels version normalised for semver comparison.
-	 * Dev builds surface as "0.0.0-dev" via BuildInfo. The legacy
-	 * "@build.version@" check is kept as a defensive guard for any path that
-	 * still feeds the raw placeholder in. Both normalise to "0.0.0" so strict
-	 * version constraints don't falsely reject packages during development.
+	 * Dev builds surface as "0.0.0-dev" via BuildInfo, or as the unsubstituted
+	 * build placeholder when the raw value is fed in directly. Both normalise
+	 * to "0.0.0" so strict version constraints don't falsely reject packages
+	 * during development.
+	 *
+	 * The placeholder is detected by its STRUCTURAL shape (prefix + suffix),
+	 * NOT by literal equality. tools/build/scripts/prepare-core.sh does a
+	 * GLOBAL line-oriented sed over every .cfc at artifact-construction time
+	 * that rewrites the literal version placeholder to the release version. A
+	 * literal comparison here would be rewritten too — turning the guard into
+	 * `local.raw == "4.0.3"` on a shipped 4.0.3 build, normalising the real
+	 * runtime version to "0.0.0" and silently disabling wheelsVersion
+	 * enforcement for every package (issue #3178). Mirrors BuildInfo.cfc's
+	 * isDev() detection, which is structural for exactly this reason. The
+	 * prefix/suffix fragments are not full placeholder tokens, so the sed pass
+	 * leaves them untouched.
 	 */
 	private string function $normalizeWheelsVersion() {
 		local.raw = SpanExcluding(variables.wheelsVersion, " ");
-		if (local.raw == "@build.version@" || local.raw == "0.0.0-dev") {
+		local.isPlaceholder = Len(local.raw) >= 8
+			&& Left(local.raw, 7) == "@build."
+			&& Right(local.raw, 1) == "@";
+		if (local.isPlaceholder || local.raw == "0.0.0-dev") {
 			return "0.0.0";
 		}
 		return local.raw;
