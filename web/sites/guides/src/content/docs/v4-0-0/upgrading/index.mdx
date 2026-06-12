@@ -12,7 +12,7 @@ Upgrade an existing app to a new version of Wheels. Start with the policy, then 
 
 ## Versioning policy
 
-Wheels follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The `CHANGELOG.md` at the repo root declares this explicitly and groups every release under `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` headings in the Keep a Changelog format.
+Wheels follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The `CHANGELOG.md` at the repo root declares this explicitly and follows the Keep a Changelog format — release sections include the standard `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` headings alongside more granular ones (`Bug Fixes`, `Breaking Changes`, per-layer enhancement groups, and others), so don't expect every release to use exactly those six.
 
 - **Major** (`3.x` → `4.x`) — breaking changes are allowed. Read the upgrade guide for that jump before you touch code.
 - **Minor** (`4.0` → `4.1`) — additive only. New features, no breaking changes to supported APIs.
@@ -22,17 +22,16 @@ Deprecations land in a minor release with a log warning and stay functional unti
 
 ## Where to find the current version
 
-Three sources, in order of authority:
+Two sources, in order of authority:
 
-- `vendor/wheels/events/onapplicationstart.cfc` — the `application.$wheels.version` assignment is the runtime truth. As of this snapshot, `4.0.0`.
-- `box.json` at the repo root — the package manifest version.
+- **Runtime** — `application.$wheels.version` is the runtime truth. It is populated at application start from `BuildInfo`, which reads `vendor/wheels/wheels.json`. Don't go looking for a readable literal in `vendor/wheels/events/onapplicationstart.cfc` — there isn't one. In the source repo the manifest carries the placeholder `@build.version@`; the build pipeline substitutes the real semver (e.g. `4.0.3`) in distributed apps.
 - `CHANGELOG.md` — the most recent non-`[Unreleased]` heading.
 
-If any two disagree, the runtime constant wins — that's the version your app actually boots against.
+If the two disagree, the runtime value wins — that's the version your app actually boots against.
 
 ## Release cadence
 
-Wheels doesn't ship on a fixed schedule. Releases go out when the changelog entries warrant one and the test matrix is green. The git tag history is the authoritative record — `git tag --sort=-v:refname` shows the latest builds (currently `v4.0.0-SNAPSHOT+1524` on the way to the `4.0.0` GA tag). The `-SNAPSHOT+N` suffix is a continuous build number, not a release.
+Wheels doesn't ship on a fixed schedule. Releases go out when the changelog entries warrant one and the test matrix is green. The git tag history is the authoritative record — `git tag --sort=-v:refname` shows the latest release (currently `v4.0.3`; the 4.0 line went GA 2026-06-09). Pre-GA builds were tagged in a `v4.0.0-SNAPSHOT+N` series — the `+N` suffix is a continuous build number, not a release.
 
 Don't assume a release date. Watch the [releases page on GitHub](https://github.com/wheels-dev/wheels/releases) and subscribe to the repo if you need to know when a tagged build lands.
 
