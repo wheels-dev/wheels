@@ -96,6 +96,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(len(out)).toBeGT(0);
                 expect(out).toInclude("docker stop");
             });
+
+            // Issue #3111: `--release=1` hung ~76s under --dry-run because the
+            // argv round-trip dropped the numeric value and the parser then
+            // swallowed --dry-run. Pin the contract at this layer too: a
+            // dry-run boot with a purely numeric version must never touch the
+            // SshPool (strict fake throws on ANY unexpected command).
+            it("dry-run with a numeric version never touches the SshPool (issue ##3111)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool({strict: true});
+                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var out = cli.boot({configPath: variables.fixture, version: "1", dryRun: true});
+                expect(arrayLen(fake.calls())).toBe(0);
+                expect(out).toInclude("docker run");
+                expect(out).toInclude("demo-web-1");
+            });
         });
     }
 
