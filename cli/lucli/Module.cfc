@@ -4931,6 +4931,19 @@ component extends="modules.BaseModule" {
 			);
 		}
 
+		// Run the service's pre-mutation refusal checks BEFORE announcing the
+		// plan (#3039 review, blocking): the plan ends with the restore
+		// one-liner (`rm -rf "<vendor/wheels>" && mv …`), and printing it on
+		// a refusal path would hand the user a recovery command for a backup
+		// that was never made — running it deletes the intact vendor/wheels/.
+		// applyUpgrade() re-runs the same checks (idempotent reads, no drift
+		// risk); refusals here print-then-throw per the #2941 convention.
+		var validationError = upgrader.validateSwap(sourceDir, vendorDir);
+		if (len(validationError)) {
+			out(validationError, "red");
+			throw(type = "Wheels.UpgradeApplyFailed", message = validationError);
+		}
+
 		out("Source:  #sourceDir#");
 		out("Target:  #vendorDir#");
 		out("");
@@ -4956,10 +4969,12 @@ component extends="modules.BaseModule" {
 		var result = {};
 		try {
 			result = upgrader.applyUpgrade(sourceDir, vendorDir, arguments.doBackup, backupPath);
-		} catch (Wheels.FrameworkUpgrader.CopyFailed e) {
-			// The service's message names the partial-state target and the
-			// backup to restore from (or the re-vendor instructions when
-			// --nobackup) — print it, then exit non-zero via the standard
+		} catch (Wheels.FrameworkUpgrader e) {
+			// Hierarchical match: catches every service-thrown failure —
+			// CopyFailed (partial state; message names the backup to restore
+			// from, or the re-vendor instructions when --nobackup) and
+			// RenameFailed (backup rename refused; vendor/wheels/ intact).
+			// Print the message, then exit non-zero via the standard
 			// apply-failure type (print-then-throw, #2941).
 			out(e.message, "red");
 			throw(type = "Wheels.UpgradeApplyFailed", message = e.message);

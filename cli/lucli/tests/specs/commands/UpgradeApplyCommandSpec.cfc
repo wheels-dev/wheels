@@ -54,7 +54,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			// apply mode mutates vendor/, so specs can't share a fixture.
 			beforeEach(() => {
 				variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
-				variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
+				// Output-capturing Module (same dispatch surface) so refusal
+				// specs can assert what got PRINTED, not just what was thrown:
+				// the #3039 review's blocking finding was a restore one-liner
+				// printed on paths where no backup was ever made.
+				variables.mod = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
 			});
 
 			afterEach(() => {
@@ -155,6 +159,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(() => mod.upgrade(arg1 = "apply")).toThrow(type = "Wheels.UpgradeApplyFailed");
 					// And nothing was created.
 					expect(directoryExists(variables.tempRoot & "/vendor/wheels")).toBeFalse();
+					// No backup happened, so no restore command may be offered.
+					expect(mod.capturedOutput()).notToInclude("rm -rf");
 				});
 
 				it("refuses when --to= does not match the CLI's bundled framework version", () => {
@@ -162,6 +168,34 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(() => mod.upgrade(arg1 = "apply", to = "99.99.99")).toThrow(type = "Wheels.UpgradeApplyFailed");
 					// Side effect check: the seeded manifest is untouched.
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
+					expect(mod.capturedOutput()).notToInclude("rm -rf");
+				});
+
+				it("refuses a vendor/wheels/ that does not sniff as a framework — without printing the restore one-liner", () => {
+					// #3039 review (blocking): the service-level refusals fire
+					// AFTER Module printed the pre-swap plan, so the user was
+					// handed `rm -rf "<vendor/wheels>" && mv "<backup>" …` for
+					// a backup that was never made — running it deletes the
+					// intact vendor/wheels/. Drive a real service refusal (a
+					// generic app box.json is not framework evidence) and pin
+					// that the restore command never reaches the output.
+					var vendorDir = variables.tempRoot & "/vendor/wheels";
+					directoryCreate(vendorDir, true, true);
+					fileWrite(vendorDir & "/box.json", '{"name":"myapp","version":"1.0.0"}');
+					fileWrite(vendorDir & "/marker.txt", "not-a-framework");
+
+					expect(() => mod.upgrade(arg1 = "apply")).toThrow(type = "Wheels.UpgradeApplyFailed");
+
+					// The refusal explains itself…
+					expect(mod.capturedOutput()).toInclude("does not look like a Wheels framework");
+					// …but never offers a restore command for a backup that
+					// does not exist.
+					expect(mod.capturedOutput()).notToInclude("rm -rf");
+					expect(mod.capturedOutput()).notToInclude("Backing up vendor/wheels");
+
+					// And the target is untouched: no backup, no mutation.
+					expect(arrayLen(listBackups())).toBe(0);
+					expect(fileRead(vendorDir & "/marker.txt")).toBe("not-a-framework");
 				});
 			});
 
@@ -206,6 +240,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					// And it precedes the post-swap summary in the output.
 					expect(find("Backing up vendor/wheels", result)).toBeGT(0);
 					expect(find("Framework upgraded:", result)).toBeGT(find("Backing up vendor/wheels", result));
+					// The restore one-liner also reached the PRINTED output
+					// (the refusal specs pin its absence; this pins presence
+					// on the one path where the backup really is made).
+					expect(mod.capturedOutput()).toInclude('rm -rf "');
 				});
 
 				it("accepts --to= matching the bundled version and skips the backup with --nobackup", () => {

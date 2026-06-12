@@ -97,6 +97,64 @@ component {
 	}
 
 	/**
+	 * Run every pre-mutation refusal check for a sourceDir -> vendorDir
+	 * swap. Returns "" when the swap may proceed, or the human-readable
+	 * refusal otherwise. Pure reads — no file is created, renamed, or
+	 * deleted — so callers can (and must) run it BEFORE announcing the
+	 * swap plan: printing the backup destination and the `rm -rf … && mv …`
+	 * restore one-liner ahead of a refusal would hand the user a recovery
+	 * command for a backup that was never made (#3039 review).
+	 * applyUpgrade() re-runs it first, so direct service callers keep the
+	 * exact same refusal behavior.
+	 */
+	public string function validateSwap(required string sourceDir, required string vendorDir) {
+		// 1. Validate the source.
+		if (!directoryExists(arguments.sourceDir)) {
+			return "Source framework directory does not exist: " & arguments.sourceDir;
+		}
+		if (!looksLikeWheelsFramework(arguments.sourceDir)) {
+			return "Source does not look like a Wheels framework directory (need a wheels.json or box.json whose version and name identify a Wheels framework): " & arguments.sourceDir;
+		}
+
+		// 2. Validate the target's parent. We never create the vendor/ parent
+		//    ourselves — if vendor/ doesn't exist, the user is almost certainly
+		//    pointed at the wrong directory.
+		var File = createObject("java", "java.io.File");
+		var parentPath = File.init(arguments.vendorDir).getParent();
+		if (isNull(parentPath) || !directoryExists(parentPath)) {
+			return "Parent of target directory does not exist: " & arguments.vendorDir;
+		}
+
+		// 3. Identity / containment guard — BEFORE any destructive step.
+		//    Running `wheels upgrade` inside the wheels repo checkout itself
+		//    resolves the bundled source to the very vendor/wheels/ being
+		//    replaced; the backup rename (or --nobackup delete) would destroy
+		//    the source mid-swap. Containment in either direction is just as
+		//    fatal: copying a parent into its own child recurses, and copying
+		//    a child of the target reads from a directory we just renamed.
+		var srcCanonical = File.init(arguments.sourceDir).getCanonicalPath();
+		var dstCanonical = File.init(arguments.vendorDir).getCanonicalPath();
+		if (srcCanonical == dstCanonical) {
+			return "Source and target are the same directory (" & dstCanonical & ") — refusing to swap a framework with itself. Are you running `wheels upgrade` inside the wheels repo checkout?";
+		}
+		var separator = "/";
+		if (find("\", srcCanonical & dstCanonical)) {
+			separator = "\";
+		}
+		if (left(srcCanonical & separator, len(dstCanonical & separator)) == dstCanonical & separator
+			|| left(dstCanonical & separator, len(srcCanonical & separator)) == srcCanonical & separator) {
+			return "Source and target directories contain one another (source: " & srcCanonical & ", target: " & dstCanonical & ") — refusing to swap.";
+		}
+
+		// 4. If vendorDir already exists, sniff it before destroying anything.
+		if (directoryExists(arguments.vendorDir) && !looksLikeWheelsFramework(arguments.vendorDir)) {
+			return "Target directory exists but does not look like a Wheels framework (need a wheels.json or box.json whose version and name identify a Wheels framework): " & arguments.vendorDir;
+		}
+
+		return "";
+	}
+
+	/**
 	 * Replace `vendorDir` with the contents of `sourceDir`. Both must be
 	 * Wheels framework directories (or vendorDir may be absent — fresh
 	 * install). When `doBackup` is true the existing vendorDir is renamed
@@ -133,55 +191,19 @@ component {
 			newVersion: ""
 		};
 
-		// 1. Validate the source.
-		if (!directoryExists(arguments.sourceDir)) {
-			result.error = "Source framework directory does not exist: " & arguments.sourceDir;
-			return result;
-		}
-		if (!looksLikeWheelsFramework(arguments.sourceDir)) {
-			result.error = "Source does not look like a Wheels framework directory (need a wheels.json or box.json whose version and name identify a Wheels framework): " & arguments.sourceDir;
-			return result;
-		}
-
-		// 2. Validate the target's parent. We never create the vendor/ parent
-		//    ourselves — if vendor/ doesn't exist, the user is almost certainly
-		//    pointed at the wrong directory.
-		var File = createObject("java", "java.io.File");
-		var parentPath = File.init(arguments.vendorDir).getParent();
-		if (isNull(parentPath) || !directoryExists(parentPath)) {
-			result.error = "Parent of target directory does not exist: " & arguments.vendorDir;
+		// Pre-mutation refusal checks. Callers that announce the swap plan
+		// (backup destination + restore one-liner) run validateSwap() first
+		// so refusals never print recovery guidance for a backup that was
+		// never made (#3039 review) — re-running it here keeps the service
+		// safe for direct callers, and the checks are idempotent reads.
+		result.error = validateSwap(arguments.sourceDir, arguments.vendorDir);
+		if (len(result.error)) {
 			return result;
 		}
 
-		// 3. Identity / containment guard — BEFORE any destructive step.
-		//    Running `wheels upgrade` inside the wheels repo checkout itself
-		//    resolves the bundled source to the very vendor/wheels/ being
-		//    replaced; the backup rename (or --nobackup delete) would destroy
-		//    the source mid-swap. Containment in either direction is just as
-		//    fatal: copying a parent into its own child recurses, and copying
-		//    a child of the target reads from a directory we just renamed.
-		var srcCanonical = File.init(arguments.sourceDir).getCanonicalPath();
-		var dstCanonical = File.init(arguments.vendorDir).getCanonicalPath();
-		if (srcCanonical == dstCanonical) {
-			result.error = "Source and target are the same directory (" & dstCanonical & ") — refusing to swap a framework with itself. Are you running `wheels upgrade` inside the wheels repo checkout?";
-			return result;
-		}
-		var separator = "/";
-		if (find("\", srcCanonical & dstCanonical)) {
-			separator = "\";
-		}
-		if (left(srcCanonical & separator, len(dstCanonical & separator)) == dstCanonical & separator
-			|| left(dstCanonical & separator, len(srcCanonical & separator)) == srcCanonical & separator) {
-			result.error = "Source and target directories contain one another (source: " & srcCanonical & ", target: " & dstCanonical & ") — refusing to swap.";
-			return result;
-		}
-
-		// 4. If vendorDir already exists, sniff it before destroying anything.
+		// If vendorDir already exists (validateSwap confirmed it sniffs as a
+		// framework), record its version and park or delete it.
 		if (directoryExists(arguments.vendorDir)) {
-			if (!looksLikeWheelsFramework(arguments.vendorDir)) {
-				result.error = "Target directory exists but does not look like a Wheels framework (need a wheels.json or box.json whose version and name identify a Wheels framework): " & arguments.vendorDir;
-				return result;
-			}
 			result.oldVersion = readFrameworkVersion(arguments.vendorDir);
 
 			if (arguments.doBackup) {
@@ -192,7 +214,7 @@ component {
 			}
 		}
 
-		// 5. Copy the source into the target. directoryCopy with recurse=true
+		// Copy the source into the target. directoryCopy with recurse=true
 		//    mirrors source's contents into vendorDir. From here on the old
 		//    tree is already renamed away (or deleted) — a failure must not
 		//    surface as a bare stack trace over an unannounced partial state

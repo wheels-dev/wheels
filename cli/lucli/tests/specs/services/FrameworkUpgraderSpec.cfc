@@ -211,6 +211,53 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 		});
 
+		describe("FrameworkUpgrader.validateSwap", () => {
+
+			afterEach(() => $cleanupTempDirs());
+
+			// #3039 review (blocking): the pre-mutation refusal checks must be
+			// callable on their own, BEFORE the caller prints the pre-swap plan
+			// (backup destination + `rm -rf … && mv …` restore one-liner) —
+			// otherwise every refusal path hands the user a restore command
+			// for a backup that was never made. validateSwap() is that same
+			// check block, extracted; applyUpgrade() still runs it first, so
+			// the checks are idempotent reads with no drift risk.
+
+			it("returns an empty string for a valid source/target pair", () => {
+				var f = buildFixture();
+				expect(upgrader.validateSwap(f.sourceDir, f.vendorDir)).toBe("");
+			});
+
+			it("returns an empty string for a fresh install (target absent, parent present)", () => {
+				var f = buildFixture();
+				directoryDelete(f.vendorDir, true);
+				expect(upgrader.validateSwap(f.sourceDir, f.vendorDir)).toBe("");
+			});
+
+			it("returns the sniff refusal for a non-framework source", () => {
+				var f = buildFixture();
+				fileDelete(f.sourceDir & "/wheels.json");
+				expect(upgrader.validateSwap(f.sourceDir, f.vendorDir)).toInclude("does not look like a Wheels framework");
+			});
+
+			it("returns the identity refusal when source and target are the same directory", () => {
+				var f = buildFixture();
+				expect(upgrader.validateSwap(f.vendorDir, f.vendorDir)).toInclude("same directory");
+			});
+
+			it("returns the target-sniff refusal when the target exists but is not a framework", () => {
+				var f = buildFixture(writeTargetManifest = false);
+				expect(upgrader.validateSwap(f.sourceDir, f.vendorDir)).toInclude("does not look like a Wheels framework");
+			});
+
+			it("returns the missing-parent refusal without creating anything", () => {
+				var f = buildFixture();
+				var orphanTarget = f.root & "/no-such-parent/wheels";
+				expect(upgrader.validateSwap(f.sourceDir, orphanTarget)).toInclude("Parent of target directory does not exist");
+				expect(directoryExists(f.root & "/no-such-parent")).toBeFalse();
+			});
+		});
+
 		describe("FrameworkUpgrader.applyUpgrade", () => {
 
 			afterEach(() => $cleanupTempDirs());
