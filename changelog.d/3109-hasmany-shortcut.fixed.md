@@ -1,0 +1,1 @@
+- Declaring `shortcut` on a `hasMany` association no longer breaks that association: `$expandThroughAssociations` now only rewrites a 2-element `through` into a nested include when its first segment is an association on the current model, so the plain association method, the shortcut method, and `include` no longer throw `Wheels.AssociationNotFound` (#3109)
