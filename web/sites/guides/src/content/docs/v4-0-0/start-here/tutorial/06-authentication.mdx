@@ -529,17 +529,17 @@ The design is a registry: an `Authenticator` holds a list of named strategies. O
 
    ```cfm {test:compile}
    <cfscript>
-       var di = injector();
+       local.di = injector();
 
-       di.map("authenticator").to("wheels.auth.Authenticator").asSingleton();
+       local.di.map("authenticator").to("wheels.auth.Authenticator").asSingleton();
 
-       di.map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton();
+       local.di.map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton();
    </cfscript>
    ```
 
 </Steps>
 
-`config/services.cfm` is loaded once at app init. Like every other file under `config/`, the body must be wrapped in `<cfscript>...</cfscript>` — without the wrapper, Lucee parses the file as markup and the `var di = ...` lines spill onto the page as literal text instead of executing. `injector()` returns the DI container; `.map("name").to("component.path").asSingleton()` registers a binding — one instance per app lifetime, resolved on demand. Any controller or view can ask for `service("authenticator")` and get the same instance back every time.
+`config/services.cfm` is loaded once at app init. Like every other file under `config/`, the body must be wrapped in `<cfscript>...</cfscript>` — without the wrapper, Lucee parses the file as markup and the `local.di = ...` lines spill onto the page as literal text instead of executing. `injector()` returns the DI container; `.map("name").to("component.path").asSingleton()` registers a binding — one instance per app lifetime, resolved on demand. Any controller or view can ask for `service("authenticator")` and get the same instance back every time.
 
 Next, wire the session strategy into the authenticator so `authenticate(request)` has something to try. This is `onApplicationStart` work — it only needs to happen once per app boot. The right file is `app/events/onapplicationstart.cfm`. If you don't already have one, create it; otherwise append to it:
 
@@ -744,7 +744,7 @@ Whether you stopped at 6a or continued to 6b, the user-facing behavior should be
 
 **"The password always mismatches, even for a user I just created."** The `beforeValidation` callback isn't firing, or the form is storing plaintext. Open the database and look at the `users` row directly: `passwordHash` should be exactly 64 uppercase hex characters, `passwordSalt` should be populated with a ~44-char base64 string. If either is blank, check that you named the callback correctly in `config()` (`beforeValidation("hashPassword")` — case-sensitive) and that the form submits `user[password]`, not just `password`.
 
-**"6b: `authenticator` service not found."** Three things to check, in this order. **(1) Does the file have a `<cfscript>` wrapper?** Without it, Lucee treats the body as markup — you'll see the bare `var di = injector();` lines printed at the top of every page after a cold restart, and the registration code never runs. Compare against `config/settings.cfm` if unsure of the shape. **(2) Did you do a *cold* restart?** `wheels reload` does not re-fire `onApplicationStart`, so it doesn't re-run `config/services.cfm`; you need `wheels stop && wheels start`. **(3) Component path typo?** The `.to(...)` argument must be the exact dotted path — `wheels.auth.Authenticator`, not `Authenticator` — and the `injector()` call has to come first.
+**"6b: `authenticator` service not found."** Three things to check, in this order. **(1) Does the file have a `<cfscript>` wrapper?** Without it, Lucee treats the body as markup — you'll see the bare `local.di = injector();` lines printed at the top of every page after a cold restart, and the registration code never runs. Compare against `config/settings.cfm` if unsure of the shape. **(2) Did you do a *cold* restart?** `wheels reload` does not re-fire `onApplicationStart`, so it doesn't re-run `config/services.cfm`; you need `wheels stop && wheels start`. **(3) Component path typo?** The `.to(...)` argument must be the exact dotted path — `wheels.auth.Authenticator`, not `Authenticator` — and the `injector()` call has to come first.
 
 ## What's next
 

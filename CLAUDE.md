@@ -436,10 +436,10 @@ Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `m
 Register services in `config/services.cfm` (loaded at app start; environment overrides supported):
 
 ```cfm
-var di = injector();
-di.map("emailService").to("app.lib.EmailService").asSingleton();
-di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
-di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+local.di = injector();
+local.di.map("emailService").to("app.lib.EmailService").asSingleton();
+local.di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+local.di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
 ```
 
 Resolve with `service("emailService")` anywhere, or `inject("emailService, currentUser")` in controller `config()`. Scopes: transient (default), `.asSingleton()`, `.asRequestScoped()`. Auto-wiring: `init()` params matching registered names are auto-resolved when no `initArguments` passed.

@@ -111,8 +111,8 @@ component output="false" {
 Register it in the DI container so every controller and model can reach it:
 
 ```cfm {test:compile} title="config/services.cfm"
-var di = injector();
-di.map("log").to("app.lib.Log").asSingleton();
+local.di = injector();
+local.di.map("log").to("app.lib.Log").asSingleton();
 ```
 
 Then from a controller:

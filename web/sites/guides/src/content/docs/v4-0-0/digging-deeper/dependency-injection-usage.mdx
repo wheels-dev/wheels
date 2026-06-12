@@ -27,10 +27,10 @@ This page is the hands-on companion to the DI concept tour. You already know wha
 Every registration lives in `config/services.cfm`. You grab the container with `injector()`, call `map()` (or `bind()`) with a name, chain `.to()` with a dotted component path, and optionally chain a lifecycle:
 
 ```cfm {test:compile} title="config/services.cfm"
-var di = injector();
+local.di = injector();
 
-di.map("emailService").to("app.lib.EmailService").asSingleton();
-di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+local.di.map("emailService").to("app.lib.EmailService").asSingleton();
+local.di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
 ```
 
 `map()` and `bind()` are the same method — `bind()` reads better for interface-style names. Full API tour lives on the [concept page](/v4-0-0/core-concepts/dependency-injection/); the rest of this guide assumes you've registered services this way.
@@ -71,8 +71,8 @@ Two things to know. First, the swap is global for the duration of the test — a
 Request-scoped bindings pair naturally with "resolve based on who's making this request." The resolver class looks up something from the current request on construction, and every caller in that request gets the same instance. The next request constructs a fresh one.
 
 ```cfm {test:compile} title="config/services.cfm"
-var di = injector();
-di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+local.di = injector();
+local.di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
 ```
 
 ```cfm {test:compile} title="app/lib/CurrentUserResolver.cfc"
@@ -130,8 +130,8 @@ component {
 Register the factory as a singleton, then have callers ask it for the built instance:
 
 ```cfm {test:compile} title="config/services.cfm — factory pattern"
-var di = injector();
-di.map("jwtStrategyFactory").to("app.lib.JwtStrategyFactory").asSingleton();
+local.di = injector();
+local.di.map("jwtStrategyFactory").to("app.lib.JwtStrategyFactory").asSingleton();
 
 // consumers do:
 // var jwt = service("jwtStrategyFactory").build();
@@ -161,10 +161,10 @@ component {
 ```
 
 ```cfm {test:compile} title="config/services.cfm — auto-wiring"
-var di = injector();
-di.map("emailService").to("app.lib.EmailService").asSingleton();
-di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
-di.map("signupService").to("app.lib.SignupService").asSingleton();
+local.di = injector();
+local.di.map("emailService").to("app.lib.EmailService").asSingleton();
+local.di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+local.di.map("signupService").to("app.lib.SignupService").asSingleton();
 ```
 
 `service("signupService")` constructs `SignupService`, inspects its `init()` parameters, sees `emailService` and `currentUser` are registered, resolves both, and passes them as arguments. If you *do* pass `initArguments`, auto-wiring is skipped — your explicit struct wins.
