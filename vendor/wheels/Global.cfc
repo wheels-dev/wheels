@@ -4392,6 +4392,20 @@ return local.$wheels;
 			variables[key] = reloaded[key];
 			this[key] = reloaded[key];
 		}
+		// The promote-key memo in `application[$appKey()].promotedGlobalKeys`
+		// was recorded against the include surface as it existed BEFORE this
+		// soft reload. Unlike the password-gated full reload, this path leaves
+		// the Wheels application struct (and therefore the memo) intact, so a
+		// helper added to app/global/*.cfm would be included into `variables`
+		// of fresh Global-derived instances but never promoted to `this`
+		// (invisible on Adobe CF struct-iteration — the ##2790 case). Drop the
+		// memo so the next instantiation re-scans (##2800 stale-cache lesson).
+		if (IsDefined("application")) {
+			var reincludeAppKey = $appKey();
+			if (StructKeyExists(application, reincludeAppKey) && IsStruct(application[reincludeAppKey])) {
+				StructDelete(application[reincludeAppKey], "promotedGlobalKeys");
+			}
+		}
 	}
 
 	// User-defined global functions
@@ -4430,8 +4444,12 @@ return local.$wheels;
 	 * engine-dependent, so the promotable set is not guaranteed identical
 	 * across subclasses. The gate is the cached key itself, never a separate
 	 * done-flag (##2800 lesson), and the cache lives inside
-	 * `application[$appKey()]`, which `?reload=true` rebuilds as a fresh
-	 * struct — so invalidation is structural. When `application` (or the
+	 * `application[$appKey()]`. Invalidation is two-pronged: the
+	 * password-gated `?reload=true&password=...` full reload rebuilds that
+	 * struct from scratch (structural), while the bare `?reload=true`
+	 * soft-reload (issue ##2792) mutates the include surface in place and
+	 * leaves the struct intact — so `$reincludeGlobals()` deletes the memo
+	 * explicitly after re-binding. When `application` (or the
 	 * Wheels struct in it) is unavailable — CLI/test bootstrap, early
 	 * application start — we fall back to the full scan without memoizing.
 	 */

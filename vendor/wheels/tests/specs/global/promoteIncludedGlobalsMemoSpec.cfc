@@ -86,9 +86,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("re-scans and repopulates after the cache is cleared (reload recreates application[appKey])", () => {
-				// On ?reload=true, onapplicationstart.cfc rebuilds application.$wheels
-				// as a fresh struct, so the cache is invalidated structurally. Deleting
-				// the cache key here simulates exactly that.
+				// On the password-gated ?reload=true&password=..., onapplicationstart.cfc
+				// rebuilds application.$wheels as a fresh struct, so the cache is
+				// invalidated structurally. Deleting the cache key here simulates
+				// exactly that. (The bare ?reload=true soft-reload leaves the struct
+				// intact and invalidates explicitly — covered by the
+				// $reincludeGlobals spec below.)
 				var first = new wheels.tests._assets.global.PromoteMemoFixture();
 				var firstCacheKey = StructKeyArray(application[ctx.appKey].promotedGlobalKeys)[1];
 				var firstKeys = Duplicate(application[ctx.appKey].promotedGlobalKeys[firstCacheKey]);
@@ -104,6 +107,45 @@ component extends="wheels.WheelsTest" {
 				ArraySort(firstKeys, "textnocase");
 				ArraySort(secondKeys, "textnocase");
 				expect(SerializeJSON(secondKeys)).toBe(SerializeJSON(firstKeys));
+			});
+
+			it("the bare ?reload=true soft-reload invalidates the memo via $reincludeGlobals", () => {
+				// The soft-reload path (EventMethods.cfc, issue ##2792) calls
+				// $reincludeGlobals() when an app/global/*.cfm include changed.
+				// Unlike the password-gated full reload it does NOT rebuild
+				// application[appKey], so a newly added global helper would be
+				// included into `variables` of fresh Global-derived instances
+				// but never promoted to `this` if the memo survived — the
+				// ##2790 Adobe enumerability case. $reincludeGlobals must
+				// therefore delete the memo itself.
+				var first = new wheels.tests._assets.global.PromoteMemoFixture();
+				expect(StructKeyExists(application[ctx.appKey], "promotedGlobalKeys")).toBeTrue(
+					"expected the memo to be populated before the soft reload"
+				);
+
+				var tmpDir = ExpandPath("/wheels/tests/_tmp/promoteMemo");
+				// DirectoryCreate(path, true) is Lucee-only (issue ##2567);
+				// java.io.File.mkdirs() recurses parents on every engine.
+				CreateObject("java", "java.io.File").init(tmpDir).mkdirs();
+				FileWrite(
+					tmpDir & "/softReload.cfm",
+					"<cfscript>function fxPromoteMemoSoftReload(){return 'soft';}</cfscript>"
+				);
+				try {
+					application.wo.$reincludeGlobals(file = "/wheels/tests/_tmp/promoteMemo/softReload.cfm");
+					expect(StructKeyExists(application[ctx.appKey], "promotedGlobalKeys")).toBeFalse(
+						"expected $reincludeGlobals to drop the promotedGlobalKeys memo (stale-memo guard, ##2800 lesson)"
+					);
+
+					// The next instantiation falls back to the fresh scan and
+					// repopulates the memo against the new include surface.
+					var second = new wheels.tests._assets.global.PromoteMemoFixture();
+					expect(StructKeyExists(application[ctx.appKey], "promotedGlobalKeys")).toBeTrue(
+						"expected a post-soft-reload instantiation to re-scan and repopulate the memo"
+					);
+				} finally {
+					DirectoryDelete(tmpDir, true);
+				}
 			});
 
 			it("a memo populated by a base-class instantiation never distorts a subclass surface", () => {
