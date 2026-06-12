@@ -4650,17 +4650,21 @@ component extends="modules.BaseModule" {
 				extensions: "cfm,cfc",
 				fix: "Re-enable only for controlled staging environments. The 4.0 default rejects ?environment=... in production."
 			});
-			// CSRF key auto-generates when empty (#2054) but cookies rotate
-			// on every deploy when that happens. Warn if config/ never sets
-			// csrfEncryptionKey.
+			// CSRF cookie key auto-generates when empty (#2054) but cookies
+			// rotate on every deploy when that happens. Warn if config/ never
+			// sets csrfCookieEncryptionSecretKey — the setting the framework
+			// actually reads (vendor/wheels/controller/csrf.cfc). Only matters
+			// when csrfStore="cookie" (default store is "session"), and
+			// production throws Wheels.Security.MissingCsrfKey rather than
+			// auto-generating an ephemeral key.
 			arrayAppend(checks, {
-				description: "Missing csrfEncryptionKey (CSRF cookies rotate on every deploy)",
-				pattern: "csrfEncryptionKey",
+				description: "Missing csrfCookieEncryptionSecretKey (CSRF cookies rotate on every deploy when csrfStore=""cookie"")",
+				pattern: "csrfCookieEncryptionSecretKey",
 				checkType: "grep",
 				scanDir: "config",
 				extensions: "cfm,cfc",
 				absent: true,
-				fix: 'Set a stable key: set(csrfEncryptionKey = env("WHEELS_CSRF_KEY")).'
+				fix: 'Set a stable key: set(csrfCookieEncryptionSecretKey = env("WHEELS_CSRF_KEY")).'
 			});
 			// `wheels snippets` → `wheels generate snippets` rename (#1852).
 			// Scan build / CI scripts; the CLI command is invoked from
@@ -4867,7 +4871,7 @@ component extends="modules.BaseModule" {
 
 				// `absent: true` inverts the check — warn when the pattern
 				// is NOT found anywhere in the scanned set. Used for "you
-				// should be setting csrfEncryptionKey somewhere" style
+				// should be setting csrfCookieEncryptionSecretKey somewhere" style
 				// checks. If nothing was scannable (e.g. config/ missing),
 				// treat as pass to avoid noisy false positives.
 				var isAbsent = structKeyExists(check, "absent") && check.absent;

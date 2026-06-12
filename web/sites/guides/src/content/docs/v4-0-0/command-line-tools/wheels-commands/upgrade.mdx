@@ -112,7 +112,7 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 - `new wheels.middleware.Cors()` without `allowOrigins` in `config/` — the 4.0 default changed from wildcard to deny-all (#2039).
 - `new wheels.middleware.RateLimiter` in `config/` — prompts the user to verify `trustProxy` and `proxyStrategy`, whose defaults hardened in 4.0 (#2024, #2088).
 - `allowEnvironmentSwitchViaUrl=true` in `config/` — the production default flipped to `false` (#2076).
-- Missing `csrfEncryptionKey` in `config/` — when absent the key auto-generates and CSRF cookies rotate on every deploy (#2054).
+- Missing `csrfCookieEncryptionSecretKey` in `config/` — when absent the key auto-generates and CSRF cookies rotate on every deploy (#2054).
 - Legacy `wheels snippets` in `Makefile`, `package.json`, `.github/workflows/`, and top-level `*.sh` files — renamed to `wheels generate snippets` (#1852).
 - Existence of `tests/specs/functions/` — renamed to `tests/specs/functional/` (#1872).
 - `viteScriptTag`, `viteStyleTag`, or `vitePreloadTag` in `app/views/` — `viteStrictManifest` now defaults to `true` in production, throwing on missing manifest entries (#2133).
