@@ -1,0 +1,1 @@
+- The published `wheels-core` manifest (`tools/build/core/box.json`) now sets `directory:"vendor"` + `packageDirectory:"wheels"`, so `box install wheels-core` lands the framework at `vendor/wheels/` instead of double-nesting it under `vendor/wheels/vendor/wheels/` and silently leaving the running framework un-upgraded (#3177)
