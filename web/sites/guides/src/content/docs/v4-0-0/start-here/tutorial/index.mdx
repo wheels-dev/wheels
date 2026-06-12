@@ -34,7 +34,7 @@ A blog for an individual author. The final app supports:
 
 - **Framework:** Wheels 4.0 on Lucee 7 (via the bundled `wheels` CLI)
 - **Database:** SQLite, zero setup. Same engine the tutorial runs against in CI.
-- **Frontend:** Turbo Drive for page transitions, Turbo Frames for inline errors, Turbo Streams for comment updates. Loaded from a CDN script tag in Part 4; the `hotwire` package is the eventual canonical home.
+- **Frontend:** Turbo Drive for page transitions, Turbo Frames for inline errors, Turbo Streams for comment updates. Loaded from a CDN script tag in Part 4; the installable [`wheels-hotwire`](https://github.com/wheels-dev/wheels-hotwire) package (`wheels packages add wheels-hotwire`) is the canonical home once you're past the tutorial.
 - **Styling:** [simple.css](https://simplecss.org/), wired into the generated `app/views/layout.cfm` by `wheels new`. Classless — semantic HTML renders polished without any markup changes. The [`wheels-basecoat`](https://github.com/wheels-dev/wheels-basecoat) package is available as an optional shadcn/ui-quality component-kit upgrade after the tutorial.
 - **Auth:** Wheels' built-in `SessionStrategy` for session cookies. Hand-rolled version shown first for understanding, built-in version shown second for shipping.
 - **Tests:** WheelsTest (BDD), plus one Playwright-driven browser spec.
@@ -64,7 +64,7 @@ A blog for an individual author. The final app supports:
 - **SQLite.** All development runs against SQLite in `db/development.sqlite`. Zero setup. Matches the CI testing platform.
 - **Real names.** Code examples use `Post`, `Comment`, `user.email`, `publishedAt` — not `Foo`, `Bar`, or `someField`.
 - **Complete code.** Each block shows the whole function or view, not a fragment. You can always copy a block and have the feature work.
-- **Validated end-to-end.** Every code block in the tutorial is executed by the doc site's verify-docs harness against a real `wheels` CLI. If you see a block here, it compiles and runs.
+- **Validated.** Code blocks annotated with `{test:compile}` or `{test:cli}` are validated by the doc site's verify-docs harness against a real `wheels` CLI. Blocks without an annotation (shell transcripts, illustrative excerpts) are reviewed but not executed.
 
 ## Ready to start
 
