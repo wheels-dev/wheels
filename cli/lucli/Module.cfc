@@ -4322,13 +4322,41 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function runMigration(required string action) {
-		var serverPort = $requireRunningServer(
-			hints = [
-				"Migrations require a running server bound to this project.",
-				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
-			],
-			requireProjectConfig = true
-		);
+		// latest/up/down change the schema — they must only ever target the
+		// server bound to this project's own lucee.json/.env port (#2878).
+		// info/doctor are read-only and keep the legacy common-port fallback,
+		// matching the other read-side commands (info, routes, console,
+		// dbStatus, dbVersion) — the contract #2879 documented but the gate
+		// here didn't honor (#3080).
+		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
+
+		var serverPort = 0;
+		if (mutatingAction) {
+			serverPort = $requireRunningServer(
+				hints = [
+					"Migrations require a running server bound to this project.",
+					"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+				],
+				requireProjectConfig = true
+			);
+		} else {
+			serverPort = $requireRunningServer(
+				hints = ["Start one with: wheels start"],
+				requireProjectConfig = false
+			);
+			// Transparency for the fallback attach: with no project-bound port
+			// we cannot prove the server on a common port belongs to this
+			// project — a sibling app's server would report the WRONG
+			// project's migration state. Say which port we attached to and
+			// how to pin it.
+			if (!detectServerPort(requireProjectConfig = true)) {
+				out(
+					"Attached to localhost:#serverPort# via the common-port fallback (no project-bound port in lucee.json / .env).",
+					"yellow"
+				);
+				out("If this is not this project's server, set 'port' in lucee.json (or PORT in .env) and re-run.", "yellow");
+			}
+		}
 
 		out("Running migration: #action#...", "cyan");
 
@@ -4346,8 +4374,8 @@ component extends="modules.BaseModule" {
 		// latest/up/down change the schema — the framework's /wheels/cli
 		// bridge requires POST + the reload password for state-changing
 		// commands. info/doctor are read-only and stay on GET.
-		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
-
+		// (`mutatingAction` is resolved at the top of this function — the
+		// same read/write split also decides the server-identity gate.)
 		var httpResult = "";
 		try {
 			httpResult = mutatingAction ? makeBridgePost(migrateUrl) : makeHttpRequest(migrateUrl);
