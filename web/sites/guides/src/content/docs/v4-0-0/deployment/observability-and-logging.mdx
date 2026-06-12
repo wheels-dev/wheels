@@ -332,7 +332,7 @@ A small set of signals covers almost every production incident a Wheels app will
 
 - **5xx rate** — from the reverse proxy access log or the APM agent. Alert when the ratio of 5xx responses crosses a threshold (1% over five minutes is a reasonable starting point).
 - **Response time p95** — the tail, not the average. A p95 creeping from 200 ms to 1.5 s signals a problem before the average moves.
-- **Job queue depth** — `(new wheels.Job()).queueStats()` reports pending, processing, and failed counts per queue; expose it from a (protected) controller action or a scheduled task that pushes the numbers to your metrics pipeline. Alert on pending counts that don't drain or failed counts that grow. (There is no `wheels jobs status` CLI command — a worker CLI is tracked in [#3090](https://github.com/wheels-dev/wheels/issues/3090).)
+- **Job queue depth** — `wheels jobs status --format=json` reports pending, processing, and failed counts per queue (scrape it from cron or a textfile exporter); the same numbers are available in-app via `(new wheels.Job()).queueStats()` from a (protected) controller action. Alert on pending counts that don't drain or failed counts that grow.
 - **Database connection pool saturation** — engine-specific metric. Lucee exposes datasource stats; Adobe does too. A pool pinned at its ceiling means requests are queuing to talk to the database.
 - **Health check failing** — your load balancer's view of app reachability. One pod occasionally failing is noise; all pods failing is an outage.
 - **Sentry error rate** — alert when the rate of captured exceptions for a release exceeds a baseline, or when a new error fingerprint appears post-deploy.

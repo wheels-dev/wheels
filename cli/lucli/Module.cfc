@@ -186,6 +186,7 @@ component extends="modules.BaseModule" {
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
 			"browser",  // multi-step browser testing flow
+			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
 			"mcpToolSpecs", // per-tool inputSchema registry read by LuCLI — not itself a tool
 			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
 			// unit-test them directly (the cli/CLAUDE.md "public for specs"
@@ -313,6 +314,16 @@ component extends="modules.BaseModule" {
 			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework");
 	}
 
+	private any function jobsArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop) or status (queue snapshot). Defaults to status")
+			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. Empty = all queues")
+			.option(name = "interval", default = 5, type = "numeric", description = "work only: seconds to wait between polls when no job is available")
+			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
+			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
+			.option(name = "format", default = "table", description = "status only: output format, table or json");
+	}
+
 	// ─────────────────────────────────────────────────
 	//  version / help — banner + command listing
 	// ─────────────────────────────────────────────────
@@ -431,6 +442,8 @@ component extends="modules.BaseModule" {
 		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
+		help &= "Background Jobs:" & nl;
+		help &= "  jobs                Job queue worker and stats (work, status)" & nl & nl;
 		help &= "Testing & Inspection:" & nl;
 		help &= "  test                Run the test suite" & nl;
 		help &= "  browser             Browser-based tests (Playwright)" & nl;
@@ -2890,6 +2903,270 @@ component extends="modules.BaseModule" {
 				out("Valid commands: reset, status, version");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown db command: #subcommand#");
 		}
+	}
+
+	// ─────────────────────────────────────────────────
+	//  jobs — Background job worker
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * Parse `wheels jobs` arguments. Public ONLY so JobsCommandSpec can
+	 * unit-test the parse/validation surface directly (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — the mcpHiddenTools() structural
+	 * $-prefix sweep keeps it off the MCP surface. Validation happens here,
+	 * before any server detection, so a bad flag yields a usage error
+	 * instead of a misleading "no server" diagnostic.
+	 */
+	public struct function $parseJobsArgs(required struct coll) {
+		var parsed = jobsArgSpec().parse(arguments.coll);
+		var opts = {
+			action = lCase(trim(parsed.action)),
+			queue = trim(parsed.queue),
+			interval = parsed.interval,
+			maxJobs = parsed["max-jobs"],
+			quiet = parsed.quiet,
+			format = lCase(trim(parsed.format))
+		};
+		if (!len(opts.action)) {
+			opts.action = "status";
+		}
+		if (opts.interval <= 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--interval must be a positive number of seconds."
+			);
+		}
+		if (opts.maxJobs < 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--max-jobs must be zero (unlimited) or a positive number."
+			);
+		}
+		if (!listFindNoCase("table,json", opts.format)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown --format '#opts.format#'. Valid formats: table, json."
+			);
+		}
+		return opts;
+	}
+
+	/**
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts (--format=json for machines). retry/purge/monitor are tracked follow-ups (issue 3090).
+	 */
+	public string function jobs() {
+		var opts = $parseJobsArgs(structuredArgs(arguments));
+
+		switch (opts.action) {
+			case "work":
+				return runJobsWork(opts);
+			case "status":
+				return runJobsStatus(opts);
+			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
+			// implements jobsRetry/jobsPurge/jobsMonitor — the CLI verbs are
+			// deliberate follow-ups tracked in ##3090. Fail loudly with the
+			// programmatic equivalent instead of pretending the verb exists.
+			case "retry":
+			case "purge":
+			case "monitor":
+				out("'wheels jobs #opts.action#' is not implemented yet (tracked in issue ##3090).", "red");
+				out("Until it ships, drive it programmatically on the running app:", "yellow");
+				out("  retry:   (new wheels.Job()).retryFailed(queue=""..."")", "yellow");
+				out("  purge:   (new wheels.Job()).purgeCompleted(days=7, queue=""..."")", "yellow");
+				out("  monitor: poll `wheels jobs status --format=json` on an interval", "yellow");
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "'wheels jobs #opts.action#' is not implemented yet — see https://github.com/wheels-dev/wheels/issues/3090"
+				);
+			default:
+				out("Unknown jobs action: #opts.action#", "red");
+				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--quiet] [--format=table|json]");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
+		}
+	}
+
+	/**
+	 * Long-lived worker loop: poll the framework's jobsProcessNext bridge
+	 * command, which claims and runs one pending job per call (optimistic
+	 * locking — safe to run several workers in parallel). Processing jobs
+	 * mutates application data, so this is write-side: strict server
+	 * identity (##2878) and POST + reload password (SEC-4 mutation gate).
+	 */
+	private string function runJobsWork(required struct opts) {
+		var serverPort = $requireRunningServer(
+			hints = [
+				"The job worker requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
+
+		var workUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsProcessNext&format=json";
+		if (len(arguments.opts.queue)) {
+			workUrl &= "&queues=" & urlEncodedFormat(arguments.opts.queue);
+		}
+
+		out("Wheels Job Worker", "cyan");
+		out("Queues: " & (len(arguments.opts.queue) ? arguments.opts.queue : "all"));
+		out("Poll interval: #arguments.opts.interval#s");
+		if (arguments.opts.maxJobs > 0) {
+			out("Max jobs: #arguments.opts.maxJobs#");
+		}
+		out("Press Ctrl+C to stop");
+		out("");
+
+		var counters = {processed = 0, failed = 0};
+		while (true) {
+			var httpResult = "";
+			try {
+				httpResult = makeBridgePost(workUrl);
+			} catch (any httpErr) {
+				// Connection loss is fatal: the worker exits non-zero so a
+				// process supervisor (systemd, Docker restart policy) brings
+				// it back once the server is reachable again, instead of the
+				// worker spinning silently against a dead port.
+				throw(
+					type    = "Wheels.Cli.CommandFailed",
+					message = "Job worker lost its connection to the server: #httpErr.message#",
+					detail  = httpErr.detail ?: ""
+				);
+			}
+
+			// parseCliResponse throws Wheels.Cli.CommandFailed when the bridge
+			// rejects the request (e.g. the mutation gate's reload-password or
+			// loopback checks) — permanent conditions, so the worker exits
+			// non-zero instead of retrying forever.
+			var result = parseCliResponse(httpResult, "Jobs work");
+			var jobResult = structKeyExists(result, "jobResult") && isStruct(result.jobResult)
+				? result.jobResult
+				: {skipped = true};
+			var idle = jobResult.skipped ?: true;
+
+			if (idle) {
+				// Queue empty — wait for the next poll below.
+			} else if (jobResult.success ?: false) {
+				counters.processed++;
+				if (!arguments.opts.quiet) {
+					out("[#timeFormat(now(), "HH:mm:ss")#] Completed: #jobResult.jobClass# (#jobResult.jobId#)", "green");
+				}
+			} else {
+				// The job itself failed — the framework already scheduled the
+				// retry (with backoff) or marked it failed; the worker keeps
+				// draining.
+				counters.failed++;
+				var errorMessage = len(jobResult.error ?: "") ? jobResult.error : "Unknown error";
+				out("[#timeFormat(now(), "HH:mm:ss")#] Failed: #jobResult.jobClass# - #errorMessage#", "red");
+			}
+
+			if (arguments.opts.maxJobs > 0 && (counters.processed + counters.failed) >= arguments.opts.maxJobs) {
+				out("");
+				out("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", "green");
+				out("Processed: #counters.processed# | Failed: #counters.failed#");
+				return "";
+			}
+
+			// Only sleep when the queue was empty — back-to-back pending jobs
+			// drain immediately. Failed jobs are rescheduled with future runAt
+			// timestamps, so an immediate re-poll cannot hot-loop on them.
+			if (idle) {
+				sleep(arguments.opts.interval * 1000);
+			}
+		}
+	}
+
+	/**
+	 * One-shot queue snapshot via the read-only jobsStatus bridge command.
+	 */
+	private string function runJobsStatus(required struct opts) {
+		var serverPort = $requireRunningServer(
+			hints = ["Start one with: wheels start"]
+		);
+
+		var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsStatus&format=json";
+		if (len(arguments.opts.queue)) {
+			statusUrl &= "&queue=" & urlEncodedFormat(arguments.opts.queue);
+		}
+
+		var httpResult = "";
+		try {
+			httpResult = makeHttpRequest(statusUrl);
+		} catch (any httpErr) {
+			throw(
+				type    = "Wheels.Cli.CommandFailed",
+				message = "Jobs status failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
+
+		var result = parseCliResponse(httpResult, "Jobs status");
+		var stats = structKeyExists(result, "stats") && isStruct(result.stats) ? result.stats : {};
+
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(stats));
+			return "";
+		}
+
+		out("Job Queue Status", "cyan");
+		out($formatJobsStatusTable(stats));
+		return "";
+	}
+
+	/**
+	 * Render JobWorker.getStats() output ({queues: {name: counts}, totals:
+	 * counts}) as a fixed-width table. Public ONLY so JobsCommandSpec can
+	 * unit-test the rendering without a running server (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — the mcpHiddenTools() structural
+	 * $-prefix sweep keeps it off the MCP surface. Defensive against partial
+	 * payloads: the input is deserialized JSON from the bridge. Queue names
+	 * are sorted — struct iteration order is not insertion order at scale.
+	 */
+	public string function $formatJobsStatusTable(required struct stats) {
+		var nl = chr(10);
+		var queues = structKeyExists(arguments.stats, "queues") && isStruct(arguments.stats.queues)
+			? arguments.stats.queues
+			: {};
+		var totals = structKeyExists(arguments.stats, "totals") && isStruct(arguments.stats.totals)
+			? arguments.stats.totals
+			: {};
+
+		if (structIsEmpty(queues)) {
+			return "No jobs found.";
+		}
+
+		var header = "| " & $padJobsColumn("Queue", 20) & " | " & $padJobsColumn("Pending", 10) & " | "
+			& $padJobsColumn("Processing", 12) & " | " & $padJobsColumn("Completed", 12) & " | "
+			& $padJobsColumn("Failed", 10) & " | " & $padJobsColumn("Total", 10) & " |";
+		var separator = repeatString("-", len(header));
+		var lines = [separator, header, separator];
+
+		var queueNames = structKeyArray(queues);
+		arraySort(queueNames, "textnocase");
+		for (var queueName in queueNames) {
+			var rowCounts = isStruct(queues[queueName]) ? queues[queueName] : {};
+			arrayAppend(lines, $jobsStatusRow(queueName, rowCounts));
+		}
+		arrayAppend(lines, separator);
+		arrayAppend(lines, $jobsStatusRow("TOTAL", totals));
+		arrayAppend(lines, separator);
+
+		return arrayToList(lines, nl);
+	}
+
+	private string function $jobsStatusRow(required string label, required struct counts) {
+		return "| " & $padJobsColumn(arguments.label, 20) & " | "
+			& $padJobsColumn(arguments.counts.pending ?: 0, 10) & " | "
+			& $padJobsColumn(arguments.counts.processing ?: 0, 12) & " | "
+			& $padJobsColumn(arguments.counts.completed ?: 0, 12) & " | "
+			& $padJobsColumn(arguments.counts.failed ?: 0, 10) & " | "
+			& $padJobsColumn(arguments.counts.total ?: 0, 10) & " |";
+	}
+
+	private string function $padJobsColumn(required any value, required numeric width) {
+		var str = toString(arguments.value);
+		if (len(str) >= arguments.width) {
+			return left(str, arguments.width);
+		}
+		return str & repeatString(" ", arguments.width - len(str));
 	}
 
 	// ─────────────────────────────────────────────────

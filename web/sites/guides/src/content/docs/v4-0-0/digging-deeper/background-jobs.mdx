@@ -8,13 +8,13 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page shows you how to move slow work out of the request cycle. You'll define a job class, enqueue it from a controller, drain the queue with `processQueue()` on a schedule, configure retries with exponential backoff, and route urgent work through a high-priority queue.
+This page shows you how to move slow work out of the request cycle. You'll define a job class, enqueue it from a controller, drain the queue with the `wheels jobs work` worker (or `processQueue()` on a schedule), configure retries with exponential backoff, and route urgent work through a high-priority queue.
 
 **You'll learn:**
 
 - How to define a job by extending `wheels.Job` and implementing `perform()`
 - How to enqueue jobs immediately, after a delay, or at a specific time
-- How to drain queues with `processQueue()` from a scheduled task or cron-driven script
+- How to drain queues with the `wheels jobs work` worker, or `processQueue()` from a scheduled task
 - How retries and backoff work, and how to tune them
 - How priority queues let critical work jump the line
 - How to monitor, retry, and purge jobs in production
@@ -88,11 +88,31 @@ component extends="Controller" {
 
 ## Process the queue
 
-<Aside type="caution">
-  **There is no `wheels jobs` CLI yet.** Earlier 4.0 docs described `wheels jobs work|status|retry|monitor|purge` commands, but the released CLI has no `jobs` command — invoking one errors. A worker CLI is tracked in [#3090](https://github.com/wheels-dev/wheels/issues/3090). Until it ships, drive the queue with the programmatic API on `wheels.Job`, shown below.
+The simplest way to drain the queue is the bundled worker — a long-lived CLI process that polls the `wheels_jobs` table, claims one `pending` job per cycle, and runs it. It talks to your running app server, so start that first (`wheels start`):
+
+```bash title="your shell"
+wheels jobs work                               # process all queues; loops until Ctrl-C
+wheels jobs work --queue=mailers               # only drain the mailers queue
+wheels jobs work --queue=mailers --interval=3  # poll every 3 seconds when idle (default 5)
+wheels jobs work --max-jobs=100                # stop after 100 jobs — one-shot batches from cron or CI
+wheels jobs work --quiet                       # suppress per-job output; failures still print
+```
+
+In production, run the worker under a process supervisor (systemd, Docker's restart policy, Kamal accessory containers): when it loses the server it exits non-zero and the supervisor restarts it. Run several workers for parallelism — the framework uses optimistic row locking, so two workers never run the same job twice. `--queue` accepts a comma-delimited list (`--queue=critical,default`); jobs across the listed queues run in `priority DESC, runAt ASC` order.
+
+Check queue health without tailing logs:
+
+```bash title="your shell"
+wheels jobs status                  # per-queue pending / processing / completed / failed table
+wheels jobs status --queue=mailers  # one queue only
+wheels jobs status --format=json    # machine-readable, for CI smoke tests or metric scrapes
+```
+
+<Aside type="note">
+  The `retry`, `purge`, and `monitor` verbs are tracked follow-ups in [#3090](https://github.com/wheels-dev/wheels/issues/3090) — invoking one errors and points you at the programmatic equivalent (`retryFailed()` / `purgeCompleted()`, shown below).
 </Aside>
 
-Processing is a poll: `processQueue()` picks up every `pending` job whose `runAt` has arrived, runs each one, and returns counts. Call it from anything that runs on a schedule — a CFML scheduled task, a cron-invoked script, or a controller action behind an admin route that your scheduler hits:
+You don't need a separate worker process, though. Processing is a poll: `processQueue()` picks up every `pending` job whose `runAt` has arrived, runs each one, and returns counts. Call it from anything that runs on a schedule — a CFML scheduled task, a cron-invoked script, or a controller action behind an admin route that your scheduler hits:
 
 ```cfm {test:compile} title="app/controllers/admin/Jobs.cfc (fragment)"
 component extends="Controller" {
@@ -190,7 +210,7 @@ Per-job `priority` is the finer instrument; queue-based separation is simpler to
 
 ## Monitoring in production
 
-There's no dashboard yet — it lands with the worker CLI tracked in [#3090](https://github.com/wheels-dev/wheels/issues/3090). The building block that exists today is `queueStats()`. Expose it from a small admin endpoint and point whatever you already use — Prometheus, Datadog, a custom scrape — at the JSON:
+For headless metrics, scrape `wheels jobs status --format=json` from a cron job or a Prometheus textfile exporter. (An interactive `wheels jobs monitor` dashboard is a tracked follow-up in [#3090](https://github.com/wheels-dev/wheels/issues/3090).) The same numbers are available in-app via `queueStats()` — expose it from a small admin endpoint and point whatever you already use — Prometheus, Datadog, a custom scrape — at the JSON:
 
 ```cfm {test:compile} title="app/controllers/admin/Jobs.cfc (fragment)"
 component extends="Controller" {

@@ -1,0 +1,1 @@
+- `wheels jobs work` (long-lived worker loop with `--queue`, `--interval`, `--max-jobs`, `--quiet`) and `wheels jobs status` (`--queue`, `--format=json`) CLI commands — thin wrappers over the existing `jobsProcessNext`/`jobsStatus` framework bridge that was left without a CLI surface in the LuCLI migration; the `retry`/`purge`/`monitor` verbs remain tracked follow-ups (#3090)
