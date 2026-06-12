@@ -27,7 +27,7 @@ You've read [Your First Deploy](/v4-0-0/deployment/first-deploy/). Hooks are use
 |------|-------|---------|
 | `pre-deploy` | Before any host work starts. | Yes — non-zero exit aborts the deploy before anything on the servers changes. |
 | `post-deploy` | After a successful deploy. | Yes — non-zero exit fails the deploy after-the-fact, useful for smoke tests. |
-| `post-deploy-failure` | After a deploy that threw an error. | Already a failure path — but make the hook itself exit 0. A non-zero exit currently throws and **replaces the original deploy error** in the output, masking the root cause ([#3087](https://github.com/wheels-dev/wheels/issues/3087)). |
+| `post-deploy-failure` | After a deploy that threw an error. | No — it's best-effort on an already-failed path. A non-zero exit from the hook is logged (`[hook:post-deploy-failure] ...`) and never replaces the original deploy error; the deploy rethrows the real failure and the overall exit stays non-zero. |
 
 All three live under `.kamal/hooks/` and must be executable (`chmod +x`). They run on the control machine — the same machine running `wheels deploy` — not on the target hosts.
 
@@ -82,8 +82,9 @@ The non-zero exit stops `wheels deploy` before it touches production.
 
 ```bash title=".kamal/hooks/post-deploy-failure (illustrative — do not type)"
 #!/usr/bin/env bash
-# Deliberately no `set -e`: exit 0 even if the page fails, so the
-# original deploy error stays visible (see #3087).
+# No `set -e`: a paging failure isn't worth extra noise in the deploy
+# log. (Even if this hook exits non-zero, wheels deploy only logs it —
+# the original deploy error always survives.)
 
 curl -sS -X POST https://events.pagerduty.com/v2/enqueue \
   -H 'Content-Type: application/json' \
@@ -112,7 +113,7 @@ Hook stdout and stderr are merged and prefixed with `[hook:<name>]` in the deplo
 
 A non-zero exit from `pre-deploy` aborts the deploy before any server work. A non-zero exit from `post-deploy` marks the deploy as failed after-the-fact — the containers are already rolled over, so this is useful for integration smoke tests that gate "did the deploy actually work" rather than "can I start the new container."
 
-`post-deploy-failure` runs on an already-failed path, so the overall exit stays non-zero either way — but a non-zero exit from the hook itself currently throws and **replaces the original deploy error** in the output ([#3087](https://github.com/wheels-dev/wheels/issues/3087)). Until that's fixed, write `post-deploy-failure` hooks to always exit 0 (swallow notification failures with `|| true`) so the real error survives.
+`post-deploy-failure` runs on an already-failed path, so the overall exit stays non-zero either way. The hook is best-effort: a non-zero exit from the hook itself is logged as `[hook:post-deploy-failure] Hook post-deploy-failure exited with code N (ignored — surfacing the original deploy error)` and the original deploy error rethrows untouched.
 
 ## Debugging hooks
 

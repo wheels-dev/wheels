@@ -2,6 +2,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
     function beforeAll() {
         variables.fixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml");
+        variables.proxyFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-proxy.yml");
     }
 
     function run() {
@@ -531,6 +532,129 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
                     expect(e.message).toInclude("docker pull");
                 }
+            });
+
+            // Regression suite for #3087 — a failing post-deploy-failure hook used to
+            // throw DeployMainCli.HookFailed from inside the deploy catch block,
+            // replacing the original deploy error. The hook fires on an already-failed
+            // path, so it must be best-effort: run, log a non-zero exit, and let the
+            // original exception rethrow.
+
+            it("a failing post-deploy-failure hook does not mask the original deploy error (##3087)", () => {
+                var tmpProject = getTempDirectory() & "/wheels-3087-" & createUUID();
+                var marker = tmpProject & "/hook-ran.txt";
+                directoryCreate(tmpProject & "/.kamal/hooks", true, true);
+                // The hook proves it ran (marker file) and then fails.
+                fileWrite(
+                    tmpProject & "/.kamal/hooks/post-deploy-failure",
+                    "##!/usr/bin/env bash" & chr(10)
+                        & "echo ran > " & marker & chr(10)
+                        & "exit 1"
+                );
+                fileSetAccessMode(tmpProject & "/.kamal/hooks/post-deploy-failure", "755");
+
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake, {projectRoot: tmpProject});
+                // savecontent captures the hook log (asserted below) and keeps
+                // real-mode hook output out of the test runner's response stream.
+                var state = {threw = false, errType = "", errMsg = "", logged = ""};
+                savecontent variable="state.logged" {
+                    try {
+                        dc.deploy({configPath: variables.fixture, version: "v1"});
+                    } catch (any e) {
+                        state.threw = true;
+                        state.errType = e.type;
+                        state.errMsg = e.message;
+                    }
+                }
+                // The surfaced error must be the original pull failure,
+                // NOT DeployMainCli.HookFailed from the notification hook.
+                expect(state.threw).toBeTrue();
+                expect(state.errType).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                expect(state.errMsg).toInclude("docker pull");
+                // ...and the hook's non-zero exit is logged, not thrown.
+                expect(state.logged).toInclude("[hook:post-deploy-failure]");
+                expect(state.logged).toInclude("exited with code 1");
+                directoryDelete(tmpProject, true);
+            });
+
+            it("the post-deploy-failure hook still runs (best-effort) before the original error rethrows (##3087)", () => {
+                var tmpProject = getTempDirectory() & "/wheels-3087-ran-" & createUUID();
+                var marker = tmpProject & "/hook-ran.txt";
+                directoryCreate(tmpProject & "/.kamal/hooks", true, true);
+                fileWrite(
+                    tmpProject & "/.kamal/hooks/post-deploy-failure",
+                    "##!/usr/bin/env bash" & chr(10)
+                        & "echo ""$KAMAL_ERROR"" > " & marker & chr(10)
+                        & "exit 1"
+                );
+                fileSetAccessMode(tmpProject & "/.kamal/hooks/post-deploy-failure", "755");
+
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake, {projectRoot: tmpProject});
+                var state = {threw = false, logged = ""};
+                savecontent variable="state.logged" {
+                    try {
+                        dc.deploy({configPath: variables.fixture, version: "v1"});
+                    } catch (any e) {
+                        state.threw = true;
+                    }
+                }
+                expect(state.threw).toBeTrue();
+                // The hook ran and received KAMAL_ERROR even though it exited non-zero.
+                expect(fileExists(marker)).toBeTrue();
+                expect(fileRead(marker)).toInclude("exit 1");
+                directoryDelete(tmpProject, true);
+            });
+
+            // Regression suite for #3089 — deploy()/rollback() hardcoded the
+            // kamal-proxy target to <container>:3000, ignoring proxy.app_port
+            // (code default 80; `wheels deploy init` scaffolds 8080).
+
+            it("deploy --dry-run builds the kamal-proxy target from proxy.app_port (##3089)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({
+                    configPath: variables.proxyFixture,
+                    dryRun: true,
+                    version: "v1"
+                });
+                expect(out).toInclude("--target demo-web-v1:8080");
+                expect(out).notToInclude(":3000");
+            });
+
+            it("rollback --dry-run builds the kamal-proxy target from proxy.app_port (##3089)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.rollback({
+                    configPath: variables.proxyFixture,
+                    dryRun: true,
+                    version: "v-old"
+                });
+                expect(out).toInclude("--target demo-web-v-old:8080");
+                expect(out).notToInclude(":3000");
+            });
+
+            it("deploy --dry-run falls back to app_port default 80 when proxy is unconfigured (##3089)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({
+                    configPath: variables.fixture,
+                    dryRun: true,
+                    version: "v1"
+                });
+                expect(out).toInclude("--target demo-web-v1:80");
+                expect(out).notToInclude(":3000");
             });
 
             // Regression for #2671 — git's stderr ("fatal: not a git repository...") used to leak through as the version string.
