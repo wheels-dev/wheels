@@ -423,10 +423,13 @@ new wheels.middleware.RateLimiter()                                            /
 new wheels.middleware.RateLimiter(maxRequests=100, windowSeconds=120, strategy="slidingWindow")
 new wheels.middleware.RateLimiter(maxRequests=50, windowSeconds=60, strategy="tokenBucket")
 new wheels.middleware.RateLimiter(storage="database")                          // auto-creates wheels_rate_limits
-new wheels.middleware.RateLimiter(keyFunction=function(req) {                  // rate-limit per API key
+// rate-limit per API key — hoist the closure first: an inline function literal
+// as a constructor named arg crashes Adobe CF (Cross-Engine Invariant 5)
+var apiKeyFn = function(req) {
     var apiKey = cgi.http_x_api_key;
     return Len(apiKey) ? apiKey : "anonymous";
-})
+};
+new wheels.middleware.RateLimiter(keyFunction=apiKeyFn)
 ```
 
 The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method}` — it has **no `cgi` key** ([#3074](https://github.com/wheels-dev/wheels/issues/3074)), so `req.cgi.*` silently collapses every client into one bucket. Read the real `cgi` scope directly, and guard with `Len()` (a missing header reads as empty string, not undefined, so `?:` never fires).
