@@ -139,6 +139,8 @@ Routes match first-to-last. Wrong order = wrong matches.
 Order: MCP routes → resources → custom named routes → root → wildcard (last!)
 ```
 
+One blessed exception ([#3073](https://github.com/wheels-dev/wheels/issues/3073)): placeholder-free patterns live in an exact-path index resolved BEFORE the ordered scan, so a literal like `/posts/featured` beats `/posts/[key]` regardless of declaration position. Declaration order still decides placeholder-vs-placeholder conflicts and ties between identical static patterns. Pinned by `vendor/wheels/tests/specs/dispatch/RoutePrecedenceSpec.cfc`; fast path in `Dispatch.cfc::$findMatchingRoute`, index built in `Mapper.cfc`.
+
 ### 7. `timestamps()` Adds Three Columns (Not Two)
 `createdAt`, `updatedAt`, AND `deletedAt` (soft-delete marker). Don't add separate datetime columns for these. Verified against `vendor/wheels/migrator/TableDefinition.cfc`.
 

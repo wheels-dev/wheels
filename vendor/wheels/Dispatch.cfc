@@ -197,6 +197,10 @@ component output="false" extends="wheels.Global"{
 		// --- Fast path: Static route O(1) lookup ---
 		// Static routes (no variables in pattern) are indexed in a hash map at registration time.
 		// This avoids regex matching entirely for common static paths like /login, /about, etc.
+		// NOTE: this is a deliberate precedence rule, not just a perf shortcut — a literal path
+		// beats a placeholder route regardless of declaration order. Declaration order still
+		// decides placeholder-vs-placeholder conflicts and ties between identical static
+		// patterns. Pinned by tests/specs/dispatch/RoutePrecedenceSpec.cfc (issue 3073).
 		if (StructKeyExists(application.wheels, "staticRoutes")) {
 			local.staticKey = local.methodKey & ":/" & arguments.path;
 			if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
