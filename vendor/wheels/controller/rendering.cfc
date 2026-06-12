@@ -572,7 +572,7 @@ component {
 	public string function $generateIncludeTemplatePath(
 		required any $name,
 		required any $type,
-		string $controllerName = variables.params.controller,
+		string $controllerName = StructKeyExists(variables, "params") ? variables.params.controller : "",
 		string $baseTemplatePath = $get("viewPath"),
 		boolean $prependWithUnderscore = true
 	) {
@@ -623,12 +623,27 @@ component {
 		if (Left(arguments.$name, 1) == "/") {
 			// Include a file in a sub folder to views.
 			local.rv &= local.folderName & "/" & local.fileName;
-		} else if (Find("/", arguments.$name)) {
-			// Include a file in a sub folder of the current controller.
-			local.rv &= "/" & arguments.$controllerName & "/" & local.folderName & "/" & local.fileName;
 		} else {
-			// Include a file in the current controller's view folder.
-			local.rv &= "/" & arguments.$controllerName & "/" & local.fileName;
+			// Controller-relative resolution needs a controller name. A bare-instantiated
+			// controller (e.g. `new wheels.Controller()`) never ran the request lifecycle,
+			// so it has no `variables.params` and `$controllerName` defaults to "". Surface a
+			// clear, named error instead of dereferencing the missing `params` (which threw a
+			// raw "Element PARAMS is undefined" 500 on every engine) or building a broken
+			// `//...` lookup path.
+			if (!Len(arguments.$controllerName)) {
+				Throw(
+					type = "Wheels.ControllerNameRequired",
+					message = "Cannot resolve the controller-relative template path `#EncodeForHTML(arguments.$name)#` without a controller name.",
+					extendedInfo = "This controller instance has no `params.controller` (it was not built through the request lifecycle). Use an absolute template path (with a leading slash), or construct the controller via `controller(name=..., params=...)`."
+				);
+			}
+			if (Find("/", arguments.$name)) {
+				// Include a file in a sub folder of the current controller.
+				local.rv &= "/" & arguments.$controllerName & "/" & local.folderName & "/" & local.fileName;
+			} else {
+				// Include a file in the current controller's view folder.
+				local.rv &= "/" & arguments.$controllerName & "/" & local.fileName;
+			}
 		}
 		return LCase(local.rv);
 	}
