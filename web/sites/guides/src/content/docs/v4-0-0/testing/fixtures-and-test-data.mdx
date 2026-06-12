@@ -32,6 +32,10 @@ The trigger conditions live in `vendor/wheels/tests/runner.cfm`. The runner read
 This is a significant departure from Rails or Laravel, where the framework wraps each test in a transaction and rolls back. Wheels sets `application.wheels.transactionMode = "none"` in `runner.cfm`, so writes during a test run persist across specs. The two mechanisms you have for isolation are: (1) make `populate.cfm` idempotent so re-running it always resets the world, and (2) wrap destructive specs in a manual `transaction { ... }` block that rolls back.
 
 <Aside type="caution">
+  The runner applies these settings (and path swaps like `modelPath`) to the **live** `application.wheels` of the server it runs against — they can leak into normal requests served during and after a test run. Track [#3025](https://github.com/wheels-dev/wheels/issues/3025) for the isolation work; until then, prefer a dedicated test server over running the suite against the instance you're browsing.
+</Aside>
+
+<Aside type="caution">
   `populate.cfm` does not run between specs. A `create()` in `specs/models/PostSpec.cfc` leaves a row visible to `specs/models/CommentSpec.cfc`. Design specs to tolerate shared state, or roll back writes explicitly.
 </Aside>
 
@@ -44,13 +48,17 @@ The canonical pattern is DROP + CREATE + seed, in that order, with the drops in 
 // Runs once per test run. Triggered by runner.cfm whenever url.populate is
 // truthy (default) or when the sentinel table is missing.
 
+function runSql(required string sql) {
+    queryExecute(arguments.sql, {}, {datasource: application.wheels.dataSourceName});
+}
+
 // Drop existing tables (reverse dependency order)
-try { application.wo.execute("DROP TABLE comments"); } catch (any e) {}
-try { application.wo.execute("DROP TABLE posts"); } catch (any e) {}
-try { application.wo.execute("DROP TABLE users"); } catch (any e) {}
+try { runSql("DROP TABLE comments"); } catch (any e) {}
+try { runSql("DROP TABLE posts"); } catch (any e) {}
+try { runSql("DROP TABLE users"); } catch (any e) {}
 
 // Create tables
-application.wo.execute("
+runSql("
     CREATE TABLE users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email VARCHAR(100) UNIQUE NOT NULL,
@@ -60,7 +68,7 @@ application.wo.execute("
     )
 ");
 
-application.wo.execute("
+runSql("
     CREATE TABLE posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         userId INTEGER NOT NULL,
@@ -72,7 +80,7 @@ application.wo.execute("
     )
 ");
 
-application.wo.execute("
+runSql("
     CREATE TABLE comments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         postId INTEGER NOT NULL,
@@ -84,20 +92,20 @@ application.wo.execute("
 ");
 
 // Seed known fixtures
-application.wo.execute("
+runSql("
     INSERT INTO users (email, passwordHash, createdAt, updatedAt)
     VALUES ('alice@example.com', 'hash', NOW(), NOW()),
            ('bob@example.com', 'hash', NOW(), NOW())
 ");
 
-application.wo.execute("
+runSql("
     INSERT INTO posts (userId, title, body, status, createdAt, updatedAt)
     VALUES (1, 'Welcome', 'First post', 'published', NOW(), NOW())
 ");
 </cfscript>
 ```
 
-Two things to notice. First, every call goes through `application.wo.execute(...)` rather than a bare `execute(...)`. That's the scope gotcha (covered below) — Wheels' internal functions are not available as globals inside a plain `.cfm` include. Second, the schema uses SQLite-flavoured syntax (`AUTOINCREMENT`, `TEXT`) because SQLite is the inner-loop reference platform for Wheels 4.0 tests.
+Two things to notice. First, every call goes through native `queryExecute(...)` rather than a bare `execute(...)` — there is no global `execute()` in a plain `.cfm` include, and none on `application.wo` either; `execute()` exists only inside migration CFCs. That's the scope gotcha (covered below). Second, the schema uses SQLite-flavoured syntax (`AUTOINCREMENT`, `TEXT`) because SQLite is the inner-loop reference platform for Wheels 4.0 tests.
 
 ## Per-spec isolation — the manual pattern
 
@@ -137,7 +145,7 @@ Sometimes you want a model that exists only during the test run — a stripped-d
 ```cfm {test:compile} title="tests/_assets/models/TestPost.cfc"
 component extends="Model" {
     function config() {
-        tableName("test_posts");
+        table("test_posts");
         setPrimaryKey("id");
     }
 }
@@ -185,10 +193,10 @@ Factories trade a few lines of setup for a shorter, more readable spec body. Whe
 
 ## The scope gotcha
 
-Wheels' internal functions (`model()`, `$dbinfo`, `execute()`, and friends) are not available as bare globals inside plain `.cfm` files that are included from CFCs like `TestRunner.cfc`. If you write `execute("CREATE TABLE ...")` in `populate.cfm`, you'll get a "variable EXECUTE is undefined" error.
+Wheels' internal functions (`model()`, `$dbinfo`, and friends) are not available as bare globals inside plain `.cfm` files that are included from CFCs like `TestRunner.cfc`. If you write `execute("CREATE TABLE ...")` in `populate.cfm`, you'll get a "No matching function [EXECUTE] found" error (Adobe words it as "variable EXECUTE is undefined").
 
 <Aside type="caution">
-  Call framework internals via `application.wo.` (the scope where Wheels stores its callable methods) or use native CFML tags. `application.wo.execute("CREATE TABLE ...")` works; so does `<cfdbinfo>`, `<cfquery>`, and `<cfdump>`. Same rule for `application.wo.model("Post")` if you need to seed through the ORM instead of raw SQL.
+  Call framework internals via `application.wo.` (the scope where Wheels stores its callable methods) or use native CFML. `application.wo.model("Post")` works if you need to seed through the ORM. For raw SQL there is no framework helper at all here — `execute()` exists only on migration CFCs (`wheels.migrator.Migration`), not on `application.wo` — so use native `queryExecute(...)` with an explicit `datasource`, or `<cfquery>`/`<cfdbinfo>`.
 </Aside>
 
 This is the most common first-time-authoring bug in `populate.cfm`. If your tests die at boot with "function not defined" and the stack trace points at your populate, it's this.

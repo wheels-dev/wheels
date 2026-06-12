@@ -104,7 +104,7 @@ describe("Post uniqueness", () => {
 });
 ```
 
-`create(...)` builds and saves in one call — it returns the saved object whether the save succeeded or not, so check `.persisted()` if you need to be sure.
+`create(...)` builds and saves in one call — it returns the object whether the save succeeded or not, so check `isPersisted()` (or its inverse, `isNew()`) if you need to be sure.
 
 ## Testing callbacks
 

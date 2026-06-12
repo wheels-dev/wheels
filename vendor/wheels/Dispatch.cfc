@@ -391,13 +391,17 @@ component output="false" extends="wheels.Global"{
 		// Hi-jack any wheels controller requests for GUI
 		if (ListFirst(local.params.controller, '.') EQ "wheels") {
 			if (!application.wheels.enablePublicComponent) {
-				// Return 404 so the surface is not fingerprintable. A bare
+				// Return 404 so the surface is not fingerprintable. A silent
 				// cfabort responds HTTP 200 with an empty body, which leaks
 				// the existence of the internal GUI routes. See issue #2233.
+				// Must be the script keyword `abort;` — the bare tag-in-script
+				// statement form (`cfabort;`) is Lucee-only; Adobe parses it
+				// as an undefined VARIABLE reference and throws "Variable
+				// CFABORT is undefined" at runtime. See issue #3029.
 				cfheader(statuscode=404);
 				cfcontent(type="text/plain");
 				writeOutput("Not Found");
-				cfabort;
+				abort;
 			} else {
 				// BoxLang compatibility: Check for null action parameter
 				if (IsNull(local.params.action) || !Len(local.params.action)) {

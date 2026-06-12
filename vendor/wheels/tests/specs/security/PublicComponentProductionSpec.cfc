@@ -190,13 +190,20 @@ component extends="wheels.WheelsTest" {
 					// Confirm by source inspection — we can't easily drive
 					// Dispatch.$request() from a unit test without a full
 					// request fixture, but we can lock in the 404 contract.
+					// Note: the branch ends in the script keyword `abort;`,
+					// NOT the bare tag-in-script form — that form is
+					// Lucee-only and crashed every Adobe engine with
+					// "Variable CFABORT is undefined" (issue #3029). The
+					// sibling BareCfabortGuardSpec.cfc structurally forbids
+					// any regression to the bare form.
 					var source = FileRead(ExpandPath("/wheels/Dispatch.cfc"));
 					var gateIndex = Find("!application.wheels.enablePublicComponent", source);
 					expect(gateIndex > 0).toBeTrue("Dispatch.cfc must still have the enablePublicComponent gate.");
 
-					// Look for statuscode=404 or statuscode="404" within ~400 chars
-					// after the gate (covers the whole if-block body).
-					var windowLen = Min(Len(source) - gateIndex, 400);
+					// Look for statuscode=404 or statuscode="404" within ~800 chars
+					// after the gate (covers the whole if-block body, including
+					// the explanatory comments about issues #2233 and #3029).
+					var windowLen = Min(Len(source) - gateIndex, 800);
 					var gateBlock = Mid(source, gateIndex, windowLen);
 					var has404 = REFindNoCase("statuscode\s*=\s*[""']?404", gateBlock) > 0;
 					expect(has404).toBeTrue(

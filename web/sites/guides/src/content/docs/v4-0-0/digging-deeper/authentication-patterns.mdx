@@ -209,7 +209,7 @@ The callback receives the extracted token string and returns a principal struct 
 
 ### Static token map (tests, seeded keys)
 
-```cfm {test:compile} title="illustrative — static tokens"
+```cfm title="illustrative — static tokens"
 var tokenStrategy = new wheels.auth.TokenStrategy(tokens={
     "dev-key-alice": {id: 1, role: "admin"},
     "dev-key-bob":   {id: 2, role: "reader"}

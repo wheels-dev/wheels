@@ -4,10 +4,10 @@ on:
   pull_request:
     branches: [develop]
     paths:
-      - 'web/sites/guides/src/content/docs/v4-0-0-snapshot/**'
+      - 'web/sites/guides/src/content/docs/v4-0-0/**'
       - 'web/sites/guides/scripts/verify-docs/**'
       - 'web/sites/guides/package.json'
-      - 'web/sites/guides/src/sidebars/v4-0-0-snapshot.json'
+      - 'web/sites/guides/src/sidebars/v4-0-0.json'
       - '.github/workflows/docs-verify.yml'
 
 jobs:
@@ -45,8 +45,17 @@ jobs:
         uses: Homebrew/actions/setup-homebrew@master
 
       - name: Install Wheels CLI
+        env:
+          # Homebrew 5.x's Linux sandbox needs a rootless bwrap, which
+          # ubuntu-latest runners don't provide (and 24.04's unprivileged
+          # userns restrictions make it unreliable even when installed).
+          # The ephemeral runner is already isolation enough for CI.
+          HOMEBREW_NO_SANDBOX_LINUX: "1"
         run: |
           brew tap wheels-dev/wheels || true
+          # Homebrew 5.1+ refuses to load formulae from untrusted third-party
+          # taps; trust must be granted explicitly (no-op on older brew).
+          brew trust wheels-dev/wheels || true
           brew install wheels
 
       - name: Patch wheels wrapper JAVA_HOME for Linux
@@ -61,8 +70,17 @@ jobs:
           sed -i 's|/openjdk.jdk/Contents/Home||g' "$WRAPPER"
           grep JAVA_HOME "$WRAPPER"
 
-      - name: Smoke-test the CLI
-        run: wheels --version
+      - name: Smoke-test the CLI (binary attestation)
+        # Binary attestation (#3042): this workflow installs the RELEASED
+        # brew CLI, so {test:cli}/{test:compile}/{test:tutorial} blocks
+        # attest to that release — not a CLI built from this checkout.
+        # verify-docs.mjs prints the same "wheels binary: <path> ... " line
+        # at run start. To attest to a branch-built CLI instead, export
+        # WHEELS_BIN pointing at it (not wired up yet — issue #3042 tracks
+        # building the CLI from the checkout here).
+        run: |
+          command -v wheels
+          wheels --version
 
       - name: Warm up wheels module (first-run copy)
         # Homebrew wrapper copies the module to $HOME/.wheels/modules/wheels

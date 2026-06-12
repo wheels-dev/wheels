@@ -47,7 +47,7 @@ jobs:
 
       - name: Install LuCLI
         run: |
-          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v0.3.3/lucli-0.3.3-linux" \
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v0.3.7/lucli-0.3.7-linux" \
             -o /usr/local/bin/lucli
           chmod +x /usr/local/bin/lucli
 
@@ -71,16 +71,17 @@ If you want the raw CLI instead of the bash wrapper, the equivalent is `wheels s
 
 ## Reporter output for CI
 
-The `wheels test` command accepts a `--reporter=<name>` flag, but understanding what it does today avoids a surprise: the LuCLI implementation always requests JSON from the test endpoint and then prints a human-readable summary on success or failure details on failure. The flag is parsed but does not currently select between output formats — you get the same output regardless of `--reporter` value.
+The `wheels test` command accepts a `--reporter=<name>` flag. The CLI always requests JSON from the test endpoint, then formats the result for the reporter you picked:
 
 | Flag | Behaviour today |
 | --- | --- |
 | `--reporter=simple` (default) | Human-readable summary: `N passed (Xs)` on green, plus failure details on red |
-| `--reporter=<anything else>` | Accepted, currently no-op — same human-readable output |
-| `--ci` | Accepted, reserved for CI-specific behaviour — currently a no-op in the output path |
+| `--reporter=json` | Emits the raw JSON result document — pipe it to `jq` or a post-processor |
+| `--reporter=tap` | Emits TAP version 13 (`1..N`, `ok` / `not ok` lines) for TAP-consuming CI tooling |
+| `--ci` | Accepted for forward-compatibility — currently changes nothing; every run already exits non-zero on failure |
 | `--verbose` / `-v` | Adds the full bundle/suite/spec tree to the output |
 
-For machine-readable results, call the test runner URL directly and post-process the JSON. That is exactly what `tools/ci/run-tests.sh` does in this repo: it `curl`s `/wheels/core/tests?db=sqlite&format=json`, parses the totals in Python, and emits a JUnit XML file that `actions/upload-artifact` ingests for the GitHub summary.
+For machine-readable results you can also call the test runner URL directly and post-process the JSON. That is exactly what `tools/ci/run-tests.sh` does in this repo: it `curl`s `/wheels/core/tests?db=sqlite&format=json`, parses the totals in Python, and emits a JUnit XML file that `actions/upload-artifact` ingests for the GitHub summary.
 
 ```bash title="tools/ci/run-tests.sh (excerpt)"
 curl -s -o "$RESULT_FILE" --max-time 600 \
@@ -102,7 +103,7 @@ Browser specs are expensive to run in CI — they need the Playwright JARs (~370
 - **`WHEELS_CI=true`** — mark the environment as CI
 - **`WHEELS_BROWSER_CI_ENABLE=true`** (or `1` or `yes`) — opt browser specs in
 
-If `WHEELS_CI` is set and `WHEELS_BROWSER_CI_ENABLE` is not one of `true,1,yes`, `BrowserTest.cfc` sets `this.browserTestSkipped = true` in `beforeAll`. Every `it` block in a browser spec that begins with `if (this.browserTestSkipped) return;` then exits without running. The suite stays green; the browser tests simply don't count.
+If `WHEELS_CI` is set and `WHEELS_BROWSER_CI_ENABLE` is not one of `true,1,yes`, `BrowserTest.cfc` sets `this.browserTestSkipped = true` in `beforeAll`, and `browserDescribe`'s `aroundEach` skips every `it` automatically. The suite stays green; the browser tests simply don't count.
 
 ```yaml title=".github/workflows/tests.yml (fragment)"
 env:
