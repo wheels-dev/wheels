@@ -171,7 +171,7 @@ component extends="Model" {
 - `unless` — inverse of `condition`; the rule runs only when the expression returns `false`.
 
 <Aside type="tip">
-  Validations on associations — like requiring child records to be valid before the parent saves — are covered in the associations guide (coming up in this series). `validatesAssociated` is the relevant helper.
+  Validations on associations — like requiring child records to be valid before the parent saves — happen through nested properties: when a parent saves children via `nestedProperties()`, each child runs its own validations and an invalid child blocks the save. See the [associations guide](/v4-0-0/basics/associations/) for the setup. (There is no `validatesAssociated` helper in Wheels.)
 </Aside>
 
 ## Related guides

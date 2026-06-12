@@ -64,7 +64,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-Two things to know. First, the swap is global for the duration of the test — any code path that resolves `emailService` during that `it` block gets the fake, including model callbacks and background jobs that run inline. Second, because `asSingleton()` caches the first instance per component path, you want the fake under a *different* component path than the real one (`tests._assets.FakeEmailService` vs `app.lib.EmailService`) so the cache doesn't hand you a stale real instance.
+Two things to know. First, the swap is global for the duration of the test — any code path that resolves `emailService` during that `it` block gets the fake, including model callbacks and background jobs that run inline. Second, the singleton cache is keyed by the *alias* (`emailService`), and re-binding the alias only invalidates the cached instance when the new target is a *different* component path. That's why the fake lives under its own path (`tests._assets.FakeEmailService` vs `app.lib.EmailService`): the different-path re-bind evicts the cached real instance, so the next `service("emailService")` constructs the fake instead of handing back the stale singleton.
 
 ## Per-request resolvers
 
@@ -241,7 +241,7 @@ When `service("name")` throws `Wheels.Injector` or hands back the wrong thing, r
 
 - **Is the registration in `config/services.cfm`?** The file is loaded once at app start. Typos don't surface until resolution time.
 - **Did the app reload after you edited `services.cfm`?** Run `wheels reload` or hit `?reload=true&password=...`. Service registrations are *not* re-read per request.
-- **Does the binding name match exactly?** Names are case-sensitive. `service("EmailService")` and `service("emailService")` are different keys.
+- **Does the binding name match?** Names are case-insensitive — the injector stores bindings in plain CFML structs, so `service("EmailService")` and `service("emailService")` resolve the same registration. A "name not found" error means the name genuinely was never registered, not a casing mismatch.
 - **Is `.to(...)` pointing at a valid dotted path?** A typo in the target path throws at `createObject()` time, not at registration time. The error surfaces the first time someone resolves the name.
 - **Circular dependency?** If A's `init()` auto-wires B and B's `init()` auto-wires A, the injector throws `Wheels.DI.CircularDependency` with the resolution chain. Break the cycle by turning one side into a factory or resolving lazily.
 

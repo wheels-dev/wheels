@@ -136,7 +136,15 @@ component {
 	 */
 	public void function $callAction(required string action) {
 		if (Left(arguments.action, 1) == "$" || ListFindNoCase(application.wheels.protectedControllerMethods, arguments.action)) {
-			Throw(
+			// A helper-named or $-prefixed action is treated exactly like a
+			// missing action: it 404s (see #2845 and CLAUDE.md Anti-Pattern 8).
+			// Route through $throwErrorOrShow404Page — mirroring RecordNotFound /
+			// ViewNotFound — so the 404 status header is committed at the throw
+			// site and production renders the 404 page instead of a generic 500
+			// (#3075). In development the developer-facing Wheels.ActionNotAllowed
+			// error is still thrown, and the widened EventMethods status map keeps
+			// it at 404 rather than falling through to 500.
+			$throwErrorOrShow404Page(
 				type = "Wheels.ActionNotAllowed",
 				message = "You are not allowed to execute the `#arguments.action#` method as an action.",
 				extendedInfo = "Make sure your action does not have the same name as any of the built-in Wheels functions."

@@ -107,6 +107,8 @@ Model finders return query objects, not arrays. Loop accordingly.
 .end()
 ```
 
+`scope()`, `namespace()`, `package()`, and `controller()` also accept `callback=` and auto-close the scope when the callback returns — use the same callback form for these too (#3072).
+
 ### 4. HTML5 Form Helpers Exist — Use Them
 ```cfm
 #emailField(objectName="user", property="email")#
@@ -259,7 +261,7 @@ For new migrator helpers or anywhere you accept a column-name argument: declare 
 component extends="Model" {
     function config() {
         // Table/key (only if non-conventional)
-        table("tbl_users");        // setter is table(); tableName() is a getter — tableName("x") is a silent no-op (#3079)
+        table("tbl_users");        // setter is table(); tableName() is a getter — tableName("x") throws Wheels.InvalidArgument in dev/testing, no-op in production (#3079)
         setPrimaryKey("userId");
 
         // Associations — all named params when using options
@@ -349,8 +351,9 @@ Resolves `params.key` into a model instance before the action runs. Lands in `pa
 ```cfm
 .resources(name="users", binding=true)                // params.user
 .resources(name="posts", binding="BlogPost")          // params.blogPost
-.scope(path="/api", binding=true)                     // all nested resources bound
-.end()
+.scope(path="/api", binding=true, callback=function(map) {  // all nested resources bound
+    map.resources("users");
+})
 set(routeModelBinding=true);                          // global, in config/settings.cfm
 ```
 
@@ -406,9 +409,9 @@ set(middleware = [
 
 // config/routes.cfm — route-scoped
 mapper()
-    .scope(path="/api", middleware=["app.middleware.ApiAuth"])
-        .resources("users")
-    .end()
+    .scope(path="/api", middleware=["app.middleware.ApiAuth"], callback=function(map) {
+        map.resources("users");
+    })
 .end();
 ```
 
@@ -713,7 +716,7 @@ User-facing `fix`/`feat` PRs add a **fragment file**, never a direct `CHANGELOG.
 
 There is no `wheels mcp setup` command — copy the JSON above into `.mcp.json` manually (see the MCP integration guide for OpenCode/Cursor variants).
 
-Tools are auto-discovered from `cli/lucli/Module.cfc` public functions, prefixed with the module name (`wheels_generate`, `wheels_migrate`, `wheels_test`, `wheels_reload`, `wheels_seed`, `wheels_analyze`, `wheels_validate`, `wheels_routes`, `wheels_info`, `wheels_destroy`, `wheels_doctor`, `wheels_stats`, `wheels_notes`, `wheels_db`, `wheels_upgrade`, `wheels_create`, `wheels_deploy`, `wheels_packages`). CLI-only tools (`main`, `mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`) are hidden via `mcpHiddenTools()`.
+Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (live-verified on the released 4.0.3 CLI): `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (18 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only tools (`main`, `mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`) are hidden via `mcpHiddenTools()`.
 
 **Deprecated:** the in-dev-server HTTP endpoint at `/wheels/mcp`. Emits a deprecation notice on first request. Migrate to the stdio surface.
 
@@ -725,13 +728,13 @@ Prefer MCP tools when the Wheels MCP server is available. Fall back to CLI other
 
 | Task | MCP | CLI |
 |------|-----|-----|
-| Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
-| Migrate | `wheels_migrate(action="latest\|up\|down\|info\|doctor")` | `wheels migrate latest\|up\|down\|info\|doctor` |
+| Generate | `generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
+| Migrate | `migrate(action="latest\|up\|down\|info\|doctor")` | `wheels migrate latest\|up\|down\|info\|doctor` |
 | Migrator reconciliation | — | `wheels migrate forget\|pretend <version> --yes` (shared dev DB orphan cleanup; see #2780) |
-| Test | `wheels_test()` | `wheels test` |
-| Reload | `wheels_reload()` | `?reload=true&password=...` |
+| Test | `test()` | `wheels test` |
+| Reload | `reload()` | `?reload=true&password=...` |
 | Server | — | `wheels start\|stop` |
-| Analyze | `wheels_analyze(target="all")` | — |
+| Analyze | `analyze(target="all")` | — |
 | Admin | — | `wheels g admin ModelName` |
 | Seed | — | `wheels seed` |
 

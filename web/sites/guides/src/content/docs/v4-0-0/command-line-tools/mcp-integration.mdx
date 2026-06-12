@@ -18,7 +18,7 @@ The `wheels` binary can run as a Model Context Protocol (MCP) server over stdio,
 
 ## How it works
 
-LuCLI ships a generic `mcp` subcommand that wraps any installed module's public functions as MCP tools over stdio JSON-RPC. Running `wheels mcp wheels` starts that server bound to the Wheels Module — every public function in `cli/lucli/Module.cfc` becomes a tool named `wheels_<function>` (for example, `wheels_generate`, `wheels_migrate`). The AI IDE spawns `wheels` as a subprocess, speaks newline-delimited JSON-RPC over stdin/stdout, and receives tool results the same way. No network listener is involved.
+LuCLI ships a generic `mcp` subcommand that wraps any installed module's public functions as MCP tools over stdio JSON-RPC. Running `wheels mcp wheels` starts that server bound to the Wheels Module — every public function in `cli/lucli/Module.cfc` becomes a tool named after the function itself (for example, `generate`, `migrate`). Tool names appear unprefixed in `tools/list`; the `wheels` server entry in your MCP config is what namespaces them per client. The AI IDE spawns `wheels` as a subprocess, speaks newline-delimited JSON-RPC over stdin/stdout, and receives tool results the same way. No network listener is involved.
 
 ## Setup
 
@@ -37,7 +37,7 @@ Add an `.mcp.json` file to your project root (or wherever your IDE expects it). 
 
 That's the whole configuration. The first `wheels` is the binary name; the second is the module name to expose. The IDE launches the subprocess on demand — you don't need to keep `wheels mcp wheels` running yourself, and the server exits when the IDE disconnects.
 
-Running `wheels mcp` on its own (no module name) prints the same snippet and a short pointer to configuration docs. It is a help command, not a setup wizard — there is no generated file today.
+Don't try `wheels mcp` on its own to see this snippet: on the released launcher, LuCLI reserves the `mcp` verb and a bare invocation exits with `mcp: missing module name` instead of reaching the Wheels Module's help text. To check the server from a shell, use the `--once` smoke test below. There is no setup wizard and no generated file — add the `.mcp.json` snippet manually.
 
 <Aside type="note" title="IDE-specific paths">
 Claude Code reads `.mcp.json` from the project root. OpenCode uses `.opencode.json` with the same `mcpServers` shape. Cursor reads from its settings UI. Check your IDE's MCP documentation for the exact location; the server definition itself is identical across clients.
@@ -55,28 +55,28 @@ That runs a single MCP method and exits — useful for smoke-testing without ope
 
 ## Tools exposed
 
-Every public function in the Wheels Module is auto-discovered as an MCP tool, prefixed with the module name:
+Every public function in the Wheels Module is auto-discovered as an MCP tool. Names in `tools/list` are the bare function names — 18 tools on a 4.0.3 install:
 
 | Tool | Purpose |
 |---|---|
-| `wheels_generate` | Scaffold a model, controller, view, migration, scaffold, route, test, property, or helper. |
-| `wheels_destroy` | Remove a previously generated component. The default `resource` type cascades (model + controller + views + tests + route + drop-table migration); `model`, `controller`, and `view` are scoped to that artefact only. |
-| `wheels_migrate` | Run, roll back, or inspect database migrations. |
-| `wheels_seed` | Run convention-based seeds against the configured environment. |
-| `wheels_db` | Database utility operations (schema, reset, status). |
-| `wheels_test` | Run the app or core test suite and return results. |
-| `wheels_reload` | Reload the app via the running dev server. |
-| `wheels_routes` | List registered routes. |
-| `wheels_info` | Print project, framework, and environment info. |
-| `wheels_analyze` | Run the codebase analyzer (conventions, anti-patterns, drift). |
-| `wheels_validate` | Run configuration and schema validation checks. |
-| `wheels_doctor` | Diagnose install, project, and runtime issues. |
-| `wheels_stats` | Count models, controllers, routes, tests, migrations. |
-| `wheels_notes` | Surface `TODO`, `FIXME`, `HACK`, `OPTIMIZE` annotations from the codebase. |
-| `wheels_create` | Create an application (currently only `wheels create app <name>`; forwards to `wheels new`). |
-| `wheels_upgrade` | Scan the project for breaking changes against a target framework version (read-only). |
-| `wheels_deploy` | Kamal-style production deploys (full deploy, rollback, config, setup, bootstrap, exec). |
-| `wheels_packages` | Search, show, add, update, and remove Wheels packages; manage the registry cache. |
+| `generate` | Scaffold a model, controller, view, migration, scaffold, route, test, property, or helper. |
+| `destroy` | Remove a previously generated component. The default `resource` type cascades (model + controller + views + tests + route + drop-table migration); `model`, `controller`, and `view` are scoped to that artefact only. |
+| `migrate` | Run, roll back, or inspect database migrations. |
+| `seed` | Run convention-based seeds against the configured environment. |
+| `db` | Database utility operations (schema, reset, status). |
+| `test` | Run the app or core test suite and return results. |
+| `reload` | Reload the app via the running dev server. |
+| `routes` | List registered routes. |
+| `info` | Print project, framework, and environment info. |
+| `analyze` | Run the codebase analyzer (conventions, anti-patterns, drift). |
+| `validate` | Run configuration and schema validation checks. |
+| `doctor` | Diagnose install, project, and runtime issues. |
+| `stats` | Count models, controllers, routes, tests, migrations. |
+| `notes` | Surface `TODO`, `FIXME`, `HACK`, `OPTIMIZE` annotations from the codebase. |
+| `create` | Create an application (currently only `wheels create app <name>`; forwards to `wheels new`). |
+| `upgrade` | Scan the project for breaking changes against a target framework version (read-only). |
+| `deploy` | Kamal-style production deploys (full deploy, rollback, config, setup, bootstrap, exec). |
+| `packages` | Search, show, add, update, and remove Wheels packages; manage the registry cache. |
 
 ### Tools deliberately hidden
 
@@ -87,7 +87,7 @@ A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenT
 - `new` — scaffolds an entire new project. Destructive and requires interactive prompts for project context.
 - `browser` — multi-step browser testing flow with its own subcommand tree.
 - `mcp` — the meta command itself; exposing it would let an agent recursively launch MCP servers.
-- `d` — short alias for `destroy`, excluded to avoid a duplicate tool entry (the canonical `wheels_destroy` is exposed).
+- `d` — short alias for `destroy`, excluded to avoid a duplicate tool entry (the canonical `destroy` is exposed).
 - `g` — short alias for `generate`, excluded for the same duplicate-entry reason as `d`.
 - `main` — the bare `wheels` no-args dispatch target; it is not a subcommand.
 - Any function whose name begins with `$` — internal helpers kept `public` only so unit tests can reach them (a CFML testing carve-out). `mcpHiddenTools()` discovers these structurally via `getMetaData(this)`, so a future `$helper` added to the module cannot accidentally surface as a callable MCP tool without a manual denylist update.

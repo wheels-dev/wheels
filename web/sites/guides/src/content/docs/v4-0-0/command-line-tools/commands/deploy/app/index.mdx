@@ -7,6 +7,8 @@ sidebar:
   order: 20
 ---
 
+import { Aside } from '@astrojs/starlight/components';
+
 App container lifecycle. Every verb targets containers labelled with the current service, optionally filtered by `--role`.
 
 ## Verbs
@@ -28,7 +30,15 @@ App container lifecycle. Every verb targets containers labelled with the current
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | Required for boot/start/stop/details/live/maintenance/remove. |
+| `--release=<v>` | Required for boot/start/stop/details/live/maintenance/remove. |
 | `--role=<name>` | Limit to one role. Default: all roles. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
+
+<Aside type="note" title="--release, not --version">
+The version always travels as `--release=`. A literal `--version=` flag never reaches deploy dispatch — the CLI's picocli root intercepts it first and fails with `Invalid value for option '--version'` ([#2674](https://github.com/wheels-dev/wheels/issues/2674)).
+</Aside>
+
+<Aside type="caution" title="Purely numeric release values">
+A purely numeric release value (e.g. `--release=1`) currently hangs for ~75 seconds with `Operation timed out`, even under `--dry-run` ([#3111](https://github.com/wheels-dev/wheels/issues/3111)). Use a non-numeric label — a git short sha or a `v`-prefixed tag like `v1.2.3` — until that's fixed.
+</Aside>

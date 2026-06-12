@@ -81,7 +81,7 @@ When an upgrade guide says "see #1930", reading that PR description is the faste
 
 ## Anatomy of a changelog entry
 
-Wheels follows the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format. Each release heading groups changes under one or more of these sections:
+Wheels follows the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format. Each release heading (`# [4.0.3](…) => 2026-06-09`) groups changes into sections — including, but not limited to, the six standard ones below. Real releases also use more granular headings such as `Bug Fixes`, `Breaking Changes`, `Performance`, `Documentation`, and per-layer enhancement groups (`Model Enhancements`, `View Enhancements`, …); read those with the same care as their standard counterpart (`Bug Fixes` ≈ `Fixed`, `Breaking Changes` ≈ `Changed`).
 
 | Section | What it contains |
 |---|---|
@@ -108,8 +108,10 @@ The parenthetical at the end is the PR number. If the change spans multiple PRs,
 
 Changes merged to `develop` but not yet tagged appear under `## [Unreleased]` at the top of the file. If you track the bleeding-edge channel (`wheels-be`), your installed version may already include some of these entries. If you track stable, `[Unreleased]` is a preview of what the next release will contain.
 
+Don't treat `[Unreleased]` as the complete picture, though: unreleased entries accumulate as fragment files under `changelog.d/` in the repo root and are only assembled into `CHANGELOG.md` when a release is cut. To see everything pending, read `[Unreleased]` *and* the `changelog.d/` folder on `develop`.
+
 <Aside type="tip">
-  Snapshot version strings (`v4.0.0-SNAPSHOT+1787`) correspond to the `develop` branch at the build number shown. There is no tag per snapshot — use `git log --oneline` in the upstream repo to find the exact commit if you need to correlate a snapshot build with a changelog entry.
+  Snapshot version strings (`v4.0.0-SNAPSHOT+1787`) correspond to the `develop` branch at the build number shown. Most pre-GA snapshot builds got their own tag (the `v4.0.0-SNAPSHOT+NNNN` series runs to `+1783`, where the 4.0.0 GA was cut), but not every build number did — if your build has no tag, use `git log --oneline` in the upstream repo to find the exact commit and correlate it with a changelog entry.
 </Aside>
 
 ## Related guides

@@ -98,7 +98,7 @@ When someone submits the form with a blank title, `post.save()` returns `false` 
 
 A `<turbo-frame>` is an HTML element shipped by the [Hotwire Turbo](https://turbo.hotwired.dev/) library. When a link or form inside a frame is activated, Turbo intercepts the navigation, fetches the response, finds the element with a matching `id` in the returned HTML, and swaps only that frame's contents. The rest of the page stays exactly where it was — no flash, no scroll jump, no lost input in other fields.
 
-For the frame to do anything, Turbo has to be loaded on the page. The `hotwire` package (introduced conceptually in Part 3) handles this automatically when activated. Until you activate it, include Turbo from a CDN.
+For the frame to do anything, Turbo has to be loaded on the page. The `wheels-hotwire` package (introduced in Part 3) handles this when activated. The tutorial sticks with a plain CDN tag so this chapter works without any install step.
 
 <Steps>
 
@@ -110,7 +110,7 @@ For the frame to do anything, Turbo has to be loaded on the page. The `hotwire` 
 
 </Steps>
 
-That one tag gives you Turbo Drive (SPA-like page transitions) globally, plus the Frame and Stream features. Once the `hotwire` package is installable on your CLI, this manual include goes away — the package drops a bundled Turbo build into `public/` and wires the tag for you.
+That one tag gives you Turbo Drive (SPA-like page transitions) globally, plus the Frame and Stream features. If you'd rather let the package manage the script tags, run `wheels packages add wheels-hotwire` and replace the manual include with the package's `#hotwireIncludes()#` helper in the layout — it emits the Turbo (and Stimulus) module tags for you, and the package also brings controller helpers like `renderTurboStream()` and `isHotwireRequest()` that you'll appreciate in Part 5. Either path works for the rest of the tutorial.
 
 ## Wrap the form in a Turbo Frame
 

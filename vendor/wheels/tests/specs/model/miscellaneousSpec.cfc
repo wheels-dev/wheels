@@ -159,6 +159,44 @@ component extends="wheels.WheelsTest" {
 				expect(users.recordcount).toBe(3)
 			})
 		})
+
+		describe("Tests that tableName rejects arguments - issue 3079", () => {
+
+			it("fails loud when passed a name and showErrorInformation is on, without changing the table", () => {
+				_origShowErr = application.wheels.showErrorInformation
+				application.wheels.showErrorInformation = true
+				try {
+					author = g.model("author")
+					expect(() => author.tableName("tbl_authors_override")).toThrow(type = "Wheels.InvalidArgument")
+					// The guard throws BEFORE any mutation — the mapped table is untouched.
+					expect(author.tableName()).toBe("c_o_r_e_authors")
+				} finally {
+					application.wheels.showErrorInformation = _origShowErr
+				}
+			})
+
+			it("still works as a zero-argument getter when showErrorInformation is on", () => {
+				_origShowErr = application.wheels.showErrorInformation
+				application.wheels.showErrorInformation = true
+				try {
+					expect(g.model("author").tableName()).toBe("c_o_r_e_authors")
+				} finally {
+					application.wheels.showErrorInformation = _origShowErr
+				}
+			})
+
+			it("stays a silent no-op when showErrorInformation is off (production)", () => {
+				_origShowErr = application.wheels.showErrorInformation
+				application.wheels.showErrorInformation = false
+				try {
+					author = g.model("author")
+					expect(() => author.tableName("tbl_authors_override")).notToThrow()
+					expect(author.tableName()).toBe("c_o_r_e_authors")
+				} finally {
+					application.wheels.showErrorInformation = _origShowErr
+				}
+			})
+		})
 	}
 
 	function assert_pagination(required string handle) {

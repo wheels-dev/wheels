@@ -12,14 +12,14 @@ sidebar:
 ## Synopsis
 
 ```  title="Synopsis"
-wheels deploy app stop --version=<v> [--role=<name>] [--destination=<name>] [--dry-run]
+wheels deploy app stop --release=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--version=<v>` | **Required.** |
+| `--release=<v>` | **Required.** |
 | `--role=<name>` | Limit to one role. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
@@ -33,5 +33,5 @@ For traffic-safe shutdown, use `wheels deploy rollback` to the previous version 
 ## Example
 
 ```bash title="Example"
-wheels deploy app stop --version=abc1234
+wheels deploy app stop --release=abc1234
 ```
