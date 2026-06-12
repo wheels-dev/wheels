@@ -130,7 +130,14 @@ component {
         } else {
             processed = reReplace(processed, "\{\{validations\}\}", "", "all");
         }
-        
+
+        // Process enums — this legacy CommandBox-module generator has no enum codegen
+        // (unlike the LuCLI generator at cli/lucli/services/CodeGen.cfc). The model
+        // template still carries an {{enums}} placeholder, so strip it unconditionally;
+        // otherwise the literal {{enums}} leaks into the generated config() body as
+        // invalid CFML (issue ##3180).
+        processed = reReplace(processed, "\{\{enums\}\}", "", "all");
+
         // Process actions for controllers
         if (structKeyExists(arguments.context, "actions") && isArray(arguments.context.actions)) {
             var actionsCode = generateActionsCode(arguments.context.actions);
