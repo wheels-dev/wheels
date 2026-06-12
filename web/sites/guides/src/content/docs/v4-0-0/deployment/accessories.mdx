@@ -49,7 +49,7 @@ accessories:
 
 `wheels deploy accessory boot redis` on first deploy. Produces a container named `<service>-redis` on the named host, published on 6379. From the app side, connect to `redis://192.0.2.20:6379`.
 
-## Postgres with volume, env, and an init file
+## Postgres with volume and env
 
 ```yaml title="config/deploy.yml (illustrative — do not type)"
 accessories:
@@ -61,21 +61,23 @@ accessories:
       clear:
         POSTGRES_USER: app
         POSTGRES_DB: myapp_production
-      secret:
-        - POSTGRES_PASSWORD
     volumes:
       - /data/pg:/var/lib/postgresql/data
-    files:
-      - config/init.sql:/docker-entrypoint-initdb.d/init.sql
 ```
 
-- `env.secret:` pulls `POSTGRES_PASSWORD` from `.kamal/secrets` — never commit it to `deploy.yml`.
+- `env.clear:` values become `docker run -e` flags on the accessory container.
 - `volumes:` persists `/var/lib/postgresql/data` to the host so the database survives `docker rm`.
-- `files:` uploads local paths to the container filesystem at deploy time. Useful for initialization scripts, client certs, or any read-only payload the container needs.
+
+<Aside type="caution" title="env.secret and files: are not delivered yet">
+  Two Kamal accessory features are parsed but not implemented in the current Phase 1 CLI:
+
+  - `env.secret:` — secret values from `.kamal/secrets` are not delivered to accessory containers ([#2956](https://github.com/wheels-dev/wheels/issues/2956)/[#2957](https://github.com/wheels-dev/wheels/issues/2957)). For something like `POSTGRES_PASSWORD` you currently have to provision the value another way (e.g. a host-managed env file or volume).
+  - `files:` — Kamal's "upload local paths into the container filesystem" mechanism is accepted by the config validator but no upload ever happens ([#3088](https://github.com/wheels-dev/wheels/issues/3088)). Initialization scripts and certs need to be placed on the host yourself and mounted via `volumes:`.
+</Aside>
 
 ## Named containers and labels
 
-Accessory containers are named `<service>-<accessory>` — the example above yields `myapp-db` and `myapp-redis`. They carry the same `service=` label as your app containers, so `wheels deploy details` lists them alongside everything else.
+Accessory containers are named `<service>-<accessory>` — the example above yields `myapp-db` and `myapp-redis`. Their `service=` label uses that same combined value (`service=myapp-db`), **not** the app containers' bare `service=myapp` — so a `docker ps --filter label=service=myapp` won't catch them. `wheels deploy details` still lists them alongside everything else because it inspects each declared accessory container by name rather than relying on the shared label.
 
 ## Multi-host accessories
 
@@ -114,7 +116,7 @@ wheels deploy accessory boot all
 wheels deploy accessory stop all
 ```
 
-`wheels deploy setup` boots every declared accessory as part of first-run. `wheels deploy remove` tears them down.
+`wheels deploy setup` does **not** boot accessories in the current Phase 1 CLI — it's an alias for `wheels deploy`, and full first-run orchestration is tracked in [#2957](https://github.com/wheels-dev/wheels/issues/2957). Run `wheels deploy accessory boot all` explicitly as part of first-run. `wheels deploy remove` does tear them down.
 
 ## Accessories and `wheels deploy`
 
@@ -133,6 +135,6 @@ When you do want to change an accessory — a Redis version bump, a Postgres con
   <LinkCard
     title="Secrets"
     href="/v4-0-0/deployment/secrets/"
-    description="How .kamal/secrets feeds accessory env.secret lists."
+    description="How .kamal/secrets works today, and why env.secret delivery is still pending."
   />
 </CardGrid>
