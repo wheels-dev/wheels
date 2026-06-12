@@ -149,6 +149,12 @@ component {
 		// each token on commas, trim, and de-duplicate so both forms behave identically.
 		arguments.actions = normalizeActions(arguments.actions);
 
+		// Capture the caller-requested list BEFORE the defaulting below. result.actions
+		// drives the caller's view loop, and the documented contract is "passing no
+		// actions creates an empty controller with no view files" — the index/CRUD
+		// defaults applied next shape the controller body only, never the view files.
+		var requestedActions = arguments.actions;
+
 		// Default actions based on type
 		if (arrayLen(arguments.actions) == 0) {
 			arguments.actions = arguments.crud ? crudActions : ["index"];
@@ -184,10 +190,12 @@ component {
 			context = context
 		);
 
-		// Surface the normalized action list so callers (e.g. Module.cfc's view loop)
-		// render one view file per real action instead of one named after the raw
-		// comma-joined token (#3112).
-		result.actions = arguments.actions;
+		// Surface the normalized caller-requested action list so callers (e.g.
+		// Module.cfc's view loop) render one view file per real action instead of one
+		// named after the raw comma-joined token (#3112). Deliberately the pre-default
+		// list: when no actions were passed this stays empty, so callers write no view
+		// files even though the controller body gets a default index() stub.
+		result.actions = requestedActions;
 		return result;
 	}
 

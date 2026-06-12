@@ -250,6 +250,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result.actions).toBe(["index", "show"]);
 				});
 
+				it("returns an empty action list when no actions are passed so callers write no views", () => {
+					var result = codegen.generateController(
+						name = "Stubs",
+						actions = [],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/controllers/Stubs.cfc");
+					// The controller body still gets the default index() stub...
+					expect(content).toInclude("function index()");
+					// ...but result.actions stays empty so the caller writes no view
+					// files, preserving the documented "no actions => empty controller
+					// with no view files" behavior (PR ##3131 review).
+					expect(result.actions).toBeEmpty();
+				});
+
 			});
 
 			describe("validateName()", () => {
