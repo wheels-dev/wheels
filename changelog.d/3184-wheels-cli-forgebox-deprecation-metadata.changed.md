@@ -1,0 +1,1 @@
+- The published `wheels-cli` ForgeBox registry metadata (`box.json` short description/description/instructions/name and `README.md`) now leads with the deprecation notice and points to the supported standalone `wheels` CLI (`brew install wheels-dev/wheels/wheels`), so ForgeBox browsers see the deprecation before running `box install wheels-cli` (#3184)
