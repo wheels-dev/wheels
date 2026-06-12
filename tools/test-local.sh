@@ -142,6 +142,21 @@ f = int(d.get('totalFail', 0))
 e = int(d.get('totalError', 0))
 dur = float(d.get('totalDuration', 0)) / 1000
 
+# Scope-visibility guard (issue #3083): a rejected directory= (silently
+# swapped for the full default suite) or a 0-bundle discovery must fail
+# loudly instead of masquerading as a green run for the wrong scope.
+scope_bad = False
+for w in d.get('warnings', []):
+    print(f'\033[33mWARNING: {w}\033[0m', file=sys.stderr)
+if d.get('directoryRejected'):
+    print('\033[31mERROR: the requested directory= was rejected; the full default suite ran instead\033[0m', file=sys.stderr)
+    scope_bad = True
+if int(d.get('bundlesDiscovered', -1)) == 0:
+    print('\033[31mERROR: 0 test bundles discovered for the resolved scope — vacuously green run\033[0m', file=sys.stderr)
+    scope_bad = True
+if scope_bad:
+    sys.exit(1)
+
 if f == 0 and e == 0:
     print(f'\033[32m✓ {p} passed ({dur:.1f}s)\033[0m')
 else:

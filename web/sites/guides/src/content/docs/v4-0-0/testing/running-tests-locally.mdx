@@ -99,11 +99,11 @@ curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json"
 # Filter by directory
 curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.model"
 
-# Filter to a single spec file — fastest iteration loop
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.model.postSpec"
+# Filter to a single spec file — fastest iteration loop (testBundles=, not directory=)
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&testBundles=wheels.tests.specs.model.crudSpec"
 
 # Skip populate when iterating on one spec and the schema is already in place
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&populate=false&directory=wheels.tests.specs.model.postSpec"
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&populate=false&testBundles=wheels.tests.specs.model.crudSpec"
 
 # Scope to a single installed package's tests (e.g. wheels-sentry, wheels-i18n)
 curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.wheels-sentry.tests"
