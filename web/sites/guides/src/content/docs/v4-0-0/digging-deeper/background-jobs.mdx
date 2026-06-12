@@ -145,7 +145,7 @@ component extends="wheels.Job" {
 }
 ```
 
-The backoff formula is `Min(this.baseDelay * 2^attempt, this.maxDelay)`. With the example's settings (`maxRetries=5`, `baseDelay=2`, `maxDelay=3600`), you get retries at roughly 4s, 8s, 16s, 32s, 64s — small failures resolve quickly, while a stubborn outage stops hammering the external service once it hits the cap. (The framework default is `maxRetries=3`.)
+The backoff formula is `Min(this.baseDelay * 2^attempt, this.maxDelay)`, where `attempt` is the number of the attempt that just failed (1 for the first run). Note that `maxRetries` counts total attempts, not retries: with the example's settings (`maxRetries=5`, `baseDelay=2`, `maxDelay=3600`) the job runs at most five times — the first run plus four retries at roughly 4s, 8s, 16s, and 32s — and the fifth failure moves it to `failed`. Transient failures resolve quickly, and `maxDelay` caps the gap so a job configured with many attempts stops hammering the external service. (The framework default is `maxRetries=3`: the first run plus retries at 4s and 8s.)
 
 Because retries are automatic, your `perform()` must be **idempotent**. If the first attempt charged the card but failed to record the success, the second attempt must notice and skip. Store an idempotency key on the model and check it at the top of `perform()`.
 

@@ -202,8 +202,10 @@ The ordering is strict: `beforeValidation` → validation runs → `afterValidat
 
 `afterFind` is the one callback that fires without a write: it runs once per record returned by a finder, which makes it the right place for decorating loaded records with derived values. Its contract differs by what the finder returns:
 
-- **Object-returning finders** (`findOne`, `findByKey`, `findAll(returnAs="objects")`) — the callback takes no arguments; read and mutate `this` directly.
-- **Query-returning finders** (`findAll` by default) — there is no object to mutate. The callback receives the row's columns as named arguments and decorates by *returning a struct*; any keys you return are merged back into the row (new keys become new query columns). Mutating `this` does nothing here.
+- **Object-returning finders** (`findOne`, `findByKey`, `findAll(returnAs="objects")`) — the callback receives the record's properties as named arguments. You can mutate `this` directly, or return a struct — the returned keys are applied back onto the object via `setProperties()`.
+- **Query-returning finders** (`findAll` by default) — there is no object per row. The callback receives the row's columns as named arguments and decorates by *returning a struct*; any keys you return are merged back into the row (new keys become new query columns). Mutating `this` does nothing here.
+
+Both modes receive named arguments and both honor a returned struct, so the portable pattern — one callback that decorates objects and query rows alike — is to compute from `arguments` and return a struct:
 
 ```cfm {test:compile}
 component extends="Model" {
@@ -212,12 +214,7 @@ component extends="Model" {
     }
 
     private function setFullName() {
-        if (StructKeyExists(arguments, "firstName")) {
-            // query row: decorate by returning a struct
-            return {fullName: arguments.firstName & " " & arguments.lastName};
-        }
-        // single object: mutate this
-        this.fullName = this.firstName & " " & this.lastName;
+        return {fullName: arguments.firstName & " " & arguments.lastName};
     }
 }
 ```
