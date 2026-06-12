@@ -1200,9 +1200,23 @@ component {
 				} else {
 					local.firstAssociation = ListFirst(local.throughPath);
 					local.targetAssociation = ListLast(local.throughPath);
-					
-					local.expandedInclude = local.firstAssociation & "(" & local.targetAssociation & ")";
-					local.rv = ListAppend(local.rv, local.expandedInclude);
+
+					// Only rewrite a 2-element `through` into a nested this-model include
+					// when its first segment is actually an association on the current
+					// model (mirroring the 1-element branch's existence check above). The
+					// `hasMany` `shortcut` argument stores an opposite-side chain in
+					// `through` ("#singularize(shortcut)#,#name#") that is consumed by the
+					// shortcut dispatcher in $associationMethod, not by include expansion.
+					// Rewriting it here turned the plain include (e.g. "userRoles") into a
+					// lookup for an association the current model does not have (e.g.
+					// "role(userRoles)"), throwing Wheels.AssociationNotFound (issue #3109).
+					if (StructKeyExists(local.associations, local.firstAssociation)) {
+						local.expandedInclude = local.firstAssociation & "(" & local.targetAssociation & ")";
+						local.rv = ListAppend(local.rv, local.expandedInclude);
+					} else {
+						// Not a this-model through chain (e.g. a shortcut's default through), use as-is.
+						local.rv = ListAppend(local.rv, local.currentInclude);
+					}
 				}
 			} else {
 				// No through association, use as-is
