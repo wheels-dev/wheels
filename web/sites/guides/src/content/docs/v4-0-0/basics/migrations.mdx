@@ -25,10 +25,10 @@ Migrations are versioned CFCs that carry your schema forward and back. Each one 
 
 ## Running migrations
 
-Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `wheels_migrator_versions`, so the app has to be running for them to work — see [Installing Wheels](/v4-0-0/start-here/installing/) for the server setup.
+Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `wheels_migrator_versions`, so the app has to be running for them to work — without a server, every `wheels migrate` subcommand refuses with a pointer at `wheels start` instead of guessing at a database. See [Installing Wheels](/v4-0-0/start-here/installing/) for the server setup.
 
-```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
-wheels --version
+```bash {test:cli cmd="wheels migrate info" asserts-output="No running Wheels server" asserts-exit=1}
+wheels migrate info
 ```
 
 - `wheels migrate latest` — apply every pending migration in order. The most common command; you'll run it after pulling someone else's changes.
