@@ -17,7 +17,9 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${PORT:-8080}"
-PASSWORD="wheels"
+# Must match set(reloadPassword=...) in config/settings.cfm — a mismatch never
+# reloads and, since #3062, counts against the per-IP reload rate limit.
+PASSWORD="wheels-dev"
 RESULT_FILE="/tmp/wheels-cli-test-results.json"
 
 cd "$PROJECT_ROOT"

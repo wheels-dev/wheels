@@ -270,18 +270,64 @@ component output="false" {
 			&& application.wheels.environment == url.reload;
 
 		// Reload application properly using applicationStop() if requested.
-		if (
-			StructKeyExists(url, "reload")
-			&& !local.environmentSwitchAlreadyApplied
-			&& (
-				!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "reloadPassword")
-				|| !Len(application.wheels.reloadPassword)
+		// SECURITY (issue #3062): the gate FAILS CLOSED. A URL-based reload requires a
+		// non-empty configured reloadPassword AND a matching password parameter — an
+		// empty or missing reloadPassword disables ?reload= entirely, matching the
+		// environment-switch leg in wheels/events/onapplicationstart.cfc and the
+		// warning the framework logs on boot when the password is blank. Wrong-password
+		// attempts are logged to wheels_security.log with the trusted client IP and
+		// feed the same per-IP rate limit as the cold-start path (5 failed attempts
+		// within 5 minutes locks the source out).
+		local.reloadRequested = StructKeyExists(url, "reload") && !local.environmentSwitchAlreadyApplied;
+		local.reloadAuthorized = false;
+		if (local.reloadRequested && StructKeyExists(application, "wheels") && StructKeyExists(application, "wo")) {
+			// Same per-IP store and window as wheels/events/onapplicationstart.cfc, so
+			// warm-path and cold-start attempts count against one shared bucket.
+			local.reloadClientIp = application.wo.$trustedClientIp();
+			if (!StructKeyExists(application, "$reloadRateLimit")) {
+				application.$reloadRateLimit = {};
+			}
+			local.reloadRateLimited = false;
+			if (StructKeyExists(application.$reloadRateLimit, local.reloadClientIp)) {
+				local.reloadRateLimitEntry = application.$reloadRateLimit[local.reloadClientIp];
+				if (local.reloadRateLimitEntry.count >= 5 && DateDiff("n", local.reloadRateLimitEntry.firstAttempt, Now()) < 5) {
+					local.reloadRateLimited = true;
+				}
+				if (DateDiff("n", local.reloadRateLimitEntry.firstAttempt, Now()) >= 5) {
+					StructDelete(application.$reloadRateLimit, local.reloadClientIp);
+				}
+			}
+			if (
+				!local.reloadRateLimited
+				&& StructKeyExists(application.wheels, "reloadPassword")
+				&& Len(application.wheels.reloadPassword)
+				&& StructKeyExists(url, "password")
 				// Case-sensitive, constant-time compare — same gate as the environment switch
 				// in wheels/events/onapplicationstart.cfc (CFML == is case-insensitive and
 				// exits early, which leaks timing information).
-				|| (StructKeyExists(url, "password") && application.wo.$secureCompare(url.password, application.wheels.reloadPassword))
-			)
-		) {
+				&& application.wo.$secureCompare(url.password, application.wheels.reloadPassword)
+			) {
+				local.reloadAuthorized = true;
+				try {
+					writeLog(file="wheels_security", type="information", text="Reload accepted from #local.reloadClientIp#");
+				} catch (any e) {
+					// Fail silently if logging fails
+				}
+			} else if (!local.reloadRateLimited && StructKeyExists(url, "password")) {
+				// Track the failed attempt: count it against the shared per-IP window
+				// and log it, exactly like the cold-start path does.
+				if (!StructKeyExists(application.$reloadRateLimit, local.reloadClientIp)) {
+					application.$reloadRateLimit[local.reloadClientIp] = {count: 0, firstAttempt: Now()};
+				}
+				application.$reloadRateLimit[local.reloadClientIp].count++;
+				try {
+					writeLog(file="wheels_security", type="warning", text="Reload password rejected from #local.reloadClientIp#");
+				} catch (any e) {
+					// Fail silently if logging fails
+				}
+			}
+		}
+		if (local.reloadAuthorized) {
 			application.wo.$debugPoint("total,reload");
 			if (StructKeyExists(url, "lock") && !url.lock) {
 				this.$handleRestartAppRequest();

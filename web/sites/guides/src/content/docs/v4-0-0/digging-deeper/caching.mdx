@@ -253,7 +253,7 @@ Three ways to confirm what you're seeing:
        }
    }
    ```
-3. **Clear caches on reload.** `?reload=true&password=...` flushes query and template caches automatically (`clearQueryCacheOnReload`, `clearTemplateCacheOnReload`). Combine with a custom admin action that calls `application.wo.$clearCache()` when you need to purge the full cache without a restart. Note: when `reloadPassword` is empty, `?reload=true` currently restarts the app with no password at all — set a non-empty `reloadPassword` anywhere that matters (see [#3062](https://github.com/wheels-dev/wheels/issues/3062)).
+3. **Clear caches on reload.** `?reload=true&password=...` flushes query and template caches automatically (`clearQueryCacheOnReload`, `clearTemplateCacheOnReload`). Combine with a custom admin action that calls `application.wo.$clearCache()` when you need to purge the full cache without a restart. Note: when `reloadPassword` is empty, URL-based reload is disabled entirely — set a non-empty `reloadPassword` anywhere you want `?reload=true` to work (see [#3062](https://github.com/wheels-dev/wheels/issues/3062)).
 
 ## Related guides
 
