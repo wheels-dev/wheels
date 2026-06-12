@@ -23,7 +23,7 @@ A Wheels app in production is a Java webapp running on a CFML engine. That one f
 
 The port is byte-compatible with Ruby Kamal on the server side. Container names, labels, Docker network, lock-file paths, and the `.kamal/` directory layout all match exactly — a host managed by Ruby Kamal can be taken over by `wheels deploy` during evaluation, and vice versa. You don't need Ruby, a gem install, or a second CLI. The mirrored Kamal version is 2.4.0; the `kamal-proxy` image is pinned at v0.8.6.
 
-There is exactly one deliberate schema divergence: `deploy.yml` does not support ERB. Where Ruby Kamal writes `<%= ENV["APP_NAME"] %>`, Wheels writes `${APP_NAME}` — the same `${VAR}` env-var interpolation Kamal supports natively. Everything else is identical. See [Migrating from Kamal](/v4-0-0/deployment/migrating-from-kamal/) for the full story.
+There are two deliberate schema divergences. `deploy.yml` does not support ERB — where Ruby Kamal writes `<%= ENV["APP_NAME"] %>`, Wheels writes `${APP_NAME}`, the same `${VAR}` env-var interpolation Kamal supports natively. And Kamal top-level keys the port hasn't implemented (`boot`, `logging`, `retain_containers`, …) are [rejected by the validator](/v4-0-0/deployment/config-reference/#rejected-kamal-keys) rather than silently ignored. See [Migrating from Kamal](/v4-0-0/deployment/migrating-from-kamal/) for the full story.
 
 ## When to reach for `wheels deploy`
 
@@ -109,7 +109,7 @@ The framework is narrow about production. Wheels gives you a CFML app that boots
   <LinkCard
     title="Migrating from Kamal"
     href="/v4-0-0/deployment/migrating-from-kamal/"
-    description="For teams coming from Ruby Kamal — what's compatible, what's not, and the one schema divergence."
+    description="For teams coming from Ruby Kamal — what's compatible, what's not, and the two schema divergences."
   />
   <LinkCard
     title="Production Configuration"

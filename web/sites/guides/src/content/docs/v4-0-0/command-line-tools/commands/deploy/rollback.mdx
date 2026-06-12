@@ -29,7 +29,7 @@ Omitting the version throws `DeployMainCli.MissingVersion`.
 
 For each role, for each host in sequence: `docker start <service>-<role>-<version>`, then `kamal-proxy deploy` to route fresh traffic to the resurrected container.
 
-Success requires the target containers to still exist on each host. `retain_containers:` in `deploy.yml` (default 5) controls how many old ones are kept; `wheels deploy prune` removes older ones. If a target container has been pruned, the `docker start` step fails — re-deploy from that sha instead.
+Success requires the target containers to still exist on each host. [`wheels deploy prune`](/v4-0-0/command-line-tools/commands/deploy/prune/) removes old containers, keeping the 5 most recent per host unless you pass `--keep=<n>` on the prune command line (there is no `deploy.yml` key for this — Kamal's `retain_containers:` is rejected by the config validator). If a target container has been pruned, the `docker start` step fails — re-deploy from that sha instead.
 
 ## Examples
 
