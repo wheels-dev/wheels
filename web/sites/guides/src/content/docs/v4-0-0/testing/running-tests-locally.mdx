@@ -111,6 +111,10 @@ curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=v
 
 The `populate=false` query param is the trick that makes tight inner loops possible. Populate drops and recreates every test table — a second or two on SQLite but much slower on networked databases. Once the schema is in place for the run, skipping populate shaves the wait down to just your specs executing.
 
+<Aside type="note" title="Scope-visibility fields in the JSON response">
+  The JSON payload includes `directoryRequested`, `directoryResolved`, `directoryRejected`, `bundlesDiscovered`, and `warnings[]`. When a `directory=` value fails the allowlist the runner substitutes the default and sets `directoryRejected: true` with a `warnings[]` entry — the run is no longer silently green for the wrong scope. A path that names a single spec file rather than a directory yields `bundlesDiscovered: 0` and a warning; use `testBundles=` to target a single file directly.
+</Aside>
+
 ## Filtering tests
 
 The runner accepts filters at every layer. Pick whichever matches your workflow.

@@ -86,9 +86,17 @@ For machine-readable results, call the test runner URL directly and post-process
 curl -s -o "$RESULT_FILE" --max-time 600 \
   "http://localhost:${PORT}/wheels/core/tests?db=sqlite&format=json"
 
-# Parse totals with Python, then emit JUnit XML
-python3 -c "import json; d=json.load(open('$RESULT_FILE')); \
-  print(f\"{d['totalPass']} pass, {d['totalFail']} fail, {d['totalError']} error\")"
+# Parse totals and surface any scope warnings (rejected directory, 0-bundle discovery)
+python3 -c "
+import json, sys
+d = json.load(open('$RESULT_FILE'))
+for w in d.get('warnings', []):
+    print('WARNING:', w, file=sys.stderr)
+if d.get('directoryRejected'):
+    print('ERROR: directory= was rejected; ran the full suite instead', file=sys.stderr)
+    sys.exit(1)
+print(f\"{d['totalPass']} pass, {d['totalFail']} fail, {d['totalError']} error\")
+"
 ```
 
 <Aside type="tip">
