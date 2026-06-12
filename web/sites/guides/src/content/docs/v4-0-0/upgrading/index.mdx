@@ -31,7 +31,7 @@ If the two disagree, the runtime value wins — that's the version your app actu
 
 ## Release cadence
 
-Wheels doesn't ship on a fixed schedule. Releases go out when the changelog entries warrant one and the test matrix is green. The git tag history is the authoritative record — `git tag --sort=-v:refname` shows the latest release (currently `v4.0.3`; the 4.0 line went GA 2026-06-09). Pre-GA builds were tagged in a `v4.0.0-SNAPSHOT+N` series — the `+N` suffix is a continuous build number, not a release.
+Wheels doesn't ship on a fixed schedule. Releases go out when the changelog entries warrant one and the test matrix is green. The git tag history is the authoritative record — `git tag --sort=-v:refname` shows the latest release (currently `v4.0.3`, released 2026-06-09; the 4.0 line went GA 2026-05-12 with `v4.0.0`). Pre-GA builds were tagged in a `v4.0.0-SNAPSHOT+N` series — the `+N` suffix is a continuous build number, not a release.
 
 Don't assume a release date. Watch the [releases page on GitHub](https://github.com/wheels-dev/wheels/releases) and subscribe to the repo if you need to know when a tagged build lands.
 
