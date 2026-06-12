@@ -429,13 +429,13 @@ new wheels.middleware.RateLimiter(storage="database")                          /
 // rate-limit per API key — hoist the closure first: an inline function literal
 // as a constructor named arg crashes Adobe CF (Cross-Engine Invariant 5)
 var apiKeyFn = function(req) {
-    var apiKey = cgi.http_x_api_key;
+    var apiKey = req.cgi.http_x_api_key ?: "";
     return Len(apiKey) ? apiKey : "anonymous";
 };
 new wheels.middleware.RateLimiter(keyFunction=apiKeyFn)
 ```
 
-The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method}` — it has **no `cgi` key** ([#3074](https://github.com/wheels-dev/wheels/issues/3074)), so `req.cgi.*` silently collapses every client into one bucket. Read the real `cgi` scope directly, and guard with `Len()` (a missing header reads as empty string, not undefined, so `?:` never fires).
+The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method, cgi}`. The `cgi` member is the sanitized `request.cgi` copy overlaid on every inbound HTTP header under its CGI-style `http_*` name (built by `Dispatch.$buildMiddlewareCgiScope()`), so arbitrary headers like `X-Api-Key` resolve per client ([#3074](https://github.com/wheels-dev/wheels/issues/3074) — before 4.0.4 the context had **no `cgi` key** and `req.cgi.*` silently collapsed every client into one bucket). Keep the `Len()` guard: an empty-valued header reads as empty string, and on pre-fix versions a missing header does too.
 
 Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` or `database`. Emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. Returns `429` with `Retry-After` when exceeded.
 
