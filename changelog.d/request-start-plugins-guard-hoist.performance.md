@@ -1,0 +1,1 @@
+- Mixin-free apps no longer pay a throwaway `wheels.Plugins` (plus its `wheels.Global` pseudo-constructor) instantiation on every request: `$runOnRequestStart` now constructs the instance only inside the `!StructIsEmpty(application.wheels.mixins)` guard where it is used (issue [#2897](https://github.com/wheels-dev/wheels/issues/2897), Stage 3 quick win).
