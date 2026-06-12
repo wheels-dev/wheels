@@ -300,6 +300,27 @@ private string function myHelper() { ... }
 public string function $myHelper() { ... }
 ```
 
+### Bare `$helper()` Calls in Non-Mixin Event CFCs (Lucee)
+
+Event CFCs under `vendor/wheels/events/` that are declared as bare `component {` (no `extends`) are **not** processed by the `$integrateComponents()` mixin pass. They do not receive the `wheels.Global` helper surface, so a bare `$location()`, `$header()`, or any other `$`-prefixed framework helper call resolves against the component's own scope — which doesn't carry those methods. On Lucee this throws `No matching function [$LOCATION] found` and the application cold start aborts.
+
+```cfm
+// WRONG — bare $helper() call in a bare component { event CFC
+// Lucee throws: No matching function [$LOCATION] found
+$location(url = local.url, addToken = false);
+
+// RIGHT — qualify through application.wo (matches the other 27 helper calls in the file)
+application.wo.$location(url = local.url, addToken = false);
+```
+
+**Rule**: in any `vendor/wheels/events/*.cfc` file whose declaration is `component {` with no `extends`, route every `wheels.Global` helper call through `application.wo.$helper(...)`. Files that `extend` a base CFC (e.g. `EventMethods.cfc`) inherit the helper surface normally and can use bare calls.
+
+**Why this is silent**: the affected branch (`redirectAfterReload=true` + `url.reload` present) only runs during a real application cold start triggered by the URL env-switch. Tests that boot directly into an environment via `environment.cfm` never exercise this path, so the bug only surfaces in production under `?reload=production&password=<secret>`.
+
+**Structural guard**: `vendor/wheels/tests/specs/security/EventHelperScopeGuardSpec.cfc` (in the spirit of `BareCfabortGuardSpec`) fails the suite if any bare event CFC calls an out-of-scope framework helper without the `application.wo.` receiver.
+
+**Reference fix**: [#3054](https://github.com/wheels-dev/wheels/issues/3054) — `vendor/wheels/events/onapplicationstart.cfc` line 488: `$location(...)` → `application.wo.$location(...)`.
+
 ### `attributeCollection` with the `arguments` Scope (Adobe CF 2023/2025)
 
 Adobe CF 2023 and 2025 reject the raw `arguments` scope when passed as `attributeCollection` to *any* built-in CFML tag, throwing engine-specific errors (`cfheader` reports `"Failed to add HTML header"`) and aborting the request. Lucee 6/7, BoxLang, and Adobe CF 2018/2021 all accept the `arguments` scope without complaint. Both the string-interpolated form (`attributeCollection = "#arguments#"`) and the CFScript direct-struct form (`attributeCollection = arguments`) are affected.
