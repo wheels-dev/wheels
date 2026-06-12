@@ -643,6 +643,10 @@ component {
 				StructDelete(arguments, "query");
 				local.rv = "";
 				local.iEnd = local.query.recordCount;
+				// The column list is constant for the whole query, so tokenize it once
+				// instead of on every row of the per-row loops below.
+				local.columnArray = ListToArray(local.query.columnList);
+				local.columnCount = ArrayLen(local.columnArray);
 				if (Len(arguments.$group)) {
 					// We want to group based on a column so loop through the rows until we find, this will break if the query is not ordered by the grouped column.
 					local.tempSpacer = "}|{";
@@ -670,9 +674,7 @@ component {
 							local.groupQueryCount = 1;
 						}
 						QueryAddRow(arguments.group);
-						local.columnArray = ListToArray(local.query.columnList);
-						local.jEnd = ArrayLen(local.columnArray);
-						for (local.j = 1; local.j <= local.jEnd; local.j++) {
+						for (local.j = 1; local.j <= local.columnCount; local.j++) {
 							local.property = local.columnArray[local.j];
 							arguments[local.property] = local.query[local.property][local.i];
 							QuerySetCell(arguments.group, local.property, local.query[local.property][local.i], local.groupQueryCount);
@@ -695,16 +697,30 @@ component {
 					}
 					local.rv = Replace(local.rv, local.tempSpacer, arguments.$spacer, "all");
 				} else {
+					local.unreadableColumns = {};
 					for (local.i = 1; local.i <= local.iEnd; local.i++) {
 						arguments.current = local.i;
 						arguments.totalCount = local.iEnd;
-						local.columnArray = ListToArray(local.query.columnList);
-						local.jEnd = ArrayLen(local.columnArray);
-						for (local.j = 1; local.j <= local.jEnd; local.j++) {
+						for (local.j = 1; local.j <= local.columnCount; local.j++) {
 							local.property = local.columnArray[local.j];
 							try {
 								arguments[local.property] = local.query[local.property][local.i];
 							} catch (any e) {
+								// A column value that cannot be read (e.g. an unsupported / binary
+								// type) defaults to an empty string. Log once per column so the
+								// failure is surfaced instead of silently swallowed.
+								if (!StructKeyExists(local.unreadableColumns, local.property)) {
+									local.unreadableColumns[local.property] = true;
+									try {
+										WriteLog(
+											type = "warning",
+											text = "[Wheels] Could not read query column `#local.property#` while rendering partial `#arguments.$name#` (first failing row: #local.i#): #e.message#. Defaulting the column to an empty string.",
+											file = "wheels"
+										);
+									} catch (any logError) {
+										// Logging is best-effort; never let it break rendering.
+									}
+								}
 								arguments[local.property] = "";
 							}
 						}
@@ -799,7 +815,9 @@ component {
 		local.status = arguments.status;
 		if (IsNumeric(local.status)) {
 			local.statusCode = local.status;
-			local.statusText = $returnStatusText(local.status);
+			// Validates the numeric code (throws Wheels.RenderingError on unknown codes);
+			// the text itself is not needed when a numeric code is passed.
+			$returnStatusText(local.status);
 		} else {
 			// Try for statuscode;
 			local.statusCode = $returnStatusCode(local.status);
@@ -830,21 +848,30 @@ component {
 	 */
 	public string function $returnStatusCode(any status = 200) {
 		local.status = arguments.status;
-		local.statusCodes = $getStatusCodes();
-		local.rv = "";
-		local.lookup = StructFindValue(local.statuscodes, local.status);
-		if (ArrayLen(local.lookup)) {
-			local.rv = local.lookup[1]["key"];
-		} else {
-			Throw(type = "Wheels.RenderingError", message = "An invalid http response text #local.status# was passed in.");
+		// Ensures both the memoized code map and its reverse lookup exist.
+		$getStatusCodes();
+		local.lookup = application[$appKey()].statusCodeLookup;
+		if (StructKeyExists(local.lookup, local.status)) {
+			return local.lookup[local.status];
 		}
-		return local.rv;
+		Throw(type = "Wheels.RenderingError", message = "An invalid http response text #local.status# was passed in.");
 	}
 
 	/**
-	 * Returns a list of HTTP status codes and their response names
+	 * Returns a list of HTTP status codes and their response names.
+	 * The map is constant, so it is built once per application and memoized in the
+	 * application scope together with a reverse (text to code) lookup used by
+	 * `$returnStatusCode()`. Rebuilding the 63-entry struct on every render was
+	 * measurable overhead since this sits on every render path.
 	 */
 	public struct function $getStatusCodes() {
+		local.appKey = $appKey();
+		if (
+			StructKeyExists(application[local.appKey], "statusCodes")
+			&& StructKeyExists(application[local.appKey], "statusCodeLookup")
+		) {
+			return application[local.appKey].statusCodes;
+		}
 		local.rv = {
 			100 = 'Continue',
 			101 = 'Switching Protocols',
@@ -910,6 +937,25 @@ component {
 			510 = 'Not Extended',
 			511 = 'Network Authentication Required'
 		};
+
+		// Build the reverse (text to code) lookup deterministically: iterate the codes in
+		// numeric order so duplicated texts (e.g. "Unassigned" at 427 / 430 / 509) always
+		// resolve to the lowest matching code.
+		local.lookup = {};
+		local.sortedCodes = ListSort(StructKeyList(local.rv), "numeric");
+		local.iEnd = ListLen(local.sortedCodes);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.code = ListGetAt(local.sortedCodes, local.i);
+			if (!StructKeyExists(local.lookup, local.rv[local.code])) {
+				local.lookup[local.rv[local.code]] = local.code;
+			}
+		}
+
+		// Assign the lookup before the code map so any concurrent reader that observes
+		// `statusCodes` is guaranteed to also see `statusCodeLookup` (both writes are
+		// idempotent, so a benign double-build needs no lock).
+		application[local.appKey].statusCodeLookup = local.lookup;
+		application[local.appKey].statusCodes = local.rv;
 		return local.rv;
 	}
 

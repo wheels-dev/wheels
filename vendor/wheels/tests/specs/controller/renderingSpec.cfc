@@ -942,6 +942,58 @@ component extends="wheels.WheelsTest" {
 				expect(captured).toBe("")
 			})
 		})
+
+		describe("Tests that $getStatusCodes is memoized", () => {
+
+			beforeEach(() => {
+				params = {controller = "dummy", action = "dummy"}
+				_controller = application.wo.controller("dummy", params)
+				appKey = StructKeyExists(application, "$wheels") ? "$wheels" : "wheels"
+			})
+
+			it("memoizes the status code map and its reverse lookup in the application scope", () => {
+				StructDelete(application[appKey], "statusCodes")
+				StructDelete(application[appKey], "statusCodeLookup")
+
+				codes = _controller.$getStatusCodes()
+
+				expect(codes["404"]).toBe("Not Found")
+				expect(StructKeyExists(application[appKey], "statusCodes")).toBeTrue()
+				expect(StructKeyExists(application[appKey], "statusCodeLookup")).toBeTrue()
+			})
+
+			it("returns the memoized struct on subsequent calls instead of rebuilding it", () => {
+				_controller.$getStatusCodes()
+				application[appKey].statusCodes["999"] = "Memo Marker"
+				try {
+					codes = _controller.$getStatusCodes()
+					expect(StructKeyExists(codes, "999")).toBeTrue()
+				} finally {
+					StructDelete(application[appKey].statusCodes, "999")
+					StructDelete(application[appKey], "statusCodeLookup")
+					StructDelete(application[appKey], "statusCodes")
+				}
+			})
+
+			it("resolves status text to a code and code to text", () => {
+				expect(_controller.$returnStatusCode("Not Found")).toBe(404)
+				expect(_controller.$returnStatusText(404)).toBe("Not Found")
+			})
+
+			it("resolves a duplicated status text to the lowest matching code", () => {
+				// 427, 430, and 509 all carry the text "Unassigned"
+				expect(_controller.$returnStatusCode("Unassigned")).toBe(427)
+			})
+
+			it("still throws on unknown codes and texts", () => {
+				expect(() => {
+					_controller.$returnStatusText(999)
+				}).toThrow("Wheels.RenderingError")
+				expect(() => {
+					_controller.$returnStatusCode("No Such Status")
+				}).toThrow("Wheels.RenderingError")
+			})
+		})
 	}
 
 	function $injectIntoVariablesScope(required string name, required any data) {

@@ -94,6 +94,19 @@ component extends="wheels.WheelsTest" {
 				expect(request.partialTests.thirdUserName).toBe("Per")
 			})
 
+			it("is including partial with query grouped by a column", () => {
+				groupQuery = QueryNew(
+					"dept,name",
+					"varchar,varchar",
+					[{dept: "a", name: "x"}, {dept: "a", name: "y"}, {dept: "b", name: "z"}]
+				)
+				savecontent variable="result" {
+					WriteOutput(_controller.includePartial(partial = "groupRow", query = groupQuery, group = "dept"))
+				}
+
+				expect(REReplace(result, "\s", "", "all")).toBe("a:2;b:1;")
+			})
+
 			it("is including partial with normal query argument", () => {
 				usersQuery = g.model("user").findAll(order = "firstName");
 				savecontent variable="result" {
