@@ -874,54 +874,53 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-   * Applies mixins to a component based on application configurations.
-   */
-  public any function $initializeMixins(required struct variablesScope) {
-		// We use $wheels here since these variables get placed in the variables scope of all objects.
-		// This way we sure they don't clash with other Wheels variables or any variables the developer may set.
+	 * Applies mixins to a component based on application configurations.
+	 *
+	 * Scratch state (appKey / metaData / className) is kept strictly local-scoped:
+	 * this method runs on the shared application-cached Plugins instance (see
+	 * $pluginObj() in Global.cfc), and unscoped writes would land in that shared
+	 * instance's variables scope — a data race across concurrent requests, with
+	 * className cross-contaminating which mixin set a target receives (issue 2897).
+	 */
+	public any function $initializeMixins(required struct variablesScope) {
 		if (IsDefined("application") && StructKeyExists(application, "$wheels")) {
-			$wheels.appKey = "$wheels";
+			local.appKey = "$wheels";
 		} else {
-			$wheels.appKey = "wheels";
+			local.appKey = "wheels";
 		}
 
-		if (IsDefined("application") && !StructIsEmpty(application[$wheels.appKey].mixins)) {
-			$wheels.metaData = GetMetadata(variablesScope.this);
+		if (IsDefined("application") && !StructIsEmpty(application[local.appKey].mixins)) {
+			local.metaData = GetMetadata(variablesScope.this);
 			// Classify by dotted-path segment, not unanchored substring: an
 			// unanchored FindNoCase("controllers", ...) also matched component
 			// names like "app.models.ControllerStats" and handed them the
 			// controller mixin set (di-packages:12).
-			if (StructKeyExists($wheels.metaData, "displayName")) {
-				$wheels.className = $wheels.metaData.displayName;
-			} else if (ListFindNoCase($wheels.metaData.fullname, "controllers", "./\")) {
-				$wheels.className = "controller";
-			} else if (ListFindNoCase($wheels.metaData.fullname, "models", "./\")) {
-				$wheels.className = "model";
-			} else if (ListFindNoCase($wheels.metaData.fullname, "tests", "./\")) {
-				$wheels.className = "test";
+			if (StructKeyExists(local.metaData, "displayName")) {
+				local.className = local.metaData.displayName;
+			} else if (ListFindNoCase(local.metaData.fullname, "controllers", "./\")) {
+				local.className = "controller";
+			} else if (ListFindNoCase(local.metaData.fullname, "models", "./\")) {
+				local.className = "model";
+			} else if (ListFindNoCase(local.metaData.fullname, "tests", "./\")) {
+				local.className = "test";
 			} else {
-				$wheels.className = Reverse(SpanExcluding(Reverse($wheels.metaData.name), "."));
+				local.className = Reverse(SpanExcluding(Reverse(local.metaData.name), "."));
 			}
-			if (StructKeyExists(application[$wheels.appKey].mixins, $wheels.className)) {
+			if (StructKeyExists(application[local.appKey].mixins, local.className)) {
 				if (!StructKeyExists(variablesScope, "core")) {
 					variablesScope.core = {};
 					StructAppend(variablesScope.core, variablesScope);
 					StructDelete(variablesScope.core, "$wheels");
 				}
-				StructAppend(variablesScope, application[$wheels.appKey].mixins[$wheels.className], true);
+				StructAppend(variablesScope, application[local.appKey].mixins[local.className], true);
 
 				if (StructKeyExists(variablesScope, "this")) {
-					StructAppend(variablesScope.this, application[$wheels.appKey].mixins[$wheels.className], true);
+					StructAppend(variablesScope.this, application[local.appKey].mixins[local.className], true);
 				}
 
 				if (StructKeyExists(variablesScope.core, "this")) {
-					StructAppend(variablesScope.core.this, application[$wheels.appKey].mixins[$wheels.className], true);
+					StructAppend(variablesScope.core.this, application[local.appKey].mixins[local.className], true);
 				}
-			}
-
-			// Get rid of any extra data created in the variables scope.
-			if (StructKeyExists(variablesScope, "$wheels")) {
-				StructDelete(variablesScope, "$wheels");
 			}
 		}
 		return variablesScope;

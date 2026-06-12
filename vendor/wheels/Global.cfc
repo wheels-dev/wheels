@@ -3194,6 +3194,27 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Returns the application-cached Plugins instance so the
+	 * request-lifecycle call sites (onDIcomplete on controllers, models and the
+	 * dispatcher, plus $runOnRequestStart) don't construct a throwaway
+	 * wheels.Plugins — and its wheels.Global parent pseudo-constructor — per
+	 * request / per materialized model row (issue 2897, Stage 3). Falls back to
+	 * a fresh instance during bootstrap windows where the cache has not been
+	 * populated yet, or where the application scope is undefined (CLI / test
+	 * bootstrap). Sharing one instance is safe because $initializeMixins keeps
+	 * its scratch state local-scoped.
+	 */
+	public any function $pluginObj() {
+		if (IsDefined("application")) {
+			local.appKey = StructKeyExists(application, "$wheels") ? "$wheels" : "wheels";
+			if (StructKeyExists(application, local.appKey) && StructKeyExists(application[local.appKey], "PluginObj")) {
+				return application[local.appKey].PluginObj;
+			}
+		}
+		return CreateObject("component", "wheels.Plugins");
+	}
+
+	/**
 	 * Internal function. Records a deprecation warning through a single shared
 	 * policy: the first call for a given feature logs a warning to the standard
 	 * wheels log and registers the warning in
