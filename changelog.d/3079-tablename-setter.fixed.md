@@ -1,0 +1,1 @@
+- `tableName("my_table")` now works as a model table setter: when called with a name it delegates to `table()` and returns the resolved name, instead of silently no-opping and leaving the model on its convention table. The zero-argument getter form is unchanged (#3079)

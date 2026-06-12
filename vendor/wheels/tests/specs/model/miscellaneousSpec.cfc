@@ -159,6 +159,33 @@ component extends="wheels.WheelsTest" {
 				expect(users.recordcount).toBe(3)
 			})
 		})
+
+		describe("Tests that tableName acts as a setter when given a name - issue 3079", () => {
+
+			afterEach(() => {
+				// Restore the mapped table so the override never leaks into other specs
+				g.model("author").table("c_o_r_e_authors")
+			})
+
+			it("delegates to table() when a name argument is passed", () => {
+				author = g.model("author")
+				author.tableName("tbl_authors_override")
+
+				expect(author.tableName()).toBe("tbl_authors_override")
+			})
+
+			it("returns the newly set name from the setter call", () => {
+				author = g.model("author")
+
+				expect(author.tableName("tbl_authors_override")).toBe("tbl_authors_override")
+			})
+
+			it("still returns the current name when called with no argument", () => {
+				author = g.model("author")
+
+				expect(author.tableName()).toBe("c_o_r_e_authors")
+			})
+		})
 	}
 
 	function assert_pagination(required string handle) {

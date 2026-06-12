@@ -170,11 +170,19 @@ component {
 
 	/**
 	 * Returns the name of the database table that this model is mapped to.
+	 * When called with a `name` argument it acts as a setter, delegating to `table()`,
+	 * and returns the resolved name. This makes the commonly-reached-for
+	 * `tableName("my_table")` form in `config()` work instead of silently no-opping.
 	 *
 	 * [section: Model Class]
 	 * [category: Miscellaneous Functions]
+	 *
+	 * @name When provided, sets the table this model maps to (alias for `table()`).
 	 */
-	public string function tableName() {
+	public string function tableName(any name) {
+		if (StructKeyExists(arguments, "name")) {
+			table(arguments.name);
+		}
 		if ($get("lowerCaseTableNames")) {
 			return LCase(variables.wheels.class.tableName);
 		} else {
