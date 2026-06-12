@@ -170,13 +170,13 @@ var result = {count: 0};
 items.each(function(i) { result.count++; });
 ```
 
-### 11. CFML Reserved Scopes Shadow Function Parameters
-**Source:** [#2591](https://github.com/wheels-dev/wheels/pull/2591) — `consoleExec(url, body)` received the URL scope struct in place of the URL string, throwing `Cannot cast Object type [url] to a value of type [string]`.
+### 11. CFML Reserved Scopes Shadow Parameters and Local Variables
+**Source:** [#2591](https://github.com/wheels-dev/wheels/pull/2591) — `consoleExec(url, body)` received the URL scope struct in place of the URL string, throwing `Cannot cast Object type [url] to a value of type [string]`; [#3053](https://github.com/wheels-dev/wheels/issues/3053) — `local.url` coexisted with bare `url.*` reads in `$buildRedirectUrl()`, throwing `ScopeCastException` on Adobe CF (Adobe resolves bare reads to the string local first; Lucee inverts — the reserved scope always wins over locals).
 
 Reserved scope names in CFML: `url`, `form`, `cgi`, `client`, `session`, `application`, `cookie`, `request`, `server`, `arguments`, `variables`, `local`, `this`. Naming a function parameter, local var, or argument the same as a scope shadows it but the scope can also win depending on engine and context.
 
 ```cfm
-// WRONG
+// WRONG — named parameter: Lucee resolves bare `url` to the scope struct, not the string param
 function consoleExec(required string url, required string body) {
     makeHttpPost(url, body);  // url = URL scope struct on Lucee, not the string
 }
@@ -184,6 +184,18 @@ function consoleExec(required string url, required string body) {
 // RIGHT
 function consoleExec(required string requestUrl, required string body) {
     makeHttpPost(requestUrl, body);
+}
+
+// WRONG — local variable: Adobe CF resolves bare `url.*` reads to the string local, not the URL scope
+public string function $buildRedirectUrl() {
+    local.url = cgi.path_info;  // string local
+    if (StructKeyExists(url, "reload")) { ... }  // Adobe: ScopeCastException — url is the string above
+}
+
+// RIGHT — rename so bare url.* reads resolve to the URL scope on every engine
+public string function $buildRedirectUrl() {
+    local.redirectUrl = cgi.path_info;
+    if (StructKeyExists(url, "reload")) { ... }  // all engines: URL scope
 }
 ```
 
