@@ -24,7 +24,7 @@ wheels upgrade check [--to=<version>] [--format=json] [--strict]
 wheels upgrade apply [--to=<version>] [--nobackup]
 ```
 
-Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0.
+Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0. Any other subcommand — a typo like `wheels upgrade chekc` — prints the usage and then hard-errors with a non-zero exit, so a misspelled verb in a script fails loudly instead of looking like a successful run.
 
 ### What it does
 
@@ -43,7 +43,7 @@ Nothing in the project is modified. No files are written. The command does not s
 
 None that the command enforces — but in practice:
 
-- **Commit first.** The scanner is read-only, but the actual upgrade (`brew upgrade wheels`, a fresh `vendor/wheels/` drop-in, etc.) will replace framework code. Have a clean working tree so you can diff and roll back.
+- **Commit first.** The scanner is read-only, but the actual upgrade — `wheels upgrade apply` (or a manual `vendor/wheels/` drop-in if you vendor by hand) — replaces framework code. Have a clean working tree so you can diff and roll back. (`brew upgrade wheels` only updates the CLI binary, never your app's vendored framework copy.)
 - **Run your tests.** Rerun the test suite after the framework swap, not after this command — `wheels upgrade check` does not exercise anything, it only greps.
 - **Internet access** is required when you don't pass `--to=`. The command fetches the latest release tag from GitHub.
 
@@ -79,18 +79,19 @@ Breaking Changes (2 found):
 All Clear (1 checks):
   + Direct WireBox references
 
-Upgrade with: brew upgrade wheels
+Apply with: wheels upgrade apply
 ```
 
 When current and target share a major version, the major-transition note is shown but the advisory scan still runs:
 
-```text title="illustrative — same-major output"
+```text title="illustrative — same-major output (trimmed)"
 Current version: 4.0.0
 Target version:  4.0.1
 
-Same major version — no known breaking changes between majors.
-(advisory scan still runs against the same-major patterns)
-Upgrade with: brew upgrade wheels
+Same major version — no known breaking changes.
+Scanning for opt-in recommendations...
+
+Apply with: wheels upgrade apply
 ```
 
 ### What gets checked
@@ -134,12 +135,15 @@ If this is interrupted, restore with:
   rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
 ```
 
-After the swap, it reports the version transition and backup location:
+After the swap, it reports the version transition, the backup location, and the recovery one-liner:
 
 ```text title="illustrative — swap summary"
-3.5.1 -> 4.0.2
-Backed up to: vendor/wheels.bak-20260611-141502
+Framework upgraded: 3.5.1 -> 4.0.2
+Backup:  /path/to/app/vendor/wheels.bak-20260611-141502
+Recover with:  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
 ```
+
+If a safety check refuses the swap, the command prints only the refusal and exits non-zero — no backup is made and no restore command is shown, because there is nothing to restore.
 
 Safety checks run before any mutation:
 - Source (CLI-bundled) and target (`vendor/wheels/`) must each sniff as a valid Wheels framework directory — a generic `box.json` is not sufficient.
