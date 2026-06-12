@@ -4419,8 +4419,69 @@ return local.$wheels;
 	 * only reliably surfaces `this`-scope members. Must stay a function: an
 	 * inline `local.X` iterator in the pseudo-constructor materializes
 	 * `variables.local` and shadows method-local `local` on BoxLang.
+	 *
+	 * The promote-key list is memoized in application scope because this runs
+	 * on EVERY instantiation of every Global-derived component (per model row,
+	 * per controller, per Plugins instance) while its input — the function set
+	 * injected by the `/app/global/functions.cfm` include above — is constant
+	 * for the application lifetime. The memo is keyed per concrete class name
+	 * because whether a subclass's own (e.g. private) methods are already
+	 * registered in `variables` at this point in the pseudo-constructor is
+	 * engine-dependent, so the promotable set is not guaranteed identical
+	 * across subclasses. The gate is the cached key itself, never a separate
+	 * done-flag (##2800 lesson), and the cache lives inside
+	 * `application[$appKey()]`, which `?reload=true` rebuilds as a fresh
+	 * struct — so invalidation is structural. When `application` (or the
+	 * Wheels struct in it) is unavailable — CLI/test bootstrap, early
+	 * application start — we fall back to the full scan without memoizing.
 	 */
 	public void function $promoteIncludedGlobalsToThis() {
+		var promoteCache = "";
+		var promoteCacheKey = "";
+		if (IsDefined("application")) {
+			var promoteAppKey = $appKey();
+			if (StructKeyExists(application, promoteAppKey) && IsStruct(application[promoteAppKey])) {
+				var classMetadata = GetMetadata(this);
+				if (IsStruct(classMetadata) && StructKeyExists(classMetadata, "name") && Len(classMetadata.name)) {
+					promoteCacheKey = classMetadata.name;
+					if (!StructKeyExists(application[promoteAppKey], "promotedGlobalKeys")) {
+						application[promoteAppKey].promotedGlobalKeys = {};
+					}
+					promoteCache = application[promoteAppKey].promotedGlobalKeys;
+				}
+			}
+		}
+		if (IsStruct(promoteCache) && StructKeyExists(promoteCache, promoteCacheKey)) {
+			// Memoized path: apply the recorded keys with the same guards the
+			// fresh scan uses. Keys that vanished from `variables` are skipped
+			// and keys already on `this` are left alone, so a stale entry can
+			// never promote something the scan would not have.
+			var cachedKeys = promoteCache[promoteCacheKey];
+			var cachedKeyCount = ArrayLen(cachedKeys);
+			for (var keyIndex = 1; keyIndex <= cachedKeyCount; keyIndex++) {
+				var promoteKey = cachedKeys[keyIndex];
+				if (StructKeyExists(variables, promoteKey) && !StructKeyExists(this, promoteKey)) {
+					this[promoteKey] = variables[promoteKey];
+				}
+			}
+			return;
+		}
+		var promotedKeys = $scanAndPromoteIncludedGlobals();
+		if (IsStruct(promoteCache)) {
+			// Concurrent first instantiations may both scan and both assign;
+			// the value is deterministic per class, so last-write-wins is safe.
+			promoteCache[promoteCacheKey] = promotedKeys;
+		}
+	}
+
+	/**
+	 * The full `variables` scan behind `$promoteIncludedGlobalsToThis()`:
+	 * promote every variables-scope custom function that is not already on
+	 * `this`, returning the promoted key names. Also serves as the
+	 * non-memoizing fallback when application scope is unavailable.
+	 */
+	public array function $scanAndPromoteIncludedGlobals() {
+		var promotedKeys = [];
 		for (var promoteKey in variables) {
 			if (!isCustomFunction(variables[promoteKey])) {
 				continue;
@@ -4429,7 +4490,9 @@ return local.$wheels;
 				continue;
 			}
 			this[promoteKey] = variables[promoteKey];
+			ArrayAppend(promotedKeys, promoteKey);
 		}
+		return promotedKeys;
 	}
 
 }
