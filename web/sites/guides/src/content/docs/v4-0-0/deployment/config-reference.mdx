@@ -293,7 +293,7 @@ Only uppercase-and-underscore tokens are expanded — `${APP_NAME}` matches; low
 No loops, conditionals, or method calls. If you need logic (e.g. different values per destination), resolve it in `.kamal/secrets` or a `.kamal/secrets.<destination>` overlay first and reference the result with `${VAR}`.
 
 <Aside type="caution" title="No ERB">
-Ruby Kamal supports `<%= ... %>` ERB inside `deploy.yml`. Wheels does not — rendering ERB would require embedding a Ruby runtime in the CFML CLI. This is the single schema divergence. Most ERB-using configs convert mechanically by replacing `<%= ENV["X"] %>` with `${X}`. See [Migrating from Kamal](/v4-0-0/deployment/migrating-from-kamal/) for the full conversion patterns.
+Ruby Kamal supports `<%= ... %>` ERB inside `deploy.yml`. Wheels does not — rendering ERB would require embedding a Ruby runtime in the CFML CLI. This and the [rejected top-level keys](#rejected-kamal-keys) above are the two schema divergences from Kamal. Most ERB-using configs convert mechanically by replacing `<%= ENV["X"] %>` with `${X}`. See [Migrating from Kamal](/v4-0-0/deployment/migrating-from-kamal/) for the full conversion patterns.
 </Aside>
 
 ## Destination overlays
