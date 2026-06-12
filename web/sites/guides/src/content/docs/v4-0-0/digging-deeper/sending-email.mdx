@@ -107,7 +107,7 @@ component {
 ```
 
 <Aside type="caution">
-  Don't instantiate the controller directly: `new wheels.Controller().sendEmail(...)` throws on every engine ("Component [wheels.Controller] has no accessible Member with name [PARAMS]" on Lucee, "Element PARAMS is undefined" on Adobe) because a bare controller instance has no `params` struct — the rendering pipeline dereferences it even for absolute template paths. The `controller(name, params)` factory builds a request-capable instance. Hardening `sendEmail()` for out-of-request senders is tracked in [#3078](https://github.com/wheels-dev/wheels/issues/3078).
+  Prefer the `controller(name, params)` factory over `new wheels.Controller()` directly. A bare instance has no `params` struct (it never ran the request lifecycle). Absolute template paths (leading `/`) now compose correctly on bare instances, but controller-relative (no-leading-slash) paths throw a `Wheels.ControllerNameRequired` error. The factory builds a request-capable instance that resolves both forms.
 </Aside>
 
 Put the views under `app/views/mailers/user/welcome.cfm` and `app/views/mailers/user/password_reset.cfm`. The leading slash on `template=` makes the path absolute (rooted at `app/views/`) so the mailer works regardless of which controller triggered it.
