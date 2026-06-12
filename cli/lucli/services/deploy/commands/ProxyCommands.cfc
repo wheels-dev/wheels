@@ -27,7 +27,7 @@ component extends="Base" {
             "--network kamal",
             "--publish 80:80",
             "--publish 443:443",
-            "--volume /home/#variables.config.ssh().user()#/.config/kamal-proxy:/home/kamal-proxy/.config/kamal-proxy",
+            "--volume #$remoteHome()#/.config/kamal-proxy:/home/kamal-proxy/.config/kamal-proxy",
             variables.PROXY_IMAGE
         );
     }
@@ -90,5 +90,16 @@ component extends="Base" {
 
     public string function restart() {
         return docker("restart", variables.PROXY_CONTAINER_NAME);
+    }
+
+    /**
+     * Home directory of the deploy user on the remote host, for the proxy
+     * config volume. The previous hardcoded `/home/<user>` was wrong for
+     * the DEFAULT ssh user (root's home is /root) — #2957 DEP-11c.
+     * compare(), not ==: unix usernames are case-sensitive.
+     */
+    private string function $remoteHome() {
+        var sshUser = variables.config.ssh().user();
+        return compare(sshUser, "root") == 0 ? "/root" : "/home/" & sshUser;
     }
 }

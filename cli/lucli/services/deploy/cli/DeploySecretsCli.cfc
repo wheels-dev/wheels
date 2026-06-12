@@ -67,7 +67,10 @@ component {
             var eq = find("=", line);
             // eq > 1, not > 0: a line starting with '=' has no key, and
             // left(line, 0) crashes Lucee 7 (Cross-Engine Invariant 8).
-            if (eq > 1 && left(line, eq - 1) == key) {
+            // compare(), not ==: CFML == is case-insensitive, but env var
+            // names are case-sensitive and Kamal's extract is an exact
+            // match (#2957 DEP-11b).
+            if (eq > 1 && compare(left(line, eq - 1), key) == 0) {
                 return mid(line, eq + 1, 99999);
             }
         }

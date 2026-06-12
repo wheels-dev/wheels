@@ -118,6 +118,9 @@ component {
 
                 for (var role in cfg.roles()) {
                     for (var host in role.hosts()) {
+                        // A same-version redeploy would hit a guaranteed
+                        // docker run --name conflict otherwise (#2957 DEP-11a).
+                        $dispatch([host], app.remove_conflicting(role, ver), dryRun);
                         $dispatch([host], app.run(role, ver), dryRun);
                         // Only proxy-fronted roles register with kamal-proxy —
                         // job/worker roles serve no traffic (#2957).
@@ -128,6 +131,11 @@ component {
                                 dryRun
                             );
                         }
+                        // Post-cutover cleanup: stop superseded versions
+                        // (#2957 DEP-11a). Best-effort (allowFail) — a failed
+                        // stop of an OLD container must not fail an
+                        // otherwise-complete deploy of the NEW one.
+                        $dispatch([host], app.stop_old_versions(role, ver), dryRun, true);
                     }
                 }
             } finally {
@@ -178,7 +186,13 @@ component {
                 message = "rollback requires a version (pass opts.version)"
             );
         }
-        var cfg = variables.loader.load(arguments.opts.configPath);
+        // Forward the destination overlay — rollback() was the last
+        // loader.load() call site not doing so (#2957; same defect class
+        // as the config() fix in #3085).
+        var cfg = variables.loader.load(
+            arguments.opts.configPath,
+            {destination: arguments.opts.destination ?: ""}
+        );
         var app = new modules.wheels.services.deploy.commands.AppCommands(cfg);
         var proxy = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
