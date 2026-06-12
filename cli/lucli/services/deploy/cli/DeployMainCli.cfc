@@ -113,6 +113,7 @@ component {
                             $deliverEnvFile(
                                 [host],
                                 app.ensure_env_file(role),
+                                app.relock_env_file(role),
                                 envFileContent,
                                 app.env_file_path(role),
                                 secretNames,
@@ -486,12 +487,17 @@ component {
      *   1. dispatch ensure-cmd (mkdir + touch + chmod 600) so the file is
      *      permission-locked BEFORE any content lands,
      *   2. SFTP the content via uploadString — values never enter argv,
-     *      dry-run output, or exception command summaries.
+     *      dry-run output, or exception command summaries,
+     *   3. dispatch relock-cmd (chmod 600) AFTER the upload — belt-and-braces
+     *      against the SFTP layer resetting perms to 0644 (sshj's
+     *      preserve-attributes default; SshClient disables it, but FakeSshPool
+     *      can't verify that, so this re-lock is the testable guarantee).
      * Under dryRun, records the upload by path and secret NAMES only.
      */
     private void function $deliverEnvFile(
         required array hosts,
         required string ensureCmd,
+        required string relockCmd,
         required string content,
         required string remotePath,
         required array secretNames,
@@ -507,12 +513,15 @@ component {
                         & arrayToList(arguments.secretNames, ", ") & " — values not shown)"
                 );
             }
+            $dispatch(arguments.hosts, arguments.relockCmd, arguments.dryRun);
             return;
         }
         var c = arguments.content;
         var p = arguments.remotePath;
+        var relock = arguments.relockCmd;
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
             ssh.uploadString(c, p);
+            ssh.run(relock, {raise: true});
         });
     }
 

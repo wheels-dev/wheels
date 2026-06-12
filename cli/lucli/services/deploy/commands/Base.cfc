@@ -99,4 +99,16 @@ component {
             & " && touch " & shellEscape(arguments.path)
             & " && chmod 600 " & shellEscape(arguments.path);
     }
+
+    /**
+     * Command that re-locks a remote env file to 600 perms AFTER its content
+     * is uploaded. Belt-and-braces for the SFTP layer: sshj's file transfer
+     * can apply local-file attributes (0644) to the remote on put — SshClient
+     * disables that (setPreserveAttributes(false)), but the real SFTP
+     * behavior is unverifiable through FakeSshPool, so the delivery flow also
+     * dispatches this re-lock and the specs pin it (##2957).
+     */
+    public string function $relockEnvFileCmd(required string path) {
+        return "chmod 600 " & shellEscape(arguments.path);
+    }
 }

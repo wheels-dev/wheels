@@ -722,22 +722,30 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     dc.deploy({configPath: proj.config, version: "v1"});
 
                     var calls = fake.calls();
-                    var ensureIdx = 0; var uploadIdx = 0; var runIdx = 0;
+                    var ensureIdx = 0; var uploadIdx = 0; var relockIdx = 0; var runIdx = 0;
                     for (var i = 1; i <= arrayLen(calls); i++) {
                         var cmd = calls[i].cmd ?: "";
                         if (!ensureIdx && findNoCase("chmod 600", cmd)
                             && find(".kamal/apps/demo/env/roles/web.env", cmd)) ensureIdx = i;
                         if (!uploadIdx && (calls[i].kind ?: "") == "uploadString") uploadIdx = i;
+                        // Post-upload re-lock: the SFTP layer may reset perms
+                        // (sshj preserve-attributes), so a second chmod 600
+                        // must follow the upload (##2957).
+                        if (uploadIdx && i > uploadIdx && !relockIdx
+                            && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) relockIdx = i;
                         // Match the APP run specifically — the proxy boot
                         // fallback (details() || boot()) also contains a
                         // `docker run --detach`, dispatched before this.
                         if (!runIdx && findNoCase("docker run --detach", cmd)
                             && find("--name demo-web-v1", cmd)) runIdx = i;
                     }
-                    // ensure (mkdir+touch+chmod 600) → upload → docker run, in order.
+                    // ensure (mkdir+touch+chmod 600) → upload → re-lock
+                    // (chmod 600) → docker run, in order.
                     expect(ensureIdx).toBeGT(0);
                     expect(uploadIdx).toBeGT(ensureIdx);
-                    expect(runIdx).toBeGT(uploadIdx);
+                    expect(relockIdx).toBeGT(uploadIdx);
+                    expect(runIdx).toBeGT(relockIdx);
 
                     // The upload carries the resolved value to the role env file.
                     expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/roles/web.env");

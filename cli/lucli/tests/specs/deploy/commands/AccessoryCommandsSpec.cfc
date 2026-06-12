@@ -64,6 +64,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("chmod 600 '.kamal/apps/app/env/accessories/mysql.env'");
             });
 
+            it("relock_env_file() re-locks the accessory env file to 600 perms after upload (##2957)", () => {
+                var fullCfg = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml"));
+                var cmds = new cli.lucli.services.deploy.commands.AccessoryCommands(fullCfg);
+                expect(cmds.relock_env_file(fullCfg.accessory("mysql")))
+                    .toBe("chmod 600 '.kamal/apps/app/env/accessories/mysql.env'");
+            });
+
             it("start() starts the accessory container", () => {
                 var db = variables.cfg.accessory("db");
                 var cmd = new cli.lucli.services.deploy.commands.AccessoryCommands(variables.cfg).start(db);

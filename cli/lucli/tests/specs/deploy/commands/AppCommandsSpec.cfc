@@ -109,6 +109,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("chmod 600 '.kamal/apps/demo/env/roles/web.env'");
             });
 
+            it("relock_env_file() re-locks the role env file to 600 perms after upload (##2957)", () => {
+                var cmds = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg);
+                expect(cmds.relock_env_file(variables.cfg.roles()[1]))
+                    .toBe("chmod 600 '.kamal/apps/demo/env/roles/web.env'");
+            });
+
             it("env_file_path() namespaces by destination when one is set", () => {
                 var cfg = new cli.lucli.services.deploy.config.Config(
                     {service: "demo", image: "acme/demo", servers: ["1.2.3.4"]},

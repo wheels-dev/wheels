@@ -125,6 +125,15 @@ component extends="Base" {
         return $ensureEnvFileCmd($envAccessoriesDir(), env_file_path(arguments.accessory));
     }
 
+    /**
+     * Re-lock command for the accessory env file: chmod 600 AFTER the
+     * content upload, guarding against the SFTP layer resetting perms
+     * (##2957).
+     */
+    public string function relock_env_file(required any accessory) {
+        return $relockEnvFileCmd(env_file_path(arguments.accessory));
+    }
+
     private string function $envAccessoriesDir() {
         var ns = variables.config.service();
         if (len(variables.config.destination())) {

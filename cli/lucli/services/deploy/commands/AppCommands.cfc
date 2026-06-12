@@ -132,6 +132,14 @@ component extends="Base" {
         return $ensureEnvFileCmd($envRolesDir(), env_file_path(arguments.role));
     }
 
+    /**
+     * Re-lock command for the role env file: chmod 600 AFTER the content
+     * upload, guarding against the SFTP layer resetting perms (##2957).
+     */
+    public string function relock_env_file(required any role) {
+        return $relockEnvFileCmd(env_file_path(arguments.role));
+    }
+
     private string function $envRolesDir() {
         var ns = variables.config.service();
         if (len(variables.config.destination())) {
