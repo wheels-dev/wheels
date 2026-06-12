@@ -153,6 +153,20 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	}
 
 	public void function $runOnRequestStart(required targetPage) {
+		// Perform the redirect-after-reload that onApplicationStart deferred
+		// (issue #3054). The redirect must not fire inside onApplicationStart
+		// itself: cflocation aborts the event mid-flight and the engine then
+		// discards the half-started application, silently reverting URL
+		// environment switches into production/maintenance (the two
+		// environments that auto-enable redirectAfterReload). By the time this
+		// event runs, the new application — including a switched environment —
+		// has been persisted, so aborting here is safe. Runs first on purpose:
+		// nothing else in this event matters for a request being redirected.
+		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "redirectAfterReloadUrl")) {
+			local.redirectAfterReloadUrl = request.wheels.redirectAfterReloadUrl;
+			StructDelete(request.wheels, "redirectAfterReloadUrl");
+			$location(url = local.redirectAfterReloadUrl, addToken = false);
+		}
 		local.Mixins = new wheels.Plugins();
 		// If the first debug point has not already been set in a reload request we set it here.
 		if (application.wheels.showDebugInformation) {
