@@ -1027,6 +1027,9 @@ component output="false" extends="wheels.Global"{
 
 	function onDIComplete(){
 		$engineAdapter().prepareDIComplete(variables, this);
-		new wheels.Plugins().$initializeMixins(variables);
+		// Shared application-cached instance; $pluginObj() falls back to a fresh
+		// wheels.Plugins during bootstrap windows before $loadPlugins has cached
+		// one (issue 2897).
+		$pluginObj().$initializeMixins(variables);
 	}
 }

@@ -63,6 +63,23 @@ component {
         var names = [];
 
         for (var acc in targets) {
+            // env.secret delivery (#2957): verbs that (re)create the container
+            // get the accessory env file written — 600 perms first, content
+            // over SFTP — before docker run references it via --env-file.
+            if (listFindNoCase("run,reboot", arguments.method)) {
+                var accSecrets = acc.env().secret();
+                if (arrayLen(accSecrets)) {
+                    $deliverEnvFile(
+                        acc.hosts(),
+                        accCmds.ensure_env_file(acc),
+                        accCmds.relock_env_file(acc),
+                        accCmds.env_file_content(accSecrets, $resolvedSecrets()),
+                        accCmds.env_file_path(acc),
+                        accSecrets,
+                        dryRun
+                    );
+                }
+            }
             var cmd = structIsEmpty(arguments.methodOpts)
                 ? invoke(accCmds, arguments.method, [acc])
                 : invoke(accCmds, arguments.method, [acc, arguments.methodOpts]);
@@ -93,5 +110,57 @@ component {
         var c = arguments.cmd;
         var doRaise = !arguments.allowFail;
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
+    }
+
+    /**
+     * Resolved key→value map from the SecretResolver the loader built for
+     * the most recent load(). Empty struct when no resolver exists.
+     */
+    private struct function $resolvedSecrets() {
+        var resolver = variables.loader.secretResolver();
+        return isObject(resolver) ? resolver.all() : {};
+    }
+
+    /**
+     * Deliver env.secret content to `remotePath` on each host (#2957):
+     * ensure-cmd (mkdir + touch + chmod 600) first so the file is
+     * permission-locked before content lands, then SFTP via uploadString —
+     * values never enter argv or dry-run output — then relock-cmd
+     * (chmod 600) AFTER the upload, belt-and-braces against the SFTP layer
+     * resetting perms to 0644 (sshj's preserve-attributes default;
+     * SshClient disables it, but FakeSshPool can't verify that, so the
+     * re-lock is the testable guarantee). Mirrors
+     * DeployMainCli.$deliverEnvFile (each Cli keeps its own dispatch
+     * plumbing by design).
+     */
+    private void function $deliverEnvFile(
+        required array hosts,
+        required string ensureCmd,
+        required string relockCmd,
+        required string content,
+        required string remotePath,
+        required array secretNames,
+        required boolean dryRun
+    ) {
+        $dispatch(arguments.hosts, arguments.ensureCmd, arguments.dryRun);
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(
+                    variables.dryRunBuffer,
+                    "[" & h & "] upload env file " & arguments.remotePath
+                        & " (" & arrayLen(arguments.secretNames) & " secret(s): "
+                        & arrayToList(arguments.secretNames, ", ") & " — values not shown)"
+                );
+            }
+            $dispatch(arguments.hosts, arguments.relockCmd, arguments.dryRun);
+            return;
+        }
+        var c = arguments.content;
+        var p = arguments.remotePath;
+        var relock = arguments.relockCmd;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+            ssh.uploadString(c, p);
+            ssh.run(relock, {raise: true});
+        });
     }
 }

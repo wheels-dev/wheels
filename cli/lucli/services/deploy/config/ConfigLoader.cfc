@@ -67,6 +67,16 @@ component {
 	}
 
 	/**
+	 * The SecretResolver built (or injected) for the most recent load().
+	 * Deploy verbs use it to resolve `env.secret` names into values for
+	 * remote env-file delivery (##2957). Returns "" before any load when
+	 * no resolver was injected.
+	 */
+	public any function secretResolver() {
+		return variables.secretResolver;
+	}
+
+	/**
 	 * Derive the secrets project root from a deploy.yml path.
 	 *
 	 * When the YAML sits inside a directory named `config` (the standard

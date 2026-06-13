@@ -34,19 +34,42 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).notToInclude("-e GREETING");
             });
 
-            it("run() rejects env.secret with a clear error instead of silently dropping it", () => {
+            // env.secret delivery (#2957, Wave 2b) — accessory secrets reach the
+            // container via a remote env file (600 perms) referenced by --env-file.
+
+            it("run() references the accessory env file via --env-file when env.secret is declared (##2957)", () => {
                 var fullCfg = new cli.lucli.services.deploy.config.ConfigLoader()
                     .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml"));
-                var state = {threw: false, message: ""};
-                try {
-                    new cli.lucli.services.deploy.commands.AccessoryCommands(fullCfg)
-                        .run(fullCfg.accessory("mysql"));
-                } catch (Wheels.Deploy.EnvSecretUnsupported e) {
-                    state.threw = true;
-                    state.message = e.message;
-                }
-                expect(state.threw).toBeTrue();
-                expect(state.message).toInclude("MYSQL_ROOT_PASSWORD");
+                var cmd = new cli.lucli.services.deploy.commands.AccessoryCommands(fullCfg)
+                    .run(fullCfg.accessory("mysql"));
+                expect(cmd).toInclude("--env-file .kamal/apps/app/env/accessories/mysql.env");
+                // The secret NAME must never surface as a -e pair.
+                expect(cmd).notToInclude("-e 'MYSQL_ROOT_PASSWORD");
+                expect(cmd).notToInclude("-e MYSQL_ROOT_PASSWORD");
+            });
+
+            it("run() omits --env-file when the accessory declares no env.secret", () => {
+                var db = variables.cfg.accessory("db");
+                var cmd = new cli.lucli.services.deploy.commands.AccessoryCommands(variables.cfg).run(db);
+                expect(cmd).notToInclude("--env-file");
+            });
+
+            it("ensure_env_file() creates the env dir and pre-locks the file to 600 perms (##2957)", () => {
+                var fullCfg = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml"));
+                var cmds = new cli.lucli.services.deploy.commands.AccessoryCommands(fullCfg);
+                var cmd = cmds.ensure_env_file(fullCfg.accessory("mysql"));
+                expect(cmd).toInclude("mkdir -p '.kamal/apps/app/env/accessories'");
+                expect(cmd).toInclude("touch '.kamal/apps/app/env/accessories/mysql.env'");
+                expect(cmd).toInclude("chmod 600 '.kamal/apps/app/env/accessories/mysql.env'");
+            });
+
+            it("relock_env_file() re-locks the accessory env file to 600 perms after upload (##2957)", () => {
+                var fullCfg = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .load(expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml"));
+                var cmds = new cli.lucli.services.deploy.commands.AccessoryCommands(fullCfg);
+                expect(cmds.relock_env_file(fullCfg.accessory("mysql")))
+                    .toBe("chmod 600 '.kamal/apps/app/env/accessories/mysql.env'");
             });
 
             it("start() starts the accessory container", () => {

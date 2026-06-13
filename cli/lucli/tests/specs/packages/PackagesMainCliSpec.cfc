@@ -119,6 +119,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				DirectoryDelete(proj, true);
 			});
 
+			it("install tells the user a reload activates the package (reload re-fires onApplicationStart)", () => {
+				// An authorized `wheels reload` calls applicationStop(), so the
+				// next request re-fires onApplicationStart — which runs the
+				// PackageLoader. A cold restart is no longer required to
+				// activate an installed package (see #3110).
+				var proj = $scratch();
+				var stack = $buildStack(proj);
+				var out = stack.cli.install({target: "wheels-fake"});
+				expect(out).toInclude("wheels reload");
+				expect(out).notToInclude("wheels stop && wheels start");
+				stack.cache.refresh();
+				DirectoryDelete(proj, true);
+			});
+
 			it("install honours @version pin", () => {
 				var proj = $scratch();
 				var stack = $buildStack(proj);

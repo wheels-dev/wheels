@@ -142,7 +142,68 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("docker run");
                 expect(out).toInclude("demo-web-1");
             });
+
+            // env.secret delivery (#2957, Wave 2b) — app boot writes the role
+            // env file (600 perms) before docker run; values stay out of argv.
+            it("boot writes the role env file before docker run and keeps secret values out of argv (##2957)", () => {
+                var proj = $makeSecretProject();
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                    cli.boot({configPath: proj.config, version: "v1"});
+
+                    var calls = fake.calls();
+                    var ensureIdx = 0; var uploadIdx = 0; var relockIdx = 0; var runIdx = 0;
+                    for (var i = 1; i <= arrayLen(calls); i++) {
+                        var cmd = calls[i].cmd ?: "";
+                        if (!ensureIdx && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) ensureIdx = i;
+                        if (!uploadIdx && (calls[i].kind ?: "") == "uploadString") uploadIdx = i;
+                        // Post-upload re-lock: the SFTP layer may reset perms
+                        // (sshj preserve-attributes), so a second chmod 600
+                        // must follow the upload (##2957).
+                        if (uploadIdx && i > uploadIdx && !relockIdx
+                            && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) relockIdx = i;
+                        if (!runIdx && findNoCase("docker run", cmd)) runIdx = i;
+                    }
+                    expect(ensureIdx).toBeGT(0);
+                    expect(uploadIdx).toBeGT(ensureIdx);
+                    expect(relockIdx).toBeGT(uploadIdx);
+                    expect(runIdx).toBeGT(relockIdx);
+
+                    expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/roles/web.env");
+                    expect(calls[uploadIdx].content).toInclude("APP_SECRET=s3cr3t-value-42");
+                    expect(calls[runIdx].cmd).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    for (var c in calls) {
+                        expect(c.cmd ?: "").notToInclude("s3cr3t-value-42");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
         });
+    }
+
+    /**
+     * Temp project: config/deploy.yml declaring env.secret [APP_SECRET],
+     * resolved by .kamal/secrets.
+     */
+    private struct function $makeSecretProject() {
+        var root = getTempDirectory() & "/wheels-2957-app-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "env: {clear: {DB_HOST: db.internal}, secret: [APP_SECRET]}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "APP_SECRET=s3cr3t-value-42#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
     }
 
     private array function $cmdsFrom(required any fake) {
