@@ -143,7 +143,72 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     directoryDelete(proj.root, true);
                 }
             });
+
+            // Secret redaction in RemoteExecutionFailed (#3159): an env.clear
+            // value interpolated from a ${SECRET} token rides `docker run ...
+            // -e KEY=value` (env.clear, NOT env.secret — so it's argv, not the
+            // --env-file path). A nonzero accessory boot exit must surface a
+            // redacted summary so the secret never lands in CI logs.
+            // DeployAccessoryCli registers the resolver's values on the pool
+            // after load(), same as DeployAppCli/DeployMainCli.
+            it("redacts a ${SECRET}-interpolated env.clear value from a failed accessory docker run (issue 3159)", () => {
+                var proj = $makeClearSecretAccessoryProject();
+                try {
+                    // Capture the exact docker run command via dry-run first.
+                    var probe = new cli.lucli.services.deploy.cli.DeployAccessoryCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    probe.boot({configPath: proj.config, name: "db", dryRun: true});
+                    var runCmd = "";
+                    for (var line in probe.dryRunOutput()) {
+                        if (findNoCase("docker run", line)) {
+                            // Strip the "[host] " prefix the dry-run buffer adds.
+                            runCmd = reReplace(line, "^\[[^\]]*\] ", "");
+                            break;
+                        }
+                    }
+                    expect(runCmd).toInclude("super-secret-acc-pw-9000");
+
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    fake.expect("1.2.3.5", runCmd, {exitCode: 125, stdout: "", stderr: "boom"});
+                    var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                    try {
+                        cli.boot({configPath: proj.config, name: "db"});
+                        fail("expected RemoteExecutionFailed");
+                    } catch (any e) {
+                        expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                        expect(e.message).notToInclude("super-secret-acc-pw-9000");
+                        expect(e.message).toInclude("[REDACTED]");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
         });
+    }
+
+    /**
+     * Temp project: a postgres accessory with an env.clear value interpolated
+     * from a ${DB_ROOT_PW} token, resolved by .kamal/secrets. No accessory
+     * env.secret, so the value rides `docker run ... -e DB_ROOT_PW=value` in
+     * argv — the exact leak #3159 closes, on the accessory verb.
+     */
+    private struct function $makeClearSecretAccessoryProject() {
+        var root = getTempDirectory() & "/wheels-3159-acc-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "accessories: {db: {image: 'postgres:16', host: 1.2.3.5, "
+                & "env: {clear: {DB_ROOT_PW: '$#chr(123)#DB_ROOT_PW#chr(125)#'}}}}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "DB_ROOT_PW=super-secret-acc-pw-9000#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
     }
 
     /**
