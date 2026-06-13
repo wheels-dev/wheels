@@ -1,24 +1,27 @@
-# Wheels CLI
+# Wheels CLI — DEPRECATED & FROZEN
 
-The official Command Line Interface for the wheels framework.
+> **This CommandBox module is deprecated and frozen.** It does not know about
+> Wheels 4.0+ and drifts from the supported Wheels CLI. The Wheels release
+> pipeline no longer publishes it (#3184); the last ForgeBox version
+> (`wheels-cli@4.0.3`) is left in place but will not advance. **Do not install
+> it for new work.**
 
-## Installation
+## Use the supported Wheels CLI instead
 
-Install the Wheels CLI module via CommandBox:
+The canonical Wheels 4.0+ CLI is the LuCLI-based `wheels` binary, distributed
+through your platform package manager — **not** `box install`:
 
 ```bash
-box install wheels-cli
+# macOS / Linux (Homebrew)
+brew install wheels-dev/wheels/wheels
+
+# Windows (Scoop)
+scoop bucket add wheels-dev https://github.com/wheels-dev/scoop-wheels
+scoop install wheels
+
+# Linux apt:  https://apt.wheels.dev
+# Linux yum:  https://yum.wheels.dev
 ```
-
-## Features
-
-- **Code Generation** - Generate applications, controllers, models, views, and complete scaffolds
-- **Database Migrations** - Version control your database schema with migrations
-- **Testing** - Run tests with coverage reports and debugging capabilities
-- **Development Tools** - File watching, reloading, and environment management
-- **Deployment** - Docker integration and CI/CD configuration
-
-## Quick Start
 
 Create a new Wheels application:
 
@@ -26,27 +29,12 @@ Create a new Wheels application:
 wheels new myapp
 ```
 
-Generate a complete resource:
+Full install docs:
+<https://guides.wheels.dev/v4-0-0/command-line-tools/installation/>
 
-```bash
-wheels scaffold Product name:string price:decimal description:text
-```
-
-Run database migrations:
-
-```bash
-wheels dbmigrate latest
-```
-
-## Documentation
-
-Full documentation is available at:
-https://wheels.dev/3.1.0/guides/command-line-tools/commands/README
-
-## Requirements
-
-- CommandBox 5.0+
-- wheels 3.0+
+The deprecation timeline (removal scheduled for v5.0) is in the
+[3.x → 4.x upgrade guide](https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/)
+under "Legacy CommandBox `wheels-cli` module" (#2227, #2634, #3180, #3184).
 
 ## License
 

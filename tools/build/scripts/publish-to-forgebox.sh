@@ -188,8 +188,10 @@ main() {
     # Publish Wheels Core
     publish_package "Wheels Core" "$ROOT_DIR/build-wheels-core/wheels" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE" "$MARK_STABLE"
 
-    # Publish Wheels CLI
-    publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE" "$MARK_STABLE"
+    # NOTE: the legacy CommandBox `wheels-cli` module is FROZEN (#3184). It is no
+    # longer prepared or published to ForgeBox — it drifts from the canonical
+    # LuCLI-era `wheels` CLI and mis-advertises itself as the official CLI. The
+    # already-published 4.0.3 stays in place. See cli/src/README.md.
 
     # Publish Wheels Starter App
     publish_package "Wheels Starter App" "$ROOT_DIR/build-wheels-starterApp" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE" "$MARK_STABLE"
