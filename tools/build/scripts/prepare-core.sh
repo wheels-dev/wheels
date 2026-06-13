@@ -32,11 +32,35 @@ cp -r vendor/wheels/* "${BUILD_DIR}/wheels/"
 cp LICENSE "${BUILD_DIR}/wheels/"
 cp NOTICE "${BUILD_DIR}/wheels/"
 
-# Copy docs
+# Copy docs.
+#
+# Ship ONLY the user-facing reference docs. The repo's docs/ tree also holds
+# internal working artifacts that must never reach a `box install` consumer:
+#
+#   docs/superpowers/   — AI planning specs/plans/patches (75+ files)
+#   docs/plans/         — internal implementation plans
+#   docs/releases/      — unpublished blog drafts, skeletons, social posts, audits
+#   docs/contributing/  — wheels-bot CI/automation architecture (internal)
+#
+# Use an explicit ALLOWLIST rather than `cp -r docs/*` + excludes so that any
+# new internal subtree added to docs/ in the future does not silently leak into
+# the published artifact (it would simply not be copied until allowlisted here).
 echo "Copying docs..."
 rm -rf "${BUILD_DIR}/wheels/docs"
 mkdir -p "${BUILD_DIR}/wheels/docs"
-cp -r docs/* "${BUILD_DIR}/wheels/docs/"
+# User-facing reference subtrees/files (extend this list deliberately).
+DOCS_ALLOWLIST=(
+    "api"                      # versioned API reference JSON
+    "AI_INTEGRATION_GUIDE.md"  # consumer-facing AI integration guide
+    "wheels-vs-frameworks.md"  # consumer-facing framework comparison
+)
+for item in "${DOCS_ALLOWLIST[@]}"; do
+    if [ -e "docs/${item}" ]; then
+        cp -r "docs/${item}" "${BUILD_DIR}/wheels/docs/"
+    else
+        echo "  WARNING: allowlisted docs entry not found: docs/${item}" >&2
+    fi
+done
 
 # Copy template files. The package now ships TWO manifests:
 #
@@ -53,9 +77,33 @@ cp tools/build/core/wheels.json "${BUILD_DIR}/wheels/wheels.json"
 cp tools/build/core/box.json "${BUILD_DIR}/wheels/box.json"
 cp tools/build/core/README.md "${BUILD_DIR}/wheels/README.md"
 
-# Replace version placeholders
+# Replace version placeholders.
+#
+# IMPORTANT: `@build.version@` is NOT a free template token across the whole
+# tree — it doubles as a *literal sentinel* in framework code and test specs:
+#
+#   - vendor/wheels/PackageLoader.cfc::$normalizeWheelsVersion()
+#   - vendor/wheels/Plugins.cfc::$normalizeWheelsVersion()
+#       both compare `local.raw == "@build.version@"` as a defensive guard for
+#       paths that still feed the raw, unstamped placeholder in. A global
+#       `sed s/@build.version@/<ver>/g` rewrites that comparison to
+#       `== "<ver>"`, silently disabling the dev-build guard in every release.
+#   - vendor/wheels/tests/specs/{buildInfoSpec,events/frameworkVersionSpec,
+#       packages/PackageLoaderSpec}.cfc reference the literal as assertion
+#       fixtures; stamping them corrupts the shipped regression guard.
+#
+# The ONLY legitimate `.cfc` stamp site is BuildInfo.cfc's `version:` field
+# (every other framework component reads the runtime version from BuildInfo at
+# app start, not from a stamped literal). So stamp `@build.version@` into the
+# manifests and BuildInfo.cfc only — never blanket every .cfc/.cfm. The
+# buildInfoSpec.cfc "sentinel exactly once" regression guard depends on this.
 echo "Replacing version placeholders..."
-find "${BUILD_DIR}/wheels" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) | while read file; do
+for file in \
+    "${BUILD_DIR}/wheels/box.json" \
+    "${BUILD_DIR}/wheels/wheels.json" \
+    "${BUILD_DIR}/wheels/README.md" \
+    "${BUILD_DIR}/wheels/BuildInfo.cfc"; do
+    [ -f "$file" ] || continue
     sed -i.bak "s/@build\.version@/${VERSION}/g" "$file" && rm "${file}.bak"
 done
 

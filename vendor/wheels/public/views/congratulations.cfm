@@ -1,4 +1,13 @@
 <!--- cfformat-ignore-start --->
+<cfscript>
+	// The shared _header_simple.cfm defaults its <title> to "Wheels - Error"
+	// (it was first written for the error screen). Override it here so a new
+	// user's first browser tab reads "Welcome to Wheels", not "Error" (#3175).
+	if (!StructKeyExists(request, "wheels") || !IsStruct(request.wheels)) {
+		request.wheels = {};
+	}
+	request.wheels.simpleHeaderTitle = "Welcome to Wheels";
+</cfscript>
 <!--- Use the slimmed _simple header (no top nav). Navigation to /wheels/info,
       /wheels/routes, /wheels/api, etc. is provided by the dev-mode debug bar
       emitted at onrequestend, so the welcome page only needs doctype/head/body

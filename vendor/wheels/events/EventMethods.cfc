@@ -230,10 +230,13 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		}
 
 		// Inject methods from plugins and packages directly to Application.cfc.
-		// Uses the shared application-cached Plugins instance — the previous
-		// unconditional `new wheels.Plugins()` at the top of this event paid a
-		// full Plugins + Global construction on every request, even for
-		// mixin-free apps that never entered this guard (issue 2897).
+		// Uses the shared application-cached Plugins instance ($pluginObj). The
+		// previous unconditional `new wheels.Plugins()` at the top of this event
+		// paid a full Plugins + wheels.Global pseudo-constructor on every
+		// request; #3160 (Stage 3 PR A) moved the construction inside this
+		// mixins-nonempty guard so mixin-free apps skip it, and this change
+		// (PR B) drops the per-request construction entirely in favor of the
+		// cached instance (issue #2897).
 		if (!StructIsEmpty(application.wheels.mixins)) {
 			$engineAdapter().prepareDIComplete(variables, this);
 			$pluginObj().$initializeMixins(variables);
