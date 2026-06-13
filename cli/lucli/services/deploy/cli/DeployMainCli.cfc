@@ -93,12 +93,30 @@ component {
         // --target. Resolved from proxy.app_port (default 80); see #3089.
         var appPort = cfg.proxy().appPort();
 
+        // env.secret delivery (#2957): render the env-file content ONCE,
+        // before the lock or any remote call, so an unresolvable secret
+        // fails fast locally (Wheels.Deploy.EnvSecretMissing) without
+        // acquiring — and then stranding — the deploy lock. Values come
+        // from the SecretResolver the loader already built; they reach the
+        // host only via SFTP (uploadString), never argv.
+        var secretNames = cfg.env().secret();
+        var envFileContent = "";
+        if (arrayLen(secretNames)) {
+            envFileContent = app.env_file_content(secretNames, $resolvedSecrets());
+        }
+
         $fireHook(hooks, "pre-deploy", hookEnv, dryRun);
 
+        // The lock lives on EVERY host (deduped — a host serving two roles
+        // must not contend with itself) so a concurrent deploy collides with
+        // it no matter which host it probes (##2957 DEP-1).
+        var lockHosts = $uniqueHosts(hosts);
+
         try {
-            $dispatchAny(
-                hosts,
+            $acquireLockAllOrNothing(
+                lockHosts,
                 lock.acquire({user: $currentUser(), message: "deploy " & ver}),
+                lock,
                 dryRun
             );
 
@@ -127,6 +145,17 @@ component {
                         // A same-version redeploy would hit a guaranteed
                         // docker run --name conflict otherwise (#2957 DEP-11a).
                         $dispatch([host], app.remove_conflicting(role, ver), dryRun);
+                        if (arrayLen(secretNames)) {
+                            $deliverEnvFile(
+                                [host],
+                                app.ensure_env_file(role),
+                                app.relock_env_file(role),
+                                envFileContent,
+                                app.env_file_path(role),
+                                secretNames,
+                                dryRun
+                            );
+                        }
                         $dispatch([host], app.run(role, ver), dryRun);
                         // Only proxy-fronted roles register with kamal-proxy —
                         // job/worker roles serve no traffic (#2957).
@@ -147,10 +176,16 @@ component {
                 $dispatch(hosts, auditor.record("completed deploy of version " & ver), dryRun, true);
             } finally {
                 // Tolerate release failures so they can never shadow the
-                // original deploy exception inside this finally block. rm -f
-                // is idempotent; if it genuinely fails on a remote, the deploy
-                // already has a real error to surface from the try body.
-                $dispatchAny(hosts, lock.release(), dryRun, true);
+                // original deploy exception inside this finally block — and
+                // "tolerate" must cover transport failures, not just exit
+                // codes: allowFail only maps to {raise: false}, while a host
+                // that died mid-deploy (the correlated case) makes the
+                // release's startSession throw out of onEach and REPLACE the
+                // in-flight deploy error. Per-host best-effort dispatch
+                // confines each failure to its host, so every healthy host
+                // is still released (##2957 DEP-1b). rm -f is idempotent;
+                // skipped hosts are logged for manual cleanup.
+                $logSkippedLockReleases($dispatchPerHostTolerant(lockHosts, lock.release(), dryRun));
             }
 
             hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
@@ -537,6 +572,196 @@ component {
     }
 
     /**
+     * All-or-nothing deploy-lock acquisition (##2957 DEP-1).
+     *
+     * The lock only provides mutual exclusion if a concurrent deploy is
+     * guaranteed to collide with it. The old $dispatchAny acquire was
+     * first-success-wins: contention on host 1 was swallowed by
+     * SshPool.onAny and a fresh lock was acquired on host 2, so two deploys
+     * could run side by side on any multi-host fleet. Instead: acquire on
+     * EVERY host, in deterministic (config) order, sequentially — two
+     * concurrent deploys probe hosts in the same order, so exactly one wins
+     * the first host and the other aborts there. On a partial failure, roll
+     * back ONLY the locks already acquired (the contended host's lock
+     * belongs to the other deploy) and surface the per-host error.
+     *
+     * MIRROR: DeployLockCli.$acquireLockAllOrNothing implements the same
+     * contract for the manual lock verbs — keep them in lockstep.
+     */
+    private void function $acquireLockAllOrNothing(
+        required array hosts,
+        required string acquireCmd,
+        required any lock,
+        required boolean dryRun
+    ) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.acquireCmd);
+            }
+            return;
+        }
+        var c = arguments.acquireCmd;
+        // Shared struct so the callback can record progress — closures can't
+        // reliably mutate outer scalars across engines (anti-pattern ##10).
+        var state = {acquired: [], lastHost: ""};
+        try {
+            variables.sshPool.sequential(arguments.hosts, function(ssh, host) {
+                state.lastHost = host;
+                ssh.run(c, {raise: true});
+                arrayAppend(state.acquired, host);
+            });
+        } catch (any e) {
+            $rollbackAcquiredLocks(state.acquired, arguments.lock);
+            throw(
+                type = "Wheels.Deploy.LockAcquireFailed",
+                message = "Could not acquire the deploy lock on " & state.lastHost
+                    & " — another deploy may hold it. Rolled back "
+                    & arrayLen(state.acquired) & " already-acquired lock(s). "
+                    & "Inspect with 'wheels deploy lock status'; clear a stale lock with "
+                    & "'wheels deploy lock release'. Cause: " & e.message,
+                detail = e.detail ?: ""
+            );
+        }
+    }
+
+    /**
+     * Best-effort release of the locks a partially-failed acquire already
+     * placed. A rollback failure must never shadow the LockAcquireFailed
+     * the caller is about to throw. Host-granular: one unreachable host
+     * must not stop the rollback from clearing the remaining healthy hosts.
+     */
+    private void function $rollbackAcquiredLocks(required array hosts, required any lock) {
+        if (!arrayLen(arguments.hosts)) return;
+        // $dispatchPerHostTolerant never throws — per-host failures are
+        // swallowed deliberately; the acquire error is the one the operator
+        // needs to see. Stale locks are recoverable via
+        // `wheels deploy lock release`.
+        $dispatchPerHostTolerant(arguments.hosts, arguments.lock.release(), false);
+    }
+
+    /**
+     * Per-host best-effort dispatch. allowFail-style onEach is NOT enough
+     * for tolerant fan-out: the real SshPool.onEach pre-resolves a
+     * connection for EVERY host before submitting any task, so a single
+     * unreachable host throws before the command runs anywhere, and a
+     * transport failure inside a task (dead cached connection) is rethrown
+     * from future.get() regardless of {raise: false}. Dispatching each host
+     * in its own sequential([host]) call with a per-host try/catch confines
+     * every failure mode — connect and transport alike — to its host.
+     *
+     * @return array of {host, message} structs for hosts that failed.
+     *
+     * MIRROR: DeployLockCli.$dispatchPerHostTolerant is the manual-verb
+     * twin of this helper — keep them in lockstep.
+     */
+    private array function $dispatchPerHostTolerant(
+        required array hosts,
+        required string cmd,
+        required boolean dryRun
+    ) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
+            }
+            return [];
+        }
+        var c = arguments.cmd;
+        var failed = [];
+        for (var h in arguments.hosts) {
+            try {
+                variables.sshPool.sequential([h], function(ssh, host) {
+                    ssh.run(c, {raise: false});
+                });
+            } catch (any e) {
+                arrayAppend(failed, {host: h, message: e.message});
+            }
+        }
+        return failed;
+    }
+
+    /**
+     * Surface (but never throw) the hosts a best-effort lock release could
+     * not reach. Mirrors the post-deploy-failure hook logging (#3087):
+     * visibility without shadowing whatever error is already in flight.
+     * Lives in a helper because loops inside `finally` miscompile on
+     * Lucee 7 (cross-engine invariant 12).
+     */
+    private void function $logSkippedLockReleases(required array failed) {
+        for (var f in arguments.failed) {
+            writeOutput(
+                "[lock:release] " & f.host & ": " & f.message
+                    & " (ignored — run 'wheels deploy lock release' when the host is back)" & chr(10)
+            );
+        }
+    }
+
+    /** Order-preserving dedupe — a host serving several roles appears once. */
+    private array function $uniqueHosts(required array hosts) {
+        var seen = {};
+        var out = [];
+        for (var h in arguments.hosts) {
+            if (!structKeyExists(seen, h)) {
+                seen[h] = true;
+                arrayAppend(out, h);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Resolved key→value map from the SecretResolver the loader built for
+     * the most recent load(). Empty struct when no resolver exists (e.g. a
+     * loader injected with one in tests that never loaded).
+     */
+    private struct function $resolvedSecrets() {
+        var resolver = variables.loader.secretResolver();
+        return isObject(resolver) ? resolver.all() : {};
+    }
+
+    /**
+     * Deliver env.secret content to `remotePath` on each host (#2957):
+     *   1. dispatch ensure-cmd (mkdir + touch + chmod 600) so the file is
+     *      permission-locked BEFORE any content lands,
+     *   2. SFTP the content via uploadString — values never enter argv,
+     *      dry-run output, or exception command summaries,
+     *   3. dispatch relock-cmd (chmod 600) AFTER the upload — belt-and-braces
+     *      against the SFTP layer resetting perms to 0644 (sshj's
+     *      preserve-attributes default; SshClient disables it, but FakeSshPool
+     *      can't verify that, so this re-lock is the testable guarantee).
+     * Under dryRun, records the upload by path and secret NAMES only.
+     */
+    private void function $deliverEnvFile(
+        required array hosts,
+        required string ensureCmd,
+        required string relockCmd,
+        required string content,
+        required string remotePath,
+        required array secretNames,
+        required boolean dryRun
+    ) {
+        $dispatch(arguments.hosts, arguments.ensureCmd, arguments.dryRun);
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(
+                    variables.dryRunBuffer,
+                    "[" & h & "] upload env file " & arguments.remotePath
+                        & " (" & arrayLen(arguments.secretNames) & " secret(s): "
+                        & arrayToList(arguments.secretNames, ", ") & " — values not shown)"
+                );
+            }
+            $dispatch(arguments.hosts, arguments.relockCmd, arguments.dryRun);
+            return;
+        }
+        var c = arguments.content;
+        var p = arguments.remotePath;
+        var relock = arguments.relockCmd;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+            ssh.uploadString(c, p);
+            ssh.run(relock, {raise: true});
+        });
+    }
+
+    /**
      * Dispatch a command and collect the remote output, host-prefixed
      * (`[host] line`), in host order. Used by read verbs (`audit`,
      * `details`) so live mode surfaces what the remote actually said
@@ -583,7 +808,9 @@ component {
 
     /**
      * Dispatch a single command to "any one" host — used for operations
-     * that only need to happen once across the fleet (lock acquire/release).
+     * that only need to happen once across the fleet (proxy boot check).
+     * NOT suitable for the deploy lock: onAny swallows per-host failures,
+     * which is exactly the multi-host lock bypass fixed in ##2957 DEP-1.
      * FakeSshPool.onAny records exactly one call.
      */
     private void function $dispatchAny(

@@ -3,6 +3,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     function beforeAll() {
         variables.fixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml");
         variables.proxyFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-proxy.yml");
+        variables.multiHostFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/multi-host.yml");
         variables.multiRoleFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml");
         variables.accessoriesFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-accessories.yml");
     }
@@ -588,6 +589,67 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 }
             });
 
+            // Regression suite for the ##2957 review: the ##2696 guard above only
+            // scripts an exit-code release failure, which {raise: false} already
+            // tolerates. A TRANSPORT failure (host died mid-deploy, the cached
+            // connection's startSession throws inside the release) used to
+            // propagate out of the finally block and REPLACE the in-flight
+            // deploy exception — the operator saw a connect error instead of
+            // the real deploy failure, and the post-deploy-failure hook got the
+            // wrong KAMAL_ERROR.
+
+            it("a transport-dead lock release in the finally block does not mask the original deploy exception", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                // The same host then drops off the network: the release in the
+                // finally dies in the SSH transport, not in an exit code.
+                fake.expect("1.2.3.4", lockCmds.release(), {transportError: "Broken pipe"});
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var state = {threw = false, errType = "", errMsg = "", logged = ""};
+                savecontent variable="state.logged" {
+                    try {
+                        dc.deploy({configPath: variables.fixture, version: "v1"});
+                    } catch (any e) {
+                        state.threw = true;
+                        state.errType = e.type;
+                        state.errMsg = e.message;
+                    }
+                }
+                expect(state.threw).toBeTrue();
+                expect(state.errType).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                expect(state.errMsg).toInclude("docker pull");
+                // ...and the skipped release is logged, not thrown.
+                expect(state.logged).toInclude("[lock:release]");
+                expect(state.logged).toInclude("1.2.3.4");
+            });
+
+            it("a transport-dead host during the finally lock release does not fail an otherwise-successful deploy and still releases the rest", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.multiHostFixture);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                fake.expect("10.0.0.1", lockCmds.release(), {transportError: "Connection reset"});
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var state = {out = "", logged = ""};
+                savecontent variable="state.logged" {
+                    state.out = dc.deploy({configPath: variables.multiHostFixture, version: "v1"});
+                }
+                expect(state.out).toInclude("Deployed");
+                // Host 2's lock was still released even though host 1 dropped.
+                var releaseHosts = [];
+                for (var c in fake.calls()) {
+                    if (findNoCase("rm -f ", c.cmd ?: "") && findNoCase("kamal_deploy_lock_demo", c.cmd ?: "")) {
+                        arrayAppend(releaseHosts, c.host);
+                    }
+                }
+                expect(releaseHosts).toInclude("10.0.0.2");
+                expect(state.logged).toInclude("[lock:release] 10.0.0.1");
+            });
+
             // Regression suite for #3087 — a failing post-deploy-failure hook used to
             // throw DeployMainCli.HookFailed from inside the deploy catch block,
             // replacing the original deploy error. The hook fires on an already-failed
@@ -709,6 +771,96 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 });
                 expect(out).toInclude("--target demo-web-v1:80");
                 expect(out).notToInclude(":3000");
+            });
+
+            // env.secret delivery (#2957, Wave 2b) — deploy writes a remote env
+            // file (600 perms) per role and references it via --env-file. Secret
+            // values travel only over SFTP (uploadString); they never appear in
+            // any command string, dry-run line, or exception summary.
+
+            it("deploy writes the env file (600 perms) before docker run and keeps secret values out of argv (##2957)", () => {
+                var proj = $makeSecretProject();
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                    dc.deploy({configPath: proj.config, version: "v1"});
+
+                    var calls = fake.calls();
+                    var ensureIdx = 0; var uploadIdx = 0; var relockIdx = 0; var runIdx = 0;
+                    for (var i = 1; i <= arrayLen(calls); i++) {
+                        var cmd = calls[i].cmd ?: "";
+                        if (!ensureIdx && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) ensureIdx = i;
+                        if (!uploadIdx && (calls[i].kind ?: "") == "uploadString") uploadIdx = i;
+                        // Post-upload re-lock: the SFTP layer may reset perms
+                        // (sshj preserve-attributes), so a second chmod 600
+                        // must follow the upload (##2957).
+                        if (uploadIdx && i > uploadIdx && !relockIdx
+                            && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) relockIdx = i;
+                        // Match the APP run specifically — the proxy boot
+                        // fallback (details() || boot()) also contains a
+                        // `docker run --detach`, dispatched before this.
+                        if (!runIdx && findNoCase("docker run --detach", cmd)
+                            && find("--name demo-web-v1", cmd)) runIdx = i;
+                    }
+                    // ensure (mkdir+touch+chmod 600) → upload → re-lock
+                    // (chmod 600) → docker run, in order.
+                    expect(ensureIdx).toBeGT(0);
+                    expect(uploadIdx).toBeGT(ensureIdx);
+                    expect(relockIdx).toBeGT(uploadIdx);
+                    expect(runIdx).toBeGT(relockIdx);
+
+                    // The upload carries the resolved value to the role env file.
+                    expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/roles/web.env");
+                    expect(calls[uploadIdx].content).toInclude("APP_SECRET=s3cr3t-value-42");
+
+                    // docker run references the env file; the value appears in NO command.
+                    expect(calls[runIdx].cmd).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    for (var c in calls) {
+                        expect(c.cmd ?: "").notToInclude("s3cr3t-value-42");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
+
+            it("deploy --dry-run notes the env-file upload by name only — values never shown (##2957)", () => {
+                var proj = $makeSecretProject();
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                    var out = dc.deploy({configPath: proj.config, version: "v1", dryRun: true});
+                    expect(arrayLen(fake.calls())).toBe(0);
+                    expect(out).toInclude("chmod 600");
+                    expect(out).toInclude(".kamal/apps/demo/env/roles/web.env");
+                    expect(out).toInclude("APP_SECRET");
+                    expect(out).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    expect(out).notToInclude("s3cr3t-value-42");
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
+
+            it("deploy fails fast with Wheels.Deploy.EnvSecretMissing before any remote call when a secret can't be resolved (##2957)", () => {
+                var proj = $makeSecretProject("UNDECLARED_KEY");
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                    var state = {threw: false, message: ""};
+                    try {
+                        dc.deploy({configPath: proj.config, version: "v1"});
+                    } catch (Wheels.Deploy.EnvSecretMissing e) {
+                        state.threw = true;
+                        state.message = e.message;
+                    }
+                    expect(state.threw).toBeTrue();
+                    expect(state.message).toInclude("UNDECLARED_KEY");
+                    // No lock acquired, nothing dispatched — fail-fast happens locally.
+                    expect(arrayLen(fake.calls())).toBe(0);
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
             });
 
             // Regression suite for #2957 (Wave 2a) — fresh-host bootstrap.
@@ -1011,6 +1163,28 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     private boolean function $anyInclude(required array arr, required string needle) {
         for (var s in arguments.arr) if (findNoCase(arguments.needle, s)) return true;
         return false;
+    }
+
+    /**
+     * Scaffold a temp project with config/deploy.yml declaring env.secret
+     * and a .kamal/secrets file resolving APP_SECRET. Pass a different
+     * secretName to declare a key the secrets file does NOT resolve.
+     */
+    private struct function $makeSecretProject(string secretName = "APP_SECRET") {
+        var root = getTempDirectory() & "/wheels-2957-envfile-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "env: {clear: {DB_HOST: db.internal}, secret: [" & arguments.secretName & "]}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "APP_SECRET=s3cr3t-value-42#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
     }
 
     private array function $cmds(required any fake) {

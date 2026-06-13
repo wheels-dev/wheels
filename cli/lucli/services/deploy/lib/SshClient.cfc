@@ -221,6 +221,24 @@ component {
 		variables.$loader.withIsolatedTCCL(() => {
 			var sftp = sshjRef.newSFTPClient();
 			try {
+				// sshj's SFTPFileTransfer defaults preserveAttributes=true,
+				// which "preserves" the LOCAL file's attributes onto the
+				// remote after the transfer — and FileSystemFile
+				// .getPermissions() hardcodes 0644 for regular files
+				// (verified against the bundled sshj-0.39.0 bytecode). Left
+				// on, every put() would chmod the remote file to 0644,
+				// silently undoing any stricter mode set before the upload
+				// (e.g. the chmod 600 the env-file delivery flow applies
+				// before secret content lands — #2957). An upload must never
+				// touch remote permissions, so switch it off.
+				//
+				// NOTE: FakeSshPool cannot regression-test this — it records
+				// upload/uploadString calls without SFTP attribute semantics,
+				// so a fake-pool spec stays green whether or not this line
+				// exists. The $deliverEnvFile callers also dispatch a
+				// post-upload `chmod 600` re-lock as belt-and-braces, which
+				// the fake-pool specs DO pin.
+				sftp.getFileTransfer().setPreserveAttributes(javaCast("boolean", false));
 				sftp.put(localRef, remoteRef);
 			} finally {
 				sftp.close();

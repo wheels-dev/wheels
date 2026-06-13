@@ -899,12 +899,15 @@ component extends="modules.BaseModule" {
 		}
 
 		out("Application reloaded successfully.", "green");
-		// Surface the hot-vs-cold reload contract — Wheels does NOT
-		// re-fire onApplicationStart on `?reload=true`. Users editing
-		// app/events/onapplicationstart.cfm or config/services.cfm need
-		// a full restart. See finding #8 in the 2026-04-29 fresh-VM
-		// triage.
-		out("Note: onApplicationStart does NOT re-fire. For init-code edits, run `wheels stop && wheels start`.", "cyan");
+		// Surface the actual reload contract (verified live on Lucee 7,
+		// see #3110): an authorized `?reload=true&password=...` calls
+		// applicationStop(), so the next request re-fires onApplicationStart
+		// in full — app/events/onapplicationstart.cfm, config/services.cfm,
+		// and the PackageLoader all re-run. Caveat: the restart only
+		// happens when the reload password resolves; a missing or wrong
+		// password silently serves the request without restarting
+		// (#3059 / #3062).
+		out("Note: an authorized reload re-fires onApplicationStart (re-runs config/services.cfm and the package loader). A missing or wrong reload password silently skips the restart.", "cyan");
 		verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
 		return "";
 	}

@@ -45,24 +45,70 @@ component {
     }
 
     /**
-     * Fail fast on a non-empty `env.secret` block: wheels deploy has no
-     * env-file delivery mechanism yet, so declared secrets would silently
-     * never reach the container — and the natural workaround (moving them
-     * to env.clear) would funnel them into plaintext remote argv. Secret
-     * NAMES only are surfaced; values are never read (##2956). Env-file
-     * delivery is tracked in ##2957. An empty `secret: []` stays a no-op.
+     * Render docker --env-file content (KEY=value lines) for the declared
+     * `env.secret` names from an already-resolved secrets map (SecretResolver
+     * .all()). Pure string building — resolution I/O happened at config load.
+     *
+     * Values are escaped Kamal-style for docker's env-file parser (one line
+     * per key, no quoting layer): backslash doubled, then any newline form
+     * (CRLF / LF / CR) collapsed to a literal `\n` sequence. Docker hands the
+     * two-character sequence through verbatim, exactly as Ruby Kamal does.
+     *
+     * A declared name the resolver can't supply throws
+     * Wheels.Deploy.EnvSecretMissing listing the MISSING names only —
+     * resolvable keys and all values stay out of the message (##2956/##2957).
      */
-    public void function $rejectEnvSecrets(required any env) {
-        var secretNames = arguments.env.secret();
-        if (arrayLen(secretNames)) {
+    public string function env_file_content(
+        required array secretNames,
+        required struct resolved
+    ) {
+        var lines = [];
+        var missing = [];
+        for (var name in arguments.secretNames) {
+            if (!structKeyExists(arguments.resolved, name)) {
+                arrayAppend(missing, name);
+                continue;
+            }
+            var v = toString(arguments.resolved[name]);
+            v = replace(v, "\", "\\", "all");
+            v = replace(v, chr(13) & chr(10), "\n", "all");
+            v = replace(v, chr(10), "\n", "all");
+            v = replace(v, chr(13), "\n", "all");
+            arrayAppend(lines, name & "=" & v);
+        }
+        if (arrayLen(missing)) {
             throw(
-                type = "Wheels.Deploy.EnvSecretUnsupported",
-                message = "env.secret is not yet delivered to containers by wheels deploy — "
-                    & "declared secret(s) [" & arrayToList(secretNames, ", ")
-                    & "] would be silently omitted. Remove the env.secret block for now; "
-                    & "env-file delivery is tracked in wheels-dev/wheels ##2957.",
-                detail = "Secret names are listed by name only; their values are never read or printed."
+                type = "Wheels.Deploy.EnvSecretMissing",
+                message = "env.secret declares [" & arrayToList(missing, ", ")
+                    & "] but no value resolved from .kamal/secrets (or its destination overlay). "
+                    & "Add the key(s) there — values may use $(cmd) substitution.",
+                detail = "Unresolved secret keys are listed by name only; values are never read or printed."
             );
         }
+        return arrayToList(lines, chr(10)) & chr(10);
+    }
+
+    /**
+     * Command that prepares a remote env file before its content is uploaded:
+     * create the directory, create the file, and lock it to 600 perms FIRST so
+     * the secret content never lands in a world-readable window. Runs before
+     * SshClient.uploadString writes the content over SFTP (##2957).
+     */
+    public string function $ensureEnvFileCmd(required string dir, required string path) {
+        return "mkdir -p " & shellEscape(arguments.dir)
+            & " && touch " & shellEscape(arguments.path)
+            & " && chmod 600 " & shellEscape(arguments.path);
+    }
+
+    /**
+     * Command that re-locks a remote env file to 600 perms AFTER its content
+     * is uploaded. Belt-and-braces for the SFTP layer: sshj's file transfer
+     * can apply local-file attributes (0644) to the remote on put — SshClient
+     * disables that (setPreserveAttributes(false)), but the real SFTP
+     * behavior is unverifiable through FakeSshPool, so the delivery flow also
+     * dispatches this re-lock and the specs pin it (##2957).
+     */
+    public string function $relockEnvFileCmd(required string path) {
+        return "chmod 600 " & shellEscape(arguments.path);
     }
 }

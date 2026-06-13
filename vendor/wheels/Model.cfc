@@ -677,6 +677,8 @@ component output="false" displayName="Model" extends="wheels.Global"{
 	
 	function onDIcomplete(){
 		$engineAdapter().prepareDIComplete(variables, this);
-		new wheels.Plugins().$initializeMixins(variables);
+		// Shared application-cached instance — constructing wheels.Plugins here
+		// paid the full Global pseudo-constructor per materialized row (issue 2897).
+		$pluginObj().$initializeMixins(variables);
 	}
 }

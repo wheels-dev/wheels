@@ -29,14 +29,17 @@ component extends="Base" {
     public string function acquire(required struct opts) {
         var user = arguments.opts.user ?: "unknown";
         var message = arguments.opts.message ?: "";
-        // $(hostname) and $(date ...) resolved by the remote shell; user and
-        // message are escaped by surrounding the whole target in single
-        // quotes so shell metacharacters don't blow up the ln command.
-        // Inner single quotes in either value are closed and re-opened
-        // ( "'\''").
-        var safeUser = replace(user, "'", "'\''", "all");
-        var safeMessage = replace(message, "'", "'\''", "all");
-        var target = "'" & safeUser & "@$(hostname)/$(date --iso-8601=seconds)/" & safeMessage & "'";
+        // The symlink target is three concatenated shell words: the single-
+        // quoted (inert) user, a double-quoted middle segment whose
+        // $(hostname) and $(date ...) ARE resolved by the remote shell, and
+        // the single-quoted (inert) message. Adjacent quoted segments join
+        // into one argument, so metacharacters in user/message can't execute
+        // while the metadata substitutions still expand. Previously the whole
+        // target was single-quoted, which suppressed command substitution and
+        // recorded the literal "$(hostname)" text (##2957 DEP-10).
+        var target = shellEscape(user)
+            & """@$(hostname)/$(date --iso-8601=seconds)/"""
+            & shellEscape(message);
         return "ln -s " & target & " " & lockPath();
     }
 

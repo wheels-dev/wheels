@@ -128,6 +128,70 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(threw).toBeFalse();
             });
 
+            // Transport-failure modeling — mirrors the REAL pool's semantics so
+            // specs can exercise unreachable-host paths (##2957 review follow-up):
+            //   - onEach pre-resolves every connection first, so one dead host
+            //     aborts the whole fan-out with zero commands executed;
+            //   - sequential resolves lazily, so earlier hosts already ran;
+            //   - onAny catches per host and falls through to the next;
+            //   - a scripted `transportError` result throws from run() itself,
+            //     regardless of {raise: false} (dead cached connection).
+
+            it("failConnection makes onEach abort wholesale before any command runs (mirrors real pre-resolve)", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                p.failConnection("h2");
+                expect(() => p.onEach(["h1", "h2"], function(ssh, host) { ssh.run("x"); }))
+                    .toThrow(type="FakeSshPool.ConnectionFailure");
+                expect(arrayLen(p.calls())).toBe(0);
+            });
+
+            it("failConnection makes sequential fail at that host after earlier hosts ran", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                p.failConnection("h2", "No route to host");
+                var state = {threw = false, errMsg = ""};
+                try {
+                    p.sequential(["h1", "h2", "h3"], function(ssh, host) { ssh.run("x"); });
+                } catch (any e) {
+                    state.threw = true;
+                    state.errMsg = e.message;
+                }
+                expect(state.threw).toBeTrue();
+                expect(state.errMsg).toInclude("No route to host");
+                expect(arrayLen(p.calls())).toBe(1);
+                expect(p.calls()[1].host).toBe("h1");
+            });
+
+            it("failConnection makes onAny skip to the next host", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                p.failConnection("h1");
+                p.onAny(["h1", "h2"], function(ssh, host) { ssh.run("x"); });
+                expect(arrayLen(p.calls())).toBe(1);
+                expect(p.calls()[1].host).toBe("h2");
+            });
+
+            it("onAny rethrows the last error when every host is unreachable", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                p.failConnection("h1");
+                p.failConnection("h2", "last one");
+                var state = {threw = false, errMsg = ""};
+                try {
+                    p.onAny(["h1", "h2"], function(ssh, host) { ssh.run("x"); });
+                } catch (any e) {
+                    state.threw = true;
+                    state.errMsg = e.message;
+                }
+                expect(state.threw).toBeTrue();
+                expect(state.errMsg).toInclude("last one");
+            });
+
+            it("a scripted transportError throws from run regardless of raise=false", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                p.expect("h1", "rm -f /lock", {transportError: "Broken pipe"});
+                expect(() => p.onEach(["h1"], function(ssh, host) {
+                    ssh.run("rm -f /lock", {raise: false});
+                })).toThrow(type="FakeSshPool.TransportFailure", regex="Broken pipe");
+            });
+
             it("inline run trims very long stderr in the thrown error detail", () => {
                 var p = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var longErr = repeatString("x", 800);

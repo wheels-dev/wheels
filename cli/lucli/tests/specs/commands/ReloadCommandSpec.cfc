@@ -5,6 +5,13 @@
  * a spec (see finding #8 in
  * docs/superpowers/plans/2026-04-29-fresh-vm-onboarding-findings.md).
  *
+ * Contract (verified live on Lucee 7, see #3110): an authorized
+ * `?reload=true&password=...` calls applicationStop(), so the next request
+ * re-fires onApplicationStart in full — config/services.cfm and the
+ * PackageLoader re-run. The earlier "does NOT re-fire" note was wrong; it
+ * stemmed from reloads whose password never resolved (a missing/wrong
+ * password silently skips the restart, see #3059 / #3062).
+ *
  * The #3059 blocks cover reporting honesty: reload() used to print
  * "Application reloaded successfully." whenever the HTTP exchange completed,
  * never inspecting the status code. The framework's reload gate restarts the
@@ -60,10 +67,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("wheels reload — output hints", () => {
 
-			it("emits a note that onApplicationStart does NOT re-fire on a hot reload", () => {
+			it("emits a note that an authorized reload re-fires onApplicationStart", () => {
 				var moduleSource = fileRead(expandPath("/cli/lucli/Module.cfc"));
-				expect(moduleSource).toInclude("onApplicationStart does NOT re-fire");
-				expect(moduleSource).toInclude("wheels stop && wheels start");
+				expect(moduleSource).toInclude("re-fires onApplicationStart");
+				// The old, false claim must be gone.
+				expect(moduleSource).notToInclude("onApplicationStart does NOT re-fire");
 			});
 
 			it("honors an explicit --password override before falling back to auto-detect", () => {
