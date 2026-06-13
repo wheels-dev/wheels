@@ -442,6 +442,8 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 
 	function onDIcomplete(){
 		$engineAdapter().prepareDIComplete(variables, this);
-		new wheels.Plugins().$initializeMixins(variables);
+		// Shared application-cached instance — constructing wheels.Plugins here
+		// paid the full Global pseudo-constructor on every request (issue 2897).
+		$pluginObj().$initializeMixins(variables);
 	}
 }
