@@ -10,20 +10,27 @@
 	// Added via Wheels CLI
 	this.name = "starterApp";
 
+	// H2 embedded database — boots out of the box with no .env or external
+	// database server. The H2 driver (org.h2.Driver) is bundled with Lucee, so
+	// it works on a plain `box install` / CommandBox install without any extra
+	// JDBC driver. MODE=MySQL gives MySQL-compatible SQL. Data files live under
+	// db/h2/. Run `wheels migrate latest` after install to create the schema.
+	//
+	// To use a server-based database (MySQL/PostgreSQL/etc.) instead, copy
+	// .env.example to .env, fill in your credentials, and swap the datasource
+	// definition below for one that reads this.env.DB_* (see .env.example for
+	// the full set of keys).
 	this.datasources["starterApp"] = {
-		class: this.env.DB_CLASS, 
-		bundleName: this.env.DB_BUNDLENAME, 
-		bundleVersion: this.env.DB_BUNDLEVERSION,
-		connectionString: "jdbc:mysql://#this.env.DB_HOST#:#this.env.DB_PORT#/#this.env.DB_NAME#?characterEncoding=UTF-8&serverTimezone=UTC&maxReconnects=3",
-		username: this.env.DB_USER,
-		password: "encrypted:#this.env.DB_PASSWORD#",
-		
-		// optional settings
-		connectionLimit: val(this.env.DB_CONNECTIONLIMIT), // default:-1
-		liveTimeout: val(this.env.DB_LIVETIMEOUT), // default: -1; unit: minutes
-		alwaysSetTimeout: this.env.DB_ALWAYSSETTIMEOUT EQ "true", // default: false
-		validate: this.env.DB_VALIDATE EQ "true" // default: false
-		
+		class: "org.h2.Driver",
+		connectionString: "jdbc:h2:file:" & expandPath("../db/h2/starterApp") & ";MODE=MySQL",
+		username: "sa"
+	};
+
+	// Test database datasource (used by the app test suite).
+	this.datasources["starterApp_test"] = {
+		class: "org.h2.Driver",
+		connectionString: "jdbc:h2:file:" & expandPath("../db/h2/starterApp_test") & ";MODE=MySQL",
+		username: "sa"
 	};
 
 	// buffer the output of a tag/function body to output in case of a exception
