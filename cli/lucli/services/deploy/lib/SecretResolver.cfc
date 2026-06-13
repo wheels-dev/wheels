@@ -38,6 +38,11 @@ component {
         // (e.g. a non-standard Git Bash install on Windows). Also the
         // seam the BashUnavailable spec uses.
         variables.bashCmd = arguments.opts.bashCmd ?: "bash";
+        // Upper bound on resolution, in seconds (#2957): a command inside
+        // the secrets file that blocks on interactive input — `op read`
+        // prompting for sign-in, `bw get` waiting to unlock — used to hang
+        // the deploy thread forever on an unbounded waitFor()/stdout read.
+        variables.timeoutSeconds = arguments.opts.timeoutSeconds ?: 60;
         variables.resolved = $loadAll();
         return this;
     }
@@ -165,7 +170,7 @@ component {
         // the stderr write while we block on the stdout read. A file sink
         // never fills, so bash always runs to completion. Secret values
         // travel on stdout (read in-memory); only diagnostics touch disk,
-        // and the file is deleted in the finally block even when waitFor()
+        // and the file is deleted in the finally block even when the drain
         // or the throw paths interrupt the happy path.
         var errPath = getTempFile(getTempDirectory(), "wheels-secret-err");
         try {
@@ -181,7 +186,9 @@ component {
                     detail = "Secret resolution requires a local bash for $(cmd) expansion. On Windows, run inside WSL or Git Bash."
                 );
             }
-            var out = $readStream(proc.getInputStream());
+            var out = $drainWithDeadline(proc);
+            // The drain only returns once the process has exited, so this
+            // waitFor() is an immediate exit-code read, not a blocking wait.
             var exitCode = proc.waitFor();
             var err = fileExists(errPath) ? fileRead(errPath, "UTF-8") : "";
             return {exitCode: exitCode, out: out, err: err};
@@ -190,12 +197,43 @@ component {
         }
     }
 
-    private string function $readStream(required any inputStream) {
-        var scanner = createObject("java", "java.util.Scanner").init(arguments.inputStream, "UTF-8");
-        scanner.useDelimiter("\A");
-        var content = scanner.hasNext() ? scanner.next() : "";
-        scanner.close();
-        return content;
+    /**
+     * Drain the process's stdout to completion, bounded by
+     * variables.timeoutSeconds (#2957). The previous shape — a blocking
+     * read-to-EOF followed by an unbounded waitFor() — hung the deploy
+     * thread forever when a command inside the secrets file blocked on
+     * interactive input while holding stdout open. Polling `available()`
+     * against a deadline bounds both hang shapes (silent never-exits AND
+     * endless streamers); on expiry the bash process is force-killed and
+     * a clear ResolutionFailed surfaces.
+     */
+    private string function $drainWithDeadline(required any proc) {
+        var deadlineAt = getTickCount() + (variables.timeoutSeconds * 1000);
+        var stdoutStream = arguments.proc.getInputStream();
+        var buffer = createObject("java", "java.io.ByteArrayOutputStream").init();
+        while (arguments.proc.isAlive()) {
+            if (getTickCount() >= deadlineAt) {
+                arguments.proc.destroyForcibly();
+                throw(
+                    type = "SecretResolver.ResolutionFailed",
+                    message = "Resolving .kamal/secrets timed out after " & variables.timeoutSeconds
+                        & " second(s) — a command inside the secrets file may be waiting for"
+                        & " interactive input (e.g. a credential manager prompting for sign-in)."
+                        & " The bash process was killed.",
+                    detail = "Sign in to the secret manager in a terminal first, or raise the limit"
+                        & " via SecretResolver init opts.timeoutSeconds for legitimately slow commands."
+                );
+            }
+            var avail = stdoutStream.available();
+            if (avail > 0) {
+                buffer.writeBytes(stdoutStream.readNBytes(avail));
+            } else {
+                sleep(25);
+            }
+        }
+        // Process exited — anything left in the pipe reads to EOF instantly.
+        buffer.writeBytes(stdoutStream.readAllBytes());
+        return buffer.toString("UTF-8");
     }
 
     private string function $shellEscape(required string path) {

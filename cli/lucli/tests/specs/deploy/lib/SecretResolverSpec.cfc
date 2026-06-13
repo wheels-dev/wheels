@@ -135,6 +135,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 }).toThrow(type="SecretResolver.ResolutionFailed");
             });
 
+            // #2957 — $runBash had an unbounded proc.waitFor()/stdout read, so a
+            // secrets command blocking on interactive input (op/bw prompting for
+            // sign-in) hung the deploy thread forever. Resolution is now bounded
+            // by opts.timeoutSeconds (default 60); on expiry the bash process is
+            // killed and a clear ResolutionFailed surfaces.
+            it("throws ResolutionFailed when a secrets command hangs past the timeout (##2957)", () => {
+                fileWrite(variables.tempRoot & "/.kamal/secrets", "SLOW=$(sleep 30)");
+                var startedAt = getTickCount();
+                expect(() => {
+                    new cli.lucli.services.deploy.lib.SecretResolver({
+                        projectRoot: variables.tempRoot,
+                        timeoutSeconds: 1
+                    });
+                }).toThrow(type="SecretResolver.ResolutionFailed", regex="timed out");
+                // The hang must be cut at the deadline, not ridden out to the
+                // command's own 30s completion.
+                expect(getTickCount() - startedAt).toBeLT(10000);
+            });
+
             it("throws BashUnavailable when bash cannot be launched", () => {
                 fileWrite(variables.tempRoot & "/.kamal/secrets", "FOO=bar");
                 expect(() => {

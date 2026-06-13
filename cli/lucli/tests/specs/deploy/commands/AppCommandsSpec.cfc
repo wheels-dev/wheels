@@ -161,6 +161,32 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(state.message).notToInclude("PRESENT");
             });
 
+            // #2957 DEP-11a — `docker run --name X` hard-fails when ANY container
+            // (running or stopped) already holds the name, which is the guaranteed
+            // state on a same-version redeploy. The conflict guard must be exact-name
+            // anchored and a no-op when nothing matches (xargs -r).
+            it("remove_conflicting() force-removes an existing same-name container, idempotently (##2957 DEP-11a)", () => {
+                var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
+                    .remove_conflicting(variables.cfg.roles()[1], "v1");
+                expect(cmd).toInclude("docker container ls --all");
+                expect(cmd).toInclude("--filter name=^demo-web-v1$");
+                expect(cmd).toInclude("--quiet");
+                expect(cmd).toInclude("xargs -r docker container rm --force");
+            });
+
+            // #2957 DEP-11a — superseded containers were never stopped after
+            // cutover, so every old version kept running (and restarting) forever.
+            it("stop_old_versions() stops same-role containers except the current version (##2957 DEP-11a)", () => {
+                var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
+                    .stop_old_versions(variables.cfg.roles()[1], "v2");
+                expect(cmd).toInclude("docker ps");
+                expect(cmd).toInclude("--filter label=service=demo");
+                expect(cmd).toInclude("--filter label=role=web");
+                expect(cmd).toInclude("--filter label=destination=");
+                expect(cmd).toInclude("grep -v '^demo-web-v2$'");
+                expect(cmd).toInclude("xargs -r docker stop");
+            });
+
             it("remove() chains docker stop and docker rm", () => {
                 var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
                     .remove(variables.cfg.roles()[1], "v9");

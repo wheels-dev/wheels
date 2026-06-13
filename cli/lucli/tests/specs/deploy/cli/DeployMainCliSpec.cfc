@@ -961,6 +961,59 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("--name demo-web-v1");
             });
 
+            // Regression suite for #2957 (Wave 4 roll-ups).
+            // (DEP-11a) deploy() issued `docker run --name <service>-<role>-<version>`
+            // with no prior conflict removal — a same-version redeploy hit a
+            // guaranteed name conflict — and superseded containers were never
+            // stopped after cutover. (rollback --destination) rollback() was the
+            // last loader.load() call site not forwarding the destination overlay
+            // (same defect class as the config() fix in #3085).
+
+            it("deploy removes a conflicting same-name container before docker run (##2957 DEP-11a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cmds = $cmds(fake);
+                var rmIdx = 0; var runIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!rmIdx && findNoCase("name=^demo-web-v1$", cmds[i])
+                        && findNoCase("docker container rm --force", cmds[i])) rmIdx = i;
+                    // "--name demo-web-v1" pins the APP container run — the
+                    // proxy's start_or_run also embeds a "docker run --detach".
+                    if (!runIdx && findNoCase("docker run --detach", cmds[i])
+                        && findNoCase("--name demo-web-v1", cmds[i])) runIdx = i;
+                }
+                expect(rmIdx).toBeGT(0);
+                expect(runIdx).toBeGT(rmIdx);
+            });
+
+            it("deploy stops superseded versions after the proxy cutover (##2957 DEP-11a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cmds = $cmds(fake);
+                var proxyIdx = 0; var stopOldIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!proxyIdx && findNoCase("kamal-proxy deploy", cmds[i])) proxyIdx = i;
+                    if (!stopOldIdx && findNoCase("grep -v '^demo-web-v1$'", cmds[i])
+                        && findNoCase("xargs -r docker stop", cmds[i])) stopOldIdx = i;
+                }
+                expect(proxyIdx).toBeGT(0);
+                expect(stopOldIdx).toBeGT(proxyIdx);
+            });
+
+            it("a failing old-version stop does not fail an otherwise-complete deploy (##2957 DEP-11a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+                fake.expect("1.2.3.4", app.stop_old_versions(cfg.roles()[1], "v1"), {
+                    exitCode: 1, stdout: "", stderr: "Cannot connect to the Docker daemon"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({configPath: variables.fixture, version: "v1"});
+                expect(out).toInclude("Deployed");
+            });
+
             // Regression suite for #2957 (Wave 3 — observability). (DEP-6a) the
             // dispatch closures dropped every ssh.run() result, so read verbs
             // (`audit`, `details`) returned only host-count summaries in live
@@ -1057,6 +1110,34 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
                 var out = dc.deploy({configPath: variables.fixture, version: "v1"});
                 expect(out).toInclude("Deployed");
+            });
+
+            it("rollback --dry-run applies the destination overlay (##2957, same class as ##3085)", () => {
+                var base = getTempFile(getTempDirectory(), "yml");
+                fileWrite(
+                    base,
+                    "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [192.0.2.10]"
+                        & "#chr(10)#registry: {username: u, password: [X]}"
+                );
+                var overlay = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .$overlayPathFor(base, "staging");
+                fileWrite(overlay, "servers:#chr(10)#  - 192.0.2.99");
+                try {
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    var out = dc.rollback({
+                        configPath: base,
+                        destination: "staging",
+                        version: "v1",
+                        dryRun: true
+                    });
+                    expect(out).toInclude("192.0.2.99");
+                    expect(out).notToInclude("192.0.2.10");
+                } finally {
+                    fileDelete(base);
+                    fileDelete(overlay);
+                }
             });
 
             // Regression for #2671 — git's stderr ("fatal: not a git repository...") used to leak through as the version string.

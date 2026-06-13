@@ -29,6 +29,43 @@ component extends="Base" {
         );
     }
 
+    /**
+     * Idempotent same-name conflict guard (#2957 DEP-11a): `docker run
+     * --name X` hard-fails when ANY container — running or stopped —
+     * already holds the name, which is the guaranteed state on a
+     * same-version redeploy. The name filter is regex-anchored for an
+     * exact match and `xargs -r` makes the whole pipeline a no-op
+     * (exit 0) when nothing matches.
+     */
+    public string function remove_conflicting(required any role, required string version) {
+        return pipe([
+            docker("container", "ls", "--all",
+                   "--filter name=^#container_name(arguments.role, arguments.version)#$",
+                   "--quiet"),
+            "xargs -r docker container rm --force"
+        ]);
+    }
+
+    /**
+     * Stop every superseded version of this role's container after the
+     * proxy cutover (#2957 DEP-11a) — previously old versions kept
+     * running (and auto-restarting) forever. Scoped by the same
+     * service/role/destination labels $labelArgs stamps on at run time;
+     * the just-deployed container is excluded by exact name. `xargs -r`
+     * keeps a first deploy (no old versions) a no-op.
+     */
+    public string function stop_old_versions(required any role, required string version) {
+        return pipe([
+            docker("ps",
+                   "--filter label=service=#variables.config.service()#",
+                   "--filter label=role=#arguments.role.name()#",
+                   "--filter label=destination=#variables.config.destination()#",
+                   "--format {{.Names}}"),
+            "grep -v '^#container_name(arguments.role, arguments.version)#$'",
+            "xargs -r docker stop"
+        ]);
+    }
+
     public string function start(required any role, required string version) {
         return docker("start", container_name(arguments.role, arguments.version));
     }

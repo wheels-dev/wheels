@@ -56,6 +56,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cli.extract({key: "", from: "FOO=bar"})).toBe("");
             });
 
+            // #2957 DEP-11b — CFML `==` is case-insensitive, so `extract path`
+            // matched the PATH line. Kamal's extract is an exact (case-sensitive)
+            // key match; env var names are case-sensitive in every shell.
+            it("extract key match is case-sensitive (##2957 DEP-11b)", () => {
+                var cli = new cli.lucli.services.deploy.cli.DeploySecretsCli();
+                var block = "PATH=/usr/bin" & chr(10) & "path=lower-value";
+                expect(cli.extract({key: "path", from: block})).toBe("lower-value");
+                expect(cli.extract({key: "PATH", from: block})).toBe("/usr/bin");
+                expect(cli.extract({key: "Path", from: block})).toBe("");
+            });
+
             it("extract skips malformed lines that start with '='", () => {
                 // left(line, 0) on a keyless '=...' line crashes Lucee 7
                 // (Cross-Engine Invariant 8); such lines must be skipped.
