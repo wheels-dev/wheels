@@ -1,0 +1,154 @@
+---
+title: Installing with CommandBox
+description: Install and serve the Wheels framework from ForgeBox with CommandBox. Supported as a server manager and package fetcher — not as the Wheels developer CLI.
+type: howto
+sidebar:
+  order: 7
+---
+
+import { Aside, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+[CommandBox](https://www.ortussolutions.com/products/commandbox) is Ortus Solutions' CFML package manager and server runner. Wheels publishes its framework artifacts to [ForgeBox](https://forgebox.io/), so you can install and serve a Wheels app with `box` alone — no `wheels` CLI required.
+
+This page exists because CommandBox-centric 2.x/3.x teams need a clear answer to one question: **what is my supported workflow on Wheels 4?**
+
+## What CommandBox is supported for
+
+In Wheels 4, CommandBox is supported as a **server manager and package fetcher** — and that's the whole of it.
+
+| You want to… | CommandBox? | Tool |
+|---|---|---|
+| Install the framework from ForgeBox | **Yes** | `box install wheels-base-template` |
+| Run a CFML server (Lucee / Adobe CF / BoxLang) | **Yes** | `box server start` |
+| Vendor `wheels-core` into an existing app | **Yes** | `box install wheels-core` |
+| Scaffold an app, generators, migrate, test, console | **No** | the [`wheels` CLI](/v4-0-0/start-here/installing/) |
+| The packages registry, MCP server, deploy | **No** | the [`wheels` CLI](/v4-0-0/start-here/installing/) |
+
+The short version: **CommandBox gets you the framework and a running server. Reach for the [`wheels` CLI](/v4-0-0/start-here/installing/) for scaffolding** — generators, `wheels migrate`, `wheels test`, `wheels console`, the MCP server, the [packages registry](/v4-0-0/digging-deeper/packages/), and `wheels deploy`. None of those run through CommandBox.
+
+<Aside type="note" title="Two different package systems">
+ForgeBox (CommandBox) ships the *framework itself* — `wheels-core` and the app template. The Wheels **packages registry** (`wheels packages ...`) is a separate, `wheels`-CLI-only system for first-party add-ons like `wheels-hotwire` and `wheels-basecoat`. It is **not** on ForgeBox. See [Packages](/v4-0-0/digging-deeper/packages/).
+</Aside>
+
+## The ForgeBox packages
+
+Every stable Wheels release publishes four packages to ForgeBox (see `.github/workflows/release.yml`):
+
+| Slug | What it is |
+|---|---|
+| `wheels-base-template` | The full app skeleton. Declares `wheels-core` as a dependency, so installing it pulls the framework into `vendor/wheels/` too. **Start here.** |
+| `wheels-core` | The framework core only — installs into `vendor/wheels/`. Use it to vendor or upgrade the framework inside an existing app. |
+| `wheels-cli` | The **deprecated** legacy CommandBox CLI module. Predates 4.0 and does not know the 4.0 commands — see below. |
+| `wheels-starter-app` | A pre-built sample app for demos and experiments. |
+
+All four track the current release version (4.0.x at time of writing).
+
+## Supported: install the framework
+
+<Steps>
+
+1. Install CommandBox if you don't have it:
+
+   ```bash title="illustrative — install CommandBox"
+   # macOS
+   brew install commandbox
+   # Windows
+   choco install commandbox
+   # Linux: see https://commandbox.ortusbooks.com/setup/installation
+   ```
+
+2. Install the base template into an empty directory. This pulls `wheels-core` into `vendor/wheels/` via the template's declared `installPaths`:
+
+   ```bash title="illustrative — box pulls from ForgeBox"
+   mkdir myapp && cd myapp
+   box install wheels-base-template
+   ```
+
+   You'll get the modern Wheels 4.0 layout: `app/`, `config/`, `db/`, `public/` (the web root), `tests/`, a `server.json`, and the framework core in `vendor/wheels/`.
+
+</Steps>
+
+<Aside type="tip" title="Vendoring the framework into an existing app">
+If you already have a Wheels app and just want to add or upgrade the framework, install `wheels-core` on its own — it lands in `vendor/wheels/`:
+
+```bash title="illustrative"
+box install wheels-core
+```
+
+Use `box install wheels-core --force` to cleanly replace an older `vendor/wheels/`.
+</Aside>
+
+## Supported: serve
+
+The template ships a `server.json`, so a server start is a one-liner from the app root:
+
+```bash title="illustrative — box server start"
+box server start
+```
+
+Pin a specific engine the same way the [CFML Engines](/v4-0-0/start-here/cfml-engines/) page describes — CommandBox downloads it on first use:
+
+```bash title="illustrative — pin the engine"
+box server start cfengine=lucee@7        # or adobe@2025, or boxlang@latest
+```
+
+Reload the framework after a config or code change by hitting the reload URL directly (there is no `wheels reload` on this path):
+
+```text title="illustrative — reload URL"
+http://localhost:<port>/?reload=true&password=<your reload password>
+```
+
+## Not supported via CommandBox: the `wheels` CLI feature set
+
+CommandBox fetches and serves; it does **not** replace the developer CLI. The following all require the LuCLI-based `wheels` binary (install it from [brew / scoop / apt / yum](/v4-0-0/start-here/installing/) or a [manual JAR](/v4-0-0/command-line-tools/installation/#manual-jar-install)):
+
+- **Scaffolding** — `wheels new`, and every generator (`wheels generate model/controller/scaffold/...`).
+- **Migrations** — `wheels migrate latest|up|down|info|doctor`.
+- **Testing** — `wheels test`.
+- **Console** — `wheels console`.
+- **MCP server** — `wheels mcp wheels`.
+- **The packages registry** — `wheels packages ...` (first-party add-ons; **not** on ForgeBox).
+- **Deploy** — `wheels deploy`.
+
+<Aside type="caution" title="The legacy `wheels-cli` ForgeBox module is deprecated">
+The CommandBox module published as `wheels-cli` is the pre-4.0 CLI. It does **not** know the 4.0+ command set and is scheduled for removal in Wheels 5 (see [Upgrading 3.x → 4.x](/v4-0-0/upgrading/3x-to-4x/)). Do not install it for new work. The supported developer CLI is the standalone `wheels` binary — see [Installing Wheels](/v4-0-0/start-here/installing/).
+</Aside>
+
+## Coming from a 2.x / 3.x `box` workflow
+
+The 3.x getting-started spine was built on CommandBox. Here's how each old step maps onto Wheels 4:
+
+| 2.x / 3.x (CommandBox) | Wheels 4 |
+|---|---|
+| `box install wheels-cli` | Install the standalone [`wheels` CLI](/v4-0-0/start-here/installing/) (brew / scoop / apt / yum) |
+| `wheels generate app myApp` / `wheels g app` | `wheels new myApp` |
+| `box server start` | Still works — or `wheels start` (Lucee, bundled with the CLI) |
+| ForgeBox plugins (`box install ...`, `forgebox install`) | The [`wheels packages`](/v4-0-0/digging-deeper/packages/) registry (CLI-only; not ForgeBox) |
+| `box install wheels-base-template` + `wheels-core` | Unchanged — still the supported way to fetch the framework with CommandBox |
+
+The practical recommendation: keep CommandBox if you rely on it for Adobe CF or BoxLang server management, and add the `wheels` CLI alongside it for everything in the [feature-set list above](#not-supported-via-commandbox-the-wheels-cli-feature-set).
+
+## Related
+
+<CardGrid>
+  <LinkCard
+    title="Installing Wheels"
+    href="/v4-0-0/start-here/installing/"
+    description="Get the wheels CLI — generators, migrate, test, and more."
+  />
+  <LinkCard
+    title="CFML Engines"
+    href="/v4-0-0/start-here/cfml-engines/"
+    description="Run Wheels on Lucee, Adobe CF, or BoxLang via CommandBox."
+  />
+  <LinkCard
+    title="Packages"
+    href="/v4-0-0/digging-deeper/packages/"
+    description="First-party add-ons via the wheels packages registry."
+  />
+  <LinkCard
+    title="Upgrading 3.x → 4.x"
+    href="/v4-0-0/upgrading/3x-to-4x/"
+    description="What changed, including the wheels-cli deprecation."
+  />
+</CardGrid>

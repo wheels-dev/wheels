@@ -33,4 +33,21 @@ component {
 		return variables.raw.cmd ?: "";
 	}
 
+	/**
+	 * Whether this role's containers are fronted by kamal-proxy.
+	 *
+	 * Mirrors Kamal's Role#running_proxy? (lib/kamal/configuration/role.rb):
+	 * an explicit role-level `proxy:` boolean wins; a `proxy:` hash (proxy
+	 * options) opts the role in; otherwise only the default "web" role runs
+	 * behind the proxy. Job/worker roles must not receive proxy boot or
+	 * `kamal-proxy deploy` commands (#2957).
+	 */
+	public boolean function runningProxy() {
+		if (structKeyExists(variables.raw, "proxy")) {
+			if (isBoolean(variables.raw.proxy)) return variables.raw.proxy;
+			if (isStruct(variables.raw.proxy)) return true;
+		}
+		return lCase(name()) == "web";
+	}
+
 }

@@ -37,14 +37,20 @@ export const RESOLVED_WHEELS = resolveWheels();
 
 /**
  * One-line attestation of WHICH `wheels` binary this run exercises:
- * the resolved path, how it was resolved, and its `--version` output.
- * A green run only attests to the binary named here — on CI the
- * docs-verify workflow installs the released brew CLI, so cli blocks
- * attest to that release, not the checkout, unless WHEELS_BIN points
- * at a branch-built CLI (issue #3042).
+ * the resolved path, how it was resolved, its `--version` output, and
+ * the MODE — whose CLI code the binary actually dispatches to (#3042).
+ *
+ * Mode comes from WHEELS_ATTEST_MODE. The CI docs-verify workflow sets
+ * it after overlaying the checkout's cli/lucli module onto the installed
+ * CLI's module dir, so a green CI run attests to the branch's CLI module
+ * (on the released LuCLI runtime). Without the env var the line says
+ * "as-installed": whatever module the resolved binary shipped with —
+ * locally that's the released brew CLI, and a green run only attests
+ * to that release, not your checkout.
  */
 export async function wheelsBinaryAttestation() {
   const source = process.env.WHEELS_BIN ? 'WHEELS_BIN' : 'PATH discovery';
+  const mode = process.env.WHEELS_ATTEST_MODE || 'as-installed (no module overlay declared)';
   const r = await runExec('wheels', ['--version']);
   const firstLine = `${r.stdout}\n${r.stderr}`
     .split('\n')
@@ -54,7 +60,7 @@ export async function wheelsBinaryAttestation() {
     r.code === 0 && firstLine
       ? firstLine
       : `--version failed (exit ${r.code}${firstLine ? `: ${firstLine}` : ''})`;
-  return `wheels binary: ${RESOLVED_WHEELS} (via ${source}) — ${version}`;
+  return `wheels binary: ${RESOLVED_WHEELS} (via ${source}) — ${version} — mode: ${mode}`;
 }
 
 /**

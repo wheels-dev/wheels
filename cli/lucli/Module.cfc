@@ -741,7 +741,7 @@ component extends="modules.BaseModule" {
 		var filter = opts.filter;
 		var reporter = opts.reporter;
 		var format = opts.format;
-		var verboseOutput = opts.verbose;
+		var verboseOutput = $resolveTestVerbosity(opts.verbose);
 		var ciMode = opts.ci;
 		var coreTests = opts.core;
 		var db = opts.db;
@@ -767,6 +767,25 @@ component extends="modules.BaseModule" {
 		filter = $normalizeTestFilter(filter, coreTests);
 
 		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit, basePath);
+	}
+
+	/**
+	 * Resolve the effective verbose flag for `wheels test`. The LuCLI picocli
+	 * root defines `-v`/`--verbose` as GLOBAL options and consumes them
+	 * wherever they appear on the command line — `wheels test --verbose`
+	 * forwards only `test` to the module (verified live, issue #3113), so
+	 * `parseTestArgs()` can never see the token on a normal install. The
+	 * runtime conveys the flag through `init(verboseEnabled=...)` instead
+	 * (LuCLI's executeModule.cfs passes `verboseEnabled=verbose`), which
+	 * BaseModule stores as `variables.verboseEnabled`. Honor both sources:
+	 * the parsed token still wins for direct/programmatic invocations that
+	 * deliver it.
+	 *
+	 * Public `$`-prefixed so specs can exercise it (cli/CLAUDE.md carve-out);
+	 * hidden from MCP by the `mcpHiddenTools()` structural sweep.
+	 */
+	public boolean function $resolveTestVerbosity(boolean parsedVerbose = false) {
+		return arguments.parsedVerbose || (variables.verboseEnabled ?: false);
 	}
 
 	/**
@@ -2244,7 +2263,7 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy rollback v1              - roll back to version v1
 	 *   wheels deploy config                   - print resolved config as YAML
 	 *   wheels deploy init                     - create config stub
-	 *   wheels deploy setup                    - full setup (Phase 2 adds accessories)
+	 *   wheels deploy setup                    - one-time bootstrap (network + accessories) + deploy
 	 *   wheels deploy bootstrap                - install Docker on every host
 	 *   wheels deploy exec "uname -a"          - run a command on every host
 	 *   wheels deploy version                  - show version pinning
@@ -2416,8 +2435,11 @@ component extends="modules.BaseModule" {
 			// branch below is retained for Kamal parity and direct callers
 			// (MCP, internal tests) that don't go through LuCLI's picocli root.
 			case "bootstrap":
+				// #2957 DEP-7: build the pool from deploy.yml's ssh: block like
+				// every other verb — a bare `new SshPool()` here meant the only
+				// CLI-reachable bootstrap form ignored ssh.user/port/keys.
 				var bootstrapCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return bootstrapCli.bootstrap(opts);
 			case "exec":
@@ -2430,8 +2452,9 @@ component extends="modules.BaseModule" {
 					arrayAppend(execCmdParts, positional[ei]);
 				}
 				opts.cmd = arrayToList(execCmdParts, " ");
+				// #2957 DEP-7: same ssh-config seeding as the nested `server` branch.
 				var execCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return execCli.exec(opts);
 			case "server":

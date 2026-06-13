@@ -1,5 +1,5 @@
 {
-	"name":"|appName|",
+	"name":"Wheels",
 	"web":{
 			"host":"localhost",
 			"webroot": "public",
@@ -9,7 +9,7 @@
 			}
 	},
 	"app":{
-			"cfengine":"|cfmlEngine|",
+			"cfengine":"lucee",
       "libDirs":"app/lib"
 	}
 }
