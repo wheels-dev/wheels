@@ -29,7 +29,9 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${PORT:-8080}"
 FILTER="${1:-}"
 DB="${DB:-sqlite}"
-PASSWORD="wheels"
+# Must match set(reloadPassword=...) in config/settings.cfm — a mismatch never
+# reloads and, since #3062, counts against the per-IP reload rate limit.
+PASSWORD="wheels-dev"
 RESULT_FILE="/tmp/wheels-local-test-results.json"
 
 # Browser specs call back into the local Wheels CLI server — point Playwright

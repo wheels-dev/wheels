@@ -58,8 +58,8 @@ A bare positional argument is treated as the filter directory — `wheels test m
 | `--directory=<dir>` | Alias for `--filter` (tutorial chapter 7). When both are supplied, `--directory` wins. |
 | `--db=<engine>` | Database engine for `--core` matrix runs only. Ignored for app tests (with a warning) — see [below](#testing-against-different-engines). |
 | `--reporter=<name>` | `simple` (default, colourful), `json` (raw runner JSON), `tap` (TAP v13 for CI consumers). |
-| `--verbose`, `-v` | Accepted but currently inert — output is identical to a plain run; no per-spec output is printed for passing specs. Wiring tracked in [#3113](https://github.com/wheels-dev/wheels/issues/3113). |
-| `--ci` | Accepted but currently inert — output is byte-identical to a plain run, and exit codes are already non-zero on failure without it. Intended to tighten output for GitHub Actions and similar runners; tracked in [#3113](https://github.com/wheels-dev/wheels/issues/3113). |
+| `--verbose`, `-v` | Print the full bundle → suite → spec tree (one `[PASS]`/`[FAIL]` line per spec) instead of only the summary line. Applies to the default `simple` reporter. The launcher consumes the flag globally, so any position works (`wheels test --verbose`, `wheels test -v`, `wheels -v test`). CLI binaries built on a LuCLI runtime that predates the [#3113](https://github.com/wheels-dev/wheels/issues/3113) launcher fix drop the signal before it reaches the test command and print the plain summary. |
+| `--ci` | CI mode: emits one GitHub Actions `::error` workflow-command annotation per failed or errored spec, so failures surface inline in CI logs and PR-check panels. Exit code is non-zero on failure regardless. |
 | `--core` | Run framework self-tests (`vendor/wheels/tests/specs/`) instead of your app suite. App tests are the default; `--core` is the explicit opt-in. |
 | `--no-test-db` | Disable the auto-swap to `<datasource>_test`. App tests run against your dev datasource, with whatever data is already in it. |
 | `--base-path=<path>` | URL prefix the app is mounted under (e.g. `/myapp`). Auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` in `config/settings.cfm` when omitted. Leave unset for root-mounted apps (the default). |
@@ -155,8 +155,10 @@ wheels test
 # Narrow to one area while iterating
 wheels test --filter=models
 
-# CI run — exit codes are already firm without extra flags; for machine-readable
-# output use a reporter (--ci itself is inert today, #3113)
+# CI run on GitHub Actions — --ci adds one ::error annotation per failed or
+# errored spec (exit codes are firm with or without it); for machine-readable
+# output use a reporter
+wheels test --ci
 wheels test --reporter=tap
 
 # First-time browser setup, then exercise the browser specs

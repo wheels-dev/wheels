@@ -47,6 +47,24 @@ component extends="wheels.WheelsTest" {
 				expect(topLevel[1].join).notToBe(nested[2].join);
 			});
 
+			it("fills the context-independent association metadata once under the memo marker", () => {
+				g.model("author").$expandedAssociations(include = "posts");
+				var assoc = g.model("author").$classData().associations["posts"];
+				expect(StructKeyExists(assoc, "expandedMetadataFilled")).toBeTrue();
+
+				// The metadata is derived solely from class data, so later calls must not
+				// rewrite the shared application-scoped struct outside the lock.
+				assoc.columnList = "memoMarkerColumn";
+				try {
+					g.model("author").$expandedAssociations(include = "posts");
+					expect(g.model("author").$classData().associations["posts"].columnList).toBe("memoMarkerColumn");
+				} finally {
+					// Drop the marker and re-expand so the real metadata is restored for other specs.
+					StructDelete(assoc, "expandedMetadataFilled");
+					g.model("author").$expandedAssociations(include = "posts");
+				}
+			});
+
 			it("still memoizes the join string per context variant", () => {
 				var first = g.model("author").$expandedAssociations(include = "posts", includeSoftDeletes = false);
 				var second = g.model("author").$expandedAssociations(include = "posts", includeSoftDeletes = false);

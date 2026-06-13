@@ -1,0 +1,1 @@
+- `wheels generate controller Name a,b` now splits the comma-joined action token into discrete actions (`a` and `b`) instead of silently emitting an invalid `function a,b()` method plus an `a,b.cfm` view file — the comma form now matches the documented space-separated form (#3112)

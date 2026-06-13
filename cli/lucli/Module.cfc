@@ -186,6 +186,7 @@ component extends="modules.BaseModule" {
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
 			"browser",  // multi-step browser testing flow
+			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
 			"mcpToolSpecs", // per-tool inputSchema registry read by LuCLI — not itself a tool
 			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
 			// unit-test them directly (the cli/CLAUDE.md "public for specs"
@@ -313,6 +314,16 @@ component extends="modules.BaseModule" {
 			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework");
 	}
 
+	private any function jobsArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop) or status (queue snapshot). Defaults to status")
+			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. Empty = all queues")
+			.option(name = "interval", default = 5, type = "numeric", description = "work only: seconds to wait between polls when no job is available")
+			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
+			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
+			.option(name = "format", default = "table", description = "status only: output format, table or json");
+	}
+
 	// ─────────────────────────────────────────────────
 	//  version / help — banner + command listing
 	// ─────────────────────────────────────────────────
@@ -431,6 +442,8 @@ component extends="modules.BaseModule" {
 		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
+		help &= "Background Jobs:" & nl;
+		help &= "  jobs                Job queue worker and stats (work, status)" & nl & nl;
 		help &= "Testing & Inspection:" & nl;
 		help &= "  test                Run the test suite" & nl;
 		help &= "  browser             Browser-based tests (Playwright)" & nl;
@@ -728,7 +741,7 @@ component extends="modules.BaseModule" {
 		var filter = opts.filter;
 		var reporter = opts.reporter;
 		var format = opts.format;
-		var verboseOutput = opts.verbose;
+		var verboseOutput = $resolveTestVerbosity(opts.verbose);
 		var ciMode = opts.ci;
 		var coreTests = opts.core;
 		var db = opts.db;
@@ -754,6 +767,25 @@ component extends="modules.BaseModule" {
 		filter = $normalizeTestFilter(filter, coreTests);
 
 		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit, basePath);
+	}
+
+	/**
+	 * Resolve the effective verbose flag for `wheels test`. The LuCLI picocli
+	 * root defines `-v`/`--verbose` as GLOBAL options and consumes them
+	 * wherever they appear on the command line — `wheels test --verbose`
+	 * forwards only `test` to the module (verified live, issue #3113), so
+	 * `parseTestArgs()` can never see the token on a normal install. The
+	 * runtime conveys the flag through `init(verboseEnabled=...)` instead
+	 * (LuCLI's executeModule.cfs passes `verboseEnabled=verbose`), which
+	 * BaseModule stores as `variables.verboseEnabled`. Honor both sources:
+	 * the parsed token still wins for direct/programmatic invocations that
+	 * deliver it.
+	 *
+	 * Public `$`-prefixed so specs can exercise it (cli/CLAUDE.md carve-out);
+	 * hidden from MCP by the `mcpHiddenTools()` structural sweep.
+	 */
+	public boolean function $resolveTestVerbosity(boolean parsedVerbose = false) {
+		return arguments.parsedVerbose || (variables.verboseEnabled ?: false);
 	}
 
 	/**
@@ -834,27 +866,80 @@ component extends="modules.BaseModule" {
 		// See onboarding finding F5.
 		$purgeServerCfclasses();
 
+		// Response honesty (#3059): a SUCCESSFUL reload is ALWAYS a 302 — the
+		// framework's reload gate restarts the app and then location()-redirects
+		// (public/Application.cfc :: $handleRestartAppRequest). Redirects stay
+		// OFF so the raw status is the verdict: following the success-redirect
+		// would collapse a real reload (302 -> 200 at `/`) into the same 200 a
+		// wrong-password page render produces. Failures print-then-throw per
+		// the #2941 exit-code convention so `wheels reload && ...` gates work.
+		var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
+		var reloadState = { statusCode = 0 };
 		try {
-			var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
-			var httpResult = makeHttpRequest(reloadUrl);
-			out("Application reloaded successfully.", "green");
-			// Surface the actual reload contract (verified live on Lucee 7,
-			// see #3110): an authorized `?reload=true&password=...` calls
-			// applicationStop(), so the next request re-fires onApplicationStart
-			// in full — app/events/onapplicationstart.cfm, config/services.cfm,
-			// and the PackageLoader all re-run. Caveat: the restart only
-			// happens when the reload password resolves; a missing or wrong
-			// password silently serves the request without restarting
-			// (#3059 / #3062).
-			out("Note: an authorized reload re-fires onApplicationStart (re-runs config/services.cfm and the package loader). A missing or wrong reload password silently skips the restart.", "cyan");
-			verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
+			reloadState.statusCode = makeHttpRequestWithStatus(reloadUrl, false).statusCode;
 		} catch (any e) {
 			out("Failed to reload: #e.message#", "red");
 			if (!len(password)) {
 				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
 			}
+			throw(
+				type = "Wheels.ReloadFailed",
+				message = "Reload request to localhost:#serverPort# failed: #e.message#"
+			);
 		}
+
+		var verdict = $evaluateReloadResponse(reloadState.statusCode);
+		if (!verdict.success) {
+			out(verdict.message, "red");
+			if (!len(password)) {
+				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
+			}
+			verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
+			throw(type = "Wheels.ReloadFailed", message = verdict.message);
+		}
+
+		out("Application reloaded successfully.", "green");
+		// Surface the actual reload contract (verified live on Lucee 7,
+		// see #3110): an authorized `?reload=true&password=...` calls
+		// applicationStop(), so the next request re-fires onApplicationStart
+		// in full — app/events/onapplicationstart.cfm, config/services.cfm,
+		// and the PackageLoader all re-run. Caveat: the restart only
+		// happens when the reload password resolves; a missing or wrong
+		// password silently serves the request without restarting
+		// (#3059 / #3062).
+		out("Note: an authorized reload re-fires onApplicationStart (re-runs config/services.cfm and the package loader). A missing or wrong reload password silently skips the restart.", "cyan");
+		verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
 		return "";
+	}
+
+	/**
+	 * Verdict for a `?reload=true` response status (#3059).
+	 *
+	 * The framework's reload gate restarts the app and then redirects via
+	 * location(), so a successful reload is always a 3xx (302 in practice).
+	 * A 2xx means the warm-path gate fell through and the page was served
+	 * normally — the reload password didn't match, nothing restarted (404
+	 * is the same fall-through on an app without a root route). 4xx/5xx
+	 * means the endpoint itself errored (e.g. the #3053 Adobe regression).
+	 *
+	 * Public ONLY so ReloadCommandSpec can unit-test it (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — hidden from MCP via the structural
+	 * $-prefix sweep in mcpHiddenTools().
+	 */
+	public struct function $evaluateReloadResponse(required numeric statusCode) {
+		if (arguments.statusCode >= 300 && arguments.statusCode < 400) {
+			return { success = true, message = "" };
+		}
+		if (arguments.statusCode >= 400) {
+			return {
+				success = false,
+				message = "Reload failed: the server returned HTTP #arguments.statusCode#. The application was NOT reloaded — check the server's error output."
+			};
+		}
+		return {
+			success = false,
+			message = "Reload was not triggered: the server served the page normally (HTTP #arguments.statusCode#) instead of answering with the reload redirect (302). The application was NOT reloaded — check the reload password."
+		};
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1509,9 +1594,18 @@ component extends="modules.BaseModule" {
 				case "/reload":
 					out("Reloading application...", "cyan");
 					try {
+						// Same 302-vs-200 honesty contract as the reload
+						// command (#3059) — but interactive, so failures
+						// print red instead of throwing.
 						var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
-						makeHttpRequest(reloadUrl);
-						out("Application reloaded.", "green");
+						var reloadVerdict = $evaluateReloadResponse(
+							makeHttpRequestWithStatus(reloadUrl, false).statusCode
+						);
+						if (reloadVerdict.success) {
+							out("Application reloaded.", "green");
+						} else {
+							out(reloadVerdict.message, "red");
+						}
 					} catch (any e) {
 						out("Reload failed: #e.message#", "red");
 					}
@@ -2172,7 +2266,7 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy rollback v1              - roll back to version v1
 	 *   wheels deploy config                   - print resolved config as YAML
 	 *   wheels deploy init                     - create config stub
-	 *   wheels deploy setup                    - full setup (Phase 2 adds accessories)
+	 *   wheels deploy setup                    - one-time bootstrap (network + accessories) + deploy
 	 *   wheels deploy bootstrap                - install Docker on every host
 	 *   wheels deploy exec "uname -a"          - run a command on every host
 	 *   wheels deploy version                  - show version pinning
@@ -2344,8 +2438,11 @@ component extends="modules.BaseModule" {
 			// branch below is retained for Kamal parity and direct callers
 			// (MCP, internal tests) that don't go through LuCLI's picocli root.
 			case "bootstrap":
+				// #2957 DEP-7: build the pool from deploy.yml's ssh: block like
+				// every other verb — a bare `new SshPool()` here meant the only
+				// CLI-reachable bootstrap form ignored ssh.user/port/keys.
 				var bootstrapCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return bootstrapCli.bootstrap(opts);
 			case "exec":
@@ -2358,8 +2455,9 @@ component extends="modules.BaseModule" {
 					arrayAppend(execCmdParts, positional[ei]);
 				}
 				opts.cmd = arrayToList(execCmdParts, " ");
+				// #2957 DEP-7: same ssh-config seeding as the nested `server` branch.
 				var execCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return execCli.exec(opts);
 			case "server":
@@ -2834,6 +2932,270 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
+	//  jobs — Background job worker
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * Parse `wheels jobs` arguments. Public ONLY so JobsCommandSpec can
+	 * unit-test the parse/validation surface directly (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — the mcpHiddenTools() structural
+	 * $-prefix sweep keeps it off the MCP surface. Validation happens here,
+	 * before any server detection, so a bad flag yields a usage error
+	 * instead of a misleading "no server" diagnostic.
+	 */
+	public struct function $parseJobsArgs(required struct coll) {
+		var parsed = jobsArgSpec().parse(arguments.coll);
+		var opts = {
+			action = lCase(trim(parsed.action)),
+			queue = trim(parsed.queue),
+			interval = parsed.interval,
+			maxJobs = parsed["max-jobs"],
+			quiet = parsed.quiet,
+			format = lCase(trim(parsed.format))
+		};
+		if (!len(opts.action)) {
+			opts.action = "status";
+		}
+		if (opts.interval <= 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--interval must be a positive number of seconds."
+			);
+		}
+		if (opts.maxJobs < 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--max-jobs must be zero (unlimited) or a positive number."
+			);
+		}
+		if (!listFindNoCase("table,json", opts.format)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown --format '#opts.format#'. Valid formats: table, json."
+			);
+		}
+		return opts;
+	}
+
+	/**
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts (--format=json for machines). retry/purge/monitor are tracked follow-ups (issue 3090).
+	 */
+	public string function jobs() {
+		var opts = $parseJobsArgs(structuredArgs(arguments));
+
+		switch (opts.action) {
+			case "work":
+				return runJobsWork(opts);
+			case "status":
+				return runJobsStatus(opts);
+			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
+			// implements jobsRetry/jobsPurge/jobsMonitor — the CLI verbs are
+			// deliberate follow-ups tracked in ##3090. Fail loudly with the
+			// programmatic equivalent instead of pretending the verb exists.
+			case "retry":
+			case "purge":
+			case "monitor":
+				out("'wheels jobs #opts.action#' is not implemented yet (tracked in issue ##3090).", "red");
+				out("Until it ships, drive it programmatically on the running app:", "yellow");
+				out("  retry:   (new wheels.Job()).retryFailed(queue=""..."")", "yellow");
+				out("  purge:   (new wheels.Job()).purgeCompleted(days=7, queue=""..."")", "yellow");
+				out("  monitor: poll `wheels jobs status --format=json` on an interval", "yellow");
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "'wheels jobs #opts.action#' is not implemented yet — see https://github.com/wheels-dev/wheels/issues/3090"
+				);
+			default:
+				out("Unknown jobs action: #opts.action#", "red");
+				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--quiet] [--format=table|json]");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
+		}
+	}
+
+	/**
+	 * Long-lived worker loop: poll the framework's jobsProcessNext bridge
+	 * command, which claims and runs one pending job per call (optimistic
+	 * locking — safe to run several workers in parallel). Processing jobs
+	 * mutates application data, so this is write-side: strict server
+	 * identity (##2878) and POST + reload password (SEC-4 mutation gate).
+	 */
+	private string function runJobsWork(required struct opts) {
+		var serverPort = $requireRunningServer(
+			hints = [
+				"The job worker requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
+
+		var workUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsProcessNext&format=json";
+		if (len(arguments.opts.queue)) {
+			workUrl &= "&queues=" & urlEncodedFormat(arguments.opts.queue);
+		}
+
+		out("Wheels Job Worker", "cyan");
+		out("Queues: " & (len(arguments.opts.queue) ? arguments.opts.queue : "all"));
+		out("Poll interval: #arguments.opts.interval#s");
+		if (arguments.opts.maxJobs > 0) {
+			out("Max jobs: #arguments.opts.maxJobs#");
+		}
+		out("Press Ctrl+C to stop");
+		out("");
+
+		var counters = {processed = 0, failed = 0};
+		while (true) {
+			var httpResult = "";
+			try {
+				httpResult = makeBridgePost(workUrl);
+			} catch (any httpErr) {
+				// Connection loss is fatal: the worker exits non-zero so a
+				// process supervisor (systemd, Docker restart policy) brings
+				// it back once the server is reachable again, instead of the
+				// worker spinning silently against a dead port.
+				throw(
+					type    = "Wheels.Cli.CommandFailed",
+					message = "Job worker lost its connection to the server: #httpErr.message#",
+					detail  = httpErr.detail ?: ""
+				);
+			}
+
+			// parseCliResponse throws Wheels.Cli.CommandFailed when the bridge
+			// rejects the request (e.g. the mutation gate's reload-password or
+			// loopback checks) — permanent conditions, so the worker exits
+			// non-zero instead of retrying forever.
+			var result = parseCliResponse(httpResult, "Jobs work");
+			var jobResult = structKeyExists(result, "jobResult") && isStruct(result.jobResult)
+				? result.jobResult
+				: {skipped = true};
+			var idle = jobResult.skipped ?: true;
+
+			if (idle) {
+				// Queue empty — wait for the next poll below.
+			} else if (jobResult.success ?: false) {
+				counters.processed++;
+				if (!arguments.opts.quiet) {
+					out("[#timeFormat(now(), "HH:mm:ss")#] Completed: #jobResult.jobClass# (#jobResult.jobId#)", "green");
+				}
+			} else {
+				// The job itself failed — the framework already scheduled the
+				// retry (with backoff) or marked it failed; the worker keeps
+				// draining.
+				counters.failed++;
+				var errorMessage = len(jobResult.error ?: "") ? jobResult.error : "Unknown error";
+				out("[#timeFormat(now(), "HH:mm:ss")#] Failed: #jobResult.jobClass# - #errorMessage#", "red");
+			}
+
+			if (arguments.opts.maxJobs > 0 && (counters.processed + counters.failed) >= arguments.opts.maxJobs) {
+				out("");
+				out("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", "green");
+				out("Processed: #counters.processed# | Failed: #counters.failed#");
+				return "";
+			}
+
+			// Only sleep when the queue was empty — back-to-back pending jobs
+			// drain immediately. Failed jobs are rescheduled with future runAt
+			// timestamps, so an immediate re-poll cannot hot-loop on them.
+			if (idle) {
+				sleep(arguments.opts.interval * 1000);
+			}
+		}
+	}
+
+	/**
+	 * One-shot queue snapshot via the read-only jobsStatus bridge command.
+	 */
+	private string function runJobsStatus(required struct opts) {
+		var serverPort = $requireRunningServer(
+			hints = ["Start one with: wheels start"]
+		);
+
+		var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsStatus&format=json";
+		if (len(arguments.opts.queue)) {
+			statusUrl &= "&queue=" & urlEncodedFormat(arguments.opts.queue);
+		}
+
+		var httpResult = "";
+		try {
+			httpResult = makeHttpRequest(statusUrl);
+		} catch (any httpErr) {
+			throw(
+				type    = "Wheels.Cli.CommandFailed",
+				message = "Jobs status failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
+
+		var result = parseCliResponse(httpResult, "Jobs status");
+		var stats = structKeyExists(result, "stats") && isStruct(result.stats) ? result.stats : {};
+
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(stats));
+			return "";
+		}
+
+		out("Job Queue Status", "cyan");
+		out($formatJobsStatusTable(stats));
+		return "";
+	}
+
+	/**
+	 * Render JobWorker.getStats() output ({queues: {name: counts}, totals:
+	 * counts}) as a fixed-width table. Public ONLY so JobsCommandSpec can
+	 * unit-test the rendering without a running server (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — the mcpHiddenTools() structural
+	 * $-prefix sweep keeps it off the MCP surface. Defensive against partial
+	 * payloads: the input is deserialized JSON from the bridge. Queue names
+	 * are sorted — struct iteration order is not insertion order at scale.
+	 */
+	public string function $formatJobsStatusTable(required struct stats) {
+		var nl = chr(10);
+		var queues = structKeyExists(arguments.stats, "queues") && isStruct(arguments.stats.queues)
+			? arguments.stats.queues
+			: {};
+		var totals = structKeyExists(arguments.stats, "totals") && isStruct(arguments.stats.totals)
+			? arguments.stats.totals
+			: {};
+
+		if (structIsEmpty(queues)) {
+			return "No jobs found.";
+		}
+
+		var header = "| " & $padJobsColumn("Queue", 20) & " | " & $padJobsColumn("Pending", 10) & " | "
+			& $padJobsColumn("Processing", 12) & " | " & $padJobsColumn("Completed", 12) & " | "
+			& $padJobsColumn("Failed", 10) & " | " & $padJobsColumn("Total", 10) & " |";
+		var separator = repeatString("-", len(header));
+		var lines = [separator, header, separator];
+
+		var queueNames = structKeyArray(queues);
+		arraySort(queueNames, "textnocase");
+		for (var queueName in queueNames) {
+			var rowCounts = isStruct(queues[queueName]) ? queues[queueName] : {};
+			arrayAppend(lines, $jobsStatusRow(queueName, rowCounts));
+		}
+		arrayAppend(lines, separator);
+		arrayAppend(lines, $jobsStatusRow("TOTAL", totals));
+		arrayAppend(lines, separator);
+
+		return arrayToList(lines, nl);
+	}
+
+	private string function $jobsStatusRow(required string label, required struct counts) {
+		return "| " & $padJobsColumn(arguments.label, 20) & " | "
+			& $padJobsColumn(arguments.counts.pending ?: 0, 10) & " | "
+			& $padJobsColumn(arguments.counts.processing ?: 0, 12) & " | "
+			& $padJobsColumn(arguments.counts.completed ?: 0, 12) & " | "
+			& $padJobsColumn(arguments.counts.failed ?: 0, 10) & " | "
+			& $padJobsColumn(arguments.counts.total ?: 0, 10) & " |";
+	}
+
+	private string function $padJobsColumn(required any value, required numeric width) {
+		var str = toString(arguments.value);
+		if (len(str) >= arguments.width) {
+			return left(str, arguments.width);
+		}
+		return str & repeatString(" ", arguments.width - len(str));
+	}
+
+	// ─────────────────────────────────────────────────
 	//  upgrade — Upgrade assistance
 	// ─────────────────────────────────────────────────
 
@@ -3193,6 +3555,13 @@ component extends="modules.BaseModule" {
 			out(result.error, "red");
 			return "";
 		}
+
+		// Use the normalized action list from the generator (comma-joined tokens like
+		// "index,show" are split into discrete actions) so view files match the
+		// controller methods instead of being named "index,show.cfm" (#3112). When no
+		// actions were passed result.actions is empty — documented behavior is an
+		// empty controller with no view files, so the view loop below writes nothing.
+		actions = result.actions;
 
 		// Create view files for non-mutation actions
 		var viewDir = variables.projectRoot & "/app/views/#lCase(controllerName)#";
@@ -3979,13 +4348,41 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function runMigration(required string action) {
-		var serverPort = $requireRunningServer(
-			hints = [
-				"Migrations require a running server bound to this project.",
-				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
-			],
-			requireProjectConfig = true
-		);
+		// latest/up/down change the schema — they must only ever target the
+		// server bound to this project's own lucee.json/.env port (#2878).
+		// info/doctor are read-only and keep the legacy common-port fallback,
+		// matching the other read-side commands (info, routes, console,
+		// dbStatus, dbVersion) — the contract #2879 documented but the gate
+		// here didn't honor (#3080).
+		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
+
+		var serverPort = 0;
+		if (mutatingAction) {
+			serverPort = $requireRunningServer(
+				hints = [
+					"Migrations require a running server bound to this project.",
+					"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+				],
+				requireProjectConfig = true
+			);
+		} else {
+			serverPort = $requireRunningServer(
+				hints = ["Start one with: wheels start"],
+				requireProjectConfig = false
+			);
+			// Transparency for the fallback attach: with no project-bound port
+			// we cannot prove the server on a common port belongs to this
+			// project — a sibling app's server would report the WRONG
+			// project's migration state. Say which port we attached to and
+			// how to pin it.
+			if (!detectServerPort(requireProjectConfig = true)) {
+				out(
+					"Attached to localhost:#serverPort# via the common-port fallback (no project-bound port in lucee.json / .env).",
+					"yellow"
+				);
+				out("If this is not this project's server, set 'port' in lucee.json (or PORT in .env) and re-run.", "yellow");
+			}
+		}
 
 		out("Running migration: #action#...", "cyan");
 
@@ -4003,8 +4400,8 @@ component extends="modules.BaseModule" {
 		// latest/up/down change the schema — the framework's /wheels/cli
 		// bridge requires POST + the reload password for state-changing
 		// commands. info/doctor are read-only and stay on GET.
-		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
-
+		// (`mutatingAction` is resolved at the top of this function — the
+		// same read/write split also decides the server-identity gate.)
 		var httpResult = "";
 		try {
 			httpResult = mutatingAction ? makeBridgePost(migrateUrl) : makeHttpRequest(migrateUrl);
@@ -4591,17 +4988,21 @@ component extends="modules.BaseModule" {
 				extensions: "cfm,cfc",
 				fix: "Re-enable only for controlled staging environments. The 4.0 default rejects ?environment=... in production."
 			});
-			// CSRF key auto-generates when empty (#2054) but cookies rotate
-			// on every deploy when that happens. Warn if config/ never sets
-			// csrfEncryptionKey.
+			// CSRF cookie key auto-generates when empty (#2054) but cookies
+			// rotate on every deploy when that happens. Warn if config/ never
+			// sets csrfCookieEncryptionSecretKey — the setting the framework
+			// actually reads (vendor/wheels/controller/csrf.cfc). Only matters
+			// when csrfStore="cookie" (default store is "session"), and
+			// production throws Wheels.Security.MissingCsrfKey rather than
+			// auto-generating an ephemeral key.
 			arrayAppend(checks, {
-				description: "Missing csrfEncryptionKey (CSRF cookies rotate on every deploy)",
-				pattern: "csrfEncryptionKey",
+				description: "Missing csrfCookieEncryptionSecretKey (CSRF cookies rotate on every deploy when csrfStore=""cookie"")",
+				pattern: "csrfCookieEncryptionSecretKey",
 				checkType: "grep",
 				scanDir: "config",
 				extensions: "cfm,cfc",
 				absent: true,
-				fix: 'Set a stable key: set(csrfEncryptionKey = env("WHEELS_CSRF_KEY")).'
+				fix: 'Set a stable key: set(csrfCookieEncryptionSecretKey = env("WHEELS_CSRF_KEY")).'
 			});
 			// `wheels snippets` → `wheels generate snippets` rename (#1852).
 			// Scan build / CI scripts; the CLI command is invoked from
@@ -4808,7 +5209,7 @@ component extends="modules.BaseModule" {
 
 				// `absent: true` inverts the check — warn when the pattern
 				// is NOT found anywhere in the scanned set. Used for "you
-				// should be setting csrfEncryptionKey somewhere" style
+				// should be setting csrfCookieEncryptionSecretKey somewhere" style
 				// checks. If nothing was scannable (e.g. config/ missing),
 				// treat as pass to avoid noisy false positives.
 				var isAbsent = structKeyExists(check, "absent") && check.absent;
@@ -5251,7 +5652,7 @@ component extends="modules.BaseModule" {
 						break;
 					case "simple":
 					default:
-						displayTestResults(result, verboseOutput, resolvedDir);
+						displayTestResults(result, verboseOutput, resolvedDir, ciMode);
 				}
 
 				// Record failure so the command can exit non-zero AFTER the output
@@ -5415,7 +5816,8 @@ component extends="modules.BaseModule" {
 	private void function displayTestResults(
 		required any result,
 		boolean verboseOutput = false,
-		string testDirectory = ""
+		string testDirectory = "",
+		boolean ciMode = false
 	) {
 		if (!isStruct(result)) {
 			out(serializeJSON(result));
@@ -5523,6 +5925,105 @@ component extends="modules.BaseModule" {
 				}
 			}
 		}
+
+		// CI mode (--ci): emit GitHub Actions-style error annotations so each
+		// failure/error surfaces inline in CI logs and PR-check annotations.
+		// testing.mdx documents --ci as tightening output for GitHub Actions
+		// and similar runners; before #3113 the flag was parsed and threaded
+		// through to here but never consumed — byte-identical to a plain run.
+		if (arguments.ciMode) {
+			for (var annotation in $buildCiAnnotations(arguments.result)) {
+				out(annotation);
+			}
+		}
+	}
+
+	/**
+	 * Build GitHub Actions workflow-command annotations (one `::error` line per
+	 * failed or errored spec) from a TestBox result memento. Returns an empty
+	 * array when nothing failed. Pure (no I/O) so it is unit-testable without a
+	 * live server — the `--ci` consumer added for issue #3113.
+	 *
+	 * Format: `::error title=<spec>::<message>`. Message/title are encoded per
+	 * the workflow-command rules (newlines → %0A, % → %25, and `:`/`,` in the
+	 * title) so a multi-line failMessage stays a single annotation line.
+	 */
+	public array function $buildCiAnnotations(required any result) {
+		var annotations = [];
+		if (!isStruct(arguments.result)) {
+			return annotations;
+		}
+
+		// Walk bundle → suite (recursively) → spec, collecting failures. Mirror
+		// the emitTapResults() walker: the closure references itself by name and
+		// appends to a parent struct field (not a bare array) so the mutation is
+		// seen by reference — the established pattern on the CLI's bundled Lucee.
+		var ctx = {failures: []};
+		var walkSuite = function(suite) {
+			for (var spec in (suite.specStats ?: [])) {
+				var status = spec.status ?: "";
+				if (status == "Failed" || status == "Error") {
+					var message = "";
+					if (status == "Failed") {
+						message = spec.failMessage ?: "";
+					} else if (structKeyExists(spec, "error") && isStruct(spec.error)) {
+						message = spec.error.message ?: "";
+					}
+					arrayAppend(ctx.failures, {name: (spec.name ?: "(unnamed spec)"), message: message});
+				}
+			}
+			// Suite-level failure with no specs (compile error, beforeAll threw).
+			if (
+				arrayIsEmpty(suite.specStats ?: [])
+				&& listFindNoCase("Failed,Error", suite.status ?: "")
+			) {
+				arrayAppend(ctx.failures, {
+					name: (suite.name ?: "(unnamed suite)") & " (suite-level)",
+					message: suite.globalException ?: ""
+				});
+			}
+			for (var inner in (suite.suiteStats ?: [])) {
+				walkSuite(inner);
+			}
+		};
+		for (var bundle in (arguments.result.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				walkSuite(suite);
+			}
+		}
+
+		for (var failure in ctx.failures) {
+			arrayAppend(
+				annotations,
+				"::error title=" & $encodeAnnotationProperty(failure.name)
+					& "::" & $encodeAnnotationData(failure.message)
+			);
+		}
+		return annotations;
+	}
+
+	/**
+	 * Encode a GitHub Actions workflow-command data segment (the message after
+	 * `::`). Percent must be escaped first, then carriage returns dropped and
+	 * line feeds collapsed to %0A so the annotation stays one line.
+	 */
+	private string function $encodeAnnotationData(required string value) {
+		var encoded = replace(arguments.value, "%", "%25", "all");
+		encoded = replace(encoded, chr(13), "", "all");
+		encoded = replace(encoded, chr(10), "%0A", "all");
+		return encoded;
+	}
+
+	/**
+	 * Encode a GitHub Actions workflow-command property value (e.g. `title=`).
+	 * Properties additionally escape `:` and `,` so they don't terminate the
+	 * property list.
+	 */
+	private string function $encodeAnnotationProperty(required string value) {
+		var encoded = $encodeAnnotationData(arguments.value);
+		encoded = replace(encoded, ":", "%3A", "all");
+		encoded = replace(encoded, ",", "%2C", "all");
+		return encoded;
 	}
 
 	private void function displaySuite(required struct suite, string indent = "") {
@@ -6916,9 +7417,28 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function makeHttpRequest(required string requestUrl) {
+		return makeHttpRequestWithStatus(arguments.requestUrl).body;
+	}
+
+	/**
+	 * GET `requestUrl` and return BOTH the final status code and the body:
+	 * `{statusCode: numeric, body: string}`. Callers that need to act on the
+	 * HTTP status (reload's 302-vs-200 contract, #3059) use this directly;
+	 * everything else keeps the body-only makeHttpRequest() wrapper above.
+	 *
+	 * `followRedirects=false` surfaces the raw 3xx instead of the post-
+	 * redirect response — required by reload(), where following the
+	 * success-redirect would make a real reload (302 -> 200 at `/`)
+	 * indistinguishable from the wrong-password page render (200).
+	 */
+	private struct function makeHttpRequestWithStatus(
+		required string requestUrl,
+		boolean followRedirects = true
+	) {
 		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
 		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("GET");
+		conn.setInstanceFollowRedirects(javacast("boolean", arguments.followRedirects));
 		conn.setConnectTimeout(5000);
 		conn.setReadTimeout(120000);
 
@@ -6928,7 +7448,7 @@ component extends="modules.BaseModule" {
 		// Scanner.init(null) NPEs on Lucee and surfaces as a useless "null"
 		// error message (#2947 review, #2977). No body — return empty.
 		if (isNull(inputStream)) {
-			return "";
+			return { statusCode = responseCode, body = "" };
 		}
 		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
@@ -6936,7 +7456,7 @@ component extends="modules.BaseModule" {
 			response &= scanner.nextLine() & chr(10);
 		}
 		scanner.close();
-		return trim(response);
+		return { statusCode = responseCode, body = trim(response) };
 	}
 
 	/**

@@ -7,18 +7,19 @@ sidebar:
   order: 1
 ---
 
-Prune old containers and old images on every host, respecting `retain_containers:`.
+Prune old containers and old images on every host, keeping the most recent stopped containers per host (`--keep=<n>`, default 5).
 
 ## Synopsis
 
 ``` title="Synopsis"
-wheels deploy prune all [--destination=<name>] [--dry-run]
+wheels deploy prune all [--keep=<n>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
+| `--keep=<n>` | How many old (stopped) containers to keep per host. Default 5. There is no `deploy.yml` equivalent — Kamal's `retain_containers:` is rejected by the config validator. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print the commands without executing. |
 

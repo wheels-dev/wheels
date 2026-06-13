@@ -48,3 +48,8 @@ Hook stdout/stderr is merged and prefixed `[hook:<name>]` in the deploy
 log. A non-zero exit from `pre-deploy` aborts the deploy; a non-zero
 exit from `post-deploy` fails the deploy after-the-fact (useful for
 smoke tests).
+
+`post-deploy-failure` is best-effort: it runs on an already-failed
+deploy, so a non-zero exit from the hook is logged
+(`[hook:post-deploy-failure] ...`) and never replaces the original
+deploy error. The deploy rethrows the real failure either way.

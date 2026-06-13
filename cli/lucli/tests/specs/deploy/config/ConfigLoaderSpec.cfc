@@ -69,6 +69,44 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				directoryDelete(tmpRoot, true);
 			});
 
+			it("resolves ${VAR} from project-root .kamal/secrets when deploy.yml lives in config/ (##3084)", () => {
+				var tmpRoot = getTempDirectory() & "/wheels-deploy-cfg-root-" & createUUID();
+				directoryCreate(tmpRoot & "/.kamal", true, true);
+				directoryCreate(tmpRoot & "/config", true, true);
+				fileWrite(tmpRoot & "/.kamal/secrets", "ROOT_SECRET_VAR=fromProjectRoot");
+
+				var yml = tmpRoot & "/config/deploy.yml";
+				fileWrite(yml, "service: demo#chr(10)#image: acme/${ROOT_SECRET_VAR}#chr(10)#servers: [1.2.3.4]#chr(10)#registry: {username: u, password: [X]}");
+
+				var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(yml);
+				expect(cfg.image()).toBe("acme/fromProjectRoot");
+
+				directoryDelete(tmpRoot, true);
+			});
+
+			it("resolves destination-overlay secrets from the project root for the config/ layout", () => {
+				var tmpRoot = getTempDirectory() & "/wheels-deploy-cfg-dest-" & createUUID();
+				directoryCreate(tmpRoot & "/.kamal", true, true);
+				directoryCreate(tmpRoot & "/config", true, true);
+				fileWrite(tmpRoot & "/.kamal/secrets", "DEST_SECRET_VAR=fromBase");
+				fileWrite(tmpRoot & "/.kamal/secrets.production", "DEST_SECRET_VAR=fromProductionOverlay");
+
+				var yml = tmpRoot & "/config/deploy.yml";
+				fileWrite(yml, "service: demo#chr(10)#image: acme/${DEST_SECRET_VAR}#chr(10)#servers: [1.2.3.4]#chr(10)#registry: {username: u, password: [X]}");
+
+				var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(yml, {destination: "production"});
+				expect(cfg.image()).toBe("acme/fromProductionOverlay");
+
+				directoryDelete(tmpRoot, true);
+			});
+
+			it("$projectRootFor steps up to the parent of a config/ directory and leaves other layouts alone", () => {
+				var loader = new cli.lucli.services.deploy.config.ConfigLoader();
+				expect(loader.$projectRootFor("/srv/myapp/config/deploy.yml")).toBe("/srv/myapp/");
+				expect(loader.$projectRootFor("/srv/myapp/deploy.yml")).toBe("/srv/myapp/");
+				expect(loader.$projectRootFor("/config/deploy.yml")).toBe("/");
+			});
+
 		});
 
 	}

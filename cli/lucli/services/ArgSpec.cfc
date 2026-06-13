@@ -158,17 +158,30 @@ component {
 		}
 
 		// Named keys, re-prefixed. --no-X for false preserves the negation.
+		// Flag detection MUST use an exact string compare: CFML `==` coerces
+		// both operands, so "1" == "true" and "0" == "false" evaluate TRUE.
+		// That coercion turned `--release=1` into a bare --release flag (value
+		// dropped) and the downstream deploy parser then swallowed --dry-run
+		// as the version — a documented dry run dispatched live SSH and hung
+		// ~76s against the config stub's placeholder host (issue #3111).
+		// LuCLI normalizes flags to the literal strings "true"/"false"; MCP
+		// argCollections may carry native booleans, which toString() renders
+		// as "true"/"false" — both shapes match the exact compare.
 		for (var key in arguments.coll) {
 			if (reFindNoCase("^arg\d+$", key)) {
 				continue;
 			}
 			var value = arguments.coll[key];
-			if (isSimpleValue(value) && value == "true") {
+			if (!isSimpleValue(value)) {
+				continue;
+			}
+			var stringValue = toString(value);
+			if (compareNoCase(stringValue, "true") == 0) {
 				arrayAppend(result, "--" & key);
-			} else if (isSimpleValue(value) && value == "false") {
+			} else if (compareNoCase(stringValue, "false") == 0) {
 				arrayAppend(result, "--no-" & key);
-			} else if (isSimpleValue(value)) {
-				arrayAppend(result, "--" & key & "=" & value);
+			} else {
+				arrayAppend(result, "--" & key & "=" & stringValue);
 			}
 		}
 

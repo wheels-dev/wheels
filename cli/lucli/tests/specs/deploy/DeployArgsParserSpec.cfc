@@ -68,6 +68,30 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(structKeyExists(opts, "version")).toBeFalse();
             });
 
+            // Issue #3111: a bare --release followed by another flag must NOT
+            // swallow that flag as its value. Before the guard, --release ate
+            // --dry-run (version became the literal string "--dry-run" and
+            // dryRun was never set), so a documented dry run dispatched real
+            // SSH connections. $deployStripFlags in Module.cfc already applies
+            // the same `left(next, 2) != "--"` rule; the parser now matches.
+            it("does not swallow a following flag as the value of '--release' (issue ##3111)", () => {
+                var opts = parser.parse(["app", "boot", "--release", "--dry-run"]);
+                expect(structKeyExists(opts, "version")).toBeFalse();
+                expect(opts.dryRun).toBeTrue();
+            });
+
+            it("does not swallow a following flag as the value of '--version' (issue ##3111)", () => {
+                var opts = parser.parse(["app", "boot", "--version", "--dry-run"]);
+                expect(structKeyExists(opts, "version")).toBeFalse();
+                expect(opts.dryRun).toBeTrue();
+            });
+
+            it("does not swallow a following flag as the value of '--destination'", () => {
+                var opts = parser.parse(["--destination", "--dry-run"]);
+                expect(structKeyExists(opts, "destination")).toBeFalse();
+                expect(opts.dryRun).toBeTrue();
+            });
+
             // CLI audit H9: --config aliases --configPath; the deploy guides
             // document --config but only --configPath was parsed.
             it("parses --config=value as an alias for configPath", () => {

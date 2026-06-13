@@ -142,6 +142,19 @@ component {
 
 		var crudActions = ["index", "show", "new", "create", "edit", "update", "delete"];
 
+		// Normalize the action list: a comma-joined token like "index,show" is the
+		// natural guess for anyone used to Wheels list args (validatesPresenceOf("a,b")),
+		// but passed through verbatim it produced `function index,show()` — invalid CFML
+		// that fails to compile — plus a view file named `index,show.cfm` (#3112). Split
+		// each token on commas, trim, and de-duplicate so both forms behave identically.
+		arguments.actions = normalizeActions(arguments.actions);
+
+		// Capture the caller-requested list BEFORE the defaulting below. result.actions
+		// drives the caller's view loop, and the documented contract is "passing no
+		// actions creates an empty controller with no view files" — the index/CRUD
+		// defaults applied next shape the controller body only, never the view files.
+		var requestedActions = arguments.actions;
+
 		// Default actions based on type
 		if (arrayLen(arguments.actions) == 0) {
 			arguments.actions = arguments.crud ? crudActions : ["index"];
@@ -171,11 +184,38 @@ component {
 			template = hasCustomActions ? "ControllerContent.txt" : "CRUDContent.txt";
 		}
 
-		return variables.templateService.generateFromTemplate(
+		var result = variables.templateService.generateFromTemplate(
 			template = template,
 			destination = relativePath,
 			context = context
 		);
+
+		// Surface the normalized caller-requested action list so callers (e.g.
+		// Module.cfc's view loop) render one view file per real action instead of one
+		// named after the raw comma-joined token (#3112). Deliberately the pre-default
+		// list: when no actions were passed this stays empty, so callers write no view
+		// files even though the controller body gets a default index() stub.
+		result.actions = requestedActions;
+		return result;
+	}
+
+	/**
+	 * Flatten a positional action list into discrete, trimmed, de-duplicated action
+	 * names. Splits comma-joined tokens ("index,show" -> ["index","show"]) so the comma
+	 * form matches the documented space-separated form, drops empties, and preserves
+	 * first-seen order. Comparison is case-insensitive but the original casing is kept (#3112).
+	 */
+	private array function normalizeActions(required array actions) {
+		var normalized = [];
+		for (var token in arguments.actions) {
+			for (var part in listToArray(token, ",")) {
+				var trimmed = trim(part);
+				if (len(trimmed) && !arrayFindNoCase(normalized, trimmed)) {
+					arrayAppend(normalized, trimmed);
+				}
+			}
+		}
+		return normalized;
 	}
 
 	/**

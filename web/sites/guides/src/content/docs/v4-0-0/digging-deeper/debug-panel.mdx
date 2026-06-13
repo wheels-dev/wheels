@@ -111,12 +111,12 @@ The Environment tab label shows the current environment name (Development, Testi
 
 Always shown. Lists the environment, the git branch (when the **web root** — `public/` — contains a `.git` directory; in a standard app layout the `.git` directory lives at the project root, so the row does not appear), the Wheels version, the CFML engine and version, and the host name (when available).
 
-When no reload password is set, the environment name is followed by quick-switch links. These links are currently dead: switching environments via the URL requires a configured `reloadPassword` plus a matching `password` parameter, which is exactly the state in which the links do not render — so clicking one only restarts the app in the same environment. See [#3060](https://github.com/wheels-dev/wheels/issues/3060).
+When no reload password is set, the environment name is followed by quick-switch links. These links are dead: any URL-based reload — environment switch or plain restart — requires a configured `reloadPassword` plus a matching `password` parameter, which is exactly the state in which the links do not render, so clicking one serves the page normally without restarting anything. See [#3060](https://github.com/wheels-dev/wheels/issues/3060).
 
 To actually switch environments at runtime, set a `reloadPassword` in `config/settings.cfm` and request `?reload=<environment>&password=<your password>`. The switch is additionally gated by the `allowEnvironmentSwitchViaUrl` setting: an explicit boolean you set is honored in every environment, and when unset it defaults to `false` in `production`, `testing`, and `maintenance` and `true` everywhere else. Switching to the environment you are already in is a no-op, and after a successful switch the redirect strips the reload parameters from the URL.
 
 <Aside type="caution">
-  When no `reloadPassword` is configured, any visitor can currently restart the application with `?reload=true` — the bar's reload link is just that URL. This contract is being tightened; see [#3062](https://github.com/wheels-dev/wheels/issues/3062).
+  When no `reloadPassword` is configured, URL-based reload is disabled entirely — `?reload=true` (the bar's reload link) serves the page normally without restarting, and Wheels logs a `wheels_security` warning on boot telling you to set a password ([#3062](https://github.com/wheels-dev/wheels/issues/3062); before that fix the same state let any visitor restart the application anonymously).
 </Aside>
 
 ![Environment & Configuration panel showing Application section with Environment (Development with green dot), Wheels Version, CFML Engine (Lucee 7.0.0.395), Host Name; Packages section listing wheels-basecoat; and Plugins (Legacy) "No plugins installed."](/v4-0-0/digging-deeper/debug-panel-screenshots/05-environment-panel.png)

@@ -32,4 +32,20 @@ component extends="cli.lucli.Module" {
 		return arrayToList(variables.capturedLines, chr(10));
 	}
 
+	/**
+	 * Render a TestBox result struct through the private displayTestResults()
+	 * path and return everything it printed. Lets specs assert the observable
+	 * effect of `--verbose` (per-spec tree) and `--ci` (GitHub Actions
+	 * annotations) without standing up a live test server (issue #3113).
+	 */
+	public string function renderResults(
+		required any result,
+		boolean verboseOutput = false,
+		boolean ciMode = false
+	) {
+		variables.capturedLines = [];
+		displayTestResults(arguments.result, arguments.verboseOutput, "", arguments.ciMode);
+		return capturedOutput();
+	}
+
 }

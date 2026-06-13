@@ -93,6 +93,7 @@ component {
 					var roleRaw = {name: roleName, hosts: hosts};
 					if (structKeyExists(entry, "env")) roleRaw.env = entry.env;
 					if (structKeyExists(entry, "cmd")) roleRaw.cmd = entry.cmd;
+					if (structKeyExists(entry, "proxy")) roleRaw.proxy = entry.proxy;
 					arrayAppend(out, new Role(roleRaw));
 				}
 			}
