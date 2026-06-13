@@ -77,6 +77,37 @@ publish_package() {
         exit 1
     fi
 
+    # Slug allowlist guard (defensive — see #3182).
+    #
+    # `box publish` derives the ForgeBox slug from box.json["slug"], NOT from
+    # any argument this script passes. A 4.0 publish must ONLY ever land on a
+    # wheels-* slug. The deprecated 2.x channel slugs — cfwheels-base-template
+    # (76k installs) and cfwheels-cli — must never receive a 4.0 artifact: a
+    # 2.x user running `box install cfwheels-base-template` would otherwise get
+    # a broken modern install. The publish path is already safe by construction
+    # (every template box.json carries a wheels-* slug and the prepare-*.sh
+    # scripts only substitute the version placeholder), but a stray edit to a
+    # box.json — or a future cfwheels-* compatibility shim — could regress that
+    # silently. This assert fails the release loudly instead of mispublishing.
+    local PACKAGE_SLUG
+    PACKAGE_SLUG="$(jq -r '.slug // empty' "$PACKAGE_DIR/box.json")"
+    if [ -z "$PACKAGE_SLUG" ]; then
+        echo "ERROR: box.json in $PACKAGE_DIR has no \"slug\" — cannot validate the publish target!"
+        exit 1
+    fi
+    case "$PACKAGE_SLUG" in
+        wheels-*)
+            echo "  Slug allowlist: '$PACKAGE_SLUG' is an approved wheels-* target."
+            ;;
+        *)
+            echo "ERROR: refusing to publish slug '$PACKAGE_SLUG' from $PACKAGE_DIR."
+            echo "       Only wheels-* slugs may be published. The legacy 2.x slugs"
+            echo "       (cfwheels-base-template, cfwheels-cli) are frozen and must"
+            echo "       never receive a 4.0 artifact — see #3182."
+            exit 1
+            ;;
+    esac
+
     # Verify package contents
     if ! verify_package_contents "$PACKAGE_DIR" "$PACKAGE_NAME"; then
         echo "ERROR: Package verification failed!"
