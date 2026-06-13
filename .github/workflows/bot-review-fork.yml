@@ -131,9 +131,9 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           prompt: |
             /review-pr ${{ steps.pr.outputs.pr_num }} ${{ steps.pr.outputs.sha }}
-          # Model policy: judging gate = fable, coding stages = opus, janitorial = sonnet.
+          # Model policy: judging gate = opus (was Fable 5 until its 2026-06 deactivation), coding stages = opus, janitorial = sonnet.
           claude_args: |
-            --model claude-fable-5
+            --model claude-opus-4-8
             --max-turns 250
             --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"
 
