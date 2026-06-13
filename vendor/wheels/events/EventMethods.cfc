@@ -170,7 +170,6 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			StructDelete(request.wheels, "redirectAfterReloadUrl");
 			$location(url = local.redirectAfterReloadUrl, addToken = false);
 		}
-		local.Mixins = new wheels.Plugins();
 		// If the first debug point has not already been set in a reload request we set it here.
 		if (application.wheels.showDebugInformation) {
 			if (StructKeyExists(request.wheels, "execution")) {
@@ -231,7 +230,11 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		}
 
 		// Inject methods from plugins and packages directly to Application.cfc.
+		// The Plugins instance is constructed inside the guard on purpose: each
+		// construction also pays the wheels.Global pseudo-constructor, so
+		// mixin-free apps skip it entirely (issue #2897, Stage 3).
 		if (!StructIsEmpty(application.wheels.mixins)) {
+			local.Mixins = new wheels.Plugins();
 			$engineAdapter().prepareDIComplete(variables, this);
 			local.Mixins.$initializeMixins(variables);
 		}

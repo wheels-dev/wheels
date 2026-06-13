@@ -147,18 +147,41 @@ plugins/            # Third-party plugins
   - Adobe ColdFusion 2018/2021/2023/2025
   - Lucee 5, Lucee 6, Lucee 7
   - Boxlang
-- **Database Engine**: Choose one of the following:
-  - MySQL
-  - PostgreSQL
-  - Microsoft SQL Server
-  - Oracle Database
-  - SQLite Database
-  - H2 Database (for development/testing)
 
-### Environment Configuration
+### Install and Run (zero-config)
+
+The starter app boots out of the box with no database server and no `.env` file.
+It ships with an **H2 embedded database** (the H2 Lucee extension is declared in
+`server.json`, so CommandBox installs it automatically on first start) and the
+`authenticateThis` plugin is bundled under `plugins/`.
+
+```bash
+# 1. Install the framework (lands in vendor/wheels/)
+box install
+
+# 2. Start the server (auto-installs the H2 extension, boots the app)
+box server start
+
+# 3. Create the schema and seed the default data
+wheels migrate latest
+
+# 4. Reload the application so the seeded settings load
+#    (or just restart the server). Then open the site:
+box server open
+```
+
+Default sign-in credentials are seeded by the migrations — see
+`app/migrator/migrations/20180519105944_Adds_Default_UserAccounts.cfc`.
+
+### Using a server-based database instead
+
+To point the app at MySQL, PostgreSQL, SQL Server, or Oracle:
 
 1. Copy `.env.example` to `.env`
-2. Configure database settings based on your chosen database:
+2. Configure database settings based on your chosen database (see below)
+3. Replace the H2 datasource block in `config/app.cfm` with one that reads the
+   `this.env.DB_*` values (the original env-driven MySQL example is preserved in
+   the comments of `.env.example`)
 
 #### MySQL Configuration
 

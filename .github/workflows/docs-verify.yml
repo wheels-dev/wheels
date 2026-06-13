@@ -9,6 +9,10 @@ on:
       - 'web/sites/guides/package.json'
       - 'web/sites/guides/src/sidebars/v4-0-0.json'
       - '.github/workflows/docs-verify.yml'
+      # The harness exercises the checkout's CLI module (overlaid onto the
+      # installed brew CLI below), so CLI changes can flip {test:cli} blocks
+      # red — run the docs gate when the CLI module changes (#3042).
+      - 'cli/lucli/**'
 
 jobs:
   verify:
@@ -20,6 +24,13 @@ jobs:
     # same install flow, and Linux posix_spawn is unaffected.
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    env:
+      # Attestation mode (#3042): consumed by lib/exec.mjs
+      # wheelsBinaryAttestation() and echoed by the smoke-test step, so the
+      # log states exactly whose CLI code the {test:cli}/{test:tutorial}
+      # blocks dispatched to. github.sha is hex-only (injection-safe).
+      WHEELS_ATTEST_MODE: "checkout cli/lucli module overlay @ ${{ github.sha }} (released LuCLI runtime via brew)"
 
     steps:
       - name: Checkout
@@ -70,23 +81,45 @@ jobs:
           sed -i 's|/openjdk.jdk/Contents/Home||g' "$WRAPPER"
           grep JAVA_HOME "$WRAPPER"
 
+      - name: Overlay checkout CLI module (branch attestation)
+        # Binary attestation (#3042): `wheels` is the released LuCLI runtime
+        # plus a CFML module — and the module IS this repo's cli/lucli/ (the
+        # brew formula ships it verbatim as wheels-module-<ver>.tar.gz, plus
+        # vendor/wheels/ staged inside it). The wrapper installed above syncs
+        # that released module to $HOME/.wheels/modules/wheels the first time
+        # a non-intercepted command runs. Write that directory from the
+        # CHECKOUT instead, before anything triggers the first-run sync, so
+        # every `wheels` invocation in this job dispatches to the branch's
+        # CLI module. {test:cli} blocks then attest to the tree under review:
+        # a branch change to a command's output flips its block red.
+        #
+        # The .module-version marker is copied from the formula so the
+        # wrapper's version-diff sync never overwrites the overlay with the
+        # released module mid-job. (Note: `wheels --version` and `--help`
+        # are intercepted in the wrapper itself — kept in sync with
+        # Module.cfc — so those two surfaces still answer with released
+        # wrapper text; every real subcommand runs branch code.)
+        #
+        # Out of scope: the LuCLI runtime stays at the released version the
+        # formula pins — runtime changes ship via LuCLI releases, not this
+        # repo's PRs.
+        run: |
+          MODULE_DST="$HOME/.wheels/modules/wheels"
+          rm -rf "$MODULE_DST"
+          mkdir -p "$MODULE_DST/vendor/wheels"
+          cp -R "$GITHUB_WORKSPACE/cli/lucli/." "$MODULE_DST/"
+          cp -R "$GITHUB_WORKSPACE/vendor/wheels/." "$MODULE_DST/vendor/wheels/"
+          cp "$(brew --prefix wheels)/share/wheels/.module-version" "$MODULE_DST/.module-version"
+          echo "Overlaid $MODULE_DST from checkout (marker: $(cat "$MODULE_DST/.module-version"))"
+
       - name: Smoke-test the CLI (binary attestation)
-        # Binary attestation (#3042): this workflow installs the RELEASED
-        # brew CLI, so {test:cli}/{test:compile}/{test:tutorial} blocks
-        # attest to that release — not a CLI built from this checkout.
-        # verify-docs.mjs prints the same "wheels binary: <path> ... " line
-        # at run start. To attest to a branch-built CLI instead, export
-        # WHEELS_BIN pointing at it (not wired up yet — issue #3042 tracks
-        # building the CLI from the checkout here).
+        # verify-docs.mjs prints the full attestation line (binary path,
+        # resolution source, version, and WHEELS_ATTEST_MODE) at run start;
+        # this step is the early, human-greppable copy of the same facts.
         run: |
           command -v wheels
           wheels --version
-
-      - name: Warm up wheels module (first-run copy)
-        # Homebrew wrapper copies the module to $HOME/.wheels/modules/wheels
-        # on first invocation. Trigger it so the module is in place before
-        # the harness spawns `wheels`.
-        run: wheels --version >/dev/null
+          echo "attest mode: $WHEELS_ATTEST_MODE"
 
       - name: Run harness unit tests
         working-directory: web/sites/guides

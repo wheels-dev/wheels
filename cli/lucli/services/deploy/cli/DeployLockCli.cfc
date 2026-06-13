@@ -63,12 +63,14 @@ component {
         // as advisory output, not a thrown error. #2696. Checked on every
         // host since the lock lives fleet-wide (##2957 DEP-1) — and the same
         // advisory contract covers an unreachable host: report it, don't throw.
-        var failed = $dispatchPerHostTolerant($uniqueHosts($allHosts(cfg)), lock.status(), dryRun);
-        return $renderResult(
-            arguments.opts,
-            "Checked deploy lock status for " & cfg.service()
-                & $skippedHostsSuffix(failed, "the lock state there is unknown")
-        );
+        // #2957 DEP-6a: also surface readlink's output (the lock holder on
+        // stdout, or the "No such file" diagnostic on stderr) per host instead
+        // of dropping it.
+        var collected = $collectPerHostTolerant($uniqueHosts($allHosts(cfg)), lock.status(), dryRun);
+        var summary = "Checked deploy lock status for " & cfg.service();
+        if (arrayLen(collected.lines)) summary &= chr(10) & arrayToList(collected.lines, chr(10));
+        summary &= $skippedHostsSuffix(collected.failed, "the lock state there is unknown");
+        return $renderResult(arguments.opts, summary);
     }
 
     private string function $renderResult(required struct opts, required string summary) {
@@ -214,6 +216,58 @@ component {
         return chr(10) & "WARNING: skipped " & arrayLen(arguments.failed)
             & " unreachable host(s): " & arrayToList(parts, "; ")
             & " — " & arguments.consequence & ".";
+    }
+
+    /**
+     * Per-host best-effort dispatch that ALSO collects the remote output,
+     * host-prefixed (`[host] line`). Combines two ##2957 contracts that the
+     * `lock status` verb needs at once:
+     *   - DEP-1: read the lock on EVERY host (the lock lives fleet-wide), and
+     *     tolerate an unreachable host — report it, don't throw. Each host
+     *     runs in its own sequential([host]) with a per-host try/catch so a
+     *     dead connect or a dead cached session is confined to that host (see
+     *     $dispatchPerHostTolerant for why allowFail-style onEach/onAny is not
+     *     enough).
+     *   - DEP-6a: surface what readlink actually said. Stdout wins (the lock
+     *     holder); stderr is the fallback so the "No such file" diagnostic on
+     *     an unheld lock still reaches the operator. The command is run with
+     *     {raise: false} so a nonzero exit (no lock held) is advisory output,
+     *     not a thrown error.
+     *
+     * @return struct {lines: array of "[host] line", failed: array of
+     *         {host, message} for hosts that were unreachable}.
+     */
+    private struct function $collectPerHostTolerant(
+        required array hosts,
+        required string cmd,
+        required boolean dryRun
+    ) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
+            }
+            return {lines: [], failed: []};
+        }
+        var c = arguments.cmd;
+        // Closures can't write outer locals reliably — collect via a shared struct.
+        var ctx = {lines: [], failed: []};
+        for (var h in arguments.hosts) {
+            try {
+                variables.sshPool.sequential([h], function(ssh, host) {
+                    var res = ssh.run(c, {raise: false});
+                    var text = trim(res.stdout ?: "");
+                    if (!len(text)) text = trim(res.stderr ?: "");
+                    if (!len(text)) return;
+                    text = replace(text, chr(13), "", "all");
+                    for (var line in listToArray(text, chr(10))) {
+                        arrayAppend(ctx.lines, "[" & host & "] " & line);
+                    }
+                });
+            } catch (any e) {
+                arrayAppend(ctx.failed, {host: h, message: e.message});
+            }
+        }
+        return ctx;
     }
 
     private string function $currentUser() {

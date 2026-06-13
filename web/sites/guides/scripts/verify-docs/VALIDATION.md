@@ -192,22 +192,32 @@ binary (`drivers/tutorial.mjs`, `ensureServer()`), not a fresh `PATH`
 lookup — so `WHEELS_BIN` redirects it like every other spawn.
 
 `verify-docs.mjs` prints an attestation line at run start stating the
-resolved path, how it was resolved, and the binary's `--version` output:
+resolved path, how it was resolved, the binary's `--version` output, and
+the **mode** — whose CLI code the binary dispatches to:
 
 ```
-verify-docs: wheels binary: /opt/homebrew/bin/wheels (via PATH discovery) — ...
+verify-docs: wheels binary: /opt/homebrew/bin/wheels (via PATH discovery) — Wheels Version: 4.0.3 — mode: as-installed (no module overlay declared)
 ```
 
-A green run only attests to the binary named on that line.
+A green run only attests to the binary + mode named on that line. The mode
+comes from `WHEELS_ATTEST_MODE` (free-form text, set by whoever arranged a
+non-default module); when unset it reports `as-installed`.
 
-**CI implication:** `.github/workflows/docs-verify.yml` installs the
-**released** brew CLI and does not set `WHEELS_BIN`, so a green CI run of
-`{test:cli}` / `{test:compile}` / `{test:tutorial}` blocks attests to the
-released CLI — not to a CLI built from the PR's checkout. Wiring CI to a
-branch-built CLI (so a CLI behavior change in a PR can flip a cli block
-red) is tracked in [#3042](https://github.com/wheels-dev/wheels/issues/3042).
-To attest to a locally built CLI, point `WHEELS_BIN` at it before running
-the harness.
+**CI (#3042):** the `wheels` CLI is the released LuCLI runtime plus a CFML
+module, and that module is this repo's `cli/lucli/`. `.github/workflows/docs-verify.yml`
+installs the released brew CLI, then **overlays the checkout's `cli/lucli/`
+(plus `vendor/wheels/`) onto `$HOME/.wheels/modules/wheels`** before any
+command runs, and sets `WHEELS_ATTEST_MODE` accordingly. So a green CI run
+of `{test:cli}` / `{test:tutorial}` blocks attests to the PR branch's CLI
+module on the released runtime — a branch change to a command's behavior
+flips its block red. Two caveats: the LuCLI runtime itself stays at the
+released version (runtime changes ship via LuCLI releases, not this repo),
+and bare `wheels --version` / `wheels --help` are intercepted by the brew
+wrapper script before the module is consulted, so those two surfaces still
+answer with released wrapper text.
+
+To attest to a locally built CLI, point `WHEELS_BIN` at it (and set
+`WHEELS_ATTEST_MODE` to describe it) before running the harness.
 
 ## Running the harness locally
 
