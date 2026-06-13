@@ -36,7 +36,7 @@ Install a package:
 
 ```bash title="your shell"
 wheels packages add wheels-hotwire
-wheels stop && wheels start
+wheels reload
 ```
 
 Browse, search, inspect, update, or remove:
@@ -57,7 +57,7 @@ Deactivation is a single command — `remove` deletes the `vendor/<name>/` direc
   The registry caches its index for 24 hours. If you want to see a just-published version immediately, `wheels packages registry refresh` busts the cache. `wheels packages registry info` shows the configured registry URL and cache state.
 </Aside>
 
-The restart re-runs `PackageLoader` at startup, which rediscovers what's in `vendor/` and reconciles the mixin, service, and middleware tables with the new state. A plain `wheels reload` is not enough — `PackageLoader` only re-scans `vendor/` on a cold start.
+The reload re-runs `PackageLoader`, which rediscovers what's in `vendor/` and reconciles the mixin, service, and middleware tables with the new state. An authorized `wheels reload` calls `applicationStop()` so the next request re-fires `onApplicationStart` in full — `wheels stop && wheels start` also works. Caveat: a missing or wrong reload password silently skips the restart.
 
 ## First-party packages
 
@@ -156,7 +156,7 @@ component output="false" {
 }
 ```
 
-After installing the package into `vendor/myfeature/` and restarting the server (`wheels stop && wheels start`), every controller has `myHelper()` available. The framework collects public methods from the package instance and merges them into the application mixin tables — the same machinery that runs for plugins, but scoped to the targets you named in the manifest.
+After installing the package into `vendor/myfeature/` and reloading (`wheels reload` or `wheels stop && wheels start`), every controller has `myHelper()` available. The framework collects public methods from the package instance and merges them into the application mixin tables — the same machinery that runs for plugins, but scoped to the targets you named in the manifest.
 
 Lifecycle hook names the loader specifically skips when collecting mixins: `init`, `onPluginLoad`, `onPluginActivate`, `register`, `boot`. If you name a method any of those, it won't be mixed in — the loader treats them as package infrastructure.
 
