@@ -90,8 +90,8 @@ Three quick checks before running anything:
    # Registry — matches registry.password[0] in deploy.yml
    KAMAL_REGISTRY_PASSWORD=$(op read op://Production/Registry/password)
 
-   # App-level secrets — will feed env.secret once container delivery
-   # lands (#2956/#2957); harmless to stage here in the meantime
+   # App-level secrets — referenced by env.secret in deploy.yml and
+   # delivered to the container via a host-side env file (#2957)
    DATABASE_URL=$(op read op://Production/App/database-url)
    WHEELS_RELOAD_PASSWORD=$(op read op://Production/App/reload-password)
    ```
@@ -113,8 +113,8 @@ Three quick checks before running anything:
 
    `clear:` values are baked into `deploy.yml` and safe under git. At deploy time, `wheels deploy` translates them into `docker run -e` flags.
 
-   <Aside type="caution" title="env.secret is not yet supported">
-     Kamal's `env.secret:` block — naming `.kamal/secrets` keys to be passed into the app container — is **not delivered to containers yet**. The released 4.0.3 CLI silently drops `env.secret` entries; CLIs built from `develop` reject the block outright with `Wheels.Deploy.EnvSecretUnsupported` so the gap can't bite silently. Secret delivery to app containers is tracked in [#2956](https://github.com/wheels-dev/wheels/issues/2956) and [#2957](https://github.com/wheels-dev/wheels/issues/2957). Until it lands, get secrets into the container another way (bake non-secrets into the image, or mount an env file you manage yourself). `.kamal/secrets` still works for its other consumer: `registry.password` resolution at `docker login` time.
+   <Aside type="caution" title="env.secret requires a 4.0.4+ CLI">
+     Kamal's `env.secret:` block — naming `.kamal/secrets` keys to be passed into the app container — works on CLIs built from `develop` (4.0.4+): each deploy writes the resolved values to a per-role env file on the host (`600` permissions, content over SFTP) and `docker run` references it via `--env-file`, so values never appear on a command line ([#2957](https://github.com/wheels-dev/wheels/issues/2957)). The **released 4.0.3 CLI silently drops `env.secret` entries** — on 4.0.3, get secrets into the container another way (bake non-secrets into the image, or mount an env file you manage yourself).
    </Aside>
 
 5. **Bootstrap Docker on the host (first time only).**

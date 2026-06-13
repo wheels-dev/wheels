@@ -162,10 +162,10 @@ env:
 
 Changes to `env` take effect on next deploy only; running containers keep their original values.
 
-<Aside type="caution" title="env.secret is not yet supported">
-Kamal's `env.secret` list (secret keys resolved from `.kamal/secrets` and delivered to the container) is **not implemented**. On the released 4.0.3 CLI, `secret:` entries are silently dropped — the variables never reach the container. On current develop builds the loader fails fast with `Wheels.Deploy.EnvSecretUnsupported` instead of dropping them. Track secret delivery in [#2956](https://github.com/wheels-dev/wheels/issues/2956).
+<Aside type="caution" title="env.secret requires a 4.0.4+ CLI">
+Kamal's `env.secret` list (secret keys resolved from `.kamal/secrets` and delivered to the container) works on CLIs built from `develop` (4.0.4+): values are written to a per-role env file on each host (`600` permissions, content over SFTP) and `docker run` references it via `--env-file`, so values never appear on a command line ([#2957](https://github.com/wheels-dev/wheels/issues/2957)). A declared name with no resolvable value fails fast with `Wheels.Deploy.EnvSecretMissing` before anything touches a host. On the **released 4.0.3 CLI**, `secret:` entries are silently dropped — the variables never reach the container.
 
-Per-role `env:` overrides are also not implemented — only the top-level `env.clear` map reaches `docker run` ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+Per-role `env:` overrides are not implemented — only the top-level `env` block reaches `docker run` ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
 </Aside>
 
 ## `ssh`
@@ -240,7 +240,7 @@ accessories:
       - config/init.sql:/docker-entrypoint-initdb.d/init.sql
 ```
 
-Two caveats on the example shapes: `files:` is accepted but **never uploaded** — no copy step or docker flag is emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)) — and accessory `env.secret` entries are subject to the same not-yet-implemented secret delivery as the top-level [`env`](#env) key ([#2956](https://github.com/wheels-dev/wheels/issues/2956)).
+Two caveats on the example shapes: `files:` is accepted but **never uploaded** — no copy step or docker flag is emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)) — and accessory `env.secret` entries follow the same delivery rules as the top-level [`env`](#env) key: delivered via a host-side env file on 4.0.4+ builds, silently dropped on the released 4.0.3 ([#2957](https://github.com/wheels-dev/wheels/issues/2957)).
 
 See [Accessories](/v4-0-0/deployment/accessories/) for the full walk-through.
 

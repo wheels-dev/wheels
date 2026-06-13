@@ -25,9 +25,11 @@ component {
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
     public string function boot(required struct opts) {
+        // boot (re)creates the container, so env.secret values must be
+        // delivered to the role env file first (#2957).
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
             return cmds.run(role, version);
-        });
+        }, {deliverEnvFile: true});
         return $renderResult(arguments.opts, "Booted app on " & n & " host(s)");
     }
 
@@ -122,9 +124,29 @@ component {
         var roleFilter = arguments.opts.role ?: "";
         var hostCount = 0;
 
+        // env.secret delivery (#2957): container-(re)creating verbs opt in
+        // via flags.deliverEnvFile. Content renders once — an unresolvable
+        // secret fails fast locally before any remote call.
+        var secretNames = (arguments.flags.deliverEnvFile ?: false) ? cfg.env().secret() : [];
+        var envFileContent = "";
+        if (arrayLen(secretNames)) {
+            envFileContent = appCmds.env_file_content(secretNames, $resolvedSecrets());
+        }
+
         for (var role in cfg.roles()) {
             if (len(roleFilter) && role.name() != roleFilter) continue;
             for (var host in role.hosts()) {
+                if (arrayLen(secretNames)) {
+                    $deliverEnvFile(
+                        [host],
+                        appCmds.ensure_env_file(role),
+                        appCmds.relock_env_file(role),
+                        envFileContent,
+                        appCmds.env_file_path(role),
+                        secretNames,
+                        dryRun
+                    );
+                }
                 var cmd = arguments.cmdFn(appCmds, role, version);
                 if (collect) {
                     for (var l in $dispatchCollect([host], cmd, dryRun)) {
@@ -159,6 +181,58 @@ component {
         var c = arguments.cmd;
         var doRaise = !arguments.allowFail;
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
+    }
+
+    /**
+     * Resolved key→value map from the SecretResolver the loader built for
+     * the most recent load(). Empty struct when no resolver exists.
+     */
+    private struct function $resolvedSecrets() {
+        var resolver = variables.loader.secretResolver();
+        return isObject(resolver) ? resolver.all() : {};
+    }
+
+    /**
+     * Deliver env.secret content to `remotePath` on each host (#2957):
+     * ensure-cmd (mkdir + touch + chmod 600) first so the file is
+     * permission-locked before content lands, then SFTP via uploadString —
+     * values never enter argv or dry-run output — then relock-cmd
+     * (chmod 600) AFTER the upload, belt-and-braces against the SFTP layer
+     * resetting perms to 0644 (sshj's preserve-attributes default;
+     * SshClient disables it, but FakeSshPool can't verify that, so the
+     * re-lock is the testable guarantee). Mirrors
+     * DeployMainCli.$deliverEnvFile (each Cli keeps its own dispatch
+     * plumbing by design).
+     */
+    private void function $deliverEnvFile(
+        required array hosts,
+        required string ensureCmd,
+        required string relockCmd,
+        required string content,
+        required string remotePath,
+        required array secretNames,
+        required boolean dryRun
+    ) {
+        $dispatch(arguments.hosts, arguments.ensureCmd, arguments.dryRun);
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(
+                    variables.dryRunBuffer,
+                    "[" & h & "] upload env file " & arguments.remotePath
+                        & " (" & arrayLen(arguments.secretNames) & " secret(s): "
+                        & arrayToList(arguments.secretNames, ", ") & " — values not shown)"
+                );
+            }
+            $dispatch(arguments.hosts, arguments.relockCmd, arguments.dryRun);
+            return;
+        }
+        var c = arguments.content;
+        var p = arguments.remotePath;
+        var relock = arguments.relockCmd;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+            ssh.uploadString(c, p);
+            ssh.run(relock, {raise: true});
+        });
     }
 
     /**
