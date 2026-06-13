@@ -11,6 +11,21 @@ if (StructKeyExists(request, "wheels") && IsStruct(request.wheels)) {
 	request.wheels.showDebugInformation = true;
 }
 
+// Page title. This shared simple header is used by BOTH the error screen
+// (default) AND the congratulations/welcome page. The including template can
+// override the title via request.wheels.simpleHeaderTitle; everything else
+// (errors via EventMethods.$runOnError) falls back to "Wheels - Error".
+// Read it here into a local so the <head> below stays markup-only. See #3175.
+local.simpleHeaderTitle = "Wheels - Error";
+if (
+	StructKeyExists(request, "wheels")
+	&& IsStruct(request.wheels)
+	&& StructKeyExists(request.wheels, "simpleHeaderTitle")
+	&& Len(request.wheels.simpleHeaderTitle)
+) {
+	local.simpleHeaderTitle = request.wheels.simpleHeaderTitle;
+}
+
 // Inline icon font (see _header.cfm and issue ##2421). Duplicated here
 // because error pages can render before _header.cfm has been visited.
 // Double-checked locking matches _header.cfm — see comment there for
@@ -36,7 +51,7 @@ if (!StructKeyExists(application.wheels, "iconsFontDataUri")) {
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Wheels - Error</title>
+	<title>#EncodeForHTML(local.simpleHeaderTitle)#</title>
 	<meta charset="utf-8">
 	<meta name="robots" content="noindex,nofollow">
 	<style>
