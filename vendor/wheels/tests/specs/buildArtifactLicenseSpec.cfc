@@ -12,6 +12,15 @@ component extends="wheels.WheelsTest" {
 	// asserting the canonical `cp LICENSE` / `cp NOTICE` lines mirrors the
 	// regression-guard pattern used by buildInfoSpec.cfc and
 	// routesViewBrowserFixturesSpec.cfc.
+	//
+	// Two source-operand forms are accepted: the bare `cp LICENSE "${BUILD_DIR}/"`
+	// (core/cli/starterApp run from the repo root, so a relative LICENSE
+	// resolves) and the CWD-independent `cp "${REPO_ROOT}/LICENSE" "${BUILD_DIR}/"`
+	// that prepare-base.sh uses (#3196 — the LuCLI-source rebuild derives
+	// REPO_ROOT from BASH_SOURCE and reads every source file by absolute path,
+	// so a bare LICENSE would be a lone CWD-dependent outlier). Both forms still
+	// land LICENSE/NOTICE in BUILD_DIR; the regex remains tight enough that
+	// deleting the copy line fails the guard.
 
 	function run() {
 
@@ -36,7 +45,7 @@ component extends="wheels.WheelsTest" {
 						it("copies LICENSE into its BUILD_DIR", () => {
 							var src = fileRead(repoRoot & "/" & relPath);
 							var hasLicense = reFindNoCase(
-								"cp[[:space:]]+LICENSE[[:space:]]+""\$\{BUILD_DIR\}",
+								"cp[[:space:]]+(""?\$\{REPO_ROOT\}/)?LICENSE""?[[:space:]]+""\$\{BUILD_DIR\}",
 								src
 							) > 0;
 							expect(hasLicense).toBeTrue(
@@ -47,7 +56,7 @@ component extends="wheels.WheelsTest" {
 						it("copies NOTICE into its BUILD_DIR", () => {
 							var src = fileRead(repoRoot & "/" & relPath);
 							var hasNotice = reFindNoCase(
-								"cp[[:space:]]+NOTICE[[:space:]]+""\$\{BUILD_DIR\}",
+								"cp[[:space:]]+(""?\$\{REPO_ROOT\}/)?NOTICE""?[[:space:]]+""\$\{BUILD_DIR\}",
 								src
 							) > 0;
 							expect(hasNotice).toBeTrue(

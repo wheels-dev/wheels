@@ -11,7 +11,7 @@
 			"mvc",
 			"rails",
 			"wheels",
-			"wheels",
+			"cfml",
 			"core"
 		],
     "homepage":"https://wheels.dev/",
@@ -48,9 +48,9 @@
         }
     ],
     "scripts":{
-        "postInstall":"pathExists .env || cp env.example .env && mv env.example .env.example",
-        "format":"cfformat run config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc --overwrite",
-        "format:check":"cfformat check config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc",
-        "format:watch":"cfformat watch path='config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc' settingsPath='.cfformat.json'"
+        "postInstall":"pathExists .env || cp env.example .env",
+        "format":"cfformat run config/,app/,tests/,*.cfc --overwrite",
+        "format:check":"cfformat check config/,app/,tests/,*.cfc",
+        "format:watch":"cfformat watch path='config/,app/,tests/,*.cfc' settingsPath='.cfformat.json'"
     }
 }
