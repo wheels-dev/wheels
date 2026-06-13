@@ -349,6 +349,94 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(fileExists(root & "templates/deploy/init/dockerignore.mustache")).toBeTrue();
             });
 
+            // #3158 — the `wheels deploy init` scaffold must round-trip through
+            // `config` and `deploy --dry-run` without the EnvSecretUnsupported
+            // hard-fail #3008 introduced. Since #3167 retired that guard and
+            // delivers env.secret via a remote env file, the scaffolded
+            // `env.secret: [WHEELS_RELOAD_PASSWORD]` block is now correct and
+            // must validate + deploy end-to-end. These pin that contract so the
+            // scaffold and the deploy engine can never drift back apart.
+            it("the init scaffold round-trips through config() and deploy --dry-run with no EnvSecret error (##3158)", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-3158-init-roundtrip-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+                try {
+                    var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool(),
+                        {projectRoot: tmpCwd}
+                    );
+                    localCli.init_stub({cwd: tmpCwd, service: "demo", image: "acme/demo"});
+
+                    var cfgPath = tmpCwd & "/config/deploy.yml";
+                    // The scaffold declares env.secret: [WHEELS_RELOAD_PASSWORD]
+                    // and .kamal/secrets declares the matching (empty) key, so
+                    // the resolver supplies a value and env_file_content() does
+                    // not raise EnvSecretMissing.
+                    expect(fileRead(cfgPath)).toInclude("WHEELS_RELOAD_PASSWORD");
+                    expect(fileRead(tmpCwd & "/.kamal/secrets")).toInclude("WHEELS_RELOAD_PASSWORD");
+
+                    // config() must validate and dump the scaffold unchanged.
+                    var configOut = localCli.config({configPath: cfgPath});
+                    expect(configOut).toInclude("service: demo");
+
+                    // deploy --dry-run must not throw EnvSecretUnsupported/Missing
+                    // and must route the secret through the --env-file path.
+                    var fake2 = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        fake2,
+                        {projectRoot: tmpCwd}
+                    );
+                    var dryOut = dc.deploy({configPath: cfgPath, version: "v1", dryRun: true});
+                    expect(arrayLen(fake2.calls())).toBe(0);
+                    expect(dryOut).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    expect(dryOut).toInclude("WHEELS_RELOAD_PASSWORD");
+                } finally {
+                    directoryDelete(tmpCwd, true);
+                }
+            });
+
+            it("a deploy of the init scaffold delivers WHEELS_RELOAD_PASSWORD via the env file, never argv (##3158)", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-3158-init-deliver-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+                try {
+                    var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool(),
+                        {projectRoot: tmpCwd}
+                    );
+                    localCli.init_stub({cwd: tmpCwd, service: "demo", image: "acme/demo"});
+
+                    // A user populates the scaffolded secrets file; the registry
+                    // password the scaffold also references is set so the deploy
+                    // path resolves cleanly.
+                    fileWrite(
+                        tmpCwd & "/.kamal/secrets",
+                        "KAMAL_REGISTRY_PASSWORD=regpw#chr(10)#WHEELS_RELOAD_PASSWORD=reload-s3cret"
+                    );
+
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        fake,
+                        {projectRoot: tmpCwd}
+                    );
+                    dc.deploy({configPath: tmpCwd & "/config/deploy.yml", version: "v1"});
+
+                    var calls = fake.calls();
+                    var uploadIdx = 0;
+                    for (var i = 1; i <= arrayLen(calls); i++) {
+                        if (!uploadIdx && (calls[i].kind ?: "") == "uploadString") uploadIdx = i;
+                    }
+                    expect(uploadIdx).toBeGT(0);
+                    // The scaffolded secret reaches the role env file over SFTP.
+                    expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/roles/web.env");
+                    expect(calls[uploadIdx].content).toInclude("WHEELS_RELOAD_PASSWORD=reload-s3cret");
+                    // The value must never appear in any command string.
+                    for (var c in calls) {
+                        expect(c.cmd ?: "").notToInclude("reload-s3cret");
+                    }
+                } finally {
+                    directoryDelete(tmpCwd, true);
+                }
+            });
+
             it("audit dispatches tail of audit log to every host", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
