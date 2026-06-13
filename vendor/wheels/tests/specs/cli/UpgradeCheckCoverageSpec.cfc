@@ -64,9 +64,17 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
-			it("scans for missing csrfEncryptionKey configuration", () => {
-				expect(findNoCase("csrfEncryptionKey", block) > 0).toBeTrue(
-					"3.x -> 4.x checks should detect a missing csrfEncryptionKey in config/ (CHANGELOG ##2054, ##2079)."
+			it("scans for missing csrfCookieEncryptionSecretKey configuration", () => {
+				expect(findNoCase("csrfCookieEncryptionSecretKey", block) > 0).toBeTrue(
+					"3.x -> 4.x checks should detect a missing csrfCookieEncryptionSecretKey in config/ — the real "
+					& "setting the framework reads (vendor/wheels/controller/csrf.cfc), CHANGELOG ##2054, ##2079."
+				);
+				// Regression for ##3115: the rule used to recommend the inert
+				// `csrfEncryptionKey`, a name no framework code consults — a
+				// user following it kept the rotate-on-every-deploy behaviour.
+				expect(findNoCase("csrfEncryptionKey", block) == 0).toBeTrue(
+					"The check must not reference the inert csrfEncryptionKey — the framework only reads "
+					& "csrfCookieEncryptionSecretKey, so recommending csrfEncryptionKey is a no-op (##3115)."
 				);
 			});
 

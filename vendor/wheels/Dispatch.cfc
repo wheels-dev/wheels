@@ -197,6 +197,10 @@ component output="false" extends="wheels.Global"{
 		// --- Fast path: Static route O(1) lookup ---
 		// Static routes (no variables in pattern) are indexed in a hash map at registration time.
 		// This avoids regex matching entirely for common static paths like /login, /about, etc.
+		// NOTE: this is a deliberate precedence rule, not just a perf shortcut — a literal path
+		// beats a placeholder route regardless of declaration order. Declaration order still
+		// decides placeholder-vs-placeholder conflicts and ties between identical static
+		// patterns. Pinned by tests/specs/dispatch/RoutePrecedenceSpec.cfc (issue 3073).
 		if (StructKeyExists(application.wheels, "staticRoutes")) {
 			local.staticKey = local.methodKey & ":/" & arguments.path;
 			if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
@@ -362,13 +366,15 @@ component output="false" extends="wheels.Global"{
 			request.wheels.params = {};
 			// Cors.handle() reads the verb from arguments.request.cgi.request_method
 			// rather than arguments.request.method, so we don't carry the method
-			// field on this context. Cors is the only middleware that gates on
-			// this path; once it short-circuits, middleware registered after it
-			// does not run. Middleware registered before Cors still executes.
+			// field on this context — the `cgi` member supplies it (#3074).
+			// Cors is the only middleware that gates on this path; once it
+			// short-circuits, middleware registered after it does not run.
+			// Middleware registered before Cors still executes.
 			local.preflightContext = {
 				params = {},
 				route = {},
-				pathInfo = arguments.pathInfo
+				pathInfo = arguments.pathInfo,
+				cgi = $buildMiddlewareCgiScope()
 			};
 			local.preflightHandler = function(required struct request) {
 				return "";
@@ -416,12 +422,16 @@ component output="false" extends="wheels.Global"{
 				return "";
 			}
 		} else {
-			// Build the request context for middleware.
+			// Build the request context for middleware. The `cgi` member carries
+			// the sanitized request.cgi copy overlaid on the full inbound HTTP
+			// header set so documented patterns like a RateLimiter keyFunction
+			// reading `req.cgi.http_x_api_key` resolve per client (#3074).
 			local.requestContext = {
 				params = local.params,
 				route = StructKeyExists(request.wheels, "currentRoute") ? request.wheels.currentRoute : {},
 				pathInfo = arguments.pathInfo,
-				method = $getRequestMethod()
+				method = $getRequestMethod(),
+				cgi = $buildMiddlewareCgiScope()
 			};
 
 			// The core handler that middleware wraps around.
@@ -449,6 +459,57 @@ component output="false" extends="wheels.Global"{
 
 			return variables.$middlewarePipeline.run(request = local.requestContext, coreHandler = local.coreHandler);
 		}
+	}
+
+	/**
+	 * Build the `cgi` member of the middleware request context (#3074).
+	 *
+	 * Starts from the inbound HTTP headers — each mapped to its CGI-style
+	 * `http_*` name — and overlays the sanitized `request.cgi` copy so the
+	 * standard keys keep the IIS/encoding fixes applied by `$cgiScope()` (and
+	 * so test specs that inject values into `request.cgi` win over the live
+	 * header snapshot). The header mapping is what makes arbitrary headers
+	 * like `X-Api-Key` resolve: `$cgiScope()` copies a fixed key list, and
+	 * the engine CGI scope exposes arbitrary headers by name but is not
+	 * enumerable on Adobe CF.
+	 *
+	 * The `headers` argument exists for spec injection; live dispatch omits
+	 * it and reads the real inbound headers via `$requestHttpHeaders()`.
+	 */
+	public struct function $buildMiddlewareCgiScope(struct headers) {
+		if (!StructKeyExists(arguments, "headers")) {
+			arguments.headers = $requestHttpHeaders();
+		}
+		local.rv = {};
+		for (local.headerName in arguments.headers) {
+			if (Len(local.headerName) && IsSimpleValue(arguments.headers[local.headerName])) {
+				local.rv["http_" & Replace(LCase(local.headerName), "-", "_", "all")] = arguments.headers[local.headerName];
+			}
+		}
+		if (StructKeyExists(request, "cgi") && IsStruct(request.cgi)) {
+			StructAppend(local.rv, request.cgi, true);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Snapshot of the inbound HTTP headers, or an empty struct when they are
+	 * unavailable (test contexts or unusual dispatch paths). Prefers the
+	 * body-skipping form of GetHttpRequestData so reading headers never
+	 * consumes the request input stream.
+	 */
+	public struct function $requestHttpHeaders() {
+		try {
+			return GetHttpRequestData(false).headers;
+		} catch (any e) {
+			// Fall through: some engines may not support the boolean argument.
+		}
+		try {
+			return GetHttpRequestData().headers;
+		} catch (any e) {
+			// Fall through: no servlet request available in this context.
+		}
+		return {};
 	}
 
 	/**

@@ -258,6 +258,9 @@ component output="false" {
 		}
 
 		// Build static route index for O(1) lookup of routes with no variables.
+		// First registration wins per method+pattern key, so declaration order breaks ties
+		// between identical static patterns. Precedence semantics are pinned by
+		// tests/specs/dispatch/RoutePrecedenceSpec.cfc (issue 3073).
 		if (local.routeStruct.isStatic) {
 			if (!StructKeyExists(application[$appKey()], "staticRoutes")) {
 				application[$appKey()].staticRoutes = {};

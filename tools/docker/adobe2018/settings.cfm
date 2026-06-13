@@ -22,8 +22,12 @@
 	*/
 	set(URLRewriting="On");
 
-	// Reload your application with ?reload=true&password=|reloadPassword|
-	set(reloadPassword="");
+	// Reload your application with ?reload=true&password=wheels-dev
+	// SECURITY (issue #3062): an empty reloadPassword disables URL-based reload
+	// entirely, so the harness needs a real (non-secret, throwaway) password for
+	// edit-reload-test cycles. Matches the demo app's config/settings.cfm and
+	// the SMOKE_RELOAD_PASSWORD the CI workflows use.
+	set(reloadPassword="wheels-dev");
 
 	// CLI-Appends-Here
 </cfscript>

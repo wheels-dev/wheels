@@ -139,6 +139,8 @@ Routes match first-to-last. Wrong order = wrong matches.
 Order: MCP routes → resources → custom named routes → root → wildcard (last!)
 ```
 
+One blessed exception ([#3073](https://github.com/wheels-dev/wheels/issues/3073)): placeholder-free patterns live in an exact-path index resolved BEFORE the ordered scan, so a literal like `/posts/featured` beats `/posts/[key]` regardless of declaration position. Declaration order still decides placeholder-vs-placeholder conflicts and ties between identical static patterns. Pinned by `vendor/wheels/tests/specs/dispatch/RoutePrecedenceSpec.cfc`; fast path in `Dispatch.cfc::$findMatchingRoute`, index built in `Mapper.cfc`.
+
 ### 7. `timestamps()` Adds Three Columns (Not Two)
 `createdAt`, `updatedAt`, AND `deletedAt` (soft-delete marker). Don't add separate datetime columns for these. Verified against `vendor/wheels/migrator/TableDefinition.cfc`.
 
@@ -219,6 +221,8 @@ if (len(resolved)) header("Access-Control-Allow-Origin", resolved);
 ```
 
 Pair with `Vary: Origin` whenever the response varies by request origin ([#2724](https://github.com/wheels-dev/wheels/pull/2724)).
+
+Running `set(allowCorsRequests=true)` alongside a `wheels.middleware.Cors` instance no longer duplicates headers — the global path defers to the middleware automatically ([#3114](https://github.com/wheels-dev/wheels/issues/3114)) and writes a one-time `wheels.log` warning. Remove the six `allowCorsRequests` / `accessControlAllow*` settings from `config/settings.cfm` once the middleware is configured.
 
 ### 14. Strip CFML Comments Before Source-Scanning
 **Source:** [#2595](https://github.com/wheels-dev/wheels/pull/2595) — `wheels validate` checked for `extends="Model"` with raw `findNoCase()` and was satisfied by a commented-out `// component extends="Model"` line, missing real missing-inheritance bugs.
@@ -429,13 +433,13 @@ new wheels.middleware.RateLimiter(storage="database")                          /
 // rate-limit per API key — hoist the closure first: an inline function literal
 // as a constructor named arg crashes Adobe CF (Cross-Engine Invariant 5)
 var apiKeyFn = function(req) {
-    var apiKey = cgi.http_x_api_key;
+    var apiKey = req.cgi.http_x_api_key ?: "";
     return Len(apiKey) ? apiKey : "anonymous";
 };
 new wheels.middleware.RateLimiter(keyFunction=apiKeyFn)
 ```
 
-The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method}` — it has **no `cgi` key** ([#3074](https://github.com/wheels-dev/wheels/issues/3074)), so `req.cgi.*` silently collapses every client into one bucket. Read the real `cgi` scope directly, and guard with `Len()` (a missing header reads as empty string, not undefined, so `?:` never fires).
+The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method, cgi}`. The `cgi` member is the sanitized `request.cgi` copy overlaid on every inbound HTTP header under its CGI-style `http_*` name (built by `Dispatch.$buildMiddlewareCgiScope()`), so arbitrary headers like `X-Api-Key` resolve per client ([#3074](https://github.com/wheels-dev/wheels/issues/3074) — before 4.0.4 the context had **no `cgi` key** and `req.cgi.*` silently collapsed every client into one bucket). Keep the `Len()` guard: an empty-valued header reads as empty string, and on pre-fix versions a missing header does too.
 
 Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` or `database`. Emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. Returns `429` with `Retry-After` when exceeded.
 
@@ -659,7 +663,12 @@ result = (new wheels.Job()).processQueue(queue="mailers", limit=10);
 stats = (new wheels.Job()).queueStats();
 ```
 
-Worker CLI: none yet — `wheels jobs work|status|retry|purge|monitor` do not exist (`cli/lucli/Module.cfc` has no `jobs` command; invoking one errors — [#3090](https://github.com/wheels-dev/wheels/issues/3090)). Drive queues programmatically via `processQueue()` / `queueStats()` (above), e.g. from a scheduled task or cron-invoked script.
+Worker CLI (`cli/lucli/Module.cfc::jobs()` — thin wrapper over the `jobsProcessNext`/`jobsStatus` bridge commands in `vendor/wheels/public/views/cli.cfm`; requires a running server):
+```bash
+wheels jobs work --queue=mailers --interval=3   # long-lived worker loop; --max-jobs=N for one-shot batches, --quiet
+wheels jobs status [--queue=mailers] [--format=json]
+```
+The `retry`/`purge`/`monitor` verbs are tracked follow-ups ([#3090](https://github.com/wheels-dev/wheels/issues/3090)) — invoking one errors with the programmatic equivalent (`(new wheels.Job()).retryFailed()` / `.purgeCompleted()`).
 
 Backoff: `this.baseDelay = 2`, `this.maxDelay = 3600` in `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`. The `wheels_jobs` table is auto-created on first enqueue/processing — no migration needed.
 
@@ -716,7 +725,7 @@ User-facing `fix`/`feat` PRs add a **fragment file**, never a direct `CHANGELOG.
 
 There is no `wheels mcp setup` command — copy the JSON above into `.mcp.json` manually (see the MCP integration guide for OpenCode/Cursor variants).
 
-Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (live-verified on the released 4.0.3 CLI): `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (18 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only tools (`main`, `mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`) are hidden via `mcpHiddenTools()`.
+Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (live-verified on the released 4.0.3 CLI): `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (18 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only tools (`main`, `mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`, `jobs`) are hidden via `mcpHiddenTools()`.
 
 **Deprecated:** the in-dev-server HTTP endpoint at `/wheels/mcp`. Emits a deprecation notice on first request. Migrate to the stdio surface.
 

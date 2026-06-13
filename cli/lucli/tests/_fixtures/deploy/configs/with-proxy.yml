@@ -1,0 +1,11 @@
+service: demo
+image: acme/demo
+servers:
+  - 1.2.3.4
+registry:
+  username: demo
+  password:
+    - REGISTRY_PASSWORD
+proxy:
+  host: app.example.com
+  app_port: 8080

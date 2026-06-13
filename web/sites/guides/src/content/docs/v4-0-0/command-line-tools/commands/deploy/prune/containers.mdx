@@ -7,18 +7,19 @@ sidebar:
   order: 3
 ---
 
-Prune old containers beyond `retain_containers:` on every host. The current live container and everything in the retention window survives.
+Prune old containers beyond the retention window (`--keep=<n>`, default 5) on every host. The current live container and everything in the retention window survives.
 
 ## Synopsis
 
 ``` title="synopsis"
-wheels deploy prune containers [--destination=<name>] [--dry-run]
+wheels deploy prune containers [--keep=<n>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
+| `--keep=<n>` | How many old (stopped) containers to keep per host. Default 5. There is no `deploy.yml` equivalent — Kamal's `retain_containers:` is rejected by the config validator. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print the commands without executing. |
 

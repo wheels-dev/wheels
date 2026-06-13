@@ -37,7 +37,10 @@ component {
     }
 
     public string function config(required struct opts) {
-        var cfg = variables.loader.load(arguments.opts.configPath);
+        var cfg = variables.loader.load(
+            arguments.opts.configPath,
+            {destination: arguments.opts.destination ?: ""}
+        );
         var yaml = new modules.wheels.services.deploy.lib.Yaml();
         var rolesMap = $roleHosts(cfg);
         return yaml.dump({
@@ -53,6 +56,15 @@ component {
 
     public string function deploy(required struct opts) {
         arrayClear(variables.dryRunBuffer);
+        return $deploy(arguments.opts);
+    }
+
+    /**
+     * Deploy body, shared by deploy() and setup(). Does NOT clear the
+     * dry-run buffer — the public verbs do, so setup()'s pre-deploy
+     * bootstrap commands survive into dryRunOutput().
+     */
+    private string function $deploy(required struct opts) {
         var cfg = variables.loader.load(
             arguments.opts.configPath,
             {destination: arguments.opts.destination ?: ""}
@@ -63,7 +75,9 @@ component {
         var app = new modules.wheels.services.deploy.commands.AppCommands(cfg);
         var proxy = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var builder = new modules.wheels.services.deploy.commands.BuilderCommands(cfg);
+        var dockerCmds = new modules.wheels.services.deploy.commands.DockerCommands(cfg);
         var lock = new modules.wheels.services.deploy.commands.LockCommands(cfg);
+        var auditor = new modules.wheels.services.deploy.commands.AuditorCommands(cfg);
         var hooks = new modules.wheels.services.deploy.commands.HookCommands(
             cfg,
             {projectRoot: variables.projectRoot}
@@ -75,6 +89,9 @@ component {
             KAMAL_HOSTS: arrayToList(hosts, ",")
         };
         var deployStart = getTickCount();
+        // Port the app listens on inside the container — the kamal-proxy
+        // --target. Resolved from proxy.app_port (default 80); see #3089.
+        var appPort = cfg.proxy().appPort();
 
         $fireHook(hooks, "pre-deploy", hookEnv, dryRun);
 
@@ -86,19 +103,40 @@ component {
             );
 
             try {
+                // #2957 DEP-6b: write the on-server audit trail that the
+                // `audit` verb tails. Records bracket the work (started /
+                // completed) and are dispatched allowFail — observability
+                // must never fail a deploy.
+                $dispatch(hosts, auditor.record("started deploy of version " & ver), dryRun, true);
                 $dispatch(hosts, builder.pull(ver), dryRun);
-                $dispatchAny(hosts, proxy.details() & " || " & proxy.boot(), dryRun);
+                // Fresh-host bootstrap (#2957 DEP-5c): every `docker run`
+                // below joins --network kamal, so the network must exist
+                // before the first consumer. ensure_network is idempotent.
+                $dispatch(hosts, dockerCmds.ensure_network("kamal"), dryRun);
+                // Boot (or start) kamal-proxy on EVERY proxy-fronted host
+                // (#2957 DEP-5a/5b). The old `details() || boot()` guard
+                // never booted anything — `docker ps` exits 0 regardless —
+                // and was dispatched to only one host via $dispatchAny.
+                var proxyHosts = $proxyHosts(cfg);
+                if (arrayLen(proxyHosts)) {
+                    $dispatch(proxyHosts, proxy.start_or_run(), dryRun);
+                }
 
                 for (var role in cfg.roles()) {
                     for (var host in role.hosts()) {
                         $dispatch([host], app.run(role, ver), dryRun);
-                        $dispatch(
-                            [host],
-                            proxy.deploy(role, app.container_name(role, ver) & ":3000"),
-                            dryRun
-                        );
+                        // Only proxy-fronted roles register with kamal-proxy —
+                        // job/worker roles serve no traffic (#2957).
+                        if (role.runningProxy()) {
+                            $dispatch(
+                                [host],
+                                proxy.deploy(role, app.container_name(role, ver) & ":" & appPort),
+                                dryRun
+                            );
+                        }
                     }
                 }
+                $dispatch(hosts, auditor.record("completed deploy of version " & ver), dryRun, true);
             } finally {
                 // Tolerate release failures so they can never shadow the
                 // original deploy exception inside this finally block. rm -f
@@ -112,7 +150,19 @@ component {
         } catch (any e) {
             hookEnv.KAMAL_RUNTIME = int((getTickCount() - deployStart) / 1000);
             hookEnv.KAMAL_ERROR = e.message;
-            $fireHook(hooks, "post-deploy-failure", hookEnv, dryRun);
+            // post-deploy-failure is best-effort notification on an
+            // already-failed path: a flaky hook must never shadow the
+            // original deploy error (mirrors the allowFail lock release in
+            // the finally block above). Log the hook failure and rethrow
+            // the original exception. See #3087.
+            try {
+                $fireHook(hooks, "post-deploy-failure", hookEnv, dryRun);
+            } catch (any hookError) {
+                writeOutput(
+                    "[hook:post-deploy-failure] " & hookError.message
+                        & " (ignored — surfacing the original deploy error)" & chr(10)
+                );
+            }
             rethrow;
         }
 
@@ -139,18 +189,24 @@ component {
         var app = new modules.wheels.services.deploy.commands.AppCommands(cfg);
         var proxy = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
+        // Same proxy-target resolution as deploy() — see #3089.
+        var appPort = cfg.proxy().appPort();
         var hostList = [];
         for (var role in cfg.roles()) {
             for (var host in role.hosts()) {
                 $dispatch([host], app.start(role, arguments.opts.version), dryRun);
                 $dispatch(
                     [host],
-                    proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":3000"),
+                    proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":" & appPort),
                     dryRun
                 );
                 arrayAppend(hostList, host);
             }
         }
+        // #2957 DEP-6b: rollbacks are exactly what an operator greps the audit
+        // log for later. allowFail — never let the log line fail the rollback.
+        var auditor = new modules.wheels.services.deploy.commands.AuditorCommands(cfg);
+        $dispatch(hostList, auditor.record("rolled back to version " & arguments.opts.version), dryRun, true);
 
         return $renderResult(
             arguments.opts,
@@ -159,9 +215,37 @@ component {
         );
     }
 
+    /**
+     * One-time server bootstrap + first deploy (Kamal `setup` semantics):
+     * create the kamal docker network on every accessory host, boot each
+     * accessory on its hosts, then run a full deploy (which bootstraps the
+     * network + proxy on the app hosts). Previously a literal alias for
+     * deploy(), so fresh hosts never got their accessories (#2957).
+     */
     public string function setup(required struct opts) {
-        // Phase 2 will add accessory boot; for Phase 1 this equals deploy.
-        return deploy(arguments.opts);
+        arrayClear(variables.dryRunBuffer);
+        var cfg = variables.loader.load(
+            arguments.opts.configPath,
+            {destination: arguments.opts.destination ?: ""}
+        );
+        var dryRun = arguments.opts.dryRun ?: false;
+
+        if (arrayLen(cfg.accessories())) {
+            var dockerCmds = new modules.wheels.services.deploy.commands.DockerCommands(cfg);
+            var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
+            var auditor = new modules.wheels.services.deploy.commands.AuditorCommands(cfg);
+            for (var acc in cfg.accessories()) {
+                // Accessories join --network kamal too, and may live on
+                // hosts outside the app roles — ensure the network there
+                // before the accessory container runs (#2957 DEP-5c).
+                $dispatch(acc.hosts(), dockerCmds.ensure_network("kamal"), dryRun);
+                $dispatch(acc.hosts(), accCmds.run(acc), dryRun);
+                // #2957 DEP-6b: audit trail for setup's accessory phase.
+                $dispatch(acc.hosts(), auditor.record("booted accessory " & acc.name()), dryRun, true);
+            }
+        }
+
+        return $deploy(arguments.opts);
     }
 
     /**
@@ -178,11 +262,15 @@ component {
         var cmd = "tail -n " & tail & " /tmp/kamal-audit.log";
         var hosts = $allHosts(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
-        $dispatch(hosts, cmd, dryRun);
+        // #2957 DEP-6a: surface the actual log content, not just a summary.
+        var lines = $dispatchCollect(hosts, cmd, dryRun);
         return $renderResult(
             arguments.opts,
-            "Tailed audit log (last " & tail & " lines) on "
-                & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+            $withRemoteOutput(
+                "Tailed audit log (last " & tail & " lines) on "
+                    & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", "),
+                lines
+            )
         );
     }
 
@@ -225,21 +313,26 @@ component {
         var proxyCmds = new modules.wheels.services.deploy.commands.ProxyCommands(cfg);
         var hosts = $allHosts(cfg);
 
+        // #2957 DEP-6a: read verbs surface the remote stdout, host-prefixed.
+        var lines = [];
         // app details: docker ps filtered by service label
-        $dispatch(hosts, appCmds.containers(), dryRun);
+        for (var l in $dispatchCollect(hosts, appCmds.containers(), dryRun)) arrayAppend(lines, l);
         // proxy details: docker ps filtered by kamal-proxy name
-        $dispatch(hosts, proxyCmds.details(), dryRun);
+        for (var l in $dispatchCollect(hosts, proxyCmds.details(), dryRun)) arrayAppend(lines, l);
         // accessory details (if any)
         if (arrayLen(cfg.accessories())) {
             var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
             for (var acc in cfg.accessories()) {
-                $dispatch(acc.hosts(), accCmds.details(acc), dryRun);
+                for (var l in $dispatchCollect(acc.hosts(), accCmds.details(acc), dryRun)) arrayAppend(lines, l);
             }
         }
         return $renderResult(
             arguments.opts,
-            "Collected app + proxy + accessory details from "
-                & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
+            $withRemoteOutput(
+                "Collected app + proxy + accessory details from "
+                    & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", "),
+                lines
+            )
         );
     }
 
@@ -430,9 +523,54 @@ component {
     }
 
     /**
+     * Dispatch a command and collect the remote output, host-prefixed
+     * (`[host] line`), in host order. Used by read verbs (`audit`,
+     * `details`) so live mode surfaces what the remote actually said
+     * instead of just a host-count summary (#2957 DEP-6a). Runs hosts
+     * sequentially — read output should arrive in a predictable order,
+     * and serial execution keeps the collection single-threaded.
+     * Falls back to stderr when a tolerated (allowFail) command produced
+     * no stdout, so e.g. "No such file" diagnostics still reach the user.
+     */
+    private array function $dispatchCollect(
+        required array hosts,
+        required string cmd,
+        required boolean dryRun,
+        boolean allowFail = false
+    ) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
+            }
+            return [];
+        }
+        var c = arguments.cmd;
+        var doRaise = !arguments.allowFail;
+        // Closures can't write outer locals reliably — collect via a shared struct.
+        var ctx = {lines: []};
+        variables.sshPool.sequential(arguments.hosts, function(ssh, host) {
+            var res = ssh.run(c, {raise: doRaise});
+            var text = trim(res.stdout ?: "");
+            if (!len(text)) text = trim(res.stderr ?: "");
+            if (!len(text)) return;
+            text = replace(text, chr(13), "", "all");
+            for (var line in listToArray(text, chr(10))) {
+                arrayAppend(ctx.lines, "[" & host & "] " & line);
+            }
+        });
+        return ctx.lines;
+    }
+
+    /** Append the remote output block to a live-mode summary (no-op when empty). */
+    private string function $withRemoteOutput(required string summary, required array lines) {
+        if (!arrayLen(arguments.lines)) return arguments.summary;
+        return arguments.summary & chr(10) & arrayToList(arguments.lines, chr(10));
+    }
+
+    /**
      * Dispatch a single command to "any one" host — used for operations
-     * that only need to happen once across the fleet (lock acquire/release,
-     * proxy boot check). FakeSshPool.onAny records exactly one call.
+     * that only need to happen once across the fleet (lock acquire/release).
+     * FakeSshPool.onAny records exactly one call.
      */
     private void function $dispatchAny(
         required array hosts,
@@ -520,6 +658,22 @@ component {
         var out = [];
         for (var role in arguments.cfg.roles()) {
             for (var h in role.hosts()) arrayAppend(out, h);
+        }
+        return out;
+    }
+
+    /**
+     * Distinct hosts of every proxy-fronted role (Role.runningProxy()),
+     * in declaration order. Each of these needs its own kamal-proxy
+     * container (#2957 DEP-5b).
+     */
+    private array function $proxyHosts(required any cfg) {
+        var out = [];
+        for (var role in arguments.cfg.roles()) {
+            if (!role.runningProxy()) continue;
+            for (var h in role.hosts()) {
+                if (!arrayContains(out, h)) arrayAppend(out, h);
+            }
         }
         return out;
     }

@@ -85,10 +85,10 @@ Execution order is fixed: `app/db/seeds.cfm` runs first (always), then `app/db/s
 
 ## Running seeds
 
-Seeds run against your app's datasource, so the server has to be up.
+Seeds run against your app's datasource, so the server has to be up — with no server running, `wheels seed` refuses and points you at `wheels start` rather than seeding the wrong database.
 
-```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
-wheels --version
+```bash {test:cli cmd="wheels seed" asserts-output="No running Wheels server" asserts-exit=1}
+wheels seed
 ```
 
 The commands you'll actually use day-to-day:

@@ -214,7 +214,11 @@ component extends="wheels.WheelsTest" {
 				// (which web-root-prefixes the path on Adobe CF).
 				local.outsideDir = GetTempDirectory() & "dlprobe3077_outside"
 				if (!DirectoryExists(local.outsideDir)) {
-					DirectoryCreate(local.outsideDir, true)
+					// Adobe CF's DirectoryCreate accepts exactly one parameter (the extra
+					// createPath boolean is Lucee-only) and rejects extras at COMPILE time,
+					// crashing the entire bundle. The parent (temp dir) always exists, so
+					// the single-argument form is sufficient on every engine.
+					DirectoryCreate(local.outsideDir)
 				}
 				local.target = local.outsideDir & "/secret.txt"
 				FileWrite(local.target, "secret payload")
@@ -241,7 +245,9 @@ component extends="wheels.WheelsTest" {
 				// (e.g. /var/www/wheels/uploads), silently rewriting it.
 				local.wheelsDir = GetTempDirectory() & "wheels3077-dl"
 				if (!DirectoryExists(local.wheelsDir)) {
-					DirectoryCreate(local.wheelsDir, true)
+					// Single-argument form only: the createPath boolean is Lucee-only and
+					// Adobe rejects it at compile time (crashes the whole bundle).
+					DirectoryCreate(local.wheelsDir)
 				}
 				local.target = local.wheelsDir & "/secret.txt"
 				FileWrite(local.target, "secret payload")
@@ -271,7 +277,9 @@ component extends="wheels.WheelsTest" {
 				local.relDir = "dlprobe3077_rel"
 				local.absDir = ExpandPath("/" & local.relDir)
 				if (!DirectoryExists(local.absDir)) {
-					DirectoryCreate(local.absDir, true)
+					// Single-argument form only: the createPath boolean is Lucee-only and
+					// Adobe rejects it at compile time (crashes the whole bundle).
+					DirectoryCreate(local.absDir)
 				}
 				local.target = local.absDir & "/report.txt"
 				FileWrite(local.target, "webroot-relative payload")

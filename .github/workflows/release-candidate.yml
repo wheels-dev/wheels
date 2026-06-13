@@ -89,9 +89,10 @@ jobs:
         run: |
           ./tools/build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
-      - name: Prepare Wheels CLI for ForgeBox
-        run: |
-         ./tools/build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+      # The legacy CommandBox `wheels-cli` module (built from cli/src/) is FROZEN
+      # as of #3184 — RC cuts no longer prepare/validate/build/publish it. The
+      # canonical CLI ships as the LuCLI module via brew/scoop/apt/yum + `wheels
+      # new`. Refs #3180.
 
       - name: Prepare Wheels Starter App for ForgeBox
         run: |
@@ -159,9 +160,10 @@ jobs:
             echo "  ✓ Package validated successfully"
           }
 
+          # The legacy CommandBox wheels-cli module is frozen (#3184) and no
+          # longer prepared/published, so it is not validated.
           validate_package "build-wheels-base" "Wheels Base Template"
           validate_package "build-wheels-core/wheels" "Wheels Core"
-          validate_package "build-wheels-cli/wheels-cli" "Wheels CLI"
           validate_package "build-wheels-starterApp" "Wheels Starter App"
 
           echo ""
@@ -178,11 +180,12 @@ jobs:
       # Build Artifacts for GitHub
       #############################################
 
+      # build-cli.sh (the legacy CommandBox wheels-cli zip) is no longer invoked —
+      # the module is frozen (#3184).
       - name: Build All Wheels Artifacts
         run: |
           ./tools/build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-          ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
       - name: Upload Wheels Base Template Artifact
@@ -203,14 +206,8 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
 
-      - name: Upload Wheels CLI Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: rc-build-artifacts-cli
-          path: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.sha512
+      # The legacy CommandBox wheels-cli zip is no longer built (#3184), so there
+      # is no "Upload Wheels CLI Artifact" step.
 
       - name: Upload Wheels Starter App Artifact
         uses: actions/upload-artifact@v7
@@ -267,9 +264,6 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip.sha512
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512

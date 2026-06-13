@@ -28,12 +28,10 @@
         ".env.example"
     ],
     "dependencies": {
-        "wheels-core": "^4.0.0",
-        "wheels-authenticateThis":"^1"
+        "wheels-core": "^4.0.0"
     },
     "installPaths": {
-        "wheels-core": "vendor/wheels/",
-        "wheels-authenticateThis":"plugins/authenticateThis/"
+        "wheels-core": "vendor/wheels/"
     },
     "private":false,
     "license":[

@@ -48,11 +48,15 @@ component {
 		}
 
 		// Build a SecretResolver lazily if the caller didn't inject one.
-		// Project root defaults to the directory containing the YAML file —
-		// this lets `.kamal/secrets` alongside `deploy.yml` resolve naturally.
+		// Project root is derived from the YAML path via $projectRootFor():
+		// the standard `config/deploy.yml` layout resolves `.kamal/secrets`
+		// at the PROJECT ROOT (the parent of config/) — the same root
+		// `wheels deploy init` scaffolds and DeploySecretsCli reads — while
+		// a deploy.yml outside a config/ directory keeps resolving
+		// `.kamal/secrets` alongside itself. See issue 3084.
 		if (!isObject(variables.secretResolver)) {
 			variables.secretResolver = new modules.wheels.services.deploy.lib.SecretResolver({
-				projectRoot: getDirectoryFromPath(arguments.path),
+				projectRoot: $projectRootFor(arguments.path),
 				destination: dest
 			});
 		}
@@ -60,6 +64,27 @@ component {
 		raw = $interpolate(raw);
 		variables.validator.validate(raw, arguments.path);
 		return new Config(raw, {destination: dest});
+	}
+
+	/**
+	 * Derive the secrets project root from a deploy.yml path.
+	 *
+	 * When the YAML sits inside a directory named `config` (the standard
+	 * `wheels deploy init` layout: <root>/config/deploy.yml), the project
+	 * root is the PARENT of that directory, so `.kamal/secrets` resolves
+	 * from the project root — agreeing with DeploySecretsCli and the
+	 * registry-login SecretResolver default. Any other layout keeps the
+	 * YAML's own directory as the root (`.kamal/secrets` alongside it).
+	 */
+	public string function $projectRootFor(required string path) {
+		var dir = getDirectoryFromPath(arguments.path);
+		var lastChar = right(dir, 1);
+		var trimmed = (len(dir) > 1 && (lastChar == "/" || lastChar == "\")) ? left(dir, len(dir) - 1) : dir;
+		if (len(trimmed) > 1 && listLast(trimmed, "/\") == "config") {
+			var parent = getDirectoryFromPath(trimmed);
+			if (len(parent)) return parent;
+		}
+		return dir;
 	}
 
 	/**

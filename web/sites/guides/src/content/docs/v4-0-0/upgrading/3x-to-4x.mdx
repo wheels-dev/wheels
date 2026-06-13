@@ -89,13 +89,13 @@ All six CORS settings (`allowCorsRequests` and the five `accessControlAllow*` se
 
 **What happens when both are active**
 
-The two paths can technically coexist, but the result is split — and partly broken ([#3114](https://github.com/wheels-dev/wheels/issues/3114)):
+The two paths used to be independent and **additive** — both layers emitted their own `Access-Control-Allow-*` lines (`cfheader` stacks rather than replaces), and an origin allowed by **both** layers — exactly the origins a migrating app cares about — received duplicate `Access-Control-Allow-Origin` headers, which the Fetch spec makes browsers reject ([#3114](https://github.com/wheels-dev/wheels/issues/3114)). `curl` looked fine; browsers failed the CORS check.
 
-- **OPTIONS requests**: the global setting fires first in `onRequestStart` and calls `abort` — the middleware never runs. Preflight headers come exclusively from the global setting's configuration.
-- **All other requests**: the two layers are independent and **additive** — neither overwrites the other. Each layer adds `Access-Control-Allow-Origin` only when the request `Origin` matches its own allow-list — but the legacy layer emits its `Access-Control-Allow-Headers` and `Access-Control-Allow-Methods` lines regardless of the origin (only the middleware gates all of its headers on the match). `cfheader` stacks rather than replaces, so a request whose `Origin` the middleware allows carries both layers' `Access-Control-Allow-Headers` and `Access-Control-Allow-Methods` lines. Worst of all, an origin allowed by **both** layers — exactly the origins a migrating app cares about — receives duplicate `Access-Control-Allow-Origin` headers, which the Fetch spec makes browsers reject. `curl` looks fine; browsers fail the CORS check.
-- The middleware pipeline also doesn't run on the public root/congrats page (a bare `.root(method="get")` route), where only the global headers appear.
+As of the [#3114](https://github.com/wheels-dev/wheels/issues/3114) fix, Wheels arbitrates this automatically. When a `wheels.middleware.Cors` instance is registered in the pipeline, the global `onRequestStart` path detects it and steps aside — skipping both `$setCORSHeaders` and the global OPTIONS `abort` — so the middleware is the single source of truth for CORS headers and preflight on every request type. A one-time warning is written to `wheels.log` prompting you to clean up the now-redundant setting.
 
-Do not run both. The moment you configure the `Cors` middleware, remove `set(allowCorsRequests=true)` (and the `accessControlAllow*` settings) in the same change.
+One caveat: the middleware pipeline does not run on the public root/congrats page (a bare `.root(method="get")` route). Under the old additive behavior that page carried the global headers; now that the global path defers whenever the middleware is registered, it gets no CORS headers at all. If you need CORS on a route the pipeline doesn't cover, use the global setting alone (without the middleware).
+
+Even with the arbitration in place, do not run both deliberately — it is a safety net for the migration window, not a supported configuration. The moment you configure the `Cors` middleware, remove `set(allowCorsRequests=true)` (and the `accessControlAllow*` settings) in the same change.
 
 **Recommendation**
 

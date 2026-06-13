@@ -170,7 +170,6 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			StructDelete(request.wheels, "redirectAfterReloadUrl");
 			$location(url = local.redirectAfterReloadUrl, addToken = false);
 		}
-		local.Mixins = new wheels.Plugins();
 		// If the first debug point has not already been set in a reload request we set it here.
 		if (application.wheels.showDebugInformation) {
 			if (StructKeyExists(request.wheels, "execution")) {
@@ -231,7 +230,11 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		}
 
 		// Inject methods from plugins and packages directly to Application.cfc.
+		// The Plugins instance is constructed inside the guard on purpose: each
+		// construction also pays the wheels.Global pseudo-constructor, so
+		// mixin-free apps skip it entirely (issue #2897, Stage 3).
 		if (!StructIsEmpty(application.wheels.mixins)) {
+			local.Mixins = new wheels.Plugins();
 			$engineAdapter().prepareDIComplete(variables, this);
 			local.Mixins.$initializeMixins(variables);
 		}
@@ -275,13 +278,22 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			$clearCache("sql");
 		}
 		if (application.wheels.allowCorsRequests) {
-			$setCORSHeaders(
-				allowOrigin = application.wheels.accessControlAllowOrigin,
-				allowCredentials = application.wheels.accessControlAllowCredentials,
-				allowHeaders = application.wheels.accessControlAllowHeaders,
-				allowMethods = application.wheels.accessControlAllowMethods,
-				allowMethodsByRoute = application.wheels.accessControlAllowMethodsByRoute
-			);
+			// When a wheels.middleware.Cors instance is registered it owns CORS
+			// headers + preflight; emitting the global headers here too would
+			// stack duplicate Access-Control-Allow-* values (a duplicate
+			// Access-Control-Allow-Origin makes browsers reject the response).
+			// Defer to the middleware pipeline and warn once. (#3114)
+			if ($corsMiddlewareActive()) {
+				$warnGlobalCorsDeferred();
+			} else {
+				$setCORSHeaders(
+					allowOrigin = application.wheels.accessControlAllowOrigin,
+					allowCredentials = application.wheels.accessControlAllowCredentials,
+					allowHeaders = application.wheels.accessControlAllowHeaders,
+					allowMethods = application.wheels.accessControlAllowMethods,
+					allowMethodsByRoute = application.wheels.accessControlAllowMethodsByRoute
+				);
+			}
 		}
 		$include(template = "#application.wheels.eventPath#/onrequeststart.cfm");
 		if (application.wheels.showDebugInformation) {
@@ -290,8 +302,13 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 
 		// Also for CORS compliance, an OPTIONS request must return 200 and the above headers. No data is required.
 		// This will be remove when OPTIONS is implemented in the mapper (issue #623)
+		// Skipped when a wheels.middleware.Cors instance is registered — the
+		// dispatch pipeline answers preflight via $hasPreflightCapableMiddleware()
+		// so aborting here (with no headers, since $setCORSHeaders was deferred)
+		// would break the preflight. (#3114)
 		if (
 			application.wheels.allowCorsRequests
+			&& !$corsMiddlewareActive()
 			&& StructKeyExists(request, "CGI")
 			&& StructKeyExists(request.CGI, "request_method")
 			&& request.CGI.request_method eq "OPTIONS"

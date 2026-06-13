@@ -55,7 +55,7 @@ HTTP request
 
 ### 1. Dispatch and route match
 
-The router walks `config/routes.cfm` top-to-bottom, first match wins. A match resolves to a controller name, an action name, and a set of route params (including `params.key` from `[key]` segments). Route model binding (when `binding=true` on a resource) loads `params.<singular>` from the database here — before your action runs. An unmatched URL throws `Wheels.RouteNotFound` (a 404) right here — nothing further in the pipeline runs for it.
+The router resolves the URL in two steps: placeholder-free patterns are checked against an exact-path index first (a literal path beats a placeholder route regardless of declaration order), then everything else is scanned top-to-bottom — first match wins (see [How Routing Works](/v4-0-0/core-concepts/how-routing-works/)). A match resolves to a controller name, an action name, and a set of route params (including `params.key` from `[key]` segments). Route model binding (when `binding=true` on a resource) loads `params.<singular>` from the database here — before your action runs. An unmatched URL throws `Wheels.RouteNotFound` (a 404) right here — nothing further in the pipeline runs for it.
 
 ### 2. Middleware
 

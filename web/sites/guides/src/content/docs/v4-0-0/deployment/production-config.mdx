@@ -64,7 +64,7 @@ Create `config/production/settings.cfm`. This file is read only when the active 
     set(dataSourceUserName=env("WHEELS_DB_USER", ""));
     set(dataSourcePassword=env("WHEELS_DB_PASSWORD", ""));
 
-    // Rotate this per-deploy. An empty value does NOT disable ?reload= —
+    // Rotate this per-deploy. An empty value disables ?reload= entirely —
     // see the pre-boot checklist, item 2.
     set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""));
 
@@ -138,7 +138,7 @@ Each deploy target exports `WHEELS_ENV` before the CFML server boots. `config/en
 
 Wheels disables URL-based switching **automatically** in production, testing, and maintenance environments unless you explicitly `set(allowEnvironmentSwitchViaUrl=true)` in your per-env settings (`onapplicationstart.cfc:360-369`; `$resolveAllowEnvironmentSwitchViaUrl()` at `:516-524`). Leave it disabled. A cached reload password plus URL switching plus production is a bad combination.
 
-The reload password uses a constant-time comparison (`$secureCompare()`, `vendor/wheels/Global.cfc:798`, called from `onapplicationstart.cfc:190` and `public/Application.cfc:277`) and rate-limits failed attempts (`onapplicationstart.cfc:160-178` and `:207-231`). Rotate it on every production deploy anyway — it's trivial to rotate and the value ends up in nginx logs if someone misconfigures TLS termination.
+The reload password uses a constant-time comparison (`$secureCompare()` in `vendor/wheels/Global.cfc`, called from both `onapplicationstart.cfc` and `public/Application.cfc`) and rate-limits failed attempts per client IP — 5 failures in 5 minutes — on both the cold-start and warm-application paths, logging each rejected or accepted attempt to `wheels_security.log` ([#3062](https://github.com/wheels-dev/wheels/issues/3062)). Rotate it on every production deploy anyway — it's trivial to rotate and the value ends up in nginx logs if someone misconfigures TLS termination.
 
 ### The `maintenance` environment
 
@@ -153,7 +153,7 @@ Run through this before the first production request. Each item maps to a framew
 </Aside>
 
 1. **`environment` is `production`.** Verify with `?controller=wheels&action=info` (dev only) or by checking `application.wheels.environment` in a smoke-test action. If it says `development`, `showErrorInformation` is still `true` and caching is off.
-2. **`reloadPassword` is set and rotated.** An empty password does **not** disable `?reload=` — it disables only URL-based environment switching (`onapplicationstart.cfc:182-190` requires a non-empty password), while a bare `?reload=true` with no password still restarts the app (`public/Application.cfc:272-277` allows the reload when the password is empty; tracked as [#3062](https://github.com/wheels-dev/wheels/issues/3062)). Wheels writes a `wheels_security` warning log on boot if it's blank (`onapplicationstart.cfc:371-376`). Set it to a random value unique to this deploy.
+2. **`reloadPassword` is set and rotated.** An empty password disables `?reload=` **entirely** — both URL-based environment switching and plain `?reload=true` require a non-empty configured password plus a matching `password` parameter (the warm-application gate in `public/Application.cfc` fails closed since [#3062](https://github.com/wheels-dev/wheels/issues/3062), mirroring the cold-start leg in `onapplicationstart.cfc`). Wheels writes a `wheels_security` warning log on boot if it's blank. Set it to a random value unique to this deploy so operators can still reload over HTTP; leave it blank only if you never want URL reload to work.
 3. **`showErrorInformation` is `false`.** The `production` switch flips this, but a stray `set(showErrorInformation=true)` in `config/settings.cfm` will leak stack traces. Grep for it.
 4. **`dataSourceName` points at a real database.** Not H2, not `wheelstestdb`, not a shared staging instance. Confirm with a read-only action that calls `model("User").count()` or similar.
 5. **`csrfCookieEncryptionSecretKey` is set** if `csrfStore="cookie"`. `csrfStore` defaults to `"session"` unconditionally (`events/init/security.cfm:3`) — cookie storage is always an explicit opt-in. With `csrfStore="cookie"` and no key, the first CSRF check throws `Wheels.Security.MissingCsrfKey` (`controller/csrf.cfc:148-157`).

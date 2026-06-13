@@ -227,6 +227,42 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(argv).toInclude("--setup-h2");
 				});
 
+				// Issue #3111: CFML `==` boolean-coerces both operands, so
+				// "1" == "true" and "0" == "false" are TRUE. `--release=1`
+				// arrived as {release: "1"}, got re-emitted as a bare
+				// --release flag (value dropped), and the downstream deploy
+				// parser then swallowed the next token — --dry-run — as the
+				// version, turning a dry run into a live SSH dispatch that
+				// hung ~76s against the config stub's placeholder host.
+				it("preserves a value of '1' as --key=1, not a bare flag (issue ##3111)", () => {
+					var argv = new cli.lucli.services.ArgSpec().toArgv({
+						"arg1": "app",
+						"arg2": "boot",
+						"release": "1",
+						"dry-run": "true"
+					});
+					expect(argv).toInclude("--release=1");
+					expect(argv).toInclude("--dry-run");
+				});
+
+				it("preserves a value of '0' as --key=0, not a --no- negation (issue ##3111)", () => {
+					var argv = new cli.lucli.services.ArgSpec().toArgv({"keep": "0"});
+					expect(argv).toInclude("--keep=0");
+				});
+
+				it("preserves boolean-castable words (yes/no) as values, not flags (issue ##3111)", () => {
+					var argv = new cli.lucli.services.ArgSpec().toArgv({"release": "yes", "follow": "no"});
+					expect(argv).toInclude("--release=yes");
+					expect(argv).toInclude("--follow=no");
+				});
+
+				it("still emits a bare flag for a native boolean true (MCP argCollection)", () => {
+					var coll = {"arg1": "app"};
+					coll["dry-run"] = javaCast("boolean", true);
+					var argv = new cli.lucli.services.ArgSpec().toArgv(coll);
+					expect(argv).toInclude("--dry-run");
+				});
+
 			});
 
 			describe("toInputSchema() — typed MCP tool input schema", () => {

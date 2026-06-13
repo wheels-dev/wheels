@@ -6,6 +6,7 @@
       { "label": "Welcome to Wheels", "link": "/v4-0-0/start-here/welcome/" },
       { "label": "Why Wheels?", "link": "/v4-0-0/start-here/why-wheels/" },
       { "label": "Installing Wheels", "link": "/v4-0-0/start-here/installing/" },
+      { "label": "Installing with CommandBox", "link": "/v4-0-0/start-here/installing-with-commandbox/" },
       { "label": "Your First 15 Minutes", "link": "/v4-0-0/start-here/first-15-minutes/" },
       {
         "label": "Tutorial: Build a Blog",
