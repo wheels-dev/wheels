@@ -14,7 +14,13 @@ WEB-INF
 cfwheels.*.zip
 settings.json
 .vscode
-/plugins/**/
+# NOTE: plugins/ is intentionally NOT ignored. The starter app ships three
+# bundled legacy plugins (authenticateThis, FlashMessagesBootstrap, jsconfirm)
+# that app/models/User.cfc (authenticateThis()) and the layouts (flashMessages())
+# depend on at runtime. CommandBox `box publish` reads this .gitignore as the
+# zip exclude list (system/endpoints/ForgeBox.cfc::generateIgnorePatterns), so a
+# `/plugins/**/` line here would strip those plugins from the published ForgeBox
+# package and make the installed app un-bootable. Keep plugins/ shippable.
 .env
 /vendor
 
