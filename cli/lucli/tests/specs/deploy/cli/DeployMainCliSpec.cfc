@@ -862,6 +862,104 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("Deployed");
             });
 
+            // Regression suite for #2957 (Wave 3 — observability). (DEP-6a) the
+            // dispatch closures dropped every ssh.run() result, so read verbs
+            // (`audit`, `details`) returned only host-count summaries in live
+            // mode — the operator never saw the remote output. (DEP-6b)
+            // AuditorCommands.record() had zero call sites, so `audit` tailed
+            // /tmp/kamal-audit.log — a file this tool never wrote.
+
+            it("audit (real mode) surfaces the remote log content host-prefixed (##2957 DEP-6a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                fake.expect("1.2.3.4", "tail -n 100 /tmp/kamal-audit.log", {
+                    exitCode: 0,
+                    stdout: "2026-06-12T10:00:00 demo started deploy of version v1" & chr(10)
+                        & "2026-06-12T10:01:00 demo completed deploy of version v1",
+                    stderr: "", durationMs: 0
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.audit({configPath: variables.fixture});
+                expect(out).toInclude("[1.2.3.4] 2026-06-12T10:00:00 demo started deploy of version v1");
+                expect(out).toInclude("[1.2.3.4] 2026-06-12T10:01:00 demo completed deploy of version v1");
+            });
+
+            it("details (real mode) surfaces the remote docker ps output host-prefixed (##2957 DEP-6a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var appCmds = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+                var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+                fake.expect("1.2.3.4", appCmds.containers(), {
+                    exitCode: 0, stdout: "abc123  acme/demo:v1  Up 2 hours", stderr: "", durationMs: 0
+                });
+                fake.expect("1.2.3.4", proxyCmds.details(), {
+                    exitCode: 0, stdout: "def456  basecamp/kamal-proxy  Up 3 days", stderr: "", durationMs: 0
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.details({configPath: variables.fixture});
+                expect(out).toInclude("[1.2.3.4] abc123  acme/demo:v1  Up 2 hours");
+                expect(out).toInclude("[1.2.3.4] def456  basecamp/kamal-proxy  Up 3 days");
+            });
+
+            it("deploy brackets the work with started/completed audit records (##2957 DEP-6b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var auditor = new cli.lucli.services.deploy.commands.AuditorCommands(cfg);
+                var startedCmd = auditor.record("started deploy of version v1");
+                var completedCmd = auditor.record("completed deploy of version v1");
+                var cmds = $cmds(fake);
+                var acquireIdx = 0; var startedIdx = 0; var pullIdx = 0;
+                var runIdx = 0; var completedIdx = 0; var releaseIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!acquireIdx && findNoCase("ln -s ", cmds[i])) acquireIdx = i;
+                    if (!startedIdx && cmds[i] == startedCmd) startedIdx = i;
+                    if (!pullIdx && findNoCase("docker pull", cmds[i])) pullIdx = i;
+                    if (!runIdx && findNoCase("docker run --detach", cmds[i])) runIdx = i;
+                    if (!completedIdx && cmds[i] == completedCmd) completedIdx = i;
+                    if (!releaseIdx && findNoCase("rm -f ", cmds[i]) && findNoCase("kamal_deploy_lock", cmds[i])) releaseIdx = i;
+                }
+                // started: after the lock, before any work; completed: after the
+                // app run, before the lock release.
+                expect(startedIdx).toBeGT(acquireIdx);
+                expect(pullIdx).toBeGT(startedIdx);
+                expect(completedIdx).toBeGT(runIdx);
+                expect(releaseIdx).toBeGT(completedIdx);
+            });
+
+            it("rollback records a rolled-back audit line (##2957 DEP-6b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.rollback({configPath: variables.fixture, version: "v-old"});
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var auditor = new cli.lucli.services.deploy.commands.AuditorCommands(cfg);
+                expect($cmds(fake)).toInclude(auditor.record("rolled back to version v-old"));
+            });
+
+            it("setup records booted-accessory audit lines on the accessory hosts (##2957 DEP-6b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.setup({configPath: variables.accessoriesFixture, version: "v1"});
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.accessoriesFixture);
+                var auditor = new cli.lucli.services.deploy.commands.AuditorCommands(cfg);
+                var dbRecord = auditor.record("booted accessory db");
+                expect($cmds(fake)).toInclude(dbRecord);
+                expect($cmds(fake)).toInclude(auditor.record("booted accessory redis"));
+                expect($hostsFor(fake, dbRecord)).toInclude("1.2.3.5");
+            });
+
+            it("a failing audit record never fails the deploy (##2957 DEP-6b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var auditor = new cli.lucli.services.deploy.commands.AuditorCommands(cfg);
+                fake.expect("1.2.3.4", auditor.record("started deploy of version v1"), {
+                    exitCode: 1, stdout: "", stderr: "sh: /tmp/kamal-audit.log: Read-only file system"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({configPath: variables.fixture, version: "v1"});
+                expect(out).toInclude("Deployed");
+            });
+
             it("rollback --dry-run applies the destination overlay (##2957, same class as ##3085)", () => {
                 var base = getTempFile(getTempDirectory(), "yml");
                 fileWrite(

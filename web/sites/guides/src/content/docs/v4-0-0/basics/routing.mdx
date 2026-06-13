@@ -159,13 +159,13 @@ Rename the resource once in `routes.cfm` and every helper updates. See [Forms an
 
 ## Listing all routes
 
-When a route isn't matching what you expect, print the registered route table. `wheels routes` shows every route's method, path, controller#action, and name. For a smoke test that your CLI is installed and responding:
+When a route isn't matching what you expect, print the registered route table. `wheels routes` shows every route's method, path, controller#action, and name. It reads the table from your *running* app — with no server up, it refuses and tells you to `wheels start` first:
 
-```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
-wheels --version
+```bash {test:cli cmd="wheels routes" asserts-output="No running Wheels server" asserts-exit=1}
+wheels routes
 ```
 
-Then in your app directory, run `wheels routes` to see the full table.
+Start the server, then run `wheels routes` in your app directory to see the full table.
 
 ## Related guides
 

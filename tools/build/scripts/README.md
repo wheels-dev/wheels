@@ -1,17 +1,19 @@
 # Wheels Build Scripts
 
-This directory contains the build scripts that replace the previous Ant-based build system. These scripts are used by the GitHub Actions workflow to build the four Wheels variants: Core, Base Template, CLI, and Starter App.
+This directory contains the build scripts that replace the previous Ant-based build system. These scripts are used by the GitHub Actions workflow to build the Wheels variants: Core, Base Template, and Starter App.
+
+> **`prepare-cli.sh` / `build-cli.sh` are FROZEN (#3184).** The legacy CommandBox `wheels-cli` module (built from `cli/src/`) is deprecated and no longer prepared, validated, built, or published by `release.yml` / `release-candidate.yml`. The scripts remain in-tree for historical/local-testing use only. The canonical Wheels 4.0+ CLI ships as the LuCLI module tarball (`cli/lucli/`, built in the "Build Wheels Module Tarball" step) and is distributed via brew/scoop/apt/yum. See `cli/src/README.md`.
 
 ## Two Types of Scripts
 
 ### 1. Prepare Scripts (for ForgeBox Publishing)
-- `prepare-core.sh`, `prepare-base.sh`, `prepare-cli.sh`
+- `prepare-core.sh`, `prepare-base.sh` (`prepare-cli.sh` — FROZEN, #3184)
 - These scripts prepare the directory structure WITHOUT creating ZIP files
 - Used by the ForgeBox publish action which creates its own packages
 - Files remain in place for the publish action to package
 
 ### 2. Build Scripts (for GitHub Artifacts)
-- `build-core.sh`, `build-base.sh`, `build-cli.sh`, `build-starterApp.sh`
+- `build-core.sh`, `build-base.sh`, `build-starterApp.sh` (`build-cli.sh` — FROZEN, #3184)
 - These scripts create complete ZIP packages with checksums
 - Used for creating GitHub release artifacts
 - Creates both versioned and bleeding-edge (-be) packages
@@ -22,7 +24,7 @@ This directory contains the build scripts that replace the previous Ant-based bu
 
 - **`build-core.sh`** - Builds the Wheels Core framework package
 - **`build-base.sh`** - Builds the Wheels Base Template (application starter template)
-- **`build-cli.sh`** - Builds the Wheels CLI commands module
+- **`build-cli.sh`** - FROZEN (#3184) — built the legacy CommandBox `wheels-cli` module; no longer invoked by CI
 - **`build-starterApp.sh`** - Builds the Wheels Starter App
 
 Each script takes 4 parameters:
@@ -86,17 +88,15 @@ artifacts/
       wheels-base-template-{version}.zip
       wheels-base-template-{version}.zip.md5
       wheels-base-template-{version}.zip.sha512
-      wheels-cli-{version}.zip
-      wheels-cli-{version}.zip.md5
-      wheels-cli-{version}.zip.sha512
       wheels-starter-app-{version}.zip
       wheels-starter-app-{version}.zip.md5
       wheels-starter-app-{version}.zip.sha512
     wheels-core-be.zip
     wheels-base-template-be.zip
-    wheels-cli-be.zip
     wheels-starter-app-be.zip
 ```
+
+(The `wheels-cli-{version}.zip` / `wheels-cli-be.zip` artifacts are no longer produced — `build-cli.sh` is frozen, #3184.)
 
 ## Version Handling
 
