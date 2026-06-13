@@ -566,6 +566,9 @@ component {
         // remote exit codes was the silent-success bug.
         var c = arguments.cmd;
         var doRaise = !arguments.allowFail;
+        // Scrub resolved secret values from any RemoteExecutionFailed summary
+        // (#3159) — env.clear values ride `docker run ... -e KEY=value`.
+        $registerSecretsForRedaction();
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
             ssh.run(c, {raise: doRaise});
         });
@@ -719,6 +722,28 @@ component {
     }
 
     /**
+     * Hand the resolved secret VALUES to the pool so $raiseRemoteFailure
+     * scrubs them from command summaries (#3159). env.clear values
+     * interpolated from ${SECRET} tokens ride `docker run ... -e KEY=value`,
+     * so a nonzero exit would otherwise leak them into the
+     * RemoteExecutionFailed message and CI logs. Reads from the
+     * most-recent-load resolver, so calling it at dispatch time picks up
+     * whichever verb's config is live; idempotent and guarded for pools that
+     * predate $setSecretValues.
+     */
+    private void function $registerSecretsForRedaction() {
+        if (!isObject(variables.sshPool) || !structKeyExists(variables.sshPool, "$setSecretValues")) {
+            return;
+        }
+        var resolved = $resolvedSecrets();
+        var values = [];
+        for (var k in resolved) {
+            arrayAppend(values, toString(resolved[k]));
+        }
+        variables.sshPool.$setSecretValues(values);
+    }
+
+    /**
      * Deliver env.secret content to `remotePath` on each host (#2957):
      *   1. dispatch ensure-cmd (mkdir + touch + chmod 600) so the file is
      *      permission-locked BEFORE any content lands,
@@ -785,6 +810,8 @@ component {
         }
         var c = arguments.cmd;
         var doRaise = !arguments.allowFail;
+        // Scrub resolved secret values from any RemoteExecutionFailed summary (#3159).
+        $registerSecretsForRedaction();
         // Closures can't write outer locals reliably — collect via a shared struct.
         var ctx = {lines: []};
         variables.sshPool.sequential(arguments.hosts, function(ssh, host) {
@@ -826,6 +853,8 @@ component {
         if (arrayLen(arguments.hosts) == 0) return;
         var c = arguments.cmd;
         var doRaise = !arguments.allowFail;
+        // Scrub resolved secret values from any RemoteExecutionFailed summary (#3159).
+        $registerSecretsForRedaction();
         // Prefer onAny when available (both real SshPool and FakeSshPool
         // expose it). Fall back to onEach with a single host otherwise.
         if (structKeyExists(variables.sshPool, "onAny")) {
