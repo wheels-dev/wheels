@@ -110,6 +110,12 @@ component {
             arguments.opts.configPath,
             {destination: arguments.opts.destination ?: ""}
         );
+        // Register resolved secret values so a nonzero `docker run ... -e
+        // KEY=value` exit can't leak an env.clear value interpolated from a
+        // ${SECRET} token into the RemoteExecutionFailed message / CI logs
+        // (#3159). The env.secret path already avoids -e via --env-file, but
+        // env.clear values still ride argv.
+        $registerSecretsForRedaction();
         var version = arguments.opts.version ?: "";
         var versionOptional = arguments.flags.versionOptional ?: false;
         if (!versionOptional && !len(version)) {
@@ -190,6 +196,23 @@ component {
     private struct function $resolvedSecrets() {
         var resolver = variables.loader.secretResolver();
         return isObject(resolver) ? resolver.all() : {};
+    }
+
+    /**
+     * Hand the resolved secret VALUES to the pool so $raiseRemoteFailure
+     * scrubs them from command summaries (#3159). Guarded for pools that
+     * predate $setSecretValues. Values only — keys are harmless in argv.
+     */
+    private void function $registerSecretsForRedaction() {
+        if (!isObject(variables.sshPool) || !structKeyExists(variables.sshPool, "$setSecretValues")) {
+            return;
+        }
+        var resolved = $resolvedSecrets();
+        var values = [];
+        for (var k in resolved) {
+            arrayAppend(values, toString(resolved[k]));
+        }
+        variables.sshPool.$setSecretValues(values);
     }
 
     /**

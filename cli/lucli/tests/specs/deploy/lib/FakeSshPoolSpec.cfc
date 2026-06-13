@@ -207,6 +207,91 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     expect(e.detail).toInclude("xxxx");
                 }
             });
+
+            // Secret redaction in the command summary — #3159 (deferred from
+            // #3008). env.clear values interpolated from ${SECRET} tokens ride
+            // as `docker run ... -e KEY=value`, so the raw value would leak into
+            // the RemoteExecutionFailed message and CI logs. $setSecretValues
+            // registers the resolved-secret set; $raiseRemoteFailure replaces
+            // every occurrence with [REDACTED] BEFORE the 200-char trim.
+
+            it("redacts a secret-interpolated env value from the command summary", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var secret = "s3cr3t-DB-pa55word";
+                var cmd = "docker run -d -e 'DATABASE_PASSWORD=" & secret & "' acme/demo:v1";
+                p.$setSecretValues([secret]);
+                p.expect("h1", cmd, {exitCode: 125, stdout: "", stderr: "boom"});
+                try {
+                    p.onEach(["h1"], function(ssh, host) { ssh.run(cmd, {raise: true}); });
+                    fail("expected throw");
+                } catch (any e) {
+                    expect(e.message).notToInclude(secret);
+                    expect(e.message).toInclude("[REDACTED]");
+                    expect(e.message).toInclude("DATABASE_PASSWORD=");
+                }
+            });
+
+            it("redacts every occurrence of a repeated secret across multiple -e flags", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var secret = "repeated-secret-value-123";
+                var cmd = "docker run -e 'A=" & secret & "' -e 'B=" & secret & "' img";
+                p.$setSecretValues([secret]);
+                p.expect("h1", cmd, {exitCode: 1, stdout: "", stderr: "fail"});
+                try {
+                    p.onEach(["h1"], function(ssh, host) { ssh.run(cmd, {raise: true}); });
+                    fail("expected throw");
+                } catch (any e) {
+                    expect(e.message).notToInclude(secret);
+                    expect(reMatchNoCase("\[REDACTED\]", e.message).len()).toBe(2);
+                }
+            });
+
+            it("leaves a command with no secrets unchanged", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                p.$setSecretValues(["a-secret-never-present"]);
+                p.expect("h1", "docker pull acme/demo:v1", {exitCode: 125, stdout: "", stderr: "denied"});
+                try {
+                    p.onEach(["h1"], function(ssh, host) { ssh.run("docker pull acme/demo:v1", {raise: true}); });
+                    fail("expected throw");
+                } catch (any e) {
+                    expect(e.message).toInclude("docker pull acme/demo:v1");
+                    expect(e.message).notToInclude("[REDACTED]");
+                }
+            });
+
+            it("does not redact empty or trivially short secret values into unrelated text", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                // Empty string + a 1-char value must never mangle the summary.
+                p.$setSecretValues(["", "x"]);
+                var cmd = "docker run -e 'EXAMPLE=value' acme/demo:v1";
+                p.expect("h1", cmd, {exitCode: 1, stdout: "", stderr: "boom"});
+                try {
+                    p.onEach(["h1"], function(ssh, host) { ssh.run(cmd, {raise: true}); });
+                    fail("expected throw");
+                } catch (any e) {
+                    expect(e.message).toInclude("docker run -e 'EXAMPLE=value' acme/demo:v1");
+                    expect(e.message).notToInclude("[REDACTED]");
+                }
+            });
+
+            it("redacts a secret sitting on the 200-char trim boundary before truncating", () => {
+                var p = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var secret = "boundary-secret-VALUE-9876";
+                // Pad so the secret straddles the 200-char boundary: a partial
+                // leak would slip through if the trim ran before redaction.
+                var pad = repeatString("a", 190);
+                var cmd = pad & secret & " tail";
+                p.$setSecretValues([secret]);
+                p.expect("h1", cmd, {exitCode: 1, stdout: "", stderr: "boom"});
+                try {
+                    p.onEach(["h1"], function(ssh, host) { ssh.run(cmd, {raise: true}); });
+                    fail("expected throw");
+                } catch (any e) {
+                    // No prefix of the secret long enough to be identifiable leaks.
+                    expect(e.message).notToInclude(left(secret, 10));
+                    expect(e.message).toInclude("[REDACTED]");
+                }
+            });
         });
     }
 }

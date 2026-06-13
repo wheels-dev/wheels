@@ -15,6 +15,10 @@ component {
 		variables.calls = [];
 		variables.expectations = {};
 		variables.connectFailures = {};
+		// Resolved-secret values to scrub from RemoteExecutionFailed command
+		// summaries (#3159). Mirrors SshClient — seeded empty, populated via
+		// $setSecretValues.
+		variables.$secretValues = [];
 		return this;
 	}
 
@@ -113,10 +117,15 @@ component {
 	 * detail-trim behavior so tests can assert one contract regardless of
 	 * which pool the deploy layer is talking to. Regression #2696.
 	 *
-	 * MIRROR: SshClient.$raiseRemoteFailure is the source of truth. If you
-	 * change the trim limits, throw type, or message template there, update
-	 * this method in lockstep. We don't share the helper because FakeSshPool
-	 * is a test double that should not import the real SSH client.
+	 * MIRROR: SshClient.$raiseRemoteFailure (and $setSecretValues /
+	 * $redactSecrets) is the source of truth. If you change the trim limits,
+	 * throw type, message template, or redaction behavior there, update these
+	 * methods in lockstep. We don't share the helper because FakeSshPool is a
+	 * test double that should not import the real SSH client.
+	 *
+	 * Resolved secret values registered via $setSecretValues are scrubbed from
+	 * the command summary BEFORE the trim so a boundary value can't partially
+	 * leak (#3159).
 	 */
 	public void function $raiseRemoteFailure(
 		required string host,
@@ -127,7 +136,7 @@ component {
 		if (len(stderr) > 500) {
 			stderr = left(stderr, 500) & "…";
 		}
-		var cmdSummary = arguments.cmd;
+		var cmdSummary = $redactSecrets(arguments.cmd);
 		if (len(cmdSummary) > 200) {
 			cmdSummary = left(cmdSummary, 200) & "…";
 		}
@@ -137,6 +146,34 @@ component {
 				& " (exit " & arguments.result.exitCode & "): " & cmdSummary,
 			detail = stderr
 		);
+	}
+
+	/**
+	 * Register the set of resolved secret values to redact from
+	 * RemoteExecutionFailed command summaries (#3159).
+	 *
+	 * MIRROR: keep byte-identical with SshClient.$setSecretValues.
+	 */
+	public void function $setSecretValues(required array values) {
+		variables.$secretValues = arguments.values;
+	}
+
+	/**
+	 * Replace every occurrence of each registered secret value with
+	 * [REDACTED]. Empty and trivially short values are skipped so they can't
+	 * mangle unrelated text. A value may appear multiple times (#3159).
+	 *
+	 * MIRROR: keep byte-identical with SshClient.$redactSecrets.
+	 */
+	public string function $redactSecrets(required string text) {
+		var out = arguments.text;
+		var values = variables.$secretValues ?: [];
+		for (var v in values) {
+			if (isSimpleValue(v) && len(v) >= 4) {
+				out = replace(out, v, "[REDACTED]", "all");
+			}
+		}
+		return out;
 	}
 
 	private any function $makeFakeSsh(required string host) {

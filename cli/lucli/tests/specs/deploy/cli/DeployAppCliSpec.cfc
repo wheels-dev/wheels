@@ -182,7 +182,68 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     directoryDelete(proj.root, true);
                 }
             });
+
+            // Secret redaction in RemoteExecutionFailed (#3159): an env.clear
+            // value interpolated from a ${SECRET} token rides `docker run ...
+            // -e KEY=value`. A nonzero exit must surface a redacted summary so
+            // the secret never lands in CI logs. End-to-end through the loader:
+            // DeployAppCli registers the resolver's values on the pool.
+            it("redacts a ${SECRET}-interpolated env.clear value from a failed docker run (issue 3159)", () => {
+                var proj = $makeClearSecretProject();
+                try {
+                    // Capture the exact docker run command via dry-run first.
+                    var probe = new cli.lucli.services.deploy.cli.DeployAppCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    probe.boot({configPath: proj.config, version: "v1", dryRun: true});
+                    var runCmd = "";
+                    for (var line in probe.dryRunOutput()) {
+                        if (findNoCase("docker run", line)) {
+                            // Strip the "[host] " prefix the dry-run buffer adds.
+                            runCmd = reReplace(line, "^\[[^\]]*\] ", "");
+                            break;
+                        }
+                    }
+                    expect(runCmd).toInclude("super-secret-db-pw-9000");
+
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    fake.expect("1.2.3.4", runCmd, {exitCode: 125, stdout: "", stderr: "boom"});
+                    var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                    try {
+                        cli.boot({configPath: proj.config, version: "v1"});
+                        fail("expected RemoteExecutionFailed");
+                    } catch (any e) {
+                        expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                        expect(e.message).notToInclude("super-secret-db-pw-9000");
+                        expect(e.message).toInclude("[REDACTED]");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
         });
+    }
+
+    /**
+     * Temp project: config/deploy.yml with an env.clear value interpolated
+     * from a ${DB_PASSWORD} token, resolved by .kamal/secrets. No env.secret,
+     * so the value rides `docker run ... -e DB_PASSWORD=value` (#3159).
+     */
+    private struct function $makeClearSecretProject() {
+        var root = getTempDirectory() & "/wheels-3159-app-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "env: {clear: {DB_PASSWORD: '$#chr(123)#DB_PASSWORD#chr(125)#'}}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "DB_PASSWORD=super-secret-db-pw-9000#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
     }
 
     /**
