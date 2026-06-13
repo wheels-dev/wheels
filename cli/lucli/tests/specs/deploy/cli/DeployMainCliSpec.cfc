@@ -3,6 +3,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     function beforeAll() {
         variables.fixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml");
         variables.proxyFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-proxy.yml");
+        variables.multiHostFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/multi-host.yml");
         variables.multiRoleFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml");
         variables.accessoriesFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-accessories.yml");
     }
@@ -586,6 +587,67 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
                     expect(e.message).toInclude("docker pull");
                 }
+            });
+
+            // Regression suite for the ##2957 review: the ##2696 guard above only
+            // scripts an exit-code release failure, which {raise: false} already
+            // tolerates. A TRANSPORT failure (host died mid-deploy, the cached
+            // connection's startSession throws inside the release) used to
+            // propagate out of the finally block and REPLACE the in-flight
+            // deploy exception — the operator saw a connect error instead of
+            // the real deploy failure, and the post-deploy-failure hook got the
+            // wrong KAMAL_ERROR.
+
+            it("a transport-dead lock release in the finally block does not mask the original deploy exception", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                // The same host then drops off the network: the release in the
+                // finally dies in the SSH transport, not in an exit code.
+                fake.expect("1.2.3.4", lockCmds.release(), {transportError: "Broken pipe"});
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var state = {threw = false, errType = "", errMsg = "", logged = ""};
+                savecontent variable="state.logged" {
+                    try {
+                        dc.deploy({configPath: variables.fixture, version: "v1"});
+                    } catch (any e) {
+                        state.threw = true;
+                        state.errType = e.type;
+                        state.errMsg = e.message;
+                    }
+                }
+                expect(state.threw).toBeTrue();
+                expect(state.errType).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                expect(state.errMsg).toInclude("docker pull");
+                // ...and the skipped release is logged, not thrown.
+                expect(state.logged).toInclude("[lock:release]");
+                expect(state.logged).toInclude("1.2.3.4");
+            });
+
+            it("a transport-dead host during the finally lock release does not fail an otherwise-successful deploy and still releases the rest", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.multiHostFixture);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                fake.expect("10.0.0.1", lockCmds.release(), {transportError: "Connection reset"});
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var state = {out = "", logged = ""};
+                savecontent variable="state.logged" {
+                    state.out = dc.deploy({configPath: variables.multiHostFixture, version: "v1"});
+                }
+                expect(state.out).toInclude("Deployed");
+                // Host 2's lock was still released even though host 1 dropped.
+                var releaseHosts = [];
+                for (var c in fake.calls()) {
+                    if (findNoCase("rm -f ", c.cmd ?: "") && findNoCase("kamal_deploy_lock_demo", c.cmd ?: "")) {
+                        arrayAppend(releaseHosts, c.host);
+                    }
+                }
+                expect(releaseHosts).toInclude("10.0.0.2");
+                expect(state.logged).toInclude("[lock:release] 10.0.0.1");
             });
 
             // Regression suite for #3087 — a failing post-deploy-failure hook used to

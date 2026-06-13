@@ -1,0 +1,11 @@
+service: demo
+image: acme/demo
+servers:
+  web:
+    - 10.0.0.5
+  job:
+    - 10.0.0.5
+registry:
+  username: demo
+  password:
+    - REGISTRY_PASSWORD
