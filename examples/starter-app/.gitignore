@@ -17,3 +17,8 @@ settings.json
 /plugins/**/
 .env
 /vendor
+
+# H2 embedded database data files (created at runtime; keep the directory)
+/db/h2/*.db
+/db/h2/*.trace.db
+!/db/h2/.keep
