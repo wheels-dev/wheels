@@ -55,6 +55,13 @@ component {
             arguments.opts.configPath,
             {destination: arguments.opts.destination ?: ""}
         );
+        // Register resolved secret values so a nonzero `docker run ... -e
+        // KEY=value` exit can't leak an env.clear value interpolated from a
+        // ${SECRET} token into the RemoteExecutionFailed message / CI logs
+        // (#3159). The env.secret path already avoids -e via --env-file, but
+        // env.clear values still ride argv — AccessoryCommands.$envArgs emits
+        // them as `-e 'KEY=value'`.
+        $registerSecretsForRedaction();
         var accCmds = new modules.wheels.services.deploy.commands.AccessoryCommands(cfg);
         var dryRun = arguments.opts.dryRun ?: false;
         var targets = (arguments.opts.name == "all")
@@ -119,6 +126,25 @@ component {
     private struct function $resolvedSecrets() {
         var resolver = variables.loader.secretResolver();
         return isObject(resolver) ? resolver.all() : {};
+    }
+
+    /**
+     * Hand the resolved secret VALUES to the pool so $raiseRemoteFailure
+     * scrubs them from command summaries (#3159). Guarded for pools that
+     * predate $setSecretValues. Values only — keys are harmless in argv.
+     * Mirrors DeployAppCli/DeployMainCli (each Cli keeps its own dispatch
+     * plumbing by design).
+     */
+    private void function $registerSecretsForRedaction() {
+        if (!isObject(variables.sshPool) || !structKeyExists(variables.sshPool, "$setSecretValues")) {
+            return;
+        }
+        var resolved = $resolvedSecrets();
+        var values = [];
+        for (var k in resolved) {
+            arrayAppend(values, toString(resolved[k]));
+        }
+        variables.sshPool.$setSecretValues(values);
     }
 
     /**
