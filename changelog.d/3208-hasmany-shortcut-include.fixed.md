@@ -1,0 +1,1 @@
+- `findAll(include=...)` now accepts a `hasMany` `shortcut` name and expands it into the nested bridge include (e.g. `include="Category"` joins through `ProductCategories`) instead of throwing `Wheels.AssociationNotFound` (#3208)

@@ -1219,11 +1219,46 @@ component {
 					}
 				}
 			} else {
-				// No through association, use as-is
-				local.rv = ListAppend(local.rv, local.currentInclude);
+				// `currentInclude` is not a this-model `through` association. It may,
+				// however, be the `shortcut` name of a many-to-many `hasMany` — a
+				// convenience accessor registered as a dynamic method (consumed by the
+				// shortcut dispatcher in $associationMethod), NOT as a first-class
+				// includable association. When such a name reaches `include`, resolve it
+				// to the nested this-model bridge include so the join still happens
+				// instead of throwing Wheels.AssociationNotFound (issue #3208).
+				//
+				// Only the shortcut path is rewritten here: a plain association without
+				// a `through` is left untouched, and a real association whose name was
+				// passed (even one carrying a shortcut's own through-chain) never enters
+				// this branch — preserving the issue #3109 contract.
+				local.shortcutExpanded = "";
+				if (!StructKeyExists(local.associations, local.currentInclude)) {
+					for (local.assocName in local.associations) {
+						local.assoc = local.associations[local.assocName];
+						if (
+							StructKeyExists(local.assoc, "shortcut")
+							&& Len(local.assoc.shortcut)
+							&& local.assoc.shortcut == local.currentInclude
+							&& StructKeyExists(local.assoc, "through")
+							&& ListLen(local.assoc.through) == 2
+						) {
+							// through = "<bridge-assoc-to-far-side>,<far-side-assoc-to-bridge>";
+							// the first segment is the bridge model's association to the far
+							// side, so the shortcut joins as "<name>(<ListFirst(through)>)".
+							local.shortcutExpanded = local.assocName & "(" & ListFirst(local.assoc.through) & ")";
+							break;
+						}
+					}
+				}
+				if (Len(local.shortcutExpanded)) {
+					local.rv = ListAppend(local.rv, local.shortcutExpanded);
+				} else {
+					// No through / shortcut match, use as-is
+					local.rv = ListAppend(local.rv, local.currentInclude);
+				}
 			}
 		}
-		
+
 		return local.rv;
 	}
 
