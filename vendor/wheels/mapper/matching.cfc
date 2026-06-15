@@ -369,6 +369,15 @@ component {
 			Throw(type = "Wheels.MapperArgumentMissing", message = "Either 'pattern' or 'name' must be defined.");
 		}
 
+		// Normalize a null pattern to an empty string. A name-derived or
+		// resource-generated route can leave `arguments.pattern` null here, and the
+		// string operations below (Find / ReFindNoCase / concatenation) NPE on a
+		// null subject on BoxLang, where Lucee and Adobe coerce null to "". Setting
+		// it once keeps the downstream pattern manipulation identical on every engine.
+		if (IsNull(arguments.pattern)) {
+			arguments.pattern = "";
+		}
+
 		// Accept either "method" or "methods".
 		if (StructKeyExists(arguments, "method")) {
 			arguments.methods = arguments.method;
