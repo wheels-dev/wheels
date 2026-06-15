@@ -109,6 +109,13 @@ component {
 		}
 		application.$wheels.controllers = {};
 		application.$wheels.models = {};
+		// Per-app column-metadata cache (see databaseAdapters/Base.cfc $getColumns).
+		// Deliberately a SIBLING of `cache`, not a `cache.*` category: it stores raw
+		// query objects that live for the application lifetime, whereas every
+		// `cache.*` category holds {value, expiresAt} envelopes that the cull/count
+		// machinery ($addToCache / $cacheCount) walks and dereferences `.expiresAt`
+		// on. Putting schema queries under `cache.*` makes the cull throw.
+		application.$wheels.schemaColumnCache = {};
 		application.$wheels.helperFileCache = {};
 		application.$wheels.layoutFileCache = {};
 		application.$wheels.existingObjectFiles = {};
@@ -128,7 +135,6 @@ component {
 		application.$wheels.cache.page = {};
 		application.$wheels.cache.partial = {};
 		application.$wheels.cache.query = {};
-		application.$wheels.cache.schema = {};
 		application.$wheels.cacheLastCulledAt = Now();
 
 		// Set up paths to various folders in the framework. When the app
