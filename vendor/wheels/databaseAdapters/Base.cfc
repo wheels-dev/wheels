@@ -417,6 +417,23 @@ component output=false extends="wheels.Global"{
 		local.args.username = variables.username;
 		local.args.password = variables.password;
 		local.args.table = arguments.tableName;
+
+		// Column metadata is a JDBC catalog round-trip (cfdbinfo type="columns")
+		// fetched once per model class. On remote / wide-schema databases that
+		// round-trip dominates first-request latency, and it is otherwise re-paid
+		// on every reload and for every model sharing a table. When
+		// cacheDatabaseSchema is on, memoize the result per datasource+table in
+		// application scope. A reload rebuilds the application scope, so schema
+		// changes are still picked up on reload — the same contract as the model
+		// and controller config caches. (perf)
+		local.cacheSchema = $get("cacheDatabaseSchema");
+		if (local.cacheSchema) {
+			local.cacheKey = Hash(variables.dataSource & Chr(31) & arguments.tableName);
+			if (StructKeyExists(application.wheels.cache.schema, local.cacheKey)) {
+				return application.wheels.cache.schema[local.cacheKey];
+			}
+		}
+
 		if ($get("showErrorInformation")) {
 			try {
 				local.rv = $getColumnInfo(argumentCollection = local.args);
@@ -429,6 +446,12 @@ component output=false extends="wheels.Global"{
 			}
 		} else {
 			local.rv = $getColumnInfo(argumentCollection = local.args);
+		}
+
+		if (local.cacheSchema) {
+			lock name="wheels.cache.schema" type="exclusive" timeout="10" {
+				application.wheels.cache.schema[local.cacheKey] = local.rv;
+			}
 		}
 		return local.rv;
 	}

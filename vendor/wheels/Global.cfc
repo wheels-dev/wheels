@@ -4390,6 +4390,24 @@ return local.$wheels;
 	}
 
 	/**
+	 * Convert the comma-list returned by `$buildProtectedControllerMethods()`
+	 * into a struct-as-set so `$callAction()` can perform an O(1)
+	 * `StructKeyExists` membership test on the per-request dispatch hot path
+	 * instead of an O(n) `ListFindNoCase` scan over ~100-250 helper names.
+	 * CFML struct keys are case-insensitive by default, preserving the prior
+	 * `ListFindNoCase` semantics (an action named `ENV` is still rejected like
+	 * `env`). Stored on `application.wheels.protectedControllerMethodsLookup`
+	 * alongside the list, which is retained for callers expecting that shape.
+	 */
+	public struct function $protectedControllerMethodsLookup(required string methods) {
+		var lookup = {};
+		for (var name in ListToArray(arguments.methods)) {
+			lookup[name] = true;
+		}
+		return lookup;
+	}
+
+	/**
 	 * Re-evaluate the given global-includes file into `application.wo`'s
 	 * variables/this scope. Invoked from the bare `?reload=true` soft-reload
 	 * when `$globalIncludesChanged` reports drift (issue ##2792).

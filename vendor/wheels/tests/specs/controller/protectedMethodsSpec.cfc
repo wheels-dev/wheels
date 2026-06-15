@@ -35,6 +35,39 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		// The dispatch hot path checks membership via an O(1) struct-as-set
+		// (perf) instead of an O(n) ListFindNoCase over the comma-list. The set
+		// must stay in lockstep with the list it is derived from.
+		describe("application.wheels.protectedControllerMethodsLookup", () => {
+
+			it("is populated at application start", () => {
+				expect(StructCount(application.wheels.protectedControllerMethodsLookup)).toBeGT(0)
+			})
+
+			it("has one key per entry in the comma-list (case-insensitive)", () => {
+				for (var item in ListToArray(application.wheels.protectedControllerMethods)) {
+					expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, item)).toBeTrue()
+				}
+			})
+
+			it("matches helper names case-insensitively, like the prior ListFindNoCase", () => {
+				expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, "model")).toBeTrue()
+				expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, "MODEL")).toBeTrue()
+				expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, "redirectTo")).toBeTrue()
+			})
+
+			it("does not contain entries the list lacks", () => {
+				expect(StructCount(application.wheels.protectedControllerMethodsLookup))
+					.toBe(ListLen(application.wheels.protectedControllerMethods))
+			})
+
+			it("builds an equivalent set from a known list via the helper", () => {
+				var set = application.wo.$protectedControllerMethodsLookup("env,model,redirectTo")
+				expect(StructCount(set)).toBe(3)
+				expect(StructKeyExists(set, "ENV")).toBeTrue()
+			})
+		})
+
 		describe("$callAction action-dispatch gate", () => {
 
 			beforeEach(() => {
