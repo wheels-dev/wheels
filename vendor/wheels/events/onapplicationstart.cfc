@@ -109,6 +109,13 @@ component {
 		}
 		application.$wheels.controllers = {};
 		application.$wheels.models = {};
+		// Per-app column-metadata cache (see databaseAdapters/Base.cfc $getColumns).
+		// Deliberately a SIBLING of `cache`, not a `cache.*` category: it stores raw
+		// query objects that live for the application lifetime, whereas every
+		// `cache.*` category holds {value, expiresAt} envelopes that the cull/count
+		// machinery ($addToCache / $cacheCount) walks and dereferences `.expiresAt`
+		// on. Putting schema queries under `cache.*` makes the cull throw.
+		application.$wheels.schemaColumnCache = {};
 		application.$wheels.helperFileCache = {};
 		application.$wheels.layoutFileCache = {};
 		application.$wheels.existingObjectFiles = {};
@@ -399,6 +406,13 @@ component {
 		// request whose action segment matches one of these names so global
 		// helpers like env(), model(), redirectTo() are never URL-invokable.
 		application.$wheels.protectedControllerMethods = application.wo.$buildProtectedControllerMethods();
+
+		// Companion struct-as-set for O(1) membership checks on the dispatch hot
+		// path (see $callAction()); the comma-list above is kept for callers that
+		// expect that shape.
+		application.$wheels.protectedControllerMethodsLookup = application.wo.$protectedControllerMethodsLookup(
+			application.$wheels.protectedControllerMethods
+		);
 
 		// Enable the main GUI Component
 		if (application.$wheels.enablePublicComponent) {

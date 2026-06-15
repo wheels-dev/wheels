@@ -135,7 +135,7 @@ component {
 	 * Internal function.
 	 */
 	public void function $callAction(required string action) {
-		if (Left(arguments.action, 1) == "$" || ListFindNoCase(application.wheels.protectedControllerMethods, arguments.action)) {
+		if (Left(arguments.action, 1) == "$" || StructKeyExists(application.wheels.protectedControllerMethodsLookup, arguments.action)) {
 			// A helper-named or $-prefixed action is treated exactly like a
 			// missing action: it 404s (see #2845 and CLAUDE.md Anti-Pattern 8).
 			// Route through $throwErrorOrShow404Page — mirroring RecordNotFound /

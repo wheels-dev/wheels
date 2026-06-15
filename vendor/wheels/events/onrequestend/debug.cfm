@@ -83,51 +83,9 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 	</cfif>
 </cfloop>
 <!--- cfformat-ignore-start --->
-<cfoutput>
+<cfsavecontent variable="local.wdbHtml"><cfoutput>
 <div id="wheels-debugbar" style="all:initial;position:fixed;bottom:0;left:0;right:0;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
-<style>
-##wheels-debugbar *{box-sizing:border-box;margin:0;padding:0;}
-##wheels-debugbar{position:fixed;bottom:0;left:0;right:0;z-index:99999;font-size:13px;line-height:1.4;}
-##wheels-debugbar .wdb-bar{display:flex;align-items:center;background:##1e1e2e;color:##cdd6f4;height:36px;padding:0 8px;gap:2px;border-top:1px solid ##45475a;user-select:none;}
-##wheels-debugbar .wdb-bar a,##wheels-debugbar .wdb-bar span{color:##cdd6f4;text-decoration:none;}
-##wheels-debugbar .wdb-tab{display:flex;align-items:center;gap:5px;padding:0 10px;height:36px;cursor:pointer;border:none;background:none;color:##cdd6f4;font-size:12px;font-family:inherit;white-space:nowrap;transition:background .15s;}
-##wheels-debugbar .wdb-tab:hover{background:##313244;}
-##wheels-debugbar .wdb-tab.active{background:##313244;color:##89b4fa;border-top:2px solid ##89b4fa;padding-top:2px;}
-##wheels-debugbar .wdb-tab svg{width:14px;height:14px;fill:currentColor;flex-shrink:0;}
-##wheels-debugbar .wdb-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;line-height:1;}
-##wheels-debugbar .wdb-badge-green{background:##28a74533;color:##a6e3a1;}
-##wheels-debugbar .wdb-badge-yellow{background:##ffc10733;color:##f9e2af;}
-##wheels-debugbar .wdb-badge-red{background:##dc354533;color:##f38ba8;}
-##wheels-debugbar .wdb-badge-blue{background:##89b4fa33;color:##89b4fa;}
-##wheels-debugbar .wdb-sep{width:1px;height:20px;background:##45475a;margin:0 4px;}
-##wheels-debugbar .wdb-spacer{flex:1;}
-##wheels-debugbar .wdb-panel{display:none;position:fixed;bottom:36px;left:0;right:0;max-height:50vh;background:##1e1e2e;border-top:1px solid ##45475a;overflow-y:auto;color:##cdd6f4;padding:0;}
-##wheels-debugbar .wdb-panel.open{display:block;}
-##wheels-debugbar .wdb-panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid ##313244;position:sticky;top:0;background:##1e1e2e;z-index:1;}
-##wheels-debugbar .wdb-panel-header h3{font-size:14px;font-weight:600;color:##cdd6f4;}
-##wheels-debugbar .wdb-panel-body{padding:12px 16px;}
-##wheels-debugbar .wdb-table{width:100%;border-collapse:collapse;}
-##wheels-debugbar .wdb-table th{text-align:left;padding:6px 12px;font-size:11px;font-weight:600;color:##a6adc8;text-transform:uppercase;letter-spacing:.5px;background:##181825;border-bottom:1px solid ##313244;}
-##wheels-debugbar .wdb-table td{padding:6px 12px;border-bottom:1px solid ##313244;font-size:12px;vertical-align:top;}
-##wheels-debugbar .wdb-table tr:hover td{background:##31324433;}
-##wheels-debugbar .wdb-kv{display:grid;grid-template-columns:180px 1fr;gap:0;}
-##wheels-debugbar .wdb-kv dt{padding:6px 12px;font-weight:600;color:##a6adc8;font-size:12px;border-bottom:1px solid ##313244;}
-##wheels-debugbar .wdb-kv dd{padding:6px 12px;font-size:12px;border-bottom:1px solid ##313244;word-break:break-word;}
-##wheels-debugbar .wdb-kv dd code{font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;background:##313244;padding:1px 5px;border-radius:3px;font-size:11px;}
-##wheels-debugbar .wdb-timing-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-##wheels-debugbar .wdb-timing-label{width:100px;font-size:12px;color:##a6adc8;text-align:right;}
-##wheels-debugbar .wdb-timing-bar-bg{flex:1;height:20px;background:##313244;border-radius:3px;overflow:hidden;position:relative;}
-##wheels-debugbar .wdb-timing-bar{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:6px;font-size:10px;font-weight:600;color:##1e1e2e;min-width:30px;}
-##wheels-debugbar .wdb-close-btn{background:none;border:none;color:##a6adc8;cursor:pointer;font-size:18px;padding:4px 8px;border-radius:4px;line-height:1;}
-##wheels-debugbar .wdb-close-btn:hover{background:##45475a;color:##cdd6f4;}
-##wheels-debugbar .wdb-link-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:4px 0;}
-##wheels-debugbar .wdb-link-card{display:flex;align-items:center;gap:8px;padding:10px 12px;background:##313244;border-radius:6px;color:##cdd6f4;text-decoration:none;font-size:12px;font-weight:500;transition:background .15s;}
-##wheels-debugbar .wdb-link-card:hover{background:##45475a;}
-##wheels-debugbar .wdb-link-card svg{width:16px;height:16px;fill:##89b4fa;flex-shrink:0;}
-##wheels-debugbar .wdb-env-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
-##wheels-debugbar .wdb-section{margin-bottom:16px;}
-##wheels-debugbar .wdb-section-title{font-size:11px;font-weight:700;color:##89b4fa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid ##313244;}
-</style>
+<style><cfinclude template="/wheels/public/assets/css/debugbar.css"></style>
 
 <!--- ============ COLLAPSED BAR ============ --->
 <div class="wdb-bar" id="wdb-bar">
@@ -517,53 +475,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 	</button>
 </div>
 
-<script>
-(function(){
-	var activePanel=null;
-	window.wdbToggle=function(name){
-		var panels=document.querySelectorAll('##wheels-debugbar .wdb-panel');
-		var tabs=document.querySelectorAll('##wheels-debugbar .wdb-tab');
-		if(activePanel===name){
-			wdbClosePanel();
-			return;
-		}
-		for(var i=0;i<panels.length;i++)panels[i].classList.remove('open');
-		var p=document.getElementById('wdb-panel-'+name);
-		if(p)p.classList.add('open');
-		for(var j=0;j<tabs.length;j++)tabs[j].classList.remove('active');
-		var t=document.getElementById('wdb-tab-'+name);
-		if(t)t.classList.add('active');
-		activePanel=name;
-	};
-	window.wdbClosePanel=function(){
-		var panels=document.querySelectorAll('##wheels-debugbar .wdb-panel');
-		var tabs=document.querySelectorAll('##wheels-debugbar .wdb-tab');
-		for(var i=0;i<panels.length;i++)panels[i].classList.remove('open');
-		for(var j=0;j<tabs.length;j++)tabs[j].classList.remove('active');
-		activePanel=null;
-	};
-	window.wdbMinimize=function(){
-		wdbClosePanel();
-		document.getElementById('wheels-debugbar').style.display='none';
-		document.getElementById('wdb-minimized').style.display='block';
-		try{sessionStorage.setItem('wdb-hidden','1');}catch(e){}
-	};
-	window.wdbRestore=function(){
-		document.getElementById('wheels-debugbar').style.display='';
-		document.getElementById('wdb-minimized').style.display='none';
-		try{sessionStorage.removeItem('wdb-hidden');}catch(e){}
-	};
-	window.wdbEnvSwitch=function(el){
-		var target=el.getAttribute('data-wdb-reload');
-		if(!target)return false;
-		var pw=window.prompt('Enter the reload password to switch environments:');
-		if(pw===null||pw==='')return false;
-		window.location.href=target+'&password='+encodeURIComponent(pw);
-		return false;
-	};
-	try{if(sessionStorage.getItem('wdb-hidden')==='1')wdbMinimize();}catch(e){}
-})();
-</script>
+<script><cfinclude template="/wheels/public/assets/js/debugbar.js"></script>
 </div>
-</cfoutput>
+</cfoutput></cfsavecontent><cfoutput>#ReReplace(local.wdbHtml, "(?m)>\s+<", "><", "all")#</cfoutput>
 <!--- cfformat-ignore-end --->
