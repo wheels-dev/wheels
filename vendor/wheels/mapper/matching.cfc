@@ -350,6 +350,16 @@ component {
 			}
 		}
 
+		// On BoxLang an unpassed optional `pattern` argument surfaces as a
+		// present-but-null key (Lucee/Adobe treat it as absent). Strip it so the
+		// name->pattern derivation below runs identically on every engine — deriving
+		// `hyphenize(name)` for a named route, and letting the "pattern or name
+		// required" guard fire when neither is supplied — instead of a present-null
+		// key skipping derivation and leaving a null/empty pattern on BoxLang.
+		if (StructKeyExists(arguments, "pattern") && IsNull(arguments.pattern)) {
+			StructDelete(arguments, "pattern");
+		}
+
 		// Pull route name from arguments if it exists.
 		local.name = "";
 		if (StructKeyExists(arguments, "name")) {

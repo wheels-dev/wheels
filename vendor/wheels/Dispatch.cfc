@@ -480,6 +480,12 @@ component output="false" extends="wheels.Global"{
 		if (!StructKeyExists(arguments, "headers")) {
 			arguments.headers = $requestHttpHeaders();
 		}
+		// $requestHttpHeaders() can hand back null on some servlet hosts (BoxLang
+		// under certain servers); iterating a null subject NPEs there where
+		// Lucee/Adobe iterate an empty struct. Default to an empty struct.
+		if (IsNull(arguments.headers) || !IsStruct(arguments.headers)) {
+			arguments.headers = {};
+		}
 		local.rv = {};
 		for (local.headerName in arguments.headers) {
 			if (Len(local.headerName) && IsSimpleValue(arguments.headers[local.headerName])) {
