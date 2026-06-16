@@ -2,7 +2,7 @@
 title: 'Wheels + Claude: Building a Feature via the stdio MCP'
 slug: wheels-claude-stdio-mcp
 publishedAt: '2026-06-16T14:00:00.000Z'
-updatedAt: '2026-06-14T15:45:55.000Z'
+updatedAt: '2026-06-16T19:33:31.000Z'
 author: Peter Amiri
 tags:
   - wheels-4
@@ -260,7 +260,7 @@ The fix is the same shape OpenCode supports for any stdio MCP server — `type: 
 
 This shape was already in `tools/build/base/.opencode.json` (the canonical reference copy used by the monorepo's build), and the CHANGELOG entry from when the stdio shift landed actually claimed the templates had been updated everywhere. They hadn't — two files (`cli/src/templates/OpenCodeConfig.json` and `app/snippets/OpenCodeConfig.json`) were missed. Both are now corrected, and an OpenCode user copying the template gets a working stdio config on the first try.
 
-The second piece of drift is smaller, and its current state is the more instructive part. When this post was first drafted, the `mcp()` meta function in `Module.cfc` printed "For OpenCode, Cursor, and other AI IDEs, see: docs/command-line-tools/commands/mcp/mcp-configuration-guide.md" — a guide that was planned but never written. The CLI side has since been fixed in the 4.0.3-era audit sweep: `wheels mcp` now prints the live guide URL (`https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration`). But the deprecated HTTP endpoint kept the stale pointer — the deprecation notice in `vendor/wheels/public/views/mcp.cfm` and the hand-written `McpServer.cfc` both still advertise the phantom path, in the file comments and in the warning they write to the log. The surface that's deprecated *because* it drifted is, fittingly, the one place the fix didn't reach. Aligning those references is its own follow-up.
+The second piece of drift is smaller, and its arc is the more instructive part. When this post was first drafted, the `mcp()` meta function in `Module.cfc` printed "For OpenCode, Cursor, and other AI IDEs, see: docs/command-line-tools/commands/mcp/mcp-configuration-guide.md" — a guide that was planned but never written. The CLI surface was fixed first, in the 4.0.3-era audit sweep: `wheels mcp` now prints the live guide URL (`https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration`). The deprecated HTTP endpoint lagged behind — for a while the deprecation notice in `vendor/wheels/public/views/mcp.cfm` and the hand-written `McpServer.cfc` still advertised the phantom path, in their comments and in the warning they wrote to the log. Fittingly, the surface that was deprecated *because* it drifted was the last place the fix reached. A later sweep closed it: both references now point to the live guide, and a regression test (`McpDeprecationNoticeStaleDocPathSpec`) fails the build if the phantom path ever creeps back.
 
 Neither of these is a code-path bug. They're documentation-and-templates drift, the same shape as the package-system fixes from the previous post. The pattern keeps holding: writing the article forces you to actually walk every path a reader will walk, and the parts where the docs disagree with the code are exactly the parts where the next person was going to get stuck.
 
