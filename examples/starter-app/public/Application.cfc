@@ -26,13 +26,14 @@ component output="false" {
 	this.sessionManagement = true;
 
 	// If a plugin has a jar or class file, automatically add the mapping to this.javasettings.
+	// Legacy plugins system (DEPRECATED — superseded by vendor/<name>/ packages).
+	// Only scan when a plugins/ directory exists, so a removed plugins/ dir does not
+	// error on engines whose directoryList() throws on a missing path (e.g. RustCFML;
+	// Lucee tolerates it). This lookup is slated for removal in the next major.
 	this.wheels.pluginDir = this.appDir & "../plugins";
-	this.wheels.pluginFolders = DirectoryList(
-		this.wheels.pluginDir,
-		"true",
-		"path",
-		"*.class|*.jar|*.java"
-	);
+	this.wheels.pluginFolders = DirectoryExists(this.wheels.pluginDir)
+		? DirectoryList(this.wheels.pluginDir, "true", "path", "*.class|*.jar|*.java")
+		: [];
 
 	for (this.wheels.folder in this.wheels.pluginFolders) {
 		if (!StructKeyExists(this, "javaSettings")) {

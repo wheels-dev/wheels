@@ -1041,6 +1041,14 @@ component output="false" extends="wheels.Global"{
 	}
 
 	public query function $folders() {
+		// The legacy plugins/ directory is deprecated (superseded by vendor/<name>/
+		// packages) and may be absent. Skip the scan when it does not exist so
+		// engines whose directory listing throws on a missing path (e.g. RustCFML)
+		// don't fail at boot; Lucee/Adobe return empty for a missing dir anyway.
+		// Slated for removal with the plugins system in the next major.
+		if (!DirectoryExists(variables.$class.pluginPathFull)) {
+			return QueryNew("name,directory,type");
+		}
 		local.query = $directory(
 			action = "list",
 			directory = variables.$class.pluginPathFull,
@@ -1086,6 +1094,10 @@ component output="false" extends="wheels.Global"{
 	}
 
 	public query function $files() {
+		// See $folders(): the deprecated plugins/ directory may be absent.
+		if (!DirectoryExists(variables.$class.pluginPathFull)) {
+			return QueryNew("name,directory,type");
+		}
 		local.query = $directory(
 			action = "list",
 			directory = variables.$class.pluginPathFull,
