@@ -52,4 +52,16 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 	}
+
+	// Mirror the sibling plugin specs (pluginsSpec.cfc:549, pluginsModernSpec,
+	// pluginsSemverSpec, pluginsManifestIntegrationSpec): a component-level
+	// helper that instantiates wheels.Plugins via $createObjectFromRoot and
+	// dispatches $init with the full config — INCLUDING pluginPath. Without it,
+	// $pluginObj(config) resolves to the parameterless Global.$pluginObj() that
+	// WheelsTest auto-binds, which ignores config and returns the cached PluginObj
+	// pointing at the real plugins/ dir — so the missing-path branch (the fix)
+	// never runs and these specs pass for the wrong reason.
+	function $pluginObj(required struct config) {
+		return g.$createObjectFromRoot(argumentCollection = arguments.config)
+	}
 }
