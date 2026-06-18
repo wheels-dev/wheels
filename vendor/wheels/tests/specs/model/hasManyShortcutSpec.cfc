@@ -72,6 +72,36 @@ component extends="wheels.WheelsTest" {
 			});
 		});
 
+		describe("hasMany shortcut name as an include (issue ##3208)", () => {
+
+			it("expands a shortcut name into the nested bridge include", () => {
+				// `memberTeams` declares `shortcut="teams"`, so the convenience name
+				// "teams" is NOT an association on Member — it only exists as a dynamic
+				// accessor. Used in `include`, it must expand into the this-model bridge
+				// include "memberTeams(team)" (Member -> memberTeams -> Team) instead of
+				// throwing Wheels.AssociationNotFound. ListFirst(through) ("team") is the
+				// bridge model's association to the far side.
+				var expanded = g.model("member").$expandThroughAssociations("teams");
+				expect(expanded).toBe("memberTeams(team)");
+			});
+
+			it("eager-loads the far side through a shortcut include", () => {
+				// Alice carries two join rows, Bob one — joining through the bridge to
+				// Team yields one row per join row, and must not throw.
+				var members = g.model("member").findAll(include = "teams", order = "id");
+				expect(members.recordCount).toBe(3);
+			});
+
+			it("expands a shortcut declared with an explicit through override", () => {
+				// `rosterSpots` declares `shortcut="squads"` with an explicit
+				// `through="squad,rosterEntries"`. ListFirst(through) ("squad") is the
+				// bridge model's association to Team, so "squads" expands to the nested
+				// this-model include "rosterSpots(squad)".
+				var expanded = g.model("member").$expandThroughAssociations("squads");
+				expect(expanded).toBe("rosterSpots(squad)");
+			});
+		});
+
 		describe("$expandThroughAssociations this-model rewrite (preserved PR ##449 behavior)", () => {
 
 			it("rewrites a 2-element through whose first segment IS an association on the model", () => {

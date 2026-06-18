@@ -239,7 +239,7 @@ component extends="Model" {
 }
 ```
 
-A single `hasMany` with `shortcut` provides both access paths: `user.userRoles()` for the join rows and `user.roles()` for the far-side records. Behind the scenes Wheels walks both association chains to build the query. The same declaration also works correctly with `include` — `model("User").findAll(include="userRoles")` joins the join table as expected.
+A single `hasMany` with `shortcut` provides both access paths: `user.userRoles()` for the join rows and `user.roles()` for the far-side records. Behind the scenes Wheels walks both association chains to build the query. Both names also work in `include`: `model("User").findAll(include="userRoles")` loads just the join rows, and `model("User").findAll(include="roles")` uses the shortcut name to load the far-side records through the bridge in one step (Wheels expands it to `userRoles(role)` automatically).
 
 The join model needs both `belongsTo` declarations:
 
