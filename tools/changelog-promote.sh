@@ -125,24 +125,51 @@ def parse_unreleased(text):
 
 
 def merged_sections(existing, fragments):
-    """Merge fragment bullets into the existing Unreleased sections."""
-    out = []
-    seen = set()
+    """Combine existing [Unreleased] bullets with fragment bullets into ONE
+    section per heading, emitted in CANONICAL order.
+
+    The [Unreleased] body can accumulate the same heading more than once (e.g.
+    two separate '### Performance' blocks added by different PRs over a cycle);
+    consolidating per-heading keeps the released section from carrying duplicate
+    or out-of-order headings into the public release notes. Within a heading,
+    existing bullets (which predate the fragments) come first, then fragment
+    bullets. Headings outside CANONICAL are preserved after the canonical ones
+    in first-seen order so nothing is silently dropped."""
+    combined = {}      # heading -> [bullets]
+    extra_order = []   # non-canonical headings, first-seen order
+    prose = []         # heading=None prose (rare)
+
+    def add(heading, lines):
+        bullets = [l for l in lines if l.strip()]
+        if not bullets:
+            return
+        if heading not in combined:
+            combined[heading] = []
+            if heading not in CANONICAL:
+                extra_order.append(heading)
+        combined[heading].extend(bullets)
+
     for heading, lines in existing:
         if heading is None:
-            # Prose before the first ### heading (rare) — keep as-is.
-            out.append((heading, [l for l in lines if l.strip()]))
-            continue
-        bullets = [l for l in lines if l.strip()]
-        if heading in fragments:
-            bullets.extend(fragments[heading])
-        out.append((heading, bullets))
-        seen.add(heading)
+            prose.extend(l for l in lines if l.strip())
+        else:
+            add(heading, lines)
     for heading in CANONICAL:
-        if heading in fragments and heading not in seen:
-            out.append((heading, list(fragments[heading])))
-    # Drop empty sections.
-    return [(h, b) for h, b in out if b]
+        if heading in fragments:
+            add(heading, fragments[heading])
+    for heading in fragments:           # defensive: read_fragments validates
+        if heading not in CANONICAL:     # types, so this normally never fires
+            add(heading, fragments[heading])
+
+    out = []
+    if prose:
+        out.append((None, prose))
+    for heading in CANONICAL:
+        if heading in combined:
+            out.append((heading, combined[heading]))
+    for heading in extra_order:
+        out.append((heading, combined[heading]))
+    return out
 
 
 def render(sections):
