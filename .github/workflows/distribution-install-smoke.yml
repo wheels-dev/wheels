@@ -166,12 +166,10 @@ jobs:
     name: "apt (${{ matrix.arch }})"
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
-    # arm64 stable is allowed to fail for now: the stable arm64 Packages index
-    # is currently empty (the per-channel clobber bug, #3218), so `apt install`
-    # 404s on arm64. continue-on-error surfaces it (annotation + neutral result)
-    # without blocking the suite. Flip to a hard failure once the arm64 index is
-    # repaired.
-    continue-on-error: ${{ matrix.arch == 'arm64' }}
+    # arm64 now gates (hard-fail): as of 4.0.5 the Linux packages are
+    # architecture-independent (`all` deb) and apt-wheels generates an arm64
+    # index, so `apt install wheels` works on arm64 (live-verified). A regression
+    # on either arch should block.
     strategy:
       fail-fast: false
       matrix:
@@ -221,15 +219,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # RHEL-family, dnf4 — matches the documented `dnf config-manager --add-repo`
-    # path. The release ships an x86_64 rpm, which this amd64 container matches.
-    #
-    # continue-on-error for now: the rpm installs cleanly and pulls in
-    # java-21-openjdk-headless, but `wheels --version` reports "cannot find a
-    # Java 21 runtime" — the wrapper's Java detection doesn't locate Rocky 9's
-    # headless JRE (the headless package registers no /usr/bin/java alternative).
-    # That's a real yum-vector packaging bug to fix in the rpm/wrapper; surfaced
-    # here, non-blocking until then. Flip to a hard failure once fixed.
-    continue-on-error: true
+    # path. The release ships a noarch rpm; dnf serves it on this amd64 container.
+    # Gates (hard-fail): as of 4.0.5 the rpm's wrapper resolves the RHEL/Fedora
+    # Java-21 layout, so `wheels --version` works on Rocky 9 (was the 4.0.4 bug).
     container:
       image: rockylinux:9
     env:
