@@ -9,15 +9,27 @@ name: Distribution install smoke (brew / scoop / apt / yum)
 #   - the Homebrew formula auto-update dies when LuCLI ships a binary-less tag
 #     (recurring; homebrew-wheels#383/#384)
 #   - the apt stable Packages index gets clobbered to 0 bytes by a bleeding-edge
-#     publish (#3218 — and the arm64 stable index is empty right now)
+#     publish (#3218, fixed by apt-wheels#5 — now guarded by the index-integrity
+#     job below, which also covers the bidirectional case)
 #   - a tap PR never merges / a dispatch token loses scope, leaving a channel
 #     stuck on an old version
 #
-# This workflow installs the CLI the exact documented way on each channel and
-# asserts `wheels --version` reports the current GA. It runs daily (propagation
-# has settled by then) and on demand. It does NOT run on `release: published`
-# on purpose — right after a tag the channels lag, which would be a false red;
-# the daily run is the signal.
+# This workflow has two layers:
+#   1. index-integrity — a fast, container-free probe of the PUBLISHED apt/yum
+#      dist indexes (Packages / repomd primary). It asserts each channel's index
+#      is non-empty and that stable names the current GA. This catches the #3218
+#      clobber deterministically: the full-install legs only sample once a day,
+#      so a clobber that lands outside the 14:00 window (the index is populated
+#      only briefly right after a stable publish) can slip past them — but an
+#      empty/missing index always fails this probe with a message that names the
+#      regression. It also asserts the bleeding-edge index stays non-empty, since
+#      the clobber was bidirectional (a stable publish could wipe BE too).
+#   2. the per-channel install legs — install the CLI the exact documented way
+#      on each channel and assert `wheels --version` reports the current GA.
+#
+# Runs daily (propagation has settled by then) and on demand. It does NOT run on
+# `release: published` on purpose — right after a tag the channels lag, which
+# would be a false red; the daily run is the signal.
 #
 # Java is NOT set up by hand anywhere: every package declares/bundles it
 # (brew `depends_on "openjdk@21"`, the .deb `Depends: openjdk-21-jre-headless`,
@@ -74,6 +86,135 @@ jobs:
           fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "All channels must serve wheels $VER"
+
+  index-integrity:
+    needs: resolve
+    name: "Index integrity (apt + yum dists)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Direct probe of the PUBLISHED dist indexes — no install, no containers.
+    # Catches the #3218 cross-channel clobber deterministically: a regression
+    # that empties a Packages / repomd index always fails here with a message
+    # that names the regression, even outside the brief post-publish window the
+    # full-install legs happen to sample. Both directions are checked because
+    # the clobber was bidirectional (a stable publish could wipe bleeding-edge
+    # and vice versa) — apt-wheels#5 scopes regen per-channel to prevent both.
+    env:
+      # Validated semver from `resolve`; passed via env (never interpolated into
+      # the shell). The only external input the script touches.
+      EXPECTED: ${{ needs.resolve.outputs.version }}
+      # NOTE: deliberately NO cache-buster. apt/dnf fetch the plain URLs, which
+      # hit Cloudflare's edge cache — so this probe must fetch those SAME plain
+      # URLs to see what clients see. An earlier draft appended `?cb=` to dodge
+      # the edge cache; that hit R2 origin instead and showed green while real
+      # `apt install` failed on a stale edge-cached Packages.gz (#3218 follow-up:
+      # apt-wheels#6 sets `no-store` on metadata so the edge stops caching it).
+    steps:
+      - name: Probe apt + yum stable/bleeding-edge indexes
+        run: |
+          set -uo pipefail
+          fail=0
+          note() { echo "::error::$*"; fail=1; }
+
+          # Retrying fetch: a transient blip must not red a daily guardian. -f
+          # fails on HTTP >=400 so --retry-all-errors retries 5xx too. Prints
+          # body to stdout; non-zero exit (after retries) => caller sees empty.
+          fetch() { curl -fsSL --retry 4 --retry-delay 3 --retry-all-errors --max-time 60 "$1"; }
+
+          # All grep checks feed from a here-string (grep PAT <<<"$body"), NOT a
+          # `printf | grep` pipe. `grep -q` exits on first match without draining
+          # stdin, so a piped printf of a 100KB index gets SIGPIPE (exit 141) and
+          # `set -o pipefail` then reports the whole pipeline as failed EVEN WHEN
+          # grep matched — a false red. A here-string has no upstream process to
+          # kill, so the exit status is grep's alone.
+
+          # sha256 of a file (sha256sum on Linux runners). Takes a path, NOT
+          # piped data — gzip blobs are binary and `$(...)` would corrupt them
+          # (command substitution is text-only: strips trailing newlines, can't
+          # hold NUL bytes). Always fetch binary to a temp file, then hash/gunzip
+          # the file.
+          sha256f() { sha256sum "$1" | awk '{print $1}'; }
+
+          # --- apt stable: replicate what `apt-get update` actually verifies.
+          # Parse the SHA256 the (plain) Release records for binary-<arch>/
+          # Packages.gz, then fetch the (plain) Packages.gz and compare. This is
+          # the exact check apt makes — and the exact one that failed in #3218
+          # when a stale edge-cached Packages.gz no longer matched a fresh
+          # Release ("File has unexpected size"). Then gunzip and confirm the
+          # content actually lists the GA (a clean clobber can be empty-but-
+          # internally-consistent: hash matches, content empty — caught here).
+          rel="$(fetch "https://apt.wheels.dev/dists/stable/Release" || true)"
+          if ! grep -q "^SHA256:" <<<"$rel"; then
+            note "apt stable Release missing or has no SHA256 section."
+          else
+            for arch in amd64 arm64; do
+              relpath="main/binary-${arch}/Packages.gz"
+              exp="$(awk -v p="$relpath" '/^SHA256:/{f=1;next} /^[A-Z]/{f=0} f && $3==p {print $1}' <<<"$rel" | head -1)"
+              tmp="$(mktemp)"
+              fetch "https://apt.wheels.dev/dists/stable/${relpath}" > "$tmp" 2>/dev/null || true
+              act="$(sha256f "$tmp")"
+              content="$(gunzip -c "$tmp" 2>/dev/null || true)"
+              rm -f "$tmp"
+              if [ -z "$exp" ]; then
+                note "apt stable Release does not record a SHA256 for ${relpath}."
+              elif [ "$exp" != "$act" ]; then
+                note "apt stable ${arch} Packages.gz hash != Release (stale edge cache or torn publish — the #3218 'unexpected size' failure). expected=${exp} served=${act:-<empty>}"
+              elif ! grep -q "Version: ${EXPECTED}" <<<"$content"; then
+                note "apt stable ${arch} Packages.gz is hash-consistent but does not list wheels ${EXPECTED} (empty/old index)."
+              else
+                echo "OK  apt stable ${arch}: Packages.gz matches Release and lists ${EXPECTED}"
+              fi
+            done
+          fi
+
+          # --- apt: bleeding-edge must stay non-empty (bidirectional guard).
+          # Versions float (snapshot.N), so only assert it has at least one stanza.
+          be_body="$(fetch "https://apt.wheels.dev/dists/bleeding-edge/main/binary-amd64/Packages.gz" 2>/dev/null | gunzip 2>/dev/null || true)"
+          if ! grep -q "^Package:" <<<"$be_body"; then
+            note "apt bleeding-edge amd64 index is EMPTY (a stable publish may be clobbering it)."
+          else
+            echo "OK  apt bleeding-edge amd64: index non-empty ($(grep -c '^Package:' <<<"$be_body") entries)"
+          fi
+
+          # --- yum: resolve repomd -> primary.xml.gz (plain urls), assert the GA.
+          # repomd records the primary's checksum; verify the served primary
+          # matches it, then that it lists the GA — the dnf analogue of the apt
+          # check above.
+          check_yum() {
+            local ch="$1" assert_ver="$2"
+            local repomd loc exp gz act content
+            repomd="$(fetch "https://yum.wheels.dev/${ch}/repodata/repomd.xml" || true)"
+            loc="$(grep -oE 'repodata/[a-f0-9]+-primary\.xml\.gz' <<<"$repomd" | head -1 || true)"
+            if [ -z "$loc" ]; then
+              note "yum ${ch} repomd.xml has no primary metadata (empty/missing repodata)."
+              return
+            fi
+            # The primary's filename IS its sha256 (createrepo_c names it that,
+            # and it equals the repomd <checksum> for the compressed file).
+            exp="$(sed -E 's@.*/([a-f0-9]+)-primary\.xml\.gz@\1@' <<<"$loc")"
+            tmp="$(mktemp)"
+            fetch "https://yum.wheels.dev/${ch}/${loc}" > "$tmp" 2>/dev/null || true
+            act="$(sha256f "$tmp")"
+            content="$(gunzip -c "$tmp" 2>/dev/null || true)"
+            rm -f "$tmp"
+            if [ -n "$exp" ] && [ "$exp" != "$act" ]; then
+              note "yum ${ch} primary.xml.gz hash != repomd reference (stale edge cache or torn publish). expected=${exp} served=${act:-<empty>}"
+            elif ! grep -q '<package ' <<<"$content"; then
+              note "yum ${ch} primary metadata lists no packages."
+            elif [ -n "$assert_ver" ] && ! grep -q "ver=\"${assert_ver}\"" <<<"$content"; then
+              note "yum ${ch} primary metadata does not list wheels ${assert_ver} (stale or partial)."
+            else
+              echo "OK  yum ${ch}: primary matches repomd and lists packages${assert_ver:+ incl. ${assert_ver}}"
+            fi
+          }
+          check_yum stable "$EXPECTED"
+          check_yum bleeding-edge ""
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Index-integrity check failed — see annotations above. This is the signature of the #3218 cross-channel clobber; check the apt-wheels / yum-wheels publish runs."
+            exit 1
+          fi
+          echo "All dist indexes healthy."
 
   homebrew:
     needs: resolve
