@@ -1,0 +1,261 @@
+name: Distribution install smoke (brew / scoop / apt / yum)
+
+# End-to-end guardian for the four public package-manager install vectors.
+#
+# Every Wheels release fans out to Homebrew, Scoop, apt.wheels.dev and
+# yum.wheels.dev through independent downstream repos + workflows. Those break
+# in ways the release build itself can't see — and only surface when a user
+# can't install:
+#   - the Homebrew formula auto-update dies when LuCLI ships a binary-less tag
+#     (recurring; homebrew-wheels#383/#384)
+#   - the apt stable Packages index gets clobbered to 0 bytes by a bleeding-edge
+#     publish (#3218 — and the arm64 stable index is empty right now)
+#   - a tap PR never merges / a dispatch token loses scope, leaving a channel
+#     stuck on an old version
+#
+# This workflow installs the CLI the exact documented way on each channel and
+# asserts `wheels --version` reports the current GA. It runs daily (propagation
+# has settled by then) and on demand. It does NOT run on `release: published`
+# on purpose — right after a tag the channels lag, which would be a false red;
+# the daily run is the signal.
+#
+# Java is NOT set up by hand anywhere: every package declares/bundles it
+# (brew `depends_on "openjdk@21"`, the .deb `Depends: openjdk-21-jre-headless`,
+# the scoop manifest inlines OpenJDK, the .rpm Requires java-21) — so a missing
+# Java here is itself a real packaging regression worth catching.
+
+on:
+  schedule:
+    # Daily 14:00 UTC. Runs on the default branch (develop). Far enough after
+    # any release that all four channels have propagated.
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: "Version every channel must serve (blank = latest GA tag)"
+        required: false
+        default: ""
+  pull_request:
+    branches: [develop]
+    paths:
+      # Self-test when the workflow itself changes.
+      - '.github/workflows/distribution-install-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve expected version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - name: Determine the GA version each channel must serve
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          # Untrusted (workflow_dispatch input) — kept in env and validated to
+          # semver below; never interpolated straight into a shell command.
+          INPUT: ${{ github.event.inputs.expected_version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT:-}" ]; then
+            VER="${INPUT#v}"
+            echo "Using dispatch input: $VER"
+          else
+            VER="$(gh release view --repo "$REPO" --json tagName -q .tagName | sed 's/^v//')"
+            echo "Latest GA tag: $VER"
+          fi
+          if ! printf '%s' "$VER" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::could not resolve a clean semver expected version (got '$VER')"
+            exit 1
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "All channels must serve wheels $VER"
+
+  homebrew:
+    needs: resolve
+    name: "Homebrew (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest is Apple Silicon (arm64); ubuntu-latest exercises the
+        # Linuxbrew path (amd64). Both are documented install targets.
+        os: [macos-latest, ubuntu-latest]
+    env:
+      EXPECTED: ${{ needs.resolve.outputs.version }}
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_FROM_API: "1"
+      NONINTERACTIVE: "1"
+    steps:
+      # GitHub's ubuntu runners ship Homebrew (Linuxbrew) but do NOT put it on
+      # PATH; macos runners do. Add it on Linux so `brew` resolves in the next
+      # steps (GITHUB_PATH persists across steps).
+      - name: Ensure Homebrew is on PATH (Linuxbrew)
+        if: runner.os == 'Linux'
+        run: echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+      - name: brew tap + install (the documented path)
+        run: |
+          set -euo pipefail
+          brew tap wheels-dev/wheels
+          # Newer Homebrew refuses to load a formula from a third-party tap until
+          # it's trusted — a hard error on Linuxbrew, a warning on macOS. (Worth
+          # surfacing in the tap's install docs for Linuxbrew users.)
+          brew trust wheels-dev/wheels || true
+          brew install wheels
+      - name: Assert wheels --version == GA
+        env:
+          CHANNEL: "Homebrew (${{ matrix.os }})"
+        run: |
+          set -uo pipefail
+          RAW="$(wheels --version 2>&1 || true)"
+          # Extract the first semver from the output. Channels differ in format:
+          # the LuCLI/brew build prints "Wheels Version: 4.0.4" (+ an ASCII
+          # banner), the .deb/.rpm print "wheels 4.0.4 (stable)" — neither a
+          # keyword filter nor a fixed prefix is portable, so take the first
+          # x.y.z (the version always leads; the banner carries no semver).
+          GOT="$(printf '%s\n' "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          echo "${CHANNEL}: wheels --version => '${GOT}' (expected '${EXPECTED}')"
+          if [ "$GOT" != "$EXPECTED" ]; then
+            echo "::error::${CHANNEL} serves '${GOT}', expected '${EXPECTED}'"
+            echo "--- raw wheels --version ---"; printf '%s\n' "$RAW" | head -20
+            exit 1
+          fi
+
+  scoop:
+    needs: resolve
+    name: "Scoop (windows)"
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      EXPECTED: ${{ needs.resolve.outputs.version }}
+    steps:
+      - name: scoop bucket add + install (the documented path)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+            Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+          }
+          scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
+          scoop install wheels
+          # scoop puts shims in ~\scoop\shims and edits the *persistent* user
+          # PATH (registry) — which the next step's shell does not inherit.
+          # Expose the shims dir to later steps explicitly so `wheels` resolves.
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Assert wheels --version == GA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $raw = (wheels --version 2>&1 | Out-String)
+          $got = [regex]::Match($raw, '\d+\.\d+\.\d+').Value
+          Write-Host "Scoop: wheels --version => '$got' (expected '$env:EXPECTED')"
+          if ($got -ne $env:EXPECTED) {
+            Write-Host "::error::Scoop serves '$got', expected '$env:EXPECTED'"
+            Write-Host "--- raw wheels --version ---"
+            Write-Host $raw
+            exit 1
+          }
+
+  apt:
+    needs: resolve
+    name: "apt (${{ matrix.arch }})"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    # arm64 stable is allowed to fail for now: the stable arm64 Packages index
+    # is currently empty (the per-channel clobber bug, #3218), so `apt install`
+    # 404s on arm64. continue-on-error surfaces it (annotation + neutral result)
+    # without blocking the suite. Flip to a hard failure once the arm64 index is
+    # repaired.
+    continue-on-error: ${{ matrix.arch == 'arm64' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      EXPECTED: ${{ needs.resolve.outputs.version }}
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Add apt.wheels.dev + install
+        run: |
+          set -euo pipefail
+          # The published wheels.gpg is ASCII-armored, so dearmor it into the
+          # keyring. (The apt-wheels README still shows a bare `tee` of the
+          # armored key — the user-facing docs should be updated to dearmor to
+          # match this; tracked as a follow-up.)
+          curl -fsSL https://apt.wheels.dev/wheels.gpg | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
+          echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
+            | sudo tee /etc/apt/sources.list.d/wheels.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y wheels
+      - name: Assert wheels --version == GA
+        env:
+          CHANNEL: "apt (${{ matrix.arch }})"
+        run: |
+          set -uo pipefail
+          RAW="$(wheels --version 2>&1 || true)"
+          # Extract the first semver from the output. Channels differ in format:
+          # the LuCLI/brew build prints "Wheels Version: 4.0.4" (+ an ASCII
+          # banner), the .deb/.rpm print "wheels 4.0.4 (stable)" — neither a
+          # keyword filter nor a fixed prefix is portable, so take the first
+          # x.y.z (the version always leads; the banner carries no semver).
+          GOT="$(printf '%s\n' "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          echo "${CHANNEL}: wheels --version => '${GOT}' (expected '${EXPECTED}')"
+          if [ "$GOT" != "$EXPECTED" ]; then
+            echo "::error::${CHANNEL} serves '${GOT}', expected '${EXPECTED}'"
+            echo "--- raw wheels --version ---"; printf '%s\n' "$RAW" | head -20
+            exit 1
+          fi
+
+  yum:
+    needs: resolve
+    name: "yum (rocky 9)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # RHEL-family, dnf4 — matches the documented `dnf config-manager --add-repo`
+    # path. The release ships an x86_64 rpm, which this amd64 container matches.
+    #
+    # continue-on-error for now: the rpm installs cleanly and pulls in
+    # java-21-openjdk-headless, but `wheels --version` reports "cannot find a
+    # Java 21 runtime" — the wrapper's Java detection doesn't locate Rocky 9's
+    # headless JRE (the headless package registers no /usr/bin/java alternative).
+    # That's a real yum-vector packaging bug to fix in the rpm/wrapper; surfaced
+    # here, non-blocking until then. Flip to a hard failure once fixed.
+    continue-on-error: true
+    container:
+      image: rockylinux:9
+    env:
+      EXPECTED: ${{ needs.resolve.outputs.version }}
+    steps:
+      - name: Add yum.wheels.dev + install (the documented path)
+        run: |
+          set -euo pipefail
+          dnf -y install dnf-plugins-core
+          dnf -y config-manager --add-repo https://yum.wheels.dev/wheels.repo
+          dnf -y install wheels
+      - name: Assert wheels --version == GA
+        env:
+          CHANNEL: "yum (rocky 9)"
+        run: |
+          set -uo pipefail
+          RAW="$(wheels --version 2>&1 || true)"
+          # Extract the first semver from the output. Channels differ in format:
+          # the LuCLI/brew build prints "Wheels Version: 4.0.4" (+ an ASCII
+          # banner), the .deb/.rpm print "wheels 4.0.4 (stable)" — neither a
+          # keyword filter nor a fixed prefix is portable, so take the first
+          # x.y.z (the version always leads; the banner carries no semver).
+          GOT="$(printf '%s\n' "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          echo "${CHANNEL}: wheels --version => '${GOT}' (expected '${EXPECTED}')"
+          if [ "$GOT" != "$EXPECTED" ]; then
+            echo "::error::${CHANNEL} serves '${GOT}', expected '${EXPECTED}'"
+            echo "--- raw wheels --version ---"; printf '%s\n' "$RAW" | head -20
+            exit 1
+          fi
