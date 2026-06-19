@@ -5,8 +5,10 @@
 #   tools/changelog-promote.sh --preview            # print assembled sections, change nothing
 #   tools/changelog-promote.sh <version> [date]     # promote: merge fragments + current
 #                                                   # [Unreleased] body into a new
-#                                                   # "## [<version>] - <date>" section,
-#                                                   # reset [Unreleased], delete fragments
+#                                                   # "# [<version>](tag-url) => <date>"
+#                                                   # section (the format release.yml's
+#                                                   # awk extraction expects), reset
+#                                                   # [Unreleased], delete fragments
 #
 # Promotion only edits files — review the diff and commit yourself. The
 # script refuses to promote when there is nothing to promote, and fails
@@ -237,7 +239,7 @@ for path in sorted(FRAG_DIR.glob("*.md")):
         path.unlink()
         removed.append(path.name)
 
-print(f"[{version}] - {date} now carries {sum(len(b) for _, b in merged)} entries (fragments + prior [Unreleased] content).")
+print(f"[{version}] => {date} now carries {sum(len(b) for _, b in merged)} entries (fragments + prior [Unreleased] content).")
 print(f"Removed {len(removed)} fragment(s): {', '.join(removed) if removed else '(none)'}")
 print("Review the CHANGELOG.md diff, then commit.")
 PYEOF
