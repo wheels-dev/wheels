@@ -26,6 +26,18 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ---
 
+# [4.0.5](https://github.com/wheels-dev/wheels/releases/tag/v4.0.5) => 2026-06-19
+
+### Added
+
+- Linux `.deb` / `.rpm` packages are now architecture-independent (`all` / `noarch`) and install on **arm64 (aarch64)** as well as amd64 — the package launches the CLI through a portable `java -jar` launcher instead of an amd64-only native binary, so `apt install wheels` / `dnf install wheels` now work on arm64 hosts (#3223)
+
+### Fixed
+
+- The Wheels CLI `.rpm` now starts on RHEL-family distributions (Rocky Linux, Fedora, AlmaLinux): the `/usr/bin/wheels` wrapper's Java-21 probe only checked Debian/Ubuntu paths, so `wheels` failed with "cannot find a Java 21 runtime" even with `java-21-openjdk-headless` installed. It now also resolves the RHEL/Fedora JRE layout (and falls back to `java` on `PATH`) (#3223)
+
+---
+
 # [4.0.4](https://github.com/wheels-dev/wheels/releases/tag/v4.0.4) => 2026-06-18
 
 ### Added
