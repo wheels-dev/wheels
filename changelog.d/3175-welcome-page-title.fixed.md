@@ -1,1 +1,0 @@
-- The welcome/congratulations page rendered with `<title>Wheels - Error</title>` because it shared the error screen's header; it now reads "Welcome to Wheels" while the error page keeps its title (#3175)

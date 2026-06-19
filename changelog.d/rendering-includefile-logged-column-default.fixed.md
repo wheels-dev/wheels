@@ -1,1 +1,0 @@
-- Rendering a partial with a query no longer silently swallows unreadable column values: the blanket `catch` in `$includeFile()` that blanked a column it could not read now logs a warning to the `wheels` log (once per column per render) naming the column, partial, first failing row, and the underlying error before defaulting the value to an empty string (#2961)

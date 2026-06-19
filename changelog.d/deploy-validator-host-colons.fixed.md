@@ -1,1 +1,0 @@
-- `wheels deploy` host validation no longer under-counts adjacent colons: unbracketed IPv6-ish hosts like `::1:22`, `:a:b`, and `a::b` are now rejected with the documented `invalid host` error, while bracketed `[::1]:22` and single-colon `user@host:port` forms remain accepted ([#3086](https://github.com/wheels-dev/wheels/issues/3086))
