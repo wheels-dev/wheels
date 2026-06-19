@@ -90,7 +90,14 @@ def parse_unreleased(text):
         fail("CHANGELOG.md has no '## [Unreleased]' section")
     head = text[: match.end()]
     rest = text[match.end():]
-    next_heading = re.search(r"(?m)^## ", rest)
+    # Version sections in this changelog use a SINGLE '#' (e.g.
+    # "# [4.0.3](...) => date"); [Unreleased] and some legacy 1.x entries use
+    # '##', and old sections contain '## ' subheadings (e.g. "## Detailed
+    # Changes"). Match the next VERSION heading at either level ("#"/"##"
+    # followed by " [") so the tail begins at the previous release — not at a
+    # '## ' subheading buried inside an old section (which would pull every
+    # release since into the promoted body).
+    next_heading = re.search(r"(?m)^#{1,2} \[", rest)
     body = rest[: next_heading.start()] if next_heading else rest
     tail = rest[next_heading.start():] if next_heading else ""
 
@@ -100,6 +107,12 @@ def parse_unreleased(text):
     sections = []
     current = (None, [])
     for line in body.splitlines():
+        # Drop horizontal-rule separators ('---' / '----') left in the
+        # [Unreleased] body — the promote step re-emits its own '---' separators
+        # around the new section, and a stray rule promoted as content would
+        # break release.yml's awk '/^# [VERSION]/,/^---$/' notes extraction.
+        if re.fullmatch(r"-{3,}", line.strip()):
+            continue
         if line.startswith("### "):
             if current[0] is not None or any(l.strip() for l in current[1]):
                 sections.append(current)
@@ -178,8 +191,18 @@ if not merged:
     fail("nothing to promote: no fragments and [Unreleased] is empty")
 
 new_unreleased = f"\n{MARKER}\n\n"
-version_section = f"## [{version}] - {date}\n\n{render(merged)}\n"
-CHANGELOG.write_text(head + new_unreleased + version_section + tail, encoding="utf-8")
+# Match the established section format: a single '#' heading that links to the
+# release tag and uses ' => ' before the date — every prior release uses this,
+# and release.yml builds the GitHub Release notes with
+# awk '/^# \[VERSION\]/,/^---$/' (single hash, terminated by exactly '---').
+tag_url = f"https://github.com/wheels-dev/wheels/releases/tag/v{version}"
+version_section = f"# [{version}]({tag_url}) => {date}\n\n{render(merged)}\n"
+# Emit explicit '---' (three-dash) separators around the new section: one
+# between [Unreleased] and it, one between it and the previous release (tail).
+# A '----' (four-dash) rule would silently extend release.yml's awk range into
+# the previous version's notes (the recurring #2606 / #2768 footgun).
+sep = "---\n\n"
+CHANGELOG.write_text(head + new_unreleased + sep + version_section + sep + tail, encoding="utf-8")
 
 removed = []
 for path in sorted(FRAG_DIR.glob("*.md")):
