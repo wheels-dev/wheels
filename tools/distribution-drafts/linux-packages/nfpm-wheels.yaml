@@ -11,7 +11,9 @@
 # The version is interpolated from the WHEELS_VERSION env var at build time.
 
 name: wheels
-arch: amd64
+# Architecture-independent: the payload is a Java jar + CFML + a shell wrapper.
+# PKG_ARCH is set by build-linux-packages.sh — `all` for deb, `noarch` for rpm.
+arch: ${PKG_ARCH}
 platform: linux
 version: ${WHEELS_VERSION}
 section: devel
@@ -25,14 +27,14 @@ vendor: Wheels
 homepage: https://wheels.dev
 license: Apache-2.0
 contents:
-  # The LuCLI binary, renamed to `wheels` at stage time so basename(argv[0])
-  # is `wheels` when the wrapper execs it — LuCLI's module dispatcher routes
-  # via argv[0], so renaming is what makes `wheels start` reach the bundled
-  # module. See #2700.
-  - src: ./build/wheels
-    dst: /opt/wheels/wheels
+  # The portable LuCLI launcher jar. The wrapper runs it with
+  # `java -Dlucli.binary.name=wheels -jar`, which routes to the bundled wheels
+  # module (the flag replaces the old basename(argv[0]) trick) and is
+  # architecture-independent — what makes this package all/noarch. See #2700.
+  - src: ./build/lucli.jar
+    dst: /opt/wheels/lucli.jar
     file_info:
-      mode: 0755
+      mode: 0644
   # The CLI module — what LuCLI dispatches `wheels new`, `wheels migrate`, etc. into.
   - src: ./build/module/
     dst: /opt/wheels/module/
