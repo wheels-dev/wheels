@@ -103,9 +103,12 @@ jobs:
       # Validated semver from `resolve`; passed via env (never interpolated into
       # the shell). The only external input the script touches.
       EXPECTED: ${{ needs.resolve.outputs.version }}
-      # Cache-bust R2's CDN so a stale-but-cached good index can't mask a live
-      # clobber.
-      CB: ${{ github.run_id }}-${{ github.run_attempt }}
+      # NOTE: deliberately NO cache-buster. apt/dnf fetch the plain URLs, which
+      # hit Cloudflare's edge cache — so this probe must fetch those SAME plain
+      # URLs to see what clients see. An earlier draft appended `?cb=` to dodge
+      # the edge cache; that hit R2 origin instead and showed green while real
+      # `apt install` failed on a stale edge-cached Packages.gz (#3218 follow-up:
+      # apt-wheels#6 sets `no-store` on metadata so the edge stops caching it).
     steps:
       - name: Probe apt + yum stable/bleeding-edge indexes
         run: |
@@ -125,48 +128,83 @@ jobs:
           # grep matched — a false red. A here-string has no upstream process to
           # kill, so the exit status is grep's alone.
 
-          # --- apt: stable must be non-empty AND name the current GA, per arch.
-          # The .deb is architecture-independent (`all`) from 4.0.5 on, but apt
-          # serves a separate per-arch index — both must carry the GA stanza.
-          for arch in amd64 arm64; do
-            url="https://apt.wheels.dev/dists/stable/main/binary-${arch}/Packages?cb=${CB}"
-            body="$(fetch "$url" || true)"
-            if [ -z "$body" ]; then
-              note "apt stable ${arch} Packages index is EMPTY or missing (#3218 clobber). url=${url%%\?*}"
-            elif ! grep -q "Version: ${EXPECTED}" <<<"$body"; then
-              note "apt stable ${arch} Packages index does not list wheels ${EXPECTED} (stale or partial). url=${url%%\?*}"
-            else
-              echo "OK  apt stable ${arch}: index non-empty and lists ${EXPECTED}"
-            fi
-          done
+          # sha256 of a file (sha256sum on Linux runners). Takes a path, NOT
+          # piped data — gzip blobs are binary and `$(...)` would corrupt them
+          # (command substitution is text-only: strips trailing newlines, can't
+          # hold NUL bytes). Always fetch binary to a temp file, then hash/gunzip
+          # the file.
+          sha256f() { sha256sum "$1" | awk '{print $1}'; }
+
+          # --- apt stable: replicate what `apt-get update` actually verifies.
+          # Parse the SHA256 the (plain) Release records for binary-<arch>/
+          # Packages.gz, then fetch the (plain) Packages.gz and compare. This is
+          # the exact check apt makes — and the exact one that failed in #3218
+          # when a stale edge-cached Packages.gz no longer matched a fresh
+          # Release ("File has unexpected size"). Then gunzip and confirm the
+          # content actually lists the GA (a clean clobber can be empty-but-
+          # internally-consistent: hash matches, content empty — caught here).
+          rel="$(fetch "https://apt.wheels.dev/dists/stable/Release" || true)"
+          if ! grep -q "^SHA256:" <<<"$rel"; then
+            note "apt stable Release missing or has no SHA256 section."
+          else
+            for arch in amd64 arm64; do
+              relpath="main/binary-${arch}/Packages.gz"
+              exp="$(awk -v p="$relpath" '/^SHA256:/{f=1;next} /^[A-Z]/{f=0} f && $3==p {print $1}' <<<"$rel" | head -1)"
+              tmp="$(mktemp)"
+              fetch "https://apt.wheels.dev/dists/stable/${relpath}" > "$tmp" 2>/dev/null || true
+              act="$(sha256f "$tmp")"
+              content="$(gunzip -c "$tmp" 2>/dev/null || true)"
+              rm -f "$tmp"
+              if [ -z "$exp" ]; then
+                note "apt stable Release does not record a SHA256 for ${relpath}."
+              elif [ "$exp" != "$act" ]; then
+                note "apt stable ${arch} Packages.gz hash != Release (stale edge cache or torn publish — the #3218 'unexpected size' failure). expected=${exp} served=${act:-<empty>}"
+              elif ! grep -q "Version: ${EXPECTED}" <<<"$content"; then
+                note "apt stable ${arch} Packages.gz is hash-consistent but does not list wheels ${EXPECTED} (empty/old index)."
+              else
+                echo "OK  apt stable ${arch}: Packages.gz matches Release and lists ${EXPECTED}"
+              fi
+            done
+          fi
 
           # --- apt: bleeding-edge must stay non-empty (bidirectional guard).
           # Versions float (snapshot.N), so only assert it has at least one stanza.
-          be_url="https://apt.wheels.dev/dists/bleeding-edge/main/binary-amd64/Packages?cb=${CB}"
-          be_body="$(fetch "$be_url" || true)"
+          be_body="$(fetch "https://apt.wheels.dev/dists/bleeding-edge/main/binary-amd64/Packages.gz" 2>/dev/null | gunzip 2>/dev/null || true)"
           if ! grep -q "^Package:" <<<"$be_body"; then
-            note "apt bleeding-edge amd64 Packages index is EMPTY (a stable publish may be clobbering it). url=${be_url%%\?*}"
+            note "apt bleeding-edge amd64 index is EMPTY (a stable publish may be clobbering it)."
           else
             echo "OK  apt bleeding-edge amd64: index non-empty ($(grep -c '^Package:' <<<"$be_body") entries)"
           fi
 
-          # --- yum: resolve repomd -> primary.xml.gz, assert stable names the GA.
+          # --- yum: resolve repomd -> primary.xml.gz (plain urls), assert the GA.
+          # repomd records the primary's checksum; verify the served primary
+          # matches it, then that it lists the GA — the dnf analogue of the apt
+          # check above.
           check_yum() {
             local ch="$1" assert_ver="$2"
-            local repomd loc prim
-            repomd="$(fetch "https://yum.wheels.dev/${ch}/repodata/repomd.xml?cb=${CB}" || true)"
+            local repomd loc exp gz act content
+            repomd="$(fetch "https://yum.wheels.dev/${ch}/repodata/repomd.xml" || true)"
             loc="$(grep -oE 'repodata/[a-f0-9]+-primary\.xml\.gz' <<<"$repomd" | head -1 || true)"
             if [ -z "$loc" ]; then
               note "yum ${ch} repomd.xml has no primary metadata (empty/missing repodata)."
               return
             fi
-            prim="$(fetch "https://yum.wheels.dev/${ch}/${loc}?cb=${CB}" 2>/dev/null | gunzip 2>/dev/null || true)"
-            if ! grep -q '<package ' <<<"$prim"; then
+            # The primary's filename IS its sha256 (createrepo_c names it that,
+            # and it equals the repomd <checksum> for the compressed file).
+            exp="$(sed -E 's@.*/([a-f0-9]+)-primary\.xml\.gz@\1@' <<<"$loc")"
+            tmp="$(mktemp)"
+            fetch "https://yum.wheels.dev/${ch}/${loc}" > "$tmp" 2>/dev/null || true
+            act="$(sha256f "$tmp")"
+            content="$(gunzip -c "$tmp" 2>/dev/null || true)"
+            rm -f "$tmp"
+            if [ -n "$exp" ] && [ "$exp" != "$act" ]; then
+              note "yum ${ch} primary.xml.gz hash != repomd reference (stale edge cache or torn publish). expected=${exp} served=${act:-<empty>}"
+            elif ! grep -q '<package ' <<<"$content"; then
               note "yum ${ch} primary metadata lists no packages."
-            elif [ -n "$assert_ver" ] && ! grep -q "ver=\"${assert_ver}\"" <<<"$prim"; then
+            elif [ -n "$assert_ver" ] && ! grep -q "ver=\"${assert_ver}\"" <<<"$content"; then
               note "yum ${ch} primary metadata does not list wheels ${assert_ver} (stale or partial)."
             else
-              echo "OK  yum ${ch}: primary lists packages${assert_ver:+ incl. ${assert_ver}}"
+              echo "OK  yum ${ch}: primary matches repomd and lists packages${assert_ver:+ incl. ${assert_ver}}"
             fi
           }
           check_yum stable "$EXPECTED"
