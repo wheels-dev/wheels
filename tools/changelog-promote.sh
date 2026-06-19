@@ -5,8 +5,10 @@
 #   tools/changelog-promote.sh --preview            # print assembled sections, change nothing
 #   tools/changelog-promote.sh <version> [date]     # promote: merge fragments + current
 #                                                   # [Unreleased] body into a new
-#                                                   # "## [<version>] - <date>" section,
-#                                                   # reset [Unreleased], delete fragments
+#                                                   # "# [<version>](tag-url) => <date>"
+#                                                   # section (the format release.yml's
+#                                                   # awk extraction expects), reset
+#                                                   # [Unreleased], delete fragments
 #
 # Promotion only edits files — review the diff and commit yourself. The
 # script refuses to promote when there is nothing to promote, and fails
@@ -90,7 +92,14 @@ def parse_unreleased(text):
         fail("CHANGELOG.md has no '## [Unreleased]' section")
     head = text[: match.end()]
     rest = text[match.end():]
-    next_heading = re.search(r"(?m)^## ", rest)
+    # Version sections in this changelog use a SINGLE '#' (e.g.
+    # "# [4.0.3](...) => date"); [Unreleased] and some legacy 1.x entries use
+    # '##', and old sections contain '## ' subheadings (e.g. "## Detailed
+    # Changes"). Match the next VERSION heading at either level ("#"/"##"
+    # followed by " [") so the tail begins at the previous release — not at a
+    # '## ' subheading buried inside an old section (which would pull every
+    # release since into the promoted body).
+    next_heading = re.search(r"(?m)^#{1,2} \[", rest)
     body = rest[: next_heading.start()] if next_heading else rest
     tail = rest[next_heading.start():] if next_heading else ""
 
@@ -100,6 +109,12 @@ def parse_unreleased(text):
     sections = []
     current = (None, [])
     for line in body.splitlines():
+        # Drop horizontal-rule separators ('---' / '----') left in the
+        # [Unreleased] body — the promote step re-emits its own '---' separators
+        # around the new section, and a stray rule promoted as content would
+        # break release.yml's awk '/^# [VERSION]/,/^---$/' notes extraction.
+        if re.fullmatch(r"-{3,}", line.strip()):
+            continue
         if line.startswith("### "):
             if current[0] is not None or any(l.strip() for l in current[1]):
                 sections.append(current)
@@ -112,24 +127,51 @@ def parse_unreleased(text):
 
 
 def merged_sections(existing, fragments):
-    """Merge fragment bullets into the existing Unreleased sections."""
-    out = []
-    seen = set()
+    """Combine existing [Unreleased] bullets with fragment bullets into ONE
+    section per heading, emitted in CANONICAL order.
+
+    The [Unreleased] body can accumulate the same heading more than once (e.g.
+    two separate '### Performance' blocks added by different PRs over a cycle);
+    consolidating per-heading keeps the released section from carrying duplicate
+    or out-of-order headings into the public release notes. Within a heading,
+    existing bullets (which predate the fragments) come first, then fragment
+    bullets. Headings outside CANONICAL are preserved after the canonical ones
+    in first-seen order so nothing is silently dropped."""
+    combined = {}      # heading -> [bullets]
+    extra_order = []   # non-canonical headings, first-seen order
+    prose = []         # heading=None prose (rare)
+
+    def add(heading, lines):
+        bullets = [l for l in lines if l.strip()]
+        if not bullets:
+            return
+        if heading not in combined:
+            combined[heading] = []
+            if heading not in CANONICAL:
+                extra_order.append(heading)
+        combined[heading].extend(bullets)
+
     for heading, lines in existing:
         if heading is None:
-            # Prose before the first ### heading (rare) — keep as-is.
-            out.append((heading, [l for l in lines if l.strip()]))
-            continue
-        bullets = [l for l in lines if l.strip()]
-        if heading in fragments:
-            bullets.extend(fragments[heading])
-        out.append((heading, bullets))
-        seen.add(heading)
+            prose.extend(l for l in lines if l.strip())
+        else:
+            add(heading, lines)
     for heading in CANONICAL:
-        if heading in fragments and heading not in seen:
-            out.append((heading, list(fragments[heading])))
-    # Drop empty sections.
-    return [(h, b) for h, b in out if b]
+        if heading in fragments:
+            add(heading, fragments[heading])
+    for heading in fragments:           # defensive: read_fragments validates
+        if heading not in CANONICAL:     # types, so this normally never fires
+            add(heading, fragments[heading])
+
+    out = []
+    if prose:
+        out.append((None, prose))
+    for heading in CANONICAL:
+        if heading in combined:
+            out.append((heading, combined[heading]))
+    for heading in extra_order:
+        out.append((heading, combined[heading]))
+    return out
 
 
 def render(sections):
@@ -178,8 +220,18 @@ if not merged:
     fail("nothing to promote: no fragments and [Unreleased] is empty")
 
 new_unreleased = f"\n{MARKER}\n\n"
-version_section = f"## [{version}] - {date}\n\n{render(merged)}\n"
-CHANGELOG.write_text(head + new_unreleased + version_section + tail, encoding="utf-8")
+# Match the established section format: a single '#' heading that links to the
+# release tag and uses ' => ' before the date — every prior release uses this,
+# and release.yml builds the GitHub Release notes with
+# awk '/^# \[VERSION\]/,/^---$/' (single hash, terminated by exactly '---').
+tag_url = f"https://github.com/wheels-dev/wheels/releases/tag/v{version}"
+version_section = f"# [{version}]({tag_url}) => {date}\n\n{render(merged)}\n"
+# Emit explicit '---' (three-dash) separators around the new section: one
+# between [Unreleased] and it, one between it and the previous release (tail).
+# A '----' (four-dash) rule would silently extend release.yml's awk range into
+# the previous version's notes (the recurring #2606 / #2768 footgun).
+sep = "---\n\n"
+CHANGELOG.write_text(head + new_unreleased + sep + version_section + sep + tail, encoding="utf-8")
 
 removed = []
 for path in sorted(FRAG_DIR.glob("*.md")):
@@ -187,7 +239,7 @@ for path in sorted(FRAG_DIR.glob("*.md")):
         path.unlink()
         removed.append(path.name)
 
-print(f"[{version}] - {date} now carries {sum(len(b) for _, b in merged)} entries (fragments + prior [Unreleased] content).")
+print(f"[{version}] => {date} now carries {sum(len(b) for _, b in merged)} entries (fragments + prior [Unreleased] content).")
 print(f"Removed {len(removed)} fragment(s): {', '.join(removed) if removed else '(none)'}")
 print("Review the CHANGELOG.md diff, then commit.")
 PYEOF

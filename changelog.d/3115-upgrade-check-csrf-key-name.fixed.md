@@ -1,1 +1,0 @@
-- `wheels upgrade check` for a 3.x→4.x jump now recommends `csrfCookieEncryptionSecretKey` — the setting the framework actually reads — instead of the inert `csrfEncryptionKey`, which no framework code consults; a user following the old advice added a setting Wheels ignored and kept the rotate-on-every-deploy CSRF-cookie behavior the rule exists to prevent (#3115)
