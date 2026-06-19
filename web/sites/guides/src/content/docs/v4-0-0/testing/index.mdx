@@ -67,7 +67,7 @@ Wheels used to ship with a homegrown runner called RocketUnit. Specs were CFCs i
 
 ## The reference platform
 
-Wheels 4.0 core tests run against **Lucee 7 + SQLite**. That's the baseline you should assume when reading the test docs. The full matrix — Adobe ColdFusion 2018/2021/2023/2025, BoxLang, and every supported database (MySQL, PostgreSQL, SQL Server, H2, SQLite, CockroachDB) — runs in CI on every PR to the framework. For your own app, pick one engine and one database for fast feedback, then let CI handle the matrix. Cross-engine nuances (Lucee vs. Adobe scope rules, closure semantics, reserved names) surface as asides in the detail pages where they matter.
+Wheels 4.0 core tests run against **Lucee 7 + SQLite**. That's the baseline you should assume when reading the test docs. The full matrix — Lucee 6/7, Adobe ColdFusion 2023/2025, BoxLang, and every supported database (MySQL, PostgreSQL, SQL Server, SQLite, CockroachDB, Oracle) — runs on a weekly schedule (plus manual dispatch) in the framework repo, not on every PR. For your own app, pick one engine and one database for fast feedback, then let a scheduled matrix job handle the rest. Cross-engine nuances (Lucee vs. Adobe scope rules, closure semantics, reserved names) surface as asides in the detail pages where they matter.
 
 ## Running tests
 
@@ -81,9 +81,9 @@ Common invocations:
 
 - `wheels test` — execute the entire suite.
 - `wheels test --filter=models` — a single directory or keyword.
-- `wheels test --ci` — CI mode (browser specs gate on `WHEELS_BROWSER_CI_ENABLE`).
+- `wheels test --ci` — accepted for forward-compatibility, but currently a no-op: failure exit codes are non-zero on every run, with or without the flag. Browser-spec gating is controlled by the *server's* environment (`WHEELS_CI` / `WHEELS_BROWSER_CI_ENABLE`), not by this flag.
 
-The runner also exposes an HTTP endpoint at `/wheels/core/tests` you can hit directly. A URL like `/wheels/core/tests?format=json&directory=tests.specs.model` runs just the model specs and returns JSON. This is useful for dev-loop iteration — keep the server up, change a spec, refresh the URL. See [Running Tests Locally](/v4-0-0/testing/running-tests-locally/) for the full invocation surface including Docker-based cross-engine runs.
+The runner also exposes an HTTP endpoint at `/wheels/app/tests` you can hit directly. A URL like `/wheels/app/tests?format=json&directory=tests.specs.models` runs just the model specs and returns JSON. (The framework's own suite lives at `/wheels/core/tests`, where the directory prefix is `wheels.tests.specs` — e.g. `directory=wheels.tests.specs.model`. A `directory` value the endpoint doesn't recognize is silently ignored and the full suite runs instead; see [#3083](https://github.com/wheels-dev/wheels/issues/3083).) This is useful for dev-loop iteration — keep the server up, change a spec, refresh the URL. See [Running Tests Locally](/v4-0-0/testing/running-tests-locally/) for the full invocation surface including Docker-based cross-engine runs.
 
 ## Setup files that matter
 
@@ -93,14 +93,14 @@ Four files drive your test setup. Knowing what each one does saves a lot of head
 |------|--------------|
 | `tests/TestRunner.cfc` | Sets up shared state. Runs before and after the whole suite. |
 | `tests/populate.cfm` | Seeds test data. Runs **once per test run**, not per spec. |
-| `tests/_assets/models/` | Test-only models, often using `tableName()` to map to test tables. |
+| `tests/_assets/models/` | Test-only models, often using `table()` to map to test tables. |
 | `tests/specs/<category>/` | Where your actual specs live. |
 
-`populate.cfm` typically drops and recreates the test schema — it's idempotent by construction but runs exactly once per `wheels test` invocation (or when you hit the runner URL with `?populate=true`). This is a deliberate departure from Rails/Laravel-style per-spec rollback: the framework default is `transactionMode = "none"`, so writes persist across specs unless you explicitly wrap them in `transaction { ... transaction action="rollback"; }`. [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) walks through the real lifecycle and the per-spec isolation pattern.
+`populate.cfm` typically drops and recreates the test schema — it's idempotent by construction and runs by default on every runner-URL hit (pass `?populate=false` to opt out). This is a deliberate departure from Rails/Laravel-style per-spec rollback: the framework default is `transactionMode = "none"`, so writes persist across specs unless you explicitly wrap them in `transaction { ... transaction action="rollback"; }`. [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) walks through the real lifecycle and the per-spec isolation pattern.
 
 ## CI integration
 
-The Wheels repo ships with GitHub Actions workflows that run the full engine × database matrix on every PR. Your app's CI doesn't need to be nearly that heavy. A single job that runs `wheels test --ci` against one engine and one database is usually enough. See [CI Integration](/v4-0-0/testing/ci-integration/) for drop-in templates, cross-engine matrix patterns, browser-test gating, and soft-fail database handling.
+The Wheels repo ships with GitHub Actions workflows that run the full engine × database matrix on a weekly schedule. Your app's CI doesn't need to be nearly that heavy. A single job that runs `wheels test` against one engine and one database is usually enough. See [CI Integration](/v4-0-0/testing/ci-integration/) for drop-in templates, cross-engine matrix patterns, browser-test gating, and soft-fail database handling.
 
 ## Where to go next
 

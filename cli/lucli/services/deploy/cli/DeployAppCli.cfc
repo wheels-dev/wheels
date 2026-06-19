@@ -17,15 +17,19 @@ component {
         variables.sshPool = arguments.sshPool;
         variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
+        // Host-prefixed remote stdout collected by read verbs (#2957 DEP-6a).
+        variables.liveOutput = [];
         return this;
     }
 
     public array function dryRunOutput() { return variables.dryRunBuffer; }
 
     public string function boot(required struct opts) {
+        // boot (re)creates the container, so env.secret values must be
+        // delivered to the role env file first (#2957).
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
             return cmds.run(role, version);
-        });
+        }, {deliverEnvFile: true});
         return $renderResult(arguments.opts, "Booted app on " & n & " host(s)");
     }
 
@@ -46,21 +50,21 @@ component {
     public string function details(required struct opts) {
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
             return cmds.status(role, version);
-        });
+        }, {collect: true});
         return $renderResult(arguments.opts, "Collected app details on " & n & " host(s)");
     }
 
     public string function containers(required struct opts) {
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
             return cmds.containers();
-        }, {versionOptional: true});
+        }, {versionOptional: true, collect: true});
         return $renderResult(arguments.opts, "Listed app containers on " & n & " host(s)");
     }
 
     public string function images(required struct opts) {
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
             return cmds.images();
-        }, {versionOptional: true});
+        }, {versionOptional: true, collect: true});
         return $renderResult(arguments.opts, "Listed app images on " & n & " host(s)");
     }
 
@@ -72,7 +76,7 @@ component {
         };
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
             return cmds.logs(logOpts);
-        }, {versionOptional: true});
+        }, {versionOptional: true, collect: true});
         return $renderResult(arguments.opts, "Tailed app logs on " & n & " host(s)");
     }
 
@@ -101,10 +105,17 @@ component {
 
     private numeric function $forEachHost(required struct opts, required any cmdFn, struct flags = {}) {
         arrayClear(variables.dryRunBuffer);
+        arrayClear(variables.liveOutput);
         var cfg = variables.loader.load(
             arguments.opts.configPath,
             {destination: arguments.opts.destination ?: ""}
         );
+        // Register resolved secret values so a nonzero `docker run ... -e
+        // KEY=value` exit can't leak an env.clear value interpolated from a
+        // ${SECRET} token into the RemoteExecutionFailed message / CI logs
+        // (#3159). The env.secret path already avoids -e via --env-file, but
+        // env.clear values still ride argv.
+        $registerSecretsForRedaction();
         var version = arguments.opts.version ?: "";
         var versionOptional = arguments.flags.versionOptional ?: false;
         if (!versionOptional && !len(version)) {
@@ -112,15 +123,44 @@ component {
                   message="This verb requires --version (e.g. --version=v1.2.3). On older wrappers that pre-date the picocli rewrite, pass --release instead.");
         }
         var dryRun = arguments.opts.dryRun ?: false;
+        // collect=true marks a read verb: remote stdout is gathered into
+        // liveOutput and appended to the live-mode summary (#2957 DEP-6a).
+        var collect = arguments.flags.collect ?: false;
         var appCmds = new modules.wheels.services.deploy.commands.AppCommands(cfg);
         var roleFilter = arguments.opts.role ?: "";
         var hostCount = 0;
 
+        // env.secret delivery (#2957): container-(re)creating verbs opt in
+        // via flags.deliverEnvFile. Content renders once — an unresolvable
+        // secret fails fast locally before any remote call.
+        var secretNames = (arguments.flags.deliverEnvFile ?: false) ? cfg.env().secret() : [];
+        var envFileContent = "";
+        if (arrayLen(secretNames)) {
+            envFileContent = appCmds.env_file_content(secretNames, $resolvedSecrets());
+        }
+
         for (var role in cfg.roles()) {
             if (len(roleFilter) && role.name() != roleFilter) continue;
             for (var host in role.hosts()) {
+                if (arrayLen(secretNames)) {
+                    $deliverEnvFile(
+                        [host],
+                        appCmds.ensure_env_file(role),
+                        appCmds.relock_env_file(role),
+                        envFileContent,
+                        appCmds.env_file_path(role),
+                        secretNames,
+                        dryRun
+                    );
+                }
                 var cmd = arguments.cmdFn(appCmds, role, version);
-                $dispatch([host], cmd, dryRun);
+                if (collect) {
+                    for (var l in $dispatchCollect([host], cmd, dryRun)) {
+                        arrayAppend(variables.liveOutput, l);
+                    }
+                } else {
+                    $dispatch([host], cmd, dryRun);
+                }
                 hostCount++;
             }
         }
@@ -130,6 +170,9 @@ component {
     private string function $renderResult(required struct opts, required string summary) {
         if (arguments.opts.dryRun ?: false) {
             return arrayToList(variables.dryRunBuffer, chr(10));
+        }
+        if (arrayLen(variables.liveOutput)) {
+            return arguments.summary & chr(10) & arrayToList(variables.liveOutput, chr(10));
         }
         return arguments.summary;
     }
@@ -144,5 +187,101 @@ component {
         var c = arguments.cmd;
         var doRaise = !arguments.allowFail;
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
+    }
+
+    /**
+     * Resolved key→value map from the SecretResolver the loader built for
+     * the most recent load(). Empty struct when no resolver exists.
+     */
+    private struct function $resolvedSecrets() {
+        var resolver = variables.loader.secretResolver();
+        return isObject(resolver) ? resolver.all() : {};
+    }
+
+    /**
+     * Hand the resolved secret VALUES to the pool so $raiseRemoteFailure
+     * scrubs them from command summaries (#3159). Guarded for pools that
+     * predate $setSecretValues. Values only — keys are harmless in argv.
+     */
+    private void function $registerSecretsForRedaction() {
+        if (!isObject(variables.sshPool) || !structKeyExists(variables.sshPool, "$setSecretValues")) {
+            return;
+        }
+        var resolved = $resolvedSecrets();
+        var values = [];
+        for (var k in resolved) {
+            arrayAppend(values, toString(resolved[k]));
+        }
+        variables.sshPool.$setSecretValues(values);
+    }
+
+    /**
+     * Deliver env.secret content to `remotePath` on each host (#2957):
+     * ensure-cmd (mkdir + touch + chmod 600) first so the file is
+     * permission-locked before content lands, then SFTP via uploadString —
+     * values never enter argv or dry-run output — then relock-cmd
+     * (chmod 600) AFTER the upload, belt-and-braces against the SFTP layer
+     * resetting perms to 0644 (sshj's preserve-attributes default;
+     * SshClient disables it, but FakeSshPool can't verify that, so the
+     * re-lock is the testable guarantee). Mirrors
+     * DeployMainCli.$deliverEnvFile (each Cli keeps its own dispatch
+     * plumbing by design).
+     */
+    private void function $deliverEnvFile(
+        required array hosts,
+        required string ensureCmd,
+        required string relockCmd,
+        required string content,
+        required string remotePath,
+        required array secretNames,
+        required boolean dryRun
+    ) {
+        $dispatch(arguments.hosts, arguments.ensureCmd, arguments.dryRun);
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(
+                    variables.dryRunBuffer,
+                    "[" & h & "] upload env file " & arguments.remotePath
+                        & " (" & arrayLen(arguments.secretNames) & " secret(s): "
+                        & arrayToList(arguments.secretNames, ", ") & " — values not shown)"
+                );
+            }
+            $dispatch(arguments.hosts, arguments.relockCmd, arguments.dryRun);
+            return;
+        }
+        var c = arguments.content;
+        var p = arguments.remotePath;
+        var relock = arguments.relockCmd;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+            ssh.uploadString(c, p);
+            ssh.run(relock, {raise: true});
+        });
+    }
+
+    /**
+     * Dispatch + collect host-prefixed remote output (`[host] line`) for
+     * read verbs (#2957 DEP-6a). Sequential so output order is stable and
+     * the collection stays single-threaded. Mirrors
+     * DeployMainCli.$dispatchCollect — keep the two in lockstep.
+     */
+    private array function $dispatchCollect(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
+            return [];
+        }
+        var c = arguments.cmd;
+        var doRaise = !arguments.allowFail;
+        var ctx = {lines: []};
+        variables.sshPool.sequential(arguments.hosts, function(ssh, host) {
+            var res = ssh.run(c, {raise: doRaise});
+            var text = trim(res.stdout ?: "");
+            if (!len(text)) text = trim(res.stderr ?: "");
+            if (!len(text)) return;
+            text = replace(text, chr(13), "", "all");
+            for (var line in listToArray(text, chr(10))) {
+                arrayAppend(ctx.lines, "[" & host & "] " & line);
+            }
+        });
+        return ctx.lines;
     }
 }

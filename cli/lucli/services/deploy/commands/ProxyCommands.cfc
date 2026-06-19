@@ -27,7 +27,7 @@ component extends="Base" {
             "--network kamal",
             "--publish 80:80",
             "--publish 443:443",
-            "--volume /home/#variables.config.ssh().user()#/.config/kamal-proxy:/home/kamal-proxy/.config/kamal-proxy",
+            "--volume #$remoteHome()#/.config/kamal-proxy:/home/kamal-proxy/.config/kamal-proxy",
             variables.PROXY_IMAGE
         );
     }
@@ -71,11 +71,35 @@ component extends="Base" {
         return docker("start", variables.PROXY_CONTAINER_NAME);
     }
 
+    /**
+     * Fresh-host-safe boot, mirroring Kamal's Proxy#start_or_run
+     * (`combine start, run, by: "||"`): `docker start` succeeds when the
+     * container already exists (running start is a no-op, stopped start
+     * resumes it), and the full `docker run` fires only on a truly fresh
+     * host. The previous guard — `details() || boot()` — never reached
+     * boot() because `docker ps --filter` exits 0 whether or not anything
+     * matches (#2957 DEP-5a).
+     */
+    public string function start_or_run() {
+        return start() & " || " & boot();
+    }
+
     public string function stop() {
         return docker("stop", variables.PROXY_CONTAINER_NAME);
     }
 
     public string function restart() {
         return docker("restart", variables.PROXY_CONTAINER_NAME);
+    }
+
+    /**
+     * Home directory of the deploy user on the remote host, for the proxy
+     * config volume. The previous hardcoded `/home/<user>` was wrong for
+     * the DEFAULT ssh user (root's home is /root) — #2957 DEP-11c.
+     * compare(), not ==: unix usernames are case-sensitive.
+     */
+    private string function $remoteHome() {
+        var sshUser = variables.config.ssh().user();
+        return compare(sshUser, "root") == 0 ? "/root" : "/home/" & sshUser;
     }
 }

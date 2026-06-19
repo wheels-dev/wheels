@@ -1,6 +1,6 @@
 ---
 title: Migrating from Kamal
-description: For teams coming from Ruby Kamal — what wheels deploy inherits verbatim, the one deliberate schema divergence, and a concrete switch-over checklist.
+description: For teams coming from Ruby Kamal — what wheels deploy inherits verbatim, the two schema divergences (ERB and the rejected top-level keys), and a concrete switch-over checklist.
 type: howto
 sidebar:
   order: 12
@@ -8,41 +8,45 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-This page is for teams already running Ruby Kamal who want to replace `kamal` with `wheels deploy`. The short version: your `config/deploy.yml`, `.kamal/secrets`, and `.kamal/hooks/*` work unchanged with one exception — ERB inside `deploy.yml`. Keep reading for the full story.
+This page is for teams already running Ruby Kamal who want to replace `kamal` with `wheels deploy`. The short version: your `.kamal/secrets` and `.kamal/hooks/*` work unchanged, and `config/deploy.yml` largely does too, with two schema exceptions — ERB inside `deploy.yml`, and a set of Kamal top-level keys the validator rejects because the port doesn't implement them — and a version caveat: `env.secret` delivery to containers requires a CLI built from `develop` (4.0.4+) — the released 4.0.3 silently drops those entries ([#2957](https://github.com/wheels-dev/wheels/issues/2957)). Keep reading for the full story.
 
 **You'll learn:**
 
 - What `wheels deploy` keeps byte-compatible with Ruby Kamal
-- The one deliberate schema divergence — ERB removed; Kamal's `${VAR}` interpolation kept unchanged
+- The two deliberate schema divergences — ERB removed (Kamal's `${VAR}` interpolation kept unchanged), and unimplemented Kamal top-level keys rejected instead of silently ignored
 - The coexistence guarantee — running both tools against the same host during evaluation
 - A concrete switch-over checklist
 
 <Aside type="caution" title="ERB is not supported">
-`deploy.yml` in Ruby Kamal supports embedded ERB. `wheels deploy` does not. This is the only schema-level incompatibility. If you use ERB anywhere in your deploy config, you will need to convert it to `${VAR}` env-var interpolation (which Kamal already supports too) or move the logic into `.kamal/secrets`. See [The one divergence](#the-one-divergence) below.
+`deploy.yml` in Ruby Kamal supports embedded ERB. `wheels deploy` does not. If you use ERB anywhere in your deploy config, you will need to convert it to `${VAR}` env-var interpolation (which Kamal already supports too) or move the logic into `.kamal/secrets`. See [Divergence 1: ERB removed](#divergence-1-erb-removed) below.
+</Aside>
+
+<Aside type="caution" title="Unimplemented Kamal keys are rejected">
+The validator only accepts the top-level keys `wheels deploy` actually implements: `service`, `image`, `servers`, `registry`, `builder`, `env`, `ssh`, `proxy`, `accessories`. Kamal keys the port doesn't implement yet — `boot`, top-level `healthcheck`, `hooks`, `volumes`, `labels`, `logging`, `retain_containers`, `minimum_version`, `asset_path`, `require_destination`, `allow_empty_roles`, `run_directory`, `readiness_delay` — make every command fail with `unknown top-level key: '<name>'`. A typical Kamal config needs those keys deleted (or `healthcheck` moved under `proxy:`) before it loads. See [Divergence 2: rejected top-level keys](#divergence-2-rejected-top-level-keys) below.
 </Aside>
 
 ## What's byte-compatible
 
-The on-server state managed by `wheels deploy` and Ruby Kamal is identical by design. Everything in this list matches the Kamal 2.4.0 contract exactly.
+The on-server state managed by `wheels deploy` and Ruby Kamal is identical by design — that's the Kamal 2.4.0 contract the port targets. A few rows are still pending in the current Phase 1 CLI (tracked in [#2957](https://github.com/wheels-dev/wheels/issues/2957)); they're annotated below.
 
 | Concern | Value |
 |---------|-------|
 | Container name | `<service>-<role>-<version>` (e.g. `myapp-web-abc1234`) |
 | Container labels | `service=`, `role=`, `destination=`, `version=` |
-| Docker network | `kamal` |
+| Docker network | `kamal` — *pending #2957: the network is not created yet* |
 | Proxy image | `basecamp/kamal-proxy:v0.8.6` |
-| Proxy config dir | `/home/<user>/.config/kamal-proxy/` |
+| Proxy config dir | `/home/<user>/.config/kamal-proxy/` — *pending #2957: currently computed as `/home/<user>` even when deploying as root (Kamal uses `/root`)* |
 | Lock file path | `/tmp/kamal_deploy_lock_<service>` |
-| Audit log | `/tmp/kamal-audit.log` |
+| Audit log | `/tmp/kamal-audit.log` — *pending #2957: never written yet* |
 | Hook directory | `.kamal/hooks/` |
 | Hook env prefix | `KAMAL_*` (not `WHEELS_*`) |
 | Secret file | `.kamal/secrets`, `.kamal/secrets.<destination>` |
 
-Why keep the `KAMAL_*` prefix? Because every hook anyone has ever written for Ruby Kamal uses it. Renaming would break every user's existing scripts for zero benefit.
+Why keep the `KAMAL_*` prefix? Because every hook anyone has ever written for Ruby Kamal uses it. Renaming would break every user's existing scripts for zero benefit. One honesty note: the env block is a **subset** of Ruby Kamal's — `KAMAL_VERSION`, `KAMAL_HOSTS`, `KAMAL_PERFORMER`, `KAMAL_DESTINATION`, `KAMAL_RUNTIME`, and `KAMAL_ERROR` are set; `KAMAL_ROLE`, `KAMAL_SERVICE`, and the rest are not. Hooks reading only the supported subset port unchanged. See [Hooks](/v4-0-0/deployment/hooks/) for the full table.
 
 Why keep the `.kamal/` directory name? Because you can sit on both tools during evaluation — `kamal deploy` and `wheels deploy` read the same secrets and the same hooks. Switch back and forth freely; nothing on the server changes.
 
-## The one divergence
+## Divergence 1: ERB removed
 
 Ruby Kamal allows ERB inside `deploy.yml`:
 
@@ -63,10 +67,9 @@ image: ${REGISTRY}/${APP_NAME}
 
 `${VAR}` references resolve in this order:
 
-1. CLI `--env` overrides (test/CI shims).
-2. `.kamal/secrets` (and the destination overlay `.kamal/secrets.<destination>` when `--destination` is set).
-3. `System.getenv(VAR)` on the machine running `wheels deploy`.
-4. Empty string (Kamal's behavior for unset vars).
+1. `.kamal/secrets` (and the destination overlay `.kamal/secrets.<destination>` when `--destination` is set). Caveat: the lookup is currently relative to `deploy.yml`'s directory, so it reads `config/.kamal/secrets` rather than the project-root `.kamal/secrets` ([#3084](https://github.com/wheels-dev/wheels/issues/3084)).
+2. `System.getenv(VAR)` on the machine running `wheels deploy`.
+3. Empty string (Kamal's behavior for unset vars).
 
 Only uppercase-and-underscore tokens are expanded — `${APP_NAME}` matches; lowercase `${service}` is left alone (this prevents accidental capture of shell-style placeholders elsewhere in the config). This is the same rule Kamal applies.
 
@@ -78,8 +81,23 @@ If your existing config uses ERB logic — `<%= "blue" if ENV["ROLE"] == "stagin
 |----------------|-----------------|
 | `<%= ENV["FOO"] %>` | `${FOO}` |
 | `<%= ENV.fetch("FOO", "bar") %>` | `${FOO}` — set `FOO=bar` in `.kamal/secrets` for the default |
-| `<%= `git rev-parse --short HEAD`.chomp %>` | pass `--version=$(git rev-parse --short HEAD)` on the CLI, or set `VERSION` in `.kamal/secrets` and use `${VERSION}` |
+| `<%= `git rev-parse --short HEAD`.chomp %>` | pass `--release=$(git rev-parse --short HEAD)` on the CLI, or set `VERSION` in `.kamal/secrets` and use `${VERSION}` |
 | `<%= ENV["STAGE"] == "prod" ? 1 : 0 %>` | set the resolved value in `.kamal/secrets.production` or `.kamal/secrets.staging` — destination overlays replace in-file logic |
+
+## Divergence 2: rejected top-level keys
+
+Kamal accepts a number of top-level `deploy.yml` keys that `wheels deploy` has not implemented. Rather than accepting them and silently doing nothing, the validator **rejects** them — any unimplemented key makes every command fail with `unknown top-level key: '<name>'` ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
+
+The accepted top-level keys are `service`, `image`, `servers`, `registry`, `builder`, `env`, `ssh`, `proxy`, and `accessories`. Everything else must come out of the file before it loads, including:
+
+- `boot` — hosts always deploy one at a time, sequentially ([#2957](https://github.com/wheels-dev/wheels/issues/2957))
+- top-level `healthcheck` — move it under `proxy.healthcheck:` instead
+- `hooks` — the hooks *feature* works (scripts are always loaded from `.kamal/hooks/`); only the path-override key is rejected
+- `volumes`, `labels`, `logging` — no app-container mounts, extra labels, or logging flags are emitted
+- `retain_containers` — pass `--keep=<n>` to [`wheels deploy prune`](/v4-0-0/command-line-tools/commands/deploy/prune/) instead (default keeps the 5 most recent)
+- `minimum_version`, `asset_path`, `require_destination`, `allow_empty_roles`, `run_directory`, `readiness_delay`
+
+See the [Rejected Kamal keys](/v4-0-0/deployment/config-reference/#rejected-kamal-keys) table in the config reference for what each key does in Kamal and the `wheels deploy` behavior you get instead.
 
 ## What changes in the CLI
 
@@ -87,20 +105,20 @@ The verb surface mirrors Kamal's. Most invocations are identical save the leadin
 
 | Ruby Kamal | `wheels deploy` |
 |------------|-----------------|
-| `kamal setup` | `wheels deploy setup` |
+| `kamal setup` | `wheels deploy setup` — *currently an alias for `wheels deploy`; unlike Kamal it doesn't boot the proxy or accessories yet ([#2957](https://github.com/wheels-dev/wheels/issues/2957)) — run `wheels deploy proxy boot` and `wheels deploy accessory boot all` yourself* |
 | `kamal deploy` | `wheels deploy` |
 | `kamal redeploy` | `wheels deploy redeploy` |
-| `kamal rollback VERSION` | `wheels deploy rollback --version=VERSION` |
+| `kamal rollback VERSION` | `wheels deploy rollback VERSION` |
 | `kamal config` | `wheels deploy config` |
 | `kamal app logs --follow` | `wheels deploy app logs --follow` |
 | `kamal proxy boot` | `wheels deploy proxy boot` |
 | `kamal accessory boot db` | `wheels deploy accessory boot db` |
-| `kamal secrets fetch --from op://...` | `wheels deploy secrets fetch --adapter=op --from=op://...` |
+| `kamal secrets fetch --from op://...` | `wheels deploy fetch-secrets --adapter=op --from=op://...` |
 | `kamal version` | `wheels deploy version` |
 
 Two CLI-level differences worth flagging:
 
-- **Flag style.** `wheels deploy` uses `--flag=value` everywhere. Positional args for a few verbs (`accessory boot <name>`, `rollback <version>` in Kamal) become named flags (`accessory boot --name=<name>`, `rollback --version=<version>`) for consistency across the CFML arg parser.
+- **Some nested verbs are flat.** The CLI runtime claims a few top-level subcommand names (`server`, `secrets`) and the root parser claims `--version`, so those Kamal forms get intercepted before the deploy module sees them. The working spellings are flat: `wheels deploy bootstrap` (not `server bootstrap`, [#2677](https://github.com/wheels-dev/wheels/issues/2677)), `wheels deploy fetch-secrets` / `extract-secrets` / `print-secrets` (not `secrets fetch|extract|print`, [#2697](https://github.com/wheels-dev/wheels/issues/2697)), and positional `rollback VERSION` (never `--version=`, [#2674](https://github.com/wheels-dev/wheels/issues/2674)). Kamal's positional arguments (`accessory boot db`, `rollback VERSION`) are required, exactly as in Kamal — named-flag spellings like `accessory boot --name=db` do not exist.
 - **`--dry-run` is everywhere.** Every `wheels deploy` verb accepts `--dry-run` and prints the commands it would have run, prefixed by host. This is wider coverage than Kamal's `KAMAL_DEBUG=1` logs.
 
 ## The coexistence guarantee
@@ -118,13 +136,14 @@ This exists for evaluation, not long-term mixed use. Pick a tool per repo and st
 Before removing `kamal` from your ecosystem:
 
 1. **Scan `deploy.yml` for ERB.** `grep -n '<%' config/deploy.yml`. Every match needs conversion.
-2. **Review `.kamal/secrets` for shell compatibility.** `wheels deploy` evaluates the file through `bash`; if you relied on `sh`-only behavior, nothing changes, but confirm.
-3. **Install the Wheels CLI on every control machine that runs deploys.** See [installing the CLI](/v4-0-0/command-line-tools/installation/).
-4. **Run `wheels deploy config` and diff against `kamal config`.** Every field wheels emits should match kamal's. The reverse isn't true — wheels emits a subset during Phase 1.
-5. **Run `wheels deploy --dry-run`.** Every command it would run, printed with host prefixes. Confirm it matches what you expect.
-6. **Deploy a non-critical environment first.** Staging before production. Verify logs, health checks, rollback.
-7. **Update CI.** Replace any `bundle exec kamal ...` or `gem install kamal` lines with your Wheels CLI install command plus `wheels deploy ...`.
-8. **Remove `Gemfile` / `Gemfile.lock` Kamal entries.** Only after at least one successful production deploy with `wheels deploy`.
+2. **Remove rejected top-level keys.** Delete any key outside the accepted list (or move `healthcheck` under `proxy:`) — see [Divergence 2](#divergence-2-rejected-top-level-keys). `wheels deploy config` fails loudly on the first offender, so it doubles as the checker.
+3. **Review `.kamal/secrets` for shell compatibility.** `wheels deploy` evaluates the file through `bash`; if you relied on `sh`-only behavior, nothing changes, but confirm.
+4. **Install the Wheels CLI on every control machine that runs deploys.** See [installing the CLI](/v4-0-0/command-line-tools/installation/).
+5. **Run `wheels deploy config` and diff against `kamal config`.** Every field wheels emits should match kamal's. The reverse isn't true — wheels emits a subset during Phase 1.
+6. **Run `wheels deploy --dry-run`.** Every command it would run, printed with host prefixes. Confirm it matches what you expect.
+7. **Deploy a non-critical environment first.** Staging before production. Verify logs, health checks, rollback.
+8. **Update CI.** Replace any `bundle exec kamal ...` or `gem install kamal` lines with your Wheels CLI install command plus `wheels deploy ...`.
+9. **Remove `Gemfile` / `Gemfile.lock` Kamal entries.** Only after at least one successful production deploy with `wheels deploy`.
 
 ## What's explicitly not supported
 
@@ -150,6 +169,6 @@ These Ruby Kamal features have no `wheels deploy` equivalent and won't get one:
   <LinkCard
     title="Hooks"
     href="/v4-0-0/deployment/hooks/"
-    description="Your Ruby Kamal hooks port over unchanged — KAMAL_ env is preserved."
+    description="The KAMAL_ env prefix is preserved — most Ruby Kamal hooks port over; check the supported-variable table."
   />
 </CardGrid>

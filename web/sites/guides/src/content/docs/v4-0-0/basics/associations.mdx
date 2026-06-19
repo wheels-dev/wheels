@@ -234,13 +234,12 @@ Wheels handles many-to-many through a real join model plus the `shortcut` argume
 ```cfm {test:compile}
 component extends="Model" {
     function config() {
-        hasMany(name="userRoles");
         hasMany(name="userRoles", shortcut="roles");
     }
 }
 ```
 
-The first `hasMany` gives you direct access to the join rows — `user.userRoles()`. The second, with `shortcut="roles"`, generates `user.roles()` that returns the Roles on the far side of the join. Behind the scenes Wheels walks both association chains to build the query.
+A single `hasMany` with `shortcut` provides both access paths: `user.userRoles()` for the join rows and `user.roles()` for the far-side records. Behind the scenes Wheels walks both association chains to build the query. Both names also work in `include`: `model("User").findAll(include="userRoles")` loads just the join rows, and `model("User").findAll(include="roles")` uses the shortcut name to load the far-side records through the bridge in one step (Wheels expands it to `userRoles(role)` automatically).
 
 The join model needs both `belongsTo` declarations:
 
@@ -258,7 +257,6 @@ And the Role side mirrors the User side:
 ```cfm {test:compile}
 component extends="Model" {
     function config() {
-        hasMany(name="userRoles");
         hasMany(name="userRoles", shortcut="users");
     }
 }

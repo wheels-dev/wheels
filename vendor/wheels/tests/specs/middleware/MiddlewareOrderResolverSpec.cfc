@@ -136,6 +136,48 @@ component extends="wheels.WheelsTest" {
 					expect(result[2].pluginName).toBe("pluginB");
 				});
 
+				it("preserves ordering constraints when duplicate names are present", function() {
+					// Regression: duplicate names collapsed into a single graph node,
+					// so the visited count never reached the entry total, the resolver
+					// fired the circular-dependency warning (a wrong diagnosis), and
+					// fell back to priority-only ordering — discarding all
+					// before/after constraints.
+					var entries = [
+						$entry("alpha", "pluginOne", {priority: 10}),
+						$entry("alpha", "pluginTwo", {priority: 20}),
+						$entry("gamma", "pluginThree", {priority: 1, after: "alpha"})
+					];
+					var result = resolver.resolve(entries);
+					expect(ArrayLen(result)).toBe(3);
+					// Priority-only fallback would put gamma (priority 1) first.
+					// The after="alpha" constraint binds to the first registration.
+					expect(result[1].pluginName).toBe("pluginOne");
+					expect(result[2].pluginName).toBe("pluginThree");
+					expect(result[3].pluginName).toBe("pluginTwo");
+				});
+
+				it("does not throw when duplicate-name entries lack a pluginName key", function() {
+					// Regression: the duplicate-name warning dereferenced
+					// entry.pluginName unguarded, so duplicates without a pluginName
+					// threw inside the warning path itself.
+					var entries = [
+						{middleware = "test.middleware.DupOne", options = {name = "dup"}},
+						{middleware = "test.middleware.DupTwo", options = {name = "dup"}}
+					];
+					var result = resolver.resolve(entries);
+					expect(ArrayLen(result)).toBe(2);
+				});
+
+				it("retains all duplicate-name entries in the output", function() {
+					var entries = [
+						$entry("same", "pluginA", {priority: 30}),
+						$entry("same", "pluginB", {priority: 10}),
+						$entry("same", "pluginC", {priority: 20})
+					];
+					var result = resolver.resolve(entries);
+					expect(ArrayLen(result)).toBe(3);
+				});
+
 				it("ignores unknown before target with warning", function() {
 					var entries = [
 						$entry("A", "pluginA", {before: "NonExistent"}),

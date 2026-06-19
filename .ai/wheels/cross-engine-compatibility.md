@@ -170,6 +170,32 @@ createDynamicProxy(consumer, ["java.util.function.Consumer"]);
 
 **Reference example**: [`vendor/wheels/wheelstest/DialogConsumer.cfc`](../../vendor/wheels/wheelstest/DialogConsumer.cfc) shows the CFC-based pattern used by `BrowserClient` to proxy Playwright's `Consumer<Dialog>`. The probe in `$requireDialogSupport` mirrors the real call shape so engine compatibility is verified on the same code path.
 
+### `for` Loops Inside `finally` Blocks Miscompile on Lucee 7
+
+Lucee 7.0.1+100 throws `variable [local] doesn't exist` at runtime when a `for` loop declares or iterates `local`-/`var`-scoped variables inside a `finally` block. Both loop forms are affected — `for (init; cond; step)` and `for (item in collection)`. Isolated with minimal probes: bare assignments and function calls inside `finally` compile and run fine; loops do not. One probe shape even produced a JVM `Expecting a stackmap frame` bytecode-verifier error, pointing at a codegen bug in Lucee's `finally`-block compilation.
+
+```cfm
+// WRONG — crashes at runtime on Lucee 7
+try {
+    doWork();
+} finally {
+    for (local.key in local.savedState) {
+        variables[local.key] = local.savedState[local.key];
+    }
+}
+
+// RIGHT — hoist the loop into a helper; the finally body is just a call
+try {
+    doWork();
+} finally {
+    $restoreState(local.savedState);
+}
+```
+
+**Why**: Lucee 7's bytecode generation for `finally` blocks mishandles the `local` scope frame for loop constructs. Adobe CF and BoxLang are unaffected.
+
+**Reference example**: `$restoreEmailViewVariables()` in [`vendor/wheels/controller/miscellaneous.cfc`](../../vendor/wheels/controller/miscellaneous.cfc) — the `sendEmail` variables-scope restore runs from `finally` via a `public` `$`-prefixed helper (mixin invariant: helpers must be public). Found while addressing review on [#2922](https://github.com/wheels-dev/wheels/pull/2922).
+
 ### `DirectoryCreate()` Second Argument Is Lucee-Only
 
 Lucee accepts `DirectoryCreate(path, createPath, mode)` and recurses parent directories when `createPath=true`. Adobe CF's signature varies by version and at least some Adobe builds reject any second argument with `"The function takes 1 parameter"` (issue #2567).

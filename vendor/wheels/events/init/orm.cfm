@@ -65,4 +65,10 @@
 
 		// Additional configurable flash options
 		application.$wheels.flashAppend = false;
+
+		// Cookie attributes used when flashStorage is "cookie" (mirrors the CSRF cookie
+		// defaults). Set flashCookieSecure=false for plain-HTTP development setups.
+		application.$wheels.flashCookieHttpOnly = true;
+		application.$wheels.flashCookieSecure = true;
+		application.$wheels.flashCookieSameSite = "Lax";
 </cfscript>

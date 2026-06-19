@@ -40,6 +40,7 @@ component {
 	) {
 		$args(name = "textField", reserved = "name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -99,6 +100,7 @@ component {
 	) {
 		$args(name = "passwordField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -159,6 +161,7 @@ component {
 	) {
 		$args(name = "emailField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -219,6 +222,7 @@ component {
 	) {
 		$args(name = "urlField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -285,6 +289,7 @@ component {
 	) {
 		$args(name = "numberField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -341,6 +346,7 @@ component {
 	) {
 		$args(name = "telField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -406,6 +412,7 @@ component {
 	) {
 		$args(name = "dateField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -462,6 +469,7 @@ component {
 	) {
 		$args(name = "colorField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -524,6 +532,7 @@ component {
 	) {
 		$args(name = "rangeField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -580,6 +589,7 @@ component {
 	) {
 		$args(name = "searchField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -683,6 +693,7 @@ component {
 	) {
 		$args(name = "fileField", reserved = "type,name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -736,6 +747,7 @@ component {
 	) {
 		$args(name = "textArea", reserved = "name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		local.maxLength = $maxLength(argumentCollection = arguments);
 		if (StructKeyExists(local, "maxLength")) {
 			arguments.maxLength = local.maxLength;
@@ -795,6 +807,7 @@ component {
 	) {
 		$args(name = "radioButton", reserved = "type,name,value,checked", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		local.valueToAppend = LCase(Replace(ReReplaceNoCase(arguments.tagValue, "[^a-z0-9- ]", "", "all"), " ", "-", "all"));
 		$applyAutoId(
 			args = arguments,
@@ -862,6 +875,7 @@ component {
 	) {
 		$args(name = "checkBox", reserved = "type,name,value,checked", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -953,6 +967,7 @@ component {
 	) {
 		$args(name = "select", reserved = "name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		$primeBoundObject(args = arguments);
 		$applyAutoId(args = arguments, objectName = arguments.objectName, property = arguments.property);
 		local.before = $formBeforeElement(argumentCollection = arguments);
 		local.after = $formAfterElement(argumentCollection = arguments);
@@ -1000,6 +1015,11 @@ component {
 		required any encode
 	) {
 		local.value = $formValue(argumentCollection = arguments);
+		// Only multi-selects should treat the bound value as a list when deciding which option(s)
+		// are selected; single selects must use exact comparison (a bound value like "Doe,John"
+		// must not mark a "Doe" option selected). The `multiple` key is only present on the
+		// argument struct when the select is a multi-select (see the normalization in select()).
+		local.multiple = StructKeyExists(arguments, "multiple") && (!IsBoolean(arguments.multiple) || arguments.multiple);
 		local.rv = "";
 		if (IsQuery(arguments.options)) {
 			if (!Len(arguments.valueField) || !Len(arguments.textField)) {
@@ -1018,16 +1038,21 @@ component {
 					arguments.textField = ListGetAt(local.columns, 1);
 				} else {
 					// take the first numeric field in the query as the value field and the first non numeric as the text field
+					local.columnsArray = ListToArray(local.columns);
 					local.iEnd = arguments.options.RecordCount;
+					local.jEnd = ArrayLen(local.columnsArray);
 					for (local.i = 1; local.i <= local.iEnd; local.i++) {
-						local.jEnd = ListLen(local.columns);
 						for (local.j = 1; local.j <= local.jEnd; local.j++) {
-							if (!Len(arguments.valueField) && IsNumeric(arguments.options[ListGetAt(local.columns, local.j)][local.i])) {
-								arguments.valueField = ListGetAt(local.columns, local.j);
+							if (!Len(arguments.valueField) && IsNumeric(arguments.options[local.columnsArray[local.j]][local.i])) {
+								arguments.valueField = local.columnsArray[local.j];
 							}
-							if (!Len(arguments.textField) && !IsNumeric(arguments.options[ListGetAt(local.columns, local.j)][local.i])) {
-								arguments.textField = ListGetAt(local.columns, local.j);
+							if (!Len(arguments.textField) && !IsNumeric(arguments.options[local.columnsArray[local.j]][local.i])) {
+								arguments.textField = local.columnsArray[local.j];
 							}
+						}
+						// stop scanning rows as soon as both fields have been inferred
+						if (Len(arguments.valueField) && Len(arguments.textField)) {
+							break;
 						}
 					}
 					if (!Len(arguments.valueField) || !Len(arguments.textField)) {
@@ -1043,7 +1068,8 @@ component {
 					objectValue = local.value,
 					optionValue = arguments.options[arguments.valueField][local.i],
 					optionText = arguments.options[arguments.textField][local.i],
-					encode = arguments.encode
+					encode = arguments.encode,
+					multiple = local.multiple
 				);
 			}
 		} else if (IsStruct(arguments.options)) {
@@ -1058,7 +1084,8 @@ component {
 					objectValue = local.value,
 					optionValue = LCase(local.key),
 					optionText = arguments.options[local.key],
-					encode = arguments.encode
+					encode = arguments.encode,
+					multiple = local.multiple
 				);
 			}
 		} else {
@@ -1130,7 +1157,8 @@ component {
 					objectValue = local.value,
 					optionValue = local.optionValue,
 					optionText = local.optionText,
-					encode = arguments.encode
+					encode = arguments.encode,
+					multiple = local.multiple
 				);
 			}
 		}
@@ -1144,10 +1172,17 @@ component {
 		required string objectValue,
 		required string optionValue,
 		required string optionText,
-		required any encode
+		required any encode,
+		boolean multiple = false
 	) {
 		local.optionAttributes = {value = arguments.optionValue};
-		if (arguments.optionValue == arguments.objectValue || ListFindNoCase(arguments.objectValue, arguments.optionValue)) {
+		// Only treat the bound value as a list of selected values for multi-selects.
+		// Single selects use exact comparison so a bound value containing a comma
+		// (e.g. "Doe,John") does not mark its comma-segment options as selected.
+		if (
+			arguments.optionValue == arguments.objectValue
+			|| (arguments.multiple && ListFindNoCase(arguments.objectValue, arguments.optionValue))
+		) {
 			local.optionAttributes.selected = "selected";
 		}
 		if (

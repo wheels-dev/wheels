@@ -211,18 +211,22 @@ return local.$wheels;
 	 * Includes a config file like /config/settings.cfm or /config/services.cfm
 	 * during application start, capturing any output it produces.
 	 *
-	 * If the captured output is non-empty — almost always a sign that the file
-	 * is missing a cfscript wrapper, so Lucee/Adobe parse the body as markup
-	 * and any cfscript-style code becomes literal output text that never
-	 * executes — log a clear warning pointing the developer at the most likely
-	 * cause, and discard the output so it doesn't leak into the response of
-	 * whichever request happened to trigger onApplicationStart (which would
-	 * otherwise manifest as raw `var di = ...` text spilling onto every page
-	 * until the next cold restart).
+	 * If the file fails to compile or run, the failure is logged and rethrown
+	 * as a named `Wheels.ConfigIncludeFailed` error that carries the failing
+	 * template path and the original engine message (original type/detail are
+	 * preserved in `detail`). This is deliberate fail-closed behavior in EVERY
+	 * environment: an app whose config did not load must not boot on framework
+	 * defaults and serve traffic. The named error propagates out of
+	 * onApplicationStart by design, and renders on the development error page
+	 * now that onError no longer masks application-start errors.
 	 *
-	 * The function never throws on output; missing-wrapper mistakes are
-	 * recoverable (the file just registered nothing) and a hard error during
-	 * onApplicationStart is worse than a warning + downstream failure.
+	 * If the include succeeds but the captured output is non-empty — almost
+	 * always a sign that the file is missing a cfscript wrapper, so Lucee/Adobe
+	 * parse the body as markup and any cfscript-style code becomes literal
+	 * output text that never executes — log a clear warning pointing the
+	 * developer at the most likely cause, and discard the output so it doesn't
+	 * leak into the response of whichever request happened to trigger
+	 * onApplicationStart.
 	 *
 	 * Note for maintainers: deliberately avoids putting any literal cf-tags
 	 * in this docblock — Lucee 7's tag scanner reads CFC comments before
@@ -231,11 +235,45 @@ return local.$wheels;
 	 * @template Mapping-relative path like "/config/services.cfm".
 	 */
 	public void function $includeConfig(required string template) {
-		// cfformat-ignore-start
-  	savecontent variable="local.$wheelsConfigOutput" {
-  	  include "#LCase(arguments.template)#"
-  	};
-		// cfformat-ignore-end
+		try {
+			// cfformat-ignore-start
+  		savecontent variable="local.$wheelsConfigOutput" {
+  		  include "#LCase(arguments.template)#"
+  		};
+			// cfformat-ignore-end
+		} catch (any e) {
+			// Fail closed: a compile-time or runtime failure in a config template is a
+			// boot-blocking configuration error in EVERY environment. Booting anyway
+			// would silently run the app on framework defaults (no DI registrations,
+			// default settings, …) and serve traffic fail-open — strictly worse than
+			// a hard stop. Log the offending template, then rethrow a NAMED, located
+			// error that says what broke, where, and why — instead of the old masked,
+			// app-wide HTTP 500 whose secondary onError failure hid the real cause
+			// (the canonical trigger is Adobe CF rejecting a top-level
+			// `var di = injector();` in config/services.cfm — a compile error on
+			// Adobe, accepted on Lucee — issue #3063). The throw is unconditional:
+			// no environment branching, no swallowed path.
+			try {
+				writeLog(
+					file = "wheels",
+					type = "error",
+					text = "Wheels: " & arguments.template & " failed to compile or run during"
+						& " onApplicationStart — application start was aborted (fail-closed)."
+						& " Error: " & e.message
+				);
+			} catch (any logErr) {
+				// Logging is best-effort during application start.
+			}
+			Throw(
+				type = "Wheels.ConfigIncludeFailed",
+				message = "Failed to include config template '" & arguments.template & "': " & e.message,
+				detail = "Original exception type: " & e.type & "."
+					& (StructKeyExists(e, "detail") && Len(e.detail) ? " " & e.detail : "")
+					& " Application start was aborted because this config file could not be"
+					& " loaded — fix the file and restart (booting without it would run the"
+					& " application on framework defaults)."
+			);
+		}
 		if (Len(Trim(local.$wheelsConfigOutput))) {
 			local.preview = Left(Trim(local.$wheelsConfigOutput), 200);
 			local.scriptOpen = Chr(60) & "cfscript" & Chr(62);
@@ -633,10 +671,14 @@ return local.$wheels;
 		// Multi-tenant config override: per-tenant settings take precedence
 		// over application-level settings (non-function settings only).
 		// Security-sensitive settings cannot be overridden per-tenant.
-		// Use IsDefined() for safe nested scope traversal during app startup.
+		// Use a StructKeyExists chain for safe nested scope traversal during app
+		// startup (IsDefined string-parses its dotted-path argument on every call
+		// and $get runs on every settings read so it's too expensive here).
 		if (
 			!Len(arguments.functionName)
-			&& IsDefined("request.wheels.tenant.config")
+			&& StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "tenant")
+			&& StructKeyExists(request.wheels.tenant, "config")
 			&& StructKeyExists(request.wheels.tenant.config, arguments.name)
 			&& !ListFindNoCase(
 				"encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls",
@@ -786,6 +828,20 @@ return local.$wheels;
 
 	/**
 	 * Internal function.
+	 * Case-sensitive, constant-time string comparison. Both values are hashed with
+	 * SHA-256 before being compared via MessageDigest.isEqual so the comparison
+	 * neither leaks length information nor exits early on the first differing byte.
+	 * Used by the reload/restart password gate and the environment-switch gate.
+	 */
+	public boolean function $secureCompare(required string candidate, required string comparedValue) {
+		return CreateObject("java", "java.security.MessageDigest").isEqual(
+			Hash(arguments.candidate, "SHA-256").getBytes("UTF-8"),
+			Hash(arguments.comparedValue, "SHA-256").getBytes("UTF-8")
+		);
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public any function $timeSpanForCache(
 		required any cache,
@@ -818,29 +874,44 @@ return local.$wheels;
 		numeric time = application.wheels.defaultCacheTime,
 		string category = "main"
 	) {
+		local.currentCount = $cacheCount();
 		if (
 			application.wheels.cacheCullPercentage > 0
 			&& application.wheels.cacheLastCulledAt < DateAdd("n", -application.wheels.cacheCullInterval, Now())
-			&& $cacheCount() >= application.wheels.maximumItemsToCache
+			&& local.currentCount >= application.wheels.maximumItemsToCache
 		) {
-			// cache is full so flush out expired items from this cache to make more room if possible
+			// the cache is full so flush out expired items to make more room if possible
+			// (the maximum applies to the cache as a whole so we cull across all categories,
+			// otherwise a write to a small category would free nothing and get dropped)
 			local.deletedItems = 0;
-			local.cacheCount = $cacheCount();
-			for (local.key in application.wheels.cache[arguments.category]) {
-				if (Now() > application.wheels.cache[arguments.category][local.key].expiresAt) {
-					$removeFromCache(key = local.key, category = arguments.category);
-					if (application.wheels.cacheCullPercentage < 100) {
+			if (application.wheels.cacheCullPercentage < 100) {
+				local.maxItemsToDelete = Ceiling(local.currentCount * application.wheels.cacheCullPercentage / 100);
+			} else {
+				local.maxItemsToDelete = local.currentCount;
+			}
+			local.now = Now();
+			local.categories = StructKeyArray(application.wheels.cache);
+			local.iEnd = ArrayLen(local.categories);
+			for (local.i = 1; local.i <= local.iEnd && local.deletedItems < local.maxItemsToDelete; local.i++) {
+				local.cacheCategory = local.categories[local.i];
+				// snapshot the keys so we never delete from the struct we are iterating over
+				local.cacheKeys = StructKeyArray(application.wheels.cache[local.cacheCategory]);
+				local.jEnd = ArrayLen(local.cacheKeys);
+				for (local.j = 1; local.j <= local.jEnd && local.deletedItems < local.maxItemsToDelete; local.j++) {
+					local.cacheKey = local.cacheKeys[local.j];
+					if (
+						StructKeyExists(application.wheels.cache[local.cacheCategory], local.cacheKey)
+						&& local.now > application.wheels.cache[local.cacheCategory][local.cacheKey].expiresAt
+					) {
+						$removeFromCache(key = local.cacheKey, category = local.cacheCategory);
 						local.deletedItems++;
-						local.percentageDeleted = (local.deletedItems / local.cacheCount) * 100;
-						if (local.percentageDeleted >= application.wheels.cacheCullPercentage) {
-							break;
-						}
 					}
 				}
 			}
+			local.currentCount -= local.deletedItems;
 			application.wheels.cacheLastCulledAt = Now();
 		}
-		if ($cacheCount() < application.wheels.maximumItemsToCache) {
+		if (local.currentCount < application.wheels.maximumItemsToCache) {
 			local.cacheItem = {};
 			local.cacheItem.expiresAt = DateAdd(application.wheels.cacheDatePart, arguments.time, Now());
 			if (IsSimpleValue(arguments.value)) {
@@ -924,6 +995,27 @@ return local.$wheels;
 
 	/**
 	 * Internal function.
+	 *
+	 * Lock-free warm fast-path lookup used by `model()` to bypass
+	 * `$doubleCheckedLock` and its `$invoke` reflective dispatch on cache
+	 * hits. The full `StructKeyExists` chain guards early-bootstrap and
+	 * post-`?reload=true` windows where `application.wheels.models` may
+	 * not yet exist. Returns the cached class on hit, `false` on miss
+	 * (callers fall through to the slow path).
+	 */
+	public any function $cachedModelLookup(required string name) {
+		if (
+			StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "models")
+			&& StructKeyExists(application.wheels.models, arguments.name)
+		) {
+			return application.wheels.models[arguments.name];
+		}
+		return false;
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public any function $cachedControllerClassExists(required string name) {
 		local.rv = false;
@@ -931,6 +1023,23 @@ return local.$wheels;
 			local.rv = application.wheels.controllers[arguments.name];
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 *
+	 * Lock-free warm fast-path lookup used by `controller()`. Same
+	 * shape and bootstrap guards as `$cachedModelLookup`.
+	 */
+	public any function $cachedControllerLookup(required string name) {
+		if (
+			StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "controllers")
+			&& StructKeyExists(application.wheels.controllers, arguments.name)
+		) {
+			return application.wheels.controllers[arguments.name];
+		}
+		return false;
 	}
 
 	/**
@@ -1005,17 +1114,19 @@ return local.$wheels;
 		// by default we return Model or Controller so that the base component gets loaded
 		local.rv = capitalize(arguments.type);
 
-		// we are going to store the full controller / model path in the
-		// existing / non-existing lists so we can have controllers / models
-		// in multiple places
+		// we are going to memoize the full controller / model path in the
+		// existing / non-existing structs so we can have controllers / models
+		// in multiple places (structs give O(1) lookups and atomic writes where
+		// the comma lists used previously were O(n) scans per materialized object
+		// and lost entries to unlocked concurrent ListAppend calls)
 		//
 		// The name coming into $objectFileName could have dot notation due to
 		// nested controllers so we need to change delims here on the name
 		local.fullObjectPath = arguments.objectPath & "/" & ListChangeDelims(arguments.name, '/', '.');
 
 		if (
-			!ListFindNoCase(application.wheels.existingObjectFiles, local.fullObjectPath)
-			&& !ListFindNoCase(application.wheels.nonExistingObjectFiles, local.fullObjectPath)
+			!StructKeyExists(application.wheels.existingObjectFiles, local.fullObjectPath)
+			&& !StructKeyExists(application.wheels.nonExistingObjectFiles, local.fullObjectPath)
 		) {
 			// we have not yet checked if this file exists or not so let's do that
 			// here (the function below will return the file name with the correct
@@ -1025,28 +1136,20 @@ return local.$wheels;
 			if (IsBoolean(local.file) && !local.file) {
 				// no file exists, let's store that if caching is on so we don't have to check it again
 				if (application.wheels.cacheFileChecking) {
-					application.wheels.nonExistingObjectFiles = ListAppend(
-						application.wheels.nonExistingObjectFiles,
-						local.fullObjectPath
-					);
+					application.wheels.nonExistingObjectFiles[local.fullObjectPath] = false;
 				}
 			} else {
 				// the file exists, let's store the proper case of the file if caching is turned on
 				local.file = SpanExcluding(local.file, ".");
-				local.fullObjectPath = ListSetAt(local.fullObjectPath, ListLen(local.fullObjectPath, "/"), local.file, "/");
 				if (application.wheels.cacheFileChecking) {
-					application.wheels.existingObjectFiles = ListAppend(
-						application.wheels.existingObjectFiles,
-						local.fullObjectPath
-					);
+					application.wheels.existingObjectFiles[local.fullObjectPath] = local.file;
 				}
 			}
 		}
 
 		// if the file exists we return the file name in its proper case
-		local.pos = ListFindNoCase(application.wheels.existingObjectFiles, local.fullObjectPath);
-		if (local.pos) {
-			local.file = ListLast(ListGetAt(application.wheels.existingObjectFiles, local.pos), "/");
+		if (StructKeyExists(application.wheels.existingObjectFiles, local.fullObjectPath)) {
+			local.file = application.wheels.existingObjectFiles[local.fullObjectPath];
 		}
 
 		// we've found a file so we'll need to send back the corrected name
@@ -1142,16 +1245,22 @@ return local.$wheels;
 	 * @params The params struct (combination of form and URL variables).
 	 */
 	public any function controller(required string name, struct params = {}) {
-		local.args = {};
-		local.args.name = arguments.name;
-
-		local.rv = $doubleCheckedLock(
-			condition = "$cachedControllerClassExists",
-			conditionArgs = local.args,
-			execute = "$createControllerClass",
-			executeArgs = local.args,
-			name = "controllerLock#application.applicationName#"
-		);
+		// Lock-free warm fast path: skip $doubleCheckedLock + $invoke
+		// reflective dispatch on cache hits (issue #2897, Stage 1). Returns
+		// the cached *class*; the params branch below still creates an
+		// instance when params is non-empty.
+		local.rv = $cachedControllerLookup(name = arguments.name);
+		if (IsBoolean(local.rv) && !local.rv) {
+			local.args = {};
+			local.args.name = arguments.name;
+			local.rv = $doubleCheckedLock(
+				condition = "$cachedControllerClassExists",
+				conditionArgs = local.args,
+				execute = "$createControllerClass",
+				executeArgs = local.args,
+				name = "controllerLock#application.applicationName#"
+			);
+		}
 		if (!StructIsEmpty(arguments.params)) {
 			local.rv = local.rv.$createControllerObject(arguments.params);
 		}
@@ -1167,13 +1276,19 @@ return local.$wheels;
 	 * @name Name of the model to get a reference to.
 	 */
 	public any function model(required string name) {
-		return $doubleCheckedLock(
-			condition = "$cachedModelClassExists",
-			conditionArgs = arguments,
-			execute = "$createModelClass",
-			executeArgs = arguments,
-			name = "modelLock#application.applicationName#"
-		);
+		// Lock-free warm fast path: skip $doubleCheckedLock + $invoke
+		// reflective dispatch on cache hits (issue #2897, Stage 1).
+		local.rv = $cachedModelLookup(name = arguments.name);
+		if (IsBoolean(local.rv) && !local.rv) {
+			return $doubleCheckedLock(
+				condition = "$cachedModelClassExists",
+				conditionArgs = arguments,
+				execute = "$createModelClass",
+				executeArgs = arguments,
+				name = "modelLock#application.applicationName#"
+			);
+		}
+		return local.rv;
 	}
 
 	/**
@@ -1423,9 +1538,21 @@ return local.$wheels;
 	 */
 	public void function $lockedLoadRoutes() {
 		local.appKey = $appKey();
-		// clear out the route info
+		// clear out the route info (including the static-route index so a reload
+		// can't serve stale first-write-wins entries from the previous route set)
 		ArrayClear(application[local.appKey].routes);
 		StructClear(application[local.appKey].namedRoutePositions);
+		if (StructKeyExists(application[local.appKey], "staticRoutes")) {
+			StructClear(application[local.appKey].staticRoutes);
+		}
+		// Drop the URLFor controller/action memo so cached lookups from the
+		// previous route set (including negative-cached misses) can't leak
+		// across a reload. `$addRoute` also clears the memo, but doing it
+		// here guarantees a freshly-reloaded app starts with an empty cache
+		// even before the first `$addRoute` call runs.
+		if (StructKeyExists(application[local.appKey], "urlForCache")) {
+			StructClear(application[local.appKey].urlForCache);
+		}
 		// load wheels internal gui routes
 		// TODO skip this if mode != development|testing?
 		$include(template = "/wheels/public/routes.cfm");
@@ -1527,27 +1654,36 @@ return local.$wheels;
 
 		// Look up actual route paths instead of providing default Wheels path generation.
 		// Loop over all routes to find matching one, break the loop on first match.
-		// If the route is already in the cache we get it from there instead.
+		// The (controller, action) → route-name memo lives in application scope and
+		// negative-caches misses (empty string sentinel) so wildcard-`[controller]`
+		// apps — where `$addRoute` strips the `controller` key, guaranteeing no
+		// match — don't re-scan the route table for every link helper. The cache
+		// is invalidated by `$addRoute` and `$lockedLoadRoutes`.
 		if (!Len(arguments.route) && Len(arguments.action)) {
 			if (!Len(arguments.controller)) {
 				arguments.controller = local.params.controller;
 			}
+			local.appKey = $appKey();
+			if (!StructKeyExists(application[local.appKey], "urlForCache")) {
+				application[local.appKey].urlForCache = {};
+			}
+			local.cache = application[local.appKey].urlForCache;
 			local.key = arguments.controller & "##" & arguments.action;
-			local.cache = request.wheels.urlForCache;
 			if (!StructKeyExists(local.cache, local.key)) {
-				local.iEnd = ArrayLen(application.wheels.routes);
+				local.found = "";
+				local.iEnd = ArrayLen(application[local.appKey].routes);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.route = application.wheels.routes[local.i];
+					local.route = application[local.appKey].routes[local.i];
 					local.controllerMatch = StructKeyExists(local.route, "controller") && local.route.controller == arguments.controller;
 					local.actionMatch = StructKeyExists(local.route, "action") && local.route.action == arguments.action;
 					if (local.controllerMatch && local.actionMatch) {
-						arguments.route = local.route.name;
-						local.cache[local.key] = arguments.route;
+						local.found = local.route.name;
 						break;
 					}
 				}
+				local.cache[local.key] = local.found;
 			}
-			if (StructKeyExists(local.cache, local.key)) {
+			if (Len(local.cache[local.key])) {
 				arguments.route = local.cache[local.key];
 			}
 		}
@@ -2169,7 +2305,7 @@ return local.$wheels;
 	 */
 	public string function $statusCode() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getStatusCode();
+			return $engineAdapter().getStatusCode();
 		}
 		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "lucee") || StructKeyExists(server, "boxlang")) {
@@ -2186,7 +2322,7 @@ return local.$wheels;
 	 */
 	public string function $contentType() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getContentType();
+			return $engineAdapter().getContentType();
 		}
 		// Fallback when adapter not yet initialized
 		local.rv = "";
@@ -2285,6 +2421,94 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Returns whether the application has opted into trusting `X-Forwarded-*`
+	 * headers via `set(trustProxyHeaders=true)`. Guarded so it is safe to call on a cold start
+	 * before `application.wheels` exists (resolves to `false`, i.e. do not trust).
+	 */
+	public boolean function $trustProxyHeaders() {
+		return StructKeyExists(application, "wheels")
+		&& StructKeyExists(application.wheels, "trustProxyHeaders")
+		&& IsBoolean(application.wheels.trustProxyHeaders)
+		&& application.wheels.trustProxyHeaders;
+	}
+
+	/**
+	 * Internal function. Resolves the trusted client IP for security decisions.
+	 * Returns `REMOTE_ADDR` (the socket address) unless `trustProxyHeaders` is enabled and
+	 * `X-Forwarded-For` is non-empty, in which case the rightmost hop is used — that is the entry
+	 * appended by the trusted proxy nearest the app; earlier entries are client-supplied and
+	 * spoofable. For this to be safe the proxy must overwrite — never append to — the incoming
+	 * header.
+	 */
+	public string function $trustedClientIp(string remoteAddr, string forwardedFor) {
+		if (!StructKeyExists(arguments, "remoteAddr")) {
+			arguments.remoteAddr = cgi.remote_addr;
+		}
+		if (!StructKeyExists(arguments, "forwardedFor")) {
+			arguments.forwardedFor = cgi.http_x_forwarded_for;
+		}
+		local.rv = Trim(arguments.remoteAddr);
+		if ($trustProxyHeaders() && Len(Trim(arguments.forwardedFor))) {
+			local.rv = Trim(ListLast(arguments.forwardedFor));
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Returns whether the current client is exempt from maintenance mode.
+	 * The exception list comes from config only (`set(ipExceptions="...")`). A list containing
+	 * letters is matched against the user agent (legacy behavior preserved verbatim); otherwise
+	 * it is matched against the trusted client IP.
+	 */
+	public boolean function $maintenanceModeExempt(
+		required string exceptions,
+		required string userAgent,
+		required string clientIp
+	) {
+		if (!Len(arguments.exceptions)) {
+			return false;
+		}
+		if (ReFindNoCase("[a-z]", arguments.exceptions)) {
+			return ListFindNoCase(arguments.exceptions, arguments.userAgent) > 0;
+		}
+		return ListFind(arguments.exceptions, arguments.clientIp) > 0;
+	}
+
+	/**
+	 * Internal function. Derives `webPath`, `rootPath`, `rootcomponentPath`,
+	 * and `wheelsComponentPath` from either an explicit URL `subpath`
+	 * (issue #2968 — subfolder installs where `cgi.script_name` does not
+	 * reflect the public mount) or, when no subpath is given, the existing
+	 * `cgi.script_name` derivation. Returning a struct keeps the helper
+	 * pure so it can be unit-tested in isolation.
+	 */
+	public struct function $resolveFrameworkPaths(required string scriptName, string subpath = "") {
+		local.rv = {};
+		local.normalized = Trim(arguments.subpath);
+		if (Len(local.normalized) && Left(local.normalized, 1) != "/") {
+			local.normalized = "/" & local.normalized;
+		}
+		// Strip trailing slash(es) without falling through to Left(str, 0),
+		// which crashes Lucee 7 (see CLAUDE.md § "Cross-Engine Invariants").
+		while (Len(local.normalized) > 1 && Right(local.normalized, 1) == "/") {
+			local.normalized = Left(local.normalized, Len(local.normalized) - 1);
+		}
+		if (Len(local.normalized)) {
+			local.rv.webPath = local.normalized == "/" ? "/" : local.normalized & "/";
+		} else {
+			local.rv.webPath = Replace(
+				arguments.scriptName,
+				Reverse(SpanExcluding(Reverse(arguments.scriptName), "/")),
+				""
+			);
+		}
+		local.rv.rootPath = "/" & ListChangeDelims(local.rv.webPath, "/", "/");
+		local.rv.rootcomponentPath = ListChangeDelims(local.rv.webPath, ".", "/");
+		local.rv.wheelsComponentPath = ListAppend(local.rv.rootcomponentPath, "wheels", ".");
+		return local.rv;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $abortInvalidRequest() {
@@ -2329,7 +2553,7 @@ return local.$wheels;
 	 */
 	public numeric function $getRequestTimeout() {
 		if ($hasEngineAdapter()) {
-			return application.wheels.engineAdapter.getRequestTimeout();
+			return $engineAdapter().getRequestTimeout();
 		}
 		// Fallback when adapter not yet initialized (e.g. error during startup)
 		if (StructKeyExists(server, "boxlang")) {
@@ -2612,6 +2836,25 @@ return local.$wheels;
 
 	/**
 	 * Internal function.
+	 * Disambiguates a D1/D2/YYYY slash date: a component greater than 12 cannot
+	 * be a month so the format is unambiguous; otherwise the engine adapter's
+	 * locale preference decides (MM/DD/YYYY on Lucee / Adobe, DD/MM/YYYY on
+	 * BoxLang). All slash-date parsing should funnel through this helper.
+	 */
+	public date function $parseSlashDate(required numeric d1, required numeric d2, required numeric year) {
+		if (arguments.d1 > 12) {
+			// the first component cannot be a month so it must be the day (DD/MM/YYYY)
+			return CreateDate(arguments.year, arguments.d2, arguments.d1);
+		} else if (arguments.d2 > 12) {
+			// the second component cannot be a month so it must be the day (MM/DD/YYYY)
+			return CreateDate(arguments.year, arguments.d1, arguments.d2);
+		} else {
+			return $engineAdapter().parseAmbiguousSlashDate(arguments.d1, arguments.d2, arguments.year);
+		}
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public string function $convertToString(required any value, string type = "") {
 		// Normalize inputs
@@ -2683,7 +2926,8 @@ return local.$wheels;
 				arguments.value
 			)
 		) {
-			// Manually parse DD/MM/YYYY format to avoid engine-specific interpretation
+			// Manually parse the slash date to avoid engine-specific interpretation,
+			// disambiguating day/month through $parseSlashDate()
 			local.parts = ListToArray(arguments.value, " ");
 			local.datePart = local.parts[1];
 			local.timePart = local.parts[2];
@@ -2692,9 +2936,11 @@ return local.$wheels;
 			local.dateComponents = ListToArray(local.datePart, "/");
 			local.timeComponents = ListToArray(local.timePart, ":");
 
-			local.day = Val(local.dateComponents[1]); // First = day (DD/MM/YYYY)
-			local.month = Val(local.dateComponents[2]); // Second = month
-			local.year = Val(local.dateComponents[3]);
+			local.parsedDate = $parseSlashDate(
+				d1 = Val(local.dateComponents[1]),
+				d2 = Val(local.dateComponents[2]),
+				year = Val(local.dateComponents[3])
+			);
 			local.hour = Val(local.timeComponents[1]);
 			local.minute = Val(local.timeComponents[2]);
 
@@ -2703,7 +2949,14 @@ return local.$wheels;
 			} else if (local.amPm == "AM" && local.hour == 12) {
 				local.hour = 0;
 			}
-			val = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
+			val = CreateDateTime(
+				Year(local.parsedDate),
+				Month(local.parsedDate),
+				Day(local.parsedDate),
+				local.hour,
+				local.minute,
+				0
+			);
 			detectedType = "datetime";
 		}
 
@@ -2753,9 +3006,13 @@ return local.$wheels;
 						// fallback parsing attempts for common formats
 
 						// 1) ISO YYYY-MM-DD[ hh[:mm[:ss]]]
-						if (ReFind("(?i)^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?$", local.s2)) {
-							local.parts = ReReplace(local.s2, "^(\\d{4})-(\\d{2})-(\\d{2}).*$", "\\1-\\2-\\3", "all");
-							local.timePart = ReReplace(local.s2, ".*[ T](\\d{1,2}:\\d{2}(?::\\d{2})?).*$", "\\1", "all");
+						// Single-backslash escapes: in CFML "\\d" is a literal
+						// backslash + d in the compiled regex, which never matches a
+						// digit — the branch was dead. Mirrors the already-fixed
+						// slash-format branch below (#2933 carry-forward, #2977).
+						if (ReFind("(?i)^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$", local.s2)) {
+							local.parts = ReReplace(local.s2, "^(\d{4})-(\d{2})-(\d{2}).*$", "\1-\2-\3", "all");
+							local.timePart = ReReplace(local.s2, ".*[ T](\d{1,2}:\d{2}(?::\d{2})?).*$", "\1", "all");
 							if (Len(local.timePart) AND local.timePart NEQ local.s2) {
 								// has time
 								local.dt = ParseDateTime(local.parts & " " & local.timePart);
@@ -2773,30 +3030,16 @@ return local.$wheels;
 							}
 						}
 
-						// 2) Slash format DD/MM/YYYY or MM/DD/YYYY — prefer DD/MM/YYYY if BoxLang or if day>12
-						if (ReFind("^\\d{1,2}/\\d{1,2}/\\d{4}", local.s2)) {
+						// 2) Slash format DD/MM/YYYY or MM/DD/YYYY — disambiguated by $parseSlashDate()
+						if (ReFind("^\d{1,2}/\d{1,2}/\d{4}", local.s2)) {
 							local.comps = ListToArray(local.s2, "/");
-							local.d1 = Val(local.comps[1]);
-							local.d2 = Val(local.comps[2]);
-							local.y = Val(local.comps[3]);
-
-							// Heuristic: if day part > 12 then it's DD/MM/YYYY
-							if (d1 > 12) {
-								local.day = d1;
-								local.month = d2;
-							} else if (d2 > 12) {
-								// likely MM/DD/YYYY
-								local.month = d1;
-								local.day = d2;
-							} else {
-								// ambiguous -> use adapter to determine date format preference
-								local.ambiguousDate = $engineAdapter().parseAmbiguousSlashDate(d1, d2, y);
-								local.month = Month(local.ambiguousDate);
-								local.day = Day(local.ambiguousDate);
-							}
-							local.dt = CreateDate(y, local.month, local.day);
+							local.dt = $parseSlashDate(
+								d1 = Val(local.comps[1]),
+								d2 = Val(local.comps[2]),
+								year = Val(local.comps[3])
+							);
 							// if time exists in same string, try to parse it using ParseDateTime
-							if (ReFind("\\d{1,2}:\\d{2}", local.s2)) {
+							if (ReFind("\d{1,2}:\d{2}", local.s2)) {
 								try {
 									local.dt2 = ParseDateTime(local.s2);
 									if (IsDate(local.dt2)) {
@@ -2950,6 +3193,85 @@ return local.$wheels;
 		return local.rv;
 	}
 
+	/**
+	 * Internal function. Returns the application-cached Plugins instance so the
+	 * request-lifecycle call sites (onDIcomplete on controllers, models and the
+	 * dispatcher, plus $runOnRequestStart) don't construct a throwaway
+	 * wheels.Plugins — and its wheels.Global parent pseudo-constructor — per
+	 * request / per materialized model row (issue 2897, Stage 3). Falls back to
+	 * a fresh instance during bootstrap windows where the cache has not been
+	 * populated yet, or where the application scope is undefined (CLI / test
+	 * bootstrap). Sharing one instance is safe because $initializeMixins keeps
+	 * its scratch state local-scoped.
+	 */
+	public any function $pluginObj() {
+		if (IsDefined("application")) {
+			local.appKey = StructKeyExists(application, "$wheels") ? "$wheels" : "wheels";
+			if (StructKeyExists(application, local.appKey) && StructKeyExists(application[local.appKey], "PluginObj")) {
+				return application[local.appKey].PluginObj;
+			}
+		}
+		return CreateObject("component", "wheels.Plugins");
+	}
+
+	/**
+	 * Internal function. Records a deprecation warning through a single shared
+	 * policy: the first call for a given feature logs a warning to the standard
+	 * wheels log and registers the warning in
+	 * application[appKey].deprecationWarnings so running apps can surface it
+	 * (debug panel, tooling). Subsequent calls for the same feature are no-ops,
+	 * making the helper safe to call from per-request code paths. The dedup
+	 * check, registration, and log write run atomically under an exclusive
+	 * lock so concurrent first callers (e.g. parallel first requests hitting a
+	 * deprecated per-request helper) register and log exactly once. If the
+	 * Wheels application struct does not exist yet, the helper is a silent
+	 * no-op: with no registry to dedup against, logging would fire on every
+	 * call, and all framework callers run after the struct is established.
+	 *
+	 * @feature Stable identifier for the deprecated feature (e.g. "plugins-directory", "paginationLinks").
+	 * @message Human-readable message: what is deprecated, what replaces it, and when it goes away.
+	 * @docUrl Optional URL of the migration guide, appended to the logged message.
+	 */
+	public void function $deprecated(required string feature, required string message, string docUrl = "") {
+		try {
+			local.appKey = $appKey();
+			if (StructKeyExists(application, local.appKey)) {
+				// One app-wide lock (rather than per-feature) also serializes the lazy
+				// creation of the registry array itself; contention is a non-issue at
+				// once-per-feature-per-application frequency.
+				lock name="wheels_deprecated_registry" type="exclusive" timeout="5" {
+					if (!StructKeyExists(application[local.appKey], "deprecationWarnings")) {
+						application[local.appKey].deprecationWarnings = [];
+					}
+					for (local.existing in application[local.appKey].deprecationWarnings) {
+						if (local.existing.feature == arguments.feature) {
+							return;
+						}
+					}
+					ArrayAppend(application[local.appKey].deprecationWarnings, {
+						feature = arguments.feature,
+						message = arguments.message,
+						url = arguments.docUrl
+					});
+					// Log if-and-only-if the registration above just succeeded; the
+					// registry is what enforces the warn-once policy for the log too.
+					try {
+						local.text = "[Wheels] Deprecation: " & arguments.message;
+						if (Len(arguments.docUrl)) {
+							local.text &= " See: " & arguments.docUrl;
+						}
+						WriteLog(type = "warning", text = local.text, file = "wheels");
+					} catch (any e) {
+						// Logging is best-effort; the registry entry above already records the warning.
+					}
+				}
+			}
+		} catch (any e) {
+			// Best-effort by design (including lock timeouts); never let a
+			// deprecation notice break the caller.
+		}
+	}
+
 	// Returns the running framework version. Delegates to BuildInfo.cfc, which
 	// is the authoritative version source. The historical box.json-reading
 	// implementation (with monorepo / wheels-base-template fallback chain)
@@ -3007,22 +3329,16 @@ return local.$wheels;
 			local.minimumMinor = "3";
 			local.minimumPatch = "2";
 			local.minimumBuild = "77";
+			// per-major-release floor consumed by the `StructKeyExists(local, local.major)`
+			// check below (keyed by the running engine's major version number)
 			local.5 = {minimumMinor = 2, minimumPatch = 1, minimumBuild = 9};
 		} else if (arguments.engine == "Adobe ColdFusion") {
-			local.minimumMajor = "11";
-			local.minimumMinor = "0";
-			local.minimumPatch = "18";
-			local.minimumBuild = "314030";
-		} else if (arguments.engine == "Adobe ColdFusion") {
-			local.minimumMajor = "2016";
-			local.minimumMinor = "0";
-			local.minimumPatch = "10";
-			local.minimumBuild = "314028";
-		} else if (arguments.engine == "Adobe ColdFusion") {
+			// Adobe ColdFusion 2018 is the oldest supported Adobe engine
+			// (CF 11 / 2016 are end-of-life and no longer supported)
 			local.minimumMajor = "2018";
 			local.minimumMinor = "0";
-			local.minimumPatch = "10";
-			local.minimumBuild = "314028";
+			local.minimumPatch = "0";
+			local.minimumBuild = "";
 		} else if (arguments.engine == "RustCFML") {
 			// RustCFML is a pre-1.0, rapidly evolving experimental engine that
 			// Wheels supports on a best-effort basis. Accept any version (leave
@@ -3064,6 +3380,32 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Normalizes mixin-collision records to a single
+	 * shared shape: {target, method, firstProvider, secondProvider,
+	 * acknowledged, source}. Plugins.cfc emits legacy-shaped records
+	 * ({existingPlugin, overridingPlugin}) while PackageLoader.cfc and the
+	 * cross-system merge in $loadPackages emit the shared shape directly;
+	 * all of them end up in the same application.wheels.mixinCollisions
+	 * array, which /wheels/plugins and the development debug footer consume
+	 * unconditionally — a mixed-shape array crashes those surfaces with a
+	 * "key doesn't exist" error.
+	 */
+	public array function $normalizeMixinCollisions(required array collisions) {
+		local.rv = [];
+		for (local.c in arguments.collisions) {
+			ArrayAppend(local.rv, {
+				target = local.c.target,
+				method = local.c.method,
+				firstProvider = StructKeyExists(local.c, "firstProvider") ? local.c.firstProvider : local.c.existingPlugin,
+				secondProvider = StructKeyExists(local.c, "secondProvider") ? local.c.secondProvider : local.c.overridingPlugin,
+				acknowledged = StructKeyExists(local.c, "acknowledged") ? local.c.acknowledged : false,
+				source = StructKeyExists(local.c, "source") ? local.c.source : "plugin"
+			});
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $loadPlugins() {
@@ -3085,7 +3427,14 @@ return local.$wheels;
 		application[local.appKey].incompatiblePlugins = application[local.appKey].PluginObj.getIncompatiblePlugins();
 		application[local.appKey].dependantPlugins = application[local.appKey].PluginObj.getDependantPlugins();
 		application[local.appKey].versionMismatchPlugins = application[local.appKey].PluginObj.getVersionMismatchPlugins();
-		application[local.appKey].mixinCollisions = application[local.appKey].PluginObj.getMixinCollisions();
+		// Plugins.cfc emits legacy-shaped collision records ({existingPlugin,
+		// overridingPlugin}); normalize them to the shared shape at the merge
+		// point so package- and cross-system records (which already use
+		// {firstProvider, secondProvider}) can live in the same array without
+		// crashing the consumers (/wheels/plugins and the debug footer).
+		application[local.appKey].mixinCollisions = $normalizeMixinCollisions(
+			application[local.appKey].PluginObj.getMixinCollisions()
+		);
 		application[local.appKey].mixins = application[local.appKey].PluginObj.getMixins();
 		application[local.appKey].pluginMiddleware = application[local.appKey].PluginObj.getPluginMiddleware();
 		// Invoke register(container) on ServiceProviderInterface plugins before activation
@@ -3119,41 +3468,6 @@ return local.$wheels;
 		application[local.appKey].packages = application[local.appKey].PackageLoaderObj.getPackages();
 		application[local.appKey].packageMeta = application[local.appKey].PackageLoaderObj.getPackageMeta();
 		application[local.appKey].failedPackages = application[local.appKey].PackageLoaderObj.getFailedPackages();
-
-		// Surface an aggregate summary when any packages failed to load. Without
-		// this, PackageLoader records each failure in variables.failedPackages and
-		// emits per-package WriteLog calls — but a developer who hits a downstream
-		// "No matching function [BASECOATINCLUDES]" error has no obvious place to
-		// look. Logging a single high-visibility WARN to wheels.log + a stronger
-		// one to wheels-errors.log gives a clear breadcrumb back to the root cause.
-		if (ArrayLen(application[local.appKey].failedPackages)) {
-			local.failNames = "";
-			local.failDetail = "";
-			for (local.fp in application[local.appKey].failedPackages) {
-				local.failNames = ListAppend(local.failNames, local.fp.name);
-				local.failDetail &= "  - " & local.fp.name & ": " & local.fp.error & Chr(10);
-			}
-			try {
-				writeLog(
-					file = "wheels",
-					type = "warning",
-					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
-						& " package(s) failed to load: " & local.failNames
-						& ". Helpers / services these packages provide will be unavailable —"
-						& " calling code typically surfaces this as 'No matching function [...]"
-						& "' or 'No service registered with the name [...]'."
-						& " Per-package detail in wheels-errors.log."
-				);
-				writeLog(
-					file = "wheels-errors",
-					type = "error",
-					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
-						& " package(s) failed to load:" & Chr(10) & local.failDetail
-				);
-			} catch (any e) {
-				// Logging is best-effort during application start.
-			}
-		}
 
 		// Ensure mixinCollisions exists (unset when no plugins loaded before packages)
 		if (!StructKeyExists(application[local.appKey], "mixinCollisions")) {
@@ -3216,10 +3530,59 @@ return local.$wheels;
 			ArrayAppend(application[local.appKey].pluginMiddleware, local.mw);
 		}
 
-		// Invoke ServiceProvider register/boot if DI container exists
-		if (IsDefined("application.wheelsdi") && ArrayLen(application[local.appKey].PackageLoaderObj.getServiceProviders())) {
+		// Invoke ServiceProvider register/boot if DI container exists. The
+		// gate asks the loader (not just getServiceProviders()) because lazy
+		// service-hinted packages aren't instantiated yet at this point —
+		// $invokeServiceProviderRegister pulls them into the lifecycle, so a
+		// vendor tree containing only lazy service packages still needs the
+		// lifecycle invoked.
+		if (IsDefined("application.wheelsdi") && application[local.appKey].PackageLoaderObj.$hasServiceProviderWork()) {
 			application[local.appKey].PackageLoaderObj.$invokeServiceProviderRegister(application.wheelsdi);
 			application[local.appKey].PackageLoaderObj.$invokeServiceProviderBoot(application[local.appKey]);
+			// Re-sync the application-scope copy so register()/boot() failure
+			// records are visible there too. Adobe CF copies arrays by value on
+			// assignment, so the copy taken above (pre-invoke) never receives
+			// lifecycle-phase entries on those engines — only Lucee/BoxLang share
+			// the reference. Re-assigning is harmless on Lucee/BoxLang (same
+			// reference) and required on Adobe (fresh copy including new entries).
+			application[local.appKey].failedPackages = application[local.appKey].PackageLoaderObj.getFailedPackages();
+		}
+
+		// Surface an aggregate summary when any packages failed to load. Without
+		// this, PackageLoader records each failure in variables.failedPackages and
+		// emits per-package WriteLog calls — but a developer who hits a downstream
+		// "No matching function [BASECOATINCLUDES]" error has no obvious place to
+		// look. Logging a single high-visibility WARN to wheels.log + a stronger
+		// one to wheels-errors.log gives a clear breadcrumb back to the root cause.
+		// Runs after the ServiceProvider lifecycle invoke so register()/boot()
+		// failures appear in the same summary as load-phase failures.
+		if (ArrayLen(application[local.appKey].failedPackages)) {
+			local.failNames = "";
+			local.failDetail = "";
+			for (local.fp in application[local.appKey].failedPackages) {
+				local.failNames = ListAppend(local.failNames, local.fp.name);
+				local.failDetail &= "  - " & local.fp.name & ": " & local.fp.error & Chr(10);
+			}
+			try {
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
+						& " package(s) failed to load: " & local.failNames
+						& ". Helpers / services these packages provide will be unavailable —"
+						& " calling code typically surfaces this as 'No matching function [...]"
+						& "' or 'No service registered with the name [...]'."
+						& " Per-package detail in wheels-errors.log."
+				);
+				writeLog(
+					file = "wheels-errors",
+					type = "error",
+					text = "Wheels: " & ArrayLen(application[local.appKey].failedPackages)
+						& " package(s) failed to load:" & Chr(10) & local.failDetail
+				);
+			} catch (any e) {
+				// Logging is best-effort during application start.
+			}
 		}
 	}
 
@@ -3759,6 +4122,61 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal. Returns true when a `wheels.middleware.Cors` instance (or its
+	 * component path) is registered in `application.wheels.middleware`. When it
+	 * is, the dispatch-level Cors middleware is the single source of truth for
+	 * CORS headers and OPTIONS preflight, so the legacy global path
+	 * (`$setCORSHeaders` + the `onRequestStart` OPTIONS abort) must step aside.
+	 * Running both stacks duplicate `Access-Control-Allow-*` headers; a
+	 * duplicate `Access-Control-Allow-Origin` makes browsers reject the
+	 * response per the Fetch spec. Mirrors the detection in
+	 * `Dispatch.$computePreflightCapable()`. (#3114)
+	 */
+	public boolean function $corsMiddlewareActive() {
+		if (
+			!StructKeyExists(application, "wheels")
+			|| !StructKeyExists(application.wheels, "middleware")
+			|| !IsArray(application.wheels.middleware)
+		) {
+			return false;
+		}
+		for (local.mw in application.wheels.middleware) {
+			if (IsSimpleValue(local.mw)) {
+				if (local.mw == "wheels.middleware.Cors") {
+					return true;
+				}
+			} else if (IsObject(local.mw) && IsInstanceOf(local.mw, "wheels.middleware.Cors")) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Internal. Logs a one-time warning when the legacy global CORS path is
+	 * suppressed in favour of a registered `wheels.middleware.Cors` instance,
+	 * so operators notice the redundant `allowCorsRequests=true` setting. (#3114)
+	 */
+	public void function $warnGlobalCorsDeferred() {
+		if (StructKeyExists(application.wheels, "$corsGlobalDeferredWarned")) {
+			return;
+		}
+		cflock(name = "wheels.corsGlobalDeferred.#application.applicationName#", type = "exclusive", timeout = 5) {
+			if (!StructKeyExists(application.wheels, "$corsGlobalDeferredWarned")) {
+				application.wheels.$corsGlobalDeferredWarned = true;
+				cflog(
+					type = "warning",
+					file = "wheels",
+					text = "CORS configuration conflict: both allowCorsRequests=true and a wheels.middleware.Cors "
+						& "instance are active. The legacy global CORS path is deferring to the middleware to avoid "
+						& "duplicate Access-Control-Allow-* headers. Disable allowCorsRequests once the Cors middleware "
+						& "is configured. (##3114)"
+				);
+			}
+		}
+	}
+
+	/**
 	 * Restore the application scope modified by the test runner
 	 */
 	public void function $restoreTestRunnerApplicationScope() {
@@ -3972,6 +4390,24 @@ return local.$wheels;
 	}
 
 	/**
+	 * Convert the comma-list returned by `$buildProtectedControllerMethods()`
+	 * into a struct-as-set so `$callAction()` can perform an O(1)
+	 * `StructKeyExists` membership test on the per-request dispatch hot path
+	 * instead of an O(n) `ListFindNoCase` scan over ~100-250 helper names.
+	 * CFML struct keys are case-insensitive by default, preserving the prior
+	 * `ListFindNoCase` semantics (an action named `ENV` is still rejected like
+	 * `env`). Stored on `application.wheels.protectedControllerMethodsLookup`
+	 * alongside the list, which is retained for callers expecting that shape.
+	 */
+	public struct function $protectedControllerMethodsLookup(required string methods) {
+		var lookup = {};
+		for (var name in ListToArray(arguments.methods)) {
+			lookup[name] = true;
+		}
+		return lookup;
+	}
+
+	/**
 	 * Re-evaluate the given global-includes file into `application.wo`'s
 	 * variables/this scope. Invoked from the bare `?reload=true` soft-reload
 	 * when `$globalIncludesChanged` reports drift (issue ##2792).
@@ -4022,8 +4458,69 @@ return local.$wheels;
 	 * only reliably surfaces `this`-scope members. Must stay a function: an
 	 * inline `local.X` iterator in the pseudo-constructor materializes
 	 * `variables.local` and shadows method-local `local` on BoxLang.
+	 *
+	 * The promote-key list is memoized in application scope because this runs
+	 * on EVERY instantiation of every Global-derived component (per model row,
+	 * per controller, per Plugins instance) while its input — the function set
+	 * injected by the `/app/global/functions.cfm` include above — is constant
+	 * for the application lifetime. The memo is keyed per concrete class name
+	 * because whether a subclass's own (e.g. private) methods are already
+	 * registered in `variables` at this point in the pseudo-constructor is
+	 * engine-dependent, so the promotable set is not guaranteed identical
+	 * across subclasses. The gate is the cached key itself, never a separate
+	 * done-flag (##2800 lesson), and the cache lives inside
+	 * `application[$appKey()]`, which `?reload=true` rebuilds as a fresh
+	 * struct — so invalidation is structural. When `application` (or the
+	 * Wheels struct in it) is unavailable — CLI/test bootstrap, early
+	 * application start — we fall back to the full scan without memoizing.
 	 */
 	public void function $promoteIncludedGlobalsToThis() {
+		var promoteCache = "";
+		var promoteCacheKey = "";
+		if (IsDefined("application")) {
+			var promoteAppKey = $appKey();
+			if (StructKeyExists(application, promoteAppKey) && IsStruct(application[promoteAppKey])) {
+				var classMetadata = GetMetadata(this);
+				if (IsStruct(classMetadata) && StructKeyExists(classMetadata, "name") && Len(classMetadata.name)) {
+					promoteCacheKey = classMetadata.name;
+					if (!StructKeyExists(application[promoteAppKey], "promotedGlobalKeys")) {
+						application[promoteAppKey].promotedGlobalKeys = {};
+					}
+					promoteCache = application[promoteAppKey].promotedGlobalKeys;
+				}
+			}
+		}
+		if (IsStruct(promoteCache) && StructKeyExists(promoteCache, promoteCacheKey)) {
+			// Memoized path: apply the recorded keys with the same guards the
+			// fresh scan uses. Keys that vanished from `variables` are skipped
+			// and keys already on `this` are left alone, so a stale entry can
+			// never promote something the scan would not have.
+			var cachedKeys = promoteCache[promoteCacheKey];
+			var cachedKeyCount = ArrayLen(cachedKeys);
+			for (var keyIndex = 1; keyIndex <= cachedKeyCount; keyIndex++) {
+				var promoteKey = cachedKeys[keyIndex];
+				if (StructKeyExists(variables, promoteKey) && !StructKeyExists(this, promoteKey)) {
+					this[promoteKey] = variables[promoteKey];
+				}
+			}
+			return;
+		}
+		var promotedKeys = $scanAndPromoteIncludedGlobals();
+		if (IsStruct(promoteCache)) {
+			// Concurrent first instantiations may both scan and both assign;
+			// the value is deterministic per class, so last-write-wins is safe.
+			promoteCache[promoteCacheKey] = promotedKeys;
+		}
+	}
+
+	/**
+	 * The full `variables` scan behind `$promoteIncludedGlobalsToThis()`:
+	 * promote every variables-scope custom function that is not already on
+	 * `this`, returning the promoted key names. Also serves as the
+	 * non-memoizing fallback when application scope is unavailable.
+	 */
+	public array function $scanAndPromoteIncludedGlobals() {
+		var promotedKeys = [];
 		for (var promoteKey in variables) {
 			if (!isCustomFunction(variables[promoteKey])) {
 				continue;
@@ -4032,7 +4529,9 @@ return local.$wheels;
 				continue;
 			}
 			this[promoteKey] = variables[promoteKey];
+			ArrayAppend(promotedKeys, promoteKey);
 		}
+		return promotedKeys;
 	}
 
 }

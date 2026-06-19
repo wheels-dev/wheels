@@ -45,7 +45,7 @@ Run the Wheels BDD test suite. Auto-detects core tests when `vendor/wheels/tests
 #### Synopsis
 
 ``` title="synopsis"
-wheels test [--filter=<dir>] [--db=<engine>] [--verbose] [--ci] [--core] [flags]
+wheels test [--filter=<dir>] [--db=<engine>] [--verbose] [--ci] [--core] [--base-path=<path>] [flags]
 ```
 
 A bare positional argument is treated as the filter directory — `wheels test models` is equivalent to `wheels test --filter=models`.
@@ -58,10 +58,11 @@ A bare positional argument is treated as the filter directory — `wheels test m
 | `--directory=<dir>` | Alias for `--filter` (tutorial chapter 7). When both are supplied, `--directory` wins. |
 | `--db=<engine>` | Database engine for `--core` matrix runs only. Ignored for app tests (with a warning) — see [below](#testing-against-different-engines). |
 | `--reporter=<name>` | `simple` (default, colourful), `json` (raw runner JSON), `tap` (TAP v13 for CI consumers). |
-| `--verbose`, `-v` | Print per-spec output instead of the summary line. |
-| `--ci` | CI mode: tightens exit codes and output for GitHub Actions and similar runners. |
+| `--verbose`, `-v` | Print the full bundle → suite → spec tree (one `[PASS]`/`[FAIL]` line per spec) instead of only the summary line. Applies to the default `simple` reporter. The launcher consumes the flag globally, so any position works (`wheels test --verbose`, `wheels test -v`, `wheels -v test`). CLI binaries built on a LuCLI runtime that predates the [#3113](https://github.com/wheels-dev/wheels/issues/3113) launcher fix drop the signal before it reaches the test command and print the plain summary. |
+| `--ci` | CI mode: emits one GitHub Actions `::error` workflow-command annotation per failed or errored spec, so failures surface inline in CI logs and PR-check panels. Exit code is non-zero on failure regardless. |
 | `--core` | Run framework self-tests (`vendor/wheels/tests/specs/`) instead of your app suite. App tests are the default; `--core` is the explicit opt-in. |
 | `--no-test-db` | Disable the auto-swap to `<datasource>_test`. App tests run against your dev datasource, with whatever data is already in it. |
+| `--base-path=<path>` | URL prefix the app is mounted under (e.g. `/myapp`). Auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` in `config/settings.cfm` when omitted. Leave unset for root-mounted apps (the default). |
 
 #### `--db` is for `--core` runs only
 
@@ -86,10 +87,10 @@ The engine identifiers are `postgres` (not `postgresql`) and `sqlserver` (not `m
 #### Example
 
 ```bash title="example"
-wheels test --filter=models --verbose
+wheels test --filter=models
 ```
 
-Runs every spec under `tests/specs/models/` with per-spec output. Exit code is non-zero if any spec fails or errors.
+Runs every spec under `tests/specs/models/`. Exit code is non-zero if any spec fails or errors.
 
 #### Testing against different engines
 
@@ -154,8 +155,11 @@ wheels test
 # Narrow to one area while iterating
 wheels test --filter=models
 
-# CI-shaped run — tight output, firm exit codes
-wheels test --ci --db=sqlite
+# CI run on GitHub Actions — --ci adds one ::error annotation per failed or
+# errored spec (exit codes are firm with or without it); for machine-readable
+# output use a reporter
+wheels test --ci
+wheels test --reporter=tap
 
 # First-time browser setup, then exercise the browser specs
 wheels browser setup

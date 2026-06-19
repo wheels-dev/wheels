@@ -285,6 +285,38 @@ component extends="wheels.WheelsTest" {
 				expect(r.url).toBe("//" & request.cgi.server_name & "/page")
 			})
 
+			it("throws on redirectTo url with slash-backslash external domain", () => {
+				// Browsers normalize "/\" to "//" and navigate off-site.
+				expect(function(){
+					_controller.redirectTo(url = "/\evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with backslash-slash external domain", () => {
+				expect(function(){
+					_controller.redirectTo(url = "\/evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with double-backslash external domain", () => {
+				expect(function(){
+					_controller.redirectTo(url = "\\evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with single-slash scheme external domain", () => {
+				// Browsers normalize "https:/evil.com" to "https://evil.com".
+				expect(function(){
+					_controller.redirectTo(url = "https:/evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with javascript scheme", () => {
+				expect(function(){
+					_controller.redirectTo(url = "javascript:alert(1)")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
 			it("allows external redirect when allowExternalRedirects is true", () => {
 				application.wheels.allowExternalRedirects = true;
 				try {
@@ -295,6 +327,71 @@ component extends="wheels.WheelsTest" {
 				} finally {
 					application.wheels.allowExternalRedirects = false;
 				}
+			})
+
+			// Deferred from #2898 — WHATWG URL parsing strips embedded ASCII tab/CR/LF
+			// and trims leading/trailing whitespace before navigation, so URLs that
+			// look like same-origin relative paths to the pre-normalization gate
+			// navigate off-domain once the browser strips. Mirror the strip.
+
+			it("throws on redirectTo url with leading tab protocol-relative external domain", () => {
+				// Browser strips the leading tab and navigates to "//evil.com".
+				expect(function(){
+					_controller.redirectTo(url = Chr(9) & "//evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with embedded tab in protocol-relative path", () => {
+				// Browser strips the embedded tab; result is "//evil.com".
+				expect(function(){
+					_controller.redirectTo(url = "/" & Chr(9) & "/evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with leading LF protocol-relative external domain", () => {
+				expect(function(){
+					_controller.redirectTo(url = Chr(10) & "//evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with embedded LF in protocol-relative path", () => {
+				expect(function(){
+					_controller.redirectTo(url = "/" & Chr(10) & "/evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with leading CR protocol-relative external domain", () => {
+				expect(function(){
+					_controller.redirectTo(url = Chr(13) & "//evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with embedded CR in protocol-relative path", () => {
+				expect(function(){
+					_controller.redirectTo(url = "/" & Chr(13) & "/evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with leading space protocol-relative external domain", () => {
+				// Browser strips leading ASCII whitespace per WHATWG.
+				expect(function(){
+					_controller.redirectTo(url = " //evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with leading NUL control character", () => {
+				// NUL (Chr(0)) is a C0 control; engine behavior diverges, so reject outright.
+				expect(function(){
+					_controller.redirectTo(url = Chr(0) & "//evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with embedded vertical-tab in protocol-relative path", () => {
+				// Vertical tab (Chr(11)) is a C0 control not stripped by browsers but
+				// can confuse the same-origin classifier. Reject outright.
+				expect(function(){
+					_controller.redirectTo(url = "/" & Chr(11) & "/evil.com")
+				}).toThrow("Wheels.UnsafeRedirect")
 			})
 		})
 	}

@@ -2,6 +2,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
     function beforeAll() {
         variables.fixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/minimal.yml");
+        variables.proxyFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-proxy.yml");
+        variables.multiHostFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/multi-host.yml");
+        variables.multiRoleFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/full.yml");
+        variables.accessoriesFixture = expandPath("/cli/lucli/tests/_fixtures/deploy/configs/with-accessories.yml");
     }
 
     function run() {
@@ -22,6 +26,58 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var out = dc.config({configPath: variables.fixture});
                 expect(out).toInclude("service: demo");
                 expect(out).toInclude("image: acme/demo");
+            });
+
+            // Regression for #3085 — config() loaded the YAML without forwarding
+            // opts.destination, so `wheels deploy config --destination=X` printed
+            // the un-overlaid base config while every other verb applied the overlay.
+            it("config() applies the destination overlay (##3085)", () => {
+                var base = getTempFile(getTempDirectory(), "yml");
+                fileWrite(
+                    base,
+                    "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [192.0.2.10]"
+                        & "#chr(10)#registry: {username: u, password: [X]}"
+                );
+                // Yaml.deepMerge replaces arrays whole, so the overlay's servers
+                // list fully supersedes the base list — exactly the shape from
+                // the issue repro.
+                var overlay = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .$overlayPathFor(base, "staging");
+                fileWrite(overlay, "servers:#chr(10)#  - 192.0.2.99");
+                try {
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    var out = dc.config({configPath: base, destination: "staging"});
+                    expect(out).toInclude("192.0.2.99");
+                    expect(out).notToInclude("192.0.2.10");
+                } finally {
+                    fileDelete(base);
+                    fileDelete(overlay);
+                }
+            });
+
+            it("config() without a destination dumps the base config unchanged", () => {
+                var base = getTempFile(getTempDirectory(), "yml");
+                fileWrite(
+                    base,
+                    "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [192.0.2.10]"
+                        & "#chr(10)#registry: {username: u, password: [X]}"
+                );
+                var overlay = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .$overlayPathFor(base, "staging");
+                fileWrite(overlay, "servers:#chr(10)#  - 192.0.2.99");
+                try {
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    var out = dc.config({configPath: base});
+                    expect(out).toInclude("192.0.2.10");
+                    expect(out).notToInclude("192.0.2.99");
+                } finally {
+                    fileDelete(base);
+                    fileDelete(overlay);
+                }
             });
 
             it("deploy --dry-run emits commands without touching SshPool", () => {
@@ -293,6 +349,94 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(fileExists(root & "templates/deploy/init/dockerignore.mustache")).toBeTrue();
             });
 
+            // #3158 — the `wheels deploy init` scaffold must round-trip through
+            // `config` and `deploy --dry-run` without the EnvSecretUnsupported
+            // hard-fail #3008 introduced. Since #3167 retired that guard and
+            // delivers env.secret via a remote env file, the scaffolded
+            // `env.secret: [WHEELS_RELOAD_PASSWORD]` block is now correct and
+            // must validate + deploy end-to-end. These pin that contract so the
+            // scaffold and the deploy engine can never drift back apart.
+            it("the init scaffold round-trips through config() and deploy --dry-run with no EnvSecret error (##3158)", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-3158-init-roundtrip-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+                try {
+                    var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool(),
+                        {projectRoot: tmpCwd}
+                    );
+                    localCli.init_stub({cwd: tmpCwd, service: "demo", image: "acme/demo"});
+
+                    var cfgPath = tmpCwd & "/config/deploy.yml";
+                    // The scaffold declares env.secret: [WHEELS_RELOAD_PASSWORD]
+                    // and .kamal/secrets declares the matching (empty) key, so
+                    // the resolver supplies a value and env_file_content() does
+                    // not raise EnvSecretMissing.
+                    expect(fileRead(cfgPath)).toInclude("WHEELS_RELOAD_PASSWORD");
+                    expect(fileRead(tmpCwd & "/.kamal/secrets")).toInclude("WHEELS_RELOAD_PASSWORD");
+
+                    // config() must validate and dump the scaffold unchanged.
+                    var configOut = localCli.config({configPath: cfgPath});
+                    expect(configOut).toInclude("service: demo");
+
+                    // deploy --dry-run must not throw EnvSecretUnsupported/Missing
+                    // and must route the secret through the --env-file path.
+                    var fake2 = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        fake2,
+                        {projectRoot: tmpCwd}
+                    );
+                    var dryOut = dc.deploy({configPath: cfgPath, version: "v1", dryRun: true});
+                    expect(arrayLen(fake2.calls())).toBe(0);
+                    expect(dryOut).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    expect(dryOut).toInclude("WHEELS_RELOAD_PASSWORD");
+                } finally {
+                    directoryDelete(tmpCwd, true);
+                }
+            });
+
+            it("a deploy of the init scaffold delivers WHEELS_RELOAD_PASSWORD via the env file, never argv (##3158)", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-3158-init-deliver-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+                try {
+                    var localCli = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool(),
+                        {projectRoot: tmpCwd}
+                    );
+                    localCli.init_stub({cwd: tmpCwd, service: "demo", image: "acme/demo"});
+
+                    // A user populates the scaffolded secrets file; the registry
+                    // password the scaffold also references is set so the deploy
+                    // path resolves cleanly.
+                    fileWrite(
+                        tmpCwd & "/.kamal/secrets",
+                        "KAMAL_REGISTRY_PASSWORD=regpw#chr(10)#WHEELS_RELOAD_PASSWORD=reload-s3cret"
+                    );
+
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        fake,
+                        {projectRoot: tmpCwd}
+                    );
+                    dc.deploy({configPath: tmpCwd & "/config/deploy.yml", version: "v1"});
+
+                    var calls = fake.calls();
+                    var uploadIdx = 0;
+                    for (var i = 1; i <= arrayLen(calls); i++) {
+                        if (!uploadIdx && (calls[i].kind ?: "") == "uploadString") uploadIdx = i;
+                    }
+                    expect(uploadIdx).toBeGT(0);
+                    // The scaffolded secret reaches the role env file over SFTP.
+                    expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/roles/web.env");
+                    expect(calls[uploadIdx].content).toInclude("WHEELS_RELOAD_PASSWORD=reload-s3cret");
+                    // The value must never appear in any command string.
+                    for (var c in calls) {
+                        expect(c.cmd ?: "").notToInclude("reload-s3cret");
+                    }
+                } finally {
+                    directoryDelete(tmpCwd, true);
+                }
+            });
+
             it("audit dispatches tail of audit log to every host", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
@@ -533,6 +677,557 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 }
             });
 
+            // Regression suite for the ##2957 review: the ##2696 guard above only
+            // scripts an exit-code release failure, which {raise: false} already
+            // tolerates. A TRANSPORT failure (host died mid-deploy, the cached
+            // connection's startSession throws inside the release) used to
+            // propagate out of the finally block and REPLACE the in-flight
+            // deploy exception — the operator saw a connect error instead of
+            // the real deploy failure, and the post-deploy-failure hook got the
+            // wrong KAMAL_ERROR.
+
+            it("a transport-dead lock release in the finally block does not mask the original deploy exception", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                // The same host then drops off the network: the release in the
+                // finally dies in the SSH transport, not in an exit code.
+                fake.expect("1.2.3.4", lockCmds.release(), {transportError: "Broken pipe"});
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var state = {threw = false, errType = "", errMsg = "", logged = ""};
+                savecontent variable="state.logged" {
+                    try {
+                        dc.deploy({configPath: variables.fixture, version: "v1"});
+                    } catch (any e) {
+                        state.threw = true;
+                        state.errType = e.type;
+                        state.errMsg = e.message;
+                    }
+                }
+                expect(state.threw).toBeTrue();
+                expect(state.errType).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                expect(state.errMsg).toInclude("docker pull");
+                // ...and the skipped release is logged, not thrown.
+                expect(state.logged).toInclude("[lock:release]");
+                expect(state.logged).toInclude("1.2.3.4");
+            });
+
+            it("a transport-dead host during the finally lock release does not fail an otherwise-successful deploy and still releases the rest", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.multiHostFixture);
+                var lockCmds = new cli.lucli.services.deploy.commands.LockCommands(cfg);
+                fake.expect("10.0.0.1", lockCmds.release(), {transportError: "Connection reset"});
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var state = {out = "", logged = ""};
+                savecontent variable="state.logged" {
+                    state.out = dc.deploy({configPath: variables.multiHostFixture, version: "v1"});
+                }
+                expect(state.out).toInclude("Deployed");
+                // Host 2's lock was still released even though host 1 dropped.
+                var releaseHosts = [];
+                for (var c in fake.calls()) {
+                    if (findNoCase("rm -f ", c.cmd ?: "") && findNoCase("kamal_deploy_lock_demo", c.cmd ?: "")) {
+                        arrayAppend(releaseHosts, c.host);
+                    }
+                }
+                expect(releaseHosts).toInclude("10.0.0.2");
+                expect(state.logged).toInclude("[lock:release] 10.0.0.1");
+            });
+
+            // Regression suite for #3087 — a failing post-deploy-failure hook used to
+            // throw DeployMainCli.HookFailed from inside the deploy catch block,
+            // replacing the original deploy error. The hook fires on an already-failed
+            // path, so it must be best-effort: run, log a non-zero exit, and let the
+            // original exception rethrow.
+
+            it("a failing post-deploy-failure hook does not mask the original deploy error (##3087)", () => {
+                var tmpProject = getTempDirectory() & "/wheels-3087-" & createUUID();
+                var marker = tmpProject & "/hook-ran.txt";
+                directoryCreate(tmpProject & "/.kamal/hooks", true, true);
+                // The hook proves it ran (marker file) and then fails.
+                fileWrite(
+                    tmpProject & "/.kamal/hooks/post-deploy-failure",
+                    "##!/usr/bin/env bash" & chr(10)
+                        & "echo ran > " & marker & chr(10)
+                        & "exit 1"
+                );
+                fileSetAccessMode(tmpProject & "/.kamal/hooks/post-deploy-failure", "755");
+
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake, {projectRoot: tmpProject});
+                // savecontent captures the hook log (asserted below) and keeps
+                // real-mode hook output out of the test runner's response stream.
+                var state = {threw = false, errType = "", errMsg = "", logged = ""};
+                savecontent variable="state.logged" {
+                    try {
+                        dc.deploy({configPath: variables.fixture, version: "v1"});
+                    } catch (any e) {
+                        state.threw = true;
+                        state.errType = e.type;
+                        state.errMsg = e.message;
+                    }
+                }
+                // The surfaced error must be the original pull failure,
+                // NOT DeployMainCli.HookFailed from the notification hook.
+                expect(state.threw).toBeTrue();
+                expect(state.errType).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                expect(state.errMsg).toInclude("docker pull");
+                // ...and the hook's non-zero exit is logged, not thrown.
+                expect(state.logged).toInclude("[hook:post-deploy-failure]");
+                expect(state.logged).toInclude("exited with code 1");
+                directoryDelete(tmpProject, true);
+            });
+
+            it("the post-deploy-failure hook still runs (best-effort) before the original error rethrows (##3087)", () => {
+                var tmpProject = getTempDirectory() & "/wheels-3087-ran-" & createUUID();
+                var marker = tmpProject & "/hook-ran.txt";
+                directoryCreate(tmpProject & "/.kamal/hooks", true, true);
+                fileWrite(
+                    tmpProject & "/.kamal/hooks/post-deploy-failure",
+                    "##!/usr/bin/env bash" & chr(10)
+                        & "echo ""$KAMAL_ERROR"" > " & marker & chr(10)
+                        & "exit 1"
+                );
+                fileSetAccessMode(tmpProject & "/.kamal/hooks/post-deploy-failure", "755");
+
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var builder = new cli.lucli.services.deploy.commands.BuilderCommands(cfg);
+                fake.expect("1.2.3.4", builder.pull("v1"), {
+                    exitCode: 1, stdout: "", stderr: "manifest unknown"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake, {projectRoot: tmpProject});
+                var state = {threw = false, logged = ""};
+                savecontent variable="state.logged" {
+                    try {
+                        dc.deploy({configPath: variables.fixture, version: "v1"});
+                    } catch (any e) {
+                        state.threw = true;
+                    }
+                }
+                expect(state.threw).toBeTrue();
+                // The hook ran and received KAMAL_ERROR even though it exited non-zero.
+                expect(fileExists(marker)).toBeTrue();
+                expect(fileRead(marker)).toInclude("exit 1");
+                directoryDelete(tmpProject, true);
+            });
+
+            // Regression suite for #3089 — deploy()/rollback() hardcoded the
+            // kamal-proxy target to <container>:3000, ignoring proxy.app_port
+            // (code default 80; `wheels deploy init` scaffolds 8080).
+
+            it("deploy --dry-run builds the kamal-proxy target from proxy.app_port (##3089)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({
+                    configPath: variables.proxyFixture,
+                    dryRun: true,
+                    version: "v1"
+                });
+                expect(out).toInclude("--target demo-web-v1:8080");
+                expect(out).notToInclude(":3000");
+            });
+
+            it("rollback --dry-run builds the kamal-proxy target from proxy.app_port (##3089)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.rollback({
+                    configPath: variables.proxyFixture,
+                    dryRun: true,
+                    version: "v-old"
+                });
+                expect(out).toInclude("--target demo-web-v-old:8080");
+                expect(out).notToInclude(":3000");
+            });
+
+            it("deploy --dry-run falls back to app_port default 80 when proxy is unconfigured (##3089)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({
+                    configPath: variables.fixture,
+                    dryRun: true,
+                    version: "v1"
+                });
+                expect(out).toInclude("--target demo-web-v1:80");
+                expect(out).notToInclude(":3000");
+            });
+
+            // env.secret delivery (#2957, Wave 2b) — deploy writes a remote env
+            // file (600 perms) per role and references it via --env-file. Secret
+            // values travel only over SFTP (uploadString); they never appear in
+            // any command string, dry-run line, or exception summary.
+
+            it("deploy writes the env file (600 perms) before docker run and keeps secret values out of argv (##2957)", () => {
+                var proj = $makeSecretProject();
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                    dc.deploy({configPath: proj.config, version: "v1"});
+
+                    var calls = fake.calls();
+                    var ensureIdx = 0; var uploadIdx = 0; var relockIdx = 0; var runIdx = 0;
+                    for (var i = 1; i <= arrayLen(calls); i++) {
+                        var cmd = calls[i].cmd ?: "";
+                        if (!ensureIdx && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) ensureIdx = i;
+                        if (!uploadIdx && (calls[i].kind ?: "") == "uploadString") uploadIdx = i;
+                        // Post-upload re-lock: the SFTP layer may reset perms
+                        // (sshj preserve-attributes), so a second chmod 600
+                        // must follow the upload (##2957).
+                        if (uploadIdx && i > uploadIdx && !relockIdx
+                            && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) relockIdx = i;
+                        // Match the APP run specifically — the proxy boot
+                        // fallback (details() || boot()) also contains a
+                        // `docker run --detach`, dispatched before this.
+                        if (!runIdx && findNoCase("docker run --detach", cmd)
+                            && find("--name demo-web-v1", cmd)) runIdx = i;
+                    }
+                    // ensure (mkdir+touch+chmod 600) → upload → re-lock
+                    // (chmod 600) → docker run, in order.
+                    expect(ensureIdx).toBeGT(0);
+                    expect(uploadIdx).toBeGT(ensureIdx);
+                    expect(relockIdx).toBeGT(uploadIdx);
+                    expect(runIdx).toBeGT(relockIdx);
+
+                    // The upload carries the resolved value to the role env file.
+                    expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/roles/web.env");
+                    expect(calls[uploadIdx].content).toInclude("APP_SECRET=s3cr3t-value-42");
+
+                    // docker run references the env file; the value appears in NO command.
+                    expect(calls[runIdx].cmd).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    for (var c in calls) {
+                        expect(c.cmd ?: "").notToInclude("s3cr3t-value-42");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
+
+            it("deploy --dry-run notes the env-file upload by name only — values never shown (##2957)", () => {
+                var proj = $makeSecretProject();
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                    var out = dc.deploy({configPath: proj.config, version: "v1", dryRun: true});
+                    expect(arrayLen(fake.calls())).toBe(0);
+                    expect(out).toInclude("chmod 600");
+                    expect(out).toInclude(".kamal/apps/demo/env/roles/web.env");
+                    expect(out).toInclude("APP_SECRET");
+                    expect(out).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    expect(out).notToInclude("s3cr3t-value-42");
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
+
+            it("deploy fails fast with Wheels.Deploy.EnvSecretMissing before any remote call when a secret can't be resolved (##2957)", () => {
+                var proj = $makeSecretProject("UNDECLARED_KEY");
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                    var state = {threw: false, message: ""};
+                    try {
+                        dc.deploy({configPath: proj.config, version: "v1"});
+                    } catch (Wheels.Deploy.EnvSecretMissing e) {
+                        state.threw = true;
+                        state.message = e.message;
+                    }
+                    expect(state.threw).toBeTrue();
+                    expect(state.message).toInclude("UNDECLARED_KEY");
+                    // No lock acquired, nothing dispatched — fail-fast happens locally.
+                    expect(arrayLen(fake.calls())).toBe(0);
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
+
+            // Regression suite for #2957 (Wave 2a) — fresh-host bootstrap.
+            // (DEP-5a) the proxy boot guard was `details() || boot()`; details()
+            // is `docker ps --filter ...` which exits 0 whether or not the proxy
+            // exists, so boot() was unreachable and kamal-proxy never started on
+            // a fresh host. (DEP-5b) the guard was dispatched to ONE host via
+            // $dispatchAny while every proxy-fronted host needs its own proxy.
+            // (DEP-5c) `docker network create kamal` had zero call sites while
+            // app/proxy/accessory runs all require `--network kamal`. setup()
+            // was literally `return deploy(opts)` — no accessory boot. And
+            // proxy.deploy fired for EVERY role, including non-fronted job roles.
+
+            it("deploy boots kamal-proxy via docker start || docker run, not the dead docker ps guard (##2957 DEP-5a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cmds = $cmds(fake);
+                expect($anyInclude(cmds, "docker start kamal-proxy || docker run")).toBeTrue();
+                expect($anyInclude(cmds, "docker ps --filter name=kamal-proxy || ")).toBeFalse();
+            });
+
+            it("deploy creates the kamal network before any --network kamal consumer (##2957 DEP-5c)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cmds = $cmds(fake);
+                var networkIdx = 0; var consumerIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!networkIdx && findNoCase("docker network create kamal", cmds[i])) networkIdx = i;
+                    if (!consumerIdx && findNoCase("--network kamal", cmds[i])) consumerIdx = i;
+                }
+                expect(networkIdx).toBeGT(0);
+                expect(consumerIdx).toBeGT(networkIdx);
+            });
+
+            it("deploy boots the proxy on EVERY proxy-fronted host, not just one (##2957 DEP-5b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.multiRoleFixture, version: "v1"});
+                var bootHosts = $hostsFor(fake, "docker start kamal-proxy || docker run");
+                // full.yml: web role = 1.1.1.1 + 1.1.1.2; workers = 1.1.1.3 + 1.1.1.4.
+                expect(bootHosts).toInclude("1.1.1.1");
+                expect(bootHosts).toInclude("1.1.1.2");
+                expect(bootHosts).notToInclude("1.1.1.3");
+                expect(bootHosts).notToInclude("1.1.1.4");
+            });
+
+            it("deploy gates kamal-proxy deploy to proxy-fronted roles only (##2957)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.multiRoleFixture, version: "v1"});
+                var proxyDeployHosts = $hostsFor(fake, "kamal-proxy deploy");
+                expect(proxyDeployHosts).toInclude("1.1.1.1");
+                expect(proxyDeployHosts).toInclude("1.1.1.2");
+                expect(proxyDeployHosts).notToInclude("1.1.1.3");
+                expect(proxyDeployHosts).notToInclude("1.1.1.4");
+                // ...while the app containers still run on every role's hosts.
+                var runHosts = $hostsFor(fake, "docker run --detach --restart unless-stopped --name app-");
+                expect(runHosts).toInclude("1.1.1.3");
+                expect(runHosts).toInclude("1.1.1.4");
+            });
+
+            it("setup boots accessories before the app deploy; plain deploy does not (##2957 setup!=deploy)", () => {
+                // setup: accessory containers run, before the app container.
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.setup({configPath: variables.accessoriesFixture, version: "v1"});
+                var cmds = $cmds(fake);
+                var accIdx = 0; var appIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!accIdx && findNoCase("--name demo-db", cmds[i])) accIdx = i;
+                    if (!appIdx && findNoCase("--name demo-web-v1", cmds[i])) appIdx = i;
+                }
+                expect(accIdx).toBeGT(0);
+                expect($anyInclude(cmds, "--name demo-redis")).toBeTrue();
+                expect(appIdx).toBeGT(accIdx);
+                // The accessory host (1.2.3.5) gets the network created too.
+                expect($hostsFor(fake, "docker network create kamal")).toInclude("1.2.3.5");
+
+                // plain deploy: no accessory boot.
+                var fake2 = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc2 = new cli.lucli.services.deploy.cli.DeployMainCli(fake2);
+                dc2.deploy({configPath: variables.accessoriesFixture, version: "v1"});
+                var cmds2 = $cmds(fake2);
+                expect($anyInclude(cmds2, "--name demo-db")).toBeFalse();
+                expect($anyInclude(cmds2, "--name demo-redis")).toBeFalse();
+            });
+
+            it("setup --dry-run buffers network create + accessory boot + proxy boot + app run (##2957)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.setup({configPath: variables.accessoriesFixture, version: "v1", dryRun: true});
+                expect(arrayLen(fake.calls())).toBe(0);
+                expect(out).toInclude("docker network create kamal");
+                expect(out).toInclude("--name demo-db");
+                expect(out).toInclude("docker start kamal-proxy || docker run");
+                expect(out).toInclude("--name demo-web-v1");
+            });
+
+            // Regression suite for #2957 (Wave 4 roll-ups).
+            // (DEP-11a) deploy() issued `docker run --name <service>-<role>-<version>`
+            // with no prior conflict removal — a same-version redeploy hit a
+            // guaranteed name conflict — and superseded containers were never
+            // stopped after cutover. (rollback --destination) rollback() was the
+            // last loader.load() call site not forwarding the destination overlay
+            // (same defect class as the config() fix in #3085).
+
+            it("deploy removes a conflicting same-name container before docker run (##2957 DEP-11a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cmds = $cmds(fake);
+                var rmIdx = 0; var runIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!rmIdx && findNoCase("name=^demo-web-v1$", cmds[i])
+                        && findNoCase("docker container rm --force", cmds[i])) rmIdx = i;
+                    // "--name demo-web-v1" pins the APP container run — the
+                    // proxy's start_or_run also embeds a "docker run --detach".
+                    if (!runIdx && findNoCase("docker run --detach", cmds[i])
+                        && findNoCase("--name demo-web-v1", cmds[i])) runIdx = i;
+                }
+                expect(rmIdx).toBeGT(0);
+                expect(runIdx).toBeGT(rmIdx);
+            });
+
+            it("deploy stops superseded versions after the proxy cutover (##2957 DEP-11a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cmds = $cmds(fake);
+                var proxyIdx = 0; var stopOldIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!proxyIdx && findNoCase("kamal-proxy deploy", cmds[i])) proxyIdx = i;
+                    if (!stopOldIdx && findNoCase("grep -v '^demo-web-v1$'", cmds[i])
+                        && findNoCase("xargs -r docker stop", cmds[i])) stopOldIdx = i;
+                }
+                expect(proxyIdx).toBeGT(0);
+                expect(stopOldIdx).toBeGT(proxyIdx);
+            });
+
+            it("a failing old-version stop does not fail an otherwise-complete deploy (##2957 DEP-11a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var app = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+                fake.expect("1.2.3.4", app.stop_old_versions(cfg.roles()[1], "v1"), {
+                    exitCode: 1, stdout: "", stderr: "Cannot connect to the Docker daemon"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({configPath: variables.fixture, version: "v1"});
+                expect(out).toInclude("Deployed");
+            });
+
+            // Regression suite for #2957 (Wave 3 — observability). (DEP-6a) the
+            // dispatch closures dropped every ssh.run() result, so read verbs
+            // (`audit`, `details`) returned only host-count summaries in live
+            // mode — the operator never saw the remote output. (DEP-6b)
+            // AuditorCommands.record() had zero call sites, so `audit` tailed
+            // /tmp/kamal-audit.log — a file this tool never wrote.
+
+            it("audit (real mode) surfaces the remote log content host-prefixed (##2957 DEP-6a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                fake.expect("1.2.3.4", "tail -n 100 /tmp/kamal-audit.log", {
+                    exitCode: 0,
+                    stdout: "2026-06-12T10:00:00 demo started deploy of version v1" & chr(10)
+                        & "2026-06-12T10:01:00 demo completed deploy of version v1",
+                    stderr: "", durationMs: 0
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.audit({configPath: variables.fixture});
+                expect(out).toInclude("[1.2.3.4] 2026-06-12T10:00:00 demo started deploy of version v1");
+                expect(out).toInclude("[1.2.3.4] 2026-06-12T10:01:00 demo completed deploy of version v1");
+            });
+
+            it("details (real mode) surfaces the remote docker ps output host-prefixed (##2957 DEP-6a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var appCmds = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+                var proxyCmds = new cli.lucli.services.deploy.commands.ProxyCommands(cfg);
+                fake.expect("1.2.3.4", appCmds.containers(), {
+                    exitCode: 0, stdout: "abc123  acme/demo:v1  Up 2 hours", stderr: "", durationMs: 0
+                });
+                fake.expect("1.2.3.4", proxyCmds.details(), {
+                    exitCode: 0, stdout: "def456  basecamp/kamal-proxy  Up 3 days", stderr: "", durationMs: 0
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.details({configPath: variables.fixture});
+                expect(out).toInclude("[1.2.3.4] abc123  acme/demo:v1  Up 2 hours");
+                expect(out).toInclude("[1.2.3.4] def456  basecamp/kamal-proxy  Up 3 days");
+            });
+
+            it("deploy brackets the work with started/completed audit records (##2957 DEP-6b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.deploy({configPath: variables.fixture, version: "v1"});
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var auditor = new cli.lucli.services.deploy.commands.AuditorCommands(cfg);
+                var startedCmd = auditor.record("started deploy of version v1");
+                var completedCmd = auditor.record("completed deploy of version v1");
+                var cmds = $cmds(fake);
+                var acquireIdx = 0; var startedIdx = 0; var pullIdx = 0;
+                var runIdx = 0; var completedIdx = 0; var releaseIdx = 0;
+                for (var i = 1; i <= arrayLen(cmds); i++) {
+                    if (!acquireIdx && findNoCase("ln -s ", cmds[i])) acquireIdx = i;
+                    if (!startedIdx && cmds[i] == startedCmd) startedIdx = i;
+                    if (!pullIdx && findNoCase("docker pull", cmds[i])) pullIdx = i;
+                    if (!runIdx && findNoCase("docker run --detach", cmds[i])) runIdx = i;
+                    if (!completedIdx && cmds[i] == completedCmd) completedIdx = i;
+                    if (!releaseIdx && findNoCase("rm -f ", cmds[i]) && findNoCase("kamal_deploy_lock", cmds[i])) releaseIdx = i;
+                }
+                // started: after the lock, before any work; completed: after the
+                // app run, before the lock release.
+                expect(startedIdx).toBeGT(acquireIdx);
+                expect(pullIdx).toBeGT(startedIdx);
+                expect(completedIdx).toBeGT(runIdx);
+                expect(releaseIdx).toBeGT(completedIdx);
+            });
+
+            it("rollback records a rolled-back audit line (##2957 DEP-6b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.rollback({configPath: variables.fixture, version: "v-old"});
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var auditor = new cli.lucli.services.deploy.commands.AuditorCommands(cfg);
+                expect($cmds(fake)).toInclude(auditor.record("rolled back to version v-old"));
+            });
+
+            it("setup records booted-accessory audit lines on the accessory hosts (##2957 DEP-6b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                dc.setup({configPath: variables.accessoriesFixture, version: "v1"});
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.accessoriesFixture);
+                var auditor = new cli.lucli.services.deploy.commands.AuditorCommands(cfg);
+                var dbRecord = auditor.record("booted accessory db");
+                expect($cmds(fake)).toInclude(dbRecord);
+                expect($cmds(fake)).toInclude(auditor.record("booted accessory redis"));
+                expect($hostsFor(fake, dbRecord)).toInclude("1.2.3.5");
+            });
+
+            it("a failing audit record never fails the deploy (##2957 DEP-6b)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var auditor = new cli.lucli.services.deploy.commands.AuditorCommands(cfg);
+                fake.expect("1.2.3.4", auditor.record("started deploy of version v1"), {
+                    exitCode: 1, stdout: "", stderr: "sh: /tmp/kamal-audit.log: Read-only file system"
+                });
+                var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake);
+                var out = dc.deploy({configPath: variables.fixture, version: "v1"});
+                expect(out).toInclude("Deployed");
+            });
+
+            it("rollback --dry-run applies the destination overlay (##2957, same class as ##3085)", () => {
+                var base = getTempFile(getTempDirectory(), "yml");
+                fileWrite(
+                    base,
+                    "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [192.0.2.10]"
+                        & "#chr(10)#registry: {username: u, password: [X]}"
+                );
+                var overlay = new cli.lucli.services.deploy.config.ConfigLoader()
+                    .$overlayPathFor(base, "staging");
+                fileWrite(overlay, "servers:#chr(10)#  - 192.0.2.99");
+                try {
+                    var dc = new cli.lucli.services.deploy.cli.DeployMainCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    var out = dc.rollback({
+                        configPath: base,
+                        destination: "staging",
+                        version: "v1",
+                        dryRun: true
+                    });
+                    expect(out).toInclude("192.0.2.99");
+                    expect(out).notToInclude("192.0.2.10");
+                } finally {
+                    fileDelete(base);
+                    fileDelete(overlay);
+                }
+            });
+
             // Regression for #2671 — git's stderr ("fatal: not a git repository...") used to leak through as the version string.
             it("$gitShortSha() returns 'unknown' when run outside a git repo", () => {
                 var nonGitDir = getTempDirectory() & "/wheels-2671-main-" & createUUID();
@@ -556,5 +1251,44 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     private boolean function $anyInclude(required array arr, required string needle) {
         for (var s in arguments.arr) if (findNoCase(arguments.needle, s)) return true;
         return false;
+    }
+
+    /**
+     * Scaffold a temp project with config/deploy.yml declaring env.secret
+     * and a .kamal/secrets file resolving APP_SECRET. Pass a different
+     * secretName to declare a key the secrets file does NOT resolve.
+     */
+    private struct function $makeSecretProject(string secretName = "APP_SECRET") {
+        var root = getTempDirectory() & "/wheels-2957-envfile-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "env: {clear: {DB_HOST: db.internal}, secret: [" & arguments.secretName & "]}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "APP_SECRET=s3cr3t-value-42#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
+    }
+
+    private array function $cmds(required any fake) {
+        var out = [];
+        for (var c in arguments.fake.calls()) arrayAppend(out, c.cmd ?: "");
+        return out;
+    }
+
+    /** Distinct hosts that received a command containing needle, in call order. */
+    private array function $hostsFor(required any fake, required string needle) {
+        var out = [];
+        for (var c in arguments.fake.calls()) {
+            if (findNoCase(arguments.needle, c.cmd ?: "") && !arrayContains(out, c.host ?: "")) {
+                arrayAppend(out, c.host ?: "");
+            }
+        }
+        return out;
     }
 }

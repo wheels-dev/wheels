@@ -48,6 +48,8 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 9. **`toBeInstanceOf("component")` fails on BoxLang** — returns the FQN, not the literal `"component"`. Use `toBeWheelsModel()` for finder results.
 10. **Adobe CF 2023 and 2025 reject the `arguments` scope as `attributeCollection` on *any* built-in CFML tag.** Affects every `cfheader` / `cfcache` / `cfcontent` / `cfmail` / `cfdirectory` / `cffile` / `cflocation` / `cfhtmlhead` / `cfimage` / `cfdbinfo` / `cfinvoke` / `cfwddx` / `cfzip` wrapper. Covers both the string-interpolated (`attributeCollection = "#arguments#"`) and direct-struct (`attributeCollection = arguments`) forms. Adobe 2023/2025 throw — `cfheader`'s message is `"Failed to add HTML header"`; other tags surface their own — and `$header()` is catastrophic because it runs on every request. Copy to a plain struct first: `local.args = {}; for (local.key in arguments) { local.args[local.key] = arguments[local.key]; }`. Lucee 6/7, BoxLang, and Adobe 2018/2021 accept both forms; Adobe 2023/2025 require the plain struct. The 13 sites in `vendor/wheels/Global.cfc` were patched uniformly in [#2750](https://github.com/wheels-dev/wheels/pull/2750).
 11. **`local.X = ...` inside `catch` doesn't persist on BoxLang.** Catch body runs under a nested `local` that gets discarded on exit, so `expect(local.X)` after the catch reads the un-touched outer value. Use a struct field: `var state = {flag = false}; ... state.flag = true;`. Bare `var bareName` + unscoped `bareName = true` also works but the struct form mirrors `TenantResolverSpec` and is the prior-art pattern.
+12. **`for (local.i = ...)` inside `finally` miscompiles on Lucee 7.** Lucee 7.0.1+100 throws `variable [local] doesn't exist` at runtime when a `for` loop declares or iterates `local`-/`var`-scoped variables inside a `finally` block (one probe shape even produced a JVM `Expecting a stackmap frame` verifier error). Bare assignments and function calls in `finally` are fine; loops are not. Hoist the loop into a `public` `$`-prefixed helper and call it from `finally` — reference: `$restoreEmailViewVariables()` in `vendor/wheels/controller/miscellaneous.cfc` ([#2922](https://github.com/wheels-dev/wheels/pull/2922)).
+13. **Bare tag-in-script statements without parentheses (e.g. `cfabort;`) are Lucee-only.** Adobe CF compiles the bare token as a reference to an undefined VARIABLE and throws `Variable CFABORT is undefined` at runtime (every Adobe engine, not just one release). Use the script keyword (`abort;`) or the parenthesized call form (`cfheader(...)`-style) instead. The `enablePublicComponent=false` 404 branch in `vendor/wheels/Dispatch.cfc` shipped a bare `cfabort;`, which turned `GET /` on every stock Adobe install in `testing`/`production` into an HTTP 500 ([#3029](https://github.com/wheels-dev/wheels/issues/3029)). Structural guard: `vendor/wheels/tests/specs/security/BareCfabortGuardSpec.cfc` fails the suite if any bare script-context `cfabort` statement reappears under `vendor/wheels/**/*.cfc` (tag-context `<cfabort>` in `.cfm`/tag-based CFCs stays legal).
 
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
@@ -105,6 +107,8 @@ Model finders return query objects, not arrays. Loop accordingly.
 .end()
 ```
 
+`scope()`, `namespace()`, `package()`, and `controller()` also accept `callback=` and auto-close the scope when the callback returns — use the same callback form for these too (#3072).
+
 ### 4. HTML5 Form Helpers Exist — Use Them
 ```cfm
 #emailField(objectName="user", property="email")#
@@ -119,13 +123,14 @@ Model finders return query objects, not arrays. Loop accordingly.
 ```
 
 ### 5. Migration Seed Data — Direct SQL Only
-Parameter binding in `execute()` is unreliable. Use inline SQL.
+`execute()` accepts only a SQL string — there is no `parameters` argument (`Migration.cfc`: `execute(required string sql)`). Use inline SQL.
 ```cfm
 // WRONG
 execute(sql="INSERT INTO roles (name) VALUES (?)", parameters=[{value="admin"}]);
 
-// RIGHT — and use NOW() for database-agnostic dates (MySQL/PG/MSSQL/H2/SQLite)
-execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
+// RIGHT — and use CURRENT_TIMESTAMP for database-agnostic dates (MySQL/PG/MSSQL/H2/SQLite).
+// NOW() fails on SQLite (the `wheels new` default DB) and SQL Server; no adapter rewrites it.
+execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
 ```
 
 ### 6. Route Order Matters
@@ -133,6 +138,8 @@ Routes match first-to-last. Wrong order = wrong matches.
 ```
 Order: MCP routes → resources → custom named routes → root → wildcard (last!)
 ```
+
+One blessed exception ([#3073](https://github.com/wheels-dev/wheels/issues/3073)): placeholder-free patterns live in an exact-path index resolved BEFORE the ordered scan, so a literal like `/posts/featured` beats `/posts/[key]` regardless of declaration position. Declaration order still decides placeholder-vs-placeholder conflicts and ties between identical static patterns. Pinned by `vendor/wheels/tests/specs/dispatch/RoutePrecedenceSpec.cfc`; fast path in `Dispatch.cfc::$findMatchingRoute`, index built in `Mapper.cfc`.
 
 ### 7. `timestamps()` Adds Three Columns (Not Two)
 `createdAt`, `updatedAt`, AND `deletedAt` (soft-delete marker). Don't add separate datetime columns for these. Verified against `vendor/wheels/migrator/TableDefinition.cfc`.
@@ -147,7 +154,7 @@ function authenticate() { ... }
 private function authenticate() { ... }
 ```
 
-Conversely, public **framework helpers** mixed onto every controller (`env`, `model`, `redirectTo`, `linkTo`, the `is*` request predicates, the flash helpers, …) are auto-excluded from the routable surface. At app start `application.wheels.protectedControllerMethods` is built from the `wheels.Global` + `wheels.controller.*` + `wheels.view.*` mixin surface (the same `getMetaData().functions` set `$integrateComponents` mixes in), and `$callAction()` throws `Wheels.ActionNotAllowed` → 404 for any action whose name matches one. So a helper can't be invoked as an action — but you also **can't name a user action after a framework helper** (it 404s instead of dispatching). The standard REST action names (`index`, `show`, `new`, `edit`, `create`, `update`, `delete`) are not helpers, so they're unaffected ([#2845](https://github.com/wheels-dev/wheels/pull/2845)).
+Conversely, public **framework helpers** mixed onto every controller (`env`, `model`, `redirectTo`, `linkTo`, the `is*` request predicates, the flash helpers, …) are auto-excluded from the routable surface. At app start `application.wheels.protectedControllerMethods` is built from the `wheels.Global` + `wheels.controller.*` + `wheels.view.*` mixin surface (the same `getMetaData().functions` set `$integrateComponents` mixes in), and `$callAction()` throws `Wheels.ActionNotAllowed` for any action whose name matches one — intended to fall through to the 404 path, but it currently surfaces as HTTP 500 in every environment ([#3075](https://github.com/wheels-dev/wheels/issues/3075)). So a helper can't be invoked as an action — but you also **can't name a user action after a framework helper** (it errors instead of dispatching). The standard REST action names (`index`, `show`, `new`, `edit`, `create`, `update`, `delete`) are not helpers, so they're unaffected ([#2845](https://github.com/wheels-dev/wheels/pull/2845)).
 
 ### 9. Always cfparam View Variables
 Every variable passed from controller to view needs a cfparam at the top of the view file.
@@ -215,6 +222,8 @@ if (len(resolved)) header("Access-Control-Allow-Origin", resolved);
 
 Pair with `Vary: Origin` whenever the response varies by request origin ([#2724](https://github.com/wheels-dev/wheels/pull/2724)).
 
+Running `set(allowCorsRequests=true)` alongside a `wheels.middleware.Cors` instance no longer duplicates headers — the global path defers to the middleware automatically ([#3114](https://github.com/wheels-dev/wheels/issues/3114)) and writes a one-time `wheels.log` warning. Remove the six `allowCorsRequests` / `accessControlAllow*` settings from `config/settings.cfm` once the middleware is configured.
+
 ### 14. Strip CFML Comments Before Source-Scanning
 **Source:** [#2595](https://github.com/wheels-dev/wheels/pull/2595) — `wheels validate` checked for `extends="Model"` with raw `findNoCase()` and was satisfied by a commented-out `// component extends="Model"` line, missing real missing-inheritance bugs.
 
@@ -256,7 +265,7 @@ For new migrator helpers or anywhere you accept a column-name argument: declare 
 component extends="Model" {
     function config() {
         // Table/key (only if non-conventional)
-        tableName("tbl_users");
+        table("tbl_users");        // setter is table(); tableName() is a getter — tableName("x") throws Wheels.InvalidArgument in dev/testing, no-op in production (#3079)
         setPrimaryKey("userId");
 
         // Associations — all named params when using options
@@ -346,8 +355,9 @@ Resolves `params.key` into a model instance before the action runs. Lands in `pa
 ```cfm
 .resources(name="users", binding=true)                // params.user
 .resources(name="posts", binding="BlogPost")          // params.blogPost
-.scope(path="/api", binding=true)                     // all nested resources bound
-.end()
+.scope(path="/api", binding=true, callback=function(map) {  // all nested resources bound
+    map.resources("users");
+})
 set(routeModelBinding=true);                          // global, in config/settings.cfm
 ```
 
@@ -403,13 +413,15 @@ set(middleware = [
 
 // config/routes.cfm — route-scoped
 mapper()
-    .scope(path="/api", middleware=["app.middleware.ApiAuth"])
-        .resources("users")
-    .end()
+    .scope(path="/api", middleware=["app.middleware.ApiAuth"], callback=function(map) {
+        map.resources("users");
+    })
 .end();
 ```
 
 Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`. Custom: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
+
+**Singleton lifecycle contract**: both global and route-scoped middleware (including string-path entries) are resolved once and cached for the application lifetime. The same instance handles every matching request — stateful middleware (e.g. in-memory `RateLimiter` on a `.scope()`) accumulates state across requests as intended. Implication: every middleware component must be safe to share across concurrent requests (use CFML locks for any mutable state).
 
 ### Rate Limiting
 
@@ -418,10 +430,16 @@ new wheels.middleware.RateLimiter()                                            /
 new wheels.middleware.RateLimiter(maxRequests=100, windowSeconds=120, strategy="slidingWindow")
 new wheels.middleware.RateLimiter(maxRequests=50, windowSeconds=60, strategy="tokenBucket")
 new wheels.middleware.RateLimiter(storage="database")                          // auto-creates wheels_rate_limits
-new wheels.middleware.RateLimiter(keyFunction=function(req) {                  // rate-limit per API key
-    return req.cgi.http_x_api_key ?: "anonymous";
-})
+// rate-limit per API key — hoist the closure first: an inline function literal
+// as a constructor named arg crashes Adobe CF (Cross-Engine Invariant 5)
+var apiKeyFn = function(req) {
+    var apiKey = req.cgi.http_x_api_key ?: "";
+    return Len(apiKey) ? apiKey : "anonymous";
+};
+new wheels.middleware.RateLimiter(keyFunction=apiKeyFn)
 ```
+
+The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method, cgi}`. The `cgi` member is the sanitized `request.cgi` copy overlaid on every inbound HTTP header under its CGI-style `http_*` name (built by `Dispatch.$buildMiddlewareCgiScope()`), so arbitrary headers like `X-Api-Key` resolve per client ([#3074](https://github.com/wheels-dev/wheels/issues/3074) — before 4.0.4 the context had **no `cgi` key** and `req.cgi.*` silently collapsed every client into one bucket). Keep the `Len()` guard: an empty-valued header reads as empty string, and on pre-fix versions a missing header does too.
 
 Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` or `database`. Emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. Returns `429` with `Retry-After` when exceeded.
 
@@ -432,10 +450,10 @@ Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `m
 Register services in `config/services.cfm` (loaded at app start; environment overrides supported):
 
 ```cfm
-var di = injector();
-di.map("emailService").to("app.lib.EmailService").asSingleton();
-di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
-di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+local.di = injector();
+local.di.map("emailService").to("app.lib.EmailService").asSingleton();
+local.di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+local.di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
 ```
 
 Resolve with `service("emailService")` anywhere, or `inject("emailService, currentUser")` in controller `config()`. Scopes: transient (default), `.asSingleton()`, `.asRequestScoped()`. Auto-wiring: `init()` params matching registered names are auto-resolved when no `initArguments` passed.
@@ -645,14 +663,12 @@ result = (new wheels.Job()).processQueue(queue="mailers", limit=10);
 stats = (new wheels.Job()).queueStats();
 ```
 
-Worker CLI:
+Worker CLI (`cli/lucli/Module.cfc::jobs()` — thin wrapper over the `jobsProcessNext`/`jobsStatus` bridge commands in `vendor/wheels/public/views/cli.cfm`; requires a running server):
 ```bash
-wheels jobs work --queue=mailers --interval=3
-wheels jobs status [--format=json]
-wheels jobs retry --queue=mailers
-wheels jobs purge --completed --failed --older-than=30
-wheels jobs monitor
+wheels jobs work --queue=mailers --interval=3   # long-lived worker loop; --max-jobs=N for one-shot batches, --quiet
+wheels jobs status [--queue=mailers] [--format=json]
 ```
+The `retry`/`purge`/`monitor` verbs are tracked follow-ups ([#3090](https://github.com/wheels-dev/wheels/issues/3090)) — invoking one errors with the programmatic equivalent (`(new wheels.Job()).retryFailed()` / `.purgeCompleted()`).
 
 Backoff: `this.baseDelay = 2`, `this.maxDelay = 3600` in `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`. The `wheels_jobs` table is auto-created on first enqueue/processing — no migration needed.
 
@@ -695,6 +711,10 @@ Notes:
 - `ci` is a TYPE, not a scope — never write `refactor(ci):`.
 - DCO sign-off email must match `git config user.email` — prefer `git commit -s` over manual trailer.
 
+### Changelog entries
+
+User-facing `fix`/`feat` PRs add a **fragment file**, never a direct `CHANGELOG.md` edit: write `changelog.d/<slug>.<type>.md` (type ∈ `added,changed,deprecated,removed,fixed,security,performance`) containing the complete markdown bullet line(s). Direct `[Unreleased]` edits recreate the same-anchor merge conflicts the fragment system removes. At release cut, `tools/changelog-promote.sh <version>` assembles fragments (plus any legacy `[Unreleased]` content) into the new version section and clears the folder. See `changelog.d/README.md`.
+
 ## CLI / MCP
 
 **Canonical surface (Wheels 4.0+):** the Wheels CLI's stdio MCP server at `wheels mcp wheels`.
@@ -705,7 +725,7 @@ Notes:
 
 There is no `wheels mcp setup` command — copy the JSON above into `.mcp.json` manually (see the MCP integration guide for OpenCode/Cursor variants).
 
-Tools are auto-discovered from `cli/lucli/Module.cfc` public functions, prefixed with the module name (`wheels_generate`, `wheels_migrate`, `wheels_test`, `wheels_reload`, `wheels_seed`, `wheels_analyze`, `wheels_validate`, `wheels_routes`, `wheels_info`, `wheels_destroy`, `wheels_doctor`, `wheels_stats`, `wheels_notes`, `wheels_db`, `wheels_upgrade`, `wheels_create`, `wheels_deploy`). CLI-only tools (`mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`) are hidden via `mcpHiddenTools()`.
+Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (live-verified on the released 4.0.3 CLI): `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (18 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only tools (`main`, `mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`, `jobs`) are hidden via `mcpHiddenTools()`.
 
 **Deprecated:** the in-dev-server HTTP endpoint at `/wheels/mcp`. Emits a deprecation notice on first request. Migrate to the stdio surface.
 
@@ -717,13 +737,13 @@ Prefer MCP tools when the Wheels MCP server is available. Fall back to CLI other
 
 | Task | MCP | CLI |
 |------|-----|-----|
-| Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
-| Migrate | `wheels_migrate(action="latest\|up\|down\|info\|doctor")` | `wheels migrate latest\|up\|down\|info\|doctor` |
+| Generate | `generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
+| Migrate | `migrate(action="latest\|up\|down\|info\|doctor")` | `wheels migrate latest\|up\|down\|info\|doctor` |
 | Migrator reconciliation | — | `wheels migrate forget\|pretend <version> --yes` (shared dev DB orphan cleanup; see #2780) |
-| Test | `wheels_test()` | `wheels test` |
-| Reload | `wheels_reload()` | `?reload=true&password=...` |
+| Test | `test()` | `wheels test` |
+| Reload | `reload()` | `?reload=true&password=...` |
 | Server | — | `wheels start\|stop` |
-| Analyze | `wheels_analyze(target="all")` | — |
+| Analyze | `analyze(target="all")` | — |
 | Admin | — | `wheels g admin ModelName` |
 | Seed | — | `wheels seed` |
 

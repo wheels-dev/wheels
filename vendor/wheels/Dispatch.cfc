@@ -3,10 +3,26 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Returns itself (the Dispatch object).
+	 *
+	 * Middleware lifecycle contract (see #2954):
+	 *   - Global middleware is resolved once here and reused for every request.
+	 *   - Route-scoped string middleware is resolved on first encounter and
+	 *     cached in `application[$appKey()].$middlewareInstanceCache` keyed by
+	 *     component path so subsequent requests reuse the same instance. The
+	 *     cache lives in application scope so a hard reload (which calls
+	 *     `applicationStop()`) clears it alongside `application.wheels.*`.
+	 *   - The preflight-capability boolean is computed once here and stored
+	 *     on `variables.$preflightCapable` instead of being re-scanned per
+	 *     OPTIONS request.
+	 *
+	 * Implication: middleware components must be safe to share across
+	 * concurrent requests (mutate only via thread-safe state, e.g. CFML
+	 * locks). All built-in middleware already follow this contract.
 	 */
 	public any function $init() {
 		// Initialize the middleware pipeline from application settings.
 		variables.$middlewarePipeline = $buildMiddlewarePipeline();
+		variables.$preflightCapable = $computePreflightCapable(variables.$middlewarePipeline.getMiddleware());
 		return this;
 	}
 
@@ -55,12 +71,42 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Resolve a middleware item: instantiate from component path string, or return as-is if already an object.
+	 *
+	 * String paths resolve to cached singletons keyed by the path so route-scoped
+	 * middleware survives across requests (#2954). The cache lives under
+	 * `application[$appKey()].$middlewareInstanceCache` and is cleared whenever
+	 * `applicationStop()` runs (the password-gated reload path).
+	 *
+	 * Concurrency: cache population uses double-checked locking via a named
+	 * `cflock` (matching the pattern in `wheels.middleware.RateLimiter`) so two
+	 * threads racing on the first request for the same component path cannot
+	 * each instantiate their own copy and silently drop the loser's state
+	 * mutations. The fast path is a lock-free struct read once the slot is
+	 * populated; the slow path takes an exclusive lock and re-checks before
+	 * creating the instance.
 	 */
-	private any function $resolveMiddlewareInstance(required any middleware) {
-		if (IsSimpleValue(arguments.middleware)) {
-			return CreateObject("component", arguments.middleware).init();
+	public any function $resolveMiddlewareInstance(required any middleware) {
+		if (!IsSimpleValue(arguments.middleware)) {
+			return arguments.middleware;
 		}
-		return arguments.middleware;
+		local.appKey = $appKey();
+		// Fast path: once the slot is populated, the struct read is safe without a lock.
+		if (
+			StructKeyExists(application[local.appKey], "$middlewareInstanceCache")
+			&& StructKeyExists(application[local.appKey].$middlewareInstanceCache, arguments.middleware)
+		) {
+			return application[local.appKey].$middlewareInstanceCache[arguments.middleware];
+		}
+		// Slow path: exclusive lock guards the check-then-create against concurrent first-touch races.
+		cflock(name = "wheels.middlewareCache.#local.appKey#", type = "exclusive", timeout = 10) {
+			if (!StructKeyExists(application[local.appKey], "$middlewareInstanceCache")) {
+				application[local.appKey].$middlewareInstanceCache = {};
+			}
+			if (!StructKeyExists(application[local.appKey].$middlewareInstanceCache, arguments.middleware)) {
+				application[local.appKey].$middlewareInstanceCache[arguments.middleware] = CreateObject("component", arguments.middleware).init();
+			}
+		}
+		return application[local.appKey].$middlewareInstanceCache[arguments.middleware];
 	}
 
 	/**
@@ -151,16 +197,20 @@ component output="false" extends="wheels.Global"{
 		// --- Fast path: Static route O(1) lookup ---
 		// Static routes (no variables in pattern) are indexed in a hash map at registration time.
 		// This avoids regex matching entirely for common static paths like /login, /about, etc.
+		// NOTE: this is a deliberate precedence rule, not just a perf shortcut — a literal path
+		// beats a placeholder route regardless of declaration order. Declaration order still
+		// decides placeholder-vs-placeholder conflicts and ties between identical static
+		// patterns. Pinned by tests/specs/dispatch/RoutePrecedenceSpec.cfc (issue 3073).
 		if (StructKeyExists(application.wheels, "staticRoutes")) {
 			local.staticKey = local.methodKey & ":/" & arguments.path;
 			if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
-				local.rv = StructCopy(application.wheels.staticRoutes[local.staticKey]);
+				local.rv = $copyRouteForRequest(application.wheels.staticRoutes[local.staticKey]);
 			}
 			// Also try the root path.
 			if (!StructKeyExists(local, "rv") && !Len(arguments.path)) {
 				local.staticKey = local.methodKey & ":/";
 				if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
-					local.rv = StructCopy(application.wheels.staticRoutes[local.staticKey]);
+					local.rv = $copyRouteForRequest(application.wheels.staticRoutes[local.staticKey]);
 				}
 			}
 		}
@@ -180,8 +230,13 @@ component output="false" extends="wheels.Global"{
 				}
 
 				// If route matches regular expression, set it for return.
-				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
-					local.rv = Duplicate(local.route);
+				// Run the regex once with sub-expressions and stash the result on the
+				// per-request copy so $mergeRoutePattern can reuse it instead of
+				// re-executing the same regex against the same path.
+				local.match = ReFindNoCase(local.route.regex, arguments.path, 1, true);
+				if (local.match.pos[1] > 0 || (!Len(arguments.path) && local.route.pattern == "/")) {
+					local.rv = $copyRouteForRequest(local.route);
+					local.rv.regexMatch = local.match;
 					break;
 				}
 			}
@@ -222,6 +277,40 @@ component output="false" extends="wheels.Global"{
 			}
 		}
 
+		return local.rv;
+	}
+
+	/**
+	 * Returns a per-request copy of a matched route struct. Top-level keys are shallow-copied
+	 * and any non-simple members (constraints, etc.) are duplicated so request
+	 * code (middleware reading request.wheels.currentRoute, for example) can never mutate
+	 * the shared route table through the copy. Used by both the static fast path and the
+	 * regex fallback in $findMatchingRoute so the two paths share identical copy semantics.
+	 *
+	 * The `middleware` key is intentionally exempted from the Duplicate pass — instances
+	 * registered there are singletons under the dispatch lifecycle contract (see #2954),
+	 * and Adobe CF's Duplicate() of an array containing CFCs clones the instances, which
+	 * would silently reset any state the middleware holds across requests. The array itself
+	 * is shallow-copied so callers can append/replace entries without mutating the route
+	 * table; the instance references inside the new array are preserved.
+	 */
+	public struct function $copyRouteForRequest(required struct route) {
+		local.rv = StructCopy(arguments.route);
+		for (local.key in local.rv) {
+			if (local.key == "middleware") {
+				if (IsArray(local.rv[local.key])) {
+					local.copy = [];
+					for (local.mw in local.rv[local.key]) {
+						ArrayAppend(local.copy, local.mw);
+					}
+					local.rv[local.key] = local.copy;
+				}
+				continue;
+			}
+			if (!IsSimpleValue(local.rv[local.key])) {
+				local.rv[local.key] = Duplicate(local.rv[local.key]);
+			}
+		}
 		return local.rv;
 	}
 
@@ -277,13 +366,15 @@ component output="false" extends="wheels.Global"{
 			request.wheels.params = {};
 			// Cors.handle() reads the verb from arguments.request.cgi.request_method
 			// rather than arguments.request.method, so we don't carry the method
-			// field on this context. Cors is the only middleware that gates on
-			// this path; once it short-circuits, middleware registered after it
-			// does not run. Middleware registered before Cors still executes.
+			// field on this context — the `cgi` member supplies it (#3074).
+			// Cors is the only middleware that gates on this path; once it
+			// short-circuits, middleware registered after it does not run.
+			// Middleware registered before Cors still executes.
 			local.preflightContext = {
 				params = {},
 				route = {},
-				pathInfo = arguments.pathInfo
+				pathInfo = arguments.pathInfo,
+				cgi = $buildMiddlewareCgiScope()
 			};
 			local.preflightHandler = function(required struct request) {
 				return "";
@@ -306,13 +397,17 @@ component output="false" extends="wheels.Global"{
 		// Hi-jack any wheels controller requests for GUI
 		if (ListFirst(local.params.controller, '.') EQ "wheels") {
 			if (!application.wheels.enablePublicComponent) {
-				// Return 404 so the surface is not fingerprintable. A bare
+				// Return 404 so the surface is not fingerprintable. A silent
 				// cfabort responds HTTP 200 with an empty body, which leaks
 				// the existence of the internal GUI routes. See issue #2233.
+				// Must be the script keyword `abort;` — the bare tag-in-script
+				// statement form (`cfabort;`) is Lucee-only; Adobe parses it
+				// as an undefined VARIABLE reference and throws "Variable
+				// CFABORT is undefined" at runtime. See issue #3029.
 				cfheader(statuscode=404);
 				cfcontent(type="text/plain");
 				writeOutput("Not Found");
-				cfabort;
+				abort;
 			} else {
 				// BoxLang compatibility: Check for null action parameter
 				if (IsNull(local.params.action) || !Len(local.params.action)) {
@@ -327,12 +422,16 @@ component output="false" extends="wheels.Global"{
 				return "";
 			}
 		} else {
-			// Build the request context for middleware.
+			// Build the request context for middleware. The `cgi` member carries
+			// the sanitized request.cgi copy overlaid on the full inbound HTTP
+			// header set so documented patterns like a RateLimiter keyFunction
+			// reading `req.cgi.http_x_api_key` resolve per client (#3074).
 			local.requestContext = {
 				params = local.params,
 				route = StructKeyExists(request.wheels, "currentRoute") ? request.wheels.currentRoute : {},
 				pathInfo = arguments.pathInfo,
-				method = $getRequestMethod()
+				method = $getRequestMethod(),
+				cgi = $buildMiddlewareCgiScope()
 			};
 
 			// The core handler that middleware wraps around.
@@ -363,13 +462,83 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Build the `cgi` member of the middleware request context (#3074).
+	 *
+	 * Starts from the inbound HTTP headers — each mapped to its CGI-style
+	 * `http_*` name — and overlays the sanitized `request.cgi` copy so the
+	 * standard keys keep the IIS/encoding fixes applied by `$cgiScope()` (and
+	 * so test specs that inject values into `request.cgi` win over the live
+	 * header snapshot). The header mapping is what makes arbitrary headers
+	 * like `X-Api-Key` resolve: `$cgiScope()` copies a fixed key list, and
+	 * the engine CGI scope exposes arbitrary headers by name but is not
+	 * enumerable on Adobe CF.
+	 *
+	 * The `headers` argument exists for spec injection; live dispatch omits
+	 * it and reads the real inbound headers via `$requestHttpHeaders()`.
+	 */
+	public struct function $buildMiddlewareCgiScope(struct headers) {
+		if (!StructKeyExists(arguments, "headers")) {
+			arguments.headers = $requestHttpHeaders();
+		}
+		// $requestHttpHeaders() can hand back null on some servlet hosts (BoxLang
+		// under certain servers); iterating a null subject NPEs there where
+		// Lucee/Adobe iterate an empty struct. Default to an empty struct.
+		if (IsNull(arguments.headers) || !IsStruct(arguments.headers)) {
+			arguments.headers = {};
+		}
+		local.rv = {};
+		for (local.headerName in arguments.headers) {
+			if (Len(local.headerName) && IsSimpleValue(arguments.headers[local.headerName])) {
+				local.rv["http_" & Replace(LCase(local.headerName), "-", "_", "all")] = arguments.headers[local.headerName];
+			}
+		}
+		if (StructKeyExists(request, "cgi") && IsStruct(request.cgi)) {
+			StructAppend(local.rv, request.cgi, true);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Snapshot of the inbound HTTP headers, or an empty struct when they are
+	 * unavailable (test contexts or unusual dispatch paths). Prefers the
+	 * body-skipping form of GetHttpRequestData so reading headers never
+	 * consumes the request input stream.
+	 */
+	public struct function $requestHttpHeaders() {
+		try {
+			return GetHttpRequestData(false).headers;
+		} catch (any e) {
+			// Fall through: some engines may not support the boolean argument.
+		}
+		try {
+			return GetHttpRequestData().headers;
+		} catch (any e) {
+			// Fall through: no servlet request available in this context.
+		}
+		return {};
+	}
+
+	/**
 	 * Returns true if the global middleware pipeline contains a CORS middleware
 	 * instance capable of handling an OPTIONS preflight short-circuit. Used to
 	 * preserve the legacy `allowCorsRequests=true` short-circuit semantics in
 	 * the new middleware pipeline. See issue #2703.
+	 *
+	 * The boolean is computed once at `$init` from the pipeline snapshot and
+	 * stored on `variables.$preflightCapable`; this method is a single struct
+	 * read on the dispatch hot path instead of an `IsInstanceOf` scan per
+	 * OPTIONS request (#2954).
 	 */
-	private boolean function $hasPreflightCapableMiddleware() {
-		for (local.mw in variables.$middlewarePipeline.getMiddleware()) {
+	public boolean function $hasPreflightCapableMiddleware() {
+		return variables.$preflightCapable;
+	}
+
+	/**
+	 * Internal: scan the given middleware array for a CORS instance. Called
+	 * once at `$init` to compute the cached preflight-capability boolean.
+	 */
+	private boolean function $computePreflightCapable(required array middleware) {
+		for (local.mw in arguments.middleware) {
 			if (IsObject(local.mw) && IsInstanceOf(local.mw, "wheels.middleware.Cors")) {
 				return true;
 			}
@@ -379,9 +548,12 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Resolve route-scoped middleware from the matched route's `middleware` property.
-	 * Returns an array of instantiated middleware components.
+	 * Returns an array of instantiated middleware components. String paths resolve
+	 * to cached singletons via `$resolveMiddlewareInstance` so route-scoped
+	 * stateful middleware (e.g. an in-memory RateLimiter) survives across requests
+	 * (#2954).
 	 */
-	private array function $getRouteMiddleware(required struct params) {
+	public array function $getRouteMiddleware(required struct params) {
 		local.instances = [];
 		// The matched route is stored on request.wheels.currentRoute during $findMatchingRoute.
 		if (!StructKeyExists(request.wheels, "currentRoute") || !StructKeyExists(request.wheels.currentRoute, "middleware")) {
@@ -482,8 +654,21 @@ component output="false" extends="wheels.Global"{
 	 */
 	public struct function $mergeRoutePattern(required struct params, required struct route, required string path) {
 		local.rv = arguments.params;
-		local.matches = ReFindNoCase(arguments.route.regex, arguments.path, 1, true);
-		local.iEnd = ArrayLen(local.matches.pos);
+		// Reuse the match result stashed by $findMatchingRoute when present so the route
+		// regex only executes once per request. Fall back to a fresh match for routes that
+		// did not go through the regex fallback (static fast path or direct calls).
+		if (StructKeyExists(arguments.route, "regexMatch")) {
+			local.matches = arguments.route.regexMatch;
+		} else {
+			local.matches = ReFindNoCase(arguments.route.regex, arguments.path, 1, true);
+		}
+
+		// Bound the loop by the number of route variables. Constraint patterns are
+		// normalized to non-capturing groups at draw time, but this guard ensures an
+		// unexpected extra capturing group can never push extraction past the variable
+		// list (wrong values or a ListGetAt out-of-bounds crash).
+		local.variableCount = StructKeyExists(arguments.route, "foundVariables") ? ListLen(arguments.route.foundVariables) : 0;
+		local.iEnd = Min(ArrayLen(local.matches.pos), local.variableCount + 1);
 		for (local.i = 2; local.i <= local.iEnd; local.i++) {
 			local.key = ListGetAt(arguments.route.foundVariables, local.i - 1);
 			local.rv[local.key] = Mid(arguments.path, local.matches.pos[local.i], local.matches.len[local.i]);
@@ -513,7 +698,10 @@ component output="false" extends="wheels.Global"{
 	/**
 	 * Resolves a model instance from params.key when route model binding is enabled.
 	 * The resolved model is stored in params under the singularized controller name (e.g., params.user).
-	 * Throws Wheels.RecordNotFound if the record doesn't exist. Silently skips if the model class doesn't exist.
+	 * Throws Wheels.RecordNotFound if the record doesn't exist. Convention-derived bindings skip
+	 * silently (with a negative cache, cleared on reload) when the model class can't be resolved;
+	 * explicit bindings (binding="BlogPost") rethrow resolution failures since they indicate a
+	 * configuration error. Query errors from the finder always propagate.
 	 */
 	public struct function $resolveRouteModelBinding(required struct params, required struct route) {
 		local.rv = arguments.params;
@@ -540,7 +728,8 @@ component output="false" extends="wheels.Global"{
 		}
 
 		// Derive the model name.
-		if (IsSimpleValue(local.binding) && !IsBoolean(local.binding) && Len(local.binding)) {
+		local.explicitBinding = IsSimpleValue(local.binding) && !IsBoolean(local.binding) && Len(local.binding);
+		if (local.explicitBinding) {
 			// Explicit model name override (e.g., binding="BlogPost").
 			local.modelName = local.binding;
 		} else {
@@ -556,13 +745,50 @@ component output="false" extends="wheels.Global"{
 			local.modelName = capitalize(singularize(local.controllerName));
 		}
 
-		// Attempt to resolve the model instance.
-		try {
-			local.instance = model(local.modelName).findByKey(local.rv.key);
-		} catch (any e) {
-			// Model class doesn't exist — silently skip (don't break non-model routes).
+		// Negative cache: a conventional binding that previously failed to resolve is skipped
+		// without re-acquiring the app-wide model lock and re-running the model bootstrap
+		// (including its DB metadata query) on every request. Lives in the application.wheels
+		// struct so it's cleared on reload.
+		local.appKey = $appKey();
+		if (
+			!local.explicitBinding
+			&& StructKeyExists(application[local.appKey], "unresolvableRouteBindings")
+			&& StructKeyExists(application[local.appKey].unresolvableRouteBindings, local.modelName)
+		) {
 			return local.rv;
 		}
+
+		// Resolve the model class in its own try so only class/bootstrap resolution failures
+		// are handled here.
+		try {
+			local.modelClass = model(local.modelName);
+		} catch (any e) {
+			// An explicit binding name (binding="BlogPost") that fails to resolve is a
+			// configuration error — surface it instead of silently skipping.
+			if (local.explicitBinding) {
+				rethrow;
+			}
+			// Conventional binding against a non-model-backed controller: skip silently so
+			// non-model routes keep working, but negative-cache the miss so the failed
+			// bootstrap doesn't repeat on every request, and leave a dev-mode breadcrumb.
+			if (!StructKeyExists(application[local.appKey], "unresolvableRouteBindings")) {
+				application[local.appKey].unresolvableRouteBindings = {};
+			}
+			application[local.appKey].unresolvableRouteBindings[local.modelName] = true;
+			if ($get("environment") != "production") {
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Route model binding could not resolve model `#local.modelName#` (#e.type#: #e.message#). Binding is skipped for this model until reload."
+				);
+			}
+			return local.rv;
+		}
+
+		// Run the finder outside the try so query errors (DB connection failures, missing
+		// tables at query time, SQL errors) propagate instead of being masked as a missing
+		// model class.
+		local.instance = local.modelClass.findByKey(local.rv.key);
 
 		// If no record was found, throw a 404.
 		if (IsBoolean(local.instance) && !local.instance) {
@@ -739,6 +965,7 @@ component output="false" extends="wheels.Global"{
 			StructDelete(local.rv, local.key & "($hour)");
 			StructDelete(local.rv, local.key & "($minute)");
 			StructDelete(local.rv, local.key & "($second)");
+			StructDelete(local.rv, local.key & "($ampm)");
 		}
 		return local.rv;
 	}
@@ -806,6 +1033,9 @@ component output="false" extends="wheels.Global"{
 
 	function onDIComplete(){
 		$engineAdapter().prepareDIComplete(variables, this);
-		new wheels.Plugins().$initializeMixins(variables);
+		// Shared application-cached instance; $pluginObj() falls back to a fresh
+		// wheels.Plugins during bootstrap windows before $loadPlugins has cached
+		// one (issue 2897).
+		$pluginObj().$initializeMixins(variables);
 	}
 }

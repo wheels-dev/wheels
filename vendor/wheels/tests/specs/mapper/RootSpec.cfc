@@ -45,6 +45,32 @@ component extends="wheels.WheelsTest" {
                expect(r[3].pattern).toBe("/");
 			});
 
+            it("Root with explicit to= only responds to GET by default", function(){
+               m.$draw()
+               .root(to = "test##test")
+               .end();
+               r = m.getRoutes();
+               expect(r[1]).toHaveKey("methods");
+               expect(r[1].methods).toBe("get");
+			});
+
+            it("Root with explicit to= honors an explicitly passed method", function(){
+               m.$draw()
+               .root(to = "test##test", method = "post")
+               .end();
+               r = m.getRoutes();
+               expect(r[1].methods).toBe("post");
+			});
+
+            it("Root without to= defaults to GET", function(){
+               m.$draw()
+               .root()
+               .end();
+               r = m.getRoutes();
+               expect(r[1]).toHaveKey("methods");
+               expect(r[1].methods).toBe("get");
+			});
+
 		});
 	}
 

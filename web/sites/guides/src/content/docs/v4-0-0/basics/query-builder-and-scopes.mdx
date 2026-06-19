@@ -136,7 +136,7 @@ component extends="Model" {
 Call it like any other scope: `model("User").byRole("admin").findAll()`. Arguments passed to the scope call flow straight into the handler.
 
 <Aside type="caution">
-  Handler-returned `where` strings are still strings — if the argument came from user input, interpolate it only after you've validated or escaped it. For user-supplied values, pair the scope with a builder call: `model("User").byRole("admin").where("status", params.status).get()`.
+  Handler-returned `where` strings are still strings — if the argument came from user input, interpolate it only after you've validated or escaped it. For user-supplied values, pair the scope with a builder call: `model("User").byRole("admin").where("status", params.status).get()`. Wheels applies a built-in sanitizer to scope handler arguments across all invocation paths — direct (`model.byRole(input)`), scope-chained (`model.someScope().byRole(input)`), and builder-chained (`model.where(...).byRole(input)`) — but treat that as a safety net, not a substitute for validating user input before it reaches a `where` string.
 </Aside>
 
 ## Enums — named property values

@@ -53,9 +53,12 @@ they are honored. Violating them is a bug — fix the prompt, not the rails.
   matching the configured git author identity. Use `git commit -s` (the
   caller workflow's `git config` for `user.name` / `user.email` makes this
   the right value automatically) or append the trailer manually before the
-  `Co-authored-by:` lines. The [DCO GitHub App](https://github.com/apps/dco)
-  is a required status check on every PR and will block merges if any
-  commit is missing the trailer. See
+  `Co-authored-by:` lines. Note: sign-off is project policy verified during
+  code review — there is NO DCO status check on this repo, and no check will
+  fail for a missing trailer. When reviewing someone else's PR, treat a
+  missing sign-off as a fix-before-merge review request (suggest
+  `git rebase --signoff develop`), never as a failing or required CI check.
+  See
   [`CONTRIBUTING.md` § DCO](../../CONTRIBUTING.md#developer-certificate-of-origin-dco)
   for the contributor-facing explanation.
 - **Branch naming** for bot-authored work: `fix/bot-<issue>-<slug>` or
@@ -75,8 +78,7 @@ existing comments for the marker that matches your stage and key. If found,
 ## Output format
 
 - Start every comment / review with a clear H2 header naming the stage:
-  `## Wheels Bot — Triage`, `## Wheels Bot — Reviewer A`,
-  `## Wheels Bot — Reviewer B (round N)`,
+  `## Wheels Bot — Triage`, `## Wheels Bot — Reviewer`,
   `## Wheels Bot — Cross-Framework Research`.
 - End with the appropriate marker on its own line.
 - No emoji unless the team's existing style uses them (CFML repo norms — minimal).

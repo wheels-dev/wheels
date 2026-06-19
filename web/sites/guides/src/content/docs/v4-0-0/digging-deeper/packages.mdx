@@ -36,7 +36,7 @@ Install a package:
 
 ```bash title="your shell"
 wheels packages add wheels-hotwire
-wheels stop && wheels start
+wheels reload
 ```
 
 Browse, search, inspect, update, or remove:
@@ -57,7 +57,7 @@ Deactivation is a single command — `remove` deletes the `vendor/<name>/` direc
   The registry caches its index for 24 hours. If you want to see a just-published version immediately, `wheels packages registry refresh` busts the cache. `wheels packages registry info` shows the configured registry URL and cache state.
 </Aside>
 
-The restart re-runs `PackageLoader` at startup, which rediscovers what's in `vendor/` and reconciles the mixin, service, and middleware tables with the new state. A plain `wheels reload` is not enough — `PackageLoader` only re-scans `vendor/` on a cold start.
+The reload re-runs `PackageLoader`, which rediscovers what's in `vendor/` and reconciles the mixin, service, and middleware tables with the new state. An authorized `wheels reload` calls `applicationStop()` so the next request re-fires `onApplicationStart` in full — `wheels stop && wheels start` also works. Caveat: a missing or wrong reload password silently skips the restart.
 
 ## First-party packages
 
@@ -88,7 +88,7 @@ Every package declares a `package.json` at its root. The loader parses it before
         "services": [],
         "middleware": []
     },
-    "dependencies": {}
+    "requires": {}
 }
 ```
 
@@ -156,7 +156,7 @@ component output="false" {
 }
 ```
 
-After installing the package into `vendor/myfeature/` and restarting the server (`wheels stop && wheels start`), every controller has `myHelper()` available. The framework collects public methods from the package instance and merges them into the application mixin tables — the same machinery that runs for plugins, but scoped to the targets you named in the manifest.
+After installing the package into `vendor/myfeature/` and reloading (`wheels reload` or `wheels stop && wheels start`), every controller has `myHelper()` available. The framework collects public methods from the package instance and merges them into the application mixin tables — the same machinery that runs for plugins, but scoped to the targets you named in the manifest.
 
 Lifecycle hook names the loader specifically skips when collecting mixins: `init`, `onPluginLoad`, `onPluginActivate`, `register`, `boot`. If you name a method any of those, it won't be mixed in — the loader treats them as package infrastructure.
 
@@ -317,7 +317,7 @@ The install/update surface is covered by the commands shown earlier under [The a
 - `wheels packages add <name>@<version>` — pin a specific version; omit for the latest compatible.
 - `wheels packages add <name> --force` — overwrite an existing `vendor/<name>/`.
 
-The canonical verb is `add`. On the shell surface, `wheels packages install foo` is intercepted by LuCLI's built-in extension installer before it reaches the Wheels package handler, so it silently no-ops (the same trap that renamed `wheels browser install` to `wheels browser setup`). On v4.0.0 the same `install` argument also no-ops via the stdio MCP server (`wheels_packages`) and other in-process callers; the transparent `install` → `add` alias on MCP / in-process paths landed in v4.0.1 — see the v4.0.1 snapshot docs. Use `add` for compatibility across all 4.x releases.
+The canonical verb is `add`. On the shell surface, `wheels packages install foo` is intercepted by LuCLI's built-in extension installer before it reaches the Wheels package handler, so it silently no-ops (the same trap that renamed `wheels browser install` to `wheels browser setup`). On v4.0.0 the same `install` argument also no-ops via the stdio MCP server (the `packages` tool) and other in-process callers; the transparent `install` → `add` alias on MCP / in-process paths landed in v4.0.1 — see the v4.0.1 snapshot docs. Use `add` for compatibility across all 4.x releases.
 - `wheels packages update --all --yes` — bulk-update every installed package, no prompt.
 - `wheels packages registry refresh | info` — manage the 24-hour registry cache.
 

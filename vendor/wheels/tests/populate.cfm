@@ -96,7 +96,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation">
+<cfset local.tables = "c_o_r_e_memberteams,c_o_r_e_members,c_o_r_e_teams,c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation,c_o_r_e_uuidrecords">
 <!---
 	On Oracle, append CASCADE CONSTRAINTS so the drop removes incoming FK
 	references along with the table. PURGE skips the recycle bin so the
@@ -263,6 +263,16 @@ CREATE TABLE c_o_r_e_shops
 ) #local.storageEngine#
 </cfquery>
 
+<!--- this table is for testing UUID primary key auto-generation on create --->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_uuidrecords
+(
+	uuidid char(36) NOT NULL
+	,name varchar(50) NOT NULL
+	,PRIMARY KEY(uuidid)
+) #local.storageEngine#
+</cfquery>
+
 <!--- this table is for testing ambiguous column names (shopid) --->
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
 CREATE TABLE c_o_r_e_trucks
@@ -406,6 +416,35 @@ CREATE TABLE c_o_r_e_polycomments
 	,commentabletype varchar(255) NULL
 	,createdat #local.datetimeColumnType# NULL
 	,updatedat #local.datetimeColumnType# NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<!--- many-to-many shortcut association fixtures (issue #3109) --->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_members
+(
+	id #local.identityColumnType#
+	,name varchar(100) NOT NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_teams
+(
+	id #local.identityColumnType#
+	,name varchar(100) NOT NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_memberteams
+(
+	id #local.identityColumnType#
+	,memberid #local.intColumnType# NOT NULL
+	,teamid #local.intColumnType# NOT NULL
 	,PRIMARY KEY(id)
 ) #local.storageEngine#
 </cfquery>
@@ -672,3 +711,13 @@ INSERT INTO c_o_r_e_polycomments (body, commentableid, commentabletype) VALUES (
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
 INSERT INTO c_o_r_e_polycomments (body, commentableid, commentabletype) VALUES ('Comment on photo 2', #local.polyPhoto2.id#, 'PolyPhoto')
 </cfquery>
+
+<!--- many-to-many shortcut association data (issue #3109) --->
+<cfset local.memberAlice = model("member").create(name = "Alice")>
+<cfset local.memberBob = model("member").create(name = "Bob")>
+<cfset local.teamRed = model("team").create(name = "Red")>
+<cfset local.teamBlue = model("team").create(name = "Blue")>
+<cfset local.teamGreen = model("team").create(name = "Green")>
+<cfset model("memberTeam").create(memberid = local.memberAlice.id, teamid = local.teamRed.id)>
+<cfset model("memberTeam").create(memberid = local.memberAlice.id, teamid = local.teamBlue.id)>
+<cfset model("memberTeam").create(memberid = local.memberBob.id, teamid = local.teamGreen.id)>

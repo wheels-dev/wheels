@@ -1,2 +1,8 @@
+# Installed framework core + packages (pulled by `box install` / `box update`).
 /vendor/*/
-/db/**
+
+# SQLite/H2 database files created at runtime. The db/ directory itself MUST
+# ship (it carries db/.keep) so JDBC drivers have a parent dir to write into —
+# only the generated database files are ignored.
+/db/*.sqlite
+/db/*.db

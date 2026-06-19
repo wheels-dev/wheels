@@ -1,4 +1,4 @@
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		config = {path = "wheels", fileName = "Mapper", method = "$init"}
@@ -281,6 +281,35 @@ component extends="wheels.Testbox" {
 				expect("users/status/deleted").notToMatch(local.route.regex)
 			})
 
+			it("whereIn escapes regex metacharacters in values", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="fileShow", pattern="files/[file]", to="files##show")
+						.whereIn("file", "readme.txt,changelog.md")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+				expect("files/readme.txt").toMatch(local.route.regex)
+				expect("files/changelog.md").toMatch(local.route.regex)
+				// An unescaped "." would let any character match here.
+				expect("files/readmextxt").notToMatch(local.route.regex)
+			})
+
+			it("whereIn trims whitespace around values", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="byStatus", pattern="status/[status]", to="users##byStatus")
+						.whereIn("status", "active, inactive , pending")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+				expect("status/active").toMatch(local.route.regex)
+				expect("status/inactive").toMatch(local.route.regex)
+				expect("status/pending").toMatch(local.route.regex)
+			})
+
 			it("whereMatch applies a custom regex", function() {
 				local.mapper = $mapper()
 					.$draw()
@@ -306,6 +335,112 @@ component extends="wheels.Testbox" {
 				local.route = local.routes[1]
 				expect(local.route.constraints.userId).toBe("\d+")
 				expect(local.route.constraints.postId).toBe("\d+")
+			})
+
+			it("whereMatch with an invalid regex throws Wheels.InvalidRegex at draw time", function() {
+				constraintMapper = $mapper()
+					.$draw()
+					.get(name="user", pattern="users/[id]", to="users##show")
+
+				expect(function() {
+					constraintMapper.whereMatch("id", "[0-9+")
+				}).toThrow("Wheels.InvalidRegex")
+
+				// The route must not be left with a broken regex after the failed apply.
+				local.routes = constraintMapper.getRoutes()
+				expect("users/123").toMatch(local.routes[1].regex)
+			})
+
+			it("rewrites capturing groups in constraints to non-capturing groups", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="archive", pattern="archive/[year]/[month]", to="archive##show")
+						.whereMatch("year", "(20\d{2})")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+				expect("archive/2024/05").toMatch(local.route.regex)
+
+				// The compiled regex must expose exactly one capture group per route
+				// variable; an extra group from the constraint would shift positional
+				// param extraction in Dispatch's $mergeRoutePattern.
+				local.matches = ReFind(local.route.regex, "archive/2024/05", 1, true)
+				expect(ArrayLen(local.matches.pos)).toBe(3)
+			})
+
+			it("rewrites Java named capture groups in constraints to non-capturing groups", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="namedArchive", pattern="archive/[year]/[month]", to="archive##show")
+						.whereMatch("year", "(?<yr>20\d{2})")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+				expect("archive/2024/05").toMatch(local.route.regex)
+
+				// Java named groups still count in the positional group arithmetic
+				// $mergeRoutePattern relies on, so they must be normalized away
+				// exactly like anonymous capturing groups — otherwise [month]
+				// would silently receive the year's value (issue #2976).
+				local.matches = ReFind(local.route.regex, "archive/2024/05", 1, true)
+				expect(ArrayLen(local.matches.pos)).toBe(3)
+			})
+
+			it("normalizes named groups but preserves lookbehinds in $nonCapturingConstraint", function() {
+				local.mapper = $mapper()
+
+				// Named capturing group opener is replaced wholesale with `(?:`.
+				expect(local.mapper.$nonCapturingConstraint("(?<yr>20\d{2})")).toBe("(?:20\d{2})")
+
+				// Nested named groups: the scanner must resume right after the outer
+				// `>` and re-detect the inner opener at the very next character.
+				expect(local.mapper.$nonCapturingConstraint("(?<outer>(?<inner>\d{2})\-\d{2})"))
+					.toBe("(?:(?:\d{2})\-\d{2})")
+
+				// Lookbehinds start with `(?<` too but are NOT capturing groups —
+				// the rewrite must leave them untouched.
+				expect(local.mapper.$nonCapturingConstraint("\w+(?<!tmp)")).toBe("\w+(?<!tmp)")
+				expect(local.mapper.$nonCapturingConstraint("\w+(?<=pdf)")).toBe("\w+(?<=pdf)")
+
+				// Inside a character class, `(?<x>` is a run of literal characters.
+				expect(local.mapper.$nonCapturingConstraint("[(?<x>)]")).toBe("[(?<x>)]")
+			})
+
+			it("throws Wheels.InvalidRegex when a normalized named group leaves a dangling backref", function() {
+				constraintMapper = $mapper()
+					.$draw()
+					.get(name="backrefs", pattern="items/[id]", to="items##show")
+
+				// After normalization, `(?<n>\d+)` becomes `(?:\d+)`, so the
+				// trailing `\k<n>` backref points at a group name that no longer
+				// exists. java.util.regex.Pattern.compile() rejects this, and
+				// $compileRegex rethrows it as Wheels.InvalidRegex at draw time
+				// — closing the loop on issue #2976's second acceptance criterion.
+				expect(function() {
+					constraintMapper.whereMatch("id", "(?<n>\d+)\k<n>")
+				}).toThrow("Wheels.InvalidRegex")
+			})
+
+			it("leaves parentheses inside character classes untouched", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(name="wikiPage", pattern="wiki/[slug]", to="wiki##show")
+						.whereMatch("slug", "[\w()-]+")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
+
+				// Parens inside a character class are literal characters, not capturing
+				// groups, so wiki-style slugs containing them must keep matching.
+				expect("wiki/page(draft)").toMatch(local.route.regex)
+
+				// A naive "(" to "(?:" rewrite inside the class would silently widen it
+				// to also match "?" and ":".
+				expect("wiki/why?not").notToMatch(local.route.regex)
+				expect("wiki/a:b").notToMatch(local.route.regex)
 			})
 
 			it("throws error when no routes exist", function() {

@@ -171,10 +171,25 @@ component {
 	/**
 	 * Returns the name of the database table that this model is mapped to.
 	 *
+	 * This is a getter and takes no arguments — the table setter is `table()`.
+	 * Calling `tableName()` with an argument has always been a silent no-op (CFML
+	 * accepts the extra argument and the model keeps its convention table), a trap
+	 * some 4.0-era docs taught as a setter. When error information is shown
+	 * (development / testing — the same gate `exists()` uses above) it now fails
+	 * loud; in production it stays a no-op so an upgrade never breaks a running
+	 * app. See issue #3079.
+	 *
 	 * [section: Model Class]
 	 * [category: Miscellaneous Functions]
 	 */
 	public string function tableName() {
+		if (StructCount(arguments) && $get("showErrorInformation")) {
+			Throw(
+				type = "Wheels.InvalidArgument",
+				message = "`tableName()` is a getter and takes no arguments. To set the database table for this model, call `table()` in `config()` instead, e.g. `table(""my_table"")`.",
+				detail = "Passing a name to `tableName()` has always been a silent no-op (the model keeps its convention table), so it now fails loud in development. The table setter is `table()`. See issue ##3079."
+			);
+		}
 		if ($get("lowerCaseTableNames")) {
 			return LCase(variables.wheels.class.tableName);
 		} else {
@@ -310,7 +325,7 @@ component {
 				local.parts = ListToArray(local.rv.value, "/-");
 				if (ArrayLen(local.parts) == 3 && IsNumeric(local.parts[1]) && IsNumeric(local.parts[2]) && IsNumeric(local.parts[3])) {
 					try {
-						local.rv.value = $engineAdapter().parseAmbiguousSlashDate(local.parts[1], local.parts[2], local.parts[3]);
+						local.rv.value = $parseSlashDate(d1 = local.parts[1], d2 = local.parts[2], year = local.parts[3]);
 					} catch (any e) {
 						local.rv.value = CreateDate(local.parts[3], local.parts[1], local.parts[2]);
 					}
@@ -373,5 +388,41 @@ component {
 	 */
 	public void function $timestampProperty(required string property) {
 		this[arguments.property] = $timestamp(variables.wheels.class.timeStampMode);
+	}
+
+	/**
+	 * Internal function. Single shared implementation of the timestamp stamping rules used by
+	 * both `$create` and `$update` so the two write paths can't drift apart (the update path
+	 * once copy-pasted the create-only `setUpdatedAtOnCreate` gate from the create path).
+	 * Stamps the configured create or update timestamp property unless stamping is gated off
+	 * via `enabled` or the property was explicitly assigned while `allowExplicitTimestamps` is
+	 * enabled on the object. The explicit-assignment check uses the global setting name while
+	 * stamping targets the class-level property, mirroring the original inline logic (the two
+	 * can differ when the class-level property is overridden at runtime).
+	 *
+	 * @event Which timestamp to stamp: "create" or "update".
+	 * @enabled Whether stamping is enabled for this write path (class-level timestamping
+	 *          config combined with any path-specific gates).
+	 */
+	public void function $stampTimestampProperty(required string event, required boolean enabled) {
+		if (!arguments.enabled) {
+			return;
+		}
+		if (arguments.event == "create") {
+			local.settingName = "timeStampOnCreateProperty";
+		} else {
+			local.settingName = "timeStampOnUpdateProperty";
+		}
+		// Allow explicit assignment of the timestamp property if allowExplicitTimestamps is true.
+		if (
+			StructKeyExists(this, "allowExplicitTimestamps")
+			&& this.allowExplicitTimestamps
+			&& StructKeyExists(this, $get(local.settingName))
+			&& Len(this[$get(local.settingName)])
+		) {
+			// Leave the explicitly assigned value unmolested.
+			return;
+		}
+		$timestampProperty(property = variables.wheels.class[local.settingName]);
 	}
 }

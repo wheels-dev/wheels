@@ -1,5 +1,10 @@
 component {
 
+	// Boot-time sentinel meaning "the developer has not explicitly set
+	// allowEnvironmentSwitchViaUrl". Must never escape $init(): the setting is
+	// resolved back to a real boolean by $resolveAllowEnvironmentSwitchViaUrl()
+	// right after the config/settings.cfm includes (issue #3031).
+	variables.$envSwitchUnset = "__wheels_unset__";
 
 	public void function $init(struct keys = {}) {
 
@@ -31,9 +36,10 @@ component {
 			application.$wheels.reloadPassword = local.oldReloadPassword;
 		}
 
-
 		// Check and store server engine name, throw error if using a version that we don't support.
-		else if (StructKeyExists(server, "boxlang")) {
+		// Note: this must NOT be chained to the reloadPassword carryover above with `else` —
+		// engine detection has to run unconditionally or serverVersion is never set.
+		if (StructKeyExists(server, "boxlang")) {
 			application.$wheels.serverName = "BoxLang";
 			application.$wheels.serverVersion = server.boxlang.version;
 		} else if (StructKeyExists(server, "lucee")) {
@@ -103,12 +109,17 @@ component {
 		}
 		application.$wheels.controllers = {};
 		application.$wheels.models = {};
-		application.$wheels.existingHelperFiles = "";
-		application.$wheels.existingLayoutFiles = "";
-		application.$wheels.existingObjectFiles = "";
-		application.$wheels.nonExistingHelperFiles = "";
-		application.$wheels.nonExistingLayoutFiles = "";
-		application.$wheels.nonExistingObjectFiles = "";
+		// Per-app column-metadata cache (see databaseAdapters/Base.cfc $getColumns).
+		// Deliberately a SIBLING of `cache`, not a `cache.*` category: it stores raw
+		// query objects that live for the application lifetime, whereas every
+		// `cache.*` category holds {value, expiresAt} envelopes that the cull/count
+		// machinery ($addToCache / $cacheCount) walks and dereferences `.expiresAt`
+		// on. Putting schema queries under `cache.*` makes the cull throw.
+		application.$wheels.schemaColumnCache = {};
+		application.$wheels.helperFileCache = {};
+		application.$wheels.layoutFileCache = {};
+		application.$wheels.existingObjectFiles = {};
+		application.$wheels.nonExistingObjectFiles = {};
 		application.$wheels.directoryFiles = {};
 		application.$wheels.routes = [];
 		application.$wheels.middleware = [];
@@ -126,18 +137,29 @@ component {
 		application.$wheels.cache.query = {};
 		application.$wheels.cacheLastCulledAt = Now();
 
-		// Set up paths to various folders in the framework.
-		application.$wheels.webPath = Replace(
-			request.cgi.script_name,
-			Reverse(SpanExcluding(Reverse(request.cgi.script_name), "/")),
-			""
-		);
-		application.$wheels.rootPath = "/" & ListChangeDelims(application.$wheels.webPath, "/", "/");
-		application.$wheels.rootcomponentPath = ListChangeDelims(application.$wheels.webPath, ".", "/");
-		application.$wheels.wheelsComponentPath = ListAppend(application.$wheels.rootcomponentPath, "wheels", ".");
+		// Set up paths to various folders in the framework. When the app
+		// is deployed under a URL subpath (issue #2968), cgi.script_name
+		// may not match the public mount point — typical with CommandBox
+		// single-site → IIS subfolder migrations or reverse proxies that
+		// fold `/public/` out of the URL. The default derivation runs
+		// first so paths exist for any code that consumes them between
+		// here and the config/settings.cfm include below; the override
+		// (`set(subpath="/wheelsproject1")` or `WHEELS_SUBPATH` env var)
+		// is reapplied after settings.cfm loads.
+		local.paths = application.wo.$resolveFrameworkPaths(scriptName = request.cgi.script_name);
+		application.$wheels.webPath = local.paths.webPath;
+		application.$wheels.rootPath = local.paths.rootPath;
+		application.$wheels.rootcomponentPath = local.paths.rootcomponentPath;
+		application.$wheels.wheelsComponentPath = local.paths.wheelsComponentPath;
 
-		// Check old environment to see whether we're allowed to switch configuration
-		application.$wheels.allowEnvironmentSwitchViaUrl = true;
+		// Check old environment to see whether we're allowed to switch configuration.
+		// The setting boots as a non-boolean sentinel (NOT `true`) so that an explicit
+		// set(allowEnvironmentSwitchViaUrl=true) in config/settings.cfm is distinguishable
+		// from "the developer never set it" — see $resolveAllowEnvironmentSwitchViaUrl()
+		// below, which runs right after the settings includes and always resolves the
+		// setting back to a real boolean (issue #3031). The sentinel only ever exists
+		// between here and that resolution point within a single application start.
+		application.$wheels.allowEnvironmentSwitchViaUrl = variables.$envSwitchUnset;
 		if (StructKeyExists(local, "allowEnvironmentSwitchViaUrl") && !local.allowEnvironmentSwitchViaUrl) {
 			application.$wheels.allowEnvironmentSwitchViaUrl = false;
 		}
@@ -146,7 +168,11 @@ component {
 		if (!StructKeyExists(application, "$reloadRateLimit")) {
 			application.$reloadRateLimit = {};
 		}
-		local.reloadRateLimitKey = cgi.REMOTE_ADDR;
+		// Key on the trusted client IP: the socket address unless the running app's
+		// trustProxyHeaders setting opted into X-Forwarded-For (rightmost hop). On a cold
+		// start application.wheels does not exist yet, so trust resolves to false and the
+		// key falls back to the socket address.
+		local.reloadRateLimitKey = application.wo.$trustedClientIp();
 		local.reloadRateLimited = false;
 		if (StructKeyExists(application.$reloadRateLimit, local.reloadRateLimitKey)) {
 			local.rl = application.$reloadRateLimit[local.reloadRateLimitKey];
@@ -168,10 +194,7 @@ component {
 			&& StructKeyExists(application.$wheels, "reloadPassword")
 			&& Len(application.$wheels.reloadPassword)
 			&& StructKeyExists(URL, "password")
-			&& CreateObject("java", "java.security.MessageDigest").isEqual(
-				Hash(URL.password, "SHA-256").getBytes("UTF-8"),
-				Hash(application.$wheels.reloadPassword, "SHA-256").getBytes("UTF-8")
-			)
+			&& application.wo.$secureCompare(URL.password, application.$wheels.reloadPassword)
 		) {
 			local.reloadPasswordMatched = true;
 			application.$wheels.environment = URL.reload;
@@ -179,7 +202,7 @@ component {
 				writeLog(
 					file="wheels_security",
 					type="warning",
-					text="Environment switched to '" & URL.reload & "' via URL from " & cgi.REMOTE_ADDR
+					text="Environment switched to '" & URL.reload & "' via URL from " & local.reloadRateLimitKey
 				);
 			} catch (any e) {
 				// Fail silently if logging fails
@@ -200,7 +223,7 @@ component {
 			}
 			application.$reloadRateLimit[local.reloadRateLimitKey].count++;
 			try {
-				writeLog(file="wheels_security", type="warning", text="Reload password rejected from #cgi.REMOTE_ADDR#");
+				writeLog(file="wheels_security", type="warning", text="Reload password rejected from #local.reloadRateLimitKey#");
 			} catch (any e) {
 			}
 		}
@@ -208,13 +231,20 @@ component {
 		// Log successful reload
 		if (local.reloadPasswordMatched) {
 			try {
-				writeLog(file="wheels_security", type="information", text="Reload accepted from #cgi.REMOTE_ADDR# (environment: #URL.reload#)");
+				writeLog(file="wheels_security", type="information", text="Reload accepted from #local.reloadRateLimitKey# (environment: #URL.reload#)");
 			} catch (any e) {
 			}
 		}
 
-		// If we're not allowed to switch, override and replace with the old environment
-		if (!application.$wheels.allowEnvironmentSwitchViaUrl && StructKeyExists(local, "oldEnvironment")) {
+		// If we're not allowed to switch, override and replace with the old environment.
+		// At this point the setting can still be the boot sentinel (= "not explicitly
+		// set", which historically meant `true` here), so only an explicit or
+		// carried-over boolean false blocks the switch.
+		if (
+			IsBoolean(application.$wheels.allowEnvironmentSwitchViaUrl)
+			&& !application.$wheels.allowEnvironmentSwitchViaUrl
+			&& StructKeyExists(local, "oldEnvironment")
+		) {
 			application.$wheels.environment = local.oldEnvironment;
 		}
 
@@ -293,28 +323,57 @@ component {
 		application.$wheels.initialized = true;
 
 		// Load general developer settings first, then override with environment specific ones.
-		// Track the initial default so we can detect if the developer explicitly overrides it.
 		// $includeConfig captures any output the file produces and warns via the application
 		// log if non-empty — usually the signal that a config/*.cfm file is missing its
 		// cfscript wrapper, in which case the engine parses cfscript-style code as markup
 		// and the registrations silently never run. (Note: Lucee 7's tag scanner reads
 		// CFC comments before compilation and treats literal cf-tags as unclosed errors,
 		// so this comment deliberately avoids putting the angle-bracketed form inline.)
-		local.envSwitchDefault = application.$wheels.allowEnvironmentSwitchViaUrl;
 		application.wo.$includeConfig(template = "/config/settings.cfm");
 		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
 			application.wo.$includeConfig(template = "/config/#application.$wheels.environment#/settings.cfm");
 		}
 
-		// In production-like environments, disable URL-based environment switching by default.
-		// Developers can override by explicitly calling set(allowEnvironmentSwitchViaUrl=true) in settings.cfm.
-		if (
-			ListFindNoCase("production,testing,maintenance", application.$wheels.environment)
-			&& application.$wheels.allowEnvironmentSwitchViaUrl == local.envSwitchDefault
-			&& local.envSwitchDefault
+		// Re-derive framework paths now that settings.cfm has loaded. Detection
+		// priority for the URL subpath (issue #2968):
+		//   1. set(subpath="/wheelsproject1") in config/settings.cfm
+		//   2. WHEELS_SUBPATH environment variable (CommandBox / IIS deploys)
+		//   3. existing cgi.script_name derivation (no-op when both are empty)
+		// `server.system.environment` is the cross-engine-safe env read; Lucee's
+		// `getSystemSetting()` is not portable.
+		local.configuredSubpath = "";
+		if (StructKeyExists(application.$wheels, "subpath") && Len(Trim(application.$wheels.subpath))) {
+			local.configuredSubpath = application.$wheels.subpath;
+		} else if (
+			StructKeyExists(server, "system")
+			&& StructKeyExists(server.system, "environment")
+			&& StructKeyExists(server.system.environment, "WHEELS_SUBPATH")
+			&& Len(Trim(server.system.environment.WHEELS_SUBPATH))
 		) {
-			application.$wheels.allowEnvironmentSwitchViaUrl = false;
+			local.configuredSubpath = server.system.environment.WHEELS_SUBPATH;
 		}
+		if (Len(local.configuredSubpath)) {
+			local.paths = application.wo.$resolveFrameworkPaths(
+				scriptName = request.cgi.script_name,
+				subpath = local.configuredSubpath
+			);
+			application.$wheels.webPath = local.paths.webPath;
+			application.$wheels.rootPath = local.paths.rootPath;
+			application.$wheels.rootcomponentPath = local.paths.rootcomponentPath;
+			application.$wheels.wheelsComponentPath = local.paths.wheelsComponentPath;
+			application.$wheels.subpath = local.configuredSubpath;
+		}
+
+		// Resolve allowEnvironmentSwitchViaUrl to a real boolean now that the developer's
+		// settings have loaded. If it is still the boot sentinel the framework default
+		// applies: disabled in production-like environments, enabled everywhere else.
+		// An explicit boolean from config/settings.cfm — including explicit `true`, which
+		// used to be indistinguishable from the default and silently discarded — is
+		// honored as-is in every environment (issue #3031).
+		application.$wheels.allowEnvironmentSwitchViaUrl = $resolveAllowEnvironmentSwitchViaUrl(
+			settingValue = application.$wheels.allowEnvironmentSwitchViaUrl,
+			environment = application.$wheels.environment
+		);
 
 		// Warn if reloadPassword is empty — URL-based reload and environment switching are disabled.
 		if (!Len(application.$wheels.reloadPassword)) {
@@ -347,6 +406,13 @@ component {
 		// request whose action segment matches one of these names so global
 		// helpers like env(), model(), redirectTo() are never URL-invokable.
 		application.$wheels.protectedControllerMethods = application.wo.$buildProtectedControllerMethods();
+
+		// Companion struct-as-set for O(1) membership checks on the dispatch hot
+		// path (see $callAction()); the comma-list above is kept for callers that
+		// expect that shape.
+		application.$wheels.protectedControllerMethodsLookup = application.wo.$protectedControllerMethodsLookup(
+			application.$wheels.protectedControllerMethods
+		);
 
 		// Enable the main GUI Component
 		if (application.$wheels.enablePublicComponent) {
@@ -433,7 +499,41 @@ component {
 				local.queryString = ArrayToList(local.newQueryString, "&");
 				local.url = "#local.url#?#local.queryString#";
 			}
-			$location(url = local.url, addToken = false);
+			// Defer the actual redirect to EventMethods.$runOnRequestStart (issue #3054).
+			// Two reasons this block must not redirect directly:
+			// 1. This component is a plain `component {` with no extends and no mixins,
+			//    so framework helpers like $location() (vendor/wheels/Global.cfc) are not
+			//    in scope — the bare $location() that used to sit here threw "No matching
+			//    function [$LOCATION] found" during the post-switch cold start.
+			// 2. Even a resolvable cflocation is wrong here: it aborts the request while
+			//    onApplicationStart is still running, the engine then discards the
+			//    half-started application, and the next request cold-starts from
+			//    config/environment.cfm — silently reverting URL environment switches
+			//    into production/maintenance (the two environments that auto-enable
+			//    redirectAfterReload, see events/init/orm.cfm). Verified on Lucee 7.
+			// The request scope survives into $runOnRequestStart, which runs in this
+			// same request after the application (including a switched environment)
+			// has been fully initialized and persisted, so aborting there is safe.
+			request.wheels.redirectAfterReloadUrl = local.url;
 		}
+	}
+
+	/**
+	 * Resolves the allowEnvironmentSwitchViaUrl setting to a real boolean after the
+	 * config/settings.cfm includes have run. Any explicit boolean the developer set is
+	 * honored as-is in every environment — this is what makes the documented production
+	 * override set(allowEnvironmentSwitchViaUrl=true) actually work (issue #3031).
+	 * A non-boolean value means the developer never touched the setting (it still holds
+	 * the boot sentinel), so the framework default applies: disabled in production-like
+	 * environments, enabled everywhere else.
+	 */
+	public boolean function $resolveAllowEnvironmentSwitchViaUrl(
+		required any settingValue,
+		required string environment
+	) {
+		if (IsBoolean(arguments.settingValue)) {
+			return arguments.settingValue;
+		}
+		return !ListFindNoCase("production,testing,maintenance", arguments.environment);
 	}
 }

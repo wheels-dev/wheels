@@ -140,7 +140,7 @@ wheels validate
 wheels analyze
 ```
 
-Run `validate` first and read its output for any ✗ errors or ⚠ warnings. Then run `analyze` for a broader look at health scores and anti-patterns. Both commands always exit 0 regardless of findings, so read each report before moving on — the results are in the output, not the exit code.
+Run `validate` first and read its output for any ✗ errors or ⚠ warnings. Then run `analyze` for a broader look at health scores and anti-patterns. `wheels validate` exits non-zero when it finds error-severity issues, so you can gate CI on it. `wheels analyze` always exits 0 — its findings live in the output only.
 
 ### Scope the analysis
 

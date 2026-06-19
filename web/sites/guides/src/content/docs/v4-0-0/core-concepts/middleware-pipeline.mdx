@@ -59,6 +59,8 @@ mapper()
 
 That pattern is the right fit for an API auth check that shouldn't touch marketing pages, a tenant resolver that only applies under `/app`, or an admin guard limited to `/admin` resources. Nested scopes inherit their parent's middleware, so an `/api/v2` scope inside `/api` still sees `ApiAuth`.
 
+**Singleton lifecycle.** Whether you register middleware by instance or by string CFC path, the dispatch layer resolves each entry once and reuses it for every request. String paths are instantiated on first match and cached in application scope keyed by the component path; the cache is cleared on every hard reload alongside `application.wheels.*`. This means stateful route-scoped middleware — an in-memory `RateLimiter` tracking per-client counts under `/api`, for example — correctly accumulates state across requests, matching the contract global middleware has always had. The corollary: every middleware component must be safe to share across concurrent requests. All built-in components already satisfy this.
+
 ## Writing your own
 
 Implement `wheels.middleware.MiddlewareInterface` — a single `handle(request, next)` method returning the response string — and drop the component into `app/middleware/`. Reference it either by instance in `config/settings.cfm` or by CFC path in a route scope. That is the whole contract: inspect the request, decide whether to call `next(request)`, decide what to do with the response when it comes back.

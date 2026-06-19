@@ -36,6 +36,11 @@ component {
 	 */
 	public SshClient function init(string host = "", struct opts = {}) {
 		variables.$loader = new modules.wheels.services.deploy.lib.JarLoader();
+		// Resolved-secret values to scrub from RemoteExecutionFailed command
+		// summaries (#3159). Seeded empty; deploy verbs register the config's
+		// resolved secrets via $setSecretValues after loading. Set before the
+		// deferred-open early return so an unconnected client still redacts.
+		variables.$secretValues = [];
 		// Deferred-open pattern: `new SshClient()` with no args is a no-op so
 		// Lucee's implicit init-on-new doesn't try to connect. Callers use
 		// `new SshClient().init(host, opts)` to actually open a connection.
@@ -97,12 +102,20 @@ component {
 	 *                password throw shape, just for arbitrary remote failures.
 	 *                Regression #2696 — deploy verbs used to discard the result
 	 *                struct and silently treat any nonzero exit as success.
+	 *       - stdin  string, default "". If non-empty, written UTF-8 to the
+	 *                remote process's stdin and then closed (EOF) before the
+	 *                output streams are drained. This is how secrets reach
+	 *                stdin-reading commands like `docker login
+	 *                --password-stdin` without ever entering the command
+	 *                string — keeping them out of dry-run output, exception
+	 *                summaries, and the remote process table (#2956).
 	 *
 	 * @return struct {exitCode, stdout, stderr, durationMs}
 	 */
 	public struct function run(required string cmd, struct opts = {}) {
 		var useSudo = (arguments.opts.sudo ?: false) && variables.$opts.user != "root";
 		var raise = arguments.opts.raise ?: false;
+		var stdinData = arguments.opts.stdin ?: "";
 		var effectiveCmd = useSudo ? "sudo -n " & arguments.cmd : arguments.cmd;
 		var loader = variables.$loader;
 		var hostRef = variables.$host;
@@ -116,6 +129,15 @@ component {
 			var sess = sshjRef.startSession();
 			try {
 				var command = sess.exec(effectiveCmd);
+				// Feed stdin BEFORE draining stdout/stderr: commands like
+				// `docker login --password-stdin` block on stdin until EOF,
+				// so the stream must be written, flushed, and closed first.
+				if (len(stdinData)) {
+					var os = command.getOutputStream();
+					os.write(charsetDecode(stdinData, "UTF-8"));
+					os.flush();
+					os.close();
+				}
 				// Drain both streams before join() to avoid blocking on a full pipe buffer.
 				// We read via JDK streams rather than commons-io — sshj 0.39.0 doesn't
 				// ship IOUtils and we'd rather not bundle another JAR just for this.
@@ -162,8 +184,15 @@ component {
 	 * output stays scannable when long shell pipelines or noisy stderr would
 	 * otherwise dominate the surfaced error.
 	 *
-	 * MIRROR: FakeSshPool.$raiseRemoteFailure must stay byte-identical to this
-	 * method. If you change the trim limits, throw type, or message template
+	 * Resolved secret values registered via $setSecretValues are scrubbed from
+	 * the command summary BEFORE the trim, so a value sitting on the 200-char
+	 * boundary can't leak a partial fragment (#3159). env.clear values
+	 * interpolated from ${SECRET} tokens ride as `docker run ... -e KEY=value`,
+	 * which would otherwise surface in this message and in CI logs.
+	 *
+	 * MIRROR: FakeSshPool.$raiseRemoteFailure (and $setSecretValues /
+	 * $redactSecrets) must stay byte-identical to this method. If you change
+	 * the trim limits, throw type, message template, or redaction behavior
 	 * here, update the test double in lockstep — tests assert against this
 	 * exact shape regardless of which pool the deploy layer is talking to.
 	 */
@@ -176,7 +205,7 @@ component {
 		if (len(stderr) > 500) {
 			stderr = left(stderr, 500) & "…";
 		}
-		var cmdSummary = arguments.cmd;
+		var cmdSummary = $redactSecrets(arguments.cmd);
 		if (len(cmdSummary) > 200) {
 			cmdSummary = left(cmdSummary, 200) & "…";
 		}
@@ -186,6 +215,38 @@ component {
 				& " (exit " & arguments.result.exitCode & "): " & cmdSummary,
 			detail = stderr
 		);
+	}
+
+	/**
+	 * Register the set of resolved secret values to redact from
+	 * RemoteExecutionFailed command summaries (#3159). Deploy verbs call this
+	 * with SecretResolver.all()'s values after loading config so env.clear
+	 * values interpolated from ${SECRET} tokens never reach a thrown message.
+	 *
+	 * MIRROR: keep byte-identical with FakeSshPool.$setSecretValues.
+	 */
+	public void function $setSecretValues(required array values) {
+		variables.$secretValues = arguments.values;
+	}
+
+	/**
+	 * Replace every occurrence of each registered secret value with
+	 * [REDACTED]. Empty and trivially short values are skipped so they can't
+	 * mangle unrelated text — a 1-char or 2-char "secret" would otherwise
+	 * shred ordinary command bytes. A value may appear multiple times (several
+	 * -e flags), so every occurrence is replaced (#3159).
+	 *
+	 * MIRROR: keep byte-identical with FakeSshPool.$redactSecrets.
+	 */
+	public string function $redactSecrets(required string text) {
+		var out = arguments.text;
+		var values = variables.$secretValues ?: [];
+		for (var v in values) {
+			if (isSimpleValue(v) && len(v) >= 4) {
+				out = replace(out, v, "[REDACTED]", "all");
+			}
+		}
+		return out;
 	}
 
 	/**
@@ -204,6 +265,24 @@ component {
 		variables.$loader.withIsolatedTCCL(() => {
 			var sftp = sshjRef.newSFTPClient();
 			try {
+				// sshj's SFTPFileTransfer defaults preserveAttributes=true,
+				// which "preserves" the LOCAL file's attributes onto the
+				// remote after the transfer — and FileSystemFile
+				// .getPermissions() hardcodes 0644 for regular files
+				// (verified against the bundled sshj-0.39.0 bytecode). Left
+				// on, every put() would chmod the remote file to 0644,
+				// silently undoing any stricter mode set before the upload
+				// (e.g. the chmod 600 the env-file delivery flow applies
+				// before secret content lands — #2957). An upload must never
+				// touch remote permissions, so switch it off.
+				//
+				// NOTE: FakeSshPool cannot regression-test this — it records
+				// upload/uploadString calls without SFTP attribute semantics,
+				// so a fake-pool spec stays green whether or not this line
+				// exists. The $deliverEnvFile callers also dispatch a
+				// post-upload `chmod 600` re-lock as belt-and-braces, which
+				// the fake-pool specs DO pin.
+				sftp.getFileTransfer().setPreserveAttributes(javaCast("boolean", false));
 				sftp.put(localRef, remoteRef);
 			} finally {
 				sftp.close();

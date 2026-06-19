@@ -17,17 +17,6 @@ component output=false extends="wheels.Global"{
 		local.sqlArray = args.sql;
 		local.sqlLen   = arrayLen(sqlArray);
 
-		// Detect datasource info once
-		local.ds = args.queryAttributes;
-		local.dsInfo = ( structKeyExists(ds, "DATASOURCE") && len(ds.DATASOURCE) )
-			? $dbinfo(type="version", datasource=ds.DATASOURCE)
-			: $dbinfo(
-				type     = "version",
-				datasource = application.wheels.dataSourceName,
-				username   = application.wheels.dataSourceUserName,
-				password   = application.wheels.dataSourcePassword
-			);
-
 		// Build query
 		cfquery(attributeCollection = args.queryAttributes) {
 			local.pos = 1;
@@ -54,7 +43,10 @@ component output=false extends="wheels.Global"{
 						if (args.parameterize) {
 							cfqueryParam(attributeCollection = qp);
 						} else {
-							writeOutput("(" & preserveSingleQuotes(part.value) & ")");
+							// No inner parentheses here — the outer pair above / below
+							// already wraps the list ("IN ((1,2,3))" is a row-constructor
+							// syntax error on every supported database).
+							writeOutput(preserveSingleQuotes(part.value));
 						}
 						writeOutput(")");
 					}
@@ -79,18 +71,7 @@ component output=false extends="wheels.Global"{
 
 			// LIMIT / OFFSET logic
 			if (args.limit) {
-				if (findNoCase("Oracle", dsInfo.database_productname)) {
-					if (args.offset) {
-						writeOutput("OFFSET " & args.offset & " ROWS" & newLine & "FETCH NEXT " & args.limit & " ROWS ONLY");
-					} else {
-						writeOutput("FETCH FIRST " & args.limit & " ROWS ONLY");
-					}
-				} else {
-					writeOutput("LIMIT " & args.limit);
-					if (args.offset) {
-						writeOutput(newLine & "OFFSET " & args.offset);
-					}
-				}
+				writeOutput($limitOffsetClause(limit = args.limit, offset = args.offset));
 			}
 
 			// Comment block
@@ -162,11 +143,51 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Reports whether the current CFML engine is BoxLang. Centralized here so
+	 * the adapters' engine-conditional branches (column-list parsing, identity
+	 * retrieval) share one probe — and so test doubles can override it without
+	 * application state ($engineAdapter() requires an initialized app).
+	 */
+	public boolean function $isBoxLangEngine() {
+		return StructKeyExists(server, "boxlang");
+	}
+
+	/**
+	 * Extract the column list from a rendered INSERT statement (the names
+	 * between the first parenthesis pair), normalized to a plain comma list:
+	 * whitespace and newlines removed, identifier quotes stripped.
+	 * Returns an empty string when no complete parenthesis pair is found.
+	 */
+	public string function $parseInsertColumnList(required string sql) {
+		local.startPar = Find("(", arguments.sql) + 1;
+		local.endPar = Find(")", arguments.sql);
+		local.columnList = "";
+		if (local.startPar > 1 && local.endPar > local.startPar) {
+			local.rawColumns = Mid(arguments.sql, local.startPar, (local.endPar - local.startPar));
+			if ($isBoxLangEngine()) {
+				// BoxLang's ReplaceList behaves differently — use regex to parse the column names.
+				local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
+				local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
+				local.columnList = Trim(local.columnList);
+			} else {
+				// Original Lucee / Adobe CF behavior.
+				local.columnList = ReplaceList(local.rawColumns, "#Chr(10)#,#Chr(13)#, ", ",,");
+			}
+		}
+		// Strip identifier quotes from the column list for comparison.
+		return $stripIdentifierQuotes(local.columnList);
+	}
+
+	/**
 	 * Called after a query has executed.
 	 * If the query was an INSERT and the generated auto-incrementing primary key is not in the result we get it manually.
 	 * If the primary key was part of the INSERT (i.e. it wasn't auto-incrementing) we don't need to check it though.
 	 * This process is typically needed on non-supported databases (example: H2) and drivers (example: jTDS).
 	 * We return void or a struct containing the key name / value.
+	 *
+	 * Template method: the shared INSERT / already-present-key / bulk-path /
+	 * key-in-column-list guards live here; the engine-specific retrieval is
+	 * delegated to the $lastIdLookup hook each adapter overrides.
 	 */
 	public any function $identitySelect(
 		required struct queryAttributes,
@@ -174,25 +195,66 @@ component output=false extends="wheels.Global"{
 		required string primaryKey,
 		any returningIdentity = ""
 	) {
-		local.query = {};
 		local.sql = Trim(arguments.result.sql);
-		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
-			local.startPar = Find("(", local.sql) + 1;
-			local.endPar = Find(")", local.sql);
-			local.columnList = ReplaceList(
-				Mid(local.sql, local.startPar, (local.endPar - local.startPar)),
-				"#Chr(10)#,#Chr(13)#, ",
-				",,"
-			);
-			// Strip identifier quotes from column list for comparison
-			local.columnList = $stripIdentifierQuotes(local.columnList);
-			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
-				local.rv = {};
-				query = $query(sql = "SELECT LAST_INSERT_ID() AS lastId", argumentCollection = arguments.queryAttributes);
-				local.rv[$generatedKey()] = query.lastId;
-				return local.rv;
-			}
+		if (Left(local.sql, 11) != "INSERT INTO" || StructKeyExists(arguments.result, $generatedKey())) {
+			return;
 		}
+
+		// Bulk operations (insertAll / upsertAll) invoke the shared query path
+		// without a primary-key hint, because the caller does not consume a
+		// generated key. Skip the lookup entirely in that case — it would be a
+		// wasted round-trip at best, and on PostgreSQL it would emit
+		// `pg_get_serial_sequence(..., '')`, which Postgres rejects with
+		// `column "" of relation "..." does not exist`.
+		if (!Len(arguments.primaryKey)) {
+			return;
+		}
+
+		// If the primary key was part of the INSERT it wasn't auto-generated.
+		if (ListFindNoCase($parseInsertColumnList(local.sql), ListFirst(arguments.primaryKey))) {
+			return;
+		}
+
+		// Hook contract: return a simple value (possibly empty) to publish it
+		// under $generatedKey(); return nothing to publish nothing.
+		local.id = $lastIdLookup(
+			queryAttributes = arguments.queryAttributes,
+			result = arguments.result,
+			primaryKey = arguments.primaryKey,
+			returningIdentity = arguments.returningIdentity,
+			insertSql = local.sql
+		);
+		if (!StructKeyExists(local, "id")) {
+			return;
+		}
+		local.rv = {};
+		local.rv[$generatedKey()] = local.id;
+		return local.rv;
+	}
+
+	/**
+	 * Engine-specific hook used by the $identitySelect template to retrieve the
+	 * generated key after an INSERT. Adapters override this with their own
+	 * retrieval strategy (sequence CURRVAL, same-batch resultset, driver key…).
+	 *
+	 * Contract: return a simple value (possibly empty) to publish it under
+	 * $generatedKey(); return nothing (void) to publish nothing.
+	 *
+	 * @queryAttributes Struct of cfquery attributes (datasource etc.) for follow-up queries.
+	 * @result The cfquery result struct from the INSERT.
+	 * @primaryKey Primary key column name(s).
+	 * @returningIdentity Resultset produced by the INSERT's own batch, when one exists.
+	 * @insertSql The trimmed SQL of the executed INSERT statement.
+	 */
+	public any function $lastIdLookup(
+		required struct queryAttributes,
+		required struct result,
+		required string primaryKey,
+		any returningIdentity = "",
+		required string insertSql
+	) {
+		local.query = $query(sql = "SELECT LAST_INSERT_ID() AS lastId", argumentCollection = arguments.queryAttributes);
+		return local.query.lastId;
 	}
 
 	/**
@@ -355,6 +417,32 @@ component output=false extends="wheels.Global"{
 		local.args.username = variables.username;
 		local.args.password = variables.password;
 		local.args.table = arguments.tableName;
+
+		// Column metadata is a JDBC catalog round-trip (cfdbinfo type="columns")
+		// fetched once per model class. On remote / wide-schema databases that
+		// round-trip dominates first-request latency, and it is otherwise re-paid
+		// on every reload and for every model sharing a table. When
+		// cacheDatabaseSchema is on, memoize the result per datasource+table in
+		// application.wheels.schemaColumnCache. A reload rebuilds the application
+		// scope, so schema changes are still picked up on reload — the same
+		// contract as the model and controller config caches. The cache lives
+		// OUTSIDE application.wheels.cache.* on purpose: those categories hold
+		// {value, expiresAt} envelopes walked by the time-based cull, which would
+		// throw on a raw query. The read mirrors $getFromCache (try/catch +
+		// Duplicate) so a concurrent struct read can't surface a partial value and
+		// a caller can't mutate the cached query in place. (perf)
+		local.cacheSchema = $get("cacheDatabaseSchema");
+		if (local.cacheSchema) {
+			local.cacheKey = Hash(variables.dataSource & Chr(31) & arguments.tableName);
+			try {
+				if (StructKeyExists(application.wheels.schemaColumnCache, local.cacheKey)) {
+					return Duplicate(application.wheels.schemaColumnCache[local.cacheKey]);
+				}
+			} catch (any e) {
+				// fall through to a fresh catalog lookup on any concurrent-read hiccup
+			}
+		}
+
 		if ($get("showErrorInformation")) {
 			try {
 				local.rv = $getColumnInfo(argumentCollection = local.args);
@@ -367,6 +455,14 @@ component output=false extends="wheels.Global"{
 			}
 		} else {
 			local.rv = $getColumnInfo(argumentCollection = local.args);
+		}
+
+		if (local.cacheSchema) {
+			// Store an isolated copy so the cached entry can never be mutated via a
+			// reference handed to an earlier caller.
+			lock name="wheels.schemaColumnCache" type="exclusive" timeout="10" {
+				application.wheels.schemaColumnCache[local.cacheKey] = Duplicate(local.rv);
+			}
 		}
 		return local.rv;
 	}
@@ -609,6 +705,20 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Returns the SQL clause used to limit (and optionally offset) query results.
+	 * Individual database adapters override this when their dialect differs (e.g. Oracle
+	 * uses OFFSET/FETCH). The adapter type already identifies the database product, so
+	 * no per-query metadata probe is needed to choose the syntax.
+	 */
+	public string function $limitOffsetClause(required numeric limit, required numeric offset) {
+		local.rv = "LIMIT " & arguments.limit;
+		if (arguments.offset) {
+			local.rv &= Chr(13) & Chr(10) & "OFFSET " & arguments.offset;
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Remove the maxRows argument and add a limit argument instead.
 	 * The args argument is the original arguments passed in by reference so we just modify it without passing it back.
 	 */
@@ -636,13 +746,23 @@ component output=false extends="wheels.Global"{
 		local.hasGroupBy = false;
 		local.havingPos = 0;
 		local.iEnd = ArrayLen(arguments.args.sql);
+
+		// Cheap GROUP BY scan first — the rewrite below is only needed when a GROUP BY
+		// is present, so skip the per-fragment aggregate regex entirely otherwise.
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			if (IsSimpleValue(arguments.args.sql[local.i]) && Left(arguments.args.sql[local.i], 8) == "GROUP BY") {
 				local.hasGroupBy = true;
 				local.havingPos = local.i + 1;
 			}
+		}
+		if (!local.hasGroupBy) {
+			return;
+		}
+
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			if (IsSimpleValue(arguments.args.sql[local.i]) && $isAggregateFunction(arguments.args.sql[local.i])) {
 				local.hasAggregate = true;
+				break;
 			}
 		}
 		if (local.hasGroupBy && local.hasAggregate) {
@@ -731,14 +851,13 @@ component output=false extends="wheels.Global"{
 		}
 
 		// Overloaded arguments are settings for the query.
-		local.orgArgs = Duplicate(arguments);
-		StructDelete(local.orgArgs, "sql");
-		StructDelete(local.orgArgs, "parameterize");
-		StructDelete(local.orgArgs, "$debugName");
-		StructDelete(local.orgArgs, "limit");
-		StructDelete(local.orgArgs, "offset");
-		StructDelete(local.orgArgs, "$primaryKey");
-		StructAppend(local.queryAttributes, local.orgArgs);
+		// Copy only the non-excluded keys by reference — Duplicate(arguments) would
+		// deep-clone the entire SQL fragment array (including param structs) per query.
+		for (local.key in arguments) {
+			if (!ListFindNoCase("sql,parameterize,$debugName,limit,offset,$primaryKey", local.key)) {
+				local.queryAttributes[local.key] = arguments[local.key];
+			}
+		}
 		return $executeQuery(
 			queryAttributes = local.queryAttributes,
 			sql = arguments.sql,

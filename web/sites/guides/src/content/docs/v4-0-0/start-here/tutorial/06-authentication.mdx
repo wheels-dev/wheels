@@ -160,7 +160,7 @@ Four pieces to notice:
 
 </Steps>
 
-`passwordHash` is 64 chars because that's the width of a SHA-256 hex digest. `passwordSalt` is ~44 chars because `generateSecretKey("AES")` returns a base64-encoded AES key — 48 gives a little headroom. `timestamps()` creates both `createdAt` and `updatedAt` columns.
+`passwordHash` is 64 chars because that's the width of a SHA-256 hex digest. `passwordSalt` is ~44 chars because `generateSecretKey("AES")` returns a base64-encoded AES key — 48 gives a little headroom. `timestamps()` creates three columns: `createdAt`, `updatedAt`, and `deletedAt` (the soft-delete marker).
 
 ### Signup — the Users controller
 
@@ -497,7 +497,7 @@ The `/logout` route is a `DELETE`, so a plain `<a href>` won't reach it — you 
 That's the hand-rolled version. Thirty-ish lines of logic total, no hidden machinery. Now let's see what the framework gives you for free.
 
 <Aside type="caution" title="Scripting smoke tests with curl? Read this first.">
-**CSRF token rotation**: Wheels rotates the CSRF token after each accepted POST. A scraped token is single-use — re-POSTing with the same token fails with `Wheels.InvalidAuthenticityToken`. To script a flow, fetch a fresh form before every write. **Always scrape the token from the layout's `<meta name="csrf-token" content="...">` tag**, not from a form's hidden `authenticityToken` input. The meta tag is in the response on every page render and always carries the current token. Form-helper-emitted hidden inputs work too on signup, but other forms (login, post show with the comments form, the rewritten basecoat views in chapter 8) don't always include the input — scraping the meta tag uniformly avoids the special cases.
+**CSRF token scraping**: with the default session-backed store, Wheels keeps one CSRF token per session — it stays valid across multiple POSTs in the same scripted flow, so you don't need to re-fetch a form before every write. **Always scrape the token from the layout's `<meta name="csrf-token" content="...">` tag**, not from a form's hidden `authenticityToken` input. The meta tag is in the response on every page render and always carries the session's token. Form-helper-emitted hidden inputs work too on signup, but other forms (login, post show with the comments form, the rewritten basecoat views in chapter 8) don't always include the input — scraping the meta tag uniformly avoids the special cases.
 
 **curl bracket-syntax and `@`**: a curl POST body using bracket-nested keys without an `=` separator — for example `--data-urlencode "user[email][badkey]"` — is read by Lucee's form parser as a deeper nested-struct path. The email arrives in your controller as `params.user.email = {"badkey": ""}` (a struct, not a string), and the next assignment via `setProperties()` is rejected with a `Wheels.PropertyIsIncorrectType` error from the model layer. (Don't put a literal `@` inside the bracket key when reproducing this — `--data-urlencode` reads any unescaped `@` as the start of a filename, so curl would error on the example before it ever reached Lucee.) The fix is to keep the `=` separator AND %-encode the brackets and the `@` in the body. The reliable shape is:
 
@@ -529,17 +529,17 @@ The design is a registry: an `Authenticator` holds a list of named strategies. O
 
    ```cfm {test:compile}
    <cfscript>
-       var di = injector();
+       local.di = injector();
 
-       di.map("authenticator").to("wheels.auth.Authenticator").asSingleton();
+       local.di.map("authenticator").to("wheels.auth.Authenticator").asSingleton();
 
-       di.map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton();
+       local.di.map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton();
    </cfscript>
    ```
 
 </Steps>
 
-`config/services.cfm` is loaded once at app init. Like every other file under `config/`, the body must be wrapped in `<cfscript>...</cfscript>` — without the wrapper, Lucee parses the file as markup and the `var di = ...` lines spill onto the page as literal text instead of executing. `injector()` returns the DI container; `.map("name").to("component.path").asSingleton()` registers a binding — one instance per app lifetime, resolved on demand. Any controller or view can ask for `service("authenticator")` and get the same instance back every time.
+`config/services.cfm` is loaded once at app init. Like every other file under `config/`, the body must be wrapped in `<cfscript>...</cfscript>` — without the wrapper, Lucee parses the file as markup and the `local.di = ...` lines spill onto the page as literal text instead of executing. `injector()` returns the DI container; `.map("name").to("component.path").asSingleton()` registers a binding — one instance per app lifetime, resolved on demand. Any controller or view can ask for `service("authenticator")` and get the same instance back every time.
 
 Next, wire the session strategy into the authenticator so `authenticate(request)` has something to try. This is `onApplicationStart` work — it only needs to happen once per app boot. The right file is `app/events/onapplicationstart.cfm`. If you don't already have one, create it; otherwise append to it:
 
@@ -557,7 +557,7 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
 
 Don't put this in `config/app.cfm` — that file is for `Application.cfc` `this`-scope settings (`this.name`, `this.datasources`, `this.sessionTimeout`, etc.), not for init code. The DI container isn't initialized when `config/app.cfm` runs, so `application.wheelsdi` doesn't exist yet and the registration silently no-ops.
 
-On a *cold* reload — meaning `wheels stop` followed by `wheels start`, which re-fires `onApplicationStart` — this registers the strategy exactly once. (Plain `wheels reload` does **not** re-run `onApplicationStart`; if you edit init code, restart the server.) The `hasStrategy` check keeps a second cold reload from stacking duplicates.
+Both `wheels reload` and a full `wheels stop && wheels start` re-fire `onApplicationStart` — an authorized reload stops the application and the next request boots it fresh, re-running this file and `config/services.cfm`. Either way, this registers the strategy exactly once, and the `hasStrategy` check keeps repeated restarts from stacking duplicates. (CLI versions predating the [#3110](https://github.com/wheels-dev/wheels/issues/3110) fix printed a note claiming `wheels reload` skips `onApplicationStart`; that note was wrong.)
 
 ### Rewrite the Sessions controller
 
@@ -744,7 +744,7 @@ Whether you stopped at 6a or continued to 6b, the user-facing behavior should be
 
 **"The password always mismatches, even for a user I just created."** The `beforeValidation` callback isn't firing, or the form is storing plaintext. Open the database and look at the `users` row directly: `passwordHash` should be exactly 64 uppercase hex characters, `passwordSalt` should be populated with a ~44-char base64 string. If either is blank, check that you named the callback correctly in `config()` (`beforeValidation("hashPassword")` — case-sensitive) and that the form submits `user[password]`, not just `password`.
 
-**"6b: `authenticator` service not found."** Three things to check, in this order. **(1) Does the file have a `<cfscript>` wrapper?** Without it, Lucee treats the body as markup — you'll see the bare `var di = injector();` lines printed at the top of every page after a cold restart, and the registration code never runs. Compare against `config/settings.cfm` if unsure of the shape. **(2) Did you do a *cold* restart?** `wheels reload` does not re-fire `onApplicationStart`, so it doesn't re-run `config/services.cfm`; you need `wheels stop && wheels start`. **(3) Component path typo?** The `.to(...)` argument must be the exact dotted path — `wheels.auth.Authenticator`, not `Authenticator` — and the `injector()` call has to come first.
+**"6b: `authenticator` service not found."** Three things to check, in this order. **(1) Does the file have a `<cfscript>` wrapper?** Without it, Lucee treats the body as markup — you'll see the bare `local.di = injector();` lines printed at the top of every page after a cold restart, and the registration code never runs. Compare against `config/settings.cfm` if unsure of the shape. **(2) Did the application actually restart?** Both `wheels reload` and `wheels stop && wheels start` re-fire `onApplicationStart` and re-run `config/services.cfm` — but a reload with a wrong or missing reload password silently skips the restart. If in doubt, `wheels stop && wheels start` removes that variable. (CLI messages claiming `wheels reload` never re-fires `onApplicationStart` predate the [#3110](https://github.com/wheels-dev/wheels/issues/3110) fix.) **(3) Component path typo?** The `.to(...)` argument must be the exact dotted path — `wheels.auth.Authenticator`, not `Authenticator` — and the `injector()` call has to come first.
 
 ## What's next
 

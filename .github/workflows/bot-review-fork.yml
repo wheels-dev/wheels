@@ -1,0 +1,193 @@
+name: Wheels Bot — Reviewer (fork PRs)
+
+# Fork PRs cannot use the standard `pull_request` Reviewer path: GitHub does
+# not pass `vars` OR `secrets` to `pull_request` runs from a forked repository,
+# so the bot's `vars.WHEELS_BOT_ENABLED == 'true'` gate fails closed (the var
+# reads as empty) and the App token / ANTHROPIC_API_KEY would be absent anyway.
+# This workflow runs the Reviewer's single-pass review for maintainer-labeled
+# fork PRs via `pull_request_target`, which executes in the BASE-repo context
+# where vars + secrets are available.
+#
+# SECURITY — pull_request_target hardening (load-bearing, do not weaken):
+#   * We check out the BASE branch ONLY. We never check out the fork's head and
+#     never run any fork-controlled code. The local composite action
+#     `./.github/actions/wheels-bot-skip-check` therefore always resolves to
+#     trusted base code. Checking out the fork ref first would let a malicious
+#     fork swap that action's implementation and run arbitrary code with the
+#     bot's write-capable App token + ANTHROPIC_API_KEY (the classic
+#     "pwn-request").
+#   * The fork's commit OBJECTS are fetched (refs/pull/<n>/head) so the review's
+#     read-only `git log/diff/show` work, but the working tree stays on base —
+#     fetching objects executes nothing.
+#   * persist-credentials:false keeps no token in .git/config.
+#   * Gated on a maintainer-applied `bot-review` label: only users with write
+#     access can apply labels, so a human vets the fork diff before the bot runs.
+#   * The Reviewer's tool surface is read-only (gh + read-only git + Read/Grep/Glob).
+#
+# Downstream: the review submitted here is the pipeline's single quality gate.
+# (The former Reviewer B critique loop and its issue_comment convergence path
+# were retired per maintainer decision 2026-06-11 — see bot-review.yml.)
+
+on:
+  pull_request_target:
+    types: [labeled, synchronize]
+    branches: [develop]
+
+permissions:
+  # Keep the default GITHUB_TOKEN read-only (mirrors bot-review.yml). All
+  # writes — posting the review, dismissing bogus reviews — go through the
+  # App token, not this token. Minimizing the default token is extra
+  # defense-in-depth for the pull_request_target context.
+  contents: read
+
+concurrency:
+  # Shared with bot-review.yml (the group key retains the legacy "review-a"
+  # name) so a fork review and an internal review for the same PR number can
+  # never overlap. A PR is either fork or internal, so in practice only one
+  # of the two workflows ever matches.
+  group: wheels-bot-review-a-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    # Distinct from bot-review.yml's "Reviewer": both workflows trigger for
+    # a labeled fork PR (the pull_request one skips on the absent vars gate,
+    # this one runs), so distinct check names keep the UI unambiguous.
+    name: Reviewer (fork)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Fork PRs only, and only once a maintainer has applied the `bot-review`
+    # label. `synchronize` re-reviews on new pushes while the label is present;
+    # the skip-check idempotency marker prevents duplicate reviews on a SHA
+    # already reviewed, so re-firing on unrelated label events is a safe no-op.
+    if: |
+      vars.WHEELS_BOT_ENABLED == 'true'
+      && github.event.pull_request.head.repo.fork == true
+      && contains(github.event.pull_request.labels.*.name, 'bot-review')
+    steps:
+      - name: Checkout BASE branch (trusted — never the fork ref)
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Resolve PR info
+        id: pr
+        env:
+          # Pass event values through env (never interpolate ${{ }} straight
+          # into the script body). Both are GitHub-generated — number is an
+          # integer, head.sha a 40-char hex — but env + validation is the
+          # defense-in-depth pattern. head.sha is the commit the review marker
+          # keys off (#2848).
+          PR_NUM: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$PR_NUM" =~ ^[0-9]+$ ]]; then
+            echo "::error::PR number is not numeric: $PR_NUM"
+            exit 1
+          fi
+          if ! [[ "$HEAD_SHA" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+            echo "::error::head SHA is not a hex commit id: $HEAD_SHA"
+            exit 1
+          fi
+          echo "pr_num=${PR_NUM}" >> "$GITHUB_OUTPUT"
+          echo "sha=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch PR head commit objects (read-only; never checked out)
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_num }}
+        run: |
+          set -euo pipefail
+          # Bring the fork's commit OBJECTS into the local repo so the review's
+          # read-only `git log/diff/show <base>..<head-sha>` resolve. The working
+          # tree stays on the trusted base branch; no fork code is executed.
+          git fetch --no-tags origin "refs/pull/${PR_NUMBER}/head"
+
+      - name: Skip check
+        id: gate
+        uses: ./.github/actions/wheels-bot-skip-check
+        with:
+          target-type: pr
+          target-number: ${{ steps.pr.outputs.pr_num }}
+          # Initial review marker: `wheels-bot:review-a:<pr>:<sha>` (no suffix).
+          marker-pattern: 'wheels-bot:review-a:${{ steps.pr.outputs.pr_num }}:${{ steps.pr.outputs.sha }}'
+          github-token: ${{ steps.app-token.outputs.token }}
+
+      - name: Run Reviewer
+        if: steps.gate.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          allowed_bots: 'wheels-bot[bot],github-actions[bot]'
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            /review-pr ${{ steps.pr.outputs.pr_num }} ${{ steps.pr.outputs.sha }}
+          # Model policy: judging gate = opus (was Fable 5 until its 2026-06 deactivation), coding stages = opus, janitorial = sonnet.
+          claude_args: |
+            --model claude-opus-4-8
+            --max-turns 250
+            --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git grep:*),Bash(git status),Read,Grep,Glob"
+
+      # Post-submission guard (issue #2558), mirrored from bot-review.yml.
+      # Auto-dismisses any wheels-bot review on this SHA that is too short or
+      # missing the canonical marker (e.g. a CLI-probe placeholder). Runs on
+      # always() so it still fires if the Claude step failed mid-session.
+      - name: Validate Reviewer output
+        if: always() && steps.gate.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_num }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          reviews=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate \
+            | jq -c --arg sha "$HEAD_SHA" \
+                '[.[] | select(.user.login == "wheels-bot[bot]") | select(.commit_id == $sha) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")]')
+
+          count=$(echo "$reviews" | jq 'length')
+          if [[ "$count" == "0" ]]; then
+            echo "::notice::No active wheels-bot reviews on ${HEAD_SHA} to validate"
+            exit 0
+          fi
+
+          dismissed=0
+          while IFS= read -r row; do
+            id=$(echo "$row" | jq -r '.id')
+            body=$(echo "$row" | jq -r '.body')
+            body_len=${#body}
+
+            if [[ "$body_len" -lt 200 ]] || ! grep -q 'wheels-bot:review-a' <<<"$body"; then
+              echo "::warning::Dismissing bogus Reviewer review id=${id} len=${body_len}"
+              gh api -X PUT \
+                "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews/${id}/dismissals" \
+                -f message="Auto-dismissed by the Reviewer guard: body is shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See wheels-dev/wheels#2558 for context."
+              dismissed=$((dismissed + 1))
+            fi
+          done < <(echo "$reviews" | jq -c '.[]')
+
+          if [[ "$dismissed" -gt 0 ]]; then
+            guard_marker="wheels-bot:review-a-guard:${PR_NUMBER}:${HEAD_SHA}"
+            existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+              | jq -r --arg m "$guard_marker" '[.[] | select(.body | contains($m))] | length')
+
+            if [[ "$existing" == "0" ]]; then
+              short_sha=${HEAD_SHA:0:7}
+              gh pr comment "$PR_NUMBER" --body "## Wheels Bot — Reviewer guard
+
+          Detected and dismissed ${dismissed} bogus Reviewer review(s) on commit \`${short_sha}\`. Cause: review body shorter than 200 characters or missing the canonical \`wheels-bot:review-a\` marker. See [wheels-dev/wheels#2558](https://github.com/wheels-dev/wheels/issues/2558) for context.
+
+          <!-- ${guard_marker} -->"
+            else
+              echo "::notice::Guard comment already present for ${PR_NUMBER}@${HEAD_SHA}; skipping duplicate"
+            fi
+          fi

@@ -69,6 +69,16 @@ component extends="wheels.WheelsTest" {
                 expect(bt.$detectBaseUrlFromCgi({})).toBe("");
             });
 
+            it("$detectBaseUrlFromCgi falls back to localhost when server_name is empty or missing", () => {
+                // Without this guard a blank cgi.server_name would build
+                // "http://:8585" and silently point browser specs at an
+                // unreachable origin.
+                var bt = new wheels.wheelstest.BrowserTest();
+                var fakeCgi = {server_port: "8585", server_name: "", https: "off"};
+                expect(bt.$detectBaseUrlFromCgi(fakeCgi)).toBe("http://localhost:8585");
+                expect(bt.$detectBaseUrlFromCgi({server_port: "8585"})).toBe("http://localhost:8585");
+            });
+
             it("JVM system property is honored when this.baseUrl is empty", () => {
                 var bt = new wheels.wheelstest.BrowserTest();
                 bt.baseUrl = "";

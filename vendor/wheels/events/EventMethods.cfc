@@ -51,7 +51,11 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 						local.wheelsError = arguments.exception;
 					} else if (
 						StructKeyExists(arguments.exception, "cause")
+						&& !IsNull(arguments.exception.cause) && IsStruct(arguments.exception.cause)
 						&& StructKeyExists(arguments.exception.cause, "rootCause")
+						&& !IsNull(arguments.exception.cause.rootCause)
+						&& IsStruct(arguments.exception.cause.rootCause)
+						&& StructKeyExists(arguments.exception.cause.rootCause, "type")
 						&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
 					) {
 						local.wheelsError = arguments.exception.cause.rootCause;
@@ -61,7 +65,11 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 						local.wheelsError = arguments.exception.rootCause;
 					} else if (
 						StructKeyExists(arguments.exception, "cause")
+						&& !IsNull(arguments.exception.cause) && IsStruct(arguments.exception.cause)
 						&& StructKeyExists(arguments.exception.cause, "rootCause")
+						&& !IsNull(arguments.exception.cause.rootCause)
+						&& IsStruct(arguments.exception.cause.rootCause)
+						&& StructKeyExists(arguments.exception.cause.rootCause, "type")
 						&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
 					) {
 						local.wheelsError = arguments.exception.cause.rootCause;
@@ -70,7 +78,10 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 				if (StructKeyExists(local, "wheelsError")) {
 					// Map Wheels error types to HTTP status codes. Any
 					// `Wheels.*NotFound` (RouteNotFound, RecordNotFound,
-					// ViewNotFound, etc) is a 404; everything else is a 500.
+					// ViewNotFound, etc) is a 404, as is `Wheels.ActionNotAllowed`
+					// — the action-dispatch gate blocks framework helpers and
+					// $-prefixed internals by treating them as missing actions
+					// (#2845, #3075); everything else is a 500.
 					// Set the status BEFORE writing the body so the response
 					// header is committed at the right code regardless of
 					// when the servlet engine flushes (HTML-format Wheels
@@ -82,7 +93,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 					// reset the response, so we re-assert the status here.
 					if (
 						StructKeyExists(local.wheelsError, "type")
-						&& ReFindNoCase("^Wheels\.[A-Za-z]*NotFound$", local.wheelsError.type)
+						&& ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", local.wheelsError.type)
 					) {
 						$header(statusCode = 404);
 					} else {
@@ -153,7 +164,20 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	}
 
 	public void function $runOnRequestStart(required targetPage) {
-		local.Mixins = new wheels.Plugins();
+		// Perform the redirect-after-reload that onApplicationStart deferred
+		// (issue #3054). The redirect must not fire inside onApplicationStart
+		// itself: cflocation aborts the event mid-flight and the engine then
+		// discards the half-started application, silently reverting URL
+		// environment switches into production/maintenance (the two
+		// environments that auto-enable redirectAfterReload). By the time this
+		// event runs, the new application — including a switched environment —
+		// has been persisted, so aborting here is safe. Runs first on purpose:
+		// nothing else in this event matters for a request being redirected.
+		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "redirectAfterReloadUrl")) {
+			local.redirectAfterReloadUrl = request.wheels.redirectAfterReloadUrl;
+			StructDelete(request.wheels, "redirectAfterReloadUrl");
+			$location(url = local.redirectAfterReloadUrl, addToken = false);
+		}
 		// If the first debug point has not already been set in a reload request we set it here.
 		if (application.wheels.showDebugInformation) {
 			if (StructKeyExists(request.wheels, "execution")) {
@@ -170,9 +194,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		}
 
 		// Copy HTTP headers.
-		if (!StructKeyExists(request, "$wheelsHeader")) {
-			request.$wheelsHeaders = GetHTTPRequestData().headers;
-		}
+		$initializeRequestHeaders();
 
 		// Soft-reload of app/global/*.cfm when bare ?reload=true is hit in dev
 		// and any tracked include has a newer mtime. The password-gated
@@ -216,32 +238,31 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		}
 
 		// Inject methods from plugins and packages directly to Application.cfc.
+		// Uses the shared application-cached Plugins instance ($pluginObj). The
+		// previous unconditional `new wheels.Plugins()` at the top of this event
+		// paid a full Plugins + wheels.Global pseudo-constructor on every
+		// request; #3160 (Stage 3 PR A) moved the construction inside this
+		// mixins-nonempty guard so mixin-free apps skip it, and this change
+		// (PR B) drops the per-request construction entirely in favor of the
+		// cached instance (issue #2897).
 		if (!StructIsEmpty(application.wheels.mixins)) {
 			$engineAdapter().prepareDIComplete(variables, this);
-			local.Mixins.$initializeMixins(variables);
+			$pluginObj().$initializeMixins(variables);
 		}
 
 		if (application.wheels.environment == "maintenance") {
-			if (StructKeyExists(url, "except")) {
-				application.wheels.ipExceptions = url.except;
-			}
-			local.makeException = false;
-			if (Len(application.wheels.ipExceptions)) {
-				if (ReFindNoCase("[a-z]", application.wheels.ipExceptions)) {
-					if (ListFindNoCase(application.wheels.ipExceptions, cgi.http_user_agent)) {
-						local.makeException = true;
-					}
-				} else {
-					local.ipAddress = cgi.remote_addr;
-					if (Len(request.cgi.http_x_forwarded_for)) {
-						local.ipAddress = request.cgi.http_x_forwarded_for;
-					}
-					if (ListFind(application.wheels.ipExceptions, local.ipAddress)) {
-						local.makeException = true;
-					}
-				}
-			}
-			if (!local.makeException) {
+			// Exceptions come from config only (set(ipExceptions="...")). The legacy ?except=
+			// URL parameter let any anonymous client rewrite the exception list for everyone
+			// (issue #2953), so request data is no longer written into the application scope.
+			// The client IP is the socket address unless the app opted into X-Forwarded-For
+			// (rightmost hop) via set(trustProxyHeaders=true).
+			if (
+				!$maintenanceModeExempt(
+					exceptions = application.wheels.ipExceptions,
+					userAgent = cgi.http_user_agent,
+					clientIp = $trustedClientIp()
+				)
+			) {
 				$header(statusCode = 503);
 
 				// Set the content to be displayed in maintenance mode to a request variable and exit the function.
@@ -268,13 +289,22 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			$clearCache("sql");
 		}
 		if (application.wheels.allowCorsRequests) {
-			$setCORSHeaders(
-				allowOrigin = application.wheels.accessControlAllowOrigin,
-				allowCredentials = application.wheels.accessControlAllowCredentials,
-				allowHeaders = application.wheels.accessControlAllowHeaders,
-				allowMethods = application.wheels.accessControlAllowMethods,
-				allowMethodsByRoute = application.wheels.accessControlAllowMethodsByRoute
-			);
+			// When a wheels.middleware.Cors instance is registered it owns CORS
+			// headers + preflight; emitting the global headers here too would
+			// stack duplicate Access-Control-Allow-* values (a duplicate
+			// Access-Control-Allow-Origin makes browsers reject the response).
+			// Defer to the middleware pipeline and warn once. (#3114)
+			if ($corsMiddlewareActive()) {
+				$warnGlobalCorsDeferred();
+			} else {
+				$setCORSHeaders(
+					allowOrigin = application.wheels.accessControlAllowOrigin,
+					allowCredentials = application.wheels.accessControlAllowCredentials,
+					allowHeaders = application.wheels.accessControlAllowHeaders,
+					allowMethods = application.wheels.accessControlAllowMethods,
+					allowMethodsByRoute = application.wheels.accessControlAllowMethodsByRoute
+				);
+			}
 		}
 		$include(template = "#application.wheels.eventPath#/onrequeststart.cfm");
 		if (application.wheels.showDebugInformation) {
@@ -283,13 +313,33 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 
 		// Also for CORS compliance, an OPTIONS request must return 200 and the above headers. No data is required.
 		// This will be remove when OPTIONS is implemented in the mapper (issue #623)
+		// Skipped when a wheels.middleware.Cors instance is registered — the
+		// dispatch pipeline answers preflight via $hasPreflightCapableMiddleware()
+		// so aborting here (with no headers, since $setCORSHeaders was deferred)
+		// would break the preflight. (#3114)
 		if (
 			application.wheels.allowCorsRequests
+			&& !$corsMiddlewareActive()
 			&& StructKeyExists(request, "CGI")
 			&& StructKeyExists(request.CGI, "request_method")
 			&& request.CGI.request_method eq "OPTIONS"
 		) {
 			abort;
+		}
+	}
+
+	/**
+	 * Internal function. Memoizes HTTP request headers in request.$wheelsHeaders.
+	 * Reuses the GetHTTPRequestData() result stored by $initializeRequestScope()
+	 * so the request body is not materialized a second time per request.
+	 */
+	public void function $initializeRequestHeaders() {
+		if (!StructKeyExists(request, "$wheelsHeaders")) {
+			if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "httpRequestData")) {
+				request.$wheelsHeaders = request.wheels.httpRequestData.headers;
+			} else {
+				request.$wheelsHeaders = GetHTTPRequestData().headers;
+			}
 		}
 	}
 
@@ -327,7 +377,10 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	public string function $getRequestFormat() {
 		local.rv = "html";
 		if (StructKeyExists(url, "format")) {
-			local.rv = url.format;
+			// Security: reject non-alphanumeric url.format to prevent LFI via the error-template include path in $runOnError.
+			if (ReFind("^[A-Za-z0-9]+$", url.format)) {
+				local.rv = url.format;
+			}
 		} else if ((StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "http_accept"))){
 			local.httpAccept = request.cgi.http_accept;
 			local.formats = $get("formats");

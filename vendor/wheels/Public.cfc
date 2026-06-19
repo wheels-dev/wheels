@@ -9,23 +9,29 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	/**
-	 * Returns true when the current application environment is `production`.
+	 * Returns true unless the current application environment is `development`
+	 * (fail closed: a missing `application.wheels` struct or `environment` key
+	 * also blocks). This is an allowlist matching the environment checks in
+	 * consoleeval.cfm and mcp.cfm; the name is historical from issue #2233,
+	 * when the gate only matched `production`.
 	 *
 	 * The public GUI exposes routes, env info, a CFML REPL, test runners, and
 	 * a migration UI. Even if a developer overrides `enablePublicComponent` to
-	 * true in production (documented historical behavior for ad-hoc
-	 * debugging), these surfaces must stay gated. See issue #2233.
+	 * true outside development (documented historical behavior for ad-hoc
+	 * debugging), these surfaces must stay gated.
 	 */
 	public boolean function $shouldBlockInProduction() {
-		return StructKeyExists(application, "wheels")
-		&& StructKeyExists(application.wheels, "environment")
-		&& application.wheels.environment == "production";
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "environment")) {
+			return true;
+		}
+		return application.wheels.environment != "development";
 	}
 
 	/**
-	 * Defense-in-depth: if the current environment is production, short-circuit
-	 * the handler with a 404 response before any view is included. Called as
-	 * the first statement of every non-`index` handler in this component.
+	 * Defense-in-depth: unless the current environment is `development`,
+	 * short-circuit the handler with a 404 response before any view is
+	 * included. Called as the first statement of every non-`index` handler in
+	 * this component.
 	 */
 	public void function $blockInProduction() {
 		if ($shouldBlockInProduction()) {
@@ -37,9 +43,194 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	/**
+	 * Returns true when a /wheels/cli bridge command changes state — DB
+	 * schema/data mutations (migrations, seeds, resets, job processing) or
+	 * file writes (migration generators, dump output). These commands must
+	 * pass $cliMutationGateCheck() before running; read-only commands stay
+	 * reachable over plain GET for the CLI and the legacy GUI bridge.
+	 *
+	 * `diff` is read-only analysis unless asked to write migration files,
+	 * so the caller passes that flag separately (2026-06-09 review SEC-4).
+	 */
+	public boolean function $cliCommandIsMutating(required string command, boolean writesFiles = false) {
+		local.mutating = "createMigration,migrateTo,migrateToLatest,migrateUp,migrateDown,renameSystemTables,"
+			& "redoMigration,forgetVersion,pretendVersion,dbRollback,dbSeed,dbCreate,dbReset,dbSetup,dbDump,"
+			& "jobsProcessNext,jobsRetry,jobsPurge";
+		if (ListFindNoCase(local.mutating, arguments.command)) {
+			return true;
+		}
+		return CompareNoCase(arguments.command, "diff") == 0 && arguments.writesFiles;
+	}
+
+	/**
+	 * Gate for state-changing /wheels/cli commands (2026-06-09 review SEC-4):
+	 * the request must be a POST, from a loopback address (with no
+	 * non-loopback X-Forwarded-For hop), carrying the reload password. A
+	 * plain GET was CSRF-reachable — `<img src=".../wheels/cli?command=dbReset">`
+	 * on any page a developer visits would silently drop every table.
+	 *
+	 * Inputs arrive as arguments (instead of reading cgi directly) so the
+	 * policy is unit-testable. Returns {allowed, statusCode, error}. Fails
+	 * closed when no reload password is configured, matching consoleeval.cfm.
+	 */
+	public struct function $cliMutationGateCheck(
+		required string requestMethod,
+		required string remoteAddr,
+		string forwardedFor = "",
+		string password = ""
+	) {
+		if (arguments.requestMethod != "POST") {
+			return {
+				allowed = false,
+				statusCode = 405,
+				error = "This command changes state and must be sent as a POST request with the reload password. Upgrade the wheels CLI if it still sends GET."
+			};
+		}
+		if (!$isLoopbackAddress(arguments.remoteAddr)) {
+			return {allowed = false, statusCode = 403, error = "State-changing CLI commands are restricted to localhost."};
+		}
+		if (Len(Trim(arguments.forwardedFor))) {
+			for (local.ip in ListToArray(arguments.forwardedFor)) {
+				if (!$isLoopbackAddress(Trim(local.ip))) {
+					return {allowed = false, statusCode = 403, error = "State-changing CLI commands are restricted to localhost."};
+				}
+			}
+		}
+		if (
+			!StructKeyExists(application, "wheels")
+			|| !StructKeyExists(application.wheels, "reloadPassword")
+			|| !Len(Trim(application.wheels.reloadPassword))
+		) {
+			return {
+				allowed = false,
+				statusCode = 403,
+				error = "State-changing CLI commands require a reload password. Set WHEELS_RELOAD_PASSWORD in .env or reloadPassword in config/settings.cfm."
+			};
+		}
+		if (!$cliSecureCompare(arguments.password, application.wheels.reloadPassword)) {
+			return {allowed = false, statusCode = 403, error = "Invalid reload password."};
+		}
+		return {allowed = true, statusCode = 200, error = ""};
+	}
+
+	/**
+	 * True when the supplied IP address (or hostname) resolves to a loopback
+	 * address. Empty input and unresolvable input both fail closed.
+	 */
+	public boolean function $isLoopbackAddress(required string ipAddress) {
+		if (!Len(Trim(arguments.ipAddress))) {
+			return false;
+		}
+		try {
+			return CreateObject("java", "java.net.InetAddress").getByName(Trim(arguments.ipAddress)).isLoopbackAddress();
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Constant-time string comparison (hash both sides, compare digests via
+	 * MessageDigest.isEqual) to prevent timing attacks on the reload
+	 * password. Same construction as consoleeval.cfm / onapplicationstart.cfc.
+	 */
+	public boolean function $cliSecureCompare(required string input, required string expected) {
+		return CreateObject("java", "java.security.MessageDigest").isEqual(
+			Hash(arguments.input, "SHA-256").getBytes("UTF-8"),
+			Hash(arguments.expected, "SHA-256").getBytes("UTF-8")
+		);
+	}
+
+	/**
+	 * Resolves the dbDump `output` parameter to a canonical absolute path
+	 * and confines it to the application's web root — the same
+	 * canonicalize-and-confine pattern guideImage() uses. Returns "" when
+	 * the path is empty or escapes the root via `../` traversal
+	 * (2026-06-09 review SEC-5).
+	 */
+	public string function $cliResolveDumpPath(required string output) {
+		if (!Len(Trim(arguments.output))) {
+			return "";
+		}
+		try {
+			local.canonicalRoot = CreateObject("java", "java.io.File").init(ExpandPath("/")).getCanonicalPath();
+			// Treat the requested path as web-root-relative. The old raw
+			// ExpandPath() resolved bare relative paths against the current
+			// template directory and let `../` climb out of the application
+			// entirely; java.io.File(parent, child) keeps absolute child
+			// paths contained too, and getCanonicalPath() collapses any
+			// remaining traversal before the confinement check below.
+			local.canonicalTarget = CreateObject("java", "java.io.File").init(local.canonicalRoot, arguments.output).getCanonicalPath();
+		} catch (any e) {
+			return "";
+		}
+		local.separator = CreateObject("java", "java.io.File").separator;
+		if (Right(local.canonicalRoot, 1) != local.separator) {
+			local.canonicalRoot &= local.separator;
+		}
+		if (CompareNoCase(Left(local.canonicalTarget, Len(local.canonicalRoot)), local.canonicalRoot) != 0) {
+			return "";
+		}
+		return local.canonicalTarget;
+	}
+
+	/**
+	 * Returns the migrator adapter name for the application datasource,
+	 * memoized in the application scope — $getDBType() costs a $dbinfo
+	 * round-trip on every call and the driver behind a datasource cannot
+	 * change without a reload (which rebuilds application.wheels and so
+	 * clears this cache). Keyed by datasource name so a datasource swap
+	 * re-probes (2026-06-09 review P10).
+	 */
+	public string function $cliDatabaseType() {
+		local.dsName = application.wheels.dataSourceName;
+		if (!StructKeyExists(application.wheels, "$cliDbTypeCache")) {
+			application.wheels["$cliDbTypeCache"] = {};
+		}
+		if (!StructKeyExists(application.wheels.$cliDbTypeCache, local.dsName)) {
+			application.wheels.$cliDbTypeCache[local.dsName] = CreateObject("component", "wheels.migrator.Base").$getDBType();
+		}
+		return application.wheels.$cliDbTypeCache[local.dsName];
+	}
+
+	/**
+	 * Formats the migrator's discovery list for the /wheels/cli dbStatus
+	 * command, mapping the migrator's own status field ("migrated" or "")
+	 * to applied/pending. The previous version-comparison heuristic
+	 * (version <= currentVersion → "applied") misclassified out-of-sequence
+	 * pending migrations as applied — the exact shared-dev-DB drift
+	 * `migrate doctor` exists to surface (2026-06-09 review P3).
+	 */
+	public struct function $cliFormatMigrationStatus(required array migrations) {
+		local.rv = {migrations = [], summary = {total = 0, applied = 0, pending = 0}};
+		for (local.migration in arguments.migrations) {
+			local.isApplied = local.migration.status == "migrated";
+			// getAvailableMigrations() does not track per-row apply
+			// timestamps; keep the key for CLI display compatibility
+			// (the CLI prints "-" when empty).
+			ArrayAppend(
+				local.rv.migrations,
+				{
+					version = local.migration.version,
+					description = local.migration.name,
+					status = local.isApplied ? "applied" : "pending",
+					appliedAt = ""
+				}
+			);
+			if (local.isApplied) {
+				local.rv.summary.applied++;
+			} else {
+				local.rv.summary.pending++;
+			}
+		}
+		local.rv.summary.total = ArrayLen(local.rv.migrations);
+		return local.rv;
+	}
+
+	/**
 	 * Returns a struct { packages: [...], error: "" } populated from the
-	 * wheels-packages registry. Short-circuits in production (defense in
-	 * depth — the handler is already $blockInProduction()-gated). Captures
+	 * wheels-packages registry. Short-circuits outside development (defense in
+	 * depth — the handler is already $blockInProduction()-gated, which since
+	 * #2903 is a development-only allowlist). Captures
 	 * any registry error into the `error` field so the view can render a
 	 * friendly banner instead of a stack trace.
 	 *
@@ -74,6 +265,68 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			application.wheels.$packageRegistry = new wheels.services.packages.Registry();
 		}
 		return application.wheels.$packageRegistry;
+	}
+
+	/**
+	 * Returns true when a setting name looks like it holds a secret (keys,
+	 * passwords, passphrases, tokens, credentials). Single source of truth for
+	 * the /wheels/info page so the HTML and JSON branches cannot drift — the
+	 * JSON branch omits matching settings and the HTML branch redacts them.
+	 *
+	 * `accessControlAllowCredentials` (and any future `*allowCredentials` flag)
+	 * is exempt: it mirrors the boolean `Access-Control-Allow-Credentials` CORS
+	 * response header and is not a credential value.
+	 */
+	public boolean function $isProtectedSetting(required string settingName) {
+		if (ReFindNoCase("allowcredentials$", arguments.settingName)) {
+			return false;
+		}
+		return ReFindNoCase("(secret|password|passphrase|privatekey|apikey|credential|token)", arguments.settingName) > 0;
+	}
+
+	/**
+	 * Returns the display-safe HTML value for a setting row on the /wheels/info
+	 * page. Secret-shaped settings are redacted without ever being read, so an
+	 * unset key cannot throw and the raw value never reaches the output buffer.
+	 */
+	public string function $settingDisplayValue(required string settingName) {
+		if ($isProtectedSetting(arguments.settingName)) {
+			return "<em>[redacted]</em>";
+		}
+		return formatSettingOutput(get(arguments.settingName));
+	}
+
+	/**
+	 * Returns the whitelisted subset of getApplicationMetadata() that the JSON
+	 * branch of /wheels/info may serialize. The full metadata struct carries
+	 * datasource definitions (credentials), ORM settings, and arbitrary
+	 * application config, so anything not explicitly listed here is dropped
+	 * (issue #2974).
+	 */
+	public struct function $safeApplicationMetadata(required struct metadata) {
+		local.whitelist = ListToArray("applicationTimeout,mappings,name,sessionManagement,sessionTimeout,setClientCookies");
+		local.rv = {};
+		for (local.metaKey in local.whitelist) {
+			if (StructKeyExists(arguments.metadata, local.metaKey)) {
+				local.rv[local.metaKey] = arguments.metadata[local.metaKey];
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Resolves the docs-viewer `format` request parameter to a safe layout
+	 * filename. Falls back to `"html"` for empty input or anything that isn't
+	 * a bare alphanumeric token — matching the LFI hardening shipped for
+	 * $getRequestFormat() so `vendor/wheels/public/docs/core.cfm` can't be
+	 * tricked into including arbitrary files via the `layouts/<format>.cfm`
+	 * interpolation.
+	 */
+	public string function $resolveDocFormat(required string format) {
+		if (ReFind("^[A-Za-z0-9]+$", arguments.format)) {
+			return arguments.format;
+		}
+		return "html";
 	}
 
 	/*
@@ -364,6 +617,133 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		cfheader(name = "Content-Type", value = mime);
 		cffile(action = "readBinary", file = assetPath, variable = "imgData");
 		cfcontent(type = mime, variable = imgData);
+	}
+
+	/**
+	 * Serves a bundled dev-UI static asset (JS/CSS/fonts) from
+	 * /wheels/public/assets/ with immutable cache headers. The dev-UI pages
+	 * previously inlined ~1MB of JS/CSS into every response via cfinclude
+	 * (issue #2959); this action lets the browser cache those assets at
+	 * versioned URLs instead. Same canonicalize-and-confine shape as
+	 * guideImage(), except subdirectory paths are allowed
+	 * (css/woff_files/icons.woff2) while traversal stays blocked.
+	 */
+	function assets() {
+		$blockInProduction();
+		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
+		var assetPath = $resolveDevAssetPath(file);
+		if (!Len(assetPath)) {
+			cfheader(statusCode = 404);
+			WriteOutput("Asset not found");
+			return;
+		}
+		var mime = $devAssetMimeType(assetPath);
+		cfheader(name = "Cache-Control", value = "public, max-age=31536000, immutable");
+		cfheader(name = "Content-Type", value = mime);
+		cffile(action = "readBinary", file = assetPath, variable = "assetData");
+		cfcontent(type = mime, variable = assetData);
+	}
+
+	/**
+	 * Resolves a webroot-relative dev-UI asset path (e.g.
+	 * `css/semantic.min.css`, `css/woff_files/icons.woff2`) to a canonical
+	 * absolute path confined to /wheels/public/assets/. Unlike guideImage()
+	 * this keeps subdirectory components, so the confinement relies on the
+	 * charset check, the `..` rejection, AND the canonical-prefix compare.
+	 * Returns "" for traversal payloads, absolute/backslash paths,
+	 * disallowed extensions, and missing files.
+	 */
+	public string function $resolveDevAssetPath(required string file) {
+		if (!Len(Trim(arguments.file))) {
+			return "";
+		}
+		// Reject traversal, backslashes, absolute paths, and anything outside a
+		// conservative charset before touching the filesystem.
+		if (
+			Find("..", arguments.file)
+			|| Left(arguments.file, 1) == "/"
+			|| ReFind("[^A-Za-z0-9_\-./]", arguments.file)
+		) {
+			return "";
+		}
+		// Extension allowlist: only known static asset types are servable —
+		// prevents serving stray source files dropped under assets/.
+		if (!ListFindNoCase("css,js,woff,woff2,ttf,eot,svg,png,jpg,jpeg,gif,map", ListLast(arguments.file, "."))) {
+			return "";
+		}
+		var assetsDir = ExpandPath("/wheels/public/assets/");
+		var assetPath = assetsDir & arguments.file;
+		try {
+			var canonicalAssets = CreateObject("java", "java.io.File").init(assetsDir).getCanonicalPath();
+			var canonicalPath = CreateObject("java", "java.io.File").init(assetPath).getCanonicalPath();
+		} catch (any e) {
+			return "";
+		}
+		var separator = CreateObject("java", "java.io.File").separator;
+		if (Right(canonicalAssets, 1) != separator) {
+			canonicalAssets &= separator;
+		}
+		if (CompareNoCase(Left(canonicalPath, Len(canonicalAssets)), canonicalAssets) != 0) {
+			return "";
+		}
+		if (!FileExists(canonicalPath)) {
+			return "";
+		}
+		return canonicalPath;
+	}
+
+	/**
+	 * Maps a dev-UI asset filename to its MIME type. Falls back to
+	 * application/octet-stream for anything not in the serving allowlist.
+	 */
+	public string function $devAssetMimeType(required string file) {
+		switch (LCase(ListLast(arguments.file, "."))) {
+			case "css":
+				return "text/css";
+			case "js":
+				return "application/javascript";
+			case "map":
+				return "application/json";
+			case "woff2":
+				return "font/woff2";
+			case "woff":
+				return "font/woff";
+			case "ttf":
+				return "font/ttf";
+			case "eot":
+				return "application/vnd.ms-fontobject";
+			case "svg":
+				return "image/svg+xml";
+			case "png":
+				return "image/png";
+			case "jpg":
+			case "jpeg":
+				return "image/jpeg";
+			case "gif":
+				return "image/gif";
+			default:
+				return "application/octet-stream";
+		}
+	}
+
+	/**
+	 * Builds a versioned URL for a bundled dev-UI asset, served by the
+	 * wheelsAssets route with immutable cache headers. The framework version
+	 * works as the cache-buster because these assets only change with a
+	 * framework upgrade. encode=false because the path segment contains
+	 * literal slashes (values are hardcoded framework paths, never user
+	 * input) — EncodeForURL would emit %2F, which servlet containers reject
+	 * in paths by default. Lives on the component (not helpers.cfm) so the
+	 * layout can call it from every Public.cfc include chain AND specs can
+	 * call it on an instance.
+	 */
+	public string function devAssetUrl(required string relativePath) {
+		return urlFor(
+			route = "wheelsAssets",
+			file = arguments.relativePath,
+			params = "v=" & application.wheels.version,
+			encode = false
+		);
 	}
 
 	function mcp() {

@@ -2,7 +2,7 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
-		describe("Tests that scope handler arguments are sanitized against SQL injection", () => {
+		describe("Tests that scope handler arguments are escaped (not rewritten) for quoted SQL interpolation", () => {
 
 			it("escapes single quotes in string arguments", () => {
 				var m = application.wo.model("author");
@@ -16,14 +16,6 @@ component extends="wheels.WheelsTest" {
 				var result = m.$sanitizeScopeHandlerArgs({"1": "Djurner' OR '1'='1"});
 
 				expect(result["1"]).toBe("Djurner'' OR ''1''=''1");
-			});
-
-			it("strips semicolons and comment markers from injection attempts", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "'; DROP TABLE users; --"});
-
-				// semicolons stripped, -- stripped, then quotes escaped
-				expect(result["1"]).toBe("'' DROP TABLE users ");
 			});
 
 			it("leaves clean string arguments unchanged", () => {
@@ -94,14 +86,6 @@ component extends="wheels.WheelsTest" {
 				expect(result["1"]).toBe("test\\path");
 			});
 
-			it("escapes backslash-quote bypass attempts and strips comments", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "test\' OR 1=1 --"});
-
-				// -- stripped, then backslash escaped, then quote escaped
-				expect(result["1"]).toBe("test\\'' OR 1=1 ");
-			});
-
 			it("strips null bytes from string arguments", () => {
 				var m = application.wo.model("author");
 				var result = m.$sanitizeScopeHandlerArgs({"1": "test" & Chr(0) & "injection"});
@@ -116,107 +100,56 @@ component extends="wheels.WheelsTest" {
 				expect(result["1"]).toBe("O\\''Brien");
 			});
 
-			it("strips SQL line comment sequences", () => {
+			it("preserves SQL keywords in legitimate values", () => {
 				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "admin-- comment"});
 
-				expect(result["1"]).toBe("admin comment");
+				expect(m.$sanitizeScopeHandlerArgs({"1": "Union Pacific"})["1"]).toBe("Union Pacific");
+				expect(m.$sanitizeScopeHandlerArgs({"1": "Estimated delay"})["1"]).toBe("Estimated delay");
+				expect(m.$sanitizeScopeHandlerArgs({"1": "executor"})["1"]).toBe("executor");
+				expect(m.$sanitizeScopeHandlerArgs({"1": "Benchmark Capital"})["1"]).toBe("Benchmark Capital");
 			});
 
-			it("strips SQL block comment markers", () => {
+			it("preserves comment markers and semicolons (quote-escaping only)", () => {
 				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "admin/* injected */value"});
 
-				expect(result["1"]).toBe("admin injected value");
+				expect(m.$sanitizeScopeHandlerArgs({"1": "admin-- comment"})["1"]).toBe("admin-- comment");
+				expect(m.$sanitizeScopeHandlerArgs({"1": "value; DROP TABLE users"})["1"]).toBe("value; DROP TABLE users");
+				expect(m.$sanitizeScopeHandlerArgs({"1": "admin/* injected */value"})["1"]).toBe("admin/* injected */value");
 			});
 
-			it("strips semicolons to prevent stacked queries", () => {
+			it("still escapes quotes in values containing keywords", () => {
 				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "value; DROP TABLE users"});
+				var result = m.$sanitizeScopeHandlerArgs({"1": "Djurner' OR '1'='1"});
 
-				expect(result["1"]).toBe("value DROP TABLE users");
+				expect(result["1"]).toBe("Djurner'' OR ''1''=''1");
+
+				var result2 = m.$sanitizeScopeHandlerArgs({"1": "x' UNION SELECT password FROM users --"});
+
+				expect(result2["1"]).toBe("x'' UNION SELECT password FROM users --");
 			});
 
-			it("handles all dangerous patterns combined", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": Chr(0) & "val'; DROP TABLE x;/* comment */--end"});
+		});
 
-				// null bytes stripped, -- stripped, /* */ stripped, ; stripped, \ escaped, ' escaped
-				expect(result["1"]).toBe("val'' DROP TABLE x comment end");
+		describe("scope handler args are sanitized on every invocation path (##3013)", () => {
+
+			// Quote-bearing input that the escape-only sanitizer transforms: ' doubled → "O''Brien".
+			// If sanitization runs, the handler sees "O''Brien"; if it is bypassed it sees the raw "O'Brien".
+			it("sanitizes args on the model-root path", () => {
+				request.capturedScopeHandlerArg = "";
+				application.wo.model("authorScoped").captureLastName("O'Brien");
+				expect(request.capturedScopeHandlerArg).toBe("O''Brien");
 			});
 
-			it("strips UNION keyword from injection attempts", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "foo UNION SELECT password FROM users"});
-
-				expect(result["1"]).notToInclude("UNION");
+			it("sanitizes args on the ScopeChain (scope-on-scope) path", () => {
+				request.capturedScopeHandlerArg = "";
+				application.wo.model("authorScoped").withLastNameDjurner().captureLastName("O'Brien");
+				expect(request.capturedScopeHandlerArg).toBe("O''Brien");
 			});
 
-			it("strips EXEC and EXECUTE keywords", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "EXEC xp_cmdshell"});
-
-				expect(result["1"]).notToInclude("EXEC");
-				expect(result["1"]).notToInclude("xp_");
-			});
-
-			it("strips BENCHMARK and SLEEP keywords", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "BENCHMARK(10000000,SHA1('test'))"});
-
-				expect(result["1"]).notToInclude("BENCHMARK");
-
-				var result2 = m.$sanitizeScopeHandlerArgs({"1": "SLEEP(5)"});
-
-				expect(result2["1"]).notToInclude("SLEEP");
-			});
-
-			it("does not strip partial keyword matches in normal values", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "executor"});
-
-				// "executor" should remain because EXEC is not a whole-word match
-				expect(result["1"]).toBe("executor");
-			});
-
-			it("strips WAITFOR and DELAY keywords from time-based injection", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "WAITFOR DELAY ''00:00:05''"});
-
-				expect(result["1"]).notToInclude("WAITFOR");
-				expect(result["1"]).notToInclude("DELAY");
-			});
-
-			it("strips INTO OUTFILE from file-write injection", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "test'' INTO OUTFILE ''/tmp/dump"});
-
-				expect(result["1"]).notToInclude("INTO OUTFILE");
-			});
-
-			it("strips LOAD_FILE function from file-read injection", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "LOAD_FILE(''/etc/passwd'')"});
-
-				expect(result["1"]).notToInclude("LOAD_FILE");
-			});
-
-			it("strips CHAR function from encoding bypass injection", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "CHAR(0x41)"});
-
-				expect(result["1"]).notToInclude("CHAR(");
-			});
-
-			it("does not strip DELAY or WAITFOR as partial word matches", () => {
-				var m = application.wo.model("author");
-				var result = m.$sanitizeScopeHandlerArgs({"1": "delayed"});
-
-				expect(result["1"]).toBe("delayed");
-
-				var result2 = m.$sanitizeScopeHandlerArgs({"1": "waitforward"});
-
-				expect(result2["1"]).toBe("waitforward");
+			it("sanitizes args on the QueryBuilder (where → scope) path", () => {
+				request.capturedScopeHandlerArg = "";
+				application.wo.model("authorScoped").where("1=1").captureLastName("O'Brien");
+				expect(request.capturedScopeHandlerArg).toBe("O''Brien");
 			});
 
 		});

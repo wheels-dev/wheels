@@ -78,7 +78,7 @@ These come directly from `.ai/wheels/cross-engine-compatibility.md` and are the 
 
 Both engines resolve `obj.map()` as the built-in struct member function, not your CFC's `map()` method. The DI container exposes `mapInstance()` as the engine-safe alias.
 
-```cfm title="illustrative — do not type" {test:compile}
+```cfm title="illustrative — do not type"
 // WRONG — triggers struct.map(callback) on Lucee/Adobe
 arguments.container.map("myService").to("path").asSingleton();
 
@@ -90,7 +90,7 @@ arguments.container.mapInstance("myService").to("path").asSingleton();
 
 Adobe's `application` scope is Java-backed and loses function members across requests. Pass a plain struct context instead of mutating `application` directly.
 
-```cfm title="illustrative — do not type" {test:compile}
+```cfm title="illustrative — do not type"
 // WRONG — works on Lucee, breaks on Adobe
 application.registerMiddleware = function() { return true; };
 
@@ -103,7 +103,7 @@ context.registerMiddleware = function() { return true; };
 
 A closure binds `this` to where it is defined, not where it is assigned. Test code that dynamically attaches methods to a controller will call back into the spec, not the controller.
 
-```cfm title="illustrative — do not type" {test:compile}
+```cfm title="illustrative — do not type"
 // WRONG — this.renderText() runs on the test spec
 _controller.myAction = function() {
     this.renderText("hello");
@@ -120,7 +120,7 @@ _controller.myAction = function() {
 
 Split the lookup and the call.
 
-```cfm title="illustrative — do not type" {test:compile}
+```cfm title="illustrative — do not type"
 // WRONG — crashes Adobe CF 2021/2023 parser inside closures
 var result = obj["dynamicMethod"]();
 
@@ -133,7 +133,7 @@ var result = fn();
 
 `{arr: myArray}` duplicates the array on Adobe. Closures that append to the copy never touch the original. Reference through a parent struct.
 
-```cfm title="illustrative — do not type" {test:compile}
+```cfm title="illustrative — do not type"
 // WRONG — Adobe copies myArray into the struct
 var config = {arr: myArray};
 

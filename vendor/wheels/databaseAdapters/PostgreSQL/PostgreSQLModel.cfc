@@ -119,70 +119,28 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Override Base adapter's function.
+	 * Override Base adapter's $identitySelect hook.
+	 * Lucee/ACF doesn't support PostgreSQL natively when it comes to returning
+	 * the primary key value of the last inserted record so we have to do it
+	 * manually by using the sequence. (The bulk-path guard that previously
+	 * lived here — skipping the lookup when no primary-key hint is passed —
+	 * is enforced for all adapters by the Base $identitySelect template.)
 	 */
-	public any function $identitySelect(
+	public any function $lastIdLookup(
 		required struct queryAttributes,
 		required struct result,
 		required string primaryKey,
-		any returningIdentity = ""
+		any returningIdentity = "",
+		required string insertSql
 	) {
-		var query = {};
-		local.sql = Trim(arguments.result.sql);
-		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
-			local.startPar = Find("(", local.sql) + 1;
-			local.endPar = Find(")", local.sql);
-			local.columnList = "";
-			if (local.endPar) {
-				local.rawColumns = Mid(local.sql, local.startPar, (local.endPar - local.startPar));
-
-				// BoxLang compatibility fix - ReplaceList behaves differently
-				if (StructKeyExists(server, "boxlang")) {
-					// For BoxLang, use regex to properly parse column names
-					local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
-					local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
-					local.columnList = Trim(local.columnList);
-				} else {
-					// Original Lucee/ACF behavior
-					local.columnList = ReplaceList(
-						local.rawColumns,
-						"#Chr(10)#,#Chr(13)#, ",
-						",,"
-					);
-				}
-			}
-
-			// Strip identifier quotes from column list for comparison
-			local.columnList = $stripIdentifierQuotes(local.columnList);
-
-			// Bulk operations (insertAll / upsertAll) invoke the shared
-			// query path without a primary-key hint, because the caller
-			// does not consume a generated key. Skip the sequence lookup
-			// in that case — otherwise we emit
-			// `pg_get_serial_sequence(..., '')`, which Postgres rejects
-			// with `column "" of relation "..." does not exist`. Scope:
-			// vanilla PostgreSQL only. The CockroachDB adapter's
-			// RETURNING / ON CONFLICT multi-value path is a separate
-			// failure surface tracked under #2106 and is intentionally
-			// not touched here.
-			if (!Len(arguments.primaryKey)) {
-				return;
-			}
-
-			// Lucee/ACF doesn't support PostgreSQL natively when it comes to returning the primary key value of the last inserted record so we have to do it manually by using the sequence.
-			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
-				local.rv = {};
-				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
-				// Strip identifier quotes that may have been added by $quoteIdentifier
-				local.tbl = ReReplace(local.tbl, '^"|"$', "", "all");
-				query = $query(
-					sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#ListFirst(arguments.primaryKey)#')) AS lastId",
-					argumentCollection = arguments.queryAttributes
-				);
-				local.rv[$generatedKey()] = query.lastId;
-				return local.rv;
-			}
-		}
+		local.tbl = SpanExcluding(Right(arguments.insertSql, Len(arguments.insertSql) - 12), " ");
+		// Strip identifier quotes that may have been added by $quoteIdentifier
+		local.tbl = ReReplace(local.tbl, '^"|"$', "", "all");
+		local.query = $query(
+			sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#ListFirst(arguments.primaryKey)#')) AS lastId",
+			argumentCollection = arguments.queryAttributes
+		);
+		return local.query.lastId;
 	}
 
 	/**
@@ -193,16 +151,34 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Acquire a PostgreSQL advisory lock using pg_advisory_lock.
-	 * This is a session-level lock that blocks until acquired.
-	 * The lock name is hashed to an integer using hashtext().
+	 * Acquire a PostgreSQL session-level advisory lock by polling
+	 * pg_try_advisory_lock until the timeout expires. The lock name is hashed
+	 * to an integer using hashtext(). Throws `Wheels.AdvisoryLockTimeout` when
+	 * the lock cannot be acquired in time, matching the MySQL adapter's
+	 * contract (a blocking pg_advisory_lock would ignore the timeout and wait
+	 * forever).
 	 */
 	public void function $acquireAdvisoryLock(required string name, numeric timeout = 10) {
-		queryExecute(
-			"SELECT pg_advisory_lock(hashtext(?))",
-			[arguments.name],
-			{datasource: variables.dataSource, username: variables.username, password: variables.password}
-		);
+		local.startedAt = GetTickCount();
+		local.timeoutMs = arguments.timeout * 1000;
+		while (true) {
+			local.result = queryExecute(
+				"SELECT pg_try_advisory_lock(hashtext(?)) AS lockresult",
+				[arguments.name],
+				{datasource: variables.dataSource, username: variables.username, password: variables.password}
+			);
+			if (IsQuery(local.result) && IsBoolean(local.result.lockresult) && local.result.lockresult) {
+				return;
+			}
+			if (GetTickCount() - local.startedAt >= local.timeoutMs) {
+				Throw(
+					type = "Wheels.AdvisoryLockTimeout",
+					message = "Could not acquire advisory lock '#arguments.name#' within #arguments.timeout# seconds.",
+					extendedInfo = "The PostgreSQL pg_try_advisory_lock function kept returning false, indicating another session holds the lock."
+				);
+			}
+			Sleep(250);
+		}
 	}
 
 	/**

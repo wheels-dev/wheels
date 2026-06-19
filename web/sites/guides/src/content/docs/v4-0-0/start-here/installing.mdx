@@ -20,6 +20,10 @@ Install the `wheels` CLI. Five minutes.
 The `wheels` CLI bundles a Lucee runtime — that's the easiest path for development and what the rest of these docs assume. The framework itself runs on Adobe ColdFusion 2023/2025 and BoxLang too; you'll use CommandBox to manage the engine instead of the bundled CLI. See [CFML Engines](/v4-0-0/start-here/cfml-engines/) for the setup.
 </Aside>
 
+<Aside type="note" title="Already a CommandBox user?">
+You can install and serve the framework straight from ForgeBox with `box install wheels-base-template` and `box server start` — no `wheels` CLI required. That path is supported as a server manager and package fetcher, but the generators, `migrate`, `test`, and the rest of the CLI feature set still need the `wheels` binary below. See [Installing with CommandBox](/v4-0-0/start-here/installing-with-commandbox/) for the support tiers.
+</Aside>
+
 <Aside type="note">
   **Prerequisite:** Java 21 or newer. `wheels` bundles a CFML runtime (Lucee) that targets JDK 21. Install it from [Adoptium](https://adoptium.net/) if you don't already have it, or on macOS:
 
@@ -89,6 +93,8 @@ The two are mutually exclusive — both expose the `wheels` binary. You install 
    brew tap wheels-dev/wheels
    ```
 
+   Homebrew 5.1+ asks you to trust third-party taps on first use — run `brew trust wheels-dev/wheels` once if prompted.
+
 2. Install the CLI:
 
    ```bash title="your shell"
@@ -97,15 +103,11 @@ The two are mutually exclusive — both expose the `wheels` binary. You install 
 
 3. Verify:
 
-   ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
+   ```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels Version:"}
    wheels --version
    ```
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
-
-   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
-   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
-   </Aside>
 
 </Steps>
 
@@ -152,10 +154,6 @@ The legacy `wheels` package on chocolatey.org is the CommandBox-based v1.x relea
    ```
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
-
-   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
-   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
-   </Aside>
 
 </Steps>
 
@@ -215,10 +213,6 @@ The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerpri
 
    You should see a `Wheels Version: <version>` line followed by ASCII art. A `Lucee Version: <version>` line may also appear once Lucee Express has been downloaded (typically on first `wheels start`). Any non-empty version output means the CLI is wired up correctly.
 
-   <Aside type="note" title="Multiple version surfaces during 4.0-SNAPSHOT">
-   During the 4.0 pre-release, three places report a Wheels version: the package-manager formula (e.g. `brew info wheels`), `wheels --version` (CLI runtime), and the dev-mode debug bar shown on every rendered page (framework). They may currently disagree — the framework still reports `0.0.0-dev` even when the CLI reports a real version. This is tracked and will converge before 4.0 GA. If your CLI version output is non-empty and roughly matches the formula, your install is fine.
-   </Aside>
-
 </Steps>
 
 </TabItem>
@@ -235,6 +229,8 @@ The apt and yum repos are GPG-signed with the Wheels Distribution key (fingerpri
 brew update
 brew upgrade wheels
 ```
+
+If Homebrew 5.1+ refuses with an "untrusted tap" error, run `brew trust wheels-dev/wheels` once, then re-run the upgrade.
 
 </TabItem>
 
@@ -288,6 +284,10 @@ If you installed from Adoptium directly instead of Homebrew, use whatever `/usr/
 **`brew: cask 'wheels' has no formulae to install from`**
 
 You skipped `brew tap wheels-dev/wheels`. Run the tap command, then re-run the install.
+
+**`Refusing to load formula wheels from untrusted tap wheels-dev/wheels`**
+
+Homebrew 5.1+ requires trusting third-party taps before installing or upgrading from them. Run `brew trust wheels-dev/wheels` once, then re-run the command.
 
 ## Related guides
 

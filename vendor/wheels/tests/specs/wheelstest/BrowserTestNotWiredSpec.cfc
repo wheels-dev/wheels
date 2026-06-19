@@ -31,6 +31,30 @@ component extends="wheels.WheelsTest" {
                 expect(state.detail).toInclude("assertSee");
             });
 
+            it("$startBrowserContext() throws Wheels.BrowserTest.NotWired when no Browser was acquired", () => {
+                // Simulates a spec that overrides beforeAll() without calling
+                // super.beforeAll(): $browser stays an empty string, and the
+                // guard must surface a clear error instead of the cryptic
+                // "function [newContext] does not exist in the String".
+                var spec = new wheels.wheelstest.BrowserTest();
+                expect(function() {
+                    spec.$startBrowserContext();
+                }).toThrow(type="Wheels.BrowserTest.NotWired");
+            });
+
+            it("$startBrowserContext() guard message points at super.beforeAll()", () => {
+                var spec = new wheels.wheelstest.BrowserTest();
+                var state = {message: ""};
+
+                try {
+                    spec.$startBrowserContext();
+                } catch (Wheels.BrowserTest.NotWired e) {
+                    state.message = e.message;
+                }
+
+                expect(state.message).toInclude("super.beforeAll()");
+            });
+
         });
     }
 }

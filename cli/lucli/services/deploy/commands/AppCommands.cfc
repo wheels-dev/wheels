@@ -29,6 +29,43 @@ component extends="Base" {
         );
     }
 
+    /**
+     * Idempotent same-name conflict guard (#2957 DEP-11a): `docker run
+     * --name X` hard-fails when ANY container — running or stopped —
+     * already holds the name, which is the guaranteed state on a
+     * same-version redeploy. The name filter is regex-anchored for an
+     * exact match and `xargs -r` makes the whole pipeline a no-op
+     * (exit 0) when nothing matches.
+     */
+    public string function remove_conflicting(required any role, required string version) {
+        return pipe([
+            docker("container", "ls", "--all",
+                   "--filter name=^#container_name(arguments.role, arguments.version)#$",
+                   "--quiet"),
+            "xargs -r docker container rm --force"
+        ]);
+    }
+
+    /**
+     * Stop every superseded version of this role's container after the
+     * proxy cutover (#2957 DEP-11a) — previously old versions kept
+     * running (and auto-restarting) forever. Scoped by the same
+     * service/role/destination labels $labelArgs stamps on at run time;
+     * the just-deployed container is excluded by exact name. `xargs -r`
+     * keeps a first deploy (no old versions) a no-op.
+     */
+    public string function stop_old_versions(required any role, required string version) {
+        return pipe([
+            docker("ps",
+                   "--filter label=service=#variables.config.service()#",
+                   "--filter label=role=#arguments.role.name()#",
+                   "--filter label=destination=#variables.config.destination()#",
+                   "--format {{.Names}}"),
+            "grep -v '^#container_name(arguments.role, arguments.version)#$'",
+            "xargs -r docker stop"
+        ]);
+    }
+
     public string function start(required any role, required string version) {
         return docker("start", container_name(arguments.role, arguments.version));
     }
@@ -93,13 +130,58 @@ component extends="Base" {
         ];
     }
 
+    /**
+     * env.clear values ride as escaped -e pairs; env.secret values NEVER
+     * enter argv — run() references the remote env file (written with 600
+     * perms by the orchestration layer before this command is dispatched)
+     * via --env-file instead (##2957).
+     */
     private array function $envArgs(required any role) {
+        var env = variables.config.env();
         var parts = [];
-        var clear = variables.config.env().clear();
+        var clear = env.clear();
         for (var k in clear) {
             arrayAppend(parts, "-e");
-            arrayAppend(parts, "#k#=#clear[k]#");
+            arrayAppend(parts, shellEscape(k & "=" & clear[k]));
+        }
+        if (arrayLen(env.secret())) {
+            arrayAppend(parts, "--env-file");
+            arrayAppend(parts, env_file_path(arguments.role));
         }
         return parts;
+    }
+
+    /**
+     * Remote env-file path for a role, relative to the SSH user's home
+     * (the cwd of every dispatched command — same convention as the lock
+     * symlink). Namespaced by service and destination, mirroring Kamal's
+     * .kamal/apps/<service[-destination]>/env/roles/<role>.env layout.
+     */
+    public string function env_file_path(required any role) {
+        return $envRolesDir() & "/" & arguments.role.name() & ".env";
+    }
+
+    /**
+     * Preparation command for the role env file: mkdir + touch + chmod 600
+     * BEFORE the secret content is uploaded over SFTP (##2957).
+     */
+    public string function ensure_env_file(required any role) {
+        return $ensureEnvFileCmd($envRolesDir(), env_file_path(arguments.role));
+    }
+
+    /**
+     * Re-lock command for the role env file: chmod 600 AFTER the content
+     * upload, guarding against the SFTP layer resetting perms (##2957).
+     */
+    public string function relock_env_file(required any role) {
+        return $relockEnvFileCmd(env_file_path(arguments.role));
+    }
+
+    private string function $envRolesDir() {
+        var ns = variables.config.service();
+        if (len(variables.config.destination())) {
+            ns &= "-" & variables.config.destination();
+        }
+        return ".kamal/apps/" & ns & "/env/roles";
     }
 }

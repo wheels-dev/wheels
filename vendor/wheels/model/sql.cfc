@@ -433,6 +433,37 @@ component {
 
 	/**
 	 * Internal function.
+	 * Returns true when a select-list item contains SQL control characters or a
+	 * parenthesized subquery — the patterns $orderByClause and $groupByClause already
+	 * reject but the select clause currently passes through verbatim (SEC-21).
+	 */
+	public boolean function $isSuspiciousSelectItem(required string item) {
+		return Find(";", arguments.item) > 0
+		|| Find("--", arguments.item) > 0
+		|| Find("/*", arguments.item) > 0
+		|| ReFindNoCase("\(\s*SELECT(\s|\()", arguments.item) > 0;
+	}
+
+	/**
+	 * Internal function.
+	 * SEC-21 deprecation window: logs a development-mode warning for suspicious
+	 * select= items instead of rejecting them, so existing apps keep working while
+	 * being nudged off raw SQL in select=. Returns true when a warning was logged.
+	 */
+	public boolean function $warnOnUnvalidatedSelectItem(required string item) {
+		if (get("environment") != "development" || !$isSuspiciousSelectItem(arguments.item)) {
+			return false;
+		}
+		WriteLog(
+			type = "warning",
+			file = "wheels",
+			text = "[Wheels] The select= item `#arguments.item#` contains SQL control characters or a subquery. Dotted/aliased select items are currently passed through unvalidated; a future Wheels release will reject items containing `;`, `--`, `/*`, or subqueries (use a calculated property instead, and never pass request input to select=)."
+		);
+		return true;
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public string function $createSQLFieldList(
 		required string clause,
@@ -499,6 +530,14 @@ component {
 					In case "." or " AS " is passed in the column name item, append that as it is in the select query and then move onto the next iteration.
 				*/
 				if (Find(".", local.iItem) || Find(" AS ", local.iItem)) {
+					// SEC-21 deprecation window: dotted/aliased select items pass through
+					// unvalidated (unlike ORDER BY / GROUP BY). Warn in development mode when
+					// an item looks like raw SQL so apps can migrate before a future release
+					// rejects these. GROUP BY items are already rejected in $groupByClause
+					// before reaching this function, so gate on the select clause only.
+					if (arguments.clause == "select") {
+						$warnOnUnvalidatedSelectItem(local.iItem);
+					}
 					local.rv = ListAppend(local.rv, local.iItem);
 					continue;
 				}
@@ -699,6 +738,29 @@ component {
 
 	/**
 	 * Internal function.
+	 * Returns the SQL dialect name for THIS model's datasource (e.g. "MySQL",
+	 * "PostgreSQL", "SQLite") by stripping the "Model" suffix from the adapter
+	 * name persisted on the model class at $assignAdapter() time. Replaces the
+	 * former Migration.adapter.adapterName() probe, which instantiated
+	 * wheels.migrator.Migration on every WHERE build and — worse — probed the
+	 * app DEFAULT datasource's dialect even for models on a custom datasource.
+	 * Deliberately NOT get("adapterName"): $assignAdapter() rewrites that
+	 * GLOBAL setting on every model class init (including adapter-cache hits),
+	 * so in a multi-datasource app it holds the adapter of whichever model
+	 * class initialized most recently — order-dependent and wrong for any
+	 * model whose datasource differs from the last-initialized one. The
+	 * global remains only as a fallback for table-less models, which never
+	 * run $assignAdapter().
+	 */
+	public string function $dialectName() {
+		if (StructKeyExists(variables.wheels.class, "adapterName")) {
+			return ReReplace(variables.wheels.class.adapterName, "Model$", "");
+		}
+		return ReReplace(get("adapterName"), "Model$", "");
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public array function $addWhereClause(
 		required array sql,
@@ -709,9 +771,9 @@ component {
 		struct useIndex = {}
 	) {
 		// Issue#1273: Added this section to allow included tables to be referenced in the query
-		local.migration = CreateObject("component", "wheels.migrator.Migration").init();
+		local.dialect = $dialectName();
 		local.tempSql = "";
-		if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2,MicrosoftSQLServer,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2,MicrosoftSQLServer,Oracle,SQLite', local.dialect) && structKeyExists(arguments, "sql")){
 			local.tempSql = arguments.sql;
 		}
 		local.whereClause = $whereClause(
@@ -726,15 +788,22 @@ component {
 			// Resolve include via $expandedAssociations to get safe table names (prevents SQL injection)
 			local.expandedAssociations = $expandedAssociations(include=arguments.include);
 			if(ArrayLen(local.expandedAssociations)){
-				local.resolvedTableName = variables.wheels.class.adapter.$quoteIdentifier(local.expandedAssociations[1].tableName);
-				if(ListFind('PostgreSQL,CockroachDB', local.migration.adapter.adapterName())){
-					ArrayAppend(arguments.sql, "FROM #local.resolvedTableName#");
+				// list EVERY included table — hard-indexing [1] dropped all includes after the first
+				local.resolvedTableNames = "";
+				for (local.i = 1; local.i <= ArrayLen(local.expandedAssociations); local.i++) {
+					local.resolvedTableNames = ListAppend(
+						local.resolvedTableNames,
+						variables.wheels.class.adapter.$quoteIdentifier(local.expandedAssociations[local.i].tableName)
+					);
 				}
-				else if(ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName())){
+				if(ListFind('PostgreSQL,CockroachDB', local.dialect)){
+					ArrayAppend(arguments.sql, "FROM #local.resolvedTableNames#");
+				}
+				else if(ListFind('MicrosoftSQLServer', local.dialect)){
 					ArrayAppend(arguments.sql, "FROM #$quotedTableName()#");
 				}
-				else if(ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName())){
-					ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #local.resolvedTableName#");
+				else if(ListFind('H2,Oracle,SQLite', local.dialect)){
+					ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #local.resolvedTableNames#");
 				}
 			}
 		}
@@ -750,6 +819,8 @@ component {
 	 */
 	public array function $whereClause(required string where, string include = "", boolean includeSoftDeletes = "false", sql = "", boolean softDelete = "true", useIndex = {}) {
 		local.rv = [];
+		// hoisted: the soft-delete section at the bottom of this function also reads the dialect
+		local.dialect = $dialectName();
 		if (Len(arguments.where)) {
 			// setup an array containing class info for current class and all the ones that should be included
 			local.classes = [];
@@ -762,27 +833,50 @@ component {
 			// constructed internally by $expandedAssociations() using $quoteIdentifier() for all
 			// table and column names (see the join-building loop in $expandedAssociations). The
 			// include parameter is validated against registered associations before reaching here.
+			// for UPDATE-with-include the joined tables' ON conditions move into the WHERE
+			// clause; use the joinOnConditions exposed by $expandedAssociations (position
+			// arithmetic on " ON ") and join multiple includes with AND — the former
+			// Split("ON") truncated joins containing the ON substring and the classes[2]
+			// hard-index dropped every include after the first
 			local.joinclause = "";
-			local.migration = CreateObject("component", "wheels.migrator.Migration").init();
-			if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
-				for(local.i = 1; local.i<= arrayLen(local.classes); i++){
-					if(structKeyExists(local.classes[local.i], "JOIN")){
-						local.joinclause &= local.classes[local.i].JOIN.Split("ON")[2];
+			if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB,H2', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
+				for(local.i = 1; local.i <= ArrayLen(local.classes); local.i++){
+					if(StructKeyExists(local.classes[local.i], "joinOnConditions") && Len(local.classes[local.i].joinOnConditions)){
+						if(Len(local.joinclause)){
+							local.joinclause &= " AND ";
+						}
+						local.joinclause &= local.classes[local.i].joinOnConditions;
 					}
+				}
+				if(!Len(local.joinclause)){
+					Throw(type="Wheels.UpdateAll.EmptyJoinConditions",
+						message="updateAll(include=) produced no join conditions for dialect #local.dialect#");
 				}
 				ArrayAppend(local.rv, "WHERE #local.joinclause# AND");
 			}
-			else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
-				for(local.i = 1; local.i<= arrayLen(local.classes); i++){
+			else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
+				for(local.i = 1; local.i <= ArrayLen(local.classes); local.i++){
 					if(structKeyExists(local.classes[local.i], "JOIN")){
 						local.joinclause &= local.classes[local.i].JOIN;
 					}
 				}
 				ArrayAppend(local.rv, "#local.joinclause# WHERE ");
 			}
-			else if(arguments.include != "" && ListFind('Oracle,SQLite', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
+			else if(arguments.include != "" && ListFind('Oracle,SQLite', local.dialect) && left(arguments.sql[1], 6) == 'UPDATE'){
+				for(local.i = 1; local.i <= ArrayLen(local.classes); local.i++){
+					if(StructKeyExists(local.classes[local.i], "joinOnConditions") && Len(local.classes[local.i].joinOnConditions)){
+						if(Len(local.joinclause)){
+							local.joinclause &= " AND ";
+						}
+						local.joinclause &= local.classes[local.i].joinOnConditions;
+					}
+				}
+				if(!Len(local.joinclause)){
+					Throw(type="Wheels.UpdateAll.EmptyJoinConditions",
+						message="updateAll(include=) produced no join conditions for dialect #local.dialect#");
+				}
 				ArrayAppend(local.rv, "WHERE");
-				ArrayAppend(local.rv, local.classes[2].JOIN.Split("ON")[2] & " AND");
+				ArrayAppend(local.rv, local.joinclause & " AND");
 			}
 			else {
 				ArrayAppend(local.rv, "WHERE");
@@ -922,7 +1016,7 @@ component {
 			local.addToWhere = Replace(local.addToWhere, ",", " AND ", "all");
 			if (Len(local.addToWhere)) {
 				if (Len(arguments.where)) {
-					if(!(ListFind('Oracle,SQLite', local.migration.adapter.adapterName()) && (isArray(arguments.sql) && left(arguments.sql[1], 6) == 'UPDATE'))){
+					if(!(ListFind('Oracle,SQLite', local.dialect) && (isArray(arguments.sql) && left(arguments.sql[1], 6) == 'UPDATE'))){
 						ArrayInsertAt(local.rv, local.wherePos, " (");
 					}
 					ArrayAppend(local.rv, ") AND (");
@@ -1106,16 +1200,65 @@ component {
 				} else {
 					local.firstAssociation = ListFirst(local.throughPath);
 					local.targetAssociation = ListLast(local.throughPath);
-					
-					local.expandedInclude = local.firstAssociation & "(" & local.targetAssociation & ")";
-					local.rv = ListAppend(local.rv, local.expandedInclude);
+
+					// Only rewrite a 2-element `through` into a nested this-model include
+					// when its first segment is actually an association on the current
+					// model (mirroring the 1-element branch's existence check above). The
+					// `hasMany` `shortcut` argument stores an opposite-side chain in
+					// `through` ("#singularize(shortcut)#,#name#") that is consumed by the
+					// shortcut dispatcher in $associationMethod, not by include expansion.
+					// Rewriting it here turned the plain include (e.g. "userRoles") into a
+					// lookup for an association the current model does not have (e.g.
+					// "role(userRoles)"), throwing Wheels.AssociationNotFound (issue #3109).
+					if (StructKeyExists(local.associations, local.firstAssociation)) {
+						local.expandedInclude = local.firstAssociation & "(" & local.targetAssociation & ")";
+						local.rv = ListAppend(local.rv, local.expandedInclude);
+					} else {
+						// Not a this-model through chain (e.g. a shortcut's default through), use as-is.
+						local.rv = ListAppend(local.rv, local.currentInclude);
+					}
 				}
 			} else {
-				// No through association, use as-is
-				local.rv = ListAppend(local.rv, local.currentInclude);
+				// `currentInclude` is not a this-model `through` association. It may,
+				// however, be the `shortcut` name of a many-to-many `hasMany` — a
+				// convenience accessor registered as a dynamic method (consumed by the
+				// shortcut dispatcher in $associationMethod), NOT as a first-class
+				// includable association. When such a name reaches `include`, resolve it
+				// to the nested this-model bridge include so the join still happens
+				// instead of throwing Wheels.AssociationNotFound (issue #3208).
+				//
+				// Only the shortcut path is rewritten here: a plain association without
+				// a `through` is left untouched, and a real association whose name was
+				// passed (even one carrying a shortcut's own through-chain) never enters
+				// this branch — preserving the issue #3109 contract.
+				local.shortcutExpanded = "";
+				if (!StructKeyExists(local.associations, local.currentInclude)) {
+					for (local.assocName in local.associations) {
+						local.assoc = local.associations[local.assocName];
+						if (
+							StructKeyExists(local.assoc, "shortcut")
+							&& Len(local.assoc.shortcut)
+							&& local.assoc.shortcut == local.currentInclude
+							&& StructKeyExists(local.assoc, "through")
+							&& ListLen(local.assoc.through) == 2
+						) {
+							// through = "<bridge-assoc-to-far-side>,<far-side-assoc-to-bridge>";
+							// the first segment is the bridge model's association to the far
+							// side, so the shortcut joins as "<name>(<ListFirst(through)>)".
+							local.shortcutExpanded = local.assocName & "(" & ListFirst(local.assoc.through) & ")";
+							break;
+						}
+					}
+				}
+				if (Len(local.shortcutExpanded)) {
+					local.rv = ListAppend(local.rv, local.shortcutExpanded);
+				} else {
+					// No through / shortcut match, use as-is
+					local.rv = ListAppend(local.rv, local.currentInclude);
+				}
 			}
 		}
-		
+
 		return local.rv;
 	}
 
@@ -1179,47 +1322,71 @@ component {
 			// create a reference to the associated class
 			local.associatedClass = model(local.classAssociations[local.name].modelName);
 
-			if (!Len(local.classAssociations[local.name].foreignKey)) {
-				// cfformat-ignore-start
-				if (local.classAssociations[local.name].type == "belongsTo") {
-					local.classAssociations[local.name].foreignKey = local.associatedClass.$classData().modelName & Replace(local.associatedClass.$classData().keys, ",", ",#local.associatedClass.$classData().modelName#", "all");
-				} else {
-					local.classAssociations[local.name].foreignKey = local.class.$classData().modelName & Replace(local.class.$classData().keys, ",", ",#local.class.$classData().modelName#", "all");
+			// fill in the context-independent association metadata under a double-checked named
+			// lock so a concurrent first hit cannot interleave partial writes into the shared
+			// application-scoped association struct (same pattern as the JOIN-variant memo
+			// below); the lock is only taken before the marker exists so the hot path stays
+			// lock-free, and the values are derived solely from class data so filling them
+			// once per application lifetime is equivalent to the previous per-call rewrite
+			if (!StructKeyExists(local.classAssociations[local.name], "expandedMetadataFilled")) {
+				lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
+					if (!StructKeyExists(local.classAssociations[local.name], "expandedMetadataFilled")) {
+						if (!Len(local.classAssociations[local.name].foreignKey)) {
+							// cfformat-ignore-start
+							if (local.classAssociations[local.name].type == "belongsTo") {
+								local.classAssociations[local.name].foreignKey = local.associatedClass.$classData().modelName & Replace(local.associatedClass.$classData().keys, ",", ",#local.associatedClass.$classData().modelName#", "all");
+							} else {
+								local.classAssociations[local.name].foreignKey = local.class.$classData().modelName & Replace(local.class.$classData().keys, ",", ",#local.class.$classData().modelName#", "all");
+							}
+							// cfformat-ignore-end
+						}
+						if (!Len(local.classAssociations[local.name].joinKey)) {
+							if (local.classAssociations[local.name].type == "belongsTo") {
+								local.classAssociations[local.name].joinKey = local.associatedClass.$classData().keys;
+							} else {
+								local.classAssociations[local.name].joinKey = local.class.$classData().keys;
+							}
+						}
+						local.classAssociations[local.name].tableName = local.associatedClass.$classData().tableName;
+						local.classAssociations[local.name].columnList = local.associatedClass.$classData().columnList;
+						local.classAssociations[local.name].properties = local.associatedClass.$classData().properties;
+						local.classAssociations[local.name].propertyList = local.associatedClass.$classData().propertyList;
+
+						/*
+							To fix the issue below:
+							https://github.com/wheels-dev/wheels/issues/580
+
+							Add aliasedPropertyList in the associated class that will be used to check the duplicate column
+						*/
+						local.classAssociations[local.name].aliasedPropertyList = local.associatedClass.$classData().aliasedPropertyList;
+
+						local.classAssociations[local.name].calculatedProperties = local.associatedClass.$classData().calculatedProperties;
+						local.classAssociations[local.name].calculatedPropertyList = local.associatedClass.$classData().calculatedPropertyList;
+						// TODO: deprecate the lists above in favour of these structs to avoid listFind
+						local.classAssociations[local.name].columnStruct = local.associatedClass.$classData().columnStruct;
+						local.classAssociations[local.name].propertyStruct = local.associatedClass.$classData().propertyStruct;
+
+						// the marker is written last so readers that skip the lock only ever
+						// observe a fully-populated metadata set
+						local.classAssociations[local.name].expandedMetadataFilled = true;
+					}
 				}
-				// cfformat-ignore-end
 			}
-			if (!Len(local.classAssociations[local.name].joinKey)) {
-				if (local.classAssociations[local.name].type == "belongsTo") {
-					local.classAssociations[local.name].joinKey = local.associatedClass.$classData().keys;
-				} else {
-					local.classAssociations[local.name].joinKey = local.class.$classData().keys;
-				}
-			}
-			local.classAssociations[local.name].tableName = local.associatedClass.$classData().tableName;
-			local.classAssociations[local.name].columnList = local.associatedClass.$classData().columnList;
-			local.classAssociations[local.name].properties = local.associatedClass.$classData().properties;
-			local.classAssociations[local.name].propertyList = local.associatedClass.$classData().propertyList;
 
-			/*
-				To fix the issue below:
-				https://github.com/wheels-dev/wheels/issues/580
+			// the JOIN string depends on the calling context (soft-delete handling and whether the
+			// table needs to be aliased), so memoize it per context variant instead of globally
+			local.aliasJoin = ListFindNoCase(local.tables, local.classAssociations[local.name].tableName) > 0;
+			local.joinVariantKey = "sd" & (arguments.includeSoftDeletes ? 1 : 0) & "_alias" & (local.aliasJoin ? 1 : 0);
 
-				Add aliasedPropertyList in the associated class that will be used to check the duplicate column
-			*/
-			local.classAssociations[local.name].aliasedPropertyList = local.associatedClass.$classData().aliasedPropertyList;
-
-			local.classAssociations[local.name].calculatedProperties = local.associatedClass.$classData().calculatedProperties;
-			local.classAssociations[local.name].calculatedPropertyList = local.associatedClass.$classData().calculatedPropertyList;
-			// TODO: deprecate the lists above in favour of these structs to avoid listFind
-			local.classAssociations[local.name].columnStruct = local.associatedClass.$classData().columnStruct;
-			local.classAssociations[local.name].propertyStruct = local.associatedClass.$classData().propertyStruct;
-
-			// create the join string if it hasn't already been done
-			if (!StructKeyExists(local.classAssociations[local.name], "join")) {
+			// create the join string if it hasn't already been done for this context variant
+			if (
+				!StructKeyExists(local.classAssociations[local.name], "joinVariants")
+				|| !StructKeyExists(local.classAssociations[local.name].joinVariants, local.joinVariantKey)
+			) {
 				local.joinType = UCase(ReplaceNoCase(local.classAssociations[local.name].joinType, "outer", "left outer", "one"));
 				local.join = local.joinType & " JOIN " & variables.wheels.class.adapter.$quoteIdentifier(local.classAssociations[local.name].tableName);
 				// alias the table as the association name when joining to itself
-				if (ListFindNoCase(local.tables, local.classAssociations[local.name].tableName)) {
+				if (local.aliasJoin) {
 					local.join = variables.wheels.class.adapter.$tableAlias(
 						local.join,
 						local.classAssociations[local.name].pluralizedName
@@ -1253,9 +1420,8 @@ component {
 
 					// alias the table as the association name when joining to itself
 					local.tableName = local.classAssociations[local.name].tableName;
-					if (ListFindNoCase(local.tables, local.classAssociations[local.name].tableName)) {
+					if (local.aliasJoin) {
 						local.tableName = local.classAssociations[local.name].pluralizedName;
-						;
 					}
 					local.toAppend = ListAppend(
 						local.toAppend,
@@ -1283,7 +1449,20 @@ component {
 					);
 				}
 
-				local.classAssociations[local.name].join = local.join & Replace(local.toAppend, ",", " AND ", "all");
+				// store the built string under a double-checked named lock so a concurrent first hit
+				// for another context cannot poison the shared application-scoped association struct;
+				// the lock is only taken on memo miss so the hot path stays lock-free
+				lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
+					if (!StructKeyExists(local.classAssociations[local.name], "joinVariants")) {
+						local.classAssociations[local.name].joinVariants = {};
+					}
+					local.classAssociations[local.name].joinVariants[local.joinVariantKey] = local.join & Replace(
+						local.toAppend,
+						",",
+						" AND ",
+						"all"
+					);
+				}
 			}
 
 			// loop over each character in the delimiter sequence and move up / down the levels as appropriate
@@ -1300,8 +1479,18 @@ component {
 			// add table name to the list of used ones so we know to alias it when used a second time
 			local.tables = ListAppend(local.tables, local.classAssociations[local.name].tableName);
 
-			// add info to the array that we will return
-			ArrayAppend(local.rv, local.classAssociations[local.name]);
+			// add info to the array that we will return; use a per-call shallow copy carrying the
+			// context-correct join so callers are immune to concurrent re-memoization of other variants
+			local.entry = StructCopy(local.classAssociations[local.name]);
+			local.entry.join = local.classAssociations[local.name].joinVariants[local.joinVariantKey];
+			StructDelete(local.entry, "joinVariants");
+			// expose the ON conditions separately for UPDATE-with-include WHERE building:
+			// position arithmetic on the " ON " the builder writes verbatim above — replaces
+			// the former case-sensitive Split("ON") that corrupted joins whose quoted
+			// identifiers contain the ON substring (e.g. uppercase H2 schemas)
+			local.onPos = Find(" ON ", local.entry.join);
+			local.entry.joinOnConditions = local.onPos GT 0 ? Mid(local.entry.join, local.onPos + 4, Len(local.entry.join)) : "";
+			ArrayAppend(local.rv, local.entry);
 		}
 		return local.rv;
 	}

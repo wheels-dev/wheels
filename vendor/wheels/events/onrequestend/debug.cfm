@@ -83,51 +83,9 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 	</cfif>
 </cfloop>
 <!--- cfformat-ignore-start --->
-<cfoutput>
+<cfsavecontent variable="local.wdbHtml"><cfoutput>
 <div id="wheels-debugbar" style="all:initial;position:fixed;bottom:0;left:0;right:0;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
-<style>
-##wheels-debugbar *{box-sizing:border-box;margin:0;padding:0;}
-##wheels-debugbar{position:fixed;bottom:0;left:0;right:0;z-index:99999;font-size:13px;line-height:1.4;}
-##wheels-debugbar .wdb-bar{display:flex;align-items:center;background:##1e1e2e;color:##cdd6f4;height:36px;padding:0 8px;gap:2px;border-top:1px solid ##45475a;user-select:none;}
-##wheels-debugbar .wdb-bar a,##wheels-debugbar .wdb-bar span{color:##cdd6f4;text-decoration:none;}
-##wheels-debugbar .wdb-tab{display:flex;align-items:center;gap:5px;padding:0 10px;height:36px;cursor:pointer;border:none;background:none;color:##cdd6f4;font-size:12px;font-family:inherit;white-space:nowrap;transition:background .15s;}
-##wheels-debugbar .wdb-tab:hover{background:##313244;}
-##wheels-debugbar .wdb-tab.active{background:##313244;color:##89b4fa;border-top:2px solid ##89b4fa;padding-top:2px;}
-##wheels-debugbar .wdb-tab svg{width:14px;height:14px;fill:currentColor;flex-shrink:0;}
-##wheels-debugbar .wdb-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;line-height:1;}
-##wheels-debugbar .wdb-badge-green{background:##28a74533;color:##a6e3a1;}
-##wheels-debugbar .wdb-badge-yellow{background:##ffc10733;color:##f9e2af;}
-##wheels-debugbar .wdb-badge-red{background:##dc354533;color:##f38ba8;}
-##wheels-debugbar .wdb-badge-blue{background:##89b4fa33;color:##89b4fa;}
-##wheels-debugbar .wdb-sep{width:1px;height:20px;background:##45475a;margin:0 4px;}
-##wheels-debugbar .wdb-spacer{flex:1;}
-##wheels-debugbar .wdb-panel{display:none;position:fixed;bottom:36px;left:0;right:0;max-height:50vh;background:##1e1e2e;border-top:1px solid ##45475a;overflow-y:auto;color:##cdd6f4;padding:0;}
-##wheels-debugbar .wdb-panel.open{display:block;}
-##wheels-debugbar .wdb-panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid ##313244;position:sticky;top:0;background:##1e1e2e;z-index:1;}
-##wheels-debugbar .wdb-panel-header h3{font-size:14px;font-weight:600;color:##cdd6f4;}
-##wheels-debugbar .wdb-panel-body{padding:12px 16px;}
-##wheels-debugbar .wdb-table{width:100%;border-collapse:collapse;}
-##wheels-debugbar .wdb-table th{text-align:left;padding:6px 12px;font-size:11px;font-weight:600;color:##a6adc8;text-transform:uppercase;letter-spacing:.5px;background:##181825;border-bottom:1px solid ##313244;}
-##wheels-debugbar .wdb-table td{padding:6px 12px;border-bottom:1px solid ##313244;font-size:12px;vertical-align:top;}
-##wheels-debugbar .wdb-table tr:hover td{background:##31324433;}
-##wheels-debugbar .wdb-kv{display:grid;grid-template-columns:180px 1fr;gap:0;}
-##wheels-debugbar .wdb-kv dt{padding:6px 12px;font-weight:600;color:##a6adc8;font-size:12px;border-bottom:1px solid ##313244;}
-##wheels-debugbar .wdb-kv dd{padding:6px 12px;font-size:12px;border-bottom:1px solid ##313244;word-break:break-word;}
-##wheels-debugbar .wdb-kv dd code{font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;background:##313244;padding:1px 5px;border-radius:3px;font-size:11px;}
-##wheels-debugbar .wdb-timing-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-##wheels-debugbar .wdb-timing-label{width:100px;font-size:12px;color:##a6adc8;text-align:right;}
-##wheels-debugbar .wdb-timing-bar-bg{flex:1;height:20px;background:##313244;border-radius:3px;overflow:hidden;position:relative;}
-##wheels-debugbar .wdb-timing-bar{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:6px;font-size:10px;font-weight:600;color:##1e1e2e;min-width:30px;}
-##wheels-debugbar .wdb-close-btn{background:none;border:none;color:##a6adc8;cursor:pointer;font-size:18px;padding:4px 8px;border-radius:4px;line-height:1;}
-##wheels-debugbar .wdb-close-btn:hover{background:##45475a;color:##cdd6f4;}
-##wheels-debugbar .wdb-link-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:4px 0;}
-##wheels-debugbar .wdb-link-card{display:flex;align-items:center;gap:8px;padding:10px 12px;background:##313244;border-radius:6px;color:##cdd6f4;text-decoration:none;font-size:12px;font-weight:500;transition:background .15s;}
-##wheels-debugbar .wdb-link-card:hover{background:##45475a;}
-##wheels-debugbar .wdb-link-card svg{width:16px;height:16px;fill:##89b4fa;flex-shrink:0;}
-##wheels-debugbar .wdb-env-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
-##wheels-debugbar .wdb-section{margin-bottom:16px;}
-##wheels-debugbar .wdb-section-title{font-size:11px;font-weight:700;color:##89b4fa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid ##313244;}
-</style>
+<style><cfinclude template="/wheels/public/assets/css/debugbar.css"></style>
 
 <!--- ============ COLLAPSED BAR ============ --->
 <div class="wdb-bar" id="wdb-bar">
@@ -140,7 +98,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 	<!--- Request tab --->
 	<button class="wdb-tab" onclick="wdbToggle('request')" id="wdb-tab-request" title="Request">
 		<svg viewBox="0 0 512 512"><path d="M256 512A256 256 0 10256 0a256 256 0 000 512zm-24-176h24V272h-24c-13.3 0-24-10.7-24-24s10.7-24 24-24h48c13.3 0 24 10.7 24 24v88h8c13.3 0 24 10.7 24 24s-10.7 24-24 24h-80c-13.3 0-24-10.7-24-24s10.7-24 24-24zm40-208a32 32 0 110 64 32 32 0 010-64z"/></svg>
-		#request.wheels.params.controller#.#request.wheels.params.action#
+		#EncodeForHTML(request.wheels.params.controller)#.#EncodeForHTML(request.wheels.params.action)#
 	</button>
 
 	<!--- Timing tab --->
@@ -186,7 +144,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 
 	<!--- Reload button --->
 	<cfif NOT Len($get("reloadPassword"))>
-		<a href="#local.baseReloadURL#true" class="wdb-tab" title="Reload Application" style="color:##f9e2af;">
+		<a href="#EncodeForHTMLAttribute(local.baseReloadURL)#true" class="wdb-tab" title="Reload Application" style="color:##f9e2af;">
 			<svg viewBox="0 0 512 512" style="width:13px;height:13px;fill:##f9e2af;"><path d="M105.1 202.6c7.7-21.8 20.2-42.3 37.8-59.8c62.5-62.5 163.8-62.5 226.3 0L386.3 160H352c-17.7 0-32 14.3-32 32s14.3 32 32 32h127.9c17.7 0 32-14.3 32-32V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v35.2L430.6 81.9c-87.5-87.5-229.3-87.5-316.8 0C85.7 109.9 61 143.5 44.5 180.2l60.6 22.4z"/></svg>
 		</a>
 	</cfif>
@@ -207,20 +165,20 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 		<dl class="wdb-kv">
 			<cfif StructKeyExists(request.wheels.params, "route")>
 				<dt>Route</dt>
-				<dd><code>#request.wheels.params.route#</code></dd>
+				<dd><code>#EncodeForHTML(request.wheels.params.route)#</code></dd>
 			</cfif>
 			<dt>Controller</dt>
-			<dd><code>#request.wheels.params.controller#</code></dd>
+			<dd><code>#EncodeForHTML(request.wheels.params.controller)#</code></dd>
 			<dt>Action</dt>
-			<dd><code>#request.wheels.params.action#</code></dd>
+			<dd><code>#EncodeForHTML(request.wheels.params.action)#</code></dd>
 			<cfif StructKeyExists(request.wheels.params, "key")>
 				<dt>Key</dt>
-				<dd><code>#request.wheels.params.key#</code></dd>
+				<dd><code>#EncodeForHTML(request.wheels.params.key)#</code></dd>
 			</cfif>
 			<dt>HTTP Method</dt>
 			<dd><code>#UCase(cgi.request_method)#</code></dd>
 			<dt>URL</dt>
-			<dd><code>#cgi.server_name##cgi.path_info#<cfif Len(cgi.query_string)>?#cgi.query_string#</cfif></code></dd>
+			<dd><code>#EncodeForHTML(cgi.server_name)##EncodeForHTML(cgi.path_info)#<cfif Len(cgi.query_string)>?#EncodeForHTML(cgi.query_string)#</cfif></code></dd>
 			<dt>Application</dt>
 			<dd>#application.applicationName#</dd>
 			<dt>Data Source</dt>
@@ -274,7 +232,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 				<tbody>
 				<cfloop from="1" to="#ArrayLen(local.paramsList)#" index="local.pIdx">
 					<tr>
-						<td><code>#local.paramsList[local.pIdx].name#</code></td>
+						<td><code>#EncodeForHTML(local.paramsList[local.pIdx].name)#</code></td>
 						<td style="font-family:monospace;max-width:500px;overflow:hidden;text-overflow:ellipsis;">#EncodeForHTML(local.paramsList[local.pIdx].value)#</td>
 						<td><span class="wdb-badge wdb-badge-blue">#local.paramsList[local.pIdx].type#</span></td>
 					</tr>
@@ -301,12 +259,20 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 				<dd>
 					<span class="wdb-env-dot" style="background:#local.envColor#;"></span>
 					#capitalize($get("environment"))#
-					<cfif NOT Len($get("reloadPassword"))>
+					<!---
+						Quick-switch links render only when switching can actually work:
+						since ##2082 the ?reload=<env> switch requires a non-empty
+						reloadPassword (plus a matching password parameter) and is gated
+						by allowEnvironmentSwitchViaUrl. The password is never embedded
+						in the page — wdbEnvSwitch() prompts for it at click time and
+						builds the documented ?reload=<env>&password=... request.
+					--->
+					<cfif Len($get("reloadPassword")) AND $get("allowEnvironmentSwitchViaUrl")>
 						<cfset local.environments = "development,testing,maintenance,production">
 						&mdash;
 						<cfloop list="#local.environments#" index="local.ei">
 							<cfif $get("environment") IS NOT local.ei>
-								<a href="#local.baseReloadURL##local.ei#" style="color:##89b4fa;font-size:11px;margin-left:4px;">#capitalize(local.ei)#</a>
+								<a href="##" data-wdb-reload="#EncodeForHTMLAttribute(local.baseReloadURL & local.ei)#" onclick="return wdbEnvSwitch(this);" title="Switch to #capitalize(local.ei)# (prompts for the reload password)" style="color:##89b4fa;font-size:11px;margin-left:4px;">#capitalize(local.ei)#</a>
 							</cfif>
 						</cfloop>
 					</cfif>
@@ -402,12 +368,49 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 						</cfif>
 						<cfif isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions)>
 							<cfloop array="#application.wheels.mixinCollisions#" index="local.ci">
-								<p>Method <strong>#local.ci.method#</strong> on <strong>#local.ci.target#</strong>: <strong>#local.ci.existingPlugin#</strong> overridden by <strong>#local.ci.overridingPlugin#</strong></p>
+								<p>Method <strong>#local.ci.method#</strong> on <strong>#local.ci.target#</strong>: <strong>#local.ci.firstProvider#</strong> overridden by <strong>#local.ci.secondProvider#</strong></p>
 							</cfloop>
 						</cfif>
 					</div>
 				</div>
 			</cfif>
+		</cfif>
+		<!---
+			Deprecation warnings collected via the shared $deprecated() helper.
+			application.wheels (not $appKey()) is correct here: application.$wheels only
+			exists during onapplicationstart, and its final line reassigns the same struct
+			reference to application.wheels — so init-time registrations are already
+			visible under application.wheels by the time any onrequestend runs.
+		--->
+
+		<cfif StructKeyExists(application.wheels, "deprecationWarnings") AND ArrayLen(application.wheels.deprecationWarnings)>
+			<div class="wdb-section">
+				<div class="wdb-section-title" style="color:##f9e2af;">Deprecations</div>
+				<div style="color:##f9e2af;font-size:12px;">
+					<cfloop array="#application.wheels.deprecationWarnings#" index="local.dw">
+						<p>
+							#EncodeForHTML(local.dw.message)#
+							<cfif StructKeyExists(local.dw, "url") AND Len(local.dw.url)>
+								<a href="#EncodeForHTMLAttribute(local.dw.url)#" style="color:##89b4fa;" target="_blank" rel="noopener">Migration guide</a>
+							</cfif>
+						</p>
+					</cfloop>
+				</div>
+			</div>
+		</cfif>
+		<!---
+			Controller configuration warnings collected via $warnIfConfigSkipsSuper()
+			(controllers overriding config() without calling super.config()).
+		--->
+		<cfif StructKeyExists(application.wheels, "controllerConfigWarnings") AND ArrayLen(application.wheels.controllerConfigWarnings)>
+			<div class="wdb-section">
+				<div class="wdb-section-title" style="color:##f9e2af;">Configuration Warnings</div>
+				<div style="color:##f9e2af;font-size:12px;">
+					<cfloop array="#application.wheels.controllerConfigWarnings#" index="local.cw">
+						<p>#EncodeForHTML(local.cw.message)#</p>
+					</cfloop>
+				</div>
+			</div>
 		</cfif>
 	</div>
 </div>
@@ -472,45 +475,7 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 	</button>
 </div>
 
-<script>
-(function(){
-	var activePanel=null;
-	window.wdbToggle=function(name){
-		var panels=document.querySelectorAll('##wheels-debugbar .wdb-panel');
-		var tabs=document.querySelectorAll('##wheels-debugbar .wdb-tab');
-		if(activePanel===name){
-			wdbClosePanel();
-			return;
-		}
-		for(var i=0;i<panels.length;i++)panels[i].classList.remove('open');
-		var p=document.getElementById('wdb-panel-'+name);
-		if(p)p.classList.add('open');
-		for(var j=0;j<tabs.length;j++)tabs[j].classList.remove('active');
-		var t=document.getElementById('wdb-tab-'+name);
-		if(t)t.classList.add('active');
-		activePanel=name;
-	};
-	window.wdbClosePanel=function(){
-		var panels=document.querySelectorAll('##wheels-debugbar .wdb-panel');
-		var tabs=document.querySelectorAll('##wheels-debugbar .wdb-tab');
-		for(var i=0;i<panels.length;i++)panels[i].classList.remove('open');
-		for(var j=0;j<tabs.length;j++)tabs[j].classList.remove('active');
-		activePanel=null;
-	};
-	window.wdbMinimize=function(){
-		wdbClosePanel();
-		document.getElementById('wheels-debugbar').style.display='none';
-		document.getElementById('wdb-minimized').style.display='block';
-		try{sessionStorage.setItem('wdb-hidden','1');}catch(e){}
-	};
-	window.wdbRestore=function(){
-		document.getElementById('wheels-debugbar').style.display='';
-		document.getElementById('wdb-minimized').style.display='none';
-		try{sessionStorage.removeItem('wdb-hidden');}catch(e){}
-	};
-	try{if(sessionStorage.getItem('wdb-hidden')==='1')wdbMinimize();}catch(e){}
-})();
-</script>
+<script><cfinclude template="/wheels/public/assets/js/debugbar.js"></script>
 </div>
-</cfoutput>
+</cfoutput></cfsavecontent><cfoutput>#ReReplace(local.wdbHtml, "(?m)>\s+<", "><", "all")#</cfoutput>
 <!--- cfformat-ignore-end --->

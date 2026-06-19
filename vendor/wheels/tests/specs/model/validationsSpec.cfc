@@ -173,6 +173,22 @@ component extends="wheels.WheelsTest" {
 				assert_test(user, true)
 			})
 
+			it("if validation using uppercase word-form operator", () => {
+				// Word-form operators arrive raw in $evaluateLogicalExpression
+				// (only symbolic operators are pre-lowercased) — uppercase EQ
+				// used to hit the case-sensitive switch in $resolveOperator on
+				// Adobe CF and throw (##2977).
+				args.condition = "1 EQ 1"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("unless validation using uppercase word-form operator", () => {
+				args.unless = "1 EQ 1"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, true)
+			})
+
 			it("if validation using method invalid", () => {
 				args.condition = "isnew()"
 				user.validatesLengthOf(argumentCollection = args)
@@ -225,6 +241,62 @@ component extends="wheels.WheelsTest" {
 				args.unless = "this.username eq ''"
 				user.validatesLengthOf(argumentCollection = args)
 				assert_test(user, true)
+			})
+
+			it("normalizes compound symbolic operators without mangling them", () => {
+				expect(user.$normalizeConditionOperators("a >= b")).toBe("a gte b")
+				expect(user.$normalizeConditionOperators("a <= b")).toBe("a lte b")
+				expect(user.$normalizeConditionOperators("a>=b")).toBe("a gte b")
+			})
+
+			it("evaluates symbolic comparison operators in condition strings", () => {
+				expect(user.$evaluateConditionString("5 >= 3")).toBeTrue()
+				expect(user.$evaluateConditionString("3 <= 5")).toBeTrue()
+				expect(user.$evaluateConditionString("3 >= 5")).toBeFalse()
+				expect(user.$evaluateConditionString("5 == 5")).toBeTrue()
+				expect(user.$evaluateConditionString("5 != 3")).toBeTrue()
+			})
+
+			it("does not split on operator names inside identifiers", () => {
+				user.frequency = "weekly"
+				expect(user.$evaluateConditionString("this.frequency eq 'weekly'")).toBeTrue()
+				user.adult = true
+				expect(user.$evaluateConditionString("this.adult")).toBeTrue()
+			})
+
+			it("if validation runs when condition property name contains an operator substring", () => {
+				user.frequency = "weekly"
+				args.condition = "this.frequency eq 'weekly'"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("if validation runs when condition uses a symbolic gte comparison", () => {
+				user.score = 20
+				args.condition = "this.score >= 10"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("throws in development when a condition cannot be evaluated", () => {
+				args.condition = "noSuchMethod()"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
+			it("skips the validation without throwing in production when a condition cannot be evaluated", () => {
+				args.condition = "noSuchMethod()"
+				user.validatesLengthOf(argumentCollection = args)
+				var originalShowErrorInformation = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = false
+					expect(user.valid()).toBeTrue()
+				} finally {
+					application.wheels.showErrorInformation = originalShowErrorInformation
+				}
 			})
 		})
 

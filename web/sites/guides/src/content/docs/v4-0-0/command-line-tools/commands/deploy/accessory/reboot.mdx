@@ -12,14 +12,14 @@ Stop, remove, and re-run the named accessory container. Useful after bumping the
 ## Synopsis
 
 ``` title="Synopsis"
-wheels deploy accessory reboot --name=<name|all> [--destination=<name>] [--dry-run]
+wheels deploy accessory reboot <name|all> [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--name=<name>` | **Required.** Accessory name, or `all`. |
+| `<name>` | **Required positional.** Accessory name, or `all` to fan out. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print commands without executing. |
 
@@ -30,5 +30,5 @@ Per accessory: `docker stop <service>-<name>`, `docker rm <service>-<name>`, the
 ## Example
 
 ```bash title="Example"
-wheels deploy accessory reboot --name=redis
+wheels deploy accessory reboot redis
 ```

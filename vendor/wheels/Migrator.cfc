@@ -26,11 +26,21 @@ component output="false" extends="wheels.Global"{
 	 */
 	public string function migrateTo(string version = "", boolean missingMigFlag = false) {
 		local.rv = "";
-		local.currentVersion = getCurrentMigrationVersion();
 		local.appKey = $appKey();
 
+		// Bootstrap the migrator system tables up front — migrateTo is a
+		// mutating entry point. Read helpers (getCurrentMigrationVersion,
+		// getAvailableMigrations, doctor) no longer create tables themselves.
+		$ensureSystemTables();
+
+		// Compute the applied-versions list once and thread it through the
+		// call graph below; getAvailableMigrations and $getOrphanVersions
+		// would otherwise re-run the whole probe chain per call.
+		local.appliedList = $getVersionsPreviouslyMigrated();
+		local.currentVersion = ListLast(local.appliedList);
+
 		// Load migrations early to detect unapplied "gap" migrations before short-circuiting
-		local.migrations = getAvailableMigrations();
+		local.migrations = getAvailableMigrations(previousMigrationList = local.appliedList);
 		local.hasPendingMigrations = false;
 		for (local.m in local.migrations) {
 			if (local.m.status != "migrated" && local.m.version <= arguments.version) {
@@ -44,7 +54,7 @@ component output="false" extends="wheels.Global"{
 		// a migration whose file isn't yet in this branch. Without this
 		// check, the directional logic below silently took the "down" branch
 		// and emitted a misleading "Migrating from X down to Y" output.
-		local.orphans = $getOrphanVersions();
+		local.orphans = $getOrphanVersions(appliedList = local.appliedList, migrations = local.migrations);
 		local.orphansAboveTarget = [];
 		for (local.v in local.orphans) {
 			if (local.v > arguments.version) {
@@ -62,7 +72,7 @@ component output="false" extends="wheels.Global"{
 			// has files to run down() on) — we still emit a warning naming
 			// the orphans but otherwise proceed as before.
 			local.dbVersionsAboveTarget = [];
-			for (local.v in ListToArray($getVersionsPreviouslyMigrated())) {
+			for (local.v in ListToArray(local.appliedList)) {
 				if (Len(local.v) && local.v != "0" && local.v > arguments.version) {
 					ArrayAppend(local.dbVersionsAboveTarget, local.v);
 				}
@@ -110,38 +120,23 @@ component output="false" extends="wheels.Global"{
 						break;
 					}
 					if (local.migration.status == "migrated" && application[local.appKey].allowMigrationDown) {
-						transaction action="begin" {
-							try {
-								// Test query to establish datasource for BoxLang compatibility
-								if (structKeyExists(server, "boxlang")) {
-									$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
-								}
-								local.rv = local.rv & "#Chr(13) & Chr(10)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13) & Chr(10)#";
-								request.$wheelsMigrationOutput = "";
-								request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_down.sql";
-								if (application[local.appKey].writeMigratorSQLFiles) {
-									$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
-								}
-								// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
-								request.$wheelsTransactionWrapper = true;
-								local.migration.cfc.down();
-								local.rv = local.rv & request.$wheelsMigrationOutput;
-								$removeVersionAsMigrated(local.migration.version);
-							} catch (any e) {
-								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
-								transaction action="rollback";
-								StructDelete(request, "$wheelsTransactionWrapper");
-								break;
-							}
-							StructDelete(request, "$wheelsTransactionWrapper");
-							transaction action="commit";
+						local.step = $runMigrationStep(migration = local.migration, direction = "down");
+						local.rv &= local.step.output;
+						if (!local.step.success) {
+							break;
 						}
 					}
 				}
 			} else {
 				if(arguments.missingMigFlag){
+					// Note: this path used to delete the current version's
+					// tracking row here and re-insert it (nameless) after the
+					// loop. That pair was a no-op for which migrations run —
+					// the loop below skips rows already marked "migrated" —
+					// but a crash between the two calls permanently lost the
+					// top version row, and the nameless re-insert wiped the
+					// enriched name/applied_at metadata. Removed.
 					local.rv &= "Migrating remaining migrations till #arguments.version#.#Chr(13) & Chr(10)#";
-					$removeVersionAsMigrated(local.currentVersion);
 				} else if (local.currentVersion gte arguments.version && local.hasPendingMigrations) {
 					// Out-of-order pending migrations: a migration with a
 					// timestamp earlier than currentVersion is still pending
@@ -156,39 +151,15 @@ component output="false" extends="wheels.Global"{
 				}
 				for (local.migration in local.migrations) {
 					if (local.migration.version <= arguments.version && local.migration.status != "migrated") {
-						transaction {
-							try {
-								// Test query to establish datasource for BoxLang compatibility
-								if (structKeyExists(server, "boxlang")) {
-									$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
-								}
-								local.rv = local.rv & "#Chr(13) & Chr(10)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13) & Chr(10)#";
-								request.$wheelsMigrationOutput = "";
-								request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_up.sql";
-								if (application[local.appKey].writeMigratorSQLFiles) {
-									$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
-								}
-								// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
-								request.$wheelsTransactionWrapper = true;
-								local.migration.cfc.up();
-								local.rv = local.rv & request.$wheelsMigrationOutput;
-								$setVersionAsMigrated(local.migration.version, local.migration.name);
-							} catch (any e) {
-								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
-								transaction action="rollback";
-								StructDelete(request, "$wheelsTransactionWrapper");
-								break;
-							}
-							StructDelete(request, "$wheelsTransactionWrapper");
-							transaction action="commit";
+						local.step = $runMigrationStep(migration = local.migration, direction = "up");
+						local.rv &= local.step.output;
+						if (!local.step.success) {
+							break;
 						}
 					} else if (local.migration.version > arguments.version) {
 						break;
 					}
 				};
-				if(arguments.missingMigFlag){
-					$setVersionAsMigrated(local.currentVersion);
-				}
 			}
 		}
 		return local.rv;
@@ -207,6 +178,8 @@ component output="false" extends="wheels.Global"{
 	public string function migrateIndividual(required string version) {
 		local.rv = "";
 		local.appKey = $appKey();
+		// Mutating entry point — bootstrap the system tables before any read.
+		$ensureSystemTables();
 		local.migrations = getAvailableMigrations();
 		local.migrationArray = ArrayFilter(local.migrations, function(i) {
 			return i.version == version;
@@ -222,34 +195,8 @@ component output="false" extends="wheels.Global"{
 			DirectoryCreate(this.paths.sql);
 		}
 		local.rv = "Running individual migration #arguments.version#.#Chr(13) & Chr(10)#";
-		transaction {
-			try {
-				if (structKeyExists(server, "boxlang")) {
-					$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
-				}
-				local.rv = local.rv & "#Chr(13) & Chr(10)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13) & Chr(10)#";
-				request.$wheelsMigrationOutput = "";
-				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_up.sql";
-				if (application[local.appKey].writeMigratorSQLFiles) {
-					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
-				}
-				// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
-				request.$wheelsTransactionWrapper = true;
-				local.migration.cfc.up();
-				local.rv = local.rv & request.$wheelsMigrationOutput;
-				$setVersionAsMigrated(local.migration.version, local.migration.name);
-			} catch (any e) {
-				local.rv = local.rv & "Error migrating #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
-				transaction action="rollback";
-				StructDelete(request, "$wheelsTransactionWrapper");
-				// Skip the commit below — rollback already closed the transaction.
-				// Mirrors the `break` in migrateTo()'s catch (no enclosing loop
-				// here, so we return instead).
-				return local.rv;
-			}
-			StructDelete(request, "$wheelsTransactionWrapper");
-			transaction action="commit";
-		}
+		local.step = $runMigrationStep(migration = local.migration, direction = "up", errorLabel = "Error migrating");
+		local.rv &= local.step.output;
 		return local.rv;
 	}
 
@@ -304,10 +251,14 @@ component output="false" extends="wheels.Global"{
 	 * [category: General Functions]
 	 *
 	 * @path Path to Migration Files: defaults to /app/migrator/migrations/
+	 * @previousMigrationList Optional precomputed applied-versions list (from
+	 *   $getVersionsPreviouslyMigrated). Callers that already hold the list
+	 *   (doctor, info, migrateTo) pass it through to avoid re-running the
+	 *   tracking-table probe chain; when empty it is computed here.
 	 */
-	public array function getAvailableMigrations(string path = this.paths.migrate) {
+	public array function getAvailableMigrations(string path = this.paths.migrate, string previousMigrationList = "") {
 		local.rv = [];
-		local.previousMigrationList = $getVersionsPreviouslyMigrated();
+		local.previousMigrationList = Len(arguments.previousMigrationList) ? arguments.previousMigrationList : $getVersionsPreviouslyMigrated();
 		local.migrationRE = "^([\d]{3,14})_([^\.]*)\.cfc$";
 		if (!DirectoryExists(this.paths.migrate)) {
 			DirectoryCreate(this.paths.migrate);
@@ -356,36 +307,93 @@ component output="false" extends="wheels.Global"{
 	 * @version The Database schema version to rerun
 	 */
 	public string function redoMigration(string version = "") {
-		local.currentVersion = getCurrentMigrationVersion();
 		local.appKey = $appKey();
+		// Mutating entry point — bootstrap the system tables before any read.
+		$ensureSystemTables();
+		local.currentVersion = getCurrentMigrationVersion();
 		if (Len(arguments.version)) {
-			currentVersion = arguments.version;
+			local.currentVersion = arguments.version;
 		}
-		local.migrationArray = ArrayFilter(getAvailableMigrations(), function(i) {
-			return i.version == currentVersion;
-		});
+		local.migrationArray = [];
+		for (local.m in getAvailableMigrations()) {
+			if (local.m.version == local.currentVersion) {
+				ArrayAppend(local.migrationArray, local.m);
+			}
+		}
 		if (!ArrayLen(local.migrationArray)) {
 			return "Error re-running #arguments.version#.#Chr(13) & Chr(10)#This version was not found#Chr(13) & Chr(10)#";
 		}
 
 		local.migration = local.migrationArray[1];
-		local.rv = "";
-		try {
-			local.rv = local.rv & "#Chr(13) & Chr(10)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13) & Chr(10)#";
-			request.$wheelsMigrationOutput = "";
-			request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_redo.sql";
-			if (application[local.appKey].writeMigratorSQLFiles) {
-				$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
+		// Run down()+up() through the shared per-migration transaction
+		// wrapper. This path previously ran both destructive calls with no
+		// transaction at all — a failed up() left the schema half-torn-down.
+		local.step = $runMigrationStep(migration = local.migration, direction = "redo", errorLabel = "Error re-running");
+		return local.step.output;
+	}
+
+	/**
+	 * Runs a single migration step (up, down, or redo) inside its own
+	 * transaction. Shared by migrateTo()'s up and down loops,
+	 * migrateIndividual() and redoMigration() so the transaction /
+	 * rollback / request-flag handling can't drift between them again.
+	 *
+	 * Returns {success: boolean, output: string}; the caller appends the
+	 * output and decides how to react to failure (break the loop, return).
+	 *
+	 * @migration A migration struct from getAvailableMigrations() (version, name, cfcfile, cfc).
+	 * @direction One of "up", "down" or "redo" (down() then up(), no tracking-row change).
+	 * @errorLabel Prefix for the error line, preserved per caller for output compatibility.
+	 */
+	private struct function $runMigrationStep(
+		required struct migration,
+		required string direction,
+		string errorLabel = "Error migrating to"
+	) {
+		local.appKey = $appKey();
+		local.result = {success = true, output = ""};
+		local.divider = arguments.direction == "up" ? "--------" : "-------";
+		transaction action="begin" {
+			try {
+				// Test query to establish datasource for BoxLang compatibility
+				if (structKeyExists(server, "boxlang")) {
+					$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
+				}
+				local.result.output &= "#Chr(13) & Chr(10)##local.divider# " & arguments.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(arguments.migration.cfcfile)))##Chr(13) & Chr(10)#";
+				request.$wheelsMigrationOutput = "";
+				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
+				if (application[local.appKey].writeMigratorSQLFiles) {
+					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
+				}
+				// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
+				request.$wheelsTransactionWrapper = true;
+				if (arguments.direction == "down") {
+					arguments.migration.cfc.down();
+					local.result.output &= request.$wheelsMigrationOutput;
+					$removeVersionAsMigrated(arguments.migration.version);
+				} else if (arguments.direction == "redo") {
+					if (application[local.appKey].allowMigrationDown) {
+						arguments.migration.cfc.down();
+					}
+					arguments.migration.cfc.up();
+					local.result.output &= request.$wheelsMigrationOutput;
+				} else {
+					arguments.migration.cfc.up();
+					local.result.output &= request.$wheelsMigrationOutput;
+					$setVersionAsMigrated(arguments.migration.version, arguments.migration.name);
+				}
+			} catch (any e) {
+				local.result.success = false;
+				local.result.output &= "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
+				transaction action="rollback";
+				StructDelete(request, "$wheelsTransactionWrapper");
+				// Skip the commit below — rollback already closed the transaction.
+				return local.result;
 			}
-			if (application[local.appKey].allowMigrationDown) {
-				local.migration.cfc.down();
-			}
-			local.migration.cfc.up();
-			local.rv = local.rv & request.$wheelsMigrationOutput;
-		} catch (any e) {
-			local.rv = local.rv & "Error re-running #local.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
+			StructDelete(request, "$wheelsTransactionWrapper");
+			transaction action="commit";
 		}
-		return local.rv;
+		return local.result;
 	}
 
 	/**
@@ -521,6 +529,14 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Returns previously migrated versions as a list.
+	 *
+	 * This is a genuine read: it never creates tables or runs ALTERs. The
+	 * system-table bootstrap lives in $ensureSystemTables(), which the
+	 * mutating entry points (migrateTo, migrateIndividual, redoMigration,
+	 * pretendVersion) call up front. That keeps doctor() / info / current-
+	 * version lookups pure, and stops a transient SELECT failure
+	 * (permissions, connectivity) from being misread as "table missing"
+	 * and triggering DDL.
 	 */
 	private string function $getVersionsPreviouslyMigrated() {
 		local.appKey = $appKey();
@@ -531,132 +547,222 @@ component output="false" extends="wheels.Global"{
 		// keep the `wheels_*` defaults from onapplicationstart.cfc.
 		$detectSystemTables(appKey = local.appKey);
 
-		/* Choose appropriate SQL syntax for LIMIT based on database engine */
-		local.info = $dbinfo(
-			type = "version",
-			datasource = application.wheels.dataSourceName,
-			username = application.wheels.dataSourceUserName,
-			password = application.wheels.dataSourcePassword
-		);
-		local.levelsTable = application[local.appKey].levelsTableName;
-		if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)){
-			local.sql = "SELECT TOP 1 * FROM #local.levelsTable#";
-		} else if(FindNoCase("Oracle", local.info.database_productname)){
-			local.sql = "SELECT * FROM #local.levelsTable# FETCH FIRST 1 ROWS ONLY";
-		} else{
-			local.sql = "SELECT * FROM #local.levelsTable# LIMIT 1";
-		}
-
-		try {
-			local.levelsCheck = $query(
-				datasource = application[local.appKey].dataSourceName,
-				sql = local.sql
-			);
-		} catch (any e) {
-			if (application[local.appKey].createMigratorTable) {
-				$query(
-					datasource = application[local.appKey].dataSourceName,
-					sql = "CREATE TABLE #local.levelsTable# (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))"
-				);
-				$query(
-					datasource = application[local.appKey].dataSourceName,
-					sql = "INSERT INTO #local.levelsTable# (id, name, description) VALUES (1, 'App', 'Application level migrations')"
-				);
-				$query(
-					datasource = application[local.appKey].dataSourceName,
-					sql = "INSERT INTO #local.levelsTable# (id, name, description) VALUES (2, 'Test', 'Test level migrations')"
-				);
-			}
-		}
 		try {
 			local.migratedVersions = $query(
 				datasource = application[local.appKey].dataSourceName,
 				sql = "SELECT version FROM #application[local.appKey].migratorTableName# WHERE core_level = #application[local.appKey].migrationLevel# ORDER BY version ASC"
 			);
-			// Table exists — ensure the enriched name + applied_at columns are
-			// present. Cached on app scope so this fires once per app process,
-			// not on every migrator call. See issue #2780 / Plan 3.
-			$maybeEnsureTrackingColumns(local.appKey);
-			if (!local.migratedVersions.recordcount) {
-				return 0;
-			} else {
-				return ValueList(local.migratedVersions.version);
-			}
 		} catch (any e) {
-			if (application[local.appKey].createMigratorTable) {
+			// Only the genuine fresh-DB case — tracking table absent on an
+			// otherwise reachable datasource — maps to the empty sentinel
+			// (bootstrapping happens in $ensureSystemTables() on the next
+			// mutating call). Anything else (datasource down/misconfigured,
+			// table present but unreadable) is rethrown rather than being
+			// misread as an empty migration history.
+			var probeState = {fresh = false};
+			if (!$migratorTableExists(application[local.appKey].dataSourceName, application[local.appKey].migratorTableName)) {
+				try {
+					$dbinfo(
+						type = "version",
+						datasource = application[local.appKey].dataSourceName,
+						username = application.wheels.dataSourceUserName,
+						password = application.wheels.dataSourcePassword
+					);
+					probeState.fresh = true;
+				} catch (any datasourceError) {
+					// Datasource itself is unreachable — fall through to rethrow.
+				}
+			}
+			if (probeState.fresh) {
+				return 0;
+			}
+			rethrow;
+		}
+		// Table exists — refresh the enriched-columns flag from the actual
+		// schema state WITHOUT mutating (addMissing=false probes only; the
+		// ALTERs run from $ensureSystemTables). See issue #2780 / Plan 3.
+		$maybeEnsureTrackingColumns(appKey = local.appKey, addMissing = false);
+		if (!local.migratedVersions.recordcount) {
+			return 0;
+		} else {
+			return ValueList(local.migratedVersions.version);
+		}
+	}
+
+	/**
+	 * Probes whether a table exists on the given datasource. `WHERE 1=0`
+	 * keeps the probe row-free and is portable across every supported
+	 * adapter (same pattern as $detectSystemTables / renameSystemTables).
+	 */
+	private boolean function $migratorTableExists(required string datasourceName, required string tableName) {
+		try {
+			$query(
+				datasource = arguments.datasourceName,
+				sql = "SELECT 1 FROM #arguments.tableName# WHERE 1=0"
+			);
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Ensures the migrator system tables (levels + version tracking) exist,
+	 * bootstrapping them when absent, and adds the enriched tracking columns.
+	 * Extracted from $getVersionsPreviouslyMigrated() so read paths (doctor,
+	 * info, getCurrentMigrationVersion) are genuine reads and only mutating
+	 * entry points run DDL.
+	 *
+	 * Existence is decided by explicit probes instead of interpreting a
+	 * failed data-read as "table missing". The legacy `migratorversions`
+	 * rename fallback only takes the CREATE path when the probe itself
+	 * fails; a rename/ALTER failure after the probe proved the legacy table
+	 * exists (e.g. insufficient DDL privileges) is rethrown — silently
+	 * creating a fresh empty tracking table would orphan the full history
+	 * and invite a destructive re-run of every migration.
+	 *
+	 * Bootstrap DDL runs inside a named exclusive lock so concurrent
+	 * fresh-database entries in the same JVM don't race; create errors are
+	 * tolerated when a re-probe shows another process (e.g. a second JVM)
+	 * already created the table. The levels seed rows are verified
+	 * independently of table creation so a previously interrupted bootstrap
+	 * (table created, seed rows missing) self-heals on the next call.
+	 */
+	private void function $ensureSystemTables() {
+		local.appKey = $appKey();
+
+		// Align configured names with what's already in the database first.
+		$detectSystemTables(appKey = local.appKey);
+
+		if (!application[local.appKey].createMigratorTable) {
+			// Table creation is disabled — still refresh the tracking-column
+			// state for whatever schema the user manages themselves.
+			$maybeEnsureTrackingColumns(local.appKey);
+			return;
+		}
+
+		local.dsn = application[local.appKey].dataSourceName;
+		local.levelsTable = application[local.appKey].levelsTableName;
+		local.versionsTable = application[local.appKey].migratorTableName;
+
+		lock name="wheels_migrator_bootstrap" type="exclusive" timeout="60" {
+			// Levels table: create when missing (re-probe inside the lock so
+			// the loser of a concurrent bootstrap skips the DDL) ...
+			if (!$migratorTableExists(local.dsn, local.levelsTable)) {
+				try {
+					$query(
+						datasource = local.dsn,
+						sql = "CREATE TABLE #local.levelsTable# (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))"
+					);
+				} catch (any e) {
+					// Tolerate "already exists" from a cross-process race;
+					// rethrow anything that left the table absent.
+					if (!$migratorTableExists(local.dsn, local.levelsTable)) {
+						rethrow;
+					}
+				}
+			}
+			// ... then verify the seed rows separately, repairing a partial
+			// bootstrap where the CREATE succeeded but the seeding didn't.
+			local.levelRows = $query(
+				datasource = local.dsn,
+				sql = "SELECT id FROM #local.levelsTable#"
+			);
+			local.levelIds = ValueList(local.levelRows.id);
+			if (!ListFind(local.levelIds, 1)) {
+				$query(
+					datasource = local.dsn,
+					sql = "INSERT INTO #local.levelsTable# (id, name, description) VALUES (1, 'App', 'Application level migrations')"
+				);
+			}
+			if (!ListFind(local.levelIds, 2)) {
+				$query(
+					datasource = local.dsn,
+					sql = "INSERT INTO #local.levelsTable# (id, name, description) VALUES (2, 'Test', 'Test level migrations')"
+				);
+			}
+
+			// Version tracking table.
+			if (!$migratorTableExists(local.dsn, local.versionsTable)) {
+				local.info = $dbinfo(
+					type = "version",
+					datasource = local.dsn,
+					username = application.wheels.dataSourceUserName,
+					password = application.wheels.dataSourcePassword
+				);
 				local.dbType = local.info.database_productname;
-				local.tableName = application[local.appKey].migratorTableName;
 				// FK constraint name follows the levels-table prefix so a
 				// fresh install gets `fk_wheels_level` and a legacy install
 				// keeps `fk_core_level`. Constraint names are scoped to
 				// their tables, so this only matters for new bootstraps.
 				local.fkName = (local.levelsTable == "c_o_r_e_levels") ? "fk_core_level" : "fk_wheels_level";
 
-				// SQLite: skip rename / ALTER, create table with constraint in one query
 				if (FindNoCase("SQLite", local.dbType)) {
-					local.createSQL = "
-						CREATE TABLE #local.tableName# (
-							version VARCHAR(25),
-							core_level INT NOT NULL DEFAULT 1,
-							CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)
-						)
-					";
-					$query(
-						datasource = application[local.appKey].dataSourceName,
-						sql = local.createSQL
-					);
-				} else {
-					if (FindNoCase("SQLServer", local.dbType) || FindNoCase("SQL Server", local.dbType)) {
-						local.renameSQL = "EXEC sp_rename 'migratorversions', '#local.tableName#'";
-						local.createSQL = "CREATE TABLE #local.tableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
-						local.addColumnSQL = "ALTER TABLE #local.tableName# ADD core_level INT NOT NULL DEFAULT 1";
-					} else if (FindNoCase("Oracle", local.dbType)) {
-						local.renameSQL = "RENAME migratorversions TO #local.tableName#";
-						local.createSQL = "CREATE TABLE #local.tableName# (version VARCHAR2(25), core_level NUMBER DEFAULT 1 NOT NULL)";
-						local.addColumnSQL = "ALTER TABLE #local.tableName# ADD core_level NUMBER DEFAULT 1 NOT NULL";
-					} else {
-						// Fallback: Postgres, MySQL and H2
-						local.renameSQL = "ALTER TABLE migratorversions RENAME TO #local.tableName#";
-						local.createSQL = "CREATE TABLE #local.tableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
-						local.addColumnSQL = "ALTER TABLE #local.tableName# ADD core_level INT NOT NULL DEFAULT 1";
-					}
-
+					// SQLite: no legacy-rename path; create table with the
+					// constraint in one statement.
 					try {
 						$query(
-							datasource=application[local.appKey].dataSourceName,
-							sql="SELECT version FROM migratorversions"
-						);
-						$query(
-							datasource=application[local.appKey].dataSourceName,
-							sql=local.renameSQL
-						);
-						$query(
-							datasource=application[local.appKey].dataSourceName,
-							sql=local.addColumnSQL
-						);
-						$query(
-							datasource=application[local.appKey].dataSourceName,
-							sql="ALTER TABLE #local.tableName# ADD CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)"
+							datasource = local.dsn,
+							sql = "
+								CREATE TABLE #local.versionsTable# (
+									version VARCHAR(25),
+									core_level INT NOT NULL DEFAULT 1,
+									CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)
+								)
+							"
 						);
 					} catch (any e) {
-						// If rename fails, create table instead
+						if (!$migratorTableExists(local.dsn, local.versionsTable)) {
+							rethrow;
+						}
+					}
+				} else if ($migratorTableExists(local.dsn, "migratorversions")) {
+					// Legacy pre-2.x table present — rename and upgrade it in
+					// place. Failures here are NOT a reason to create a fresh
+					// empty table (that would silently reset migration
+					// history); let them surface to the caller.
+					if (FindNoCase("SQLServer", local.dbType) || FindNoCase("SQL Server", local.dbType)) {
+						local.renameSQL = "EXEC sp_rename 'migratorversions', '#local.versionsTable#'";
+						local.addColumnSQL = "ALTER TABLE #local.versionsTable# ADD core_level INT NOT NULL DEFAULT 1";
+					} else if (FindNoCase("Oracle", local.dbType)) {
+						local.renameSQL = "RENAME migratorversions TO #local.versionsTable#";
+						local.addColumnSQL = "ALTER TABLE #local.versionsTable# ADD core_level NUMBER DEFAULT 1 NOT NULL";
+					} else {
+						// Fallback: Postgres, MySQL and H2
+						local.renameSQL = "ALTER TABLE migratorversions RENAME TO #local.versionsTable#";
+						local.addColumnSQL = "ALTER TABLE #local.versionsTable# ADD core_level INT NOT NULL DEFAULT 1";
+					}
+					$query(datasource = local.dsn, sql = local.renameSQL);
+					$query(datasource = local.dsn, sql = local.addColumnSQL);
+					$query(
+						datasource = local.dsn,
+						sql = "ALTER TABLE #local.versionsTable# ADD CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)"
+					);
+				} else {
+					// Fresh database — create the tracking table.
+					if (FindNoCase("Oracle", local.dbType)) {
+						local.createSQL = "CREATE TABLE #local.versionsTable# (version VARCHAR2(25), core_level NUMBER DEFAULT 1 NOT NULL)";
+					} else {
+						local.createSQL = "CREATE TABLE #local.versionsTable# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
+					}
+					try {
+						$query(datasource = local.dsn, sql = local.createSQL);
 						$query(
-							datasource=application[local.appKey].dataSourceName,
-							sql=local.createSQL
+							datasource = local.dsn,
+							sql = "ALTER TABLE #local.versionsTable# ADD CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)"
 						);
-						$query(
-							datasource=application[local.appKey].dataSourceName,
-							sql="ALTER TABLE #local.tableName# ADD CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)"
-						);
+					} catch (any e) {
+						if (!$migratorTableExists(local.dsn, local.versionsTable)) {
+							rethrow;
+						}
 					}
 				}
 			}
-			// Tracking table was just bootstrapped — add the enriched
-			// columns now so subsequent $setVersionAsMigrated calls can
-			// write the migration name + applied timestamp.
-			$maybeEnsureTrackingColumns(local.appKey);
-			return 0;
 		}
+
+		// Table guaranteed present — add the enriched name + applied_at
+		// columns when missing so $setVersionAsMigrated can write them.
+		$maybeEnsureTrackingColumns(local.appKey);
 	}
 
 	/**
@@ -674,10 +780,14 @@ component output="false" extends="wheels.Global"{
 	 * reads the flag to decide whether to include the enriched columns
 	 * in its INSERT; an out-of-date flag would cause INSERTs against
 	 * missing columns or skip the enriched path when columns are present.
+	 *
+	 * @addMissing When false, only probes and refreshes the flag — no ALTERs
+	 *   run. Used by read paths ($getVersionsPreviouslyMigrated) so doctor()
+	 *   and info stay pure; mutating paths ($ensureSystemTables) pass true.
 	 */
-	private void function $maybeEnsureTrackingColumns(required string appKey) {
+	private void function $maybeEnsureTrackingColumns(required string appKey, boolean addMissing = true) {
 		try {
-			var rv = $ensureTrackingColumns();
+			var rv = $ensureTrackingColumns(addMissing = arguments.addMissing);
 			if (rv.hasName && rv.hasAppliedAt) {
 				application[arguments.appKey].$trackingColumnsEnsured = true;
 			} else {
@@ -704,13 +814,24 @@ component output="false" extends="wheels.Global"{
 	 * Result is sorted ascending. The sentinel "0" returned by
 	 * $getVersionsPreviouslyMigrated() on an empty tracking table is excluded.
 	 *
+	 * @appliedList Optional precomputed applied-versions list; computed when empty.
+	 * @migrations Optional precomputed result of getAvailableMigrations();
+	 *   computed when omitted. Passing both avoids re-running the probe chain
+	 *   and the migration-directory instantiation pass.
+	 *
 	 * [section: Migrator]
 	 * [category: General Functions]
 	 */
-	public array function $getOrphanVersions() {
-		local.appliedList = ListToArray($getVersionsPreviouslyMigrated());
+	public array function $getOrphanVersions(string appliedList = "", array migrations) {
+		if (!Len(arguments.appliedList)) {
+			arguments.appliedList = $getVersionsPreviouslyMigrated();
+		}
+		if (!StructKeyExists(arguments, "migrations")) {
+			arguments.migrations = getAvailableMigrations(previousMigrationList = arguments.appliedList);
+		}
+		local.appliedList = ListToArray(arguments.appliedList);
 		local.fileVersions = [];
-		for (local.m in getAvailableMigrations()) {
+		for (local.m in arguments.migrations) {
 			ArrayAppend(local.fileVersions, local.m.version);
 		}
 		local.orphans = [];
@@ -737,11 +858,18 @@ component output="false" extends="wheels.Global"{
 	 *
 	 * Result is sorted ascending by version, matching $getOrphanVersions().
 	 *
+	 * @appliedList Optional precomputed applied-versions list; computed when empty.
+	 * @migrations Optional precomputed result of getAvailableMigrations(); computed when omitted.
+	 *
 	 * [section: Migrator]
 	 * [category: General Functions]
 	 */
-	public array function $getOrphanVersionsWithMeta() {
-		local.bareOrphans = $getOrphanVersions();
+	public array function $getOrphanVersionsWithMeta(string appliedList = "", array migrations) {
+		if (StructKeyExists(arguments, "migrations")) {
+			local.bareOrphans = $getOrphanVersions(appliedList = arguments.appliedList, migrations = arguments.migrations);
+		} else {
+			local.bareOrphans = $getOrphanVersions(appliedList = arguments.appliedList);
+		}
 		local.rv = [];
 		if (!ArrayLen(local.bareOrphans)) {
 			return local.rv;
@@ -804,9 +932,13 @@ component output="false" extends="wheels.Global"{
 	 */
 	public array function $buildInfoOutput() {
 		local.lines = [];
-		local.migrations = getAvailableMigrations();
-		local.currentVersion = getCurrentMigrationVersion();
-		local.orphansWithMeta = $getOrphanVersionsWithMeta();
+		// Compute the applied-versions list and the migrations array once and
+		// thread them through — each sub-helper would otherwise re-run the
+		// probe chain and the migration-directory instantiation pass.
+		local.appliedList = $getVersionsPreviouslyMigrated();
+		local.migrations = getAvailableMigrations(previousMigrationList = local.appliedList);
+		local.currentVersion = ListLast(local.appliedList);
+		local.orphansWithMeta = $getOrphanVersionsWithMeta(appliedList = local.appliedList, migrations = local.migrations);
 		local.applied = 0;
 		local.pending = 0;
 		for (local.m in local.migrations) {
@@ -887,10 +1019,14 @@ component output="false" extends="wheels.Global"{
 	 * [category: General Functions]
 	 */
 	public struct function doctor() {
-		local.migrations = getAvailableMigrations();
-		local.orphans = $getOrphanVersions();
-		local.orphansWithMeta = $getOrphanVersionsWithMeta();
-		local.currentVersion = getCurrentMigrationVersion();
+		// Compute the applied-versions list and the migrations array once and
+		// thread them through the helpers — one probe chain and one
+		// migration-directory pass per doctor() call instead of 3-6.
+		local.appliedList = $getVersionsPreviouslyMigrated();
+		local.migrations = getAvailableMigrations(previousMigrationList = local.appliedList);
+		local.orphans = $getOrphanVersions(appliedList = local.appliedList, migrations = local.migrations);
+		local.orphansWithMeta = $getOrphanVersionsWithMeta(appliedList = local.appliedList, migrations = local.migrations);
+		local.currentVersion = ListLast(local.appliedList);
 		local.pending = [];
 		local.applied = 0;
 		for (local.m in local.migrations) {
@@ -996,6 +1132,9 @@ component output="false" extends="wheels.Global"{
 			local.rv.message = "Invalid version: must contain at least one digit.";
 			return local.rv;
 		}
+		// Mutating entry point — the INSERT below needs the tracking table
+		// (and ideally the enriched columns) to exist.
+		$ensureSystemTables();
 		local.appliedList = ListToArray($getVersionsPreviouslyMigrated());
 		if (ArrayFind(local.appliedList, local.cleanVersion)) {
 			local.rv.message = "Version " & local.cleanVersion & " is already applied. "
@@ -1264,10 +1403,14 @@ component output="false" extends="wheels.Global"{
 	 *
 	 * Result: {hasName, hasAppliedAt, added: array of column names, errors: array}.
 	 *
+	 * @addMissing When false, only probes for the columns and returns the
+	 *   state — no ALTERs run. Lets read paths refresh the
+	 *   $trackingColumnsEnsured flag without mutating the schema.
+	 *
 	 * [section: Migrator]
 	 * [category: General Functions]
 	 */
-	public struct function $ensureTrackingColumns() {
+	public struct function $ensureTrackingColumns(boolean addMissing = true) {
 		var rv = {hasName: false, hasAppliedAt: false, added: [], errors: []};
 		var appKey = $appKey();
 		var dsn = application[appKey].dataSourceName;
@@ -1313,6 +1456,12 @@ component output="false" extends="wheels.Global"{
 		}
 
 		if (rv.hasName && rv.hasAppliedAt) {
+			return rv;
+		}
+
+		// Probe-only mode: report the column state without mutating. Read
+		// paths use this to keep doctor()/info pure.
+		if (!arguments.addMissing) {
 			return rv;
 		}
 

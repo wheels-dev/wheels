@@ -109,10 +109,7 @@ component {
 		local.iEnd = ArrayLen(local.filters);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.filter = local.filters[local.i];
-			local.listsNotSpecified = !Len(local.filter.only) && !Len(local.filter.except);
-			local.inOnlyList = Len(local.filter.only) && ListFindNoCase(local.filter.only, arguments.action);
-			local.notInExceptionList = Len(local.filter.except) && !ListFindNoCase(local.filter.except, arguments.action);
-			if (local.listsNotSpecified || local.inOnlyList || local.notInExceptionList) {
+			if ($appliesToAction(action = arguments.action, only = local.filter.only, except = local.filter.except)) {
 				if (!StructKeyExists(variables, local.filter.through)) {
 					Throw(
 						type = "Wheels.FilterNotFound",

@@ -98,12 +98,20 @@ component extends="modules.BaseModule" {
 	 * `create` → `new`, and unit tests). That array is reconstructed into the
 	 * same structured shape LuCLI would have produced, so a command behaves
 	 * identically whether LuCLI dispatched it or another command delegated to it.
+	 *
+	 * `__arguments` is consume-once: it is cleared on every call so a stale
+	 * stash can never replay. One-shot CLI runs hid the leak, but the stdio
+	 * MCP server (`wheels mcp wheels`) is a persistent process — after any
+	 * delegating call (create/generate app → new) a later zero-arg tool call
+	 * (e.g. wheels_test()) would otherwise re-parse the stale argv and turn
+	 * into a completely different invocation.
 	 */
 	private struct function structuredArgs(struct callerArgs = {}) {
+		var raw = __arguments ?: [];
+		__arguments = [];
 		if (!structIsEmpty(arguments.callerArgs)) {
 			return arguments.callerArgs;
 		}
-		var raw = __arguments ?: [];
 		return argvToCollection(isArray(raw) ? raw : []);
 	}
 
@@ -155,9 +163,20 @@ component extends="modules.BaseModule" {
 	 * interactive (console), meta (mcp), alias (d), or don't translate to
 	 * single-call MCP semantics (browser). Read by LuCLI >= 0.3.4 per the
 	 * mcpHiddenTools() convention.
+	 *
+	 * Defense-in-depth (#2963 / wave-2 §5.2): every public function whose
+	 * name starts with `$` is appended structurally via `getMetaData(this)`.
+	 * These are the "public for specs" carve-out helpers documented in
+	 * cli/CLAUDE.md — kept public only so TestBox can reach them — and must
+	 * never appear in MCP `tools/list`. Without this structural sweep, a
+	 * future `$publicHelperFour` added without a denylist update would leak
+	 * as a callable tool. The literal `$normalizeTestFilter` /
+	 * `$resolveAppTestDataSource` entries below are retained for clarity
+	 * and the case where LuCLI consults the list before metadata is fully
+	 * populated; the structural pass de-duplicates and catches additions.
 	 */
 	public array function mcpHiddenTools() {
-		return [
+		var hidden = [
 			"main",     // bare `wheels` no-args dispatch target — not an MCP tool
 			"mcp",      // meta command — prints MCP setup instructions
 			"d",        // alias for destroy
@@ -167,6 +186,8 @@ component extends="modules.BaseModule" {
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
 			"browser",  // multi-step browser testing flow
+			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
+			"mcpToolSpecs", // per-tool inputSchema registry read by LuCLI — not itself a tool
 			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
 			// unit-test them directly (the cli/CLAUDE.md "public for specs"
 			// carve-out) — they are not commands and must never surface as MCP
@@ -175,6 +196,132 @@ component extends="modules.BaseModule" {
 			"$normalizeTestFilter",
 			"$resolveAppTestDataSource"
 		];
+
+		// Structural sweep — discover every $-prefixed PUBLIC function on
+		// this module via getMetaData(this).functions and add anything not
+		// already listed. Defense-in-depth so a future $-helper added without
+		// a denylist update can't accidentally leak as an MCP tool.
+		try {
+			var meta = getMetaData(this);
+			if (structKeyExists(meta, "functions") && isArray(meta.functions)) {
+				for (var fn in meta.functions) {
+					if (
+						structKeyExists(fn, "name")
+						&& structKeyExists(fn, "access")
+						&& fn.access == "public"
+						&& left(fn.name, 1) == "$"
+						&& !arrayContainsNoCase(hidden, fn.name)
+					) {
+						arrayAppend(hidden, fn.name);
+					}
+				}
+			}
+		} catch (any e) {
+			// Reflection failure: fall through to the literal denylist.
+			// The hard-coded $-entries above still cover the two known cases.
+		}
+
+		return hidden;
+	}
+
+	/**
+	 * MCP tool input schemas, keyed by tool name. Read by LuCLI's MCP server
+	 * per the same optional-convention mechanism as mcpHiddenTools(), so the
+	 * stdio `tools/list` advertisement carries a populated inputSchema.
+	 *
+	 * Why this exists (#2963): Module command functions declare no formal
+	 * parameters — they consume LuCLI's structured argCollection — so the
+	 * runtime's signature-derived schema is `{properties: {}}` with
+	 * `additionalProperties: false`, which tells MCP clients the tools take
+	 * no arguments at all. Each entry below is built from the SAME ArgSpec
+	 * builder the command's parse helper uses, so the CLI parse surface and
+	 * the MCP advertisement cannot drift.
+	 *
+	 * Commands still on hand-rolled token parsing (generate, migrate, db,
+	 * deploy, routes, info, reload, validate, create — tracked by #2861)
+	 * gain entries here as they migrate to ArgSpec.
+	 */
+	public struct function mcpToolSpecs() {
+		return {
+			"analyze" = analyzeArgSpec().toInputSchema(),
+			"destroy" = destroyArgSpec().toInputSchema(),
+			"doctor"  = verboseFlagSpec().toInputSchema(),
+			"notes"   = notesArgSpec().toInputSchema(),
+			"seed"    = seedArgSpec().toInputSchema(),
+			"stats"   = verboseFlagSpec().toInputSchema(),
+			"test"    = testArgSpec().toInputSchema(),
+			"upgrade" = upgradeArgSpec().toInputSchema()
+		};
+	}
+
+	// ─────────────────────────────────────────────────
+	//  ArgSpec builders — one per command, shared by the
+	//  command's parse helper and mcpToolSpecs() so the
+	//  CLI parse surface and the MCP tools/list schema
+	//  cannot drift (#2963). Descriptions flow into the
+	//  schema via ArgSpec.toInputSchema().
+	// ─────────────────────────────────────────────────
+
+	private any function seedArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "environment", default = "", description = "Environment whose seed files run (defaults to the app's current environment)")
+			.option(name = "mode", default = "auto", description = "Seeding mode: auto (detect), convention (app/db/seeds.cfm), or generate (random test data)")
+			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate");
+	}
+
+	private any function testArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "filter",    default = "", description = "Spec filter — a dotted directory or bundle path (e.g. tests.specs.models)")
+			.option(name = "directory", default = "", description = "Documented alias for --filter")
+			.option(name = "reporter",  default = "simple", description = "Output format: simple, json, or tap")
+			.option(name = "db",        default = "sqlite", description = "Database the suite runs against")
+			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
+			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
+			.flag(name = "ci",      default = false, description = "CI mode output")
+			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
+			.flag(name = "test-db", default = true, description = "Swap to the dedicated test datasource for the run (disable with --no-test-db)");
+	}
+
+	private any function analyzeArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "target", default = "all", description = "Analysis target (default: all)");
+	}
+
+	private any function destroyArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "type", default = "", description = "What to remove: resource, model, controller, or view")
+			.positional(name = "name", default = "", description = "Name of the artifact to remove")
+			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
+	}
+
+	private any function verboseFlagSpec() {
+		return new services.ArgSpec()
+			.flag(name = "verbose", default = false, description = "Print detailed output");
+	}
+
+	private any function notesArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "annotations", default = "TODO,FIXME,OPTIMIZE", description = "Comma-delimited annotation markers to scan for")
+			.option(name = "custom", default = "", description = "Additional custom annotation markers (comma-delimited)");
+	}
+
+	private any function upgradeArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "subcommand", default = "", description = "Explicit verb required: `check` scans for breaking changes (read-only); `apply` swaps vendor/wheels/ with the CLI's bundled framework (backup first). Omitted/empty prints usage and never modifies files")
+			.option(name = "to", default = "", description = "Target Wheels version. check: version to scan against (default: latest). apply: must match the CLI's bundled framework version")
+			.option(name = "format", default = "", description = "check only: set to json for machine-readable output")
+			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
+			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework");
+	}
+
+	private any function jobsArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "action", default = "status", description = "work (long-lived worker loop) or status (queue snapshot). Defaults to status")
+			.option(name = "queue", default = "", description = "work: comma-delimited queue names to process in order. status: single queue to filter by. Empty = all queues")
+			.option(name = "interval", default = 5, type = "numeric", description = "work only: seconds to wait between polls when no job is available")
+			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
+			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
+			.option(name = "format", default = "table", description = "status only: output format, table or json");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -295,6 +442,8 @@ component extends="modules.BaseModule" {
 		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
+		help &= "Background Jobs:" & nl;
+		help &= "  jobs                Job queue worker and stats (work, status)" & nl & nl;
 		help &= "Testing & Inspection:" & nl;
 		help &= "  test                Run the test suite" & nl;
 		help &= "  browser             Browser-based tests (Playwright)" & nl;
@@ -308,7 +457,7 @@ component extends="modules.BaseModule" {
 		help &= "  notes               Find TODO / FIXME / OPTIMIZE comments (--annotations to customize)" & nl & nl;
 		help &= "Packages & Deployment:" & nl;
 		help &= "  packages            Add, update, search Wheels packages (verb is `add`, not `install`)" & nl;
-		help &= "  upgrade             Scan for breaking changes before upgrading Wheels (read-only)" & nl;
+		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
 		help &= "  mcp                 Configure Wheels MCP server for AI assistants" & nl;
@@ -514,11 +663,7 @@ component extends="modules.BaseModule" {
 	 * shorthand for `--mode=generate`.
 	 */
 	private struct function parseSeedArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "environment", default = "")
-			.option(name = "mode", default = "auto")
-			.flag(name = "generate", default = false)
-			.parse(arguments.coll);
+		var parsed = seedArgSpec().parse(arguments.coll);
 		return {
 			environment = parsed.environment,
 			mode = parsed.generate ? "generate" : parsed.mode
@@ -548,16 +693,7 @@ component extends="modules.BaseModule" {
 	 * space form as a bare flag + a separate positional, not a named value (#2861).
 	 */
 	private struct function parseTestArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "filter",    default = "")
-			.option(name = "directory", default = "")
-			.option(name = "reporter",  default = "simple")
-			.option(name = "db",        default = "sqlite")
-			.flag(name = "verbose", default = false)
-			.flag(name = "ci",      default = false)
-			.flag(name = "core",    default = false)
-			.flag(name = "test-db", default = true)
-			.parse(arguments.coll);
+		var parsed = testArgSpec().parse(arguments.coll);
 
 		// `--directory` is a documented alias for `--filter` (tutorial ch. 7).
 		var filter = len(parsed.directory) ? parsed.directory : parsed.filter;
@@ -592,7 +728,8 @@ component extends="modules.BaseModule" {
 			core = parsed.core,
 			db = parsed.db,
 			dbExplicit = structKeyExists(arguments.coll, "db"),
-			useTestDB = parsed["test-db"]
+			useTestDB = parsed["test-db"],
+			basePath = parsed["base-path"]
 		};
 	}
 
@@ -604,12 +741,13 @@ component extends="modules.BaseModule" {
 		var filter = opts.filter;
 		var reporter = opts.reporter;
 		var format = opts.format;
-		var verboseOutput = opts.verbose;
+		var verboseOutput = $resolveTestVerbosity(opts.verbose);
 		var ciMode = opts.ci;
 		var coreTests = opts.core;
 		var db = opts.db;
 		var dbExplicit = opts.dbExplicit;
 		var useTestDB = opts.useTestDB;
+		var basePath = opts.basePath;
 
 		// Default to APP mode unless --core is set explicitly. The previous
 		// auto-detection ("if vendor/wheels/tests/ exists, default to core")
@@ -628,7 +766,26 @@ component extends="modules.BaseModule" {
 		// expects. Onboarding finding #2.
 		filter = $normalizeTestFilter(filter, coreTests);
 
-		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit);
+		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit, basePath);
+	}
+
+	/**
+	 * Resolve the effective verbose flag for `wheels test`. The LuCLI picocli
+	 * root defines `-v`/`--verbose` as GLOBAL options and consumes them
+	 * wherever they appear on the command line — `wheels test --verbose`
+	 * forwards only `test` to the module (verified live, issue #3113), so
+	 * `parseTestArgs()` can never see the token on a normal install. The
+	 * runtime conveys the flag through `init(verboseEnabled=...)` instead
+	 * (LuCLI's executeModule.cfs passes `verboseEnabled=verbose`), which
+	 * BaseModule stores as `variables.verboseEnabled`. Honor both sources:
+	 * the parsed token still wins for direct/programmatic invocations that
+	 * deliver it.
+	 *
+	 * Public `$`-prefixed so specs can exercise it (cli/CLAUDE.md carve-out);
+	 * hidden from MCP by the `mcpHiddenTools()` structural sweep.
+	 */
+	public boolean function $resolveTestVerbosity(boolean parsedVerbose = false) {
+		return arguments.parsedVerbose || (variables.verboseEnabled ?: false);
 	}
 
 	/**
@@ -709,24 +866,80 @@ component extends="modules.BaseModule" {
 		// See onboarding finding F5.
 		$purgeServerCfclasses();
 
+		// Response honesty (#3059): a SUCCESSFUL reload is ALWAYS a 302 — the
+		// framework's reload gate restarts the app and then location()-redirects
+		// (public/Application.cfc :: $handleRestartAppRequest). Redirects stay
+		// OFF so the raw status is the verdict: following the success-redirect
+		// would collapse a real reload (302 -> 200 at `/`) into the same 200 a
+		// wrong-password page render produces. Failures print-then-throw per
+		// the #2941 exit-code convention so `wheels reload && ...` gates work.
+		var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
+		var reloadState = { statusCode = 0 };
 		try {
-			var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
-			var httpResult = makeHttpRequest(reloadUrl);
-			out("Application reloaded successfully.", "green");
-			// Surface the hot-vs-cold reload contract — Wheels does NOT
-			// re-fire onApplicationStart on `?reload=true`. Users editing
-			// app/events/onapplicationstart.cfm or config/services.cfm need
-			// a full restart. See finding #8 in the 2026-04-29 fresh-VM
-			// triage.
-			out("Note: onApplicationStart does NOT re-fire. For init-code edits, run `wheels stop && wheels start`.", "cyan");
-			verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
+			reloadState.statusCode = makeHttpRequestWithStatus(reloadUrl, false).statusCode;
 		} catch (any e) {
 			out("Failed to reload: #e.message#", "red");
 			if (!len(password)) {
 				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
 			}
+			throw(
+				type = "Wheels.ReloadFailed",
+				message = "Reload request to localhost:#serverPort# failed: #e.message#"
+			);
 		}
+
+		var verdict = $evaluateReloadResponse(reloadState.statusCode);
+		if (!verdict.success) {
+			out(verdict.message, "red");
+			if (!len(password)) {
+				out("Hint: Set WHEELS_RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
+			}
+			verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
+			throw(type = "Wheels.ReloadFailed", message = verdict.message);
+		}
+
+		out("Application reloaded successfully.", "green");
+		// Surface the actual reload contract (verified live on Lucee 7,
+		// see #3110): an authorized `?reload=true&password=...` calls
+		// applicationStop(), so the next request re-fires onApplicationStart
+		// in full — app/events/onapplicationstart.cfm, config/services.cfm,
+		// and the PackageLoader all re-run. Caveat: the restart only
+		// happens when the reload password resolves; a missing or wrong
+		// password silently serves the request without restarting
+		// (#3059 / #3062).
+		out("Note: an authorized reload re-fires onApplicationStart (re-runs config/services.cfm and the package loader). A missing or wrong reload password silently skips the restart.", "cyan");
+		verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
 		return "";
+	}
+
+	/**
+	 * Verdict for a `?reload=true` response status (#3059).
+	 *
+	 * The framework's reload gate restarts the app and then redirects via
+	 * location(), so a successful reload is always a 3xx (302 in practice).
+	 * A 2xx means the warm-path gate fell through and the page was served
+	 * normally — the reload password didn't match, nothing restarted (404
+	 * is the same fall-through on an app without a root route). 4xx/5xx
+	 * means the endpoint itself errored (e.g. the #3053 Adobe regression).
+	 *
+	 * Public ONLY so ReloadCommandSpec can unit-test it (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — hidden from MCP via the structural
+	 * $-prefix sweep in mcpHiddenTools().
+	 */
+	public struct function $evaluateReloadResponse(required numeric statusCode) {
+		if (arguments.statusCode >= 300 && arguments.statusCode < 400) {
+			return { success = true, message = "" };
+		}
+		if (arguments.statusCode >= 400) {
+			return {
+				success = false,
+				message = "Reload failed: the server returned HTTP #arguments.statusCode#. The application was NOT reloaded — check the server's error output."
+			};
+		}
+		return {
+			success = false,
+			message = "Reload was not triggered: the server served the page normally (HTTP #arguments.statusCode#) instead of answering with the reload redirect (302). The application was NOT reloaded — check the reload password."
+		};
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1259,7 +1472,8 @@ component extends="modules.BaseModule" {
 		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
-		out("Tools are prefixed with the module name: wheels_generate, wheels_migrate, etc.");
+		out("Tool names match the command names: generate, migrate, etc. (unprefixed");
+		out("in tools/list — the server entry in .mcp.json namespaces them per client).");
 		out("Stateful/interactive commands (start, stop, new, console, ...) are hidden");
 		out("from MCP tools/list via mcpHiddenTools() — they remain CLI-only.");
 		return "";
@@ -1380,9 +1594,18 @@ component extends="modules.BaseModule" {
 				case "/reload":
 					out("Reloading application...", "cyan");
 					try {
+						// Same 302-vs-200 honesty contract as the reload
+						// command (#3059) — but interactive, so failures
+						// print red instead of throwing.
 						var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
-						makeHttpRequest(reloadUrl);
-						out("Application reloaded.", "green");
+						var reloadVerdict = $evaluateReloadResponse(
+							makeHttpRequestWithStatus(reloadUrl, false).statusCode
+						);
+						if (reloadVerdict.success) {
+							out("Application reloaded.", "green");
+						} else {
+							out(reloadVerdict.message, "red");
+						}
 					} catch (any e) {
 						out("Reload failed: #e.message#", "red");
 					}
@@ -1638,9 +1861,7 @@ component extends="modules.BaseModule" {
 	 * target so the "not in a project" guard only fires for the bare form.
 	 */
 	private struct function parseAnalyzeArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.positional(name = "target", default = "all")
-			.parse(arguments.coll);
+		var parsed = analyzeArgSpec().parse(arguments.coll);
 		return {
 			target = lCase(parsed.target),
 			hasTarget = structKeyExists(arguments.coll, "arg1")
@@ -1728,11 +1949,15 @@ component extends="modules.BaseModule" {
 	public string function validate() {
 		if (!directoryExists(variables.projectRoot & "/app")) {
 			out("No app/ directory found. Are you in a Wheels project?", "red");
-			return "";
+			// throw maps to non-zero exit; return "" would silently succeed.
+			throw(type = "Wheels.InvalidArguments", message = "No app/ directory found — run wheels validate from a Wheels project root.");
 		}
 
 		out("Validating...", "cyan");
 		out("");
+
+		var validationFailed = false;
+		var issueCount = 0;
 
 		try {
 			var analysis = getService("analysis");
@@ -1749,8 +1974,19 @@ component extends="modules.BaseModule" {
 				var severity = issue.severity == "error" ? "red" : "yellow";
 				out("  [#uCase(issue.severity)#] #fileName# — #issue.message#", severity);
 			}
+
+			// Capture before try ends; throwing inside would be swallowed by the catch.
+			validationFailed = !results.valid;
+			issueCount = results.totalIssues;
 		} catch (any e) {
 			out("Validation failed: #e.message#", "red");
+			// rethrow maps to non-zero exit; an analyzer crash must not exit 0.
+			rethrow;
+		}
+
+		// Throw after the full report flushes — errors exit non-zero, warnings stay green.
+		if (validationFailed) {
+			throw(type = "Wheels.ValidationFailed", message = "Validation found #issueCount# issue(s) — see the report above.");
 		}
 
 		return "";
@@ -1768,9 +2004,10 @@ component extends="modules.BaseModule" {
 	 * migration unchanged — ArgSpec only replaced the hand-rolled token split.
 	 */
 	private struct function parseDestroyArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.flag(name = "force", default = false)
-			.parse(arguments.coll);
+		// The builder also declares the <type>/<name> positionals (for the MCP
+		// schema); the smart legacy-order reorder below still reads them from
+		// the raw collection, so only parsed.force is consumed here.
+		var parsed = destroyArgSpec().parse(arguments.coll);
 
 		// Collect positionals from every arg<n> value in numeric order. LuCLI
 		// numbers positionals by global token index, so a leading `--force`
@@ -1926,9 +2163,7 @@ component extends="modules.BaseModule" {
 	 * so a short flag arrives as a positional arg<n> value.
 	 */
 	private boolean function parseVerboseFlag(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.flag(name = "verbose", default = false)
-			.parse(arguments.coll);
+		var parsed = verboseFlagSpec().parse(arguments.coll);
 		if (parsed.verbose) {
 			return true;
 		}
@@ -2031,7 +2266,7 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy rollback v1              - roll back to version v1
 	 *   wheels deploy config                   - print resolved config as YAML
 	 *   wheels deploy init                     - create config stub
-	 *   wheels deploy setup                    - full setup (Phase 2 adds accessories)
+	 *   wheels deploy setup                    - one-time bootstrap (network + accessories) + deploy
 	 *   wheels deploy bootstrap                - install Docker on every host
 	 *   wheels deploy exec "uname -a"          - run a command on every host
 	 *   wheels deploy version                  - show version pinning
@@ -2203,8 +2438,11 @@ component extends="modules.BaseModule" {
 			// branch below is retained for Kamal parity and direct callers
 			// (MCP, internal tests) that don't go through LuCLI's picocli root.
 			case "bootstrap":
+				// #2957 DEP-7: build the pool from deploy.yml's ssh: block like
+				// every other verb — a bare `new SshPool()` here meant the only
+				// CLI-reachable bootstrap form ignored ssh.user/port/keys.
 				var bootstrapCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return bootstrapCli.bootstrap(opts);
 			case "exec":
@@ -2217,8 +2455,9 @@ component extends="modules.BaseModule" {
 					arrayAppend(execCmdParts, positional[ei]);
 				}
 				opts.cmd = arrayToList(execCmdParts, " ");
+				// #2957 DEP-7: same ssh-config seeding as the nested `server` branch.
 				var execCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					new modules.wheels.services.deploy.lib.SshPool()
+					$deployBuildSshPool(opts.configPath)
 				);
 				return execCli.exec(opts);
 			case "server":
@@ -2606,10 +2845,7 @@ component extends="modules.BaseModule" {
 	 * consumes them directly.
 	 */
 	private struct function parseNotesArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "annotations", default = "TODO,FIXME,OPTIMIZE")
-			.option(name = "custom", default = "")
-			.parse(arguments.coll);
+		var parsed = notesArgSpec().parse(arguments.coll);
 		return { annotations = parsed.annotations, custom = parsed.custom };
 	}
 
@@ -2696,77 +2932,503 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
+	//  jobs — Background job worker
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * Parse `wheels jobs` arguments. Public ONLY so JobsCommandSpec can
+	 * unit-test the parse/validation surface directly (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — the mcpHiddenTools() structural
+	 * $-prefix sweep keeps it off the MCP surface. Validation happens here,
+	 * before any server detection, so a bad flag yields a usage error
+	 * instead of a misleading "no server" diagnostic.
+	 */
+	public struct function $parseJobsArgs(required struct coll) {
+		var parsed = jobsArgSpec().parse(arguments.coll);
+		var opts = {
+			action = lCase(trim(parsed.action)),
+			queue = trim(parsed.queue),
+			interval = parsed.interval,
+			maxJobs = parsed["max-jobs"],
+			quiet = parsed.quiet,
+			format = lCase(trim(parsed.format))
+		};
+		if (!len(opts.action)) {
+			opts.action = "status";
+		}
+		if (opts.interval <= 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--interval must be a positive number of seconds."
+			);
+		}
+		if (opts.maxJobs < 0) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "--max-jobs must be zero (unlimited) or a positive number."
+			);
+		}
+		if (!listFindNoCase("table,json", opts.format)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown --format '#opts.format#'. Valid formats: table, json."
+			);
+		}
+		return opts;
+	}
+
+	/**
+	 * hint: Background job queue — `work` runs a long-lived worker loop, `status` prints per-queue counts (--format=json for machines). retry/purge/monitor are tracked follow-ups (issue 3090).
+	 */
+	public string function jobs() {
+		var opts = $parseJobsArgs(structuredArgs(arguments));
+
+		switch (opts.action) {
+			case "work":
+				return runJobsWork(opts);
+			case "status":
+				return runJobsStatus(opts);
+			// The framework bridge (vendor/wheels/public/views/cli.cfm) already
+			// implements jobsRetry/jobsPurge/jobsMonitor — the CLI verbs are
+			// deliberate follow-ups tracked in ##3090. Fail loudly with the
+			// programmatic equivalent instead of pretending the verb exists.
+			case "retry":
+			case "purge":
+			case "monitor":
+				out("'wheels jobs #opts.action#' is not implemented yet (tracked in issue ##3090).", "red");
+				out("Until it ships, drive it programmatically on the running app:", "yellow");
+				out("  retry:   (new wheels.Job()).retryFailed(queue=""..."")", "yellow");
+				out("  purge:   (new wheels.Job()).purgeCompleted(days=7, queue=""..."")", "yellow");
+				out("  monitor: poll `wheels jobs status --format=json` on an interval", "yellow");
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "'wheels jobs #opts.action#' is not implemented yet — see https://github.com/wheels-dev/wheels/issues/3090"
+				);
+			default:
+				out("Unknown jobs action: #opts.action#", "red");
+				out("Usage: wheels jobs [work|status] [--queue=<names>] [--interval=<seconds>] [--max-jobs=<n>] [--quiet] [--format=table|json]");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown jobs action: #opts.action#");
+		}
+	}
+
+	/**
+	 * Long-lived worker loop: poll the framework's jobsProcessNext bridge
+	 * command, which claims and runs one pending job per call (optimistic
+	 * locking — safe to run several workers in parallel). Processing jobs
+	 * mutates application data, so this is write-side: strict server
+	 * identity (##2878) and POST + reload password (SEC-4 mutation gate).
+	 */
+	private string function runJobsWork(required struct opts) {
+		var serverPort = $requireRunningServer(
+			hints = [
+				"The job worker requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
+
+		var workUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsProcessNext&format=json";
+		if (len(arguments.opts.queue)) {
+			workUrl &= "&queues=" & urlEncodedFormat(arguments.opts.queue);
+		}
+
+		out("Wheels Job Worker", "cyan");
+		out("Queues: " & (len(arguments.opts.queue) ? arguments.opts.queue : "all"));
+		out("Poll interval: #arguments.opts.interval#s");
+		if (arguments.opts.maxJobs > 0) {
+			out("Max jobs: #arguments.opts.maxJobs#");
+		}
+		out("Press Ctrl+C to stop");
+		out("");
+
+		var counters = {processed = 0, failed = 0};
+		while (true) {
+			var httpResult = "";
+			try {
+				httpResult = makeBridgePost(workUrl);
+			} catch (any httpErr) {
+				// Connection loss is fatal: the worker exits non-zero so a
+				// process supervisor (systemd, Docker restart policy) brings
+				// it back once the server is reachable again, instead of the
+				// worker spinning silently against a dead port.
+				throw(
+					type    = "Wheels.Cli.CommandFailed",
+					message = "Job worker lost its connection to the server: #httpErr.message#",
+					detail  = httpErr.detail ?: ""
+				);
+			}
+
+			// parseCliResponse throws Wheels.Cli.CommandFailed when the bridge
+			// rejects the request (e.g. the mutation gate's reload-password or
+			// loopback checks) — permanent conditions, so the worker exits
+			// non-zero instead of retrying forever.
+			var result = parseCliResponse(httpResult, "Jobs work");
+			var jobResult = structKeyExists(result, "jobResult") && isStruct(result.jobResult)
+				? result.jobResult
+				: {skipped = true};
+			var idle = jobResult.skipped ?: true;
+
+			if (idle) {
+				// Queue empty — wait for the next poll below.
+			} else if (jobResult.success ?: false) {
+				counters.processed++;
+				if (!arguments.opts.quiet) {
+					out("[#timeFormat(now(), "HH:mm:ss")#] Completed: #jobResult.jobClass# (#jobResult.jobId#)", "green");
+				}
+			} else {
+				// The job itself failed — the framework already scheduled the
+				// retry (with backoff) or marked it failed; the worker keeps
+				// draining.
+				counters.failed++;
+				var errorMessage = len(jobResult.error ?: "") ? jobResult.error : "Unknown error";
+				out("[#timeFormat(now(), "HH:mm:ss")#] Failed: #jobResult.jobClass# - #errorMessage#", "red");
+			}
+
+			if (arguments.opts.maxJobs > 0 && (counters.processed + counters.failed) >= arguments.opts.maxJobs) {
+				out("");
+				out("Reached max jobs limit (#arguments.opts.maxJobs#). Shutting down.", "green");
+				out("Processed: #counters.processed# | Failed: #counters.failed#");
+				return "";
+			}
+
+			// Only sleep when the queue was empty — back-to-back pending jobs
+			// drain immediately. Failed jobs are rescheduled with future runAt
+			// timestamps, so an immediate re-poll cannot hot-loop on them.
+			if (idle) {
+				sleep(arguments.opts.interval * 1000);
+			}
+		}
+	}
+
+	/**
+	 * One-shot queue snapshot via the read-only jobsStatus bridge command.
+	 */
+	private string function runJobsStatus(required struct opts) {
+		var serverPort = $requireRunningServer(
+			hints = ["Start one with: wheels start"]
+		);
+
+		var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsStatus&format=json";
+		if (len(arguments.opts.queue)) {
+			statusUrl &= "&queue=" & urlEncodedFormat(arguments.opts.queue);
+		}
+
+		var httpResult = "";
+		try {
+			httpResult = makeHttpRequest(statusUrl);
+		} catch (any httpErr) {
+			throw(
+				type    = "Wheels.Cli.CommandFailed",
+				message = "Jobs status failed (connection error): #httpErr.message#",
+				detail  = httpErr.detail ?: ""
+			);
+		}
+
+		var result = parseCliResponse(httpResult, "Jobs status");
+		var stats = structKeyExists(result, "stats") && isStruct(result.stats) ? result.stats : {};
+
+		if (arguments.opts.format == "json") {
+			out(serializeJSON(stats));
+			return "";
+		}
+
+		out("Job Queue Status", "cyan");
+		out($formatJobsStatusTable(stats));
+		return "";
+	}
+
+	/**
+	 * Render JobWorker.getStats() output ({queues: {name: counts}, totals:
+	 * counts}) as a fixed-width table. Public ONLY so JobsCommandSpec can
+	 * unit-test the rendering without a running server (the cli/CLAUDE.md
+	 * "public for specs" carve-out) — the mcpHiddenTools() structural
+	 * $-prefix sweep keeps it off the MCP surface. Defensive against partial
+	 * payloads: the input is deserialized JSON from the bridge. Queue names
+	 * are sorted — struct iteration order is not insertion order at scale.
+	 */
+	public string function $formatJobsStatusTable(required struct stats) {
+		var nl = chr(10);
+		var queues = structKeyExists(arguments.stats, "queues") && isStruct(arguments.stats.queues)
+			? arguments.stats.queues
+			: {};
+		var totals = structKeyExists(arguments.stats, "totals") && isStruct(arguments.stats.totals)
+			? arguments.stats.totals
+			: {};
+
+		if (structIsEmpty(queues)) {
+			return "No jobs found.";
+		}
+
+		var header = "| " & $padJobsColumn("Queue", 20) & " | " & $padJobsColumn("Pending", 10) & " | "
+			& $padJobsColumn("Processing", 12) & " | " & $padJobsColumn("Completed", 12) & " | "
+			& $padJobsColumn("Failed", 10) & " | " & $padJobsColumn("Total", 10) & " |";
+		var separator = repeatString("-", len(header));
+		var lines = [separator, header, separator];
+
+		var queueNames = structKeyArray(queues);
+		arraySort(queueNames, "textnocase");
+		for (var queueName in queueNames) {
+			var rowCounts = isStruct(queues[queueName]) ? queues[queueName] : {};
+			arrayAppend(lines, $jobsStatusRow(queueName, rowCounts));
+		}
+		arrayAppend(lines, separator);
+		arrayAppend(lines, $jobsStatusRow("TOTAL", totals));
+		arrayAppend(lines, separator);
+
+		return arrayToList(lines, nl);
+	}
+
+	private string function $jobsStatusRow(required string label, required struct counts) {
+		return "| " & $padJobsColumn(arguments.label, 20) & " | "
+			& $padJobsColumn(arguments.counts.pending ?: 0, 10) & " | "
+			& $padJobsColumn(arguments.counts.processing ?: 0, 12) & " | "
+			& $padJobsColumn(arguments.counts.completed ?: 0, 12) & " | "
+			& $padJobsColumn(arguments.counts.failed ?: 0, 10) & " | "
+			& $padJobsColumn(arguments.counts.total ?: 0, 10) & " |";
+	}
+
+	private string function $padJobsColumn(required any value, required numeric width) {
+		var str = toString(arguments.value);
+		if (len(str) >= arguments.width) {
+			return left(str, arguments.width);
+		}
+		return str & repeatString(" ", arguments.width - len(str));
+	}
+
+	// ─────────────────────────────────────────────────
 	//  upgrade — Upgrade assistance
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Parse `wheels upgrade` arguments. `subcommand` (positional) must be
-	 * "check"; `--to=<version>` selects the target. `sawTo` / `sawDryRun` drive
-	 * the "did you mean" nudge and match both `--to` and `--to=x` (LuCLI maps a
-	 * bare `--to` to to=true and `--to=x` to to=x — either way the key exists).
+	 * Parse `wheels upgrade` arguments. The `subcommand` positional selects
+	 * the mode: `check` runs the read-only scan, `apply` performs the
+	 * framework swap, `help` prints usage, and "" (bare) prints the usage
+	 * steer — the destructive path always requires the explicit verb.
+	 * `--to=<version>` selects the target. The `saw*` fields drive the
+	 * apply-mode refusals and the "did you mean" nudges; they match both
+	 * `--x` and `--x=value` (LuCLI maps a bare `--x` to x=true and `--x=v`
+	 * to x=v — either way the key exists).
+	 *
+	 * The MCP surface (#2963) advertises `subcommand` as a named property,
+	 * so accept it by name as well as positionally — a tool call sending
+	 * {subcommand: "check"} must never fall through to another verb just
+	 * because no arg1 key exists.
 	 */
 	private struct function parseUpgradeArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.positional(name = "subcommand", default = "")
-			.option(name = "to", default = "")
-			.parse(arguments.coll);
+		var parsed = upgradeArgSpec().parse(arguments.coll);
+
+		var sub = parsed.subcommand;
+		if (!len(sub) && structKeyExists(arguments.coll, "subcommand") && isSimpleValue(arguments.coll.subcommand)) {
+			sub = arguments.coll.subcommand;
+		}
+		sub = lCase(trim(sub));
+
+		// --nobackup is the documented spelling, but LuCLI normalizes the
+		// conventional negation `--no-backup` to backup=false — honor both.
+		var doBackup = !parsed.nobackup;
+		if (structKeyExists(arguments.coll, "backup") && isSimpleValue(arguments.coll.backup) && arguments.coll.backup == "false") {
+			doBackup = false;
+		}
+
 		return {
-			isCheck = lCase(parsed.subcommand) == "check",
+			subcommand = sub,
+			isCheck = sub == "check",
+			isApply = sub == "apply",
+			wantsHelp = sub == "help" || sub == "-h"
+				|| (structKeyExists(arguments.coll, "help") && isSimpleValue(arguments.coll.help) && arguments.coll.help == "true")
+				|| (structKeyExists(arguments.coll, "h") && isSimpleValue(arguments.coll.h) && arguments.coll.h == "true"),
 			targetVersion = parsed.to,
+			format = parsed.format,
+			// #2963: --strict escalates advisory findings to a hard failure
+			// (throws Wheels.UpgradeCheckFailed) so CI can gate on opt-in
+			// recommendations, not just breaking changes. Mirrors Django
+			// --fail-level WARNING / Mix --warnings-as-errors.
+			strict = parsed.strict,
+			doBackup = doBackup,
 			sawTo = structKeyExists(arguments.coll, "to"),
-			sawDryRun = structKeyExists(arguments.coll, "dry-run")
+			sawDryRun = structKeyExists(arguments.coll, "dry-run"),
+			sawStrict = structKeyExists(arguments.coll, "strict"),
+			sawFormat = structKeyExists(arguments.coll, "format")
 		};
 	}
 
 	/**
-	 * hint: Scan your app for breaking changes before upgrading Wheels (read-only)
+	 * hint: Upgrade the Wheels framework in your app (vendor/wheels/) — `check` scans for breaking changes (read-only), `apply` performs the swap
 	 *
-	 * This command does NOT perform the upgrade. It only scans the current app
-	 * for code paths that will break against a target framework version. The
-	 * actual framework swap is performed by your package manager
-	 * (`brew upgrade wheels`, `scoop update wheels`, or the equivalent).
+	 * `wheels upgrade apply` performs the framework swap (#3035): it
+	 * replaces the app's vendor/wheels/ with the framework bundled inside
+	 * the installed CLI, parking the old copy at vendor/wheels.bak-<timestamp>/
+	 * unless --nobackup. Recovery is a single mv (announced, with the exact
+	 * backup path, before anything is touched). Only the CLI's bundled
+	 * framework is available as a source for now — pair it with your package
+	 * manager (`brew upgrade wheels`, `brew install wheels-be`, `scoop update
+	 * wheels`) to choose what gets bundled. Downloading arbitrary --to=
+	 * targets is the planned follow-up.
 	 *
-	 * Despite occasional appearances in older help output, `--dry-run` is not
-	 * supported — the command is already read-only by design.
+	 * Bare `wheels upgrade` deliberately does nothing: it prints concise
+	 * usage steering at the two verbs and exits 0. Destructive commands
+	 * deserve an explicit verb, and MCP clients calling wheels_upgrade with
+	 * {} must never mutate — requiring `apply` fixes that transport-
+	 * independently, and exit 0 matches the pre-apply-mode bare behavior so
+	 * existing CI invocations see usage text, not a new failure.
+	 *
+	 * `wheels upgrade check` keeps the read-only scan: it reports code paths
+	 * that will break against a target framework version without modifying
+	 * any files. Breaking findings throw Wheels.UpgradeCheckFailed after the
+	 * report is printed, so the command exits non-zero and can gate CI.
+	 * --strict escalates advisory findings the same way. (--dry-run is not
+	 * supported — `check` is the preview.)
 	 *
 	 * Examples:
-	 *   wheels upgrade check                 - scan against the latest stable release
-	 *   wheels upgrade check --to=4.0.0      - scan against a specific target version
+	 *   wheels upgrade apply                       - apply the swap, with backup
+	 *   wheels upgrade apply --nobackup            - apply without the backup
+	 *   wheels upgrade check                       - scan against the latest stable release
+	 *   wheels upgrade check --to=4.0.0            - scan against a specific target version
+	 *   wheels upgrade check --format=json         - machine-readable report (CI pipelines)
 	 */
 	public string function upgrade() {
-		var opts = parseUpgradeArgs(structuredArgs(arguments));
+		var coll = structuredArgs(arguments);
+		var opts = parseUpgradeArgs(coll);
 
-		if (!opts.isCheck) {
-			var nl = chr(10);
-			var help = "Usage: wheels upgrade check [--to=<version>]" & nl
-				& nl
-				& "Scans your app for breaking changes between Wheels versions." & nl
-				& "This command is read-only — it does not modify vendor/wheels/." & nl
-				& nl
-				& "Options:" & nl
-				& "  --to=<version>    Target Wheels version (default: latest stable)" & nl
-				& nl
-				& "Unsupported flags:" & nl
-				& "  --dry-run is not supported — the command is already read-only," & nl
-				& "                              so there is no dry-run mode to opt into." & nl
-				& nl
-				& "To actually install a new Wheels version, run:" & nl
-				& "  brew upgrade wheels       (macOS / Homebrew)" & nl
-				& "  scoop update wheels       (Windows / Scoop)" & nl;
-
-			// Nudge the two common misfires from the legacy help text toward the
-			// right invocation explicitly (detected during parse).
-			if (opts.sawDryRun || opts.sawTo) {
-				help &= nl & "Did you mean: wheels upgrade check"
-					& (opts.sawTo ? " --to=<version>" : "")
-					& " ?" & nl;
-			}
-
-			out(help, "yellow");
-			return help;
+		if (opts.wantsHelp) {
+			return $printUpgradeHelp();
 		}
 
-		return runUpgradeCheck(opts.targetVersion);
+		if (opts.isCheck) {
+			return runUpgradeCheck(opts.targetVersion, opts.format, opts.strict);
+		}
+
+		// Bare `wheels upgrade` (no verb) is deliberately inert: print the
+		// usage steer and exit 0. Destructive commands deserve an explicit
+		// verb, and MCP clients calling wheels_upgrade with {} must never
+		// mutate vendor/wheels/ — requiring `apply` fixes that transport-
+		// independently (#3039 review). Exit 0 matches the pre-apply-mode
+		// bare behavior, so no CI surprise.
+		if (!len(opts.subcommand)) {
+			return $printUpgradeUsageSteer();
+		}
+
+		// ── Apply verb. Every refusal below fires before any file mutation.
+
+		// A positional that isn't check/apply/help is a typo'd subcommand.
+		// A typo'd verb must hard-stop rather than exit 0 looking like it
+		// did something (`wheels upgrade chekc` in a script should fail
+		// loudly, not print usage and report success).
+		if (!opts.isApply) {
+			out("Unknown upgrade subcommand: #opts.subcommand#", "red");
+			$printUpgradeHelp();
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown upgrade subcommand '#opts.subcommand#' — use `wheels upgrade apply` (swap the framework) or `wheels upgrade check` (read-only scan)."
+			);
+		}
+
+		// Check-only flags on the apply verb almost always mean the user
+		// wanted the scan — nudge toward it instead of mutating
+		// vendor/wheels/. --dry-run is not supported on either verb;
+		// `check` is the preview.
+		if (opts.sawDryRun || opts.sawStrict || opts.sawFormat) {
+			var offending = opts.sawDryRun ? "--dry-run" : (opts.sawStrict ? "--strict" : "--format");
+			var nudge = "wheels upgrade check"
+				& (opts.sawTo ? " --to=<version>" : "")
+				& (opts.sawStrict ? " --strict" : "")
+				& (opts.sawFormat ? " --format=json" : "");
+			out("#offending# is only available on the read-only scan.", "yellow");
+			out("Did you mean: #nudge# ?", "yellow");
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "#offending# is not supported by the apply verb — did you mean `#nudge#`?"
+			);
+		}
+
+		// Unknown named keys hard-stop too. ArgSpec ignores them by design
+		// (fine for read-only commands, kept for `check` above), but a
+		// destructive verb must not run alongside a flag the user typo'd.
+		var knownKeys = "to,format,strict,nobackup,backup,subcommand,help,h,dry-run";
+		for (var key in coll) {
+			if (reFindNoCase("^arg\d+$", key) || listFindNoCase(knownKeys, key)) {
+				continue;
+			}
+			out("Unknown argument: --#key#", "red");
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown argument '--#key#' — run `wheels upgrade help` for usage."
+			);
+		}
+
+		return runUpgradeApply(opts.targetVersion, opts.doBackup);
+	}
+
+	/**
+	 * Help block for `wheels upgrade help` / `--help`. Extracted so the
+	 * help short-circuit and the unknown-subcommand error path stay in sync.
+	 */
+	private string function $printUpgradeHelp() {
+		var nl = chr(10);
+		var help = "Usage:" & nl
+			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
+			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
+			& nl
+			& "Upgrade the Wheels framework in your app (vendor/wheels/)." & nl
+			& nl
+			& "Subcommands:" & nl
+			& "  check             Scan the app for known breaking changes between" & nl
+			& "                    your current framework version and the target." & nl
+			& "                    Read-only — does not modify any files. Exits" & nl
+			& "                    non-zero when breaking changes are found." & nl
+			& "  apply             Apply the upgrade — replace vendor/wheels/ with" & nl
+			& "                    the CLI's bundled framework. Backs up the existing" & nl
+			& "                    vendor/wheels/ as vendor/wheels.bak-<timestamp>/" & nl
+			& "                    unless --nobackup." & nl
+			& "  (none)            Print usage. Bare `wheels upgrade` never modifies" & nl
+			& "                    files — the swap requires the explicit `apply` verb." & nl
+			& nl
+			& "Options:" & nl
+			& "  --to=<version>    Target Wheels version. For check, defaults to the" & nl
+			& "                    latest stable release. For apply, must match the" & nl
+			& "                    CLI's bundled framework version." & nl
+			& "  --nobackup        Apply only: skip the vendor/wheels.bak-<timestamp>/" & nl
+			& "                    backup. Useful when vendor/wheels/ is tracked in git." & nl
+			& "  --strict          Check only: treat advisory findings as failures" & nl
+			& "                    (non-zero exit) so CI can gate on them." & nl
+			& "  --format=json     Check only: emit a machine-readable JSON report." & nl
+			& nl
+			& "Unsupported flags:" & nl
+			& "  --dry-run is not supported — run `wheels upgrade check` for the" & nl
+			& "                              read-only preview, then apply." & nl
+			& nl
+			& "Examples:" & nl
+			& "  wheels upgrade check                 - scan against latest stable" & nl
+			& "  wheels upgrade check --to=4.0.0      - scan against a specific version" & nl
+			& "  wheels upgrade apply                 - apply the swap, with backup" & nl
+			& "  wheels upgrade apply --nobackup      - apply, skipping the backup" & nl
+			& nl
+			& "The CLI binary itself is upgraded by your package manager:" & nl
+			& "  brew upgrade wheels       (macOS / Homebrew)" & nl
+			& "  scoop update wheels       (Windows / Scoop)" & nl;
+		out(help, "yellow");
+		return help;
+	}
+
+	/**
+	 * Concise usage steer for bare `wheels upgrade` (no subcommand). The
+	 * bare verb is deliberately inert — see upgrade()'s dispatch comment —
+	 * so this prints just enough to route the user to `check` or `apply`
+	 * and exits 0 (matching the pre-apply-mode bare behavior).
+	 */
+	private string function $printUpgradeUsageSteer() {
+		var nl = chr(10);
+		var usage = "wheels upgrade needs an explicit subcommand (nothing was changed):" & nl
+			& nl
+			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
+			& "      Scan the app for breaking changes (read-only)." & nl
+			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
+			& "      Replace vendor/wheels/ with the CLI's bundled framework" & nl
+			& "      (backs up to vendor/wheels.bak-<timestamp>/ first)." & nl
+			& nl
+			& "Run `wheels upgrade help` for full usage." & nl;
+		out(usage, "yellow");
+		return usage;
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2893,6 +3555,13 @@ component extends="modules.BaseModule" {
 			out(result.error, "red");
 			return "";
 		}
+
+		// Use the normalized action list from the generator (comma-joined tokens like
+		// "index,show" are split into discrete actions) so view files match the
+		// controller methods instead of being named "index,show.cfm" (#3112). When no
+		// actions were passed result.actions is empty — documented behavior is an
+		// empty controller with no view files, so the view loop below writes nothing.
+		actions = result.actions;
 
 		// Create view files for non-mutation actions
 		var viewDir = variables.projectRoot & "/app/views/#lCase(controllerName)#";
@@ -3645,14 +4314,75 @@ component extends="modules.BaseModule" {
 
 	// ── Migration Execution ──────────────────────────
 
+	/**
+	 * True when migrator output carries the failed-step signature that
+	 * Migrator.$runMigrationStep() emits — "Error migrating to <version>."
+	 * migrateTo() concatenates that line into its returned string instead of
+	 * throwing, so the /wheels/cli bridge reports success:true and the CLI's
+	 * parseCliResponse() success->exit-code mapping never trips. Detecting the
+	 * signature lets a failed up()/down() reach the exit code — the
+	 * migrate-side sibling of the #2973/#2987 seeder honesty fix (#3081).
+	 *
+	 * Anchored on the literal label plus a numeric version so normal progress
+	 * lines ("Migrating from 0 up to N.") never match. Public ONLY so the CLI
+	 * specs can reach it (cli/CLAUDE.md "public for specs" carve-out); the
+	 * mcpHiddenTools() structural $-prefix sweep keeps it off the MCP surface.
+	 */
+	public boolean function $migrationOutputIndicatesFailure(required string output) {
+		return reFindNoCase("Error migrating(\s+to)?\s+[0-9]+\.", arguments.output) > 0;
+	}
+
+	/**
+	 * True when a /wheels/cli migration-style response should map to a non-zero
+	 * CLI exit: either an explicit success:false (forget/pretend refusals such
+	 * as "not found in the tracking table" or "matching local file exists", or
+	 * a bridge-surfaced error) OR the subtler honesty gap where the bridge
+	 * reports success:true while migrateTo() folded a failed step into the
+	 * message. Public for specs; hidden from MCP via the structural sweep (#3081).
+	 */
+	public boolean function $cliMigrationResponseFailed(required struct response) {
+		if (!(arguments.response.success ?: true)) {
+			return true;
+		}
+		return $migrationOutputIndicatesFailure(arguments.response.message ?: "");
+	}
+
 	private string function runMigration(required string action) {
-		var serverPort = $requireRunningServer(
-			hints = [
-				"Migrations require a running server bound to this project.",
-				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
-			],
-			requireProjectConfig = true
-		);
+		// latest/up/down change the schema — they must only ever target the
+		// server bound to this project's own lucee.json/.env port (#2878).
+		// info/doctor are read-only and keep the legacy common-port fallback,
+		// matching the other read-side commands (info, routes, console,
+		// dbStatus, dbVersion) — the contract #2879 documented but the gate
+		// here didn't honor (#3080).
+		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
+
+		var serverPort = 0;
+		if (mutatingAction) {
+			serverPort = $requireRunningServer(
+				hints = [
+					"Migrations require a running server bound to this project.",
+					"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+				],
+				requireProjectConfig = true
+			);
+		} else {
+			serverPort = $requireRunningServer(
+				hints = ["Start one with: wheels start"],
+				requireProjectConfig = false
+			);
+			// Transparency for the fallback attach: with no project-bound port
+			// we cannot prove the server on a common port belongs to this
+			// project — a sibling app's server would report the WRONG
+			// project's migration state. Say which port we attached to and
+			// how to pin it.
+			if (!detectServerPort(requireProjectConfig = true)) {
+				out(
+					"Attached to localhost:#serverPort# via the common-port fallback (no project-bound port in lucee.json / .env).",
+					"yellow"
+				);
+				out("If this is not this project's server, set 'port' in lucee.json (or PORT in .env) and re-run.", "yellow");
+			}
+		}
 
 		out("Running migration: #action#...", "cyan");
 
@@ -3667,9 +4397,14 @@ component extends="modules.BaseModule" {
 
 		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
 
+		// latest/up/down change the schema — the framework's /wheels/cli
+		// bridge requires POST + the reload password for state-changing
+		// commands. info/doctor are read-only and stay on GET.
+		// (`mutatingAction` is resolved at the top of this function — the
+		// same read/write split also decides the server-identity gate.)
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(migrateUrl);
+			httpResult = mutatingAction ? makeBridgePost(migrateUrl) : makeHttpRequest(migrateUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3681,6 +4416,20 @@ component extends="modules.BaseModule" {
 		// parseCliResponse throws Wheels.Cli.CommandFailed on success:false —
 		// the previous code silently treated it as success. See issue #2315.
 		var result = parseCliResponse(httpResult, "Migration #action#");
+
+		// Honesty gap (#3081): migrateTo() folds a failed up()/down() step into
+		// its returned message ("Error migrating to <version>.") instead of
+		// throwing, so the bridge reports success:true and parseCliResponse()
+		// above doesn't trip. Detect that signature for the schema-mutating
+		// actions so a failed migration reaches the exit code — the migrate-side
+		// sibling of the #2973/#2987 seeder honesty fix.
+		if (mutatingAction && $migrationOutputIndicatesFailure(result.message ?: "")) {
+			out(result.message ?: "", "red");
+			throw(
+				type    = "MigrationError",
+				message = "Migration #arguments.action# failed — a migration step reported an error (see output above)."
+			);
+		}
 
 		// For `doctor`, switch the output color to yellow when the report
 		// signals unhealthy state (orphans or pending migrations). Green
@@ -3747,9 +4496,10 @@ component extends="modules.BaseModule" {
 		// spurious query parameters before reaching that point.
 		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
 
+		// forget/pretend mutate the tracking table — POST + reload password.
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(reconcileUrl);
+			httpResult = makeBridgePost(reconcileUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3759,14 +4509,24 @@ component extends="modules.BaseModule" {
 		}
 
 		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {success: false, message: "Invalid response"};
-		var success = parsed.success ?: false;
 		var msg = parsed.message ?: "";
 
-		if (success) {
-			out(msg, "green");
-		} else {
-			out(msg, "red");
+		// Honesty gap (#3081): forget/pretend refusals ("not found in the
+		// tracking table", "matching local file exists", "already applied",
+		// "no matching file") come back as success:false but previously printed
+		// red and returned "" — exit 0, indistinguishable from a real mutation
+		// in a script. Throw so the refusal reaches the exit code. The
+		// informational dry-run branches above (missing <version> / missing
+		// --yes) still return "" (exit 0) because they precede the server call.
+		if ($cliMigrationResponseFailed(parsed)) {
+			out(Len(msg) ? msg : "#verb# refused.", "red");
+			throw(
+				type    = "MigrationError",
+				message = Len(msg) ? msg : "#verb# refused — no change made."
+			);
 		}
+
+		out(msg, "green");
 		return "";
 	}
 
@@ -3784,9 +4544,11 @@ component extends="modules.BaseModule" {
 		var renameUrl = "http://localhost:#serverPort#/wheels/cli?command=renameSystemTables&format=json"
 			& (arguments.dryRun ? "&dryRun=true" : "");
 
+		// renameSystemTables alters tables — POST + reload password (the
+		// dry-run preview rides the same gated command).
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(renameUrl);
+			httpResult = makeBridgePost(renameUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "MigrationError",
@@ -3854,9 +4616,10 @@ component extends="modules.BaseModule" {
 			seedUrl &= "&environment=#environment#";
 		}
 
+		// dbSeed writes data — POST + reload password.
 		var httpResult = "";
 		try {
-			httpResult = makeHttpRequest(seedUrl);
+			httpResult = makeBridgePost(seedUrl);
 		} catch (any httpErr) {
 			throw(
 				type    = "SeedError",
@@ -3904,7 +4667,12 @@ component extends="modules.BaseModule" {
 			runMigration("latest");
 		} catch (any e) {
 			out("Migration failed: #e.message#", "red");
-			return "";
+			// #3081: a refusal (e.g. ServerNotRunning) or a failed migration
+			// must reach the exit code — swallowing it (return "") made
+			// `db reset --force` report success while the schema never moved.
+			// `wheels migrate latest` and `wheels seed` already exit non-zero
+			// on the same refusal; this aligns `db reset` with them.
+			rethrow;
 		}
 
 		// Step 2: Seed (unless skipped)
@@ -4024,8 +4792,15 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Scan app for breaking changes between current and target version.
+	 *
+	 * Breaking findings throw Wheels.UpgradeCheckFailed after the report is
+	 * flushed (same pattern as validate()'s Wheels.ValidationFailed), so the
+	 * command exits non-zero and can gate CI. Advisory findings never affect
+	 * the exit code. `format="json"` replaces the human report with a single
+	 * JSON document for pipelines.
 	 */
-	private string function runUpgradeCheck(string targetVersion = "") {
+	private string function runUpgradeCheck(string targetVersion = "", string format = "", boolean strict = false) {
+		var jsonMode = lCase(arguments.format) == "json";
 		// Detect current version. Prefer wheels.json (post-rename) and fall back
 		// to box.json so apps with pre-rename vendor/wheels/ committed in their
 		// repo still work. The fallback can be removed two releases after the
@@ -4051,21 +4826,24 @@ component extends="modules.BaseModule" {
 				var releaseData = deserializeJSON(response);
 				target = replace(releaseData.tag_name, "v", "");
 			} catch (any e) {
-				out("Could not fetch latest version. Use --to=<version> to specify.", "yellow");
+				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
+				out(jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
 				return "";
 			}
 		}
 
-		out("Current version: #currentVersion#", "bold");
-		out("Target version:  #target#", "bold");
-		out("");
+		if (!jsonMode) {
+			out("Current version: #currentVersion#", "bold");
+			out("Target version:  #target#", "bold");
+			out("");
+		}
 
 		// Compare major versions
 		var currentMajor = val(listFirst(currentVersion, "."));
 		var targetMajor = val(listFirst(target, "."));
 		var sameMajor = (currentMajor == targetMajor);
 
-		if (sameMajor) {
+		if (sameMajor && !jsonMode) {
 			out("Same major version — no known breaking changes.", "green");
 			out("Scanning for opt-in recommendations...", "green");
 			out("");
@@ -4079,16 +4857,23 @@ component extends="modules.BaseModule" {
 
 		// 2.x -> 3.x
 		if (currentMajor <= 2 && targetMajor >= 3) {
+			// 2.x plugins lived at the webroot's /plugins (the previous
+			// `app/plugins` path never existed in any Wheels layout, so the
+			// check was dead). The 3.x -> 4.x block adds an identical root
+			// /plugins check, so skip this one on a 2.x -> 4.x jump to avoid
+			// reporting the same directory twice.
+			if (targetMajor < 4) {
+				arrayAppend(checks, {
+					description: "Legacy plugin directory",
+					pattern: "",
+					checkType: "directory",
+					path: "plugins",
+					fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
+				});
+			}
 			arrayAppend(checks, {
-				description: "Legacy plugin directory",
-				pattern: "",
-				checkType: "directory",
-				path: "app/plugins",
-				fix: "Migrate to packages/ + vendor/ activation model"
-			});
-			arrayAppend(checks, {
-				description: "Old test base class (wheels.Test)",
-				pattern: 'extends\s*=\s*"wheels\.Test"',
+				description: "Old test base class (wheels.Test / wheels.Testbox)",
+				pattern: 'extends\s*=\s*["'']wheels\.Test(box)?["'']',
 				checkType: "grep",
 				scanDir: "tests",
 				extensions: "cfc",
@@ -4099,27 +4884,74 @@ component extends="modules.BaseModule" {
 		// 3.x -> 4.x
 		if (currentMajor <= 3 && targetMajor >= 4) {
 			arrayAppend(checks, {
-				description: "Legacy plugin directory (deprecated in 4.x)",
+				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
 				pattern: "",
 				checkType: "directory",
 				path: "plugins",
-				fix: "Migrate to packages/ + vendor/ system"
+				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
 			});
+			// Matches both quote styles and the silent wheels.Testbox shim
+			// (deprecated alias of wheels.WheelsTest, removal target 5.0) —
+			// the previous double-quote-only wheels.Test pattern missed both.
 			arrayAppend(checks, {
-				description: "Old test base class (wheels.Test)",
-				pattern: 'extends\s*=\s*"wheels\.Test"',
+				description: "Old test base class (wheels.Test / wheels.Testbox)",
+				pattern: 'extends\s*=\s*["'']wheels\.Test(box)?["'']',
 				checkType: "grep",
 				scanDir: "tests",
 				extensions: "cfc",
 				fix: 'Change to extends="wheels.WheelsTest"'
 			});
+			// application.wirebox → application.wheelsdi (guide item 10). The
+			// hardest real-world case is a root Application.cfc bootstrap that
+			// calls `new wirebox.system.ioc.Injector(...)` — the WireBox
+			// package no longer ships in vendor/wheels/ — so scan the root
+			// Application.cfc and config/ in addition to app/.
 			arrayAppend(checks, {
-				description: "Direct WireBox references",
-				pattern: "application\.wirebox",
+				description: "Direct WireBox references (application.wirebox / wirebox.system.ioc)",
+				pattern: "application\.wirebox|wirebox\.system\.ioc",
 				checkType: "grep",
 				scanDir: "app",
 				extensions: "cfc,cfm",
-				fix: "Use service() or inject() from the DI container instead"
+				scanTargets: [
+					{path: "Application.cfc"},
+					{path: "config", extensions: "cfm,cfc", recurse: true}
+				],
+				fix: "Use service() / application.wheelsdi instead of application.wirebox; replace `new wirebox.system.ioc.Injector(...)` bootstraps with `new wheels.Injector()`. The legacy adapter does NOT shim this item."
+			});
+			// renderPage()/renderPageToString() removed in 4.0 — shimmed by
+			// the optional wheels-legacy-adapter package, but unshimmed apps
+			// throw at first render.
+			arrayAppend(checks, {
+				description: "Removed renderPage()/renderPageToString() helpers",
+				pattern: "renderPage(ToString)?\s*\(",
+				checkType: "grep",
+				scanDir: "app",
+				extensions: "cfc,cfm",
+				fix: 'Replace renderPage() with renderView() and renderPageToString() with renderView(returnAs="string"), or install the soft-landing shim: wheels packages add wheels-legacy-adapter'
+			});
+			// HSTS defaults on in production (guide item 2, ##2081). Advisory:
+			// fires on SecurityHeaders usage so proxied/LB setups know the
+			// header now emits by default.
+			arrayAppend(checks, {
+				description: "SecurityHeaders middleware — HSTS defaults on in production in 4.0 (advisory)",
+				severity: "advisory",
+				pattern: "new\s+wheels\.middleware\.SecurityHeaders",
+				checkType: "grep",
+				scanDir: "config",
+				extensions: "cfm,cfc",
+				fix: "4.0 emits Strict-Transport-Security (max-age=31536000; includeSubDomains) by default in production. Pass hsts=false to the middleware if your load balancer already sets it."
+			});
+			// CSRF cookie now sets SameSite (guide item 6, ##2035). Advisory:
+			// fires on CSRF protection usage — same-site flows are unaffected,
+			// but cross-site POSTs from third-party frames will break.
+			arrayAppend(checks, {
+				description: "CSRF cookie sets SameSite in 4.0 (advisory: review cross-site POST flows)",
+				severity: "advisory",
+				pattern: "protectsFromForgery",
+				checkType: "grep",
+				scanDir: "app",
+				extensions: "cfc",
+				fix: "The CSRF cookie now sets the SameSite attribute. Cross-site POSTs from third-party frames that relied on the missing attribute will break; same-site app flows are unaffected."
 			});
 			// CORS default flip — wildcard "*" → deny-all (#2039). A bare
 			// `new wheels.middleware.Cors()` accepts no requests in 4.0.
@@ -4156,17 +4988,21 @@ component extends="modules.BaseModule" {
 				extensions: "cfm,cfc",
 				fix: "Re-enable only for controlled staging environments. The 4.0 default rejects ?environment=... in production."
 			});
-			// CSRF key auto-generates when empty (#2054) but cookies rotate
-			// on every deploy when that happens. Warn if config/ never sets
-			// csrfEncryptionKey.
+			// CSRF cookie key auto-generates when empty (#2054) but cookies
+			// rotate on every deploy when that happens. Warn if config/ never
+			// sets csrfCookieEncryptionSecretKey — the setting the framework
+			// actually reads (vendor/wheels/controller/csrf.cfc). Only matters
+			// when csrfStore="cookie" (default store is "session"), and
+			// production throws Wheels.Security.MissingCsrfKey rather than
+			// auto-generating an ephemeral key.
 			arrayAppend(checks, {
-				description: "Missing csrfEncryptionKey (CSRF cookies rotate on every deploy)",
-				pattern: "csrfEncryptionKey",
+				description: "Missing csrfCookieEncryptionSecretKey (CSRF cookies rotate on every deploy when csrfStore=""cookie"")",
+				pattern: "csrfCookieEncryptionSecretKey",
 				checkType: "grep",
 				scanDir: "config",
 				extensions: "cfm,cfc",
 				absent: true,
-				fix: 'Set a stable key: set(csrfEncryptionKey = env("WHEELS_CSRF_KEY")).'
+				fix: 'Set a stable key: set(csrfCookieEncryptionSecretKey = env("WHEELS_CSRF_KEY")).'
 			});
 			// `wheels snippets` → `wheels generate snippets` rename (#1852).
 			// Scan build / CI scripts; the CLI command is invoked from
@@ -4329,18 +5165,21 @@ component extends="modules.BaseModule" {
 				}
 
 				if (structKeyExists(check, "scanTargets") && isArray(check.scanTargets)) {
-					for (var target in check.scanTargets) {
-						var targetPath = variables.projectRoot & "/" & target.path;
+					// `scanTarget`, not `target` — the function-level `target`
+					// above holds the target VERSION string and a same-named
+					// loop var would shadow (then clobber) it.
+					for (var scanTarget in check.scanTargets) {
+						var targetPath = variables.projectRoot & "/" & scanTarget.path;
 						if (fileExists(targetPath)) {
 							arrayAppend(filesToScan, targetPath);
 						} else if (directoryExists(targetPath)) {
-							var recurse = structKeyExists(target, "recurse") ? target.recurse : true;
+							var recurse = structKeyExists(scanTarget, "recurse") ? scanTarget.recurse : true;
 							// Avoid Elvis `?:` on `check.extensions` — Adobe CF
 							// throws when the key is absent. The `wheels snippets`
 							// check has no top-level `extensions`, so this branch
 							// is reached on every Adobe CF run when a target is a
 							// directory without its own `extensions` key.
-							var exts = structKeyExists(target, "extensions") ? target.extensions
+							var exts = structKeyExists(scanTarget, "extensions") ? scanTarget.extensions
 								: (structKeyExists(check, "extensions") ? check.extensions : "");
 							for (var ext in listToArray(exts)) {
 								var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
@@ -4370,7 +5209,7 @@ component extends="modules.BaseModule" {
 
 				// `absent: true` inverts the check — warn when the pattern
 				// is NOT found anywhere in the scanned set. Used for "you
-				// should be setting csrfEncryptionKey somewhere" style
+				// should be setting csrfCookieEncryptionSecretKey somewhere" style
 				// checks. If nothing was scannable (e.g. config/ missing),
 				// treat as pass to avoid noisy false positives.
 				var isAbsent = structKeyExists(check, "absent") && check.absent;
@@ -4403,46 +5242,311 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		// Output — three sections in priority order: Breaking → Recommended → All Clear
+		// The version-appropriate guide + the soft-landing adapter, surfaced
+		// whenever breaking findings are reported (and always in JSON output).
+		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
+			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
+
+		// `success` must reflect every condition that produces a non-zero
+		// exit, otherwise `jq .success` and `$?` disagree when --strict is
+		// active with advisory-only findings (#2963 review round 1).
+		var strictAdvisoryFail = arguments.strict && arrayLen(advisories) > 0;
+
+		// JSON mode — one machine-readable document, no human report. The
+		// breaking-findings throw below still fires so pipelines can gate on
+		// the exit code without parsing stdout.
+		if (jsonMode) {
+			out(serializeJSON({
+				"currentVersion": currentVersion,
+				"targetVersion": target,
+				"success": arrayLen(issues) == 0 && !strictAdvisoryFail,
+				"strict": arguments.strict,
+				"breaking": issues,
+				"advisories": advisories,
+				"passed": passed,
+				"guide": guideUrl
+			}));
+		} else {
+			// Output — three sections in priority order: Breaking → Recommended → All Clear
+			if (arrayLen(issues)) {
+				out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
+				for (var issue in issues) {
+					out("  ! #issue.description#", "yellow");
+					for (var match in issue.matches) {
+						out("    #match#");
+					}
+					out("    -> #issue.fix#", "cyan");
+					out("");
+				}
+				out("Upgrade guide: #guideUrl#", "cyan");
+				if (targetMajor >= 4) {
+					out("Soft landing: wheels packages add wheels-legacy-adapter (shims renderPage()/renderPageToString() while you migrate)", "cyan");
+				}
+				out("");
+			}
+
+			if (arrayLen(advisories)) {
+				out("Recommended Improvements (#arrayLen(advisories)# found):", "cyan");
+				for (var advisory in advisories) {
+					out("  ~ #advisory.description#", "cyan");
+					for (var match in advisory.matches) {
+						out("    #match#");
+					}
+					// Advisory fix lines are intentionally uncolored so the
+					// section header and description carry the cyan accent and
+					// opt-in items read lighter than breaking-change fixes
+					// (which use cyan on the fix line for stronger emphasis).
+					out("    -> #advisory.fix#");
+					out("");
+				}
+			}
+
+			if (arrayLen(passed)) {
+				out("All Clear (#arrayLen(passed)# checks):", "green");
+				for (var p in passed) {
+					out("  + #p#", "green");
+				}
+			}
+
+			out("");
+			// The framework swap is `wheels upgrade apply` (#3035) —
+			// `brew upgrade wheels` only updates the CLI binary, never the
+			// app's vendored framework copy.
+			out("Apply with: wheels upgrade apply");
+		}
+
+		// Throw after the full report flushes — breaking findings exit
+		// non-zero (CI gate), advisories and all-clear exit 0. Mirrors
+		// validate()'s Wheels.ValidationFailed convention.
 		if (arrayLen(issues)) {
-			out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
-			for (var issue in issues) {
-				out("  ! #issue.description#", "yellow");
-				for (var match in issue.matches) {
-					out("    #match#");
-				}
-				out("    -> #issue.fix#", "cyan");
-				out("");
-			}
+			throw(
+				type = "Wheels.UpgradeCheckFailed",
+				message = "Upgrade check found #arrayLen(issues)# breaking change(s) — see the report above."
+			);
 		}
 
-		if (arrayLen(advisories)) {
-			out("Recommended Improvements (#arrayLen(advisories)# found):", "cyan");
-			for (var advisory in advisories) {
-				out("  ~ #advisory.description#", "cyan");
-				for (var match in advisory.matches) {
-					out("    #match#");
-				}
-				// Advisory fix lines are intentionally uncolored so the
-				// section header and description carry the cyan accent and
-				// opt-in items read lighter than breaking-change fixes
-				// (which use cyan on the fix line for stronger emphasis).
-				out("    -> #advisory.fix#");
-				out("");
-			}
+		// #2963: --strict escalates advisory findings to the same hard-fail
+		// path. Reuses Wheels.UpgradeCheckFailed so CI pipelines that already
+		// filter on the breaking-case type pick the strict case up too. The
+		// breaking branch above already returned, so this fires only when
+		// strict mode is on AND at least one advisory matched but no
+		// breaking finding did.
+		if (arguments.strict && arrayLen(advisories)) {
+			throw(
+				type = "Wheels.UpgradeCheckFailed",
+				message = "Upgrade check found #arrayLen(advisories)# advisory finding(s) and --strict is set — see the report above."
+			);
 		}
-
-		if (arrayLen(passed)) {
-			out("All Clear (#arrayLen(passed)# checks):", "green");
-			for (var p in passed) {
-				out("  + #p#", "green");
-			}
-		}
-
-		out("");
-		out("Upgrade with: brew upgrade wheels");
 
 		return "";
+	}
+
+	// ── Upgrade Apply (bundled-source swap, #3035) ───
+
+	/**
+	 * Perform the framework swap: copy the CLI's bundled vendor/wheels/
+	 * over the project's vendor/wheels/, backing up the existing copy
+	 * first unless the user opted out.
+	 *
+	 * Scope (PR1, #3035): only the CLI's bundled framework is supported
+	 * as a source, so `--to=<version>` is an assertion — a value that
+	 * doesn't match the bundled version is a hard error. Downloading
+	 * arbitrary --to= targets (via ReleaseChannel) is the PR2 follow-up.
+	 *
+	 * Every refusal throws Wheels.UpgradeApplyFailed AFTER printing the
+	 * guidance, mirroring validate()'s print-then-throw convention so the
+	 * process exits non-zero (#2941) without losing the human-readable
+	 * explanation.
+	 */
+	private string function runUpgradeApply(string targetVersion = "", boolean doBackup = true) {
+		var nl = chr(10);
+
+		// resolveProjectRoot() falls back to cwd when no vendor/wheels/ is
+		// found walking up, so "is this a Wheels app?" is decided by the
+		// vendor/wheels/ probe below — not by projectRoot being empty.
+		var vendorDir = variables.projectRoot & "/vendor/wheels";
+		if (!$safeDirExists(vendorDir)) {
+			out("No vendor/wheels/ found at #vendorDir#", "red");
+			out("Run 'wheels upgrade apply' from an existing app's root, or scaffold a new app with 'wheels new <name>'.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "No vendor/wheels/ found at #vendorDir# — run `wheels upgrade apply` from a Wheels app root."
+			);
+		}
+
+		var sourceDir = $resolveBundledFrameworkSource();
+		if (!len(sourceDir)) {
+			out("Could not locate the CLI's bundled framework — the CLI install may be incomplete.", "red");
+			out("Tried (in order): the WHEELS_FRAMEWORK_PATH env var, then walking up from the module's own location.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "Could not locate the CLI's bundled framework (tried WHEELS_FRAMEWORK_PATH, then the module's own install tree)."
+			);
+		}
+
+		var upgrader = new services.FrameworkUpgrader();
+		var bundledVersion = upgrader.readFrameworkVersion(sourceDir);
+
+		if (len(arguments.targetVersion) && arguments.targetVersion != bundledVersion) {
+			out("Requested --to=#arguments.targetVersion# but the CLI's bundled framework is #len(bundledVersion) ? bundledVersion : 'unknown'#.", "yellow");
+			out("Either:");
+			out("  - Install a CLI that bundles your target (brew upgrade wheels / scoop update wheels), then re-run wheels upgrade apply.");
+			out("  - Or omit --to= to apply the bundled framework directly.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "--to=#arguments.targetVersion# does not match the CLI's bundled framework version (#bundledVersion#). Downloading arbitrary versions is not supported yet — see ##3035."
+			);
+		}
+
+		// Run the service's pre-mutation refusal checks BEFORE announcing the
+		// plan (#3039 review, blocking): the plan ends with the restore
+		// one-liner (`rm -rf "<vendor/wheels>" && mv …`), and printing it on
+		// a refusal path would hand the user a recovery command for a backup
+		// that was never made — running it deletes the intact vendor/wheels/.
+		// applyUpgrade() re-runs the same checks (idempotent reads, no drift
+		// risk); refusals here print-then-throw per the #2941 convention.
+		var validationError = upgrader.validateSwap(sourceDir, vendorDir);
+		if (len(validationError)) {
+			out(validationError, "red");
+			throw(type = "Wheels.UpgradeApplyFailed", message = validationError);
+		}
+
+		out("Source:  #sourceDir#");
+		out("Target:  #vendorDir#");
+		out("");
+
+		// Announce the full plan — the exact backup destination and the
+		// recovery one-liner — BEFORE any mutation (#3039 review). If the
+		// copy is interrupted or dies partway, the user is already holding
+		// the restore command instead of fishing an unannounced backup out
+		// of a stack trace. The reserved path is passed into applyUpgrade()
+		// so the announcement and the actual backup always agree.
+		var plan = "";
+		var backupPath = "";
+		if (arguments.doBackup) {
+			backupPath = upgrader.reserveBackupPath(vendorDir);
+			plan = "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
+				& "If this is interrupted, restore with:" & nl
+				& "  rm -rf ""#vendorDir#"" && mv ""#backupPath#"" ""#vendorDir#""" & nl;
+		} else {
+			plan = "Replacing vendor/wheels WITHOUT a backup (--nobackup) — the current copy is not recoverable if the swap fails." & nl;
+		}
+		out(plan);
+
+		var result = {};
+		try {
+			result = upgrader.applyUpgrade(sourceDir, vendorDir, arguments.doBackup, backupPath);
+		} catch (Wheels.FrameworkUpgrader e) {
+			// Hierarchical match: catches every service-thrown failure —
+			// CopyFailed (partial state; message names the backup to restore
+			// from, or the re-vendor instructions when --nobackup) and
+			// RenameFailed (backup rename refused; vendor/wheels/ intact).
+			// Print the message, then exit non-zero via the standard
+			// apply-failure type (print-then-throw, #2941).
+			out(e.message, "red");
+			throw(type = "Wheels.UpgradeApplyFailed", message = e.message);
+		}
+
+		if (!result.success) {
+			out(result.error, "red");
+			throw(type = "Wheels.UpgradeApplyFailed", message = result.error);
+		}
+
+		var summary = "";
+		if (len(result.oldVersion)) {
+			summary &= "Framework upgraded: #result.oldVersion# -> #result.newVersion#" & nl;
+		} else {
+			summary &= "Framework installed: #result.newVersion#" & nl;
+		}
+		if (len(result.backupDir)) {
+			summary &= "Backup:  #result.backupDir#" & nl;
+			summary &= "Recover with:  rm -rf ""#vendorDir#"" && mv ""#result.backupDir#"" ""#vendorDir#""" & nl;
+		}
+
+		// Surface root-level manifest files the user may want to review
+		// after the upgrade — version refs, dependencies, etc.
+		var rootFiles = $collectRootManifestSuggestions();
+		if (arrayLen(rootFiles)) {
+			summary &= nl & "Files that may carry a framework version reference to review:" & nl;
+			for (var f in rootFiles) {
+				summary &= "  - " & f & nl;
+			}
+		}
+
+		out(summary, "green");
+		// Return value carries the pre-swap plan too, so callers (and the
+		// dispatch specs) see the full command output in order.
+		return plan & nl & summary;
+	}
+
+	/**
+	 * Resolve the CLI's bundled framework source for apply mode. This
+	 * deliberately bypasses the project-root candidate that
+	 * resolveFrameworkSource() prefers — the project's vendor/wheels/ is
+	 * what we're upgrading, so it can never be the source.
+	 */
+	private string function $resolveBundledFrameworkSource() {
+		// 1. WHEELS_FRAMEWORK_PATH env var (same explicit-override semantics
+		//    as resolveFrameworkSource — an invalid path hard-fails rather
+		//    than silently falling through, see GH #2215).
+		var override = "";
+		try {
+			var javaSystem = createObject("java", "java.lang.System");
+			var envValue = javaSystem.getenv("WHEELS_FRAMEWORK_PATH");
+			if (!isNull(envValue)) {
+				override = envValue;
+			}
+		} catch (any e) {
+			// Env var not accessible in this runtime — treat as unset.
+		}
+		if (len(trim(override))) {
+			if ($safeDirExists(override)) {
+				return $normalizePath(override);
+			}
+			throw(
+				type = "Wheels.FrameworkPathInvalid",
+				message = "WHEELS_FRAMEWORK_PATH is set to '#override#' but that directory does not exist. Unset the variable to fall back to the CLI's bundled framework."
+			);
+		}
+
+		// 2. Walk up from moduleRoot looking for vendor/wheels/. On a brew
+		//    install moduleRoot is ~/.wheels/modules/wheels/, so the very
+		//    first candidate (./vendor/wheels) is the bundled framework; in
+		//    a repo checkout (cli/lucli/) the walk lands on the checkout's
+		//    own vendor/wheels/.
+		if (len(variables.moduleRoot)) {
+			var File = createObject("java", "java.io.File");
+			var dir = variables.moduleRoot;
+			for (var i = 0; i < 6; i++) {
+				var canonical = $normalizePath(File.init(dir).getCanonicalPath());
+				var candidate = canonical & "/vendor/wheels";
+				if ($safeDirExists(candidate)) {
+					return candidate;
+				}
+				var parent = File.init(canonical).getParent();
+				if (isNull(parent) || parent == canonical) break;
+				dir = parent;
+			}
+		}
+
+		return "";
+	}
+
+	/**
+	 * List root-level manifest / config files that may carry a wheels
+	 * version reference the user wants to review after an upgrade.
+	 * Filters to files that actually exist so the printed notice is
+	 * actionable.
+	 */
+	private array function $collectRootManifestSuggestions() {
+		var candidates = ["box.json", "wheels.json", "config/settings.cfm"];
+		var existing = [];
+		for (var rel in candidates) {
+			if (fileExists(variables.projectRoot & "/" & rel)) {
+				arrayAppend(existing, rel);
+			}
+		}
+		return existing;
 	}
 
 	// ── Test Execution ───────────────────────────────
@@ -4456,14 +5560,21 @@ component extends="modules.BaseModule" {
 		string db = "sqlite",
 		boolean ciMode = false,
 		boolean useTestDB = true,
-		boolean dbExplicit = false
+		boolean dbExplicit = false,
+		string basePath = ""
 	) {
 		var serverPort = $requireRunningServer([
 			"Start one with: wheels start",
 			"Or use: bash tools/test-local.sh (auto-manages server)"
 		]);
 
-		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
+		// Subfolder-mounted apps (`set(subpath="/myapp")`, #2985/#3026) serve the
+		// test runner under a URL prefix the rewrite layer expects — without it
+		// the request never routes to the app. Resolve the prefix from the
+		// explicit --base-path flag, else WHEELS_SUBPATH, else the subpath
+		// setting in config/settings.cfm; root-mounted apps resolve to "".
+		var resolvedBasePath = $resolveTestBasePath(basePath);
+		var testPath = $buildTestRunnerPath(coreTests, resolvedBasePath);
 
 		// Print the suite type with a truthful datasource label. Issue #2489:
 		// the previous output echoed `--db` even for app tests where the
@@ -4501,6 +5612,10 @@ component extends="modules.BaseModule" {
 		}
 
 		var testsFailed = false;
+		// Struct (not a bare local) so the catch-block write persists on
+		// BoxLang — local assignments inside catch are discarded there
+		// (CLAUDE.md cross-engine invariant 11).
+		var runState = {crashed = false};
 
 		try {
 			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
@@ -4537,7 +5652,7 @@ component extends="modules.BaseModule" {
 						break;
 					case "simple":
 					default:
-						displayTestResults(result, verboseOutput, resolvedDir);
+						displayTestResults(result, verboseOutput, resolvedDir, ciMode);
 				}
 
 				// Record failure so the command can exit non-zero AFTER the output
@@ -4545,7 +5660,9 @@ component extends="modules.BaseModule" {
 				// testing.mdx documents a non-zero exit on failure. CLI audit H6.
 				testsFailed = ((result.totalFail ?: 0) + (result.totalError ?: 0)) > 0;
 			} else {
-				// Could be an HTML error page
+				// Could be an HTML error page. Either way no result document was
+				// produced — the run crashed, which must exit non-zero (#2963).
+				runState.crashed = true;
 				if (reFindNoCase("<html", httpResult)) {
 					out("Server returned HTML instead of JSON — possible error page.", "red");
 					out("Check server logs or visit the test URL directly.", "yellow");
@@ -4555,6 +5672,7 @@ component extends="modules.BaseModule" {
 				}
 			}
 		} catch (any e) {
+			runState.crashed = true;
 			out("Test execution failed: #e.message#", "red");
 		}
 
@@ -4563,6 +5681,11 @@ component extends="modules.BaseModule" {
 		// tests failed, silently green-lighting broken builds. CLI audit H6.
 		if (testsFailed) {
 			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		}
+		// A crash during the HTTP/parse phase printed red but exited 0 — the
+		// throw above only covers FAILING tests, not CRASHED runs (#2963).
+		if (runState.crashed) {
+			throw(type = "Wheels.TestRunFailed", message = "Test run crashed before producing results — see the output above.");
 		}
 
 		return "";
@@ -4693,7 +5816,8 @@ component extends="modules.BaseModule" {
 	private void function displayTestResults(
 		required any result,
 		boolean verboseOutput = false,
-		string testDirectory = ""
+		string testDirectory = "",
+		boolean ciMode = false
 	) {
 		if (!isStruct(result)) {
 			out(serializeJSON(result));
@@ -4801,6 +5925,105 @@ component extends="modules.BaseModule" {
 				}
 			}
 		}
+
+		// CI mode (--ci): emit GitHub Actions-style error annotations so each
+		// failure/error surfaces inline in CI logs and PR-check annotations.
+		// testing.mdx documents --ci as tightening output for GitHub Actions
+		// and similar runners; before #3113 the flag was parsed and threaded
+		// through to here but never consumed — byte-identical to a plain run.
+		if (arguments.ciMode) {
+			for (var annotation in $buildCiAnnotations(arguments.result)) {
+				out(annotation);
+			}
+		}
+	}
+
+	/**
+	 * Build GitHub Actions workflow-command annotations (one `::error` line per
+	 * failed or errored spec) from a TestBox result memento. Returns an empty
+	 * array when nothing failed. Pure (no I/O) so it is unit-testable without a
+	 * live server — the `--ci` consumer added for issue #3113.
+	 *
+	 * Format: `::error title=<spec>::<message>`. Message/title are encoded per
+	 * the workflow-command rules (newlines → %0A, % → %25, and `:`/`,` in the
+	 * title) so a multi-line failMessage stays a single annotation line.
+	 */
+	public array function $buildCiAnnotations(required any result) {
+		var annotations = [];
+		if (!isStruct(arguments.result)) {
+			return annotations;
+		}
+
+		// Walk bundle → suite (recursively) → spec, collecting failures. Mirror
+		// the emitTapResults() walker: the closure references itself by name and
+		// appends to a parent struct field (not a bare array) so the mutation is
+		// seen by reference — the established pattern on the CLI's bundled Lucee.
+		var ctx = {failures: []};
+		var walkSuite = function(suite) {
+			for (var spec in (suite.specStats ?: [])) {
+				var status = spec.status ?: "";
+				if (status == "Failed" || status == "Error") {
+					var message = "";
+					if (status == "Failed") {
+						message = spec.failMessage ?: "";
+					} else if (structKeyExists(spec, "error") && isStruct(spec.error)) {
+						message = spec.error.message ?: "";
+					}
+					arrayAppend(ctx.failures, {name: (spec.name ?: "(unnamed spec)"), message: message});
+				}
+			}
+			// Suite-level failure with no specs (compile error, beforeAll threw).
+			if (
+				arrayIsEmpty(suite.specStats ?: [])
+				&& listFindNoCase("Failed,Error", suite.status ?: "")
+			) {
+				arrayAppend(ctx.failures, {
+					name: (suite.name ?: "(unnamed suite)") & " (suite-level)",
+					message: suite.globalException ?: ""
+				});
+			}
+			for (var inner in (suite.suiteStats ?: [])) {
+				walkSuite(inner);
+			}
+		};
+		for (var bundle in (arguments.result.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				walkSuite(suite);
+			}
+		}
+
+		for (var failure in ctx.failures) {
+			arrayAppend(
+				annotations,
+				"::error title=" & $encodeAnnotationProperty(failure.name)
+					& "::" & $encodeAnnotationData(failure.message)
+			);
+		}
+		return annotations;
+	}
+
+	/**
+	 * Encode a GitHub Actions workflow-command data segment (the message after
+	 * `::`). Percent must be escaped first, then carriage returns dropped and
+	 * line feeds collapsed to %0A so the annotation stays one line.
+	 */
+	private string function $encodeAnnotationData(required string value) {
+		var encoded = replace(arguments.value, "%", "%25", "all");
+		encoded = replace(encoded, chr(13), "", "all");
+		encoded = replace(encoded, chr(10), "%0A", "all");
+		return encoded;
+	}
+
+	/**
+	 * Encode a GitHub Actions workflow-command property value (e.g. `title=`).
+	 * Properties additionally escape `:` and `,` so they don't terminate the
+	 * property list.
+	 */
+	private string function $encodeAnnotationProperty(required string value) {
+		var encoded = $encodeAnnotationData(arguments.value);
+		encoded = replace(encoded, ":", "%3A", "all");
+		encoded = replace(encoded, ",", "%2C", "all");
+		return encoded;
 	}
 
 	private void function displaySuite(required struct suite, string indent = "") {
@@ -6045,6 +7268,78 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Resolve the URL base path the app is mounted under, for the test-runner
+	 * request. Precedence (issue #3026): an explicit value (the --base-path
+	 * flag) wins; otherwise the WHEELS_SUBPATH environment variable; otherwise
+	 * a `set(subpath="...")` call scanned out of config/settings.cfm (CFML
+	 * comments stripped first — Anti-Pattern 14). Root-mounted apps resolve to
+	 * "". The returned value is normalized (leading slash, no trailing slash)
+	 * so callers can prefix it directly onto the runner path.
+	 */
+	public string function $resolveTestBasePath(string explicit = "") {
+		// 1. Explicit flag wins over any derivation.
+		if (len(trim(arguments.explicit))) {
+			return $normalizeBasePath(arguments.explicit);
+		}
+
+		// 2. WHEELS_SUBPATH environment variable — mirrors how the framework
+		//    reads it in $resolveFrameworkPaths()/$get("subpath").
+		try {
+			var envValue = createObject("java", "java.lang.System").getenv("WHEELS_SUBPATH");
+			if (!isNull(envValue) && len(trim(envValue))) {
+				return $normalizeBasePath(envValue);
+			}
+		} catch (any e) {}
+
+		// 3. set(subpath="...") in config/settings.cfm. Strip comments first so a
+		//    commented-out call can't false-match (Anti-Pattern 14). The word
+		//    boundary keeps `coreTestSubpath`-style siblings from matching.
+		var settingsFile = variables.projectRoot & "/config/settings.cfm";
+		if (fileExists(settingsFile)) {
+			var settingsContent = stripCfmlComments(fileRead(settingsFile));
+			var settingsMatch = reFindNoCase('\bsubpath\b\s*=\s*"([^"]*)"', settingsContent, 1, true);
+			if (arrayLen(settingsMatch.match) > 1 && len(trim(settingsMatch.match[2]))) {
+				return $normalizeBasePath(settingsMatch.match[2]);
+			}
+		}
+
+		return "";
+	}
+
+	/**
+	 * Normalize a URL base path to a leading slash with no trailing slash,
+	 * mirroring the framework's $resolveFrameworkPaths() in
+	 * vendor/wheels/Global.cfc. Empty/whitespace input and a bare root slash
+	 * both resolve to "" (root mount — no prefix to add).
+	 */
+	public string function $normalizeBasePath(required string raw) {
+		var normalized = trim(arguments.raw);
+		if (!len(normalized)) {
+			return "";
+		}
+		if (left(normalized, 1) != "/") {
+			normalized = "/" & normalized;
+		}
+		// Strip trailing slash(es). Guard the Len > 1 floor so we never call
+		// Left(str, 0), which crashes Lucee 7 (CLAUDE.md cross-engine invariant 8).
+		while (len(normalized) > 1 && right(normalized, 1) == "/") {
+			normalized = left(normalized, len(normalized) - 1);
+		}
+		// A bare "/" means the app is at the server root — no prefix.
+		return normalized == "/" ? "" : normalized;
+	}
+
+	/**
+	 * Build the test-runner request path, prefixed by the (normalized) base
+	 * path. Core tests hit /wheels/core/tests; app tests hit /wheels/app/tests.
+	 * issue #3026.
+	 */
+	public string function $buildTestRunnerPath(boolean coreTests = false, string basePath = "") {
+		var prefix = $normalizeBasePath(arguments.basePath);
+		return prefix & (arguments.coreTests ? "/wheels/core/tests" : "/wheels/app/tests");
+	}
+
+	/**
 	 * Check if a port is responding to HTTP requests
 	 */
 	private boolean function isPortOpen(required numeric port) {
@@ -6122,14 +7417,78 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function makeHttpRequest(required string requestUrl) {
+		return makeHttpRequestWithStatus(arguments.requestUrl).body;
+	}
+
+	/**
+	 * GET `requestUrl` and return BOTH the final status code and the body:
+	 * `{statusCode: numeric, body: string}`. Callers that need to act on the
+	 * HTTP status (reload's 302-vs-200 contract, #3059) use this directly;
+	 * everything else keeps the body-only makeHttpRequest() wrapper above.
+	 *
+	 * `followRedirects=false` surfaces the raw 3xx instead of the post-
+	 * redirect response — required by reload(), where following the
+	 * success-redirect would make a real reload (302 -> 200 at `/`)
+	 * indistinguishable from the wrong-password page render (200).
+	 */
+	private struct function makeHttpRequestWithStatus(
+		required string requestUrl,
+		boolean followRedirects = true
+	) {
 		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
 		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("GET");
+		conn.setInstanceFollowRedirects(javacast("boolean", arguments.followRedirects));
 		conn.setConnectTimeout(5000);
 		conn.setReadTimeout(120000);
 
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		// getErrorStream() returns Java null on a bodiless 4xx/5xx response;
+		// Scanner.init(null) NPEs on Lucee and surfaces as a useless "null"
+		// error message (#2947 review, #2977). No body — return empty.
+		if (isNull(inputStream)) {
+			return { statusCode = responseCode, body = "" };
+		}
+		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
+		var response = "";
+		while (scanner.hasNextLine()) {
+			response &= scanner.nextLine() & chr(10);
+		}
+		scanner.close();
+		return { statusCode = responseCode, body = trim(response) };
+	}
+
+	/**
+	 * POST to a /wheels/cli bridge URL. State-changing bridge commands
+	 * (migrate, seed, forget/pretend, rename-system-tables, ...) require
+	 * POST + the reload password — the framework rejects them over GET so
+	 * they cannot be CSRF-fired from a browser. The password is
+	 * auto-detected from .env / config/settings.cfm and sent as a form
+	 * field to keep it out of the URL and access logs.
+	 */
+	private string function makeBridgePost(required string requestUrl) {
+		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
+		var conn = javaUrl.openConnection();
+		conn.setRequestMethod("POST");
+		conn.setConnectTimeout(5000);
+		conn.setReadTimeout(120000);
+		conn.setDoOutput(true);
+		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+
+		var writer = createObject("java", "java.io.OutputStreamWriter").init(conn.getOutputStream(), "UTF-8");
+		writer.write("password=" & urlEncodedFormat(detectReloadPassword()));
+		writer.flush();
+		writer.close();
+
+		var responseCode = conn.getResponseCode();
+		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		// getErrorStream() returns Java null on a bodiless 4xx/5xx response;
+		// Scanner.init(null) NPEs on Lucee and surfaces as a useless "null"
+		// error message (#2947 review, #2977). No body — return empty.
+		if (isNull(inputStream)) {
+			return "";
+		}
 		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
 		while (scanner.hasNextLine()) {
@@ -6160,6 +7519,12 @@ component extends="modules.BaseModule" {
 		// Read response (handle both success and error streams)
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+		// getErrorStream() returns Java null on a bodiless 4xx/5xx response;
+		// Scanner.init(null) NPEs on Lucee and surfaces as a useless "null"
+		// error message (#2947 review, #2977). No body — return empty.
+		if (isNull(inputStream)) {
+			return "";
+		}
 		var scanner = createObject("java", "java.util.Scanner").init(inputStream, "UTF-8");
 		var response = "";
 		while (scanner.hasNextLine()) {
@@ -6412,6 +7777,7 @@ component extends="modules.BaseModule" {
 	private string function browserTest(array args = []) {
 		var format = "text";
 		var verboseOutput = false;
+		var basePath = "";
 		// Default to the APP's browser specs (tests/specs/browser/) — not the
 		// framework's internal browser specs. Onboarding finding F11 reported
 		// `wheels browser test` running 0 tests because it pointed at
@@ -6428,6 +7794,8 @@ component extends="modules.BaseModule" {
 				format = valueAfterEquals(arg);
 			} else if (reFindNoCase("^--directory=", arg)) {
 				directory = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--base-path=", arg)) {
+				basePath = valueAfterEquals(arg);
 			} else if (!arg.startsWith("--")) {
 				directory = arg;
 			}
@@ -6478,7 +7846,12 @@ component extends="modules.BaseModule" {
 		// core test runner (`/wheels/core/tests`). The latter only knows
 		// about specs under `vendor/wheels/tests/specs/`. Apps live under
 		// `tests/specs/`, mounted by the app runner. F11.
-		var testUrl = "http://localhost:#serverPort#/wheels/app/tests?db=sqlite&format=json&directory=#directory#";
+		//
+		// Prefix the subfolder base path (#3026) so browser tests reach the
+		// runner on a subpath-mounted app the same way `wheels test` does.
+		var resolvedBasePath = $resolveTestBasePath(basePath);
+		var runnerPath = $buildTestRunnerPath(false, resolvedBasePath);
+		var testUrl = "http://localhost:#serverPort##runnerPath#?db=sqlite&format=json&directory=#directory#";
 
 		try {
 			var httpResult = makeHttpRequest(testUrl);

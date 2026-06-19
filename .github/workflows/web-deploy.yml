@@ -290,11 +290,36 @@ jobs:
       # elsewhere — investigators can see the failure with the un-committed
       # refreshed blog.png in the diffs artifact and update baselines once
       # the non-blog regression is fixed.
-      - name: Commit pre-refreshed blog baseline
+      #
+      # develop's branch protection rejects direct pushes (GH013: changes
+      # must be made through a pull request) — the old `git push
+      # origin HEAD:develop` retry loop failed all 5 attempts on every run,
+      # permanently stranding the refreshed baseline (issue #2915). The
+      # refresh now lands through a PR opened with the wheels-bot app token
+      # (app-token PRs trigger CI, unlike GITHUB_TOKEN PRs) and merged by
+      # this job once the required check reports. The repo has
+      # allow_auto_merge=false, so this polls-and-merges instead of using
+      # `gh pr merge --auto`. The docs/bot- branch prefix makes the
+      # required "Bot PR TDD Gate" check a declared no-op for this
+      # docs-artifact-only PR.
+      - name: Create wheels-bot app token for baseline PR
+        id: baseline-app-token
         if: |
           github.event_name == 'push' &&
           needs.detect-scope.outputs.blog_content_changed == 'true' &&
           steps.regress.outcome == 'success'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      - name: Open and merge blog-baseline refresh PR
+        if: |
+          github.event_name == 'push' &&
+          needs.detect-scope.outputs.blog_content_changed == 'true' &&
+          steps.regress.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.baseline-app-token.outputs.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -304,44 +329,60 @@ jobs:
             echo "Baseline did not actually change after pre-refresh — exiting clean."
             exit 0
           fi
-          # [skip ci] keeps this push from re-triggering the deploy
-          # workflow and creating a publish loop.
-          git commit -m "chore(docs): auto-refresh blog visual baseline after content change [skip ci]"
 
-          # Retry with fetch+rebase: develop can move while this ~3-min job
-          # is running (e.g., another PR merges right behind a blog content
-          # push). Without retry, a dropped push here leaves the baseline
-          # stale on develop and trips every subsequent non-blog PR until
-          # someone refreshes manually.
-          for attempt in 1 2 3 4 5; do
-            git fetch origin develop
-            if ! git rebase origin/develop; then
-              # Rebase conflict is vanishingly unlikely (we only touch one PNG)
-              # and would mean a parallel run also refreshed the baseline.
-              # In that case our refresh is redundant — drop it.
-              # `|| true` so a failed --abort (e.g., already-clean rebase state)
-              # doesn't trip set -e and turn the exit-0 path into exit-1.
-              git rebase --abort || true
-              echo "Rebase conflict on attempt $attempt — abandoning auto-refresh (parallel refresh likely already landed)."
-              exit 0
-            fi
-            if git push origin HEAD:develop; then
-              echo "Pushed baseline refresh on attempt $attempt."
-              exit 0
-            fi
-            # Skip the backoff (and the misleading "will retry" message) on
-            # the last iteration — no retry follows it; the loop falls through
-            # to the exit-1 path below.
-            if [ "$attempt" -lt 5 ]; then
-              echo "Push rejected on attempt $attempt; will fetch + rebase + retry."
-              sleep $((RANDOM % 5 + 2))
-            else
-              echo "Push rejected on attempt $attempt (final attempt, no retry)."
-            fi
+          branch="docs/bot-refresh-blog-baseline-${GITHUB_RUN_ID}"
+          git checkout -b "$branch"
+          git commit -m "chore(docs): auto-refresh blog visual baseline after content change"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${branch}"
+
+          pr_body_file="$(mktemp)"
+          {
+            printf '%s\n\n' "## Summary"
+            printf '%s\n' "A blog-content merge changed the blog index page, so the committed visual-regression baseline at \`web/tests/visual-baselines/blog.png\` is stale. Without this refresh, every subsequent \`web/**\`-touching PR fails the Visual regression check on a deterministic diff until someone refreshes manually (issue #2915)."
+            printf '\n%s\n\n' "develop's branch protection rejects direct pushes, so the refresh lands through this PR, opened and merged by the deploy run that published the blog change."
+            printf '%s\n' "🤖 Opened automatically by .github/workflows/web-deploy.yml."
+          } > "$pr_body_file"
+
+          pr_url=$(gh pr create \
+            --base develop \
+            --head "$branch" \
+            --title "chore(docs): refresh blog visual baseline after content change" \
+            --body-file "$pr_body_file")
+          rm -f "$pr_body_file"
+          echo "Opened $pr_url"
+
+          # Required check: "Bot PR TDD Gate" (a declared no-op for docs/bot-*
+          # branches). Status-check policy is non-strict and required reviews
+          # are zero, so the PR is mergeable as soon as the gate reports —
+          # even if develop moves meanwhile. Poll bounded so a stuck check
+          # fails this step visibly instead of hanging the job.
+          merged=false
+          for attempt in $(seq 1 40); do
+            states=$(gh pr checks "$pr_url" --required --json state \
+              --jq 'map(.state) | unique | join(",")' 2>/dev/null || echo "PENDING")
+            case "$states" in
+              SUCCESS)
+                # [skip ci] keeps the squash commit from re-triggering this
+                # deploy workflow and creating a publish loop.
+                gh pr merge "$pr_url" --squash --delete-branch \
+                  --subject "chore(docs): auto-refresh blog visual baseline after content change [skip ci]"
+                echo "Merged baseline refresh on attempt $attempt."
+                merged=true
+                break
+                ;;
+              *FAILURE*|*ERROR*|*CANCELLED*)
+                echo "Required check failed on the baseline PR — leaving $pr_url open for manual handling."
+                exit 1
+                ;;
+              *)
+                sleep 15
+                ;;
+            esac
           done
-          echo "Failed to push baseline refresh after 5 attempts — develop is unusually contended."
-          echo "The auto-refresh will be retried on the next push that touches web/content/blog/posts/."
-          exit 1
+          if [ "$merged" != "true" ]; then
+            echo "Required checks did not report within 10 minutes — leaving $pr_url open for manual handling."
+            exit 1
+          fi
 
       # Upload BEFORE the explicit-fail step. Without this ordering, the
       # fail step exits 1 first and Actions skips subsequent steps (even

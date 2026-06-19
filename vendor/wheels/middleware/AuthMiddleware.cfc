@@ -33,6 +33,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 *                application.$wheels.authenticator or application.wheels.authenticator at request time.
 	 * @strategies Comma-delimited list or array of strategy names to restrict authentication to.
 	 *             If empty, all registered strategies are tried. Useful for per-route strategy selection.
+	 *             When set, the authenticator must expose authenticateWith(request, strategies)
+	 *             (wheels.auth.Authenticator does; previously the restricted path required the
+	 *             equally non-interface getStrategy()).
 	 * @onFailure Optional callback invoked on authentication failure. Receives (request, authResult)
 	 *            and must return a response string. If not provided, returns a JSON error with the
 	 *            appropriate HTTP status code.
@@ -69,9 +72,12 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	public string function handle(required struct request, required any next) {
 		local.auth = $resolveAuthenticator();
 
-		// Authenticate — restricted to specific strategies or all
+		// Authenticate — restricted to specific strategies or all. Strategy
+		// filtering is delegated to the Authenticator so the restricted path
+		// shares its diagnostics (zero registered strategies, unknown strategy
+		// names) and AuthResult construction.
 		if (ArrayLen(variables.strategies)) {
-			local.result = $authenticateWithStrategies(local.auth, arguments.request);
+			local.result = local.auth.authenticateWith(request = arguments.request, strategies = variables.strategies);
 		} else {
 			local.result = local.auth.authenticate(arguments.request);
 		}
@@ -126,53 +132,6 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			type = "Wheels.Auth.NoAuthenticator",
 			message = "AuthMiddleware could not resolve an Authenticator. Pass one to init() or register one in application.$wheels.authenticator."
 		);
-	}
-
-	/**
-	 * Authenticate using only the specified strategies from the registry.
-	 * Strategies are tried in the order listed in the strategies array.
-	 */
-	private struct function $authenticateWithStrategies(required any auth, required struct request) {
-		local.lastError = "";
-		local.lastStatusCode = 401;
-
-		for (local.strategyName in variables.strategies) {
-			if (!arguments.auth.hasStrategy(local.strategyName)) {
-				continue;
-			}
-
-			local.strategy = arguments.auth.getStrategy(local.strategyName);
-
-			if (!local.strategy.supports(arguments.request)) {
-				continue;
-			}
-
-			local.result = local.strategy.authenticate(arguments.request);
-
-			if (local.result.success) {
-				// Stamp strategy name if not already set
-				if (!Len(local.result.strategy)) {
-					local.result.strategy = local.strategyName;
-				}
-				return local.result;
-			}
-
-			local.lastError = local.result.error;
-			local.lastStatusCode = local.result.statusCode;
-		}
-
-		// All specified strategies failed or were not found
-		if (!Len(local.lastError)) {
-			local.lastError = "No authentication strategy supports this request";
-		}
-
-		return {
-			success = false,
-			principal = {},
-			strategy = "",
-			error = local.lastError,
-			statusCode = local.lastStatusCode
-		};
 	}
 
 	/**

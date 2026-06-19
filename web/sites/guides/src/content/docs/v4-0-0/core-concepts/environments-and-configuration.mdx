@@ -14,30 +14,33 @@ Wheels ships with three named environments, a small stack of configuration files
 - Where configuration lives and the order files load in
 - How `set()` writes into the settings struct and how overrides cascade
 - How the active environment is chosen at boot
+- How to switch environments at runtime — and what gates it
 - Where secrets belong — and where they don't
 
 ## The three environments
 
-| Environment | When it's used | Typical settings |
-|-------------|----------------|------------------|
+| Environment | When it's used | Framework defaults |
+|-------------|----------------|--------------------|
 | `development` | Local dev server | Verbose errors, hot reload, debug helpers visible |
-| `testing` | Test suite runs | Clean DB reset per spec, shorter timeouts, deterministic time |
-| `production` | Real users | Errors hidden, caches warmed, log rotation, HTTPS enforced |
+| `testing` | Test suite runs | Debug UI off, `/wheels/*` public component disabled, caching on, URL environment switching blocked by default |
+| `production` | Real users | Errors hidden, caching on, debug UI and `/wheels/*` public component disabled |
 
 A fourth value, `maintenance`, is supported for planned downtime. Most apps never need it.
 
+These are the defaults the framework itself flips per environment. Operational concerns like log rotation and HTTPS enforcement are not framework settings — handle those in your web server, or use the `SecurityHeaders` middleware for transport-security headers.
+
 ## Where settings live
 
-Configuration loads from a small set of files in `config/`. The framework reads them in order at application start and on every `wheels reload`:
+Configuration loads from a small set of files in `config/`. The framework reads them in order at application start and on every reload (`?reload=true&password=...`):
 
-- `config/app.cfm` — init-time hooks for the `this` scope of `Application.cfc` (app name, session timeout). Runs once per app start.
+- `config/app.cfm` — hooks for the `this` scope of `Application.cfc` (app name, session timeout). It's included from the `Application.cfc` pseudo-constructor, so it *executes on every request* — its `this`-scope effects apply at application start, but don't put side effects in it that aren't safe to run per request.
+- `config/environment.cfm` — sets the active environment name. This runs *first* at application start: the framework derives its environment-dependent defaults (error verbosity, caching, debug UI) from this value before any other config file loads.
 - `config/settings.cfm` — shared defaults that apply to every environment. Middleware list, datasource name, reload password.
-- `config/environment.cfm` — reads the active environment name, typically from `WHEELS_ENV` with a sane default.
 - `config/<environment>/settings.cfm` — per-environment overrides. `config/development/settings.cfm`, `config/testing/settings.cfm`, `config/production/settings.cfm`. Loaded *after* the shared file, so these win.
 - `config/services.cfm` — DI container registrations. See [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/).
 - `config/routes.cfm` — route definitions. See [How Routing Works](/v4-0-0/core-concepts/how-routing-works/).
 
-The per-environment override directory is only read for the environment you're in. `config/production/settings.cfm` never runs in development, which is exactly what you want when production is where the caching and HTTPS enforcement belong.
+The per-environment override directory is only read for the environment you're in. `config/production/settings.cfm` never runs in development, which is exactly what you want when production is where the extra caching belongs.
 
 ## The `set()` pattern
 
@@ -46,8 +49,11 @@ Every framework setting is written with one function: `set(key=value)`. It write
 ```cfm title="illustrative — config/settings.cfm"
 set(dataSourceName = "myapp_dev");
 set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""));
-set(environment = env("WHEELS_ENV", "development"));
 ```
+
+One exception: don't `set(environment=...)` here. Environment selection belongs in `config/environment.cfm` only — by the time `settings.cfm` runs, the framework has already derived its environment-dependent defaults, so setting the environment this late produces a half-switched app (the environment reports `production` while verbose error details, development caching flags, and `allowMigrationDown` persist from the boot-time value).
+
+Also note that a blank `reloadPassword` currently permits *anonymous* `?reload=true` restarts — the password check is skipped entirely when no password is configured ([#3062](https://github.com/wheels-dev/wheels/issues/3062)). Set a real reload password in every environment.
 
 Settings cascade: framework defaults load first, then `config/settings.cfm`, then `config/<environment>/settings.cfm`. Later writes win. A value you set in the shared file is the default for every environment; the environment-specific file only needs to name the keys it changes.
 
@@ -55,7 +61,37 @@ One development-only default worth noting: `reloadOnGlobalChange` (defaults `tru
 
 ## Environment detection
 
-The active environment is set by `config/environment.cfm`, which typically reads `WHEELS_ENV` from the environment variables with a default of `development`. The `wheels` CLI respects the same variable, and `.env` files loaded at boot get merged into the lookup. Override in CI or production by exporting `WHEELS_ENV=production` before the app starts — a deploy script, a Dockerfile `ENV`, or a systemd unit is the usual place.
+The active environment is whatever `config/environment.cfm` sets — and the scaffold hard-codes it:
+
+```cfm title="illustrative — config/environment.cfm (as generated)"
+set(environment = "development");
+```
+
+Exporting `WHEELS_ENV` does **not** change the environment on a stock app: nothing in the generated `environment.cfm` reads it, and the `wheels` CLI ignores the variable entirely. In a generated app, the exported value's only built-in effect is selecting which `.env.<name>` overlay file loads at boot.
+
+To drive the environment from a variable, two edits are required:
+
+1. Change `config/environment.cfm` to read it:
+
+   ```cfm title="illustrative — config/environment.cfm"
+   set(environment = env("WHEELS_ENV", "development"));
+   ```
+
+2. Remove the `WHEELS_ENV=development` line the scaffold writes into `.env`. `env()` checks `.env` *before* OS environment variables, so that line shadows any exported `WHEELS_ENV=production` until it's gone.
+
+With both edits in place, export `WHEELS_ENV=production` before the app starts — a deploy script, a Dockerfile `ENV`, or a systemd unit is the usual place.
+
+## Switching environments at runtime
+
+A running app can switch environments without a redeploy: request `?reload=<environment>&password=<reloadPassword>` (for example `?reload=testing&password=...`). The framework restarts the application, carries the switch parameters through the restart redirect, and boots into the requested environment — including switches into `production` or `maintenance`, after which the redirect strips the parameters. Requesting the environment you're already in is a no-op; for a plain same-environment restart use `?reload=true&password=<reloadPassword>`, which strips the reload parameters from the redirect.
+
+The gate is `allowEnvironmentSwitchViaUrl`. Any explicit boolean you `set()` is honored in every environment. If you never touch it, the default is `false` in `production`, `testing`, and `maintenance`, and `true` everywhere else. Leave it disabled in production.
+
+In development, the debug bar's Environment panel offers the same switch as quick-switch links: they render when a `reloadPassword` is configured and switching via the URL is allowed, and clicking one prompts for the reload password (it is never embedded in the page).
+
+One caveat, tracked as an open issue:
+
+- The `wheels reload` CLI command can report success even when the reload didn't take effect ([#3059](https://github.com/wheels-dev/wheels/issues/3059)) — verify with the URL form.
 
 ## Secrets handling
 

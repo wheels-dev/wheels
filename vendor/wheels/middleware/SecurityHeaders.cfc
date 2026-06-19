@@ -19,7 +19,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @strictTransportSecurity Strict-Transport-Security value. Auto-defaults to `max-age=31536000; includeSubDomains` in production when not explicitly set.
 	 * @hsts Set to false to suppress the Strict-Transport-Security header entirely, regardless of environment or strictTransportSecurity value. Useful when a TLS-terminating proxy already emits HSTS.
 	 * @permissionsPolicy Permissions-Policy value. Empty by default (opt-in) because it is app-specific.
-	 * @environment Application environment (e.g. "production", "development"). When empty, falls back to application.$wheels.environment if available.
+	 * @environment Application environment (e.g. "production", "development"). When empty, falls back to application.$wheels.environment (during application start) and then application.wheels.environment (after start) if available.
 	 */
 	public SecurityHeaders function init(
 		string frameOptions = "SAMEORIGIN",
@@ -35,11 +35,18 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		variables.headers = {};
 
 		// Resolve environment: explicit parameter > application.$wheels.environment
+		// (during application start) > application.wheels.environment (after start).
+		// onapplicationstart renames application.$wheels to application.wheels when it
+		// finishes, and route-scoped string middleware is instantiated per request —
+		// long after the rename — so checking only $wheels would silently disable
+		// the production HSTS auto-default for those instantiations.
 		local.env = arguments.environment;
 		if (!Len(local.env)) {
 			try {
 				if (StructKeyExists(application, "$wheels") && StructKeyExists(application.$wheels, "environment")) {
 					local.env = application.$wheels.environment;
+				} else if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "environment")) {
+					local.env = application.wheels.environment;
 				}
 			} catch (any e) {
 				// application scope may not be available during testing

@@ -261,6 +261,256 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("$normalizeBasePath (issue 3026)", () => {
+
+			it("returns empty string for empty or whitespace input", () => {
+				expect(mod.$normalizeBasePath("")).toBe("");
+				expect(mod.$normalizeBasePath("   ")).toBe("");
+			});
+
+			it("adds a leading slash when missing", () => {
+				expect(mod.$normalizeBasePath("myapp")).toBe("/myapp");
+			});
+
+			it("leaves an already-leading-slash value intact", () => {
+				expect(mod.$normalizeBasePath("/myapp")).toBe("/myapp");
+			});
+
+			it("strips a single trailing slash", () => {
+				expect(mod.$normalizeBasePath("/myapp/")).toBe("/myapp");
+				expect(mod.$normalizeBasePath("myapp/")).toBe("/myapp");
+			});
+
+			it("strips multiple trailing slashes", () => {
+				expect(mod.$normalizeBasePath("/myapp///")).toBe("/myapp");
+			});
+
+			it("treats a bare root slash as no prefix", () => {
+				expect(mod.$normalizeBasePath("/")).toBe("");
+			});
+
+		});
+
+		describe("$buildTestRunnerPath (issue 3026)", () => {
+
+			it("returns the root-mounted app path when no base path is given", () => {
+				expect(mod.$buildTestRunnerPath(false, "")).toBe("/wheels/app/tests");
+			});
+
+			it("returns the root-mounted core path when coreTests is true", () => {
+				expect(mod.$buildTestRunnerPath(true, "")).toBe("/wheels/core/tests");
+			});
+
+			it("prefixes the base path onto the app runner path", () => {
+				expect(mod.$buildTestRunnerPath(false, "/myapp")).toBe("/myapp/wheels/app/tests");
+			});
+
+			it("prefixes the base path onto the core runner path", () => {
+				expect(mod.$buildTestRunnerPath(true, "/myapp")).toBe("/myapp/wheels/core/tests");
+			});
+
+			it("normalizes an un-normalized base path before prefixing", () => {
+				expect(mod.$buildTestRunnerPath(false, "myapp/")).toBe("/myapp/wheels/app/tests");
+			});
+
+		});
+
+		describe("$resolveTestBasePath (issue 3026)", () => {
+
+			it("returns empty when no flag, env, or subpath setting is present", () => {
+				var sandbox = $scaffold(settingsBody = "");
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("")).toBe("");
+				$tearDown(sandbox);
+			});
+
+			it("normalizes and returns an explicit flag value", () => {
+				var sandbox = $scaffold(settingsBody = "");
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("wheelsproject1/")).toBe("/wheelsproject1");
+				$tearDown(sandbox);
+			});
+
+			it("derives the base path from set(subpath=...) in config/settings.cfm", () => {
+				var sandbox = $scaffold(settingsBody = 'set(subpath="/myapp");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("")).toBe("/myapp");
+				$tearDown(sandbox);
+			});
+
+			it("normalizes a derived subpath lacking a leading slash", () => {
+				var sandbox = $scaffold(settingsBody = 'set(subpath="myapp");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("")).toBe("/myapp");
+				$tearDown(sandbox);
+			});
+
+			it("lets an explicit flag win over a settings-derived subpath", () => {
+				var sandbox = $scaffold(settingsBody = 'set(subpath="/fromsettings");');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("/fromflag")).toBe("/fromflag");
+				$tearDown(sandbox);
+			});
+
+			it("ignores a commented-out subpath setting", () => {
+				var body =
+					"// set(subpath=" & chr(34) & "/commented" & chr(34) & ");" & chr(10) &
+					"set(subpath=" & chr(34) & "/active" & chr(34) & ");";
+				var sandbox = $scaffold(settingsBody = body);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveTestBasePath("")).toBe("/active");
+				$tearDown(sandbox);
+			});
+
+		});
+
+		describe("test command base-path wiring (issue 3026)", () => {
+
+			it("exposes --base-path on the test ArgSpec and MCP tool schema", () => {
+				var schema = mod.mcpToolSpecs()["test"];
+				expect(schema.properties).toHaveKey("base-path");
+			});
+
+		});
+
+		describe("--ci annotation builder ($buildCiAnnotations, issue 3113)", () => {
+
+			it("returns an empty array when nothing failed", () => {
+				var anns = mod.$buildCiAnnotations($passingResult());
+				expect(anns).toBeArray();
+				expect(arrayLen(anns)).toBe(0);
+			});
+
+			it("emits one ::error annotation per failed and errored spec", () => {
+				var anns = mod.$buildCiAnnotations($mixedResult());
+				expect(arrayLen(anns)).toBe(2);
+				var joined = arrayToList(anns, chr(10));
+				expect(joined).toInclude("::error ");
+				expect(joined).toInclude("fails a thing");
+				expect(joined).toInclude("expected true to be false");
+				expect(joined).toInclude("errors a thing");
+				expect(joined).toInclude("boom NPE");
+			});
+
+			it("encodes newlines and percent signs in the annotation message", () => {
+				var result = $failingResult("line1" & chr(10) & "50% off");
+				var anns = mod.$buildCiAnnotations(result);
+				expect(anns[1]).toInclude("line1%0A");
+				expect(anns[1]).toInclude("50%25 off");
+				// The raw newline must not survive — annotations are single-line.
+				expect(anns[1]).notToInclude(chr(10));
+			});
+
+		});
+
+		describe("--ci / --verbose observable output (issue 3113)", () => {
+
+			it("a plain run prints neither a per-spec tree nor CI annotations", () => {
+				var cap = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+				var printed = cap.renderResults($passingResult(), false, false);
+				expect(printed).notToInclude("[PASS]");
+				expect(printed).notToInclude("::error");
+			});
+
+			it("--verbose prints per-spec PASS lines", () => {
+				var cap = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+				var printed = cap.renderResults($passingResult(), true, false);
+				expect(printed).toInclude("[PASS]");
+				expect(printed).toInclude("passes a thing");
+			});
+
+			it("--ci prints GitHub Actions error annotations for failures", () => {
+				var cap = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+				var printed = cap.renderResults($mixedResult(), false, true);
+				expect(printed).toInclude("::error");
+				expect(printed).toInclude("fails a thing");
+			});
+
+		});
+
+		// The LuCLI picocli root defines -v/--verbose as GLOBAL options and
+		// consumes them wherever they sit on the command line, so the token
+		// never reaches parseTestArgs() ("wheels test --verbose" forwards only
+		// "test" to the module — verified live in issue 3113). The runtime
+		// conveys the flag through init(verboseEnabled=...) instead, and
+		// test() must honor it for --verbose to have any observable effect.
+		describe("$resolveTestVerbosity (--verbose / -v consumed by the LuCLI root, issue 3113)", () => {
+
+			it("is false for a plain run", () => {
+				expect(mod.$resolveTestVerbosity(false)).toBeFalse();
+			});
+
+			it("honors the runtime verboseEnabled flag set by a root-consumed --verbose / -v", () => {
+				var vmod = new cli.lucli.Module(cwd = variables.tempRoot, verboseEnabled = true);
+				expect(vmod.$resolveTestVerbosity(false)).toBeTrue();
+			});
+
+			it("honors a --verbose token that does reach the module's own parser", () => {
+				expect(mod.$resolveTestVerbosity(true)).toBeTrue();
+			});
+
+		});
+
+	}
+
+	/**
+	 * A TestBox result memento where every spec passed. Shaped like the
+	 * JSONReporter getMemento() the CLI deserializes from /wheels/app|core/tests.
+	 */
+	private struct function $passingResult() {
+		return {
+			totalPass: 1, totalFail: 0, totalError: 0, totalDuration: 12,
+			bundleStats: [{
+				name: "tests.specs.FooSpec",
+				suiteStats: [{
+					name: "Foo feature",
+					status: "Passed",
+					specStats: [{ name: "passes a thing", status: "Passed" }],
+					suiteStats: []
+				}]
+			}]
+		};
+	}
+
+	/**
+	 * A result with one pass, one failure, and one error spec.
+	 */
+	private struct function $mixedResult() {
+		return {
+			totalPass: 1, totalFail: 1, totalError: 1, totalDuration: 34,
+			bundleStats: [{
+				name: "tests.specs.FooSpec",
+				suiteStats: [{
+					name: "Foo feature",
+					status: "Failed",
+					specStats: [
+						{ name: "passes a thing", status: "Passed" },
+						{ name: "fails a thing", status: "Failed", failMessage: "expected true to be false" },
+						{ name: "errors a thing", status: "Error", error: { message: "boom NPE" } }
+					],
+					suiteStats: []
+				}]
+			}]
+		};
+	}
+
+	/**
+	 * A result with a single failure carrying the given fail message — used
+	 * to exercise annotation message encoding.
+	 */
+	private struct function $failingResult(required string failMessage) {
+		return {
+			totalPass: 0, totalFail: 1, totalError: 0, totalDuration: 5,
+			bundleStats: [{
+				name: "tests.specs.FooSpec",
+				suiteStats: [{
+					name: "Foo feature",
+					status: "Failed",
+					specStats: [{ name: "fails a thing", status: "Failed", failMessage: arguments.failMessage }],
+					suiteStats: []
+				}]
+			}]
+		};
 	}
 
 	/**

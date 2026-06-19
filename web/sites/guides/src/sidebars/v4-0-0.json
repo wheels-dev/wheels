@@ -6,6 +6,7 @@
       { "label": "Welcome to Wheels", "link": "/v4-0-0/start-here/welcome/" },
       { "label": "Why Wheels?", "link": "/v4-0-0/start-here/why-wheels/" },
       { "label": "Installing Wheels", "link": "/v4-0-0/start-here/installing/" },
+      { "label": "Installing with CommandBox", "link": "/v4-0-0/start-here/installing-with-commandbox/" },
       { "label": "Your First 15 Minutes", "link": "/v4-0-0/start-here/first-15-minutes/" },
       {
         "label": "Tutorial: Build a Blog",
@@ -65,6 +66,7 @@
       { "label": "Sending Email", "link": "/v4-0-0/digging-deeper/sending-email/" },
       { "label": "File Uploads & Downloads", "link": "/v4-0-0/digging-deeper/file-uploads-and-downloads/" },
       { "label": "Server-Sent Events", "link": "/v4-0-0/digging-deeper/server-sent-events/" },
+      { "label": "Channels", "link": "/v4-0-0/digging-deeper/channels/" },
       { "label": "Internationalization", "link": "/v4-0-0/digging-deeper/internationalization/" },
       { "label": "Multi-tenancy", "link": "/v4-0-0/digging-deeper/multi-tenancy/" },
       { "label": "Packages", "link": "/v4-0-0/digging-deeper/packages/" },

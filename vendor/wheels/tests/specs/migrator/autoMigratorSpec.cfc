@@ -415,6 +415,25 @@ component extends="wheels.WheelsTest" {
 					expect(local.result).toBeStruct();
 				});
 
+				it("throws on an out-of-range heuristicThreshold instead of reporting no drift", () => {
+					// Pre-fix, the per-model catch swallowed the InvalidThreshold
+					// throw from every diff() call and diffAll() returned an empty
+					// struct — silently reporting "no drift" for a config error.
+					expect(() => {
+						autoMigrator.diffAll(options = {heuristicThreshold: 5});
+					}).toThrow("Wheels.InvalidThreshold");
+				});
+
+				it("rethrows invalid rename hints instead of silently skipping the model", () => {
+					// Ensure the Author model is registered so diffAll() reaches it.
+					g.model("Author");
+					expect(() => {
+						autoMigrator.diffAll(options = {
+							hints: {"Author": {renames: {"no_such_column_xyz": "also_missing_xyz"}}}
+						});
+					}).toThrow("Wheels.InvalidRenameHint");
+				});
+
 			});
 
 			describe("diff() — rename integration", () => {

@@ -14,7 +14,7 @@ This page is for readers who want to understand how `wheels deploy` is put toget
 
 - Why `wheels deploy` is a port of [Basecamp's Kamal](https://kamal-deploy.org/) rather than a new tool
 - The byte-compatibility contract that makes a Kamal-managed server takeoverable by `wheels deploy` without cleanup
-- The one deliberate divergence from Kamal's config schema (ERB removed; `${VAR}` interpolation kept unchanged) and why
+- The deliberate divergences from Kamal's config schema (ERB removed, unimplemented top-level keys rejected; `${VAR}` interpolation kept unchanged) and why
 - The commands-are-strings invariant that makes `--dry-run` trivial and lets the test suite run offline
 - How the three third-party JARs load in isolation so they don't collide with the rest of the JVM
 
@@ -43,6 +43,14 @@ The design bet: a server managed by Ruby Kamal can be taken over by `wheels depl
 | Hook env prefix | `KAMAL_*` |
 | Secret file | `.kamal/secrets`, `.kamal/secrets.<destination>` |
 
+<Aside type="caution" title="Three rows are still aspirational">
+The values above are what the code is written against, but three rows don't hold on a live host yet ([#2957](https://github.com/wheels-dev/wheels/issues/2957)):
+
+- **Audit log** — `/tmp/kamal-audit.log` is never written; the audit `record()` command builder has no call sites.
+- **Docker network** — containers are run with `--network kamal`, but `docker network create kamal` is never issued, so on a host not previously managed by Ruby Kamal the network doesn't exist.
+- **Proxy config dir** — the path is built as `/home/<user>/.config/kamal-proxy/`, which resolves to `/home/root` for the default `root` SSH user; root's home is actually `/root` — and Ruby Kamal mounts a named Docker volume (`kamal-proxy-config`) rather than a host home path, so the bind mount diverges from Kamal either way.
+</Aside>
+
 Two choices in that table warrant commentary.
 
 **Why `KAMAL_*` and not `WHEELS_*`.** Every hook script ever written for Ruby Kamal reads environment variables named `KAMAL_SERVICE`, `KAMAL_VERSION`, and so on. Renaming to `WHEELS_*` would be slightly more consistent with the rest of the Wheels CLI — and it would break every user's existing hook scripts for zero benefit.
@@ -55,9 +63,9 @@ If you have a working Ruby Kamal setup, you can run `wheels deploy config` again
 
 See [Migrating from Kamal](/v4-0-0/deployment/migrating-from-kamal/) for the complete switch-over checklist.
 
-## The one divergence: ERB removed
+## The big divergence: ERB removed
 
-`config/deploy.yml` does not support ERB. This is the only schema-level incompatibility with Ruby Kamal, and it's deliberate.
+`config/deploy.yml` does not support ERB. This is the main schema-level incompatibility with Ruby Kamal, and it's deliberate. (The other is that Kamal top-level keys the port hasn't implemented — `boot`, `logging`, `retain_containers`, … — are [rejected by the validator](/v4-0-0/deployment/config-reference/#rejected-kamal-keys) instead of silently ignored.)
 
 Ruby Kamal allows ERB inside `deploy.yml`:
 
@@ -78,10 +86,9 @@ image: ${REGISTRY}/${APP_NAME}
 
 The interpolator (`ConfigLoader.$interpolate`) walks the parsed YAML tree and resolves each `${VAR}` token through this lookup chain:
 
-1. CLI `--env` overrides (test/CI shims).
-2. `.kamal/secrets`, then `.kamal/secrets.<destination>` overlay if `--destination` is set.
-3. `System.getenv(VAR)` on the machine running `wheels deploy`.
-4. Empty string for unset vars (matching Kamal's behavior).
+1. `.kamal/secrets`, then `.kamal/secrets.<destination>` overlay if `--destination` is set. Known defect: this leg resolves the secrets file relative to `deploy.yml`'s own directory — `config/.kamal/secrets` for the standard layout — so the project-root `.kamal/secrets` the rest of the CLI uses is never consulted ([#3084](https://github.com/wheels-dev/wheels/issues/3084)).
+2. `System.getenv(VAR)` on the machine running `wheels deploy`.
+3. Empty string for unset vars (matching Kamal's behavior).
 
 Only uppercase-and-underscore tokens are expanded — the regex is `\$\{([A-Z_][A-Z0-9_]*)\}`. That keeps shell-style `${service}` placeholders elsewhere in the config from being captured by accident, the same rule Kamal applies.
 
@@ -90,7 +97,7 @@ No conditionals, no method calls, no computed expressions. If your existing conf
 We considered preserving ERB by shelling out to a system Ruby. The problem is that it turns a single-binary install into a "works if you also have Ruby" story, and every user without Ruby installed gets a cryptic error on their first deploy. Naming the divergence up front — and keeping Kamal's `${VAR}` syntax untouched — is the honest trade-off.
 
 <Aside type="note" title="Mustache is used elsewhere — not in deploy.yml at runtime">
-The `cli/lucli/services/deploy/lib/Mustache.cfc` wrapper is a thin facade over jmustache, but it is **not** applied to `deploy.yml` at runtime. It's used by `wheels deploy init` to render the initial scaffolding templates (`config/deploy.yml` and `.kamal/secrets`) when a project doesn't have one yet. Once those files exist, `${VAR}` is the only interpolation that runs.
+The `cli/lucli/services/deploy/lib/Mustache.cfc` wrapper is a thin facade over jmustache, but it is **not** applied to `deploy.yml` at runtime. It's used by `wheels deploy init` to render the initial scaffolding templates (`config/deploy.yml`, `.kamal/secrets`, `Dockerfile`, and `.dockerignore`) when a project doesn't have them yet. Once those files exist, `${VAR}` is the only interpolation that runs.
 </Aside>
 
 ## Commands-are-strings invariant
@@ -136,7 +143,7 @@ The separation of `cli/` (user-facing orchestration) from `commands/` (pure comm
 
 - **snakeyaml** — YAML parsing for `config/deploy.yml`
 - **sshj** (with BouncyCastle transitives) — SSH transport
-- **jmustache** — template rendering for the `wheels deploy init` scaffolding (`deploy.yml.mustache`, `secrets.mustache`); not applied to `deploy.yml` at runtime
+- **jmustache** — template rendering for the `wheels deploy init` scaffolding (`deploy.yml.mustache`, `secrets.mustache`, `Dockerfile.mustache`, `dockerignore.mustache`); not applied to `deploy.yml` at runtime
 
 These JARs load through a dedicated `URLClassLoader` isolated from the main JVM classpath. That isolation matters because CFML engines (Lucee, Adobe CF) ship their own copies of some transitive dependencies (older BouncyCastle versions, in particular). Without isolation, class-resolution order would be nondeterministic and you'd get obscure `NoSuchMethodError` failures depending on load order.
 

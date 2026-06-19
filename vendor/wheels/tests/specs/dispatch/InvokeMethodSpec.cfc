@@ -42,11 +42,14 @@ component extends="wheels.WheelsTest" {
 			it("invokes a Public.cfc instance without throwing on $blockInProduction", function() {
 				// End-to-end shape of the dispatch flow at Dispatch.cfc:287.
 				// We don't actually serve a request — we just verify the
-				// adapter can invoke a Public.cfc handler. In non-production
-				// environments $blockInProduction() short-circuits to a no-op,
-				// so the only thing we're testing is "did the receiver survive
+				// adapter can invoke a Public.cfc handler. In the development
+				// environment $blockInProduction() short-circuits to a no-op
+				// (since #2903 the gate is a development-only allowlist), so
+				// the only thing we're testing is "did the receiver survive
 				// the dispatch?" If it didn't, the call throws before the
-				// include statement runs.
+				// include statement runs. (This spec invokes the ungated
+				// index() handler, so the production-only early-return below
+				// is belt-and-suspenders.)
 				if (
 					StructKeyExists(application, "wheels")
 					&& StructKeyExists(application.wheels, "environment")

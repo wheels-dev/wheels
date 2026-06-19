@@ -10,6 +10,7 @@ import {
   fixturePath,
 } from '../lib/tutorial-fixture.mjs';
 import { assertCliResult } from '../lib/cli-assert.mjs';
+import { RESOLVED_WHEELS } from '../lib/exec.mjs';
 
 function findFreePort() {
   return new Promise((resolve, reject) => {
@@ -91,7 +92,13 @@ export class TutorialSession {
     // and deadlocking the child (which would surface as a spurious
     // waitForListening timeout). The timeout error message alone is
     // diagnostic enough; add an env-gated log capture later if needed.
-    const proc = spawn('wheels', ['start'], {
+    //
+    // Spawn RESOLVED_WHEELS, not bare 'wheels': this is the only spawn
+    // site that can't go through runExec() (we need the long-running
+    // child handle), and a bare PATH lookup here would let the tutorial
+    // dev server run a different binary than the one the attestation
+    // line names (and would ignore WHEELS_BIN). See #3042.
+    const proc = spawn(RESOLVED_WHEELS, ['start'], {
       cwd: fixturePath(),
       stdio: ['ignore', 'ignore', 'ignore'],
       shell: false,

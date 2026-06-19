@@ -435,9 +435,10 @@ component output="false" {
 			local.scopeDef = variables.modelReference.$classData().scopes[arguments.missingMethodName];
 
 			if (StructKeyExists(local.scopeDef, "handler") && Len(local.scopeDef.handler)) {
+				local.sanitizedArgs = variables.modelReference.$sanitizeScopeHandlerArgs(arguments.missingMethodArguments);
 				local.spec = variables.modelReference.$invoke(
 					method = local.scopeDef.handler,
-					invokeArgs = arguments.missingMethodArguments
+					invokeArgs = local.sanitizedArgs
 				);
 			} else {
 				local.spec = Duplicate(local.scopeDef);

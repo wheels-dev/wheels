@@ -1,6 +1,6 @@
 ---
 title: "Upgrade"
-description: wheels upgrade check — scan an existing project for known breaking changes against the current release (or a pinned target), without touching any files.
+description: wheels upgrade — check for breaking changes before upgrading (check), or swap vendor/wheels/ from the CLI bundle (apply).
 type: reference
 sidebar:
   order: 10
@@ -8,21 +8,23 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-`wheels upgrade` is a **read-only scanner**. It compares the framework version installed in `vendor/wheels/` against a target release, then greps the project for patterns that are known to break between major versions. It does **not** swap out `vendor/wheels/`, edit `box.json`, rewrite your code, or install anything. That part of the upgrade happens through your package manager — the CLI just tells you what will be waiting for you on the other side.
+`wheels upgrade` has two verbs. `wheels upgrade check` is a **read-only scanner** — it compares the framework version installed in `vendor/wheels/` against a target release, then greps the project for patterns that are known to break between major versions. `wheels upgrade apply` performs the actual framework swap, replacing `vendor/wheels/` with the copy bundled inside the installed CLI. Neither verb edits `box.json`, rewrites your code, or installs packages.
 
 **You'll use this for:**
 
-- Previewing a major-version bump (2 → 3, 3 → 4) before you pull the trigger.
-- Confirming an upgrade is "clean" — same major version, no code changes expected.
-- Pinning the scan to a specific target with `--to=<version>` when you're not chasing the latest release.
+- Previewing a major-version bump (2 → 3, 3 → 4) before you pull the trigger — `check`.
+- Confirming an upgrade is "clean" — same major version, no code changes expected — `check`.
+- Pinning the scan to a specific target with `--to=<version>` when you're not chasing the latest release — `check`.
+- Swapping `vendor/wheels/` from the CLI bundle without a manual zip dance — `apply`.
 
 ### Synopsis
 
 ``` title="Synopsis"
-wheels upgrade check [--to=<version>]
+wheels upgrade check [--to=<version>] [--format=json] [--strict]
+wheels upgrade apply [--to=<version>] [--nobackup]
 ```
 
-Calling `wheels upgrade` with no subcommand (or any subcommand other than `check`) prints usage and exits. The only verb the command currently understands is `check`.
+Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0. Any other subcommand — a typo like `wheels upgrade chekc` — prints the usage and then hard-errors with a non-zero exit, so a misspelled verb in a script fails loudly instead of looking like a successful run.
 
 ### What it does
 
@@ -33,23 +35,25 @@ Calling `wheels upgrade` with no subcommand (or any subcommand other than `check
 3. **Compares major versions.** If current and target share the same major, the command notes "Same major version — no known breaking changes" for the major-transition checks, then still runs its advisory scan for the same-major patterns below.
 4. **Runs breaking-change checks.** Each check is either a directory existence test or a regex grep across a sub-tree of the project. Major-version transitions add their own checks on top of the advisory scan. Hits are printed as issues (yellow); absences are printed as passed checks (green).
 
+**Exit status:** when breaking findings exist the command throws `Wheels.UpgradeCheckFailed` after the report flushes, exiting non-zero so it can gate CI. Without `--strict`, advisory findings never affect the exit code. With `--strict`, advisory findings escalate to the same hard-fail path — useful for CI pipelines that want to gate on opt-in convention changes, not just breaking ones. With `--format=json` the human report is replaced by a single JSON document (`currentVersion`, `targetVersion`, `success`, `strict`, `breaking`, `advisories`, `passed`, `guide`) — the non-zero exit on breaking or strict-mode advisory findings still applies. The document's `success` field tracks the exit code precisely: it is `false` whenever the process exits non-zero, including the `--strict` + advisory-only case, and the `strict` field is echoed back so consumers can tell `success: false` with empty `breaking[]` apart from a data inconsistency.
+
 Nothing in the project is modified. No files are written. The command does not stage, commit, or touch git state.
 
 ### Prerequisites
 
 None that the command enforces — but in practice:
 
-- **Commit first.** The scanner is read-only, but the actual upgrade (`brew upgrade wheels`, a fresh `vendor/wheels/` drop-in, etc.) will replace framework code. Have a clean working tree so you can diff and roll back.
+- **Commit first.** The scanner is read-only, but the actual upgrade — `wheels upgrade apply` (or a manual `vendor/wheels/` drop-in if you vendor by hand) — replaces framework code. Have a clean working tree so you can diff and roll back. (`brew upgrade wheels` only updates the CLI binary, never your app's vendored framework copy.)
 - **Run your tests.** Rerun the test suite after the framework swap, not after this command — `wheels upgrade check` does not exercise anything, it only greps.
 - **Internet access** is required when you don't pass `--to=`. The command fetches the latest release tag from GitHub.
 
-### Flags
+### Flags — `check`
 
 | Flag | Description |
 |---|---|
 | `--to=<version>` | Target version to scan against (e.g. `--to=4.0.0`). When omitted, the command queries GitHub for the latest release tag. If the GitHub call fails and no `--to=` is given, the command aborts. |
-
-That is the complete flag surface. The command does not accept `--force`, `--dry-run`, `--check`, `--backup`, or any apply-style switch — there is nothing to apply.
+| `--format=json` | Emit a single machine-readable JSON report instead of the human output — for CI pipelines. Breaking findings (and advisory findings when `--strict` is set) still exit non-zero. |
+| `--strict` | Escalate advisory findings (the "Recommended Improvements" section) to the same hard-fail path as breaking findings. The command throws `Wheels.UpgradeCheckFailed` and exits non-zero so CI can gate on opt-in convention changes. Without this flag, advisories are reported but never fail the check. Mirrors Django's `--fail-level WARNING` / Mix's `--warnings-as-errors`. |
 
 ### Example
 
@@ -75,18 +79,19 @@ Breaking Changes (2 found):
 All Clear (1 checks):
   + Direct WireBox references
 
-Upgrade with: brew upgrade wheels
+Apply with: wheels upgrade apply
 ```
 
 When current and target share a major version, the major-transition note is shown but the advisory scan still runs:
 
-```text title="illustrative — same-major output"
+```text title="illustrative — same-major output (trimmed)"
 Current version: 4.0.0
 Target version:  4.0.1
 
-Same major version — no known breaking changes between majors.
-(advisory scan still runs against the same-major patterns)
-Upgrade with: brew upgrade wheels
+Same major version — no known breaking changes.
+Scanning for opt-in recommendations...
+
+Apply with: wheels upgrade apply
 ```
 
 ### What gets checked
@@ -95,21 +100,24 @@ The checks are hard-coded in the CLI and keyed by the major-version transition:
 
 **2.x → 3.x**
 
-- Existence of `app/plugins/` (legacy plugin directory).
-- `extends="wheels.Test"` anywhere under `tests/` (old BDD base class).
+- Existence of `plugins/` at the project root (legacy plugin directory; skipped on a 2.x → 4.x jump where the 4.x check below covers it).
+- `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/` (old test base classes).
 
 **3.x → 4.x**
 
 - Existence of `plugins/` at the project root (deprecated plugin location).
-- `extends="wheels.Test"` anywhere under `tests/`.
-- `application.wirebox` references anywhere under `app/` — these must move to `service()` / `inject()` on the new DI container.
+- `extends="wheels.Test"` or `extends="wheels.Testbox"` (either quote style) anywhere under `tests/`.
+- `application.wirebox` or `wirebox.system.ioc` references under `app/`, `config/`, and the root `Application.cfc` — these must move to `service()` / `application.wheelsdi`, and `new wirebox.system.ioc.Injector(...)` bootstraps to `new wheels.Injector()` (#1888).
+- `renderPage()` / `renderPageToString()` under `app/` — removed in 4.0; replace with `renderView()` / `renderView(returnAs="string")`, or install `wheels-legacy-adapter` for a soft landing.
 - `new wheels.middleware.Cors()` without `allowOrigins` in `config/` — the 4.0 default changed from wildcard to deny-all (#2039).
 - `new wheels.middleware.RateLimiter` in `config/` — prompts the user to verify `trustProxy` and `proxyStrategy`, whose defaults hardened in 4.0 (#2024, #2088).
 - `allowEnvironmentSwitchViaUrl=true` in `config/` — the production default flipped to `false` (#2076).
-- Missing `csrfEncryptionKey` in `config/` — when absent the key auto-generates and CSRF cookies rotate on every deploy (#2054).
+- Missing `csrfCookieEncryptionSecretKey` in `config/` — when absent the key auto-generates and CSRF cookies rotate on every deploy (#2054).
 - Legacy `wheels snippets` in `Makefile`, `package.json`, `.github/workflows/`, and top-level `*.sh` files — renamed to `wheels generate snippets` (#1852).
 - Existence of `tests/specs/functions/` — renamed to `tests/specs/functional/` (#1872).
 - `viteScriptTag`, `viteStyleTag`, or `vitePreloadTag` in `app/views/` — `viteStrictManifest` now defaults to `true` in production, throwing on missing manifest entries (#2133).
+- *(advisory)* `new wheels.middleware.SecurityHeaders` in `config/` — HSTS defaults on in production in 4.0; pass `hsts=false` if your load balancer already sets it (#2081).
+- *(advisory)* `protectsFromForgery` under `app/` — the CSRF cookie now sets `SameSite`; cross-site POSTs from third-party frames will break (#2035).
 
 Each grep scan covers the file types relevant to that check (`.cfc` and `.cfm` for config and view checks; `Makefile`, `package.json`, `.yml`, `.yaml`, and `.sh` for the `wheels snippets` check) and reports `path:lineNumber` for every hit. Directory checks report only the top-level path when the directory exists and is non-empty.
 
@@ -117,25 +125,79 @@ Each grep scan covers the file types relevant to that check (`.cfc` and `.cfm` f
 The scanner catches the patterns that are most commonly missed during a major upgrade — it is not a full migration checklist. Read the release notes for the target version alongside the scan output.
 </Aside>
 
+### `wheels upgrade apply`
+
+`wheels upgrade apply` replaces the app's `vendor/wheels/` with the copy of the framework bundled inside the installed CLI binary. Before any file is touched, the command announces the plan — printing the reserved backup path and the exact one-liner to recover if the swap is interrupted:
+
+```text title="illustrative — pre-swap announcement"
+Backing up vendor/wheels -> vendor/wheels.bak-20260611-141502
+If this is interrupted, restore with:
+  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+```
+
+After the swap, it reports the version transition, the backup location, and the recovery one-liner:
+
+```text title="illustrative — swap summary"
+Framework upgraded: 3.5.1 -> 4.0.2
+Backup:  /path/to/app/vendor/wheels.bak-20260611-141502
+Recover with:  rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+```
+
+If a safety check refuses the swap, the command prints only the refusal and exits non-zero — no backup is made and no restore command is shown, because there is nothing to restore.
+
+Safety checks run before any mutation:
+- Source (CLI-bundled) and target (`vendor/wheels/`) must each sniff as a valid Wheels framework directory — a generic `box.json` is not sufficient.
+- The command refuses to run inside the Wheels repo checkout itself (source = target).
+- The command refuses outside a Wheels app (no `vendor/wheels/`).
+
+#### Flags — `apply`
+
+| Flag | Description |
+|---|---|
+| `--to=<version>` | Assert that the CLI's bundled framework is exactly this version. Errors if the bundled version does not match — `--to` on `apply` is a safety assertion, not a download trigger. Use `wheels upgrade check --to=<version>` to scan before applying. |
+| `--nobackup` | Skip the backup. The old `vendor/wheels/` is deleted before the new copy is placed. Useful when disk space is a concern or you have your own rollback strategy (git). |
+
+#### Example
+
+```bash title="typical upgrade sequence"
+wheels upgrade check          # scan for breaking changes first
+wheels upgrade apply          # swap vendor/wheels/ with automatic backup
+```
+
+```bash title="no-backup apply"
+wheels upgrade apply --nobackup
+```
+
 ### What gets updated
 
-Nothing. The scanner is read-only. To actually move to a new release:
+**`check` verb:** Nothing — the scanner is read-only.
 
-- **Homebrew:** `brew upgrade wheels` — replaces the `wheels` CLI binary.
-- **Project `vendor/wheels/`:** swap the directory manually, or regenerate the app skeleton against the new release and port your `app/` into it.
+**`apply` verb:** `vendor/wheels/` is replaced with the framework bundled in the installed CLI. By default, the old copy is moved to a timestamped `vendor/wheels.bak-*` directory before the swap, so recovery is a single `mv`.
 
-Framework upgrades live outside the CLI by design. `wheels upgrade check` is the safety net you run before and after.
+To also update the CLI binary itself:
+- **Homebrew:** `brew upgrade wheels`
+- **Scoop:** `scoop update wheels`
+
+After each CLI upgrade, run `wheels upgrade apply` to update your app's vendored framework copy.
 
 ### Rollback
 
-Because the command writes no files, there is nothing to roll back. If you proceed with the actual upgrade and it goes sideways, the standard git recovery applies to your project:
+**`check` verb:** Because the command writes no files, there is nothing to roll back.
 
-```bash title="illustrative"
+**`apply` verb:** The old `vendor/wheels/` is moved to a timestamped backup before the swap. The pre-swap announcement prints the exact recovery command — copy it before the swap completes if you want it on hand:
+
+```bash title="recovery — from pre-swap announcement"
+rm -rf "/path/to/app/vendor/wheels" && mv "/path/to/app/vendor/wheels.bak-20260611-141502" "/path/to/app/vendor/wheels"
+```
+
+If you passed `--nobackup`, recover from git instead:
+
+```bash title="git restore"
 git restore vendor/wheels/
 git clean -fd vendor/wheels/
 ```
 
-Or revert the commit that introduced the new `vendor/wheels/` tree. The CLI binary itself is managed by your package manager — `brew` keeps the previous cellar around for `brew switch`-style rollback.
+Or revert the commit that recorded the new `vendor/wheels/` tree. The CLI binary itself is managed by your package manager — `brew` keeps the previous cellar around for `brew switch`-style rollback.
 
 ### Related commands
 

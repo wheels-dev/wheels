@@ -128,8 +128,8 @@ component extends="wheels.Controller" {
 
 1. **View** — add a hidden token field to any `POST`/`PUT`/`PATCH`/`DELETE` form with `authenticityTokenField()` (view helper in `vendor/wheels/view/csrf.cfc`, line 26). Form helpers like `startFormTag()` insert it automatically for non-GET forms.
 2. **View (AJAX)** — add `csrfMetaTags()` to your layout `<head>` (line 10 of the same file). It emits two `<meta>` tags your JavaScript reads to send the token as an `X-CSRF-Token` header.
-3. **Controller pipeline** — before each action runs, `$runCsrfProtection(action)` (`vendor/wheels/controller/csrf.cfc` line 37) checks the `only`/`except` filters, calls `$verifyAuthenticityToken()` (line 63), and throws, aborts, or ignores per the `with` setting.
-4. **Verification** — `$isVerifiedRequest()` (line 82) short-circuits on GET/HEAD/OPTIONS; otherwise it matches `params.authenticityToken` against the session-stored token (`CsrfVerifyToken`) or the cookie-stored token depending on `application.wheels.csrfStore` (session by default, see `vendor/wheels/events/init/security.cfm` line 3).
+3. **Controller pipeline** — before each action runs, `$runCsrfProtection(action)` (`vendor/wheels/controller/csrf.cfc` line 37) checks the `only`/`except` filters, calls `$verifyAuthenticityToken()` (line 59), and throws, aborts, or ignores per the `with` setting.
+4. **Verification** — `$isVerifiedRequest()` (line 78) short-circuits on GET/HEAD/OPTIONS; otherwise it matches `params.authenticityToken` against the session-stored token (`CsrfVerifyToken`) or the cookie-stored token depending on `application.wheels.csrfStore` (session by default, see `vendor/wheels/events/init/security.cfm` line 3).
 
 ### Disable per-action for API endpoints
 
@@ -152,7 +152,9 @@ For an entire JSON API under `/api`, inherit from a controller that calls `prote
 
 ## Reload password
 
-`reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, both are disabled and Wheels logs a security warning on boot (`vendor/wheels/events/onapplicationstart.cfc` line 287-290). If it's set, attempts log to `wheels_security.log` with the source IP (line 189, 197) and rate-limit by IP (line 135).
+`reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, **both are disabled**: the reload gate in `public/Application.cfc` fails closed and requires a non-empty configured password plus a matching `password` parameter before it will restart anything, mirroring the environment-switch leg in `vendor/wheels/events/onapplicationstart.cfc`. The security warning Wheels logs on boot when the password is blank states exactly that. (Before [#3062](https://github.com/wheels-dev/wheels/issues/3062) a blank password left plain `?reload=true` open to any anonymous client — an internet-reachable restart-DoS — so still set a real password anywhere reload should work.)
+
+If it's set, rejected and accepted attempts log to `wheels_security.log` with the trusted client IP, and failed attempts rate-limit by IP — 5 failures in 5 minutes locks the source out, with the correct password refused for the rest of the window. Both the cold-start path (`vendor/wheels/events/onapplicationstart.cfc`) and the warm-application gate (`public/Application.cfc`) log and count attempts against the same shared per-IP bucket, so brute-forcing the reload password against a running app is visible and throttled too (also [#3062](https://github.com/wheels-dev/wheels/issues/3062); before that fix only cold starts were monitored).
 
 ```cfm {test:compile} title="config/settings.cfm"
 <cfscript>
@@ -165,7 +167,7 @@ Rotate it in every environment. The scaffolded template already reads this from 
 
 ### What it protects (and what it doesn't)
 
-The reload password defends a single threat: **a remote attacker who can reach your app over HTTP** otherwise being able to call `/?reload=true` and clobber app state, or `/?reload=production` and switch environments at will. With the password set, those URLs return 403 unless the attacker also knows the secret.
+The reload password defends a single threat: **a remote attacker who can reach your app over HTTP** otherwise being able to call `/?reload=true` and clobber app state, or `/?reload=production` and switch environments at will. With the password set, a request with a missing or wrong password is served normally (HTTP 200) without reloading — no `403` is returned, and nothing in the response reveals that the attempt was noticed (the gate in `public/Application.cfc` simply falls through to normal request serving; the only `403`s on this surface live on the CLI command gate in `vendor/wheels/Public.cfc`). Server-side, though, the attempt is recorded: a `wheels_security.log` warning with the source IP, plus a bump to the per-IP rate-limit bucket.
 
 What it explicitly does **not** gate:
 
@@ -205,10 +207,39 @@ set(dataSourcePassword=env("DB_PASSWORD"));
 
 ## Trusted proxies and client IP
 
-Wheels does **not** trust `X-Forwarded-For` by default. `cgi.remote_addr` is the last-hop address — your load balancer, not the end user. Two framework surfaces touch this:
+Wheels does **not** trust `X-Forwarded-*` headers by default. They are ordinary request headers — any client can send them — so `cgi.remote_addr` (the last-hop socket address, i.e. your load balancer behind a proxy) is what security decisions use, and nothing in Wheels *trusts* a forwarded header until you explicitly opt in. Three independent opt-ins exist, one per surface:
 
-- **`RateLimiter` middleware.** Opt into proxy trust explicitly with `trustProxy=true`. The default is `false` "for security" (`vendor/wheels/middleware/RateLimiter.cfc` line 20, 51). Your proxy **must** strip any incoming `X-Forwarded-For` and append the real client, otherwise attackers can spoof an arbitrary IP and bypass rate limits.
-- **Application-level logging.** Nothing in Wheels reads `X-Forwarded-For` automatically for `cgi.remote_addr`. If you want the real client IP in logs, configure your reverse proxy to overwrite `CF.REMOTE_ADDR` at the connector (`mod_cfml`, Tuckey rewriter, nginx `proxy_set_header`) before the request reaches the engine.
+### `trustProxyHeaders` — framework-wide header trust
+
+`set(trustProxyHeaders=true)` (default `false`) governs the framework's own use of forwarded headers across three surfaces:
+
+- **`isSecure()`.** With trust off, only the engine's `server_port_secure` flag counts — a client-supplied `X-Forwarded-Proto: https` is ignored, so a direct-HTTP client can't spoof secure-cookie, CSRF, or HTTPS-redirect decisions. With trust on, `X-Forwarded-Proto: https` from your TLS-terminating proxy makes `isSecure()` return `true`.
+- **Maintenance-mode IP exceptions.** `set(ipExceptions="...")` is matched against the socket address by default, or against the rightmost `X-Forwarded-For` hop when trust is on. The exception list comes from config only — the legacy `?except=` URL parameter has been removed (it let any anonymous client rewrite the exception list for everyone).
+- **Reload rate-limit keying.** Failed `?reload=` password attempts are counted per trusted client IP, so with trust on, clients behind a shared proxy no longer share one lockout bucket.
+
+```cfm {test:compile} title="config/production/settings.cfm — app behind a TLS-terminating reverse proxy"
+<cfscript>
+set(trustProxyHeaders=true);
+</cfscript>
+```
+
+Only enable this behind a reverse proxy that **overwrites** — never appends to — `X-Forwarded-For` and `X-Forwarded-Proto`. The rightmost `X-Forwarded-For` entry is the one appended by the trusted proxy nearest the app; earlier entries are client-supplied and spoofable. If your proxy appends instead of overwriting, an attacker controls the rightmost hop too.
+
+### `debugAccessTrustProxy` — debug-UI IP allowlisting
+
+`set(allowIPBasedDebugAccess=true)` plus `set(debugAccessIPs=["203.0.113.7"])` enables the debug panel and public component for specific client IPs outside the `development` environment. The allowlist matches the socket address unless you also `set(debugAccessTrustProxy=true)` (default `false`), which switches matching to the rightmost `X-Forwarded-For` hop under the same proxy-overwrite contract.
+
+```cfm {test:compile} title="config/settings.cfm — debug access for an ops IP behind a proxy"
+<cfscript>
+set(allowIPBasedDebugAccess=true);
+set(debugAccessIPs=["203.0.113.7"]);
+set(debugAccessTrustProxy=true);
+</cfscript>
+```
+
+### `RateLimiter` middleware — `trustProxy`
+
+Opt into proxy trust explicitly with `trustProxy=true`. The default is `false` "for security" (`vendor/wheels/middleware/RateLimiter.cfc` line 20, 51). Your proxy **must** strip any incoming `X-Forwarded-For` and append the real client, otherwise attackers can spoof an arbitrary IP and bypass rate limits.
 
 ```cfm {test:compile} title="config/settings.cfm — rate limiter with trusted proxy"
 <cfscript>
@@ -225,6 +256,8 @@ set(middleware = [
 ```
 
 `proxyStrategy="last"` takes the rightmost IP in `X-Forwarded-For` (added by the nearest trusted proxy). Use `"first"` only if your proxy chain guarantees the client is always the leftmost entry.
+
+For **application-level logging**, nothing in Wheels rewrites `cgi.remote_addr`. If you want the real client IP in logs, configure your reverse proxy to overwrite the remote address at the connector (`mod_cfml`, Tuckey rewriter, nginx `proxy_set_header`) before the request reaches the engine.
 
 ## Rate limiting
 
@@ -275,6 +308,7 @@ For dependency and engine monitoring:
 - [ ] `Cors` middleware with an explicit origin allowlist if serving cross-origin
 - [ ] `showErrorInformation=false` and `showDebugInformation=false` in production
 - [ ] `trustProxy` set correctly on `RateLimiter` for your proxy topology
+- [ ] `trustProxyHeaders=true` only when behind a reverse proxy that overwrites `X-Forwarded-*` headers
 - [ ] Lucee/Adobe security bulletins subscribed
 
 ## Related guides

@@ -4,9 +4,11 @@
  * Source of truth: Kamal 2.4.0 lib/kamal/cli/registry.rb
  *
  * `setup` is an alias for `login`; `remove` is an alias for `logout`.
- * Password may be supplied via opts.password (tests, explicit CLI flag)
+ * Password may be supplied via opts.password (tests, programmatic callers)
  * or resolved from .kamal/secrets via SecretResolver using the first key
- * listed in registry.password[].
+ * listed in registry.password[]. Either way it is delivered to the remote
+ * `docker login --password-stdin` over SSH stdin — never as part of the
+ * command string (#2956).
  */
 component {
 
@@ -35,11 +37,25 @@ component {
         var dryRun = arguments.opts.dryRun ?: false;
         var regCmds = new modules.wheels.services.deploy.commands.RegistryCommands(cfg);
         var hosts = $allHosts(cfg);
-        var cmd = arguments.isLogin
-            ? regCmds.login({password: arguments.opts.password ?: $resolvePassword(cfg)})
-            : regCmds.logout();
+        // #2956: the password never enters the command string. login() emits
+        // `--password-stdin` and the secret travels via SSH exec-channel
+        // stdin, so dry-run output, exception summaries, and remote argv
+        // stay clean.
+        var pw = "";
+        if (arguments.isLogin) {
+            pw = arguments.opts.password ?: $resolvePassword(cfg);
+            if (!len(pw) && !dryRun) {
+                throw(
+                    type = "DeployRegistryCli.MissingPassword",
+                    message = "No registry password available — `docker login --password-stdin` "
+                        & "would receive an empty secret. Declare the key listed under "
+                        & "registry.password[] in deploy.yml inside .kamal/secrets."
+                );
+            }
+        }
+        var cmd = arguments.isLogin ? regCmds.login() : regCmds.logout();
         // #2696: login is strict (auth failure must surface); logout tolerates.
-        $dispatch(hosts, cmd, dryRun, !arguments.isLogin);
+        $dispatch(hosts, cmd, dryRun, !arguments.isLogin, pw);
         var action = arguments.isLogin ? "Logged into" : "Logged out of";
         return $renderResult(
             arguments.opts,
@@ -74,7 +90,7 @@ component {
         return out;
     }
 
-    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
+    private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false, string stdinData = "") {
         if (arguments.dryRun) {
             for (var h in arguments.hosts) arrayAppend(variables.dryRunBuffer, "[" & h & "] " & arguments.cmd);
             return;
@@ -82,6 +98,7 @@ component {
         // #2696: registry login is strict; logout is tolerant.
         var c = arguments.cmd;
         var doRaise = !arguments.allowFail;
-        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise}); });
+        var sin = arguments.stdinData;
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) { ssh.run(c, {raise: doRaise, stdin: sin}); });
     }
 }

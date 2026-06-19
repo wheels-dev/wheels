@@ -93,15 +93,22 @@ component {
 		required string returnIncluded
 	) {
 		local.rv = [];
-		local.doneStructs = "";
+
+		// Duplicate root rows can only occur when associated tables are joined into the query via the `include` argument, so for plain queries we skip duplicate detection entirely to avoid the per-row serialization/hashing cost.
+		local.detectDuplicates = Len(arguments.include) > 0;
+		local.doneStructs = {};
 
 		// loop through all of our records and create an object for each row in the query
 		local.iEnd = arguments.query.recordCount;
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			// create a new struct
 			local.struct = $queryRowToStruct(properties = arguments.query, row = local.i);
-			local.structHash = $hashedKey(local.struct);
-			if (!ListFind(local.doneStructs, local.structHash, Chr(7))) {
+			local.isDuplicate = false;
+			if (local.detectDuplicates) {
+				local.structHash = $hashedKey(local.struct);
+				local.isDuplicate = StructKeyExists(local.doneStructs, local.structHash);
+			}
+			if (!local.isDuplicate) {
 				if (Len(arguments.include) && arguments.returnIncluded) {
 					// loop through our associations to build nested objects attached to the main object
 					local.jEnd = ListLen(arguments.include);
@@ -110,7 +117,7 @@ component {
 						if (variables.wheels.class.associations[local.include].type == "hasMany") {
 							// we have a hasMany association, so loop through all of the records again to find the ones that belong to our root object
 							local.struct[local.include] = [];
-							local.hasManyDoneStructs = "";
+							local.hasManyDoneStructs = {};
 
 							// only get a reference to our model once per association
 							local._model = model(variables.wheels.class.associations[local.include].modelName);
@@ -125,7 +132,7 @@ component {
 									base = false
 								);
 								local.hasManyStructHash = $hashedKey(local.hasManyStruct);
-								if (!ListFind(local.hasManyDoneStructs, local.hasManyStructHash, Chr(7))) {
+								if (!StructKeyExists(local.hasManyDoneStructs, local.hasManyStructHash)) {
 									// create object instance from values in current query row if it belongs to the current object
 									local.primaryKeyColumnValues = "";
 									local.lEnd = ListLen(primaryKeys());
@@ -141,7 +148,7 @@ component {
 									) {
 										ArrayAppend(local.struct[local.include], local.hasManyStruct);
 									}
-									local.hasManyDoneStructs = ListAppend(local.hasManyDoneStructs, local.hasManyStructHash, Chr(7));
+									local.hasManyDoneStructs[local.hasManyStructHash] = true;
 								}
 							}
 						} else {
@@ -173,7 +180,9 @@ component {
 				}
 
 				ArrayAppend(local.rv, local.struct);
-				local.doneStructs = ListAppend(local.doneStructs, local.structHash, Chr(7));
+				if (local.detectDuplicates) {
+					local.doneStructs[local.structHash] = true;
+				}
 			}
 		}
 		return local.rv;

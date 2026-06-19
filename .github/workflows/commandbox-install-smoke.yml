@@ -1,0 +1,265 @@
+name: CommandBox install smoke (ForgeBox path)
+
+# Durability net for the ForgeBox/CommandBox install path (issues #3173, #3174,
+# #3176, #3177). The published ForgeBox channel was repaired across a campaign:
+# the base template is now regenerated from cli/lucli/templates/app/ as the
+# single source of truth (#3176) with build-time placeholder substitution
+# (#3173) and db/ retained (#3174), and wheels-core lands flat (#3177).
+#
+# Those fixes are easy to silently regress — a placeholder reintroduced into a
+# config override, a db/ exclude added back to the base .gitignore, a prepare
+# script re-pointed at the demo app — and ForgeBox publishing is stable-only
+# and asynchronous, so the breakage only surfaces in production weeks later
+# (which is exactly how the channel rotted the first time).
+#
+# This leg closes that gap by exercising the FIXED build pipeline end to end on
+# every PR that touches it:
+#
+#   1. Build the base + core packages FROM THE TREE
+#      (tools/build/scripts/prepare-base.sh + prepare-core.sh) — i.e. the
+#      artifact this PR would publish, NOT the lagging ForgeBox copy.
+#   2. Stage them the way `box install wheels-base-template` lands them: the
+#      base scaffold at the app root, wheels-core at vendor/wheels/ per the
+#      box.json installPaths.
+#   3. Boot the app under CommandBox (the ortussolutions/commandbox image —
+#      CommandBox is the runtime on this path, not LuCLI) with ZERO manual
+#      edits and assert the install->serve journey:
+#        - dev:  server starts no-edit, GET / is 200, /wheels/info is 200
+#                (the dev whitelist), clean URLs (/main/index) work, db/ ships.
+#        - prod: tools/ci/smoke-env.sh passes its 6 reload-gate / no-trace
+#                probes (the same script the Smoke workflow drives).
+#
+# IMPORTANT — ordering within the campaign: this leg tests the FIXED pipeline.
+# The template keystone (#3176, build base template from cli/lucli/templates/app)
+# is a sibling PR that is NOT yet on develop. Until it merges, develop's
+# prepare-base.sh still copies the repo-root demo app and ships
+# "cfengine":"|cfmlEngine|" — so `box server start` hard-errors with "Invalid
+# slug detected" and the connectivity probe fails (status 000). That is the
+# defect this leg is meant to catch; the probes are deliberately NOT weakened to
+# pass on the unfixed tree. Once the keystone lands on develop this job goes
+# green. The wheels-core fixes (#3177/#3178/#3179) are already on develop.
+#
+# Verified locally (2026-06-12, CommandBox 6.3.3 / ortussolutions/commandbox:
+# latest, keystone composed): all six smoke-env.sh probes PASS in production
+# and the dev journey (GET / 200, /wheels/info 200, /main/index 200, db/
+# present) passes with no edits. Booting the unfixed develop artifact exits 1
+# with "Invalid slug detected" — the gate is real.
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      # The build pipeline that produces the packages.
+      - 'tools/build/**'
+      # The single source of truth the base template is regenerated from.
+      - 'cli/lucli/templates/app/**'
+      # The probe harness this leg drives in production.
+      - 'tools/ci/smoke-env.sh'
+      # The workflow itself.
+      - '.github/workflows/commandbox-install-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  commandbox-install-smoke:
+    name: "box install -> serve (CommandBox)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # CommandBox is the runtime on the ForgeBox install path. Run the whole job
+    # inside the official image so `box` is on PATH exactly as a real CommandBox
+    # user has it — no host install, mirroring how release.yml gets CommandBox
+    # for ForgeBox publishing (its "Install CommandBox" step), just containerized
+    # so the box server boots in the same userland it serves from.
+    container:
+      image: ortussolutions/commandbox:latest
+    env:
+      # Throwaway values for the CI app; not secrets.
+      SMOKE_RELOAD_PASSWORD: "wheels-dev"
+      # Pin the version the prepare scripts stamp into the artifacts.
+      PKG_VERSION: "0.0.0-cismoke"
+    steps:
+      - uses: actions/checkout@v5
+
+      # curl + jq are the only host tools the probes need; the CommandBox image
+      # is Debian-based but minimal. Install defensively (no-op if present).
+      - name: Ensure curl is available
+        run: |
+          command -v curl >/dev/null 2>&1 || {
+            apt-get update -y && apt-get install -y --no-install-recommends curl ca-certificates
+          }
+          curl --version | head -1
+
+      # Build BOTH packages from the working tree — this is the output of the
+      # pipeline this PR would publish, so a regression in either prepare script
+      # fails here, not silently on ForgeBox weeks later. (Snapshot params:
+      # branch=develop so the version-number handling matches a snapshot build.)
+      - name: Build base + core packages from the tree
+        run: |
+          set -e
+          bash tools/build/scripts/prepare-base.sh "${PKG_VERSION}" "develop" "${{ github.run_number }}" "false"
+          bash tools/build/scripts/prepare-core.sh "${PKG_VERSION}" "develop" "${{ github.run_number }}" "false"
+          test -d build-wheels-base || { echo "::error::prepare-base.sh produced no build-wheels-base/"; exit 1; }
+          test -d build-wheels-core/wheels || { echo "::error::prepare-core.sh produced no build-wheels-core/wheels/"; exit 1; }
+
+      # Structural guards on the prepared base artifact (cheap, pre-boot). These
+      # pin the three packaging defects the campaign repaired so a regression is
+      # named precisely instead of surfacing as an opaque boot failure.
+      - name: Assert prepared base artifact is publish-clean
+        run: |
+          set -e
+          BASE=build-wheels-base
+
+          # #3174: db/ must ship (JDBC needs a parent dir; the base .gitignore
+          # must not strip it). The keeper marker is enough — only generated
+          # *.db/*.sqlite files are ignored.
+          test -d "$BASE/db" || { echo "::error::#3174 regression: base artifact has no db/ directory"; exit 1; }
+          test -f "$BASE/db/.keep" || { echo "::error::#3174 regression: db/.keep missing — empty dir will not survive packaging"; exit 1; }
+
+          # #3173: NO unsubstituted placeholders may remain in the files a raw
+          # `box install` consumes. |cfmlEngine| in server.json is the one that
+          # hard-errors `box server start`; the {{...}} app tokens are the ones
+          # that break boot/config. (app/snippets/*.txt code-gen tokens are
+          # excluded — those ship verbatim by design.)
+          if grep -rnE '\|(appName|cfmlEngine|datasourceName|reloadPassword)\|' \
+              "$BASE/server.json" "$BASE/config" "$BASE/app/views" 2>/dev/null; then
+            echo "::error::#3173 regression: legacy |placeholder| token survived into the prepared base artifact"
+            exit 1
+          fi
+          if grep -rnE '\{\{(appName|cfmlEngine|datasourceName|reloadPassword|luceeAdminPassword)\}\}' \
+              "$BASE/server.json" "$BASE/config" "$BASE/app/views" 2>/dev/null; then
+            echo "::error::#3173 regression: {{placeholder}} token survived into the prepared base artifact"
+            exit 1
+          fi
+
+          # The root route targets main##index — the default controller/view must
+          # be generated (the LuCLI template does not carry them statically), else
+          # GET / is Wheels.ViewNotFound on every install.
+          test -f "$BASE/app/controllers/Main.cfc" || { echo "::error::default Main.cfc missing — GET / would 404"; exit 1; }
+          test -f "$BASE/app/views/main/index.cfm" || { echo "::error::default main/index.cfm missing — GET / would 404"; exit 1; }
+
+          echo "Prepared base artifact is publish-clean (db/ present, no placeholders, root view present)."
+
+      # Stage the app exactly as `box install wheels-base-template` lands it: the
+      # base scaffold at the app root + wheels-core resolved into vendor/wheels/
+      # per the box.json installPaths. Installing from the locally built core
+      # (not ForgeBox) is the whole point — it exercises THIS PR's pipeline
+      # output rather than the lagging published copy.
+      - name: Stage the installed app (base + local wheels-core)
+        run: |
+          set -e
+          APP="${RUNNER_TEMP:-/tmp}/cb-app"
+          rm -rf "$APP"; mkdir -p "$APP"
+          cp -r build-wheels-base/. "$APP/"
+          rm -rf "$APP/vendor/wheels"; mkdir -p "$APP/vendor/wheels"
+          cp -r build-wheels-core/wheels/. "$APP/vendor/wheels/"
+          # postInstall copies env.example -> .env on a real install; mimic it.
+          [ -f "$APP/env.example" ] && cp "$APP/env.example" "$APP/.env"
+          echo "APP_DIR=$APP" >> "$GITHUB_ENV"
+          echo "Staged app at $APP"
+          ls -la "$APP"
+
+      # --- Development journey: the user's actual first experience. -----------
+      # Boot with NO edits (dev is the template default) and assert the install
+      # ->serve journey holds. /wheels/info is 200 in development (the documented
+      # dev whitelist, #2988), so this leg asserts 200 here and the clean 404 is
+      # asserted by the production smoke-env.sh leg below.
+      - name: Start CommandBox server (development)
+        run: |
+          set -e
+          cd "$APP_DIR"
+          box server start port=8080 host=0.0.0.0 openbrowser=false || true
+          # Readiness via curl-retry (no sleep): accept the first byte.
+          curl -s -o /dev/null --retry 40 --retry-delay 3 --retry-all-errors \
+            --retry-connrefused --max-time 10 "http://localhost:8080/" \
+            || { echo "::error::server did not bind in development"; box server log || true; exit 1; }
+
+      - name: Assert install->serve journey (development)
+        run: |
+          set -e
+          FAILS=0
+          probe() { # name url expect must
+            local name="$1" url="$2" expect="$3" must="$4" body status
+            body=$(mktemp)
+            status=$(curl -s -o "$body" -w '%{http_code}' --max-time 30 "$url")
+            if [ "$status" != "$expect" ]; then
+              echo "FAIL $name: expected $expect got $status ($url)"
+              echo "  body_head: $(head -c 200 "$body" | tr '\n' ' ')"
+              FAILS=$((FAILS+1))
+            elif [ -n "$must" ] && ! grep -qiE "$must" "$body"; then
+              echo "FAIL $name: status $expect ok but body missing /$must/ ($url)"
+              echo "  body_head: $(head -c 200 "$body" | tr '\n' ' ')"
+              FAILS=$((FAILS+1))
+            else
+              echo "PASS $name ($status)"
+            fi
+            rm -f "$body"
+          }
+          # GET / renders the welcome page (200, no manual edits).
+          probe "root-welcome"        "http://localhost:8080/"           "200" "Wheels"
+          # /wheels/info is the public component, 200 in development (#2988).
+          probe "wheels-info-dev-200" "http://localhost:8080/wheels/info" "200" "System Information"
+          # Clean URLs: controller/action route resolves (rewrites work).
+          probe "clean-url-main"      "http://localhost:8080/main/index"  "200" ""
+          if [ "$FAILS" -ne 0 ]; then
+            echo "::error::development install->serve journey failed ($FAILS probe(s))"
+            exit 1
+          fi
+          echo "development journey: all probes passed"
+
+      - name: Stop CommandBox server (development)
+        if: always()
+        run: |
+          cd "$APP_DIR" 2>/dev/null && box server stop 2>/dev/null || true
+
+      # --- Production journey: the non-dev reload-gate / no-trace probes. ------
+      # Reuse tools/ci/smoke-env.sh (the same harness the Smoke workflow drives)
+      # against a production boot. environment.cfm hardcodes set(environment=...),
+      # so flip it to production before boot (the app cold-boots into it). The
+      # reload password is read from env("WHEELS_RELOAD_PASSWORD") in settings.cfm
+      # and commandbox-dotenv loads .env at boot, so the password must live in
+      # .env (a container -e var is overridden by .env on this path) for probe 6
+      # (authorized reload must 302) to be meaningful.
+      - name: Switch app to production
+        run: |
+          set -e
+          cd "$APP_DIR"
+          sed -i 's/set(environment="[a-z]*")/set(environment="production")/' config/environment.cfm
+          grep -qF 'set(environment="production")' config/environment.cfm || {
+            echo "::error::environment.cfm substitution failed — pattern drift?"; exit 1; }
+          # Reload password into .env so settings.cfm's env() read + the smoke
+          # probe agree. (commandbox-dotenv wins over container env on this path.)
+          if [ -f .env ]; then
+            sed -i 's/^WHEELS_RELOAD_PASSWORD=.*/WHEELS_RELOAD_PASSWORD='"${SMOKE_RELOAD_PASSWORD}"'/' .env
+            grep -q '^WHEELS_RELOAD_PASSWORD=' .env || echo "WHEELS_RELOAD_PASSWORD=${SMOKE_RELOAD_PASSWORD}" >> .env
+          else
+            printf 'WHEELS_RELOAD_PASSWORD=%s\n' "${SMOKE_RELOAD_PASSWORD}" > .env
+          fi
+          grep -n 'set(environment' config/environment.cfm
+          grep -n '^WHEELS_RELOAD_PASSWORD' .env
+
+      - name: Start CommandBox server (production)
+        run: |
+          set -e
+          cd "$APP_DIR"
+          box server start port=8080 host=0.0.0.0 openbrowser=false || true
+          curl -s -o /dev/null --retry 40 --retry-delay 3 --retry-all-errors \
+            --retry-connrefused --max-time 10 "http://localhost:8080/" \
+            || { echo "::error::server did not bind in production"; box server log || true; exit 1; }
+
+      - name: Run smoke-env.sh probes (production)
+        run: |
+          BASE_URL="http://localhost:8080" SMOKE_ENV="production" \
+            SMOKE_RELOAD_PASSWORD="${SMOKE_RELOAD_PASSWORD}" \
+            bash tools/ci/smoke-env.sh
+
+      - name: Debug server log
+        if: failure()
+        run: |
+          cd "$APP_DIR" 2>/dev/null && box server log 2>/dev/null | tail -200 || true
+
+      - name: Stop CommandBox server (production)
+        if: always()
+        run: |
+          cd "$APP_DIR" 2>/dev/null && box server stop 2>/dev/null || true

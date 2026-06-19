@@ -1,16 +1,61 @@
 <!--- CLI & GUI Uses this file to talk to wheels via JSON when in maintenance/testing/development mode --->
 <cfscript>
-baseCfc = createObject("wheels.migrator.Base");
 setting showDebugOutput="no";
 migrator = application.wheels.migrator;
 try {
+	local.cliCommand = StructKeyExists(request.wheels.params, "command") ? request.wheels.params.command : "";
+
+	// ── Security gate (2026-06-09 review SEC-4) ─────────────────────────
+	// State-changing commands must arrive as POST from loopback carrying
+	// the reload password — a plain GET here was CSRF-reachable (an <img>
+	// tag on any page a developer visits could drop every table via
+	// dbReset). Read-only commands stay on GET for the CLI and legacy GUI.
+	local.writesMigrationFiles = StructKeyExists(request.wheels.params, "write") && request.wheels.params.write == "true";
+	if (Len(local.cliCommand) && $cliCommandIsMutating(local.cliCommand, local.writesMigrationFiles)) {
+		local.gate = $cliMutationGateCheck(
+			requestMethod = cgi.request_method,
+			remoteAddr = cgi.remote_addr,
+			forwardedFor = cgi.http_x_forwarded_for,
+			// Form scope ONLY: request.wheels.params merges URL + form, so a
+			// ?password=... query string would satisfy the gate while logging
+			// the reload password in access logs / proxies — contradicting the
+			// SEC-4 design of carrying it as a form field (#2947 review, #2977).
+			password = StructKeyExists(form, "password") ? form.password : ""
+		);
+		if (!local.gate.allowed) {
+			cfheader(statuscode = local.gate.statusCode);
+			cfcontent(type = "application/json");
+			WriteOutput(
+				SerializeJSON({
+					"success" = false,
+					"command" = local.cliCommand,
+					"message" = local.gate.error,
+					"messages" = local.gate.error
+				})
+			);
+			abort;
+		}
+	}
+
+	// ── Lazy migration discovery (2026-06-09 review P10) ────────────────
+	// getAvailableMigrations() instantiates every migration CFC (a $dbinfo
+	// round-trip each) and $getDBType() costs another probe, so only the
+	// commands that actually consume them pay — `routes`, `introspect`, and
+	// the jobs* commands job workers poll every few seconds skip discovery
+	// entirely. An empty command keeps the full legacy ping payload.
+	local.needsMigrations = !Len(local.cliCommand)
+		|| ListFindNoCase("info,migrateUp,migrateDown,redoMigration,dbStatus,dbRollback", local.cliCommand) > 0;
+	local.needsVersion = local.needsMigrations || CompareNoCase(local.cliCommand, "dbVersion") == 0;
+	local.needsDbType = !Len(local.cliCommand)
+		|| ListFindNoCase("info,doctor,dbSchema,dbCreate,dbReset,dbDump,dbRestore,dbShell", local.cliCommand) > 0;
+
 	"data" = {};
 	data["success"] = true;
 	data["datasource"] = application.wheels.dataSourceName;
 	data["wheelsVersion"] = application.wheels.version;
-	data["currentVersion"] = migrator.getCurrentMigrationVersion();
-	data["databaseType"] = baseCfc.$getDBType();
-	data["migrations"] = migrator.getAvailableMigrations();
+	data["currentVersion"] = local.needsVersion ? migrator.getCurrentMigrationVersion() : "";
+	data["databaseType"] = local.needsDbType ? $cliDatabaseType() : "";
+	data["migrations"] = local.needsMigrations ? migrator.getAvailableMigrations() : [];
 	data["lastVersion"] = 0;
 	data["message"] = "";
 	data["messages"] = "";
@@ -20,9 +65,9 @@ try {
 		data.lastVersion = data.migrations[ArrayLen(data.migrations)].version;
 	}
 
-	if (StructKeyExists(request.wheels.params, "command")) {
-		data.command = request.wheels.params.command;
-		switch (request.wheels.params.command) {
+	if (Len(local.cliCommand)) {
+		data.command = local.cliCommand;
+		switch (local.cliCommand) {
 			case "createMigration":
 				if (StructKeyExists(request.wheels.params, "migrationPrefix") && Len(request.wheels.params.migrationPrefix)) {
 					data.message = migrator.createMigration(
@@ -252,42 +297,15 @@ try {
 
 			// Database commands
 			case "dbStatus":
-				// Return migration status
+				// Return migration status straight from the migrator's own
+				// status field — see Public.cfc::$cliFormatMigrationStatus()
+				// for why the old version-comparison heuristic was wrong.
+				// Reuses the list discovered in the preamble instead of
+				// running discovery a second time.
+				local.statusReport = $cliFormatMigrationStatus(data.migrations);
 				data.success = true;
-				data.currentVersion = data.currentVersion;
-				data.migrations = [];
-				
-				// Format migrations for CLI consumption
-				for (local.migration in migrator.getAvailableMigrations()) {
-					local.migrationInfo = {
-						version = local.migration.version,
-						description = local.migration.name,
-						status = local.migration.status,
-						appliedAt = local.migration.loadedAt ?: ""
-					};
-					if (local.migration.version <= data.currentVersion) {
-						local.migrationInfo.status = "applied";
-					} else {
-						local.migrationInfo.status = "pending";
-					}
-					arrayAppend(data.migrations, local.migrationInfo);
-				}
-				
-				// Add summary
-				local.applied = 0;
-				local.pending = 0;
-				for (local.m in data.migrations) {
-					if (local.m.status == "applied") {
-						local.applied++;
-					} else {
-						local.pending++;
-					}
-				}
-				data.summary = {
-					total = arrayLen(data.migrations),
-					applied = local.applied,
-					pending = local.pending
-				};
+				data.migrations = local.statusReport.migrations;
+				data.summary = local.statusReport.summary;
 				break;
 				
 			case "dbVersion":
@@ -302,10 +320,16 @@ try {
 				local.steps = structKeyExists(request.wheels.params, "steps") ? request.wheels.params.steps : 1;
 				local.targetVersion = "";
 				
-				// Find target version based on steps
+				// Find target version based on steps. Reuses the list
+				// discovered in the preamble instead of re-discovering.
+				// Filter on tracked status, not version <= current: on a shared
+				// dev DB a peer-applied version above your latest local file
+				// made the version heuristic count pending/orphan rows as
+				// applied, so `steps=N` rolled back fewer real migrations
+				// (same P3 fix dbStatus got in #2947; #2977).
 				local.appliedMigrations = [];
-				for (local.migration in migrator.getAvailableMigrations()) {
-					if (local.migration.version <= data.currentVersion) {
+				for (local.migration in data.migrations) {
+					if (local.migration.status == "migrated") {
 						arrayAppend(local.appliedMigrations, local.migration);
 					}
 				}
@@ -448,113 +472,13 @@ try {
 				break;
 
 			case "dbSeed":
-				local.mode = structKeyExists(request.wheels.params, "mode") ? request.wheels.params.mode : "auto";
-				local.environment = structKeyExists(request.wheels.params, "environment") ? request.wheels.params.environment : get("environment");
-				data.success = true;
-				data.mode = local.mode;
-
-				try {
-					// Determine seed mode: convention files vs generated test data
-					local.useConvention = false;
-					if (local.mode == "convention") {
-						local.useConvention = true;
-					} else if (local.mode == "generate") {
-						local.useConvention = false;
-					} else {
-						// Auto-detect: use convention if seed files exist
-						if (structKeyExists(application.wheels, "seeder") && application.wheels.seeder.hasSeedFiles()) {
-							local.useConvention = true;
-						}
-					}
-
-					if (local.useConvention) {
-						// Run convention-based seed files (app/db/seeds.cfm + environment)
-						data.mode = "convention";
-						local.seeder = application.wheels.seeder;
-						local.seedResult = local.seeder.runSeeds(environment = local.environment);
-						data.success = local.seedResult.success;
-						data.message = local.seedResult.message;
-						data.environment = local.environment;
-						data.totalCreated = local.seedResult.totalCreated;
-						data.totalSkipped = local.seedResult.totalSkipped;
-						data.results = local.seedResult.results;
-						if (structKeyExists(local.seedResult, "detail")) {
-							data.detail = local.seedResult.detail;
-						}
-					} else {
-						// Generate random test data (legacy behavior)
-						data.mode = "generate";
-						local.count = structKeyExists(request.wheels.params, "count") ? val(request.wheels.params.count) : 10;
-						local.models = structKeyExists(request.wheels.params, "models") ? request.wheels.params.models : "";
-						data.seeded = [];
-
-						// Get all model files if no specific models requested
-						local.modelList = [];
-						if (len(local.models)) {
-							local.modelList = listToArray(local.models);
-						} else {
-							local.modelPath = expandPath("/app/models");
-							if (directoryExists(local.modelPath)) {
-								local.modelFiles = directoryList(local.modelPath, false, "name", "*.cfc");
-								for (local.file in local.modelFiles) {
-									if (left(local.file, 1) != "_") {
-										arrayAppend(local.modelList, listFirst(local.file, "."));
-									}
-								}
-							}
-						}
-
-						// Seed each model with generated data
-						for (local.modelName in local.modelList) {
-							try {
-								local.model = model(local.modelName);
-								local.seededCount = 0;
-
-								local.properties = [];
-								if (structKeyExists(local.model, "$classData") && structKeyExists(local.model.$classData(), "properties")) {
-									local.properties = local.model.$classData().properties;
-								}
-
-								for (local.i = 1; local.i <= local.count; local.i++) {
-									local.record = {};
-									for (local.prop in local.properties) {
-										if (local.prop.name != "id" && !listFindNoCase("createdAt,updatedAt,deletedAt", local.prop.name)) {
-											local.record[local.prop.name] = generateTestData(local.prop.name, local.prop.type, local.i);
-										}
-									}
-									local.newRecord = local.model.new(local.record);
-									if (local.newRecord.save()) {
-										local.seededCount++;
-									}
-								}
-
-								arrayAppend(data.seeded, {
-									model = local.modelName,
-									count = local.seededCount,
-									success = true
-								});
-							} catch (any modelError) {
-								arrayAppend(data.seeded, {
-									model = local.modelName,
-									count = 0,
-									success = false,
-									error = modelError.message
-								});
-							}
-						}
-
-						local.totalSeeded = 0;
-						for (local.result in data.seeded) {
-							if (local.result.success) {
-								local.totalSeeded += local.result.count;
-							}
-						}
-						data.message = "Database seeding completed. Created #local.totalSeeded# records across #arrayLen(data.seeded)# models.";
-					}
-				} catch (any e) {
-					data.success = false;
-					data.message = "Error during database seeding: " & e.message;
-				}
+				// The seed orchestration lives in the page-level
+				// runDbSeed() UDF below. Generate mode delegates to
+				// wheels.Seeder.generateSeeds(). Extracted so `dbSetup`
+				// can compose seeding without re-entering the dispatcher
+				// (issue ##2959).
+				local.seedResult = runDbSeed(request.wheels.params);
+				StructAppend(data, local.seedResult, true);
 				break;
 				
 			case "routes":
@@ -680,23 +604,31 @@ try {
 				// Setup database (create + migrate + seed)
 				data.success = true;
 				data.message = "Database setup: ";
-				
-				// Run migrations to latest
+
 				try {
 					local.migrateResult = migrator.migrateToLatest();
 					data.message &= "Migrations completed. ";
-					
-					// Run seeding if requested
+
 					if (structKeyExists(request.wheels.params, "seed") && request.wheels.params.seed) {
-						// Use the dbSeed logic
-						request.wheels.params.command = "dbSeed";
-						local.seedCount = structKeyExists(request.wheels.params, "seedCount") ? val(request.wheels.params.seedCount) : 10;
-						request.wheels.params.count = local.seedCount;
-						
-						// Re-run this switch for dbSeed
-						data.command = "dbSeed";
-						include "/wheels/public/views/cli.cfm";
-						abort;
+						// Compose seeding through a direct UDF call —
+						// the legacy path mutated `request.wheels.params`
+						// and re-included `cli.cfm`, which rebuilt the
+						// envelope from scratch and silently discarded
+						// the "Migrations completed." string we just set
+						// (issue ##2959). Merge the seed result on top
+						// of `data` while preserving the dbSetup envelope
+						// (command, prefixed message, combined success).
+						local.seedParams = Duplicate(request.wheels.params);
+						local.seedParams.count = StructKeyExists(request.wheels.params, "seedCount")
+							? val(request.wheels.params.seedCount) : 10;
+						local.seedResult = runDbSeed(local.seedParams);
+						local.setupMessage = data.message;
+						StructAppend(data, local.seedResult, true);
+						data.command = "dbSetup";
+						data.message = local.setupMessage & local.seedResult.message;
+						if (!local.seedResult.success) {
+							data.success = false;
+						}
 					}
 				} catch (any e) {
 					data.success = false;
@@ -727,11 +659,19 @@ try {
 						data.dump = local.sqlDump;
 						data.message = "Database dump generated successfully. Use --output parameter to save to file.";
 						
-						// If output file specified, save it
+						// If output file specified, save it. The path is
+						// canonicalized and confined to the application root
+						// (2026-06-09 review SEC-5) — `../` traversal would
+						// otherwise make this an arbitrary-location file write.
 						if (structKeyExists(request.wheels.params, "output")) {
-							local.outputFile = expandPath(request.wheels.params.output);
-							fileWrite(local.outputFile, local.sqlDump);
-							data.message = "Database dump saved to: " & request.wheels.params.output;
+							local.outputFile = $cliResolveDumpPath(request.wheels.params.output);
+							if (Len(local.outputFile)) {
+								fileWrite(local.outputFile, local.sqlDump);
+								data.message = "Database dump saved to: " & request.wheels.params.output;
+							} else {
+								data.success = false;
+								data.message = "Invalid output path: the dump file must resolve inside the application root.";
+							}
 						}
 						
 					} catch (any e) {
@@ -805,21 +745,14 @@ try {
 					data.message &= chr(10) & "Option 2: Command Line" & chr(10);
 					data.message &= "java -cp [path-to-h2.jar] org.h2.tools.Shell" & chr(10);
 
-					// If command parameter provided, execute it
-					if (structKeyExists(request.wheels.params, "command")) {
-						try {
-							local.shellQuery = new Query();
-							local.shellQuery.setDatasource(application.wheels.dataSourceName);
-							local.shellQuery.setSQL(request.wheels.params.command);
-							local.shellResult = local.shellQuery.execute().getResult();
-
-							data.success = true;
-							data.result = local.shellResult;
-							data.message = "Command executed successfully.";
-						} catch (any e) {
-							data.message = "Error executing command: " & e.message;
-						}
-					}
+					// NOTE: an earlier revision tried to execute
+					// request.wheels.params.command as SQL here, but that
+					// param is always the literal dispatch value "dbShell",
+					// so the branch executed "dbShell" as SQL, always threw,
+					// and clobbered the help text above with an error
+					// (2026-06-09 review P1). An SQL pass-through would also
+					// need the POST + reload-password gate; use the console
+					// (`wheels console`) for ad-hoc statements instead.
 				} else {
 					// Provide database-specific guidance
 					data.message = "Database shell access requires command-line tools. ";
@@ -926,111 +859,77 @@ try {
 	}
 } catch (any e) {
 	data.success = false;
-	data.messages = e.message & ': ' & e.detail;
+	// Envelope consistency: per-command catches surface their failure via
+	// `data.message` (singular); the outer catch historically only set
+	// `data.messages` (plural), so a CLI client reading either name in
+	// isolation missed half the failure modes (issue ##2959). Mirror the
+	// error on both keys so the plural stays backward-compatible while
+	// the singular matches every other code path.
+	data.message = e.message & ': ' & e.detail;
+	data.messages = data.message;
 }
 
-// Helper function to generate test data based on property name and type
-function generateTestData(required string propertyName, string propertyType = "string", numeric index = 1) {
-	// Common patterns for property names
-	local.name = lCase(arguments.propertyName);
-	
-	// Email fields
-	if (findNoCase("email", local.name)) {
-		return "test#arguments.index#@example.com";
-	}
-	
-	// Name fields
-	if (findNoCase("firstname", local.name) || local.name == "fname") {
-		local.firstNames = ["John", "Jane", "Bob", "Alice", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"];
-		return local.firstNames[(arguments.index - 1) mod arrayLen(local.firstNames) + 1];
-	}
-	
-	if (findNoCase("lastname", local.name) || local.name == "lname") {
-		local.lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"];
-		return local.lastNames[(arguments.index - 1) mod arrayLen(local.lastNames) + 1];
-	}
-	
-	if (local.name == "name" || findNoCase("username", local.name)) {
-		return "TestUser#arguments.index#";
-	}
-	
-	// Phone fields
-	if (findNoCase("phone", local.name) || findNoCase("mobile", local.name)) {
-		return "555-#numberFormat(1000 + arguments.index, '0000')#";
-	}
-	
-	// Address fields
-	if (findNoCase("address", local.name) || findNoCase("street", local.name)) {
-		return "#arguments.index# Test Street";
-	}
-	
-	if (findNoCase("city", local.name)) {
-		local.cities = ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego"];
-		return local.cities[(arguments.index - 1) mod arrayLen(local.cities) + 1];
-	}
-	
-	if (findNoCase("state", local.name) || findNoCase("province", local.name)) {
-		local.states = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"];
-		return local.states[(arguments.index - 1) mod arrayLen(local.states) + 1];
-	}
-	
-	if (findNoCase("zip", local.name) || findNoCase("postal", local.name)) {
-		return numberFormat(10000 + arguments.index, "00000");
-	}
-	
-	// URL fields
-	if (findNoCase("url", local.name) || findNoCase("website", local.name)) {
-		return "https://example#arguments.index#.com";
-	}
-	
-	// Password fields
-	if (findNoCase("password", local.name)) {
-		return "TestPass#arguments.index#!";
-	}
-	
-	// Boolean fields
-	if (arguments.propertyType == "boolean" || findNoCase("active", local.name) || findNoCase("enabled", local.name) || findNoCase("published", local.name)) {
-		return (arguments.index mod 2) == 1;
-	}
-	
-	// Numeric fields
-	if (arguments.propertyType == "integer" || arguments.propertyType == "numeric") {
-		if (findNoCase("age", local.name)) {
-			return 20 + (arguments.index mod 50);
+// Seed orchestration extracted from the `dbSeed` switch case so that
+// `dbSetup` can compose seeding through a direct call instead of the
+// legacy recursive cfinclude (issue ##2959). Returns a struct with
+// {success, mode, message, ...mode-specific fields} that the caller
+// merges into the response envelope via StructAppend.
+function runDbSeed(struct seedParams = {}) {
+	var result = {success = true, mode = "auto", message = ""};
+	var sp = arguments.seedParams;
+	var requestedMode = structKeyExists(sp, "mode") ? sp.mode : "auto";
+	var environment = structKeyExists(sp, "environment") ? sp.environment : get("environment");
+	result.mode = requestedMode;
+
+	try {
+		var useConvention = false;
+		if (requestedMode == "convention") {
+			useConvention = true;
+		} else if (requestedMode == "generate") {
+			useConvention = false;
+		} else if (structKeyExists(application.wheels, "seeder") && application.wheels.seeder.hasSeedFiles()) {
+			useConvention = true;
 		}
-		if (findNoCase("price", local.name) || findNoCase("cost", local.name) || findNoCase("amount", local.name)) {
-			return (arguments.index * 10) + 0.99;
+
+		if (useConvention) {
+			result.mode = "convention";
+			var seeder = application.wheels.seeder;
+			var conventionResult = seeder.runSeeds(environment = environment);
+			result.success = conventionResult.success;
+			result.message = conventionResult.message;
+			result.environment = environment;
+			result.totalCreated = conventionResult.totalCreated;
+			result.totalSkipped = conventionResult.totalSkipped;
+			if (structKeyExists(conventionResult, "totalFailed")) {
+				result.totalFailed = conventionResult.totalFailed;
+			}
+			result.results = conventionResult.results;
+			if (structKeyExists(conventionResult, "detail")) {
+				result.detail = conventionResult.detail;
+			}
+		} else {
+			// Generate mode delegates to Seeder.generateSeeds(), which fixes
+			// both #3082 defects: it iterates $classData().properties as the
+			// STRUCT it is (the old inline loop treated it as an array of
+			// property structs and threw on every model), and it reports
+			// overall success=false when any model fails — so the CLI surfaces
+			// a non-zero exit instead of printing "Seeding completed." (#3082).
+			var count = structKeyExists(sp, "count") ? val(sp.count) : 10;
+			var modelsArg = structKeyExists(sp, "models") ? sp.models : "";
+			var generateSeeder = structKeyExists(application.wheels, "seeder")
+				? application.wheels.seeder
+				: CreateObject("component", "wheels.Seeder").init();
+			var generateResult = generateSeeder.generateSeeds(models = modelsArg, count = count);
+			StructAppend(result, generateResult, true);
 		}
-		if (findNoCase("quantity", local.name) || findNoCase("count", local.name)) {
-			return arguments.index * 5;
-		}
-		return arguments.index;
+	} catch (any e) {
+		result.success = false;
+		result.message = "Error during database seeding: " & e.message;
 	}
-	
-	// Date fields
-	if (arguments.propertyType == "date" || arguments.propertyType == "datetime" || findNoCase("date", local.name) || findNoCase("birthday", local.name) || findNoCase("dob", local.name)) {
-		return dateAdd("d", -arguments.index, now());
-	}
-	
-	// Text/description fields
-	if (arguments.propertyType == "text" || findNoCase("description", local.name) || findNoCase("content", local.name) || findNoCase("body", local.name)) {
-		return "This is test content #arguments.index#. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
-	}
-	
-	// Title fields
-	if (findNoCase("title", local.name) || findNoCase("subject", local.name)) {
-		return "Test Title #arguments.index#";
-	}
-	
-	// Status fields
-	if (findNoCase("status", local.name)) {
-		local.statuses = ["pending", "active", "completed", "cancelled"];
-		return local.statuses[(arguments.index - 1) mod arrayLen(local.statuses) + 1];
-	}
-	
-	// Default string value
-	return "#arguments.propertyName# Test #arguments.index#";
+
+	return result;
 }
+
 </cfscript>
 <cfcontent reset="true" type="application/json"><cfoutput>#SerializeJSON(data)#</cfoutput>
 <cfabort>

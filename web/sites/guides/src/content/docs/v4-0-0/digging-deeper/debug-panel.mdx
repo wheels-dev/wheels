@@ -32,13 +32,15 @@ This means AJAX-driven partial updates, Turbo Streams, API endpoints, and CSV ex
 
 ## Enabling and disabling
 
-The bar respects the `showDebugInformation` application setting. By default, Wheels sets this to `true` only in the `development` environment and `false` in every other environment (`testing`, `maintenance`, and `production`). You can override it explicitly in `config/environment.cfm`:
+The bar respects the `showDebugInformation` application setting. By default, Wheels sets this to `true` only in the `development` environment and `false` in every other environment (`testing`, `maintenance`, and `production`). You can override it explicitly in `config/settings.cfm` (or an environment-specific file such as `config/production/settings.cfm`):
 
-```cfm title="config/environment.cfm"
+```cfm {test:compile} title="config/settings.cfm"
 <cfset set(showDebugInformation=true)>
 ```
 
 Setting `showDebugInformation=false` removes the bar entirely — no HTML is injected into responses.
+
+Do not put this override in `config/environment.cfm`. That file only selects the environment: it is included before the framework's own defaults are applied, so any other `set()` call placed there is silently overwritten.
 
 <Aside type="caution">
   Never enable the debug bar in production. It renders internal state — your data source name, environment, CFML engine version, and parameter values — that you do not want visible to end users.
@@ -46,7 +48,7 @@ Setting `showDebugInformation=false` removes the bar entirely — no HTML is inj
 
 ## The debug bar
 
-When active, the bar appears as a slim strip pinned to the bottom of the browser window. Tabs are arranged from left to right: a Wheels logo (doubles as the Request tab toggle), then Request, Timing, Params, Environment, and optionally Tools. The right side shows the current git branch (when Wheels detects a `.git` directory), the framework version, and a one-click reload link when no reload password is configured.
+When active, the bar appears as a slim strip pinned to the bottom of the browser window. Tabs are arranged from left to right: a Wheels logo (doubles as the Request tab toggle), then Request, Timing, Params, Environment, and optionally Tools. The right side shows the current git branch (when the web root — `public/` — contains a `.git` directory), the framework version, and a one-click reload link when no reload password is configured.
 
 ![The collapsed Wheels debug bar pinned to the bottom of a browser window: Wheels logo, Posts.index controller.action, timing badge, Params, Development environment, and Tools tabs, with Wheels 4.0.0-SNAPSHOT version on the right](/v4-0-0/digging-deeper/debug-panel-screenshots/01-collapsed-bar.png)
 
@@ -81,11 +83,11 @@ The Timing tab label shows the total request duration in milliseconds, color-cod
 - **Yellow** — 100–499 ms
 - **Red** — 500 ms or more
 
-Opening the panel shows a horizontal bar chart breaking down where time was spent. Each phase (model, queries, template rendering, etc.) is sorted by duration descending and rendered as a proportional colored bar showing both the raw milliseconds and the percentage of total time.
+Opening the panel shows a horizontal bar chart breaking down where time was spent. Each framework phase (`setup`, `requestStart`, `beforeFilters`, `action`, `afterFilters`, `view`, `requestEnd`) that recorded time is sorted by duration descending and rendered as a proportional colored bar — the bar's width represents the phase's share of total time, and the raw milliseconds are printed inside it. No percentage figure is displayed.
 
 ![Timing panel showing "Execution Timing — 9ms total" in the header with horizontal bar chart for action and view phases, color-coded and sorted by duration](/v4-0-0/digging-deeper/debug-panel-screenshots/03-timing-panel.png)
 
-The chart is most useful for spotting query-heavy actions: if `queries` or `model` accounts for 80%+ of total time, look at the SQL being generated (the Routes admin page lists query counts per action if you need more detail).
+The chart is most useful for spotting where a slow request spends its time: if `action` dominates the total, look at the model calls and SQL your action triggers; if `view` dominates, look at the rendering work in your templates and partials.
 
 ## Params tab
 
@@ -103,19 +105,25 @@ This is the fastest way to confirm that form fields, query string values, and ne
 
 ## Environment tab
 
-The Environment tab label shows the current environment name (Development, Testing, etc.) with a color-coded dot matching the timing badge palette. The panel is divided into subsections based on what is enabled.
+The Environment tab label shows the current environment name (Development, Testing, etc.) with a color-coded dot: green for `development`, orange for `testing`, yellow for `maintenance`, and red for `production`. The panel is divided into subsections based on what is enabled.
 
 ### Application
 
-Always shown. Lists the environment, the git branch (when the app root contains a `.git` directory), the Wheels version, the CFML engine and version, and the host name (when available).
+Always shown. Lists the environment, the git branch (when the **web root** — `public/` — contains a `.git` directory; in a standard app layout the `.git` directory lives at the project root, so the row does not appear), the Wheels version, the CFML engine and version, and the host name (when available).
 
-When no reload password is set, the environment name is followed by quick-switch links that reload the app in a different environment mode. This is useful during development to test environment-specific code paths without editing config files.
+When a `reloadPassword` is configured and `allowEnvironmentSwitchViaUrl` resolves to `true`, the environment name is followed by quick-switch links for the other environments. Clicking one prompts for the reload password — it is never embedded in the page — and then issues the documented `?reload=<environment>&password=<your password>` request. When no `reloadPassword` is set, or switching via the URL is disallowed, the links do not render because the switch cannot work. See [#3060](https://github.com/wheels-dev/wheels/issues/3060).
+
+You can also switch environments manually: set a `reloadPassword` in `config/settings.cfm` and request `?reload=<environment>&password=<your password>`. The switch is additionally gated by the `allowEnvironmentSwitchViaUrl` setting: an explicit boolean you set is honored in every environment, and when unset it defaults to `false` in `production`, `testing`, and `maintenance` and `true` everywhere else. Switching to the environment you are already in is a no-op, and after a successful switch the redirect strips the reload parameters from the URL.
+
+<Aside type="caution">
+  When no `reloadPassword` is configured, URL-based reload is disabled entirely — `?reload=true` (the bar's reload link) serves the page normally without restarting, and Wheels logs a `wheels_security` warning on boot telling you to set a password ([#3062](https://github.com/wheels-dev/wheels/issues/3062); before that fix the same state let any visitor restart the application anonymously).
+</Aside>
 
 ![Environment & Configuration panel showing Application section with Environment (Development with green dot), Wheels Version, CFML Engine (Lucee 7.0.0.395), Host Name; Packages section listing wheels-basecoat; and Plugins (Legacy) "No plugins installed."](/v4-0-0/digging-deeper/debug-panel-screenshots/05-environment-panel.png)
 
 ### Packages
 
-Shown when `enablePackagesComponent` is `true` (the default in Wheels 4.0+). Displays two tables.
+Shown when `enablePackagesComponent` is `true` (the default in Wheels 4.0+).
 
 **Installed packages** lists every package found in `vendor/` and loaded by `PackageLoader.cfc`:
 
@@ -127,17 +135,9 @@ Shown when `enablePackagesComponent` is `true` (the default in Wheels 4.0+). Dis
 
 If any package failed to load (manifest error, missing dependency, CFC exception), a red error list appears below the installed table with the package name and the exception message.
 
-**Available from registry** pulls the same 24-hour cached registry index used by the `wheels packages` CLI and shows what is available to install:
-
-| Column | Description |
-|---|---|
-| Package | Name, linked to the package homepage when available |
-| Latest | Latest compatible version |
-| Description | Registry description |
-
 ![Packages section of the Environment panel — Installed table showing wheels-basecoat 3.0.0-rc.1 with version and description columns](/v4-0-0/digging-deeper/debug-panel-screenshots/05-environment-panel.png)
 
-This lets you discover first-party packages such as `wheels-hotwire`, `wheels-sentry`, or `wheels-i18n` without leaving the app. The table reflects the same 24-hour cache as `wheels packages list`; run `wheels packages registry refresh` from the CLI if you need up-to-the-minute data.
+To browse what is available to install — and discover first-party packages such as `wheels-hotwire`, `wheels-sentry`, or `wheels-i18n` — open the Packages tool page at `/wheels/packages` (linked from the Tools tab) or run `wheels packages list` from the CLI. Both read the same 24-hour cached registry index; run `wheels packages registry refresh` if you need up-to-the-minute data.
 
 ### Plugins (legacy)
 
@@ -169,9 +169,9 @@ Shown when `enablePublicComponent` is `true` (the default in development). Opens
 
 ## Configuration reference
 
-All settings are applied in `config/settings.cfm` or an environment-specific file under `config/`:
+All settings are applied in `config/settings.cfm` or an environment-specific file under `config/` (not `config/environment.cfm`, which only selects the environment — see [Enabling and disabling](#enabling-and-disabling)):
 
-```cfm title="config/environment.cfm"
+```cfm {test:compile} title="config/settings.cfm"
 <cfset set(showDebugInformation=true)>
 <cfset set(enablePackagesComponent=true)>
 <cfset set(enablePluginsComponent=true)>
@@ -179,6 +179,10 @@ All settings are applied in `config/settings.cfm` or an environment-specific fil
 <cfset set(enablePublicComponent=true)>
 <cfset set(enableMigratorComponent=true)>
 ```
+
+:::note
+Setting `enablePublicComponent=true` outside the `development` environment shows the Tools tab, but every Tools link (`/wheels/info`, `/wheels/routes`, the test runners, migrator, packages, …) returns **404**: since Wheels 4.0.4 ([#2903](https://github.com/wheels-dev/wheels/pull/2903)) those handlers are gated by a development-only allowlist, regardless of this setting. Only `environment="development"` can reach them.
+:::
 
 | Setting | Default | Effect |
 |---|---|---|
@@ -188,6 +192,18 @@ All settings are applied in `config/settings.cfm` or an environment-specific fil
 | `showIncompatiblePlugins` | `true` | Include incompatible-plugin warnings in the Warnings subsection |
 | `enablePublicComponent` | `true` in `development`, `false` elsewhere | Show the Tools tab and its link grid |
 | `enableMigratorComponent` | `true` | Show the Migrator link in the Tools panel |
+
+### IP-based debug access outside development
+
+Three settings let requests from specific source IPs see the debug bar in non-development environments, overriding the "`false` elsewhere" defaults above on a per-request basis:
+
+| Setting | Default | Effect |
+|---|---|---|
+| `allowIPBasedDebugAccess` | `false` | Master switch for the per-request IP override |
+| `debugAccessIPs` | `[]` | Array of allowed client IP addresses (exact match) |
+| `debugAccessTrustProxy` | `false` | When `true`, use the rightmost `X-Forwarded-For` entry as the client IP — only enable this behind a trusted reverse proxy, since the header is otherwise client-controlled |
+
+When `allowIPBasedDebugAccess` is `true` and the request comes from an IP listed in `debugAccessIPs`, Wheels re-enables `showDebugInformation`, `enablePublicComponent`, and `showErrorInformation` for that request only — so the debug bar (including the Tools tab) renders even in `production`. The `/wheels/*` tool pages themselves still return **404** outside `development`: the allowlist described in the note above is environment-based and is not bypassed by the IP override. Requests from any other IP are unaffected.
 
 ## Related guides
 

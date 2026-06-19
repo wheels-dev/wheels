@@ -86,7 +86,7 @@ if (request.wheels.params.format == "json") {
 							<cfloop list="#application.wheels.versionMismatchPlugins#" index="local.mm">Plugin <strong>#ListGetAt(local.mm, 1, "|")#</strong> requires <strong>#ListGetAt(local.mm, 2, "|")#</strong> #ListGetAt(local.mm, 3, "|")# but version <strong>#ListGetAt(local.mm, 4, "|")#</strong> is loaded<br></cfloop>
 						</cfif>
 						<cfif isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions)>
-							<cfloop array="#application.wheels.mixinCollisions#" index="local.c">Method <strong>#local.c.method#</strong> on <strong>#local.c.target#</strong>: provided by <strong>#local.c.existingPlugin#</strong>, overridden by <strong>#local.c.overridingPlugin#</strong><br></cfloop>
+							<cfloop array="#application.wheels.mixinCollisions#" index="local.c">Method <strong>#local.c.method#</strong> on <strong>#local.c.target#</strong>: provided by <strong>#local.c.firstProvider#</strong>, overridden by <strong>#local.c.secondProvider#</strong><br></cfloop>
 						</cfif>
 			</div>
 		</cfif>

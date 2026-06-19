@@ -282,6 +282,120 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("assertSeeInOrder overlap (review test-infra:6)", () => {
+
+				it("fails when the next text only occurs inside the previous match", () => {
+					var fc = $fakeClient(body = "<p>John Smith</p>");
+					expect(function() {
+						fc.assertSeeInOrder(["John Smith", "Smith"]);
+					}).toThrow("TestBox.AssertionFailed");
+				});
+
+				it("passes when the text genuinely repeats after the previous match", () => {
+					var fc = $fakeClient(body = "<p>John Smith</p><p>Smith</p>");
+					fc.assertSeeInOrder(["John Smith", "Smith"]);
+				});
+
+				it("passes for adjacent matches with no gap between them", () => {
+					var fc = $fakeClient(body = "alphabeta");
+					fc.assertSeeInOrder(["alpha", "beta"]);
+				});
+
+			});
+
+			describe("assertJson with arrays and complex values (review test-infra:7)", () => {
+
+				it("accepts a top-level JSON array response", () => {
+					var fc = $fakeClient(body = '[{"id":1},{"id":2}]');
+					fc.assertJson();
+				});
+
+				it("reports a test failure, not an engine error, when matching keys against a JSON array", () => {
+					var fc = $fakeClient(body = '[{"id":1}]');
+					expect(function() {
+						fc.assertJson({total: 5});
+					}).toThrow("TestBox.AssertionFailed");
+				});
+
+				it("matches complex expected values structurally", () => {
+					var fc = $fakeClient(body = '{"tags":["a","b"],"meta":{"page":1}}');
+					fc.assertJson({tags: ["a", "b"]});
+				});
+
+				it("reports a test failure on complex value mismatch", () => {
+					var fc = $fakeClient(body = '{"tags":["a","b"]}');
+					expect(function() {
+						fc.assertJson({tags: ["a", "z"]});
+					}).toThrow("TestBox.AssertionFailed");
+				});
+
+				it("reports a test failure when a simple actual value meets a complex expected value", () => {
+					var fc = $fakeClient(body = '{"tags":"ab"}');
+					expect(function() {
+						fc.assertJson({tags: ["a", "b"]});
+					}).toThrow("TestBox.AssertionFailed");
+				});
+
+				it("assertJsonPath matches complex values structurally", () => {
+					var fc = $fakeClient(body = '{"user":{"roles":["admin","editor"]}}');
+					fc.assertJsonPath("user.roles", ["admin", "editor"]);
+				});
+
+				it("assertJsonPath reports a test failure on complex value mismatch", () => {
+					var fc = $fakeClient(body = '{"user":{"roles":["admin"]}}');
+					expect(function() {
+						fc.assertJsonPath("user.roles", ["admin", "editor"]);
+					}).toThrow("TestBox.AssertionFailed");
+				});
+
+			});
+
+			describe("path validation (review test-infra:12)", () => {
+
+				it("throws Wheels.TestClientInvalidPath when the path has no leading slash", () => {
+					var c = new wheels.wheelstest.TestClient(baseUrl = "http://localhost:9999");
+					expect(function() {
+						c.visit("users");
+					}).toThrow("Wheels.TestClientInvalidPath");
+				});
+
+				it("applies the leading-slash guard to every HTTP verb", () => {
+					var c = new wheels.wheelstest.TestClient(baseUrl = "http://localhost:9999");
+					expect(function() {
+						c.post("users");
+					}).toThrow("Wheels.TestClientInvalidPath");
+					expect(function() {
+						c.put("users");
+					}).toThrow("Wheels.TestClientInvalidPath");
+					expect(function() {
+						c.patch("users");
+					}).toThrow("Wheels.TestClientInvalidPath");
+					expect(function() {
+						c.delete("users");
+					}).toThrow("Wheels.TestClientInvalidPath");
+				});
+
+			});
+
+			describe("response caching (review test-infra:15)", () => {
+
+				it("content() reflects a new fake response after the cache is primed", () => {
+					var fc = $fakeClient(body = "first body");
+					expect(fc.content()).toBe("first body");
+					fc.$setFakeResponse(statusCode = "200 OK", fileContent = "second body");
+					expect(fc.content()).toBe("second body");
+				});
+
+				it("JSON assertions reflect a new fake response after the cache is primed", () => {
+					var fc = $fakeClient(body = '{"v":1}');
+					fc.assertJson({v: 1});
+					fc.$setFakeResponse(statusCode = "200 OK", fileContent = '{"v":2}');
+					fc.assertJson({v: 2});
+					expect(fc.json().v).toBe(2);
+				});
+
+			});
+
 		});
 
 	}

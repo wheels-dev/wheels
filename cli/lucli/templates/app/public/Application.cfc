@@ -24,13 +24,14 @@ component output="false" {
 	this.sessionManagement = true;
 
 	// If a plugin has a jar or class file, automatically add the mapping to this.javasettings.
+	// Legacy plugins system (DEPRECATED — superseded by vendor/<name>/ packages).
+	// Only scan when a plugins/ directory exists, so a removed plugins/ dir does not
+	// error on engines whose directoryList() throws on a missing path (e.g. RustCFML;
+	// Lucee tolerates it). This lookup is slated for removal in the next major.
 	this.wheels.pluginDir = this.appDir & "../plugins";
-	this.wheels.pluginFolders = DirectoryList(
-		this.wheels.pluginDir,
-		"true",
-		"path",
-		"*.class|*.jar|*.java"
-	);
+	this.wheels.pluginFolders = DirectoryExists(this.wheels.pluginDir)
+		? DirectoryList(this.wheels.pluginDir, "true", "path", "*.class|*.jar|*.java")
+		: [];
 
 	for (this.wheels.folder in this.wheels.pluginFolders) {
 		if (!StructKeyExists(this, "javaSettings")) {
@@ -84,12 +85,46 @@ component output="false" {
 		performVariableInterpolation(this.env);
 	}
 
+	// Harden the session cookie: httpOnly blocks JavaScript access and sameSite=lax
+	// limits cross-site sends. The secure flag (HTTPS-only cookie) turns on
+	// automatically in production. Override in config/app.cfm if your setup differs,
+	// e.g. `this.sessionCookie.secure = true;` when non-production environments are
+	// also served over HTTPS.
+	this.sessionCookie = {
+		httpOnly: true,
+		sameSite: "lax",
+		secure: structKeyExists(variables, "currentEnv") && currentEnv == "production"
+	};
+
 	function onServerStart() {}
 
 	include "../config/app.cfm";
 
 	function onApplicationStart() {
 		application.env = duplicate(this.env);
+
+		// Consume the single-use reload-password handoff left by
+		// $handleRestartAppRequest() for environment-switch restarts (issue #3030).
+		// The framework's switch code in wheels/events/onapplicationstart.cfc runs
+		// before config/settings.cfm is loaded and gets the configured password via
+		// carryover from application.wheels.reloadPassword — which applicationStop()
+		// destroys. Seeding this.wheels.reloadPassword here restores that carryover
+		// on the post-restart cold start ($init copies this.wheels into
+		// application.wheels before the carryover check).
+		local.handoffKey = "$wheelsReloadPasswordHandoff_" & this.name;
+		if (StructKeyExists(server, local.handoffKey)) {
+			local.handoff = server[local.handoffKey];
+			StructDelete(server, local.handoffKey);
+			if (
+				IsStruct(local.handoff)
+				&& StructKeyExists(local.handoff, "reloadPassword")
+				&& StructKeyExists(local.handoff, "expiresAt")
+				&& DateCompare(Now(), local.handoff.expiresAt) < 0
+			) {
+				this.wheels.reloadPassword = local.handoff.reloadPassword;
+			}
+		}
+
 		application.wheelsdi = new wheels.Injector("wheels.Bindings");
 
 		/* wheels/global object */
@@ -100,6 +135,18 @@ component output="false" {
 	}
 
 	public void function onApplicationEnd( struct ApplicationScope ) {
+		// Release the application-scoped browser-test launcher (headless browser,
+		// node driver process, URLClassLoader handles on the Playwright JARs)
+		// before the scope is discarded. CFML has no destructors, so without this
+		// every applicationStop() reload cycle would orphan those processes.
+		if (StructKeyExists(arguments.applicationScope, "$wheelsBrowserLauncher")) {
+			try {
+				arguments.applicationScope.$wheelsBrowserLauncher.release();
+			} catch (any e) {
+				// Best-effort cleanup — never block application shutdown.
+			}
+		}
+
 		application.wo.$include(
 			template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
 			argumentCollection = arguments
@@ -111,7 +158,12 @@ component output="false" {
 
 		// Fix for shared application name (issue 359).
 		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "eventpath")) {
-			local.executeArgs = {"componentReference" = "application"};
+			// Case-exact "Application" (the file is Application.cfc): on case-sensitive
+			// filesystems Adobe CF resolves CFC names by exact case then all-lowercase,
+			// so a lowercase reference never matches Application.cfc and throws "Could
+			// not find the ColdFusion component or interface application" (issue #3053
+			// follow-up). Lucee matches case-insensitively either way.
+			local.executeArgs = {"componentReference" = "Application"};
 
 			application.wo.$simpleLock(name = local.lockName, execute = "onApplicationStart", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 		}
@@ -168,7 +220,18 @@ component output="false" {
 			application.wheels.environment != "development" &&
 			(application.wheels.allowIPBasedDebugAccess)
 		) {
-			local.clientIP = CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR;
+			// Client IP comes from the socket address. X-Forwarded-For is client-controlled
+			// and trivially spoofed, so it is only consulted when the app explicitly opts in
+			// via set(debugAccessTrustProxy=true) behind a trusted reverse proxy.
+			local.clientIP = Trim(CGI.REMOTE_ADDR);
+			if (
+				StructKeyExists(application.wheels, "debugAccessTrustProxy")
+				&& application.wheels.debugAccessTrustProxy
+				&& Len(Trim(CGI.HTTP_X_FORWARDED_FOR))
+			) {
+				// Rightmost entry is the one appended by the trusted proxy nearest the app.
+				local.clientIP = Trim(ListLast(CGI.HTTP_X_FORWARDED_FOR));
+			}
 			local.allowedIPs = application.wheels.debugAccessIPs;
 
 			if (arrayContains(local.allowedIPs, local.clientIP)) {
@@ -186,20 +249,88 @@ component output="false" {
 			}
 		}
 
+		// Loop-break for URL environment switches (issue #3030): $buildRedirectUrl()
+		// keeps ?reload=<environment>&password=... on the post-restart redirect so the
+		// framework's switch code (vendor/wheels/events/onapplicationstart.cfc) can see
+		// them on the request that starts the new application. When that redirected
+		// request arrives here the switch has already been applied, so firing another
+		// applicationStop() would redirect forever. If the requested environment is
+		// already active, skip the restart and serve the request normally.
+		// Trade-off: ?reload=<current-environment> is a no-op — use ?reload=true for a
+		// same-environment restart.
+		local.environmentSwitchAlreadyApplied = StructKeyExists(url, "reload")
+			&& !IsBoolean(url.reload)
+			&& StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "environment")
+			&& application.wheels.environment == url.reload;
+
 		// Reload application properly using applicationStop() if requested.
-		if (
-			StructKeyExists(url, "reload")
-			&& (
-				!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "reloadPassword")
-				|| !Len(application.wheels.reloadPassword)
-				|| (StructKeyExists(url, "password") && url.password == application.wheels.reloadPassword)
-			)
-		) {
+		// SECURITY (issue #3062): the gate FAILS CLOSED. A URL-based reload requires a
+		// non-empty configured reloadPassword AND a matching password parameter — an
+		// empty or missing reloadPassword disables ?reload= entirely, matching the
+		// environment-switch leg in wheels/events/onapplicationstart.cfc and the
+		// warning the framework logs on boot when the password is blank. Wrong-password
+		// attempts are logged to wheels_security.log with the trusted client IP and
+		// feed the same per-IP rate limit as the cold-start path (5 failed attempts
+		// within 5 minutes locks the source out).
+		local.reloadRequested = StructKeyExists(url, "reload") && !local.environmentSwitchAlreadyApplied;
+		local.reloadAuthorized = false;
+		if (local.reloadRequested && StructKeyExists(application, "wheels") && StructKeyExists(application, "wo")) {
+			// Same per-IP store and window as wheels/events/onapplicationstart.cfc, so
+			// warm-path and cold-start attempts count against one shared bucket.
+			local.reloadClientIp = application.wo.$trustedClientIp();
+			if (!StructKeyExists(application, "$reloadRateLimit")) {
+				application.$reloadRateLimit = {};
+			}
+			local.reloadRateLimited = false;
+			if (StructKeyExists(application.$reloadRateLimit, local.reloadClientIp)) {
+				local.reloadRateLimitEntry = application.$reloadRateLimit[local.reloadClientIp];
+				if (local.reloadRateLimitEntry.count >= 5 && DateDiff("n", local.reloadRateLimitEntry.firstAttempt, Now()) < 5) {
+					local.reloadRateLimited = true;
+				}
+				if (DateDiff("n", local.reloadRateLimitEntry.firstAttempt, Now()) >= 5) {
+					StructDelete(application.$reloadRateLimit, local.reloadClientIp);
+				}
+			}
+			if (
+				!local.reloadRateLimited
+				&& StructKeyExists(application.wheels, "reloadPassword")
+				&& Len(application.wheels.reloadPassword)
+				&& StructKeyExists(url, "password")
+				// Case-sensitive, constant-time compare — same gate as the environment switch
+				// in wheels/events/onapplicationstart.cfc (CFML == is case-insensitive and
+				// exits early, which leaks timing information).
+				&& application.wo.$secureCompare(url.password, application.wheels.reloadPassword)
+			) {
+				local.reloadAuthorized = true;
+				try {
+					writeLog(file="wheels_security", type="information", text="Reload accepted from #local.reloadClientIp#");
+				} catch (any e) {
+					// Fail silently if logging fails
+				}
+			} else if (!local.reloadRateLimited && StructKeyExists(url, "password")) {
+				// Track the failed attempt: count it against the shared per-IP window
+				// and log it, exactly like the cold-start path does.
+				if (!StructKeyExists(application.$reloadRateLimit, local.reloadClientIp)) {
+					application.$reloadRateLimit[local.reloadClientIp] = {count: 0, firstAttempt: Now()};
+				}
+				application.$reloadRateLimit[local.reloadClientIp].count++;
+				try {
+					writeLog(file="wheels_security", type="warning", text="Reload password rejected from #local.reloadClientIp#");
+				} catch (any e) {
+					// Fail silently if logging fails
+				}
+			}
+		}
+		if (local.reloadAuthorized) {
 			application.wo.$debugPoint("total,reload");
 			if (StructKeyExists(url, "lock") && !url.lock) {
 				this.$handleRestartAppRequest();
 			} else {
-				local.executeArgs = {"componentReference" = "application"};
+				// Case-exact "Application" — see the matching comment in onSessionStart().
+				// A lowercase reference turns every authorized reload into an HTTP 500 on
+				// Adobe CF + case-sensitive filesystems (issue #3053 follow-up).
+				local.executeArgs = {"componentReference" = "Application"};
 				application.wo.$simpleLock(name = local.lockName, execute = "$handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 			}
 			return false;
@@ -260,8 +391,18 @@ component output="false" {
 
 	public void function onError( any Exception, string EventName ) {
 		try {
-			application.wheelsdi = new wheels.Injector("wheels.Bindings");
-			application.wo = application.wheelsdi.getInstance("global");
+			// Only rebuild the DI container when it never came up (e.g. the
+			// Injector failed during onApplicationStart). Injector.init()
+			// self-registers at application.wheelsdi, so an unguarded
+			// construction here would replace the live container on every
+			// error page — wiping all config/services.cfm registrations and
+			// cached singletons (issue ##3061).
+			if (!StructKeyExists(application, "wheelsdi")) {
+				application.wheelsdi = new wheels.Injector("wheels.Bindings");
+			}
+			if (!StructKeyExists(application, "wo")) {
+				application.wo = application.wheelsdi.getInstance("global");
+			}
 
 			// Make exception available to the event template
 			request.wheels = request.wheels ?: {};
@@ -340,17 +481,95 @@ component output="false" {
 
 	public void function $handleRestartAppRequest() {
 		local.redirectUrl = this.$buildRedirectUrl();
+
+		// Environment-switch restarts (?reload=<environment>) need the configured
+		// reloadPassword available when the NEW application starts: the switch code
+		// in wheels/events/onapplicationstart.cfc runs before config/settings.cfm is
+		// loaded and normally reads the password via carryover from the live
+		// application scope, which applicationStop() destroys. Hand it across the
+		// restart via a single-use, short-lived server-scope entry consumed by
+		// onApplicationStart() (issue #3030). The value is the app's own configured
+		// password (the request's password was already verified against it by the
+		// reload gate), and the server scope is only reachable by code running on
+		// this engine — the same trust domain as config/settings.cfm itself.
+		// Skipped when allowEnvironmentSwitchViaUrl is explicitly disabled (covers
+		// both set(allowEnvironmentSwitchViaUrl=false) and the framework's
+		// production/testing/maintenance auto-disable): after applicationStop()
+		// the framework cannot enforce the flag itself — its revert in
+		// wheels/events/onapplicationstart.cfc needs carryover state the restart
+		// destroys — so this pre-restart gate is the only place the off-switch
+		// holds. A missing flag counts as allowed, matching the framework's
+		// carryover default.
+		if (
+			StructKeyExists(url, "reload")
+			&& !IsBoolean(url.reload)
+			&& Len(url.reload)
+			&& StructKeyExists(url, "password")
+			&& StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "reloadPassword")
+			&& Len(application.wheels.reloadPassword)
+			&& (
+				!StructKeyExists(application.wheels, "allowEnvironmentSwitchViaUrl")
+				|| application.wheels.allowEnvironmentSwitchViaUrl
+			)
+		) {
+			server["$wheelsReloadPasswordHandoff_" & this.name] = {
+				reloadPassword: application.wheels.reloadPassword,
+				expiresAt: DateAdd("n", 1, Now())
+			};
+		}
+
 		applicationStop();
 		location(url = local.redirectUrl, addToken = false);
 	}
 
 	public string function $buildRedirectUrl() {
+		// The local carrying the redirect target must NOT be named "url": this
+		// function reads the URL scope unscoped below (StructKeyExists(url, ...)),
+		// and on Adobe CF an unscoped url resolves to a local of that name first,
+		// turning every password reload into an HTTP 500 (issue #3053, CLAUDE.md
+		// anti-pattern #11 — reserved scope names).
 		if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
-			local.url = cgi.path_info;
+			local.redirectPath = cgi.path_info;
 		} else if (StructKeyExists(cgi, "path_info")) {
-			local.url = "/";
+			local.redirectPath = "/";
 		} else {
-			local.url = cgi.script_name;
+			local.redirectPath = cgi.script_name;
+		}
+
+		// For a plain restart (?reload=true) every reload-related parameter is
+		// stripped so the redirected request cannot trigger another restart. For an
+		// environment switch (?reload=<environment>) the framework needs URL.reload
+		// and URL.password present on the request that starts the new application
+		// (vendor/wheels/events/onapplicationstart.cfc), so those two survive the
+		// redirect; the restart loop is broken in onRequestStart instead, which
+		// skips the restart once the requested environment is active (issue #3030).
+		// Only preserve when the switch can actually be applied (a non-empty
+		// reloadPassword is configured and the request carries a password) —
+		// otherwise the new application could never switch and the preserved
+		// parameters would redirect forever. The same goes for
+		// allowEnvironmentSwitchViaUrl: when switching is explicitly disallowed
+		// (set(allowEnvironmentSwitchViaUrl=false) or the framework's
+		// production/testing/maintenance auto-disable) the parameters are
+		// stripped and the request degrades to a plain restart — the framework
+		// cannot enforce the flag on the post-applicationStop() cold start, so
+		// it must be enforced here, pre-restart. A missing flag counts as
+		// allowed, matching the framework's carryover default.
+		local.stripParams = "reload,password,lock";
+		if (
+			StructKeyExists(url, "reload")
+			&& !IsBoolean(url.reload)
+			&& Len(url.reload)
+			&& StructKeyExists(url, "password")
+			&& StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "reloadPassword")
+			&& Len(application.wheels.reloadPassword)
+			&& (
+				!StructKeyExists(application.wheels, "allowEnvironmentSwitchViaUrl")
+				|| application.wheels.allowEnvironmentSwitchViaUrl
+			)
+		) {
+			local.stripParams = "lock";
 		}
 
 		if (StructKeyExists(cgi, "query_string") && Len(cgi.query_string)) {
@@ -362,18 +581,18 @@ component output="false" {
 				local.keyValue = local.oldQueryString[local.i];
 				local.key = ListFirst(local.keyValue, "=");
 
-				if (!ListFindNoCase("reload,password,lock", local.key)) {
+				if (!ListFindNoCase(local.stripParams, local.key)) {
 					ArrayAppend(local.newQueryString, local.keyValue);
 				}
 			}
 
 			if (ArrayLen(local.newQueryString)) {
 				local.queryString = ArrayToList(local.newQueryString, "&");
-				local.url = "#local.url#?#local.queryString#";
+				local.redirectPath = "#local.redirectPath#?#local.queryString#";
 			}
 		}
 
-		return local.url;
+		return local.redirectPath;
 	}
 
 	/**

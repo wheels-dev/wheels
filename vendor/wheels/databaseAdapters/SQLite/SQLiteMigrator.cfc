@@ -213,22 +213,41 @@ component extends="wheels.databaseAdapters.Abstract" {
 			sql = "SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = '#local.tableName#' AND sql IS NOT NULL"
 		);
 
-		// PRAGMA foreign_keys must toggle outside any active transaction.
-		local.statements = [
-			"PRAGMA foreign_keys = OFF",
-			"BEGIN TRANSACTION",
-			local.createSQL,
-			"INSERT INTO #local.quotedTempTable# (#local.columnList#) SELECT #local.columnList# FROM #local.quotedTable#",
-			"DROP TABLE #local.quotedTable#",
-			"ALTER TABLE #local.quotedTempTable# RENAME TO #quoteTableName(local.tableName)#",
-			"COMMIT"
-		];
+		// When the migrator's cftransaction already wraps this call (issue #2789
+		// sets request.$wheelsTransactionWrapper) the engine owns BEGIN / COMMIT /
+		// ROLLBACK: emitting our own would collide with the active transaction,
+		// PRAGMA foreign_keys is a silent no-op inside one, and a raw COMMIT would
+		// defeat the wrapper's rollback (leaving the temp table behind on a
+		// mid-sequence failure). Use PRAGMA defer_foreign_keys instead — it is
+		// allowed mid-transaction, moves FK enforcement to COMMIT, and auto-resets
+		// on commit/rollback — and let the wrapper provide atomicity.
+		local.inWrappingTransaction = StructKeyExists(request, "$wheelsTransactionWrapper")
+		&& request.$wheelsTransactionWrapper;
+		if (local.inWrappingTransaction) {
+			local.statements = ["PRAGMA defer_foreign_keys = ON"];
+		} else {
+			// Standalone execution: PRAGMA foreign_keys must toggle outside any
+			// active transaction, so wrap the recreate in our own.
+			local.statements = ["PRAGMA foreign_keys = OFF", "BEGIN TRANSACTION"];
+		}
+		ArrayAppend(local.statements, local.createSQL);
+		ArrayAppend(
+			local.statements,
+			"INSERT INTO #local.quotedTempTable# (#local.columnList#) SELECT #local.columnList# FROM #local.quotedTable#"
+		);
+		ArrayAppend(local.statements, "DROP TABLE #local.quotedTable#");
+		ArrayAppend(local.statements, "ALTER TABLE #local.quotedTempTable# RENAME TO #quoteTableName(local.tableName)#");
+		if (!local.inWrappingTransaction) {
+			ArrayAppend(local.statements, "COMMIT");
+		}
 		if (IsQuery(local.indexes)) {
 			for (local.j = 1; local.j <= local.indexes.recordCount; local.j++) {
 				ArrayAppend(local.statements, local.indexes.sql[local.j]);
 			}
 		}
-		ArrayAppend(local.statements, "PRAGMA foreign_keys = ON");
+		if (!local.inWrappingTransaction) {
+			ArrayAppend(local.statements, "PRAGMA foreign_keys = ON");
+		}
 		return local.statements;
 	}
 

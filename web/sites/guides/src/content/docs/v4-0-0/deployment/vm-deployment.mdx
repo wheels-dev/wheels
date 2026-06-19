@@ -229,7 +229,7 @@ sudo certbot --nginx -d myapp.example.com
 Certbot edits the nginx config to wire the cert paths and installs a renewal timer. `sudo certbot renew --dry-run` verifies renewal works before the cert actually expires.
 
 <Aside type="note">
-  `X-Forwarded-Proto` is what tells Wheels the request came in over HTTPS even though Lucee itself is listening on plain HTTP inside the box. Without it, `isSecure()`-style checks and protocol-aware redirects misfire. See [HTTPS Detection](/v4-0-0/digging-deeper/security/https-detection/).
+  `X-Forwarded-Proto` is what tells Wheels the request came in over HTTPS even though Lucee itself is listening on plain HTTP inside the box — but the header alone isn't enough. Wheels ignores proxy headers unless you opt in with `set(trustProxyHeaders=true)` in `config/settings.cfm`; without that setting, `isSecure()`-style checks and protocol-aware redirects misfire even with the `proxy_set_header` line above in place. See [HTTPS Detection](/v4-0-0/digging-deeper/security/https-detection/).
 </Aside>
 
 ## Firewall
@@ -286,7 +286,7 @@ From your build machine or CI runner:
 4. **Run migrations against the new release.** Point the CLI at the new release so it reads the new migration files.
 
    ```bash title="Run database migrations on the new release"
-   ssh lucee@myapp.example.com "cd /opt/myapp/releases/$RELEASE && wheels dbmigrate latest"
+   ssh lucee@myapp.example.com "cd /opt/myapp/releases/$RELEASE && wheels migrate latest"
    ```
 
    If a migration fails, stop here. The old `current` symlink is still live; nothing changed for users.
@@ -317,7 +317,7 @@ From your build machine or CI runner:
 
 </Steps>
 
-**Rolling back** is the swap in reverse — `ln -sfn /opt/myapp/releases/<previous> /opt/myapp/current` and reload. If the failed deploy ran a migration, roll the migration back first (`wheels dbmigrate down`) or accept that the older code is running against a newer schema.
+**Rolling back** is the swap in reverse — `ln -sfn /opt/myapp/releases/<previous> /opt/myapp/current` and reload. If the failed deploy ran a migration, roll the migration back first (`wheels migrate down`) or accept that the older code is running against a newer schema.
 
 ## Log rotation
 

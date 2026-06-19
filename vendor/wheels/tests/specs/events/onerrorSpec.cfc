@@ -54,6 +54,15 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.DataSourceNotFound")).toBe(404)
 			})
 
+			// GH ##3075: the action-dispatch gate ($callAction) blocks framework
+			// helpers and $-prefixed internals by throwing Wheels.ActionNotAllowed.
+			// #2845 and CLAUDE.md Anti-Pattern 8 promise that resolves to a 404,
+			// but the *NotFound-only regex sent it to 500. ActionNotAllowed is now
+			// an explicit member of the 404 set alongside the *NotFound family.
+			it("maps Wheels.ActionNotAllowed to HTTP 404 (##3075)", () => {
+				expect($expectedStatusFor("Wheels.ActionNotAllowed")).toBe(404)
+			})
+
 			it("maps a generic Wheels error type to HTTP 500 (##2319)", () => {
 				expect($expectedStatusFor("Wheels.UnknownThingHappened")).toBe(500)
 			})
@@ -62,10 +71,54 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.ActionParameterMissing")).toBe(500)
 			})
 		})
+
+		// Security regression: $getRequestFormat must reject non-alphanumeric url.format (LFI via $runOnError's error-template include path).
+		describe("$getRequestFormat rejects unsafe format tokens (T4 LFI)", () => {
+
+			it("coerces ../ traversal tokens to html", () => {
+				expect($requestFormatFor("../../../wheels/public/layout/_header_simple")).toBe("html")
+			})
+
+			it("coerces tokens containing a slash or dot to html", () => {
+				expect($requestFormatFor("onerror.cfm/../x")).toBe("html")
+			})
+
+			it("preserves a valid alphanumeric format", () => {
+				expect($requestFormatFor("json")).toBe("json")
+			})
+
+			it("preserves another valid format", () => {
+				expect($requestFormatFor("xml")).toBe("xml")
+			})
+
+			it("falls back to html for an empty format", () => {
+				expect($requestFormatFor("")).toBe("html")
+			})
+		})
+	}
+
+	private string function $requestFormatFor(required string formatValue) {
+		var em = CreateObject("component", "wheels.events.EventMethods")
+		var hadFormat = StructKeyExists(url, "format")
+		var prior = hadFormat ? url.format : ""
+		var result = ""
+		try {
+			url.format = arguments.formatValue
+			result = em.$getRequestFormat()
+		} finally {
+			if (hadFormat) {
+				url.format = prior
+			} else {
+				StructDelete(url, "format")
+			}
+		}
+		return result
 	}
 
 	private numeric function $expectedStatusFor(required string wheelsType) {
-		if (ReFindNoCase("^Wheels\.[A-Za-z]*NotFound$", arguments.wheelsType)) {
+		// Mirrors the status map in EventMethods.$runOnError. Keep the regex in
+		// sync with that source — a rename or narrowing there must break here.
+		if (ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.wheelsType)) {
 			return 404
 		}
 		return 500

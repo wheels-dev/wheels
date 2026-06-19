@@ -13,7 +13,7 @@ Define the URL surface of your app in `config/routes.cfm`. This page shows how t
 **You'll learn:**
 
 - How to define a single route with `get`, `post`, `patch`, `delete`
-- How `resources()` produces seven REST routes in one line
+- How `resources()` produces the seven REST actions in one line
 - How to nest resources and namespace an admin section
 - How to constrain placeholder patterns with regex
 - Which helper reads which route at call time
@@ -39,7 +39,7 @@ mapper()
 
 ## Resource routes
 
-`resources()` is where most routing happens. One call generates seven REST routes plus the named helpers that go with them.
+`resources()` is where most routing happens. One call generates routes for the seven REST actions plus the named helpers that go with them.
 
 ```cfm {test:compile}
 <cfscript>
@@ -51,7 +51,7 @@ mapper()
 </cfscript>
 ```
 
-This gives you `GET /posts`, `GET /posts/new`, `POST /posts`, `GET /posts/:key`, `GET /posts/:key/edit`, `PATCH /posts/:key`, and `DELETE /posts/:key` — plus the named routes `posts`, `newPost`, `post`, and `editPost`. `binding=true` turns on route model binding: the member actions (`show`, `edit`, `update`, `delete`) see a pre-loaded `params.post` instance without calling `findByKey` themselves.
+This gives you `GET /posts`, `GET /posts/new`, `POST /posts`, `GET /posts/:key`, `GET /posts/:key/edit`, `PATCH/PUT /posts/:key` (both verbs map to `update`), and `DELETE /posts/:key` — plus the named routes `posts`, `newPost`, `post`, and `editPost`. Each route is also registered with a `.[format]` twin (`/posts.json`, `/posts/:key.xml`, …), so the actual table holds more rows than seven. `binding=true` turns on route model binding: the member actions (`show`, `edit`, `update`, `delete`) see a pre-loaded `params.post` instance without calling `findByKey` themselves.
 
 ## Trim the resource with `only` or `except`
 
@@ -88,7 +88,23 @@ The nested resource produces `POST /posts/:postKey/comments → comments##create
 
 ## Namespaced sections
 
-Group a set of controllers under a shared URL prefix and a subfolder. `.namespace(name="admin")` prefixes URLs with `/admin` and loads controllers from `app/controllers/admin/`.
+Group a set of controllers under a shared URL prefix and a subfolder. `.namespace("admin")` prefixes URLs with `/admin` and loads controllers from `app/controllers/admin/`. Declare the namespaced routes between the `.namespace()` call and a matching `.end()`:
+
+```cfm {test:compile}
+<cfscript>
+mapper()
+    .namespace("admin")
+        .resources("posts")
+    .end()
+    .resources("posts")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+URLs become `/admin/posts`, `/admin/posts/:key`, and so on; the controller class is `admin/Posts.cfc`. The outer `.resources("posts")` still serves the public `/posts` URLs — namespaces don't replace the non-namespaced routes, they sit alongside them.
+
+`namespace()` (and `scope()`, `package()`, `controller()`) also accept a `callback=` argument, mirroring `resources()`: the routes declared inside the callback register under the namespace, and the scope closes automatically when the callback returns — no `.end()` needed:
 
 ```cfm {test:compile}
 <cfscript>
@@ -102,11 +118,15 @@ mapper()
 </cfscript>
 ```
 
-URLs become `/admin/posts`, `/admin/posts/:key`, and so on; the controller class is `admin/Posts.cfc`. The outer `.resources("posts")` still serves the public `/posts` URLs — namespaces don't replace the non-namespaced routes, they sit alongside them.
+<Aside type="caution">
+  With the explicit form, always close a namespace with `.end()` — an unclosed scope swallows every route declared afterward into the namespace, so the public `/posts` above would 404. And on releases before the [#3072](https://github.com/wheels-dev/wheels/issues/3072) fix (4.0.3 and earlier), `namespace()` and `scope()` silently ignored `callback=` — the callback's routes never registered and the scope never closed. Use the explicit `.end()` form on those versions.
+</Aside>
+
+Controllers that live in `app/controllers/admin/` must extend the base controller with its full path — `extends="app.controllers.Controller"`. The bare `extends="Controller"` fails to resolve from the subfolder on Lucee (`invalid component definition, can't find component [Controller]`).
 
 ## Constrain pattern placeholders
 
-Pattern placeholders are written as `[name]`. By default any non-slash string matches. Pass a `constraints` struct to restrict a placeholder to a regex.
+Pattern placeholders are written as `[name]`. By default a placeholder matches any string without a slash or dot (`[^\./]+` — dots are reserved for the optional `.[format]` suffix). Pass a `constraints` struct to restrict a placeholder to a regex.
 
 ```cfm {test:compile}
 <cfscript>
@@ -139,13 +159,13 @@ Rename the resource once in `routes.cfm` and every helper updates. See [Forms an
 
 ## Listing all routes
 
-When a route isn't matching what you expect, print the registered route table. `wheels routes` shows every route's method, path, controller#action, and name. For a smoke test that your CLI is installed and responding:
+When a route isn't matching what you expect, print the registered route table. `wheels routes` shows every route's method, path, controller#action, and name. It reads the table from your *running* app — with no server up, it refuses and tells you to `wheels start` first:
 
-```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
-wheels --version
+```bash {test:cli cmd="wheels routes" asserts-output="No running Wheels server" asserts-exit=1}
+wheels routes
 ```
 
-Then in your app directory, run `wheels routes` to see the full table.
+Start the server, then run `wheels routes` in your app directory to see the full table.
 
 ## Related guides
 

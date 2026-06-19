@@ -445,6 +445,105 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("belongsTo scaffolding (CLI-D2)", () => {
+
+				it("injects include= into the CRUD controller finders with all-named findByKey", () => {
+					var result = scaffold.generateScaffold(
+						name = "Review",
+						properties = [{name: "body", type: "text"}],
+						belongsTo = "Author",
+						force = true
+					);
+					expect(result.success).toBeTrue();
+					var content = fileRead(tempRoot & "/app/controllers/Reviews.cfc");
+					expect(content).toInclude('findAll(include="author")');
+					expect(content).toInclude('findByKey(key=params.key, include="author")');
+					// The mixed positional+named form is rejected at runtime by
+					// Lucee/Adobe — it must never be generated.
+					expect(content).notToInclude('findByKey(params.key, include=');
+					expect(content).notToInclude("findByKey(params.key)");
+				});
+
+				it("index.cfm renders the raw FK column, not query.assoc.name", () => {
+					scaffold.generateScaffold(
+						name = "Review",
+						properties = [{name: "body", type: "text"}],
+						belongsTo = "Author",
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/views/reviews/index.cfm");
+					// findAll() queries are flat — reviews.author.name throws at runtime.
+					expect(content).notToInclude(".author.name");
+					expect(content).toInclude("##reviews.authorId##");
+				});
+
+				it("show.cfm association display is backed by the injected include", () => {
+					scaffold.generateScaffold(
+						name = "Review",
+						properties = [{name: "body", type: "text"}],
+						belongsTo = "Author",
+						force = true
+					);
+					var showContent = fileRead(tempRoot & "/app/views/reviews/show.cfm");
+					var controllerContent = fileRead(tempRoot & "/app/controllers/Reviews.cfc");
+					// show.cfm walks review.author.* — valid only because the
+					// controller fetches with include="author".
+					expect(showContent).toInclude("review.author.name");
+					expect(controllerContent).toInclude('findByKey(key=params.key, include="author")');
+				});
+
+				it("injects include= into the API controller with all-named findByKey", () => {
+					var result = scaffold.generateApiResource(
+						name = "Memo",
+						properties = [{name: "subject", type: "string"}],
+						belongsTo = "Author",
+						force = true
+					);
+					expect(result.success).toBeTrue();
+					var content = fileRead(tempRoot & "/app/controllers/api/Memos.cfc");
+					expect(content).toInclude('findAll(include="author")');
+					expect(content).toInclude('findByKey(key=params.key, include="author")');
+					expect(content).notToInclude('findByKey(params.key, include=');
+				});
+
+			});
+
+			describe("generateApiTest() (CLI-D3)", () => {
+
+				it("emits processRequest calls matching the real framework signature", () => {
+					var result = scaffold.generateApiTest("Widgets", "Widget");
+					expect(result.success).toBeTrue();
+					var content = fileRead(result.path);
+					// Route NAME inside the params struct + returnAs="struct"
+					// (the old route="/api/widgets" URL-path form never matched
+					// processRequest(required struct params, ...)).
+					expect(content).toInclude('params={route: "apiWidgets", format: "json"}');
+					expect(content).toInclude('route: "apiWidget"');
+					expect(content).toInclude('returnAs="struct"');
+					expect(content).notToInclude('processRequest(route=');
+				});
+
+			});
+
+			describe("generated migration failure tracking (CLI-D4)", () => {
+
+				it("uses the struct-field catch pattern instead of local.X (BoxLang-safe)", () => {
+					var path = scaffold.createMigrationWithProperties(
+						name = "Ledger",
+						properties = [{name: "total", type: "decimal"}]
+					);
+					var content = fileRead(path);
+					// `local.X = ...` inside catch is discarded on BoxLang
+					// (Cross-Engine Invariant #11): a failed migration would
+					// take the commit branch and be recorded as applied.
+					expect(content).toInclude("var state = {};");
+					expect(content).toInclude("state.exception = e;");
+					expect(content).toInclude('StructKeyExists(state, "exception")');
+					expect(content).notToInclude("local.exception");
+				});
+
+			});
+
 		});
 
 	}

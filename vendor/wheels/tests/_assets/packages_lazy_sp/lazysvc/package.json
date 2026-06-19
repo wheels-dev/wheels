@@ -1,0 +1,10 @@
+{
+	"name": "wheels-lazysvc",
+	"version": "1.0.0",
+	"description": "Test fixture: lazy service-only ServiceProvider — must be pulled into the register()/boot() lifecycle at boot.",
+	"lazy": true,
+	"provides": {
+		"mixins": "none",
+		"services": ["lazyGreeter"]
+	}
+}

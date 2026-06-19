@@ -2,7 +2,7 @@ component extends="wheels.migrator.Migration" {
 
 	function up() {
 		// Add to your table: change "tablename" below
-		addColumn(table="tablename", columnType="datetime", columnName="deletedAt", null=true, default="NULL");
+		addColumn(table="tablename", columnType="datetime", columnName="deletedAt", allowNull=true, default="NULL");
 		addIndex(table="tablename", columnNames="deletedAt");
 	}
 

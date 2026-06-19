@@ -78,11 +78,18 @@ git push --force-with-lease
 
 ### Enforcement
 
-The [DCO GitHub App](https://github.com/apps/dco) runs as a required status check on every PR. It verifies that every commit in the PR carries a valid `Signed-off-by:` trailer and blocks merge if any are missing. The app comments on the PR with a fixup suggestion when it finds an unsigned commit.
+Sign-off is required project policy, but it is currently verified during **code review**, not by an automated status check. The [DCO GitHub App](https://github.com/apps/dco) is **not** installed on this repository, and the develop branch's only merge-blocking status check is `Bot PR TDD Gate`. The other CI jobs that run on every PR (commit-message linting, the Lucee test suite, the wheels-bot reviewers) do not verify sign-offs either.
+
+In practice:
+
+- Sign every commit with `git commit -s`. Reviewers (human and bot) check for the `Signed-off-by:` trailer and will ask you to add any missing sign-offs (see [Forgot to sign off?](#forgot-to-sign-off)) before merge.
+- A missing sign-off surfaces as a review request to fix, **not** as a failing check on the PR.
+
+If automated DCO enforcement is added later (installing the DCO App and adding its context to the required status checks), this section will be updated to match.
 
 ### Grandfathering
 
-The DCO is enforced on **new PRs only**. Commits authored before DCO adoption are grandfathered and do not need to be retroactively signed.
+The DCO applies to **new PRs only**. Commits authored before DCO adoption are grandfathered and do not need to be retroactively signed.
 
 ---
 
@@ -286,8 +293,8 @@ Wheels 3.0 includes these core dependencies (automatically managed):
 ## Wheels Bot
 
 Issues and PRs on this repo are processed by an automated Claude-powered bot
-(`wheels-bot[bot]`). Five stages: triage, cross-framework research,
-propose-fix, Reviewer A, Reviewer B. See
+(`wheels-bot[bot]`). Core stages: triage, cross-framework research,
+propose-fix, and a single-pass Reviewer. See
 [`docs/contributing/wheels-bot.md`](docs/contributing/wheels-bot.md) for the
 full reference, or [`CLAUDE.md`](CLAUDE.md#wheels-bot) for a quick summary.
 
@@ -297,7 +304,7 @@ processing for that issue/PR immediately. Any human comment to the bot
 asking it to stop is also honored.
 
 **To interpret bot output**: every bot comment / review opens with a clear
-H2 header (`## Wheels Bot — Triage`, `## Wheels Bot — Reviewer A`, etc.) and
+H2 header (`## Wheels Bot — Triage`, `## Wheels Bot — Reviewer`, etc.) and
 ends with an HTML-comment marker. Bot-authored draft PRs are clearly
 labelled and require a human approving review on `develop` before merge.
 

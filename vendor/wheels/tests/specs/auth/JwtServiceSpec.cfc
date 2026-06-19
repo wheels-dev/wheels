@@ -6,9 +6,31 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(function() {
 				jwt = new wheels.auth.JwtService(
-					secretKey = "test-secret-key-for-jwt-specs",
+					secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
 					defaultExpiry = 3600
 				);
+			});
+
+			describe("init() secret validation", function() {
+
+				it("throws InvalidSecretKey for an empty secret", function() {
+					expect(function() {
+						var svc = new wheels.auth.JwtService(secretKey = "");
+					}).toThrow("Wheels.Auth.JWT.InvalidSecretKey");
+				});
+
+				it("throws WeakSecretKey for a secret shorter than 32 bytes", function() {
+					expect(function() {
+						var svc = new wheels.auth.JwtService(secretKey = "short-secret");
+					}).toThrow("Wheels.Auth.JWT.WeakSecretKey");
+				});
+
+				it("accepts a secret of exactly 32 bytes", function() {
+					var svc = new wheels.auth.JwtService(secretKey = RepeatString("k", 32));
+					var token = svc.encode(claims = {sub = 1});
+					expect(svc.verify(token)).toBeTrue();
+				});
+
 			});
 
 			describe("encode()", function() {
@@ -50,7 +72,7 @@ component extends="wheels.WheelsTest" {
 
 				it("adds issuer when configured", function() {
 					var jwtWithIssuer = new wheels.auth.JwtService(
-						secretKey = "test-secret-key-for-jwt-specs",
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
 						issuer = "wheels-app"
 					);
 					var token = jwtWithIssuer.encode(claims = {sub = 1});
@@ -60,11 +82,16 @@ component extends="wheels.WheelsTest" {
 
 				it("does not overwrite explicit issuer in claims", function() {
 					var jwtWithIssuer = new wheels.auth.JwtService(
-						secretKey = "test-secret-key-for-jwt-specs",
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
 						issuer = "default-issuer"
 					);
 					var token = jwtWithIssuer.encode(claims = {sub = 1, iss = "custom-issuer"});
-					var claims = jwtWithIssuer.decode(token);
+					// Decode with a service that has no configured issuer: the issuing
+					// service itself would reject the mismatched iss claim on decode.
+					var verifier = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes"
+					);
+					var claims = verifier.decode(token);
 					expect(claims.iss).toBe("custom-issuer");
 				});
 
@@ -117,7 +144,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("throws InvalidSignature for tokens signed with wrong key", function() {
-					var otherJwt = new wheels.auth.JwtService(secretKey = "different-secret");
+					var otherJwt = new wheels.auth.JwtService(secretKey = "different-secret-padded-to-at-least-32-bytes");
 					var token = otherJwt.encode(claims = {sub = 1});
 					expect(function() {
 						jwt.decode(token);
@@ -161,7 +188,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("still validates signature when ignoreExpiry is true", function() {
-					var otherJwt = new wheels.auth.JwtService(secretKey = "wrong-key");
+					var otherJwt = new wheels.auth.JwtService(secretKey = "wrong-key-padded-to-at-least-32-bytes");
 					var now = Int(CreateObject("java", "java.lang.System").currentTimeMillis() / 1000);
 					var token = otherJwt.encode(claims = {sub = 1, exp = now - 3600});
 					expect(function() {
@@ -171,11 +198,79 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("issuer validation", function() {
+
+				it("decodes a token whose iss matches the configured issuer", function() {
+					var issuerJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						issuer = "expected-issuer"
+					);
+					var token = issuerJwt.encode(claims = {sub = 7});
+					var claims = issuerJwt.decode(token);
+					expect(claims.sub).toBe(7);
+					expect(claims.iss).toBe("expected-issuer");
+				});
+
+				it("throws InvalidIssuer when iss does not match the configured issuer", function() {
+					var issuerJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						issuer = "expected-issuer"
+					);
+					var otherJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						issuer = "other-issuer"
+					);
+					var token = otherJwt.encode(claims = {sub = 1});
+					expect(function() {
+						issuerJwt.decode(token);
+					}).toThrow("Wheels.Auth.JWT.InvalidIssuer");
+				});
+
+				it("throws InvalidIssuer when iss is missing but an issuer is configured", function() {
+					var plainJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes"
+					);
+					var issuerJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						issuer = "expected-issuer"
+					);
+					var token = plainJwt.encode(claims = {sub = 1});
+					expect(function() {
+						issuerJwt.decode(token);
+					}).toThrow("Wheels.Auth.JWT.InvalidIssuer");
+				});
+
+				it("validates the issuer case-sensitively", function() {
+					var issuerJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						issuer = "Wheels-App"
+					);
+					var otherJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						issuer = "wheels-app"
+					);
+					var token = otherJwt.encode(claims = {sub = 1});
+					expect(function() {
+						issuerJwt.decode(token);
+					}).toThrow("Wheels.Auth.JWT.InvalidIssuer");
+				});
+
+				it("does not validate iss when no issuer is configured", function() {
+					var plainJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes"
+					);
+					var token = plainJwt.encode(claims = {sub = 1, iss = "anything-goes"});
+					var claims = plainJwt.decode(token);
+					expect(claims.iss).toBe("anything-goes");
+				});
+
+			});
+
 			describe("allowedClockSkew", function() {
 
 				it("permits tokens within clock skew window", function() {
 					var jwtWithSkew = new wheels.auth.JwtService(
-						secretKey = "test-secret-key-for-jwt-specs",
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
 						allowedClockSkew = 60
 					);
 					var now = Int(CreateObject("java", "java.lang.System").currentTimeMillis() / 1000);
@@ -187,7 +282,7 @@ component extends="wheels.WheelsTest" {
 
 				it("rejects tokens beyond clock skew window", function() {
 					var jwtWithSkew = new wheels.auth.JwtService(
-						secretKey = "test-secret-key-for-jwt-specs",
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
 						allowedClockSkew = 60
 					);
 					var now = Int(CreateObject("java", "java.lang.System").currentTimeMillis() / 1000);
@@ -200,7 +295,7 @@ component extends="wheels.WheelsTest" {
 
 				it("permits nbf tokens within clock skew window", function() {
 					var jwtWithSkew = new wheels.auth.JwtService(
-						secretKey = "test-secret-key-for-jwt-specs",
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
 						allowedClockSkew = 60
 					);
 					var now = Int(CreateObject("java", "java.lang.System").currentTimeMillis() / 1000);
@@ -288,7 +383,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("rejects tokens with invalid signature during refresh", function() {
-					var otherJwt = new wheels.auth.JwtService(secretKey = "wrong-key");
+					var otherJwt = new wheels.auth.JwtService(secretKey = "wrong-key-padded-to-at-least-32-bytes");
 					var token = otherJwt.encode(claims = {sub = 1});
 					expect(function() {
 						jwt.refresh(token);

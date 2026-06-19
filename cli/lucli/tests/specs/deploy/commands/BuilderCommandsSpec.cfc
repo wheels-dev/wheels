@@ -59,6 +59,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).notToInclude("--push");
             });
 
+            it("push() and dev() shell-escape the dockerfile and context paths", () => {
+                var push = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                    .push("v1");
+                expect(push).toInclude("--file 'Dockerfile'");
+                expect(push).toInclude(" '.'");
+                var dev = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
+                    .dev();
+                expect(dev).toInclude("--file 'Dockerfile'");
+                expect(dev).toInclude(" '.'");
+            });
+
             it("$builderName() prefixes kamal- to the service name", () => {
                 var bc = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg);
                 expect(bc.$builderName()).toBe("kamal-demo");

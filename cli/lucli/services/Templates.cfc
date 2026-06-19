@@ -547,12 +547,12 @@ component {
 		for (var prop in arguments.properties) {
 			var label = variables.helpers.capitalize(prop.name);
 			if (arrayFindNoCase(foreignKeys, prop.name)) {
-				var assocName = left(prop.name, len(prop.name) - 2);
-				label = variables.helpers.capitalize(assocName);
-				arrayAppend(blocks, '<p>' & label & ': ##|ObjectNamePlural|.' & assocName & '.name##</p>');
-			} else {
-				arrayAppend(blocks, '<p>' & label & ': ##|ObjectNamePlural|.' & prop.name & '##</p>');
+				// findAll() returns a flat query — association objects are not
+				// reachable inside a query-driven cfloop, so posts.author.name throws.
+				// Keep the friendly label but render the raw FK column value.
+				label = variables.helpers.capitalize(left(prop.name, len(prop.name) - 2));
 			}
+			arrayAppend(blocks, '<p>' & label & ': ##|ObjectNamePlural|.' & prop.name & '##</p>');
 		}
 		return arrayToList(blocks, chr(10) & chr(9) & chr(9));
 	}
@@ -579,16 +579,13 @@ component {
 	 */
 	private string function generateIndexTableBody(required array properties, string belongsTo = "") {
 		var cells = [];
-		var foreignKeys = buildForeignKeyList(arguments.belongsTo);
 
+		// findAll() returns a flat query — association objects are not reachable
+		// inside a query-driven cfloop, so FK columns render their raw value (e.g.
+		// authorId); the table header still shows the association label.
 		for (var prop in arguments.properties) {
 			var cellCode = '<td>' & chr(10);
-			if (arrayFindNoCase(foreignKeys, prop.name)) {
-				var assocName = left(prop.name, len(prop.name) - 2);
-				cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.' & assocName & '.name##' & chr(10);
-			} else {
-				cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.#prop.name###' & chr(10);
-			}
+			cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.#prop.name###' & chr(10);
 			cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '</td>';
 			arrayAppend(cells, cellCode);
 		}
@@ -635,10 +632,16 @@ component {
 
 		var includeParam = 'include="' & arrayToList(includeList) & '"';
 
-		processed = replace(processed, '=model("|ObjectNameSingular|").findAll();', '=model("|ObjectNameSingular|").findAll(#includeParam#);', 'all');
-		processed = replace(processed, '=model("|ObjectNameSingular|").findByKey(params.key);', '=model("|ObjectNameSingular|").findByKey(params.key, #includeParam#);', 'all');
+		// CRUD controller template (CRUDContent.txt) uses the capitalized
+		// |ObjectNameSingularC| placeholder inside model() and no spaces around
+		// the assignment `=`. findByKey must be all-named (key=...) — Wheels
+		// rejects mixing the positional key with the named include at runtime.
+		processed = replace(processed, '=model("|ObjectNameSingularC|").findAll();', '=model("|ObjectNameSingularC|").findAll(#includeParam#);', 'all');
+		processed = replace(processed, '=model("|ObjectNameSingularC|").findByKey(params.key);', '=model("|ObjectNameSingularC|").findByKey(key=params.key, #includeParam#);', 'all');
+		// API controller template (ApiControllerContent.txt) assigns into the
+		// `local.` scope with spaces around `=` and the lowercase placeholder.
 		processed = replace(processed, 'local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll();', 'local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll(#includeParam#);', 'all');
-		processed = replace(processed, 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);', 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key, #includeParam#);', 'all');
+		processed = replace(processed, 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);', 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(key=params.key, #includeParam#);', 'all');
 
 		return processed;
 	}

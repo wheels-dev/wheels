@@ -154,6 +154,31 @@ component extends="wheels.WheelsTest" {
 					expect(local.mw.$headers()["Strict-Transport-Security"]).toBe("max-age=31536000; includeSubDomains");
 				});
 
+				it("auto-defaults HSTS in production when the environment is resolved from application.wheels", function() {
+					// Regression: init() only read application.$wheels.environment, but
+					// onapplicationstart renames $wheels to wheels when it finishes.
+					// Route-scoped string middleware is instantiated per request — after
+					// the rename — so the production HSTS auto-default silently never
+					// fired for those instantiations.
+					var hadKey = StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "environment");
+					var originalEnv = hadKey ? application.wheels.environment : "";
+					try {
+						if (!StructKeyExists(application, "wheels")) {
+							application.wheels = {};
+						}
+						application.wheels.environment = "production";
+						local.mw = new wheels.middleware.SecurityHeaders();
+						expect(local.mw.$headers()).toHaveKey("Strict-Transport-Security");
+						expect(local.mw.$headers()["Strict-Transport-Security"]).toBe("max-age=31536000; includeSubDomains");
+					} finally {
+						if (hadKey) {
+							application.wheels.environment = originalEnv;
+						} else if (StructKeyExists(application, "wheels")) {
+							StructDelete(application.wheels, "environment");
+						}
+					}
+				});
+
 			});
 
 			describe("Permissions-Policy", function() {

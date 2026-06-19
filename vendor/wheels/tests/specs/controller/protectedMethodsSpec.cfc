@@ -35,6 +35,39 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		// The dispatch hot path checks membership via an O(1) struct-as-set
+		// (perf) instead of an O(n) ListFindNoCase over the comma-list. The set
+		// must stay in lockstep with the list it is derived from.
+		describe("application.wheels.protectedControllerMethodsLookup", () => {
+
+			it("is populated at application start", () => {
+				expect(StructCount(application.wheels.protectedControllerMethodsLookup)).toBeGT(0)
+			})
+
+			it("has one key per entry in the comma-list (case-insensitive)", () => {
+				for (var item in ListToArray(application.wheels.protectedControllerMethods)) {
+					expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, item)).toBeTrue()
+				}
+			})
+
+			it("matches helper names case-insensitively, like the prior ListFindNoCase", () => {
+				expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, "model")).toBeTrue()
+				expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, "MODEL")).toBeTrue()
+				expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, "redirectTo")).toBeTrue()
+			})
+
+			it("does not contain entries the list lacks", () => {
+				expect(StructCount(application.wheels.protectedControllerMethodsLookup))
+					.toBe(ListLen(application.wheels.protectedControllerMethods))
+			})
+
+			it("builds an equivalent set from a known list via the helper", () => {
+				var set = application.wo.$protectedControllerMethodsLookup("env,model,redirectTo")
+				expect(StructCount(set)).toBe(3)
+				expect(StructKeyExists(set, "ENV")).toBeTrue()
+			})
+		})
+
 		describe("$callAction action-dispatch gate", () => {
 
 			beforeEach(() => {
@@ -81,5 +114,51 @@ component extends="wheels.WheelsTest" {
 				expect(state.thrown).toBeFalse()
 			})
 		})
+
+		// GH #3075: #2845's PR body and CLAUDE.md Anti-Pattern 8 both promise
+		// that a helper-named action "falls through to the missing-action / 404
+		// path, matching every other non-existent action." The block itself
+		// worked, but the status contract was broken — the gate raw-threw
+		// Wheels.ActionNotAllowed, which the EventMethods status map sent to a
+		// 500 (only ^Wheels\.*NotFound$ mapped to 404). Routing the gate through
+		// $throwErrorOrShow404Page (mirroring RecordNotFound / ViewNotFound) sets
+		// the 404 header at the throw site and renders the production 404 page.
+		describe("$callAction protected-method gate HTTP status (#chr(35)#3075)", () => {
+
+			beforeEach(() => {
+				params = {controller = "test", action = "test"}
+				_controller = application.wo.controller("test", params)
+				// Reset to a non-404 sentinel so a prior spec's status can't mask a
+				// regression (the gate must set 404 itself).
+				try { application.wo.$header(statusCode = 200) } catch (any e) {}
+			})
+
+			it("sets HTTP 404 (not 500) when a helper-named action is blocked", () => {
+				try {
+					_controller.$callAction(action = "env")
+				} catch (Wheels.ActionNotAllowed e) {
+					// expected — in dev/test ($get('showErrorInformation') = true)
+					// $throwErrorOrShow404Page re-throws after setting the 404 header.
+				}
+				expect($responseStatus()).toBe(404)
+			})
+
+			it("sets HTTP 404 when a $-prefixed internal method is blocked", () => {
+				try {
+					_controller.$callAction(action = "$callAction")
+				} catch (Wheels.ActionNotAllowed e) {
+				}
+				expect($responseStatus()).toBe(404)
+			})
+		})
+	}
+
+	// Reads the committed response status via the engine-adapter abstraction.
+	// Raw GetPageContext().getResponse().getStatus() is wrong on Adobe CF,
+	// which requires getFusionContext() to reach the response object (see
+	// AdobeAdapter.getResponse()). $statusCode() is the matrix-proven pattern
+	// used for exact-status assertions in renderingSpec.cfc.
+	private numeric function $responseStatus() {
+		return application.wo.$statusCode()
 	}
 }

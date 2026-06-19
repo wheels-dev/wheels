@@ -189,7 +189,9 @@ component {
 		if (Len(arguments.data)) {
 			local.normalizedData = Replace(arguments.data, Chr(13) & Chr(10), Chr(10), "all");
 			local.normalizedData = Replace(local.normalizedData, Chr(13), Chr(10), "all");
-			local.dataLines = ListToArray(local.normalizedData, Chr(10));
+			// includeEmptyFields=true so blank lines in multi-line data are preserved
+			// as empty "data:" lines instead of being silently dropped
+			local.dataLines = ListToArray(local.normalizedData, Chr(10), true);
 			for (local.line in local.dataLines) {
 				ArrayAppend(local.lines, "data: #local.line#");
 			}

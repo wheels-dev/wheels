@@ -18,6 +18,14 @@ component extends="wheels.WheelsTest" {
 
 			afterEach(function() {
 				g.$set(routeModelBinding = _originalBinding);
+				// Clean up any negative-cache entries created by these tests so other
+				// specs (and re-runs) are unaffected.
+				var appKey = g.$appKey();
+				if (StructKeyExists(application[appKey], "unresolvableRouteBindings")) {
+					StructDelete(application[appKey].unresolvableRouteBindings, "Post");
+					StructDelete(application[appKey].unresolvableRouteBindings, "NonexistentThing");
+					StructDelete(application[appKey].unresolvableRouteBindings, "NonexistentWidget");
+				}
 			});
 
 			describe("when binding is enabled on a route", function() {
@@ -98,6 +106,15 @@ component extends="wheels.WheelsTest" {
 					expect(result.author.key()).toBe(author.key());
 				});
 
+				it("throws when the explicitly named model cannot be resolved", function() {
+					var params = {controller = "writers", action = "show", key = "1"};
+					var route = {binding = "TotallyMissingBindingModel"};
+
+					expect(function() {
+						_dispatch.$resolveRouteModelBinding(params = params, route = route);
+					}).toThrow();
+				});
+
 			});
 
 			describe("controller resolution", function() {
@@ -143,6 +160,38 @@ component extends="wheels.WheelsTest" {
 					var result = _dispatch.$resolveRouteModelBinding(params = params, route = route);
 
 					expect(result).notToHaveKey("nonexistentThing");
+				});
+
+				it("negative-caches a conventional binding miss so the bootstrap is not repeated", function() {
+					var appKey = g.$appKey();
+					// Start clean in case a previous run already cached this miss.
+					if (StructKeyExists(application[appKey], "unresolvableRouteBindings")) {
+						StructDelete(application[appKey].unresolvableRouteBindings, "NonexistentWidget");
+					}
+
+					var params = {controller = "nonexistentWidgets", action = "show", key = "1"};
+					var route = {binding = true};
+
+					var result = _dispatch.$resolveRouteModelBinding(params = params, route = route);
+
+					expect(result).notToHaveKey("nonexistentWidget");
+					expect(application[appKey]).toHaveKey("unresolvableRouteBindings");
+					expect(application[appKey].unresolvableRouteBindings).toHaveKey("NonexistentWidget");
+				});
+
+				it("skips resolution for models present in the negative cache", function() {
+					var appKey = g.$appKey();
+					if (!StructKeyExists(application[appKey], "unresolvableRouteBindings")) {
+						application[appKey].unresolvableRouteBindings = {};
+					}
+					application[appKey].unresolvableRouteBindings["Post"] = true;
+
+					var params = {controller = "posts", action = "show", key = "1"};
+					var route = {binding = true};
+
+					var result = _dispatch.$resolveRouteModelBinding(params = params, route = route);
+
+					expect(result).notToHaveKey("post");
 				});
 
 				it("resolves models when global setting is enabled and no per-route binding", function() {

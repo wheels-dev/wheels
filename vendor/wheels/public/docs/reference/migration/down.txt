@@ -1,19 +1,20 @@
 // 1. Reverse a table creation by dropping the table
 // Called automatically when rolling back this migration
 function down() {
+	var state = {};
 	transaction {
 		try {
 			dropTable("employees");
 		} catch (any e) {
-			local.exception = e;
+			state.exception = e;
 		}
 
-		if (structKeyExists(local, "exception")) {
+		if (structKeyExists(state, "exception")) {
 			transaction action="rollback";
 			throw(
 				errorCode = "1",
-				detail    = local.exception.detail,
-				message   = local.exception.message,
+				detail    = state.exception.detail,
+				message   = state.exception.message,
 				type      = "any"
 			);
 		} else {
@@ -24,19 +25,20 @@ function down() {
 
 // 2. Reverse an addColumn() call by removing the column
 function down() {
+	var state = {};
 	transaction {
 		try {
 			removeColumn(table="users", columnName="biography");
 		} catch (any e) {
-			local.exception = e;
+			state.exception = e;
 		}
 
-		if (structKeyExists(local, "exception")) {
+		if (structKeyExists(state, "exception")) {
 			transaction action="rollback";
 			throw(
 				errorCode = "1",
-				detail    = local.exception.detail,
-				message   = local.exception.message,
+				detail    = state.exception.detail,
+				message   = state.exception.message,
 				type      = "any"
 			);
 		} else {
@@ -49,19 +51,20 @@ function down() {
 component extends="[extends]" hint="Add status column to orders" {
 
 	function up() {
+		var state = {};
 		transaction {
 			try {
 				addColumn(table="orders", columnType="string", columnName="status", limit=50, default="pending");
 			} catch (any e) {
-				local.exception = e;
+				state.exception = e;
 			}
 
-			if (structKeyExists(local, "exception")) {
+			if (structKeyExists(state, "exception")) {
 				transaction action="rollback";
 				throw(
 					errorCode = "1",
-					detail    = local.exception.detail,
-					message   = local.exception.message,
+					detail    = state.exception.detail,
+					message   = state.exception.message,
 					type      = "any"
 				);
 			} else {
@@ -71,19 +74,20 @@ component extends="[extends]" hint="Add status column to orders" {
 	}
 
 	function down() {
+		var state = {};
 		transaction {
 			try {
 				removeColumn(table="orders", columnName="status");
 			} catch (any e) {
-				local.exception = e;
+				state.exception = e;
 			}
 
-			if (structKeyExists(local, "exception")) {
+			if (structKeyExists(state, "exception")) {
 				transaction action="rollback";
 				throw(
 					errorCode = "1",
-					detail    = local.exception.detail,
-					message   = local.exception.message,
+					detail    = state.exception.detail,
+					message   = state.exception.message,
 					type      = "any"
 				);
 			} else {

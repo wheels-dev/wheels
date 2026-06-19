@@ -96,7 +96,175 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(len(out)).toBeGT(0);
                 expect(out).toInclude("docker stop");
             });
+
+            // Regression suite for #2957 (Wave 3, DEP-6a) — read verbs dropped
+            // every ssh.run() result, so `app logs` / `app details` returned
+            // only a host-count summary in live mode.
+
+            it("logs (real mode) surfaces the remote log output host-prefixed (##2957 DEP-6a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var appCmds = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+                var logsCmd = appCmds.logs({tail: 100, follow: false, container: ""});
+                fake.expect("1.2.3.4", logsCmd, {
+                    exitCode: 0,
+                    stdout: "line one" & chr(10) & "line two",
+                    stderr: "", durationMs: 0
+                });
+                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var out = cli.logs({configPath: variables.fixture});
+                expect(out).toInclude("[1.2.3.4] line one");
+                expect(out).toInclude("[1.2.3.4] line two");
+            });
+
+            it("containers (real mode) surfaces the remote docker ps output (##2957 DEP-6a)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(variables.fixture);
+                var appCmds = new cli.lucli.services.deploy.commands.AppCommands(cfg);
+                fake.expect("1.2.3.4", appCmds.containers(), {
+                    exitCode: 0, stdout: "abc123  acme/demo:v1  Up 2 hours", stderr: "", durationMs: 0
+                });
+                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var out = cli.containers({configPath: variables.fixture});
+                expect(out).toInclude("[1.2.3.4] abc123  acme/demo:v1  Up 2 hours");
+            });
+
+            // Issue #3111: `--release=1` hung ~76s under --dry-run because the
+            // argv round-trip dropped the numeric value and the parser then
+            // swallowed --dry-run. Pin the contract at this layer too: a
+            // dry-run boot with a purely numeric version must never touch the
+            // SshPool (strict fake throws on ANY unexpected command).
+            it("dry-run with a numeric version never touches the SshPool (issue ##3111)", () => {
+                var fake = new cli.lucli.services.deploy.lib.FakeSshPool({strict: true});
+                var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                var out = cli.boot({configPath: variables.fixture, version: "1", dryRun: true});
+                expect(arrayLen(fake.calls())).toBe(0);
+                expect(out).toInclude("docker run");
+                expect(out).toInclude("demo-web-1");
+            });
+
+            // env.secret delivery (#2957, Wave 2b) — app boot writes the role
+            // env file (600 perms) before docker run; values stay out of argv.
+            it("boot writes the role env file before docker run and keeps secret values out of argv (##2957)", () => {
+                var proj = $makeSecretProject();
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                    cli.boot({configPath: proj.config, version: "v1"});
+
+                    var calls = fake.calls();
+                    var ensureIdx = 0; var uploadIdx = 0; var relockIdx = 0; var runIdx = 0;
+                    for (var i = 1; i <= arrayLen(calls); i++) {
+                        var cmd = calls[i].cmd ?: "";
+                        if (!ensureIdx && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) ensureIdx = i;
+                        if (!uploadIdx && (calls[i].kind ?: "") == "uploadString") uploadIdx = i;
+                        // Post-upload re-lock: the SFTP layer may reset perms
+                        // (sshj preserve-attributes), so a second chmod 600
+                        // must follow the upload (##2957).
+                        if (uploadIdx && i > uploadIdx && !relockIdx
+                            && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/roles/web.env", cmd)) relockIdx = i;
+                        if (!runIdx && findNoCase("docker run", cmd)) runIdx = i;
+                    }
+                    expect(ensureIdx).toBeGT(0);
+                    expect(uploadIdx).toBeGT(ensureIdx);
+                    expect(relockIdx).toBeGT(uploadIdx);
+                    expect(runIdx).toBeGT(relockIdx);
+
+                    expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/roles/web.env");
+                    expect(calls[uploadIdx].content).toInclude("APP_SECRET=s3cr3t-value-42");
+                    expect(calls[runIdx].cmd).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    for (var c in calls) {
+                        expect(c.cmd ?: "").notToInclude("s3cr3t-value-42");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
+
+            // Secret redaction in RemoteExecutionFailed (#3159): an env.clear
+            // value interpolated from a ${SECRET} token rides `docker run ...
+            // -e KEY=value`. A nonzero exit must surface a redacted summary so
+            // the secret never lands in CI logs. End-to-end through the loader:
+            // DeployAppCli registers the resolver's values on the pool.
+            it("redacts a ${SECRET}-interpolated env.clear value from a failed docker run (issue 3159)", () => {
+                var proj = $makeClearSecretProject();
+                try {
+                    // Capture the exact docker run command via dry-run first.
+                    var probe = new cli.lucli.services.deploy.cli.DeployAppCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    probe.boot({configPath: proj.config, version: "v1", dryRun: true});
+                    var runCmd = "";
+                    for (var line in probe.dryRunOutput()) {
+                        if (findNoCase("docker run", line)) {
+                            // Strip the "[host] " prefix the dry-run buffer adds.
+                            runCmd = reReplace(line, "^\[[^\]]*\] ", "");
+                            break;
+                        }
+                    }
+                    expect(runCmd).toInclude("super-secret-db-pw-9000");
+
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    fake.expect("1.2.3.4", runCmd, {exitCode: 125, stdout: "", stderr: "boom"});
+                    var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
+                    try {
+                        cli.boot({configPath: proj.config, version: "v1"});
+                        fail("expected RemoteExecutionFailed");
+                    } catch (any e) {
+                        expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                        expect(e.message).notToInclude("super-secret-db-pw-9000");
+                        expect(e.message).toInclude("[REDACTED]");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
         });
+    }
+
+    /**
+     * Temp project: config/deploy.yml with an env.clear value interpolated
+     * from a ${DB_PASSWORD} token, resolved by .kamal/secrets. No env.secret,
+     * so the value rides `docker run ... -e DB_PASSWORD=value` (#3159).
+     */
+    private struct function $makeClearSecretProject() {
+        var root = getTempDirectory() & "/wheels-3159-app-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "env: {clear: {DB_PASSWORD: '$#chr(123)#DB_PASSWORD#chr(125)#'}}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "DB_PASSWORD=super-secret-db-pw-9000#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
+    }
+
+    /**
+     * Temp project: config/deploy.yml declaring env.secret [APP_SECRET],
+     * resolved by .kamal/secrets.
+     */
+    private struct function $makeSecretProject() {
+        var root = getTempDirectory() & "/wheels-2957-app-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "env: {clear: {DB_HOST: db.internal}, secret: [APP_SECRET]}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "APP_SECRET=s3cr3t-value-42#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
     }
 
     private array function $cmdsFrom(required any fake) {

@@ -10,7 +10,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	/**
 	 * Creates the CORS middleware with configurable options.
 	 *
-	 * @allowOrigins Comma-delimited list of allowed origins, or "*" for any origin. Defaults to "" (no origins allowed). You must explicitly configure allowed origins for CORS to function.
+	 * @allowOrigins Comma-delimited list of allowed origins, or "*" for any origin. Whitespace around entries is ignored. Defaults to "" (no origins allowed). You must explicitly configure allowed origins for CORS to function.
 	 * @allowMethods Comma-delimited list of allowed HTTP methods.
 	 * @allowHeaders Comma-delimited list of allowed request headers.
 	 * @allowCredentials Whether to allow credentials (cookies, auth headers).
@@ -27,7 +27,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// Access-Control-Allow-Credentials: true.  Browsers silently
 		// reject the response, which often leads developers to weaken
 		// security further.  Fail fast with a clear message instead.
-		if (arguments.allowOrigins == "*" && arguments.allowCredentials) {
+		if (Trim(arguments.allowOrigins) == "*" && arguments.allowCredentials) {
 			Throw(
 				type    = "Wheels.Cors.InvalidConfiguration",
 				message = "CORS misconfiguration: allowOrigins=""*"" cannot be combined with allowCredentials=true. "
@@ -36,7 +36,18 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			);
 		}
 
-		variables.allowOrigins = arguments.allowOrigins;
+		// Normalize allowOrigins once: split the comma-delimited list and trim
+		// each entry so configs like "https://a.com, https://b.com" match every
+		// origin. Without this, entries after a space keep their leading
+		// whitespace inside the list element and silently never match.
+		local.normalizedOrigins = [];
+		for (local.entry in ListToArray(arguments.allowOrigins)) {
+			if (Len(Trim(local.entry))) {
+				ArrayAppend(local.normalizedOrigins, Trim(local.entry));
+			}
+		}
+
+		variables.allowOrigins = ArrayToList(local.normalizedOrigins);
 		variables.allowMethods = arguments.allowMethods;
 		variables.allowHeaders = arguments.allowHeaders;
 		variables.allowCredentials = arguments.allowCredentials;

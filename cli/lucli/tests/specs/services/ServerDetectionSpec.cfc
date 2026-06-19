@@ -53,6 +53,38 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		testHelper.cleanupTempProject(variables.tempRoot);
 	}
 
+	/**
+	 * Capture the requireProjectConfig flag runMigration() hands to
+	 * $requireRunningServer() for a given migrate action (#3080). The mocked
+	 * guard throws so the command aborts before any HTTP probing — the call
+	 * log then exposes the exact named arguments the call site passed.
+	 */
+	private boolean function capturedRequireProjectConfig(required string action) {
+		// MockBox writes its generated method stubs to /testbox/system/stubs
+		// (webroot-relative) and removes them after mixing in — make sure the
+		// directory exists. java.io.File.mkdirs() recurses parents on every
+		// engine and is a no-op when the directory already exists (same
+		// workaround as vendor/wheels/tests/specs/controller/channelSpec.cfc).
+		createObject("java", "java.io.File").init(expandPath("/testbox/system/stubs")).mkdirs();
+
+		var m = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(m);
+		m.$(
+			method = "$requireRunningServer",
+			throwException = true,
+			throwType = "TestAbort.ServerGuard",
+			throwMessage = "spec capture — abort before HTTP"
+		);
+		try {
+			m.migrate(arg1 = arguments.action);
+		} catch (any e) {
+			// expected: the mocked guard throws TestAbort.ServerGuard
+		}
+		var log = m.$callLog()["$requireRunningServer"];
+		expect(arrayLen(log)).toBeGTE(1, "migrate #arguments.action# never reached $requireRunningServer()");
+		return log[1].requireProjectConfig;
+	}
+
 	function run() {
 
 		describe("detectServerPort — server-identity guard (##2878)", () => {
@@ -105,6 +137,58 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					}
 					ourSocket.close();
 				}
+			});
+
+		});
+
+		describe("read-side migrate gating — info + doctor (##3080)", () => {
+
+			// #2879 documented that read-side commands keep the legacy
+			// common-port fallback, but runMigration() gated EVERY migrate
+			// subcommand behind requireProjectConfig=true — so `migrate info`
+			// and `migrate doctor` refused a server on 8080 (the first
+			// documented fallback port). These specs pin the call-site wiring:
+			// info/doctor pass requireProjectConfig=false, the schema-mutating
+			// actions keep requireProjectConfig=true.
+
+			it("migrate info keeps the read-side common-port fallback (requireProjectConfig=false)", () => {
+				expect(capturedRequireProjectConfig("info")).toBeFalse();
+			});
+
+			it("migrate doctor keeps the read-side common-port fallback (requireProjectConfig=false)", () => {
+				expect(capturedRequireProjectConfig("doctor")).toBeFalse();
+			});
+
+			it("migrate latest still refuses the common-port fallback (requireProjectConfig=true)", () => {
+				expect(capturedRequireProjectConfig("latest")).toBeTrue();
+			});
+
+			it("migrate up still refuses the common-port fallback (requireProjectConfig=true)", () => {
+				expect(capturedRequireProjectConfig("up")).toBeTrue();
+			});
+
+			it("migrate down still refuses the common-port fallback (requireProjectConfig=true)", () => {
+				expect(capturedRequireProjectConfig("down")).toBeTrue();
+			});
+
+			it("migrate info in a no-config project never throws the project-bound refusal", () => {
+				// End-to-end through the real (unmocked) guard. Environment
+				// tolerant: when something IS listening on a common port the
+				// command proceeds past the guard (and fails later on HTTP /
+				// response parsing — fine); when nothing is listening it must
+				// throw the READ-SIDE ServerNotRunning message (which names
+				// the probed ports), never the project-bound refusal.
+				if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+				if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				var state = {sawProjectBoundRefusal = false};
+				try {
+					mod.migrate(arg1 = "info");
+				} catch (any e) {
+					if (e.type == "Wheels.ServerNotRunning" && !findNoCase("8080", e.message)) {
+						state.sawProjectBoundRefusal = true;
+					}
+				}
+				expect(state.sawProjectBoundRefusal).toBeFalse();
 			});
 
 		});

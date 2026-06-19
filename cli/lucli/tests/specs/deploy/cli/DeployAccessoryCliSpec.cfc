@@ -102,7 +102,135 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var out = arrayToList(cli.dryRunOutput(), chr(10));
                 expect(out).toInclude("docker stop demo-db");
             });
+
+            // env.secret delivery (#2957, Wave 2b) — accessory boot writes the
+            // env file (600 perms) before docker run; values stay out of argv.
+            it("boot writes the accessory env file before docker run and keeps secret values out of argv (##2957)", () => {
+                var proj = $makeSecretProject();
+                try {
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                    cli.boot({configPath: proj.config, name: "db"});
+
+                    var calls = fake.calls();
+                    var ensureIdx = 0; var uploadIdx = 0; var relockIdx = 0; var runIdx = 0;
+                    for (var i = 1; i <= arrayLen(calls); i++) {
+                        var cmd = calls[i].cmd ?: "";
+                        if (!ensureIdx && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/accessories/db.env", cmd)) ensureIdx = i;
+                        if (!uploadIdx && (calls[i].kind ?: "") == "uploadString") uploadIdx = i;
+                        // Post-upload re-lock: the SFTP layer may reset perms
+                        // (sshj preserve-attributes), so a second chmod 600
+                        // must follow the upload (##2957).
+                        if (uploadIdx && i > uploadIdx && !relockIdx
+                            && findNoCase("chmod 600", cmd)
+                            && find(".kamal/apps/demo/env/accessories/db.env", cmd)) relockIdx = i;
+                        if (!runIdx && findNoCase("docker run", cmd)) runIdx = i;
+                    }
+                    expect(ensureIdx).toBeGT(0);
+                    expect(uploadIdx).toBeGT(ensureIdx);
+                    expect(relockIdx).toBeGT(uploadIdx);
+                    expect(runIdx).toBeGT(relockIdx);
+
+                    expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/accessories/db.env");
+                    expect(calls[uploadIdx].content).toInclude("POSTGRES_PASSWORD=pgpw-secret-9");
+                    expect(calls[uploadIdx].host).toBe("1.2.3.5");
+                    expect(calls[runIdx].cmd).toInclude("--env-file .kamal/apps/demo/env/accessories/db.env");
+                    for (var c in calls) {
+                        expect(c.cmd ?: "").notToInclude("pgpw-secret-9");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
+
+            // Secret redaction in RemoteExecutionFailed (#3159): an env.clear
+            // value interpolated from a ${SECRET} token rides `docker run ...
+            // -e KEY=value` (env.clear, NOT env.secret — so it's argv, not the
+            // --env-file path). A nonzero accessory boot exit must surface a
+            // redacted summary so the secret never lands in CI logs.
+            // DeployAccessoryCli registers the resolver's values on the pool
+            // after load(), same as DeployAppCli/DeployMainCli.
+            it("redacts a ${SECRET}-interpolated env.clear value from a failed accessory docker run (issue 3159)", () => {
+                var proj = $makeClearSecretAccessoryProject();
+                try {
+                    // Capture the exact docker run command via dry-run first.
+                    var probe = new cli.lucli.services.deploy.cli.DeployAccessoryCli(
+                        new cli.lucli.services.deploy.lib.FakeSshPool()
+                    );
+                    probe.boot({configPath: proj.config, name: "db", dryRun: true});
+                    var runCmd = "";
+                    for (var line in probe.dryRunOutput()) {
+                        if (findNoCase("docker run", line)) {
+                            // Strip the "[host] " prefix the dry-run buffer adds.
+                            runCmd = reReplace(line, "^\[[^\]]*\] ", "");
+                            break;
+                        }
+                    }
+                    expect(runCmd).toInclude("super-secret-acc-pw-9000");
+
+                    var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+                    fake.expect("1.2.3.5", runCmd, {exitCode: 125, stdout: "", stderr: "boom"});
+                    var cli = new cli.lucli.services.deploy.cli.DeployAccessoryCli(fake);
+                    try {
+                        cli.boot({configPath: proj.config, name: "db"});
+                        fail("expected RemoteExecutionFailed");
+                    } catch (any e) {
+                        expect(e.type).toBe("Wheels.Deploy.RemoteExecutionFailed");
+                        expect(e.message).notToInclude("super-secret-acc-pw-9000");
+                        expect(e.message).toInclude("[REDACTED]");
+                    }
+                } finally {
+                    directoryDelete(proj.root, true);
+                }
+            });
         });
+    }
+
+    /**
+     * Temp project: a postgres accessory with an env.clear value interpolated
+     * from a ${DB_ROOT_PW} token, resolved by .kamal/secrets. No accessory
+     * env.secret, so the value rides `docker run ... -e DB_ROOT_PW=value` in
+     * argv — the exact leak #3159 closes, on the accessory verb.
+     */
+    private struct function $makeClearSecretAccessoryProject() {
+        var root = getTempDirectory() & "/wheels-3159-acc-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "accessories: {db: {image: 'postgres:16', host: 1.2.3.5, "
+                & "env: {clear: {DB_ROOT_PW: '$#chr(123)#DB_ROOT_PW#chr(125)#'}}}}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "DB_ROOT_PW=super-secret-acc-pw-9000#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
+    }
+
+    /**
+     * Temp project: config/deploy.yml with a postgres accessory declaring
+     * env.secret [POSTGRES_PASSWORD], resolved by .kamal/secrets.
+     */
+    private struct function $makeSecretProject() {
+        var root = getTempDirectory() & "/wheels-2957-acc-" & createUUID();
+        directoryCreate(root & "/config", true, true);
+        directoryCreate(root & "/.kamal", true, true);
+        fileWrite(
+            root & "/config/deploy.yml",
+            "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                & "registry: {username: u, password: [REGISTRY_PASSWORD]}#chr(10)#"
+                & "accessories: {db: {image: 'postgres:16', host: 1.2.3.5, "
+                & "env: {clear: {POSTGRES_USER: demo}, secret: [POSTGRES_PASSWORD]}}}"
+        );
+        fileWrite(
+            root & "/.kamal/secrets",
+            "POSTGRES_PASSWORD=pgpw-secret-9#chr(10)#REGISTRY_PASSWORD=regpw"
+        );
+        return {root: root, config: root & "/config/deploy.yml"};
     }
 
     private array function $cmdsFrom(required any fake) {

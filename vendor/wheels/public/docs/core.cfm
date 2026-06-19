@@ -40,7 +40,7 @@ if (StructKeyExists(application.wheels, "docs")) {
 	ArrayAppend(documentScope, {"name" = "model", "scope" = modelInstance});
 	
 	ArrayAppend(documentScope, {"name" = "mapper", "scope" = application.wheels.mapper});
-	if (application.wheels.enablePluginsComponent) {
+	if (application.wheels.enableMigratorComponent) {
 		ArrayAppend(documentScope, {"name" = "migrator", "scope" = application.wheels.migrator});
 		ArrayAppend(
 			documentScope,
@@ -74,5 +74,11 @@ if (StructKeyExists(application.wheels, "docs")) {
 	application.wheels.docs = docs;
 }
 
-include "layouts/#request.wheels.params.format#.cfm";
+// Validate `format` against an alphanumeric allowlist before interpolating
+// it into the include path. Without this, `format=../views/info` would
+// climb out of layouts/ — same LFI traversal class $getRequestFormat was
+// hardened against (issue #2974). Unscoped on purpose: this template runs
+// both at template level (views/docs.cfm) and inside a UDF (views/ai.cfm).
+docFormat = $resolveDocFormat(request.wheels.params.format);
+include "layouts/#docFormat#.cfm";
 </cfscript>

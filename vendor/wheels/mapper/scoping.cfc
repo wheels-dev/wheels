@@ -13,6 +13,7 @@ component {
 	 * @shallowPath Shallow path prefix.
 	 * @shallowName Shallow name prefix.
 	 * @constraints Variable patterns to use for matching.
+	 * @callback A callback function to define nested routes within this scope. If provided, the scope is automatically closed when the callback completes.
 	 */
 	public struct function scope(
 		string name,
@@ -25,8 +26,19 @@ component {
 		struct constraints,
 		any middleware,
 		any binding,
+		any callback,
 		string $call = "scope"
 	) {
+		// Consume `callback` before it can land on the scope stack. Mirrors group():
+		// without this, the extra named argument was silently dropped — the callback
+		// never ran (its routes 404'd) and nothing closed the scope, so every route
+		// declared after inherited this scope's path and middleware. namespace(),
+		// package(), and controller() forward here, so they inherit this support too.
+		if (StructKeyExists(arguments, "callback")) {
+			local.callback = arguments.callback;
+			StructDelete(arguments, "callback");
+		}
+
 		// Set shallow path and prefix if not in a resource.
 		if (!ListFindNoCase("resource,resources", variables.scopeStack[1].$call)) {
 			if (!StructKeyExists(arguments, "shallowPath") && StructKeyExists(arguments, "path")) {
@@ -90,6 +102,15 @@ component {
 		}
 		ArrayPrepend(variables.scopeStack, arguments);
 
+		// If a callback was provided, execute it to declare the nested routes and
+		// auto-close the scope — keeping namespace()/package()/controller() consistent
+		// with group()/resources(). Use IsCustomFunction (as group() does) so the same
+		// closure shape works across Lucee, Adobe, and BoxLang.
+		if (StructKeyExists(local, "callback") && IsCustomFunction(local.callback)) {
+			local.callback(this);
+			end();
+		}
+
 		return this;
 	}
 
@@ -108,7 +129,9 @@ component {
 		string package = arguments.name,
 		string path = hyphenize(arguments.name)
 	) {
-		return scope(name = arguments.name, package = arguments.package, path = arguments.path, $call = "namespace");
+		// Forward all arguments so scope() options like middleware and binding are
+		// not silently dropped.
+		return scope(argumentCollection = arguments, $call = "namespace");
 	}
 
 	/**
@@ -121,7 +144,9 @@ component {
 	 * @package Subfolder (package) to reference for controllers. This defaults to the value provided for `name`.
 	 */
 	public struct function package(required string name, string package = arguments.name) {
-		return scope(name = arguments.name, package = arguments.package, $call = "package");
+		// Forward all arguments so scope() options like middleware and binding are
+		// not silently dropped.
+		return scope(argumentCollection = arguments, $call = "package");
 	}
 
 	/**
@@ -165,20 +190,16 @@ component {
 		struct constraints,
 		any callback
 	) {
+		// Forward every passed argument so scope() options like middleware and
+		// binding are not silently dropped. Only `callback` is consumed by group()
+		// itself. (api() and version() delegate here, so they inherit this too.)
 		local.args = {};
+		for (local.key in arguments) {
+			if (local.key != "callback" && StructKeyExists(arguments, local.key) && !IsNull(arguments[local.key])) {
+				local.args[local.key] = arguments[local.key];
+			}
+		}
 		local.args.$call = "group";
-
-		if (StructKeyExists(arguments, "name")) {
-			local.args.name = arguments.name;
-		}
-
-		if (StructKeyExists(arguments, "path")) {
-			local.args.path = arguments.path;
-		}
-
-		if (StructKeyExists(arguments, "constraints")) {
-			local.args.constraints = arguments.constraints;
-		}
 
 		scope(argumentCollection = local.args);
 

@@ -43,7 +43,7 @@ component extends="wheels.WheelsTest" {
 
                 $testClient().get("/posts/##post.id##")
                     .assertOk()
-                    .assertHeader("Content-Type", "text/html; charset=UTF-8")
+                    .assertHeader("Content-Type", "text/html;charset=UTF-8")
                     .assertSee("<h1>T</h1>")
                     .assertSee("B");
             });
@@ -52,7 +52,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-The assertion chain reads as a trace of the request. `assertOk` confirms the router matched a real action and no filter short-circuited. `assertHeader` confirms the response came back as HTML, not JSON or a redirect. The two `assertSee` calls confirm the view actually rendered the record. If any layer misbehaves — a route typo, a filter that redirects, a view that swallowed the record — one of these fails and tells you which.
+The assertion chain reads as a trace of the request. `assertOk` confirms the router matched a real action and no filter short-circuited. `assertHeader` confirms the response came back as HTML, not JSON or a redirect — note it's an **exact-match** comparison, and both Lucee and Adobe emit `text/html;charset=UTF-8` with no space after the semicolon, so a `"text/html; charset=UTF-8"` literal fails. The two `assertSee` calls confirm the view actually rendered the record. If any layer misbehaves — a route typo, a filter that redirects, a view that swallowed the record — one of these fails and tells you which.
 
 ## Testing middleware effects
 
@@ -183,7 +183,7 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-The split assertion sidesteps an apostrophe-encoding gotcha: Wheels HTML-escapes error messages, so `can't` renders as `can&##39;t`. A single `assertSee("can't be empty")` would miss the encoded form. `assertSeeInOrder(["can", "t be empty"])` is an equivalent one-liner when you want to assert the two fragments appear in that order.
+The split assertion sidesteps an apostrophe-encoding gotcha: Wheels HTML-escapes error messages, so `can't` renders as `can&##x27;t` (the hex entity, on both Lucee and Adobe). A single `assertSee("can't be empty")` would miss the encoded form. `assertSeeInOrder(["can", "t be empty"])` is an equivalent one-liner when you want to assert the two fragments appear in that order.
 
 ## When to choose functional over integration
 

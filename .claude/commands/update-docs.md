@@ -15,7 +15,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
   **Do NOT modify any file under `vendor/wheels/**`, `app/**`, `tests/**`,
   `vendor/wheels/tests/**`, `.github/**`, `cli/**`, or `config/**`** —
   the implementation is already in the PR; touching it would create a
-  merge conflict and trigger Reviewer A re-runs.
+  merge conflict and trigger Reviewer re-runs.
 - Output is at most one doc-update commit + one comment on the PR.
 
 ## Args

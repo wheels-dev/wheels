@@ -34,6 +34,7 @@ The canonical pattern: deny access to anything except the public read actions. A
 ```cfm {test:compile} title="app/controllers/Posts.cfc"
 component extends="Controller" {
     function config() {
+        super.config();
         filters(through="authenticate", except="index,show");
     }
 
@@ -60,6 +61,10 @@ component extends="Controller" {
 
 `except="index,show"` leaves the two read actions public. Every other action — `new`, `create`, `edit`, `update`, `delete` — triggers `authenticate` before the action body runs. The filter returns `void`; short-circuit is signalled by calling `redirectTo`.
 
+<Aside type="caution">
+  Keep `super.config()` as the first line of every `config()` override. The default app template's parent `Controller.cfc` calls `protectsFromForgery()` in its `config()` — omit `super.config()` and CSRF protection silently drops for that controller. In development Wheels logs a one-time warning ("Controller 'Posts' overrides config() without calling super.config()...") to `wheels.log` and the debug bar when this happens.
+</Aside>
+
 ## Ownership checks
 
 Authentication proves who you are. Authorization decides whether you're allowed to touch this record. Layer a second filter after `authenticate` that rejects edits on posts owned by somebody else.
@@ -67,6 +72,7 @@ Authentication proves who you are. Authorization decides whether you're allowed 
 ```cfm {test:compile} title="app/controllers/Posts.cfc"
 component extends="Controller" {
     function config() {
+        super.config();
         filters(through="authenticate", except="index,show");
         filters(through="ownershipCheck", only="edit,update,delete");
     }
@@ -94,7 +100,7 @@ component extends="Controller" {
 }
 ```
 
-`params.post` is a model instance populated by route model binding, not a raw struct. Without binding, `params.post` doesn't exist and the dev-mode warning fires telling you to enable it. See [Route Model Binding](/v4-0-0/basics/routing/) for the one-line fix (`binding=true` on the resource).
+`params.post` is a model instance populated by route model binding, not a raw struct. Without binding, `params.post` doesn't exist — on screen you get an undefined-variable error, and Wheels writes a one-time hint per controller + action to `wheels.log` (in any environment except production) telling you to enable binding. See [Route Model Binding](/v4-0-0/basics/routing/) for the one-line fix (`binding=true` on the resource).
 
 <Aside type="tip">
   Ownership checks are cheap: one comparison. If you find yourself hitting the database inside the filter to reload the record, stop — either turn on route model binding and reuse `params.post`, or pull the authorization decision out into a policy object (below).
@@ -104,9 +110,10 @@ component extends="Controller" {
 
 For admin-only actions, read the current user's role and reject the rest. The tidy version uses a dedicated filter and a finder — keep the query off the hot path of every request by scoping it to admin-gated actions only.
 
-```cfm {test:compile} title="app/controllers/Admin/Users.cfc"
+```cfm {test:compile} title="app/controllers/AdminUsers.cfc"
 component extends="Controller" {
     function config() {
+        super.config();
         filters(through="authenticate");
         filters(through="requireAdmin");
     }
@@ -125,6 +132,8 @@ component extends="Controller" {
 }
 ```
 
+The flat `AdminUsers.cfc` is reachable at `/adminusers` through the default wildcard route. A nested `app/controllers/Admin/Users.cfc` only works if you add a route that targets it (the default route set has none — `/admin/users` parses as controller `admin`, action `users` and 404s).
+
 On the model side, keep role predicates out of ad-hoc WHERE strings. Use a named scope or the query builder — see [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/) for `model("User").where("role", "admin").get()` and the `scope(name="admins", where="role = 'admin'")` shorthand.
 
 ## `verifies()` — type and presence guards
@@ -134,6 +143,7 @@ On the model side, keep role predicates out of ad-hoc WHERE strings. Use a named
 ```cfm {test:compile} title="app/controllers/Posts.cfc"
 component extends="Controller" {
     function config() {
+        super.config();
         verifies(
             only="show,edit,update,delete",
             params="key",
@@ -149,12 +159,17 @@ component extends="Controller" {
     }
 
     private function invalidRequest() {
-        renderText(text="Bad request", status=400);
+        flashInsert(error="That request didn't look right.");
+        redirectTo(route="posts");
     }
 }
 ```
 
-Arguments match the framework signature: `params` is a comma-list of expected keys, `paramsTypes` is a parallel list of types passed through to `IsValid()` (`integer`, `numeric`, `email`, `uuid`, `boolean`, `date`, `string`). `handler` names a private method that runs on failure; omit it to fall back to a redirect or abort. Session and cookie keys have their own argument pairs (`session`/`sessionTypes`, `cookie`/`cookieTypes`).
+Arguments match the framework signature: `params` is a comma-list of expected keys, `paramsTypes` is a parallel list of types passed through to `IsValid()` (`integer`, `numeric`, `email`, `uuid`, `boolean`, `date`, `string`). `handler` names a private method that runs on failure. Omit `handler` and pass redirect arguments (e.g. `action="index"`) to redirect on failure instead; omit both and a failed verification aborts the request outright — the client receives a blank `200` response, not an error status. Session and cookie keys have their own argument pairs (`session`/`sessionTypes`, `cookie`/`cookieTypes`).
+
+<Aside type="caution">
+  A `verifies()` handler must redirect (or abort). After the handler returns, Wheels checks whether a redirect was performed and, if not, issues a back-redirect to the referrer (or `/`) — so a handler that only renders, like `renderText(text="Bad request", status=400)`, has its response discarded and the client sees a `302` instead.
+</Aside>
 
 <Aside type="caution">
   `verifies()` is not authorization — it's shape enforcement. A request with a valid-integer `params.key` passes verification whether or not the user is allowed to see that record. Verification trims the attack surface; filters enforce access.
@@ -184,6 +199,7 @@ The controller filter asks the policy the question and redirects on a `false` an
 ```cfm {test:compile} title="app/controllers/Posts.cfc"
 component extends="Controller" {
     function config() {
+        super.config();
         filters(through="authenticate", except="index,show");
         filters(through="authorizeEdit", only="edit,update");
         filters(through="authorizeDelete", only="delete");
@@ -213,11 +229,12 @@ Register `PostPolicy` in the DI container so controllers resolve it by name inst
 
 ## Filter order
 
-Before-filters run in the order they register. After-filters run in reverse. Register authentication first, then authorization, then data loading — each layer depends on the previous one succeeding.
+Before-filters run in the order they register. After-filters also run in the order they register. Register authentication first, then authorization, then data loading — each layer depends on the previous one succeeding.
 
 ```cfm {test:compile} title="app/controllers/Posts.cfc"
 component extends="Controller" {
     function config() {
+        super.config();
         filters(through="authenticate", except="index,show");
         filters(through="ownershipCheck", only="edit,update,delete");
         filters(through="loadCategories", only="new,edit");

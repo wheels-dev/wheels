@@ -91,7 +91,7 @@ component extends="../base" {
 		print.indentedLine("• Test runner (test)");
 		print.indentedLine("• Browser automation (via Browser MCP)");
 		print.line();
-		print.indentedLine("Full guide: docs/command-line-tools/commands/mcp/mcp-configuration-guide.md");
+		print.indentedLine("Full guide: https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
 		print.line();
 	}
 

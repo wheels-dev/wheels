@@ -7,6 +7,11 @@
 	mapper()
 		// CLI-Appends-Here
 
+		// Liveness / warm-up endpoint. `wheels deploy`'s proxy healthcheck probes
+		// `/up` before traffic cutover; a 200 here also compiles the request path
+		// so the first real visitor gets warm latency. See app/controllers/Up.cfc.
+		.get(name="up", to="up##index")
+
 		// The "wildcard" call below enables automatic mapping of "controller/action" type routes.
 		// This way you don't need to explicitly add a route every time you create a new action in a controller.
 		.wildcard()

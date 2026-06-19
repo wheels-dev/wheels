@@ -38,7 +38,7 @@ component output="false" extends="wheels.Global"{
 		$processMixins();
 		/* dependencies */
 		$determineDependency();
-		/* deprecation warning: plugins/ directory is deprecated in favor of packages/ */
+		/* deprecation warning: plugins/ directory is deprecated in favor of packages installed in vendor/ */
 		$checkPluginsDeprecation();
 		return this;
 	}
@@ -143,7 +143,7 @@ component output="false" extends="wheels.Global"{
 				WriteLog(
 					text = "[Wheels] Loading plugin '#local.pluginKey#' from #local.pluginValue.folderPath#",
 					type = "information",
-					file = "wheels_security"
+					file = "wheels"
 				);
 			} catch (any e) {}
 			local.plugin = CreateObject("component", $componentPathToPlugin(local.pluginKey, local.pluginValue.name)).init();
@@ -157,7 +157,18 @@ component output="false" extends="wheels.Global"{
 			}
 			if ($shouldLoadPlugin(local.compatVersion, local.wheelsVersion, variables.$class.loadIncompatiblePlugins)) {
 				variables.$class.plugins[local.pluginKey] = local.plugin;
-				$invokeOnPluginLoad(local.pluginKey, local.plugin);
+				// Per-plugin isolation (same log-and-skip pattern as the
+				// ServiceProvider register/boot phases): a throwing
+				// onPluginLoad must not prevent sibling plugins from loading.
+				try {
+					$invokeOnPluginLoad(local.pluginKey, local.plugin);
+				} catch (any e) {
+					WriteLog(
+						text = "[Wheels] Plugin '#local.pluginKey#' onPluginLoad failed: #e.message#",
+						type = "error",
+						file = "wheels"
+					);
+				}
 				// Track plugins that implement ServiceProviderInterface
 				if ($isServiceProvider(local.plugin)) {
 					ArrayAppend(variables.$class.serviceProviders, local.pluginKey);
@@ -168,12 +179,19 @@ component output="false" extends="wheels.Global"{
 					&& !$isServiceProvider(local.plugin)
 					&& !$hasPluginManifest(local.pluginKey)
 				) {
-					local.warning = 'Plugin "#local.pluginKey#" uses legacy mixin injection without a plugin.json manifest or ServiceProvider.cfc. Mixin-only plugins will be deprecated in Wheels 4.0. See: https://guides.wheels.dev/docs/migrating-plugins-to-service-providers';
+					local.warning = 'Plugin "#local.pluginKey#" uses legacy mixin injection without a plugin.json manifest or ServiceProvider.cfc. Legacy plugins are deprecated as of Wheels 4.0 and will be removed in Wheels 5.0 — migrate it to a package installed under vendor/.';
+					// Intentional dual registration: this per-instance array feeds the public
+					// getDeprecationWarnings() accessor (existing tooling/test surface), while
+					// $deprecated() below owns app-wide warn-once logging and the debug panel.
 					ArrayAppend(variables.$class.deprecationWarnings, {
 						plugin = local.pluginKey,
 						message = local.warning
 					});
-					WriteLog(type="warning", text="[Wheels] #local.warning#");
+					$deprecated(
+						feature = "plugins:mixin-only:#local.pluginKey#",
+						message = local.warning,
+						docUrl = "https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/"
+					);
 				}
 				if ($isVersionMismatch(local.compatVersion, local.wheelsVersion)) {
 					variables.$class.incompatiblePlugins = ListAppend(variables.$class.incompatiblePlugins, local.pluginKey);
@@ -243,7 +261,7 @@ component output="false" extends="wheels.Global"{
 				// Log an info-level suggestion so authors know about the new manifest option.
 				WriteLog(
 					type = "information",
-					text = "[Wheels] Plugin '#local.plugin#' does not have a plugin.json manifest. Consider adding one for declarative metadata, dependency management, and middleware registration. See: https://guides.wheels.dev/docs/plugin-json-manifest"
+					text = "[Wheels] Plugin '#local.plugin#' does not have a plugin.json manifest. Consider adding one for declarative metadata, dependency management, and middleware registration — or migrate the plugin to a package installed under vendor/. See: https://guides.wheels.dev/v4-0-0/digging-deeper/packages/"
 				);
 			}
 		}
@@ -495,13 +513,23 @@ component output="false" extends="wheels.Global"{
 	/**
 	 * Invokes the onPluginActivate lifecycle hook on all loaded plugins.
 	 * Called after all plugins are loaded, mixins processed, and data stored in the application scope.
+	 * A throwing hook is logged and skipped (same per-plugin isolation as the
+	 * ServiceProvider register/boot phases) so sibling plugins still activate.
 	 */
 	public void function $invokeOnPluginActivate() {
 		local.pluginKeys = $sortedPluginKeys();
 		for (local.iPlugin in local.pluginKeys) {
 			local.plugin = variables.$class.plugins[local.iPlugin];
 			if (StructKeyExists(local.plugin, "onPluginActivate") && IsCustomFunction(local.plugin.onPluginActivate)) {
-				local.plugin.onPluginActivate(application);
+				try {
+					local.plugin.onPluginActivate(application);
+				} catch (any e) {
+					WriteLog(
+						text = "[Wheels] Plugin '#local.iPlugin#' onPluginActivate failed: #e.message#",
+						type = "error",
+						file = "wheels"
+					);
+				}
 			}
 		}
 	}
@@ -510,11 +538,28 @@ component output="false" extends="wheels.Global"{
 	 * Invokes register(container) on all plugins that implement ServiceProviderInterface.
 	 * Called after all plugins are loaded, passing the DI Injector so plugins can register services.
 	 *
+	 * A throwing register() is logged and the plugin is dropped from the
+	 * ServiceProvider registry (so the boot phase skips it too) — the
+	 * remaining providers still run instead of the whole boot aborting.
+	 *
 	 * @container The Wheels DI container (Injector instance)
 	 */
 	public void function $invokeServiceProviderRegister(required any container) {
-		for (local.pluginKey in variables.$class.serviceProviders) {
-			variables.$class.plugins[local.pluginKey].register(arguments.container);
+		// Iterate a snapshot: a failing provider is removed from
+		// variables.$class.serviceProviders below, and mutating the array
+		// mid-iteration would skip the provider after a failing one.
+		local.providerKeys = Duplicate(variables.$class.serviceProviders);
+		for (local.pluginKey in local.providerKeys) {
+			try {
+				variables.$class.plugins[local.pluginKey].register(arguments.container);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Plugin '#local.pluginKey#' ServiceProvider register() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				$dropServiceProvider(local.pluginKey);
+			}
 		}
 	}
 
@@ -523,11 +568,41 @@ component output="false" extends="wheels.Global"{
 	 * Called after ALL register() methods have completed and user services.cfm has been loaded,
 	 * so plugins can safely resolve services from the container.
 	 *
+	 * Same per-plugin isolation as $invokeServiceProviderRegister: a throwing
+	 * boot() is logged and the plugin is dropped from the registry while the
+	 * remaining providers still boot.
+	 *
 	 * @app The Wheels application configuration struct (application.wheels or application.$wheels during init)
 	 */
 	public void function $invokeServiceProviderBoot(required struct app) {
-		for (local.pluginKey in variables.$class.serviceProviders) {
-			variables.$class.plugins[local.pluginKey].boot(arguments.app);
+		// Iterate a snapshot: a failing provider is removed mid-loop below.
+		local.providerKeys = Duplicate(variables.$class.serviceProviders);
+		for (local.pluginKey in local.providerKeys) {
+			try {
+				variables.$class.plugins[local.pluginKey].boot(arguments.app);
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Plugin '#local.pluginKey#' ServiceProvider boot() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				$dropServiceProvider(local.pluginKey);
+			}
+		}
+	}
+
+	/**
+	 * Removes a plugin key from the ServiceProvider registry. Called when a
+	 * provider's register()/boot() throws so the remaining lifecycle phases
+	 * skip it. Log-and-skip only: the legacy plugin system has no
+	 * failedPackages registry or rollback machinery to mirror.
+	 *
+	 * @pluginKey The plugin folder key as stored in the registry
+	 */
+	private void function $dropServiceProvider(required string pluginKey) {
+		local.idx = ArrayFind(variables.$class.serviceProviders, arguments.pluginKey);
+		if (local.idx > 0) {
+			ArrayDeleteAt(variables.$class.serviceProviders, local.idx);
 		}
 	}
 
@@ -553,15 +628,17 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Logs a deprecation warning if the plugins/ directory contains any loaded plugins.
-	 * The plugins/ directory is deprecated in favor of the packages/ system.
+	 * Records a deprecation warning if the plugins/ directory contains any loaded plugins.
+	 * The plugins/ directory is deprecated in favor of the package system (packages are
+	 * installed directly into vendor/).
 	 */
 	private void function $checkPluginsDeprecation() {
 		if (!StructIsEmpty(variables.$class.plugins)) {
 			local.pluginList = StructKeyList(variables.$class.plugins);
-			WriteLog(
-				type = "warning",
-				text = "[Wheels] The plugins/ directory is deprecated as of Wheels 4.0 and will be removed in Wheels 5.0. Plugins found: #local.pluginList#. Move them to packages/ and activate by copying to vendor/. See: https://wheels.dev/docs/packages"
+			$deprecated(
+				feature = "plugins-directory",
+				message = "The plugins/ directory is deprecated as of Wheels 4.0 and will be removed in Wheels 5.0. Plugins found: #local.pluginList#. Migrate each one to a package installed under vendor/ (`wheels packages add <name>` for published packages).",
+				docUrl = "https://guides.wheels.dev/v4-0-0/digging-deeper/packages/"
 			);
 		}
 	}
@@ -662,11 +739,21 @@ component output="false" extends="wheels.Global"{
 		if (!StructKeyExists(arguments.plugin, "onPluginLoad") || !IsCustomFunction(arguments.plugin.onPluginLoad)) {
 			return;
 		}
-		local.loadContext = Duplicate(application);
+		// Shallow copy: the Adobe CF workaround only requires a plain struct
+		// context (the application scope itself rejects function members), not
+		// a deep clone. Shared keys keep referencing the live objects (DI
+		// container, config struct, framework instance) so nothing forks, and
+		// the per-plugin cost is O(top-level keys) instead of a deep copy of
+		// the entire application scope.
+		local.loadContext = StructCopy(application);
 		$installPluginLoadAPI(arguments.pluginKey, local.loadContext);
 		arguments.plugin.onPluginLoad(local.loadContext);
-		// Sync non-function keys back to application scope. Closures injected
-		// by $installPluginLoadAPI are skipped to keep application clean.
+		// Sync non-function keys back to the application scope. Closures
+		// injected by $installPluginLoadAPI are skipped to keep application
+		// clean. For shared keys this re-assigns the same reference (a no-op);
+		// the loop matters for keys the plugin added or replaced, and for
+		// arrays on Adobe CF, which copies arrays by value even in a shallow
+		// StructCopy.
 		for (local.contextKey in local.loadContext) {
 			if (!IsCustomFunction(local.loadContext[local.contextKey])) {
 				application[local.contextKey] = local.loadContext[local.contextKey];
@@ -787,50 +874,53 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-   * Applies mixins to a component based on application configurations.
-   */
-  public any function $initializeMixins(required struct variablesScope) {
-		// We use $wheels here since these variables get placed in the variables scope of all objects.
-		// This way we sure they don't clash with other Wheels variables or any variables the developer may set.
+	 * Applies mixins to a component based on application configurations.
+	 *
+	 * Scratch state (appKey / metaData / className) is kept strictly local-scoped:
+	 * this method runs on the shared application-cached Plugins instance (see
+	 * $pluginObj() in Global.cfc), and unscoped writes would land in that shared
+	 * instance's variables scope — a data race across concurrent requests, with
+	 * className cross-contaminating which mixin set a target receives (issue 2897).
+	 */
+	public any function $initializeMixins(required struct variablesScope) {
 		if (IsDefined("application") && StructKeyExists(application, "$wheels")) {
-			$wheels.appKey = "$wheels";
+			local.appKey = "$wheels";
 		} else {
-			$wheels.appKey = "wheels";
+			local.appKey = "wheels";
 		}
 
-		if (IsDefined("application") && !StructIsEmpty(application[$wheels.appKey].mixins)) {
-			$wheels.metaData = GetMetadata(variablesScope.this);
-			if (StructKeyExists($wheels.metaData, "displayName")) {
-				$wheels.className = $wheels.metaData.displayName;
-			} else if (findNoCase("controllers", $wheels.metaData.fullname)){
-				$wheels.className = "controller";
-			} else if (findNoCase("models", $wheels.metaData.fullname)){
-				$wheels.className = "model";
-			} else if (findNoCase("tests", $wheels.metaData.fullname)){
-				$wheels.className = "test";
+		if (IsDefined("application") && !StructIsEmpty(application[local.appKey].mixins)) {
+			local.metaData = GetMetadata(variablesScope.this);
+			// Classify by dotted-path segment, not unanchored substring: an
+			// unanchored FindNoCase("controllers", ...) also matched component
+			// names like "app.models.ControllerStats" and handed them the
+			// controller mixin set (di-packages:12).
+			if (StructKeyExists(local.metaData, "displayName")) {
+				local.className = local.metaData.displayName;
+			} else if (ListFindNoCase(local.metaData.fullname, "controllers", "./\")) {
+				local.className = "controller";
+			} else if (ListFindNoCase(local.metaData.fullname, "models", "./\")) {
+				local.className = "model";
+			} else if (ListFindNoCase(local.metaData.fullname, "tests", "./\")) {
+				local.className = "test";
 			} else {
-				$wheels.className = Reverse(SpanExcluding(Reverse($wheels.metaData.name), "."));
+				local.className = Reverse(SpanExcluding(Reverse(local.metaData.name), "."));
 			}
-			if (StructKeyExists(application[$wheels.appKey].mixins, $wheels.className)) {
+			if (StructKeyExists(application[local.appKey].mixins, local.className)) {
 				if (!StructKeyExists(variablesScope, "core")) {
 					variablesScope.core = {};
 					StructAppend(variablesScope.core, variablesScope);
 					StructDelete(variablesScope.core, "$wheels");
 				}
-				StructAppend(variablesScope, application[$wheels.appKey].mixins[$wheels.className], true);
+				StructAppend(variablesScope, application[local.appKey].mixins[local.className], true);
 
 				if (StructKeyExists(variablesScope, "this")) {
-					StructAppend(variablesScope.this, application[$wheels.appKey].mixins[$wheels.className], true);
+					StructAppend(variablesScope.this, application[local.appKey].mixins[local.className], true);
 				}
 
 				if (StructKeyExists(variablesScope.core, "this")) {
-					StructAppend(variablesScope.core.this, application[$wheels.appKey].mixins[$wheels.className], true);
+					StructAppend(variablesScope.core.this, application[local.appKey].mixins[local.className], true);
 				}
-			}
-
-			// Get rid of any extra data created in the variables scope.
-			if (StructKeyExists(variablesScope, "$wheels")) {
-				StructDelete(variablesScope, "$wheels");
 			}
 		}
 		return variablesScope;
@@ -951,6 +1041,14 @@ component output="false" extends="wheels.Global"{
 	}
 
 	public query function $folders() {
+		// The legacy plugins/ directory is deprecated (superseded by vendor/<name>/
+		// packages) and may be absent. Skip the scan when it does not exist so
+		// engines whose directory listing throws on a missing path (e.g. RustCFML)
+		// don't fail at boot; Lucee/Adobe return empty for a missing dir anyway.
+		// Slated for removal with the plugins system in the next major.
+		if (!DirectoryExists(variables.$class.pluginPathFull)) {
+			return QueryNew("name,directory,type");
+		}
 		local.query = $directory(
 			action = "list",
 			directory = variables.$class.pluginPathFull,
@@ -996,6 +1094,10 @@ component output="false" extends="wheels.Global"{
 	}
 
 	public query function $files() {
+		// See $folders(): the deprecated plugins/ directory may be absent.
+		if (!DirectoryExists(variables.$class.pluginPathFull)) {
+			return QueryNew("name,directory,type");
+		}
 		local.query = $directory(
 			action = "list",
 			directory = variables.$class.pluginPathFull,

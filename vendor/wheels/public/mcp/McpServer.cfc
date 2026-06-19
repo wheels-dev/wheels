@@ -1271,108 +1271,23 @@ Provide migration code following Wheels conventions."
 	}
 
 	private string function executeCommand(required string command) {
-		// Structural allowlist: only permit known wheels subcommands with safe arguments
-		var allowedSubcommands = "g,generate,test,server,dbmigrate,db:seed,jobs,reload,info,new,init,deps";
-
-		if (!len(trim(arguments.command))) {
-			return "Error: Empty command.";
-		}
-
-		if (!reFind("^wheels\s", arguments.command)) {
-			return "Error: Only 'wheels' commands are allowed.";
-		}
-
-		// Strip "wheels " prefix once — used by both primary and fallback paths.
-		// 3-arg mid() is required for Adobe CF compatibility; Lucee/BoxLang accept 2 args.
-		local.strippedArgs = trim(mid(arguments.command, 7, len(arguments.command)));
-
-		if (!len(local.strippedArgs)) {
-			return "Error: Missing subcommand. Allowed: #allowedSubcommands#";
-		}
-
-		// Parse into parts and validate subcommand against allowlist
-		local.parts = ListToArray(local.strippedArgs, " ");
-		local.subcommand = local.parts[1];
-
-		if (!ListFindNoCase(allowedSubcommands, local.subcommand)) {
-			return "Error: Unknown subcommand '#EncodeForHTML(local.subcommand)#'. Allowed: #allowedSubcommands#";
-		}
-
-		// Validate each subsequent argument for shell metacharacters
-		for (var i = 2; i <= ArrayLen(local.parts); i++) {
-			if (!$isSafeArgument(local.parts[i])) {
-				return "Error: Argument contains disallowed characters.";
-			}
-		}
-
-		try {
-			// Get the application root directory using Application.cfc mappings
-			// The /app mapping points to the application's app directory (e.g., /project/app/)
-			// So /app/../ gives us the project root directory
-			local.appPath = expandPath("/app/../");
-
-			// Fallback: If /app mapping doesn't exist or doesn't point to a valid location,
-			// use the traditional detection method
-			// Wheels project marker: wheels.json (4.0+) or legacy box.json (pre-4.0).
-			// Either is a sufficient signal that we're in a Wheels project root.
-			if (!directoryExists(local.appPath) || (!fileExists(local.appPath & "wheels.json") && !fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "public/Application.cfc"))) {
-				// Fallback to manual path detection from webroot
-				local.appPath = expandPath("/");
-
-				// Check if we're in a vendor/wheels/public directory and adjust path accordingly
-				if (findNoCase("vendor/wheels/public", local.appPath) || findNoCase("wheels/public", local.appPath)) {
-					// We're in the vendor wheels directory, go up to find the application root
-					local.appPath = expandPath("/../../../");
-
-					// If that doesn't work, try going up more levels to find a project marker
-					if (!fileExists(local.appPath & "wheels.json") && !fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "Application.cfc")) {
-						local.appPath = expandPath("/../../../../");
-					}
-				} else {
-					// We're in the webroot (public/), go up one level to project root
-					local.appPath = expandPath("/../");
-				}
-			}
-
-			// Execute the command
-			cfexecute(
-				name = "wheels",
-				arguments = local.strippedArgs,
-				timeout = "30",
-				variable = "local.result",
-				errorVariable = "local.error",
-				directory = local.appPath
-			);
-
-			// Return the result
-			if (len(local.error)) {
-				return "Error: " & local.error & (len(local.result) ? chr(10) & "Output: " & local.result : "");
-			} else {
-				return len(local.result) ? local.result : "Command executed successfully";
-			}
-
-		} catch (any e) {
-			// If wheels command is not available, try using box (CommandBox)
-			try {
-				cfexecute(
-					name = "box",
-					arguments = "wheels " & local.strippedArgs,
-					timeout = "30",
-					variable = "local.result",
-					errorVariable = "local.error",
-					directory = local.appPath
-				);
-
-				if (len(local.error)) {
-					return "Error: " & local.error & (len(local.result) ? chr(10) & "Output: " & local.result : "");
-				} else {
-					return len(local.result) ? local.result : "Command executed successfully";
-				}
-
-			} catch (any e2) {
-				return "Error: Unable to execute command. Neither 'wheels' nor 'box' command found. Error: " & e.message;
-			}
-		}
+		// SEC-6 (2026-06-09 framework review): the deprecated HTTP MCP transport
+		// no longer shells out to the CLI. The cfexecute-backed execution path
+		// gave any request that reached this endpoint a command-execution
+		// primitive inside the servlet engine, gated only by environment and a
+		// localhost check — unlike consoleeval.cfm, which also requires the
+		// reload password. CLI-backed tools remain available on the canonical
+		// stdio MCP server, which runs under the developer's own shell account:
+		//
+		//     wheels mcp wheels
+		//
+		// Returning an explanatory error (instead of removing the tools from
+		// tools/list) keeps the JSON-RPC surface of this deprecated transport
+		// intact for existing clients.
+		return "Error: CLI-backed tools are disabled on the deprecated /wheels/mcp HTTP endpoint. "
+			& "Use the stdio MCP server instead ('wheels mcp wheels'; see "
+			& "https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration). "
+			& "Requested command: " & arguments.command;
 	}
 
 	private string function executeWheelsReload(required struct args) {

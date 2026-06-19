@@ -69,7 +69,9 @@
 
         // CSRF
         application.wheels.csrfCookieName = "_wheels_test_authenticity"
-        application.wheels.csrfCookieEncryptionAlgorithm = "AES"
+        // csrfCookieEncryptionAlgorithm is intentionally not overridden here — tests run
+        // against the engine-aware framework default resolved in events/init/security.cfm
+        // (AES/GCM/NoPadding where the engine supports it, random-IV CBC otherwise).
         application.wheels.csrfCookieEncryptionSecretKey = GenerateSecretKey("AES")
         application.wheels.csrfCookieEncryptionEncoding = "Base64"
 
@@ -121,16 +123,17 @@
     // The /wheels/core/tests endpoint is unauthenticated and only safe in dev;
     // the allowlist is defense-in-depth so stray input can't drive arbitrary
     // CFC compilation through whatever mappings happen to be registered.
-    local.testDirectory = "wheels.tests.specs";
-    if (StructKeyExists(url, "directory") && Len(Trim(url.directory))) {
-        local.requestedDirectory = Trim(url.directory);
-        if (ReFindNoCase(
-            "^(wheels\.tests|vendor\.[a-z0-9][a-z0-9\-]*\.tests)(\.[a-zA-Z0-9_]+)*$",
-            local.requestedDirectory
-        )) {
-            local.testDirectory = local.requestedDirectory;
-        }
-    }
+    //
+    // resolveScope() also records whether a present-but-rejected directory was
+    // silently swapped for the default, so a green total from the wrong scope
+    // is detectable downstream instead of looking like a clean run (issue #3083).
+    local.scopeResolver = new wheels.tests._assets.dispatch.TestDirectoryResolver();
+    local.testScope = local.scopeResolver.resolveScope(
+        url = url,
+        defaultDirectory = "wheels.tests.specs",
+        allowlistPattern = "^(wheels\.tests|vendor\.[a-z0-9][a-z0-9\-]*\.tests)(\.[a-zA-Z0-9_]+)*$"
+    );
+    local.testDirectory = local.testScope.resolved;
 
     try {
         // Try to create TestBox instance with coverage disabled
@@ -153,6 +156,15 @@
     local.sortedArray = testBox.getBundles()
     arraySort(local.sortedArray, "textNoCase")
     testBox.setBundles(local.sortedArray)
+
+    // Capture how many bundles the resolved scope actually discovered so the
+    // 0-bundle "green single-file" trap (e.g. directory=…callbacksSpec) is
+    // distinguishable from a real passing run (issue #3083).
+    local.bundlesDiscovered = ArrayLen(local.sortedArray)
+    local.scopeWarnings = local.scopeResolver.scopeWarnings(
+        scope = local.testScope,
+        bundlesDiscovered = local.bundlesDiscovered
+    )
 
     variables.$_setTestboxEnv()
     if (!structKeyExists(url, "format") || url.format eq "html") {
@@ -263,7 +275,15 @@
                 }
             }
         }else{
-            writeOutput(result)
+            // Thread the resolved-scope facts (and any warnings) into the JSON
+            // payload so a rejected directory or a 0-bundle discovery is
+            // detectable instead of masquerading as a green run (issue #3083).
+            writeOutput(local.scopeResolver.injectScopeMetadata(
+                resultJson = result,
+                scope = local.testScope,
+                bundlesDiscovered = local.bundlesDiscovered,
+                warnings = local.scopeWarnings
+            ))
         }
     }
     else if (url.format eq "txt") {
