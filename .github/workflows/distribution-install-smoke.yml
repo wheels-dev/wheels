@@ -92,6 +92,12 @@ jobs:
       HOMEBREW_NO_INSTALL_FROM_API: "1"
       NONINTERACTIVE: "1"
     steps:
+      # GitHub's ubuntu runners ship Homebrew (Linuxbrew) but do NOT put it on
+      # PATH; macos runners do. Add it on Linux so `brew` resolves in the next
+      # steps (GITHUB_PATH persists across steps).
+      - name: Ensure Homebrew is on PATH (Linuxbrew)
+        if: runner.os == 'Linux'
+        run: echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
       - name: brew tap + install (the documented path)
         run: |
           set -euo pipefail
@@ -103,7 +109,12 @@ jobs:
         run: |
           set -uo pipefail
           RAW="$(wheels --version 2>&1 || true)"
-          GOT="$(printf '%s\n' "$RAW" | grep -iE 'version' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          # Extract the first semver from the output. Channels differ in format:
+          # the LuCLI/brew build prints "Wheels Version: 4.0.4" (+ an ASCII
+          # banner), the .deb/.rpm print "wheels 4.0.4 (stable)" — neither a
+          # keyword filter nor a fixed prefix is portable, so take the first
+          # x.y.z (the version always leads; the banner carries no semver).
+          GOT="$(printf '%s\n' "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
           echo "${CHANNEL}: wheels --version => '${GOT}' (expected '${EXPECTED}')"
           if [ "$GOT" != "$EXPECTED" ]; then
             echo "::error::${CHANNEL} serves '${GOT}', expected '${EXPECTED}'"
@@ -128,6 +139,10 @@ jobs:
           }
           scoop bucket add wheels https://github.com/wheels-dev/scoop-wheels
           scoop install wheels
+          # scoop puts shims in ~\scoop\shims and edits the *persistent* user
+          # PATH (registry) — which the next step's shell does not inherit.
+          # Expose the shims dir to later steps explicitly so `wheels` resolves.
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - name: Assert wheels --version == GA
         shell: pwsh
         run: |
@@ -183,7 +198,12 @@ jobs:
         run: |
           set -uo pipefail
           RAW="$(wheels --version 2>&1 || true)"
-          GOT="$(printf '%s\n' "$RAW" | grep -iE 'version' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          # Extract the first semver from the output. Channels differ in format:
+          # the LuCLI/brew build prints "Wheels Version: 4.0.4" (+ an ASCII
+          # banner), the .deb/.rpm print "wheels 4.0.4 (stable)" — neither a
+          # keyword filter nor a fixed prefix is portable, so take the first
+          # x.y.z (the version always leads; the banner carries no semver).
+          GOT="$(printf '%s\n' "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
           echo "${CHANNEL}: wheels --version => '${GOT}' (expected '${EXPECTED}')"
           if [ "$GOT" != "$EXPECTED" ]; then
             echo "::error::${CHANNEL} serves '${GOT}', expected '${EXPECTED}'"
@@ -215,7 +235,12 @@ jobs:
         run: |
           set -uo pipefail
           RAW="$(wheels --version 2>&1 || true)"
-          GOT="$(printf '%s\n' "$RAW" | grep -iE 'version' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          # Extract the first semver from the output. Channels differ in format:
+          # the LuCLI/brew build prints "Wheels Version: 4.0.4" (+ an ASCII
+          # banner), the .deb/.rpm print "wheels 4.0.4 (stable)" — neither a
+          # keyword filter nor a fixed prefix is portable, so take the first
+          # x.y.z (the version always leads; the banner carries no semver).
+          GOT="$(printf '%s\n' "$RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
           echo "${CHANNEL}: wheels --version => '${GOT}' (expected '${EXPECTED}')"
           if [ "$GOT" != "$EXPECTED" ]; then
             echo "::error::${CHANNEL} serves '${GOT}', expected '${EXPECTED}'"
