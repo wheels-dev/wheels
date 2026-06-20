@@ -196,7 +196,7 @@ A small team needs **two** tiers plus a release gate — not five.
 - **Tier 2 — Nightly full matrix.** All supported engine/DB combinations from the manifest; publishes a dashboard, uploads JUnit/JSON, opens/updates issues for persistent failures. Seed already exists in [`compat-matrix.yml`](../../.github/workflows/compat-matrix.yml).
 - **Release gate.** Full matrix green-or-documented, generated-app lifecycle, upgrade tests from latest Wheels 4, **public distribution canaries** (Homebrew/Scoop/apt/yum installed on a clean system), browser tests, docs gate. A clean public install path is part of the trust story and is release-blocking.
 
-Generated-app smoke testing (run the same `wheels` binary users install: `new` → `generate scaffold` → `dbmigrate latest` → `test` → `start`) catches template/CLI/docs drift that internal unit tests cannot, and is the cheapest high-value test we have.
+Generated-app smoke testing (run the same `wheels` binary users install: `new` → `generate scaffold` → `migrate latest` → `test` → `start`) catches template/CLI/docs drift that internal unit tests cannot, and is the cheapest high-value test we have.
 
 ---
 
