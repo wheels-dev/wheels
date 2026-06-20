@@ -33,13 +33,19 @@ component extends="wheels.WheelsTest" {
 
 			it("reuses the same cached plan across instances rather than rebuilding it", () => {
 				model("author").new();
-				var first = application.wheels.integrationPlans["wheels.model"];
-				// A second materialization must not replace the cached plan.
+				// Tag the cached plan entry in place. The write goes through the full
+				// application-scope path (no intermediate local var), so it mutates the
+				// cached array element directly — reference-safe on Adobe CF too, which
+				// copies an array assigned to a local. Uses only core struct functions,
+				// so it behaves identically on Lucee/Adobe/BoxLang (avoids the array
+				// `.equals()` idiom, whose BoxLang behavior is unverified).
+				application.wheels.integrationPlans["wheels.model"][1]["cacheReuseSentinel"] = true;
+				// A second materialization must reuse the cached plan, not rebuild it
+				// (a rebuild would replace the entry with a fresh struct lacking the tag).
 				model("author").new();
-				var second = application.wheels.integrationPlans["wheels.model"];
-				// Same identity (Lucee/Adobe compare arrays by reference here): a
-				// rebuild would produce a different array with fresh instances.
-				expect(first.equals(second)).toBeTrue();
+				expect(
+					StructKeyExists(application.wheels.integrationPlans["wheels.model"][1], "cacheReuseSentinel")
+				).toBeTrue();
 			});
 
 			it("materializes instances that carry the full mixed-in model method surface", () => {
