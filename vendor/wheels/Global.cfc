@@ -1059,6 +1059,120 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal. Returns a cached "integration plan" for a folder of mixin
+	 * components (e.g. `wheels.model`, `wheels.controller`, `wheels.mapper`): an
+	 * ordered array of `{instance, methods, fullName}` where `instance` is a
+	 * single shared, stateless method-holder component and `methods` is its
+	 * `getMetaData().functions` array.
+	 *
+	 * The directory scan, the per-file `createObject`, and the `getMetaData`
+	 * calls are the expensive — and completely invariant — part of
+	 * `$integrateComponents`: they produce the same result for every object of a
+	 * given type. Before this cache they were re-paid on EVERY model, controller,
+	 * and mapper materialization (every `new()` and every finder row goes through
+	 * `$createInstance` -> `init()` -> `$integrateComponents`), which dominated
+	 * test-suite and request time (issue #3213). Now they run once per path and
+	 * the cheap per-instance work (copying function references into the target's
+	 * `variables`/`this`) is all that remains on the hot path.
+	 *
+	 * The plan is cached in `application.wheels.integrationPlans`, so a reload —
+	 * which rebuilds `application.wheels` — re-scans, the same lifetime contract
+	 * as the schema column cache. The cached method-holder components carry no
+	 * instance state (they are never `init()`'d) and CFML methods bind to the
+	 * object they are invoked on, so sharing their function references across many
+	 * target instances and across concurrent requests is safe.
+	 */
+	public array function $componentIntegrationPlan(required string path) {
+		// During early bootstrap (before application.wheels exists) fall back to
+		// an uncached build so behavior is identical to the pre-cache code path.
+		if (!StructKeyExists(application, "wheels")) {
+			return $buildComponentIntegrationPlan(arguments.path);
+		}
+		if (!StructKeyExists(application.wheels, "integrationPlans")) {
+			lock name="wheels.integrationPlans.#application.applicationName#" type="exclusive" timeout="10" {
+				if (!StructKeyExists(application.wheels, "integrationPlans")) {
+					application.wheels.integrationPlans = {};
+				}
+			}
+		}
+		if (!StructKeyExists(application.wheels.integrationPlans, arguments.path)) {
+			local.plan = $buildComponentIntegrationPlan(arguments.path);
+			lock name="wheels.integrationPlans.#application.applicationName#" type="exclusive" timeout="10" {
+				application.wheels.integrationPlans[arguments.path] = local.plan;
+			}
+		}
+		return application.wheels.integrationPlans[arguments.path];
+	}
+
+	/**
+	 * Internal. Builds (without caching) the integration plan for a path — the
+	 * directory scan + per-file createObject + getMetaData that
+	 * $componentIntegrationPlan memoizes. The DirectoryList call mirrors the
+	 * original $integrateComponents exactly so file (and therefore override)
+	 * order is unchanged.
+	 */
+	public array function $buildComponentIntegrationPlan(required string path) {
+		local.folderPath = ExpandPath("/#Replace(arguments.path, ".", "/", "all")#");
+		local.fileList = DirectoryList(local.folderPath, false, "name", "*.cfc");
+		local.rv = [];
+		for (local.fileName in local.fileList) {
+			local.componentName = Replace(local.fileName, ".cfc", "", "all");
+			local.instance = CreateObject("component", "#arguments.path#.#local.componentName#");
+			local.meta = GetMetaData(local.instance);
+			local.fns = StructKeyExists(local.meta, "functions") ? local.meta.functions : [];
+			// Pre-resolve the PUBLIC method references once. On the hot path
+			// (every materialized object) this removes both the per-method
+			// `.access` filtering and the `instance[name]` scope lookup; only the
+			// reference assignment into the target remains (issue #3213). Function
+			// references are late-bound to the object they are invoked on, so the
+			// shared, cached reference works correctly on every target instance.
+			local.publicMethods = [];
+			local.fEnd = ArrayLen(local.fns);
+			for (local.f = 1; local.f <= local.fEnd; local.f++) {
+				if (local.fns[local.f].access == "public") {
+					ArrayAppend(local.publicMethods, {
+						name = local.fns[local.f].name,
+						ref = local.instance[local.fns[local.f].name]
+					});
+				}
+			}
+			ArrayAppend(local.rv, {
+				instance = local.instance,
+				methods = local.fns,
+				publicMethods = local.publicMethods,
+				fullName = StructKeyExists(local.meta, "fullName") ? local.meta.fullName : "#arguments.path#.#local.componentName#"
+			});
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal. Returns a struct whose KEYS are the function names that a
+	 * registered plugin/package mixin will override for the given component type
+	 * (plus the always-checked "global" type). Empty — the common case, no mixins
+	 * registered — when there are none. Computed from the app-scoped, reload-stable
+	 * application.wheels.mixins so the per-method $willBeOverriddenByMixin function
+	 * call can be replaced by an O(1) struct-membership test on the hot path (#3213).
+	 */
+	public struct function $mixinOverrideSet(required string primaryType) {
+		local.rv = {};
+		if (
+			!StructKeyExists(application, "wheels")
+			|| !StructKeyExists(application.wheels, "mixins")
+			|| StructIsEmpty(application.wheels.mixins)
+		) {
+			return local.rv;
+		}
+		local.types = [arguments.primaryType, "global"];
+		for (local.t in local.types) {
+			if (StructKeyExists(application.wheels.mixins, local.t) && IsStruct(application.wheels.mixins[local.t])) {
+				StructAppend(local.rv, application.wheels.mixins[local.t], false);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $debugPoint(required string name) {
