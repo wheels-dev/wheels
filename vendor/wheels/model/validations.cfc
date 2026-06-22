@@ -584,7 +584,7 @@ component {
 						Throw(
 							type = "Wheels.InvalidValidationCondition",
 							message = "The `#local.item#` expression `#arguments[local.item]#` could not be evaluated: #e.message#",
-							extendedInfo = "Supported forms: `this.property`, `this.method()`, bare `method()` (optionally negated with `!`), and binary comparisons using eq/neq/lt/lte/gt/gte or ==/!=/</<=/>/>=."
+							extendedInfo = "Supported forms: `this.property`, `this.method()` (with named `key='val'` or positional `'val'` arguments), bare `method()` (optionally negated with `!`), and binary comparisons using eq/neq/lt/lte/gt/gte or ==/!=/</<=/>/>=."
 						);
 					}
 					cflog(
@@ -897,7 +897,7 @@ component {
 			}
 			if (StructKeyExists(this, local.methodName)) {
 				if (IsCustomFunction(this[local.methodName])) {
-					local.rv.value = invoke(this, local.methodName, $parseConditionArgs(local.argsRaw));
+					local.rv.value = invoke(this, local.methodName, $parseConditionArgs(local.argsRaw, this[local.methodName]));
 				} else {
 					local.rv.value = this[local.methodName];
 				}
@@ -917,22 +917,60 @@ component {
 	}
 
 	/**
-	 * Parses a comma-delimited argument string (e.g. "key1='val1',key2='val2'")
-	 * into a struct of named arguments.
+	 * Parses a comma-delimited argument string into a struct of named arguments
+	 * suitable for `invoke()`. Handles both named (`key='val'`) and positional
+	 * (`'val'`) arguments. Positional arguments are mapped onto the target
+	 * function's declared parameter names, so a condition like
+	 * `this.propertyIsPresent('productid')` resolves correctly (#3238).
+	 *
+	 * Named-argument invoke() resolves uniformly across Lucee/Adobe/BoxLang;
+	 * a numeric-keyed positional argumentCollection does not — hence the mapping.
+	 *
+	 * Note: arguments are split on "," so a quoted value containing a comma
+	 * (e.g. `'a,b'`) is not yet supported — this matches the prior named-arg
+	 * behaviour and is out of scope for #3238.
 	 */
-	public struct function $parseConditionArgs(required string argsString) {
-		local.rv = {};
+	public struct function $parseConditionArgs(required string argsString, any targetFunction) {
+		local.named = {};
+		local.positional = [];
 		for (local.param in ListToArray(arguments.argsString, ",")) {
 			local.param = Trim(local.param);
+			if (!Len(local.param)) {
+				continue;
+			}
 			if (Find("=", local.param)) {
-				local.splitArg = ListToArray(local.param, "=");
-				if (ArrayLen(local.splitArg) >= 2) {
-					local.varName = Trim(local.splitArg[1]);
-					local.varValue = Trim(local.splitArg[2]);
-					local.varValue = Replace(local.varValue, "'", "", "all");
-					local.varValue = Replace(local.varValue, '"', "", "all");
-					local.rv[local.varName] = local.varValue;
+				local.varName = Trim(ListFirst(local.param, "="));
+				local.named[local.varName] = $unquoteConditionValue(Trim(ListRest(local.param, "=")));
+			} else {
+				ArrayAppend(local.positional, $unquoteConditionValue(local.param));
+			}
+		}
+
+		// Map any positional arguments onto the target function's declared
+		// parameter names so the result is a single named-argument struct.
+		if (ArrayLen(local.positional) && StructKeyExists(arguments, "targetFunction")) {
+			local.paramNames = $conditionFunctionParameterNames(arguments.targetFunction);
+			for (local.i = 1; local.i <= ArrayLen(local.positional); local.i++) {
+				if (local.i <= ArrayLen(local.paramNames) && !StructKeyExists(local.named, local.paramNames[local.i])) {
+					local.named[local.paramNames[local.i]] = local.positional[local.i];
 				}
+			}
+		}
+
+		return local.named;
+	}
+
+	/**
+	 * Returns the ordered parameter names declared by a function reference.
+	 * Used to map positional condition-method arguments onto named arguments
+	 * (#3238).
+	 */
+	public array function $conditionFunctionParameterNames(required any targetFunction) {
+		local.rv = [];
+		local.meta = GetMetaData(arguments.targetFunction);
+		if (StructKeyExists(local.meta, "parameters") && IsArray(local.meta.parameters)) {
+			for (local.param in local.meta.parameters) {
+				ArrayAppend(local.rv, local.param.name);
 			}
 		}
 		return local.rv;
