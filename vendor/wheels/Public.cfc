@@ -193,6 +193,29 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	/**
+	 * Returns the shared CliBridge instance — the dev-UI / CLI command
+	 * handlers extracted from cli.cfm (issue #2959). CliBridge is stateless
+	 * (only an immutable command->method allowlist lives in its `variables`),
+	 * so one instance is cached on `application.wheels` and shared across
+	 * concurrent requests; `?reload=true` rebuilds `application.wheels` and
+	 * re-creates it. Falls back to a fresh instance during early bootstrap
+	 * (before `application.wheels` exists), mirroring `$componentIntegrationPlan`.
+	 */
+	public any function $cliBridge() {
+		if (!StructKeyExists(application, "wheels")) {
+			return CreateObject("component", "wheels.public.CliBridge").init();
+		}
+		if (!StructKeyExists(application.wheels, "cliBridge")) {
+			lock name="wheels.cliBridge.#application.applicationName#" type="exclusive" timeout="10" {
+				if (!StructKeyExists(application.wheels, "cliBridge")) {
+					application.wheels.cliBridge = CreateObject("component", "wheels.public.CliBridge").init();
+				}
+			}
+		}
+		return application.wheels.cliBridge;
+	}
+
+	/**
 	 * Formats the migrator's discovery list for the /wheels/cli dbStatus
 	 * command, mapping the migrator's own status field ("migrated" or "")
 	 * to applied/pending. The previous version-comparison heuristic
