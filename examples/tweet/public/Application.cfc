@@ -2,7 +2,11 @@ component output="false" {
 
 	// Put variables we just need internally inside a wheels struct.
 	this.wheels = {};
-	this.wheels.rootPath = GetDirectoryFromPath(GetBaseTemplatePath());
+	// Anchor to this file's directory, not the requested base template's, so
+	// rootPath stays stable when a request bootstraps under a subfolder (e.g.
+	// the test runner) — Hash(rootPath) below seeds this.name, and an unstable
+	// value splits one app across two application scopes (issue #3025/#2887).
+	this.wheels.rootPath = GetDirectoryFromPath(GetCurrentTemplatePath());
 
 	this.name = createUUID();
 	// Give this application a unique name by taking the path to the root and hashing it.
