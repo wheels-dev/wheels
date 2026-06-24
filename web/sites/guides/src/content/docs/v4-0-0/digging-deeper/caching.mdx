@@ -201,6 +201,22 @@ For caches keyed by query arguments (the automatic `findAll(cache=N)` flavor), i
    Now the model callback can call `$removeFromCache(key="posts-listing")` surgically.
 3. **Bust the engine's query cache with a reload.** `$clearCache(category="query")` does **not** invalidate finder caches — as noted above, `findAll(cache=N)` results live in the CFML engine's native query cache, not in `application.wheels.cache`. The blunt instruments that actually work are `?reload=true&password=...` (which rotates the cache-key comment Wheels embeds in every cached query's SQL, invalidating all engine-cached results) or an application restart.
 
+## Schema and model-metadata cache
+
+Separate from `application.wheels.cache` — the store everything above talks about — Wheels keeps a second, longer-lived cache that `$clearCache()` cannot reach: each model's **table and column metadata**. The first time a model is used, Wheels runs `cfdbinfo` against its table and caches the column list, types, and defaults in `application.wheels.models` for the lifetime of the application. That's what lets `model("Post").new()` know its properties without a database round-trip on every request.
+
+The flip side: a **live schema change goes stale instantly**. Drop or rename a column with `ALTER TABLE` against a running app and the next request fails with a "column not found" error (or silently ignores the new column) — the model is still working from the metadata it read at startup. `$clearCache()`, `clearQueryCacheOnReload`, and `clearTemplateCacheOnReload` do **not** rebuild it; only a reload or a restart re-runs `cfdbinfo`.
+
+To pick up a schema change without killing the process, in order of preference:
+
+1. **Migrate, then reload.** Apply the change through a [migration](/v4-0-0/basics/migrations/) and reload each node with `?reload=true&password=...` — the reload re-reads every model's schema. With more than one app server, reload them one at a time for a zero-downtime rollout.
+2. **Rolling load-balancer restart.** Drain and restart each node behind the load balancer in turn, so the fleet is never fully down.
+3. **Off-hours engine restart.** The blunt option: a full Lucee/CF restart clears everything. Fine when a maintenance window is acceptable.
+
+<Aside type="caution">
+  Don't reach into `application.wheels.models` and delete entries by hand to force a re-read — it is unsupported and races with in-flight requests. Use a reload; it rebuilds the metadata cleanly.
+</Aside>
+
 ## Per-user keys
 
 A cached action is shared across every request for the same URL — which is a problem the moment the rendered output depends on the logged-in user. Use `appendToKey` to mix more identifiers into the cache key:
