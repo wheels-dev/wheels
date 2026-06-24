@@ -2623,6 +2623,34 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Rewrites a framework-relative include path (e.g.
+	 * `/wheels/tests/app-runner.cfm`) so it resolves under a URL subpath
+	 * install (issue #3251). The shipped app test-runner template includes
+	 * the built-in app runner via an absolute `/wheels/...` path, which only
+	 * resolves when the app is mounted at the web root; under a CommandBox
+	 * multi-subfolder / IIS-subfolder topology the `/wheels` mapping does not
+	 * resolve and the include fails. Prefixing the resolved `webPath` (the
+	 * same subpath derivation as $resolveFrameworkPaths) makes the include
+	 * work in both root and subfolder installs. Pure so it can be unit-tested
+	 * in isolation.
+	 */
+	public string function $resolveSubpathInclude(required string template, string webPath) {
+		// Default to the app's resolved webPath without a runtime default-arg
+		// expression (some engines evaluate those eagerly); callers in tests
+		// pass webPath explicitly.
+		local.wp = StructKeyExists(arguments, "webPath") ? arguments.webPath : application.wheels.webPath;
+		local.base = Len(local.wp) ? local.wp : "/";
+		if (Right(local.base, 1) != "/") {
+			local.base &= "/";
+		}
+		// Strip any leading slash(es) from the framework-relative template so
+		// the join produces a single boundary slash. Anchored to the start so
+		// it never touches interior path separators.
+		local.relative = ReReplace(arguments.template, "^/+", "");
+		return local.base & local.relative;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $abortInvalidRequest() {
