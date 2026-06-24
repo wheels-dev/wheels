@@ -72,7 +72,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 			);
 		}
 		local.expiresAt = $epochSeconds() + arguments.expiresIn;
-		local.token = $sign(arguments.key & "|" & local.expiresAt);
+		local.token = $sign($signaturePayload(arguments.key, local.expiresAt, arguments.contentDisposition));
 		local.base = $joinUrl(variables.urlPrefix, arguments.key);
 		local.qs = "expires=" & local.expiresAt & "&signature=" & local.token;
 		if (Len(arguments.contentDisposition)) {
@@ -87,23 +87,57 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	 * @key The requested key.
 	 * @expires The epoch-seconds expiry carried in the URL.
 	 * @signature The token carried in the URL.
+	 * @contentDisposition The disposition carried in the URL (bound into the token).
 	 */
-	public boolean function verifySignature(required string key, required numeric expires, required string signature) {
+	public boolean function verifySignature(required string key, required numeric expires, required string signature, string contentDisposition = "") {
 		if (!Len(variables.signingKey)) {
 			return false;
 		}
 		if ($epochSeconds() > arguments.expires) {
 			return false;
 		}
-		local.expected = $sign(arguments.key & "|" & arguments.expires);
-		// Constant-time-ish compare on equal-length hex tokens.
-		return CompareNoCase(local.expected, arguments.signature) == 0;
+		local.expected = $sign($signaturePayload(arguments.key, arguments.expires, arguments.contentDisposition));
+		return $secureEquals(local.expected, arguments.signature);
 	}
 
 	// ---- internals --------------------------------------------------------
 
 	private string function $sign(required string message) {
 		return LCase(HMac(arguments.message, variables.signingKey, "HMACSHA256", "UTF-8"));
+	}
+
+	/**
+	 * Canonical string the signed-URL HMAC covers. Binding the disposition in
+	 * means a holder of a valid URL cannot alter the served Content-Disposition.
+	 * Empty disposition reproduces the legacy "key|expires" payload, so URLs
+	 * signed without one still verify.
+	 */
+	private string function $signaturePayload(required string key, required numeric expires, string contentDisposition = "") {
+		local.payload = arguments.key & "|" & arguments.expires;
+		if (Len(arguments.contentDisposition)) {
+			local.payload &= "|" & arguments.contentDisposition;
+		}
+		return local.payload;
+	}
+
+	/**
+	 * Length-independent equality for two hex tokens. Unlike CompareNoCase it
+	 * does not short-circuit on the first differing character, so it does not
+	 * leak how much of the token matched through timing. Both inputs are the
+	 * fixed-width lowercase-hex output of $sign(), so a length mismatch can only
+	 * be a forged/garbage token — comparing false there is correct.
+	 */
+	private boolean function $secureEquals(required string a, required string b) {
+		local.x = LCase(arguments.a);
+		local.y = LCase(arguments.b);
+		if (Len(local.x) != Len(local.y)) {
+			return false;
+		}
+		local.diff = 0;
+		for (local.i = 1; local.i <= Len(local.x); local.i++) {
+			local.diff = BitOr(local.diff, BitXor(Asc(Mid(local.x, local.i, 1)), Asc(Mid(local.y, local.i, 1))));
+		}
+		return local.diff == 0;
 	}
 
 	private string function $resolve(required string key) {

@@ -172,6 +172,19 @@ component output="false" {
 		return variables.host;
 	}
 
+	/**
+	 * RFC3986-encode an object key for use as a request path (forward slashes
+	 * preserved). The wire URL must use the same encoding the canonical request
+	 * signs, or S3 returns SignatureDoesNotMatch for keys with spaces / reserved
+	 * characters. Lets the disk build request/url paths that stay byte-identical
+	 * to what was signed.
+	 *
+	 * @key Object key.
+	 */
+	public string function encodeKey(required string key) {
+		return $uriEncodePath(arguments.key);
+	}
+
 	// ---- internals --------------------------------------------------------
 
 	/**

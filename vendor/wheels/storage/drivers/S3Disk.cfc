@@ -43,9 +43,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	public any function put(required string key, required any content, string contentType = "application/octet-stream", string visibility = "") {
 		local.headers = variables.signer.signedHeaders(method = "PUT", key = arguments.key, payload = arguments.content);
 		local.result = $request(method = "PUT", key = arguments.key, headers = local.headers, body = arguments.content, contentType = arguments.contentType);
-		if (Val(local.result.statusCode) >= 300) {
-			throw(type = "Wheels.Storage.RequestFailed", message = "S3 PUT failed for [#arguments.key#]: #local.result.statusCode#.");
-		}
+		$assertSuccess(result = local.result, method = "PUT", key = arguments.key);
 		return arguments.key;
 	}
 
@@ -55,23 +53,35 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		if (Val(local.result.statusCode) == 404) {
 			throw(type = "Wheels.Storage.NotFound", message = "No object stored at key [#arguments.key#].");
 		}
-		if (Val(local.result.statusCode) >= 300) {
-			throw(type = "Wheels.Storage.RequestFailed", message = "S3 GET failed for [#arguments.key#]: #local.result.statusCode#.");
-		}
+		$assertSuccess(result = local.result, method = "GET", key = arguments.key);
 		return local.result.fileContent;
 	}
 
 	public boolean function exists(required string key) {
 		local.headers = variables.signer.signedHeaders(method = "HEAD", key = arguments.key);
 		local.result = $request(method = "HEAD", key = arguments.key, headers = local.headers);
-		return Val(local.result.statusCode) < 300;
+		local.code = Val(local.result.statusCode);
+		if (local.code >= 200 && local.code < 300) {
+			return true;
+		}
+		if (local.code == 404) {
+			return false;
+		}
+		// A connection failure or 5xx is NOT "the object is absent" — reporting
+		// false there would be a silent failure, so surface it instead.
+		throw(
+			type = "Wheels.Storage.RequestFailed",
+			message = "S3 HEAD failed for [#arguments.key#]: #$statusDetail(local.result)#."
+		);
 	}
 
 	public boolean function delete(required string key) {
 		local.headers = variables.signer.signedHeaders(method = "DELETE", key = arguments.key);
 		local.result = $request(method = "DELETE", key = arguments.key, headers = local.headers);
-		// S3 DELETE is idempotent — 204 whether or not the object existed.
-		return Val(local.result.statusCode) < 300;
+		// S3 DELETE is idempotent — 2xx whether or not the object existed — but a
+		// connection failure or 5xx must not masquerade as a successful delete.
+		$assertSuccess(result = local.result, method = "DELETE", key = arguments.key);
+		return true;
 	}
 
 	public string function url(required string key) {
@@ -90,7 +100,38 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 
 	private string function $objectPath(required string key) {
 		local.k = REReplace(arguments.key, "^/+", "");
-		return variables.usePathStyle ? "/" & variables.bucket & "/" & local.k : "/" & local.k;
+		// Encode through the signer so the wire path is byte-identical to the
+		// canonical path the SigV4 signature covers — otherwise S3 rejects keys
+		// containing spaces / reserved characters with SignatureDoesNotMatch.
+		// Mirrors the signer's canonicalUri (path-style prefixes the bucket).
+		return variables.usePathStyle
+			? "/" & variables.signer.encodeKey(variables.bucket & "/" & local.k)
+			: "/" & variables.signer.encodeKey(local.k);
+	}
+
+	/**
+	 * Throw `Wheels.Storage.RequestFailed` unless the request returned a 2xx
+	 * status. `cfhttp` does not set `throwOnError`, so a DNS/connection failure
+	 * does not throw — it returns a non-numeric status (e.g. "Connection
+	 * Failure") whose `Val()` is 0. The `< 200` guard catches that path too;
+	 * without it a failed request would read as success and silently lose data.
+	 */
+	private void function $assertSuccess(required struct result, required string method, required string key) {
+		local.code = Val(arguments.result.statusCode);
+		if (local.code < 200 || local.code >= 300) {
+			throw(
+				type = "Wheels.Storage.RequestFailed",
+				message = "S3 #arguments.method# failed for [#arguments.key#]: #$statusDetail(arguments.result)#."
+			);
+		}
+	}
+
+	/**
+	 * Human-readable status for error messages — the raw status line, or an
+	 * explicit note when the request produced none (connection failure).
+	 */
+	private string function $statusDetail(required struct result) {
+		return Len(arguments.result.statusCode) ? arguments.result.statusCode : "no response (connection failure)";
 	}
 
 	/**
@@ -124,8 +165,11 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 				cfhttpparam(type = "body", value = arguments.body);
 			}
 		}
+		// Preserve the raw status line — callers extract the numeric code with
+		// Val() (0 for a non-numeric connection-failure status) and use the full
+		// string for diagnostics.
 		return {
-			statusCode = ListFirst(local.httpResult.statusCode ?: "0", " "),
+			statusCode = local.httpResult.statusCode ?: "",
 			fileContent = local.httpResult.fileContent ?: ""
 		};
 	}

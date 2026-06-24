@@ -147,6 +147,26 @@ component extends="wheels.WheelsTest" {
 					expect(disk.verifySignature(key = "a/b.png", expires = exp, signature = sig)).toBeFalse();
 				});
 
+				it("binds contentDisposition into the signed-url token", function() {
+					var signed = disk.signedUrl(key = "a/b.png", expiresIn = 600, contentDisposition = "attachment; filename=safe.png");
+					var qs = ListLast(signed, "?");
+					var sig = ReReplace(qs, ".*signature=([a-f0-9]+).*", "\1");
+					var exp = Val(ReReplace(qs, ".*expires=([0-9]+).*", "\1"));
+
+					// Verifying with the same disposition succeeds...
+					expect(disk.verifySignature(key = "a/b.png", expires = exp, signature = sig, contentDisposition = "attachment; filename=safe.png")).toBeTrue();
+					// ...but altering the disposition a holder was granted must invalidate the token.
+					expect(disk.verifySignature(key = "a/b.png", expires = exp, signature = sig, contentDisposition = "attachment; filename=evil.exe")).toBeFalse();
+				});
+
+				it("rejects a wrong-length signature without erroring", function() {
+					var signed = disk.signedUrl(key = "a/b.png", expiresIn = 600);
+					var qs = ListLast(signed, "?");
+					var exp = Val(ReReplace(qs, ".*expires=([0-9]+).*", "\1"));
+					// A truncated token must compare false, never throw (length-mismatch path).
+					expect(disk.verifySignature(key = "a/b.png", expires = exp, signature = "deadbeef")).toBeFalse();
+				});
+
 				it("requires a signingKey to produce a signed url", function() {
 					var unsigned = new wheels.storage.drivers.LocalDisk(config = {root = ctx.root, urlPrefix = "/u"});
 					expect(function() {
@@ -180,6 +200,15 @@ component extends="wheels.WheelsTest" {
 					expect(s3.url("avatars/1.png")).toBe("https://myapp-prod.s3.us-east-1.amazonaws.com/avatars/1.png");
 				});
 
+				it("rfc3986-encodes spaces in the public url so it matches the signed wire path", function() {
+					// The signer signs the encoded canonical path, but the request URL
+					// and public url are built from the raw key. They must use the same
+					// encoding or S3 returns SignatureDoesNotMatch for keys containing
+					// spaces / reserved characters.
+					expect(s3.url("my docs/q3 report.pdf"))
+						.toBe("https://myapp-prod.s3.us-east-1.amazonaws.com/my%20docs/q3%20report.pdf");
+				});
+
 				it("delegates signedUrl to the SigV4 presigner", function() {
 					var presigned = s3.signedUrl(key = "avatars/1.png", expiresIn = 120);
 					expect(presigned).toInclude("https://myapp-prod.s3.us-east-1.amazonaws.com/avatars/1.png?");
@@ -192,6 +221,51 @@ component extends="wheels.WheelsTest" {
 					expect(function() {
 						new wheels.storage.drivers.S3Disk(config = {bucket = "b", region = "us-east-1"});
 					}).toThrow("Wheels.Storage.InvalidConfiguration");
+				});
+
+			});
+
+			describe("S3Disk request failures", function() {
+
+				// Point the disk at a closed local port so every request hits the
+				// cfhttp connection-failure path — hermetic and fast (no DNS, no
+				// external network; the TCP connect is refused immediately). cfhttp
+				// does not set throwOnError, so a failed request returns a
+				// non-numeric status whose Val() is 0. The driver MUST treat that as
+				// a failure, never as a stored/served object (silent data loss).
+				var s3down = "";
+				beforeEach(function() {
+					s3down = new wheels.storage.drivers.S3Disk(config = {
+						bucket = "myapp",
+						region = "us-east-1",
+						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
+						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+						endpoint = "127.0.0.1:1"
+					});
+				});
+
+				it("throws instead of silently succeeding when put() cannot reach S3", function() {
+					expect(function() {
+						s3down.put(key = "x.txt", content = "data");
+					}).toThrow("Wheels.Storage.RequestFailed");
+				});
+
+				it("throws instead of returning a bogus body when get() cannot reach S3", function() {
+					expect(function() {
+						s3down.get(key = "x.txt");
+					}).toThrow("Wheels.Storage.RequestFailed");
+				});
+
+				it("throws instead of reporting existence when exists() cannot reach S3", function() {
+					expect(function() {
+						s3down.exists(key = "x.txt");
+					}).toThrow("Wheels.Storage.RequestFailed");
+				});
+
+				it("throws instead of reporting a successful delete when delete() cannot reach S3", function() {
+					expect(function() {
+						s3down.delete(key = "x.txt");
+					}).toThrow("Wheels.Storage.RequestFailed");
 				});
 
 			});
