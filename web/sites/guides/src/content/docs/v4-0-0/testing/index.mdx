@@ -31,6 +31,10 @@ Every test in a Wheels app is a CFC under `tests/specs/`, grouped by what it exe
 | Functional tests | `tests/specs/functional/` | Single-feature end-to-end — middleware + route + filter + action + view |
 | Browser tests | `tests/specs/browser/` | Full UI flows driven by Playwright — JavaScript, Turbo, form submission |
 
+<Aside>
+`wheels new` scaffolds `tests/specs/controllers/`, `tests/specs/functional/`, and `tests/specs/models/`. Create `tests/specs/view/` and `tests/specs/browser/` yourself when you add those kinds of tests.
+</Aside>
+
 Model and controller tests are the bulk of a healthy suite. Integration tests cover journeys that span multiple actions and users. Functional tests verify one feature end-to-end through the full request pipeline. Browser tests cover what only exists in the browser — JavaScript-driven UI, Turbo Frame updates, anything where the server's response alone doesn't tell you whether the feature works.
 
 ## What a WheelsTest spec looks like
@@ -91,7 +95,7 @@ Four files drive your test setup. Knowing what each one does saves a lot of head
 
 | File | What it does |
 |------|--------------|
-| `tests/TestRunner.cfc` | Sets up shared state. Runs before and after the whole suite. |
+| `tests/runner.cfm` | Entry point for `/wheels/app/tests` and `wheels test`. Customise here for pre-test bootstrap — the built-in app runner handles the rest. |
 | `tests/populate.cfm` | Seeds test data. Runs **once per test run**, not per spec. |
 | `tests/_assets/models/` | Test-only models, often using `table()` to map to test tables. |
 | `tests/specs/<category>/` | Where your actual specs live. |
