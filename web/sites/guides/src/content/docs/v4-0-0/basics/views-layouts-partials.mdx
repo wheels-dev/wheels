@@ -140,7 +140,8 @@ Wheels 4.0 form helpers escape their input by default (see [Forms and Form Helpe
 
 The helpers you'll reach for most often in view code:
 
-- `linkTo(route=..., key=..., text=..., class=...)` — renders an `<a>` tag with the URL filled in from a named route.
+- `linkTo(route=..., key=..., text=..., class=...)` — renders an `<a>` tag with the URL filled in from a named route. `class`, `id`, and other HTML attributes pass straight through onto the anchor.
+- `buttonTo(route=..., key=..., text=..., method="delete")` — renders a `<form>` wrapping a single submit button. Reach for it when an action must POST/PUT/PATCH/DELETE rather than GET (e.g. a "Delete" button). Because the button lives *inside* a form, attributes for the **button itself** are prefixed with `input` — use `inputClass`, `inputId`, `inputRel`, **not** `class`/`id`, e.g. `buttonTo(text="Delete", route="post", key=post.id, method="delete", inputClass="btn btn-danger")`. Unprefixed `class`/`id` land on the wrapping `<form>`. (`buttonTo` is the only link helper with this split — siblings like `linkTo` take `class`/`id` directly.)
 - `urlFor(route=..., key=...)` — returns just the URL string. Use when you need the URL outside an anchor (JavaScript, form action, `Location:` header).
 - `imageTag("logo.png", alt="Logo")` — renders `<img>` with the path resolved against `public/images/`.
 - `styleSheetLinkTag("app.css")` — renders `<link rel="stylesheet">` against `public/stylesheets/`.
