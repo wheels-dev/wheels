@@ -161,7 +161,6 @@ function config() {
 // Opt a select=false property back into one finder (additive — base columns still selected)
 user = model("User").findOne(includeCalculated="fullName");
 order = model("Order").findAll(includeCalculated="orderTotal,shippingCost");
-```
 
 // Method-based calculated property
 function displayName() {
