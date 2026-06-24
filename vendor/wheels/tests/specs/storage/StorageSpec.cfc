@@ -240,7 +240,8 @@ component extends="wheels.WheelsTest" {
 						region = "us-east-1",
 						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
 						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-						endpoint = "127.0.0.1:1"
+						endpoint = "127.0.0.1:1",
+						timeout = 5
 					});
 				});
 

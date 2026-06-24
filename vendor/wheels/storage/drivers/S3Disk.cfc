@@ -12,7 +12,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 
 	/**
 	 * @config Disk config: { bucket, region, accessKeyId, secretAccessKey,
-	 *         visibility="private", endpoint="", usePathStyle=false }.
+	 *         visibility="private", endpoint="", usePathStyle=false, timeout=60 }.
 	 */
 	public S3Disk function init(required struct config) {
 		for (local.required in ["bucket", "region", "accessKeyId", "secretAccessKey"]) {
@@ -28,6 +28,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		variables.visibility = StructKeyExists(arguments.config, "visibility") ? arguments.config.visibility : "private";
 		variables.usePathStyle = StructKeyExists(arguments.config, "usePathStyle") ? arguments.config.usePathStyle : false;
 		variables.endpoint = StructKeyExists(arguments.config, "endpoint") ? arguments.config.endpoint : "";
+		variables.timeout = StructKeyExists(arguments.config, "timeout") ? arguments.config.timeout : 60;
 
 		variables.signer = new wheels.storage.S3Signer(
 			accessKeyId = arguments.config.accessKeyId,
@@ -154,7 +155,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		}
 
 		local.httpResult = "";
-		cfhttp(method = arguments.method, url = local.targetUrl, result = "local.httpResult", getAsBinary = (arguments.getAsBinary ? "yes" : "auto"), timeout = 60) {
+		cfhttp(method = arguments.method, url = local.targetUrl, result = "local.httpResult", getAsBinary = (arguments.getAsBinary ? "yes" : "auto"), timeout = variables.timeout) {
 			for (local.name in local.hdrs) {
 				cfhttpparam(type = "header", name = local.name, value = local.hdrs[local.name]);
 			}
