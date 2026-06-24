@@ -10,6 +10,7 @@ component {
 	 * @order Maps to the `ORDER` BY clause of the query. You do not need to specify the table name(s); Wheels will do that for you.
 	 * @group Maps to the `GROUP BY` clause of the query. You do not need to specify the table name(s); Wheels will do that for you.
 	 * @select Determines how the `SELECT` clause for the query used to return data will look. You can pass in a list of the properties (which map to columns) that you want returned from your table(s). If you don't set this argument at all, Wheels will select all properties from your table(s). If you specify a table name (e.g. `users.email`) or alias a column (e.g. `fn AS firstName`) in the list, then the entire list will be passed through unchanged and used in the `SELECT` clause of the query. By default, all column names in tables joined via the `include` argument will be prepended with the singular version of the included table name.
+	 * @includeCalculated List of calculated property names (declared via `property(name="...", sql="...", select=false)`) to additively opt into this finder's `SELECT` clause. Unlike `select`, this does not replace the default column list — the named calculated properties are merged on top of all default columns, so the rest of the record is still returned. Useful for pulling a `select=false` computed property back in on a single finder without spelling out every other column. Unknown names throw `Wheels.CalculatedPropertyNotFound` in `development`/`testing` and are ignored in `production`.
 	 * @distinct Whether to add the `DISTINCT` keyword to your `SELECT` clause. Wheels will, when necessary, add this automatically (when using pagination and a `hasMany` association is used in the `include` argument, to name one example).
 	 * @include Associations that should be included in the query using `INNER` or `LEFT OUTER` joins (which join type that is used depends on how the association has been set up in your model). If all included associations are set on the current model, you can specify them in a list (e.g. `department,addresses,emails`). You can build more complex include strings by using parentheses when the association is set on an included model, like `album(artist(genre))`, for example. These complex `include` strings only work when `returnAs` is set to `query` though.
 	 * @maxRows Maximum number of records to retrieve. Passed on to the `maxRows` `cfquery` attribute. The default, `-1`, means that all records will be retrieved.
@@ -32,6 +33,7 @@ component {
 		string order,
 		string group,
 		string select = "",
+		string includeCalculated = "",
 		boolean distinct = "false",
 		string include = "",
 		numeric maxRows = "-1",
@@ -214,7 +216,8 @@ component {
 					include = arguments.include,
 					includeSoftDeletes = arguments.includeSoftDeletes,
 					list = arguments.select,
-					returnAs = arguments.returnAs
+					returnAs = arguments.returnAs,
+					includeCalculated = arguments.includeCalculated
 				);
 				// Strip dialect quotes: $createSQLFieldList now quotes identifiers; the bare-identifier regex below requires unquoted input.
 				local.columns = variables.wheels.class.adapter.$stripIdentifierQuotes(local.columns);
@@ -247,7 +250,8 @@ component {
 						select = arguments.select,
 						include = arguments.include,
 						includeSoftDeletes = arguments.includeSoftDeletes,
-						returnAs = arguments.returnAs
+						returnAs = arguments.returnAs,
+						includeCalculated = arguments.includeCalculated
 					)
 				);
 				ArrayAppend(
@@ -407,6 +411,7 @@ component {
 	 *
 	 * @key Primary key value(s) of the record. Separate with comma if passing in multiple primary key values. Accepts a string, list, or a numeric value.
 	 * @select [see:findAll].
+	 * @includeCalculated [see:findAll].
 	 * @include [see:findAll].
 	 * @handle Handle to use for the query. This is used to set the name of the query in the debug output (which otherwise defaults to `userFindOneQuery` for example).
 	 * @cache [see:findAll].
@@ -420,6 +425,7 @@ component {
 	public any function findByKey(
 		required any key,
 		string select = "",
+		string includeCalculated = "",
 		string include = "",
 		string handle = "query",
 		any cache = "",
@@ -457,6 +463,7 @@ component {
 	 * @where [see:findAll].
 	 * @order [see:findAll].
 	 * @select [see:findAll].
+	 * @includeCalculated [see:findAll].
 	 * @include [see:findAll].
 	 * @handle [see:findByKey].
 	 * @cache [see:findAll].
@@ -471,6 +478,7 @@ component {
 		string where = "",
 		string order = "",
 		string select = "",
+		string includeCalculated = "",
 		string include = "",
 		string handle = "query",
 		any cache = "",
