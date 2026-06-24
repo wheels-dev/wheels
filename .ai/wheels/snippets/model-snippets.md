@@ -151,9 +151,17 @@ function recent(days=30) {
 ## Calculated Properties
 ```cfm
 function config() {
-    // SQL-based calculated property
+    // SQL-based calculated property — included in every SELECT by default
     property(name="orderTotal", sql="(SELECT SUM(amount) FROM order_items WHERE order_id = orders.id)");
+
+    // Keep off the hot path with select=false; opt in per-call with includeCalculated
+    property(name="fullName", sql="firstName || ' ' || lastName", select=false);
 }
+
+// Opt a select=false property back into one finder (additive — base columns still selected)
+user = model("User").findOne(includeCalculated="fullName");
+order = model("Order").findAll(includeCalculated="orderTotal,shippingCost");
+```
 
 // Method-based calculated property
 function displayName() {

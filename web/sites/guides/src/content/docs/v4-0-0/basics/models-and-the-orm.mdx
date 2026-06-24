@@ -65,6 +65,26 @@ component extends="Model" {
 
 Composite keys are also supported — pass a comma-separated list to `setPrimaryKey("tenantId,entryId")`. Most apps never need them.
 
+## Calculated SQL properties
+
+A `property()` declaration can carry a `sql` expression that Wheels evaluates as a computed `SELECT` column. Pass `select=false` to keep the property off the default `SELECT` (reducing hot-path cost), then opt it back into a specific finder with `includeCalculated`:
+
+```cfm
+component extends="Model" {
+    function config() {
+        property(name="fullName", sql="firstName || ' ' || lastName", select=false);
+    }
+}
+
+// Additive — all base columns are still selected; fullName is merged on top
+user = model("User").findOne(includeCalculated="fullName");
+
+// Comma-list for multiple properties; composes with other finder arguments
+users = model("User").active().findAll(include="role", includeCalculated="fullName", page=1, perPage=25);
+```
+
+Unknown names passed to `includeCalculated` throw `Wheels.CalculatedPropertyNotFound` in `development` and `testing`, and are silently ignored in `production`.
+
 ## Finders
 
 The finders read from the database. Every finder below is a method on the class, called via `model("Name")`. The calls return different shapes depending on whether you're loading many, one, or just asking a question.

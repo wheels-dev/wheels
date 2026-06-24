@@ -280,6 +280,9 @@ component extends="Model" {
         // Callbacks
         beforeSave("sanitizeInput");
 
+        // Calculated SQL properties — select=false keeps them off the default SELECT (hot path)
+        property(name="fullName", sql="firstName || ' ' || lastName", select=false);
+
         // Query scopes — reusable, composable query fragments
         scope(name="active", where="status = 'active'");
         scope(name="recent", order="createdAt DESC");
@@ -299,6 +302,7 @@ component extends="Model" {
 Finders: `model("User").findAll()`, `findOne(where="...")`, `findByKey(params.key)`.
 Create: `model("User").new(params.user).save()`, or `model("User").create(params.user)`.
 Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
+Opt a `select=false` calculated property into one call (additive): `findAll(includeCalculated="fullName")`. Unknown names throw `Wheels.CalculatedPropertyNotFound` in dev/testing.
 
 ### Scopes / Enums / Builder / Batch
 
