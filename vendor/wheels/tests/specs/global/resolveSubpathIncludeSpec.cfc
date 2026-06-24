@@ -69,6 +69,20 @@ component extends="wheels.WheelsTest" {
 				).toBe("/wheelsproject1/wheels/tests/app-runner.cfm")
 			})
 
+			it("uses application.wheels.webPath when no webPath argument is passed (the production call shape)", () => {
+				// The shipped runner template (cli/lucli/templates/app/tests/runner.cfm)
+				// calls this with NO webPath argument, so the fallback branch that reads
+				// application.wheels.webPath is the only path real callers take. Pin it by
+				// asserting the no-arg result equals an explicit call passing the current
+				// webPath — this exercises the previously-uncovered branch without mutating
+				// global app state.
+				expect(
+					g.$resolveSubpathInclude(template = "/wheels/tests/app-runner.cfm")
+				).toBe(
+					g.$resolveSubpathInclude(template = "/wheels/tests/app-runner.cfm", webPath = application.wheels.webPath)
+				)
+			})
+
 		})
 	}
 }
