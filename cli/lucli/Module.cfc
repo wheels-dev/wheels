@@ -6191,7 +6191,20 @@ component extends="modules.BaseModule" {
 
 		fileWrite(
 			targetDir & "/app/views/main/index.cfm",
-			'<h1>Welcome to ' & appName & '</h1>' & nl & '<p>Your Wheels application is running. Edit this file at app/views/main/index.cfm</p>' & nl
+			(
+				'<cfoutput>' & nl &
+				'<h1>Welcome to ' & appName & '</h1>' & nl &
+				'<p>Your <strong>Wheels ##get("version")##</strong> application is running on ##application.wheels.serverName## with ##application.wheels.dataSourceName## (##get("environment")##).</p>' & nl &
+				nl &
+				'<h2>Next steps</h2>' & nl &
+				'<ul>' & nl &
+				tab & '<li><code>wheels g scaffold Post title content:text</code> &mdash; generate a model, controller, and views</li>' & nl &
+				tab & '<li><code>wheels migrate latest</code> &mdash; build the database schema</li>' & nl &
+				tab & '<li><code>wheels test</code> &mdash; run the test suite</li>' & nl &
+				'</ul>' & nl &
+				'<p><small>This page lives at <code>app/views/main/index.cfm</code>; routing is in <code>config/routes.cfm</code>.</small></p>' & nl &
+				'</cfoutput>' & nl
+			)
 		);
 		printCreated(appName & "/app/views/main/index.cfm");
 
