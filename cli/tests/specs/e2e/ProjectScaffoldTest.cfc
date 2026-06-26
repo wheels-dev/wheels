@@ -214,6 +214,16 @@ component extends="testbox.system.BaseSpec" {
 
 					var content = fileRead(path);
 					expect(content).toInclude("Welcome to testapp");
+					// Runtime expressions must survive generation as single-hash
+					// CFML (## -> # in the fileWrite string), not be evaluated at
+					// scaffold time. Locks in the escaping shared with Module.cfc.
+					expect(content).toInclude('##get("version")##');
+					expect(content).toInclude('##application.wheels.serverName##');
+					expect(content).toInclude("<cfoutput>");
+					expect(content).toInclude("Next steps");
+					expect(content).toInclude("wheels g scaffold");
+					expect(content).toInclude("wheels migrate latest");
+					expect(content).toInclude("wheels test");
 				});
 
 				it("generates base Controller.cfc in app/controllers/", function() {
@@ -325,7 +335,27 @@ component extends="testbox.system.BaseSpec" {
 
 		fileWrite(
 			arguments.targetDir & "/app/views/main/index.cfm",
-			'<h1>Welcome to ' & arguments.appName & '</h1>' & nl & '<p>Your Wheels application is running. Edit this file at app/views/main/index.cfm</p>' & nl
+			(
+				'<!---' & nl &
+				tab & 'Starter home page: replace before production.' & nl &
+				tab & 'This development/first-run landing page surfaces environment' & nl &
+				tab & 'details (Wheels version, engine, database, environment) and CLI' & nl &
+				tab & 'commands. Deploy a real homepage so those are not exposed to' & nl &
+				tab & 'anonymous visitors.' & nl &
+				'--->' & nl &
+				'<cfoutput>' & nl &
+				'<h1>Welcome to ' & arguments.appName & '</h1>' & nl &
+				'<p>Your <strong>Wheels ##get("version")##</strong> application is running on ##application.wheels.serverName## with ##application.wheels.dataSourceName## (##get("environment")##).</p>' & nl &
+				nl &
+				'<h2>Next steps</h2>' & nl &
+				'<ul>' & nl &
+				tab & '<li><code>wheels g scaffold Post title content:text</code> &mdash; generate a model, controller, and views</li>' & nl &
+				tab & '<li><code>wheels migrate latest</code> &mdash; build the database schema</li>' & nl &
+				tab & '<li><code>wheels test</code> &mdash; run the test suite</li>' & nl &
+				'</ul>' & nl &
+				'<p><small>This page lives at <code>app/views/main/index.cfm</code>; routing is in <code>config/routes.cfm</code>.</small></p>' & nl &
+				'</cfoutput>' & nl
+			)
 		);
 	}
 
