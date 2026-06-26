@@ -6192,6 +6192,13 @@ component extends="modules.BaseModule" {
 		fileWrite(
 			targetDir & "/app/views/main/index.cfm",
 			(
+				'<!---' & nl &
+				tab & 'Starter home page: replace before production.' & nl &
+				tab & 'This development/first-run landing page surfaces environment' & nl &
+				tab & 'details (Wheels version, engine, database, environment) and CLI' & nl &
+				tab & 'commands. Deploy a real homepage so those are not exposed to' & nl &
+				tab & 'anonymous visitors.' & nl &
+				'--->' & nl &
 				'<cfoutput>' & nl &
 				'<h1>Welcome to ' & appName & '</h1>' & nl &
 				'<p>Your <strong>Wheels ##get("version")##</strong> application is running on ##application.wheels.serverName## with ##application.wheels.dataSourceName## (##get("environment")##).</p>' & nl &
