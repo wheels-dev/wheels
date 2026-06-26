@@ -30,7 +30,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	/**
 	 * Defense-in-depth: unless the current environment is `development`,
 	 * short-circuit the handler with a 404 response before any view is
-	 * included. Called as the first statement of every non-`index` handler in
+	 * included. Called as the first statement of every handler in
 	 * this component.
 	 */
 	public void function $blockInProduction() {
@@ -356,6 +356,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	This is just a proof of concept
 	*/
 	function index() {
+		$blockInProduction();
 		include "/wheels/public/views/congratulations.cfm";
 		return "";
 	}
