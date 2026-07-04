@@ -29,11 +29,11 @@ Browsers will not submit file content unless the form is encoded as `multipart/f
 
 ```cfm {test:compile} title="app/views/users/new.cfm"
 <cfoutput>
-    ##startFormTag(route="users", method="post", multipart=true)##
-        ##textField(objectName="user", property="firstName")##
-        ##fileField(objectName="user", property="avatar")##
+    #startFormTag(route="users", method="post", multipart=true)#
+        #textField(objectName="user", property="firstName")#
+        #fileField(objectName="user", property="avatar")#
         <button type="submit">Upload</button>
-    ##endFormTag()##
+    #endFormTag()#
 </cfoutput>
 ```
 
@@ -48,7 +48,10 @@ component extends="Controller" {
     function create() {
         user = model("User").new(params.user);
 
-        local.uploadDir = expandPath("/var/uploads/tmp/");
+        // An absolute filesystem path outside the web root (adjust per OS).
+        // Don't wrap it in expandPath() — that resolves leading-slash paths
+        // against the web root, which puts unvalidated uploads inside it.
+        local.uploadDir = "/var/uploads/tmp/";
         cffile(
             action="upload",
             fileField="user[avatar]",
@@ -125,7 +128,7 @@ component extends="Controller" {
     function create() {
         user = model("User").new(params.user);
 
-        local.tmpDir = expandPath("/var/uploads/tmp/");
+        local.tmpDir = "/var/uploads/tmp/"; // outside the web root — see the caution above
         cffile(action="upload", fileField="user[avatar]", destination=local.tmpDir, nameconflict="makeunique");
         user.avatarTempPath = local.tmpDir & cffile.serverFile;
         user.avatarClientName = cffile.clientFile;
@@ -138,14 +141,14 @@ component extends="Controller" {
             return;
         }
 
-        local.finalDir = expandPath("/var/uploads/avatars/##user.id##/");
+        local.finalDir = "/var/uploads/avatars/#user.id#/";
         if (!directoryExists(local.finalDir)) {
             directoryCreate(local.finalDir);
         }
         local.ext = LCase(ListLast(user.avatarClientName, "."));
         local.finalName = "avatar." & local.ext;
         fileMove(user.avatarTempPath, local.finalDir & local.finalName);
-        user.update(avatarPath="avatars/##user.id##/##local.finalName##");
+        user.update(avatarPath="avatars/#user.id#/#local.finalName#");
 
         redirectTo(route="user", key=user.id);
     }
@@ -181,8 +184,8 @@ component extends="Controller" {
         }
 
         sendFile(
-            file="invoices/##variables.invoice.id##.pdf",
-            name="invoice-##variables.invoice.number##.pdf"
+            file="invoices/#variables.invoice.id#.pdf",
+            name="invoice-#variables.invoice.number#.pdf"
         );
     }
 

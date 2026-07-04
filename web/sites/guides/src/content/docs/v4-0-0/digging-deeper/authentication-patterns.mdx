@@ -87,7 +87,8 @@ component extends="Controller" {
     }
 
     function create() {
-        user = model("User").findOne(where="email = :email", values={email: LCase(Trim(params.email ?: ""))});
+        // Dynamic finder — binds the value for you; never interpolate params into where=
+        user = model("User").findOneByEmail(LCase(Trim(params.email ?: "")));
         if (IsObject(user) && user.authenticate(params.password ?: "")) {
             service("sessionStrategy").login(principal={id: user.id, email: user.email});
             redirectTo(route="posts", success="Welcome back.");
@@ -193,13 +194,18 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
     var auth = service("authenticator");
 
     if (!auth.hasStrategy("token")) {
-        var tokenStrategy = new wheels.auth.TokenStrategy(validator=function(token) {
-            var apiKey = model("ApiKey").findOne(where="token = :token AND revokedAt IS NULL", values={token: arguments.token});
+        // Hoist the closure into a variable first — an inline function literal as a
+        // constructor named argument crashes Adobe ColdFusion's compiler.
+        var tokenValidator = function(token) {
+            // Dynamic finder binds the token value; the extra where= condition is
+            // merged in with AND.
+            var apiKey = model("ApiKey").findOneByToken(value=arguments.token, where="revokedAt IS NULL");
             if (IsObject(apiKey)) {
                 return {id: apiKey.userId, role: apiKey.role, source: "api-key"};
             }
             return false;
-        });
+        };
+        var tokenStrategy = new wheels.auth.TokenStrategy(validator=tokenValidator);
         auth.registerStrategy(name="token", strategy=tokenStrategy);
     }
 }
@@ -231,7 +237,7 @@ component extends="Controller" {
 
     function index() {
         var result = service("authenticator").authenticate(request);
-        renderWith({items: model("Item").findAll(where="userId=:uid", values={uid: result.principal.id})});
+        renderWith({items: model("Item").findAllByUserId(result.principal.id)});
     }
 
     private function requireToken() {
@@ -276,7 +282,7 @@ component extends="Controller" {
     }
 
     function create() {
-        var user = model("User").findOne(where="email = :email", values={email: params.email ?: ""});
+        var user = model("User").findOneByEmail(params.email ?: "");
         if (IsObject(user) && user.authenticate(params.password ?: "")) {
             var jwtService = new wheels.auth.JwtService(secretKey=env("JWT_SECRET"));
             var token = jwtService.encode({sub: user.id, email: user.email, role: user.role});

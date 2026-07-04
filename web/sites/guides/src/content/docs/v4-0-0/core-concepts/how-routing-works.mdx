@@ -23,23 +23,23 @@ Routes are compiled at boot into an in-memory table, and the router resolves eac
 1. **Static routes first.** Routes whose patterns contain no placeholders (`/posts/featured`, `/about`) live in an exact-path index and are checked with an O(1) lookup before anything else. A literal path always beats a placeholder route, no matter where either was declared. If two routes register the same static pattern, the first one declared wins.
 2. **Placeholder routes in declaration order.** Everything that isn't a static match falls through to an ordered top-to-bottom scan of the placeholder routes. The first route whose HTTP method and URL pattern both match wins — even if a more specific placeholder route appears later. There is no scoring, no backtracking, no "best fit."
 
-The static-first step means declaration order does **not** decide static-vs-placeholder conflicts — only placeholder-vs-placeholder ones and ties between identical static patterns. These are the intended semantics, settled in [#3073](https://github.com/wheels-dev/wheels/issues/3073) and pinned by the framework test suite: a literal path always routes to its literal route, so the classic bug where an earlier `/posts/:key` steals `/posts/featured` cannot happen in Wheels.
+The static-first step means declaration order does **not** decide static-vs-placeholder conflicts — only placeholder-vs-placeholder ones and ties between identical static patterns. These are the intended semantics, settled in [#3073](https://github.com/wheels-dev/wheels/issues/3073) and pinned by the framework test suite: a literal path always routes to its literal route, so the classic bug where an earlier `/posts/[key]` steals `/posts/featured` cannot happen in Wheels.
 
 Resource and namespaced declarations are not matched as a unit. They expand at boot time into plain routes that sit in the same table as your hand-written `.get()` and `.post()` calls. A `.resources("posts")` registers an entry per REST action, in a fixed order. The wildcard route catches anything that falls through and maps `/controller/action` conventionally — a legacy pattern kept for upgrade paths. Named routes are the preferred way to wire URLs.
 
 ## What `.resources("posts")` expands to
 
-One call generates the seven REST actions below. Each row is also registered with a `.[format]` twin (`/posts.json`, `/posts/:key.xml`, …) for content negotiation, so the actual table holds twice as many rows. The names in the right column are what you pass to `linkTo`, `redirectTo`, and `urlFor`.
+One call generates the seven REST actions below. Each row is also registered with a `.[format]` twin (`/posts.json`, `/posts/[key].xml`, …) for content negotiation, so the actual table holds twice as many rows. The names in the right column are what you pass to `linkTo`, `redirectTo`, and `urlFor`.
 
 | HTTP method | Path | Controller#action | Named route |
 |-------------|------|-------------------|-------------|
 | GET | `/posts` | `posts#index` | `posts` |
 | GET | `/posts/new` | `posts#new` | `newPost` |
 | POST | `/posts` | `posts#create` | (same name `posts`) |
-| GET | `/posts/:key` | `posts#show` | `post` |
-| GET | `/posts/:key/edit` | `posts#edit` | `editPost` |
-| PATCH/PUT | `/posts/:key` | `posts#update` | (same name `post`) |
-| DELETE | `/posts/:key` | `posts#delete` | (same name `post`) |
+| GET | `/posts/[key]` | `posts#show` | `post` |
+| GET | `/posts/[key]/edit` | `posts#edit` | `editPost` |
+| PATCH/PUT | `/posts/[key]` | `posts#update` | (same name `post`) |
+| DELETE | `/posts/[key]` | `posts#delete` | (same name `post`) |
 
 Two routes can share a named route because the helpers disambiguate by HTTP verb. `linkTo(route="post", key=post.id)` renders a GET link to `show`; `buttonTo(route="post", key=post.id, method="delete")` renders a DELETE button against the same name. You look up by name, the helper picks the verb.
 
@@ -81,7 +81,7 @@ Rename the resource once in `config/routes.cfm` and every caller updates. That i
 
 ## See also
 
-- [The Request Lifecycle](/v4-0-0/core-concepts/request-lifecycle/) — routing is stage 2
-- [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/) — runs before the router
+- [The Request Lifecycle](/v4-0-0/core-concepts/request-lifecycle/) — routing is the first stage of dispatch
+- [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/) — runs after the route is matched, before the controller
 - [Routing](/v4-0-0/basics/routing/) — hands-on how-to
 - [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/) — where route params land

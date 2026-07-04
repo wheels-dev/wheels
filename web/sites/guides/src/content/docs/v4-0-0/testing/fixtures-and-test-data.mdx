@@ -94,13 +94,13 @@ runSql("
 // Seed known fixtures
 runSql("
     INSERT INTO users (email, passwordHash, createdAt, updatedAt)
-    VALUES ('alice@example.com', 'hash', NOW(), NOW()),
-           ('bob@example.com', 'hash', NOW(), NOW())
+    VALUES ('alice@example.com', 'hash', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+           ('bob@example.com', 'hash', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ");
 
 runSql("
     INSERT INTO posts (userId, title, body, status, createdAt, updatedAt)
-    VALUES (1, 'Welcome', 'First post', 'published', NOW(), NOW())
+    VALUES (1, 'Welcome', 'First post', 'published', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ");
 </cfscript>
 ```
@@ -215,7 +215,7 @@ If your test database is large enough that dropping tables is disruptive (say, a
 
 ## Cross-engine considerations
 
-`populate.cfm` runs against whatever database the test run targets. `NOW()` is portable across MySQL, PostgreSQL, SQL Server, H2, and SQLite. `CURRENT_TIMESTAMP` is not fully portable — SQL Server and Oracle treat it slightly differently. Identity-column syntax diverges more sharply: `AUTOINCREMENT` in SQLite, `SERIAL` in PostgreSQL, `IDENTITY(1,1)` in SQL Server, `AUTO_INCREMENT` in MySQL.
+`populate.cfm` runs against whatever database the test run targets. Use `CURRENT_TIMESTAMP` for seeded timestamps — it's ANSI SQL and works on MySQL, PostgreSQL, SQL Server, H2, and SQLite. `NOW()` is not portable: it doesn't exist on SQLite (the inner-loop reference platform) or SQL Server, and no Wheels adapter rewrites it for you. Identity-column syntax diverges more sharply: `AUTOINCREMENT` in SQLite, `SERIAL` in PostgreSQL, `IDENTITY(1,1)` in SQL Server, `AUTO_INCREMENT` in MySQL.
 
 Target your reference platform. Wheels 4.0's inner-loop tests run on SQLite, so SQLite-flavoured DDL in `populate.cfm` is fine for local development. When you need a shared populate that works across multiple engines, look at how the framework's own `vendor/wheels/tests/populate.cfm` detects the database type via `<cfdbinfo>` and branches on `local.db` to pick the right identity-column syntax.
 
@@ -223,7 +223,7 @@ Target your reference platform. Wheels 4.0's inner-loop tests run on SQLite, so 
 
 - One `populate.cfm` per app — shared across every test category
 - Drop tables in reverse dependency order (children first, parents last)
-- Seed timestamps with `NOW()` for cross-engine safety
+- Seed timestamps with `CURRENT_TIMESTAMP` for cross-engine safety (`NOW()` fails on SQLite and SQL Server)
 - Use factory functions for per-spec data that varies; keep populate for the stable baseline
 - Transaction-wrap specs that would otherwise leak state (`transaction { ... transaction action="rollback"; }`)
 - Put test-only models at `tests/_assets/models/` and set `modelPath` in the test bootstrap

@@ -46,9 +46,9 @@ set(middleware = [
         strategy = "custom",
         resolver = function(req) {
             local.subdomain = ListFirst(cgi.server_name, ".");
-            local.tenant = model("Tenant").findOne(
-                where = "subdomain='##local.subdomain##'"
-            );
+            // Dynamic finder — quotes the hostname-derived value for you. Never
+            // interpolate request input into a where= string.
+            local.tenant = model("Tenant").findOneBySubdomain(local.subdomain);
             if (!IsObject(local.tenant)) {
                 return {};
             }
@@ -79,9 +79,7 @@ set(middleware = [
         headerName = "X-Tenant-ID",
         resolver = function(req) {
             local.tenantId = req.$tenantHeaderValue ?: "";
-            local.tenant = model("Tenant").findOne(
-                where = "externalId='##local.tenantId##'"
-            );
+            local.tenant = model("Tenant").findOneByExternalId(local.tenantId);
             if (!IsObject(local.tenant)) {
                 return {};
             }
@@ -105,9 +103,7 @@ set(middleware = [
         strategy = "subdomain",
         resolver = function(req) {
             local.subdomain = req.$tenantSubdomain ?: "";
-            local.tenant = model("Tenant").findOne(
-                where = "subdomain='##local.subdomain##'"
-            );
+            local.tenant = model("Tenant").findOneBySubdomain(local.subdomain);
             if (!IsObject(local.tenant)) {
                 return {};
             }
@@ -125,7 +121,7 @@ The strategy determines *when* the resolver fires and what's extracted from the 
 If you're running one database with a `tenantId` column on every tenant-owned table, add a `currentTenant` scope to each model and chain it into every finder.
 
 <Aside type="caution">
-  **Use a dynamic scope handler, not a static `where=` string.** Static scope strings are interpolated at `config()` time — before any request exists. A scope like `where="tenantId = ##request.wheels.tenant.id##"` resolves to a fixed `tenantId = 0` forever. Every query would return tenant 0's data. This is a data-leak pitfall; the dynamic-handler form below evaluates per request.
+  **Use a dynamic scope handler, not a static `where=` string.** Static scope strings are interpolated at `config()` time — before any request exists. A scope like `where="tenantId = #request.wheels.tenant.id#"` resolves to a fixed `tenantId = 0` forever. Every query would return tenant 0's data. This is a data-leak pitfall; the dynamic-handler form below evaluates per request.
 </Aside>
 
 ```cfm {test:compile} title="app/models/Post.cfc"
@@ -239,9 +235,7 @@ set(middleware = [
     new wheels.middleware.TenantResolver(
         strategy = "subdomain",
         resolver = function(req) {
-            local.tenant = model("Tenant").findOne(
-                where = "subdomain='##req.$tenantSubdomain##'"
-            );
+            local.tenant = model("Tenant").findOneBySubdomain(req.$tenantSubdomain ?: "");
             if (!IsObject(local.tenant)) {
                 return {};
             }
@@ -310,7 +304,7 @@ component extends="Controller" {
 }
 ```
 
-For fragment caches and query caches, build the tenant ID into the key yourself: `cache(key="posts-index-##tenant().id##", time=10)`. Fragment and query cache keys are plain strings — string interpolation at call time picks up the current tenant.
+For fragment caches and query caches, build the tenant ID into the key yourself: `cache(key="posts-index-#tenant().id#", time=10)`. Fragment and query cache keys are plain strings — string interpolation at call time picks up the current tenant.
 
 ## Operational concerns
 
