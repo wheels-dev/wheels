@@ -31,7 +31,9 @@ function normalizeItem(item) {
 		return {
 			label: item.label,
 			items: children,
-			collapsed: true,
+			// Nested groups default to collapsed; a sidebar JSON entry can opt out
+			// with "collapsed": false (e.g. the Start Here > Install Wheels subgroup).
+			collapsed: item.collapsed ?? true,
 		};
 	}
 	if (item.link) {
@@ -110,6 +112,16 @@ export default defineConfig({
 		// other doc in the tree; this redirect preserves the original ugly slug
 		// for any external bookmarks accumulated while it was live.
 		'/v3-0-0/upgrading/300-config-migration': '/v3-0-0/upgrading/3-0-0-config-migration/',
+		// Courtesy redirects for v4 paths that never existed but were linked from
+		// live guide pages (and thus may have been bookmarked or crawled while the
+		// links 404'd). The in-page links themselves are fixed at their sources;
+		// these keep any accumulated inbound links working. See
+		// GUIDES-RESTRUCTURE-PROPOSAL-2026-07-04.md §4.5 (Phase 1).
+		'/v4-0-0/security/csrf-protection': '/v4-0-0/deployment/security-hardening/',
+		'/v4-0-0/digging-deeper/security-hardening': '/v4-0-0/deployment/security-hardening/',
+		'/v4-0-0/digging-deeper/security/https-detection': '/v4-0-0/deployment/security-hardening/',
+		'/v4-0-0/configuration': '/v4-0-0/core-concepts/environments-and-configuration/',
+		'/v4-0-0/troubleshooting/cross-engine-compatibility': '/v4-0-0/contributing/coding-standards/',
 	},
 	integrations: [
 		starlight({
