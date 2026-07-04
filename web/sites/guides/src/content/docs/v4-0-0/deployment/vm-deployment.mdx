@@ -229,7 +229,7 @@ sudo certbot --nginx -d myapp.example.com
 Certbot edits the nginx config to wire the cert paths and installs a renewal timer. `sudo certbot renew --dry-run` verifies renewal works before the cert actually expires.
 
 <Aside type="note">
-  `X-Forwarded-Proto` is what tells Wheels the request came in over HTTPS even though Lucee itself is listening on plain HTTP inside the box — but the header alone isn't enough. Wheels ignores proxy headers unless you opt in with `set(trustProxyHeaders=true)` in `config/settings.cfm`; without that setting, `isSecure()`-style checks and protocol-aware redirects misfire even with the `proxy_set_header` line above in place. See [HTTPS Detection](/v4-0-0/digging-deeper/security/https-detection/).
+  `X-Forwarded-Proto` is what tells Wheels the request came in over HTTPS even though Lucee itself is listening on plain HTTP inside the box — but the header alone isn't enough. Wheels ignores proxy headers unless you opt in with `set(trustProxyHeaders=true)` in `config/settings.cfm`; without that setting, `isSecure()`-style checks and protocol-aware redirects misfire even with the `proxy_set_header` line above in place. See [Trusted proxies and client IP](/v4-0-0/deployment/security-hardening/#trusted-proxies-and-client-ip).
 </Aside>
 
 ## Firewall

@@ -5,8 +5,15 @@
     "items": [
       { "label": "Welcome to Wheels", "link": "/v4-0-0/start-here/welcome/" },
       { "label": "Why Wheels?", "link": "/v4-0-0/start-here/why-wheels/" },
-      { "label": "Installing Wheels", "link": "/v4-0-0/start-here/installing/" },
-      { "label": "Installing with CommandBox", "link": "/v4-0-0/start-here/installing-with-commandbox/" },
+      {
+        "label": "Install Wheels",
+        "collapsed": false,
+        "items": [
+          { "label": "Installing Wheels", "link": "/v4-0-0/start-here/installing/" },
+          { "label": "Installing with CommandBox", "link": "/v4-0-0/start-here/installing-with-commandbox/" },
+          { "label": "CFML Engines", "link": "/v4-0-0/start-here/cfml-engines/" }
+        ]
+      },
       { "label": "Your First 15 Minutes", "link": "/v4-0-0/start-here/first-15-minutes/" },
       {
         "label": "Tutorial: Build a Blog",
@@ -22,6 +29,16 @@
           { "label": "8. Bonus: wheels-basecoat", "link": "/v4-0-0/start-here/tutorial/08-bonus-basecoat/" }
         ]
       }
+    ]
+  },
+  {
+    "label": "Upgrading & Releases",
+    "link": "/v4-0-0/upgrading/",
+    "items": [
+      { "label": "Upgrading from 3.x to 4.0", "link": "/v4-0-0/upgrading/3x-to-4x/" },
+      { "label": "Upgrading from 2.x to 3.x", "link": "/v4-0-0/upgrading/2x-to-3x/" },
+      { "label": "Release Channels", "link": "/v4-0-0/start-here/release-channels/" },
+      { "label": "Reading the Changelog", "link": "/v4-0-0/upgrading/changelog/" }
     ]
   },
   {
@@ -51,6 +68,7 @@
       { "label": "Associations", "link": "/v4-0-0/basics/associations/" },
       { "label": "Migrations", "link": "/v4-0-0/basics/migrations/" },
       { "label": "Seeding", "link": "/v4-0-0/basics/seeding/" },
+      { "label": "Shared Development Databases", "link": "/v4-0-0/basics/shared-development-databases/" },
       { "label": "Query Builder and Scopes", "link": "/v4-0-0/basics/query-builder-and-scopes/" },
       { "label": "Database and Multiple Datasources", "link": "/v4-0-0/basics/database-and-multiple-datasources/" }
     ]
@@ -73,7 +91,8 @@
       { "label": "Route Model Binding", "link": "/v4-0-0/digging-deeper/route-model-binding/" },
       { "label": "CORS", "link": "/v4-0-0/digging-deeper/cors/" },
       { "label": "Rate Limiting", "link": "/v4-0-0/digging-deeper/rate-limiting/" },
-      { "label": "Dependency Injection Usage", "link": "/v4-0-0/digging-deeper/dependency-injection-usage/" }
+      { "label": "Dependency Injection Usage", "link": "/v4-0-0/digging-deeper/dependency-injection-usage/" },
+      { "label": "Debug Panel", "link": "/v4-0-0/digging-deeper/debug-panel/" }
     ]
   },
   {
@@ -96,21 +115,43 @@
     "label": "Deployment & Operations",
     "link": "/v4-0-0/deployment/",
     "items": [
-      { "label": "Your First Deploy", "link": "/v4-0-0/deployment/first-deploy/" },
-      { "label": "deploy.yml Reference", "link": "/v4-0-0/deployment/config-reference/" },
-      { "label": "Accessories", "link": "/v4-0-0/deployment/accessories/" },
-      { "label": "Secrets", "link": "/v4-0-0/deployment/secrets/" },
-      { "label": "Hooks", "link": "/v4-0-0/deployment/hooks/" },
-      { "label": "Migrating from Kamal", "link": "/v4-0-0/deployment/migrating-from-kamal/" },
       { "label": "Production Configuration", "link": "/v4-0-0/deployment/production-config/" },
-      { "label": "Docker Deployment", "link": "/v4-0-0/deployment/docker-deployment/" },
-      { "label": "VM and Bare-metal Deployment", "link": "/v4-0-0/deployment/vm-deployment/" },
       { "label": "Security Hardening", "link": "/v4-0-0/deployment/security-hardening/" },
-      { "label": "Observability and Logging", "link": "/v4-0-0/deployment/observability-and-logging/" }
+      { "label": "Observability and Logging", "link": "/v4-0-0/deployment/observability-and-logging/" },
+      {
+        "label": "Deploy It Yourself (no CLI required)",
+        "collapsed": false,
+        "items": [
+          { "label": "Docker Deployment", "link": "/v4-0-0/deployment/docker-deployment/" },
+          { "label": "VM and Bare-metal Deployment", "link": "/v4-0-0/deployment/vm-deployment/" }
+        ]
+      },
+      {
+        "label": "wheels deploy (built-in deployer)",
+        "collapsed": false,
+        "items": [
+          { "label": "Your First Deploy", "link": "/v4-0-0/deployment/first-deploy/" },
+          { "label": "deploy.yml Reference", "link": "/v4-0-0/deployment/config-reference/" },
+          { "label": "Accessories", "link": "/v4-0-0/deployment/accessories/" },
+          { "label": "Secrets", "link": "/v4-0-0/deployment/secrets/" },
+          { "label": "Hooks", "link": "/v4-0-0/deployment/hooks/" },
+          { "label": "Migrating from Kamal", "link": "/v4-0-0/deployment/migrating-from-kamal/" },
+          { "label": "Architecture of wheels deploy", "link": "/v4-0-0/deployment/architecture/" }
+        ]
+      }
     ]
   },
   {
-    "label": "CLI Reference",
+    "label": "Contributing & Project",
+    "link": "/v4-0-0/contributing/",
+    "items": [
+      { "label": "Submitting Pull Requests", "link": "/v4-0-0/contributing/pull-requests/" },
+      { "label": "Coding Standards", "link": "/v4-0-0/contributing/coding-standards/" },
+      { "label": "Writing Documentation", "link": "/v4-0-0/contributing/writing-docs/" }
+    ]
+  },
+  {
+    "label": "wheels CLI Reference",
     "link": "/v4-0-0/command-line-tools/",
     "items": [
       { "label": "Installation", "link": "/v4-0-0/command-line-tools/installation/" },
@@ -143,7 +184,28 @@
         ]
       },
       {
-        "label": "Deploy Commands",
+        "label": "Packages Commands (generated reference)",
+        "link": "/v4-0-0/command-line-tools/commands/packages/",
+        "items": [
+          { "label": "packages list", "link": "/v4-0-0/command-line-tools/commands/packages/list/" },
+          { "label": "packages search", "link": "/v4-0-0/command-line-tools/commands/packages/search/" },
+          { "label": "packages show", "link": "/v4-0-0/command-line-tools/commands/packages/show/" },
+          { "label": "packages add", "link": "/v4-0-0/command-line-tools/commands/packages/install/" },
+          { "label": "packages update", "link": "/v4-0-0/command-line-tools/commands/packages/update/" },
+          { "label": "packages remove", "link": "/v4-0-0/command-line-tools/commands/packages/remove/" },
+          {
+            "label": "packages registry",
+            "link": "/v4-0-0/command-line-tools/commands/packages/registry/",
+            "collapsed": true,
+            "items": [
+              { "label": "registry info", "link": "/v4-0-0/command-line-tools/commands/packages/registry/info/" },
+              { "label": "registry refresh", "link": "/v4-0-0/command-line-tools/commands/packages/registry/refresh/" }
+            ]
+          }
+        ]
+      },
+      {
+        "label": "Deploy Commands (generated reference)",
         "link": "/v4-0-0/command-line-tools/commands/deploy/",
         "items": [
           { "label": "deploy", "link": "/v4-0-0/command-line-tools/commands/deploy/deploy/" },
@@ -270,24 +332,6 @@
           }
         ]
       }
-    ]
-  },
-  {
-    "label": "Contributing & Project",
-    "link": "/v4-0-0/contributing/",
-    "items": [
-      { "label": "Submitting Pull Requests", "link": "/v4-0-0/contributing/pull-requests/" },
-      { "label": "Coding Standards", "link": "/v4-0-0/contributing/coding-standards/" },
-      { "label": "Writing Documentation", "link": "/v4-0-0/contributing/writing-docs/" }
-    ]
-  },
-  {
-    "label": "Upgrading",
-    "link": "/v4-0-0/upgrading/",
-    "items": [
-      { "label": "Upgrading from 3.x to 4.0", "link": "/v4-0-0/upgrading/3x-to-4x/" },
-      { "label": "Upgrading from 2.x to 3.x", "link": "/v4-0-0/upgrading/2x-to-3x/" },
-      { "label": "Reading the Changelog", "link": "/v4-0-0/upgrading/changelog/" }
     ]
   },
   {
