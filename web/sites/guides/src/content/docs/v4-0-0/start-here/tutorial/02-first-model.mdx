@@ -329,7 +329,7 @@ Confirm your CLI is the version this tutorial targets:
 wheels --version
 ```
 
-The verify-docs harness runs this to confirm your `wheels` CLI is installed and reports a Wheels version.
+Run this any time to confirm your `wheels` CLI is installed and reporting a version.
 
 ## Checkpoint
 
@@ -345,7 +345,7 @@ wheels reload
 
 ## Troubleshooting
 
-**`Data source wheelstestdb not found`** — the migration didn't run, so the `posts` table doesn't exist. Make sure the dev server is running, then run `wheels migrate latest`.
+**`Table posts not found` (or a query error naming `posts`)** — the migration didn't run. Make sure the dev server is running, then run `wheels migrate latest`.
 
 **`model 'Post' is undefined`** — Wheels caches model discovery. After adding `app/models/Post.cfc` you must run `wheels reload` (or append `?reload=true&password=...` to any URL).
 
