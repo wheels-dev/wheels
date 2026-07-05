@@ -1,6 +1,6 @@
 ---
 title: VM and bare-metal deployment
-description: Deploy a Wheels app to a Linux VM with Lucee 7, systemd, nginx, and a zero-downtime symlink swap.
+description: Deploy a Wheels app to a Linux VM with Lucee 7, systemd, nginx, and an atomic symlink release swap.
 type: howto
 sidebar:
   order: 4
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-This page shows you how to run a Wheels app on a traditional Linux VM — no containers, no orchestrator, just Lucee under systemd with nginx in front. You'll install Lucee 7, lay out the app under `/opt/myapp`, write a systemd unit, terminate TLS in nginx, and run a zero-downtime release swap with `rsync` and a symlink.
+This page shows you how to run a Wheels app on a traditional Linux VM — no containers, no orchestrator, just Lucee under systemd with nginx in front. You'll install Lucee 7, lay out the app under `/opt/myapp`, write a systemd unit, terminate TLS in nginx, and run an atomic release swap with `rsync` and a symlink — near-zero downtime, with a two-instance variant for true zero.
 
 **You'll learn:**
 
@@ -191,12 +191,20 @@ server {
 
     root /opt/myapp/current/public;
 
-    # Serve static files directly; fall back to Lucee for dynamic requests.
+    # Static files are served directly; anything else becomes a Wheels route.
     location / {
-        try_files $uri @lucee;
+        try_files $uri @rewrite;
     }
 
-    location @lucee {
+    # Pretty URLs: /posts/1 -> /index.cfm/posts/1 — the rewrite that
+    # URLRewriting="On" expects. See the URL Rewriting guide for the
+    # same rule on Apache, IIS, and Tuckey.
+    location @rewrite {
+        rewrite ^/(.*)$ /index.cfm/$1 last;
+    }
+
+    # All CFML goes to Lucee — never serve .cfm/.cfc source from disk.
+    location ~ \.(cfm|cfc) {
         proxy_pass         http://myapp_lucee;
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
@@ -211,6 +219,8 @@ server {
     error_log  /opt/myapp/shared/logs/nginx.error.log;
 }
 ```
+
+The `@rewrite` block is what makes `URLRewriting="On"` work — without it every generated link 404s. [URL Rewriting](/v4-0-0/deployment/url-rewriting/) covers the same rule for Apache, IIS, and Tuckey, plus the `Partial` fallback if you'd rather skip server rewrites entirely.
 
 Enable the site and reload:
 
@@ -251,9 +261,9 @@ sudo firewall-cmd --reload
 
 Lucee's own HTTP listener binds to `127.0.0.1` by convention — confirm in your Lucee/CommandBox server config. A Lucee listener on `0.0.0.0:8888` behind an open firewall exposes the admin panel to the world.
 
-## Zero-downtime deploy
+## The release swap
 
-The release swap is three steps on the VM: rsync the new code in, run migrations, flip the symlink. nginx gets a `reload` so it re-resolves the symlink; systemd gets nothing — Lucee keeps serving out of the old release until the next restart.
+The swap is: rsync the new code in, flip the symlink, restart. nginx gets a `reload` so it re-resolves the symlink; Lucee gets a restart to boot the new release — a one-to-two-second blip (see step 6 for the genuinely zero-downtime variant).
 
 From your build machine or CI runner:
 
@@ -283,13 +293,12 @@ From your build machine or CI runner:
    EOF
    ```
 
-4. **Run migrations against the new release.** Point the CLI at the new release so it reads the new migration files.
+4. **Decide how migrations run.** Nothing on this VM has the `wheels` CLI, and the staged release has no running app for the CLI to talk to anyway — so pick one of the in-framework paths:
 
-   ```bash title="Run database migrations on the new release"
-   ssh lucee@myapp.example.com "cd /opt/myapp/releases/$RELEASE && wheels migrate latest"
-   ```
+   - **At boot (simplest):** `set(autoMigrateDatabase=true)` in `config/production/settings.cfm`. When Lucee restarts in step 6, the new release applies its own pending migrations before serving. If a migration fails, the failure surfaces at boot — flip the symlink back and restart to return to the old release.
+   - **After the flip, on demand:** trigger the migrator programmatically through a protected code path — `application.wheels.migrator.migrateToLatest()` — from an authenticated admin action or deploy hook. See [Running migrations without the wheels CLI](/v4-0-0/basics/migrations/#running-migrations-without-the-wheels-cli).
 
-   If a migration fails, stop here. The old `current` symlink is still live; nothing changed for users.
+   Either way, on a single node there is a moment where old code and new schema (or vice versa) overlap — write migrations to be backward-compatible for one release (add columns before code uses them; drop them one release after code stops), and rehearse risky ones against a staging copy first.
 
 5. **Flip the symlink.**
 
@@ -317,7 +326,7 @@ From your build machine or CI runner:
 
 </Steps>
 
-**Rolling back** is the swap in reverse — `ln -sfn /opt/myapp/releases/<previous> /opt/myapp/current` and reload. If the failed deploy ran a migration, roll the migration back first (`wheels migrate down`) or accept that the older code is running against a newer schema.
+**Rolling back** is the swap in reverse — `ln -sfn /opt/myapp/releases/<previous> /opt/myapp/current`, reload nginx, restart Lucee. If the failed deploy applied a migration, roll it back first (programmatically via `application.wheels.migrator.migrateTo(previousVersion)`, or run the migration's `down()` SQL by hand) — or accept that the older code is briefly running against a newer schema, which is exactly what backward-compatible migrations buy you.
 
 ## Log rotation
 

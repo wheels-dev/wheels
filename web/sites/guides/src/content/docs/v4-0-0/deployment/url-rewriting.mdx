@@ -1,0 +1,86 @@
+---
+title: URL Rewriting
+description: Pretty URLs on every server — the one rewrite rule Wheels needs, shown for Tuckey, nginx, Apache, and IIS, plus the Partial fallback that needs no server config.
+type: howto
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Every Wheels deployment needs an answer to one question: how does `/posts/1` reach `public/index.cfm`? This page is that answer for every server the community runs — it's one rewrite rule, worn four ways.
+
+## The three modes
+
+`config/settings.cfm` sets the mode with `set(URLRewriting="...")`:
+
+| Mode | URLs look like | Requires |
+|---|---|---|
+| `"On"` (template default) | `/posts/1` | A web-server rewrite rule (this page) |
+| `"Partial"` | `/index.cfm/posts/1` | Nothing beyond `cgi.path_info` support — every setup covered here has it |
+| `"Off"` | `/index.cfm?controller=posts&action=show&key=1` | Nothing |
+
+The framework generates links (`linkTo`, `urlFor`, form actions) in whatever shape the mode declares — so the mode and your server config must agree. If you can't (or don't want to) touch server config, set `"Partial"` and everything works with zero rules; `"On"` is purely cosmetic on top of that.
+
+## The rule, in words
+
+Rewrite every request that is **not a real file** to `/index.cfm/<original-path>`, and never serve `.cfm`/`.cfc` source as static content. Static assets (`stylesheets/`, `javascripts/`, `images/`, `files/`, `robots.txt`, …) are real files under `public/`, so they fall through untouched.
+
+## Per server
+
+### Tuckey — wheels CLI and CommandBox servers
+
+If the `wheels` CLI or CommandBox serves your app, you're already done: the shipped `public/urlrewrite.xml` configures the Tuckey UrlRewriteFilter both servers run. It rewrites everything except a known asset/exclusion list to `/index.cfm/$1`. Leave the file alone unless you add a top-level static path — then add it to the `<condition>` exclusion list. (On any other server this file is inert and can be deleted.)
+
+### nginx
+
+```nginx title="server block (root points at public/)"
+root /opt/myapp/current/public;
+
+# Static files are served directly; anything else becomes a Wheels route.
+location / {
+    try_files $uri @rewrite;
+}
+
+location @rewrite {
+    rewrite ^/(.*)$ /index.cfm/$1 last;
+}
+
+# All CFML goes to the engine — never serve .cfm/.cfc source from disk.
+location ~ \.(cfm|cfc) {
+    proxy_pass http://127.0.0.1:8888;
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+The full production server block (TLS, upstream keepalive, logging) lives in [VM and Bare-metal Deployment](/v4-0-0/deployment/vm-deployment/#nginx-reverse-proxy).
+
+### Apache (mod_rewrite + mod_proxy)
+
+```apache title="vhost or public/.htaccess"
+RewriteEngine On
+
+# Anything that isn't a real file or directory becomes a Wheels route.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ /index.cfm/$1 [PT,L]
+```
+
+With Apache in front of a servlet engine you'll also have a proxy/connector rule (mod_proxy, mod_cfml, or AJP) sending `*.cfm` to the engine — the rewrite must run before it, which the `[PT]` (pass-through) flag ensures. In a `.htaccess` context drop the leading slash from the target (`index.cfm/$1`).
+
+### IIS
+
+The IIS URL Rewrite Module translation — including the connector setup around it — lives on [IIS and Windows Deployment](/v4-0-0/deployment/iis-and-windows/); the rule itself is the same shape: match everything, negate real files and directories, rewrite to `index.cfm/{R:1}`.
+
+## Verifying
+
+1. `curl -I https://yourapp.example.com/index.cfm` — the engine answers (200/302, not raw CFML source). If you get source code, your CFML handler/proxy isn't wired — fix that before touching rewrites.
+2. `curl -I https://yourapp.example.com/index.cfm/posts` — routes resolve in `Partial` form regardless of rewrite rules. If this 404s at the *framework* level, the problem is your routes, not rewriting.
+3. `curl -I https://yourapp.example.com/posts` — only works once the rewrite rule is live and `URLRewriting="On"`.
+4. `curl -I https://yourapp.example.com/stylesheets/app.css` — still a direct static hit; if this proxies to the engine, your rule is missing the real-file exclusion.
+
+<Aside type="note" title="The dot-format twin">
+The shipped Tuckey config also rewrites `/posts.json` to `/posts?format=json`. On other servers you can skip that rule — Wheels also reads the format from the path inside `/index.cfm/posts.json`, and content negotiation via the `Accept` header works everywhere. Add it only if you need bare `/posts.json` URLs without the rewrite-to-index step.
+</Aside>
