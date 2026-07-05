@@ -30,9 +30,52 @@ Wheels reads `dataSourceName` from `config/settings.cfm` at application start an
 set(dataSourceName = "myapp_dev");
 ```
 
-The name you set here must match a datasource registered with your CFML engine. In Lucee that's configured in `lucee.json` (or `/lucee/admin/` for server-scope datasources); in Adobe it's in the admin UI. Check your engine's documentation for the registration shape — Wheels only cares that the name resolves to a working connection. In development, a name that doesn't resolve surfaces as a `Wheels.DataSourceNotFound` error page naming the datasource (served with HTTP 404).
+The name you set here must match a datasource registered with your CFML engine — Wheels only cares that the name resolves to a working connection. The next section shows the registration shape for each setup. In development, a name that doesn't resolve surfaces as a `Wheels.DataSourceNotFound` error page naming the datasource (served with HTTP 404).
 
-`config/settings.cfm` is the shared file loaded in every environment. The next section shows how to override it per environment.
+`config/settings.cfm` is the shared file loaded in every environment; [per-environment overrides](#per-environment-datasource) shadow it.
+
+## Registering a datasource
+
+Where the registration lives depends on what serves your app:
+
+**With the wheels CLI** — datasources live in `lucee.json` at the app root. `wheels new` writes the SQLite pair for you; add more under `configuration.datasources` using the same shape:
+
+```json title="lucee.json (excerpt — the shape wheels new generates)"
+"configuration": {
+  "datasources": {
+    "myapp_dev": {
+      "class": "org.sqlite.JDBC",
+      "database": "myapp_dev",
+      "dbdriver": "Other",
+      "dsn": "jdbc:sqlite:{project}/db/development.sqlite",
+      "host": "", "username": "", "password": ""
+    }
+  }
+}
+```
+
+For MySQL/Postgres, swap `class`/`dsn` for the driver's JDBC form (e.g. `com.mysql.cj.jdbc.Driver` with `jdbc:mysql://localhost:3306/myapp`). Restart the server (`wheels stop && wheels start`) after editing.
+
+**With CommandBox** — the scaffolded `box.json` already includes `commandbox-cfconfig`; declare datasources in `server.json` and CFConfig applies them at server start:
+
+```json title="server.json (excerpt)"
+"cfconfig": {
+  "datasources": {
+    "myapp_dev": {
+      "dbdriver": "MySQL",
+      "host": "localhost", "port": 3306,
+      "database": "myapp",
+      "username": "wheels", "password": "${DB_PASSWORD}"
+    }
+  }
+}
+```
+
+**With your own server (manual installs)** — register the datasource in the engine's admin: Lucee's server or web admin, or the **ColdFusion Administrator** on Adobe (don't rely on runtime-defined datasources on ACF — admin-registered is the reliable path).
+
+<Aside type="caution" title="Adobe ColdFusion + MySQL 8">
+If the app connects but models and the migrator act as if your tables don't exist, add `nullCatalogMeansCurrent=true` to the datasource's Connection String in the CF Administrator — MySQL Connector/J 8 changed its metadata default and schema reads come back empty without it. Details in [IIS and Windows Deployment](/v4-0-0/deployment/iis-and-windows/#adobe-coldfusion--mysql-8).
+</Aside>
 
 ## Per-environment datasource
 
@@ -151,7 +194,7 @@ Transactions commit when the block exits cleanly and roll back on any thrown exc
 
 ## Raw queries
 
-For the rare query the ORM can't express cleanly — a reporting aggregate, a window function, a vendor-specific feature — drop through to native CFML `queryExecute()`. Point it at your model's datasource with the `datasource` option and use positional parameters for any user input.
+For the rare query the ORM can't express cleanly — a reporting aggregate, a window function, a vendor-specific feature — drop through to native CFML `queryExecute()`. Point it at the app's configured datasource with the `datasource` option (don't hardcode an environment-specific name — that undoes the per-environment configuration above) and use positional parameters for any user input.
 
 ```cfm {test:compile}
 component extends="Model" {
@@ -159,7 +202,7 @@ component extends="Model" {
         return queryExecute(
             "SELECT userId, COUNT(*) AS postCount FROM posts GROUP BY userId ORDER BY postCount DESC LIMIT ?",
             [arguments.limit],
-            {datasource: "myapp_production"}
+            {datasource: get("dataSourceName")}
         );
     }
 }

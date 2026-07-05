@@ -12,8 +12,9 @@ Migrations are versioned CFCs that carry your schema forward and back. Each one 
 
 **You'll learn:**
 
-- The seven `wheels migrate` subcommands — four for the day-to-day workflow, three for reconciliation when something's off
-- How to generate a migration file and what the timestamped filename means
+- Running migrations — with the `wheels` CLI, and without it (browser GUI or programmatic)
+- The `wheels migrate` subcommands — the day-to-day four, plus reconciliation for when something's off
+- How to generate or hand-write a migration file and what the timestamped filename means
 - The column builder methods on `createTable` — `string`, `integer`, `datetime`, `references`, `timestamps`
 - How to add and remove indexes and foreign keys without dropping a table
 - How to add, rename, and remove columns on an existing table
@@ -23,7 +24,7 @@ Migrations are versioned CFCs that carry your schema forward and back. Each one 
   A migration describes schema — the tables and columns your models map to. For the model side — finders, validations, callbacks — see [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
 </Aside>
 
-## Running migrations
+## Running migrations with the wheels CLI
 
 Four subcommands cover the day-to-day workflow. Each one connects to your app's datasource and reads the migration history out of `wheels_migrator_versions`, so the app has to be running for them to work — without a server, every `wheels migrate` subcommand refuses with a pointer at `wheels start` instead of guessing at a database. See [Installing Wheels](/v4-0-0/start-here/installing/) for the server setup.
 
@@ -37,9 +38,7 @@ wheels migrate info
 - `wheels migrate info` — show which migrations have run and which are still pending. Read-only; safe any time. Orphan versions (rows in the tracking table with no matching file in `app/migrator/migrations/`) are flagged with `[?] <version> <name> (applied <timestamp>)` when the enriched `wheels_migrator_versions.name` / `.applied_at` columns are populated, or `[?] <version> ********** NO FILE **********` (Rails-style) for legacy rows that pre-date the schema enrichment.
 
 <Aside type="caution" title="Write commands require a project-bound server">
-`wheels migrate latest`, `migrate up`, `migrate down`, `migrate forget`, `migrate pretend`, `migrate rename-system-tables`, `wheels seed`, and `wheels db reset` (which runs migrate + seed) only connect to a server whose port is explicitly configured for this project — via the `port` field in `lucee.json` (created by `wheels new`, or set manually) or the `PORT` variable in `.env`. They refuse the common-port fallback (8080, etc.) to prevent silently targeting a sibling app's server when you work on multiple projects. If you see `Wheels.ServerNotRunning`, run `wheels start` in this project's directory first.
-
-`wheels migrate info` and `wheels migrate doctor` are read-only, so they keep the common-port fallback like the other read-side commands (`wheels info`, `wheels routes`, …): with no project-bound port configured they probe 8080, 60000, 3000, and 8500 and attach to the first responding server. Because a sibling project's server on one of those ports would report the *wrong* app's migration state, they print a yellow notice whenever the fallback was used — set `port` in `lucee.json` (or `PORT` in `.env`) to pin them to this project ([#3080](https://github.com/wheels-dev/wheels/issues/3080)).
+Migrate's write commands only connect to a server whose port is explicitly configured for *this* project — the `port` field in `lucee.json` or `PORT` in `.env` — so they can't silently target a sibling app's server. If you see `Wheels.ServerNotRunning`, run `wheels start` in this project's directory first (read-only commands like `migrate info` fall back to probing common ports and print a notice when they do — [#3080](https://github.com/wheels-dev/wheels/issues/3080); the [Database commands reference](/v4-0-0/command-line-tools/wheels-commands/database/) has the full port-resolution rules).
 </Aside>
 
 The runner wraps each migration in a transaction so a failing `up()` or `down()` rolls back cleanly on databases that support transactional DDL — but that support varies, so read the caution below before relying on it. One more caveat for scripts and CI: a failed migration is loud in the command output but the CLI currently still exits `0`, so don't gate a pipeline on the exit code alone ([#3081](https://github.com/wheels-dev/wheels/issues/3081)).
@@ -47,6 +46,17 @@ The runner wraps each migration in a transaction so a failing `up()` or `down()`
 <Aside type="caution" title="DDL auto-commit on MySQL and Oracle">
 On MySQL and Oracle, DDL statements (`CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`, …) implicitly commit the surrounding transaction. A multi-statement migration that fails midway on those databases leaves the statements that already ran committed — partial schema the transaction wrapper cannot undo. PostgreSQL, SQL Server, and SQLite support transactional DDL, so the all-or-nothing guarantee holds there. On MySQL/Oracle, prefer small single-purpose migrations, and if one does die halfway, use `wheels migrate doctor` and the reconciliation subcommands below to get the tracking table and schema back in line.
 </Aside>
+
+## Running migrations without the wheels CLI
+
+The CLI is a convenience, not a requirement — CommandBox teams and manual installs have the same capabilities:
+
+- **Browser GUI** — `/wheels/migrator` shows applied and pending migrations with run/rollback controls. Like all `/wheels/*` surfaces it's **development-only** (hard allowlist since 4.0.4, [#2903](https://github.com/wheels-dev/wheels/pull/2903)).
+- **Programmatic** — `application.wheels.migrator.migrateToLatest()` and `.migrateTo(version)` run the same runner from any server-side code path in **any environment**: a deploy hook, a protected admin action, a one-off script. `application.wheels.migrator.getCurrentMigrationVersion()` reads the current state.
+- **At startup** — `set(autoMigrateDatabase=true)` in `config/settings.cfm` applies pending migrations when the application starts. Handy for single-node setups where "deploy then migrate" ordering is a chore; think twice on multi-node deployments (every node races to migrate on boot).
+- **Writing the files** — a migration is a plain CFC in `app/migrator/migrations/` named `YYYYMMDDHHMMSS_description.cfc` with `up()`/`down()` methods; the generator below just saves you the boilerplate. Copy an existing file as your starting point.
+
+The full no-CLI task map lives at [Working Without the CLI](/v4-0-0/start-here/working-without-the-cli/).
 
 ## Reconciliation subcommands
 
@@ -246,7 +256,7 @@ component extends="wheels.migrator.Migration" hint="Seed admin role" {
 }
 ```
 
-Quote string values inline; wrap each statement in `execute()` individually. For anything structural — building a compound object, branching on current rows — consider writing a one-off script under `app/scripts/` and calling it from your deploy pipeline instead.
+Quote string values inline; wrap each statement in `execute()` individually. For anything structural — building a compound object, branching on current rows — consider writing a one-off script under `app/lib/` and calling it from your deploy pipeline instead.
 
 ## Reversible vs irreversible
 

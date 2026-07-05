@@ -1,6 +1,6 @@
 ---
 title: Running Tests Locally
-description: Running the test suite — wheels test CLI, tools/test-local.sh, filtering, Docker cross-engine matrix.
+description: Run your app's test suite with the wheels CLI or straight through the browser test runner — filtering, reporters, test databases, and the failure modes that eat time.
 type: howto
 sidebar:
   order: 9
@@ -8,226 +8,90 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-The fast path for day-to-day development is Lucee 7 + SQLite, driven by `wheels test` or the one-shot script `tools/test-local.sh`. Neither needs Docker, neither needs an external database, and both finish in seconds on a warm server. The Docker matrix exists for the other reason you run tests: proving a change works across every engine and every supported database before you push. This page covers both paths, plus the filter knobs, the raw test-runner URL, and the failure modes that eat the most time.
+Your app's specs live under `tests/specs/` and run through the framework's built-in runner. There are two equal ways to drive it: the `wheels` CLI from your terminal, or the runner's URL from any browser or HTTP client — the CLI calls that same URL under the hood, so nothing about your tooling choice changes what runs.
 
 **You'll learn:**
 
-- The fastest way to run the suite — `wheels test` and `tools/test-local.sh`
-- How to filter by directory or single spec, both from the CLI and the test-runner URL
-- How to drive the Docker cross-engine matrix for pre-merge verification
-- How to target a specific database (SQLite, H2, MySQL, Postgres, SQL Server, CockroachDB, Oracle)
-- The cross-engine gotchas that bite first-time contributors
-- The common failure modes — `JAVA_HOME` unset, port conflicts, missing Playwright JARs
+- Running the suite with the wheels CLI — and without it
+- Filtering by directory or a single spec, in both paths
+- How the test database behaves
+- The common failure modes and their fixes
 
 <Aside type="note">
-  You should already know what a spec looks like. See [Model Tests](/v4-0-0/testing/model-tests/) for BDD shape and [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) for the populate lifecycle.
+  You should already know what a spec looks like. See [Model Tests](/v4-0-0/testing/model-tests/) for BDD shape and [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/) for the populate lifecycle. Looking to run **the framework's own suite** (you're contributing to Wheels itself)? That's a different page: [Running the Framework Test Suite](/v4-0-0/contributing/running-framework-tests/).
 </Aside>
 
-## Prerequisites
+## With the wheels CLI
 
-Before either path works, you need a handful of tools on `PATH`:
+`wheels test` detects your running dev server, reloads the app, hits the test runner, and prints pass/fail counts. No ceremony:
 
-- **Java 21+** — `brew install openjdk@21` on macOS, your distro's OpenJDK package on Linux, Adoptium on Windows.
-- **`JAVA_HOME` set** — only matters when no Java is otherwise discoverable: the Homebrew install wraps the binary and exports `JAVA_HOME` itself, so brew users never see the preflight refusal. On other install paths, if the CLI can't find a JVM it refuses to start and points you at Adoptium — set `JAVA_HOME` in your shell profile (`export JAVA_HOME=$(/usr/libexec/java_home -v 21)` on macOS).
-- **The `wheels` CLI** — `brew install wheels`, `choco install wheels`, or the install script on Linux. The Wheels CLI is built on the LuCLI runtime; we ship the runtime under the `wheels` brand so you only ever invoke it as `wheels`.
-- **SQLite** — usually pre-installed; `brew install sqlite` if not. Needed for the default test database.
-- **Docker Desktop or Docker Engine** — only if you're running the cross-engine matrix.
-
-```bash {test:cli cmd="wheels --version" asserts-stdout="Wheels"}
-wheels --version
-```
-
-## The fastest path — `wheels test`
-
-`wheels test` is the single command you'll use most often. It detects a running Wheels server, reloads the app, hits the test runner, and prints pass/fail counts to your terminal. No Docker, no ceremony.
-
-```bash title="your shell — in the wheels repo root"
+```bash title="your shell — in your app root"
 # Run the full suite
 wheels test
 
 # Filter by directory (positional or --filter)
-wheels test model
-wheels test --filter=controller
+wheels test models
+wheels test --filter=controllers
 
 # Pick a reporter — simple (default), json, tap
 wheels test --reporter=tap
-
-# Target a specific test database — only meaningful with --core
-wheels test --core --db=mysql
 
 # CI mode: emits GitHub Actions ::error annotations per failed/errored spec
 wheels test --ci
 ```
 
-The supported flags today are `--filter=<dir>`, `--reporter=<simple|json|tap>`, `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>` (only honoured with `--core`), `--verbose` / `-v`, `--ci`, `--core` (run the framework's own suite instead of the app suite), `--no-test-db` (don't auto-swap to `<datasource>_test`), and `--base-path=<path>` (URL prefix for subfolder-mounted apps — auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` when omitted). A positional argument acts as the filter. The CLI always requests JSON from the underlying runner and formats the result for the chosen reporter.
+The supported flags are `--filter=<dir>`, `--reporter=<simple|json|tap>`, `--verbose` / `-v`, `--ci`, `--no-test-db` (don't auto-swap to the `<datasource>_test` test database), and `--base-path=<path>` (URL prefix for subfolder-mounted apps — auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` when omitted). A positional argument acts as the filter. There's also `--core` (with `--db=`) for running the framework's own suite — see [the framework-testing page](/v4-0-0/contributing/running-framework-tests/).
 
-<Aside type="note" title="--db is for --core only">
-The framework's matrix self-tests (`--core`) wire up a `wheelstestdb_<engine>` datasource per supported engine — that's what `--db` selects between. App tests run against the datasource your project is configured for; passing `--db` to an app run prints a warning and is otherwise ignored. To run your app suite against a different engine, set the engine in your shell environment before invoking `wheels test` — see [the testing CLI reference](/v4-0-0/command-line-tools/wheels-commands/testing/#testing-against-different-engines) for the env-var pattern. This matches Rails (`DATABASE_URL`), Laravel (`DB_CONNECTION`), Symfony (`APP_ENV=test`), and Phoenix (`MIX_ENV`) — DB selection is a process-level concern, not a per-invocation flag.
+<Aside type="note" title="The test database">
+By default `wheels test` swaps your app onto a test copy of its datasource (`<datasource>_test` — for a fresh `wheels new` app that's the `db/test.sqlite` file scaffolded next to `db/development.sqlite`). First run against an empty test DB, the framework includes `tests/populate.cfm` so you can build schema and fixtures; subsequent runs reuse it. Pass `--no-test-db` to run against your development database instead.
 </Aside>
 
-<Aside type="tip">
-  `wheels test` always runs the app suite by default — even in the framework repo, where `vendor/wheels/tests/` exists. Pass `--core` explicitly to run the framework suite. (Earlier builds auto-detected core mode from the presence of `vendor/wheels/tests/`; that behavior was removed because it silently ran the wrong suite for user apps.)
-</Aside>
+## Without the wheels CLI
 
-## LuCLI one-shot: `tools/test-local.sh`
+The runner is a URL. With your app running in the `development` environment — under CommandBox, your own IIS/nginx setup, anything — hit:
 
-`tools/test-local.sh` is the script every framework contributor runs before pushing. It does everything `wheels test` does, plus: creates the two SQLite test databases (`wheelstestdb.db` and `wheelstestdb_tenant_b.db`), starts a disposable LuCLI server on port 8080 if one isn't already up, downloads the SQLite JDBC driver into LuCLI's `lib/ext` if missing, runs the tests, parses the JSON, and prints coloured pass/fail output. On exit it stops the server if it started one.
+```bash title="browser or curl"
+# Run everything (browser-friendly HTML report)
+http://localhost:8080/wheels/app/tests
 
-```bash title="your shell — in the wheels repo root"
-bash tools/test-local.sh              # run all core tests
-bash tools/test-local.sh model        # run model specs only
-bash tools/test-local.sh security     # run security specs only
-bash tools/test-local.sh browser      # run browser specs (Playwright JARs required)
+# Machine-readable, and exactly what the CLI consumes
+curl "http://localhost:8080/wheels/app/tests?format=json"
+
+# Filter by directory (dot-notation, rooted at your app's tests/ mapping)
+curl "http://localhost:8080/wheels/app/tests?format=json&directory=tests.specs.models"
 ```
 
-The script accepts these short aliases as the first argument: `model` / `models`, `controller` / `controllers`, `view` / `views`, `security`, `middleware`, `dispatch`, `migrator`. Anything else is passed through as a literal directory path (dot-notation, rooted at `wheels.tests.specs.`).
+Keep the dev loop as: change a spec, refresh the URL. Two things to know:
 
-Environment knobs:
+- **Development only.** The `/wheels/*` surfaces are gated by a development-only allowlist (since 4.0.4, [#2903](https://github.com/wheels-dev/wheels/pull/2903)) — in any other environment they return 404. Run tests where the app runs as `development` (locally, or a CI job configured that way — see [CI Integration](/v4-0-0/testing/ci-integration/)).
+- **The datasource is whatever the app is using.** The `<datasource>_test` auto-swap is a CLI convenience; the raw runner exercises the datasource your app is currently configured with. If you drive tests by URL routinely, point your development datasource at a database you're happy to have `tests/populate.cfm` rebuild — or keep populate idempotent (it should be anyway; see [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/)).
 
-- `PORT=9090 bash tools/test-local.sh` — use a non-default port (handy when 8080 is in use).
-- `DB=mysql bash tools/test-local.sh` — run against a different database; you'll need to bring up the container yourself first (see the Docker matrix below).
-- `WHEELS_BROWSER_TEST_BASE_URL` — auto-set to `http://localhost:${PORT}` so browser specs hit the same server the script starts. Override it if you're pointing browser tests at a different host.
+An unrecognized `directory=` value is ignored and the **full** suite runs instead ([#3083](https://github.com/wheels-dev/wheels/issues/3083)) — if a filtered run looks suspiciously slow or broad, check the value against your `tests/specs/` layout.
 
-## The test-runner URL
+## Filtering
 
-When you need to iterate on a single spec file without rebooting anything — fastest inner loop — hit the test runner directly over HTTP. This is what `wheels test` and `tools/test-local.sh` call under the hood.
+| Method | With the wheels CLI | Without |
+|--------|---------------------|---------|
+| By directory | `wheels test models` | `&directory=tests.specs.models` |
+| One category of many | `wheels test --filter=controllers` | `&directory=tests.specs.controllers` |
+| Skip in source | `xdescribe(...)` / `xit(...)` — built into WheelsTest | same |
 
-```bash title="direct HTTP access (dev server running)"
-# Run everything
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json"
-
-# Filter by directory
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.model"
-
-# Filter to a single spec file — fastest iteration loop (use testBundles, not directory)
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&testBundles=wheels.tests.specs.model.callbacksSpec"
-
-# Skip populate when iterating on one spec and the schema is already in place
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&populate=false&testBundles=wheels.tests.specs.model.callbacksSpec"
-
-# Scope to a single installed package's tests (e.g. wheels-sentry, wheels-i18n)
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.wheels-sentry.tests"
-```
-
-`directory=` only filters down to a *directory* — pointing it at a single spec file matches zero bundles and runs nothing. For one file, pass the bundle's dotted path via `testBundles=` instead. Also note the core endpoint only accepts `directory` values starting with `wheels.tests` (or `vendor.<package>.tests`); anything else is rejected and the **full** suite runs instead — the JSON response flags this with `directoryRejected: true` and a `warnings[]` entry rather than silently reporting green ([#3083](https://github.com/wheels-dev/wheels/issues/3083)), so check those fields when a filtered run looks suspiciously slow. The `populate=false` query param is the other trick that makes tight inner loops possible. Populate drops and recreates every test table — a second or two on SQLite but much slower on networked databases. Once the schema is in place for the run, skipping populate shaves the wait down to just your specs executing.
-
-<Aside type="note" title="Scope-visibility fields in the JSON response">
-  The JSON payload includes `directoryRequested`, `directoryResolved`, `directoryRejected`, `bundlesDiscovered`, and `warnings[]`. When a `directory=` value fails the allowlist the runner substitutes the default and sets `directoryRejected: true` with a `warnings[]` entry — the run is no longer silently green for the wrong scope. A path that names a single spec file rather than a directory yields `bundlesDiscovered: 0` and a warning; use `testBundles=` to target a single file directly.
-</Aside>
-
-## Filtering tests
-
-The runner accepts filters at every layer. Pick whichever matches your workflow.
-
-| Method | How |
-|--------|-----|
-| By directory (CLI) | `wheels test model` or `wheels test --filter=controller` |
-| By directory (script) | `bash tools/test-local.sh model` |
-| By directory (URL) | `&directory=wheels.tests.specs.model` |
-| By single spec file (URL) | `&testBundles=wheels.tests.specs.model.callbacksSpec` |
-| By installed package (URL) | `&directory=vendor.wheels-sentry.tests` |
-| Skip in source | `xdescribe("...", ...)` / `xit("...", ...)` — built into WheelsTest |
-| Skip the whole populate | `&populate=false` on the URL (schema must already exist) |
-
-WheelsTest does not ship tag-based include/exclude filtering at this release. Use directory filtering plus `xdescribe` / `xit` in the spec source when you need finer control.
-
-## Docker cross-engine matrix
-
-Every Wheels release ships compose services for the supported engines in `compose.yml` at the repo root. The services share a bind-mounted copy of the repo, so there's nothing to rebuild when you edit code — just hit the port.
-
-```bash title="your shell — in the wheels repo root"
-# Start Lucee 7 + Adobe 2025 (minimum for a cross-engine check)
-docker compose up -d lucee7 adobe2025
-
-# Wait ~60s for startup, then run both
-curl -s -o /tmp/lucee7.json   "http://localhost:60007/wheels/core/tests?db=sqlite&format=json"
-curl -s -o /tmp/adobe2025.json "http://localhost:62025/wheels/core/tests?db=sqlite&format=json"
-
-# Summarize
-for f in /tmp/lucee7.json /tmp/adobe2025.json; do
-  python3 -c "
-import json
-d = json.load(open('$f'))
-print('$f', d['totalPass'], 'pass', d['totalFail'], 'fail', d['totalError'], 'error')
-"
-done
-```
-
-The service names and ports:
-
-| Engine | Service | Port |
-|--------|---------|------|
-| Lucee 5 | `lucee5` | 60005 |
-| Lucee 6 | `lucee6` | 60006 |
-| Lucee 7 | `lucee7` | 60007 |
-| Adobe 2018 | `adobe2018` | 62018 |
-| Adobe 2021 | `adobe2021` | 62021 |
-| Adobe 2023 | `adobe2023` | 62023 |
-| Adobe 2025 | `adobe2025` | 62025 |
-| BoxLang | `boxlang` | 60001 |
-
-<Aside type="tip">
-  At minimum, run one Lucee and one Adobe before pushing. Their runtime behaviours diverge in ways pure-Lucee tests don't catch — struct member functions, application scope, closure `this` capture, bracket-notation function calls.
-</Aside>
-
-## Testing against specific databases
-
-Each engine ships with H2 and SQLite baked in — no container needed for either. Every other database is a separate compose service you bring up alongside the engine: `compose.yml` ships `mysql`, `postgres`, `sqlserver`, `cockroachdb`, and `oracle` services. (The `docker-compose.db-h2.yml` / `db-mysql.yml` / `db-postgres.yml` files at the repo root are dev-stack overlays for the demo app, not test-matrix services.)
-
-```bash title="your shell — multi-database"
-# Start Lucee 7 + MySQL
-docker compose up -d lucee7 mysql
-
-# Run against MySQL
-curl -sf "http://localhost:60007/wheels/core/tests?db=mysql&format=json"
-```
-
-Supported `db` values on the URL: `sqlite` (default for the script and local runs), `h2` (default on some engines), `mysql`, `postgres`, `sqlserver`, `oracle`, `cockroachdb`. Oracle is currently soft-failed in CI — failures log warnings but don't block the build.
-
-## Cross-engine gotchas
-
-These are the runtime differences that catch first-time framework contributors. Each one has stung a real PR.
-
-- **`struct.map()`** — Lucee and Adobe resolve `obj.map()` as the built-in struct member function, not your CFC method. Use a different name (`mapInstance()`) or call the method via bracket notation.
-- **`application` scope members** — Adobe CF does not support function members on the `application` scope. Pass a plain struct context into closures instead.
-- **Closure `this` capture** — CFML closures capture `this` from the declaring scope at definition time. Share references across closures with `var ctx = { ref: obj }` rather than reassigning `this`.
-- **Bracket-notation function calls inside closures** — Adobe CF 2021 and 2023 parsers crash on `obj["key"]()` inside a closure. Split into two statements: `var fn = obj["key"]; fn();`.
-- **Array by-value in struct literals on Adobe** — Adobe copies arrays by value in `{ arr = myArray }`. Closures that append to the copy don't affect the original. Reference via a parent struct: `{ owner = parent }` then `owner.arr`.
-- **`private` mixin functions not integrated** — the framework's `$integrateComponents()` copies only `public` methods into model and controller objects. Helpers in mixin CFCs (e.g., `vendor/wheels/model/*.cfc`) must use `public` access with a `$` prefix for scoping. `private` may pass BoxLang and fail Lucee and Adobe.
+WheelsTest doesn't ship tag-based include/exclude filtering at this release; directory filtering plus `xdescribe`/`xit` in the spec source is the supported granularity.
 
 ## Common failure modes
 
-These are the errors you'll actually hit. Fix-ups first, diagnosis second.
-
-- **No Java found** — on non-brew installs, the CLI's preflight refuses to start and prints a pointer to Adoptium when it can't locate a JVM; set `JAVA_HOME` in your shell profile and re-source. Homebrew installs are immune — the brew wrapper exports `JAVA_HOME` itself.
-- **Docker daemon not running** — `docker compose up` fails with `Cannot connect to the Docker daemon`. Start Docker Desktop (macOS, Windows) or `systemctl start docker` (Linux).
-- **Port already in use** — `docker compose up` fails with `bind: address already in use` or a local `wheels start` is already on the port. Find the holder with `lsof -i :60007` and stop it.
-- **Playwright JARs missing** — browser specs skip with `this.browserTestSkipped = true` instead of failing, so the suite stays green. Run `wheels browser setup` once to install the JARs and Chromium.
-- **Populate SQL errors** — read the error. "Table already exists" means a stale table from a previous engine-specific run; add a `DROP TABLE IF EXISTS` first. "No such function: NOW" (or similar) means cross-engine SQL drift; use `CURRENT_TIMESTAMP` — it's ANSI SQL and works on every supported engine, while `NOW()` fails on SQLite and SQL Server.
-- **Flaky `wheels new` in parallel harness runs** — a known LuCLI race (framework gap tracker #11). Retry once, or serialize the runs until the fix lands.
-- **Server not responding after `compose up`** — engines need 30–90 seconds to cold-start. `curl -I http://localhost:60007/` returns connection-refused until the engine is ready. If it stays down after two minutes, check `docker compose logs <service>`.
-- **"1 error(s)" with a bundle path but no failing assertion** — the BDD runner caught a load-time or setup error for that spec file. Two common causes: (1) `it()` called directly inside `run()` without an enclosing `describe()` block, or (2) `beforeAll()` throwing an exception. The runner captures both against the bundle and populates `globalException` — check the spec file at the path shown in the summary for the underlying throw.
-
-## Cleanup
-
-Clean up is cheap but easy to forget. Left-over SQLite files and running containers are the usual culprits behind "why did my next run behave weirdly".
-
-```bash title="your shell"
-# Stop all engine containers
-docker compose down
-
-# Purge SQLite test databases between runs
-rm -f wheelstestdb.db wheelstestdb_tenant_b.db
-
-# Stop any local server the script started
-wheels stop
-```
+- **No Java found** (CLI path) — on non-brew installs the CLI refuses to start and points at Adoptium when it can't find a JVM; set `JAVA_HOME` in your shell profile. Homebrew installs export it themselves.
+- **404 from `/wheels/app/tests`** — the app isn't running as `development` (the allowlist above), or your server isn't pointing at this app's `public/`.
+- **Port already in use** — a previous `wheels start` or another server holds the port; `lsof -i :<port>` and stop it.
+- **Playwright JARs missing** — browser specs skip with `this.browserTestSkipped = true` instead of failing, so the suite stays green. Run `wheels browser setup` once, or see [Browser Tests](/v4-0-0/testing/browser-tests/).
+- **Populate SQL errors** — "Table already exists" means a stale table from a previous run; add `DROP TABLE IF EXISTS` first. "No such function: NOW" (or similar) means cross-engine SQL drift; use `CURRENT_TIMESTAMP` — it's ANSI SQL and works everywhere, while `NOW()` fails on SQLite and SQL Server.
+- **"1 error(s)" with a bundle path but no failing assertion** — the runner caught a load-time or setup error in that spec file. The two common causes: `it()` called directly inside `run()` without an enclosing `describe()`, or `beforeAll()` throwing. Check the spec file at the path shown in the summary.
 
 ## Related guides
 
 <CardGrid>
+  <LinkCard title="CI Integration" href="/v4-0-0/testing/ci-integration/" description="Running the suite in GitHub Actions — with or without the CLI." />
   <LinkCard title="Fixtures & Test Data" href="/v4-0-0/testing/fixtures-and-test-data/" description="The populate.cfm lifecycle, test models, and per-spec isolation." />
   <LinkCard title="Browser Tests" href="/v4-0-0/testing/browser-tests/" description="Installing Playwright and running browser specs locally." />
-  <LinkCard title="Testing Overview" href="/v4-0-0/testing/" description="The shape of the test suite and when to reach for each test type." />
-  <LinkCard title="Model Tests" href="/v4-0-0/testing/model-tests/" description="BDD specs for validations, callbacks, scopes, and associations." />
+  <LinkCard title="Running the Framework Test Suite" href="/v4-0-0/contributing/running-framework-tests/" description="Contributing to Wheels itself? The core suite, matrix, and gotchas." />
 </CardGrid>
