@@ -39,6 +39,7 @@
     "label": "Upgrading & Releases",
     "link": "/v4-0-0/upgrading/",
     "items": [
+      { "label": "What's New in 4.0", "link": "/v4-0-0/upgrading/whats-new-in-4/" },
       { "label": "Upgrading from 3.x to 4.0", "link": "/v4-0-0/upgrading/3x-to-4x/" },
       { "label": "Upgrading Without the CLI", "link": "/v4-0-0/upgrading/manual-upgrades/" },
       { "label": "Upgrading from 2.x to 3.x", "link": "/v4-0-0/upgrading/2x-to-3x/" },
@@ -129,7 +130,8 @@
         "items": [
           { "label": "Docker Deployment", "link": "/v4-0-0/deployment/docker-deployment/" },
           { "label": "VM and Bare-metal Deployment", "link": "/v4-0-0/deployment/vm-deployment/" },
-          { "label": "IIS and Windows Deployment", "link": "/v4-0-0/deployment/iis-and-windows/" }
+          { "label": "IIS and Windows Deployment", "link": "/v4-0-0/deployment/iis-and-windows/" },
+          { "label": "URL Rewriting", "link": "/v4-0-0/deployment/url-rewriting/" }
         ]
       },
       {
