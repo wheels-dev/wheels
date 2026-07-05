@@ -155,7 +155,7 @@ When test setup seeds defaults, set them on both `application.$wheels` and `appl
 - **Never hardcode secrets.** Env vars, `.env` (never committed), or 1Password Connect lookups — never literals in `vendor/wheels/`.
 - **Parameterise queries** at every layer except migrations. In migrations, parameter binding through `execute()` is unreliable; use inline SQL with escaped literals (see the seed-data rule in the top-level project guide).
 - **Escape `#` in CFML string literals.** `#` is the expression delimiter, so HTML entities like `&#111;` in a string become a compile error. Write `&##111;`. One unescaped `#` in a spec file crashes the entire test suite, not just that file.
-- **Use `NOW()` in migration SQL** — it is the one timestamp function Wheels normalises across MySQL, PostgreSQL, SQL Server, H2, and SQLite.
+- **Use `CURRENT_TIMESTAMP` in migration SQL** — it is ANSI SQL and works on MySQL, PostgreSQL, SQL Server, H2, and SQLite. `NOW()` is not rewritten by any adapter and fails on SQLite (the `wheels new` default) and SQL Server.
 
 ## Test before you push
 
@@ -173,11 +173,13 @@ The script starts a LuCLI server if one is not running, creates the SQLite DBs, 
 
 ### Pre-push minimum — two engines
 
-```bash title="your shell — from wheels/rig" {test:cli cmd="echo 'illustrative'"}
-cd rig
-docker compose up -d lucee6 adobe2025
+```bash title="your shell — from the wheels repo root" {test:cli cmd="echo 'illustrative'"}
+tools/test-matrix.sh lucee6,adobe2025 sqlite
+```
 
-# Wait ~60s for startup
+The script wraps the repo-root `compose.yml` (the same one CI's compat matrix uses), waits for the engines to come up, and runs the suite against each. To iterate manually instead, `docker compose up -d lucee6 adobe2025` from the repo root and curl the runners yourself:
+
+```bash title="your shell — from the wheels repo root"
 curl -sf "http://localhost:60006/wheels/core/tests?db=sqlite&format=json" > /tmp/lucee6.json
 curl -sf "http://localhost:62025/wheels/core/tests?db=sqlite&format=json" > /tmp/adobe2025.json
 ```

@@ -48,15 +48,15 @@ That file goes at `app/models/Post.cfc`. Wheels infers the table name `posts` an
 
 When the table, key, or column names don't match the defaults, override them in `config()`. Keep overrides to a minimum — every override is a rule the next reader has to learn — but reach for them freely when you're mapping onto a legacy schema.
 
-- `tableName("old_blog_entries")` — non-convention table name.
+- `table("old_blog_entries")` — non-convention table name.
 - `setPrimaryKey("entryId")` — non-`id` primary key.
-- `dataSource("legacy_db")` — non-default datasource. See [Database and Multiple Datasources](/v4-0-0/basics/database-and-multiple-datasources/) when this lands for the wider multi-database story.
+- `dataSource("legacy_db")` — non-default datasource. See [Database and Multiple Datasources](/v4-0-0/basics/database-and-multiple-datasources/) for the wider multi-database story.
 - `property(name="publishedAt", column="pub_date")` — the property on the model is `publishedAt`, the column in the table is `pub_date`. The view and controller never see the column name.
 
 ```cfm {test:compile}
 component extends="Model" {
     function config() {
-        tableName("old_blog_entries");
+        table("old_blog_entries");
         setPrimaryKey("entryId");
         property(name="publishedAt", column="pub_date");
     }

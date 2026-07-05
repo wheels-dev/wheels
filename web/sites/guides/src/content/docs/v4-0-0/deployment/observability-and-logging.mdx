@@ -272,7 +272,7 @@ try {
         );
     }
 } catch (any sentryError) {
-    writeLog(text="Sentry capture failed: ##sentryError.message##", type="error", file="application");
+    writeLog(text="Sentry capture failed: #sentryError.message#", type="error", file="application");
 }
 </cfscript>
 ```

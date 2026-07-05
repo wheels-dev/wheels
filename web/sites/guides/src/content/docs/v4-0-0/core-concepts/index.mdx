@@ -6,4 +6,60 @@ sidebar:
   order: 2
 ---
 
-Placeholder — content lands in Phase 2.
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Core Concepts explains how Wheels thinks, so the how-to pages elsewhere make sense instead of feeling like incantations. Nothing here requires any particular tooling — it's the framework itself: what happens to a request, why files live where they live, and which pieces you can swap or extend.
+
+If you're new, read the first three in order — they're the mental model everything else builds on. The rest stand alone; pull them up when the corresponding feature enters your app.
+
+**You'll find:**
+
+- What happens between the web server handing Wheels a request and the response going out
+- How models, views, and controllers divide the work — and what the conventions buy you
+- The ORM's philosophy, the DI container, and the middleware pipeline
+- How routes are matched, and how configuration changes per environment
+
+## Reading order
+
+<CardGrid>
+  <LinkCard
+    title="The Request Lifecycle"
+    href="/v4-0-0/core-concepts/request-lifecycle/"
+    description="Start here. The pipeline every request travels: rewrite, route match, middleware, controller, view, response."
+  />
+  <LinkCard
+    title="MVC in Wheels"
+    href="/v4-0-0/core-concepts/mvc-in-wheels/"
+    description="How models, views, and controllers divide the work, and what Wheels wires up for you."
+  />
+  <LinkCard
+    title="Conventions over Configuration"
+    href="/v4-0-0/core-concepts/conventions-over-configuration/"
+    description="The naming rules that make the wiring automatic — and the one-line overrides for when reality disagrees."
+  />
+  <LinkCard
+    title="ORM Philosophy"
+    href="/v4-0-0/core-concepts/orm-philosophy/"
+    description="Why Wheels reads your schema instead of asking you to declare it, and where the boundaries of the ActiveRecord pattern sit."
+  />
+  <LinkCard
+    title="The Dependency Injection Container"
+    href="/v4-0-0/core-concepts/dependency-injection/"
+    description="Registering services, resolution scopes (transient, singleton, request), and auto-wiring."
+  />
+  <LinkCard
+    title="Middleware Pipeline"
+    href="/v4-0-0/core-concepts/middleware-pipeline/"
+    description="Cross-cutting request handling that runs after route match and before the controller — global or route-scoped."
+  />
+  <LinkCard
+    title="How Routing Works"
+    href="/v4-0-0/core-concepts/how-routing-works/"
+    description="Pattern matching, precedence, the exact-path fast lane, and how params get built."
+  />
+  <LinkCard
+    title="Environments and Configuration"
+    href="/v4-0-0/core-concepts/environments-and-configuration/"
+    description="The five environments, where settings live, and how per-environment overrides layer."
+  />
+</CardGrid>
