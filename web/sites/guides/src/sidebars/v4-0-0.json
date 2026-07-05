@@ -153,6 +153,7 @@
     "items": [
       { "label": "Submitting Pull Requests", "link": "/v4-0-0/contributing/pull-requests/" },
       { "label": "Coding Standards", "link": "/v4-0-0/contributing/coding-standards/" },
+      { "label": "Running the Framework Test Suite", "link": "/v4-0-0/contributing/running-framework-tests/" },
       { "label": "Writing Documentation", "link": "/v4-0-0/contributing/writing-docs/" }
     ]
   },
