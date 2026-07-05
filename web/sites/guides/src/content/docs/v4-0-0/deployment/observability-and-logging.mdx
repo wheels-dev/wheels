@@ -14,7 +14,7 @@ This page shows you how to instrument a Wheels app so you can tell what it's doi
 
 - How to enable `wheels.middleware.RequestId` and thread the request ID through logs
 - Where Wheels writes logs by default and how to produce JSON-shaped lines a collector can parse
-- A minimal health-check action for `/healthz`
+- Liveness via the scaffolded `/up` route, plus a deeper readiness check at `/healthz`
 - How to activate and configure the first-party Sentry package
 - Which metrics and APM options are external and where to hook them in
 
@@ -35,7 +35,7 @@ set(middleware = [
 ]);
 ```
 
-The component is eight lines of real code: it calls `CreateUUID()`, stashes the value on the request scope, runs the rest of the pipeline, then writes the header on the way out. See `vendor/wheels/middleware/RequestId.cfc` line 12 (`local.requestId = CreateUUID();`) and line 20 (`cfheader(name = "X-Request-Id", value = local.requestId);`).
+The component is a few lines of real code: it calls `CreateUUID()`, stashes the value on the request scope, runs the rest of the pipeline, then writes the `X-Request-Id` header on the way out.
 
 Put it first in the pipeline. Every downstream middleware, controller, and error handler can then read `request.wheels.requestId` and log it alongside whatever they're doing.
 
@@ -170,7 +170,7 @@ The framework's job is to write structured lines. The infrastructure's job is to
 
 ## A health check endpoint
 
-Wheels does not provide a built-in health check route. Add one — every load balancer, orchestrator, and uptime prober expects it. A minimal version pings the database and returns JSON:
+Apps scaffolded by `wheels new` ship a liveness endpoint already: `app/controllers/Up.cfc` behind a `/up` route, which `wheels deploy`'s proxy probes before flipping traffic and any load balancer can poll. It returns 200 and doubles as a first-request warm-up. If your app predates the scaffold (or you installed manually from the base template), add the route and controller — and when you want a *readiness* check that verifies dependencies rather than just liveness, extend it to ping the database and return JSON:
 
 ```cfm {test:compile} title="app/controllers/Health.cfc"
 component extends="Controller" {
@@ -224,7 +224,7 @@ mapper()
 .end();
 ```
 
-Point your load balancer at `/healthz` with a short timeout (1–2 seconds) and a low threshold (two failures = unhealthy). Add more checks as they become load-bearing — Redis reachability, the background job queue depth, external API pingability — but resist the urge to check everything. A health check that fails because a downstream analytics API is slow will cycle your pods for no reason.
+Point your load balancer's liveness probe at `/up` and — if you need dependency-aware readiness — this `/healthz` at a short timeout (1–2 seconds) and a low threshold (two failures = unhealthy). Add more checks as they become load-bearing — Redis reachability, the background job queue depth, external API pingability — but resist the urge to check everything. A health check that fails because a downstream analytics API is slow will cycle your pods for no reason.
 
 <Aside type="caution">
   Keep `/healthz` cheap and unauthenticated. A load balancer polling every two seconds must not open a database transaction, hit a cache, or exercise any code path expensive enough to show up in a flame graph. The query above is a single round trip and returns one integer.

@@ -115,8 +115,10 @@ The Wheels injector's public API is `map(name).to(componentPath).asSingleton() |
 component {
     public any function init() {
         variables.instance = new wheels.auth.JwtStrategy(
-            secret=application.wo.get("jwtSecret"),
-            issuer="my-app"
+            jwtService=new wheels.auth.JwtService(
+                secretKey=application.wo.get("jwtSecret"),
+                issuer="my-app"
+            )
         );
         return this;
     }

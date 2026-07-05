@@ -19,11 +19,11 @@ Wheels 4.0 does not ship i18n primitives — no `t()` helper, no `locales/` conv
 - How to localize routes so URLs look like `/fr/posts` and `/en/posts`
 
 <Aside type="note">
-  Wheels 4.0 doesn't ship i18n primitives. This page documents the pattern you can build in your own app. First-class support is on the roadmap as a package — the existing [wheels-dev/wheels-i18n](https://github.com/wheels-dev/wheels-i18n) plugin (a 3.x-era drop-in) is the starting point for that work.
+  The framework core doesn't ship i18n primitives. This page documents the pattern you can build in your own app; the first-party [wheels-i18n](https://github.com/wheels-dev/wheels-i18n) package covers the common cases if you'd rather install than build — see [Packages](/v4-0-0/digging-deeper/packages/).
 </Aside>
 
 <Aside type="tip">
-  **Want a shortcut?** The legacy `wheels-dev/wheels-i18n` plugin works today on Wheels 4.0 via the deprecated `app/plugins/` directory — clone it in and `wheels reload`. The pattern below is if you want full control or can't depend on a plugin that's pending conversion to the 4.0 package system.
+  **Want a shortcut?** Install the first-party package: `wheels packages add wheels-i18n && wheels reload` (or, without the CLI, extract its release into `vendor/wheels-i18n/` and reload). It ships JSON-file or database-backed translations, parameter interpolation, and pluralization. The pattern below is for when you want full control or a dependency-free implementation.
 </Aside>
 
 <Aside type="note">

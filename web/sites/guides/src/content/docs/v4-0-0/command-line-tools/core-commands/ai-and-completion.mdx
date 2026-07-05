@@ -17,7 +17,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## `wheels ai`
 
-Drive Lucee-managed AI endpoints from the CLI. LuCLI stores only lightweight local defaults (default endpoint, default model, skill search paths) in `~/.lucli/ai/`. The endpoint credentials themselves live in the Lucee server's `CFConfig.json` — `wheels ai config add` writes to that file on your behalf.
+Drive Lucee-managed AI endpoints from the CLI. The CLI stores only lightweight local defaults (default endpoint, default model, skill search paths) in `<home>/ai/` — `~/.wheels/ai/` for the `wheels` binary, `~/.lucli/ai/` for standalone LuCLI. The endpoint credentials themselves live in the Lucee server's `CFConfig.json` — `wheels ai config add` writes to that file on your behalf.
 
 ### Synopsis
 
@@ -39,7 +39,7 @@ Calling `wheels ai` without a subcommand prints the help summary and exits.
 
 ### `ai config defaults`
 
-View or update the LuCLI-local defaults (stored under `~/.lucli/ai/settings.json`). These tell other `ai` subcommands which endpoint and model to use when you don't pass `--endpoint` or `--model` explicitly.
+View or update the CLI-local defaults (stored under `~/.wheels/ai/settings.json`; `~/.lucli/` on standalone LuCLI). These tell other `ai` subcommands which endpoint and model to use when you don't pass `--endpoint` or `--model` explicitly.
 
 ```bash title="synopsis"
 wheels ai config defaults [flags]
@@ -167,7 +167,7 @@ wheels ai skill <subcommand> [flags]
 | `skill path remove <dir>` | Remove a global skill search path. |
 | `skill path list [--json]` | List configured global skill search paths. |
 
-Global skill paths are stored in `~/.lucli/ai/skill-paths.json`. Pass `--skills-path` on `ai prompt` or `ai skill list` to add command-local overrides for a single invocation.
+Global skill paths are stored in `~/.wheels/ai/skill-paths.json` (`~/.lucli/` on standalone LuCLI). Pass `--skills-path` on `ai prompt` or `ai skill list` to add command-local overrides for a single invocation.
 
 ### Example
 
@@ -256,7 +256,7 @@ wheels <TAB>
 ```
 
 <Aside type="caution" title="Version-list autocomplete requires lucli">
-The generated script includes dynamic completion for `--version` values that invokes `lucli versions-list` under the hood. The `wheels` binary is a symlink over LuCLI, so this generally works, but if you've aliased `wheels` to a non-LuCLI binary, that portion of completion will fall back to empty.
+The generated script includes dynamic completion for `--version` values that invokes `lucli versions-list` under the hood. The `wheels` binary is the LuCLI launcher renamed (name-routing selects the wheels module), so this generally works, but if you've aliased `wheels` to a non-LuCLI binary, that portion of completion will fall back to empty.
 </Aside>
 
 ### Markdown reference (`completion md`)
@@ -308,7 +308,7 @@ Expect these to change or disappear without notice. Don't script against them.
   <LinkCard
     title="MCP Integration"
     href="../../mcp-integration/"
-    description="The structured AI surface — exposes wheels_* tools to an AI IDE over stdio."
+    description="The structured AI surface — exposes the CLI's tools (bare function names) to an AI IDE over stdio."
   />
   <LinkCard
     title="System & Secrets"

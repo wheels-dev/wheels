@@ -39,21 +39,21 @@ With no arguments, the middleware writes four headers on every response and — 
 
 ## Headers and defaults
 
-Verified against `vendor/wheels/middleware/SecurityHeaders.cfc`:
-
-| Constructor arg | Header | Default | Source |
-|-----------------|--------|---------|--------|
-| `frameOptions` | `X-Frame-Options` | `SAMEORIGIN` | line 24, 54 |
-| `contentTypeOptions` | `X-Content-Type-Options` | `nosniff` | line 25, 57 |
-| `xssProtection` | `X-XSS-Protection` | `1; mode=block` | line 26, 60 |
-| `referrerPolicy` | `Referrer-Policy` | `strict-origin-when-cross-origin` | line 27, 63 |
-| `contentSecurityPolicy` | `Content-Security-Policy` | `""` (opt-in) | line 28, 65-67 |
-| `strictTransportSecurity` | `Strict-Transport-Security` | `""` — auto-resolves to `max-age=31536000; includeSubDomains` in production | line 29, 48-51, 68-70 |
-| `hsts` | — | `true` — set to `false` to suppress `Strict-Transport-Security` entirely | new |
-| `permissionsPolicy` | `Permissions-Policy` | `""` (opt-in) | line 30, 71-73 |
-| `environment` | — | `""` — falls back to `application.$wheels.environment` | line 31, 37-45 |
+| Constructor arg | Header | Default |
+|-----------------|--------|---------|
+| `frameOptions` | `X-Frame-Options` | `SAMEORIGIN` |
+| `contentTypeOptions` | `X-Content-Type-Options` | `nosniff` |
+| `xssProtection` | `X-XSS-Protection` | `1; mode=block` |
+| `referrerPolicy` | `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `contentSecurityPolicy` | `Content-Security-Policy` | `""` (opt-in) |
+| `strictTransportSecurity` | `Strict-Transport-Security` | `""` — auto-resolves to `max-age=31536000; includeSubDomains` in production |
+| `hsts` | — | `true` — set to `false` to suppress `Strict-Transport-Security` entirely |
+| `permissionsPolicy` | `Permissions-Policy` | `""` (opt-in) |
+| `environment` | — | `""` — falls back to `application.$wheels.environment` |
 
 Setting any value to an empty string suppresses that header. `frameOptions=""` drops `X-Frame-Options`; the same pattern works for every argument.
+
+One default worth overriding: `X-XSS-Protection` is a deprecated header — current OWASP and browser-vendor guidance is to omit it (or send `0`), because the legacy XSS auditors it controlled introduced their own vulnerabilities and every modern browser has removed them. Pass `xssProtection=""` to drop it and lean on a real `Content-Security-Policy` instead.
 
 ## Configure CSP and Permissions-Policy
 
@@ -126,10 +126,10 @@ component extends="wheels.Controller" {
 
 ### The enforcement path
 
-1. **View** — add a hidden token field to any `POST`/`PUT`/`PATCH`/`DELETE` form with `authenticityTokenField()` (view helper in `vendor/wheels/view/csrf.cfc`, line 26). Form helpers like `startFormTag()` insert it automatically for non-GET forms.
-2. **View (AJAX)** — add `csrfMetaTags()` to your layout `<head>` (line 10 of the same file). It emits two `<meta>` tags your JavaScript reads to send the token as an `X-CSRF-Token` header.
-3. **Controller pipeline** — before each action runs, `$runCsrfProtection(action)` (`vendor/wheels/controller/csrf.cfc` line 37) checks the `only`/`except` filters, calls `$verifyAuthenticityToken()` (line 59), and throws, aborts, or ignores per the `with` setting.
-4. **Verification** — `$isVerifiedRequest()` (line 78) short-circuits on GET/HEAD/OPTIONS; otherwise it matches `params.authenticityToken` against the session-stored token (`CsrfVerifyToken`) or the cookie-stored token depending on `application.wheels.csrfStore` (session by default, see `vendor/wheels/events/init/security.cfm` line 3).
+1. **View** — add a hidden token field to any `POST`/`PUT`/`PATCH`/`DELETE` form with `authenticityTokenField()`. Form helpers like `startFormTag()` insert it automatically for non-GET forms.
+2. **View (AJAX)** — add `csrfMetaTags()` to your layout `<head>`. It emits two `<meta>` tags your JavaScript reads to send the token as an `X-CSRF-Token` header.
+3. **Controller pipeline** — before each action runs, the framework's CSRF pipeline checks the `only`/`except` filters, verifies the token, and throws, aborts, or ignores per the `with` setting.
+4. **Verification** — verification short-circuits on GET/HEAD/OPTIONS; otherwise it matches `params.authenticityToken` against the session-stored token or the cookie-stored token depending on the `csrfStore` setting (session by default).
 
 ### Disable per-action for API endpoints
 
@@ -239,7 +239,7 @@ set(debugAccessTrustProxy=true);
 
 ### `RateLimiter` middleware — `trustProxy`
 
-Opt into proxy trust explicitly with `trustProxy=true`. The default is `false` "for security" (`vendor/wheels/middleware/RateLimiter.cfc` line 20, 51). Your proxy **must** strip any incoming `X-Forwarded-For` and append the real client, otherwise attackers can spoof an arbitrary IP and bypass rate limits.
+Opt into proxy trust explicitly with `trustProxy=true`. The default is `false`. Your proxy **must** strip any incoming `X-Forwarded-For` and append the real client, otherwise attackers can spoof an arbitrary IP and bypass rate limits.
 
 ```cfm {test:compile} title="config/settings.cfm — rate limiter with trusted proxy"
 <cfscript>
@@ -271,7 +271,7 @@ Cross-origin restrictions are a browser-enforced policy, not a server-enforced o
 
 Wheels renders a detailed error page with stack traces, parameter dumps, and file paths when `showErrorInformation=true`. That's fine locally and catastrophic in production — it leaks source paths, CFML versions, and sometimes credentials from the param dump.
 
-The framework already does the right thing by default: `vendor/wheels/events/init/debugging.cfm` line 22-25 flips both `showErrorInformation` and `sendEmailOnError` when the environment is `production`. Verify for your app:
+The framework already does the right thing by default: both `showErrorInformation` and `sendEmailOnError` flip automatically when the environment is `production`. Verify for your app:
 
 ```cfm {test:compile} title="config/production/settings.cfm"
 <cfscript>
