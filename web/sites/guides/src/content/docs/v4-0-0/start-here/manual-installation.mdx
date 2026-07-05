@@ -1,0 +1,97 @@
+---
+title: Manual Installation (zip / GitHub)
+description: Install Wheels 4 from two zip downloads — no CLI, no CommandBox, no package manager. A first-class, fully supported path.
+type: howto
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+You don't need the `wheels` CLI, CommandBox, or any package manager to run Wheels. Downloading the framework from GitHub and wiring it up by hand is a **fully supported path**, and in Wheels 4 it's simpler than it has been in years: **two zips, zero external dependencies**.
+
+**You'll learn:**
+
+- Which release files to download and exactly where each one goes
+- How to point your web server at the app
+- The one datasource step and the URL-rewriting decision
+- How this differs from the Wheels 3 manual install (it got easier)
+
+<Aside type="note" title="Who this page is for">
+Teams with their own deployment workflow — IIS or nginx in front of Lucee or Adobe ColdFusion, git-based deploys, in-house installers. If you'd rather have a tool scaffold and serve the app for you, use [the wheels CLI](/v4-0-0/start-here/installing/) or [CommandBox](/v4-0-0/start-here/installing-with-commandbox/) instead; all three paths produce structurally identical apps. Not sure which you want? See [Choosing Your Tooling](/v4-0-0/start-here/choosing-your-tooling/).
+</Aside>
+
+## What to download
+
+Every release publishes its artifacts on the [GitHub releases page](https://github.com/wheels-dev/wheels/releases). For a new app you need exactly two (substitute the current version number):
+
+| File | What it is | Where it goes |
+|---|---|---|
+| `wheels-base-template-4.0.5.zip` | The application skeleton: `app/`, `config/`, `public/`, `tests/`, an empty `vendor/` | Extract as your app root |
+| `wheels-core-4.0.5.zip` | The framework itself — a single `wheels/` folder | Extract into `vendor/`, so it becomes `vendor/wheels/` |
+
+That's the complete list. Wheels 4 has **no external dependencies**: the DI container (`vendor/wheels/Injector.cfc`) and the test framework (`vendor/wheels/wheelstest/`) are built in. `.md5`/`.sha512` checksum files are published alongside each zip if you want to verify downloads.
+
+<Aside type="tip" title="Coming from the Wheels 3 manual install?">
+The 3.x recipe — wheels-base-template + wheels-core + **WireBox**, plus **TestBox** and its four undocumented sub-modules (Globber, cbMockData, CBStreams, cbproxies) in exactly-named folders — is gone. In 4.0, WireBox is replaced by the built-in Injector and TestBox by the built-in WheelsTest. If you're maintaining a 3.x app, the old layering still applies to *that* app until you upgrade; see [Upgrading from 3.x to 4.0](/v4-0-0/upgrading/3x-to-4x/) and [Upgrading Without the CLI](/v4-0-0/upgrading/manual-upgrades/).
+</Aside>
+
+## Step-by-step
+
+<Steps>
+
+1. **Extract the base template** into your application directory:
+
+   ```
+   myapp/
+     app/
+     config/
+     db/
+     public/
+     tests/
+     vendor/          (empty — that's expected)
+     box.json
+     env.example
+     server.json
+   ```
+
+   A zero-byte marker file named `wheels-base-template-4.0.5-<timestamp>` ships in the zip; it identifies the build and is safe to delete.
+
+2. **Extract the core zip into `vendor/`.** The zip contains a single `wheels/` folder, so after extraction you have `vendor/wheels/` with `Dispatch.cfc`, `Model.cfc`, `Controller.cfc`, etc. directly inside it. The folder name must be exactly `wheels` — the mappings in `public/Application.cfc` depend on it.
+
+3. **Create your `.env` file.** Copy `env.example` to `.env` and set at minimum a reload password:
+
+   ```bash title=".env"
+   WHEELS_ENV=development
+   WHEELS_DATASOURCE=wheels
+   WHEELS_RELOAD_PASSWORD=pick-something-long
+   ```
+
+   `public/Application.cfc` reads this file at startup — no dotenv tooling involved. Never commit it.
+
+4. **Point your web server at `public/`.** The web root is `public/` and only `public/` — set your IIS site, nginx root, or Apache DocumentRoot there. Everything else (`app/`, `config/`, `vendor/`, `.env`) sits one level up, unreachable from a browser. The mappings in `public/Application.cfc` are relative, so the app runs from any disk location. Your CFML engine (Lucee 5/6/7, Adobe ColdFusion 2018–2025, or BoxLang) must be wired to that site the same way as any other CFML app — see [CFML Engines](/v4-0-0/start-here/cfml-engines/) for engine specifics and [IIS and Windows Deployment](/v4-0-0/deployment/iis-and-windows/) for the full IIS walkthrough.
+
+5. **Create the datasource.** The template ships with `set(dataSourceName="wheels")` in `config/settings.cfm`. Register a datasource named `wheels` in your engine's admin (Lucee admin or ColdFusion Administrator), or change that line to the name of a datasource you already have. On Adobe ColdFusion, create the datasource in the CF Administrator — runtime-defined datasources are not reliably picked up.
+
+6. **Decide on URL rewriting.** The template defaults to `set(URLRewriting="On")` in `config/settings.cfm`, which expects your web server to rewrite `/posts/1` to `/index.cfm/posts/1`. The shipped `public/urlrewrite.xml` handles this **only** on Tuckey-based servers (what the wheels CLI and CommandBox use) — IIS, nginx, and Apache each need their own rule, covered in [IIS and Windows Deployment](/v4-0-0/deployment/iis-and-windows/) and [VM and Bare-metal Deployment](/v4-0-0/deployment/vm-deployment/). Until your rewrite rule is in place, set `URLRewriting="Partial"` — URLs take the `/index.cfm/posts/1` form with no server config at all.
+
+7. **Load the app** in a browser. You should see the Wheels congratulations page. From here the [tutorial](/v4-0-0/start-here/tutorial/) and every guide in [The Basics](/v4-0-0/basics/) apply exactly as written — only the CLI convenience commands differ, and [Working Without the CLI](/v4-0-0/start-here/working-without-the-cli/) maps each one to its no-CLI equivalent.
+
+</Steps>
+
+## Adding the framework to your own skeleton
+
+If you have your own app layout and deployment scripts and only want the framework files: the only hard requirements are (1) `vendor/wheels/` present, (2) the six mappings `public/Application.cfc` defines (`/app`, `/vendor`, `/wheels`, `/tests`, `/config`, `/plugins`), and (3) a web root containing the template's `Application.cfc` and `index.cfm`. [Anatomy of a Wheels App](/v4-0-0/start-here/app-structure/) documents the full contract. Upgrading later is a `vendor/wheels/` swap — see [Upgrading Without the CLI](/v4-0-0/upgrading/manual-upgrades/).
+
+<Aside type="note" title="The same files, via ForgeBox">
+The identical artifacts are published to ForgeBox as `wheels-base-template` and `wheels-core` for CommandBox users (`box install wheels-base-template` pulls core into `vendor/wheels/` automatically). If you're a CommandBox shop, [Installing with CommandBox](/v4-0-0/start-here/installing-with-commandbox/) is your page — same layout, tool-fetched.
+</Aside>
+
+## Git-based alternative
+
+Prefer `git clone` over zips? Clone the repo and copy `vendor/wheels/` from a release tag:
+
+```bash title="your shell"
+git clone --depth=1 --branch v4.0.5 https://github.com/wheels-dev/wheels.git /tmp/wheels-src
+cp -R /tmp/wheels-src/vendor/wheels myapp/vendor/wheels
+```
+
+The repo's `vendor/wheels/` at a release tag is the same code as the core zip, with one cosmetic difference: the release pipeline stamps the real version into `wheels.json`, while a git checkout carries the `@build.version@` placeholder — the app runs identically, but version reporting (the debug bar, `application.$wheels.version`) shows the placeholder-derived value instead of `4.0.5`. If exact version metadata matters to you, prefer the zips. (Either way, don't track the framework from `develop` in production — tags are the supported line.)

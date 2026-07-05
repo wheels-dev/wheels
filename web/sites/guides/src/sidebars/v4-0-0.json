@@ -9,11 +9,15 @@
         "label": "Install Wheels",
         "collapsed": false,
         "items": [
+          { "label": "Choosing Your Tooling", "link": "/v4-0-0/start-here/choosing-your-tooling/" },
           { "label": "Installing Wheels", "link": "/v4-0-0/start-here/installing/" },
           { "label": "Installing with CommandBox", "link": "/v4-0-0/start-here/installing-with-commandbox/" },
+          { "label": "Manual Installation (zip / GitHub)", "link": "/v4-0-0/start-here/manual-installation/" },
           { "label": "CFML Engines", "link": "/v4-0-0/start-here/cfml-engines/" }
         ]
       },
+      { "label": "Working Without the CLI", "link": "/v4-0-0/start-here/working-without-the-cli/" },
+      { "label": "Anatomy of a Wheels App", "link": "/v4-0-0/start-here/app-structure/" },
       { "label": "Your First 15 Minutes", "link": "/v4-0-0/start-here/first-15-minutes/" },
       {
         "label": "Tutorial: Build a Blog",
@@ -36,6 +40,7 @@
     "link": "/v4-0-0/upgrading/",
     "items": [
       { "label": "Upgrading from 3.x to 4.0", "link": "/v4-0-0/upgrading/3x-to-4x/" },
+      { "label": "Upgrading Without the CLI", "link": "/v4-0-0/upgrading/manual-upgrades/" },
       { "label": "Upgrading from 2.x to 3.x", "link": "/v4-0-0/upgrading/2x-to-3x/" },
       { "label": "Release Channels", "link": "/v4-0-0/start-here/release-channels/" },
       { "label": "Reading the Changelog", "link": "/v4-0-0/upgrading/changelog/" }
@@ -123,7 +128,8 @@
         "collapsed": false,
         "items": [
           { "label": "Docker Deployment", "link": "/v4-0-0/deployment/docker-deployment/" },
-          { "label": "VM and Bare-metal Deployment", "link": "/v4-0-0/deployment/vm-deployment/" }
+          { "label": "VM and Bare-metal Deployment", "link": "/v4-0-0/deployment/vm-deployment/" },
+          { "label": "IIS and Windows Deployment", "link": "/v4-0-0/deployment/iis-and-windows/" }
         ]
       },
       {

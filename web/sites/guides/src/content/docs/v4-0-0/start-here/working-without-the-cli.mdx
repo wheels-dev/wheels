@@ -1,0 +1,40 @@
+---
+title: Working Without the CLI
+description: Every wheels-CLI convenience mapped to its in-framework equivalent — reload, migrations, tests, seeds, packages — with per-environment availability.
+type: howto
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Everything the `wheels` CLI does to a *running app* goes through surfaces the framework itself provides — which means every one of them is reachable without the CLI. This page is the map. Bookmark it if you installed [manually](/v4-0-0/start-here/manual-installation/) or run [CommandBox](/v4-0-0/start-here/installing-with-commandbox/).
+
+<Aside type="note" title="CommandBox teams">
+This is your page too: `box` manages your server and fetches the framework, but for framework tasks — reload, migrate, test, seed — follow the equivalents below (they work regardless of what serves the app). Task pages across the guides label this path **"Without the wheels CLI"**.
+</Aside>
+
+## The equivalents table
+
+| Task | With the wheels CLI | Without the wheels CLI | Available in |
+|---|---|---|---|
+| Reload the app after config/code changes | `wheels reload` | `?reload=true&password=<your-reload-password>` appended to any app URL | Any environment with a non-empty `reloadPassword` (rate-limited; [set it in `.env`](/v4-0-0/deployment/security-hardening/#reload-password)). Restarting the app server also reloads. |
+| Run migrations | `wheels migrate latest` | Browser: the migrator GUI at `/wheels/migrator`. Programmatic: `application.wheels.migrator.migrateToLatest()` or `.migrateTo(version)` | GUI: **development only**. Programmatic: any environment. `set(autoMigrateDatabase=true)` runs pending migrations at application start. |
+| Check migration status | `wheels migrate info` | `/wheels/migrator` (shows applied/pending), or `application.wheels.migrator.getCurrentMigrationVersion()` | GUI: **development only**. Programmatic: any environment. |
+| Write a migration | `wheels g migration <name>` | Create `app/migrator/migrations/[timestamp]_[description].cfc` by hand — it's a plain CFC with `up()`/`down()`; copy any existing one as a starting point. See [Migrations](/v4-0-0/basics/migrations/). | n/a (files on disk) |
+| Run app tests | `wheels test` | `/wheels/app/tests` in a browser; append `?format=json` for machine-readable results (that's all the CLI does) | **Development only** |
+| Seed data | `wheels seed` | `application.wheels.seeder.runSeeds()` — callable from anywhere server-side (an admin action, a deploy hook, one-off script) | Any environment |
+| Inspect routes | `wheels routes` | `/wheels/routes` in a browser, or the debug bar's Tools panel | **Development only** |
+| App/framework info | `wheels info` | `/wheels/info`, or the debug bar's Environment panel | **Development only** |
+| Install a package | `wheels packages add <name>` | Download the package release and extract into `vendor/<name>/`, then reload — packages are auto-discovered from `vendor/*/package.json` at startup. See [Packages](/v4-0-0/digging-deeper/packages/). | n/a (files on disk) |
+| Generate models/controllers/scaffolds | `wheels g …` | No runtime equivalent — generators just write files. Copy the patterns from [The Basics](/v4-0-0/basics/) or the snippets under `app/snippets/`. | n/a |
+| Upgrade the framework | `wheels upgrade apply` | Swap `vendor/wheels/` with the new release's core zip — full recipe at [Upgrading Without the CLI](/v4-0-0/upgrading/manual-upgrades/) | n/a (files on disk) |
+| Create a new app | `wheels new` | Two zip downloads — [Manual Installation](/v4-0-0/start-here/manual-installation/) | n/a |
+
+## Why the "development only" rows are locked
+
+The browser surfaces under `/wheels/*` (migrator GUI, test runners, routes, info) are gated by a **development-only allowlist** — since 4.0.4 ([#2903](https://github.com/wheels-dev/wheels/pull/2903)) they return 404 in every other environment, and `set(enablePublicComponent=true)` cannot open them outside development. That's deliberate: they expose schema and internals no production app should serve.
+
+So the production-safe versions are the programmatic ones: `application.wheels.migrator.migrateToLatest()` and `application.wheels.seeder.runSeeds()` called from your own protected code path (a deploy hook, an authenticated admin action), plus the URL reload — which works in production precisely because it demands the `reloadPassword` you set in `.env`. [Production Configuration](/v4-0-0/deployment/production-config/) and [Security Hardening](/v4-0-0/deployment/security-hardening/) cover hardening both.
+
+<Aside type="tip">
+Nothing on this page is a second-class workaround. The CLI calls these same surfaces — `wheels test` hits the same runner as `/wheels/app/tests?format=json`. Choosing not to install the CLI costs you typing, not capability.
+</Aside>
