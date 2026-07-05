@@ -1,0 +1,53 @@
+---
+title: Choosing Your Tooling
+description: One page to decide how you'll obtain and run Wheels — CLI, CommandBox, or plain zip downloads — plus a glossary of every tool name the docs mention.
+type: explanation
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The guides mention a lot of tool names — CommandBox, ForgeBox, LuCLI, Homebrew, Scoop, buckets, binaries, JARs. If that list is overwhelming, this page is the decoder ring. It answers one narrow question — **how do I obtain and run Wheels?** — and defines every term the answer touches.
+
+**If unsure, use the [wheels CLI](/v4-0-0/start-here/installing/).** It's what the guides assume by default and the shortest path to a running app.
+
+## The three supported paths
+
+| Your situation | Your path | Install page |
+|---|---|---|
+| New project, no strong tooling opinions | The `wheels` CLI | [Installing Wheels](/v4-0-0/start-here/installing/) |
+| CommandBox shop — you already use `box` for servers and packages | Keep CommandBox | [Installing with CommandBox](/v4-0-0/start-here/installing-with-commandbox/) |
+| Your own workflow — IIS/nginx, git repos, in-house deploy scripts, no package managers | Zip downloads from GitHub | [Manual Installation](/v4-0-0/start-here/manual-installation/) |
+
+All three produce structurally identical applications, and all three are supported. Nothing about the framework itself changes based on how you obtained it.
+
+**Do CommandBox teams have to switch?** No. CommandBox is supported as a server manager and package fetcher — `box install wheels-base-template`, `box server start` — indefinitely. What CommandBox doesn't do is the Wheels-specific developer tooling (generators, `migrate`, `test`, console, deploy); for framework tasks, follow the "Without the wheels CLI" path on each task page — reload, migrate, test, and seed all have in-app equivalents that work no matter what serves your app. See [Working Without the CLI](/v4-0-0/start-here/working-without-the-cli/).
+
+**Is a plain GitHub download supported?** Yes — first-class. Two zips, zero dependencies: [Manual Installation](/v4-0-0/start-here/manual-installation/).
+
+## Glossary of tool names
+
+*This glossary exists because a group of long-time Wheels users had to build their own to decode the docs ([discussion #1838](https://github.com/wheels-dev/wheels/discussions/1838)). Each term is defined narrowly — only its role in obtaining/running Wheels.*
+
+**wheels CLI** — Wheels' own command-line tool. One binary that scaffolds apps (`wheels new`), runs a dev server, generates code, runs migrations and tests, and deploys. Installing it is the whole "Installing Wheels" page. Everything it does has a manual equivalent; it's an accelerator, not a requirement.
+
+**LuCLI** — the runtime the wheels CLI is built on. **The wheels CLI *is* LuCLI**, rebranded and preconfigured — you never install LuCLI separately, and nothing Wheels-related requires you to. If you see "LuCLI" in older docs or forums, read it as "the wheels CLI's engine."
+
+**Wheels binary** — just another name for the installed `wheels` CLI executable. It does **not** mean the framework is compiled — your CFML engine still compiles the framework's CFML at runtime, exactly as in 2.x.
+
+**Wheels JAR** — a Java-archive distribution of the same CLI, for environments where you'd rather launch it with your own Java than install a platform package. Ignore it unless that describes you.
+
+**CommandBox** — Ortus Solutions' CFML package manager and server runner. Predates the wheels CLI; many CFML shops use it for everything. For Wheels it can fetch the framework and serve the app.
+
+**ForgeBox** — the package registry CommandBox installs from (npm, for CFML). Wheels publishes `wheels-core` and `wheels-base-template` there. Only relevant if you use CommandBox.
+
+**Homebrew / Scoop / apt / yum** — ordinary OS package managers (macOS+Linux / Windows / Debian-family / RHEL-family). Each is just a way to install the wheels CLI binary; they play no ongoing role afterward.
+
+**Wheels bucket / tap** — Scoop and Homebrew jargon for "the repository that hosts the wheels package." You add it once during install; the install page gives the exact command.
+
+**Chocolatey** — a Windows package manager Wheels formerly published to; retired in favor of Scoop. If instructions mention it, they're outdated.
+
+**SDKMAN! / Maven** — JVM-ecosystem tools that appear only around the JAR distribution and internal builds. Not needed to obtain, run, or upgrade Wheels.
+
+<Aside type="note" title="The mental model in one sentence">
+The framework is a folder of CFML files (`vendor/wheels/`); every tool above is just a different way of getting that folder onto your disk and serving the `public/` folder next to it — and "download a zip and unzip it" is a perfectly good way.
+</Aside>

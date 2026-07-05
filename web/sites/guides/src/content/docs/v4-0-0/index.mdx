@@ -4,8 +4,49 @@ description: The official guides for Wheels 4.0, a CFML web framework that gets 
 type: landing
 ---
 
-Welcome to Wheels 4.0. These guides teach you the framework from zero — including CFML itself if you're new to the language.
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-**New here?** Start with [Welcome to Wheels](/v4-0-0/start-here/welcome/).
+Welcome to Wheels 4.0. These guides teach you the framework from zero — including CFML itself if you're new to the language. Start with whichever door matches your situation:
 
-**Coming from 3.x?** Read the [Upgrading to 4.0](/v4-0-0/upgrading/) guide first.
+<CardGrid>
+  <LinkCard
+    title="I'm new to Wheels"
+    href="/v4-0-0/start-here/welcome/"
+    description="Orientation, a five-minute install, your first 15 minutes, and a full tutorial that builds a working blog."
+  />
+  <LinkCard
+    title="I have a 2.x or 3.x app"
+    href="/v4-0-0/upgrading/"
+    description="What changed, the version-by-version upgrade guides, and how to upgrade with or without the CLI."
+  />
+  <LinkCard
+    title="I don't use CLI tooling"
+    href="/v4-0-0/start-here/manual-installation/"
+    description="Install from two zip downloads — fully supported, zero dependencies — and the no-CLI equivalent for every framework task."
+  />
+  <LinkCard
+    title="I'm a CommandBox shop"
+    href="/v4-0-0/start-here/installing-with-commandbox/"
+    description="Keep box for servers and installs. Exactly what's supported, what isn't, and how framework tasks work in your setup."
+  />
+  <LinkCard
+    title="I'm deploying to my own servers"
+    href="/v4-0-0/deployment/"
+    description="Docker, plain VMs, IIS on Windows — no CLI required — or the built-in wheels deploy if you want zero-downtime shipping."
+  />
+</CardGrid>
+
+Not sure which tooling story fits you? [Choosing Your Tooling](/v4-0-0/start-here/choosing-your-tooling/) settles it in one page — including a glossary of every tool name these guides mention.
+
+## The full map
+
+- **[Start Here](/v4-0-0/start-here/)** — orientation, installing (three supported paths), first 15 minutes, the blog tutorial.
+- **[Upgrading & Releases](/v4-0-0/upgrading/)** — version upgrade guides, release channels, reading the changelog.
+- **[Core Concepts](/v4-0-0/core-concepts/)** — how Wheels thinks: request lifecycle, MVC, conventions, ORM, DI, middleware, routing, environments.
+- **[The Basics](/v4-0-0/basics/)** — everyday how-tos: routing, controllers, views, forms, validation, models, associations, migrations, seeding, the query builder.
+- **[Digging Deeper](/v4-0-0/digging-deeper/)** — authentication, jobs, caching, email, uploads, SSE, channels, i18n, multi-tenancy, packages, and more.
+- **[Testing](/v4-0-0/testing/)** — writing and running model, controller, view, integration, functional, and browser tests.
+- **[Deployment & Operations](/v4-0-0/deployment/)** — production config, security hardening, observability, self-managed deploys, and `wheels deploy`.
+- **[Contributing & Project](/v4-0-0/contributing/)** — contributing code and docs to Wheels itself.
+- **[wheels CLI Reference](/v4-0-0/command-line-tools/)** — every command, flag by flag.
+- **[Glossary](/v4-0-0/glossary/)** — every Wheels term defined in one place.
