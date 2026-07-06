@@ -16,6 +16,14 @@ component extends="Model" {
 		// Never allow these to be set by mass assignment (params structs).
 		protectedProperties("passwordDigest,resetTokenDigest,resetTokenExpiresAt{{protectedApiToken}}");
 
+		// passwordDigest is populated by the beforeSave callback AFTER validation
+		// runs, so Wheels' automatic NOT-NULL presence validation (added for
+		// allowNull=false columns) would reject every new record before the hash
+		// exists. Presence stays guaranteed: validatesPresenceOf(password) on
+		// create feeds the hashing callback, and the database NOT NULL
+		// constraint is the backstop.
+		property(name="passwordDigest", automaticValidations=false);
+
 		// Validations. The transient `password` property is only validated when
 		// present, so updates that don't touch the password pass untouched.
 		validatesPresenceOf(property="email");

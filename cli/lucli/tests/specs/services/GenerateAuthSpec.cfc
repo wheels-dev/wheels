@@ -165,6 +165,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(stripped).toInclude('protectedProperties(');
 			});
 
+			it("disables the automatic NOT-NULL presence validation on passwordDigest", () => {
+				// passwordDigest is only populated by the beforeSave callback,
+				// which runs AFTER validation — Wheels' automatic presence
+				// validation for the allowNull=false column would otherwise
+				// reject every new record ("Password Digest can't be empty").
+				// Verified live: seeding/registration failed until this line
+				// was added (runtime verification on PR ##3291).
+				for (var key in ["session", "token", "jwt"]) {
+					var stripped = $strippedFile(fixtures[key].root & "/app/models/User.cfc");
+					expect(stripped).toInclude('property(name="passwordDigest", automaticValidations=false)');
+				}
+			});
+
 			it("uses the injection-safe query builder rather than interpolated where strings", () => {
 				var stripped = $strippedFile(fixtures.session.root & "/app/controllers/Sessions.cfc");
 				expect(stripped).toInclude('.where("email", email)');
@@ -333,6 +346,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(routes).toInclude("wheels:generate-auth:routes:begin");
 			});
 
+			it("extends the app base controller by full mapping path (namespaced controller)", () => {
+				// app/controllers/api/Sessions.cfc lives in a subfolder — a bare
+				// extends="Controller" cannot resolve from there and fails to
+				// compile at request time (verified live on PR ##3291). Matches
+				// the admin generator's namespaced-controller convention.
+				var stripped = $strippedFile(fixtures.token.root & "/app/controllers/api/Sessions.cfc");
+				expect(stripped).toInclude('extends="app.controllers.Controller"');
+			});
+
 			it("notes that the registration flag does not apply", () => {
 				var notes = arrayToList(fixtures.token.result.skipped, "|");
 				expect(notes).toInclude("registration");
@@ -372,6 +394,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("equalizes login timing with a dummy derivation when the email is unknown", () => {
 				var stripped = $strippedFile(fixtures.jwt.root & "/app/controllers/api/Sessions.cfc");
 				expect(stripped).toInclude('service("passwordHasher").hash(');
+			});
+
+			it("extends the app base controller by full mapping path (namespaced controller)", () => {
+				var stripped = $strippedFile(fixtures.jwt.root & "/app/controllers/api/Sessions.cfc");
+				expect(stripped).toInclude('extends="app.controllers.Controller"');
 			});
 
 		});

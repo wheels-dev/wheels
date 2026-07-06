@@ -18,7 +18,10 @@
  * an instance to `set(middleware=[...])` in config/settings.cfm or scope one
  * to the /api routes in config/routes.cfm (see the middleware guide).
  */
-component extends="Controller" {
+// Lives in app/controllers/api/, so it must extend the app base controller by
+// its full mapping path — a bare extends="Controller" cannot resolve from a
+// subfolder and fails to compile at request time.
+component extends="app.controllers.Controller" {
 
 	function config() {
 		// Inherit app-wide defaults from app/controllers/Controller.cfc.
