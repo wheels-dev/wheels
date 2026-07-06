@@ -16,6 +16,12 @@
  * The signing secret comes from the WHEELS_JWT_SECRET environment variable
  * (at least 32 random bytes; see .env). App startup fails loudly when it is
  * missing or too short.
+ *
+ * NOTE: each login attempt costs a full PBKDF2 derivation, so throttle
+ * POST /api/session in production — both to slow credential stuffing and to
+ * keep the CPU cost bounded. Wheels ships wheels.middleware.RateLimiter: add
+ * an instance to `set(middleware=[...])` in config/settings.cfm or scope one
+ * to the /api routes in config/routes.cfm (see the middleware guide).
  */
 component extends="Controller" {
 
@@ -35,6 +41,13 @@ component extends="Controller" {
 		// Injection-safe query builder — never interpolate user input into a
 		// where string.
 		var {{modelVar}} = model("{{modelName}}").where("email", email).first();
+		if (!IsObject({{modelVar}})) {
+			// Equalize timing for unknown emails: without this dummy PBKDF2
+			// derivation, requests for nonexistent accounts return measurably
+			// faster than failed passwords, leaking which addresses are
+			// registered despite the uniform error message below.
+			service("passwordHasher").hash(params.password ?: "");
+		}
 		if (IsObject({{modelVar}}) && {{modelVar}}.authenticate(params.password ?: "")) {
 			// Startup validated WHEELS_JWT_SECRET (see app/events/onapplicationstart.cfm),
 			// so construction here cannot fail on a running app.

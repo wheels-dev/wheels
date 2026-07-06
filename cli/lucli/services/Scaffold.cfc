@@ -841,9 +841,11 @@ component {
 		} catch (any e) {
 			results.success = false;
 			arrayAppend(results.errors, e.message);
-			if (e.type == "ScaffoldError") {
-				rollbackScaffold(results.rollback);
-			}
+			// Roll back on ANY failure, not just typed ScaffoldErrors — an IO
+			// error mid-run must not leave a half-generated scaffold behind.
+			// The rollback list only ever contains files THIS run created, so
+			// pre-existing user files are never deleted.
+			rollbackScaffold(results.rollback);
 		}
 
 		return results;
@@ -977,16 +979,14 @@ component {
 				// stock routes.cfm ships a commented example above the real one.
 				anchorPos = $findCodePosition(content, ".root(");
 			}
-			if (anchorPos == 0) {
-				var lastEnd = content.lastIndexOf(".end()");
-				if (lastEnd >= 0) {
-					anchorPos = lastEnd + 1;
-				}
-			}
+			// Deliberately NO `.end()` fallback: the last `.end()` closes the
+			// mapper chain AFTER `.wildcard()`, so routes inserted there could
+			// never match (anti-pattern ##6). When neither anchor exists, make
+			// the user place the block instead of injecting dead routes.
 			if (anchorPos == 0) {
 				arrayAppend(
 					arguments.results.skipped,
-					"#arguments.label#: could not find an insertion anchor (// CLI-Appends-Here, .root(), or .end()) in #arguments.relPath# — add this block manually inside the mapper() chain:" & nl & blockText
+					"#arguments.label#: could not find an insertion anchor (// CLI-Appends-Here or an uncommented .root()) in #arguments.relPath# — add this block manually inside the mapper() chain, before .root()/.wildcard():" & nl & blockText
 				);
 				return;
 			}

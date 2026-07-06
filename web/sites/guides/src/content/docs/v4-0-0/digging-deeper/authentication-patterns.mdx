@@ -85,13 +85,17 @@ Wire the session strategy into the authenticator on app init. The `hasStrategy` 
 
 ```cfm {test:compile} title="config/app.cfm or equivalent init hook"
 if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
-    var auth = service("authenticator");
-    var sessionStrategy = service("sessionStrategy");
-    if (!auth.hasStrategy("session")) {
-        auth.registerStrategy(name="session", strategy=sessionStrategy);
+    local.auth = service("authenticator");
+    local.sessionStrategy = service("sessionStrategy");
+    if (!local.auth.hasStrategy("session")) {
+        local.auth.registerStrategy(name="session", strategy=local.sessionStrategy);
     }
 }
 ```
+
+<Aside type="caution">
+  Use the `local.` prefix — never a bare `var` — for variables at the top level of these init hooks. They run as included templates, and Adobe ColdFusion rejects a template-level `var` at compile time ([#3063](https://github.com/wheels-dev/wheels/issues/3063)), turning every request into an HTTP 500. `var` is still correct *inside* function and closure bodies.
+</Aside>
 
 <Aside type="tip">
   The short `service("authenticator")` form and the long `application.wo.service("authenticator")` form resolve to the same instance. Use the short one in controllers, views, and other files that are already running inside the framework; the long form is only needed at app-init time when the global helper isn't in scope yet.
@@ -211,12 +215,12 @@ component extends="Model" {
 
 ```cfm {test:compile} title="config/app.cfm or equivalent init hook"
 if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
-    var auth = service("authenticator");
+    local.auth = service("authenticator");
 
-    if (!auth.hasStrategy("token")) {
+    if (!local.auth.hasStrategy("token")) {
         // Hoist the closure into a variable first — an inline function literal as a
         // constructor named argument crashes Adobe ColdFusion's compiler.
-        var tokenValidator = function(token) {
+        local.tokenValidator = function(token) {
             // Dynamic finder binds the token value; the extra where= condition is
             // merged in with AND.
             var apiKey = model("ApiKey").findOneByToken(value=arguments.token, where="revokedAt IS NULL");
@@ -225,8 +229,8 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
             }
             return false;
         };
-        var tokenStrategy = new wheels.auth.TokenStrategy(validator=tokenValidator);
-        auth.registerStrategy(name="token", strategy=tokenStrategy);
+        local.tokenStrategy = new wheels.auth.TokenStrategy(validator=local.tokenValidator);
+        local.auth.registerStrategy(name="token", strategy=local.tokenStrategy);
     }
 }
 ```
@@ -277,16 +281,16 @@ JWTs are self-contained signed tokens — the client holds them, you verify the 
 
 ```cfm {test:compile} title="config/app.cfm or equivalent init hook"
 if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
-    var auth = service("authenticator");
+    local.auth = service("authenticator");
 
-    if (!auth.hasStrategy("jwt")) {
-        var jwtService = new wheels.auth.JwtService(
+    if (!local.auth.hasStrategy("jwt")) {
+        local.jwtService = new wheels.auth.JwtService(
             secretKey=env("JWT_SECRET"),
             defaultExpiry=3600,
             issuer="myapp"
         );
-        var jwtStrategy = new wheels.auth.JwtStrategy(jwtService=jwtService);
-        auth.registerStrategy(name="jwt", strategy=jwtStrategy);
+        local.jwtStrategy = new wheels.auth.JwtStrategy(jwtService=local.jwtService);
+        local.auth.registerStrategy(name="jwt", strategy=local.jwtStrategy);
     }
 }
 ```
@@ -345,14 +349,14 @@ The registry pattern pays off when one app serves both HTML and JSON. Register s
 
 ```cfm {test:compile} title="config/app.cfm — register both strategies"
 if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
-    var auth = service("authenticator");
+    local.auth = service("authenticator");
 
-    if (!auth.hasStrategy("jwt")) {
-        var jwtService = new wheels.auth.JwtService(secretKey=env("JWT_SECRET"));
-        auth.registerStrategy(name="jwt", strategy=new wheels.auth.JwtStrategy(jwtService=jwtService));
+    if (!local.auth.hasStrategy("jwt")) {
+        local.jwtService = new wheels.auth.JwtService(secretKey=env("JWT_SECRET"));
+        local.auth.registerStrategy(name="jwt", strategy=new wheels.auth.JwtStrategy(jwtService=local.jwtService));
     }
-    if (!auth.hasStrategy("session")) {
-        auth.registerStrategy(name="session", strategy=service("sessionStrategy"));
+    if (!local.auth.hasStrategy("session")) {
+        local.auth.registerStrategy(name="session", strategy=service("sessionStrategy"));
     }
 }
 ```

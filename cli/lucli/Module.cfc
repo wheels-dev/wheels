@@ -4120,11 +4120,16 @@ component extends="modules.BaseModule" {
 			if (strategy == "session") {
 				out("  2. Restart or reload, then visit /login (and /register).");
 				out("  3. Protect actions with a filter that calls service(""authenticator"").authenticate(request).");
+				out("  4. Wire reset-link email delivery in app/controllers/Passwords.cfc (see the TODO in create()) —");
+				out("     until then no reset email is actually sent.");
+				out("  5. Rate-limit POST /login in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
 			} else if (strategy == "jwt") {
 				out("  2. Set WHEELS_JWT_SECRET in .env (at least 32 random bytes) — startup fails loudly without it.");
 				out("  3. Restart, then POST credentials to /api/session to receive a JWT.");
+				out("  4. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
 			} else {
 				out("  2. Restart, then POST credentials to /api/session to receive a bearer token.");
+				out("  3. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
 			}
 			out("  Generated code is yours to edit — re-run with --force and review `git diff` to upgrade.");
 		} else {

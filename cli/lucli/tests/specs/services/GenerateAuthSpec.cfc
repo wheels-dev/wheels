@@ -197,6 +197,64 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(reFindNoCase("new\s+wheels\.auth\.[A-Za-z]+\([^)]*=\s*function", bootstrap)).toBe(0);
 			});
 
+			it("rejects a blank password on reset instead of burning the token (Passwords##update)", () => {
+				var stripped = $strippedFile(fixtures.session.root & "/app/controllers/Passwords.cfc");
+				// Presence is only validated onCreate and the hash callback
+				// skips blanks — without this guard a blank submit clears the
+				// token, reports success, and keeps the old password valid.
+				expect(stripped).toInclude('addError(property="password"');
+				var guardPos = find('addError(property="password"', stripped);
+				var burnPos = find('resetTokenDigest = ""', stripped);
+				expect(guardPos).toBeGT(0);
+				expect(burnPos).toBeGT(0);
+				expect(guardPos).toBeLT(burnPos, "the blank-password guard must run before the token is cleared");
+			});
+
+			it("equalizes login timing with a dummy derivation when the email is unknown", () => {
+				var stripped = $strippedFile(fixtures.session.root & "/app/controllers/Sessions.cfc");
+				expect(stripped).toInclude('service("passwordHasher").hash(');
+			});
+
+			it("emits a controller spec that calls processAction() with no positional action argument", () => {
+				var stripped = $strippedFile(fixtures.session.root & "/tests/specs/controllers/SessionsControllerSpec.cfc");
+				// processAction()'s only parameter is includeFilters — a
+				// positional "create" would silently disable before-filters.
+				expect(stripped).toInclude("processAction()");
+				expect(stripped).notToInclude('processAction("');
+			});
+
+		});
+
+		describe("generateAuth() — bootstrap uses local.-scoped variables, never template-level var (##3063)", () => {
+
+			// app/events/onapplicationstart.cfm is $include()d from a framework
+			// function; Adobe CF rejects top-level `var` in an included template
+			// at COMPILE time, turning every request into an HTTP 500. `var`
+			// inside the hoisted closure body is fine and stays.
+			it("session bootstrap", () => {
+				var bootstrap = $stripComments(fileRead(fixtures.session.root & "/app/events/onapplicationstart.cfm"));
+				expect(bootstrap).toInclude("local.auth = ");
+				expect(bootstrap).notToInclude("var auth");
+			});
+
+			it("token bootstrap", () => {
+				var bootstrap = $stripComments(fileRead(fixtures.token.root & "/app/events/onapplicationstart.cfm"));
+				expect(bootstrap).toInclude("local.auth = ");
+				expect(bootstrap).toInclude("local.tokenValidator = ");
+				expect(bootstrap).notToInclude("var auth");
+				expect(bootstrap).notToInclude("var tokenValidator");
+			});
+
+			it("jwt bootstrap", () => {
+				var bootstrap = $stripComments(fileRead(fixtures.jwt.root & "/app/events/onapplicationstart.cfm"));
+				expect(bootstrap).toInclude("local.auth = ");
+				expect(bootstrap).toInclude("local.jwtSecret = ");
+				expect(bootstrap).toInclude("local.jwtService = ");
+				expect(bootstrap).notToInclude("var auth");
+				expect(bootstrap).notToInclude("var jwtSecret");
+				expect(bootstrap).notToInclude("var jwtService");
+			});
+
 		});
 
 		describe("generateAuth() — --no-registration", () => {
@@ -249,9 +307,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("hoists the token validator instead of inlining a closure into the constructor", () => {
 				var bootstrap = $stripComments(fileRead(fixtures.token.root & "/app/events/onapplicationstart.cfm"));
-				expect(bootstrap).toInclude("var tokenValidator = function");
-				expect(bootstrap).toInclude("TokenStrategy(validator=tokenValidator)");
+				expect(bootstrap).toInclude("local.tokenValidator = function");
+				expect(bootstrap).toInclude("TokenStrategy(validator=local.tokenValidator)");
 				expect(reFindNoCase("TokenStrategy\(\s*validator\s*=\s*function", bootstrap)).toBe(0);
+			});
+
+			it("equalizes login timing with a dummy derivation when the email is unknown", () => {
+				var stripped = $strippedFile(fixtures.token.root & "/app/controllers/api/Sessions.cfc");
+				expect(stripped).toInclude('service("passwordHasher").hash(');
+			});
+
+			it("hands the Authorization header to the authenticator explicitly on revoke", () => {
+				// request.cgi is allowlisted (Global.cfc $cgiScope) and omits
+				// http_authorization — passing the raw request scope would 401
+				// every revoke.
+				var stripped = $strippedFile(fixtures.token.root & "/app/controllers/api/Sessions.cfc");
+				expect(stripped).toInclude("GetHttpRequestData");
+				expect(stripped).toInclude("http_authorization");
+				expect(stripped).notToInclude(".authenticate(request)");
 			});
 
 			it("injects api-namespaced session routes", () => {
@@ -296,6 +369,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(content).notToInclude("apiTokenDigest");
 			});
 
+			it("equalizes login timing with a dummy derivation when the email is unknown", () => {
+				var stripped = $strippedFile(fixtures.jwt.root & "/app/controllers/api/Sessions.cfc");
+				expect(stripped).toInclude('service("passwordHasher").hash(');
+			});
+
 		});
 
 		describe("generateAuth() — force and idempotency", () => {
@@ -330,6 +408,83 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(() => {
 					fixtures.session.scaffold.generateAuth(strategy = "basic");
 				}).toThrow();
+			});
+
+		});
+
+		describe("generateAuth() — routes anchor handling", () => {
+
+			it("falls back to the first uncommented .root( when the CLI-Appends-Here marker is missing", () => {
+				var root = testHelper.scaffoldTempProject(expandPath("/"));
+				try {
+					var routesPath = root & "/config/routes.cfm";
+					var nl = chr(10);
+					// No marker; a commented-out .root( example above the real one,
+					// mirroring the stock app template.
+					fileWrite(
+						routesPath,
+						"// routes" & nl
+							& "mapper()" & nl
+							& chr(9) & "// .root(to = ""home####index"", method = ""get"")" & nl
+							& chr(9) & ".wildcard()" & nl
+							& chr(9) & ".root(method = ""get"")" & nl
+							& chr(9) & ".end();" & nl
+					);
+					var result = $newScaffold(root).generateAuth(cliVersion = "test-version");
+					expect(result.success).toBeTrue();
+					var written = fileRead(routesPath);
+					expect(written).toInclude("wheels:generate-auth:routes:begin");
+					// $findCodePosition skips the commented-out .root( example and
+					// anchors on the real one.
+					expect(find("wheels:generate-auth:routes:begin", written)).toBeLT(find('.root(method = "get")', written));
+				} finally {
+					testHelper.cleanupTempProject(root);
+				}
+			});
+
+			it("skips with a manual-insert note instead of injecting dead routes when no anchor exists", () => {
+				var root = testHelper.scaffoldTempProject(expandPath("/"));
+				try {
+					var routesPath = root & "/config/routes.cfm";
+					// Hand-edited file: no CLI-Appends-Here and the only .root( is
+					// commented out. An .end() fallback would have parked the auth
+					// routes after .wildcard(), where they could never match
+					// (anti-pattern ##6) — refusing is the only safe move.
+					var scriptOpen = chr(60) & "cfscript" & chr(62);
+					var scriptClose = chr(60) & "/cfscript" & chr(62);
+					var nl = chr(10);
+					fileWrite(
+						routesPath,
+						scriptOpen & nl
+							& "mapper()" & nl
+							& chr(9) & "// .root(to = ""home####index"", method = ""get"")" & nl
+							& chr(9) & ".wildcard()" & nl
+							& chr(9) & ".end();" & nl
+							& scriptClose & nl
+					);
+					var result = $newScaffold(root).generateAuth(cliVersion = "test-version");
+					expect(result.success).toBeTrue();
+					expect(fileRead(routesPath)).notToInclude("wheels:generate-auth:routes:begin");
+					expect(arrayToList(result.skipped, "|")).toInclude("add this block manually");
+				} finally {
+					testHelper.cleanupTempProject(root);
+				}
+			});
+
+			it("refuses to regenerate a block whose begin marker has no matching end marker", () => {
+				var root = testHelper.scaffoldTempProject(expandPath("/"));
+				try {
+					var scaffold = $newScaffold(root);
+					expect(scaffold.generateAuth(cliVersion = "test-version").success).toBeTrue();
+					var routesPath = root & "/config/routes.cfm";
+					fileWrite(routesPath, replace(fileRead(routesPath), "// wheels:generate-auth:routes:end", ""));
+					var second = scaffold.generateAuth(force = true, cliVersion = "second-run");
+					expect(arrayToList(second.skipped, "|")).toInclude("begin marker without matching end marker");
+					// The corrupted block is left untouched for the user to fix.
+					expect($countOccurrences(fileRead(routesPath), "wheels:generate-auth:routes:begin")).toBe(1);
+				} finally {
+					testHelper.cleanupTempProject(root);
+				}
 			});
 
 		});

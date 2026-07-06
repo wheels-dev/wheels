@@ -37,8 +37,10 @@ component extends="wheels.WheelsTest" {
 					password: "not-the-password-1",
 					authenticityToken: variables.csrfToken
 				};
+				// The action comes from the params handed to controller() —
+				// processAction()'s only parameter is includeFilters.
 				var sessionsController = application.wo.controller("sessions", loginParams);
-				sessionsController.processAction("create", loginParams);
+				sessionsController.processAction();
 				expect(sessionsController.response()).toInclude("Invalid email or password");
 			});
 
