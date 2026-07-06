@@ -81,21 +81,30 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 					// ViewNotFound, etc) is a 404, as is `Wheels.ActionNotAllowed`
 					// — the action-dispatch gate blocks framework helpers and
 					// $-prefixed internals by treating them as missing actions
-					// (#2845, #3075); everything else is a 500.
+					// (#2845, #3075); `Wheels.NotAuthorized` — a policy denial
+					// from the authorization layer (#3156) — is a 403; everything
+					// else is a 500.
 					// Set the status BEFORE writing the body so the response
 					// header is committed at the right code regardless of
 					// when the servlet engine flushes (HTML-format Wheels
 					// errors used to render with HTTP 200 because no
 					// $header(statusCode=...) fired before the body was
 					// written — see GH #2319). Note: $throwErrorOrShow404Page
-					// already calls $header(statusCode=404) before throwing,
-					// but onError reaches us via Application.cfc which can
-					// reset the response, so we re-assert the status here.
+					// already calls $header(statusCode=404) before throwing
+					// (and the authorization mixin's $notAuthorized() calls
+					// $header(statusCode=403)), but onError reaches us via
+					// Application.cfc which can reset the response, so we
+					// re-assert the status here.
 					if (
 						StructKeyExists(local.wheelsError, "type")
 						&& ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", local.wheelsError.type)
 					) {
 						$header(statusCode = 404);
+					} else if (
+						StructKeyExists(local.wheelsError, "type")
+						&& ReFindNoCase("^Wheels\.NotAuthorized$", local.wheelsError.type)
+					) {
+						$header(statusCode = 403);
 					} else {
 						$header(statusCode = 500);
 					}

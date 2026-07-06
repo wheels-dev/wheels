@@ -386,6 +386,59 @@ component {
 	}
 
 	/**
+	 * Generate an authorization policy CFC file (issue #3156).
+	 *
+	 * Writes app/policies/<ModelName>Policy.cfc with every standard action
+	 * denying (policies are default-deny) plus commented grant examples. Also
+	 * scaffolds the app-level app/policies/Policy.cfc base stub when missing so
+	 * `extends="Policy"` resolves (mirrors app/models/Model.cfc).
+	 */
+	public struct function generatePolicy(
+		required string name,
+		string description = "",
+		boolean force = false
+	) {
+		var modelName = variables.helpers.capitalize(arguments.name);
+		// Accept both "Post" and "PostPolicy" — normalize to the model name.
+		if (reFindNoCase("Policy$", modelName) && len(modelName) > 6) {
+			modelName = left(modelName, len(modelName) - 6);
+		}
+		var policyName = modelName & "Policy";
+		var filePath = variables.projectRoot & "/app/policies/#policyName#.cfc";
+
+		if (fileExists(filePath) && !arguments.force) {
+			return {success: false, error: "Policy already exists: app/policies/#policyName#.cfc", path: filePath, baseCreated: false};
+		}
+
+		// Ensure the parent Policy.cfc stub exists. Never overwritten.
+		var baseCreated = false;
+		if (!fileExists(variables.projectRoot & "/app/policies/Policy.cfc")) {
+			var baseResult = variables.templateService.generateFromTemplate(
+				template = "PolicyBaseContent.txt",
+				destination = "app/policies/Policy.cfc",
+				context = {timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")}
+			);
+			baseCreated = baseResult.success;
+		}
+
+		var context = {
+			policyName: policyName,
+			modelName: modelName,
+			description: arguments.description,
+			timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
+		};
+
+		var result = variables.templateService.generateFromTemplate(
+			template = "PolicyContent.txt",
+			destination = "app/policies/#policyName#.cfc",
+			context = context
+		);
+		result.baseCreated = baseCreated;
+
+		return result;
+	}
+
+	/**
 	 * Validate name for code generation
 	 */
 	public struct function validateName(required string name, required string type) {

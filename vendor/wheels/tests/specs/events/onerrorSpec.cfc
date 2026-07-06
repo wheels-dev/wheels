@@ -63,6 +63,17 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.ActionNotAllowed")).toBe(404)
 			})
 
+			// GH ##3156: policy denials from the authorization layer throw
+			// Wheels.NotAuthorized, which must surface as 403 — the same wiring
+			// pattern that maps the *NotFound family to 404.
+			it("maps Wheels.NotAuthorized to HTTP 403 (##3156)", () => {
+				expect($expectedStatusFor("Wheels.NotAuthorized")).toBe(403)
+			})
+
+			it("maps Wheels.Policy.NotDefined to HTTP 500 (a programmer error, not a denial, ##3156)", () => {
+				expect($expectedStatusFor("Wheels.Policy.NotDefined")).toBe(500)
+			})
+
 			it("maps a generic Wheels error type to HTTP 500 (##2319)", () => {
 				expect($expectedStatusFor("Wheels.UnknownThingHappened")).toBe(500)
 			})
@@ -116,10 +127,13 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private numeric function $expectedStatusFor(required string wheelsType) {
-		// Mirrors the status map in EventMethods.$runOnError. Keep the regex in
+		// Mirrors the status map in EventMethods.$runOnError. Keep the regexes in
 		// sync with that source — a rename or narrowing there must break here.
 		if (ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.wheelsType)) {
 			return 404
+		}
+		if (ReFindNoCase("^Wheels\.NotAuthorized$", arguments.wheelsType)) {
+			return 403
 		}
 		return 500
 	}
