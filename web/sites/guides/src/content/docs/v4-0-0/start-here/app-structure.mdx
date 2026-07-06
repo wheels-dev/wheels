@@ -1,0 +1,82 @@
+---
+title: Anatomy of a Wheels App
+description: Every directory in a Wheels 4 application, what lives in it, and how the pieces find each other — no tooling required to understand it.
+type: explanation
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Every Wheels 4 application — whether it came from `wheels new`, `box install wheels-base-template`, or a zip you extracted by hand — has the same shape. This page is the map. If you're coming from Wheels 2.x, the biggest change is that the framework moved from a `wheels/` folder at the root into `vendor/wheels/`, and the web root moved to `public/`.
+
+```
+myapp/
+  app/                  Your application code
+    controllers/        Controllers (plural PascalCase: Users.cfc)
+    models/             Models (singular PascalCase: User.cfc)
+    views/              One folder per controller, plus layout.cfm
+    events/             Application/request lifecycle hooks
+    global/             Global user-defined functions
+    jobs/               Background jobs (extend wheels.Job)
+    middleware/         Custom middleware components
+    migrator/migrations/  Database migration CFCs
+    snippets/           Scaffolded snippet templates
+  config/               Configuration, loaded at application start
+    settings.cfm        Datasource, reload password, URL rewriting, …
+    routes.cfm          Your routes (mapper() … .end())
+    environment.cfm     Which environment this deployment runs as
+    app.cfm             Application.cfc-level settings (this.name, mappings, …)
+    <environment>/      Per-environment overrides (production/settings.cfm, …)
+  db/                   SQLite database files, if you use SQLite
+  public/               THE WEB ROOT — the only folder a browser can reach
+    Application.cfc     Bootstraps the app: defines mappings, loads .env
+    index.cfm           Single entry point; hands every request to the dispatcher
+    urlrewrite.xml      Rewrite rules for Tuckey (CommandBox/wheels CLI servers)
+    stylesheets/, javascripts/, images/, files/, miscellaneous/
+  tests/                Your test suite
+    specs/              models/, controllers/, functional/ (+ views/, integration/, browser/)
+    populate.cfm        Optional test-data seeding
+  vendor/               Third-party code — you don't edit anything in here
+    wheels/             THE FRAMEWORK ITSELF
+    <package>/          Installed packages (wheels-sentry, wheels-basecoat, …)
+  .env                  Environment variables (copy from env.example; never commit)
+  box.json              ForgeBox manifest — only used by CommandBox installs
+  server.json           CommandBox server config — only used by CommandBox
+```
+
+## How the pieces find each other
+
+There is no magic registry and no generated wiring. `public/Application.cfc` defines six CFML mappings, all relative to the `public/` folder:
+
+```cfm
+this.mappings["/app"]     = expandPath("../app/");
+this.mappings["/vendor"]  = expandPath("../vendor/");
+this.mappings["/wheels"]  = expandPath("../vendor/wheels/");
+this.mappings["/tests"]   = expandPath("../tests");
+this.mappings["/config"]  = expandPath("../config");
+this.mappings["/plugins"] = expandPath("../plugins");
+```
+
+That's the whole contract. Point any CFML-capable web server at `public/` and the app can find its own code, no matter where on disk the folder sits or what tool put it there. It also means everything *outside* `public/` — your models, your config, your `.env`, the framework itself — is unreachable from a browser.
+
+<Aside type="tip" title="Coming from Wheels 2.x?">
+Mental mapping: your old root-level `wheels/` folder is now `vendor/wheels/`; your old `controllers/`, `models/`, `views/` folders live under `app/`; your old root `index.cfm`/`Application.cfc`/rewrite file live under `public/`; and `config/` has been promoted from `config/settings.cfm`-plus-scattered-defaults into the single place all configuration lives. Upgrading is a file reorganization, not a rewrite — see [Upgrading from 2.x to 3.x](/v4-0-0/upgrading/2x-to-3x/) and then [3.x to 4.0](/v4-0-0/upgrading/3x-to-4x/).
+</Aside>
+
+## What each top-level folder is for
+
+- **`app/`** — everything you write. Controllers extend `Controller`, models extend `Model`, views execute in the controller's variable scope. Conventions (naming, pluralization) are covered in [Conventions over Configuration](/v4-0-0/core-concepts/conventions-over-configuration/).
+- **`config/`** — read once at application start. Changing anything here requires a reload (restart the app, or `?reload=true&password=…` — see [Working Without the CLI](/v4-0-0/start-here/working-without-the-cli/)).
+- **`public/`** — the web root and *only* the web root. Static assets are served directly; everything else routes through `index.cfm` to the dispatcher.
+- **`vendor/`** — the framework plus any installed [packages](/v4-0-0/digging-deeper/packages/). Treat it as read-only: upgrades replace `vendor/wheels/` wholesale, so local edits there are lost by design.
+- **`tests/`** — your app's test suite, run via `wheels test`, or without the CLI at `/wheels/app/tests` in development. See [Testing](/v4-0-0/testing/).
+- **`db/`** — only meaningful for SQLite setups; other databases live wherever your server keeps them.
+- **`box.json` / `server.json`** — CommandBox metadata. If you neither use CommandBox nor plan to, they're inert; leaving them in place costs nothing and keeps the door open.
+
+## Framework internals worth knowing about
+
+Inside `vendor/wheels/` two things deserve a mention even though you never edit them:
+
+- **`vendor/wheels/Injector.cfc`** — the built-in dependency-injection container. Wheels 4 does **not** depend on WireBox; if you remember downloading WireBox for Wheels 3, that requirement is gone.
+- **`vendor/wheels/wheelstest/`** — the built-in test framework (`wheels.WheelsTest`). Wheels 4 does **not** depend on TestBox either; the TestBox-and-four-hidden-modules scavenger hunt from the 3.0 era is over.
+
+Both facts matter to one specific reader: the person assembling an app from zips. The complete dependency list for a Wheels 4 app is: *the framework*. See [Manual Installation](/v4-0-0/start-here/manual-installation/).

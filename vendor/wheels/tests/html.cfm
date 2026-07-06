@@ -34,12 +34,18 @@
     
     testResults.ok = (testResults.numFailures + testResults.numErrors) == 0;
     
-    // Recursive function to process nested suites
-    function processNestedSuites(suites, bundleName) {
+    // Recursive function to process nested suites. Declared as a variables-scoped
+    // function expression (not a named `function` declaration) so repeated
+    // includes of this template into the cached Public.cfc do not throw Adobe's
+    // "Routines cannot be declared more than once" — the same reason the core
+    // runner declares its helpers as closures (vendor/wheels/tests/runner.cfm).
+    // A named declaration in an included .cfm leaks into the component scope on
+    // Adobe and collides on the second request. See issue #3251.
+    variables.processNestedSuites = function(suites, bundleName) {
         for (suite in suites) {
             // Process nested suites first (deeper level)
             if (structKeyExists(suite, "suiteStats") && arrayLen(suite.suiteStats) > 0) {
-                processNestedSuites(suite.suiteStats, bundleName);
+                variables.processNestedSuites(suite.suiteStats, bundleName);
             }
             
             // Process individual specs in this suite
@@ -108,10 +114,10 @@
                 arrayAppend(testResults.results, thisResult);
             }
         }
-    }
+    };
 
     for (bundle in DeJsonResult.bundleStats) {
-        processNestedSuites(bundle.suiteStats, bundle.name);
+        variables.processNestedSuites(bundle.suiteStats, bundle.name);
     }
     
     failures = [];

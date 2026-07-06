@@ -375,69 +375,46 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 	 * @path The path to get component files from
 	 */
 	private function $integrateComponents(required string path) {
-		local.basePath = arguments.path;
-		local.folderPath = expandPath("/#replace(local.basePath, ".", "/", "all")#");
-
-		// Get a list of all CFC files in the folder
-		local.fileList = directoryList(local.folderPath, false, "name", "*.cfc");
-		for (local.fileName in local.fileList) {
-			// Remove the file extension to get the component name
-			local.componentName = replace(local.fileName, ".cfc", "", "all");
-
-			$integrateFunctions(createObject("component", "#local.basePath#.#local.componentName#"));
+		// The directory scan + per-file createObject + getMetaData, plus the
+		// public-method/reference resolution, are cached per path (issue #3213) —
+		// they are identical for every controller instance. Only the reference
+		// assignment below runs on each materialization. The mixin-override set is
+		// resolved once per call (empty in the common no-mixins case) so the old
+		// per-method $willBeOverriddenByMixin function call is gone from the loop.
+		local.plan = $componentIntegrationPlan(arguments.path);
+		local.overrideSet = $mixinOverrideSet("controller");
+		local.iEnd = ArrayLen(local.plan);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			$integrateFunctions(local.plan[local.i].publicMethods, local.overrideSet);
 		}
 	}
 
 	/**
-	 * Dynamically mix methods from a given component into this component
+	 * Mix a component's pre-resolved public methods (each `{name, ref}`, see
+	 * $componentIntegrationPlan) into this instance. Preserves the original
+	 * semantics: a method that does not already exist (from inheritance or an
+	 * earlier-integrated component) is added, and any method a plugin/package
+	 * mixin will override is also aliased to `super<name>`. `overrideSet` is the
+	 * precomputed mixin-override name set.
 	 */
-	private function $integrateFunctions(componentInstance) {
-		// Get all methods from the given component
-		local.methods = getMetaData(componentInstance).functions;
+	private function $integrateFunctions(required array publicMethods, required struct overrideSet) {
+		local.iEnd = ArrayLen(arguments.publicMethods);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.m = arguments.publicMethods[local.i];
+			local.name = local.m.name;
+			local.ref = local.m.ref;
 
-		for (local.method in local.methods) {
-			local.functionName = local.method.name;
+			if (!(StructKeyExists(variables, local.name) || StructKeyExists(this, local.name))) {
+				variables[local.name] = local.ref;
+				this[local.name] = local.ref;
+			}
 
-			// Only add public, non-inherited methods
-			if (local.method.access eq "public") {
-				local.methodExists = structKeyExists(variables, local.method.name) || structKeyExists(this, local.method.name);
-				
-				if (!local.methodExists) {
-					variables[local.functionName] = componentInstance[local.functionName];
-					this[local.functionName] = componentInstance[local.functionName];
-				}
-				
-				// Only add super prefix for functions that will be overridden by plugins/mixins
-				if ($willBeOverriddenByMixin(local.functionName)) {
-					local.superMethodName = "super" & local.functionName;
-					variables[local.superMethodName] = componentInstance[local.functionName];
-					this[local.superMethodName] = componentInstance[local.functionName];
-				}
-				
+			if (StructKeyExists(arguments.overrideSet, local.name)) {
+				local.superName = "super" & local.name;
+				variables[local.superName] = local.ref;
+				this[local.superName] = local.ref;
 			}
 		}
-	}
-
-	/**
-	 * Check if a function will be overridden by a plugin/mixin
-	 */
-	private boolean function $willBeOverriddenByMixin(required string functionName) {
-		// Check if application and mixins are available
-		if (!IsDefined("application") || !StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "mixins")) {
-			return false;
-		}
-		
-		// Check for both "controller" and "global" mixins
-		local.componentTypes = ["controller", "global"];
-		
-		for (local.componentType in local.componentTypes) {
-			if (StructKeyExists(application.wheels.mixins, local.componentType) && 
-				StructKeyExists(application.wheels.mixins[local.componentType], arguments.functionName)) {
-				return true;
-			}
-		}
-		
-		return false;
 	}
 
 	function onDIcomplete(){

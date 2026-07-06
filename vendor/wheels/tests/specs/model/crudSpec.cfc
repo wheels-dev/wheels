@@ -1262,6 +1262,41 @@ component extends="wheels.WheelsTest" {
 
 				expect(actual).toBe("FROM #qi('c_o_r_e_authors')# USE INDEX(idx_authors_123) LEFT OUTER JOIN #qi('c_o_r_e_posts')# USE INDEX(idx_posts_123) ON #qi('c_o_r_e_authors')#.#qi('id')# = #qi('c_o_r_e_posts')#.#qi('authorid')# AND #qi('c_o_r_e_posts')#.#qi('deletedat')# IS NULL")
 			})
+
+			// Regression for issue #3245: a belongsTo-chain nested include
+			// (intermediate is `belongsTo`) mixed with an OUTER-joined sibling must
+			// emit FLAT sibling joins so the root FROM table stays in scope for every
+			// ON condition. Wheels 3 over-fired the issue #449 parenthesized grouping
+			// here, scoping the root out and triggering MySQL "Unknown column ... in
+			// 'on clause'". `author.user` is a belongsTo (inner) and `author.posts` /
+			// `user.galleries` are hasMany (outer) — exactly the reported shape.
+			it("emits flat joins for a belongsTo-chain nested include (issue ##3245)", () => {
+				actual = g.model("author").$fromClause(include = "posts,user(galleries)")
+
+				// the parenthesized intermediate (`user`) is a belongsTo, so NO grouping:
+				// every join sits at the top level and the root `authors` stays in scope.
+				expect(actual).notToInclude("LEFT OUTER JOIN (")
+				expect(actual).toBe(
+					"FROM #qi('c_o_r_e_authors')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_posts')# ON #qi('c_o_r_e_authors')#.#qi('id')# = #qi('c_o_r_e_posts')#.#qi('authorid')# AND #qi('c_o_r_e_posts')#.#qi('deletedat')# IS NULL"
+					& " INNER JOIN #qi('c_o_r_e_users')# ON #qi('c_o_r_e_authors')#.#qi('firstname')# = #qi('c_o_r_e_users')#.#qi('firstname')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_galleries')# ON #qi('c_o_r_e_users')#.#qi('id')# = #qi('c_o_r_e_galleries')#.#qi('userid')#"
+				)
+			})
+
+			// Regression for issue #449 (must NOT be undone by the #3245 fix): a genuine
+			// HABTM / `through` bridge nested include keeps the parenthesized grouping so
+			// the bridge's INNER join stays scoped to the OUTER-joined bridge table.
+			// Team.memberTeams is a hasMany (outer bridge); its nested `member` inner
+			// join references the bridge table, so the grouping is correct here.
+			it("preserves nested grouping for a HABTM/through bridge include (issue ##449)", () => {
+				actual = g.model("team").$fromClause(include = "memberTeams(member)")
+
+				expect(actual).toBe(
+					"FROM #qi('c_o_r_e_teams')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_memberteams')# INNER JOIN #qi('c_o_r_e_members')# ON #qi('c_o_r_e_memberteams')#.#qi('memberid')# = #qi('c_o_r_e_members')#.#qi('id')#) ON #qi('c_o_r_e_teams')#.#qi('id')# = #qi('c_o_r_e_memberteams')#.#qi('teamid')#"
+				)
+			})
 		})
 
 		describe("Tests that group", () => {

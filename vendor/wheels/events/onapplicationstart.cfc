@@ -116,6 +116,13 @@ component {
 		// machinery ($addToCache / $cacheCount) walks and dereferences `.expiresAt`
 		// on. Putting schema queries under `cache.*` makes the cull throw.
 		application.$wheels.schemaColumnCache = {};
+		// Per-app mixin-integration plans (see Global.cfc $componentIntegrationPlan).
+		// Caches the directory scan + per-file createObject + getMetaData that
+		// $integrateComponents performs for wheels.model / wheels.controller /
+		// wheels.mapper, so that work runs once per app instead of on every model,
+		// controller, and mapper object materialization (issue #3213). Like the
+		// schema cache, it lives for the application lifetime and is rebuilt on reload.
+		application.$wheels.integrationPlans = {};
 		application.$wheels.helperFileCache = {};
 		application.$wheels.layoutFileCache = {};
 		application.$wheels.existingObjectFiles = {};

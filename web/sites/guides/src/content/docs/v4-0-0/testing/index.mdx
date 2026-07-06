@@ -26,10 +26,14 @@ Every test in a Wheels app is a CFC under `tests/specs/`, grouped by what it exe
 |----------|---------------|---------------|
 | Model tests | `tests/specs/models/` | One model — validations, callbacks, scopes, custom methods |
 | Controller tests | `tests/specs/controllers/` | One action — response status, redirects, filters, params |
-| View & form tests | `tests/specs/view/` | Rendered HTML assertions, form-helper output, `data-auto-id` selectors |
-| Integration tests | `tests/specs/functional/` | Multi-step user journeys across controllers and requests |
+| View & form tests | `tests/specs/views/` | Rendered HTML assertions, form-helper output, `data-auto-id` selectors |
+| Integration tests | `tests/specs/integration/` | Multi-step user journeys across controllers and requests |
 | Functional tests | `tests/specs/functional/` | Single-feature end-to-end — middleware + route + filter + action + view |
 | Browser tests | `tests/specs/browser/` | Full UI flows driven by Playwright — JavaScript, Turbo, form submission |
+
+<Aside>
+`wheels new` scaffolds `tests/specs/controllers/`, `tests/specs/functional/`, and `tests/specs/models/`. Create `tests/specs/views/`, `tests/specs/integration/`, and `tests/specs/browser/` yourself when you add those kinds of tests — the runner scans all of `tests/specs/`, so the split is purely organizational.
+</Aside>
 
 Model and controller tests are the bulk of a healthy suite. Integration tests cover journeys that span multiple actions and users. Functional tests verify one feature end-to-end through the full request pipeline. Browser tests cover what only exists in the browser — JavaScript-driven UI, Turbo Frame updates, anything where the server's response alone doesn't tell you whether the feature works.
 
@@ -81,7 +85,7 @@ Common invocations:
 
 - `wheels test` — execute the entire suite.
 - `wheels test --filter=models` — a single directory or keyword.
-- `wheels test --ci` — accepted for forward-compatibility, but currently a no-op: failure exit codes are non-zero on every run, with or without the flag. Browser-spec gating is controlled by the *server's* environment (`WHEELS_CI` / `WHEELS_BROWSER_CI_ENABLE`), not by this flag.
+- `wheels test --ci` — emits a GitHub Actions `::error` annotation per failed or errored spec, so failures surface inline in PR checks ([#3113](https://github.com/wheels-dev/wheels/issues/3113)). Exit codes are non-zero on failure with or without the flag. Browser-spec gating is controlled by the *server's* environment (`WHEELS_CI` / `WHEELS_BROWSER_CI_ENABLE`), not by this flag.
 
 The runner also exposes an HTTP endpoint at `/wheels/app/tests` you can hit directly. A URL like `/wheels/app/tests?format=json&directory=tests.specs.models` runs just the model specs and returns JSON. (The framework's own suite lives at `/wheels/core/tests`, where the directory prefix is `wheels.tests.specs` — e.g. `directory=wheels.tests.specs.model`. A `directory` value the endpoint doesn't recognize is silently ignored and the full suite runs instead; see [#3083](https://github.com/wheels-dev/wheels/issues/3083).) This is useful for dev-loop iteration — keep the server up, change a spec, refresh the URL. See [Running Tests Locally](/v4-0-0/testing/running-tests-locally/) for the full invocation surface including Docker-based cross-engine runs.
 
@@ -91,7 +95,7 @@ Four files drive your test setup. Knowing what each one does saves a lot of head
 
 | File | What it does |
 |------|--------------|
-| `tests/TestRunner.cfc` | Sets up shared state. Runs before and after the whole suite. |
+| `tests/runner.cfm` | Entry point for `/wheels/app/tests` and `wheels test`. Customise here for pre-test bootstrap — the built-in app runner handles the rest. |
 | `tests/populate.cfm` | Seeds test data. Runs **once per test run**, not per spec. |
 | `tests/_assets/models/` | Test-only models, often using `table()` to map to test tables. |
 | `tests/specs/<category>/` | Where your actual specs live. |

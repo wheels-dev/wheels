@@ -9,9 +9,9 @@
 #   LUCLI_LINUX_URL  — URL for the Linux LuCLI binary (default: cybersonic upstream)
 #   OUT_DIR          — where to write the .deb / .rpm (default: dist/)
 #
-# Outputs (in OUT_DIR):
-#   wheels_<v>_amd64.deb      (or wheels-be_<v>_amd64.deb for BE channel)
-#   wheels-<v>.x86_64.rpm
+# Outputs (in OUT_DIR) — architecture-independent (Java jar payload):
+#   wheels_<v>_all.deb        (or wheels-be_<v>_all.deb for BE channel)
+#   wheels-<v>.noarch.rpm
 #
 # This script is idempotent — it tears down and recreates the build/ staging dir.
 # Run from the repo root.
@@ -21,8 +21,14 @@ set -euo pipefail
 WHEELS_VERSION="${WHEELS_VERSION:?WHEELS_VERSION must be set}"
 CHANNEL="${CHANNEL:-stable}"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-artifacts/wheels/${WHEELS_VERSION}}"
-LUCLI_VERSION="${LUCLI_VERSION:-0.3.7}"
-LUCLI_LINUX_URL="${LUCLI_LINUX_URL:-https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux}"
+LUCLI_VERSION="${LUCLI_VERSION:-0.3.17}"
+# Portable JAR launcher (runs on any arch with Java 21) instead of the amd64-only
+# native `lucli-linux` binary. This is what makes the .deb/.rpm architecture-
+# independent (all/noarch) so they install on arm64 too — and it matches how the
+# Scoop manifest already launches LuCLI. Routing to the bundled `wheels` module
+# is done via -Dlucli.binary.name=wheels in the wrapper (the native binary did it
+# via basename(argv[0])).
+LUCLI_JAR_URL="${LUCLI_JAR_URL:-https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}.jar}"
 SQLITE_JDBC_VERSION="3.49.1.0"
 SQLITE_JDBC_URL="https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/${SQLITE_JDBC_VERSION}/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
 OUT_DIR="${OUT_DIR:-dist}"
@@ -59,13 +65,13 @@ tar -xzf "${ARTIFACTS_DIR}/wheels-module-${WHEELS_VERSION}.tar.gz" -C "${BUILD_D
 # 2. Unzip the framework into build/framework/
 unzip -q "${ARTIFACTS_DIR}/wheels-core-${WHEELS_VERSION}.zip" -d "${BUILD_DIR}/build/framework/"
 
-# 3. Download the LuCLI Linux binary as build/wheels. Renaming at stage time
-#    (mirroring the brew formula's `libexec.install resource("lucli") => "wheels"`)
-#    means basename(argv[0]) is `wheels` when the wrapper execs it, so lucli's
-#    module dispatcher resolves `wheels start` to the bundled wheels module
-#    instead of throwing `Unknown command`. See issue #2700.
-curl -fsSL -o "${BUILD_DIR}/build/wheels" "${LUCLI_LINUX_URL}"
-chmod +x "${BUILD_DIR}/build/wheels"
+# 3. Download the portable LuCLI JAR as build/lucli.jar. The wrapper launches it
+#    with `java -Dlucli.binary.name=wheels -jar`, which both (a) routes to the
+#    bundled wheels module (the flag replaces the old basename(argv[0]) trick the
+#    native binary relied on) and (b) is architecture-independent, so the package
+#    installs on amd64 AND arm64. See issue #2700 (routing) and the arch-independent
+#    refactor.
+curl -fsSL -o "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_URL}"
 
 # 4. Download SQLite JDBC
 curl -fsSL -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"
@@ -86,18 +92,39 @@ cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
 
 set -euo pipefail
 
-# Honor user-set JAVA_HOME if present; otherwise probe for OpenJDK 21.
+# Honor user-set JAVA_HOME if present; otherwise probe for OpenJDK 21 across the
+# Debian/Ubuntu AND RHEL/Fedora layouts, on amd64 and arm64.
 if [ -z "${JAVA_HOME:-}" ]; then
   for candidate in \
     /usr/lib/jvm/java-21-openjdk-amd64 \
+    /usr/lib/jvm/java-21-openjdk-arm64 \
     /usr/lib/jvm/java-21-openjdk \
+    /usr/lib/jvm/jre-21-openjdk \
+    /usr/lib/jvm/java-21 \
+    /usr/lib/jvm/jre-21 \
     /usr/lib/jvm/temurin-21-jdk-amd64 \
+    /usr/lib/jvm/temurin-21-jdk-arm64 \
     /usr/lib/jvm/zulu-21 \
     /usr/lib/jvm/default-java; do
-    if [ -d "${candidate}" ]; then
+    if [ -x "${candidate}/bin/java" ]; then
       export JAVA_HOME="${candidate}"
       break
     fi
+  done
+fi
+# RHEL/Fedora install into a version-stamped dir (java-21-openjdk-21.0.x...elN.<arch>)
+# that the fixed names above don't match, but the headless package registers
+# /usr/bin/java via the alternatives system — resolve JAVA_HOME from it.
+if [ -z "${JAVA_HOME:-}" ] && command -v java >/dev/null 2>&1; then
+  _j="$(command -v java)"
+  command -v readlink >/dev/null 2>&1 && _j="$(readlink -f "${_j}" 2>/dev/null || echo "${_j}")"
+  _jh="${_j%/bin/java}"
+  [ -x "${_jh}/bin/java" ] && export JAVA_HOME="${_jh}"
+fi
+# Last resort: glob the version-stamped RHEL/Fedora directories directly.
+if [ -z "${JAVA_HOME:-}" ]; then
+  for d in /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/*jre-21* /usr/lib/jvm/*-21-*; do
+    if [ -x "${d}/bin/java" ]; then export JAVA_HOME="${d}"; break; fi
   done
 fi
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
@@ -139,7 +166,11 @@ if [ -n "${LUCEE_EXT_DIR}" ] && ! ls "${LUCEE_EXT_DIR}"/sqlite-jdbc*.jar >/dev/n
   cp /opt/wheels/sqlite-jdbc.jar "${LUCEE_EXT_DIR}/sqlite-jdbc.jar"
 fi
 
-exec /opt/wheels/wheels "$@"
+# Launch via the portable LuCLI jar. -Dlucli.binary.name=wheels routes to the
+# bundled wheels module (replacing the native binary's basename(argv[0]) trick),
+# and `java -jar` is architecture-independent so this same package runs on
+# amd64 and arm64. JAVA_HOME/bin is first on PATH (above), so `java` is the 21.
+exec "${JAVA_HOME}/bin/java" -Dlucli.binary.name=wheels -jar /opt/wheels/lucli.jar "$@"
 WRAPPER_EOF
 
 # 6. Stamp the version + channel into build/ so nfpm can ship them at
@@ -187,15 +218,19 @@ fi
 #   and .github/RELEASE_PLAYBOOK.md § "Common failure modes".
 DEB_RPM_VERSION="$(echo "${WHEELS_VERSION}" | sed 's/-snapshot/~snapshot/')"
 
-WHEELS_VERSION="${DEB_RPM_VERSION}" nfpm pkg \
+# Architecture-independent packages: the payload is the LuCLI jar + CFML source
+# + a shell wrapper (no native code), so a single package serves every arch.
+# deb uses `all`, rpm uses `noarch` — PKG_ARCH is interpolated into the nfpm
+# config's `arch:` field.
+PKG_ARCH=all WHEELS_VERSION="${DEB_RPM_VERSION}" nfpm pkg \
   --config "../${NFPM_CONFIG}" \
   --packager deb \
-  --target "${NFPM_OUT}/${PKG_NAME}_${DEB_RPM_VERSION}_amd64.deb"
+  --target "${NFPM_OUT}/${PKG_NAME}_${DEB_RPM_VERSION}_all.deb"
 
-WHEELS_VERSION="${DEB_RPM_VERSION}" nfpm pkg \
+PKG_ARCH=noarch WHEELS_VERSION="${DEB_RPM_VERSION}" nfpm pkg \
   --config "../${NFPM_CONFIG}" \
   --packager rpm \
-  --target "${NFPM_OUT}/${PKG_NAME}-${DEB_RPM_VERSION}.x86_64.rpm"
+  --target "${NFPM_OUT}/${PKG_NAME}-${DEB_RPM_VERSION}.noarch.rpm"
 
 echo "── Done ──"
 ls -la "${NFPM_OUT}/" | grep -E "${PKG_NAME}_|${PKG_NAME}-"

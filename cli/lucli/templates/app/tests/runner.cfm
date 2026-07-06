@@ -12,5 +12,10 @@
 	Keep the include below as the last line (or replicate its body
 	inline) — the framework runner is what produces the JSON / HTML
 	output the rest of the system expects.
+
+	The include path is resolved through $resolveSubpathInclude so it
+	works both at the web root and under a URL subpath / CommandBox
+	multi-subfolder install, where a bare `/wheels/...` mapping does not
+	resolve (issue #3251).
 --->
-<cfinclude template="/wheels/tests/app-runner.cfm">
+<cfinclude template="#application.wo.$resolveSubpathInclude('/wheels/tests/app-runner.cfm')#">

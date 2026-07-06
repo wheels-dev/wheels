@@ -113,7 +113,7 @@ wheels repl [flags]
 
 #### Description
 
-`repl` drops you into a line-edited CFML prompt (`cfml>` by default — the prefix reflects the active LuCLI profile). Each line you enter is handed to the Lucee script engine; non-null results print to the terminal. History persists to `~/.lucli/repl_history` (500 lines) so you can arrow-back through previous expressions across sessions.
+`repl` drops you into a line-edited CFML prompt (`cfml>` by default — the prefix reflects the active LuCLI profile). Each line you enter is handed to the Lucee script engine; non-null results print to the terminal. History persists to `repl_history` in the CLI home (`~/.wheels/` for the `wheels` binary; `~/.lucli/` for standalone LuCLI) — 500 lines so you can arrow-back through previous expressions across sessions.
 
 #### Flags
 

@@ -99,13 +99,36 @@ component {
 			local.hasThroughAssociation = false;
 			local.iEnd = ArrayLen(local.associations);
 			
-			// Check if this is specifically a through association pattern
+			// Check if this is specifically a HABTM / through bridge pattern. The
+			// parenthesized-INNER-join grouping below was added for issue #449 so a
+			// many-to-many bridge (e.g. `memberTeams(member)`) keeps its nested inner
+			// join scoped to the OUTER-joined bridge table. It must NOT fire for a plain
+			// `belongsTo`-chain nested include (e.g. `SecondaryContact(User)`): there the
+			// inner join's ON clause references the root FROM table, and wrapping it
+			// inside the OUTER group scopes the root out — the MySQL "Unknown column ...
+			// in 'on clause'" regression reported in issue #3245. So consult the actual
+			// association metadata for the parenthesized intermediate instead of trusting
+			// the include string alone: only a `hasMany` / `hasOne` intermediate (the
+			// OUTER-joined bridge the grouping was designed for) qualifies; a `belongsTo`
+			// intermediate falls through to the flat-join branch Wheels 2 emitted.
 			local.originalInclude = Replace(arguments.include, " ", "", "all");
 			if (Find("(", local.originalInclude)) {
-				// Parse the include to see if it matches through pattern: intermediate(target)
+				// Parse the include to see if it matches the pattern: intermediate(target)
 				local.includePattern = ReFindNoCase("^([^(]+)\(([^)]+)\)$", local.originalInclude, 1, true);
 				if (ArrayLen(local.includePattern.pos) >= 3) {
-					local.hasThroughAssociation = true;
+					// The association that parents the parenthesized target is the last
+					// entry in the comma-list before the "(" (the only level this single-
+					// paren pattern can match), so it is always a root-model association.
+					local.intermediateName = ListLast(Mid(local.originalInclude, local.includePattern.pos[2], local.includePattern.len[2]));
+					if (
+						StructKeyExists(variables.wheels.class.associations, local.intermediateName)
+						&& ListFindNoCase(
+							"hasMany,hasOne",
+							variables.wheels.class.associations[local.intermediateName].type
+						)
+					) {
+						local.hasThroughAssociation = true;
+					}
 				}
 			}
 			
@@ -411,14 +434,16 @@ component {
 		required string select,
 		required string include,
 		boolean includeSoftDeletes = "false",
-		required string returnAs
+		required string returnAs,
+		string includeCalculated = ""
 	) {
 		local.rv = $createSQLFieldList(
 			clause = "select",
 			list = arguments.select,
 			include = arguments.include,
 			includeSoftDeletes = arguments.includeSoftDeletes,
-			returnAs = arguments.returnAs
+			returnAs = arguments.returnAs,
+			includeCalculated = arguments.includeCalculated
 		);
 		
 		// Look for " AS " followed by text containing multiple dots (namespaced aliases)
@@ -471,7 +496,8 @@ component {
 		required string include,
 		required string returnAs,
 		boolean includeSoftDeletes = "false",
-		boolean useExpandedColumnAliases = "#application.wheels.useExpandedColumnAliases#"
+		boolean useExpandedColumnAliases = "#application.wheels.useExpandedColumnAliases#",
+		string includeCalculated = ""
 	) {
 		// setup an array containing class info for current class and all the ones that should be included
 		local.classes = [];
@@ -500,6 +526,36 @@ component {
 							arguments.list = ListAppend(arguments.list, local.key);
 						}
 					}
+				}
+			}
+		}
+
+		// Additively opt in any calculated properties named via `includeCalculated` (issue #3252).
+		// These are typically declared `select=false`, so they are absent from the default list
+		// above; merging them here keeps every base column in place (additive, never replacing).
+		if (Len(arguments.includeCalculated)) {
+			local.calcArray = ListToArray(arguments.includeCalculated);
+			local.calcEnd = ArrayLen(local.calcArray);
+			for (local.c = 1; local.c <= local.calcEnd; local.c++) {
+				local.calcName = Trim(local.calcArray[local.c]);
+				if (!Len(local.calcName)) {
+					continue;
+				}
+				if (!StructKeyExists(variables.wheels.class.calculatedProperties, local.calcName)) {
+					// Dev/testing fail loud on a typo; no-op in production (mirrors existing
+					// dev-only validation such as Wheels.PaginationNav.InvalidArgument).
+					if (ListFindNoCase("development,testing", get("environment"))) {
+						Throw(
+							type = "Wheels.CalculatedPropertyNotFound",
+							message = "The calculated property `#local.calcName#` was not found on the `#variables.wheels.class.modelName#` model.",
+							extendedInfo = "The `includeCalculated` argument only accepts the names of calculated properties declared via `property(name=""..."", sql=""..."")` in the model's `config()`. Declared calculated properties: #StructKeyList(variables.wheels.class.calculatedProperties)#."
+						);
+					}
+					continue;
+				}
+				// dedup: $createSQLFieldList already de-duplicates, but skip obvious repeats
+				if (!ListFindNoCase(arguments.list, local.calcName)) {
+					arguments.list = ListAppend(arguments.list, local.calcName);
 				}
 			}
 		}

@@ -1,0 +1,1 @@
+- `wheels new` generates a richer default home page: a runtime status line (Wheels version, engine, database, environment) plus a Next-steps command guide, replacing the bare two-line placeholder — surfacing the onboarding content from the redesigned framework welcome page where users actually land (#2098)

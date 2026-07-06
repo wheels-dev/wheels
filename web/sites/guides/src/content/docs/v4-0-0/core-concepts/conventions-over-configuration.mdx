@@ -35,13 +35,13 @@ The rules themselves are narrow and mechanical. Model classes are singular Pasca
 
 Every convention has a one-line escape hatch. The overrides live where the convention would have applied — in the model's `config()`, in the route definition, in the `renderView()` call. You don't reach into framework internals to change the mapping; you declare the exception next to the thing it applies to.
 
-- **Custom table:** `tableName("old_blog_entries")` inside the model's `config()`.
+- **Custom table:** `table("old_blog_entries")` inside the model's `config()`.
 - **Custom primary key:** `setPrimaryKey("entryId")` inside `config()`. Composite keys pass an array.
 - **Custom datasource:** `dataSource("legacy")` inside `config()` picks a non-default datasource for this model.
 - **Custom foreign key on an association:** `hasMany(name="comments", foreignKey="blogPostId")` overrides the `postId` default.
 - **Custom view path:** `renderView(action="summary")` or `renderView(controller="shared", action="error")` picks a different template without renaming the action.
 - **Custom layout:** `renderView(layout="print")` for one action, or a `filters(through="$usePrintLayout")` filter that calls `usesLayout("print")` across a controller.
-- **Custom route mapping:** `.get(pattern="/old/:key", to="posts##show")` in `config/routes.cfm` maps a legacy URL onto a conventional action.
+- **Custom route mapping:** `.get(pattern="/old/[key]", to="posts##show")` in `config/routes.cfm` maps a legacy URL onto a conventional action.
 
 Each override is local. The rest of the model, the rest of the controller, the rest of the app keeps the default behavior. You pay the configuration cost only where the convention didn't fit.
 
@@ -51,7 +51,7 @@ The same shape holds for every override in the framework. The convention fires b
 
 Legacy databases are the usual source of friction. Tables named `tbl_user_data`, primary keys called `userID` instead of `id`, pluralizations Wheels' inflector doesn't recognize (`person`/`people`, `datum`/`data`, `goose`/`geese`), columns that carry JSON or enum values on a schema designed before either was a standard type. Multi-tenancy with per-tenant schemas or table prefixes. Foreign keys that don't follow the `<model>Id` pattern because someone named them after a product code twenty years ago.
 
-None of these block you. Each has a declared override — `tableName()`, `setPrimaryKey()`, `foreignKey=`, a custom inflector rule, a dynamic scope, a middleware that resolves the tenant. The cost is a handful of extra lines in the model and a reader who has to know the schema is unusual. That's a real cost, but it's paid once per table, not once per query. Most apps have five or ten such exceptions and several hundred conventional models.
+None of these block you. Each has a declared override — `table()`, `setPrimaryKey()`, `foreignKey=`, a custom inflector rule, a dynamic scope, a middleware that resolves the tenant. The cost is a handful of extra lines in the model and a reader who has to know the schema is unusual. That's a real cost, but it's paid once per table, not once per query. Most apps have five or ten such exceptions and several hundred conventional models.
 
 The pattern to avoid is configuring away a convention you could have followed. If a new table is going in and the name is negotiable, pick the plural lowercase form the framework expects. If a new foreign key is going in, name it `<model>Id`. The conventions cost nothing when you adopt them and compound every time you add a model, an association, or a controller. The exceptions are for the schemas you inherited, not the schemas you write.
 

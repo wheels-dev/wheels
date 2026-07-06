@@ -1,0 +1,1 @@
+- Added a pluggable storage-disk abstraction under `wheels.storage` with `LocalDisk` and `S3Disk` drivers behind a uniform `put/get/exists/delete/url/signedUrl` interface, resolved by name through `StorageManager`. S3 access — including presigned, expiring URLs — uses a from-scratch SigV4 signer over plain `cfhttp` (no AWS SDK, no JARs) (#3157).

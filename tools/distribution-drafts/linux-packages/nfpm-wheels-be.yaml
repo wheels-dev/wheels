@@ -11,7 +11,9 @@
 #   nfpm pkg --packager rpm --target dist/wheels-be-${WHEELS_VERSION}.x86_64.rpm
 
 name: wheels-be
-arch: amd64
+# Architecture-independent (Java jar + CFML + shell wrapper). PKG_ARCH is set by
+# build-linux-packages.sh — `all` for deb, `noarch` for rpm.
+arch: ${PKG_ARCH}
 platform: linux
 version: ${WHEELS_VERSION}
 section: devel
@@ -25,12 +27,12 @@ vendor: Wheels
 homepage: https://wheels.dev
 license: Apache-2.0
 contents:
-  # LuCLI renamed to `wheels` at stage time so argv[0]-based dispatch works.
-  # See #2700.
-  - src: ./build/wheels
-    dst: /opt/wheels/wheels
+  # Portable LuCLI launcher jar; the wrapper runs it via
+  # `java -Dlucli.binary.name=wheels -jar` (arch-independent). See #2700.
+  - src: ./build/lucli.jar
+    dst: /opt/wheels/lucli.jar
     file_info:
-      mode: 0755
+      mode: 0644
   - src: ./build/module/
     dst: /opt/wheels/module/
     type: tree

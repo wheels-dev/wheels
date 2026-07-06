@@ -43,7 +43,7 @@ https://github.com/wheels-dev/wheels/blob/develop/CHANGELOG.md
 Three ways to confirm the tag to substitute into the URL above:
 
 1. **`vendor/wheels/wheels.json`** — look for `"version"`. This is the version that was current when your project was scaffolded or last upgraded.
-2. **Runtime constant** — the `application.$wheels.version` assignment in `vendor/wheels/events/onapplicationstart.cfc` is the authoritative runtime value.
+2. **Runtime value** — dump `application.$wheels.version` (or check the debug bar's Environment panel in development). It's populated at application start from `BuildInfo`, which reads `wheels.json` — there's no readable version literal in `onapplicationstart.cfc` itself. If it disagrees with `wheels.json`, the runtime value wins.
 3. **`git log --oneline -- vendor/wheels/`** — shows the commit that last updated the vendored subtree, which you can cross-reference with the tags in the upstream repo.
 
 ### Offline / air-gapped environments

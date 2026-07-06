@@ -331,7 +331,7 @@ jobs:
       # Build .deb / .rpm Linux packages alongside the zip artifacts. nfpm
       # needs no Linux-specific build host (it's a single Go binary), so this
       # runs on the same ubuntu-latest runner as the rest of the pipeline.
-      # Generates wheels_<v>_amd64.deb and wheels-<v>.x86_64.rpm in dist/.
+      # Generates arch-independent wheels_<v>_all.deb and wheels-<v>.noarch.rpm.
       # See tools/distribution-drafts/linux-packages/ for the nfpm configs.
       - name: Install nfpm
         run: |
@@ -484,8 +484,8 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_amd64.deb
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.x86_64.rpm
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_all.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.noarch.rpm
 
       #############################################
       # Create Snapshot Pre-Release (develop only)
@@ -540,8 +540,8 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-module-*.zip.sha512
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_amd64.deb
-              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.x86_64.rpm
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*_all.deb
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels*.noarch.rpm
 
       #############################################
       # Dispatch downstream package managers

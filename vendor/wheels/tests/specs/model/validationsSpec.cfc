@@ -215,6 +215,29 @@ component extends="wheels.WheelsTest" {
 				assert_test(user, true)
 			})
 
+			it("evaluates a this.method call with a single positional argument (##3238)", () => {
+				expect(user.$evaluateConditionString("this.propertyIsPresent('username')")).toBeTrue()
+				expect(user.$evaluateConditionString("this.propertyIsPresent('nonexistent')")).toBeFalse()
+			})
+
+			it("evaluates a this.method call with multiple positional arguments", () => {
+				user.stupid_mixin = stupid_mixin
+				expect(user.$evaluateConditionString("this.stupid_mixin('1', '2') eq 3")).toBeTrue()
+				expect(user.$evaluateConditionString("this.stupid_mixin('1', '2') neq 3")).toBeFalse()
+			})
+
+			it("if validation runs when a positional-argument method condition is true (##3238)", () => {
+				args.condition = "this.propertyIsPresent('username')"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("if validation is skipped when a positional-argument method condition is false (##3238)", () => {
+				args.condition = "this.propertyIsPresent('nonexistent')"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, true)
+			})
+
 			it("both validations if triggered unless not triggered valid", () => {
 				args.condition = "1 eq 1"
 				args.unless = "this.username eq 'TheLongestNameInTheWorld'"

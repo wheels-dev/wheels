@@ -150,7 +150,8 @@ component extends="wheels.WheelsTest" {
 					"ai",
 					"guideImage",
 					"assets",
-					"mcp"
+					"mcp",
+					"index"
 				];
 
 				for (var handler in gatedHandlers) {
@@ -170,17 +171,14 @@ component extends="wheels.WheelsTest" {
 					})(handler);
 				}
 
-				it("index() is NOT gated (congratulations page stays discoverable)", () => {
-					// The issue explicitly says leave index() reachable in dev/testing.
-					// In production enablePublicComponent=false already hides it at
-					// the dispatch layer, so no per-handler block is needed.
-					var pattern = "function\s+index\s*\([^)]*\)\s*\{\s*\$blockInProduction\s*\(\s*\)\s*;";
-					var matched = REFindNoCase(pattern, source) > 0;
-					expect(matched).toBeFalse(
-						"index() should not call $blockInProduction() — it's the congratulations "
-						& "page and the issue (##2233) explicitly keeps it discoverable."
-					);
-				});
+				// index() (the congratulations/welcome page at the /wheels namespace
+				// root) is now gated like every other handler above. #2233 originally
+				// left it ungated so the welcome page stayed reachable in dev/testing,
+				// relying on enablePublicComponent=false to hide /wheels in production.
+				// Reversed because the redesigned page surfaces version/engine/db/
+				// environment (#2098/#2272), the same class of detail the gated handlers
+				// protect, so it now defense-in-depth gates itself too. Development still
+				// renders (the gate is an allowlist: only "development" passes).
 
 			});
 

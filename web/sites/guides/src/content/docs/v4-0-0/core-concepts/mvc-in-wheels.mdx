@@ -54,7 +54,7 @@ Naming is the glue. The framework maps file names to classes, classes to tables,
 | `config/routes.cfm` with `.resources("posts")` | Seven routes, named `posts`/`newPost`/`post`/`editPost` |
 | `hasMany(name="comments")` on `Post` | Expects `postId` on `comments`; provides `post.comments()` + `post.createComment()` |
 
-Break the convention and you configure your way back. Rename a table, and the model needs `tableName("tbl_posts")`. Rename the primary key, and it needs `setPrimaryKey("post_id")`. The defaults exist so the common case needs no configuration — the overrides exist for the rest.
+Break the convention and you configure your way back. Rename a table, and the model needs `table("tbl_posts")`. Rename the primary key, and it needs `setPrimaryKey("post_id")`. The defaults exist so the common case needs no configuration — the overrides exist for the rest.
 
 ## Common violations
 

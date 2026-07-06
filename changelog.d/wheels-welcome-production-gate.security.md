@@ -1,0 +1,1 @@
+- The `/wheels` welcome page now defense-in-depth gates itself with `$blockInProduction()` like every other `Public` handler, so it no longer renders outside `development` when `enablePublicComponent` is manually enabled — closing a version/engine/database/environment disclosure gap (reverses the #2233 exception)

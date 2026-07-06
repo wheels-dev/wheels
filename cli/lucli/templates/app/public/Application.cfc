@@ -2,7 +2,16 @@ component output="false" {
 
 	// Put variables we just need internally inside a wheels struct.
 	this.wheels = {};
-	this.wheels.rootPath = GetDirectoryFromPath(GetBaseTemplatePath());
+	// Anchor to THIS file's directory (the public front-controller dir), not the
+	// base template's. GetBaseTemplatePath() returns whatever file was originally
+	// requested, so when a request bootstraps under a subfolder (e.g. the test
+	// runner) rootPath would mis-anchor — and since it seeds `this.name` via
+	// Hash(rootPath) below, an unstable value silently splits one app across two
+	// application scopes (the "reload=true fixes it" symptom in issue #3025/#2887).
+	// GetCurrentTemplatePath() is always this Application.cfc's path, so rootPath
+	// stays stable regardless of the requested base template — and is identical to
+	// the old value for a normal front-controller request.
+	this.wheels.rootPath = GetDirectoryFromPath(GetCurrentTemplatePath());
 
 	this.name = createUUID();
 

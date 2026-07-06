@@ -10,7 +10,10 @@ component {
 
 	// Put variables we just need internally inside a wheels struct.
 	this.wheels = {};
-	this.wheels.rootPath = GetDirectoryFromPath(GetBaseTemplatePath());
+	// Anchor to this file's directory (matches this.webrootDir below), not the
+	// requested base template's, so rootPath stays stable under subfolder
+	// bootstrap (issue #3025/#2887).
+	this.wheels.rootPath = GetDirectoryFromPath(GetCurrentTemplatePath());
 
 	this.webrootDir = getDirectoryFromPath( getCurrentTemplatePath() );
 	this.appDir     = getCanonicalPath("_assets");

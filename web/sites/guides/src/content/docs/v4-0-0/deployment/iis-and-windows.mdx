@@ -1,0 +1,85 @@
+---
+title: IIS and Windows Deployment
+description: Run Wheels 4 on Windows Server with IIS in front of Adobe ColdFusion or Lucee — site setup, web.config rewrite rules, connectors, and the MySQL 8 datasource gotcha.
+type: howto
+---
+
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Plenty of Wheels shops run Windows Server with IIS in front of Adobe ColdFusion or Lucee — no containers, no CLI on the server, deploys from their own repos. This page is that path for Wheels 4. It assumes the app is already on disk per [Manual Installation](/v4-0-0/start-here/manual-installation/) (or copied from your repo); everything here is server wiring.
+
+<Aside type="caution" title="Verify on your box">
+These steps are assembled from the community-verified Windows setup in [discussion #1838](https://github.com/wheels-dev/wheels/discussions/1838) (Adobe ColdFusion 2025 GUI install + IIS + MySQL 8) applied to the 4.0 file layout. IIS environments vary — if a step doesn't match what you see, say so in the discussions and we'll fix the page.
+</Aside>
+
+**You'll need:**
+
+- IIS with the [URL Rewrite Module](https://www.iis.net/downloads/microsoft/url-rewrite) installed (it's a separate download; ARR is *not* required)
+- A CFML engine connected to IIS — Adobe ColdFusion 2021/2023/2025 (the installer's `wsconfig` tool wires IIS) or Lucee (the Windows installer offers the BonCode connector)
+- The app on disk, e.g. `C:\inetpub\wheels-apps\myapp\`, laid out per [Anatomy of a Wheels App](/v4-0-0/start-here/app-structure/)
+
+## Site setup
+
+<Steps>
+
+1. **Create the IIS site with its physical path at `public\`** — not the app root. For example: site `myapp`, physical path `C:\inetpub\wheels-apps\myapp\public`. This is the single most important step: everything above `public\` (your models, `config\`, `.env`, `vendor\wheels\`) must stay outside the web root, and in Wheels 4 the app is built so that pointing the site at `public\` is all it takes. `public\index.cfm` is the entry point; `public\Application.cfc` finds the rest of the app via relative mappings, so any disk location works.
+
+2. **Connect your CFML engine to the site.**
+
+   - **Adobe ColdFusion:** run `wsconfig.exe` (in `cf_root\runtime\bin`) and add the connector for your new site (or All Sites). This registers the `.cfm`/`.cfc` handler mappings.
+   - **Lucee:** the Windows installer's BonCode connector does the same; if you added the site after installing Lucee, re-run the connector installer or add the BonCode handler mappings to the site.
+
+   Confirm the wiring by requesting `/index.cfm` directly — you should see the Wheels congratulations page (with `/index.cfm/`-style URLs working) even before rewrite rules exist.
+
+3. **Add the rewrite rules.** The shipped `public\urlrewrite.xml` is for Tuckey-based servers only — IIS ignores it. Create `public\web.config` with the IIS translation of the same rule:
+
+   ```xml title="public\web.config"
+   <?xml version="1.0" encoding="UTF-8"?>
+   <configuration>
+     <system.webServer>
+       <rewrite>
+         <rules>
+           <rule name="Wheels pretty URLs" stopProcessing="true">
+             <match url="^(.*)$" />
+             <conditions logicalGrouping="MatchAll">
+               <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+               <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+               <add input="{REQUEST_URI}" pattern="^/(files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots\.txt|favicon\.ico|sitemap\.xml|index\.cfm|CFIDE|jakarta|lucee)" negate="true" />
+             </conditions>
+             <action type="Rewrite" url="index.cfm/{R:1}" />
+           </rule>
+         </rules>
+       </rewrite>
+     </system.webServer>
+   </configuration>
+   ```
+
+   With the rule in place, keep the template default `set(URLRewriting="On")` in `config/settings.cfm`. Without it, set `URLRewriting="Partial"` and Wheels serves `/index.cfm/posts/1`-style URLs — fully functional, just less pretty.
+
+4. **Create the datasource in the engine's admin.** The template expects a datasource named `wheels` (`set(dataSourceName="wheels")` in `config/settings.cfm`). On Adobe ColdFusion, create it in the **ColdFusion Administrator** — don't rely on runtime-defined datasources. On Lucee, the server or web admin both work.
+
+5. **Create `.env`** next to `app\` (one level above the web root) from `env.example`, and set `WHEELS_ENV` and `WHEELS_RELOAD_PASSWORD`. Reload later with `?reload=true&password=…` — no server access needed. See [Working Without the CLI](/v4-0-0/start-here/working-without-the-cli/).
+
+6. **Browse the site root.** Congratulations page → you're running. First error page instead? The three usual suspects, in order: handler mappings not registered for this site (step 2), site root pointing at the app folder instead of `public\` (step 1), or the datasource name not matching (step 4).
+
+</Steps>
+
+## Adobe ColdFusion + MySQL 8
+
+If the app boots but models or the migrator behave as if your tables don't exist — schema reads come back empty while direct queries work — add this to the datasource's **Connection String** in the CF Administrator:
+
+```
+nullCatalogMeansCurrent=true
+```
+
+MySQL's Connector/J 8 changed its metadata default so catalog-less metadata queries return *all* schemas instead of the current one; that flag restores the behavior Wheels' schema reader expects. This bit the community setup in #1838 and is the most common "it connects but can't see tables" cause on ACF + MySQL 8.
+
+## Mapping from a 2.5-era web.config
+
+If you're carrying a `web.config` forward from a Wheels 2.x app, the rule shape is unchanged — rewrite everything that isn't a real file/directory or excluded asset folder to `index.cfm/{R:1}`. What changed is *where it lives*: your old rules sat in the app root next to a root-level `index.cfm`; in Wheels 4 both the config and the target `index.cfm` live in `public\`, which is now the site root. Copy your old custom exclusions (if any) into the conditions list above and drop the old file.
+
+## Windows notes
+
+- **SQLite** works for development on Windows (`db\` folder), but for IIS production you'll typically run SQL Server or MySQL — see [Database and Multiple Datasources](/v4-0-0/basics/database-and-multiple-datasources/).
+- **File paths** in examples across these guides use forward slashes; CFML on Windows accepts both, and `expandPath()` returns Windows-style paths — no changes needed.
+- **Permissions:** the CFML engine's service account needs read on the whole app folder and write on `db\` (SQLite), `logs`, and any upload target — nothing under `public\` needs write access.

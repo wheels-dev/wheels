@@ -1,0 +1,56 @@
+---
+title: What's New in 4.0
+description: The at-a-glance case for upgrading from 3.x — headline features, the tooling story, and where to go next.
+type: explanation
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+You know Wheels. You have a 3.x app in production. This page is the ten-minute answer to "what does 4.0 actually give me?" — features first, tooling second, and the pointers into the upgrade path when you're convinced.
+
+## Headline features
+
+**Middleware pipeline.** Cross-cutting request handling at the dispatch level — global via `set(middleware=[...])` or scoped to route groups. Ships with `RequestId`, `SecurityHeaders`, `Cors`, and `RateLimiter` (fixed-window, sliding-window, or token-bucket; memory or database storage). → [Middleware Pipeline](/v4-0-0/core-concepts/middleware-pipeline/)
+
+**Built-in dependency injection.** Register services in `config/services.cfm`, resolve with `service()` or `inject()`, scope as transient, singleton, or request. This is the change that removed the WireBox dependency — the container is `vendor/wheels/Injector.cfc`, part of the framework. → [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/)
+
+**Chainable query builder, scopes, and enums.** `model("User").where("status","active").whereNotNull("emailVerifiedAt").orderBy("name").get()` — injection-safe, values auto-quoted. Named scopes compose (`model("User").active().recent().findAll()`), and `enum()` generates checkers and scopes from a property definition. → [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/)
+
+**Background jobs.** `app/jobs/` CFCs extending `wheels.Job`, with queues, delayed/scheduled enqueue, retries with exponential backoff, and a worker loop (`wheels jobs work`). The `wheels_jobs` table auto-creates on first use. → [Background Jobs](/v4-0-0/digging-deeper/background-jobs/)
+
+**Packages.** The successor to the legacy plugin system: modules installed into `vendor/<name>/`, auto-discovered from their `package.json`, with per-package error isolation. First-party packages include `wheels-sentry`, `wheels-hotwire`, `wheels-basecoat`, `wheels-i18n`, and `wheels-legacy-adapter` (3.x shims for a staged migration). → [Packages](/v4-0-0/digging-deeper/packages/)
+
+**Auth strategies.** Session, token, and JWT authentication ship in the framework (`wheels.auth.SessionStrategy`, `TokenStrategy`, `JwtService`) instead of every app hand-rolling them. → [Authentication Patterns](/v4-0-0/digging-deeper/authentication-patterns/)
+
+**Real-time responses.** Server-Sent Events helpers (`renderSSE()`, streaming writers) and channels for pub/sub. → [Server-Sent Events](/v4-0-0/digging-deeper/server-sent-events/), [Channels](/v4-0-0/digging-deeper/channels/)
+
+**Route model binding.** `.resources(name="users", binding=true)` resolves `params.key` into `params.user` before the action runs, 404ing on missing records so your actions don't repeat the lookup. → [Route Model Binding](/v4-0-0/digging-deeper/route-model-binding/)
+
+**WheelsTest.** A BDD test framework (`describe`/`it`/`expect`) built into the framework — the TestBox dependency is gone, and browser testing via Playwright is one `wheels browser setup` away. → [Testing](/v4-0-0/testing/)
+
+**`wheels deploy`.** A Kamal-inspired zero-downtime deployer built into the CLI — `deploy.yml`, Docker builds, TLS-terminating proxy, rollbacks. Optional: the self-managed [Docker](/v4-0-0/deployment/docker-deployment/), [VM](/v4-0-0/deployment/vm-deployment/), and [IIS](/v4-0-0/deployment/iis-and-windows/) paths are documented as first-class too. → [Deployment & Operations](/v4-0-0/deployment/)
+
+Smaller but daily-life: composable pagination (`paginationNav()` with Bootstrap/Tailwind presets), idempotent seeding (`seedOnce()`), migration reconciliation for shared dev databases (`migrate doctor`/`forget`/`pretend`), HTML5 form helpers, and a rebuilt debug bar.
+
+## The tooling story, honestly
+
+4.0 ships a first-party CLI — `wheels new`, generators, `migrate`, `test`, `console`, `deploy` — built on the LuCLI runtime and installed via Homebrew, Scoop, or apt/yum. Three sentences for the teams watching this warily:
+
+1. **CommandBox keeps working** — supported as a server manager and package fetcher (`box install wheels-base-template`, `box server start`), indefinitely.
+2. **No tooling is required at all** — the framework has zero external dependencies in 4.0, [installs from two zips](/v4-0-0/start-here/manual-installation/), and every CLI task has an [in-framework equivalent](/v4-0-0/start-here/working-without-the-cli/).
+3. **The CLI is an accelerator, not a gate** — everything it does goes through surfaces your app exposes anyway.
+
+Pick your path in one page: [Choosing Your Tooling](/v4-0-0/start-here/choosing-your-tooling/).
+
+## Breaking changes, in one breath
+
+Eleven, all enumerated with remediations in the upgrade guide. The ones most likely to touch a 3.x app: CORS defaults flipped from wildcard to deny-all, `application.wirebox` became `application.wheelsdi`, `wheels.Test` became `wheels.WheelsTest`, `tests/specs/functions/` became `tests/specs/functional/`, and production hardening (HSTS, CSRF key, environment-switch lockdown) is on by default. The [`wheels-legacy-adapter`](https://github.com/wheels-dev/wheels-legacy-adapter) package shims most 3.x patterns while you migrate.
+
+## Where to go next
+
+<CardGrid>
+  <LinkCard title="Upgrading from 3.x to 4.0" href="/v4-0-0/upgrading/3x-to-4x/" description="Every breaking change, with the exact remediation for each." />
+  <LinkCard title="Upgrading Without the CLI" href="/v4-0-0/upgrading/manual-upgrades/" description="The vendor/wheels swap recipe — zips, no tooling." />
+  <LinkCard title="Tutorial: Build a Blog" href="/v4-0-0/start-here/tutorial/" description="See the 4.0-native features in one continuous build." />
+  <LinkCard title="Reading the Changelog" href="/v4-0-0/upgrading/changelog/" description="Where release-by-release detail lives." />
+</CardGrid>

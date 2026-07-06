@@ -71,13 +71,18 @@ component extends="wheels.WheelsTest" {
 				it("emits a wrapper that routes lucli through the wheels module", () => {
 					var src = fileRead(buildScript);
 
-					// The wrapper must either:
-					//   (a) rename the binary so argv[0] is `wheels` and exec
-					//       it directly (the brew approach — lucli routes by
+					// The wrapper must route lucli through the wheels module in one
+					// of these forms:
+					//   (a) rename the native binary so argv[0] is `wheels` and exec
+					//       it directly (the old brew approach — lucli routes by
 					//       basename(argv[0])), OR
-					//   (b) call lucli via `modules run wheels "$@"` explicitly.
-					// Either way, the bare `exec /opt/wheels/lucli "$@"` form
-					// is incorrect and produces `Unknown command: 'start'`.
+					//   (b) call lucli via `modules run wheels "$@"` explicitly, OR
+					//   (c) launch the portable jar with the binary-name flag:
+					//       `exec java -Dlucli.binary.name=wheels -jar /opt/wheels/lucli.jar "$@"`
+					//       (the arch-independent form — the flag replaces the
+					//       basename(argv[0]) trick; same mechanism Scoop uses).
+					// The bare `exec /opt/wheels/lucli "$@"` form is incorrect and
+					// produces `Unknown command: 'start'`.
 					var execsBareLucli = reFindNoCase(
 						"exec[[:space:]]+/opt/wheels/lucli[[:space:]]+""?\$@""?",
 						src
@@ -98,11 +103,19 @@ component extends="wheels.WheelsTest" {
 						"exec[[:space:]]+/opt/wheels/lucli[[:space:]]+modules[[:space:]]+run[[:space:]]+wheels",
 						src
 					) > 0;
-					expect(routesByArgv0 || routesByModulesRun).toBeTrue(
-						"The wrapper must route lucli through the wheels module — either via "
-						& "argv[0] rename (`exec /opt/wheels/wheels ""$@""`) or explicit module "
-						& "dispatch (`exec /opt/wheels/lucli modules run wheels ""$@""`). "
-						& "See issue ##2700."
+					// Arch-independent jar launcher: `-Dlucli.binary.name=wheels`
+					// routes to the wheels module and `-jar .../lucli.jar` runs the
+					// portable launcher (installs/runs on amd64 AND arm64).
+					var routesByJar = reFindNoCase(
+						"-Dlucli\.binary\.name=wheels[^\n]*-jar[^\n]*lucli\.jar",
+						src
+					) > 0;
+					expect(routesByArgv0 || routesByModulesRun || routesByJar).toBeTrue(
+						"The wrapper must route lucli through the wheels module — via "
+						& "argv[0] rename (`exec /opt/wheels/wheels ""$@""`), explicit module "
+						& "dispatch (`exec /opt/wheels/lucli modules run wheels ""$@""`), or the "
+						& "portable jar launcher (`java -Dlucli.binary.name=wheels -jar "
+						& "/opt/wheels/lucli.jar ""$@""`). See issue ##2700."
 					);
 				});
 

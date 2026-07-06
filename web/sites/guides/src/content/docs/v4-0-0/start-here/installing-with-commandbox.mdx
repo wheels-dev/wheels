@@ -124,7 +124,20 @@ The 3.x getting-started spine was built on CommandBox. Here's how each old step 
 | `wheels generate app myApp` / `wheels g app` | `wheels new myApp` |
 | `box server start` | Still works — or `wheels start` (Lucee, bundled with the CLI) |
 | ForgeBox plugins (`box install ...`, `forgebox install`) | The [`wheels packages`](/v4-0-0/digging-deeper/packages/) registry (CLI-only; not ForgeBox) |
-| `box install wheels-base-template` + `wheels-core` | Unchanged — still the supported way to fetch the framework with CommandBox |
+| `box install cfwheels-base-template` | **Slug changed** — `box install wheels-base-template` (the `cfwheels-`-prefixed slug is dead; see below) |
+
+<Aside type="caution" title="The `cfwheels-base-template` slug is gone — use `wheels-base-template`">
+If your 2.x muscle memory is `box install cfwheels-base-template`, that command no longer works. The pre-rebrand `cfwheels-`-prefixed ForgeBox slugs (`cfwheels-base-template`, `cfwheels`) are **deprecated and unmaintained** — `cfwheels-base-template` still resolves on ForgeBox but errors on its missing `cfwheels` core dependency and leaves an unrunnable skeleton. The framework rebranded to **Wheels** at 3.0, and the supported 4.x slugs dropped the prefix:
+
+- `cfwheels-base-template` → [`wheels-base-template`](#supported-install-the-framework)
+- `cfwheels` → `wheels-core`
+
+Install the modern slug instead:
+
+```bash title="illustrative — the supported 4.x slug"
+box install wheels-base-template
+```
+</Aside>
 
 The practical recommendation: keep CommandBox if you rely on it for Adobe CF or BoxLang server management, and add the `wheels` CLI alongside it for everything in the [feature-set list above](#not-supported-via-commandbox-the-wheels-cli-feature-set).
 

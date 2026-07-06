@@ -46,10 +46,10 @@ PRs [#1883](https://github.com/wheels-dev/wheels/pull/1883) and [#1888](https://
 
 ```cfm
 // config/services.cfm — in-house DI, familiar surface
-var di = injector();
-di.map("emailService").to("app.lib.EmailService").asSingleton();
-di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
-di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+local.di = injector();
+local.di.map("emailService").to("app.lib.EmailService").asSingleton();
+local.di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+local.di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
 ```
 
 Scopes are explicit. Transient is the default — a fresh instance per call. Singleton lives for the application lifetime. Request-scoped lives for the duration of one HTTP request, cached on `request.$wheelsDICache`. Auto-wiring of `init()` arguments matches registered names when no explicit `initArguments` are passed, which is the common case and the reason most service definitions fit on one line.

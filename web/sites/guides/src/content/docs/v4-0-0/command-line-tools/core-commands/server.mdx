@@ -14,7 +14,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 - Managing multiple named server instances side-by-side (e.g. one per project, one per Lucee version).
 - Pinning an explicit Lucee version for reproducible local runs.
-- Tailing server, access, or error logs without hunting through `~/.lucli/servers/<name>/logs`.
+- Tailing server, access, or error logs without hunting through `~/.wheels/servers/<name>/logs` (`~/.lucli/` on standalone LuCLI).
 - Inspecting the running state of every server on your machine from one place.
 
 ## Overview
@@ -486,6 +486,6 @@ Under the hood `wheels start` just forwards to `wheels server start` inside the 
   <LinkCard
     title="MCP Integration"
     href="../../mcp-integration/"
-    description="Drive wheels_* tools (including server control) from an AI IDE via LuCLI's stdio MCP."
+    description="Drive the CLI's MCP tools from an AI IDE over stdio. Server start/stop are deliberately hidden from MCP — use the terminal for lifecycle."
   />
 </CardGrid>
