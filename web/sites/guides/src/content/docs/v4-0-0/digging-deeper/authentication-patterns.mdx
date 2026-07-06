@@ -21,6 +21,26 @@ This page shows you how to wire authentication into a Wheels app using the built
   You should already know: Wheels controllers, filters, and the `session` scope (see [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/)), plus the end-to-end login flow walked through in [Tutorial Part 6: Authentication](/v4-0-0/start-here/tutorial/06-authentication/). This page assumes you've read both and picks up where Part 6b leaves off.
 </Aside>
 
+## Scaffold it in one command
+
+Everything this page wires up by hand can be generated in one shot:
+
+```bash
+wheels generate auth
+wheels migrate latest
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--model=<Name>` | `User` | Model (and table, pluralised) to generate. |
+| `--strategy=<name>` | `session` | `session` (browser login), `token` (opaque API bearer tokens), or `jwt` (stateless signed tokens). |
+| `--registration` / `--no-registration` | on | Include the public sign-up flow (session strategy only). |
+| `--force` | off | Overwrite generated files and regenerate the injected config blocks in place. |
+
+The session strategy emits a `User` model with PBKDF2 hashing via the `passwordHasher` service, `Sessions`/`Passwords`/`Registrations` controllers and views, a create-users migration, the route/service/strategy wiring described below, and app specs. The generated files are **code you own** — edit them freely, and re-run with `--force` plus a `git diff` review when you want to pick up generator improvements. See the [`wheels generate auth` reference](/v4-0-0/command-line-tools/wheels-commands/code-generation/#wheels-generate-auth) for the full file list.
+
+The rest of this page explains the primitives the scaffold sits on — read on to understand what was generated, customize it, or wire things up by hand.
+
 ## The pieces
 
 Wheels ships four auth components under `wheels.auth.*`:

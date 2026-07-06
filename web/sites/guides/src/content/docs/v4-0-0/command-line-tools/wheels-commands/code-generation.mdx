@@ -1,6 +1,6 @@
 ---
 title: "Code Generation"
-description: wheels generate — models, controllers, scaffolds, migrations, routes, tests, properties, helpers, snippets, admin, and API resources, with attribute syntax and per-subcommand flags.
+description: wheels generate — models, controllers, scaffolds, migrations, routes, tests, properties, helpers, snippets, admin, auth, and API resources, with attribute syntax and per-subcommand flags.
 type: reference
 sidebar:
   order: 2
@@ -44,6 +44,7 @@ Running `wheels generate` with no arguments prints the list of supported types a
 | `helper` | `h` | Helper CFC under `app/helpers/` |
 | `snippets` | — | Copies a named code pattern into the project |
 | `admin` | — | CRUD admin controller + views for an existing model (requires a running server) |
+| `auth` | — | Full authentication scaffold on the `wheels.auth` primitives (session, token, or JWT strategy) |
 
 ## Attribute syntax
 
@@ -376,6 +377,56 @@ wheels generate admin User
 ```
 
 After reload, the admin interface is available at `/admin/users`.
+
+### `wheels generate auth`
+
+Generate a complete authentication scaffold on the built-in `wheels.auth` primitives (`PasswordHasher`, `Authenticator`, and the session/token/JWT strategies).
+
+#### Synopsis
+
+``` title="Synopsis"
+wheels generate auth [ModelName] [--model=User] [--strategy=session|token|jwt] [--registration|--no-registration] [--force]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--model=<Name>` | `User` | Model (and table, pluralised) to generate. A bare positional name works too. |
+| `--strategy=<name>` | `session` | `session` (browser login), `token` (opaque API bearer tokens), or `jwt` (stateless signed tokens). |
+| `--registration` / `--no-registration` | on | Include the public sign-up flow (session strategy only). |
+| `--force` | off | Overwrite existing generated files and regenerate the injected config blocks in place. |
+
+#### Description
+
+The generated code is **code you own** — every file carries a stamped header, nothing is patched by framework upgrades. To pick up generator improvements later, re-run with `--force` on a clean branch and review the changes with `git diff`. The route, service, and strategy registrations are injected between `// wheels:generate-auth:*` marker comments and replaced in place on re-runs, never duplicated. The migration is never overwritten, even with `--force`.
+
+All strategies share the same `User` model: PBKDF2-HMAC-SHA256 hashing through the `passwordHasher` service (a transient `password` property is validated — presence on create, 12-character minimum, confirmation — then hashed into `passwordDigest` and scrubbed in a `beforeSave` callback), an `authenticate()` method with transparent rehash-on-login, and single-use SHA-256-digested password reset tokens that expire after 2 hours.
+
+**Session** (default) writes `Sessions`/`Passwords`/`Registrations` controllers (every `config()` starts with `super.config()`, so the base controller's CSRF protection stays active), `startFormTag`-based views, login/logout/register/password routes, and DI registrations for `passwordHasher`, `authenticator`, and `sessionStrategy` in `config/services.cfm`, with the strategy wired into the authenticator in `app/events/onapplicationstart.cfm`.
+
+**Token** writes `app/controllers/api/Sessions.cfc` instead (no views; the registration flag doesn't apply): `POST /api/session` exchanges credentials for an opaque bearer token returned exactly once — only its SHA-256 digest is stored — and `DELETE /api/session` revokes it. The `TokenStrategy` validator is registered at startup and resolves accounts by token digest.
+
+**JWT** writes an `api/Sessions.cfc` that mints tokens with `JwtService`, signed with the `WHEELS_JWT_SECRET` environment variable (at least 32 random bytes). Startup fails loudly when the secret is missing or too short. JWTs have **no server-side revocation** — an issued token stays valid until it expires; use `--strategy=token` if you need instant revocation.
+
+Both a model spec and a sessions-controller spec are generated under `tests/specs/` so the scaffold is covered by `wheels test` from day one.
+
+#### Example
+
+```bash
+wheels generate auth
+wheels migrate latest
+wheels start
+```
+
+Writes:
+
+- `app/models/User.cfc` with hashing, validations, and `authenticate()`
+- `app/migrator/migrations/<timestamp>_create_users_table.cfc` with a unique email index
+- `app/controllers/Sessions.cfc`, `Passwords.cfc`, `Registrations.cfc`
+- `app/views/sessions/new.cfm`, `registrations/new.cfm`, `passwords/new.cfm`, `passwords/edit.cfm`
+- Marked blocks in `config/routes.cfm`, `config/services.cfm` (created if absent), and `app/events/onapplicationstart.cfm`
+- `tests/specs/models/UserAuthSpec.cfc`, `tests/specs/controllers/SessionsControllerSpec.cfc`
+
+After migrating and restarting, `/login` and `/register` are live. See the [authentication patterns guide](../../../digging-deeper/authentication-patterns/) for how the pieces fit together and how to protect actions with a filter.
 
 ## Common workflows
 

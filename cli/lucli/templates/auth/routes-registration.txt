@@ -1,0 +1,2 @@
+.get(name="register", pattern="/register", to="registrations##new")
+.post(name="registrations", pattern="/register", to="registrations##create")

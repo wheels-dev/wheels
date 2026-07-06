@@ -1,0 +1,19 @@
+
+	/**
+	 * Issue a new API token, replacing any previous one. Returns the
+	 * plaintext token exactly once; only its SHA-256 digest is stored.
+	 */
+	public string function generateApiToken() {
+		var token = newSecureToken();
+		this.apiTokenDigest = LCase(Hash(token, "SHA-256"));
+		this.save(validate=false, callbacks=false);
+		return token;
+	}
+
+	/**
+	 * Revoke the current API token.
+	 */
+	public void function revokeApiToken() {
+		this.apiTokenDigest = "";
+		this.save(validate=false, callbacks=false);
+	}
