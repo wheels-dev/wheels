@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Open a PR carrying a refreshed visual-regression baseline, then enable
-# auto-merge — so the change lands WITHOUT a direct push to a ruleset-protected
-# branch.
+# Deliver a refreshed visual-regression baseline to the dispatched branch:
+# push it directly when the branch allows that, and fall back to opening a
+# `chore/refresh-baseline-*` PR when the branch ruleset rejects direct pushes.
 #
 # Extracted from .github/workflows/refresh-visual-baselines.yml for issue #3283:
 # that workflow's final step pushed the refreshed PNG(s) straight to the
@@ -10,50 +10,70 @@
 #   remote: error: GH013: Repository rule violations found for refs/heads/develop.
 #   remote: - Changes must be made through a pull request.
 #
-# This mirrors the PR flow already used by
-# .github/workflows/refresh-packages-baseline.yml, and additionally enables
-# GitHub auto-merge so the refresh lands unattended once the required checks pass.
+# Delivery strategy:
+#   1. Commit the refreshed PNG(s), then try the direct push. On an
+#      unprotected branch (the header's documented flow — dispatching on a
+#      PR's source branch) this succeeds and behaves exactly like the
+#      pre-#3283 workflow: the commit lands immediately and retriggers CI.
+#   2. If the push is rejected (GH013 on `develop`, or any other rejection),
+#      move the commit to a throwaway `chore/refresh-baseline-*` branch and
+#      open a PR against the target branch instead — mirroring
+#      .github/workflows/refresh-packages-baseline.yml.
+#
+# The fallback PR is NOT auto-merged, on purpose. It is opened with the
+# workflow's GITHUB_TOKEN, and GitHub's recursive-trigger guard means
+# GITHUB_TOKEN-authored PRs never fire `pull_request` workflows — the target
+# branch's required checks would sit "Expected" forever, so enabling
+# auto-merge would just wedge silently. (The sibling
+# refresh-packages-baseline.yml documents the same gotcha and also leaves its
+# PR for a human.) A maintainer must eyeball the PNG diff and merge; closing
+# and reopening the PR as a human retriggers CI if the required checks are
+# wanted first.
 #
 # Contract:
 #   - CWD is the repository root.
 #   - The working tree already holds the refreshed, UNSTAGED baseline file(s).
+#   - Writes `delivery=push|pr` (and `pr_url=...` for the PR path) to
+#     $GITHUB_OUTPUT when set, so the workflow's step summary can report what
+#     actually happened.
 #
 # Inputs (all via env, never spliced into an eval'd string — this preserves the
 # workflow's Actions-injection-safe posture; see the workflow's security note):
 #   SITES         which baseline(s) were refreshed (used in the title/body/branch)
-#   TARGET_BRANCH branch the PR merges into (github.ref_name)
+#   TARGET_BRANCH branch the refresh lands on (github.ref_name)
 #   RUN_ID        github.run_id — makes the throwaway branch name unique
+#   RUN_ATTEMPT   github.run_attempt — keeps re-runs of a failed job unique too
+#                 (a bare RUN_ID collides with the branch left by attempt 1)
 #   ADD_PATHS     git pathspec(s) to stage (default: web/tests/visual-baselines/)
 #   GH_TOKEN      token with BOTH contents:write and pull-requests:write
 #
-# SITES is constrained to the workflow's `choice` input list and RUN_ID is a
-# numeric run id, so both are safe to interpolate into the branch name and the
-# --title/--body arguments (each reaches git/gh as a single argv element, never
-# a shell-expanded command string).
+# SITES is constrained to the workflow's `choice` input list and RUN_ID /
+# RUN_ATTEMPT are numeric, so all are safe to interpolate into the branch name
+# and the --title/--body arguments (each reaches git/gh as a single argv
+# element, never a shell-expanded command string).
 
 set -euo pipefail
 
 : "${SITES:?SITES is required}"
 : "${TARGET_BRANCH:?TARGET_BRANCH is required}"
 : "${RUN_ID:?RUN_ID is required}"
+RUN_ATTEMPT="${RUN_ATTEMPT:-1}"
 ADD_PATHS="${ADD_PATHS:-web/tests/visual-baselines/}"
-
-branch="chore/refresh-baseline-${SITES}-${RUN_ID}"
+GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
 
 git config user.name "github-actions[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-git checkout -b "$branch"
 # Word-split ADD_PATHS on purpose so callers can pass multiple pathspecs; the
 # value is workflow-controlled, never user input.
 # shellcheck disable=SC2086
 git add -- $ADD_PATHS
 
 # Build the commit message in a temp file so the heredoc body stays readable and
-# no value is spliced into a shell-expanded string. The subject matches the old
-# direct-push commit and stays a valid conventional commit <=100 chars, which the
-# "Validate Commit Messages" required check lints against the PR title. The
-# branch name lives on its own body line so a long TARGET_BRANCH can't push a
-# body line past commitlint's 100-char body-max-line-length.
+# no value is spliced into a shell-expanded string. The subject stays a valid
+# conventional commit <=100 chars, which the "Validate Commit Messages"
+# required check lints against the PR title in the fallback path. The branch
+# name lives on its own body line so a long TARGET_BRANCH can't push a body
+# line past commitlint's 100-char body-max-line-length.
 commit_msg_file="$(mktemp)"
 {
   printf '%s\n\n' "chore(web): refresh visual baseline(s) ($SITES)"
@@ -68,20 +88,34 @@ commit_msg_file="$(mktemp)"
 git commit -F "$commit_msg_file"
 rm -f "$commit_msg_file"
 
+# Fast path: branches without a "changes must arrive via PR" rule (typically a
+# PR's source branch, the flow the workflow header documents) still take the
+# pre-#3283 direct push. The guard means a ruleset rejection (GH013) no longer
+# fails the job — it falls through to the PR flow below.
+if git push origin "HEAD:${TARGET_BRANCH}"; then
+  echo "Pushed refreshed baseline(s) directly to ${TARGET_BRANCH} (branch accepts direct pushes)."
+  echo "delivery=push" >> "$GITHUB_OUTPUT"
+  exit 0
+fi
+
+echo "Direct push to ${TARGET_BRANCH} was rejected (ruleset requires a PR?) — opening a refresh PR instead."
+
+branch="chore/refresh-baseline-${SITES}-${RUN_ID}-${RUN_ATTEMPT}"
+git checkout -b "$branch"
 git push -u origin "$branch"
 
 pr_body_file="$(mktemp)"
 {
   printf '%s\n\n' "## Summary"
   printf '%s\n\n' "Refreshes the visual-regression baseline(s) for \`$SITES\` so the \`visual-regression\` check reflects the intended rendering."
-  printf '%s\n\n' "Opened automatically by \`.github/workflows/refresh-visual-baselines.yml\` (run \`$RUN_ID\`), which routes the refreshed PNG(s) through a PR instead of a direct push — the \`$TARGET_BRANCH\` branch ruleset requires changes to arrive via a pull request."
+  printf '%s\n\n' "Opened automatically by \`.github/workflows/refresh-visual-baselines.yml\` (run \`$RUN_ID\`, attempt \`$RUN_ATTEMPT\`): the direct push was rejected because the \`$TARGET_BRANCH\` branch ruleset requires changes to arrive via a pull request."
+  printf '%s\n\n' "> **Maintainer note:** this PR was opened with the workflow's \`GITHUB_TOKEN\`, so required checks will NOT start on their own (GitHub suppresses workflow triggers on GITHUB_TOKEN-authored PRs). Either close and reopen the PR to trigger CI, or eyeball the PNG diff below and merge."
   printf '%s\n' "## Test plan"
-  printf '%s\n' "- [ ] \`visual-regression\` job passes on this PR"
   printf '%s\n' "- [ ] The baseline diff contains only the intended content/layout change (not font/rendering drift)"
+  printf '%s\n' "- [ ] After merge, \`visual-regression\` passes on the target branch's next run"
 } > "$pr_body_file"
 
-# gh prints the new PR's URL on stdout; capture it so the auto-merge call
-# targets exactly this PR.
+# gh prints the new PR's URL on stdout; capture it for the log + step summary.
 pr_url="$(gh pr create \
   --base "$TARGET_BRANCH" \
   --head "$branch" \
@@ -91,12 +125,7 @@ pr_url="$(gh pr create \
 rm -f "$pr_body_file"
 
 echo "Opened refresh PR: $pr_url"
-
-# Enable auto-merge so the PR lands once the required checks pass — no human
-# round-trip. If the repository has auto-merge disabled, don't fail the whole
-# refresh job: the PR is already open for a human to merge manually.
-if gh pr merge "$pr_url" --auto --squash --delete-branch; then
-  echo "Auto-merge enabled — the PR will land once required checks pass."
-else
-  echo "Could not enable auto-merge (is it disabled on this repo?); PR left open for manual merge: $pr_url"
-fi
+echo "NOTE: required checks do not auto-run on GITHUB_TOKEN-authored PRs; a maintainer must"
+echo "review the PNG diff and merge (or close/reopen the PR to trigger CI first)."
+echo "delivery=pr" >> "$GITHUB_OUTPUT"
+echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"

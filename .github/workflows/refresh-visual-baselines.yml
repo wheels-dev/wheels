@@ -15,13 +15,19 @@ name: Refresh visual baselines
 #      - "Use workflow from": select the PR's source branch.
 #      - "Which baseline(s) to refresh": pick the affected site, or "all".
 #   4. The workflow rebuilds the sites, screenshots the canary page(s),
-#      writes the new PNG(s) into web/tests/visual-baselines/, and opens a
-#      `chore/refresh-baseline-*` PR against the dispatched branch with
-#      auto-merge enabled. (Direct pushes are rejected by the develop branch
-#      ruleset — see #3283 — so the refresh always arrives as a PR.)
-#   5. Once that PR merges, its commit lands on the branch and retriggers CI;
-#      `visual-regression` should now pass. If auto-merge is disabled on the
-#      repo the PR is left open for a manual merge.
+#      writes the new PNG(s) into web/tests/visual-baselines/, commits, and
+#      pushes the commit straight to the dispatched branch when that branch
+#      allows it (the normal case for a PR's source branch).
+#   5. If the branch ruleset rejects the direct push ("Changes must be made
+#      through a pull request" — develop does, see #3283), the commit is
+#      delivered as a `chore/refresh-baseline-*` PR instead. That PR is NOT
+#      auto-merged: it is authored by the workflow's GITHUB_TOKEN, and GitHub
+#      never fires `pull_request` workflows for GITHUB_TOKEN-authored PRs, so
+#      the required checks would sit "Expected" forever and auto-merge would
+#      wedge silently (same gotcha refresh-packages-baseline.yml documents).
+#      A maintainer eyeballs the PNG diff and merges — or closes/reopens the
+#      PR to trigger CI first. Once the commit lands, `visual-regression`
+#      should pass on the branch's next run.
 #
 # Why this exists alongside refresh-packages-baseline.yml:
 #   - refresh-packages-baseline.yml fires automatically when the
@@ -72,10 +78,10 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
-      # Needed by tools/gh-open-refresh-baseline-pr.sh: the develop ruleset
-      # forbids the old direct push, so the refreshed baseline is delivered
-      # through `gh pr create` + `gh pr merge --auto`, which require this scope
-      # (a `contents: write`-only token fails the PR calls silently). See #3283.
+      # Needed by tools/gh-open-refresh-baseline-pr.sh: when the target
+      # branch's ruleset forbids the direct push (develop does), the refreshed
+      # baseline is delivered through `gh pr create`, which requires this
+      # scope (a `contents: write`-only token fails the PR call). See #3283.
       pull-requests: write
     steps:
       - name: Checkout target branch
@@ -148,20 +154,24 @@ jobs:
             git diff --name-only -- web/tests/visual-baselines/
           fi
 
-      - name: Open refresh PR and enable auto-merge
+      - name: Deliver refreshed baseline(s) (direct push, or PR fallback)
+        id: deliver
         if: steps.changes.outputs.changed == 'true'
-        # The develop branch ruleset forbids a direct push ("Changes must be
-        # made through a pull request"), so instead of committing the refreshed
-        # PNG(s) straight back to the dispatched branch we route them through a
-        # throwaway `chore/refresh-baseline-*` branch, open a PR, and enable
-        # auto-merge. The branch/commit/PR/auto-merge flow lives in
-        # tools/gh-open-refresh-baseline-pr.sh (shared, reviewable, unit-pinned
-        # by RefreshVisualBaselinesPrPushSpec). See #3283.
+        # Commits the refreshed PNG(s) and pushes them straight to the
+        # dispatched branch when it allows that. If the branch ruleset rejects
+        # the push ("Changes must be made through a pull request" — develop
+        # does), the commit is routed through a throwaway
+        # `chore/refresh-baseline-*` branch and opened as a PR instead. The
+        # whole flow lives in tools/gh-open-refresh-baseline-pr.sh (shared,
+        # reviewable, unit-pinned by RefreshVisualBaselinesPrPushSpec) and
+        # reports `delivery` / `pr_url` outputs for the summary below.
+        # See #3283.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SITES: ${{ inputs.sites }}
           TARGET_BRANCH: ${{ github.ref_name }}
           RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: bash tools/gh-open-refresh-baseline-pr.sh
 
       - name: Write step summary
@@ -170,23 +180,32 @@ jobs:
           SITES: ${{ inputs.sites }}
           CHANGED: ${{ steps.changes.outputs.changed }}
           BRANCH: ${{ github.ref_name }}
+          DELIVERY: ${{ steps.deliver.outputs.delivery }}
+          PR_URL: ${{ steps.deliver.outputs.pr_url }}
         run: |
           {
             echo "## Refresh visual baselines"
             echo
             echo "- **Target branch:** \`$BRANCH\`"
             echo "- **Sites requested:** \`$SITES\`"
-            if [ "$CHANGED" = "true" ]; then
-              echo "- **Result:** Refresh PR opened against \`$BRANCH\` (auto-merge enabled)."
+            if [ "$CHANGED" = "true" ] && [ "$DELIVERY" = "push" ]; then
+              echo "- **Result:** Refreshed baseline(s) pushed directly to \`$BRANCH\`."
               echo
-              echo "### Next step"
+              echo "The commit retriggers CI on the branch; \`visual-regression\` should now pass."
+            elif [ "$CHANGED" = "true" ] && [ "$DELIVERY" = "pr" ]; then
+              echo "- **Result:** Refresh PR opened against \`$BRANCH\`: $PR_URL"
               echo
-              echo "A \`chore/refresh-baseline-*\` PR carries the refreshed baseline(s) — the"
-              echo "develop branch ruleset requires changes to arrive via a pull request (see"
-              echo "#3283). It auto-merges once the required checks pass; when its commit lands"
-              echo "on \`$BRANCH\` it retriggers CI and \`visual-regression\` should pass. If"
-              echo "auto-merge is disabled on the repo, merge the PR manually. See the job log"
-              echo "for the PR link."
+              echo "### Next step — a maintainer must merge that PR"
+              echo
+              echo "\`$BRANCH\` rejects direct pushes (see #3283), so the refreshed baseline(s)"
+              echo "travel in a \`chore/refresh-baseline-*\` PR. That PR is authored by the"
+              echo "workflow's \`GITHUB_TOKEN\`, and GitHub does not fire \`pull_request\`"
+              echo "workflows for GITHUB_TOKEN-authored PRs — its required checks will NOT"
+              echo "start on their own, so it cannot land unattended. Either close and reopen"
+              echo "the PR to trigger CI, or review the PNG diff and merge it directly. Once"
+              echo "its commit lands on \`$BRANCH\`, \`visual-regression\` should pass."
+            elif [ "$CHANGED" = "true" ]; then
+              echo "- **Result:** Baselines changed but delivery did not complete. See the job log."
             elif [ "$CHANGED" = "false" ]; then
               echo "- **Result:** No baseline drift detected — nothing to commit."
               echo
