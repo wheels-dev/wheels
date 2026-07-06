@@ -70,6 +70,24 @@ component output="false" {
 		return true;
 	}
 
+	/**
+	 * Aggregates the adapter's capability probes into a plain-data struct,
+	 * computed lazily on first call and cached in the variables scope for
+	 * the adapter's lifetime (adapters are application-scoped singletons).
+	 * Plain booleans only — never add function references here: the struct
+	 * may end up in application scope, which rejects function members on
+	 * Adobe CF.
+	 */
+	public struct function getCapabilities() {
+		if (!StructKeyExists(variables, "capabilities")) {
+			variables.capabilities = {
+				cfcache: supportsCfcache(),
+				imageInfo: supportsImageInfo()
+			};
+		}
+		return variables.capabilities;
+	}
+
 	// --- Response / PageContext ---
 
 	/**
@@ -257,6 +275,17 @@ component output="false" {
 	}
 
 	// --- Image Handling ---
+
+	/**
+	 * Returns true if the engine can read image metadata (width/height) via
+	 * the adapter's imageInfo() implementation. Engines without an image
+	 * runtime (e.g. RustCFML — no JVM, so no AWT/ImageIO) override this to
+	 * false so callers like $imageTag() skip the dimension probe and render
+	 * the tag without dimensions instead of erroring.
+	 */
+	public boolean function supportsImageInfo() {
+		return true;
+	}
 
 	/**
 	 * Gets image information for a given source file.
