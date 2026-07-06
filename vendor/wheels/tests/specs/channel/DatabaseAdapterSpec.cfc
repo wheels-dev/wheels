@@ -222,6 +222,60 @@ component extends="wheels.WheelsTest" {
 				expect(remaining.recordCount).toBe(3);
 			});
 
+			it("$applyRowBound rewrites the SELECT with TOP for sqlserver", function() {
+				var bounded = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					dbType = "sqlserver",
+					maxRows = 25
+				);
+				expect(bounded).toBe(
+					"SELECT TOP 25 id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC"
+				);
+			});
+
+			it("$applyRowBound appends FETCH FIRST for oracle", function() {
+				var bounded = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					dbType = "oracle",
+					maxRows = 25
+				);
+				expect(bounded).toBe(
+					"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC FETCH FIRST 25 ROWS ONLY"
+				);
+			});
+
+			it("$applyRowBound appends LIMIT for every other dialect", function() {
+				var dialects = ["mysql", "postgresql", "sqlite", "h2", "default"];
+				for (var dialect in dialects) {
+					var bounded = adapter.$applyRowBound(
+						sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+						dbType = dialect,
+						maxRows = 25
+					);
+					expect(bounded).toBe(
+						"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC LIMIT 25"
+					);
+				}
+			});
+
+			it("$applyRowBound hardens the bound to an integer", function() {
+				var bounded = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events",
+					dbType = "mysql",
+					maxRows = 7.9
+				);
+				expect(bounded).toBe("SELECT id FROM wheels_events LIMIT 7");
+			});
+
+			it("$applyRowBound leaves the statement unchanged for a non-positive bound", function() {
+				var unbounded = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events",
+					dbType = "mysql",
+					maxRows = 0
+				);
+				expect(unbounded).toBe("SELECT id FROM wheels_events");
+			});
+
 			it("auto-creates wheels_events table on first use", function() {
 				// The table should already exist from previous tests,
 				// but verify we can query it

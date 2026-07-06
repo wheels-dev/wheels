@@ -162,13 +162,22 @@ component {
 			if (arguments.maxRows > 0) {
 				// Bounded pass: select the oldest expired ids first, then delete only
 				// those, so the DELETE (the lock-holding statement) stays small and
-				// indexed even when a large backlog has accumulated
+				// indexed even when a large backlog has accumulated. The row bound is
+				// pushed into dialect SQL (TOP / FETCH FIRST / LIMIT) so the database
+				// does an index-assisted top-n read instead of materializing the whole
+				// expired backlog and truncating it client-side. The driver-level
+				// maxrows option stays on as belt-and-braces.
+				local.candidateSql = $applyRowBound(
+					sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					dbType = $detectDatabaseType(),
+					maxRows = arguments.maxRows
+				);
 				local.candidates = queryExecute(
-					"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					local.candidateSql,
 					{
 						cutoff: {value: local.cutoff, cfsqltype: "cf_sql_timestamp"}
 					},
-					{datasource: variables.$datasource, maxrows: arguments.maxRows}
+					{datasource: variables.$datasource, maxrows: Int(arguments.maxRows)}
 				);
 				if (local.candidates.recordCount == 0) {
 					return 0;
@@ -321,6 +330,41 @@ component {
 			// cfdbinfo not available — fall through to default
 		}
 		return "default";
+	}
+
+	/**
+	 * Rewrite a candidate SELECT so the row bound is applied in dialect SQL and the
+	 * database can do an index-assisted top-n read instead of materializing every
+	 * matching row and relying on client-side truncation.
+	 *
+	 * - sqlserver: SELECT TOP n ...
+	 * - oracle: ... FETCH FIRST n ROWS ONLY
+	 * - mysql / postgresql / sqlite / h2 / default: ... LIMIT n
+	 *
+	 * The bound is hardened with Int() so only a plain integer is ever interpolated
+	 * into the SQL string. A bound of zero or less returns the statement unchanged.
+	 * Public with $ prefix (internal naming convention) so it stays unit-testable.
+	 *
+	 * @sqlText The SELECT statement to bound.
+	 * @dbType Database type as returned by $detectDatabaseType().
+	 * @maxRows Maximum number of rows the statement may return.
+	 */
+	public string function $applyRowBound(
+		required string sqlText,
+		required string dbType,
+		required numeric maxRows
+	) {
+		local.bound = Int(arguments.maxRows);
+		if (local.bound <= 0) {
+			return arguments.sqlText;
+		}
+		if (arguments.dbType == "sqlserver") {
+			return ReplaceNoCase(arguments.sqlText, "SELECT ", "SELECT TOP #local.bound# ", "one");
+		}
+		if (arguments.dbType == "oracle") {
+			return arguments.sqlText & " FETCH FIRST #local.bound# ROWS ONLY";
+		}
+		return arguments.sqlText & " LIMIT #local.bound#";
 	}
 
 }
