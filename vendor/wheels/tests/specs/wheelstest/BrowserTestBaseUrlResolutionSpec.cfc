@@ -80,6 +80,11 @@ component extends="wheels.WheelsTest" {
             });
 
             it("JVM system property is honored when this.baseUrl is empty", () => {
+                var caps = new wheels.wheelstest.EngineCapabilities();
+                if (!caps.canWriteSystemProperties()) {
+                    debug("Skipping: JVM system property writes do not round-trip on this engine");
+                    return;
+                }
                 var bt = new wheels.wheelstest.BrowserTest();
                 bt.baseUrl = "";
                 var sys = createObject("java", "java.lang.System");

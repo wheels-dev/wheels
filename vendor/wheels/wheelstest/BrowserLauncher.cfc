@@ -103,6 +103,22 @@ component {
     }
 
     /**
+     * Lazily instantiates the shared EngineCapabilities probe, cached per
+     * launcher instance so repeated $loadJars() calls don't re-probe.
+     * Public (with $ prefix indicating "internal but accessible") so specs
+     * can reuse the launcher's probe for their own skip decisions.
+     */
+    public any function $engineCapabilities() {
+        // Cache key deliberately differs from the function name: component
+        // functions live in the variables scope, so reusing the name would
+        // clobber this function on first call.
+        if (!structKeyExists(variables, "$engineCapabilitiesProbe")) {
+            variables.$engineCapabilitiesProbe = new wheels.wheelstest.EngineCapabilities();
+        }
+        return variables.$engineCapabilitiesProbe;
+    }
+
+    /**
      * Returns an array of filesystem paths — one per entry in the manifest's
      * `classpath` array. Used to build the Playwright runtime classpath
      * (client + driver + driver-bundle + transitive deps = 7 JARs).
@@ -130,6 +146,19 @@ component {
     public void function $loadJars(required array jarPaths) {
         if (variables.$state != "uninitialized") {
             return;
+        }
+
+        // Engines without a JVM (e.g. RustCFML) cannot host the URLClassLoader
+        // that carries the Playwright JARs. Fail with a typed error so
+        // BrowserTest.beforeAll() can convert it into a clean skip instead of
+        // surfacing an opaque reflection failure mid-classloader setup.
+        if (!$engineCapabilities().hasJvmClassLoading()) {
+            throw(
+                type="Wheels.BrowserJvmUnavailable",
+                message="Browser testing requires a JVM-backed CFML engine: "
+                    & "java.lang.ClassLoader is not available here. Run the browser "
+                    & "specs on Lucee, Adobe ColdFusion, or BoxLang instead."
+            );
         }
 
         var urls = [];
