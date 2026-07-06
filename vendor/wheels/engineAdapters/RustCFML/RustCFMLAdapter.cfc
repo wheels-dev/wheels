@@ -17,13 +17,34 @@ component extends="wheels.engineAdapters.Base" output="false" {
 	}
 
 	/**
-	 * RustCFML (as of 0.41.0) does not implement the `cfcache` built-in.
-	 * Returning false makes Wheels skip its cfcache-backed template/static
-	 * cache (see Global.cfc $cache) so the framework boots and serves
-	 * cacheless-but-working instead of erroring on the missing built-in.
+	 * RustCFML implements the `cfcache` built-in as of v0.417. Earlier
+	 * builds lacked it and this override returned false so Wheels degraded
+	 * its cfcache-backed template/static cache (see Global.cfc $cache) to a
+	 * no-op. The override is kept (returning the Base default) purely as a
+	 * record of the resolved divergence.
 	 */
 	public boolean function supportsCfcache() {
+		return true;
+	}
+
+	/**
+	 * RustCFML has no JVM and therefore no AWT/ImageIO-backed image runtime,
+	 * so Base.cfc's cfimage action="info" implementation is unavailable.
+	 * Callers such as $imageTag() use this to skip the width/height probe
+	 * and render the tag without dimensions instead of erroring.
+	 */
+	public boolean function supportsImageInfo() {
 		return false;
+	}
+
+	/**
+	 * Defensive fallback for callers that reach imageInfo() despite
+	 * supportsImageInfo() being false: returns the same struct shape
+	 * Base.cfc's cfimage action="info" produces, with width/height 0
+	 * meaning "unknown" ($imageTag only emits the attributes when > 0).
+	 */
+	public struct function imageInfo(required string source) {
+		return {width: 0, height: 0, source: arguments.source};
 	}
 
 }
