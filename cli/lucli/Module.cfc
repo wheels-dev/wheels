@@ -530,6 +530,7 @@ component extends="modules.BaseModule" {
 			out("  policy        Generate an authorization policy in app/policies/ (default-deny)");
 			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
 			out("  admin         Generate admin CRUD interface for an existing model");
+			out("  auth          Generate a full authentication scaffold (session, token, or JWT)");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels generate app myapp");
@@ -545,6 +546,8 @@ component extends="modules.BaseModule" {
 			out("  wheels generate policy Post");
 			out("  wheels generate snippets auth");
 			out("  wheels generate admin User");
+			out("  wheels generate auth");
+			out("  wheels generate auth --strategy=jwt");
 			return "";
 		}
 
@@ -592,6 +595,8 @@ component extends="modules.BaseModule" {
 				return generateSnippets(remaining);
 			case "admin":
 				return generateAdmin(remaining);
+			case "auth":
+				return generateAuth(remaining);
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
@@ -4096,6 +4101,95 @@ component extends="modules.BaseModule" {
 		} else {
 			for (var err in result.errors) {
 				out(err, "red");
+			}
+		}
+
+		return "";
+	}
+
+	/**
+	 * Generate a complete authentication scaffold on the wheels.auth
+	 * primitives (issue ##3155). Session strategy (default) emits browser
+	 * login/registration/password-reset; token and jwt emit an API
+	 * sessions controller instead.
+	 */
+	private string function generateAuth(array args = []) {
+		var model = "User";
+		var strategy = "session";
+		var registration = true;
+		var force = false;
+
+		for (var arg in arguments.args) {
+			if (arg == "--force") {
+				force = true;
+			} else if (arg == "--registration") {
+				registration = true;
+			} else if (arg == "--no-registration") {
+				registration = false;
+			} else if (left(arg, 8) == "--model=") {
+				model = trim(mid(arg, 9, len(arg)));
+			} else if (left(arg, 11) == "--strategy=") {
+				strategy = trim(mid(arg, 12, len(arg)));
+			} else if (left(arg, 2) == "--") {
+				out("Unknown option: #arg#", "red");
+				out("Usage: wheels generate auth [ModelName] [--model=User] [--strategy=session|token|jwt] [--registration|--no-registration] [--force]", "yellow");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown option for generate auth: #arg#");
+			} else {
+				// First bare positional is the model name (same as --model=).
+				model = trim(arg);
+			}
+		}
+
+		if (!len(model)) {
+			model = "User";
+		}
+		if (!listFindNoCase("session,token,jwt", strategy)) {
+			out("Unknown strategy: #strategy# (valid: session, token, jwt)", "red");
+			throw(type = "Wheels.InvalidArguments", message = "Unknown auth strategy: #strategy#. Valid strategies: session, token, jwt.");
+		}
+
+		out("Generating #strategy# authentication for #capitalize(model)#...", "cyan");
+		out("");
+
+		var scaffold = getService("scaffold");
+		var results = scaffold.generateAuth(
+			model = model,
+			strategy = strategy,
+			registration = registration,
+			force = force,
+			cliVersion = super.version()
+		);
+
+		if (results.success) {
+			for (var item in results.generated) {
+				var relPath = replace(item.path, variables.projectRoot & "/", "");
+				printCreated("#item.type#: #relPath#");
+			}
+			for (var note in results.skipped ?: []) {
+				out("  skip    #note#", "yellow");
+			}
+			out("");
+			out("Authentication scaffold complete! Next steps:", "green");
+			out("  1. Run the migration: wheels migrate latest");
+			if (strategy == "session") {
+				out("  2. Restart or reload, then visit /login (and /register).");
+				out("  3. Protect actions with a filter that calls service(""authenticator"").authenticate(request).");
+				out("  4. Wire reset-link email delivery in app/controllers/Passwords.cfc (see the TODO in create()) —");
+				out("     until then no reset email is actually sent.");
+				out("  5. Rate-limit POST /login in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+			} else if (strategy == "jwt") {
+				out("  2. Set WHEELS_JWT_SECRET in .env (at least 32 random bytes) — startup fails loudly without it.");
+				out("  3. Restart, then POST credentials to /api/session to receive a JWT.");
+				out("  4. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+			} else {
+				out("  2. Restart, then POST credentials to /api/session to receive a bearer token.");
+				out("  3. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+			}
+			out("  Generated code is yours to edit — re-run with --force and review `git diff` to upgrade.");
+		} else {
+			out("Auth generation failed:", "red");
+			for (var err in results.errors) {
+				out("  #err#", "red");
 			}
 		}
 
@@ -7635,7 +7729,8 @@ component extends="modules.BaseModule" {
 					variables.services.scaffold = new services.Scaffold(
 						codeGenService = getService("codegen"),
 						helpers = getService("helpers"),
-						projectRoot = variables.projectRoot
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
 					);
 					break;
 				case "analysis":
