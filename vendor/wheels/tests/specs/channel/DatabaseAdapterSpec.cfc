@@ -244,8 +244,8 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
-			it("$applyRowBound appends LIMIT for every other dialect", function() {
-				var dialects = ["mysql", "postgresql", "sqlite", "h2", "default"];
+			it("$applyRowBound appends LIMIT for the explicit LIMIT dialects", function() {
+				var dialects = ["mysql", "postgresql", "sqlite", "h2"];
 				for (var dialect in dialects) {
 					var bounded = adapter.$applyRowBound(
 						sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
@@ -254,6 +254,23 @@ component extends="wheels.WheelsTest" {
 					);
 					expect(bounded).toBe(
 						"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC LIMIT 25"
+					);
+				}
+			});
+
+			it("$applyRowBound leaves unknown dialects unchanged so driver maxrows stays the bound", function() {
+				// "default" is what $detectDatabaseType() returns when cfdbinfo fails —
+				// appending LIMIT there would be a syntax error on SQL Server/Oracle,
+				// silently breaking cleanup() on the engines that need dialect handling.
+				var dialects = ["default", "informix"];
+				for (var dialect in dialects) {
+					var unchanged = adapter.$applyRowBound(
+						sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+						dbType = dialect,
+						maxRows = 25
+					);
+					expect(unchanged).toBe(
+						"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC"
 					);
 				}
 			});

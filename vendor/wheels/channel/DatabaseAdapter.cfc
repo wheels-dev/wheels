@@ -339,7 +339,11 @@ component {
 	 *
 	 * - sqlserver: SELECT TOP n ...
 	 * - oracle: ... FETCH FIRST n ROWS ONLY
-	 * - mysql / postgresql / sqlite / h2 / default: ... LIMIT n
+	 * - mysql / postgresql / sqlite / h2: ... LIMIT n
+	 * - anything else (incl. "default" when $detectDatabaseType() falls back on a
+	 *   cfdbinfo failure): statement UNCHANGED — appending LIMIT would be a syntax
+	 *   error on SQL Server/Oracle, and the caller keeps the driver-level maxrows
+	 *   option on the query, which still bounds the resultset on every engine.
 	 *
 	 * The bound is hardened with Int() so only a plain integer is ever interpolated
 	 * into the SQL string. A bound of zero or less returns the statement unchanged.
@@ -364,7 +368,12 @@ component {
 		if (arguments.dbType == "oracle") {
 			return arguments.sqlText & " FETCH FIRST #local.bound# ROWS ONLY";
 		}
-		return arguments.sqlText & " LIMIT #local.bound#";
+		if (ListFindNoCase("mysql,postgresql,sqlite,h2", arguments.dbType)) {
+			return arguments.sqlText & " LIMIT #local.bound#";
+		}
+		// Unknown dialect (incl. the "default" cfdbinfo-failure fallback): leave the
+		// statement alone rather than risk invalid syntax; driver maxrows bounds it.
+		return arguments.sqlText;
 	}
 
 }
