@@ -70,7 +70,8 @@ component extends="wheels.WheelsTest" {
 				"cli/src/templates/ConfigRoutes.txt",
 				"cli/src/commands/wheels/analyze/code.cfc",
 				"config/settings.cfm",
-				"config/environment.cfm"
+				"config/environment.cfm",
+				"config/routes.cfm"
 			];
 
 			it("no retired guide URLs under cli/lucli/templates/ or the known runtime-message files", () => {
