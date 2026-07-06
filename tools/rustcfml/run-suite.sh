@@ -53,9 +53,13 @@ echo "Engine: $BIN"
 
 # --- serve the repo webroot ----------------------------------------------------
 SERVE_LOG="$(mktemp)"
+OUT="$(mktemp)"
 WHEELS_CI=true "$BIN" --serve "$REPO_ROOT/public" --port "$PORT" > "$SERVE_LOG" 2>&1 &
 SERVE_PID=$!
-cleanup() { kill "$SERVE_PID" 2>/dev/null || true; }
+cleanup() {
+  kill "$SERVE_PID" 2>/dev/null || true
+  rm -f "$SERVE_LOG" "$OUT"
+}
 trap cleanup EXIT
 
 UP=0
@@ -71,7 +75,6 @@ fi
 # Warm boot, then run the suite. The /index.cfm/ prefix works around RustCFML
 # issue #194 (path-info routing without the prefix 404s under urlrewrite).
 curl -s -o /dev/null --max-time 120 "http://127.0.0.1:$PORT/index.cfm/" || true
-OUT="$(mktemp)"
 curl -s --max-time 900 \
   "http://127.0.0.1:$PORT/index.cfm/wheels/core/tests?db=sqlite&format=json" \
   -o "$OUT" || { echo "suite request failed"; exit 1; }
@@ -142,6 +145,18 @@ known = set(baseline.get("failing", []))
 new = sorted(failing - known)
 fixed = sorted(known - failing)
 
+# Coarse totals backstop: the failing[] walk only sees per-spec entries and
+# bundle-level exceptions, so a regression surfacing through a response shape
+# the walk doesn't reach (lifecycle/suite-level errors) could raise the totals
+# without adding a named entry. Flag totalFail/totalError rising above baseline
+# even when the named diff is empty.
+base_totals = baseline.get("totals", {})
+totals_worse = [
+    f"{key}: {int(base_totals.get(key, 0))} -> {totals[key]}"
+    for key in ("totalFail", "totalError")
+    if totals[key] > int(base_totals.get(key, 0))
+]
+
 summary_lines = []
 if fixed:
     summary_lines.append(f"NEWLY PASSING vs baseline ({len(fixed)}):")
@@ -150,6 +165,9 @@ if fixed:
 if new:
     summary_lines.append(f"NEW FAILURES vs baseline ({len(new)}):")
     summary_lines += [f"  - {item}" for item in new]
+if totals_worse:
+    summary_lines.append("TOTALS REGRESSION vs baseline (no named entry — check response shape):")
+    summary_lines += [f"  - {item}" for item in totals_worse]
 for line in summary_lines:
     print(line)
 
@@ -162,8 +180,8 @@ if step_summary:
                  f"baseline {baseline.get('engineVersion', '?')}\n\n")
         for line in summary_lines:
             fh.write(line + "\n")
-        if not new:
+        if not new and not totals_worse:
             fh.write("\nNo new failures versus baseline.\n")
 
-sys.exit(1 if new else 0)
+sys.exit(1 if (new or totals_worse) else 0)
 PY
