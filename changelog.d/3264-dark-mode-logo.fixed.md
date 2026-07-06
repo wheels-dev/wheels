@@ -1,0 +1,1 @@
+- Fixed the wheels.dev header and footer logo being invisible in dark mode — the `lockup` logo variant now swaps to the white lockup under `prefers-color-scheme: dark` via a pure-CSS toggle ([#3264](https://github.com/wheels-dev/wheels/issues/3264))

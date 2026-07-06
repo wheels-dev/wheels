@@ -22,16 +22,12 @@ const lockupHeights = {
 	md: 28,
 	lg: 40,
 };
-
-const isLockup = variant === 'lockup' || variant === 'lockup-on-dark';
-const src =
-	variant === 'mark' ? markPng : variant === 'lockup-on-dark' ? lockupWhitePng : lockupPng;
 ---
 
 {
 	variant === 'mark' && (
 		<img
-			src={src.src}
+			src={markPng.src}
 			width={markSizes[size].w}
 			height={markSizes[size].h}
 			alt="Wheels"
@@ -43,9 +39,32 @@ const src =
 }
 
 {
-	isLockup && (
+	variant === 'lockup' && (
+		<>
+			<img
+				src={lockupPng.src}
+				height={lockupHeights[size]}
+				alt="wheels.dev"
+				class:list={['wd-logo', 'wd-logo--lockup', 'wd-logo--lockup-light', className]}
+				loading="eager"
+				decoding="async"
+			/>
+			<img
+				src={lockupWhitePng.src}
+				height={lockupHeights[size]}
+				alt="wheels.dev"
+				class:list={['wd-logo', 'wd-logo--lockup', 'wd-logo--lockup-dark', className]}
+				loading="eager"
+				decoding="async"
+			/>
+		</>
+	)
+}
+
+{
+	variant === 'lockup-on-dark' && (
 		<img
-			src={src.src}
+			src={lockupWhitePng.src}
 			height={lockupHeights[size]}
 			alt="wheels.dev"
 			class:list={['wd-logo', 'wd-logo--lockup', className]}
@@ -62,5 +81,19 @@ const src =
 	}
 	.wd-logo--lockup {
 		width: auto;
+	}
+	/* Auto color-scheme lockup: dark-ink in light mode, white in dark mode.
+	   The site's dark mode is CSS-only (prefers-color-scheme in tokens.css),
+	   so the swap must be pure CSS too — see #3264. */
+	.wd-logo--lockup-dark {
+		display: none;
+	}
+	@media (prefers-color-scheme: dark) {
+		.wd-logo--lockup-light {
+			display: none;
+		}
+		.wd-logo--lockup-dark {
+			display: inline-block;
+		}
 	}
 </style>
