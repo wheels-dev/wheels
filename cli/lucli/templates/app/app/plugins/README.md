@@ -17,7 +17,7 @@ wheels stop && wheels start
 
 Note: the install verb is `add`, not `install`.
 
-See [Packages](https://wheels.dev/v4-0-0-snapshot/digging-deeper/) in the guides for details.
+See [Packages](https://guides.wheels.dev/v4-0-0/digging-deeper/packages/) in the guides for details.
 
 ## Migrating from a 3.x plugin
 

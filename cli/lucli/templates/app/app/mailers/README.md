@@ -31,4 +31,4 @@ set(mailerSettings = {
 });
 ```
 
-See [Sending Email](https://wheels.dev/v4-0-0-snapshot/digging-deeper/sending-email/) in the guides for the full walkthrough.
+See [Sending Email](https://guides.wheels.dev/v4-0-0/digging-deeper/sending-email/) in the guides for the full walkthrough.
