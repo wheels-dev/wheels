@@ -6429,7 +6429,7 @@ component extends="modules.BaseModule" {
 		out("       unzip wheels-core-<version>.zip -d ~/.wheels/modules/wheels/vendor/");
 		out("       wheels new #appName#");
 		out("");
-		out("See: https://guides.wheels.dev/v4-0-0-snapshot/start-here/installing/");
+		out("See: https://guides.wheels.dev/v4-0-0/start-here/installing/");
 
 		throw(
 			type="Wheels.FrameworkNotFound",

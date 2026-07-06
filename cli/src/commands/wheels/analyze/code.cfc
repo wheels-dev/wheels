@@ -661,7 +661,7 @@ component extends="../base" {
 
         html &= '
         <div class="footer">
-            <p>Wheels Code Analyzer v1.0 • <a href="https://wheels.dev/3.1.0/guides/command-line-tools/commands/analysis/analyze-code" target="blank">View Documentation</a></p>
+            <p>Wheels Code Analyzer v1.0 • <a href="https://guides.wheels.dev/v4-0-0/command-line-tools/wheels-commands/code-quality/" target="blank">View Documentation</a></p>
         </div>
     </div>
 </body>

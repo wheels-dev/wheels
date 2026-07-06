@@ -80,7 +80,26 @@ jobs:
       # Pin the version the prepare scripts stamp into the artifacts.
       PKG_VERSION: "0.0.0-cismoke"
     steps:
+      # The CommandBox image ships without git, and actions/checkout without git
+      # falls back to the REST-API tarball — which honors .gitattributes
+      # export-ignore, and this repo export-ignores tools/ and cli/. That left
+      # this job's workspace without the very build scripts and templates it
+      # exists to test (prepare-base.sh: No such file or directory, exit 127,
+      # on every run since the job was added). Install git BEFORE checkout so
+      # it performs a real clone.
+      - name: Ensure git is available (checkout must not fall back to the export-ignored tarball)
+        run: |
+          command -v git >/dev/null 2>&1 || {
+            apt-get update -y && apt-get install -y --no-install-recommends git ca-certificates
+          }
+          git --version
+
       - uses: actions/checkout@v5
+
+      - name: Assert the export-ignored paths actually checked out
+        run: |
+          test -f tools/build/scripts/prepare-base.sh || {
+            echo "::error::tools/ missing from workspace — checkout fell back to the export-ignored tarball again"; exit 1; }
 
       # curl + jq are the only host tools the probes need; the CommandBox image
       # is Debian-based but minimal. Install defensively (no-op if present).
