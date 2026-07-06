@@ -267,6 +267,60 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("generatePolicy()", () => {
+
+				it("creates the policy and the base Policy.cfc stub on first run", () => {
+					var result = codegen.generatePolicy(name = "Gadget");
+					expect(result.success).toBeTrue();
+					expect(fileExists(tempRoot & "/app/policies/GadgetPolicy.cfc")).toBeTrue();
+					expect(fileExists(tempRoot & "/app/policies/Policy.cfc")).toBeTrue();
+					expect(result.baseCreated).toBeTrue();
+				});
+
+				it("policy extends Policy and declares every standard action denying", () => {
+					codegen.generatePolicy(name = "Widget", force = true);
+					var content = fileRead(tempRoot & "/app/policies/WidgetPolicy.cfc");
+					expect(content).toInclude('extends="Policy"');
+					for (var actionName in ["index", "show", "new", "create", "edit", "update", "delete"]) {
+						expect(content).toInclude("function #actionName#(");
+					}
+					expect(content).toInclude("return false;");
+				});
+
+				it("base stub extends wheels.Policy", () => {
+					codegen.generatePolicy(name = "Sprocket", force = true);
+					var content = fileRead(tempRoot & "/app/policies/Policy.cfc");
+					expect(content).toInclude('extends="wheels.Policy"');
+				});
+
+				it("normalizes a name already carrying the Policy suffix", () => {
+					var result = codegen.generatePolicy(name = "ArticlePolicy", force = true);
+					expect(result.success).toBeTrue();
+					expect(fileExists(tempRoot & "/app/policies/ArticlePolicy.cfc")).toBeTrue();
+					expect(fileExists(tempRoot & "/app/policies/ArticlePolicyPolicy.cfc")).toBeFalse();
+				});
+
+				it("refuses to overwrite an existing policy without force", () => {
+					codegen.generatePolicy(name = "Doohickey", force = true);
+					var path = tempRoot & "/app/policies/DoohickeyPolicy.cfc";
+					fileWrite(path, "// SENTINEL");
+					var result = codegen.generatePolicy(name = "Doohickey");
+					expect(result.success).toBeFalse();
+					expect(fileRead(path)).toInclude("SENTINEL");
+				});
+
+				it("never overwrites an existing base Policy.cfc stub", () => {
+					codegen.generatePolicy(name = "Flange", force = true);
+					var basePath = tempRoot & "/app/policies/Policy.cfc";
+					fileWrite(basePath, "// BASE SENTINEL");
+					var result = codegen.generatePolicy(name = "Grommet", force = true);
+					expect(result.success).toBeTrue();
+					expect(result.baseCreated).toBeFalse();
+					expect(fileRead(basePath)).toInclude("BASE SENTINEL");
+				});
+
+			});
+
 			describe("validateName()", () => {
 
 				it("rejects empty name", () => {

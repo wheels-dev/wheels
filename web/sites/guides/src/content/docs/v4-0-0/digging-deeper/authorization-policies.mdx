@@ -1,0 +1,180 @@
+---
+title: Authorization Policies
+description: The built-in policy layer — wheels.Policy classes with authorize(), can(), and policyScope(), default-deny by design.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to use the built-in authorization layer. Where [authentication](/v4-0-0/digging-deeper/authentication-patterns/) answers *"who are you?"*, policies answer *"may this user perform this action on this record?"*. You'll generate a `PostPolicy`, grant actions to owners, enforce it with `authorize()` in controllers, check it with `can()` in views, and narrow `index` collections with `policyScope()`.
+
+**You'll learn:**
+
+- How the default-deny `wheels.Policy` base class works and how to grant actions
+- How `authorize()` throws `Wheels.NotAuthorized` (HTTP 403) and inlines around finders
+- How `can()` powers view conditionals without throwing
+- How `policyScope()` narrows a collection and keeps chaining
+- Where the current user comes from and how to customize the seam
+
+<Aside type="note">
+  You should already know: controllers, filters, and one authentication strategy (see [Authorization & Filters](/v4-0-0/digging-deeper/authorization-and-filters/) for the hand-rolled filter approach this layer formalizes, and [Authentication Patterns](/v4-0-0/digging-deeper/authentication-patterns/) for where the logged-in user comes from).
+</Aside>
+
+## The pieces
+
+| Piece | Role |
+|-------|------|
+| `wheels.Policy` | Base class. Every standard action (`index`, `show`, `new`, `create`, `edit`, `update`, `delete`) returns `false`, and `scope()` returns a no-rows chain. **Default-deny**: nothing is allowed until a policy grants it. |
+| `app/policies/<ModelName>Policy.cfc` | One policy per model, resolved by convention. Extends the app-level `Policy.cfc` stub (which extends `wheels.Policy` — same pattern as `app/models/Model.cfc`). |
+| `authorize(record [, action])` | Controller helper. Dispatches to the policy; throws `Wheels.NotAuthorized` (HTTP 403) on deny; returns the record on allow. `action` defaults to `params.action`. |
+| `can(action [, record])` | Non-throwing boolean, available in controllers *and* views (views run in the controller's `variables` scope). |
+| `policyScope(collection)` | Calls the policy's `scope()` and returns the narrowed chain for `index`-style listings. |
+| `wheels generate policy Post` | CLI generator — scaffolds `app/policies/PostPolicy.cfc` (plus the base `Policy.cfc` stub on first run). |
+
+The shape is deliberately Pundit-like (Rails), and the default-deny call matches every major framework surveyed for [the design issue](https://github.com/wheels-dev/wheels/issues/3156): Laravel, Django, Symfony, Spring, and Phoenix all deny when no rule matches.
+
+## Generate a policy
+
+```bash
+wheels generate policy Post
+```
+
+This writes `app/policies/PostPolicy.cfc` with every standard action explicitly denying, and — on first run — `app/policies/Policy.cfc`, the parent stub all your policies extend. The generated file is safe to deploy as-is: it grants nothing.
+
+## Grant actions
+
+Override a method to grant it. `variables.user` is the current identity (an empty string for guests) and `variables.record` is the record being authorized.
+
+```cfm {test:compile} title="app/policies/PostPolicy.cfc"
+component extends="Policy" {
+
+    // Any signed-in user may list posts.
+    public boolean function index() {
+        return IsStruct(variables.user) && !StructIsEmpty(variables.user);
+    }
+
+    // Everyone may read a post, including guests.
+    public boolean function show() {
+        return true;
+    }
+
+    // Only the author may update.
+    public boolean function update() {
+        return IsStruct(variables.user)
+            && StructKeyExists(variables.user, "id")
+            && variables.user.id == variables.record.authorId;
+    }
+
+    // Authors see their own posts on index pages; guests see nothing.
+    public any function scope(required any collection) {
+        if (IsStruct(variables.user) && StructKeyExists(variables.user, "id")) {
+            return arguments.collection.where("authorId", variables.user.id);
+        }
+        return super.scope(arguments.collection);
+    }
+
+}
+```
+
+Anything you don't override stays denied — including `delete`, `create`, and any custom action name you dispatch. A policy method for a custom action works the same way: define `public boolean function publish()` and call `authorize(post, "publish")`.
+
+## Enforce in controllers
+
+`authorize()` returns the record when the policy allows, so it inlines around a finder:
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+
+    function index() {
+        posts = policyScope(model("Post")).findAll(page = params.page, perPage = 25);
+    }
+
+    function update() {
+        post = authorize(model("Post").findByKey(params.key));
+        post.update(params.post);
+        redirectTo(route = "post", key = post.id);
+    }
+
+}
+```
+
+When the policy denies, `authorize()` throws `Wheels.NotAuthorized`, which the framework maps to **HTTP 403** — the same wiring that maps `Wheels.RecordNotFound` to 404. In development and testing you get the full Wheels error page (at status 403); in production the response is a plain 403 with no policy detail leaked.
+
+The `action` argument defaults to `params.action` at call time, so inside an `update` action `authorize(post)` checks the policy's `update()` method. Pass it explicitly to check a different rule: `authorize(post, "publish")`.
+
+## Check in views
+
+`can()` never throws — it returns `false` for denials, guests, empty records, and actions the policy has no method for:
+
+```cfm title="app/views/posts/show.cfm"
+<cfif can("update", post)>
+    #linkTo(text = "Edit", route = "editPost", key = post.id)#
+</cfif>
+```
+
+Because the same policy object backs `can()` and `authorize()`, the link's visibility and the controller's enforcement can't drift apart.
+
+## Narrow index collections
+
+`policyScope()` resolves the policy, calls its `scope()`, and hands back the chain for further composition:
+
+```cfm
+posts = policyScope(model("Post")).where("status", "published").findAll(page = params.page);
+```
+
+Pass the **model class first** and chain afterwards — an in-flight query-builder or scope chain can't be introspected for its model, so `policyScope(model("Post").where(...))` throws `Wheels.Policy.InvalidCollection` in development. The base `scope()` returns a no-rows chain (built on the injection-safe empty `whereIn` from [#2736](https://github.com/wheels-dev/wheels/pull/2736)), so an ungranted scope lists nothing rather than everything.
+
+## Where the user comes from
+
+Policies receive the identity resolved by `$currentUserForPolicy()`, which tries, in order:
+
+1. **The DI service `currentUser`** — if you registered one in `config/services.cfm`, it wins:
+
+   ```cfm
+   injector().map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+   ```
+
+2. **A configured authenticator** — the first registered strategy exposing a `currentUser()` method (e.g. `wheels.auth.SessionStrategy`) that reports a non-empty principal.
+
+3. **Guest** — an empty string. Policies should treat it as "not signed in".
+
+To customize beyond those seams, override `$currentUserForPolicy()` in your base `app/controllers/Controller.cfc` — declared methods win over the framework mixin.
+
+## Missing policies fail loud (in development)
+
+| Situation | Development / testing | Production |
+|-----------|----------------------|------------|
+| No policy class for the model | Throws `Wheels.Policy.NotDefined` | Silently **denies** |
+| Policy exists, no method for the action | Denies | Denies |
+| Guest (no resolvable user) | Policy decides (`variables.user` is `""`) | Same |
+
+The loud `NotDefined` in development is deliberate (borrowed from Pundit): a typo'd or forgotten policy should read as a bug while you're building, not a mysterious denial. Production flips to silent deny — the same environment posture as `tableName()`'s argument guard ([#3079](https://github.com/wheels-dev/wheels/issues/3079)) — so an upgrade or a missed file never turns into an error page for end users.
+
+## Honest limitations
+
+- **`authorize`, `can`, and `policyScope` are framework helpers now.** Like every controller mixin, they land in the protected-methods set, so you cannot name your own *actions* `authorize`, `can`, or `policyScope` ([#2845](https://github.com/wheels-dev/wheels/pull/2845) behavior). Standard REST action names are unaffected.
+- **There is no `verifyAuthorized` filter yet.** Pundit's "flag actions that never called authorize" guard is a tracked follow-up; today, forgetting to call `authorize()` means the action runs unprotected.
+- **There is no `before()` / admin-override hook, on purpose.** Laravel's equivalent is a documented foot-gun (a bare boolean silently allows everything). Grant admins inside each policy method instead — it's one condition, and it's greppable.
+- **Production denials render a plain 403.** There's no `on403` event template convention yet; if you need a branded page, catch `Wheels.NotAuthorized` in your own error handling.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard
+    title="Authorization & Filters"
+    description="The hand-rolled filter approach — ownership checks and role gates without the policy layer."
+    href="/v4-0-0/digging-deeper/authorization-and-filters/"
+  />
+  <LinkCard
+    title="Authentication Patterns"
+    description="Session, JWT, and token strategies — the identity this layer authorizes."
+    href="/v4-0-0/digging-deeper/authentication-patterns/"
+  />
+  <LinkCard
+    title="The Dependency Injection Container"
+    description="Registering the currentUser resolver and other services."
+    href="/v4-0-0/core-concepts/dependency-injection/"
+  />
+</CardGrid>

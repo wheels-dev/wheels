@@ -507,7 +507,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property, api-resource, helper, snippets)
+	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property, api-resource, helper, policy, snippets)
 	 */
 	public string function generate() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
@@ -527,6 +527,7 @@ component extends="modules.BaseModule" {
 			out("  test          Generate a test spec file");
 			out("  property      Generate an add-column migration for a model property");
 			out("  helper        Generate a helper file in app/helpers/");
+			out("  policy        Generate an authorization policy in app/policies/ (default-deny)");
 			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
 			out("  admin         Generate admin CRUD interface for an existing model");
 			out("");
@@ -541,6 +542,7 @@ component extends="modules.BaseModule" {
 			out("  wheels generate test model User");
 			out("  wheels generate property User email:string");
 			out("  wheels generate helper formatting");
+			out("  wheels generate policy Post");
 			out("  wheels generate snippets auth");
 			out("  wheels generate admin User");
 			return "";
@@ -584,6 +586,8 @@ component extends="modules.BaseModule" {
 			case "helper":
 			case "h":
 				return generateHelper(remaining);
+			case "policy":
+				return generatePolicy(remaining);
 			case "snippets":
 				return generateSnippets(remaining);
 			case "admin":
@@ -3927,6 +3931,56 @@ component extends="modules.BaseModule" {
 		out("Helper created! Next steps:", "green");
 		out("  1. Edit app/helpers/#fileName# to add your logic");
 		out("  2. Include in your controller: new app.helpers.#reReplace(fileName, '\.cfc$', '')#()");
+		return "";
+	}
+
+	private string function generatePolicy(required array args) {
+		// Parse --force flag from the args list
+		var force = false;
+		var positional = [];
+		for (var a in args) {
+			if (a == "--force") {
+				force = true;
+			} else {
+				arrayAppend(positional, a);
+			}
+		}
+
+		if (!arrayLen(positional)) {
+			out("Usage: wheels generate policy <ModelName> [--force]", "yellow");
+			out("  Example: wheels generate policy Post");
+			out("");
+			out("Writes app/policies/<ModelName>Policy.cfc — default-deny, one method per action.");
+			out("Enforce with authorize()/can()/policyScope() in your controllers and views.");
+			return "";
+		}
+
+		var codegen = getService("codegen");
+		var validation = codegen.validateName(positional[1], "policy");
+		if (!validation.valid) {
+			out("Invalid policy name: #arrayToList(validation.errors, '; ')#", "red");
+			return "";
+		}
+
+		var result = codegen.generatePolicy(name = positional[1], force = force);
+
+		if (result.success) {
+			if (structKeyExists(result, "baseCreated") && result.baseCreated) {
+				printCreated("app/policies/Policy.cfc");
+			}
+			// Derive the actual file name (CodeGen appends the "Policy" suffix)
+			var fileName = listLast(result.path, "/\");
+			printCreated("app/policies/#fileName#");
+
+			out("");
+			out("Policy created! Next steps:", "green");
+			out("  1. Edit app/policies/#fileName# — every action denies until you grant it");
+			out("  2. Enforce in a controller action: authorize(post)");
+			out("  3. Check in views without throwing: can('update', post)");
+			out("  4. Narrow index collections: policyScope(model('#reReplace(fileName, 'Policy\.cfc$', '')#')).findAll()");
+		} else {
+			out(result.error, "red");
+		}
 		return "";
 	}
 

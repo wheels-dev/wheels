@@ -85,6 +85,7 @@
     "items": [
       { "label": "Authentication Patterns", "link": "/v4-0-0/digging-deeper/authentication-patterns/" },
       { "label": "Authorization & Filters", "link": "/v4-0-0/digging-deeper/authorization-and-filters/" },
+      { "label": "Authorization Policies", "link": "/v4-0-0/digging-deeper/authorization-policies/" },
       { "label": "Background Jobs", "link": "/v4-0-0/digging-deeper/background-jobs/" },
       { "label": "Caching", "link": "/v4-0-0/digging-deeper/caching/" },
       { "label": "Sending Email", "link": "/v4-0-0/digging-deeper/sending-email/" },
