@@ -73,6 +73,11 @@ component extends="wheels.WheelsTest" {
         } catch (Wheels.BrowserNotInstalled e) {
             this.browserTestSkipped = true;
             return;
+        } catch (Wheels.BrowserJvmUnavailable e) {
+            // Engine has no JVM class loading (e.g. RustCFML) — same clean
+            // skip path as "Playwright not installed".
+            this.browserTestSkipped = true;
+            return;
         }
         variables.$browser = variables.$launcher.acquireBrowser(engine=this.browserEngine);
         variables.$baseUrl = $resolveBaseUrl();

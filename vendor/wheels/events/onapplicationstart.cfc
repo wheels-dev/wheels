@@ -39,26 +39,9 @@ component {
 		// Check and store server engine name, throw error if using a version that we don't support.
 		// Note: this must NOT be chained to the reloadPassword carryover above with `else` —
 		// engine detection has to run unconditionally or serverVersion is never set.
-		if (StructKeyExists(server, "boxlang")) {
-			application.$wheels.serverName = "BoxLang";
-			application.$wheels.serverVersion = server.boxlang.version;
-		} else if (StructKeyExists(server, "lucee")) {
-			application.$wheels.serverName = "Lucee";
-			application.$wheels.serverVersion = server.lucee.version;
-		} else if (
-			StructKeyExists(server, "coldfusion")
-			&& StructKeyExists(server.coldfusion, "productName")
-			&& server.coldfusion.productName == "RustCFML"
-		) {
-			// RustCFML reports itself via server.coldfusion.productName (no
-			// server.lucee / server.boxlang), so it must be detected before
-			// the Adobe fallback below or it gets misclassified as Adobe CF.
-			application.$wheels.serverName = "RustCFML";
-			application.$wheels.serverVersion = server.coldfusion.productVersion;
-		} else {
-			application.$wheels.serverName = "Adobe ColdFusion";
-			application.$wheels.serverVersion = server.coldfusion.productVersion;
-		}
+		local.engine = $detectEngine(serverScope = server);
+		application.$wheels.serverName = local.engine.serverName;
+		application.$wheels.serverVersion = local.engine.serverVersion;
 		application.$wheels.serverVersionMajor = ListFirst(application.$wheels.serverVersion, ".,");
 
 		// Instantiate the engine adapter for centralized cross-engine behavior.
@@ -542,5 +525,39 @@ component {
 			return arguments.settingValue;
 		}
 		return !ListFindNoCase("production,testing,maintenance", arguments.environment);
+	}
+
+	/**
+	 * Resolves the engine name and version from a server-scope-shaped struct.
+	 * Extracted from $init() so the detection ladder is unit-testable.
+	 *
+	 * Order matters — most-specific marker first. RustCFML impersonates Lucee:
+	 * it exposes a server.lucee struct (server.lucee.version reports a Lucee
+	 * 7.x version, server.lucee.versionName is "RustCFML"), so its
+	 * server.coldfusion.productName marker must be checked BEFORE the Lucee
+	 * branch or RustCFML is misclassified as Lucee and its dedicated engine
+	 * adapter becomes dead code. Other probe-verified RustCFML markers:
+	 * server.java.vendor = "RustCFML (no JVM)".
+	 */
+	public struct function $detectEngine(required struct serverScope) {
+		local.rv = {};
+		if (StructKeyExists(arguments.serverScope, "boxlang")) {
+			local.rv.serverName = "BoxLang";
+			local.rv.serverVersion = arguments.serverScope.boxlang.version;
+		} else if (
+			StructKeyExists(arguments.serverScope, "coldfusion")
+			&& StructKeyExists(arguments.serverScope.coldfusion, "productName")
+			&& arguments.serverScope.coldfusion.productName == "RustCFML"
+		) {
+			local.rv.serverName = "RustCFML";
+			local.rv.serverVersion = arguments.serverScope.coldfusion.productVersion;
+		} else if (StructKeyExists(arguments.serverScope, "lucee")) {
+			local.rv.serverName = "Lucee";
+			local.rv.serverVersion = arguments.serverScope.lucee.version;
+		} else {
+			local.rv.serverName = "Adobe ColdFusion";
+			local.rv.serverVersion = arguments.serverScope.coldfusion.productVersion;
+		}
+		return local.rv;
 	}
 }

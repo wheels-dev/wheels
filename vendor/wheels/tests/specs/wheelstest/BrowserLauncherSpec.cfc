@@ -2,6 +2,10 @@ component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         variables.launcher = new wheels.wheelstest.BrowserLauncher();
+        // $loadJars() guard-throws Wheels.BrowserJvmUnavailable on engines
+        // without JVM class loading (e.g. RustCFML) — JAR-dependent its below
+        // skip via this flag, mirroring the JAR-presence skip.
+        variables.jvmAvailable = variables.launcher.$engineCapabilities().hasJvmClassLoading();
     }
 
     function run() {
@@ -50,6 +54,10 @@ component extends="wheels.WheelsTest" {
 
             it("$loadJars() transitions state uninitialized -> ready -> shut-down", () => {
                 // Integration: requires Playwright install (~/.wheels/browser/lib/)
+                if (!variables.jvmAvailable) {
+                    debug("Skipping: JVM class loading unavailable on this engine");
+                    return;
+                }
                 var l = new wheels.wheelstest.BrowserLauncher();
                 var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
                 var allPresent = true;
@@ -72,6 +80,10 @@ component extends="wheels.WheelsTest" {
 
             it("resolves com.microsoft.playwright.Playwright class through the URLClassLoader", () => {
                 // Integration: requires Playwright install
+                if (!variables.jvmAvailable) {
+                    debug("Skipping: JVM class loading unavailable on this engine");
+                    return;
+                }
                 var l = new wheels.wheelstest.BrowserLauncher();
                 var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
                 for (var p in paths) {
@@ -87,6 +99,10 @@ component extends="wheels.WheelsTest" {
             it("acquireBrowser('chromium') launches a real headless browser", () => {
                 // Full end-to-end integration. Slow (~2-3s): starts a node driver
                 // process and a Chromium instance.
+                if (!variables.jvmAvailable) {
+                    debug("Skipping: JVM class loading unavailable on this engine");
+                    return;
+                }
                 var l = new wheels.wheelstest.BrowserLauncher();
                 var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
                 for (var p in paths) {
@@ -105,6 +121,7 @@ component extends="wheels.WheelsTest" {
             });
 
             it("acquireBrowser() returns the same Browser across calls (singleton per engine)", () => {
+                if (!variables.jvmAvailable) return;
                 var l = new wheels.wheelstest.BrowserLauncher();
                 var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
                 for (var p in paths) {
@@ -124,6 +141,7 @@ component extends="wheels.WheelsTest" {
                 // A mid-run browser crash must not poison the cache for the
                 // application lifetime. Simulate the crash by closing the
                 // browser out-of-band (bypassing release()).
+                if (!variables.jvmAvailable) return;
                 var l = new wheels.wheelstest.BrowserLauncher();
                 var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
                 for (var p in paths) {
@@ -142,6 +160,7 @@ component extends="wheels.WheelsTest" {
             });
 
             it("$loadJars() is idempotent — second call after ready stays ready", () => {
+                if (!variables.jvmAvailable) return;
                 var l = new wheels.wheelstest.BrowserLauncher();
                 var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
                 for (var p in paths) {
@@ -155,6 +174,7 @@ component extends="wheels.WheelsTest" {
             });
 
             it("acquireBrowser() throws BrowserLauncherNotReady after release()", () => {
+                if (!variables.jvmAvailable) return;
                 var l = new wheels.wheelstest.BrowserLauncher();
                 var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
                 for (var p in paths) {
@@ -168,6 +188,7 @@ component extends="wheels.WheelsTest" {
             });
 
             it("acquireBrowser() throws BrowserEngineInvalid for unknown engine", () => {
+                if (!variables.jvmAvailable) return;
                 var l = new wheels.wheelstest.BrowserLauncher();
                 var paths = l.$classpathJarPaths(installDir=l.resolveInstallDir());
                 for (var p in paths) {
@@ -241,6 +262,10 @@ component extends="wheels.WheelsTest" {
 
             beforeEach(() => {
                 optLauncher = new wheels.wheelstest.BrowserLauncher();
+                if (!variables.jvmAvailable) {
+                    skipOptionTests = true;
+                    return;
+                }
                 var paths = optLauncher.$classpathJarPaths(installDir=optLauncher.resolveInstallDir());
                 for (var p in paths) {
                     if (!fileExists(p)) {

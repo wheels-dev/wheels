@@ -227,7 +227,10 @@ component {
 				}
 			}
 			if (!StructKeyExists(arguments, "width") || !StructKeyExists(arguments, "height")) {
-				if (arguments.required) {
+				// Only probe dimensions when the engine can actually read image
+				// metadata — on engines without image support (e.g. RustCFML) the
+				// tag renders without width/height instead of erroring.
+				if (arguments.required && $engineAdapter().supportsImageInfo()) {
 					// Height and / or width arguments are missing so use cfimage to get them.
 					local.image = $image(action = "info", source = local.file);
 					if (!StructKeyExists(arguments, "width") && local.image.width > 0) {

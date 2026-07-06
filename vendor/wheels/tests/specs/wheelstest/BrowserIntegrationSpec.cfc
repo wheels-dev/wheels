@@ -5,6 +5,12 @@ component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         variables.launcher = new wheels.wheelstest.BrowserLauncher();
+        // Engines without JVM class loading (e.g. RustCFML) can't host the
+        // Playwright URLClassLoader at all — same clean skip as missing JARs.
+        if (!variables.launcher.$engineCapabilities().hasJvmClassLoading()) {
+            variables.skipBrowserTests = true;
+            return;
+        }
         var paths = variables.launcher.$classpathJarPaths(installDir=variables.launcher.resolveInstallDir());
         // Check JAR presence explicitly. Distinguishes "not installed"
         // (legitimate skip) from "installed but launcher crashed" (loud
