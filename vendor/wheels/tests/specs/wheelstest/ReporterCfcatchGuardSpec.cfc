@@ -124,7 +124,20 @@ component extends="wheels.WheelsTest" {
 
 			it("Assertion.throws still surfaces the real stack trace when the exception carries one", function() {
 				// behavior-preservation check for the guarded read: with a real
-				// engine exception the Elvis default must never kick in
+				// engine exception the Elvis default must never kick in.
+				// Honor the premise "when the exception carries one": engines
+				// whose thrown exceptions omit stackTrace entirely (RustCFML
+				// v0.417 did engine-wide) have nothing to preserve — skip.
+				var probe = {hasStackTrace = false};
+				try {
+					throw(type = "Probe.StackTrace", message = "probe");
+				} catch (any pe) {
+					probe.hasStackTrace = StructKeyExists(pe, "stackTrace") && Len(pe.stackTrace ?: "") > 0;
+				}
+				if (!probe.hasStackTrace) {
+					debug("Skipping: this engine's exceptions carry no stackTrace member");
+					return;
+				}
 				var assertion = new wheels.wheelstest.system.Assertion();
 				var thrower = function() {
 					throw(type = "Some.Other.Type", message = "not the expected one");
