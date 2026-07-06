@@ -556,6 +556,40 @@ jobs:
           path: /tmp/junit-results/
 
   #############################################
+  # RustCFML (experimental, JVM-free engine)
+  #############################################
+  # Informational lane, never a merge gate. The engine is pinned in
+  # tools/rustcfml/ENGINE_VERSION (upstream ships multiple releases/day, so
+  # tracking latest would make this lane flake on engine churn). Pass criteria
+  # is "no NEW failures vs tools/rustcfml/baseline.json" — known residual
+  # errors (no-JVM limitations, open upstream issues) live in the baseline.
+  # To bump the pin: update ENGINE_VERSION, run
+  #   bash tools/rustcfml/run-suite.sh --write-baseline
+  # locally, and commit both files together.
+  rustcfml:
+    name: "rustcfml (experimental)"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Read pinned engine version
+        id: engine
+        run: echo "version=$(tr -d '[:space:]' < tools/rustcfml/ENGINE_VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Cache engine binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/wheels-rustcfml
+          key: rustcfml-${{ steps.engine.outputs.version }}-linux-x86_64
+
+      - name: Run core suite against pinned RustCFML
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/rustcfml/run-suite.sh
+
+  #############################################
   # Publish Test Results to PR
   #############################################
   publish-results:
