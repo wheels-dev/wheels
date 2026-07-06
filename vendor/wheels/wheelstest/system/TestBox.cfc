@@ -609,7 +609,7 @@ component accessors="true" {
 		} catch ( Any e ) {
 			writeLog(
 				type = "error",
-				text = "Error sending TestBox headers: #e.message# #e.detail# #e.stackTrace#",
+				text = "Error sending TestBox headers: #e.message# #e.detail# #( e.stackTrace ?: '' )#",
 				file = "testbox.log"
 			);
 		}
@@ -779,7 +779,7 @@ component accessors="true" {
 		} catch ( Any e ) {
 			throw(
 				message = "Error executing bundle - #arguments.bundlePath#  message: #e.message# #e.detail#",
-				detail  = e.stackTrace,
+				detail  = ( e.stackTrace ?: "" ),
 				type    = "BundleRunnerMajorException"
 			);
 		}

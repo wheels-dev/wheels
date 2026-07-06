@@ -660,7 +660,7 @@ component {
 			arguments.message = (
 				len( arguments.message ) ? arguments.message : "The incoming function threw exception [type: #e.type#] [message: #e.message#] [#e.detail#] different than expected params type=[#arguments.type#], regex=[#arguments.regex#]"
 			);
-			detail = e.stackTrace;
+			detail = ( e.stackTrace ?: "" );
 		}
 
 		// found, so throw it
