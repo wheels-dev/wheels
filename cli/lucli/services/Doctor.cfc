@@ -660,7 +660,7 @@ component {
 				recs,
 				"Install or reinstall the Wheels CLI with a complete distribution, "
 				& "or set WHEELS_FRAMEWORK_PATH to a vendor/wheels/ directory. "
-				& "See: https://guides.wheels.dev/v4-0-0-snapshot/start-here/installing/"
+				& "See: https://guides.wheels.dev/v4-0-0/start-here/installing/"
 			);
 		} else if (findNoCase("Missing required directory", combined)) {
 			arrayAppend(recs, "Run 'wheels new' to scaffold a complete project structure");

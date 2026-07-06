@@ -1,21 +1,22 @@
 /**
- * Regression: scaffolded config/routes.cfm shipped a `// See https://...` doc
- * URL pointing at `https://guides.wheels.dev/docs/routing` — a path that
- * doesn't exist on the current docs site. The lucli scaffolder's active
- * `config/routes.cfm` template was already updated to the canonical
- * `/v4-0-0-snapshot/handling-requests-with-controllers/routing` URL, but two
- * sibling templates that produce the same comment for older code paths still
- * had the broken link:
+ * Regression: scaffolded files shipped `See https://...` doc URLs pointing at
+ * guide paths that no longer exist on the docs site.
  *
- *   - cli/src/templates/ConfigRoutes.txt
- *   - cli/lucli/templates/app/app/snippets/ConfigRoutes.txt
+ * Round 1 (issue ##2635): config/routes.cfm templates pointed at the retired
+ * `guides.wheels.dev/docs/routing` path.
  *
- * Both are user-facing on freshly scaffolded apps. Issue ##2635.
+ * Round 2 (2026-07): the pre-GA `v4-0-0-snapshot` slug was retired when the
+ * 4.0 docs consolidated onto `v4-0-0`, which killed every templated URL still
+ * carrying it — including the `working-with-wheels/*` paths that only ever
+ * existed in the v3 tree. The scaffolded settings.cfm/routes.cfm/environment.cfm,
+ * three template READMEs, two runtime CLI messages (Module.cfc, Doctor.cfc),
+ * and the demo app's config all linked 404s. All were repointed at live
+ * `guides.wheels.dev/v4-0-0/...` pages.
  *
- * Also guards against any reintroduction of `cfwheels.org`, `cfwheels.com`,
- * or `docs.cfwheels.org` URLs in these template files, since those domains
- * were retired at the 3.0 rebrand and only `wheels.dev` / `guides.wheels.dev`
- * remain canonical.
+ * This spec pins the canonical routing URL in the routes templates AND scans
+ * the scaffold template tree plus the known runtime-message files for any
+ * reintroduction of retired URL shapes: `v4-0-0-snapshot`, `wheels.dev/3.1.0`,
+ * and the rebrand-retired cfwheels.org / cfwheels.com / docs.cfwheels.org hosts.
  */
 component extends="wheels.WheelsTest" {
 
@@ -31,7 +32,7 @@ component extends="wheels.WheelsTest" {
 				"cli/lucli/templates/app/app/snippets/ConfigRoutes.txt",
 				"cli/lucli/templates/app/config/routes.cfm"
 			];
-			var canonical = "https://guides.wheels.dev/v4-0-0-snapshot/handling-requests-with-controllers/routing";
+			var canonical = "https://guides.wheels.dev/v4-0-0/basics/routing/";
 
 			for (var rel in targets) {
 				// Capture the loop variable so the closure body binds the
@@ -45,23 +46,69 @@ component extends="wheels.WheelsTest" {
 
 						expect(content contains canonical).toBeTrue(
 							relPath & " should reference " & canonical
-							& " — the same URL used by cli/lucli/templates/app/config/routes.cfm."
+							& " — the live v4 routing guide."
 						);
 
 						expect(content contains "guides.wheels.dev/docs/routing").toBeFalse(
 							relPath & " still references the stale /docs/routing path on guides.wheels.dev."
 						);
-
-						expect(content contains "docs.cfwheels.org").toBeFalse(
-							relPath & " still references the retired docs.cfwheels.org host."
-						);
-
-						expect(reFindNoCase("cfwheels\.(org|com)", content) > 0).toBeFalse(
-							relPath & " still references a retired cfwheels.org / cfwheels.com URL."
-						);
 					});
 				})(rel);
 			}
+
+		});
+
+		describe("Retired guide URL shapes", () => {
+
+			var repoRoot = expandPath("/wheels/../..");
+
+			// Files outside the template tree that print or ship guide URLs.
+			var extraFiles = [
+				"cli/README.md",
+				"cli/lucli/Module.cfc",
+				"cli/lucli/services/Doctor.cfc",
+				"cli/src/templates/ConfigRoutes.txt",
+				"cli/src/commands/wheels/analyze/code.cfc",
+				"config/settings.cfm",
+				"config/environment.cfm",
+				"config/routes.cfm"
+			];
+
+			it("no retired guide URLs under cli/lucli/templates/ or the known runtime-message files", () => {
+				var scanned = [];
+				var templateRoot = repoRoot & "/cli/lucli/templates";
+				var templateFiles = directoryList(templateRoot, true, "path");
+				for (var path in templateFiles) {
+					if (reFindNoCase("\.(cfm|cfc|txt|md|json)$", path)) {
+						arrayAppend(scanned, path);
+					}
+				}
+				for (var rel in extraFiles) {
+					arrayAppend(scanned, repoRoot & "/" & rel);
+				}
+
+				var offenders = [];
+				for (var path in scanned) {
+					if (!fileExists(path)) {
+						continue;
+					}
+					var content = fileRead(path);
+					if (
+						findNoCase("v4-0-0-snapshot", content)
+						|| findNoCase("wheels.dev/3.1.0", content)
+						|| findNoCase("docs.cfwheels.org", content)
+						|| reFindNoCase("cfwheels\.(org|com)", content)
+					) {
+						arrayAppend(offenders, path);
+					}
+				}
+
+				expect(arrayLen(offenders) == 0).toBeTrue(
+					"Retired guide URL shape (v4-0-0-snapshot, wheels.dev/3.1.0, or a cfwheels.org-era host) found in: "
+					& arrayToList(offenders, "; ")
+					& ". Point these at live guides.wheels.dev/v4-0-0/ pages instead."
+				);
+			});
 
 		});
 
