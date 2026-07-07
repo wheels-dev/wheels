@@ -241,7 +241,19 @@ component output="false" {
 
 		try {
 			local.factory = CreateObject("java", "javax.crypto.SecretKeyFactory").getInstance("PBKDF2WithHmacSHA256");
-			local.derivedKey = local.factory.generateSecret(local.keySpec).getEncoded();
+			local.secretKey = local.factory.generateSecret(local.keySpec);
+
+			// Do NOT call members on the returned key directly: it is a
+			// com.sun.crypto.provider.PBKDF2KeyImpl, a JDK-internal class that
+			// java.base does not open. Adobe 2025's JVM rejects the reflective
+			// member access with InaccessibleObjectException (its reflection
+			// layer makes the concrete class's methods accessible en masse).
+			// Invoke getEncoded() through the exported javax.crypto.SecretKey
+			// interface instead — public interface methods need no opens.
+			local.getEncoded = CreateObject("java", "java.lang.Class")
+				.forName("javax.crypto.SecretKey")
+				.getMethod("getEncoded", JavaCast("null", ""));
+			local.derivedKey = local.getEncoded.invoke(local.secretKey, JavaCast("null", ""));
 		} finally {
 			// Zero the internal password copy held by the spec.
 			local.keySpec.clearPassword();
