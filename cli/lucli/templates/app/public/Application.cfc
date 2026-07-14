@@ -330,6 +330,25 @@ component output="false" {
 					// Fail silently if logging fails
 				}
 			}
+			// Record WHY a requested reload did not fire so the framework's debug
+			// bar can render a development-only notice instead of a silent no-op
+			// (issue #3311). Recording is environment-agnostic — a request-scope
+			// flag, no output; the message text and the development-environment
+			// gate live framework-side in vendor/wheels/events/onrequestend/debug.cfm
+			// so wording can improve without template drift. Wrong-password and
+			// rate-limited attempts deliberately collapse into one generic reason
+			// so the notice adds no oracle on top of $secureCompare().
+			if (!local.reloadAuthorized && StructKeyExists(request, "wheels")) {
+				local.reloadPasswordConfigured = StructKeyExists(application.wheels, "reloadPassword")
+					&& Len(application.wheels.reloadPassword);
+				if (!local.reloadPasswordConfigured) {
+					request.wheels.reloadRefusedReason = "emptyPassword";
+				} else if (!StructKeyExists(url, "password")) {
+					request.wheels.reloadRefusedReason = "missingPasswordParam";
+				} else {
+					request.wheels.reloadRefusedReason = "refused";
+				}
+			}
 		}
 		if (local.reloadAuthorized) {
 			application.wo.$debugPoint("total,reload");
