@@ -203,10 +203,28 @@ component extends="wheels.WheelsTest" {
 				expect(detected.serverVersion).toBe("0.417.0");
 			});
 
+			it("resolves RustCFML under reportAsLucee impersonation (v0.507+) via the versionName marker", function() {
+				// As of RustCFML v0.507.0 reportAsLucee defaults to true:
+				// productName reports "Lucee" with Lucee's productVersion, and
+				// the real engine version hides behind a Lucee-major prefix in
+				// server.lucee.version. The stable identity marker upstream
+				// documents (and keys its own isRustCFML() on) is
+				// server.lucee.versionName == "RustCFML".
+				var events = CreateObject("component", "wheels.events.onapplicationstart");
+				var fakeServer = {
+					lucee: {version: "7.0.519.0", versionName: "RustCFML"},
+					coldfusion: {productName: "Lucee", productVersion: "2016,0,03,300357"},
+					java: {vendor: "RustCFML (no JVM)"}
+				};
+				var detected = events.$detectEngine(serverScope = fakeServer);
+				expect(detected.serverName).toBe("RustCFML");
+				expect(detected.serverVersion).toBe("0.519.0");
+			});
+
 			it("resolves Lucee when server.lucee exists without the RustCFML product marker", function() {
 				var events = CreateObject("component", "wheels.events.onapplicationstart");
 				var fakeServer = {
-					lucee: {version: "6.2.0.321"},
+					lucee: {version: "6.2.0.321", versionName: "Gelert"},
 					coldfusion: {productName: "Lucee", productVersion: "6.2.0.321"}
 				};
 				var detected = events.$detectEngine(serverScope = fakeServer);
