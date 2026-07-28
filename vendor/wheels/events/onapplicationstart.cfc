@@ -538,6 +538,14 @@ component {
 	 * branch or RustCFML is misclassified as Lucee and its dedicated engine
 	 * adapter becomes dead code. Other probe-verified RustCFML markers:
 	 * server.java.vendor = "RustCFML (no JVM)".
+	 *
+	 * As of RustCFML v0.507.0, reportAsLucee defaults to true: the productName
+	 * marker reports "Lucee" (with Lucee's productVersion) and the real engine
+	 * version moves to server.lucee.version behind a Lucee-major prefix
+	 * ("7.0.519.0" means RustCFML 0.519.0). The one field upstream documents
+	 * as the stable identity marker — their own isRustCFML() BIF keys on it —
+	 * is server.lucee.versionName == "RustCFML", so that branch must also run
+	 * BEFORE the Lucee branch.
 	 */
 	public struct function $detectEngine(required struct serverScope) {
 		local.rv = {};
@@ -551,6 +559,14 @@ component {
 		) {
 			local.rv.serverName = "RustCFML";
 			local.rv.serverVersion = arguments.serverScope.coldfusion.productVersion;
+		} else if (
+			StructKeyExists(arguments.serverScope, "lucee")
+			&& StructKeyExists(arguments.serverScope.lucee, "versionName")
+			&& arguments.serverScope.lucee.versionName == "RustCFML"
+		) {
+			local.rv.serverName = "RustCFML";
+			// Strip the impersonated Lucee major ("7.0.519.0" -> "0.519.0").
+			local.rv.serverVersion = ListRest(arguments.serverScope.lucee.version, ".");
 		} else if (StructKeyExists(arguments.serverScope, "lucee")) {
 			local.rv.serverName = "Lucee";
 			local.rv.serverVersion = arguments.serverScope.lucee.version;
