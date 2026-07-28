@@ -87,6 +87,28 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 <div id="wheels-debugbar" style="all:initial;position:fixed;bottom:0;left:0;right:0;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
 <style><cfinclude template="/wheels/public/assets/css/debugbar.css"></style>
 
+<!--- ============ RELOAD-REFUSED NOTICE (issue 3311) ============
+	The app template's reload gate (public/Application.cfc) records
+	request.wheels.reloadRefusedReason when ?reload= was requested but did not
+	fire. Development-only surface: other environments stay silent (log-only),
+	and the generic "refused" reason must never distinguish wrong-password from
+	rate-limited (no oracle on top of $secureCompare). --->
+<cfif StructKeyExists(request.wheels, "reloadRefusedReason") AND $get("environment") IS "development">
+	<div data-wdb-reload-refused="#EncodeForHTMLAttribute(request.wheels.reloadRefusedReason)#" style="background:##45475a;color:##f9e2af;padding:8px 14px;font-size:12px;line-height:1.6;border-top:2px solid ##f9e2af;">
+		<strong>Reload not performed.</strong>
+		<cfif request.wheels.reloadRefusedReason IS "emptyPassword">
+			URL-based reload is disabled because <code>reloadPassword</code> is empty (fail-closed since 4.0.4).
+			Set <code>set(reloadPassword=env('WHEELS_RELOAD_PASSWORD', ''))</code> in <code>config/settings.cfm</code>,
+			put the value in <code>.env</code>, then reload with <code>?reload=true&amp;password=...</code>
+		<cfelseif request.wheels.reloadRefusedReason IS "missingPasswordParam">
+			A <code>reloadPassword</code> is configured but the request carried no password parameter.
+			Append <code>&amp;password=&lt;your reloadPassword&gt;</code> to the URL.
+		<cfelse>
+			The reload request was refused. Check <code>wheels_security.log</code> for details.
+		</cfif>
+	</div>
+</cfif>
+
 <!--- ============ COLLAPSED BAR ============ --->
 <div class="wdb-bar" id="wdb-bar">
 	<!--- Wheels logo / toggle --->
