@@ -310,10 +310,8 @@ component {
 			// Batch finders (findEach / findInBatches) opt out via $useRequestCache so their per-page results don't accumulate in the request scope for the remainder of the request.
 			local.useRequestCache = application.wheels.cacheQueriesDuringRequest && arguments.$useRequestCache;
 			if (local.useRequestCache) {
-				// Create a struct in the request scope to store cached queries.
-				if (!StructKeyExists(request.wheels, variables.wheels.class.modelName)) {
-					request.wheels[variables.wheels.class.modelName] = {};
-				}
+				// Create this model's slot in the request-scoped query cache namespace.
+				$ensureRequestQueryCache();
 
 				// Derive the request cache key from the SQL shell key computed above (it already encodes the model name and the full arguments struct) so we don't have to serialize all arguments a second time.
 				local.queryKey = $hashedKey(local.queryShellKey, local.originalWhere);
@@ -323,9 +321,9 @@ component {
 			if (
 				local.useRequestCache
 				&& !arguments.reload
-				&& StructKeyExists(request.wheels[variables.wheels.class.modelName], local.queryKey)
+				&& StructKeyExists(request.wheels["$queryCache"][variables.wheels.class.modelName], local.queryKey)
 			) {
-				local.findAll = request.wheels[variables.wheels.class.modelName][local.queryKey];
+				local.findAll = request.wheels["$queryCache"][variables.wheels.class.modelName][local.queryKey];
 			} else {
 				local.finderArgs = {};
 				local.finderArgs.sql = local.sql;
@@ -357,7 +355,7 @@ component {
 				local.findAll = variables.wheels.class.adapter.$querySetup(argumentCollection = local.finderArgs);
 				if (local.useRequestCache) {
 					// Store in request cache so we never run the exact same query twice in the same request.
-					request.wheels[variables.wheels.class.modelName][local.queryKey] = local.findAll;
+					request.wheels["$queryCache"][variables.wheels.class.modelName][local.queryKey] = local.findAll;
 				}
 			}
 

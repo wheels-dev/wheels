@@ -138,11 +138,11 @@ This is honored only when `cacheQueries=true`. The arg name is literally `cache`
 
 ### Request-level: the dedupe you already have
 
-The second query cache is on by default and you've been using it without knowing. `cacheQueriesDuringRequest` (default `true`, even in dev) stores each unique `findAll` result in `request.wheels[ModelName]`, so an identical query within a single request runs exactly one SQL statement:
+The second query cache is on by default and you've been using it without knowing. `cacheQueriesDuringRequest` (default `true`, even in dev) stores each unique `findAll` result in `request.wheels.$queryCache[ModelName]`, so an identical query within a single request runs exactly one SQL statement:
 
 ```cfm
 // These two run only ONE SQL query within the same request —
-// the second is served from request.wheels["Author"].
+// the second is served from request.wheels.$queryCache["Author"].
 model("Author").findAll(where="lastName='Djurner'");
 model("Author").findAll(where="lastName='Djurner'");
 
@@ -319,7 +319,7 @@ Everything here is real, cited behavior — the parts that will cost you an afte
 
 - **`findAll(cache=N)` is NOT in Wheels' own cache struct.** It hands a native `cachedWithin` timespan to the DB adapter — engine-level `cfquery` caching keyed on the generated SQL. It's *not* cleared by `clearCachableActions()` and *not* affected by editing `application.wheels.cache`. It clears on app reload (cacheKey rotation) or on expiry.
 
-- **Two query caches, easily confused.** Request-level (`cacheQueriesDuringRequest`, in `request.wheels[ModelName]`) dedupes within one request and is always on — bypass it with `reload=true`. Cross-request (`findAll(cache=N)` + `cacheQueries`) is the engine cache. `reload=true` defeats the *request-level* one; it has nothing to do with `cache=N`.
+- **Two query caches, easily confused.** Request-level (`cacheQueriesDuringRequest`, in `request.wheels.$queryCache[ModelName]` — it sat directly in `request.wheels[ModelName]` before [#3336](https://github.com/wheels-dev/wheels/issues/3336)) dedupes within one request and is always on — bypass it with `reload=true`. Cross-request (`findAll(cache=N)` + `cacheQueries`) is the engine cache. `reload=true` defeats the *request-level* one; it has nothing to do with `cache=N`.
 
 - **No targeted invalidation API.** No public `clearCache(key)` / `expire(key)` for action/partial/page entries — only the `$`-prefixed internals (and `$clearCache` clears a whole category, not a single key). `clearCachableActions()` unregisters cachability; it does **not** evict already-cached content. Real invalidation = short `time` values + a full `?reload=true`, which re-inits the cache and flushes `cfcache`.
 
