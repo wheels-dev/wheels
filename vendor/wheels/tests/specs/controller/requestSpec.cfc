@@ -154,13 +154,16 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that pagination", () => {
 
 			beforeEach(() => {
-				request.wheels["myhandle"] = {test = "true"}
+				application.wo.$ensurePaginationStore()
+				request.wheels["$pagination"]["myhandle"] = {test = "true"}
 				params = {controller = "dummy", action = "dummy"}
 				_controller = application.wo.controller("dummy", params)
 			})
 
 			afterEach(() => {
-				StructDelete(request.wheels, "myhandle", false)
+				// Delete only this spec's handle. The whole core suite runs in one request, so
+				// wiping the shared $pagination namespace would destroy other specs' handles.
+				StructDelete(request.wheels["$pagination"], "myhandle", false)
 			})
 			
 			it("handle exists", () => {

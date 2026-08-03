@@ -255,7 +255,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is passing through class", () => {
-				request.wheels.testPaginationLinksQuery = {currentPage = 2, totalPages = 3}
+				g.$ensurePaginationStore()
+				request.wheels["$pagination"].testPaginationLinksQuery = {currentPage = 2, totalPages = 3}
 				r = g.controller("dummy").paginationLinks(classForCurrent = "active", handle = "testPaginationLinksQuery")
 
 				expect(r).toInclude("<span class=""active"">2</span>")

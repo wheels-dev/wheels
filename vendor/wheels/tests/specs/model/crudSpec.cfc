@@ -1477,10 +1477,10 @@ component extends="wheels.WheelsTest" {
 					order = "id"
 				)
 
-				expect(request.wheels.pagination_test_1.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_test_1.TOTALPAGES).toBe(0)
-				expect(request.wheels.pagination_test_1.TOTALRECORDS).toBe(0)
-				expect(request.wheels.pagination_test_1.ENDROW).toBe(1)
+				expect(request.wheels["$pagination"].pagination_test_1.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_test_1.TOTALPAGES).toBe(0)
+				expect(request.wheels["$pagination"].pagination_test_1.TOTALRECORDS).toBe(0)
+				expect(request.wheels["$pagination"].pagination_test_1.ENDROW).toBe(1)
 				expect(e.recordcount).toBe(0)
 			})
 
@@ -1490,10 +1490,10 @@ component extends="wheels.WheelsTest" {
 				/* 1st page */
 				e = user.findAll(select = "id", perpage = "2", page = "1", handle = "pagination_test_2", order = "id")
 
-				expect(request.wheels.pagination_test_2.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_test_2.TOTALPAGES).toBe(3)
-				expect(request.wheels.pagination_test_2.TOTALRECORDS).toBe(5)
-				expect(request.wheels.pagination_test_2.ENDROW).toBe(2)
+				expect(request.wheels["$pagination"].pagination_test_2.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_test_2.TOTALPAGES).toBe(3)
+				expect(request.wheels["$pagination"].pagination_test_2.TOTALRECORDS).toBe(5)
+				expect(request.wheels["$pagination"].pagination_test_2.ENDROW).toBe(2)
 				expect(e.recordcount).toBe(2)
 				expect(e.id[1]).toBe(r.id[1])
 				expect(e.id[2]).toBe(r.id[2])
@@ -1501,10 +1501,10 @@ component extends="wheels.WheelsTest" {
 				/* 2nd page */
 				e = user.findAll(perpage = "2", page = "2", handle = "pagination_test_3", order = "id")
 
-				expect(request.wheels.pagination_test_3.CURRENTPAGE).toBe(2)
-				expect(request.wheels.pagination_test_3.TOTALPAGES).toBe(3)
-				expect(request.wheels.pagination_test_3.TOTALRECORDS).toBe(5)
-				expect(request.wheels.pagination_test_3.ENDROW).toBe(4)
+				expect(request.wheels["$pagination"].pagination_test_3.CURRENTPAGE).toBe(2)
+				expect(request.wheels["$pagination"].pagination_test_3.TOTALPAGES).toBe(3)
+				expect(request.wheels["$pagination"].pagination_test_3.TOTALRECORDS).toBe(5)
+				expect(request.wheels["$pagination"].pagination_test_3.ENDROW).toBe(4)
 				expect(e.recordcount).toBe(2)
 				expect(e.id[1]).toBe(r.id[3])
 				expect(e.id[2]).toBe(r.id[4])
@@ -1512,10 +1512,10 @@ component extends="wheels.WheelsTest" {
 				/* 3rd page */
 				e = user.findAll(perpage = "2", page = "3", handle = "pagination_test_4", order = "id")
 
-				expect(request.wheels.pagination_test_4.CURRENTPAGE).toBe(3)
-				expect(request.wheels.pagination_test_4.TOTALPAGES).toBe(3)
-				expect(request.wheels.pagination_test_4.TOTALRECORDS).toBe(5)
-				expect(request.wheels.pagination_test_4.ENDROW).toBe(5)
+				expect(request.wheels["$pagination"].pagination_test_4.CURRENTPAGE).toBe(3)
+				expect(request.wheels["$pagination"].pagination_test_4.TOTALPAGES).toBe(3)
+				expect(request.wheels["$pagination"].pagination_test_4.TOTALRECORDS).toBe(5)
+				expect(request.wheels["$pagination"].pagination_test_4.ENDROW).toBe(5)
 				expect(e.recordcount).toBe(1)
 				expect(e.id[1]).toBe(r.id[5])
 			})
@@ -1568,10 +1568,10 @@ component extends="wheels.WheelsTest" {
 					handle = "pagination_order_test_1"
 				)
 
-				expect(request.wheels.pagination_order_test_1.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_order_test_1.TOTALPAGES).toBe(13)
-				expect(request.wheels.pagination_order_test_1.TOTALRECORDS).toBe(250)
-				expect(request.wheels.pagination_order_test_1.ENDROW).toBe(20)
+				expect(request.wheels["$pagination"].pagination_order_test_1.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALPAGES).toBe(13)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALRECORDS).toBe(250)
+				expect(request.wheels["$pagination"].pagination_order_test_1.ENDROW).toBe(20)
 			})
 
 			it("works with renamed primary key", () => {
@@ -1590,10 +1590,10 @@ component extends="wheels.WheelsTest" {
 					where = "description1 LIKE '%photo%'"
 				)
 
-				expect(request.wheels.pagination_order_test_1.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_order_test_1.TOTALPAGES).toBe(13)
-				expect(request.wheels.pagination_order_test_1.TOTALRECORDS).toBe(250)
-				expect(request.wheels.pagination_order_test_1.ENDROW).toBe(20)
+				expect(request.wheels["$pagination"].pagination_order_test_1.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALPAGES).toBe(13)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALRECORDS).toBe(250)
+				expect(request.wheels["$pagination"].pagination_order_test_1.ENDROW).toBe(20)
 			})
 
 			it("works with parameterize set to false with numeric", () => {
@@ -1607,10 +1607,10 @@ component extends="wheels.WheelsTest" {
 					where = "id = 1"
 				)
 
-				expect(request.wheels.pagination_order_test_1.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_order_test_1.TOTALPAGES).toBe(1)
-				expect(request.wheels.pagination_order_test_1.TOTALRECORDS).toBe(1)
-				expect(request.wheels.pagination_order_test_1.ENDROW).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALPAGES).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALRECORDS).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.ENDROW).toBe(1)
 			})
 
 			it("works with compound keys", () => {
