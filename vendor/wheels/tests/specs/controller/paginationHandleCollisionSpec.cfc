@@ -28,13 +28,18 @@ component extends="wheels.WheelsTest" {
 			// namespace wholesale would destroy handles other specs set up.
 			ownHandles = "articles,comments,tenant,$queryCache,noSuchHandleXYZ";
 
+			// Ensure the namespace inline rather than calling g.$ensurePaginationStore(): a
+			// zero-argument dotted call in statement position breaks Adobe CF 2025's parser.
 			beforeEach(() => {
 				originalShowErr = application.wheels.showErrorInformation;
 				originalCacheSetting = application.wheels.cacheQueriesDuringRequest;
 				StructDelete(request.wheels, "tenant");
-				g.$ensurePaginationStore();
+				if (!StructKeyExists(request.wheels, "$pagination")) {
+					request.wheels["$pagination"] = {};
+				}
+				paginationStore = request.wheels["$pagination"];
 				for (var h in ListToArray(ownHandles)) {
-					StructDelete(request.wheels["$pagination"], h, false);
+					StructDelete(paginationStore, h, false);
 				}
 			})
 
@@ -42,9 +47,12 @@ component extends="wheels.WheelsTest" {
 				application.wheels.showErrorInformation = originalShowErr;
 				application.wheels.cacheQueriesDuringRequest = originalCacheSetting;
 				StructDelete(request.wheels, "tenant");
-				g.$ensurePaginationStore();
+				if (!StructKeyExists(request.wheels, "$pagination")) {
+					request.wheels["$pagination"] = {};
+				}
+				paginationStore = request.wheels["$pagination"];
 				for (var h in ListToArray(ownHandles)) {
-					StructDelete(request.wheels["$pagination"], h, false);
+					StructDelete(paginationStore, h, false);
 				}
 			})
 
@@ -78,7 +86,7 @@ component extends="wheels.WheelsTest" {
 				expect(g.$tenantDataSource()).toBe("tenant_acme");
 			})
 
-			it("does not overwrite the finder cache namespace when a handle is named \$queryCache", () => {
+			it("does not overwrite the finder cache namespace when a handle is named $queryCache", () => {
 				application.wheels.cacheQueriesDuringRequest = true;
 				model("author").findAll(where = "lastName = 'Djurner'");
 				var cachedBefore = StructCount(request.wheels["$queryCache"]["author"]);
