@@ -45,11 +45,21 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Resolve the tenant, set request.wheels.tenant, then delegate to the next middleware.
 	 */
 	public string function handle(required struct request, required any next) {
-		// Note: In CFML, bare `request` inside a function always refers to the
-		// built-in request scope, even when a parameter is named `request`.
-		// We use `arguments.request` to access the middleware pipeline's request struct,
-		// but set tenant state on the built-in `request` scope since that's what
-		// $performQuery() and $get() read from.
+		// Note: this function has a parameter named `request` (the MiddlewareInterface
+		// signature mandates it), so the bare `request` token is ambiguous. On Lucee and
+		// Adobe 2023 it resolves to the built-in request scope; on Adobe 2025 it does NOT
+		// resolve consistently — the same token can mean the built-in scope in one
+		// expression position and `arguments.request` in another within this function.
+		//
+		// So: use `arguments.request` explicitly for the middleware pipeline's request
+		// struct, and touch the built-in scope (where $performQuery() and $get() read
+		// tenant state from) only through one of two self-consistent forms —
+		//   * `IsDefined("request.wheels.tenant")` before reading or deleting, which
+		//     string-resolves the whole path in a single evaluation, or
+		//   * assign before use: `if (!StructKeyExists(request, "wheels")) { request.wheels = {}; }`
+		// Never guard with `StructKeyExists(request, ...)` and then access `request.x` —
+		// the guard passes and the access throws `Element WHEELS is undefined in REQUEST`
+		// on Adobe 2025 (cross-engine invariant 15).
 
 		local.tenant = $resolveTenant(arguments.request);
 
