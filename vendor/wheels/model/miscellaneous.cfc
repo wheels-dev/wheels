@@ -1,9 +1,31 @@
 component {
 	/**
+	 * Internal function.
+	 * Creates this model's slot in the per-request query cache if it doesn't exist yet.
+	 *
+	 * The cache is namespaced under the reserved `$queryCache` key rather than sitting directly in
+	 * `request.wheels` under the bare model name. CFML struct keys are case-insensitive, so the flat
+	 * layout let a model name alias onto a framework-owned request key — a model named `Tenant`
+	 * shared one key with `request.wheels.tenant`, silently dropping tenant datasource routing (#3336).
+	 */
+	public void function $ensureRequestQueryCache() {
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		if (!StructKeyExists(request.wheels, "$queryCache")) {
+			request.wheels["$queryCache"] = {};
+		}
+		if (!StructKeyExists(request.wheels["$queryCache"], variables.wheels.class.modelName)) {
+			request.wheels["$queryCache"][variables.wheels.class.modelName] = {};
+		}
+	}
+
+	/**
 	 * Deletes all queries stored during the request for this model.
 	 */
 	public void function $clearRequestCache() {
-		request.wheels[variables.wheels.class.modelName] = {};
+		$ensureRequestQueryCache();
+		request.wheels["$queryCache"][variables.wheels.class.modelName] = {};
 	}
 
 	/**
