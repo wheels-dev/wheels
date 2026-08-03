@@ -726,11 +726,23 @@ return local.$wheels;
 	 * Returns the current tenant struct, or an empty struct if no tenant is active.
 	 * The tenant struct contains: `id`, `dataSource`, `config`, and `$locked`.
 	 *
+	 * A tenant only counts as active when it carries a non-empty `dataSource` — the same test
+	 * `$tenantDataSource()` applies before it routes a query. Anything else on the key reads as
+	 * no tenant rather than being handed back as though it were a resolved one, so a malformed
+	 * value degrades to a no-op instead of wrong behaviour (#3336). Every framework producer
+	 * (`switchTenant()`, `TenantResolver`, `Job.$restoreTenantContext()`, `TenantMigrator`)
+	 * already guarantees a non-empty `dataSource`, so this only filters foreign values.
+	 *
 	 * [section: Configuration]
 	 * [category: Multi-Tenancy]
 	 */
 	public struct function tenant() {
-		if (IsDefined("request.wheels.tenant")) {
+		if (
+			IsDefined("request.wheels.tenant")
+			&& IsStruct(request.wheels.tenant)
+			&& StructKeyExists(request.wheels.tenant, "dataSource")
+			&& Len(request.wheels.tenant.dataSource)
+		) {
 			return request.wheels.tenant;
 		}
 		return {};

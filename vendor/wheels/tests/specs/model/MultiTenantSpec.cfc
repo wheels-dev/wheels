@@ -27,6 +27,31 @@ component extends="wheels.WheelsTest" {
 					expect(t.id).toBe("t1");
 					expect(t.dataSource).toBe("tenant_ds");
 				});
+
+				// #3336 hardening: a value on the key that isn't a resolved tenant must read as
+				// "no tenant" rather than being handed back as though it were one. This is the
+				// same test $tenantDataSource() already applies before routing a query.
+				it("returns empty struct when the value on the key has no dataSource", () => {
+					request.wheels.tenant = {someQueryHash = {}};
+					var t = g.tenant();
+
+					expect(t).toBeStruct();
+					expect(StructIsEmpty(t)).toBeTrue();
+				});
+
+				it("returns empty struct when dataSource is present but empty", () => {
+					request.wheels.tenant = {id = "t1", dataSource = "", config = {}};
+					var t = g.tenant();
+
+					expect(StructIsEmpty(t)).toBeTrue();
+				});
+
+				it("agrees with $tenantDataSource() on what counts as resolved", () => {
+					request.wheels.tenant = {someQueryHash = {}};
+
+					expect(StructIsEmpty(g.tenant())).toBeTrue();
+					expect(g.$tenantDataSource()).toBe(application.wheels.dataSourceName);
+				});
 			});
 
 			describe("$tenantDataSource()", () => {

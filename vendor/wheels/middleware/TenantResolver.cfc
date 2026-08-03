@@ -73,6 +73,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 			// Set on the built-in request scope (where $performQuery reads it)
 			request.wheels.tenant = local.tenant;
+		} else if (StructKeyExists(request, "wheels")) {
+			// The resolver found no match. Drop any value already sitting on the key so a stale
+			// or foreign one can't outlive resolution and be read downstream as a resolved
+			// tenant — an unresolved request must look unresolved for the whole request (#3336).
+			StructDelete(request.wheels, "tenant");
 		}
 
 		try {
