@@ -3847,8 +3847,9 @@ return local.$wheels;
 	 * @handle The handle given to the query to return pagination information for.
 	 */
 	public struct function pagination(string handle = "query") {
+		local.store = $ensurePaginationStore();
 		if ($get("showErrorInformation")) {
-			if (!StructKeyExists(request.wheels, arguments.handle)) {
+			if (!StructKeyExists(local.store, arguments.handle)) {
 				Throw(
 					type = "Wheels.QueryHandleNotFound",
 					message = "Wheels couldn't find a query with the handle of `#arguments.handle#`.",
@@ -3856,7 +3857,33 @@ return local.$wheels;
 				);
 			}
 		}
-		return request.wheels[arguments.handle];
+		return local.store[arguments.handle];
+	}
+
+	/**
+	 * Internal function.
+	 * Creates the reserved per-request pagination namespace if it doesn't exist yet.
+	 *
+	 * Pagination handles are caller-supplied names, so storing them directly in `request.wheels`
+	 * put arbitrary user input in the same case-insensitive keyspace as framework-owned request
+	 * state. A handle matching a framework key overwrote it, and — because `pagination()` only
+	 * validates the handle when `showErrorInformation` is on — production reads of an unknown
+	 * handle returned whatever framework struct happened to occupy that key. Both directions are
+	 * closed by confining handles to their own sub-struct (#3339, same fix shape as #3336).
+	 *
+	 * Returns the namespace struct so callers can work through the returned reference instead of
+	 * calling this as a bare statement — Adobe CF 2025's parser rejects a bare dotted call like
+	 * `application.wo.$ensurePaginationStore()` in a script statement position (see the cross-engine
+	 * note in CLAUDE.md).
+	 */
+	public struct function $ensurePaginationStore() {
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		if (!StructKeyExists(request.wheels, "$pagination")) {
+			request.wheels["$pagination"] = {};
+		}
+		return request.wheels["$pagination"];
 	}
 
 	/**
@@ -3924,7 +3951,8 @@ return local.$wheels;
 
 		local.args = Duplicate(arguments);
 		StructDelete(local.args, "handle");
-		request.wheels[arguments.handle] = local.args;
+		local.store = $ensurePaginationStore();
+		local.store[arguments.handle] = local.args;
 	}
 
 	/**

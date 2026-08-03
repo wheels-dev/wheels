@@ -54,6 +54,20 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 
 15. **A parameter named `request` makes the bare `request` token resolve inconsistently on Adobe 2025.** In a function declaring a parameter named `request`, Adobe CF 2025 can resolve bare `request` to the built-in scope in one expression position and to `arguments.request` in another *within the same function* — so a guard written one way cannot protect an access written the other way. `if (StructKeyExists(request, "wheels")) { StructDelete(request.wheels, "tenant"); }` passed the guard and then threw `Element WHEELS is undefined in REQUEST`. Use `IsDefined("request.wheels.tenant")`, which string-resolves the whole dotted path in one evaluation, or assign before use (`if (!StructKeyExists(request, "wheels")) { request.wheels = {}; }` then write) — never mix the two forms. This hits **every middleware component**, because `wheels.middleware.MiddlewareInterface` mandates the signature `handle(required struct request, required any next)`; anti-pattern 11's "never name a parameter after a reserved scope" is unavailable there. Lucee 6/7, BoxLang and Adobe 2023 all resolve consistently, so **local Lucee green and Adobe 2023 smokes do NOT cover this** — only the Adobe 2025 matrix legs catch it, and `compat-matrix.yml` does not run on PRs (weekly cron + `workflow_dispatch`, `continue-on-error: true`). Hit by `TenantResolver.handle()` in [#3338](https://github.com/wheels-dev/wheels/pull/3338).
 
+16. **A zero-argument call through the `application` scope breaks Adobe 2025's parser in statement position.** Inside a closure, `application.wo.$someMethod()` with an **empty** argument list — used as a bare statement or as the whole right-hand side of an assignment — throws at COMPILE time: `coldfusion.compiler.CFMLParserBase$MissingNameException: Invalid construct: Either argument or name is missing` ("When using named parameters to a function, each parameter must have a name"). Adobe appears to parse it as a script-style tag call and demand at least one attribute. This is the `application`-scope sibling of invariant 2. Verified boundaries — each of these compiles, so **do not "fix" them**:
+    - any argument at all: `application.wo.$get("showErrorInformation")`
+    - nested inside another call: `expect(application.wo.$statusCode()).toBe(418)` (long-standing in `renderingSpec`)
+    - chained further: `application.wo.mapper().resources("posts")` (`RoutePrecedenceSpec`)
+    - a non-`application` receiver, zero args, bare statement in a closure: `_controller.$clearCachableActions()` (`cachingSpec`), `strategy.logout()` (`SessionStrategySpec`), `local.c.$warnIfConfigSkipsSuper()` (`configSuperWarningSpec`)
+
+    Two things make this expensive to diagnose. Adobe attributes the error to the **enclosing `describe(...)` line**, not the offending statement, so it reads like a broken test-block signature. And because the core suite compiles via `directory="wheels.tests.specs"`, one occurrence zeroes out **the entire engine leg** — adobe2025 reports `tests="0"` for every database while Lucee/BoxLang/Adobe 2023 stay green, and `compat-matrix.yml` does not run on PRs. In test code, ensure request state inline (`if (!StructKeyExists(request.wheels, "$pagination")) { request.wheels["$pagination"] = {} }`) rather than calling a void `$`-helper through `application.wo`; in framework code prefer helpers that **return** what they ensure, so callers write `local.store = $ensurePaginationStore();`. Hit by the #3339 pagination-namespace specs.
+
+    Bisect this class of bug with a single probe against a running container instead of CI (~13s vs ~19min):
+    ```bash
+    curl -s "http://localhost:62025/wheels/core/tests?db=sqlite&format=json&cli=true" | \
+      python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass','COMPILE FAIL'), d.get('RootCause',{}).get('snippet',''))"
+    ```
+
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
 curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
