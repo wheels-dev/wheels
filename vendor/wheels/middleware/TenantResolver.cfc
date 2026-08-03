@@ -73,10 +73,18 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 			// Set on the built-in request scope (where $performQuery reads it)
 			request.wheels.tenant = local.tenant;
-		} else if (StructKeyExists(request, "wheels")) {
+		} else if (IsDefined("request.wheels.tenant")) {
 			// The resolver found no match. Drop any value already sitting on the key so a stale
 			// or foreign one can't outlive resolution and be read downstream as a resolved
 			// tenant — an unresolved request must look unresolved for the whole request (#3336).
+			//
+			// Guard with IsDefined on the full path, matching the finally block below. A
+			// `StructKeyExists(request, "wheels")` guard is NOT equivalent here: this function
+			// takes a parameter named `request`, and on Adobe 2025 the bare `request` token
+			// resolves differently between the StructKeyExists argument and the `request.wheels`
+			// member-access expression, so the guard passed and the delete then threw
+			// `Element WHEELS is undefined in REQUEST`. IsDefined resolves the whole dotted path
+			// in one evaluation, so it cannot disagree with itself.
 			StructDelete(request.wheels, "tenant");
 		}
 
