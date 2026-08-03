@@ -56,16 +56,31 @@ component extends="wheels.WheelsTest" {
 
 			it("updateAll with multiple includes updates matching rows", () => {
 				if (g.model("post").$dialectName() == "CockroachDB") return;
+				loc.state = {};
 				transaction action="begin" {
-					loc.n = g.model("Post").updateAll(
+					loc.state.updated = g.model("Post").updateAll(
 						averagerating = "3.3",
 						where = "c_o_r_e_comments.postid = 1 AND c_o_r_e_authors.id > 0",
 						include = "author,c_o_r_e_comments"
 					);
-					loc.q = g.model("Post").findAll(where = "averagerating = '3.3'");
+					// Verify by range, never by equality against the literal. `averagerating` is a
+					// 4-byte `float` column, and 3.3 has no exact binary representation — on MySQL it
+					// widens to 3.299999952316, so `averagerating = '3.3'` is FALSE even though the
+					// row was updated correctly. That is what #3294 mistook for a bulk-update no-op:
+					// `updateAll` returned 1 and the row did change on every engine; only the
+					// assertion was unsound. `crudSpec` gets away with `averagerating = '5.0'`
+					// solely because 5.0 *is* exactly representable.
+					loc.q = g.model("Post").findAll(
+						where = "averagerating > 3.29 AND averagerating < 3.31",
+						order = "id"
+					);
 					transaction action="rollback";
 				}
-				expect(loc.q.recordcount).toBe(1);
+				// a positive rows-affected count rules out a genuine no-op without pinning a
+				// driver-specific number (MySQL's UPDATE ... JOIN matches 3 join rows, 1 base row)
+				expect(loc.state.updated).toBeGT(0);
+				// exactly the joined-matching row, and nothing else — a broken join would widen this
+				expect(ValueList(loc.q.id)).toBe("1");
 			});
 
 		});
