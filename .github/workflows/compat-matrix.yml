@@ -514,6 +514,8 @@ jobs:
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
           SOFT_FAIL_DBS="oracle"
+          # Keep in sync with MIN_SPECS in the run-tests step (#3302).
+          MIN_SPECS=4000
           IFS=',' read -ra DBS <<< "${{ steps.db-list.outputs.databases }}"
           for db in "${DBS[@]}"; do
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
@@ -522,18 +524,22 @@ jobs:
               IS_SOFT_FAIL=true
             fi
             if [ -f "$RESULT_FILE" ]; then
-              # Check JSON for failures
-              FAIL_COUNT=$(python3 -c "
+              # Check JSON for failures and testcase count (zero-test guard, #3302)
+              STATS=$(python3 -c "
           import json, sys
           try:
               d = json.load(open('$RESULT_FILE'))
-              print(d.get('totalFail', 0) + d.get('totalError', 0))
+              print(int(d.get('totalFail', 0) + d.get('totalError', 0)), int(d.get('totalSpecs', 0)))
           except:
-              print(-1)
-          " 2>/dev/null || echo "-1")
+              print(-1, -1)
+          " 2>/dev/null || echo "-1 -1")
+              FAIL_COUNT="${STATS% *}"
+              SPEC_COUNT="${STATS#* }"
 
-              if [ "$FAIL_COUNT" = "0" ]; then
+              if [ "$FAIL_COUNT" = "0" ] && [ "$SPEC_COUNT" -ge "$MIN_SPECS" ]; then
                 echo "| ${db} | :white_check_mark: Pass |" >> $GITHUB_STEP_SUMMARY
+              elif [ "$FAIL_COUNT" = "0" ]; then
+                echo "| ${db} | :warning: ${SPEC_COUNT} tests (zero-test guard) |" >> "$GITHUB_STEP_SUMMARY"
               elif [ "$FAIL_COUNT" = "-1" ] && [ "$IS_SOFT_FAIL" = true ]; then
                 echo "| ${db} | :warning: Error (soft-fail) |" >> $GITHUB_STEP_SUMMARY
               elif [ "$FAIL_COUNT" = "-1" ]; then
