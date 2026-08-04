@@ -89,10 +89,35 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
       python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass','COMPILE FAIL'), d.get('RootCause',{}).get('snippet',''))"
     ```
 
+17. **A parameter named `default` loses its name — and its declared default value — if a type keyword precedes it, on every Adobe engine.** Adobe treats `default` as reserved in a parameter position, so `string default = ""` registers an argument named **`string`** and discards `default` entirely; the declared default value never materializes in the `arguments` scope. Dropping the type declaration fixes it — `default = ""` (untyped) parses correctly on Adobe, Lucee 6/7 and BoxLang alike.
+
+    ```cfm
+    // WRONG — arguments scope gets a key named STRING; `default` never appears
+    public any function float(string columnNames, string default = "", boolean allowNull = "true") {
+    // RIGHT — arguments.default exists and carries ""
+    public any function float(string columnNames, default = "", boolean allowNull = "true") {
+    ```
+
+    Explicitly-passed values still arrive (as a separate lowercase `default` key alongside the bogus `STRING` one), which is what makes this so quiet: every call site that passes `default=` works, and only the *declared* default silently vanishes. `TableDefinition.uniqueidentifier()` shipped `string default = "newid()"` and emitted DDL with no `DEFAULT` clause on Adobe for as long as it has existed. All 24 `default` parameter declarations under `vendor/wheels/` were untyped uniformly in the #3302 burn-down; `cli/lucli/services/ArgSpec.cfc` still has typed ones but runs on the Lucee-only LuCLI runtime.
+
+18. **Adobe 2025's `FileWrite()` appends a trailing `0x0A` when handed a simple value.** `FileWrite(path, "hello world")` puts **12** bytes on disk, not 11. Lucee 6/7, BoxLang and Adobe 2023 write the string verbatim, so local Lucee green does not cover this. Harmless for generated source or JSON; fatal anywhere the read must round-trip what was written, which is why it corrupted every object stored through `wheels.storage.drivers.LocalDisk` (#3302). Decode to binary first — the binary overload has no line-ending behaviour on any engine:
+
+    ```cfm
+    var payload = IsBinary(content) ? content : CharsetDecode(content, "utf-8");
+    FileWrite(path, payload);
+    ```
+
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
 curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
   python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass',0),'pass',d.get('totalFail',0),'fail',d.get('totalError',0),'error')"
+```
+
+**Adobe serves cached compiled classes — `?reload=true` does NOT pick up an edited `.cfc`.** `?reload=true` rebuilds the Wheels application scope, not Adobe's template cache, so a source change can keep producing the *old* result for many minutes. This reads exactly like a fix that did not work, and the natural response — reverting or piling on a second change — makes it worse. After editing framework source, `docker restart wheels-adobe2023-1` (or `-adobe2025-1`) before trusting any Adobe result. Lucee and BoxLang pick edits up from the bind mount immediately; only the Adobe legs need this.
+
+**Narrow the run with `directory=` — it turns a ~19-minute CI round-trip into ~5 seconds.** The core-test endpoint accepts a dotted TestBox scope, allowlisted to `wheels.tests.*` and `vendor.<package>.tests.*`. `bundles=` is silently ignored (#3352), so `directory=` is the only working filter. Point it at a *directory*, never a single spec file — a single-file scope discovers 0 bundles and reports green (#3083); check `bundlesDiscovered` in the payload.
+```bash
+curl -s "http://localhost:62025/wheels/core/tests?db=sqlite&directory=wheels.tests.specs.security&format=json&reload=true"
 ```
 
 Deep reference: [.ai/wheels/cross-engine-compatibility.md](.ai/wheels/cross-engine-compatibility.md).

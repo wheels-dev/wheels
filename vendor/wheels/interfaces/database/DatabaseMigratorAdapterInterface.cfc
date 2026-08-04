@@ -54,7 +54,7 @@ interface {
 	 * @allowNull Whether NULL is allowed.
 	 * @return True if a DEFAULT clause should be added.
 	 */
-	public boolean function optionsIncludeDefault(string type, string default, boolean allowNull);
+	public boolean function optionsIncludeDefault(string type, default, boolean allowNull);
 
 	/**
 	 * Quote a value for use in DDL statements.

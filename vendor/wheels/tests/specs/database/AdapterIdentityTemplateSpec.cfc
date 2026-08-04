@@ -18,11 +18,23 @@ component extends="wheels.WheelsTest" {
 					expect(probe.$parseInsertColumnList("INSERT INTO users (id")).toBe("");
 				});
 
-				it("parses via the regex branch on engines flagged BoxLang", () => {
-					var probe = CreateObject("component", "wheels.tests._assets.adapters.BaseProbe");
-					probe.boxlangMode = true;
+				// $parseInsertColumnList used to fork on $isBoxLangEngine(). The
+				// result must now be identical no matter what that flag reports,
+				// so pin both settings to the same expectation — a reintroduced
+				// fork fails here rather than only on the boxlang matrix legs.
+				it("parses identically regardless of the BoxLang engine flag", () => {
 					var insertSql = "INSERT INTO users ([id], ""name"",#Chr(10)#age) VALUES (1,'x',2)";
-					expect(probe.$parseInsertColumnList(insertSql)).toBe("id,name,age");
+					for (var flag in [false, true]) {
+						var probe = CreateObject("component", "wheels.tests._assets.adapters.BaseProbe");
+						probe.boxlangMode = flag;
+						expect(probe.$parseInsertColumnList(insertSql)).toBe("id,name,age");
+					}
+				});
+
+				it("preserves spaces inside a quoted identifier", () => {
+					var probe = CreateObject("component", "wheels.tests._assets.adapters.BaseProbe");
+					var insertSql = "INSERT INTO orders ([order date], id) VALUES ('x',1)";
+					expect(probe.$parseInsertColumnList(insertSql)).toBe("order date,id");
 				});
 			});
 

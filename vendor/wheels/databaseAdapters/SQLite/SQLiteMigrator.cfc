@@ -76,7 +76,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	/**
 	 * In SQLite, most types can have default values, except BLOB.
 	 */
-	public boolean function optionsIncludeDefault(string type, string default = "", boolean allowNull = true) {
+	public boolean function optionsIncludeDefault(string type, default = "", boolean allowNull = true) {
 		if (ListFindNoCase("blob", arguments.type)) {
 			return false;
 		}

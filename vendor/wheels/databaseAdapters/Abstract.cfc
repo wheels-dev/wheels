@@ -113,7 +113,7 @@ component extends="wheels.migrator.Base"{
 	}
 
 	// what's the purpose of this?
-	public boolean function optionsIncludeDefault(string type, string default = "", boolean allowNull = true) {
+	public boolean function optionsIncludeDefault(string type, default = "", boolean allowNull = true) {
 		return true;
 	}
 
