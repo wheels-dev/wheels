@@ -276,6 +276,7 @@ component extends="modules.BaseModule" {
 			.option(name = "reporter",  default = "simple", description = "Output format: simple, json, or tap")
 			.option(name = "db",        default = "sqlite", description = "Database the suite runs against")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
+			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT.")
 			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
 			.flag(name = "ci",      default = false, description = "CI mode output")
 			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
@@ -738,8 +739,44 @@ component extends="modules.BaseModule" {
 			db = parsed.db,
 			dbExplicit = structKeyExists(arguments.coll, "db"),
 			useTestDB = parsed["test-db"],
-			basePath = parsed["base-path"]
+			basePath = parsed["base-path"],
+			timeout = $resolveTestTimeout(parsed.timeout)
 		};
+	}
+
+	/**
+	 * Seconds to wait for the test-runner response. `--timeout` wins, then
+	 * WHEELS_TEST_TIMEOUT, then 900.
+	 *
+	 * The shared HTTP helper reads for 120 seconds, which is right for the
+	 * request/response bridge commands but is a hard ceiling on how big a suite
+	 * `wheels test` can run: a suite that grows past roughly 140 seconds starts
+	 * failing with `Read timed out` and NO result document at all — not a failure
+	 * report, a crashed runner (issue #3352). The threshold moves with machine
+	 * speed, so a suite can pass locally and fail in CI. A test run is the one
+	 * command here whose duration is expected to scale with the project, so it
+	 * gets its own budget rather than inheriting the bridge default.
+	 *
+	 * Non-numeric or non-positive input falls back to the default rather than
+	 * throwing: a mistyped timeout should not be the thing that stops a test run.
+	 */
+	public numeric function $resolveTestTimeout(string parsedTimeout = "") {
+		if (
+			len(trim(arguments.parsedTimeout))
+			&& isNumeric(trim(arguments.parsedTimeout))
+			&& val(arguments.parsedTimeout) > 0
+		) {
+			return val(arguments.parsedTimeout);
+		}
+		// mirrors how $resolveTestBasePath() reads WHEELS_SUBPATH
+		try {
+			var envValue = createObject("java", "java.lang.System").getenv("WHEELS_TEST_TIMEOUT");
+			if (!isNull(envValue) && len(trim(envValue)) && isNumeric(trim(envValue)) && val(envValue) > 0) {
+				return val(envValue);
+			}
+		} catch (any e) {
+		}
+		return 900;
 	}
 
 	/**
@@ -757,6 +794,7 @@ component extends="modules.BaseModule" {
 		var dbExplicit = opts.dbExplicit;
 		var useTestDB = opts.useTestDB;
 		var basePath = opts.basePath;
+		var timeoutSeconds = opts.timeout;
 
 		// Default to APP mode unless --core is set explicitly. The previous
 		// auto-detection ("if vendor/wheels/tests/ exists, default to core")
@@ -775,7 +813,10 @@ component extends="modules.BaseModule" {
 		// expects. Onboarding finding #2.
 		filter = $normalizeTestFilter(filter, coreTests);
 
-		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit, basePath);
+		return runTests(
+			filter, reporter, format, verboseOutput, coreTests,
+			db, ciMode, useTestDB, dbExplicit, basePath, timeoutSeconds
+		);
 	}
 
 	/**
@@ -5709,7 +5750,8 @@ component extends="modules.BaseModule" {
 		boolean ciMode = false,
 		boolean useTestDB = true,
 		boolean dbExplicit = false,
-		string basePath = ""
+		string basePath = "",
+		numeric timeoutSeconds = 900
 	) {
 		var serverPort = $requireRunningServer([
 			"Start one with: wheels start",
@@ -5778,7 +5820,7 @@ component extends="modules.BaseModule" {
 				testUrl &= "&directory=#filter#";
 			}
 
-			var httpResult = makeHttpRequest(testUrl);
+			var httpResult = makeHttpRequest(testUrl, arguments.timeoutSeconds * 1000);
 
 			// Try to parse JSON result
 			if (isJSON(httpResult)) {
@@ -5821,7 +5863,18 @@ component extends="modules.BaseModule" {
 			}
 		} catch (any e) {
 			runState.crashed = true;
-			out("Test execution failed: #e.message#", "red");
+			// A read timeout here is indistinguishable from a hung app to anyone who has not
+			// seen it before, because the runner produced no document at all — the suite may
+			// well have passed (issue #3352). Say which side gave up, and how to give it longer.
+			if (reFindNoCase("(read timed out|SocketTimeout)", e.message)) {
+				out("Test run timed out after #arguments.timeoutSeconds#s waiting for the suite to finish.", "red");
+				out("The specs may have passed — the CLI stopped waiting, the runner did not stop running.", "yellow");
+				out("Give it longer:  wheels test --timeout=#arguments.timeoutSeconds * 2#", "yellow");
+				out("Or set WHEELS_TEST_TIMEOUT=<seconds> for the whole environment.", "yellow");
+				out("Or scope the run:  wheels test --filter=<subdirectory>", "yellow");
+			} else {
+				out("Test execution failed: #e.message#", "red");
+			}
 		}
 
 		// Exit non-zero when specs failed/errored so CI and shells can detect it.
@@ -7584,8 +7637,13 @@ component extends="modules.BaseModule" {
 		return result;
 	}
 
-	private string function makeHttpRequest(required string requestUrl) {
-		return makeHttpRequestWithStatus(arguments.requestUrl).body;
+	/**
+	 * @readTimeout Milliseconds to wait for the response. Defaults to the
+	 *              request/response bridge budget; long-running callers such as
+	 *              `wheels test` pass their own (issue #3352).
+	 */
+	private string function makeHttpRequest(required string requestUrl, numeric readTimeout = 120000) {
+		return makeHttpRequestWithStatus(requestUrl = arguments.requestUrl, readTimeout = arguments.readTimeout).body;
 	}
 
 	/**
@@ -7601,14 +7659,15 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function makeHttpRequestWithStatus(
 		required string requestUrl,
-		boolean followRedirects = true
+		boolean followRedirects = true,
+		numeric readTimeout = 120000
 	) {
 		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
 		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("GET");
 		conn.setInstanceFollowRedirects(javacast("boolean", arguments.followRedirects));
 		conn.setConnectTimeout(5000);
-		conn.setReadTimeout(120000);
+		conn.setReadTimeout(javacast("int", arguments.readTimeout));
 
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
@@ -8023,7 +8082,8 @@ component extends="modules.BaseModule" {
 		var testUrl = "http://localhost:#serverPort##runnerPath#?db=sqlite&format=json&directory=#directory#";
 
 		try {
-			var httpResult = makeHttpRequest(testUrl);
+			// same long-running suite over the same 120s-default helper (issue #3352)
+			var httpResult = makeHttpRequest(testUrl, $resolveTestTimeout() * 1000);
 		} catch (any e) {
 			out("Failed to reach test runner at: #testUrl#", "red");
 			out("Is the server running? Try: wheels start", "yellow");

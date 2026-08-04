@@ -110,6 +110,33 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		// Issue #3352: the shared HTTP helper reads for 120 seconds, which is right for the
+		// request/response bridge commands but is a hard ceiling on how big a suite `wheels
+		// test` can run. Past roughly 140 seconds the run fails with `Read timed out` and NO
+		// result document — not a failure report, a crashed runner — and the threshold moves
+		// with machine speed, so a suite can pass locally and fail in CI.
+		describe("$resolveTestTimeout", () => {
+
+			it("defaults to 900 seconds when nothing is supplied", () => {
+				// generous enough that a multi-minute suite completes, which is the ask
+				expect(mod.$resolveTestTimeout()).toBe(900);
+				expect(mod.$resolveTestTimeout("")).toBe(900);
+				expect(mod.$resolveTestTimeout("   ")).toBe(900);
+			});
+
+			it("honours an explicit --timeout", () => {
+				expect(mod.$resolveTestTimeout("1800")).toBe(1800);
+				expect(mod.$resolveTestTimeout(" 45 ")).toBe(45);
+			});
+
+			it("falls back to the default rather than throwing on junk input", () => {
+				// a mistyped timeout must not be the thing that stops a test run
+				expect(mod.$resolveTestTimeout("soon")).toBe(900);
+				expect(mod.$resolveTestTimeout("0")).toBe(900);
+				expect(mod.$resolveTestTimeout("-30")).toBe(900);
+			});
+		});
+
 		describe("$normalizeTestFilter (app mode)", () => {
 
 			it("returns empty string for empty input", () => {
