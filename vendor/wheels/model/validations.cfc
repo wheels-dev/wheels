@@ -783,8 +783,18 @@ component {
 	 * and converting blank numeric properties to IS NULL.
 	 */
 	public string function $buildWhereClausePart(required string property) {
+		// A property named in `scope=` may be absent rather than empty: `$setDefaultValues()`
+		// only seeds properties with an explicit `property()` mapping, so a column that has a
+		// database-level default but no mapping never appears on a `new()`-ed object. Reading
+		// it unguarded threw "has no accessible Member" out of a validation, so an absent
+		// scope property produced an exception where a blank one produced a validation result
+		// (issue #3350). The validated property itself cannot be absent here —
+		// `$shouldInvokeValidation()` skips the validation in that case — so this guard only
+		// ever fires for scopes. Treat absent as blank, which is the branch below that turns
+		// an empty numeric into `IS NULL`.
+		local.value = StructKeyExists(this, arguments.property) ? this[arguments.property] : "";
 		local.part = arguments.property & "=" & variables.wheels.class.adapter.$quoteValue(
-			str = this[arguments.property],
+			str = local.value,
 			type = validationTypeForProperty(arguments.property)
 		);
 		if (Right(local.part, 3) == "=''" && ListFindNoCase("integer,float,boolean", validationTypeForProperty(arguments.property))) {
