@@ -1335,6 +1335,31 @@ component extends="wheels.WheelsTest" {
 				)
 			})
 
+			// The grouping decision used to read the join TYPE by searching the generated SQL
+			// for "INNER". That misclassifies every table whose name contains the substring —
+			// `winners`, `spinners`, `beginners` — and in $fromClause a parent misread as
+			// INNER emits its nested child flat instead of grouped, silently dropping the
+			// parent rows this fix exists to preserve. `joinType` is the authoritative source:
+			// it is what the join text is built from. Unit-tested here rather than through a
+			// fixture because adding a `c_o_r_e_winners` table would mean DDL on all seven
+			// databases to pin one boolean.
+			it("reads the join type from metadata, not from the table name (issue ##3334)", () => {
+				m = g.model("post")
+
+				// the trap: an OUTER join whose table name contains "inner"
+				outerWithInnerInName = {joinType = "outer"}
+				outerSql = "LEFT OUTER JOIN #qi('c_o_r_e_winners')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_winners')#.#qi('postid')#"
+				expect(FindNoCase("INNER", outerSql)).toBeGT(0)
+				expect(m.$associationJoinsInner(outerWithInnerInName, outerSql)).toBeFalse()
+
+				// and it still recognises a genuine inner join
+				expect(m.$associationJoinsInner({joinType = "inner"}, "INNER JOIN #qi('c_o_r_e_tags')# ON 1=1")).toBeTrue()
+
+				// no joinType at all (a hand-built struct) falls back to the text scan
+				expect(m.$associationJoinsInner({}, "INNER JOIN #qi('c_o_r_e_tags')# ON 1=1")).toBeTrue()
+				expect(m.$associationJoinsInner({}, "LEFT OUTER JOIN #qi('c_o_r_e_tags')# ON 1=1")).toBeFalse()
+			})
+
 			// An unbalanced include reaches the level-tracking loop with an empty parent
 			// stack. `ListDeleteAt` on a one-element list tolerates that; `ArrayDeleteAt(x, 0)`
 			// throws. Malformed includes resolved to a plain join before the issue #3334

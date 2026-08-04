@@ -17,13 +17,13 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that the persisted jobClass round-trips", () => {
 
 			it("reports a metadata name whose last segment matches the .cfc file name exactly", () => {
-				job = CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")
-				meta = GetMetadata(job)
+				local.job = CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")
+				local.meta = GetMetadata(local.job)
 
-				fileName = ListFirst(ListLast(Replace(meta.path, "\", "/", "all"), "/"), ".")
+				local.fileName = ListFirst(ListLast(Replace(local.meta.path, "\", "/", "all"), "/"), ".")
 
 				// case-sensitive comparison — Compare(), not CompareNoCase()
-				expect(Compare(ListLast(meta.name, "."), fileName)).toBe(0)
+				expect(Compare(ListLast(local.meta.name, "."), local.fileName)).toBe(0)
 			})
 
 			it("never persists a caller's miscased path", () => {
@@ -43,49 +43,57 @@ component extends="wheels.WheelsTest" {
 				//
 				// Asserting only the first would fail on Adobe for a reason that is *safer*
 				// than the one being tested, so assert the property both satisfy.
-				canonical = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")).name
-				resolved = {miscasedConstructed = false, name = ""}
+				local.canonical = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")).name
+				local.resolved = {miscasedConstructed = false, name = ""}
 
 				try {
-					resolved.name = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.probejob")).name
-					resolved.miscasedConstructed = true
+					local.resolved.name = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.probejob")).name
+					local.resolved.miscasedConstructed = true
 				} catch (any e) {
 					// case-sensitive resolver — the stronger guarantee
 				}
 
-				if (resolved.miscasedConstructed) {
-					expect(Compare(resolved.name, canonical)).toBe(0)
+				if (local.resolved.miscasedConstructed) {
+					expect(Compare(local.resolved.name, local.canonical)).toBe(0)
 				} else {
-					expect(resolved.name).toBe("")
+					expect(local.resolved.name).toBe("")
 				}
 			})
 
 			it("re-instantiates from its own persisted metadata name", () => {
 				// the actual enqueue -> drain round trip, without touching the queue table
-				original = CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")
-				persisted = GetMetadata(original).name
+				local.original = CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")
+				local.persisted = GetMetadata(local.original).name
 
 				// Hoisted receiver. A parenthesized `new` in receiver position — `(new X()).m()`
 				// — is rejected by Adobe's parser with `Invalid construct: Either argument or
 				// name is missing`, the same MissingNameException family as cross-engine
 				// invariant 16. Adobe blames the enclosing describe() line and the whole engine
 				// leg reports tests=0. Caught by the compat matrix; Lucee and BoxLang accept it.
-				bridge = new wheels.Job()
-				revived = bridge.$instantiateJobClass(jobClass = persisted)
+				local.bridge = new wheels.Job()
+				local.revived = local.bridge.$instantiateJobClass(jobClass = local.persisted)
 
-				expect(Compare(GetMetadata(revived).name, persisted)).toBe(0)
+				expect(Compare(GetMetadata(local.revived).name, local.persisted)).toBe(0)
 			})
 		})
 
 		describe("Tests that an unresolvable jobClass", () => {
 
 			it("throws Wheels.JobClassNotFound naming the row and the class", () => {
-				thrown = {type: "", message: ""}
+				// NOT `local.`-scoped, deliberately. Cross-engine invariant 11: a catch body
+				// runs under a nested `local` on BoxLang, so `thrown.type = e.type`
+				// inside the catch writes to a struct that is discarded on exit and the
+				// assertion below reads the untouched outer value. The blessed form is a
+				// `var`-declared struct accessed WITHOUT the `local.` prefix. Scoping this
+				// one for consistency cost two BoxLang failures on every database
+				// (`Expected [Wheels.JobClassNotFound] but received []`) — caught by the
+				// compat matrix, invisible on Lucee.
+				var thrown = {type: "", message: ""}
 
-				bridge = new wheels.Job()
+				local.bridge = new wheels.Job()
 
 				try {
-					bridge.$instantiateJobClass(jobClass = "app.jobs.NoSuchJob", jobId = "abc-123")
+					local.bridge.$instantiateJobClass(jobClass = "app.jobs.NoSuchJob", jobId = "abc-123")
 				} catch (any e) {
 					thrown.type = e.type
 					thrown.message = e.message
@@ -99,13 +107,21 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("throws Wheels.InvalidJobClass when the path resolves to something that is not a job", () => {
-				thrown = {type: ""}
+				// NOT `local.`-scoped, deliberately. Cross-engine invariant 11: a catch body
+				// runs under a nested `local` on BoxLang, so `thrown.type = e.type`
+				// inside the catch writes to a struct that is discarded on exit and the
+				// assertion below reads the untouched outer value. The blessed form is a
+				// `var`-declared struct accessed WITHOUT the `local.` prefix. Scoping this
+				// one for consistency cost two BoxLang failures on every database
+				// (`Expected [Wheels.JobClassNotFound] but received []`) — caught by the
+				// compat matrix, invisible on Lucee.
+				var thrown = {type: ""}
 
-				bridge = new wheels.Job()
+				local.bridge = new wheels.Job()
 
 				try {
 					// a real component with no perform()
-					bridge.$instantiateJobClass(jobClass = "wheels.tests._assets.models.Post")
+					local.bridge.$instantiateJobClass(jobClass = "wheels.tests._assets.models.Post")
 				} catch (any e) {
 					thrown.type = e.type
 				}

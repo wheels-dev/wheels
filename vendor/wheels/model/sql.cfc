@@ -136,6 +136,13 @@ component {
 			// to every OUTER join, which only looked correct because issues #449 and #3245 both
 			// exercise a single OUTER join. A root-level INNER join (`parentPosition` 0) has no
 			// enclosing group and stays flat, keeping the root FROM table in scope for its ON.
+			//
+			// Join type comes from the association's `joinType`, not from scanning the
+			// generated SQL for "INNER". The text scan the pre-fix code used misreads any
+			// table whose name contains the substring — `winners`, `spinners`, `beginners`
+			// — as an inner join, which would emit its nested child flat and silently drop
+			// the parent rows this fix exists to preserve. `joinType` is the authoritative
+			// source: it is what the join string is built from a few hundred lines below.
 			local.nestedJoins = {};
 			local.isNested = {};
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -143,9 +150,9 @@ component {
 					? local.associations[local.i].parentPosition
 					: 0;
 				if (
-					FindNoCase("INNER", local.joins[local.i])
+					$associationJoinsInner(local.associations[local.i], local.joins[local.i])
 					&& local.parentPosition > 0
-					&& !FindNoCase("INNER", local.joins[local.parentPosition])
+					&& !$associationJoinsInner(local.associations[local.parentPosition], local.joins[local.parentPosition])
 				) {
 					if (!StructKeyExists(local.nestedJoins, local.parentPosition)) {
 						local.nestedJoins[local.parentPosition] = [];
@@ -1284,6 +1291,26 @@ component {
 	/**
 	 * Internal function.
 	 */
+	/**
+	 * Internal function.
+	 * Whether an association contributes an INNER JOIN.
+	 *
+	 * Reads the association's declared `joinType` — the same value `$expandedAssociations`
+	 * turns into the leading `INNER JOIN` / `LEFT OUTER JOIN` text — rather than searching the
+	 * built SQL for "INNER". A substring search misclassifies every table whose name contains
+	 * it (`winners`, `spinners`, `beginners`), and in `$fromClause` that would demote a nested
+	 * group to a flat join and silently drop parent rows.
+	 *
+	 * Falls back to the text scan only if an entry somehow carries no `joinType`, which keeps
+	 * this total for any caller assembling association structs by hand.
+	 */
+	public boolean function $associationJoinsInner(required struct association, required string join) {
+		if (StructKeyExists(arguments.association, "joinType") && Len(arguments.association.joinType)) {
+			return arguments.association.joinType == "inner";
+		}
+		return FindNoCase("INNER", arguments.join) > 0;
+	}
+
 	public array function $expandedAssociations(required string include, boolean includeSoftDeletes = "false") {
 		local.rv = [];
 
