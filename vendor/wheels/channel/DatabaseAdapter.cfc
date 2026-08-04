@@ -315,8 +315,12 @@ component {
 	/**
 	 * Detect the database type from the datasource via JDBC metadata.
 	 * Returns: "oracle", "postgresql", "h2", "mysql", "sqlserver", "sqlite", or "default".
+	 *
+	 * Public with $ prefix (internal naming convention), matching its caller
+	 * $applyRowBound, so a spec can reproduce the dialect the bounded cleanup
+	 * pass actually chose on the engine/database pair it is running against.
 	 */
-	private string function $detectDatabaseType() {
+	public string function $detectDatabaseType() {
 		try {
 			cfdbinfo(type="version", datasource="#variables.$datasource#", name="local.info");
 			local.product = local.info.database_productname;
