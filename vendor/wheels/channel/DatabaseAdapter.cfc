@@ -165,19 +165,33 @@ component {
 				// indexed even when a large backlog has accumulated. The row bound is
 				// pushed into dialect SQL (TOP / FETCH FIRST / LIMIT) so the database
 				// does an index-assisted top-n read instead of materializing the whole
-				// expired backlog and truncating it client-side. The driver-level
-				// maxrows option stays on as belt-and-braces.
+				// expired backlog and truncating it client-side.
+				local.candidateSelect = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC";
 				local.candidateSql = $applyRowBound(
-					sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					sqlText = local.candidateSelect,
 					dbType = $detectDatabaseType(),
 					maxRows = arguments.maxRows
 				);
+				// The driver-level maxrows option is only used when the dialect
+				// rewrite applied nothing — $applyRowBound returns the statement
+				// unchanged exactly in that case, and there it is the only bound
+				// available. Everywhere else it is redundant, and redundant is not
+				// free: on BoxLang the option reaches PgPreparedStatement as
+				// setLargeMaxRows(), which pgjdbc has never implemented, so the whole
+				// pass threw and cleanup() reported 0 deleted on postgres and
+				// cockroachdb (#3302). JobWorker.$claimNext already bounds this way
+				// and carries a NOTE saying why; this path kept the option as
+				// belt-and-braces and reintroduced the failure the note warns about.
+				local.candidateOptions = {datasource: variables.$datasource};
+				if (local.candidateSql == local.candidateSelect) {
+					local.candidateOptions.maxrows = Int(arguments.maxRows);
+				}
 				local.candidates = queryExecute(
 					local.candidateSql,
 					{
 						cutoff: {value: local.cutoff, cfsqltype: "cf_sql_timestamp"}
 					},
-					{datasource: variables.$datasource, maxrows: Int(arguments.maxRows)}
+					local.candidateOptions
 				);
 				if (local.candidates.recordCount == 0) {
 					return 0;
@@ -346,8 +360,11 @@ component {
 	 * - mysql / postgresql / sqlite / h2: ... LIMIT n
 	 * - anything else (incl. "default" when $detectDatabaseType() falls back on a
 	 *   cfdbinfo failure): statement UNCHANGED — appending LIMIT would be a syntax
-	 *   error on SQL Server/Oracle, and the caller keeps the driver-level maxrows
-	 *   option on the query, which still bounds the resultset on every engine.
+	 *   error on SQL Server/Oracle. Returning the statement unchanged is the signal
+	 *   the caller uses to fall back to the driver-level maxrows option, which is
+	 *   then the only bound on the read. That option is not portable (BoxLang routes
+	 *   it to a pgjdbc method that does not exist), so it is used only here, where
+	 *   the alternative is no bound at all.
 	 *
 	 * The bound is hardened with Int() so only a plain integer is ever interpolated
 	 * into the SQL string. A bound of zero or less returns the statement unchanged.

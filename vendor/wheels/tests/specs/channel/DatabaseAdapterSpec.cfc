@@ -255,10 +255,17 @@ component extends="wheels.WheelsTest" {
 					maxRows = 1
 				);
 
+				// Mirror cleanup()'s option handling exactly: the driver-level
+				// maxrows bound is used only when the dialect rewrite applied none.
+				// Setting it unconditionally is what threw on boxlang + pgjdbc.
+				var options = {datasource: application.wheels.dataSourceName};
+				if (candidateSql == "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC") {
+					options.maxrows = 1;
+				}
 				var candidates = queryExecute(
 					candidateSql,
 					{cutoff: {value: cutoff, cfsqltype: "cf_sql_timestamp"}},
-					{datasource: application.wheels.dataSourceName, maxrows: 1}
+					options
 				);
 				expect(candidates.recordCount).toBe(
 					1,
