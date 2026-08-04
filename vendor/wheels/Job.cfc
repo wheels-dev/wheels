@@ -269,6 +269,48 @@ component {
 	}
 
 	/**
+	 * Internal: Turn a persisted `jobClass` string back into a job instance.
+	 *
+	 * `jobClass` is written on enqueue from `GetMetadata(this).name` and read back here as a
+	 * component path, so the round trip depends on that string still resolving — including its
+	 * casing, on a case-sensitive filesystem. Lucee derives the metadata name from the file
+	 * rather than from how the component was instantiated, so it is canonical there; the
+	 * cross-engine guarantee is pinned by JobClassRoundTripSpec rather than assumed.
+	 *
+	 * When it does not resolve, the raw engine error is `component not found` for a class that
+	 * plainly exists on disk, which sends people to look at mappings and deployment. Name the
+	 * real shape of the problem instead: a string read out of a queue row (issue #3351).
+	 *
+	 * @jobClass The component path as persisted in wheels_jobs.
+	 * @jobId The queue row's id, for the error message. Optional.
+	 */
+	public any function $instantiateJobClass(required string jobClass, string jobId = "") {
+		local.rowLabel = Len(arguments.jobId) ? " named by queue row [#arguments.jobId#]" : "";
+		try {
+			local.rv = CreateObject("component", arguments.jobClass);
+		} catch (any e) {
+			Throw(
+				type = "Wheels.JobClassNotFound",
+				message = "The job class `#arguments.jobClass#`#local.rowLabel# could not be instantiated: #e.message#",
+				extendedInfo = "This path was persisted to `wheels_jobs.jobClass` when the job was enqueued and is resolved as a component path now. If the file exists, compare its name and directories to the string above CHARACTER BY CHARACTER — component paths are case-sensitive on Linux but not on macOS or Windows, so a casing mismatch resolves in development and fails in production. It also fails if the job class was renamed, moved, or deleted while rows referencing it were still queued."
+			);
+		}
+		// A job row names something to instantiate and then call perform() on. Anything without
+		// perform() is not a job, and failing here says so rather than failing later inside the
+		// job's own execution where it reads as a job bug. Note this narrows but does not close
+		// the database-string-to-CreateObject shape the issue flags: the actual guarantee is that
+		// only $enqueueJob writes this column.
+		if (!StructKeyExists(local.rv, "perform")) {
+			Throw(
+				type = "Wheels.InvalidJobClass",
+				message = "The component `#arguments.jobClass#`#local.rowLabel# is not a job — it has no `perform()` method.",
+				extendedInfo = "`wheels_jobs.jobClass` must name a component extending `wheels.Job`. Only the framework writes this column; a value that names something else means the row was written by something other than `enqueue()`."
+			);
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Internal: Process a single job row.
 	 */
 	private struct function $processJob(required struct jobRow) {
@@ -315,7 +357,7 @@ component {
 
 		try {
 			// Instantiate and execute the job
-			local.jobInstance = CreateObject("component", arguments.jobRow.jobClass);
+			local.jobInstance = $instantiateJobClass(jobClass = arguments.jobRow.jobClass, jobId = arguments.jobRow.id);
 			if (StructKeyExists(local.jobInstance, "baseDelay")) {
 				local.backoffBaseDelay = local.jobInstance.baseDelay;
 			}

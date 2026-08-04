@@ -449,7 +449,12 @@ component {
 		local.hasTenantContext = false;
 
 		try {
-			local.jobInstance = CreateObject("component", arguments.jobRow.jobClass);
+			// Shared with Job.$processJob so both processing paths report an unresolvable
+			// jobClass the same way (issue #3351)
+			local.jobInstance = $jobBridge().$instantiateJobClass(
+				jobClass = arguments.jobRow.jobClass,
+				jobId = arguments.jobRow.id
+			);
 			local.jobData = DeserializeJSON(arguments.jobRow.data);
 
 			// Restore tenant context if the job was enqueued within a tenant scope and
