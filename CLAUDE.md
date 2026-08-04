@@ -266,7 +266,11 @@ t.primaryKey(name="userId", autoIncrement=true);
 
 For new migrator helpers or anywhere you accept a column-name argument: declare `string columnNames` (NOT `required`), and call `$combineArguments(args=arguments, combine="columnNames,columnName", required=true)` at the top of the body. The pattern is documented in [vendor/wheels/migrator/CLAUDE.md](vendor/wheels/migrator/CLAUDE.md). Boolean nullable flag is `allowNull` everywhere — never `null`.
 
-`t.references()` also respects `useUnderscoreReferenceColumns` (boolean, framework default `false`, `wheels new` template default `true`) — when true it produces `<name>_id` / `<name>_type` columns matching Wheels model `belongsTo` defaults.
+`t.references()` also respects `useUnderscoreReferenceColumns` (boolean, framework default `false`, `wheels new` template default `true`) — when true it produces `<name>_id` / `<name>_type` columns instead of `<name>id` / `<name>type`.
+
+Association foreign-key defaults resolve **either** convention: the default derivation checks which column actually exists on whichever side owns the foreign key, rather than reading the setting ([#3337](https://github.com/wheels-dev/wheels/issues/3337) — before that fix the model layer derived `<modelName><key>` unconditionally and a stock `wheels new` app threw `key [<name>id] doesn't exist` on any `include=`). It is schema-driven on purpose: the migrator reads the flag per call, but the model-side default is memoized for the application lifetime, so honouring the flag there would let a runtime flip change migrations without changing models. Apps holding a mix of both shapes work for the same reason.
+
+**Polymorphic associations are not covered.** `belongsTo(polymorphic=true)` and `hasMany`/`hasOne` with `as=` fix their foreign key to `<name>id` at *registration* time (`vendor/wheels/model/associations.cfc:30`, `:81`, `:134`), before the schema is available, so the join-time resolution never sees a blank to fill. Against an underscore-shaped schema those still need an explicit `foreignKey="<name>_id"`.
 
 ## Wheels Conventions
 

@@ -1388,13 +1388,39 @@ component {
 				lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
 					if (!StructKeyExists(local.classAssociations[local.name], "expandedMetadataFilled")) {
 						if (!Len(local.classAssociations[local.name].foreignKey)) {
-							// cfformat-ignore-start
+							// The foreign key column lives on a different side depending on the association
+							// type: for `belongsTo` it is a column on THIS model's table, for `hasMany` /
+							// `hasOne` it is a column on the ASSOCIATED model's table. Resolve the default
+							// against whichever side actually owns it so both the legacy `<modelName><key>`
+							// form and the `<modelName>_<key>` form that `useUnderscoreReferenceColumns`
+							// makes the migrator emit are honoured (#3337).
 							if (local.classAssociations[local.name].type == "belongsTo") {
-								local.classAssociations[local.name].foreignKey = local.associatedClass.$classData().modelName & Replace(local.associatedClass.$classData().keys, ",", ",#local.associatedClass.$classData().modelName#", "all");
+								local.fkNameSource = local.associatedClass;
+								local.fkColumnOwner = local.class;
 							} else {
-								local.classAssociations[local.name].foreignKey = local.class.$classData().modelName & Replace(local.class.$classData().keys, ",", ",#local.class.$classData().modelName#", "all");
+								local.fkNameSource = local.class;
+								local.fkColumnOwner = local.associatedClass;
 							}
-							// cfformat-ignore-end
+							local.classAssociations[local.name].foreignKey = $deriveAssociationForeignKey(
+								columnOwner = local.fkColumnOwner,
+								modelName = local.fkNameSource.$classData().modelName,
+								keys = local.fkNameSource.$classData().keys
+							);
+							// A derived default matching no column on the owning side can only fail later,
+							// deep inside the join builder, as `key [xxx] doesn't exist` — a message naming
+							// neither the association nor the `foreignKey=` argument that fixes it. Report it
+							// here instead, while both candidate shapes are still in hand (#3337). Runs inside
+							// the memo so the success path costs one check per application lifetime, and only
+							// for defaults derived here — an explicit `foreignKey=` is the developer's call.
+							if (application.wheels.showErrorInformation) {
+								$assertDerivedForeignKeyResolves(
+									associationName = local.name,
+									foreignKey = local.classAssociations[local.name].foreignKey,
+									columnOwner = local.fkColumnOwner,
+									modelName = local.fkNameSource.$classData().modelName,
+									keys = local.fkNameSource.$classData().keys
+								);
+							}
 						}
 						if (!Len(local.classAssociations[local.name].joinKey)) {
 							if (local.classAssociations[local.name].type == "belongsTo") {
@@ -1549,6 +1575,116 @@ component {
 			ArrayAppend(local.rv, local.entry);
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * Builds the conventional foreign key list for an association default: the model name
+	 * prefixed onto each of the target primary keys, joined by `separator`.
+	 *
+	 * `keys` may be a comma list for composite primary keys, so every element gets the
+	 * prefix — `user` + `a,b` yields `usera,userb`, or `user_a,user_b` with an underscore.
+	 */
+	public string function $buildForeignKeyList(
+		required string modelName,
+		required string keys,
+		string separator = ""
+	) {
+		local.rv = "";
+		local.keysArray = ListToArray(arguments.keys);
+		local.iEnd = ArrayLen(local.keysArray);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.rv = ListAppend(local.rv, arguments.modelName & arguments.separator & Trim(local.keysArray[local.i]));
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * True when every element of a foreign key list is a property on the supplied class.
+	 * Checks property names rather than column names because that is the lookup the join
+	 * builder performs (`properties[foreignKey].column`).
+	 */
+	public boolean function $foreignKeyListResolves(required any columnOwner, required string foreignKey) {
+		local.properties = arguments.columnOwner.$classData().properties;
+		local.keysArray = ListToArray(arguments.foreignKey);
+		local.iEnd = ArrayLen(local.keysArray);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			if (!StructKeyExists(local.properties, Trim(local.keysArray[local.i]))) {
+				return false;
+			}
+		}
+		return local.iEnd > 0;
+	}
+
+	/**
+	 * Internal function.
+	 * Derives the default foreign key for an association, preferring whichever conventional
+	 * shape actually exists on the model that owns the column.
+	 *
+	 * Wheels has two conventions in play. The legacy `<modelName><key>` form is what this
+	 * function has always produced, and `useUnderscoreReferenceColumns` (the `wheels new`
+	 * default) makes the migrator emit `<modelName>_<key>` instead — leaving stock new apps
+	 * with a schema the association default could never match (#3337).
+	 *
+	 * Resolving against the real columns rather than reading the setting fixes both
+	 * conventions at once, including apps that flipped the flag mid-life and therefore hold
+	 * a mix of both shapes. It is also strictly error-reducing: the underscore form is only
+	 * consulted when the legacy form is absent, which is a case that throws today. The
+	 * setting is deliberately NOT consulted — it is read per call by the migrator, whereas
+	 * this result is memoized for the application lifetime, so honouring it here would make
+	 * a runtime flip take effect for migrations but not for models.
+	 *
+	 * Falls back to the legacy shape when neither resolves, leaving the existing error path
+	 * (and `$assertDerivedForeignKeyResolves`) to report it.
+	 */
+	public string function $deriveAssociationForeignKey(
+		required any columnOwner,
+		required string modelName,
+		required string keys
+	) {
+		local.legacy = $buildForeignKeyList(modelName = arguments.modelName, keys = arguments.keys);
+		if ($foreignKeyListResolves(columnOwner = arguments.columnOwner, foreignKey = local.legacy)) {
+			return local.legacy;
+		}
+		local.underscored = $buildForeignKeyList(modelName = arguments.modelName, keys = arguments.keys, separator = "_");
+		if ($foreignKeyListResolves(columnOwner = arguments.columnOwner, foreignKey = local.underscored)) {
+			return local.underscored;
+		}
+		return local.legacy;
+	}
+
+	/**
+	 * Internal function.
+	 * Throws a descriptive error when an association's DERIVED default foreign key matches no
+	 * property on the model that owns the column. Without this the failure surfaces much later
+	 * as `key [xxx] doesn't exist` from inside the join builder, which names neither the
+	 * association nor the argument that fixes it (#3337).
+	 *
+	 * Skipped when the owner has no properties at all — an un-migrated or missing table would
+	 * otherwise produce this error instead of the clearer one the query itself raises.
+	 */
+	public void function $assertDerivedForeignKeyResolves(
+		required string associationName,
+		required string foreignKey,
+		required any columnOwner,
+		required string modelName,
+		required string keys
+	) {
+		if (!StructCount(arguments.columnOwner.$classData().properties)) {
+			return;
+		}
+		if ($foreignKeyListResolves(columnOwner = arguments.columnOwner, foreignKey = arguments.foreignKey)) {
+			return;
+		}
+		local.ownerName = arguments.columnOwner.$classData().modelName;
+		local.legacy = $buildForeignKeyList(modelName = arguments.modelName, keys = arguments.keys);
+		local.underscored = $buildForeignKeyList(modelName = arguments.modelName, keys = arguments.keys, separator = "_");
+		Throw(
+			type = "Wheels.AssociationForeignKeyNotFound",
+			message = "The `#arguments.associationName#` association derives a default foreign key of `#arguments.foreignKey#`, which is not a property on the `#local.ownerName#` model.",
+			extendedInfo = "Wheels looks for the conventional `#local.legacy#` and, for schemas built with `useUnderscoreReferenceColumns` enabled, `#local.underscored#`. Neither exists on `#local.ownerName#`. Either pass `foreignKey=""<column>""` explicitly when setting up the `#arguments.associationName#` association, or rename the column on `#local.ownerName#` to one of those two forms."
+		);
 	}
 
 	/**
