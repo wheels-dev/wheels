@@ -12,6 +12,16 @@ component extends="wheels.WheelsTest" {
 		//   "returning clause is not allowed with INSERT and Table Value Constructor"
 		// caused by bulk INSERT emitting multi-row VALUES (?,?), (?,?) plus
 		// JDBC RETURN_GENERATED_KEYS handling on Oracle 23.
+		//
+		// This spec used to assert `INSERT ALL` and "one INTO per record" — the
+		// shape that fixed #2745. That encoded the mechanism rather than the
+		// requirement, so it stayed green while the mechanism broke identity
+		// assignment: Oracle evaluates row defaults once per row of the driving
+		// query and shares them across every INTO, and `SELECT 1 FROM dual` is one
+		// row, so every record in a batch received the same generated key (#3302).
+		// The assertions below pin what actually has to hold — one statement, no
+		// table value constructor, one source row per record — not which Oracle
+		// construct delivers it.
 
 		describe("OracleModel.$bulkInsertSQL", () => {
 
@@ -28,7 +38,7 @@ component extends="wheels.WheelsTest" {
 				];
 			});
 
-			it("emits INSERT ALL ... SELECT 1 FROM dual instead of multi-row VALUES", () => {
+			it("emits INSERT ... SELECT ... FROM dual instead of multi-row VALUES", () => {
 				var sql = oracle.$bulkInsertSQL(
 					tableName       = """AUTHORS""",
 					columns         = ["firstName", "lastName"],
@@ -51,16 +61,19 @@ component extends="wheels.WheelsTest" {
 
 				// Oracle-idiomatic shape — avoids the table-value-constructor +
 				// RETURNING incompatibility on Oracle 23.
-				expect(collapsed).toInclude("INSERT ALL");
-				expect(collapsed).toInclude(" INTO ""AUTHORS"" ");
-				expect(collapsed).toInclude("SELECT 1 FROM dual");
+				expect(collapsed).toInclude("INSERT INTO ""AUTHORS""");
+				expect(collapsed).toInclude("FROM dual");
 
 				// And must NOT contain the multi-row VALUES tuple-list shape that
 				// Oracle JDBC rejects when RETURN_GENERATED_KEYS is requested.
 				expect(collapsed).notToMatch("VALUES \(.+\), ?\(");
+
+				// Nor the multitable form, whose single driving row hands every
+				// record the same generated key.
+				expect(collapsed).notToInclude("INSERT ALL");
 			});
 
-			it("emits one INTO clause per record in the batch", () => {
+			it("emits one source row per record in the batch", () => {
 				var sql = oracle.$bulkInsertSQL(
 					tableName       = """AUTHORS""",
 					columns         = ["firstName", "lastName"],
@@ -78,9 +91,17 @@ component extends="wheels.WheelsTest" {
 					}
 				}
 
-				// Three records → three INTO clauses.
-				var intoCount = ArrayLen(ReMatch("(?i)INTO\s+""AUTHORS""", text));
-				expect(intoCount).toBe(3);
+				// Three records → three `FROM dual` source rows. This is the
+				// assertion that would have caught #3302: the old INSERT ALL form
+				// had three INTO clauses but only ONE driving row, and one driving
+				// row is one evaluation of the identity default for all three.
+				var rowCount = ArrayLen(ReMatch("(?i)FROM\s+dual", text));
+				expect(rowCount).toBe(3);
+
+				// Two of them joined by UNION ALL, one statement in total.
+				var unionCount = ArrayLen(ReMatch("(?i)UNION\s+ALL", text));
+				expect(unionCount).toBe(2);
+				expect(ArrayLen(ReMatch("(?i)INSERT\s+INTO", text))).toBe(1);
 			});
 
 			it("parameterizes values via $buildBulkParam structs (no inline interpolation)", () => {
@@ -135,8 +156,9 @@ component extends="wheels.WheelsTest" {
 				}
 				var collapsed = ReReplace(text, "[[:space:]]+", " ", "all");
 
-				expect(collapsed).toInclude("INSERT ALL");
-				expect(collapsed).toInclude("SELECT 1 FROM dual");
+				expect(collapsed).toInclude("INSERT INTO ""AUTHORS""");
+				expect(collapsed).toInclude("FROM dual");
+				expect(collapsed).notToInclude("UNION ALL");
 			});
 
 		});
