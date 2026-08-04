@@ -1530,7 +1530,13 @@ component {
 					ArrayAppend(local.parentPositions, local.i);
 				} else if (local.delimChar == ")") {
 					local.levels = ListDeleteAt(local.levels, ListLen(local.levels));
-					ArrayDeleteAt(local.parentPositions, ArrayLen(local.parentPositions));
+					// Guarded because an unbalanced include (`"posts)"`) reaches here with an
+					// empty stack, and ArrayDeleteAt(x, 0) throws where the ListDeleteAt above
+					// quietly tolerates it. Malformed includes behaved as before this change;
+					// they should not start erroring differently because of it.
+					if (ArrayLen(local.parentPositions)) {
+						ArrayDeleteAt(local.parentPositions, ArrayLen(local.parentPositions));
+					}
 				}
 			}
 

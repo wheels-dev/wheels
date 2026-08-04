@@ -1335,6 +1335,17 @@ component extends="wheels.WheelsTest" {
 				)
 			})
 
+			// An unbalanced include reaches the level-tracking loop with an empty parent
+			// stack. `ListDeleteAt` on a one-element list tolerates that; `ArrayDeleteAt(x, 0)`
+			// throws. Malformed includes resolved to a plain join before the issue #3334
+			// change and must keep doing so — the fix must not turn a tolerated input into a
+			// new error.
+			it("tolerates an unbalanced include the way it always did (issue ##3334)", () => {
+				actual = g.model("post").$fromClause(include = "c_o_r_e_comments)")
+
+				expect(actual).toInclude(qi("c_o_r_e_comments"))
+			})
+
 			// Issue #3334, the reporter's actual complaint: the grouping used to be gated on
 			// an anchored regex over the include STRING, so it only fired when the nested
 			// group came last. `a(b),c` and `c,a(b)` therefore generated structurally
