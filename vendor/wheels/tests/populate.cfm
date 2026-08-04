@@ -96,7 +96,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "c_o_r_e_memberteams,c_o_r_e_members,c_o_r_e_teams,c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation,c_o_r_e_uuidrecords">
+<cfset local.tables = "c_o_r_e_memberteams,c_o_r_e_members,c_o_r_e_teams,c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation,c_o_r_e_uuidrecords,c_o_r_e_refchildren,c_o_r_e_refparents">
 <!---
 	On Oracle, append CASCADE CONSTRAINTS so the drop removes incoming FK
 	references along with the table. PURGE skips the recycle bin so the
@@ -167,6 +167,30 @@ CREATE TABLE c_o_r_e_collisiontests
 (
 	id #local.identityColumnType#
 	,method varchar(100) NOT NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<!---
+	#3337 fixtures: a parent/child pair whose foreign key column uses the `<name>_id`
+	convention that `useUnderscoreReferenceColumns` makes the migrator emit. The
+	associations on RefParent / RefChild pass no `foreignKey`, so they only resolve if the
+	default derivation honours the underscore form as well as the legacy `<name>id` one.
+--->
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_refparents
+(
+	id #local.identityColumnType#
+	,name varchar(50)
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_refchildren
+(
+	id #local.identityColumnType#
+	,refparent_id #local.intColumnType#
 	,PRIMARY KEY(id)
 ) #local.storageEngine#
 </cfquery>
