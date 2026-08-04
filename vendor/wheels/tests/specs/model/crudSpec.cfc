@@ -1273,8 +1273,10 @@ component extends="wheels.WheelsTest" {
 			it("emits flat joins for a belongsTo-chain nested include (issue ##3245)", () => {
 				actual = g.model("author").$fromClause(include = "posts,user(galleries)")
 
-				// the parenthesized intermediate (`user`) is a belongsTo, so NO grouping:
-				// every join sits at the top level and the root `authors` stays in scope.
+				// No join here qualifies for grouping: `user` is INNER but sits at the root
+				// (nothing encloses it, and its ON references the root `authors`), and
+				// `galleries` is OUTER. Every join stays at the top level, so the root table
+				// remains in scope for every ON condition.
 				expect(actual).notToInclude("LEFT OUTER JOIN (")
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_authors')#"
@@ -1296,6 +1298,71 @@ component extends="wheels.WheelsTest" {
 					"FROM #qi('c_o_r_e_teams')#"
 					& " LEFT OUTER JOIN (#qi('c_o_r_e_memberteams')# INNER JOIN #qi('c_o_r_e_members')# ON #qi('c_o_r_e_memberteams')#.#qi('memberid')# = #qi('c_o_r_e_members')#.#qi('id')#) ON #qi('c_o_r_e_teams')#.#qi('id')# = #qi('c_o_r_e_memberteams')#.#qi('teamid')#"
 				)
+			})
+
+			// Regression for issue #3334: the issue #449 grouping copied EVERY inner join
+			// into EVERY outer join, so a shallow sibling listed before the nested group
+			// got the nested group's INNER join spliced into it — referencing a table the
+			// query has not introduced yet (ORA-00904 / "unknown column in on clause").
+			// `Post.c_o_r_e_comments` and `Post.classifications` are both hasMany (outer);
+			// `Classification.tag` is a belongsTo (inner) whose ON clause references
+			// `classifications`, so it belongs to the classifications group and nowhere else.
+			it("scopes a nested inner join to its own parent, not to every outer join (issue ##3334)", () => {
+				actual = g.model("post").$fromClause(include = "c_o_r_e_comments,classifications(tag)")
+
+				// the comments join must stay flat — nothing from the classifications
+				// subtree may appear inside it
+				expect(actual).toBe(
+					"FROM #qi('c_o_r_e_posts')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_comments')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_comments')#.#qi('postid')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+				)
+			})
+
+			// Second shape of issue #3334, and a residual case of issue #3245 that the
+			// #3245 gate does not cover: a ROOT-level inner join (`Post.author` is a
+			// belongsTo) alongside a nested group. Its ON clause references the root
+			// `posts` table, so pulling it inside the classifications parentheses scopes
+			// the root out — the same "unknown column in on clause" failure #3245 fixed
+			// for the flat branch. A root-level join has no enclosing group; it stays flat.
+			it("keeps a root-level inner join out of the nested group (issue ##3334)", () => {
+				actual = g.model("post").$fromClause(include = "author,classifications(tag)")
+
+				expect(actual).toBe(
+					"FROM #qi('c_o_r_e_posts')#"
+					& " INNER JOIN #qi('c_o_r_e_authors')# ON #qi('c_o_r_e_posts')#.#qi('authorid')# = #qi('c_o_r_e_authors')#.#qi('id')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+				)
+			})
+
+			// Issue #3334, the reporter's actual complaint: the grouping used to be gated on
+			// an anchored regex over the include STRING, so it only fired when the nested
+			// group came last. `a(b),c` and `c,a(b)` therefore generated structurally
+			// different SQL for the same query — one of them invalid. Grouping is now decided
+			// from the association tree, so include order only reorders the emitted joins.
+			it("emits the same joins wherever the nested group sits in the include (issue ##3334)", () => {
+				comments = " LEFT OUTER JOIN #qi('c_o_r_e_comments')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_comments')#.#qi('postid')#"
+				classifications = " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+
+				expect(g.model("post").$fromClause(include = "c_o_r_e_comments,classifications(tag)")).toBe(
+					"FROM #qi('c_o_r_e_posts')#" & comments & classifications
+				)
+				expect(g.model("post").$fromClause(include = "classifications(tag),c_o_r_e_comments")).toBe(
+					"FROM #qi('c_o_r_e_posts')#" & classifications & comments
+				)
+			})
+
+			// Executable form of the above — the string assertions pin the SQL, this proves
+			// the database accepts it and that both orderings agree on the result set. The
+			// nested-first ordering used to emit `tags` as a ROOT-level inner join, which
+			// silently demoted the outer join to an inner one and dropped every post with no
+			// classification; it now keeps them, matching the nested-last ordering.
+			it("returns the same rows wherever the nested group sits in the include (issue ##3334)", () => {
+				nestedLast = g.model("post").findAll(include = "c_o_r_e_comments,classifications(tag)")
+				nestedFirst = g.model("post").findAll(include = "classifications(tag),c_o_r_e_comments")
+
+				expect(nestedLast.recordCount).toBeGT(0)
+				expect(nestedLast.recordCount).toBe(nestedFirst.recordCount)
 			})
 		})
 
