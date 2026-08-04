@@ -233,8 +233,10 @@ component output="false" {
 			return this;
 		}
 
-		// Check if this is a QueryBuilder method — transition from scope chain to query builder
-		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset,select,include,group,distinct", arguments.missingMethodName)) {
+		// Check if this is a QueryBuilder method — transition from scope chain to query builder.
+		// User-defined scopes are checked BEFORE this list (above), so a scope named e.g. "select" keeps
+		// precedence. Keep this list in sync with the chain-entry list in wheels.model.onmissingmethod.
+		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset,select,include,group,distinct,forUpdate", arguments.missingMethodName)) {
 			local.builder = new wheels.model.query.QueryBuilder(modelReference = variables.modelReference, scopeSpecs = variables.specs);
 			return Invoke(local.builder, arguments.missingMethodName, arguments.missingMethodArguments);
 		}

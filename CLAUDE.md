@@ -365,7 +365,9 @@ model("User")
     .orderBy("name", "ASC")
     .limit(25)
     .get();
-// Methods: where, orWhere, whereNull, whereNotNull, whereBetween, whereIn, whereNotIn, orderBy, limit, get
+// Methods: where, orWhere, whereNull, whereNotNull, whereBetween, whereIn, whereNotIn, orderBy,
+// limit, offset, select, include, group, distinct, forUpdate, get
+// Any of these (not just where) can START the chain on the model, e.g. model("User").select("id,name").get()
 
 // Batch processing — memory-efficient
 model("User").findEach(batchSize=1000, callback=function(user) {

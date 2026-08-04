@@ -231,6 +231,75 @@ component extends="wheels.WheelsTest" {
 
 			})
 
+			describe("chain-entry builder methods on the model", () => {
+
+				it("select() starts a chain and limits the returned columns", () => {
+					var result = model("author")
+						.select("id,firstName")
+						.where("lastName", "Djurner")
+						.findAll();
+					expect(result.recordcount).toBe(1);
+					expect(ListSort(result.columnList, "textnocase")).toBe("firstName,id");
+				})
+
+				it("select() followed by where() and get() works (issue ##3346 example)", () => {
+					var result = model("author")
+						.select("id,firstName,lastName")
+						.where("lastName", "Djurner")
+						.get();
+					expect(result.recordcount).toBe(1);
+					expect(result.lastname).toBe("Djurner");
+					expect(ListSort(result.columnList, "textnocase")).toBe("firstName,id,lastName");
+				})
+
+				it("include() starts a chain", () => {
+					var result = model("author")
+						.include("posts")
+						.where("lastName", "Djurner")
+						.findAll();
+					expect(result.recordcount).toBeGT(0);
+				})
+
+				it("group() starts a chain", () => {
+					var distinctAuthors = model("post").findAll(select="authorId", group="authorId");
+					var result = model("post")
+						.group("authorId")
+						.select("authorId")
+						.findAll();
+					expect(result.recordcount).toBe(distinctAuthors.recordcount);
+				})
+
+				it("distinct() starts a chain", () => {
+					var result = model("author")
+						.distinct()
+						.where("lastName", "Djurner")
+						.get();
+					expect(result.recordcount).toBe(1);
+				})
+
+				it("forUpdate() starts a chain", () => {
+					// FOR UPDATE is a no-op on SQLite/MSSQL; this pins the chain-entry dispatch, not the locking.
+					var result = model("author")
+						.forUpdate()
+						.where("lastName", "Djurner")
+						.count();
+					expect(result).toBe(1);
+				})
+
+			})
+
+			describe("scope chain to builder transition", () => {
+
+				it("forUpdate() transitions from a scope chain to the query builder", () => {
+					var result = model("authorScoped")
+						.withLastNameDjurner()
+						.forUpdate()
+						.count();
+					expect(result).toBe(1);
+				})
+
+			})
+
 			it("handles complex chains", () => {
 				var result = model("author")
 					.where("firstName", "Per")
