@@ -26,15 +26,38 @@ component extends="wheels.WheelsTest" {
 				expect(Compare(ListLast(meta.name, "."), fileName)).toBe(0)
 			})
 
-			it("reports the same metadata name however the component was instantiated", () => {
-				// on a case-insensitive filesystem BOTH of these resolve, so if the engine
-				// echoed back the path it was handed rather than deriving it from the file,
-				// the persisted string would carry whatever casing the caller happened to
-				// type — and that string is what a Linux worker later has to resolve
-				canonical = CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")
-				lowercased = CreateObject("component", "wheels.tests._assets.jobs.probejob")
+			it("never persists a caller's miscased path", () => {
+				// The risk is an engine ECHOING BACK the path it was handed instead of
+				// deriving the name from the file: the persisted string would then carry
+				// whatever casing the caller happened to type, and that string is what a
+				// Linux worker later has to resolve.
+				//
+				// Engines close that off two different ways, and either is sufficient:
+				//
+				//   Lucee/BoxLang — a miscased path RESOLVES (the filesystem is
+				//     case-insensitive here) but the metadata name comes back canonical.
+				//   Adobe         — a miscased path does not resolve AT ALL. Its component
+				//     resolver is case-sensitive independently of the filesystem, throwing
+				//     "Could not find the ColdFusion component ... probejob". Nothing can be
+				//     persisted because nothing can be constructed.
+				//
+				// Asserting only the first would fail on Adobe for a reason that is *safer*
+				// than the one being tested, so assert the property both satisfy.
+				canonical = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")).name
+				resolved = {miscasedConstructed = false, name = ""}
 
-				expect(Compare(GetMetadata(canonical).name, GetMetadata(lowercased).name)).toBe(0)
+				try {
+					resolved.name = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.probejob")).name
+					resolved.miscasedConstructed = true
+				} catch (any e) {
+					// case-sensitive resolver — the stronger guarantee
+				}
+
+				if (resolved.miscasedConstructed) {
+					expect(Compare(resolved.name, canonical)).toBe(0)
+				} else {
+					expect(resolved.name).toBe("")
+				}
 			})
 
 			it("re-instantiates from its own persisted metadata name", () => {
