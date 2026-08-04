@@ -2700,6 +2700,80 @@ return local.$wheels;
 	}
 
 	/**
+	 * Internal function. Builds the debug bar's base reload URL (issue #3344).
+	 * The base is composed from the resolved `webPath` plus the front-controller
+	 * filename — the same idiom `urlFor()` uses — instead of raw
+	 * `cgi.script_name`, so subfolder (subpath) installs emit links like
+	 * `/myapp/posts?reload=` rather than `/myapp/public/index.cfm/posts?reload=`
+	 * (which the user's rewrite rules don't route). The caller selects which
+	 * path_info to pass (`request.cgi.path_info` when available, `cgi.path_info`
+	 * otherwise — engines report it differently). `webPath` and `rewriteFile`
+	 * default from application scope; tests pass them explicitly, and early
+	 * boot/error paths where they're missing fall back to the raw script name
+	 * (the pre-#3344 behavior). Pure string logic so it can be unit-tested in
+	 * isolation.
+	 */
+	public string function $buildDebugReloadUrl(
+		required string scriptName,
+		string pathInfo = "",
+		string queryString = "",
+		string webPath,
+		string rewriteFile
+	) {
+		// Resolve webPath/rewriteFile from application scope unless overridden.
+		// No runtime default-arg expressions (some engines evaluate those
+		// eagerly) — same pattern as $resolveSubpathInclude.
+		if (StructKeyExists(arguments, "webPath")) {
+			local.resolvedWebPath = arguments.webPath;
+		} else if (IsDefined("application.wheels.webPath")) {
+			local.resolvedWebPath = application.wheels.webPath;
+		} else {
+			local.resolvedWebPath = "";
+		}
+		if (StructKeyExists(arguments, "rewriteFile")) {
+			local.resolvedRewriteFile = arguments.rewriteFile;
+		} else if (IsDefined("application.wheels.rewriteFile")) {
+			local.resolvedRewriteFile = application.wheels.rewriteFile;
+		} else {
+			local.resolvedRewriteFile = "";
+		}
+
+		// Base: webPath + front-controller filename (matches urlFor()); fall
+		// back to the raw script name when webPath isn't resolved yet.
+		if (Len(local.resolvedWebPath)) {
+			local.rv = local.resolvedWebPath & ListLast(arguments.scriptName, "/");
+		} else {
+			local.rv = arguments.scriptName;
+		}
+		if (arguments.pathInfo != arguments.scriptName) {
+			local.rv &= arguments.pathInfo;
+		}
+		if (Len(arguments.queryString)) {
+			local.rv &= "?" & arguments.queryString;
+		}
+		if (Len(local.resolvedRewriteFile)) {
+			local.rv = ReplaceNoCase(local.rv, "/" & local.resolvedRewriteFile, "");
+		}
+		local.reloadTokens = "development,testing,maintenance,production,true";
+		local.iEnd = ListLen(local.reloadTokens);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.token = ListGetAt(local.reloadTokens, local.i);
+			local.rv = ReplaceNoCase(
+				ReplaceNoCase(local.rv, "?reload=" & local.token, ""),
+				"&reload=" & local.token,
+				""
+			);
+		}
+		if (Find("?", local.rv)) {
+			local.rv &= "&";
+		} else {
+			local.rv &= "?";
+		}
+		local.rv &= "reload=";
+		return local.rv;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $abortInvalidRequest() {
