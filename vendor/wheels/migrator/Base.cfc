@@ -232,6 +232,14 @@ component extends="wheels.Global"{
 			type = "columns",
 			table = arguments.tableName
 		);
+		// This path calls $dbinfo directly rather than going through the model adapter, so it
+		// needs its own catalog-bleed guard: an unrestricted cfdbinfo matches the table name in
+		// every schema on the connection, and a table named after an `information_schema` view
+		// (`sequences`, `tables`, `columns`, …) picks up that view's columns too. A
+		// changeTable() adding a column whose name collides with one of them — `data_type`,
+		// `start_value` — would then see it as already present (issue #3349). No application
+		// table lives in a system schema, so this cannot drop a real column.
+		local.columns = $excludeSystemSchemaRows(columns = local.columns);
 		local.columnList = ValueList(local.columns.COLUMN_NAME);
 		if (!StructKeyExists(request, "$wheelsMigratorColumns")) {
 			request.$wheelsMigratorColumns = {};

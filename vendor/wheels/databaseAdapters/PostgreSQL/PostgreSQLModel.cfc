@@ -90,8 +90,45 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			case "geography":
 				local.rv = "cf_sql_other";
 				break;
+			default:
+				// Without this branch `local.rv` is never assigned and the return throws
+				// `key [RV] doesn't exist` — an error that names nothing useful and reads
+				// like a framework bug. The classic source was catalog bleed: a table whose
+				// name collides with an `information_schema` view picked up phantom columns
+				// typed `"information_schema"."sql_identifier"` (issue #3349, fixed in
+				// `$getColumnInfo()` below). Anything reaching here now is a genuinely
+				// unmapped PostgreSQL type, so say so.
+				Throw(
+					type = "Wheels.UnknownColumnType",
+					message = "The PostgreSQL column type `#arguments.type#` is not mapped to a CFML SQL type.",
+					extendedInfo = "Add a case for `#arguments.type#` to `$getType()` in `vendor/wheels/databaseAdapters/PostgreSQL/PostgreSQLModel.cfc`. If the type name looks schema-qualified (e.g. `""information_schema"".""sql_identifier""`), the column is not yours — it came from a catalog view sharing your table's name."
+				);
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Override Base adapter's function.
+	 *
+	 * `cfdbinfo(type="columns")` applies no schema restriction, so JDBC matches the table name
+	 * across every schema on the connection. PostgreSQL and YugabyteDB both ship ANSI
+	 * `information_schema` views named `sequences`, `tables`, `columns`, `views`, `triggers`
+	 * and more, so an application table named `sequences` collected a second batch of columns
+	 * from `information_schema.sequences` — typed `"information_schema"."sql_identifier"`,
+	 * which nothing in `$getType()` matched (issue #3349). Via `CockroachDBModel`, the
+	 * `crdb_internal` and `pg_extension` view names collide the same way.
+	 *
+	 * Filtering here rather than in `$getColumns()` keeps the work behind the
+	 * `cacheDatabaseSchema` memo that `$getColumns()` wraps around this call — once per
+	 * datasource+table per application lifetime instead of on every read.
+	 */
+	public query function $getColumnInfo(
+		required string table,
+		required string datasource,
+		required string username,
+		required string password
+	) {
+		return $excludeSystemSchemaRows(columns = super.$getColumnInfo(argumentCollection = arguments));
 	}
 
 	/**

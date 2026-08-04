@@ -574,6 +574,43 @@ return local.$wheels;
 		return local.rv;
 	}
 
+	/**
+	 * Drops rows belonging to a database's system schemas from a `$dbinfo(type="columns")`
+	 * result.
+	 *
+	 * `cfdbinfo(type="columns")` passes no schema restriction to JDBC's `getColumns()`, so the
+	 * table name is matched across EVERY schema on the connection. PostgreSQL and YugabyteDB
+	 * ship real ANSI `information_schema` views named `sequences`, `tables`, `columns`,
+	 * `views`, `triggers` and more, so an application table sharing one of those names silently
+	 * collects a second batch of phantom columns from the catalog (issue #3349). No application
+	 * table lives in a system schema, so filtering them out is always safe.
+	 *
+	 * A result set that carries no `table_schem` column — several engines omit it — is returned
+	 * untouched. Yes, JDBC really does spell it `table_schem`, not `table_schema`.
+	 */
+	public query function $excludeSystemSchemaRows(
+		required query columns,
+		string schemas = "information_schema,pg_catalog,crdb_internal,pg_extension"
+	) {
+		if (!ListFindNoCase(arguments.columns.columnList, "table_schem")) {
+			return arguments.columns;
+		}
+		local.rv = QueryNew(arguments.columns.columnList);
+		local.columnNames = ListToArray(arguments.columns.columnList);
+		local.iEnd = arguments.columns.recordCount;
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			if (!ListFindNoCase(arguments.schemas, arguments.columns["table_schem"][local.i])) {
+				QueryAddRow(local.rv);
+				local.jEnd = ArrayLen(local.columnNames);
+				for (local.j = 1; local.j <= local.jEnd; local.j++) {
+					local.item = local.columnNames[local.j];
+					QuerySetCell(local.rv, local.item, arguments.columns[local.item][local.i]);
+				}
+			}
+		}
+		return local.rv;
+	}
+
 	public any function $wddx(required any input, string action = "cfml2wddx", boolean useTimeZoneInfo = true) {
 		arguments.output = "local.output";
 		local.args = {};
