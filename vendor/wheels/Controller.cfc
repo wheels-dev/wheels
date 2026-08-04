@@ -391,11 +391,19 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 
 	/**
 	 * Mix a component's pre-resolved public methods (each `{name, ref}`, see
-	 * $componentIntegrationPlan) into this instance. Preserves the original
-	 * semantics: a method that does not already exist (from inheritance or an
-	 * earlier-integrated component) is added, and any method a plugin/package
-	 * mixin will override is also aliased to `super<name>`. `overrideSet` is the
+	 * $componentIntegrationPlan) into this instance. A method that does not already
+	 * exist (from inheritance or an earlier-integrated component) is added; one that
+	 * DOES already exist is left alone and the framework original is exposed as
+	 * `super<name>`, so an app override can delegate to it. Any method a
+	 * plugin/package mixin will override is likewise aliased. `overrideSet` is the
 	 * precomputed mixin-override name set.
+	 *
+	 * The `super<name>` else-branch matches Model.cfc, which has always had it. Its
+	 * absence here meant an app that overrode a controller or view helper — exactly
+	 * as the "Overriding Core Methods" guide documents — got no `superLinkTo()` and a
+	 * 500 at render time (issue #3325, from discussion #3323). Only app overrides
+	 * reach the branch: no two framework mixins contribute the same name, so a
+	 * controller that overrides nothing gains zero extra keys.
 	 */
 	private function $integrateFunctions(required array publicMethods, required struct overrideSet) {
 		local.iEnd = ArrayLen(arguments.publicMethods);
@@ -407,6 +415,10 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 			if (!(StructKeyExists(variables, local.name) || StructKeyExists(this, local.name))) {
 				variables[local.name] = local.ref;
 				this[local.name] = local.ref;
+			} else {
+				local.superName = "super" & local.name;
+				variables[local.superName] = local.ref;
+				this[local.superName] = local.ref;
 			}
 
 			if (StructKeyExists(arguments.overrideSet, local.name)) {
