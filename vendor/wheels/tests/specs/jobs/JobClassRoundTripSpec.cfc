@@ -42,7 +42,13 @@ component extends="wheels.WheelsTest" {
 				original = CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")
 				persisted = GetMetadata(original).name
 
-				revived = (new wheels.Job()).$instantiateJobClass(jobClass = persisted)
+				// Hoisted receiver. A parenthesized `new` in receiver position — `(new X()).m()`
+				// — is rejected by Adobe's parser with `Invalid construct: Either argument or
+				// name is missing`, the same MissingNameException family as cross-engine
+				// invariant 16. Adobe blames the enclosing describe() line and the whole engine
+				// leg reports tests=0. Caught by the compat matrix; Lucee and BoxLang accept it.
+				bridge = new wheels.Job()
+				revived = bridge.$instantiateJobClass(jobClass = persisted)
 
 				expect(Compare(GetMetadata(revived).name, persisted)).toBe(0)
 			})
@@ -53,8 +59,10 @@ component extends="wheels.WheelsTest" {
 			it("throws Wheels.JobClassNotFound naming the row and the class", () => {
 				thrown = {type: "", message: ""}
 
+				bridge = new wheels.Job()
+
 				try {
-					(new wheels.Job()).$instantiateJobClass(jobClass = "app.jobs.NoSuchJob", jobId = "abc-123")
+					bridge.$instantiateJobClass(jobClass = "app.jobs.NoSuchJob", jobId = "abc-123")
 				} catch (any e) {
 					thrown.type = e.type
 					thrown.message = e.message
@@ -70,9 +78,11 @@ component extends="wheels.WheelsTest" {
 			it("throws Wheels.InvalidJobClass when the path resolves to something that is not a job", () => {
 				thrown = {type: ""}
 
+				bridge = new wheels.Job()
+
 				try {
 					// a real component with no perform()
-					(new wheels.Job()).$instantiateJobClass(jobClass = "wheels.tests._assets.models.Post")
+					bridge.$instantiateJobClass(jobClass = "wheels.tests._assets.models.Post")
 				} catch (any e) {
 					thrown.type = e.type
 				}
