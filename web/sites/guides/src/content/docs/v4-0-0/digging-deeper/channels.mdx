@@ -11,7 +11,7 @@ This page shows you how to use Wheels channels — a pub/sub layer on top of [Se
 **You'll learn:**
 
 - What channels add on top of the low-level SSE API
-- Where Wheels stands on WebSockets — and why channels are SSE-only by design
+- Where Wheels stands on WebSockets — SSE-only in core by design, with an optional `wheels-websockets` package on top
 - How to publish with `publish()` and subscribe with `subscribeToChannel()`
 - When to use the memory adapter versus the database adapter
 - How to deliver the `WheelsSSE` JavaScript client to the browser (it is not auto-served)
@@ -36,7 +36,7 @@ Everything flows one way: server to client.
 
 ## The WebSocket story
 
-Wheels does not ship WebSocket support. There is no bidirectional channel, no binary framing, no presence tracking, and no `cfwebsocket` integration. Channels are one-directional — server to client — over SSE, and that is a deliberate design choice, not a stopgap:
+The framework core ships channels over SSE only — one-directional, server to client. That is a deliberate design choice, not a stopgap:
 
 - **Plain HTTP.** SSE rides an ordinary long-lived GET request. Every proxy, load balancer, and firewall that speaks HTTP passes it through; WebSockets need their own upgrade handshake and protocol support at every hop.
 - **Free reconnection.** The browser's `EventSource` reconnects automatically and resends `Last-Event-ID` so you can resume. With WebSockets you write that yourself.
@@ -46,7 +46,22 @@ AdonisJS made the same call with its Transmit package — SSE-only, no WebSocket
 
 For the client-to-server direction, use what you already have: an ordinary HTTP POST. The action saves whatever it needs to and calls `publish()` to fan the result out to subscribers. The [chat room pattern](#chat-room) below is exactly this — and it covers most "I need WebSockets" use cases.
 
-Native WebSocket support is being scoped on the roadmap — follow [issue #2962](https://github.com/wheels-dev/wheels/issues/2962).
+### Optional WebSocket transport: the `wheels-websockets` package
+
+When you do want events delivered over a real WebSocket, the first-party [`wheels-websockets`](https://github.com/wheels-dev/wheels-websockets) package (v0.2.0) adds an opt-in WebSocket transport on top of channels:
+
+```bash title="illustrative — install the package"
+wheels packages add wheels-websockets
+```
+
+Your app keeps calling `publish()` exactly as before. Where the engine can serve WebSockets, connected browsers get the event over a socket; everywhere else, nothing changes and SSE channels keep working. Engine support:
+
+- **RustCFML** — native transport, supported since v0.1.0.
+- **Lucee 6.2+** — via the official [lucee/extension-websocket](https://github.com/lucee/extension-websocket), verified live as of v0.2.0. This is the verified stock-Lucee path today.
+- **Lucee 7** — needs an engine at 7.0.2.7 or newer *and* a jakarta-compatible release of the websocket extension, which hasn't been published yet. Until it ships, the package detects the situation, logs one warning, and channels keep working over SSE.
+- **Adobe CF / BoxLang** — no WebSocket backend yet (demand-gated on [discussion #3286](https://github.com/wheels-dev/wheels/discussions/3286)); channels degrade gracefully to SSE.
+
+The package's `WheelsRealtime` JavaScript client falls back to the stock `WheelsSSE` client automatically, so you get one subscription API on every engine. Installing the package on an unsupported engine is always safe — it logs one line and stays on SSE.
 
 ## Quick start
 
