@@ -80,26 +80,42 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that an unresolvable jobClass", () => {
 
 			it("throws Wheels.JobClassNotFound naming the row and the class", () => {
-				local.thrown = {type: "", message: ""}
+				// NOT `local.`-scoped, deliberately. Cross-engine invariant 11: a catch body
+				// runs under a nested `local` on BoxLang, so `thrown.type = e.type`
+				// inside the catch writes to a struct that is discarded on exit and the
+				// assertion below reads the untouched outer value. The blessed form is a
+				// `var`-declared struct accessed WITHOUT the `local.` prefix. Scoping this
+				// one for consistency cost two BoxLang failures on every database
+				// (`Expected [Wheels.JobClassNotFound] but received []`) — caught by the
+				// compat matrix, invisible on Lucee.
+				var thrown = {type: "", message: ""}
 
 				local.bridge = new wheels.Job()
 
 				try {
 					local.bridge.$instantiateJobClass(jobClass = "app.jobs.NoSuchJob", jobId = "abc-123")
 				} catch (any e) {
-					local.thrown.type = e.type
-					local.thrown.message = e.message
+					thrown.type = e.type
+					thrown.message = e.message
 				}
 
 				// the raw engine error is "component not found" for a class that plainly
 				// exists, which points investigators at mappings and deployment
-				expect(local.thrown.type).toBe("Wheels.JobClassNotFound")
-				expect(local.thrown.message).toInclude("app.jobs.NoSuchJob")
-				expect(local.thrown.message).toInclude("abc-123")
+				expect(thrown.type).toBe("Wheels.JobClassNotFound")
+				expect(thrown.message).toInclude("app.jobs.NoSuchJob")
+				expect(thrown.message).toInclude("abc-123")
 			})
 
 			it("throws Wheels.InvalidJobClass when the path resolves to something that is not a job", () => {
-				local.thrown = {type: ""}
+				// NOT `local.`-scoped, deliberately. Cross-engine invariant 11: a catch body
+				// runs under a nested `local` on BoxLang, so `thrown.type = e.type`
+				// inside the catch writes to a struct that is discarded on exit and the
+				// assertion below reads the untouched outer value. The blessed form is a
+				// `var`-declared struct accessed WITHOUT the `local.` prefix. Scoping this
+				// one for consistency cost two BoxLang failures on every database
+				// (`Expected [Wheels.JobClassNotFound] but received []`) — caught by the
+				// compat matrix, invisible on Lucee.
+				var thrown = {type: ""}
 
 				local.bridge = new wheels.Job()
 
@@ -107,10 +123,10 @@ component extends="wheels.WheelsTest" {
 					// a real component with no perform()
 					local.bridge.$instantiateJobClass(jobClass = "wheels.tests._assets.models.Post")
 				} catch (any e) {
-					local.thrown.type = e.type
+					thrown.type = e.type
 				}
 
-				expect(local.thrown.type).toBe("Wheels.InvalidJobClass")
+				expect(thrown.type).toBe("Wheels.InvalidJobClass")
 			})
 		})
 	}
