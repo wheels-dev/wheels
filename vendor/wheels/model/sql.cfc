@@ -92,134 +92,97 @@ component {
 				includeSoftDeletes = arguments.includeSoftDeletes
 			);
 
-			// Check if we need to nest inner joins (when both inner and outer joins are present)
-			// Only apply nesting for HABTM patterns, not for all mixed join scenarios
-			local.hasInnerJoins = false;
-			local.hasOuterJoins = false;
-			local.hasThroughAssociation = false;
 			local.iEnd = ArrayLen(local.associations);
-			
-			// Check if this is specifically a HABTM / through bridge pattern. The
-			// parenthesized-INNER-join grouping below was added for issue #449 so a
-			// many-to-many bridge (e.g. `memberTeams(member)`) keeps its nested inner
-			// join scoped to the OUTER-joined bridge table. It must NOT fire for a plain
-			// `belongsTo`-chain nested include (e.g. `SecondaryContact(User)`): there the
-			// inner join's ON clause references the root FROM table, and wrapping it
-			// inside the OUTER group scopes the root out — the MySQL "Unknown column ...
-			// in 'on clause'" regression reported in issue #3245. So consult the actual
-			// association metadata for the parenthesized intermediate instead of trusting
-			// the include string alone: only a `hasMany` / `hasOne` intermediate (the
-			// OUTER-joined bridge the grouping was designed for) qualifies; a `belongsTo`
-			// intermediate falls through to the flat-join branch Wheels 2 emitted.
-			local.originalInclude = Replace(arguments.include, " ", "", "all");
-			if (Find("(", local.originalInclude)) {
-				// Parse the include to see if it matches the pattern: intermediate(target)
-				local.includePattern = ReFindNoCase("^([^(]+)\(([^)]+)\)$", local.originalInclude, 1, true);
-				if (ArrayLen(local.includePattern.pos) >= 3) {
-					// The association that parents the parenthesized target is the last
-					// entry in the comma-list before the "(" (the only level this single-
-					// paren pattern can match), so it is always a root-model association.
-					local.intermediateName = ListLast(Mid(local.originalInclude, local.includePattern.pos[2], local.includePattern.len[2]));
-					if (
-						StructKeyExists(variables.wheels.class.associations, local.intermediateName)
-						&& ListFindNoCase(
-							"hasMany,hasOne",
-							variables.wheels.class.associations[local.intermediateName].type
-						)
-					) {
-						local.hasThroughAssociation = true;
-					}
-				}
-			}
-			
+
+			// Build the join statements. Every association carries the position of the
+			// association it is nested under (`parentPosition`, 0 at the root), so the
+			// grouping decision below reads the include structure instead of re-deriving
+			// it from the generated SQL text.
+			//
+			// This replaces a gate that only grouped when the include string matched
+			// `^([^(]+)\(([^)]+)\)$` — i.e. only when the nested group came LAST. Whether
+			// a join is scoped correctly is a property of the association tree, not of
+			// where the user happened to type the parentheses, and the old anchored
+			// pattern made `a(b),c` and `c,a(b)` generate different SQL for the same query
+			// (issue #3334).
+			local.joins = [];
+
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				if (FindNoCase("INNER", local.associations[local.i].join)) {
-					local.hasInnerJoins = true;
+				local.indexHint = this.$indexHint(
+					useIndex = arguments.useIndex,
+					modelName = local.associations[local.i].modelName,
+					adapterName = arguments.adapterName
+				);
+				local.join = local.associations[local.i].join;
+				if (Len(local.indexHint)) {
+					// replace the quoted table name with the quoted table name & index hint
+					// TODO: factor in table aliases.. the index hint is placed after the table alias
+					local.quotedAssocTable = variables.wheels.class.adapter.$quoteIdentifier(local.associations[local.i].tableName);
+					local.join = Replace(
+						local.join,
+						" #local.quotedAssocTable# ",
+						" #local.quotedAssocTable# #local.indexHint# ",
+						"one"
+					);
 				}
-				if (FindNoCase("OUTER", local.associations[local.i].join) || FindNoCase("LEFT", local.associations[local.i].join)) {
-					local.hasOuterJoins = true;
+				local.joins[local.i] = local.join;
+			}
+
+			// Decide which INNER joins get pulled inside a parenthesized group. An INNER join
+			// belongs to exactly one OUTER join — the association it is nested under in the
+			// include string — and must never be copied into a sibling, which would reference
+			// a table the query has not introduced yet (issue #3334: ORA-00904 / MySQL
+			// "unknown column in on clause"). Prior to this the loop appended every INNER join
+			// to every OUTER join, which only looked correct because issues #449 and #3245 both
+			// exercise a single OUTER join. A root-level INNER join (`parentPosition` 0) has no
+			// enclosing group and stays flat, keeping the root FROM table in scope for its ON.
+			local.nestedJoins = {};
+			local.isNested = {};
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				local.parentPosition = StructKeyExists(local.associations[local.i], "parentPosition")
+					? local.associations[local.i].parentPosition
+					: 0;
+				if (
+					FindNoCase("INNER", local.joins[local.i])
+					&& local.parentPosition > 0
+					&& !FindNoCase("INNER", local.joins[local.parentPosition])
+				) {
+					if (!StructKeyExists(local.nestedJoins, local.parentPosition)) {
+						local.nestedJoins[local.parentPosition] = [];
+					}
+					ArrayAppend(local.nestedJoins[local.parentPosition], local.joins[local.i]);
+					local.isNested[local.i] = true;
 				}
 			}
-			
-			// Only apply nesting for through associations with mixed join types
-			local.needsNesting = local.hasInnerJoins && local.hasOuterJoins && local.hasThroughAssociation;
 
-			// build the join statements
-			if (local.needsNesting) {
-				// group inner joins with parentheses and outer joins separately
-				local.innerJoins = [];
-				local.outerJoins = [];
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				if (!StructKeyExists(local.isNested, local.i)) {
+					local.join = local.joins[local.i];
 
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.indexHint = this.$indexHint(
-						useIndex = arguments.useIndex,
-						modelName = local.associations[local.i].modelName,
-						adapterName = arguments.adapterName
-					);
-					local.join = local.associations[local.i].join;
-					if (Len(local.indexHint)) {
-						// replace the quoted table name with the quoted table name & index hint
-						// TODO: factor in table aliases.. the index hint is placed after the table alias
-						local.quotedAssocTable = variables.wheels.class.adapter.$quoteIdentifier(local.associations[local.i].tableName);
-						local.join = Replace(
-							local.join,
-							" #local.quotedAssocTable# ",
-							" #local.quotedAssocTable# #local.indexHint# ",
-							"one"
-						);
-					}
-					
-					if (FindNoCase("INNER", local.join)) {
-						ArrayAppend(local.innerJoins, local.join);
-					} else {
-						ArrayAppend(local.outerJoins, local.join);
-					}
-				}
-				
-				for (local.i = 1; local.i <= ArrayLen(local.outerJoins); local.i++) {
-					local.outerJoin = local.outerJoins[local.i];
-					
-					// If we have inner joins, we need to group them in the outer join
-					if (ArrayLen(local.innerJoins) > 0) {
+					if (StructKeyExists(local.nestedJoins, local.i)) {
 						// Find the table being joined in the outer join
-						local.joinTableMatch = ReFindNoCase("LEFT OUTER JOIN ([^\s]+)", local.outerJoin, 1, true);
+						local.joinTableMatch = ReFindNoCase("LEFT OUTER JOIN ([^\s]+)", local.join, 1, true);
 						if (ArrayLen(local.joinTableMatch.pos) >= 2 && local.joinTableMatch.pos[2] > 0) {
-							local.joinTable = Mid(local.outerJoin, local.joinTableMatch.pos[2], local.joinTableMatch.len[2]);
-							
+							local.joinTable = Mid(local.join, local.joinTableMatch.pos[2], local.joinTableMatch.len[2]);
+
 							// Build grouped inner joins: (subscriptions INNER JOIN magazines ON ...)
 							local.groupedInner = "(" & local.joinTable;
-							for (local.j = 1; local.j <= ArrayLen(local.innerJoins); local.j++) {
-								local.groupedInner &= " " & local.innerJoins[local.j];
+							local.jEnd = ArrayLen(local.nestedJoins[local.i]);
+							for (local.j = 1; local.j <= local.jEnd; local.j++) {
+								local.groupedInner &= " " & local.nestedJoins[local.i][local.j];
 							}
 							local.groupedInner &= ")";
-							
+
 							// Replace in the outer join
-							local.outerJoin = Replace(local.outerJoin, "LEFT OUTER JOIN " & local.joinTable, "LEFT OUTER JOIN " & local.groupedInner);
+							local.join = Replace(
+								local.join,
+								"LEFT OUTER JOIN " & local.joinTable,
+								"LEFT OUTER JOIN " & local.groupedInner,
+								"one"
+							);
 						}
 					}
-					
-					local.rv = ListAppend(local.rv, local.outerJoin, " ");
-				}
-			} else {
-				// original logic for when nesting is not needed
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.indexHint = this.$indexHint(
-						useIndex = arguments.useIndex,
-						modelName = local.associations[local.i].modelName,
-						adapterName = arguments.adapterName
-					);
-					local.join = local.associations[local.i].join;
-					if (Len(local.indexHint)) {
-						// replace the quoted table name with the quoted table name & index hint
-						// TODO: factor in table aliases.. the index hint is placed after the table alias
-						local.quotedAssocTable = variables.wheels.class.adapter.$quoteIdentifier(local.associations[local.i].tableName);
-						local.join = Replace(
-							local.join,
-							" #local.quotedAssocTable# ",
-							" #local.quotedAssocTable# #local.indexHint# ",
-							"one"
-						);
-					}
+
 					local.rv = ListAppend(local.rv, local.join, " ");
 				}
 			}
@@ -1327,6 +1290,12 @@ component {
 		// add the current class name so that the levels list start at the lowest level
 		local.levels = variables.wheels.class.modelName;
 
+		// mirrors `local.levels` with the position in `local.rv` of the association that
+		// opened each level, so every entry can record the association it nests under.
+		// Callers that group joins (see `$fromClause`) would otherwise have to re-derive
+		// parentage from the generated SQL text — the regex guesswork behind issue #3334.
+		local.parentPositions = [];
+
 		// expand through associations before processing
 		local.include = $expandThroughAssociations(arguments.include);
 
@@ -1342,6 +1311,9 @@ component {
 		local.pos = 1;
 
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			// the association that opened the level we are currently inside, or 0 at the root
+			local.parentPosition = ArrayLen(local.parentPositions) ? local.parentPositions[ArrayLen(local.parentPositions)] : 0;
+
 			// look for the next delimiter sequence in the string and set it (can be single delims or a chain, e.g ',' or ')),'
 			local.delimFind = ReFind("[(\(|\)|,)]+", local.include, local.pos, true);
 			local.delimSequence = Mid(local.include, local.delimFind.pos[1], local.delimFind.len[1]);
@@ -1553,8 +1525,18 @@ component {
 				local.delimChar = Mid(local.delimSequence, local.j, 1);
 				if (local.delimChar == "(") {
 					local.levels = ListAppend(local.levels, local.classAssociations[local.name].modelName);
+					// this association parents everything inside the parentheses it just opened;
+					// `local.i` is its position in `local.rv` because we append exactly once per pass
+					ArrayAppend(local.parentPositions, local.i);
 				} else if (local.delimChar == ")") {
 					local.levels = ListDeleteAt(local.levels, ListLen(local.levels));
+					// Guarded because an unbalanced include (`"posts)"`) reaches here with an
+					// empty stack, and ArrayDeleteAt(x, 0) throws where the ListDeleteAt above
+					// quietly tolerates it. Malformed includes behaved as before this change;
+					// they should not start erroring differently because of it.
+					if (ArrayLen(local.parentPositions)) {
+						ArrayDeleteAt(local.parentPositions, ArrayLen(local.parentPositions));
+					}
 				}
 			}
 
@@ -1572,6 +1554,8 @@ component {
 			// identifiers contain the ON substring (e.g. uppercase H2 schemas)
 			local.onPos = Find(" ON ", local.entry.join);
 			local.entry.joinOnConditions = local.onPos GT 0 ? Mid(local.entry.join, local.onPos + 4, Len(local.entry.join)) : "";
+			// position in this array of the association this one is nested under (0 = root level)
+			local.entry.parentPosition = local.parentPosition;
 			ArrayAppend(local.rv, local.entry);
 		}
 		return local.rv;
