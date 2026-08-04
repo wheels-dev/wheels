@@ -1,0 +1,1 @@
+- `$evaluateExpression()` now evaluates built-in-function expressions through the BoxLang runtime on BoxLang. BoxLang ships no `Evaluate()` BIF, so every expression that fell through to the built-in branch returned `Error evaluating expression: Function [Evaluate] not found` instead of its result (#3302)
