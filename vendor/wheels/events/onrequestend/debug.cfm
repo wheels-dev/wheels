@@ -7,33 +7,21 @@ OR (StructKeyExists(local.reqHeaders, "X-Fetch") AND local.reqHeaders["X-Fetch"]
 OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format))>
 	<cfexit>
 </cfif>
-<cfset local.baseReloadURL = cgi.script_name>
+<!---
+	Base reload URL composed from webPath (subpath-aware, issue #3344) via
+	$buildDebugReloadUrl() in Global.cfc. Engines report path_info differently,
+	so prefer the normalized request.cgi copy when available.
+--->
 <cfif IsDefined("request.cgi.path_info")>
-	<cfif request.cgi.path_info IS NOT cgi.script_name>
-		<cfset local.baseReloadURL &= request.cgi.path_info>
-	</cfif>
+	<cfset local.debugPathInfo = request.cgi.path_info>
 	<cfelse>
-	<cfif cgi.path_info IS NOT cgi.script_name>
-		<cfset local.baseReloadURL &= cgi.path_info>
-	</cfif>
+	<cfset local.debugPathInfo = cgi.path_info>
 </cfif>
-<cfif Len(cgi.query_string)>
-	<cfset local.baseReloadURL &= "?" & cgi.query_string>
-</cfif>
-<cfset local.baseReloadURL = ReplaceNoCase(local.baseReloadURL, "/" & application.wheels.rewriteFile, "")>
-<cfloop list="development,testing,maintenance,production,true" index="local.i">
-	<cfset local.baseReloadURL = ReplaceNoCase(
-		ReplaceNoCase(local.baseReloadURL, "?reload=" & local.i, ""),
-		"&reload=" & local.i,
-		""
-	)>
-</cfloop>
-<cfif local.baseReloadURL Contains "?">
-	<cfset local.baseReloadURL &= "&">
-	<cfelse>
-	<cfset local.baseReloadURL &= "?">
-</cfif>
-<cfset local.baseReloadURL &= "reload=">
+<cfset local.baseReloadURL = $buildDebugReloadUrl(
+	scriptName = cgi.script_name,
+	pathInfo = local.debugPathInfo,
+	queryString = cgi.query_string
+)>
 <cfset local.gitbranch = DirectoryExists(GetDirectoryFromPath(GetBaseTemplatePath()) & ".git") ? FileRead(
 	GetDirectoryFromPath(GetBaseTemplatePath()) & ".git/HEAD"
 ) : "">
@@ -489,8 +477,11 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 </div>
 </cfif>
 
+</div>
+
 <!--- ============ MINIMIZED BUTTON ============ --->
-<div id="wdb-minimized" style="display:none;position:fixed;bottom:8px;right:8px;z-index:99999;">
+<!--- Sibling of ##wheels-debugbar on purpose: wdbMinimize() sets the container to display:none, and a descendant of a display:none element can never render, so nesting this inside the container makes the restore button unreachable (issue ##3345). It is independently position:fixed. The script include stays below so both elements exist when debugbar.js's load-time wdbMinimize() re-invocation runs. --->
+<div id="wdb-minimized" style="all:initial;display:none;position:fixed;bottom:8px;right:8px;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
 	<button onclick="wdbRestore()" style="background:##1e1e2e;border:1px solid ##45475a;border-radius:8px;padding:6px 10px;cursor:pointer;color:##89b4fa;font-size:12px;font-family:inherit;display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(0,0,0,.3);">
 		<svg viewBox="0 0 153 18" xmlns="http://www.w3.org/2000/svg" style="width:20px;height:5px;"><path d="M15.71 12c1.65 0 2.99 1.34 2.99 3s-1.34 3-2.99 3-2.99-1.34-2.99-3v-1.27c0-.42-.15-.79-.45-1.09L6.1 6.45c-.3-.3-.66-.45-1.09-.45H3.75c-1.65 0-2.99-1.34-2.99-3S2.09 0 3.74 0s2.99 1.34 2.99 3v1.27c0 .42.15.79.45 1.09l6.17 6.19c.3.3.66.45 1.09.45z" fill="##f38ba8"/></svg>
 		Debug
@@ -498,6 +489,5 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 </div>
 
 <script><cfinclude template="/wheels/public/assets/js/debugbar.js"></script>
-</div>
 </cfoutput></cfsavecontent><cfoutput>#ReReplace(local.wdbHtml, "(?m)>\s+<", "><", "all")#</cfoutput>
 <!--- cfformat-ignore-end --->

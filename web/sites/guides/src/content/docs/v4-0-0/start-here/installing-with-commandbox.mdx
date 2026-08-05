@@ -127,10 +127,11 @@ The 3.x getting-started spine was built on CommandBox. Here's how each old step 
 | `box install cfwheels-base-template` | **Slug changed** — `box install wheels-base-template` (the `cfwheels-`-prefixed slug is dead; see below) |
 
 <Aside type="caution" title="The `cfwheels-base-template` slug is gone — use `wheels-base-template`">
-If your 2.x muscle memory is `box install cfwheels-base-template`, that command no longer works. The pre-rebrand `cfwheels-`-prefixed ForgeBox slugs (`cfwheels-base-template`, `cfwheels`) are **deprecated and unmaintained** — `cfwheels-base-template` still resolves on ForgeBox but errors on its missing `cfwheels` core dependency and leaves an unrunnable skeleton. The framework rebranded to **Wheels** at 3.0, and the supported 4.x slugs dropped the prefix:
+If your 2.x muscle memory is `box install cfwheels-base-template`, that command no longer works. The pre-rebrand `cfwheels-`-prefixed ForgeBox slugs are **dead** — `cfwheels-base-template` has been unlisted from ForgeBox entirely, so `box install cfwheels-base-template` fails with `entry slug invalid or does not exist`. The framework rebranded to **Wheels** at 3.0, and the supported 4.x slugs dropped the prefix:
 
 - `cfwheels-base-template` → [`wheels-base-template`](#supported-install-the-framework)
 - `cfwheels` → `wheels-core`
+- `cfwheels-cli` → the standalone [`wheels` CLI](/v4-0-0/start-here/installing/) (the ForgeBox `cfwheels-cli` module is the pre-rebrand CommandBox CLI; even its renamed successor, the `wheels-cli` slug, is [deprecated](#not-supported-via-commandbox-the-wheels-cli-feature-set))
 
 Install the modern slug instead:
 

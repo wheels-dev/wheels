@@ -58,9 +58,27 @@ The two-argument form of `where` means equality. The three-argument form takes a
 | `orderBy(column, direction)` | `ORDER BY column direction` (direction defaults to `ASC`) |
 | `limit(n)` | `LIMIT n` |
 | `offset(n)` | `OFFSET n` |
+| `select(columns)` | Restrict the `SELECT` list to the given columns |
+| `include(associations)` | Join the named associations (same as `findAll(include=...)`) |
+| `group(columns)` | `GROUP BY columns` |
+| `distinct()` | `SELECT DISTINCT` |
+| `forUpdate()` | `FOR UPDATE` row locking (needs a transaction; no-op on SQL Server/SQLite) |
 | `get()` | Executes, returns a query of all matching rows |
 | `first()` | Executes, returns the first matching row |
 | `count()` | Executes `COUNT(*)`, returns an integer |
+
+Every builder method can start the chain directly on the model class — you don't have to lead with `where()`. Starting with `select()` reads naturally when you only need a few columns:
+
+```cfm {test:compile}
+component extends="Controller" {
+    function directory() {
+        people = model("Person")
+            .select("id,firstName,lastName")
+            .where("department", "engineering")
+            .get();
+    }
+}
+```
 
 Here's a longer example that exercises several of these:
 

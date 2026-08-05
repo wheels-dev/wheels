@@ -65,9 +65,19 @@
 		<!--- Request Info Grid --->
 		<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:1.5em 0;">
 			<cfif IsDefined("application.wheels.rewriteFile")>
+				<!---
+					Base composed from webPath (subpath-aware, issue #3344) so subfolder
+					installs display /myapp/... instead of /myapp/public/... — same idiom
+					as urlFor() and $buildDebugReloadUrl().
+				--->
+				<cfif IsDefined("application.wheels.webPath") AND Len(application.wheels.webPath)>
+					<cfset local.errorUrlBase = Replace(application.wheels.webPath & ListLast(cgi.script_name, "/"), "/#application.wheels.rewriteFile#", "")>
+				<cfelse>
+					<cfset local.errorUrlBase = Replace(cgi.script_name, "/#application.wheels.rewriteFile#", "")>
+				</cfif>
 				<div style="background:##181825;border:1px solid ##45475a;border-radius:6px;padding:12px 16px;">
 					<div style="font-size:10px;font-weight:700;color:##6c7086;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">URL</div>
-					<div style="font-family:monospace;font-size:12px;color:##cdd6f4;word-break:break-all;">http<cfif cgi.http_x_forwarded_proto EQ "https" OR cgi.server_port_secure EQ "true">s</cfif>://#EncodeForHTML(cgi.server_name)##Replace(cgi.script_name, "/#application.wheels.rewriteFile#", "")#<cfif IsDefined("request.cgi.path_info")>#EncodeForHTML(request.cgi.path_info)#<cfelse>#EncodeForHTML(cgi.path_info)#</cfif><cfif cgi.query_string IS NOT "">?#EncodeForHTML(cgi.query_string)#</cfif></div>
+					<div style="font-family:monospace;font-size:12px;color:##cdd6f4;word-break:break-all;">http<cfif cgi.http_x_forwarded_proto EQ "https" OR cgi.server_port_secure EQ "true">s</cfif>://#EncodeForHTML(cgi.server_name)##EncodeForHTML(local.errorUrlBase)#<cfif IsDefined("request.cgi.path_info")>#EncodeForHTML(request.cgi.path_info)#<cfelse>#EncodeForHTML(cgi.path_info)#</cfif><cfif cgi.query_string IS NOT "">?#EncodeForHTML(cgi.query_string)#</cfif></div>
 				</div>
 			</cfif>
 			<cfif Len(cgi.http_referer)>
