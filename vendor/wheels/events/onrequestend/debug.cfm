@@ -7,33 +7,21 @@ OR (StructKeyExists(local.reqHeaders, "X-Fetch") AND local.reqHeaders["X-Fetch"]
 OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format))>
 	<cfexit>
 </cfif>
-<cfset local.baseReloadURL = cgi.script_name>
+<!---
+	Base reload URL composed from webPath (subpath-aware, issue #3344) via
+	$buildDebugReloadUrl() in Global.cfc. Engines report path_info differently,
+	so prefer the normalized request.cgi copy when available.
+--->
 <cfif IsDefined("request.cgi.path_info")>
-	<cfif request.cgi.path_info IS NOT cgi.script_name>
-		<cfset local.baseReloadURL &= request.cgi.path_info>
-	</cfif>
+	<cfset local.debugPathInfo = request.cgi.path_info>
 	<cfelse>
-	<cfif cgi.path_info IS NOT cgi.script_name>
-		<cfset local.baseReloadURL &= cgi.path_info>
-	</cfif>
+	<cfset local.debugPathInfo = cgi.path_info>
 </cfif>
-<cfif Len(cgi.query_string)>
-	<cfset local.baseReloadURL &= "?" & cgi.query_string>
-</cfif>
-<cfset local.baseReloadURL = ReplaceNoCase(local.baseReloadURL, "/" & application.wheels.rewriteFile, "")>
-<cfloop list="development,testing,maintenance,production,true" index="local.i">
-	<cfset local.baseReloadURL = ReplaceNoCase(
-		ReplaceNoCase(local.baseReloadURL, "?reload=" & local.i, ""),
-		"&reload=" & local.i,
-		""
-	)>
-</cfloop>
-<cfif local.baseReloadURL Contains "?">
-	<cfset local.baseReloadURL &= "&">
-	<cfelse>
-	<cfset local.baseReloadURL &= "?">
-</cfif>
-<cfset local.baseReloadURL &= "reload=">
+<cfset local.baseReloadURL = $buildDebugReloadUrl(
+	scriptName = cgi.script_name,
+	pathInfo = local.debugPathInfo,
+	queryString = cgi.query_string
+)>
 <cfset local.gitbranch = DirectoryExists(GetDirectoryFromPath(GetBaseTemplatePath()) & ".git") ? FileRead(
 	GetDirectoryFromPath(GetBaseTemplatePath()) & ".git/HEAD"
 ) : "">
