@@ -439,12 +439,40 @@ jobs:
           " || { echo "JUnit conversion failed for ${db} (non-fatal)"; rm -f "$JUNIT_FILE"; }
             fi
 
+            # Zero-test guard (#3302): a compile-wiped leg returns HTTP 200 with
+            # totalSpecs=0 (one bad CFC zeroes the whole directory compile), which
+            # previously rendered as a pass. Every engine runs the same core suite
+            # (~4,700 specs), so anything below the floor means the suite never
+            # actually ran. Revisit the floor if per-DB spec subsets ever ship.
+            MIN_SPECS=4000
+            TOTAL_SPECS="-1"
+            if [ -f "$RESULT_FILE" ] && { [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; }; then
+              TOTAL_SPECS=$(python3 -c "
+          import json, sys
+          try:
+              d = json.load(open('$RESULT_FILE'))
+              print(int(d.get('totalSpecs', 0)))
+          except:
+              print(-1)
+          " 2>/dev/null || echo "-1")
+            fi
+
+            SPECS_OK=true
+            if { [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; } && [ "$TOTAL_SPECS" -lt "$MIN_SPECS" ]; then
+              SPECS_OK=false
+              echo "::error::${{ matrix.cfengine }} + ${db}: HTTP ${HTTP_CODE} but only ${TOTAL_SPECS} testcases reported (floor: ${MIN_SPECS}) — suite likely compile-wiped, treating leg as failed"
+            fi
+
             # Track per-database result
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "PASSED: ${{ matrix.cfengine }} + ${db}"
+            if [ "$HTTP_CODE" = "200" ] && [ "$SPECS_OK" = true ]; then
+              echo "PASSED: ${{ matrix.cfengine }} + ${db} (${TOTAL_SPECS} testcases)"
               DB_STATUS="pass"
             else
-              echo "FAILED: ${{ matrix.cfengine }} + ${db} (HTTP ${HTTP_CODE})"
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "FAILED: ${{ matrix.cfengine }} + ${db} (HTTP 200 but zero-test guard tripped)"
+              else
+                echo "FAILED: ${{ matrix.cfengine }} + ${db} (HTTP ${HTTP_CODE})"
+              fi
               DB_STATUS="fail"
               if echo "$SOFT_FAIL_DBS" | grep -qw "$db"; then
                 echo "::warning::${db} tests failed but marked as soft-fail (non-blocking)"
@@ -486,6 +514,8 @@ jobs:
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
           SOFT_FAIL_DBS="oracle"
+          # Keep in sync with MIN_SPECS in the run-tests step (#3302).
+          MIN_SPECS=4000
           IFS=',' read -ra DBS <<< "${{ steps.db-list.outputs.databases }}"
           for db in "${DBS[@]}"; do
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
@@ -494,18 +524,22 @@ jobs:
               IS_SOFT_FAIL=true
             fi
             if [ -f "$RESULT_FILE" ]; then
-              # Check JSON for failures
-              FAIL_COUNT=$(python3 -c "
+              # Check JSON for failures and testcase count (zero-test guard, #3302)
+              STATS=$(python3 -c "
           import json, sys
           try:
               d = json.load(open('$RESULT_FILE'))
-              print(d.get('totalFail', 0) + d.get('totalError', 0))
+              print(int(d.get('totalFail', 0) + d.get('totalError', 0)), int(d.get('totalSpecs', 0)))
           except:
-              print(-1)
-          " 2>/dev/null || echo "-1")
+              print(-1, -1)
+          " 2>/dev/null || echo "-1 -1")
+              FAIL_COUNT="${STATS% *}"
+              SPEC_COUNT="${STATS#* }"
 
-              if [ "$FAIL_COUNT" = "0" ]; then
+              if [ "$FAIL_COUNT" = "0" ] && [ "$SPEC_COUNT" -ge "$MIN_SPECS" ]; then
                 echo "| ${db} | :white_check_mark: Pass |" >> $GITHUB_STEP_SUMMARY
+              elif [ "$FAIL_COUNT" = "0" ]; then
+                echo "| ${db} | :warning: ${SPEC_COUNT} tests (zero-test guard) |" >> "$GITHUB_STEP_SUMMARY"
               elif [ "$FAIL_COUNT" = "-1" ] && [ "$IS_SOFT_FAIL" = true ]; then
                 echo "| ${db} | :warning: Error (soft-fail) |" >> $GITHUB_STEP_SUMMARY
               elif [ "$FAIL_COUNT" = "-1" ]; then
@@ -613,6 +647,12 @@ jobs:
           files: junit-results/**/*.xml
           check_name: "Wheels Test Results"
           comment_title: "Wheels Test Results"
+          # Keep the aggregate check neutral (#3302): oracle soft-fail debt
+          # otherwise pins a red "Wheels Test Results" check to whatever SHA
+          # the matrix was dispatched on, marking innocent PRs UNSTABLE.
+          # Leg pass/fail gating lives in the tests job (OVERALL_STATUS);
+          # annotations, PR comments, and artifacts are unaffected by this.
+          fail_on: nothing
           report_individual_runs: true
           report_suite_logs: any
           json_file: junit-results/test-results.json
@@ -647,27 +687,41 @@ jobs:
           MATRIX_MD="${MATRIX_MD}
           "
           MATRIX_MD="${MATRIX_MD}
-          | Engine | MySQL | PostgreSQL | SQL Server | H2 | CockroachDB | Oracle | SQLite |"
+          | Engine | MySQL | PostgreSQL | SQL Server | H2 | CockroachDB | Oracle (soft-fail) | SQLite |"
           MATRIX_MD="${MATRIX_MD}
-          |--------|:-----:|:----------:|:----------:|:--:|:-----------:|:------:|:------:|"
+          |--------|:-----:|:----------:|:----------:|:--:|:-----------:|:------------------:|:------:|"
+
+          # Keep in sync with SOFT_FAIL_DBS and MIN_SPECS in the tests job (#3302).
+          SOFT_FAIL_DBS="oracle"
+          MIN_SPECS=4000
 
           for engine in lucee6 lucee7 adobe2023 adobe2025 boxlang; do
             ROW="| **${engine}** |"
             for db in mysql postgres sqlserver h2 cockroachdb oracle sqlite; do
               FILE="results/test-results-${engine}/${engine}-${db}-result.txt"
+              IS_SOFT_FAIL=false
+              if echo "$SOFT_FAIL_DBS" | grep -qw "$db"; then
+                IS_SOFT_FAIL=true
+              fi
               if [ -f "$FILE" ]; then
-                FAIL=$(python3 -c "
+                STATS=$(python3 -c "
           import json, sys
           try:
               d = json.load(open('$FILE'))
-              print(int(d.get('totalFail', 0) + d.get('totalError', 0)))
+              print(int(d.get('totalFail', 0) + d.get('totalError', 0)), int(d.get('totalSpecs', 0)))
           except:
-              print(-1)
-          " 2>/dev/null || echo "-1")
-                if [ "$FAIL" = "0" ]; then
+              print(-1, -1)
+          " 2>/dev/null || echo "-1 -1")
+                FAIL="${STATS% *}"
+                SPECS="${STATS#* }"
+                if [ "$FAIL" = "0" ] && [ "$SPECS" -ge "$MIN_SPECS" ]; then
                   ROW="${ROW} :white_check_mark: |"
                 elif [ "$FAIL" = "-1" ]; then
                   ROW="${ROW} :warning: |"
+                elif [ "$FAIL" = "0" ]; then
+                  ROW="${ROW} :warning: ${SPECS} tests |"
+                elif [ "$IS_SOFT_FAIL" = true ]; then
+                  ROW="${ROW} :warning: ${FAIL} |"
                 else
                   ROW="${ROW} :x: ${FAIL} |"
                 fi
@@ -680,6 +734,9 @@ jobs:
           done
 
           MATRIX_MD="${MATRIX_MD}
+
+          *Oracle is soft-fail (non-blocking, tracked in #2663) — :warning: cells in that column never gate the run.*
+          *A ':warning: N tests' cell means the leg reported fewer than ${MIN_SPECS} testcases (suite likely compile-wiped, counted as failed).*
 
           *Results for commit ${GITHUB_SHA:0:7}.*"
 
