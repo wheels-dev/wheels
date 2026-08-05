@@ -1,0 +1,73 @@
+---
+title: Performance Notes for 2.x Upgraders
+description: What we measured after a reported 2.x-to-4.x slowdown — the root cause, the fix, and how to get it on your install.
+type: explanation
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+If you ported an app from Wheels 2.x and your test suite or request times got noticeably slower on 4.0.3–4.0.5, this page is for you. A user report of exactly that ([#3213](https://github.com/wheels-dev/wheels/issues/3213)) led to a profiling campaign, a root cause, and a fix. Everything below is a measured number from that work — no projections.
+
+## The reported regression
+
+The reporter ran the *same* RocketUnit test suite against both versions:
+
+| Version | Suite duration |
+|---|---|
+| Wheels 2.5 | 274 s |
+| Wheels 4.0.3 | 1,599 s (~27 min) |
+
+That's roughly a 6× slowdown on a like-for-like runner (their environment: Lucee 5 on Tomcat). Your mileage will differ by engine and workload, but the mechanism behind it applies to every 4.0.x install before the fix.
+
+## Root cause: per-instance mixin re-integration
+
+The cost was not per-test or per-request — it was per **object materialization**. On 4.0.x before the fix, every `model("X").new()` *and every row returned by* `findAll()` / `findOne()` / `findByKey()` re-ran the framework's mixin integration from scratch:
+
+- a directory listing of `vendor/wheels/model/`
+- a `createObject()` **and** a `getMetaData()` call per file in it (18 files)
+- a re-resolve of all ~231 mixed-in public methods, each with an override check
+
+`Controller` and `Mapper` creation carried the identical pattern. A test suite (or any finder-heavy request) materializes huge numbers of objects, so the overhead compounded badly.
+
+## The fix ([#3236](https://github.com/wheels-dev/wheels/pull/3236))
+
+The integration plan is now built **once per application** and replayed cheaply for every subsequent instance: the directory scan, per-file metadata, resolved method references, and the plugin-override set are all cached in application scope (a sibling of the schema cache). The cache is rebuilt on `?reload=true`, so framework and plugin edits are still picked up in development. Semantics are unchanged — the same public methods and `super<name>` aliases are mixed in, in the same order, and a guard spec pins the behavior.
+
+Measured on Lucee 7 + SQLite:
+
+| | Before | After |
+|---|---|---|
+| 2,000 × `model().new()` | 2,772 ms | 1,513 ms (~1.8×) |
+| Full framework test suite | 33.3 s | ~22 s |
+
+The framework suite is only partly instance-creation, so its delta understates the win for an instance-heavy app suite like the one in the original report.
+
+<Aside type="note">
+A follow-up experiment (cloning a pre-mixed prototype, which profiled ~5.8× faster on instance creation) was investigated and abandoned as a dead end — #3236 is the shipped fix.
+</Aside>
+
+## Where 4.0 stands after the fix
+
+Independent profiling of the framework in June 2026 (JFR + Apache Bench, Lucee 7 + SQLite) established the wider baseline:
+
+- **Cold first request ≈ 1.2–1.3 s, and ~85% of it is the Lucee CFML-to-bytecode compiler**, not Wheels bootstrap logic (which measured ≈ 20 ms). Cold-start time is a compile cost you pay once per deploy — see the warm-up notes in the deployment guides.
+- **Warm request serving ≈ 0.38 ms in-JVM** (~2,600 req/s single-instance, debug output off).
+- **The development debug bar costs ~34% of throughput** (+0.13 ms/request) and inflates response size. It is strictly development-only — production requests never pay it — but keep it in mind when benchmarking in the `development` environment: measure with debug output off, or in `production` mode.
+
+The practical takeaway for benchmarking your upgraded app: warm the app first (the cold request is dominated by compilation), run in `production`/`testing` mode or with debug off, and compare per-suite or per-request timings before and after applying the fix below.
+
+## How to get the fix
+
+The fix merged to `develop` on 2026-06-20 — one day **after** v4.0.5 was tagged, so it is not in any stable release yet. It ships with **v4.0.6**. Until then it is available on the bleeding-edge channel, which tracks `develop`:
+
+```bash
+# install the bleeding-edge CLI (brew/apt/yum/scoop all have a -be channel;
+# see the Release Channels guide for your platform's exact package)
+wheels upgrade check     # preview what would change
+wheels upgrade apply     # swap your app's vendor/wheels to the BE framework
+wheels server start
+```
+
+`wheels upgrade apply` swaps `vendor/wheels/` in place — do it on a branch or a copy of the app so it's easy to roll back. Once v4.0.6 is out, the stable channel carries the fix and no channel switch is needed.
+
+→ [Release Channels](/v4-0-0/start-here/release-channels/) covers switching between stable and bleeding-edge (and back) per platform.

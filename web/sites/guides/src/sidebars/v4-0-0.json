@@ -43,6 +43,7 @@
       { "label": "Upgrading from 3.x to 4.0", "link": "/v4-0-0/upgrading/3x-to-4x/" },
       { "label": "Upgrading Without the CLI", "link": "/v4-0-0/upgrading/manual-upgrades/" },
       { "label": "Upgrading from 2.x to 3.x", "link": "/v4-0-0/upgrading/2x-to-3x/" },
+      { "label": "Performance Notes for 2.x Upgraders", "link": "/v4-0-0/upgrading/performance-notes/" },
       { "label": "Release Channels", "link": "/v4-0-0/start-here/release-channels/" },
       { "label": "Reading the Changelog", "link": "/v4-0-0/upgrading/changelog/" }
     ]
