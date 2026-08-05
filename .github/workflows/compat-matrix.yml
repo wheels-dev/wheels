@@ -15,7 +15,6 @@ jobs:
   tests:
     name: "${{ matrix.cfengine }}"
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
