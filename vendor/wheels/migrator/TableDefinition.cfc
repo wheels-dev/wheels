@@ -96,7 +96,7 @@ component extends="Base" {
 	public any function column(
 		required string columnName,
 		required string columnType,
-		string default,
+		default,
 		boolean allowNull,
 		any limit,
 		numeric precision,
@@ -148,7 +148,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function bigInteger(string columnNames, numeric limit, string default, boolean allowNull) {
+	public any function bigInteger(string columnNames, numeric limit, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "biginteger", args = arguments);
 	}
 
@@ -158,7 +158,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function binary(string columnNames, string default, boolean allowNull) {
+	public any function binary(string columnNames, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "binary", args = arguments);
 	}
 
@@ -168,7 +168,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function boolean(string columnNames, string default, boolean allowNull) {
+	public any function boolean(string columnNames, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "boolean", args = arguments);
 	}
 
@@ -178,7 +178,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function date(string columnNames, string default, boolean allowNull) {
+	public any function date(string columnNames, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "date", args = arguments);
 	}
 
@@ -188,7 +188,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function datetime(string columnNames, string default, boolean allowNull) {
+	public any function datetime(string columnNames, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "datetime", args = arguments);
 	}
 
@@ -198,7 +198,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function decimal(string columnNames, string default, boolean allowNull, numeric precision, numeric scale) {
+	public any function decimal(string columnNames, default, boolean allowNull, numeric precision, numeric scale) {
 		return $addTypedColumns(columnType = "decimal", args = arguments);
 	}
 
@@ -208,7 +208,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function float(string columnNames, string default = "", boolean allowNull = "true") {
+	public any function float(string columnNames, default = "", boolean allowNull = "true") {
 		// NOTE: the default=""/allowNull="true" parameter defaults are a
 		// long-standing outlier among these helpers — preserved as-is for
 		// backward compatibility (addColumnOptions renders default="" as
@@ -222,7 +222,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function integer(string columnNames, numeric limit, string default, boolean allowNull) {
+	public any function integer(string columnNames, numeric limit, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "integer", args = arguments);
 	}
 
@@ -232,7 +232,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function string(string columnNames, any limit, string default, boolean allowNull) {
+	public any function string(string columnNames, any limit, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "string", args = arguments);
 	}
 
@@ -242,7 +242,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function char(string columnNames, any limit, string default, boolean allowNull) {
+	public any function char(string columnNames, any limit, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "char", args = arguments);
 	}
 
@@ -259,7 +259,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function text(string columnNames, string default, boolean allowNull, string size) {
+	public any function text(string columnNames, default, boolean allowNull, string size) {
 		return $addTypedColumns(columnType = "text", args = arguments);
 	}
 
@@ -269,7 +269,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function uniqueidentifier(string columnNames, string default = "newid()", boolean allowNull) {
+	public any function uniqueidentifier(string columnNames, default = "newid()", boolean allowNull) {
 		// NOTE: the default="newid()" parameter default is MSSQL syntax — this
 		// helper is only registered by the MicrosoftSQLServer adapter, so the
 		// outlier default is preserved as-is.
@@ -282,7 +282,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function time(string columnNames, string default, boolean allowNull) {
+	public any function time(string columnNames, default, boolean allowNull) {
 		return $addTypedColumns(columnType = "time", args = arguments);
 	}
 
@@ -292,7 +292,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function timestamp(string columnNames, string default, boolean allowNull, string columnType = "datetime") {
+	public any function timestamp(string columnNames, default, boolean allowNull, string columnType = "datetime") {
 		// columnType is caller-overridable here (defaults to "datetime") —
 		// unlike the sibling helpers, which stamp a fixed type.
 		return $addTypedColumns(columnType = arguments.columnType, args = arguments);
@@ -338,7 +338,7 @@ component extends="Base" {
 	public any function references(
 		string referenceNames,
 		string columnNames,
-		string default,
+		default,
 		boolean allowNull = "false",
 		boolean polymorphic = "false",
 		boolean foreignKey = "true",

@@ -32,7 +32,15 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	public any function put(required string key, required any content, string contentType = "", string visibility = "") {
 		local.path = $resolve(arguments.key);
 		$ensureParentDir(local.path);
-		FileWrite(local.path, arguments.content);
+		// Write bytes, never a string. Adobe 2025's FileWrite() appends a
+		// trailing LF (0x0A) when handed a simple value — storing "hello world"
+		// put 12 bytes on disk, so `get()` no longer round-tripped what `put()`
+		// was given, and any binary payload came back corrupted by one byte.
+		// Lucee 6/7, BoxLang and Adobe 2023 write the string verbatim, so this
+		// only ever surfaced on the adobe2025 matrix legs (#3302). The binary
+		// overload has no line-ending behaviour on any engine.
+		local.payload = IsBinary(arguments.content) ? arguments.content : CharsetDecode(arguments.content, "utf-8");
+		FileWrite(local.path, local.payload);
 		return arguments.key;
 	}
 

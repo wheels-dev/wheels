@@ -5,6 +5,24 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 */
 	public struct function $init() {
 		include "/wheels/public/helpers.cfm";
+
+		// The include above declares its UDFs into `variables` only — they never
+		// reach `this` on Lucee 6, Adobe 2023 or Adobe 2025 (Lucee 7 and BoxLang
+		// do promote them, which is why the split stayed invisible). Every helper
+		// in helpers.cfm is declared `public`, and the framework's own views reach
+		// them through `variables`, so the divergence only bites an external
+		// caller — `CreateObject("component", "wheels.Public").$init().$$findMatchingRoutes(…)`
+		// threw "has no function with name" on three of five engines (##3302).
+		//
+		// Same problem, same fix as the `/app/global/functions.cfm` include in
+		// `Global.cfc`'s pseudo-constructor. Call the raw scan rather than
+		// `$promoteIncludedGlobalsToThis()`: that wrapper memoizes its promote
+		// list per class in application scope, and the entry for `wheels.Public`
+		// is written by the pseudo-constructor *before* this include runs — so the
+		// memoized path would replay a stale, pre-include key list and promote
+		// nothing. This is the dev-only GUI component, not a request hot path.
+		$scanAndPromoteIncludedGlobals();
+
 		return this;
 	}
 
