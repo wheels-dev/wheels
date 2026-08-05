@@ -279,11 +279,12 @@ component extends="wheels.WheelsTest" {
 
 				it("forUpdate() starts a chain", () => {
 					// FOR UPDATE is a no-op on SQLite/MSSQL; this pins the chain-entry dispatch, not the locking.
+					// Terminal must be non-aggregate: Postgres/CockroachDB reject COUNT(*) ... FOR UPDATE.
 					var result = model("author")
 						.forUpdate()
 						.where("lastName", "Djurner")
-						.count();
-					expect(result).toBe(1);
+						.get();
+					expect(result.recordcount).toBe(1);
 				})
 
 			})
@@ -291,11 +292,12 @@ component extends="wheels.WheelsTest" {
 			describe("scope chain to builder transition", () => {
 
 				it("forUpdate() transitions from a scope chain to the query builder", () => {
+					// Non-aggregate terminal for the same Postgres/CockroachDB FOR UPDATE restriction.
 					var result = model("authorScoped")
 						.withLastNameDjurner()
 						.forUpdate()
-						.count();
-					expect(result).toBe(1);
+						.get();
+					expect(result.recordcount).toBe(1);
 				})
 
 			})
