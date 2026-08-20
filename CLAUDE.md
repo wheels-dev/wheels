@@ -107,6 +107,34 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
     FileWrite(path, payload);
     ```
 
+19. **The `application` scope is unreliable inside `onApplicationEnd()` on Adobe CF 2023.** During `applicationStop()` teardown (triggered by a `?reload` restart or idle-timeout reclaim), bare `application.wo` can resolve against a stale/torn-down scope and land on a Java `String[]`, throwing `Element wo is undefined in a Java object of type class [Ljava.lang.String;` and erroring the whole site until a CF service restart. The only dependable reference at shutdown is the passed-in `arguments.applicationScope`. Always route `onApplicationEnd()` through it and guard with `StructKeyExists` so a partially reclaimed scope degrades to a no-op (#3379). Lucee 6/7 and BoxLang are unaffected; only Adobe CF exhibits this during real teardown.
+
+    ```cfm
+    // WRONG — bare application.wo breaks on Adobe CF during applicationStop() teardown
+    public void function onApplicationEnd(struct ApplicationScope) {
+        application.wo.$include(
+            template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+            argumentCollection = arguments
+        );
+    }
+
+    // RIGHT — route through the passed-in scope and guard before dereferencing
+    public void function onApplicationEnd(struct ApplicationScope) {
+        if (
+            StructKeyExists(arguments.applicationScope, "wo")
+            && StructKeyExists(arguments.applicationScope, "wheels")
+            && StructKeyExists(arguments.applicationScope.wheels, "eventPath")
+        ) {
+            arguments.applicationScope.wo.$include(
+                template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+                argumentCollection = arguments
+            );
+        }
+    }
+    ```
+
+    The CLI template (`wheels new`) and the demo app were fixed in #3380. **Existing apps must apply the same change to their `public/Application.cfc`.**
+
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
 curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
