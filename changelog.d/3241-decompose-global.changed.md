@@ -1,0 +1,1 @@
+- `vendor/wheels/Global.cfc` is no longer a 4,800-line monolith: helpers now live in focused `vendor/wheels/global/*.cfm` includes compiled into the component. The public `$`-prefixed mixin surface is unchanged (#3241)
