@@ -32,7 +32,11 @@ DB="${DB:-sqlite}"
 # Must match set(reloadPassword=...) in config/settings.cfm — a mismatch never
 # reloads and, since #3062, counts against the per-IP reload rate limit.
 PASSWORD="wheels-dev"
-RESULT_FILE="/tmp/wheels-local-test-results.json"
+# Per-checkout results file. A single fixed /tmp path is shared by every checkout on
+# the machine, so two working copies running the suite overwrite each other's results —
+# and a develop-vs-branch comparison silently becomes two copies of the same run
+# (issue #3352). Keyed on the project root so concurrent checkouts stay separate.
+RESULT_FILE="${WHEELS_TEST_RESULT_FILE:-/tmp/wheels-local-test-results-$(echo "$PROJECT_ROOT" | shasum | cut -c1-12).json}"
 
 # Browser specs call back into the local Wheels CLI server — point Playwright
 # at the right port. CI sets this explicitly before invoking the script;
@@ -129,6 +133,10 @@ if [ -n "$FILTER" ]; then
 fi
 
 echo "Running tests: Lucee 7 + SQLite${FILTER:+ (filter: $FILTER)}"
+# Clear it first. When the request fails outright — a server that is not up yet reports
+# HTTP 000 — curl may write nothing, leaving the PREVIOUS run's results sitting there to
+# be read as if they were this run's (issue #3352). A crashed run must leave no result.
+rm -f "$RESULT_FILE"
 HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
   --max-time 600 \
   --write-out "%{http_code}" \

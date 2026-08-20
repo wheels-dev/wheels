@@ -82,3 +82,15 @@ web/tests/visual-diffs/
 # on every develop CI run, then used to build the api site. Never committed.
 /docs/api/v*-snapshot.json
 /web/sites/api/src/content/docs/v*-snapshot/
+# Runtime artifacts written into the working tree by a local test run or dev
+# server. All three are regenerated on demand and none are source, but until now
+# none were ignored either — so any `git add -A` after running the suite swept
+# them into the diff. That happened twice: caught in review on the #3334/#3350/
+# #3349/#3325/#3351 batch, and missed on #3362, which merged seven of them.
+#
+# public/testbox/system/stubs/ predates this entry with one file already tracked
+# (F952D54F…). Ignoring a directory does not untrack what is already in the index,
+# so that one stays as-is; only the accidental additions were removed.
+public/testbox/system/stubs/
+/rewrite.config
+/box.json

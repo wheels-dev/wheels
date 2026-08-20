@@ -55,17 +55,33 @@ component {
 		switch (arguments.transaction) {
 			case "commit":
 			case "rollback":
-				transaction action="begin" isolation=arguments.isolation {
-					try {
-						local.rv = $invoke(method = arguments.method, componentReference = this, invokeArgs = local.methodArgs);
-						if (!IsBoolean(local.rv) || !local.rv || arguments.transaction eq "rollback") {
+				// The outer try/catch exists because the `transaction action="begin"`
+				// tag can throw before the inner one is ever entered — an unsupported
+				// isolation level, a nested-isolation mismatch on Adobe, a dead
+				// connection. The open marker is set above, so without this the
+				// marker stayed `true` for the rest of the request and every later
+				// invokeWithTransaction took the "alreadyopen" path and silently ran
+				// with no transaction at all. The whole core suite runs in one
+				// request, which is how a single throwing begin in
+				// CockroachDBTransactionSpec went on to fail OuterTransactionSignalSpec
+				// several bundles later (#3302). Resetting twice is harmless: the
+				// inner catch already clears the same flag before it rethrows.
+				try {
+					transaction action="begin" isolation=arguments.isolation {
+						try {
+							local.rv = $invoke(method = arguments.method, componentReference = this, invokeArgs = local.methodArgs);
+							if (!IsBoolean(local.rv) || !local.rv || arguments.transaction eq "rollback") {
+								transaction action="rollback";
+							}
+						} catch (any e) {
 							transaction action="rollback";
+							request.wheels.transactions[local.connectionArgs] = false;
+							rethrow;
 						}
-					} catch (any e) {
-						transaction action="rollback";
-						request.wheels.transactions[local.connectionArgs] = false;
-						rethrow;
 					}
+				} catch (any e) {
+					request.wheels.transactions[local.connectionArgs] = false;
+					rethrow;
 				}
 				break;
 			case "false":

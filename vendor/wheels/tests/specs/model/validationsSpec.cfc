@@ -1015,6 +1015,32 @@ component extends="wheels.WheelsTest" {
 				expect(combiKey.valid()).toBeFalse()
 			})
 
+			// Issue #3350: a property named in `scope=` that was never assigned is ABSENT
+			// from the object, not present-and-empty — `$setDefaultValues()` only seeds
+			// properties with an explicit `property()` mapping. The scope dereference had no
+			// existence guard, so building the uniqueness WHERE clause threw
+			// "Component [X] has no accessible Member with name [Y]" out of a method whose
+			// entire job is to return a validation result. The validated property itself
+			// cannot hit this — `$shouldInvokeValidation()` skips the validation when it is
+			// absent — so only `scope=` was exposed.
+			it("validatesUniquenessOf_with_absent_scope_property", () => {
+				combiKey = g.model("combiKey").new(id1 = 1, id2 = 1)
+				StructDelete(combiKey, "id2")
+
+				// must return a validation result rather than throwing
+				expect(combiKey.valid()).toBeFalse()
+			})
+
+			// An absent scope property must behave exactly like a present-but-empty one —
+			// the split between the two was the defect, not the value itself.
+			it("validatesUniquenessOf_absent_scope_matches_blank_scope", () => {
+				absent = g.model("combiKey").new(id1 = 1, id2 = "")
+				StructDelete(absent, "id2")
+				blank = g.model("combiKey").new(id1 = 1, id2 = "")
+
+				expect(absent.$buildWhereClausePart("id2")).toBe(blank.$buildWhereClausePart("id2"))
+			})
+
 			it("validatesUniquenessOf_with_blank_property_value", () => {
 				user.blank = ""
 				user.validatesUniquenessOf(properties = "blank")

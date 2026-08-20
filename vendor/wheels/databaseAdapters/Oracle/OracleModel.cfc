@@ -279,17 +279,32 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Oracle bulk insert using `INSERT ALL INTO ... SELECT 1 FROM dual`.
+	 * Oracle bulk insert using `INSERT INTO t (cols) SELECT ... FROM dual UNION ALL ...`.
 	 *
-	 * The default Base adapter shape — `INSERT INTO t (cols) VALUES (?,?), (?,?), ...`
-	 * (SQL standard table value constructor) — was rejected on Oracle 23 with
-	 * `ORA: returning clause is not allowed with INSERT and Table Value Constructor`.
-	 * The CFML engine's `cfquery` for INSERT statements implicitly sets
-	 * `Statement.RETURN_GENERATED_KEYS`, which the Oracle JDBC driver translates into a
-	 * RETURNING clause — and Oracle 23 does not permit RETURNING with multi-row VALUES.
+	 * Two Oracle constraints shape this, and satisfying only the first is what the
+	 * previous `INSERT ALL` form did.
 	 *
-	 * `INSERT ALL` is the Oracle-idiomatic multi-row insert form, doesn't trigger the
-	 * RETURNING-clause expansion, and works on every Oracle version Wheels targets.
+	 * 1. The default Base adapter shape — `INSERT INTO t (cols) VALUES (?,?), (?,?)`
+	 *    (SQL standard table value constructor) — was rejected on Oracle 23 with
+	 *    `ORA: returning clause is not allowed with INSERT and Table Value
+	 *    Constructor`. The CFML engine's `cfquery` implicitly sets
+	 *    `Statement.RETURN_GENERATED_KEYS` on INSERTs, which the Oracle JDBC driver
+	 *    translates into a RETURNING clause, and Oracle 23 does not permit RETURNING
+	 *    with multi-row VALUES (#2745).
+	 *
+	 * 2. In a multitable insert (`INSERT ALL`), Oracle evaluates each row's default
+	 *    expressions ONCE PER ROW OF THE DRIVING QUERY and shares the result across
+	 *    every INTO clause. The driving query was `SELECT 1 FROM dual` — a single row
+	 *    — so every INTO received the SAME identity value, and any table with an
+	 *    identity or sequence-backed primary key got a duplicate-key violation on the
+	 *    second record: `ORA-00001 ... row with column values (ID:1) already exists`.
+	 *    insertAll() could never insert more than one row into such a table (#3302).
+	 *
+	 * `INSERT ... SELECT ... UNION ALL` satisfies both: it is not a table value
+	 * constructor, and its driving query returns one row per record, so the identity
+	 * default is evaluated per row. It is also the shape `$upsertSQL` below already
+	 * uses for its MERGE source, including the alias-the-first-branch-only detail.
+	 *
 	 * Uses parameterized values via `$buildBulkParam` — never interpolates user data
 	 * into SQL.
 	 */
@@ -312,11 +327,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.colList &= $quoteIdentifier(local.col);
 		}
 
-		ArrayAppend(local.sql, "INSERT ALL");
+		ArrayAppend(local.sql, "INSERT INTO #arguments.tableName# (#local.colList#) ");
 
 		local.propCount = ArrayLen(arguments.validProperties);
 		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
-			ArrayAppend(local.sql, " INTO #arguments.tableName# (#local.colList#) VALUES (");
+			if (local.r > arguments.batchStart) {
+				ArrayAppend(local.sql, " UNION ALL ");
+			}
+			ArrayAppend(local.sql, "SELECT ");
 			for (local.p = 1; local.p <= local.propCount; local.p++) {
 				if (local.p > 1) {
 					ArrayAppend(local.sql, ", ");
@@ -328,11 +346,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 					propName = local.propName,
 					propertyInfo = arguments.propertyInfo
 				));
+				// Only the first branch needs column aliases; the rest of the
+				// UNION ALL inherits them. Same rule as $upsertSQL's MERGE source.
+				if (local.r == arguments.batchStart) {
+					ArrayAppend(local.sql, " AS " & $quoteIdentifier(arguments.columns[local.p]));
+				}
 			}
-			ArrayAppend(local.sql, ")");
+			ArrayAppend(local.sql, " FROM dual");
 		}
-
-		ArrayAppend(local.sql, " SELECT 1 FROM dual");
 
 		return local.sql;
 	}

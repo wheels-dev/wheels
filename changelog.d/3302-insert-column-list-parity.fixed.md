@@ -1,0 +1,1 @@
+- `$parseInsertColumnList()` now uses one implementation on every engine instead of forking on a BoxLang check whose non-BoxLang branch dropped the comma delimiters when it ran on BoxLang. The unified regex form also preserves spaces inside quoted identifiers such as `[order date]`, which the previous `ReplaceList` form stripped (#3302)

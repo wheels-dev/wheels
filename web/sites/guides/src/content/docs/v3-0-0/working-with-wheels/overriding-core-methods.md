@@ -3,6 +3,8 @@ title: Overriding Core Methods
 ---
 ## Overriding Core Wheels Methods (Wheels 3.x)
 
+> **Version scope:** In Wheels 3.x the `super`-prefixed convention described on this page applies to **model** methods only. Overriding controller and view helpers (e.g. `linkTo()`) with `superLinkTo()` delegation is not available in 3.x — that parity arrived in Wheels 4.0.x ([#3325](https://github.com/wheels-dev/wheels/issues/3325)). See the v4 guide: [Overriding Core Methods](/v4-0-0/digging-deeper/overriding-core-methods/).
+
 In Wheels 2.5, developers could override core framework methods (such as `findAll`) in their models and call the original Wheels implementation using the `super` scope.
 
 Due to internal framework restructuring in Wheels 3.0, this behavior no longer works using the traditional `super.methodName()` syntax. To restore this capability in a predictable and explicit way, Wheels now provides a new **`super`-prefixed method convention**.

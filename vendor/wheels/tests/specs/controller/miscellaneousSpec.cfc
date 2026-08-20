@@ -494,7 +494,17 @@ component extends="wheels.WheelsTest" {
 				fileContent = FileRead(filePath)
 				FileDelete(filePath)
 
-				expect(fileContent).toInclude(textBody & Chr(13) & Chr(10) & Chr(13) & Chr(10) & HTMLBody)
+				// Assert the blank line, not the bytes that encode it. sendEmail
+				// writes CRLFCRLF, but BoxLang's cffile write normalizes CRLF to LF
+				// on the way to disk — a byte-level probe showed a 10-byte
+				// "AAA\r\n\r\nBBB" payload landing as 8 bytes — so a literal
+				// CRLFCRLF needle failed on all five boxlang legs while passing on
+				// Lucee and Adobe (#3302). The line-ending encoding of a debug
+				// artifact is the engine's business; the blank line is ours.
+				normalized = Replace(fileContent, Chr(13) & Chr(10), Chr(10), "all")
+				normalized = Replace(normalized, Chr(13), Chr(10), "all")
+
+				expect(normalized).toInclude(textBody & Chr(10) & Chr(10) & HTMLBody)
 			})
 
 			it("sends single template email when layout is an empty string", () => {

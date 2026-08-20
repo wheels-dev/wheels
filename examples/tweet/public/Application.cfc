@@ -128,10 +128,22 @@ component output="false" {
 	}
 
 	public void function onApplicationEnd( struct ApplicationScope ) {
-		application.wo.$include(
-			template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
-			argumentCollection = arguments
-		);
+		// During applicationStop() teardown on Adobe CF 2023 the LIVE `application`
+		// scope is unreliable — bare `application.wo` can resolve against a
+		// stale/torn-down scope and land on a Java String[], throwing "Element wo
+		// is undefined in a Java object of type class [Ljava.lang.String;" (issue
+		// #3379). The passed-in arguments.applicationScope is the only dependable
+		// reference at shutdown, so route the call through it and guard it.
+		if (
+			StructKeyExists(arguments.applicationScope, "wo")
+			&& StructKeyExists(arguments.applicationScope, "wheels")
+			&& StructKeyExists(arguments.applicationScope.wheels, "eventPath")
+		) {
+			arguments.applicationScope.wo.$include(
+				template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+				argumentCollection = arguments
+			);
+		}
 	}
 
 	public void function onSessionStart() {

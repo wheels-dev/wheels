@@ -36,6 +36,38 @@ plugin.onPluginLoad(context);
 
 **Why**: Adobe's application scope is implemented differently from a regular CFML struct. Function members get lost or throw errors during serialization.
 
+### Application Scope Unreliable During onApplicationEnd() Teardown (Adobe CF 2023)
+
+On Adobe CF 2023, `onApplicationEnd()` fires synchronously during `applicationStop()` teardown (triggered by a `?reload` restart or idle-timeout reclaim). Inside that teardown the live `application` scope is no longer reliable — bare `application.wo` can resolve against a stale/torn-down scope and land on a Java `String[]`, throwing `Element wo is undefined in a Java object of type class [Ljava.lang.String;` and erroring the whole site until a CF service restart.
+
+The only dependable reference at shutdown is the passed-in `arguments.applicationScope` (already used by the `$wheelsBrowserLauncher` cleanup in the same handler). Route all `onApplicationEnd()` calls through it and guard with `StructKeyExists` so a partially reclaimed scope degrades to a no-op instead of a hard error. Lucee 6/7 and BoxLang are unaffected; this only manifests on Adobe CF during real teardown (issue #3379).
+
+```cfm
+// WRONG — bare application.wo breaks during Adobe CF applicationStop() teardown
+public void function onApplicationEnd(struct ApplicationScope) {
+    application.wo.$include(
+        template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+        argumentCollection = arguments
+    );
+}
+
+// RIGHT — use the passed-in scope, the only reliable reference at shutdown
+public void function onApplicationEnd(struct ApplicationScope) {
+    if (
+        StructKeyExists(arguments.applicationScope, "wo")
+        && StructKeyExists(arguments.applicationScope, "wheels")
+        && StructKeyExists(arguments.applicationScope.wheels, "eventPath")
+    ) {
+        arguments.applicationScope.wo.$include(
+            template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+            argumentCollection = arguments
+        );
+    }
+}
+```
+
+**Existing apps**: apply this same change to `public/Application.cfc` — the CLI template (`wheels new`) and the demo app were fixed in Wheels 4.x (#3380).
+
 ### Closure `this` Captures Declaring Scope
 
 CFML closures bind `this` to the component where they are DEFINED, not where they are ASSIGNED. This trips up test code that dynamically adds methods.

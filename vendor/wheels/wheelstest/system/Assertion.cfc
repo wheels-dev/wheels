@@ -1286,6 +1286,17 @@ component {
 			return true;
 		}
 
+		// Two simple values that did not match above are unequal, and saying so here
+		// is what keeps them away from the `.equals()` fallback at the bottom of this
+		// function. That fallback is meant for objects; on BoxLang a simple value
+		// resolves `.equals()` to the DateTime member function and throws
+		// "Can't cast [2] to a DateTime", so an ordinary numeric mismatch was
+		// reported as an ERROR carrying a cast message instead of a FAILURE reading
+		// "Expected [2] but received [0]" (#3302).
+		if ( isSimpleValue( arguments.actual ) && isSimpleValue( arguments.expected ) ) {
+			return false;
+		}
+
 		// Queries
 		if ( isQuery( arguments.actual ) && isQuery( arguments.expected ) ) {
 			// Check number of records

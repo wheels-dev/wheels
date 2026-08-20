@@ -48,7 +48,16 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("updateAll with rollback does not persist changes", () => {
-					transaction action="begin" {
+					// The isolation level must be declared here even though this
+					// outer transaction does not otherwise need one. updateAll's
+					// transaction="rollback" routes through invokeWithTransaction,
+					// which opens its own cftransaction with isolation="read_committed"
+					// — and Adobe rejects a nested cftransaction whose isolation
+					// level differs from its parent's ("Nested cftransaction tag
+					// should specify same isolation level as the parent"). Lucee and
+					// BoxLang do not enforce that, so an undeclared parent only fails
+					// on the two Adobe legs of the matrix (#3302).
+					transaction action="begin" isolation="read_committed" {
 						g.model("tag").updateAll(name = "CRDBTemp", transaction = "rollback");
 						var changed = g.model("tag").findAll(where = "name = 'CRDBTemp'");
 						expect(changed.recordCount).toBe(0);
