@@ -111,6 +111,43 @@ component extends="wheels.WheelsTest" {
 				ctx.g.$include(template = eventPath & "/onapplicationend.cfm");
 			});
 
+			it("lists mapping-free fallbacks for /wheels and /app includes", () => {
+				// Adobe applicationStop() drops THIS.mappings; authorized
+				// reload then re-evaluates Global.cfc and 500s on
+				// include "/wheels/global/locking.cfm". These fallbacks
+				// are the mapping-free paths (this CFC, then public/).
+				var wheelsFallbacks = ctx.g.$mappedIncludeFallbacks("/wheels/global/locking.cfm");
+				expect(ArrayLen(wheelsFallbacks)).toBe(2);
+				expect(wheelsFallbacks[1]).toBe("global/locking.cfm");
+				expect(wheelsFallbacks[2]).toBe("../vendor/wheels/global/locking.cfm");
+				var appFallbacks = ctx.g.$mappedIncludeFallbacks("/app/events/onapplicationend.cfm");
+				expect(ArrayLen(appFallbacks)).toBe(2);
+				expect(appFallbacks[1]).toBe("../../app/events/onapplicationend.cfm");
+				expect(appFallbacks[2]).toBe("../app/events/onapplicationend.cfm");
+				expect(ArrayLen(ctx.g.$mappedIncludeFallbacks("global/locking.cfm"))).toBe(0);
+			});
+
+			it("treats Adobe missing-mapped-include as recoverable, compile errors as not", () => {
+				var missing = {
+					message: "Could not find the included template /wheels/global/locking.cfm",
+					detail: ""
+				};
+				var luceeMissing = {
+					message: "Page [/wheels/global/locking.cfm] [/tmp/x] not found",
+					detail: ""
+				};
+				var compileErr = {message: "MissingNameException", detail: ""};
+				expect(ctx.g.$isMissingMappedInclude(missing)).toBeTrue();
+				expect(ctx.g.$isMissingMappedInclude(luceeMissing)).toBeTrue();
+				expect(ctx.g.$isMissingMappedInclude(compileErr)).toBeFalse();
+			});
+
+			it("Global.cfc cluster includes keep a public-relative fallback", () => {
+				var src = FileRead(ExpandPath("/wheels/Global.cfc"));
+				expect(FindNoCase("../vendor/wheels/global/locking.cfm", src)).toBeGT(0);
+				expect(FindNoCase("$tryIncludeTemplate", src)).toBeGT(0);
+			});
+
 			it("invalid-request guard is deeper than the front controller, not the include file", () => {
 				// $abortInvalidRequest used GetCurrentTemplatePath(), which on
 				// Lucee is the mapping-absolute include /wheels/global/request.cfm

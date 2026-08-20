@@ -11,18 +11,15 @@ component output="false" {
 	// every `include` statement that apps rely on for mapping-absolute
 	// or `../../`-prefixed event/config paths here (issue ##3241).
 	public void function $include(required string template) {
-		// Hoist the resolve: `include "#$resolve...()#"` makes Adobe CF
-		// 2023 re-evaluate this CFC's component-body includes during
-		// applicationStop() teardown (onApplicationEnd), and /wheels
-		// mappings are already gone — "Could not find .../locking.cfm",
-		// authorized reload HTTP 500 (issue ##3241).
-		local.resolved = $resolveGlobalIncludeTemplate(arguments.template);
-		include "#local.resolved#";
+		// Hoist the resolve: a function call inside the `include` attribute
+		// is one Adobe teardown trigger. Mapping-absolute includes still
+		// fail after applicationStop() drops THIS.mappings — fall back
+		// via $tryIncludeTemplate (issue ##3241).
+		$tryIncludeTemplate($resolveGlobalIncludeTemplate(arguments.template));
 	}
 
 	public void function $includeAndOutput(required string template) {
-		local.resolved = $resolveGlobalIncludeTemplate(arguments.template);
-		include "#local.resolved#";
+		$tryIncludeTemplate($resolveGlobalIncludeTemplate(arguments.template));
 	}
 
 	public string function $includeAndReturnOutput(required string $template) {
@@ -32,13 +29,44 @@ component output="false" {
 		}
 		// Include the template and return the result.
 		// Variable is set to $wheels to limit chances of it being overwritten in the included template.
+		// Include stays in this function: `local = arguments` above must be
+		// visible to partials, and savecontent must wrap the include itself
+		// (a helper on this output=false CFC would capture nothing).
 		// cfformat-ignore-start
 		local.resolved = $resolveGlobalIncludeTemplate(arguments.$template);
-		savecontent variable="local.$wheels" {
-			include "#local.resolved#"
-		};
+		var includeState = {done = false, output = ""};
+		var captured = "";
+		try {
+			savecontent variable="captured" {
+				include "#local.resolved#"
+			};
+			includeState.output = captured;
+			includeState.done = true;
+		} catch (any e) {
+			if (!$isMissingMappedInclude(e)) {
+				rethrow;
+			}
+		}
+		if (!includeState.done) {
+			var fallbacks = $mappedIncludeFallbacks(local.resolved);
+			var fbCount = ArrayLen(fallbacks);
+			for (var fbIndex = 1; fbIndex <= fbCount; fbIndex++) {
+				try {
+					savecontent variable="captured" {
+						include "#fallbacks[fbIndex]#"
+					};
+					includeState.output = captured;
+					includeState.done = true;
+					break;
+				} catch (any e) {
+					if (fbIndex == fbCount || !$isMissingMappedInclude(e)) {
+						rethrow;
+					}
+				}
+			}
+		}
 		// cfformat-ignore-end
-		return local.$wheels;
+		return includeState.output;
 	}
 
 	/**
@@ -72,9 +100,38 @@ component output="false" {
 		try {
 			// cfformat-ignore-start
 			local.resolved = $resolveGlobalIncludeTemplate(arguments.template);
-			savecontent variable="local.$wheelsConfigOutput" {
-				include "#local.resolved#"
-			};
+			var configIncludeState = {done = false, output = ""};
+			var configCaptured = "";
+			try {
+				savecontent variable="configCaptured" {
+					include "#local.resolved#"
+				};
+				configIncludeState.output = configCaptured;
+				configIncludeState.done = true;
+			} catch (any e) {
+				if (!$isMissingMappedInclude(e)) {
+					rethrow;
+				}
+			}
+			if (!configIncludeState.done) {
+				var configFallbacks = $mappedIncludeFallbacks(local.resolved);
+				var configFbCount = ArrayLen(configFallbacks);
+				for (var configFbIndex = 1; configFbIndex <= configFbCount; configFbIndex++) {
+					try {
+						savecontent variable="configCaptured" {
+							include "#configFallbacks[configFbIndex]#"
+						};
+						configIncludeState.output = configCaptured;
+						configIncludeState.done = true;
+						break;
+					} catch (any e) {
+						if (configFbIndex == configFbCount || !$isMissingMappedInclude(e)) {
+							rethrow;
+						}
+					}
+				}
+			}
+			local.$wheelsConfigOutput = configIncludeState.output;
 			// cfformat-ignore-end
 		} catch (any e) {
 			// Fail closed: a compile-time or runtime failure in a config template is a
@@ -180,30 +237,316 @@ component output="false" {
 		return "/" & LCase(ArrayToList(segments, "/"));
 	}
 
+	/**
+	 * True when `include` failed because a CF mapping (`/wheels`, `/app`)
+	 * is gone — Adobe CF 2023 `applicationStop()` teardown — not because
+	 * the template has a compile/runtime error.
+	 */
+	public boolean function $isMissingMappedInclude(required any exception) {
+		var text = arguments.exception.message;
+		if (StructKeyExists(arguments.exception, "detail") && IsSimpleValue(arguments.exception.detail)) {
+			text &= " " & arguments.exception.detail;
+		}
+		if (FindNoCase("Could not find the included template", text)) {
+			return true;
+		}
+		// Lucee: Page [/wheels/...] [filesystem path] not found
+		if (FindNoCase("Page [", text) && FindNoCase("not found", text)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Mapping-free include paths for a mapping-absolute template.
+	 * [1] relative to this CFC (`vendor/wheels/Global.cfc`).
+	 * [2] relative to the front controller (`public/index.cfm`).
+	 * Pure so it can be unit-tested without applicationStop().
+	 */
+	public array function $mappedIncludeFallbacks(required string template) {
+		var normalized = Replace(arguments.template, "\", "/", "all");
+		if (!Len(normalized) || Left(normalized, 1) != "/") {
+			return [];
+		}
+		if (Left(normalized, 8) == "/wheels/") {
+			return [
+				Mid(normalized, 9, Len(normalized)),
+				"../vendor" & normalized
+			];
+		}
+		return [
+			"../.." & normalized,
+			".." & normalized
+		];
+	}
+
+	/**
+	 * `include` a mapping-absolute template, then the mapping-free
+	 * fallbacks when Adobe teardown has dropped THIS.mappings.
+	 * Page/event includes only — cluster function files must stay as
+	 * component-body includes so UDFs compile into this CFC.
+	 */
+	public void function $tryIncludeTemplate(required string template) {
+		var resolved = arguments.template;
+		var state = {done = false};
+		try {
+			include "#resolved#";
+			state.done = true;
+		} catch (any e) {
+			if (!$isMissingMappedInclude(e)) {
+				rethrow;
+			}
+		}
+		if (state.done) {
+			return;
+		}
+		var fallbacks = $mappedIncludeFallbacks(resolved);
+		var fbCount = ArrayLen(fallbacks);
+		if (!fbCount) {
+			throw(
+				type = "Wheels.MissingInclude",
+				message = "Could not include template '" & resolved & "'"
+			);
+		}
+		for (var fbIndex = 1; fbIndex <= fbCount; fbIndex++) {
+			try {
+				include "#fallbacks[fbIndex]#";
+				return;
+			} catch (any e) {
+				if (fbIndex == fbCount || !$isMissingMappedInclude(e)) {
+					rethrow;
+				}
+			}
+		}
+	}
+
 	// Focused collaborators for the former Global.cfc monolith (issue ##3241).
 	// Component-body includes compile into this CFC so every Global-derived
 	// type (Model, Controller, Dispatch, …) inherits the helpers with no
-	// per-instance mixin copy. Paths are mapping-absolute (`/wheels/...`)
-	// because a relative include would resolve against the requesting
-	// template, not this file. Each include MUST be wrapped in cfscript
+	// per-instance mixin copy. Each include MUST be wrapped in cfscript
 	// tags — an include is tag-context, so bare script would leak as
 	// output (same contract as /app/global/functions.cfm).
-	include "/wheels/global/locking.cfm";
-	include "/wheels/global/tags.cfm";
-	include "/wheels/global/settings.cfm";
-	include "/wheels/global/cache.cfm";
-	include "/wheels/global/objects.cfm";
-	include "/wheels/global/routing.cfm";
-	include "/wheels/global/strings.cfm";
-	include "/wheels/global/request.cfm";
-	include "/wheels/global/util.cfm";
-	include "/wheels/global/plugins.cfm";
-	include "/wheels/global/pagination.cfm";
-	include "/wheels/global/cors.cfm";
-	include "/wheels/global/lifecycle.cfm";
+	//
+	// Mapping-absolute `/wheels/...` is the boot path. Adobe CF 2023
+	// applicationStop() drops THIS.mappings before onApplicationEnd; the
+	// next Global method call re-evaluates these includes and
+	// `include "/wheels/global/locking.cfm"` 500s (authorized reload
+	// probe, issue ##3241). Fall back to a path relative to this CFC,
+	// then a path relative to public/index.cfm. Do not move these includes
+	// into a method — method-body includes declare UDFs locally, not on
+	// the component (see $reincludeGlobals).
+	try {
+		include "/wheels/global/locking.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/locking.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/locking.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/tags.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/tags.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/tags.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/settings.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/settings.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/settings.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/cache.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/cache.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/cache.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/objects.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/objects.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/objects.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/routing.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/routing.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/routing.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/strings.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/strings.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/strings.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/request.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/request.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/request.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/util.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/util.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/util.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/plugins.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/plugins.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/plugins.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/pagination.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/pagination.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/pagination.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/cors.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/cors.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/cors.cfm";
+		}
+	}
+	try {
+		include "/wheels/global/lifecycle.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/lifecycle.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/lifecycle.cfm";
+		}
+	}
 
 	// User-defined global functions
-	include "/app/global/functions.cfm";
+	try {
+		include "/app/global/functions.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "../../app/global/functions.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../app/global/functions.cfm";
+		}
+	}
 
 	// Promote include-injected UDFs from `variables` to `this` so they're
 	// discoverable via struct-iteration on engines (Adobe CF) where only
