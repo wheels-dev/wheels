@@ -166,14 +166,20 @@
         bundlesDiscovered = local.bundlesDiscovered
     )
 
-    // ── Concurrency guard (issue #3025) ─────────────────────────────────
-    // The swap→run→restore window below mutates the LIVE application.wheels
-    // struct ($_setTestboxEnv backs it up in application.$$$wheels and swaps
-    // in test config; the finally block swaps it back). Two overlapping test
-    // requests used to clobber each other's backup, which could restore TEST
-    // config as the live config until the next reload=true. Serialize the
-    // whole window under an exclusive named lock (precedent:
+    // ── Concurrency guard (issue #3025) + isolated app (issue #3374) ──
+    // The swap→run→restore window below mutates application.wheels
+    // ($_setTestboxEnv backs it up in application.$$$wheels and swaps
+    // in test config; the finally block swaps it back). When
+    // Application.cfc includes events/testcontext.cfm, test-runner
+    // requests bind `<this.name>_wheelsTest` — a separate CFML application
+    // scope — so this swap never touches the live app's application.wheels.
+    // Apps that have not applied that snippet still swap the live scope;
+    // the exclusive named lock below remains the fallback (precedent:
     // migrator/TenantMigrator.cfc::$runForTenant).
+    //
+    // Two overlapping test requests used to clobber each other's backup,
+    // which could restore TEST config as the live config until the next
+    // reload=true. Serialize the whole window under an exclusive named lock.
     //
     // Re-entrancy: ParallelRunner partitions re-enter this template via
     // fresh top-level HTTP GETs while the parent request holds the swap and
