@@ -11,11 +11,18 @@ component output="false" {
 	// every `include` statement that apps rely on for mapping-absolute
 	// or `../../`-prefixed event/config paths here (issue ##3241).
 	public void function $include(required string template) {
-		include "#$resolveGlobalIncludeTemplate(arguments.template)#";
+		// Hoist the resolve: `include "#$resolve...()#"` makes Adobe CF
+		// 2023 re-evaluate this CFC's component-body includes during
+		// applicationStop() teardown (onApplicationEnd), and /wheels
+		// mappings are already gone — "Could not find .../locking.cfm",
+		// authorized reload HTTP 500 (issue ##3241).
+		local.resolved = $resolveGlobalIncludeTemplate(arguments.template);
+		include "#local.resolved#";
 	}
 
 	public void function $includeAndOutput(required string template) {
-		include "#$resolveGlobalIncludeTemplate(arguments.template)#";
+		local.resolved = $resolveGlobalIncludeTemplate(arguments.template);
+		include "#local.resolved#";
 	}
 
 	public string function $includeAndReturnOutput(required string $template) {
@@ -26,8 +33,9 @@ component output="false" {
 		// Include the template and return the result.
 		// Variable is set to $wheels to limit chances of it being overwritten in the included template.
 		// cfformat-ignore-start
+		local.resolved = $resolveGlobalIncludeTemplate(arguments.$template);
 		savecontent variable="local.$wheels" {
-			include "#$resolveGlobalIncludeTemplate(arguments.$template)#"
+			include "#local.resolved#"
 		};
 		// cfformat-ignore-end
 		return local.$wheels;
@@ -63,8 +71,9 @@ component output="false" {
 	public void function $includeConfig(required string template) {
 		try {
 			// cfformat-ignore-start
+			local.resolved = $resolveGlobalIncludeTemplate(arguments.template);
 			savecontent variable="local.$wheelsConfigOutput" {
-				include "#$resolveGlobalIncludeTemplate(arguments.template)#"
+				include "#local.resolved#"
 			};
 			// cfformat-ignore-end
 		} catch (any e) {

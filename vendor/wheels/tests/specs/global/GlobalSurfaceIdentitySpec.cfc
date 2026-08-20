@@ -91,7 +91,7 @@ component extends="wheels.WheelsTest" {
 				ctx.g.$include(template = "../../" & application.wheels.eventPath & "/onabort.cfm");
 			});
 
-			it("collapses ../../#eventPath# event includes to the /app mapping", () => {
+			it("collapses Application.cfc event-include prefixes to the /app mapping", () => {
 				// Application.cfc concatenated "../../" onto eventPath
 				// (`/app/events`), producing ../../../app/events/onabort.cfm.
 				// That missed after the include split (LuCLI 1 fail / 4 error).
