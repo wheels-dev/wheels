@@ -1,1 +1,1 @@
-- `vendor/wheels/Global.cfc` is no longer a 4,800-line monolith: helpers now live in focused `vendor/wheels/global/*.cfm` includes compiled into the component. The public `$`-prefixed mixin surface is unchanged (#3241)
+- `vendor/wheels/Global.cfc` is no longer a 4,800-line monolith: helpers now live in focused `vendor/wheels/global/*.cfm` includes compiled into the component. `$include` and its siblings stay on `Global.cfc` so CFML include paths still resolve against the component (not `vendor/wheels/global/`). The public `$`-prefixed mixin surface is unchanged (#3241)

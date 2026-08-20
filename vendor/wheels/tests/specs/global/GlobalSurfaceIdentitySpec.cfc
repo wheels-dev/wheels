@@ -57,7 +57,7 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
-			it("source-scans vendor/wheels/global/*.cfm for the same public names", () => {
+			it("source-scans Global.cfc and vendor/wheels/global/*.cfm for the same public names", () => {
 				var fromFiles = ctx.g.$readGlobalIncludeFunctionNames();
 				var fileSet = {};
 				var fileCount = ArrayLen(fromFiles);
@@ -73,7 +73,7 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(ArrayLen(missing)).toBe(
 					0,
-					"pre-split public helpers not found in vendor/wheels/global/*.cfm: " & ArrayToList(missing)
+					"pre-split public helpers not found in Global.cfc / vendor/wheels/global/*.cfm: " & ArrayToList(missing)
 				);
 			});
 
@@ -81,6 +81,14 @@ component extends="wheels.WheelsTest" {
 				expect(Len(ctx.g.$appKey())).toBeGT(0);
 				expect(ctx.g.capitalize("wheels")).toBe("Wheels");
 				expect(ctx.g.singularize("statuses")).toBe("status");
+			});
+
+			it("resolves the Application.cfc onAbort include path against /app, not the webroot", () => {
+				// Lives on Global.cfc (not tags.cfm) so this path uses mappings.
+				// When $include was compiled from vendor/wheels/global/tags.cfm,
+				// Lucee resolved /app/events/onabort.cfm under the webroot and
+				// every abort (including GET / and LuCLI) returned HTTP 500.
+				ctx.g.$include(template = "../../" & application.wheels.eventPath & "/onabort.cfm");
 			});
 
 		});

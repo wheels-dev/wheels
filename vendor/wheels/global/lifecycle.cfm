@@ -278,19 +278,29 @@
 	}
 
 	/**
-	 * Line-scan `vendor/wheels/global/*.cfm` for `public ... function name(`.
-	 * Comment-only lines are skipped (Anti-Pattern 14 spirit) without a
-	 * whole-file comment-strip regex — that shape hangs Lucee 7 on large
-	 * sources (see BareCfabortGuardSpec).
+	 * Line-scan `vendor/wheels/Global.cfc` plus `vendor/wheels/global/*.cfm`
+	 * for `public ... function name(`. `$include` and siblings stay on the
+	 * CFC itself (include-path contract); everything else lives in the
+	 * includes. Comment-only lines are skipped (Anti-Pattern 14 spirit)
+	 * without a whole-file comment-strip regex — that shape hangs Lucee 7
+	 * on large sources (see BareCfabortGuardSpec).
 	 */
 	public array function $readGlobalIncludeFunctionNames() {
 		var names = [];
 		var seen = {};
-		var folder = ExpandPath("/wheels/global");
-		if (!DirectoryExists(folder)) {
-			return names;
+		var files = [];
+		var globalCfc = ExpandPath("/wheels/Global.cfc");
+		if (FileExists(globalCfc)) {
+			ArrayAppend(files, globalCfc);
 		}
-		var files = DirectoryList(folder, false, "path", "*.cfm");
+		var folder = ExpandPath("/wheels/global");
+		if (DirectoryExists(folder)) {
+			var includeFiles = DirectoryList(folder, false, "path", "*.cfm");
+			var includeCount = ArrayLen(includeFiles);
+			for (var includeIndex = 1; includeIndex <= includeCount; includeIndex++) {
+				ArrayAppend(files, includeFiles[includeIndex]);
+			}
+		}
 		var fileCount = ArrayLen(files);
 		for (var fileIndex = 1; fileIndex <= fileCount; fileIndex++) {
 			var content = FileRead(files[fileIndex]);
