@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: locking
  * Double-checked and simple named locks.
@@ -56,3 +57,4 @@
 			return local.rv;
 		}
 	}
+</cfscript>

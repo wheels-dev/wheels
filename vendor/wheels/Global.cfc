@@ -5,7 +5,9 @@ component output="false" {
 	// type (Model, Controller, Dispatch, …) inherits the helpers with no
 	// per-instance mixin copy. Paths are mapping-absolute (`/wheels/...`)
 	// because a relative include would resolve against the requesting
-	// template, not this file.
+	// template, not this file. Each include MUST be wrapped in cfscript
+	// tags — an include is tag-context, so bare script would leak as
+	// output (same contract as /app/global/functions.cfm).
 	include "/wheels/global/locking.cfm";
 	include "/wheels/global/tags.cfm";
 	include "/wheels/global/settings.cfm";

@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: strings
  * Inflection, truncation, and time-in-words helpers.
@@ -459,3 +460,4 @@
 		$args(name = "timeUntilInWords", args = arguments);
 		return distanceOfTimeInWords(argumentCollection = arguments);
 	}
+</cfscript>

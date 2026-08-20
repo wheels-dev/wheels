@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: pagination
  * Pagination store helpers used by finders and views.
@@ -129,3 +130,4 @@
 		local.store = $ensurePaginationStore();
 		local.store[arguments.handle] = local.args;
 	}
+</cfscript>

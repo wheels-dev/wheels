@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: objects
  * Model/controller/service lookup, mixin integration plans, object creation.
@@ -494,3 +495,4 @@
 		}
 		return application.wheelsdi;
 	}
+</cfscript>

@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: plugins
  * Plugin/package bootstrap, deprecation, version checks.
@@ -504,3 +505,4 @@
 
 		return local.path;
 	}
+</cfscript>

@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: settings
  * get / set / env and multi-tenant helpers.
@@ -212,3 +213,4 @@
 		}
 		request.wheels.tenant = arguments.tenant;
 	}
+</cfscript>

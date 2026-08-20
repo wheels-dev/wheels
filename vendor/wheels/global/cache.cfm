@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: cache
  * Application-scope cache helpers.
@@ -202,3 +203,4 @@
 			StructClear(application.wheels.cache);
 		}
 	}
+</cfscript>

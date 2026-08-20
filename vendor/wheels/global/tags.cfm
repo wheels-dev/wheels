@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: tags
  * CFML tag wrappers (cfheader, cfmail, cfinclude, cfdbinfo, …).
@@ -628,3 +629,4 @@ return local.$wheels;
 			return local.rv;
 		}
 	}
+</cfscript>

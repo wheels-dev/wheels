@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: cors
  * CORS header helpers and wildcard domain matching.
@@ -251,3 +252,4 @@
 			}
 		}
 	}
+</cfscript>

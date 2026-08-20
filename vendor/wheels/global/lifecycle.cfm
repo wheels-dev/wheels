@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: lifecycle
  * Error callbacks, interface contracts, global-include reload, protected methods.
@@ -450,3 +451,4 @@
 			ArrayAppend(promotedKeys, promoteKey);
 		}
 		return promotedKeys;
+</cfscript>

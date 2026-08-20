@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: routing
  * Routes, URLFor, mapper, and channel publish.
@@ -527,3 +528,4 @@
 	public struct function mapper(boolean restful = true, boolean methods = arguments.restful, boolean mapFormat = true) {
 		return application[$appKey()].mapper.$draw(argumentCollection = arguments);
 	}
+</cfscript>

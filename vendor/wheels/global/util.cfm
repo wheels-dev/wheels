@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: util
  * List/struct/args helpers, XML, obfuscation, MIME, UUID.
@@ -671,3 +672,4 @@
 		local.norm = ReReplace(local.norm, "^\.", "", "one");
 		return local.norm;
 	}
+</cfscript>

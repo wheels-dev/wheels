@@ -1,3 +1,4 @@
+<cfscript>
 /**
  * wheels.Global include: request
  * Request scope, CGI, paths, abort/404, engine adapter, processRequest.
@@ -570,3 +571,4 @@
 
 		return local.rv;
 	}
+</cfscript>
