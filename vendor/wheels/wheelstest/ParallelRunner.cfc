@@ -196,7 +196,13 @@ component {
 						method = "GET",
 						timeout = 600,
 						result = "local.httpResult"
-					);
+					) {
+						// Path already matches /wheels/core|app/tests (isolated
+						// by Application.cfc). Header is belt-and-suspenders so
+						// a rewrite that hides PATH_INFO still binds the test
+						// application (issue #3374).
+						cfhttpparam(type = "header", name = "X-Wheels-Test-Context", value = "1");
+					}
 
 					if (listFirst(local.httpResult.statusCode, " ") == "200" || listFirst(local.httpResult.statusCode, " ") == "417") {
 						thread.success = true;

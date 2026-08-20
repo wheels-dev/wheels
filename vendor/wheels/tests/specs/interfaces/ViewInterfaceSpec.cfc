@@ -5,8 +5,9 @@ component extends="wheels.WheelsTest" {
 		describe("View Interface Contracts", () => {
 
 			beforeEach(() => {
-				// Controller instances have view helpers mixed in
-				ctrl = controller("wheels");
+				// Same reason as ControllerInterfaceSpec: a real test-asset
+				// controller file so mixin helpers are present (issue ##3374).
+				ctrl = controller("Test");
 			});
 
 			describe("ViewFormInterface", () => {

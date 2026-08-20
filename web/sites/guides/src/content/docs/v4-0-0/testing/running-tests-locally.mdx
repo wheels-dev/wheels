@@ -65,6 +65,7 @@ Keep the dev loop as: change a spec, refresh the URL. Two things to know:
 
 - **Development only.** The `/wheels/*` surfaces are gated by a development-only allowlist (since 4.0.4, [#2903](https://github.com/wheels-dev/wheels/pull/2903)) — in any other environment they return 404. Run tests where the app runs as `development` (locally, or a CI job configured that way — see [CI Integration](/v4-0-0/testing/ci-integration/)).
 - **The datasource is whatever the app is using.** The `<datasource>_test` auto-swap is a CLI convenience; the raw runner exercises the datasource your app is currently configured with. If you drive tests by URL routinely, point your development datasource at a database you're happy to have `tests/populate.cfm` rebuild — or keep populate idempotent (it should be anyway; see [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/)).
+- **Isolated application scope.** With the stock `Application.cfc` snippet (`include` of `vendor/wheels/events/testcontext.cfm` after `config/app.cfm`), `/wheels/app/tests` and `/wheels/core/tests` bind a separate CFML application name. Concurrent browsing of the same server keeps live config. See [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/).
 
 An unrecognized `directory=` value is ignored and the **full** suite runs instead ([#3083](https://github.com/wheels-dev/wheels/issues/3083)) — if a filtered run looks suspiciously slow or broad, check the value against your `tests/specs/` layout.
 

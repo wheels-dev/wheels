@@ -49,6 +49,28 @@
         application.wo.set(viewPath = AssetPath & "views")
         application.wo.set(modelPath = AssetPath & "models")
         application.wo.set(wheelsComponentPath = "/wheels")
+        // Isolated-app boot (issue #3374) mounts browser-fixture controllers
+        // onto controllerPath. Drop that flag so a later $lockedLoadRoutes
+        // cannot append the fixture path after this swap — otherwise
+        // controller("wheels") falls through to the last-path Controller.cfc
+        // stub (no mixins). Test-asset BrowserTest* controllers + tests/routes.cfm
+        // keep /_browser working.
+        application.wo.set(loadBrowserTestFixtures = false)
+        // Drop class caches from the isolated app's onApplicationStart
+        // (and from any prior run). Same reason as the model-cache clear
+        // below: those instances were baked against the live paths.
+        // StructClear — do not call application.wo.$clearControllerInitializationCache()
+        // here: this closure is Adobe 2025 invariant 16b (zero-arg call
+        // through the application scope).
+        if (StructKeyExists(application.wheels, "controllers")) {
+            StructClear(application.wheels.controllers)
+        }
+        if (StructKeyExists(application.wheels, "existingObjectFiles")) {
+            StructClear(application.wheels.existingObjectFiles)
+        }
+        if (StructKeyExists(application.wheels, "nonExistingObjectFiles")) {
+            StructClear(application.wheels.nonExistingObjectFiles)
+        }
 
         /* set migration level for tests*/
         application.wheels.migrationLevel = 2;
@@ -166,14 +188,20 @@
         bundlesDiscovered = local.bundlesDiscovered
     )
 
-    // ── Concurrency guard (issue #3025) ─────────────────────────────────
-    // The swap→run→restore window below mutates the LIVE application.wheels
-    // struct ($_setTestboxEnv backs it up in application.$$$wheels and swaps
-    // in test config; the finally block swaps it back). Two overlapping test
-    // requests used to clobber each other's backup, which could restore TEST
-    // config as the live config until the next reload=true. Serialize the
-    // whole window under an exclusive named lock (precedent:
+    // ── Concurrency guard (issue #3025) + isolated app (issue #3374) ──
+    // The swap→run→restore window below mutates application.wheels
+    // ($_setTestboxEnv backs it up in application.$$$wheels and swaps
+    // in test config; the finally block swaps it back). When
+    // Application.cfc includes events/testcontext.cfm, test-runner
+    // requests bind `<this.name>_wheelsTest` — a separate CFML application
+    // scope — so this swap never touches the live app's application.wheels.
+    // Apps that have not applied that snippet still swap the live scope;
+    // the exclusive named lock below remains the fallback (precedent:
     // migrator/TenantMigrator.cfc::$runForTenant).
+    //
+    // Two overlapping test requests used to clobber each other's backup,
+    // which could restore TEST config as the live config until the next
+    // reload=true. Serialize the whole window under an exclusive named lock.
     //
     // Re-entrancy: ParallelRunner partitions re-enter this template via
     // fresh top-level HTTP GETs while the parent request holds the swap and

@@ -637,6 +637,8 @@ component extends="wheels.WheelsTest" {
 - **App tests**: `/wheels/app/tests` — project-specific, in `tests/specs/`. Uses `tests/populate.cfm` and `tests/TestRunner.cfc`.
 - **Core tests**: `/wheels/core/tests` — framework, in `vendor/wheels/tests/specs/`. Uses `vendor/wheels/tests/populate.cfm`. **This is what CI runs across all engines × DBs.**
 
+**Isolated test application (#3374):** `Application.cfc` includes `vendor/wheels/events/testcontext.cfm` after `config/app.cfm` so runner URLs (and TestClient/browser requests that send `X-Wheels-Test-Context`) bind `<this.name>_wheelsTest` — a separate CFML application scope. The live `application.wheels` is not swapped. `$testClient(testContext=false)` addresses the live app. A request-scoped overlay cannot replace this (blockers B1–B9 on #3025). Existing apps without the include still use the #3373 named-lock swap on the live scope.
+
 **Critical**: core tests use `directory="wheels.tests.specs"` which compiles EVERY CFC in the directory. One compilation error in any spec file crashes the entire suite for that engine. The "inline closure as constructor named arg" anti-pattern (#5 in Cross-Engine Invariants) is the classic example.
 
 ### Test-specific gotchas

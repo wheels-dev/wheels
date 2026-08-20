@@ -109,6 +109,13 @@ component output="false" {
 
 	include "../config/app.cfm";
 
+	// Issue #3374: bind test-runner / TestClient / browser requests to a
+	// separate CFML application name so the live application.wheels is never
+	// swapped. No-op when vendor/wheels is absent.
+	if (FileExists(GetDirectoryFromPath(GetCurrentTemplatePath()) & "../vendor/wheels/events/testcontext.cfm")) {
+		include "../vendor/wheels/events/testcontext.cfm";
+	}
+
 	function onApplicationStart() {
 		application.env = duplicate(this.env);
 

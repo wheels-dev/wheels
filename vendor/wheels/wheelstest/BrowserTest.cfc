@@ -181,9 +181,16 @@ component extends="wheels.WheelsTest" {
 
         var contextOpts = $buildContextOptions();
 
-        if (isObject(contextOpts)) {
-            variables.$context = variables.$browser.newContext(contextOpts);
-        } else {
+        // extraHTTPHeaders (Map) is the primary isolation marker so the first
+        // navigation binds the test application (issue #3374 / B6). Fall back
+        // to a bare context if the Java Map interop fails on an engine.
+        try {
+            if (IsObject(contextOpts)) {
+                variables.$context = variables.$browser.newContext(contextOpts);
+            } else {
+                variables.$context = variables.$browser.newContext();
+            }
+        } catch (any e) {
             variables.$context = variables.$browser.newContext();
         }
         variables.$page = variables.$context.newPage();
@@ -194,6 +201,16 @@ component extends="wheels.WheelsTest" {
                 baseUrl=variables.$baseUrl,
                 launcher=variables.$launcher
             );
+        // Cookie backup so follow-on navigations / form posts stay isolated
+        // even if extraHTTPHeaders was dropped by the fallback above.
+        if (Len(variables.$baseUrl ?: "")) {
+            try {
+                var ctx = new wheels.events.TestContext();
+                this.browser.setCookie(name = ctx.cookieName(), value = "1", url = variables.$baseUrl);
+            } catch (any cookieErr) {
+                // Best-effort: header may already be on the context.
+            }
+        }
     }
 
     public void function $endBrowserContext() {
@@ -369,24 +386,29 @@ component extends="wheels.WheelsTest" {
     }
 
     /**
-     * Builds Browser$NewContextOptions if viewport config is set.
-     * Returns the options object, or empty string if no config.
+     * Builds Browser$NewContextOptions. Always sets extraHTTPHeaders so
+     * Playwright requests bind the isolated test application (issue #3374).
+     * Viewport is applied on top when configured.
      */
     private any function $buildContextOptions() {
-        if (!structKeyExists(this, "browserViewport") || !len(this.browserViewport ?: "")) {
-            return "";
+        var ctx = new wheels.events.TestContext();
+        var headerMap = CreateObject("java", "java.util.LinkedHashMap").init();
+        headerMap.put(ctx.headerName(), "1");
+        var setterMap = {setExtraHTTPHeaders: headerMap};
+
+        if (StructKeyExists(this, "browserViewport") && Len(this.browserViewport ?: "")) {
+            var dims = $resolveViewportDims(this.browserViewport);
+
+            var viewport = variables.$launcher.$buildOption(
+                className="com.microsoft.playwright.options.ViewportSize",
+                constructorArgs=[dims.width, dims.height]
+            );
+            setterMap.setViewportSize = viewport;
         }
-
-        var dims = $resolveViewportDims(this.browserViewport);
-
-        var viewport = variables.$launcher.$buildOption(
-            className="com.microsoft.playwright.options.ViewportSize",
-            constructorArgs=[dims.width, dims.height]
-        );
 
         return variables.$launcher.$buildOption(
             className="com.microsoft.playwright.Browser$NewContextOptions",
-            setterMap={setViewportSize: viewport}
+            setterMap=setterMap
         );
     }
 
