@@ -451,4 +451,5 @@
 			ArrayAppend(promotedKeys, promoteKey);
 		}
 		return promotedKeys;
+	}
 </cfscript>
