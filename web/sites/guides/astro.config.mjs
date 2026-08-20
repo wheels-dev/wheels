@@ -122,6 +122,12 @@ export default defineConfig({
 		'/v4-0-0/digging-deeper/security/https-detection': '/v4-0-0/deployment/security-hardening/',
 		'/v4-0-0/configuration': '/v4-0-0/core-concepts/environments-and-configuration/',
 		'/v4-0-0/troubleshooting/cross-engine-compatibility': '/v4-0-0/contributing/coding-standards/',
+		// The `packages add` reference lived at .../packages/install/ while the
+		// page title already said `add`. The old slug advertised the broken
+		// LuCLI-intercepted verb. Keep the old URL working. One source only —
+		// listing both `/install` and `/install/` made Astro warn that the
+		// route was defined twice.
+		'/v4-0-0/command-line-tools/commands/packages/install': '/v4-0-0/command-line-tools/commands/packages/add/',
 	},
 	integrations: [
 		starlight({

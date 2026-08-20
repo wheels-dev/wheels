@@ -63,6 +63,34 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("packages() hint metadata leads with `Add`, not the intercepted `Install` verb", () => {
+				var source = fileRead(ctx.modulePath);
+
+				// LuCLI surfaces the `hint:` javadoc on the packages() function
+				// in auto-introspected help. Leading with "Install" nudges
+				// users toward `wheels packages install`, which never reaches
+				// this module.
+				expect(source contains "hint: Install, update, and list Wheels packages").toBeFalse(
+					"packages() hint still leads with `Install`. Lead with `Add` "
+					& "(the canonical verb) so auto-introspected help matches showHelp()."
+				);
+				expect(source contains "hint: Add, update, and list Wheels packages").toBeTrue(
+					"packages() hint should lead with `Add, update, and list ...` "
+					& "and mention that the verb is `add`, not `install`."
+				);
+			});
+
+			it("unknown-subcommand error points users at `wheels packages add`", () => {
+				var source = fileRead(ctx.modulePath);
+
+				expect(source contains "Unknown packages subcommand").toBeTrue(
+					"Expected the packages() default branch to throw an unknown-subcommand error."
+				);
+				expect(source contains "The install verb is `add` (not `install`): wheels packages add <name>").toBeTrue(
+					"The unknown-subcommand error should tell users the install verb is `add`."
+				);
+			});
+
 		});
 
 	}

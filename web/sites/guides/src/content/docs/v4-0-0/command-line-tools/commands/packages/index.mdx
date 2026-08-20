@@ -8,6 +8,8 @@ sidebar:
 
 `wheels packages` is the CLI surface for the [wheels-packages registry](https://github.com/wheels-dev/wheels-packages) — a curated, git-based distribution channel for Wheels ecosystem packages. Every verb talks to the registry over plain HTTPS and installs into `vendor/<name>/`, where `PackageLoader` picks it up on next reload.
 
+The install verb is [`add`](./add). `wheels packages install <name>` never reaches this command — LuCLI's built-in extension installer intercepts the literal `install` subcommand and prints `No git or extension dependencies to install` without touching `vendor/`.
+
 There is no ForgeBox and no CommandBox. The registry manifest is authoritative, tarballs live on the registry's GitHub Releases, and every tarball has a sha256 in the manifest that the installer verifies before extraction. Supply-chain attacks via force-pushed tags or drifted source archives are defeated by this design.
 
 ## Synopsis
@@ -31,7 +33,7 @@ wheels packages registry info
 | [`list`](./list) | Show every package in the registry, optionally filtered by `--tag`. |
 | [`search`](./search) | Substring match against name, description, and tags. |
 | [`show`](./show) | Detail page for a package: versions, homepage, license, install state. |
-| [`add`](./install) | Download, verify, extract into `vendor/<name>/`. |
+| [`add`](./add) | Download, verify, extract into `vendor/<name>/`. |
 | [`update`](./update) | Re-install the latest compatible version. Explicit: requires `--yes`. |
 | [`remove`](./remove) | Delete `vendor/<name>/`. Refuses dirs without a `package.json`. |
 | [`registry refresh`](./registry/refresh) | Bust the 24h cache. |

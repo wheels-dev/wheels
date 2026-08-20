@@ -202,7 +202,7 @@
           { "label": "packages list", "link": "/v4-0-0/command-line-tools/commands/packages/list/" },
           { "label": "packages search", "link": "/v4-0-0/command-line-tools/commands/packages/search/" },
           { "label": "packages show", "link": "/v4-0-0/command-line-tools/commands/packages/show/" },
-          { "label": "packages add", "link": "/v4-0-0/command-line-tools/commands/packages/install/" },
+          { "label": "packages add", "link": "/v4-0-0/command-line-tools/commands/packages/add/" },
           { "label": "packages update", "link": "/v4-0-0/command-line-tools/commands/packages/update/" },
           { "label": "packages remove", "link": "/v4-0-0/command-line-tools/commands/packages/remove/" },
           {
