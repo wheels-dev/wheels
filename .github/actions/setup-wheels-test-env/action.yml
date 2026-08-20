@@ -19,7 +19,7 @@ inputs:
   lucli-version:
     description: 'LuCLI release version'
     required: false
-    default: '0.3.7'
+    default: '0.6.1'
   install-playwright:
     description: 'Install Playwright + Chromium (set "false" to skip if no browser tests run)'
     required: false
