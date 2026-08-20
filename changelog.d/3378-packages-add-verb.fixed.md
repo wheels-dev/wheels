@@ -1,1 +1,0 @@
-- Docs, `--help`, and the packages website now agree that the install verb is `wheels packages add` — `wheels packages install` is intercepted by LuCLI before the Wheels module runs and does not install anything. The Basecoat bonus chapter also says to copy the showcase from `vendor/` after `add`, not from the raw GitHub tree (#3378)

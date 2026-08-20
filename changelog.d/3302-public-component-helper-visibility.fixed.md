@@ -1,1 +1,0 @@
-- Helper functions included into `wheels.Public` by `$init()` are now reachable on the component's `this` scope on every engine. The runtime include placed them in `variables` only, so external callers hit "has no function with name" on Lucee 6, Adobe 2023 and Adobe 2025 while the same call worked on Lucee 7 and BoxLang (#3302)

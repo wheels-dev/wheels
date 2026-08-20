@@ -1,1 +1,0 @@
-- `LocalDisk.put()` now writes content as bytes rather than as a string, so `get()` round-trips exactly what was stored. Adobe ColdFusion 2025's `FileWrite()` appends a trailing line feed to simple values, which added a byte to every stored object and corrupted binary payloads (#3302)
