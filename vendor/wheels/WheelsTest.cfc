@@ -60,13 +60,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      *   false to address the live application (isolation specs).
      */
     public any function $testClient(boolean testContext = true) {
-        var client = new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl());
+        // Do not name this local `client` — that is a reserved CFML scope
+        // and Lucee throws "client scope is not enabled" (anti-pattern 11).
+        var httpClient = new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl());
         if (arguments.testContext) {
             var ctx = new wheels.events.TestContext();
-            client.withHeader(ctx.headerName(), "1");
-            client.withCookie(ctx.cookieName(), "1");
+            httpClient.withHeader(ctx.headerName(), "1");
+            httpClient.withCookie(ctx.cookieName(), "1");
         }
-        return client;
+        return httpClient;
     }
 
     /**

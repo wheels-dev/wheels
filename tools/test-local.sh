@@ -128,6 +128,7 @@ if [ -n "$FILTER" ]; then
     middleware) FILTER="wheels.tests.specs.middleware" ;;
     dispatch) FILTER="wheels.tests.specs.dispatch" ;;
     migrator) FILTER="wheels.tests.specs.migrator" ;;
+    internal) FILTER="wheels.tests.specs.internal" ;;
   esac
   TEST_URL="${TEST_URL}&directory=${FILTER}"
 fi

@@ -92,15 +92,19 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("demo and wheels-new Application.cfc include testcontext.cfm after config/app.cfm", () => {
-					// /wheels → vendor/wheels; walk up to the repo root without
-					// relying on ExpandPath("..") which some engines refuse.
-					var eventsDir = GetDirectoryFromPath(ExpandPath("/wheels/events/testcontext.cfm"));
-					var wheelsDir = GetDirectoryFromPath(eventsDir);
-					var vendorDir = GetDirectoryFromPath(wheelsDir);
-					var repoRoot = GetDirectoryFromPath(vendorDir);
+					// Resolve the demo app via the /config mapping. Do not walk
+					// GetDirectoryFromPath() on an already-directory path —
+					// a trailing slash is a no-op walk on Lucee, which left
+					// repoRoot at vendor/wheels/events/ and missed both files.
+					var configDir = GetDirectoryFromPath(ExpandPath("/config/app.cfm"));
+					var last = Right(configDir, 1);
+					if (last == "/" || last == "\") {
+						configDir = Left(configDir, Len(configDir) - 1);
+					}
+					var repoRoot = GetDirectoryFromPath(configDir);
 					var files = [
 						repoRoot & "public/Application.cfc",
-						repoRoot & "cli/lucli/templates/app/public/Application.cfc"
+						ExpandPath("/cli/lucli/templates/app/public/Application.cfc")
 					];
 					for (var filePath in files) {
 						expect(FileExists(filePath)).toBeTrue("expected Application.cfc at #filePath#");
