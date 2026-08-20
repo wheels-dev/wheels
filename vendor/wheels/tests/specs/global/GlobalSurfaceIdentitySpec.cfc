@@ -91,6 +91,23 @@ component extends="wheels.WheelsTest" {
 				ctx.g.$include(template = "../../" & application.wheels.eventPath & "/onabort.cfm");
 			});
 
+			it("collapses ../../#eventPath# event includes to the /app mapping", () => {
+				// Application.cfc concatenated "../../" onto eventPath
+				// (`/app/events`), producing ../../../app/events/onabort.cfm.
+				// That missed after the include split (LuCLI 1 fail / 4 error).
+				var eventPath = application.wheels.eventPath;
+				expect(ctx.g.$resolveGlobalIncludeTemplate("../../" & eventPath & "/onabort.cfm")).toBe(
+					"/app/events/onabort.cfm"
+				);
+				expect(ctx.g.$resolveGlobalIncludeTemplate("../../" & eventPath & "/onapplicationend.cfm")).toBe(
+					"/app/events/onapplicationend.cfm"
+				);
+				expect(ctx.g.$resolveGlobalIncludeTemplate(eventPath & "/onabort.cfm")).toBe("/app/events/onabort.cfm");
+				expect(ctx.g.$resolveGlobalIncludeTemplate("/config/routes.cfm")).toBe("/config/routes.cfm");
+				ctx.g.$include(template = eventPath & "/onabort.cfm");
+				ctx.g.$include(template = eventPath & "/onapplicationend.cfm");
+			});
+
 			it("invalid-request guard is deeper than the front controller, not the include file", () => {
 				// $abortInvalidRequest used GetCurrentTemplatePath(), which on
 				// Lucee is the mapping-absolute include /wheels/global/request.cfm

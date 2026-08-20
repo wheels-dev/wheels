@@ -140,7 +140,7 @@ component output="false" {
 			&& StructKeyExists(arguments.applicationScope.wheels, "eventPath")
 		) {
 			arguments.applicationScope.wo.$include(
-				template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+				template = "#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
 				argumentCollection = arguments
 			);
 		}
@@ -397,7 +397,7 @@ component output="false" {
 			&& StructKeyExists(application.wo, "$restoreTestRunnerApplicationScope")
 		) {
 			application.wo.$restoreTestRunnerApplicationScope();
-			application.wo.$include(template = "../../#application.wheels.eventPath#/onabort.cfm");
+			application.wo.$include(template = "#application.wheels.eventPath#/onabort.cfm");
 		}
 		return true;
 	}

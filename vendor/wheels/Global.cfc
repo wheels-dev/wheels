@@ -11,11 +11,11 @@ component output="false" {
 	// every `include` statement that apps rely on for mapping-absolute
 	// or `../../`-prefixed event/config paths here (issue ##3241).
 	public void function $include(required string template) {
-		include "#LCase(arguments.template)#";
+		include "#$resolveGlobalIncludeTemplate(arguments.template)#";
 	}
 
 	public void function $includeAndOutput(required string template) {
-		include "#LCase(arguments.template)#";
+		include "#$resolveGlobalIncludeTemplate(arguments.template)#";
 	}
 
 	public string function $includeAndReturnOutput(required string $template) {
@@ -27,7 +27,7 @@ component output="false" {
 		// Variable is set to $wheels to limit chances of it being overwritten in the included template.
 		// cfformat-ignore-start
 		savecontent variable="local.$wheels" {
-			include "#LCase(arguments.$template)#"
+			include "#$resolveGlobalIncludeTemplate(arguments.$template)#"
 		};
 		// cfformat-ignore-end
 		return local.$wheels;
@@ -64,7 +64,7 @@ component output="false" {
 		try {
 			// cfformat-ignore-start
 			savecontent variable="local.$wheelsConfigOutput" {
-				include "#LCase(arguments.template)#"
+				include "#$resolveGlobalIncludeTemplate(arguments.template)#"
 			};
 			// cfformat-ignore-end
 		} catch (any e) {
@@ -120,6 +120,55 @@ component output="false" {
 				// Logging is best-effort during application start.
 			}
 		}
+	}
+
+	/**
+	 * Rewrite `$include` templates so Application.cfc's
+	 * `../../#eventPath#/onabort.cfm` (eventPath is `/app/events`) becomes
+	 * the mapping-absolute `/app/events/onabort.cfm`.
+	 *
+	 * `"../../" & "/app/events/onabort.cfm"` concatenates to
+	 * `../../../app/events/onabort.cfm`. After the DC7 split, `$include`
+	 * compiled from `vendor/wheels/global/tags.cfm` resolved that against
+	 * the include (or the webroot) and looked for
+	 * `public/app/events/onabort.cfm` — LuCLI 1 fail / 4 error, Lucee
+	 * smoke `onabort` / `onapplicationend` misses (issue ##3241). Collapse
+	 * a leading `../` chain as if the include lived on this CFC
+	 * (`/wheels/Global.cfc`). Mapping-absolute paths (`/app/...`,
+	 * `/config/...`, `/wheels/...`) and other relative templates are
+	 * unchanged except for the historical LCase.
+	 */
+	public string function $resolveGlobalIncludeTemplate(required string template) {
+		var normalized = Replace(arguments.template, "\", "/", "all");
+		if (!Len(normalized)) {
+			return normalized;
+		}
+		if (Left(normalized, 1) == "/") {
+			return LCase(normalized);
+		}
+		if (Left(normalized, 3) != "../") {
+			return LCase(normalized);
+		}
+		var segments = ["wheels"];
+		var parts = ListToArray(normalized, "/");
+		var partCount = ArrayLen(parts);
+		for (var partIndex = 1; partIndex <= partCount; partIndex++) {
+			var part = parts[partIndex];
+			if (!Len(part) || part == ".") {
+				continue;
+			}
+			if (part == "..") {
+				if (ArrayLen(segments)) {
+					ArrayDeleteAt(segments, ArrayLen(segments));
+				}
+			} else {
+				ArrayAppend(segments, part);
+			}
+		}
+		if (!ArrayLen(segments)) {
+			return "/";
+		}
+		return "/" & LCase(ArrayToList(segments, "/"));
 	}
 
 	// Focused collaborators for the former Global.cfc monolith (issue ##3241).
