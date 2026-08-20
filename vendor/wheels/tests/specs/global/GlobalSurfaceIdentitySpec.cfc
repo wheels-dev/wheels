@@ -95,6 +95,9 @@ component extends="wheels.WheelsTest" {
 				// Application.cfc concatenated "../../" onto eventPath
 				// (`/app/events`), producing ../../../app/events/onabort.cfm.
 				// That missed after the include split (LuCLI 1 fail / 4 error).
+				// The it() title must keep ##eventPath## escaped: a raw
+				// #eventPath# interpolates at compile time and the bundle
+				// never loads (variable [EVENTPATH] doesn't exist).
 				var eventPath = application.wheels.eventPath;
 				expect(ctx.g.$resolveGlobalIncludeTemplate("../../" & eventPath & "/onabort.cfm")).toBe(
 					"/app/events/onabort.cfm"
