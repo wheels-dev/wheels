@@ -356,10 +356,23 @@
 
 
 	/**
-	 * Internal function.
+	 * Abort when the requested template is nested deeper than
+	 * `vendor/wheels/Global.cfc`. The depth check MUST use
+	 * `ExpandPath("/wheels/Global.cfc")`, not `GetCurrentTemplatePath()`.
+	 *
+	 * This function lives in a component-body include. Lucee compiles it
+	 * as a UDF of `/wheels/global/request.cfm`, so `GetCurrentTemplatePath()`
+	 * is that mapping-absolute include (3 path segments). The front
+	 * controller is `.../public/index.cfm` (many more segments), so the
+	 * old comparison treated every normal request as invalid, ran the
+	 * 404/`onmissingtemplate` path, and — with `$include` also compiled
+	 * from an include — 500'd `onAbort` (Lucee 7 smokes, issue ##3241).
+	 * `ExpandPath("/wheels/Global.cfc")` is the same filesystem path
+	 * `GetCurrentTemplatePath()` returned when this method lived on
+	 * Global.cfc itself.
 	 */
 	public void function $abortInvalidRequest() {
-		local.applicationPath = Replace(GetCurrentTemplatePath(), "\", "/", "all");
+		local.applicationPath = Replace(ExpandPath("/wheels/Global.cfc"), "\", "/", "all");
 		local.callingPath = Replace(GetBaseTemplatePath(), "\", "/", "all");
 		if (
 			!(GetFileFromPath(local.callingPath) == "runner.cfm")

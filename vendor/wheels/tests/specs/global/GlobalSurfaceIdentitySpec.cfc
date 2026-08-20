@@ -91,6 +91,28 @@ component extends="wheels.WheelsTest" {
 				ctx.g.$include(template = "../../" & application.wheels.eventPath & "/onabort.cfm");
 			});
 
+			it("invalid-request guard is deeper than the front controller, not the include file", () => {
+				// $abortInvalidRequest used GetCurrentTemplatePath(), which on
+				// Lucee is the mapping-absolute include /wheels/global/request.cfm
+				// when the helper is an include UDF. public/index.cfm is deeper
+				// than that short path, so every GET / looked "invalid" and
+				// 404'd (issue ##3241). ExpandPath("/wheels/Global.cfc") is
+				// the pre-split baseline.
+				var globalCfc = Replace(ExpandPath("/wheels/Global.cfc"), "\", "/", "all");
+				var frontController = Replace(
+					ExpandPath(GetDirectoryFromPath(globalCfc) & "../../public/index.cfm"),
+					"\",
+					"/",
+					"all"
+				);
+				expect(FileExists(globalCfc)).toBeTrue();
+				expect(FileExists(frontController)).toBeTrue();
+				expect(ListLen(frontController, "/")).toBeLTE(
+					ListLen(globalCfc, "/"),
+					"front controller must not look deeper than Global.cfc"
+				);
+			});
+
 		});
 	}
 
