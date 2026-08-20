@@ -23,12 +23,12 @@ const homepage = /^https?:\/\//.test(pkg.homepage) ? pkg.homepage : '';
     </ul>
   )}
   <div class="install">
-    <code id={`install-${pkg.name}`}>wheels packages install {pkg.name}</code>
+    <code id={`install-${pkg.name}`}>wheels packages add {pkg.name}</code>
     <button
       type="button"
       class="copy-btn"
       data-target={`install-${pkg.name}`}
-      aria-label={`Copy install command for ${pkg.name}`}
+      aria-label={`Copy add command for ${pkg.name}`}
     >Copy</button>
   </div>
   {homepage && (

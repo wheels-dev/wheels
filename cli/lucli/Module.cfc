@@ -2615,7 +2615,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Install, update, and list Wheels packages — use `add` (not `install`) to install
+	 * hint: Add, update, and list Wheels packages (verb is `add`, not `install`)
 	 *
 	 * The verb is `add`, NOT `install`. Typing `wheels packages install <name>`
 	 * is intercepted by LuCLI's built-in extension installer before dispatch
@@ -2716,7 +2716,7 @@ component extends="modules.BaseModule" {
 				var regCli = new modules.wheels.services.packages.PackagesRegistryCli();
 				return invoke(regCli, regVerb, [opts]);
 			default:
-				throw(message="Unknown packages subcommand: #sub#");
+				throw(message="Unknown packages subcommand: #sub#. The install verb is `add` (not `install`): wheels packages add <name>");
 		}
 	}
 
