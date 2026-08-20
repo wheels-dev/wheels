@@ -5,8 +5,12 @@ component extends="wheels.WheelsTest" {
 		describe("Controller Interface Contracts", () => {
 
 			beforeEach(() => {
-				// Create a controller instance to test mixin methods
-				ctrl = controller("wheels");
+				// Use a real test-asset controller file (Test.cfc). controller("wheels")
+				// has no matching Wheels.cfc, so $createControllerClass falls through
+				// to the last-path Controller.cfc stub — the browser-fixture stub
+				// when that path is still on the search list — which is not $init'd
+				// with mixins (issue ##3374).
+				ctrl = controller("Test");
 			});
 
 			describe("ControllerFilterInterface", () => {

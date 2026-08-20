@@ -129,6 +129,7 @@ if [ -n "$FILTER" ]; then
     dispatch) FILTER="wheels.tests.specs.dispatch" ;;
     migrator) FILTER="wheels.tests.specs.migrator" ;;
     internal) FILTER="wheels.tests.specs.internal" ;;
+    interfaces) FILTER="wheels.tests.specs.interfaces" ;;
   esac
   TEST_URL="${TEST_URL}&directory=${FILTER}"
 fi

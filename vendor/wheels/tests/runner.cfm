@@ -49,6 +49,28 @@
         application.wo.set(viewPath = AssetPath & "views")
         application.wo.set(modelPath = AssetPath & "models")
         application.wo.set(wheelsComponentPath = "/wheels")
+        // Isolated-app boot (issue #3374) mounts browser-fixture controllers
+        // onto controllerPath. Drop that flag so a later $lockedLoadRoutes
+        // cannot append the fixture path after this swap — otherwise
+        // controller("wheels") falls through to the last-path Controller.cfc
+        // stub (no mixins). Test-asset BrowserTest* controllers + tests/routes.cfm
+        // keep /_browser working.
+        application.wo.set(loadBrowserTestFixtures = false)
+        // Drop class caches from the isolated app's onApplicationStart
+        // (and from any prior run). Same reason as the model-cache clear
+        // below: those instances were baked against the live paths.
+        // StructClear — do not call application.wo.$clearControllerInitializationCache()
+        // here: this closure is Adobe 2025 invariant 16b (zero-arg call
+        // through the application scope).
+        if (StructKeyExists(application.wheels, "controllers")) {
+            StructClear(application.wheels.controllers)
+        }
+        if (StructKeyExists(application.wheels, "existingObjectFiles")) {
+            StructClear(application.wheels.existingObjectFiles)
+        }
+        if (StructKeyExists(application.wheels, "nonExistingObjectFiles")) {
+            StructClear(application.wheels.nonExistingObjectFiles)
+        }
 
         /* set migration level for tests*/
         application.wheels.migrationLevel = 2;
