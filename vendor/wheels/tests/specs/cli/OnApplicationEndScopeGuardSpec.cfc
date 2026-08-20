@@ -20,9 +20,11 @@
  *
  * This is a structural guard: the failure only manifests on Adobe CF during
  * real teardown, which cannot be reproduced inside a spec without killing the
- * runner. So we assert the source shape across every Application.cfc that
- * ships the handler — the CLI template (what `wheels new` scaffolds) and the
- * repo's own demo app. Mirrors OnErrorFallbackGuardSpec (issue ##2773).
+ * runner. So we assert the source shape across every shipped Application.cfc
+ * that declares onApplicationEnd — the CLI template (`wheels new`), the repo
+ * demo app, and the bundled example apps. A discovery check walks those
+ * trees so a newly added copy cannot slip the list. Mirrors
+ * OnErrorFallbackGuardSpec (issue ##2773).
  */
 component extends="wheels.WheelsTest" {
 
@@ -35,8 +37,33 @@ component extends="wheels.WheelsTest" {
 			var repoRoot = expandPath("/wheels/../..");
 			var targets = [
 				"cli/lucli/templates/app/public/Application.cfc",
-				"public/Application.cfc"
+				"public/Application.cfc",
+				"examples/starter-app/public/Application.cfc",
+				"examples/tweet/public/Application.cfc"
 			];
+
+			it("scans every shipped Application.cfc that declares onApplicationEnd", () => {
+				var discovered = $discoverShippedOnApplicationEndHandlers(repoRoot);
+				expect(ArrayLen(discovered) > 0).toBeTrue(
+					"Expected to discover at least one shipped Application.cfc "
+					& "that declares onApplicationEnd under cli/lucli/templates, "
+					& "public/, or examples/."
+				);
+				for (var relPath in targets) {
+					expect(ArrayFindNoCase(discovered, relPath) > 0).toBeTrue(
+						"Required shipped handler " & relPath
+						& " was not discovered. Found: " & ArrayToList(discovered)
+					);
+				}
+				for (var foundPath in discovered) {
+					expect(ArrayFindNoCase(targets, foundPath) > 0).toBeTrue(
+						"Shipped Application.cfc " & foundPath
+						& " declares onApplicationEnd but is not in the guard's "
+						& "targets list. Add it so a future revert cannot go "
+						& "uncaught (issue ##3379)."
+					);
+				}
+			});
 
 			for (var rel in targets) {
 				// Capture the loop variable so the closure body binds the
@@ -123,6 +150,46 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	/**
+	 * Walk the trees that ship an Application.cfc to users (CLI `wheels new`
+	 * template, repo demo app, bundled examples) and return repo-relative
+	 * paths of every file that still declares onApplicationEnd after comment
+	 * stripping. Test-only Application.cfc copies under vendor/wheels/tests,
+	 * rocketunit_tests, and cli/lucli/tests are out of scope — they are not
+	 * shipped to apps.
+	 */
+	private array function $discoverShippedOnApplicationEndHandlers(required string repoRoot) {
+		var shippedRoots = ["cli/lucli/templates", "public", "examples"];
+		var found = [];
+		var rootNormalized = Replace(arguments.repoRoot, "\", "/", "all");
+		if (Right(rootNormalized, 1) == "/" && Len(rootNormalized) > 1) {
+			rootNormalized = Left(rootNormalized, Len(rootNormalized) - 1);
+		}
+
+		for (var relRoot in shippedRoots) {
+			var absoluteRoot = rootNormalized & "/" & relRoot;
+			if (!DirectoryExists(absoluteRoot)) {
+				continue;
+			}
+			var files = DirectoryList(absoluteRoot, true, "path", "*.cfc");
+			for (var filePath in files) {
+				if (ListLast(filePath, "/\") != "Application.cfc") {
+					continue;
+				}
+				var content = $stripCfmlComments(FileRead(filePath));
+				if (reFindNoCase("function\s+onApplicationEnd\s*\(", content) == 0) {
+					continue;
+				}
+				var normalized = Replace(filePath, "\", "/", "all");
+				var rel = Mid(normalized, Len(rootNormalized) + 2, Len(normalized));
+				ArrayAppend(found, rel);
+			}
+		}
+
+		ArraySort(found, "textnocase");
+		return found;
 	}
 
 	/**
