@@ -1,0 +1,1 @@
+- The Packages admin page (`/wheels/packages`) no longer calls `HTMLEditFormat`, which is missing on Adobe ColdFusion 2025 and caused HTTP 500. Registry names, descriptions, versions, errors, and homepage links are encoded with `EncodeForHTML` instead, matching the rest of the `/wheels` admin surface (#3378)
