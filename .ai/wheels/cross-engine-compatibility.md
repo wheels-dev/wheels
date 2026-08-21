@@ -68,6 +68,8 @@ public void function onApplicationEnd(struct ApplicationScope) {
 
 **Existing apps**: apply this same change to `public/Application.cfc` — the CLI template (`wheels new`) and the demo app were fixed in Wheels 4.x (#3380).
 
+The same torn-down-scope rule applies to `onSessionEnd()`. Adobe's `SessionTracker.SessionCleanUpAgent` can call it after the live application scope is already reclaimed, so bare `application.wo.$simpleLock` throws the same `Element wo is undefined...` error. Route through `arguments.applicationScope.wo` and guard with `StructKeyExists(arguments.applicationScope, "wo")` only — this path uses `$simpleLock`, not `$include`, so do not add the `wheels` / `eventPath` checks used by `onApplicationEnd()`. Existing 4.0.x apps must paste the same edit into their own `public/Application.cfc`.
+
 ### Closure `this` Captures Declaring Scope
 
 CFML closures bind `this` to the component where they are DEFINED, not where they are ASSIGNED. This trips up test code that dynamically adds methods.

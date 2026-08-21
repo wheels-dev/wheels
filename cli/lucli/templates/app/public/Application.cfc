@@ -208,13 +208,19 @@ component output="false" {
 		local.lockName = "reloadLock" & this.name;
 
 		arguments.componentReference = "wheels.events.EventMethods";
-		application.wo.$simpleLock(
-			name = local.lockName,
-			execute = "$runOnSessionEnd",
-			executeArgs = arguments,
-			type = "readOnly",
-			timeout = 180
-		);
+		// Adobe SessionTracker.SessionCleanUpAgent calls onSessionEnd after the
+		// live application scope can already be torn down (same class of failure
+		// as onApplicationEnd, issue #3379). Route through the passed-in
+		// arguments.applicationScope and guard so a reclaimed scope is a no-op.
+		if (StructKeyExists(arguments.applicationScope, "wo")) {
+			arguments.applicationScope.wo.$simpleLock(
+				name = local.lockName,
+				execute = "$runOnSessionEnd",
+				executeArgs = arguments,
+				type = "readOnly",
+				timeout = 180
+			);
+		}
 	}
 
 	public boolean function onRequestStart( string targetPage ) {

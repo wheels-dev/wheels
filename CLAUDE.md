@@ -135,6 +135,8 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 
     The CLI template (`wheels new`) and the demo app were fixed in #3380. **Existing apps must apply the same change to their `public/Application.cfc`.**
 
+    The same torn-down-scope rule applies to `onSessionEnd()`. Adobe's `SessionTracker.SessionCleanUpAgent` can call it after the live application scope is already reclaimed, so bare `application.wo.$simpleLock` throws the same `Element wo is undefined...` error. Route through `arguments.applicationScope.wo` and guard with `StructKeyExists(arguments.applicationScope, "wo")` only — this path uses `$simpleLock`, not `$include`, so do not add the `wheels` / `eventPath` checks used by `onApplicationEnd()`. Existing 4.0.x apps must paste the same edit into their own `public/Application.cfc`.
+
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
 curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
