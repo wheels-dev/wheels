@@ -52,8 +52,13 @@ component {
 		}
 
 		// --- Chainable Query Builder entry points ---
-		// Allow calling .where(), .orWhere(), .orderBy() etc. directly on a model to start a query builder chain.
-		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset", arguments.missingMethodName)) {
+		// Allow calling .where(), .select(), .orderBy() etc. directly on a model to start a query builder chain.
+		// Note: user-defined scopes and enum checkers above take precedence, and a real model method with one of
+		// these names bypasses onMissingMethod entirely. The dynamic-finder and association-method branches below
+		// run AFTER this list, so an association named e.g. "select" resolves to the builder instead. Keep this
+		// list in sync with the scope-to-builder transition list in wheels.model.query.ScopeChain (where user
+		// scopes are checked first).
+		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset,select,include,group,distinct,forUpdate", arguments.missingMethodName)) {
 			local.builder = new wheels.model.query.QueryBuilder(modelReference = this);
 			// Delegate the call to the query builder
 			return Invoke(local.builder, arguments.missingMethodName, arguments.missingMethodArguments);

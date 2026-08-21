@@ -215,6 +215,29 @@ component extends="wheels.WheelsTest" {
 				assert_test(user, true)
 			})
 
+			it("evaluates a this.method call with a single positional argument (##3238)", () => {
+				expect(user.$evaluateConditionString("this.propertyIsPresent('username')")).toBeTrue()
+				expect(user.$evaluateConditionString("this.propertyIsPresent('nonexistent')")).toBeFalse()
+			})
+
+			it("evaluates a this.method call with multiple positional arguments", () => {
+				user.stupid_mixin = stupid_mixin
+				expect(user.$evaluateConditionString("this.stupid_mixin('1', '2') eq 3")).toBeTrue()
+				expect(user.$evaluateConditionString("this.stupid_mixin('1', '2') neq 3")).toBeFalse()
+			})
+
+			it("if validation runs when a positional-argument method condition is true (##3238)", () => {
+				args.condition = "this.propertyIsPresent('username')"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("if validation is skipped when a positional-argument method condition is false (##3238)", () => {
+				args.condition = "this.propertyIsPresent('nonexistent')"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, true)
+			})
+
 			it("both validations if triggered unless not triggered valid", () => {
 				args.condition = "1 eq 1"
 				args.unless = "this.username eq 'TheLongestNameInTheWorld'"
@@ -990,6 +1013,32 @@ component extends="wheels.WheelsTest" {
 			it("validatesUniquenessOf_with_blank_integer_values", () => {
 				combiKey = g.model("combiKey").new(id1 = "", id2 = "")
 				expect(combiKey.valid()).toBeFalse()
+			})
+
+			// Issue #3350: a property named in `scope=` that was never assigned is ABSENT
+			// from the object, not present-and-empty — `$setDefaultValues()` only seeds
+			// properties with an explicit `property()` mapping. The scope dereference had no
+			// existence guard, so building the uniqueness WHERE clause threw
+			// "Component [X] has no accessible Member with name [Y]" out of a method whose
+			// entire job is to return a validation result. The validated property itself
+			// cannot hit this — `$shouldInvokeValidation()` skips the validation when it is
+			// absent — so only `scope=` was exposed.
+			it("validatesUniquenessOf_with_absent_scope_property", () => {
+				combiKey = g.model("combiKey").new(id1 = 1, id2 = 1)
+				StructDelete(combiKey, "id2")
+
+				// must return a validation result rather than throwing
+				expect(combiKey.valid()).toBeFalse()
+			})
+
+			// An absent scope property must behave exactly like a present-but-empty one —
+			// the split between the two was the defect, not the value itself.
+			it("validatesUniquenessOf_absent_scope_matches_blank_scope", () => {
+				absent = g.model("combiKey").new(id1 = 1, id2 = "")
+				StructDelete(absent, "id2")
+				blank = g.model("combiKey").new(id1 = 1, id2 = "")
+
+				expect(absent.$buildWhereClausePart("id2")).toBe(blank.$buildWhereClausePart("id2"))
 			})
 
 			it("validatesUniquenessOf_with_blank_property_value", () => {

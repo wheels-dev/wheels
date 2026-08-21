@@ -379,40 +379,70 @@ component output="false" {
 	 * @path The path to get component files from
 	 */
 	private function $integrateComponents(required string path) {
-    local.basePath = arguments.path;
-    local.folderPath = expandPath("/#replace(local.basePath, ".", "/", "all")#");
-
-    // Get a list of all CFC files in the folder
-    local.fileList = directoryList(local.folderPath, false, "name", "*.cfc");
-    for (local.fileName in local.fileList) {
-      // Remove the file extension to get the component name
-      local.componentName = replace(local.fileName, ".cfc", "", "all");
-
-      $integrateFunctions(createObject("component", "#local.basePath#.#local.componentName#"));
-    }
+		// The directory scan + per-file createObject + getMetaData, plus the
+		// public-method/reference resolution, are cached per path (issue #3213).
+		// The `get`/`controller` exclude-list only applies to NON-wheels.mapper
+		// sources, so for the wheels.mapper.* components scanned here every public
+		// method is integrated — exactly what the precomputed publicMethods hold.
+		local.plan = $componentIntegrationPlan(arguments.path);
+		local.iEnd = ArrayLen(local.plan);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			$integrateFunctions(local.plan[local.i].instance, local.plan[local.i].publicMethods);
+		}
 	}
 
 	/**
-	 * Dynamically mix methods from a given component into this component.
-	 * Only public, non-inherited methods are added.
+	 * Mix a component's methods into this component. The cached path passes the
+	 * pre-resolved public methods (each `{name, ref}`, see
+	 * $componentIntegrationPlan) and assigns them directly. The fallback path —
+	 * used by init() integrating wheels.Global with no cached list — keeps the
+	 * original metadata scan plus the `get`/`controller` exclude-list (#3213).
 	 *
 	 * @param componentInstance The component instance to integrate methods from.
 	 */
-	private function $integrateFunctions(required any componentInstance) {
-			// Get metadata for the component
-			local.methods = getMetaData(componentInstance).functions;
-			local.componentName = getMetaData(componentInstance).FULLNAME;
+	private function $integrateFunctions(required any componentInstance, array publicMethods = []) {
+			// Cached path: pre-resolved public method references.
+			if (ArrayLen(arguments.publicMethods)) {
+				local.iEnd = ArrayLen(arguments.publicMethods);
+				for (local.i = 1; local.i <= local.iEnd; local.i++) {
+					local.m = arguments.publicMethods[local.i];
+					variables[local.m.name] = local.m.ref;
+					this[local.m.name] = local.m.ref;
+				}
+				return;
+			}
 
-			// Iterate over the functions in the component
+			// Fallback (e.g. init() integrating wheels.Global): scan metadata and
+			// apply the exclude-list against the source's full name.
+			local.meta = getMetaData(arguments.componentInstance);
+			local.methods = StructKeyExists(local.meta, "functions") ? local.meta.functions : [];
+			local.componentName = StructKeyExists(local.meta, "fullName") ? local.meta.fullName : "";
+			local.excludeList = "get,controller";
 			for (local.method in local.methods) {
 				local.functionName = local.method.name;
-				local.excludeList = "get,controller";
 
-				// Add only public, non-inherited methods excluding specific ones
+				// Add only public methods, excluding specific ones unless the source is a mapper component.
 				if (local.method.access == "public" && (!listFindNoCase(local.excludeList, local.functionName) || findNoCase("wheels.mapper", local.componentName))) {
-					// Assign methods to `variables` and `this`
 					variables[local.functionName] = componentInstance[local.functionName];
 					this[local.functionName] = componentInstance[local.functionName];
+				}
+			}
+			// Adobe CF's getMetaData() does not list component-body includes
+			// (#2790). After the DC7 split those helpers live in
+			// vendor/wheels/global/*.cfm, so copy any names the metadata scan
+			// missed. The exclude-list is the same as above.
+			if (StructKeyExists(arguments.componentInstance, "$frameworkGlobalFunctionNames")) {
+				local.includeNames = arguments.componentInstance.$frameworkGlobalFunctionNames();
+				local.includeCount = ArrayLen(local.includeNames);
+				for (local.n = 1; local.n <= local.includeCount; local.n++) {
+					local.functionName = local.includeNames[local.n];
+					if (
+						!StructKeyExists(this, local.functionName)
+						&& (!ListFindNoCase(local.excludeList, local.functionName) || FindNoCase("wheels.mapper", local.componentName))
+					) {
+						variables[local.functionName] = arguments.componentInstance[local.functionName];
+						this[local.functionName] = arguments.componentInstance[local.functionName];
+					}
 				}
 			}
 	}

@@ -78,7 +78,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * `vendor/wheels/tests/specs/migrator/addColumnOptionsSpec.cfc` — keep
 	 * this list and that spec aligned. See #2742.
 	 */
-	public boolean function optionsIncludeDefault(string type, string default = "", boolean allowNull = true) {
+	public boolean function optionsIncludeDefault(string type, default = "", boolean allowNull = true) {
 		if (ListFindNoCase("text,mediumtext,longtext,float", arguments.type)) {
 			return false;
 		} else {

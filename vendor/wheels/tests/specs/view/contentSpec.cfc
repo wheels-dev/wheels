@@ -60,12 +60,9 @@ component extends="wheels.WheelsTest" {
 				}
 
 				expect(issimplevalue(result)).toBeFalse()
-				// BoxLang compatibility: Different CFML engines may throw different error types
-				if (StructKeyExists(server, "boxlang")) {
-					expect(result.message).toInclude("The key [FRUIT] was not found in the struct.")
-				} else {
-					expect(result.type).toBe("expression")
-				}
+				// Engines classify undefined-variable errors under different cfcatch.type values, so assert
+				// the missing key name (proof the implicit data function was NOT invoked) instead of the type.
+				expect(result.message).toInclude("fruit")
 			})
 
 			it("is including partial with query", () => {
@@ -101,7 +98,13 @@ component extends="wheels.WheelsTest" {
 					[{dept: "a", name: "x"}, {dept: "a", name: "y"}, {dept: "b", name: "z"}]
 				)
 				savecontent variable="result" {
-					WriteOutput(_controller.includePartial(partial = "groupRow", query = groupQuery, group = "dept"))
+					// Partial name stays lowercase on purpose: $generateIncludeTemplatePath
+					// LCase()s the whole resolved path, so a camelCase view filename is
+					// unreachable on a case-sensitive filesystem. Adobe enforces that;
+					// Lucee and BoxLang resolve the mismatch anyway, which is why the
+					// original `groupRow` / `_groupRow.cfm` pair only failed on the two
+					// Adobe legs of the matrix. Pinned by ViewFileNamingGuardSpec.
+					WriteOutput(_controller.includePartial(partial = "grouprow", query = groupQuery, group = "dept"))
 				}
 
 				expect(REReplace(result, "\s", "", "all")).toBe("a:2;b:1;")

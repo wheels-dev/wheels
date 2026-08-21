@@ -255,7 +255,12 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is passing through class", () => {
-				request.wheels.testPaginationLinksQuery = {currentPage = 2, totalPages = 3}
+				// Inline rather than g.$ensurePaginationStore() — a zero-argument dotted call in
+				// statement position breaks Adobe CF 2025's parser.
+				if (!StructKeyExists(request.wheels, "$pagination")) {
+					request.wheels["$pagination"] = {}
+				}
+				request.wheels["$pagination"].testPaginationLinksQuery = {currentPage = 2, totalPages = 3}
 				r = g.controller("dummy").paginationLinks(classForCurrent = "active", handle = "testPaginationLinksQuery")
 
 				expect(r).toInclude("<span class=""active"">2</span>")

@@ -21,7 +21,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 The two surfaces are easy to confuse because both talk about "installing things." Keep the distinction in mind:
 
 - **Modules** are LuCLI plugins. They live in the CLI's home directory (`~/.wheels/modules/` for the `wheels` binary, `~/.lucli/modules/` for standalone LuCLI). Each module is a `Module.cfc` that registers new top-level commands. `wheels modules list` shows what's registered.
-- **Deps** are per-project CFML libraries. They live in your project's `lucee.json` file and, once installed, under the project's `lib/` (or configured install path). They can come from git, the Lucee extension registry, ForgeBox, or a local file/JAR.
+- **Deps** are per-project CFML libraries. They live in your project's `lucee.json` file and, once installed, under the project's `dependencies/` directory (the `dependencySettings.installLocation` default — see [Configuration](/v4-0-0/command-line-tools/configuration/)). They can come from git, the Lucee extension registry, ForgeBox, or a local file/JAR.
 
 Modules affect the CLI; deps affect the app you're building with it. The same project can use both independently.
 
@@ -262,7 +262,7 @@ wheels deps prune
 Takes no flags. Prints the cache path, then deletes it.
 
 <Aside type="caution" title="Prune wipes the whole git cache">
-`prune` deletes every cloned git dependency in LuCLI's cache directory, not just unused ones. It does not touch your project's installed `lib/` — only the shared clone cache that `deps install` pulls from. Run it when you want to force clean re-clones.
+`prune` deletes every cloned git dependency in LuCLI's cache directory, not just unused ones. It does not touch your project's installed dependencies — only the shared clone cache that `deps install` pulls from. Run it when you want to force clean re-clones.
 </Aside>
 
 ## How wheels is registered
@@ -298,7 +298,7 @@ wheels deps add
 wheels deps install
 ```
 
-`add` walks you through the interactive wizard and writes the new entry into `lucee.json`. `install` then resolves every dependency in that file (including the one you just added) and drops them under the project's `lib/` directory, updating `lucee-lock.json` at the end.
+`add` walks you through the interactive wizard and writes the new entry into `lucee.json`. `install` then resolves every dependency in that file (including the one you just added) and drops them under the project's install directory (`dependencies/` by default), updating `lucee-lock.json` at the end.
 
 ### Prune removed deps
 

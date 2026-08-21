@@ -47,14 +47,105 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 8. **`Left(str, 0)` crashes Lucee 7.** Guard: `len > 0 ? Left(str, len) : ""`.
 9. **`toBeInstanceOf("component")` fails on BoxLang** — returns the FQN, not the literal `"component"`. Use `toBeWheelsModel()` for finder results.
 10. **Adobe CF 2023 and 2025 reject the `arguments` scope as `attributeCollection` on *any* built-in CFML tag.** Affects every `cfheader` / `cfcache` / `cfcontent` / `cfmail` / `cfdirectory` / `cffile` / `cflocation` / `cfhtmlhead` / `cfimage` / `cfdbinfo` / `cfinvoke` / `cfwddx` / `cfzip` wrapper. Covers both the string-interpolated (`attributeCollection = "#arguments#"`) and direct-struct (`attributeCollection = arguments`) forms. Adobe 2023/2025 throw — `cfheader`'s message is `"Failed to add HTML header"`; other tags surface their own — and `$header()` is catastrophic because it runs on every request. Copy to a plain struct first: `local.args = {}; for (local.key in arguments) { local.args[local.key] = arguments[local.key]; }`. Lucee 6/7, BoxLang, and Adobe 2018/2021 accept both forms; Adobe 2023/2025 require the plain struct. The 13 sites in `vendor/wheels/Global.cfc` were patched uniformly in [#2750](https://github.com/wheels-dev/wheels/pull/2750).
-11. **`local.X = ...` inside `catch` doesn't persist on BoxLang.** Catch body runs under a nested `local` that gets discarded on exit, so `expect(local.X)` after the catch reads the un-touched outer value. Use a struct field: `var state = {flag = false}; ... state.flag = true;`. Bare `var bareName` + unscoped `bareName = true` also works but the struct form mirrors `TenantResolverSpec` and is the prior-art pattern.
+11. **Anything written through `local.` inside `catch` doesn't persist on BoxLang.** Catch body runs under a nested `local` that gets discarded on exit, so `expect(local.X)` after the catch reads the un-touched outer value. Use a struct field: `var state = {flag = false}; ... state.flag = true;`. Bare `var bareName` + unscoped `bareName = true` also works but the struct form mirrors `TenantResolverSpec` and is the prior-art pattern.
+
+    **The struct form only works if you access it WITHOUT the `local.` prefix.** `local.state.flag = true` inside a catch fails exactly like a scalar `local.X = ...` — the nested `local` shadows `local.state`, so the write lands on a discarded copy rather than mutating the outer struct. The prefix is what breaks it, not the assignment shape:
+    ```cfm
+    var state = {type = ""};                       // RIGHT
+    try { ... } catch (any e) { state.type = e.type; }
+    local.state = {type = ""};                     // WRONG — silently empty after the catch
+    try { ... } catch (any e) { local.state.type = e.type; }
+    ```
+    This matters because `local.`-scoping spec variables is the house style everywhere else, so "tidying" a catch-using spec to match is an easy and invisible way to break it. Doing exactly that to `JobClassRoundTripSpec` cost two BoxLang failures on every database (`Expected [Wheels.JobClassNotFound] but received []`) — green on Lucee, caught only by the compat matrix.
 12. **`for (local.i = ...)` inside `finally` miscompiles on Lucee 7.** Lucee 7.0.1+100 throws `variable [local] doesn't exist` at runtime when a `for` loop declares or iterates `local`-/`var`-scoped variables inside a `finally` block (one probe shape even produced a JVM `Expecting a stackmap frame` verifier error). Bare assignments and function calls in `finally` are fine; loops are not. Hoist the loop into a `public` `$`-prefixed helper and call it from `finally` — reference: `$restoreEmailViewVariables()` in `vendor/wheels/controller/miscellaneous.cfc` ([#2922](https://github.com/wheels-dev/wheels/pull/2922)).
 13. **Bare tag-in-script statements without parentheses (e.g. `cfabort;`) are Lucee-only.** Adobe CF compiles the bare token as a reference to an undefined VARIABLE and throws `Variable CFABORT is undefined` at runtime (every Adobe engine, not just one release). Use the script keyword (`abort;`) or the parenthesized call form (`cfheader(...)`-style) instead. The `enablePublicComponent=false` 404 branch in `vendor/wheels/Dispatch.cfc` shipped a bare `cfabort;`, which turned `GET /` on every stock Adobe install in `testing`/`production` into an HTTP 500 ([#3029](https://github.com/wheels-dev/wheels/issues/3029)). Structural guard: `vendor/wheels/tests/specs/security/BareCfabortGuardSpec.cfc` fails the suite if any bare script-context `cfabort` statement reappears under `vendor/wheels/**/*.cfc` (tag-context `<cfabort>` in `.cfm`/tag-based CFCs stays legal).
+14. **Adobe 2025's JVM rejects member calls on JDK-internal classes (JPMS).** Calling any member on an object whose runtime class lives in an unexported package (`com.sun.*`, `jdk.internal.*`) — e.g. the `com.sun.crypto.provider.PBKDF2KeyImpl` returned by `SecretKeyFactory.generateSecret()` — throws `java.lang.reflect.InaccessibleObjectException` on Adobe 2025 (its reflection layer bulk-`setAccessible`s the concrete class's methods; Lucee, BoxLang, and Adobe ≤2023 tolerate the same call, so **local Adobe 2023 green does NOT cover this**). Route the call through the exported interface's `Method` object instead: `CreateObject("java","java.lang.Class").forName("javax.crypto.SecretKey").getMethod("getEncoded", JavaCast("null","")).invoke(keyObj, JavaCast("null",""))` — `getMethod`/`invoke` treat the null varargs as empty. Hit by `PasswordHasher.$deriveKey()` ([#3300](https://github.com/wheels-dev/wheels/issues/3300)); watch for it with any Java factory API that returns internal implementation types.
+
+15. **A parameter named `request` makes the bare `request` token resolve inconsistently on Adobe 2025.** In a function declaring a parameter named `request`, Adobe CF 2025 can resolve bare `request` to the built-in scope in one expression position and to `arguments.request` in another *within the same function* — so a guard written one way cannot protect an access written the other way. `if (StructKeyExists(request, "wheels")) { StructDelete(request.wheels, "tenant"); }` passed the guard and then threw `Element WHEELS is undefined in REQUEST`. Use `IsDefined("request.wheels.tenant")`, which string-resolves the whole dotted path in one evaluation, or assign before use (`if (!StructKeyExists(request, "wheels")) { request.wheels = {}; }` then write) — never mix the two forms. This hits **every middleware component**, because `wheels.middleware.MiddlewareInterface` mandates the signature `handle(required struct request, required any next)`; anti-pattern 11's "never name a parameter after a reserved scope" is unavailable there. Lucee 6/7, BoxLang and Adobe 2023 all resolve consistently, so **local Lucee green and Adobe 2023 smokes do NOT cover this** — only the Adobe 2025 matrix legs catch it, and `compat-matrix.yml` does not run on PRs (weekly cron + `workflow_dispatch`, `continue-on-error: true`). Hit by `TenantResolver.handle()` in [#3338](https://github.com/wheels-dev/wheels/pull/3338).
+
+16. **Two receiver shapes break Adobe's parser at COMPILE time with the same `MissingNameException`.** Both throw `coldfusion.compiler.CFMLParserBase$MissingNameException: Invalid construct: Either argument or name is missing` ("When using named parameters to a function, each parameter must have a name"). Adobe appears to parse the construct as a script-style tag call and demand at least one attribute.
+
+    **16a — a parenthesized `new` in receiver position, on EVERY Adobe engine.** `(new wheels.Job()).$someMethod(arg = "x")` fails to compile on Adobe **2023 and 2025**; Lucee 6/7 and BoxLang accept it. The argument list is irrelevant here — named arguments do not save it, because the receiver is what the parser chokes on. Hoist the instance to a variable first:
+    ```cfm
+    // WRONG — zeroes out both Adobe legs
+    revived = (new wheels.Job()).$instantiateJobClass(jobClass = persisted);
+    // RIGHT — variable receiver; 22 spec files already do this and pass on Adobe
+    var bridge = new wheels.Job();
+    revived = bridge.$instantiateJobClass(jobClass = persisted);
+    ```
+    Note the `(new X()).method()` form appears in this file's own Background Jobs examples and in user-facing docs — it is fine in **application** code that only ever runs on Lucee, and fatal in the **core spec suite**, which compiles on all five engines. Hit by `JobClassRoundTripSpec` in [#3351](https://github.com/wheels-dev/wheels/issues/3351).
+
+    **16b — a zero-argument call through the `application` scope, Adobe 2025.** Inside a closure, `application.wo.$someMethod()` with an **empty** argument list — used as a bare statement or as the whole right-hand side of an assignment — fails the same way. This is the `application`-scope sibling of invariant 2. Verified boundaries — each of these compiles, so **do not "fix" them**:
+    - any argument at all: `application.wo.$get("showErrorInformation")`
+    - nested inside another call: `expect(application.wo.$statusCode()).toBe(418)` (long-standing in `renderingSpec`)
+    - chained further: `application.wo.mapper().resources("posts")` (`RoutePrecedenceSpec`)
+    - a non-`application` receiver, zero args, bare statement in a closure: `_controller.$clearCachableActions()` (`cachingSpec`), `strategy.logout()` (`SessionStrategySpec`), `local.c.$warnIfConfigSkipsSuper()` (`configSuperWarningSpec`)
+
+    Two things make this expensive to diagnose. Adobe attributes the error to the **enclosing `describe(...)` line**, not the offending statement, so it reads like a broken test-block signature. And because the core suite compiles via `directory="wheels.tests.specs"`, one occurrence zeroes out **the entire engine leg** — adobe2025 reports `tests="0"` for every database while Lucee/BoxLang/Adobe 2023 stay green, and `compat-matrix.yml` does not run on PRs. In test code, ensure request state inline (`if (!StructKeyExists(request.wheels, "$pagination")) { request.wheels["$pagination"] = {} }`) rather than calling a void `$`-helper through `application.wo`; in framework code prefer helpers that **return** what they ensure, so callers write `local.store = $ensurePaginationStore();`. Hit by the #3339 pagination-namespace specs.
+
+    Bisect this class of bug with a single probe against a running container instead of CI (~13s vs ~19min):
+    ```bash
+    curl -s "http://localhost:62025/wheels/core/tests?db=sqlite&format=json&cli=true" | \
+      python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass','COMPILE FAIL'), d.get('RootCause',{}).get('snippet',''))"
+    ```
+
+17. **A parameter named `default` loses its name — and its declared default value — if a type keyword precedes it, on every Adobe engine.** Adobe treats `default` as reserved in a parameter position, so `string default = ""` registers an argument named **`string`** and discards `default` entirely; the declared default value never materializes in the `arguments` scope. Dropping the type declaration fixes it — `default = ""` (untyped) parses correctly on Adobe, Lucee 6/7 and BoxLang alike.
+
+    ```cfm
+    // WRONG — arguments scope gets a key named STRING; `default` never appears
+    public any function float(string columnNames, string default = "", boolean allowNull = "true") {
+    // RIGHT — arguments.default exists and carries ""
+    public any function float(string columnNames, default = "", boolean allowNull = "true") {
+    ```
+
+    Explicitly-passed values still arrive (as a separate lowercase `default` key alongside the bogus `STRING` one), which is what makes this so quiet: every call site that passes `default=` works, and only the *declared* default silently vanishes. `TableDefinition.uniqueidentifier()` shipped `string default = "newid()"` and emitted DDL with no `DEFAULT` clause on Adobe for as long as it has existed. All 24 `default` parameter declarations under `vendor/wheels/` were untyped uniformly in the #3302 burn-down; `cli/lucli/services/ArgSpec.cfc` still has typed ones but runs on the Lucee-only LuCLI runtime.
+
+18. **Adobe 2025's `FileWrite()` appends a trailing `0x0A` when handed a simple value.** `FileWrite(path, "hello world")` puts **12** bytes on disk, not 11. Lucee 6/7, BoxLang and Adobe 2023 write the string verbatim, so local Lucee green does not cover this. Harmless for generated source or JSON; fatal anywhere the read must round-trip what was written, which is why it corrupted every object stored through `wheels.storage.drivers.LocalDisk` (#3302). Decode to binary first — the binary overload has no line-ending behaviour on any engine:
+
+    ```cfm
+    var payload = IsBinary(content) ? content : CharsetDecode(content, "utf-8");
+    FileWrite(path, payload);
+    ```
+
+19. **The `application` scope is unreliable inside `onApplicationEnd()` on Adobe CF 2023.** During `applicationStop()` teardown (triggered by a `?reload` restart or idle-timeout reclaim), bare `application.wo` can resolve against a stale/torn-down scope and land on a Java `String[]`, throwing `Element wo is undefined in a Java object of type class [Ljava.lang.String;` and erroring the whole site until a CF service restart. The only dependable reference at shutdown is the passed-in `arguments.applicationScope`. Always route `onApplicationEnd()` through it and guard with `StructKeyExists` so a partially reclaimed scope degrades to a no-op (#3379). Lucee 6/7 and BoxLang are unaffected; only Adobe CF exhibits this during real teardown.
+
+    ```cfm
+    // WRONG — bare application.wo breaks on Adobe CF during applicationStop() teardown
+    public void function onApplicationEnd(struct ApplicationScope) {
+        application.wo.$include(
+            template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+            argumentCollection = arguments
+        );
+    }
+
+    // RIGHT — route through the passed-in scope and guard before dereferencing
+    public void function onApplicationEnd(struct ApplicationScope) {
+        if (
+            StructKeyExists(arguments.applicationScope, "wo")
+            && StructKeyExists(arguments.applicationScope, "wheels")
+            && StructKeyExists(arguments.applicationScope.wheels, "eventPath")
+        ) {
+            arguments.applicationScope.wo.$include(
+                template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+                argumentCollection = arguments
+            );
+        }
+    }
+    ```
+
+    The CLI template (`wheels new`) and the demo app were fixed in #3380. **Existing apps must apply the same change to their `public/Application.cfc`.**
 
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
 curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
   python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalPass',0),'pass',d.get('totalFail',0),'fail',d.get('totalError',0),'error')"
+```
+
+**Adobe serves cached compiled classes — `?reload=true` does NOT pick up an edited `.cfc`.** `?reload=true` rebuilds the Wheels application scope, not Adobe's template cache, so a source change can keep producing the *old* result for many minutes. This reads exactly like a fix that did not work, and the natural response — reverting or piling on a second change — makes it worse. After editing framework source, `docker restart wheels-adobe2023-1` (or `-adobe2025-1`) before trusting any Adobe result. Lucee and BoxLang pick edits up from the bind mount immediately; only the Adobe legs need this.
+
+**Narrow the run with `directory=` — it turns a ~19-minute CI round-trip into ~5 seconds.** The core-test endpoint accepts a dotted TestBox scope, allowlisted to `wheels.tests.*` and `vendor.<package>.tests.*`. `bundles=` is silently ignored (#3352), so `directory=` is the only working filter. Point it at a *directory*, never a single spec file — a single-file scope discovers 0 bundles and reports green (#3083); check `bundlesDiscovered` in the payload.
+```bash
+curl -s "http://localhost:62025/wheels/core/tests?db=sqlite&directory=wheels.tests.specs.security&format=json&reload=true"
 ```
 
 Deep reference: [.ai/wheels/cross-engine-compatibility.md](.ai/wheels/cross-engine-compatibility.md).
@@ -249,7 +340,11 @@ t.primaryKey(name="userId", autoIncrement=true);
 
 For new migrator helpers or anywhere you accept a column-name argument: declare `string columnNames` (NOT `required`), and call `$combineArguments(args=arguments, combine="columnNames,columnName", required=true)` at the top of the body. The pattern is documented in [vendor/wheels/migrator/CLAUDE.md](vendor/wheels/migrator/CLAUDE.md). Boolean nullable flag is `allowNull` everywhere — never `null`.
 
-`t.references()` also respects `useUnderscoreReferenceColumns` (boolean, framework default `false`, `wheels new` template default `true`) — when true it produces `<name>_id` / `<name>_type` columns matching Wheels model `belongsTo` defaults.
+`t.references()` also respects `useUnderscoreReferenceColumns` (boolean, framework default `false`, `wheels new` template default `true`) — when true it produces `<name>_id` / `<name>_type` columns instead of `<name>id` / `<name>type`.
+
+Association foreign-key defaults resolve **either** convention: the default derivation checks which column actually exists on whichever side owns the foreign key, rather than reading the setting ([#3337](https://github.com/wheels-dev/wheels/issues/3337) — before that fix the model layer derived `<modelName><key>` unconditionally and a stock `wheels new` app threw `key [<name>id] doesn't exist` on any `include=`). It is schema-driven on purpose: the migrator reads the flag per call, but the model-side default is memoized for the application lifetime, so honouring the flag there would let a runtime flip change migrations without changing models. Apps holding a mix of both shapes work for the same reason.
+
+**Polymorphic associations are not covered.** `belongsTo(polymorphic=true)` and `hasMany`/`hasOne` with `as=` fix their foreign key to `<name>id` at *registration* time (`vendor/wheels/model/associations.cfc:30`, `:81`, `:134`), before the schema is available, so the join-time resolution never sees a blank to fill. Against an underscore-shaped schema those still need an explicit `foreignKey="<name>_id"`.
 
 ## Wheels Conventions
 
@@ -280,6 +375,9 @@ component extends="Model" {
         // Callbacks
         beforeSave("sanitizeInput");
 
+        // Calculated SQL properties — select=false keeps them off the default SELECT (hot path)
+        property(name="fullName", sql="firstName || ' ' || lastName", select=false);
+
         // Query scopes — reusable, composable query fragments
         scope(name="active", where="status = 'active'");
         scope(name="recent", order="createdAt DESC");
@@ -299,6 +397,7 @@ component extends="Model" {
 Finders: `model("User").findAll()`, `findOne(where="...")`, `findByKey(params.key)`.
 Create: `model("User").new(params.user).save()`, or `model("User").create(params.user)`.
 Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
+Opt a `select=false` calculated property into one call (additive): `findAll(includeCalculated="fullName")`. Unknown names throw `Wheels.CalculatedPropertyNotFound` in dev/testing.
 
 ### Scopes / Enums / Builder / Batch
 
@@ -319,7 +418,9 @@ model("User")
     .orderBy("name", "ASC")
     .limit(25)
     .get();
-// Methods: where, orWhere, whereNull, whereNotNull, whereBetween, whereIn, whereNotIn, orderBy, limit, get
+// Methods: where, orWhere, whereNull, whereNotNull, whereBetween, whereIn, whereNotIn, orderBy,
+// limit, offset, select, include, group, distinct, forUpdate, get
+// Any of these (not just where) can START the chain on the model, e.g. model("User").select("id,name").get()
 
 // Batch processing — memory-efficient
 model("User").findEach(batchSize=1000, callback=function(user) {
@@ -535,6 +636,8 @@ component extends="wheels.WheelsTest" {
 
 - **App tests**: `/wheels/app/tests` — project-specific, in `tests/specs/`. Uses `tests/populate.cfm` and `tests/TestRunner.cfc`.
 - **Core tests**: `/wheels/core/tests` — framework, in `vendor/wheels/tests/specs/`. Uses `vendor/wheels/tests/populate.cfm`. **This is what CI runs across all engines × DBs.**
+
+**Isolated test application (#3374):** `Application.cfc` includes `vendor/wheels/events/testcontext.cfm` after `config/app.cfm` so runner URLs (and TestClient/browser requests that send `X-Wheels-Test-Context`) bind `<this.name>_wheelsTest` — a separate CFML application scope. The live `application.wheels` is not swapped. `$testClient(testContext=false)` addresses the live app. A request-scoped overlay cannot replace this (blockers B1–B9 on #3025). Existing apps without the include still use the #3373 named-lock swap on the live scope.
 
 **Critical**: core tests use `directory="wheels.tests.specs"` which compiles EVERY CFC in the directory. One compilation error in any spec file crashes the entire suite for that engine. The "inline closure as constructor named arg" anti-pattern (#5 in Cross-Engine Invariants) is the classic example.
 

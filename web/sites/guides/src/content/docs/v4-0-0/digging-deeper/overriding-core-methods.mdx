@@ -1,0 +1,165 @@
+---
+title: Overriding Core Methods
+description: Replace a framework method with your own and delegate to the original via the super-prefixed convention — in models, controllers, and view helpers.
+type: howto
+sidebar:
+  order: 16
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to override a core Wheels method — a model finder, a controller helper, or a view helper like `linkTo()` — while still being able to call the framework's original implementation from inside your override. You'll use the `super`-prefixed method convention, pick the right place for each kind of override, and see when a pass-through argument (like `dataConfirm`) makes an override unnecessary in the first place.
+
+**You'll learn:**
+
+- How the `super<name>` convention works and why it replaced `super.methodName()`
+- How to override a model method and delegate with `superFindAll()`
+- How to override a controller or view helper and delegate with `superLinkTo()`
+- Where each override lives: a single controller, `app/controllers/Controller.cfc`, or `app/views/helpers.cfm`
+- When to skip the override entirely — the `data-*` pass-through pattern for confirm dialogs
+- Which 4.0.x versions support controller/view overrides, and the workaround for older builds
+
+## How the convention works
+
+Wheels assembles models and controllers by mixing framework methods into your components at startup. Because the framework's `findAll()`, `linkTo()`, and friends arrive as mixins rather than through CFML inheritance, `super.findAll()` does not reach them — that syntax stopped working in Wheels 3.0.
+
+Instead, when your component defines a method whose name collides with a framework mixin, Wheels keeps **your** version and registers the framework original under the same name prefixed with `super`. Override `findAll()` and the original becomes `superFindAll()`; override `linkTo()` and the original becomes `superLinkTo()`. Method names are case-insensitive, following normal CFML rules.
+
+The alias is only created when you actually override something. A controller or model that overrides nothing gains no extra `super*` keys.
+
+<Aside type="note" title="Model-only in 3.x, symmetric in 4.0.x">
+In Wheels 3.x this convention worked for **model** methods only. Controller and view helper parity arrived in the 4.0.x patch release carrying the fix for [#3325](https://github.com/wheels-dev/wheels/issues/3325) — see [the version callout below](#version-notes-and-the-pre-fix-workaround) if you're on an earlier 4.0.x build.
+</Aside>
+
+## Overriding a model method
+
+Define the method in your model CFC. Delegate to the original with `argumentCollection = arguments` so every argument your caller passed flows through unchanged:
+
+```cfm {test:compile} title="app/models/Post.cfc"
+component extends="Model" {
+
+	function config() {
+	}
+
+	public any function findAll() {
+		// custom logic before calling the framework original
+		return superFindAll(argumentCollection = arguments);
+	}
+
+}
+```
+
+This works for any public framework method mixed into models — `findOne()`, `columnNames()`, `save()`, and so on.
+
+## Overriding a controller or view helper
+
+The same convention applies to everything mixed into controllers, which includes all view helpers (views execute in the controller's `variables` scope). Overriding `linkTo()` and delegating to the framework original looks like this:
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+
+	function config() {
+	}
+
+	public string function linkTo() {
+		// example: give every generated link a default class
+		if (!StructKeyExists(arguments, "class")) {
+			arguments.class = "app-link";
+		}
+		return superLinkTo(argumentCollection = arguments);
+	}
+
+}
+```
+
+Every call to `#linkTo(...)#` in that controller's views now runs your version, and `superLinkTo()` hands off to the real framework helper — arguments, routing, and HTML escaping all behave exactly as stock.
+
+### Where the override lives
+
+- **One controller** — define the override in that controller's CFC, as above.
+- **Every controller** — define it in `app/controllers/Controller.cfc`, the base controller your controllers extend.
+- **View helpers, app-wide** — define it in `app/views/helpers.cfm`. That file is included into every controller before the framework mixins are integrated, so your version is already in place when the framework helper arrives — your version wins and the original is registered as `super<name>`.
+
+## Version notes and the pre-fix workaround
+
+Controller and view helper overrides gained `super<name>` delegation in the 4.0.x patch release that fixed [#3325](https://github.com/wheels-dev/wheels/issues/3325). Model overrides have supported it since 3.x.
+
+<Aside type="caution" title="On 4.0.x builds predating the #3325 fix">
+On earlier 4.0.x releases, overriding a controller or view helper works, but calling `superLinkTo()` (or any controller-side `super<name>`) throws at render time — the alias was never registered outside the model layer. If you can't upgrade yet, capture the framework original directly:
+
+```cfm
+component extends="Controller" {
+
+	function config() {
+		variables.coreLinkTo = CreateObject("component", "wheels.view.links").linkTo;
+	}
+
+	public string function linkTo() {
+		return coreLinkTo(argumentCollection = arguments);
+	}
+
+}
+```
+
+Delete the workaround and switch to `superLinkTo()` once you're on a build containing the fix.
+</Aside>
+
+<Aside type="note" title="What's overridable">
+The convention covers methods mixed into **models** and **controllers** (including view helpers). Router/mapper internals are not an app-override surface — there is no `super<name>` alias for mapper methods, and overriding them is not supported.
+</Aside>
+
+## Before you override: the `data-*` pass-through
+
+A common reason people reach for a `linkTo()` override is to add behavior like a JavaScript confirm dialog to generated links. You usually don't need an override for that: every HTML helper passes unknown arguments through as HTML attributes, and arguments starting with `data` are automatically hyphenized — `dataConfirm` becomes `data-confirm`, `data_confirm` works too.
+
+```cfm {test:compile} title="app/views/posts/index.cfm"
+<cfoutput>
+	#linkTo(
+		route = "editPost",
+		key = post.id,
+		text = "Edit",
+		dataConfirm = "Discard your current draft and edit this post?"
+	)#
+
+	#buttonTo(
+		route = "post",
+		key = post.id,
+		text = "Delete",
+		method = "delete",
+		dataConfirm = "Delete this post permanently?"
+	)#
+</cfoutput>
+```
+
+Pair it with one delegated listener instead of per-link JavaScript:
+
+```js title="app/assets/js/confirm.js"
+document.addEventListener("click", function (e) {
+	var el = e.target.closest("[data-confirm]");
+	if (el && !confirm(el.dataset.confirm)) {
+		e.preventDefault();
+		e.stopImmediatePropagation();
+	}
+}, true);
+```
+
+This replaces what plugins like `jsconfirm` did in older Wheels versions — no override, no plugin, and the attribute shows up on any helper that renders a tag.
+
+## Migrating from Wheels 2.5
+
+If you're upgrading an application from Wheels 2.5 that overrode core methods:
+
+1. Search for usages of `super.methodName()`
+2. Replace them with `superMethodName()` — for example, `super.findAll()` becomes `superFindAll()`
+3. Test the overridden behavior to make sure results match
+
+No changes are required for applications that don't override core methods.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Conventions over Configuration" href="/v4-0-0/core-concepts/conventions-over-configuration/" description="The naming and placement conventions that decide where overrides live." />
+  <LinkCard title="Controllers and Actions" href="/v4-0-0/basics/controllers-and-actions/" description="How controllers are assembled — the mixin surface your overrides sit on top of." />
+  <LinkCard title="Packages" href="/v4-0-0/digging-deeper/packages/" description="Package mixins can also override framework methods — the same super delegation applies." />
+  <LinkCard title="Upgrading to 4.x" href="/v4-0-0/upgrading/" description="Version-by-version upgrade notes, including behavior changes in the 4.0.x line." />
+</CardGrid>

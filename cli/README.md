@@ -23,7 +23,7 @@ Both installers depend only on Java 21, which is pulled in automatically.
 
 ## Commands
 
-See [the CLI command guides](https://guides.wheels.dev/v4-0-0-snapshot/command-line-tools/) or run `wheels --help` in your terminal.
+See [the CLI command guides](https://guides.wheels.dev/v4-0-0/command-line-tools/) or run `wheels --help` in your terminal.
 
 ## Template Customization
 
@@ -40,4 +40,4 @@ To customize a template:
 2. Modify it to match your needs
 3. The CLI will automatically use your custom template
 
-See the [Template System Guide](https://guides.wheels.dev/v4-0-0-snapshot/command-line-tools/) for detailed documentation.
+See the [Template System Guide](https://guides.wheels.dev/v4-0-0/command-line-tools/) for detailed documentation.

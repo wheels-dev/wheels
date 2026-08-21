@@ -202,9 +202,9 @@ component extends="wheels.WheelsTest" {
 	function assert_pagination(required string handle) {
 		args = arguments
 
-		expect(request.wheels).toHaveKey(args.handle)
+		expect(request.wheels["$pagination"]).toHaveKey(args.handle)
 
-		p = request.wheels[args.handle]
+		p = request.wheels["$pagination"][args.handle]
 		StructDelete(args, "handle", false)
 
 		for (i in args) {

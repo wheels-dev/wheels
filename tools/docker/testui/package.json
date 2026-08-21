@@ -23,6 +23,6 @@
   },
   "devDependencies": {
     "puppeteer": "^22.8.2",
-    "vue-tsc": "^2.0.28"
+    "vue-tsc": "^3.3.8"
   }
 }

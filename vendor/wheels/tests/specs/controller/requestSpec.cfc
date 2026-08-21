@@ -154,13 +154,22 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that pagination", () => {
 
 			beforeEach(() => {
-				request.wheels["myhandle"] = {test = "true"}
+				// Ensure the namespace inline rather than calling application.wo.$ensurePaginationStore():
+				// a zero-argument dotted call in statement position breaks Adobe CF 2025's parser.
+				if (!StructKeyExists(request.wheels, "$pagination")) {
+					request.wheels["$pagination"] = {}
+				}
+				paginationStore = request.wheels["$pagination"]
+				paginationStore["myhandle"] = {test = "true"}
 				params = {controller = "dummy", action = "dummy"}
 				_controller = application.wo.controller("dummy", params)
 			})
 
 			afterEach(() => {
-				StructDelete(request.wheels, "myhandle", false)
+				// Delete only this spec's handle. The whole core suite runs in one request, so
+				// wiping the shared $pagination namespace would destroy other specs' handles.
+				paginationStore = request.wheels["$pagination"]
+				StructDelete(paginationStore, "myhandle", false)
 			})
 			
 			it("handle exists", () => {

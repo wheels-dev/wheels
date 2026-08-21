@@ -14,6 +14,7 @@ application.$wheels.filePath = "files";
 application.$wheels.imagePath = "images";
 application.$wheels.javascriptPath = "javascripts";
 application.$wheels.modelPath = "/app/models";
+application.$wheels.policyPath = "/app/policies";
 application.$wheels.pluginPath = "/plugins";
 application.$wheels.pluginComponentPath = "/plugins";
 application.$wheels.packagePath = "/vendor";

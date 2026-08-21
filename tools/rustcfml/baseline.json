@@ -1,0 +1,28 @@
+{
+  "engineVersion": "v0.429.0",
+  "totals": {
+    "totalSpecs": 4711,
+    "totalPass": 4638,
+    "totalFail": 15,
+    "totalError": 40,
+    "totalSkipped": 18
+  },
+  "failing": [
+    "wheels.tests.specs.controller.verifiesSpec :: Tests that verifies :: checks that strings allow blank",
+    "wheels.tests.specs.controller.verifiesSpec :: Tests that verifies :: checks valid types",
+    "wheels.tests.specs.controller.verifiesSpec :: Tests that verifies :: is valid",
+    "wheels.tests.specs.controller.verifiesSpec :: Tests that verifies :: throws at declaration time when a types list length does not match its variable list",
+    "wheels.tests.specs.global.publicSpec :: Tests that processrequest :: processes request as GET",
+    "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns false when no files changed",
+    "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns true when a new cfm file appears",
+    "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns true when a tracked cfm file is modified",
+    "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns true when a tracked cfm file is removed",
+    "wheels.tests.specs.migrator.migrationSpec :: Tests addIndex :: creates an index on multiple columns",
+    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $castForParam :: casts numeric to java.lang.Double for double param type",
+    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $castForParam :: casts numeric to java.lang.Integer for int param type",
+    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $castForParam :: passes Java objects through unchanged",
+    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $findSetter :: finds a one-arg setter by name on a JDK class",
+    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $findSetter :: throws BrowserOptionError for nonexistent setter",
+    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: BrowserLauncher path discovery :: $findZeroArgMethod throws BrowserLauncherReflectionError when method missing"
+  ]
+}

@@ -256,6 +256,8 @@ component {
 		// State lives in a struct because local assignments made inside catch blocks
 		// do not persist after the catch on BoxLang.
 		local.state = {decrypted = ""};
+		local.legacyAvailable = application.wheels.csrfCookieEncryptionAlgorithm != "AES";
+
 		try {
 			local.state.decrypted = Decrypt(
 				arguments.encryptedValue,
@@ -264,20 +266,54 @@ component {
 				application.wheels.csrfCookieEncryptionEncoding
 			);
 		} catch (any e) {
-			if (application.wheels.csrfCookieEncryptionAlgorithm != "AES") {
-				try {
-					local.state.decrypted = Decrypt(
-						arguments.encryptedValue,
-						arguments.encryptionKey,
-						"AES",
-						application.wheels.csrfCookieEncryptionEncoding
-					);
-				} catch (any legacyDecryptError) {
-					// Undecryptable with either algorithm — treat as a corrupted cookie.
+			// fall through to the legacy attempt below
+		}
+
+		// "Did not throw" is not the same as "decrypted correctly". Decrypting a
+		// bare-AES (ECB) ciphertext under AES/CBC/PKCS5Padding throws only when the
+		// trailing plaintext bytes fail padding validation, and they pass by chance
+		// roughly 1 time in 256 — so Decrypt() returns garbage, the legacy fallback
+		// never runs, and a perfectly good legacy cookie reads as corrupted (issue
+		// #3361). AES/GCM/NoPadding is authenticated and does reliably throw, so this
+		// only ever bit the engines that fall back to CBC.
+		//
+		// Checking the RESULT closes that window. This cookie's plaintext is always the
+		// JSON written by $generateCookieAuthenticityToken(), so anything else means we
+		// decrypted it with the wrong algorithm — which is exactly when the legacy
+		// attempt should still run.
+		if (local.legacyAvailable && !$isCsrfCookiePayload(local.state.decrypted)) {
+			try {
+				local.legacyDecrypted = Decrypt(
+					arguments.encryptedValue,
+					arguments.encryptionKey,
+					"AES",
+					application.wheels.csrfCookieEncryptionEncoding
+				);
+				// Only prefer the legacy result if it actually looks like the payload;
+				// otherwise keep whatever the configured algorithm produced so a
+				// genuinely corrupt cookie is not reported differently than before.
+				if ($isCsrfCookiePayload(local.legacyDecrypted)) {
+					local.state.decrypted = local.legacyDecrypted;
 				}
+			} catch (any legacyDecryptError) {
+				// Undecryptable with either algorithm — treat as a corrupted cookie.
 			}
 		}
+
 		return local.state.decrypted;
+	}
+
+	/**
+	 * Internal function.
+	 * Whether a decrypted string looks like the CSRF cookie payload rather than the
+	 * garbage a wrong-algorithm decrypt can return without throwing.
+	 *
+	 * `$generateCookieAuthenticityToken()` always writes `SerializeJSON({sessionId,
+	 * authenticityToken})`, so JSON-ness is an invariant of this cookie, not an
+	 * assumption about it. The caller re-checks the same thing before deserializing.
+	 */
+	public boolean function $isCsrfCookiePayload(required string value) {
+		return Len(arguments.value) > 0 && IsJSON(arguments.value);
 	}
 
 	/**

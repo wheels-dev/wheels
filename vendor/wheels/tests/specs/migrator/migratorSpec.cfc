@@ -304,8 +304,15 @@ component extends="wheels.WheelsTest" {
 					{},
 					{ datasource = application.wheels.dataSourceName }
 				);
+				// DEFAULT before NOT NULL, which is the order the SQL standard
+				// specifies and the only one Oracle accepts — `NOT NULL DEFAULT 1`
+				// there is ORA-03076 "unexpected item DEFAULT in a column
+				// definition". MySQL/Postgres/SQL Server/SQLite/H2 take either
+				// order, so this form is portable and the reversed one is not
+				// (#3302). Migrator.cfc already emits the Oracle-safe order for
+				// the table it creates itself; this fixture hand-writes its own.
 				queryExecute(
-					"CREATE TABLE c_o_r_e_migrator_versions (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)",
+					"CREATE TABLE c_o_r_e_migrator_versions (version VARCHAR(25), core_level INT DEFAULT 1 NOT NULL)",
 					{},
 					{ datasource = application.wheels.dataSourceName }
 				);

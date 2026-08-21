@@ -162,13 +162,36 @@ component {
 			if (arguments.maxRows > 0) {
 				// Bounded pass: select the oldest expired ids first, then delete only
 				// those, so the DELETE (the lock-holding statement) stays small and
-				// indexed even when a large backlog has accumulated
+				// indexed even when a large backlog has accumulated. The row bound is
+				// pushed into dialect SQL (TOP / FETCH FIRST / LIMIT) so the database
+				// does an index-assisted top-n read instead of materializing the whole
+				// expired backlog and truncating it client-side.
+				local.candidateSelect = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC";
+				local.candidateSql = $applyRowBound(
+					sqlText = local.candidateSelect,
+					dbType = $detectDatabaseType(),
+					maxRows = arguments.maxRows
+				);
+				// The driver-level maxrows option is only used when the dialect
+				// rewrite applied nothing — $applyRowBound returns the statement
+				// unchanged exactly in that case, and there it is the only bound
+				// available. Everywhere else it is redundant, and redundant is not
+				// free: on BoxLang the option reaches PgPreparedStatement as
+				// setLargeMaxRows(), which pgjdbc has never implemented, so the whole
+				// pass threw and cleanup() reported 0 deleted on postgres and
+				// cockroachdb (#3302). JobWorker.$claimNext already bounds this way
+				// and carries a NOTE saying why; this path kept the option as
+				// belt-and-braces and reintroduced the failure the note warns about.
+				local.candidateOptions = {datasource: variables.$datasource};
+				if (local.candidateSql == local.candidateSelect) {
+					local.candidateOptions.maxrows = Int(arguments.maxRows);
+				}
 				local.candidates = queryExecute(
-					"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					local.candidateSql,
 					{
 						cutoff: {value: local.cutoff, cfsqltype: "cf_sql_timestamp"}
 					},
-					{datasource: variables.$datasource, maxrows: arguments.maxRows}
+					local.candidateOptions
 				);
 				if (local.candidates.recordCount == 0) {
 					return 0;
@@ -306,8 +329,12 @@ component {
 	/**
 	 * Detect the database type from the datasource via JDBC metadata.
 	 * Returns: "oracle", "postgresql", "h2", "mysql", "sqlserver", "sqlite", or "default".
+	 *
+	 * Public with $ prefix (internal naming convention), matching its caller
+	 * $applyRowBound, so a spec can reproduce the dialect the bounded cleanup
+	 * pass actually chose on the engine/database pair it is running against.
 	 */
-	private string function $detectDatabaseType() {
+	public string function $detectDatabaseType() {
 		try {
 			cfdbinfo(type="version", datasource="#variables.$datasource#", name="local.info");
 			local.product = local.info.database_productname;
@@ -321,6 +348,53 @@ component {
 			// cfdbinfo not available — fall through to default
 		}
 		return "default";
+	}
+
+	/**
+	 * Rewrite a candidate SELECT so the row bound is applied in dialect SQL and the
+	 * database can do an index-assisted top-n read instead of materializing every
+	 * matching row and relying on client-side truncation.
+	 *
+	 * - sqlserver: SELECT TOP n ...
+	 * - oracle: ... FETCH FIRST n ROWS ONLY
+	 * - mysql / postgresql / sqlite / h2: ... LIMIT n
+	 * - anything else (incl. "default" when $detectDatabaseType() falls back on a
+	 *   cfdbinfo failure): statement UNCHANGED — appending LIMIT would be a syntax
+	 *   error on SQL Server/Oracle. Returning the statement unchanged is the signal
+	 *   the caller uses to fall back to the driver-level maxrows option, which is
+	 *   then the only bound on the read. That option is not portable (BoxLang routes
+	 *   it to a pgjdbc method that does not exist), so it is used only here, where
+	 *   the alternative is no bound at all.
+	 *
+	 * The bound is hardened with Int() so only a plain integer is ever interpolated
+	 * into the SQL string. A bound of zero or less returns the statement unchanged.
+	 * Public with $ prefix (internal naming convention) so it stays unit-testable.
+	 *
+	 * @sqlText The SELECT statement to bound.
+	 * @dbType Database type as returned by $detectDatabaseType().
+	 * @maxRows Maximum number of rows the statement may return.
+	 */
+	public string function $applyRowBound(
+		required string sqlText,
+		required string dbType,
+		required numeric maxRows
+	) {
+		local.bound = Int(arguments.maxRows);
+		if (local.bound <= 0) {
+			return arguments.sqlText;
+		}
+		if (arguments.dbType == "sqlserver") {
+			return ReplaceNoCase(arguments.sqlText, "SELECT ", "SELECT TOP #local.bound# ", "one");
+		}
+		if (arguments.dbType == "oracle") {
+			return arguments.sqlText & " FETCH FIRST #local.bound# ROWS ONLY";
+		}
+		if (ListFindNoCase("mysql,postgresql,sqlite,h2", arguments.dbType)) {
+			return arguments.sqlText & " LIMIT #local.bound#";
+		}
+		// Unknown dialect (incl. the "default" cfdbinfo-failure fallback): leave the
+		// statement alone rather than risk invalid syntax; driver maxrows bounds it.
+		return arguments.sqlText;
 	}
 
 }

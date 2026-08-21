@@ -48,15 +48,15 @@ That file goes at `app/models/Post.cfc`. Wheels infers the table name `posts` an
 
 When the table, key, or column names don't match the defaults, override them in `config()`. Keep overrides to a minimum — every override is a rule the next reader has to learn — but reach for them freely when you're mapping onto a legacy schema.
 
-- `tableName("old_blog_entries")` — non-convention table name.
+- `table("old_blog_entries")` — non-convention table name.
 - `setPrimaryKey("entryId")` — non-`id` primary key.
-- `dataSource("legacy_db")` — non-default datasource. See [Database and Multiple Datasources](/v4-0-0/basics/database-and-multiple-datasources/) when this lands for the wider multi-database story.
+- `dataSource("legacy_db")` — non-default datasource. See [Database and Multiple Datasources](/v4-0-0/basics/database-and-multiple-datasources/) for the wider multi-database story.
 - `property(name="publishedAt", column="pub_date")` — the property on the model is `publishedAt`, the column in the table is `pub_date`. The view and controller never see the column name.
 
 ```cfm {test:compile}
 component extends="Model" {
     function config() {
-        tableName("old_blog_entries");
+        table("old_blog_entries");
         setPrimaryKey("entryId");
         property(name="publishedAt", column="pub_date");
     }
@@ -64,6 +64,26 @@ component extends="Model" {
 ```
 
 Composite keys are also supported — pass a comma-separated list to `setPrimaryKey("tenantId,entryId")`. Most apps never need them.
+
+## Calculated SQL properties
+
+A `property()` declaration can carry a `sql` expression that Wheels evaluates as a computed `SELECT` column. Pass `select=false` to keep the property off the default `SELECT` (reducing hot-path cost), then opt it back into a specific finder with `includeCalculated`:
+
+```cfm
+component extends="Model" {
+    function config() {
+        property(name="fullName", sql="firstName || ' ' || lastName", select=false);
+    }
+}
+
+// Additive — all base columns are still selected; fullName is merged on top
+user = model("User").findOne(includeCalculated="fullName");
+
+// Comma-list for multiple properties; composes with other finder arguments
+users = model("User").active().findAll(include="role", includeCalculated="fullName", page=1, perPage=25);
+```
+
+Unknown names passed to `includeCalculated` throw `Wheels.CalculatedPropertyNotFound` in `development` and `testing`, and are silently ignored in `production`.
 
 ## Finders
 

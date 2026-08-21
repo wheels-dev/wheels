@@ -83,7 +83,7 @@ The canonical way to install a Wheels package is `wheels packages add <name>`. T
    wheels reload
    ```
 
-   `wheels reload` works because an authorized reload stops and restarts the application, re-running `onApplicationStart` — and with it the package loader. A full `wheels stop && wheels start` (as the install message also hints) does the same thing, just more heavily. (CLI versions predating the [#3110](https://github.com/wheels-dev/wheels/issues/3110) fix claimed only a stop/start activates a package; that claim was wrong.)
+   `wheels reload` works because an authorized reload stops and restarts the application, re-running `onApplicationStart` — and with it the package loader. A full `wheels stop && wheels start` does the same thing, just more heavily.
 
 </Steps>
 
@@ -102,7 +102,7 @@ Look at `vendor/wheels-basecoat/package.json`:
     "services": [],
     "middleware": []
   },
-  "dependencies": {}
+  "requires": {}
 }
 ```
 
@@ -110,7 +110,7 @@ Three fields matter for activation:
 
 - **`wheelsVersion`** — declares which Wheels versions this package is compatible with. The framework refuses to load a package whose constraint doesn't match the running runtime version.
 - **`provides.mixins`** — comma-separated mixin targets. `controller` means "inject this package's public methods into every controller's variables scope". Because Wheels views render in their controller's variables scope, controller-scoped mixins are also automatically available in views.
-- **`dependencies`** — other packages this one needs. Empty for basecoat.
+- **`requires`** — other packages this one needs (with `replaces` and `suggests` as the related fields). Empty for basecoat. A legacy `dependencies` key is ignored by the loader.
 
 The `Basecoat.cfc` file alongside the manifest is the package's entry point. PackageLoader instantiates it once at app start and harvests all its `public` methods as mixins.
 
@@ -303,6 +303,52 @@ Three things to verify:
 **Page renders unstyled** — the bundled CSS isn't being served. Check `public/assets/basecoat/basecoat.min.css` exists (re-run the `cp -r vendor/wheels-basecoat/assets/basecoat public/assets/basecoat` step if not) and `curl -I http://localhost:8080/assets/basecoat/basecoat.min.css` returns 200.
 
 **Card content is wrapped in a frame but no styling** — basecoat's JS bundle is failing to load. Check `public/assets/basecoat/basecoat.min.js` exists and look in the browser console for a network error on `/assets/basecoat/`.
+
+## Optional: the Basecoat showcase
+
+The package ships a full component gallery under `vendor/wheels-basecoat/examples/showcase/`. Use it to browse every helper (`uiBadge`, `uiAlert`, `uiDropdown`, …) against the version you just added.
+
+<Aside type="caution">
+  Copy the showcase from `vendor/wheels-basecoat/` after `wheels packages add` — not from the raw GitHub tree. The GitHub `main` branch can be newer than the tarball the registry served, so a view copied from GitHub may call helpers (for example `uiBadge`) that the installed package does not yet mix in.
+</Aside>
+
+<Steps>
+
+1. Add the package if you have not already:
+
+   ```bash title="your shell"
+   wheels packages add wheels-basecoat
+   ```
+
+2. Copy the bundled CSS+JS (same step as [Publish the basecoat assets](#publish-the-basecoat-assets)) and the showcase controller + views from `vendor/`:
+
+   ```bash title="macOS / Linux"
+   cp -r vendor/wheels-basecoat/assets/basecoat public/assets/basecoat
+   cp vendor/wheels-basecoat/examples/showcase/controllers/Showcase.cfc app/controllers/Showcase.cfc
+   cp -r vendor/wheels-basecoat/examples/showcase/views/showcase app/views/showcase
+   ```
+
+   ```bat title="Windows (cmd)"
+   xcopy /E /I vendor\wheels-basecoat\assets\basecoat public\assets\basecoat
+   copy vendor\wheels-basecoat\examples\showcase\controllers\Showcase.cfc app\controllers\Showcase.cfc
+   xcopy /E /I vendor\wheels-basecoat\examples\showcase\views\showcase app\views\showcase
+   ```
+
+3. Add a named route in `config/routes.cfm` (before `.wildcard()`):
+
+   ```cfm title="config/routes.cfm"
+   .get(name="basecoatShowcase", pattern="/basecoat-showcase", to="showcase##index")
+   ```
+
+4. Reload and open the gallery:
+
+   ```bash title="your shell"
+   wheels reload
+   ```
+
+   Visit `/basecoat-showcase`. Always check `vendor/wheels-basecoat/INSTALL.md` for the version you added — the asset and showcase layout can change between majors.
+
+</Steps>
 
 ## What's next
 

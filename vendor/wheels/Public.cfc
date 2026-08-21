@@ -5,6 +5,24 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 */
 	public struct function $init() {
 		include "/wheels/public/helpers.cfm";
+
+		// The include above declares its UDFs into `variables` only — they never
+		// reach `this` on Lucee 6, Adobe 2023 or Adobe 2025 (Lucee 7 and BoxLang
+		// do promote them, which is why the split stayed invisible). Every helper
+		// in helpers.cfm is declared `public`, and the framework's own views reach
+		// them through `variables`, so the divergence only bites an external
+		// caller — `CreateObject("component", "wheels.Public").$init().$$findMatchingRoutes(…)`
+		// threw "has no function with name" on three of five engines (##3302).
+		//
+		// Same problem, same fix as the `/app/global/functions.cfm` include in
+		// `Global.cfc`'s pseudo-constructor. Call the raw scan rather than
+		// `$promoteIncludedGlobalsToThis()`: that wrapper memoizes its promote
+		// list per class in application scope, and the entry for `wheels.Public`
+		// is written by the pseudo-constructor *before* this include runs — so the
+		// memoized path would replay a stale, pre-include key list and promote
+		// nothing. This is the dev-only GUI component, not a request hot path.
+		$scanAndPromoteIncludedGlobals();
+
 		return this;
 	}
 
@@ -30,7 +48,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	/**
 	 * Defense-in-depth: unless the current environment is `development`,
 	 * short-circuit the handler with a 404 response before any view is
-	 * included. Called as the first statement of every non-`index` handler in
+	 * included. Called as the first statement of every handler in
 	 * this component.
 	 */
 	public void function $blockInProduction() {
@@ -193,6 +211,29 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	/**
+	 * Returns the shared CliBridge instance — the dev-UI / CLI command
+	 * handlers extracted from cli.cfm (issue #2959). CliBridge is stateless
+	 * (only an immutable command->method allowlist lives in its `variables`),
+	 * so one instance is cached on `application.wheels` and shared across
+	 * concurrent requests; `?reload=true` rebuilds `application.wheels` and
+	 * re-creates it. Falls back to a fresh instance during early bootstrap
+	 * (before `application.wheels` exists), mirroring `$componentIntegrationPlan`.
+	 */
+	public any function $cliBridge() {
+		if (!StructKeyExists(application, "wheels")) {
+			return CreateObject("component", "wheels.public.CliBridge").init();
+		}
+		if (!StructKeyExists(application.wheels, "cliBridge")) {
+			lock name="wheels.cliBridge.#application.applicationName#" type="exclusive" timeout="10" {
+				if (!StructKeyExists(application.wheels, "cliBridge")) {
+					application.wheels.cliBridge = CreateObject("component", "wheels.public.CliBridge").init();
+				}
+			}
+		}
+		return application.wheels.cliBridge;
+	}
+
+	/**
 	 * Formats the migrator's discovery list for the /wheels/cli dbStatus
 	 * command, mapping the migrator's own status field ("migrated" or "")
 	 * to applied/pending. The previous version-comparison heuristic
@@ -333,6 +374,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	This is just a proof of concept
 	*/
 	function index() {
+		$blockInProduction();
 		include "/wheels/public/views/congratulations.cfm";
 		return "";
 	}

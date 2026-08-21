@@ -292,6 +292,29 @@ component extends="wheels.WheelsTest" {
 					expect(IsDefined("request.wheels.tenant")).toBeFalse();
 				});
 
+				// #3336 hardening: an unresolved request must look unresolved for its whole
+				// duration, not just after the finally block runs.
+				it("drops a pre-existing request.wheels.tenant when the resolver finds no match", function() {
+					var fn = function(req) {
+						return {};
+					};
+					var mw = new wheels.middleware.TenantResolver(resolver = fn);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
+
+					request.wheels.tenant = {id = "stale", dataSource = "stale_ds", config = {}};
+
+					var reqData = {cgi = {}};
+					var result = {hasTenant = true};
+
+					var handler = function(required struct request) {
+						result.hasTenant = IsDefined("request.wheels.tenant");
+						return "ok";
+					};
+					pipeline.run(request = reqData, coreHandler = handler);
+
+					expect(result.hasTenant).toBeFalse();
+				});
+
 				it("cleans up request.wheels.tenant even when next() throws", function() {
 					var fn = function(req) {
 						return {id = "t1", dataSource = "ds1"};

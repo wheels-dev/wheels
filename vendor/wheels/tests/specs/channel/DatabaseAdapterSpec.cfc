@@ -222,6 +222,160 @@ component extends="wheels.WheelsTest" {
 				expect(remaining.recordCount).toBe(3);
 			});
 
+			it("runs the bounded-pass statements against the live database", function() {
+				// The $applyRowBound tests below only compare strings — nothing sends
+				// the rewritten SQL to a real database, and nothing exercises the
+				// list-parameter DELETE the bounded pass pairs it with. cleanup()
+				// catches every error and returns 0, so an engine/database pair that
+				// rejects either statement presents only as a wrong row count with no
+				// message: "Expected [2] but received [0]" on boxlang + postgres and
+				// cockroachdb, with the reason only in the wheels_channels log
+				// (#3302). Running both statements here without the catch makes the
+				// database's own error the thing the suite reports.
+				adapter.cleanup();
+
+				queryExecute(
+					"INSERT INTO wheels_events (id, channel, event, data, createdAt)
+					VALUES (:id, :channel, :event, :data, :createdAt)",
+					{
+						id: {value: "livebound-evt-1", cfsqltype: "cf_sql_varchar"},
+						channel: {value: "test.livebound", cfsqltype: "cf_sql_varchar"},
+						event: {value: "old", cfsqltype: "cf_sql_varchar"},
+						data: {value: "expired", cfsqltype: "cf_sql_longvarchar"},
+						createdAt: {value: DateAdd("h", -2, Now()), cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				var cutoff = DateAdd("n", -60, Now());
+				var dialect = adapter.$detectDatabaseType();
+				var candidateSql = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					dbType = dialect,
+					maxRows = 1
+				);
+
+				// Mirror cleanup()'s option handling exactly: the driver-level
+				// maxrows bound is used only when the dialect rewrite applied none.
+				// Setting it unconditionally is what threw on boxlang + pgjdbc.
+				var options = {datasource: application.wheels.dataSourceName};
+				if (candidateSql == "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC") {
+					options.maxrows = 1;
+				}
+				var candidates = queryExecute(
+					candidateSql,
+					{cutoff: {value: cutoff, cfsqltype: "cf_sql_timestamp"}},
+					options
+				);
+				expect(candidates.recordCount).toBe(
+					1,
+					"The dialect-bounded SELECT returned no rows on #dialect#. SQL was: #candidateSql#"
+				);
+
+				// Assert against the id the bounded SELECT actually returned rather
+				// than against the row inserted above: ORDER BY createdAt ASC takes
+				// the oldest expired row in the table, which need not be ours if a
+				// previous bundle left one behind.
+				var targetId = candidates.id[1];
+
+				queryExecute(
+					"DELETE FROM wheels_events WHERE createdAt < :cutoff AND id IN (:ids)",
+					{
+						cutoff: {value: cutoff, cfsqltype: "cf_sql_timestamp"},
+						ids: {value: ValueList(candidates.id), cfsqltype: "cf_sql_varchar", list: true}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				var survivor = queryExecute(
+					"SELECT id FROM wheels_events WHERE id = :id",
+					{id: {value: targetId, cfsqltype: "cf_sql_varchar"}},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(survivor.recordCount).toBe(
+					0,
+					"The list-parameter DELETE ran without error on #dialect# but did not "
+					& "remove the row the bounded SELECT had just identified."
+				);
+
+				queryExecute(
+					"DELETE FROM wheels_events WHERE channel = :channel",
+					{channel: {value: "test.livebound", cfsqltype: "cf_sql_varchar"}},
+					{datasource: application.wheels.dataSourceName}
+				);
+			});
+
+			it("$applyRowBound rewrites the SELECT with TOP for sqlserver", function() {
+				var bounded = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					dbType = "sqlserver",
+					maxRows = 25
+				);
+				expect(bounded).toBe(
+					"SELECT TOP 25 id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC"
+				);
+			});
+
+			it("$applyRowBound appends FETCH FIRST for oracle", function() {
+				var bounded = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+					dbType = "oracle",
+					maxRows = 25
+				);
+				expect(bounded).toBe(
+					"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC FETCH FIRST 25 ROWS ONLY"
+				);
+			});
+
+			it("$applyRowBound appends LIMIT for the explicit LIMIT dialects", function() {
+				var dialects = ["mysql", "postgresql", "sqlite", "h2"];
+				for (var dialect in dialects) {
+					var bounded = adapter.$applyRowBound(
+						sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+						dbType = dialect,
+						maxRows = 25
+					);
+					expect(bounded).toBe(
+						"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC LIMIT 25"
+					);
+				}
+			});
+
+			it("$applyRowBound leaves unknown dialects unchanged so driver maxrows stays the bound", function() {
+				// "default" is what $detectDatabaseType() returns when cfdbinfo fails —
+				// appending LIMIT there would be a syntax error on SQL Server/Oracle,
+				// silently breaking cleanup() on the engines that need dialect handling.
+				var dialects = ["default", "informix"];
+				for (var dialect in dialects) {
+					var unchanged = adapter.$applyRowBound(
+						sqlText = "SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC",
+						dbType = dialect,
+						maxRows = 25
+					);
+					expect(unchanged).toBe(
+						"SELECT id FROM wheels_events WHERE createdAt < :cutoff ORDER BY createdAt ASC"
+					);
+				}
+			});
+
+			it("$applyRowBound hardens the bound to an integer", function() {
+				var bounded = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events",
+					dbType = "mysql",
+					maxRows = 7.9
+				);
+				expect(bounded).toBe("SELECT id FROM wheels_events LIMIT 7");
+			});
+
+			it("$applyRowBound leaves the statement unchanged for a non-positive bound", function() {
+				var unbounded = adapter.$applyRowBound(
+					sqlText = "SELECT id FROM wheels_events",
+					dbType = "mysql",
+					maxRows = 0
+				);
+				expect(unbounded).toBe("SELECT id FROM wheels_events");
+			});
+
 			it("auto-creates wheels_events table on first use", function() {
 				// The table should already exist from previous tests,
 				// but verify we can query it

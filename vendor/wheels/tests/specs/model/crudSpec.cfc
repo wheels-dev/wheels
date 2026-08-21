@@ -1262,6 +1262,144 @@ component extends="wheels.WheelsTest" {
 
 				expect(actual).toBe("FROM #qi('c_o_r_e_authors')# USE INDEX(idx_authors_123) LEFT OUTER JOIN #qi('c_o_r_e_posts')# USE INDEX(idx_posts_123) ON #qi('c_o_r_e_authors')#.#qi('id')# = #qi('c_o_r_e_posts')#.#qi('authorid')# AND #qi('c_o_r_e_posts')#.#qi('deletedat')# IS NULL")
 			})
+
+			// Regression for issue #3245: a belongsTo-chain nested include
+			// (intermediate is `belongsTo`) mixed with an OUTER-joined sibling must
+			// emit FLAT sibling joins so the root FROM table stays in scope for every
+			// ON condition. Wheels 3 over-fired the issue #449 parenthesized grouping
+			// here, scoping the root out and triggering MySQL "Unknown column ... in
+			// 'on clause'". `author.user` is a belongsTo (inner) and `author.posts` /
+			// `user.galleries` are hasMany (outer) — exactly the reported shape.
+			it("emits flat joins for a belongsTo-chain nested include (issue ##3245)", () => {
+				actual = g.model("author").$fromClause(include = "posts,user(galleries)")
+
+				// No join here qualifies for grouping: `user` is INNER but sits at the root
+				// (nothing encloses it, and its ON references the root `authors`), and
+				// `galleries` is OUTER. Every join stays at the top level, so the root table
+				// remains in scope for every ON condition.
+				expect(actual).notToInclude("LEFT OUTER JOIN (")
+				expect(actual).toBe(
+					"FROM #qi('c_o_r_e_authors')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_posts')# ON #qi('c_o_r_e_authors')#.#qi('id')# = #qi('c_o_r_e_posts')#.#qi('authorid')# AND #qi('c_o_r_e_posts')#.#qi('deletedat')# IS NULL"
+					& " INNER JOIN #qi('c_o_r_e_users')# ON #qi('c_o_r_e_authors')#.#qi('firstname')# = #qi('c_o_r_e_users')#.#qi('firstname')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_galleries')# ON #qi('c_o_r_e_users')#.#qi('id')# = #qi('c_o_r_e_galleries')#.#qi('userid')#"
+				)
+			})
+
+			// Regression for issue #449 (must NOT be undone by the #3245 fix): a genuine
+			// HABTM / `through` bridge nested include keeps the parenthesized grouping so
+			// the bridge's INNER join stays scoped to the OUTER-joined bridge table.
+			// Team.memberTeams is a hasMany (outer bridge); its nested `member` inner
+			// join references the bridge table, so the grouping is correct here.
+			it("preserves nested grouping for a HABTM/through bridge include (issue ##449)", () => {
+				actual = g.model("team").$fromClause(include = "memberTeams(member)")
+
+				expect(actual).toBe(
+					"FROM #qi('c_o_r_e_teams')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_memberteams')# INNER JOIN #qi('c_o_r_e_members')# ON #qi('c_o_r_e_memberteams')#.#qi('memberid')# = #qi('c_o_r_e_members')#.#qi('id')#) ON #qi('c_o_r_e_teams')#.#qi('id')# = #qi('c_o_r_e_memberteams')#.#qi('teamid')#"
+				)
+			})
+
+			// Regression for issue #3334: the issue #449 grouping copied EVERY inner join
+			// into EVERY outer join, so a shallow sibling listed before the nested group
+			// got the nested group's INNER join spliced into it — referencing a table the
+			// query has not introduced yet (ORA-00904 / "unknown column in on clause").
+			// `Post.c_o_r_e_comments` and `Post.classifications` are both hasMany (outer);
+			// `Classification.tag` is a belongsTo (inner) whose ON clause references
+			// `classifications`, so it belongs to the classifications group and nowhere else.
+			it("scopes a nested inner join to its own parent, not to every outer join (issue ##3334)", () => {
+				actual = g.model("post").$fromClause(include = "c_o_r_e_comments,classifications(tag)")
+
+				// the comments join must stay flat — nothing from the classifications
+				// subtree may appear inside it
+				expect(actual).toBe(
+					"FROM #qi('c_o_r_e_posts')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_comments')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_comments')#.#qi('postid')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+				)
+			})
+
+			// Second shape of issue #3334, and a residual case of issue #3245 that the
+			// #3245 gate does not cover: a ROOT-level inner join (`Post.author` is a
+			// belongsTo) alongside a nested group. Its ON clause references the root
+			// `posts` table, so pulling it inside the classifications parentheses scopes
+			// the root out — the same "unknown column in on clause" failure #3245 fixed
+			// for the flat branch. A root-level join has no enclosing group; it stays flat.
+			it("keeps a root-level inner join out of the nested group (issue ##3334)", () => {
+				actual = g.model("post").$fromClause(include = "author,classifications(tag)")
+
+				expect(actual).toBe(
+					"FROM #qi('c_o_r_e_posts')#"
+					& " INNER JOIN #qi('c_o_r_e_authors')# ON #qi('c_o_r_e_posts')#.#qi('authorid')# = #qi('c_o_r_e_authors')#.#qi('id')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+				)
+			})
+
+			// The grouping decision used to read the join TYPE by searching the generated SQL
+			// for "INNER". That misclassifies every table whose name contains the substring —
+			// `winners`, `spinners`, `beginners` — and in $fromClause a parent misread as
+			// INNER emits its nested child flat instead of grouped, silently dropping the
+			// parent rows this fix exists to preserve. `joinType` is the authoritative source:
+			// it is what the join text is built from. Unit-tested here rather than through a
+			// fixture because adding a `c_o_r_e_winners` table would mean DDL on all seven
+			// databases to pin one boolean.
+			it("reads the join type from metadata, not from the table name (issue ##3334)", () => {
+				m = g.model("post")
+
+				// the trap: an OUTER join whose table name contains "inner"
+				outerWithInnerInName = {joinType = "outer"}
+				outerSql = "LEFT OUTER JOIN #qi('c_o_r_e_winners')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_winners')#.#qi('postid')#"
+				expect(FindNoCase("INNER", outerSql)).toBeGT(0)
+				expect(m.$associationJoinsInner(outerWithInnerInName, outerSql)).toBeFalse()
+
+				// and it still recognises a genuine inner join
+				expect(m.$associationJoinsInner({joinType = "inner"}, "INNER JOIN #qi('c_o_r_e_tags')# ON 1=1")).toBeTrue()
+
+				// no joinType at all (a hand-built struct) falls back to the text scan
+				expect(m.$associationJoinsInner({}, "INNER JOIN #qi('c_o_r_e_tags')# ON 1=1")).toBeTrue()
+				expect(m.$associationJoinsInner({}, "LEFT OUTER JOIN #qi('c_o_r_e_tags')# ON 1=1")).toBeFalse()
+			})
+
+			// An unbalanced include reaches the level-tracking loop with an empty parent
+			// stack. `ListDeleteAt` on a one-element list tolerates that; `ArrayDeleteAt(x, 0)`
+			// throws. Malformed includes resolved to a plain join before the issue #3334
+			// change and must keep doing so — the fix must not turn a tolerated input into a
+			// new error.
+			it("tolerates an unbalanced include the way it always did (issue ##3334)", () => {
+				actual = g.model("post").$fromClause(include = "c_o_r_e_comments)")
+
+				expect(actual).toInclude(qi("c_o_r_e_comments"))
+			})
+
+			// Issue #3334, the reporter's actual complaint: the grouping used to be gated on
+			// an anchored regex over the include STRING, so it only fired when the nested
+			// group came last. `a(b),c` and `c,a(b)` therefore generated structurally
+			// different SQL for the same query — one of them invalid. Grouping is now decided
+			// from the association tree, so include order only reorders the emitted joins.
+			it("emits the same joins wherever the nested group sits in the include (issue ##3334)", () => {
+				comments = " LEFT OUTER JOIN #qi('c_o_r_e_comments')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_comments')#.#qi('postid')#"
+				classifications = " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+
+				expect(g.model("post").$fromClause(include = "c_o_r_e_comments,classifications(tag)")).toBe(
+					"FROM #qi('c_o_r_e_posts')#" & comments & classifications
+				)
+				expect(g.model("post").$fromClause(include = "classifications(tag),c_o_r_e_comments")).toBe(
+					"FROM #qi('c_o_r_e_posts')#" & classifications & comments
+				)
+			})
+
+			// Executable form of the above — the string assertions pin the SQL, this proves
+			// the database accepts it and that both orderings agree on the result set. The
+			// nested-first ordering used to emit `tags` as a ROOT-level inner join, which
+			// silently demoted the outer join to an inner one and dropped every post with no
+			// classification; it now keeps them, matching the nested-last ordering.
+			it("returns the same rows wherever the nested group sits in the include (issue ##3334)", () => {
+				nestedLast = g.model("post").findAll(include = "c_o_r_e_comments,classifications(tag)")
+				nestedFirst = g.model("post").findAll(include = "classifications(tag),c_o_r_e_comments")
+
+				expect(nestedLast.recordCount).toBeGT(0)
+				expect(nestedLast.recordCount).toBe(nestedFirst.recordCount)
+			})
 		})
 
 		describe("Tests that group", () => {
@@ -1442,10 +1580,10 @@ component extends="wheels.WheelsTest" {
 					order = "id"
 				)
 
-				expect(request.wheels.pagination_test_1.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_test_1.TOTALPAGES).toBe(0)
-				expect(request.wheels.pagination_test_1.TOTALRECORDS).toBe(0)
-				expect(request.wheels.pagination_test_1.ENDROW).toBe(1)
+				expect(request.wheels["$pagination"].pagination_test_1.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_test_1.TOTALPAGES).toBe(0)
+				expect(request.wheels["$pagination"].pagination_test_1.TOTALRECORDS).toBe(0)
+				expect(request.wheels["$pagination"].pagination_test_1.ENDROW).toBe(1)
 				expect(e.recordcount).toBe(0)
 			})
 
@@ -1455,10 +1593,10 @@ component extends="wheels.WheelsTest" {
 				/* 1st page */
 				e = user.findAll(select = "id", perpage = "2", page = "1", handle = "pagination_test_2", order = "id")
 
-				expect(request.wheels.pagination_test_2.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_test_2.TOTALPAGES).toBe(3)
-				expect(request.wheels.pagination_test_2.TOTALRECORDS).toBe(5)
-				expect(request.wheels.pagination_test_2.ENDROW).toBe(2)
+				expect(request.wheels["$pagination"].pagination_test_2.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_test_2.TOTALPAGES).toBe(3)
+				expect(request.wheels["$pagination"].pagination_test_2.TOTALRECORDS).toBe(5)
+				expect(request.wheels["$pagination"].pagination_test_2.ENDROW).toBe(2)
 				expect(e.recordcount).toBe(2)
 				expect(e.id[1]).toBe(r.id[1])
 				expect(e.id[2]).toBe(r.id[2])
@@ -1466,10 +1604,10 @@ component extends="wheels.WheelsTest" {
 				/* 2nd page */
 				e = user.findAll(perpage = "2", page = "2", handle = "pagination_test_3", order = "id")
 
-				expect(request.wheels.pagination_test_3.CURRENTPAGE).toBe(2)
-				expect(request.wheels.pagination_test_3.TOTALPAGES).toBe(3)
-				expect(request.wheels.pagination_test_3.TOTALRECORDS).toBe(5)
-				expect(request.wheels.pagination_test_3.ENDROW).toBe(4)
+				expect(request.wheels["$pagination"].pagination_test_3.CURRENTPAGE).toBe(2)
+				expect(request.wheels["$pagination"].pagination_test_3.TOTALPAGES).toBe(3)
+				expect(request.wheels["$pagination"].pagination_test_3.TOTALRECORDS).toBe(5)
+				expect(request.wheels["$pagination"].pagination_test_3.ENDROW).toBe(4)
 				expect(e.recordcount).toBe(2)
 				expect(e.id[1]).toBe(r.id[3])
 				expect(e.id[2]).toBe(r.id[4])
@@ -1477,10 +1615,10 @@ component extends="wheels.WheelsTest" {
 				/* 3rd page */
 				e = user.findAll(perpage = "2", page = "3", handle = "pagination_test_4", order = "id")
 
-				expect(request.wheels.pagination_test_4.CURRENTPAGE).toBe(3)
-				expect(request.wheels.pagination_test_4.TOTALPAGES).toBe(3)
-				expect(request.wheels.pagination_test_4.TOTALRECORDS).toBe(5)
-				expect(request.wheels.pagination_test_4.ENDROW).toBe(5)
+				expect(request.wheels["$pagination"].pagination_test_4.CURRENTPAGE).toBe(3)
+				expect(request.wheels["$pagination"].pagination_test_4.TOTALPAGES).toBe(3)
+				expect(request.wheels["$pagination"].pagination_test_4.TOTALRECORDS).toBe(5)
+				expect(request.wheels["$pagination"].pagination_test_4.ENDROW).toBe(5)
 				expect(e.recordcount).toBe(1)
 				expect(e.id[1]).toBe(r.id[5])
 			})
@@ -1533,10 +1671,10 @@ component extends="wheels.WheelsTest" {
 					handle = "pagination_order_test_1"
 				)
 
-				expect(request.wheels.pagination_order_test_1.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_order_test_1.TOTALPAGES).toBe(13)
-				expect(request.wheels.pagination_order_test_1.TOTALRECORDS).toBe(250)
-				expect(request.wheels.pagination_order_test_1.ENDROW).toBe(20)
+				expect(request.wheels["$pagination"].pagination_order_test_1.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALPAGES).toBe(13)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALRECORDS).toBe(250)
+				expect(request.wheels["$pagination"].pagination_order_test_1.ENDROW).toBe(20)
 			})
 
 			it("works with renamed primary key", () => {
@@ -1555,10 +1693,10 @@ component extends="wheels.WheelsTest" {
 					where = "description1 LIKE '%photo%'"
 				)
 
-				expect(request.wheels.pagination_order_test_1.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_order_test_1.TOTALPAGES).toBe(13)
-				expect(request.wheels.pagination_order_test_1.TOTALRECORDS).toBe(250)
-				expect(request.wheels.pagination_order_test_1.ENDROW).toBe(20)
+				expect(request.wheels["$pagination"].pagination_order_test_1.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALPAGES).toBe(13)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALRECORDS).toBe(250)
+				expect(request.wheels["$pagination"].pagination_order_test_1.ENDROW).toBe(20)
 			})
 
 			it("works with parameterize set to false with numeric", () => {
@@ -1572,10 +1710,10 @@ component extends="wheels.WheelsTest" {
 					where = "id = 1"
 				)
 
-				expect(request.wheels.pagination_order_test_1.CURRENTPAGE).toBe(1)
-				expect(request.wheels.pagination_order_test_1.TOTALPAGES).toBe(1)
-				expect(request.wheels.pagination_order_test_1.TOTALRECORDS).toBe(1)
-				expect(request.wheels.pagination_order_test_1.ENDROW).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.CURRENTPAGE).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALPAGES).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.TOTALRECORDS).toBe(1)
+				expect(request.wheels["$pagination"].pagination_order_test_1.ENDROW).toBe(1)
 			})
 
 			it("works with compound keys", () => {

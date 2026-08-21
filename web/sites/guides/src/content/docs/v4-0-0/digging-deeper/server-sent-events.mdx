@@ -30,7 +30,7 @@ SSE (Server-Sent Events) is a one-way channel from server to client over plain H
 - **SSE:** server → client only, plain HTTP, built-in auto-reconnect, passes through every proxy and firewall that speaks HTTP.
 - **WebSockets:** bidirectional, separate `ws://` protocol, richer feature set but harder to deploy behind a reverse proxy and requires its own connection lifecycle.
 
-Use SSE when the client only needs to listen — notifications, live dashboards, progress bars, log tailing, incremental search results. Reach for WebSockets when the client also needs to push — but note that Wheels itself ships no WebSocket layer; for the higher-level pub/sub option built on SSE (and the full story on what does and doesn't exist), see [Channels](/v4-0-0/digging-deeper/channels/).
+Use SSE when the client only needs to listen — notifications, live dashboards, progress bars, log tailing, incremental search results. Reach for WebSockets when the client also needs to push. The framework core ships no WebSocket layer, but the optional [`wheels-websockets`](https://github.com/wheels-dev/wheels-websockets) package adds a WebSocket transport for channels (`wheels packages add wheels-websockets`) with automatic SSE fallback — for the higher-level pub/sub option built on SSE and the full WebSocket story, see [Channels](/v4-0-0/digging-deeper/channels/).
 
 ## One-shot SSE response
 
@@ -40,7 +40,7 @@ The simplest pattern: a controller action responds to an `EventSource` request w
 component extends="Controller" {
     function poll() {
         data = model("Notification").findAll(
-            where="userId=##params.userId## AND sent=0",
+            where="userId=#Val(params.userId)# AND sent=0",
             order="createdAt DESC",
             maxRows=10
         );
@@ -69,10 +69,12 @@ component extends="Controller" {
     function stream() {
         writer = initSSEStream();
         try {
-            items = model("Activity").findAll(
-                where="createdAt > '##params.since##'",
-                order="createdAt"
-            );
+            // The chainable builder quotes params.since for you — never interpolate
+            // request input into a where= string.
+            items = model("Activity")
+                .where("createdAt", ">", params.since)
+                .orderBy("createdAt")
+                .get();
             for (var item in items) {
                 sendSSEEvent(
                     writer=writer,
@@ -103,7 +105,7 @@ Serve both HTML and SSE from the same route by checking what the client asked fo
 ```cfm {test:compile} title="app/controllers/Notifications.cfc"
 component extends="Controller" {
     function index() {
-        data = model("Notification").findAll(where="userId=##params.userId##");
+        data = model("Notification").findAll(where="userId=#Val(params.userId)#");
         if (isSSERequest()) {
             renderSSE(data=SerializeJSON(data), event="notifications");
         } else {
@@ -142,8 +144,10 @@ To resume from where the client left off, set `id=` on each event. The browser r
 
 ```cfm title="illustrative — resume handler"
 local.lastId = GetHTTPRequestData().headers["Last-Event-ID"] ?: "";
+// Val() coerces the client-supplied header to a number — an empty or garbage
+// value becomes 0, which resumes from the start instead of injecting SQL.
 local.newer = model("Notification").findAll(
-    where="id > '##local.lastId##'",
+    where="id > #Val(local.lastId)#",
     order="id"
 );
 ```
@@ -182,7 +186,7 @@ Most reverse proxies buffer responses by default. Buffering breaks SSE — the b
 - **Cloudflare:** SSE works through Cloudflare when the response streams without buffering. If you see delays, disable caching on the route and confirm `Cache-Control: no-cache` is set (Wheels does this for you).
 - **Traefik / Caddy:** streaming responses work out of the box. No extra config.
 
-Plan for this during deployment — cross-link to the upcoming Deployment guide when it lands.
+Plan for this during deployment — see [VM and Bare-metal Deployment](/v4-0-0/deployment/vm-deployment/) for the full nginx setup.
 
 ## Related guides
 

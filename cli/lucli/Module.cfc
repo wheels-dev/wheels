@@ -276,6 +276,7 @@ component extends="modules.BaseModule" {
 			.option(name = "reporter",  default = "simple", description = "Output format: simple, json, or tap")
 			.option(name = "db",        default = "sqlite", description = "Database the suite runs against")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
+			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT.")
 			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
 			.flag(name = "ci",      default = false, description = "CI mode output")
 			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
@@ -507,7 +508,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property, api-resource, helper, snippets)
+	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property, api-resource, helper, policy, snippets)
 	 */
 	public string function generate() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
@@ -527,8 +528,10 @@ component extends="modules.BaseModule" {
 			out("  test          Generate a test spec file");
 			out("  property      Generate an add-column migration for a model property");
 			out("  helper        Generate a helper file in app/helpers/");
+			out("  policy        Generate an authorization policy in app/policies/ (default-deny)");
 			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
 			out("  admin         Generate admin CRUD interface for an existing model");
+			out("  auth          Generate a full authentication scaffold (session, token, or JWT)");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels generate app myapp");
@@ -541,8 +544,11 @@ component extends="modules.BaseModule" {
 			out("  wheels generate test model User");
 			out("  wheels generate property User email:string");
 			out("  wheels generate helper formatting");
+			out("  wheels generate policy Post");
 			out("  wheels generate snippets auth");
 			out("  wheels generate admin User");
+			out("  wheels generate auth");
+			out("  wheels generate auth --strategy=jwt");
 			return "";
 		}
 
@@ -584,10 +590,14 @@ component extends="modules.BaseModule" {
 			case "helper":
 			case "h":
 				return generateHelper(remaining);
+			case "policy":
+				return generatePolicy(remaining);
 			case "snippets":
 				return generateSnippets(remaining);
 			case "admin":
 				return generateAdmin(remaining);
+			case "auth":
+				return generateAuth(remaining);
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
@@ -729,8 +739,44 @@ component extends="modules.BaseModule" {
 			db = parsed.db,
 			dbExplicit = structKeyExists(arguments.coll, "db"),
 			useTestDB = parsed["test-db"],
-			basePath = parsed["base-path"]
+			basePath = parsed["base-path"],
+			timeout = $resolveTestTimeout(parsed.timeout)
 		};
+	}
+
+	/**
+	 * Seconds to wait for the test-runner response. `--timeout` wins, then
+	 * WHEELS_TEST_TIMEOUT, then 900.
+	 *
+	 * The shared HTTP helper reads for 120 seconds, which is right for the
+	 * request/response bridge commands but is a hard ceiling on how big a suite
+	 * `wheels test` can run: a suite that grows past roughly 140 seconds starts
+	 * failing with `Read timed out` and NO result document at all — not a failure
+	 * report, a crashed runner (issue #3352). The threshold moves with machine
+	 * speed, so a suite can pass locally and fail in CI. A test run is the one
+	 * command here whose duration is expected to scale with the project, so it
+	 * gets its own budget rather than inheriting the bridge default.
+	 *
+	 * Non-numeric or non-positive input falls back to the default rather than
+	 * throwing: a mistyped timeout should not be the thing that stops a test run.
+	 */
+	public numeric function $resolveTestTimeout(string parsedTimeout = "") {
+		if (
+			len(trim(arguments.parsedTimeout))
+			&& isNumeric(trim(arguments.parsedTimeout))
+			&& val(arguments.parsedTimeout) > 0
+		) {
+			return val(arguments.parsedTimeout);
+		}
+		// mirrors how $resolveTestBasePath() reads WHEELS_SUBPATH
+		try {
+			var envValue = createObject("java", "java.lang.System").getenv("WHEELS_TEST_TIMEOUT");
+			if (!isNull(envValue) && len(trim(envValue)) && isNumeric(trim(envValue)) && val(envValue) > 0) {
+				return val(envValue);
+			}
+		} catch (any e) {
+		}
+		return 900;
 	}
 
 	/**
@@ -748,6 +794,7 @@ component extends="modules.BaseModule" {
 		var dbExplicit = opts.dbExplicit;
 		var useTestDB = opts.useTestDB;
 		var basePath = opts.basePath;
+		var timeoutSeconds = opts.timeout;
 
 		// Default to APP mode unless --core is set explicitly. The previous
 		// auto-detection ("if vendor/wheels/tests/ exists, default to core")
@@ -766,7 +813,10 @@ component extends="modules.BaseModule" {
 		// expects. Onboarding finding #2.
 		filter = $normalizeTestFilter(filter, coreTests);
 
-		return runTests(filter, reporter, format, verboseOutput, coreTests, db, ciMode, useTestDB, dbExplicit, basePath);
+		return runTests(
+			filter, reporter, format, verboseOutput, coreTests,
+			db, ciMode, useTestDB, dbExplicit, basePath, timeoutSeconds
+		);
 	}
 
 	/**
@@ -2565,7 +2615,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Install, update, and list Wheels packages — use `add` (not `install`) to install
+	 * hint: Add, update, and list Wheels packages (verb is `add`, not `install`)
 	 *
 	 * The verb is `add`, NOT `install`. Typing `wheels packages install <name>`
 	 * is intercepted by LuCLI's built-in extension installer before dispatch
@@ -2666,7 +2716,7 @@ component extends="modules.BaseModule" {
 				var regCli = new modules.wheels.services.packages.PackagesRegistryCli();
 				return invoke(regCli, regVerb, [opts]);
 			default:
-				throw(message="Unknown packages subcommand: #sub#");
+				throw(message="Unknown packages subcommand: #sub#. The install verb is `add` (not `install`): wheels packages add <name>");
 		}
 	}
 
@@ -3930,6 +3980,56 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	private string function generatePolicy(required array args) {
+		// Parse --force flag from the args list
+		var force = false;
+		var positional = [];
+		for (var a in args) {
+			if (a == "--force") {
+				force = true;
+			} else {
+				arrayAppend(positional, a);
+			}
+		}
+
+		if (!arrayLen(positional)) {
+			out("Usage: wheels generate policy <ModelName> [--force]", "yellow");
+			out("  Example: wheels generate policy Post");
+			out("");
+			out("Writes app/policies/<ModelName>Policy.cfc — default-deny, one method per action.");
+			out("Enforce with authorize()/can()/policyScope() in your controllers and views.");
+			return "";
+		}
+
+		var codegen = getService("codegen");
+		var validation = codegen.validateName(positional[1], "policy");
+		if (!validation.valid) {
+			out("Invalid policy name: #arrayToList(validation.errors, '; ')#", "red");
+			return "";
+		}
+
+		var result = codegen.generatePolicy(name = positional[1], force = force);
+
+		if (result.success) {
+			if (structKeyExists(result, "baseCreated") && result.baseCreated) {
+				printCreated("app/policies/Policy.cfc");
+			}
+			// Derive the actual file name (CodeGen appends the "Policy" suffix)
+			var fileName = listLast(result.path, "/\");
+			printCreated("app/policies/#fileName#");
+
+			out("");
+			out("Policy created! Next steps:", "green");
+			out("  1. Edit app/policies/#fileName# — every action denies until you grant it");
+			out("  2. Enforce in a controller action: authorize(post)");
+			out("  3. Check in views without throwing: can('update', post)");
+			out("  4. Narrow index collections: policyScope(model('#reReplace(fileName, 'Policy\.cfc$', '')#')).findAll()");
+		} else {
+			out(result.error, "red");
+		}
+		return "";
+	}
+
 	private string function generateSnippets(required array args) {
 		var force = false;
 		var positional = [];
@@ -4042,6 +4142,95 @@ component extends="modules.BaseModule" {
 		} else {
 			for (var err in result.errors) {
 				out(err, "red");
+			}
+		}
+
+		return "";
+	}
+
+	/**
+	 * Generate a complete authentication scaffold on the wheels.auth
+	 * primitives (issue ##3155). Session strategy (default) emits browser
+	 * login/registration/password-reset; token and jwt emit an API
+	 * sessions controller instead.
+	 */
+	private string function generateAuth(array args = []) {
+		var model = "User";
+		var strategy = "session";
+		var registration = true;
+		var force = false;
+
+		for (var arg in arguments.args) {
+			if (arg == "--force") {
+				force = true;
+			} else if (arg == "--registration") {
+				registration = true;
+			} else if (arg == "--no-registration") {
+				registration = false;
+			} else if (left(arg, 8) == "--model=") {
+				model = trim(mid(arg, 9, len(arg)));
+			} else if (left(arg, 11) == "--strategy=") {
+				strategy = trim(mid(arg, 12, len(arg)));
+			} else if (left(arg, 2) == "--") {
+				out("Unknown option: #arg#", "red");
+				out("Usage: wheels generate auth [ModelName] [--model=User] [--strategy=session|token|jwt] [--registration|--no-registration] [--force]", "yellow");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown option for generate auth: #arg#");
+			} else {
+				// First bare positional is the model name (same as --model=).
+				model = trim(arg);
+			}
+		}
+
+		if (!len(model)) {
+			model = "User";
+		}
+		if (!listFindNoCase("session,token,jwt", strategy)) {
+			out("Unknown strategy: #strategy# (valid: session, token, jwt)", "red");
+			throw(type = "Wheels.InvalidArguments", message = "Unknown auth strategy: #strategy#. Valid strategies: session, token, jwt.");
+		}
+
+		out("Generating #strategy# authentication for #capitalize(model)#...", "cyan");
+		out("");
+
+		var scaffold = getService("scaffold");
+		var results = scaffold.generateAuth(
+			model = model,
+			strategy = strategy,
+			registration = registration,
+			force = force,
+			cliVersion = super.version()
+		);
+
+		if (results.success) {
+			for (var item in results.generated) {
+				var relPath = replace(item.path, variables.projectRoot & "/", "");
+				printCreated("#item.type#: #relPath#");
+			}
+			for (var note in results.skipped ?: []) {
+				out("  skip    #note#", "yellow");
+			}
+			out("");
+			out("Authentication scaffold complete! Next steps:", "green");
+			out("  1. Run the migration: wheels migrate latest");
+			if (strategy == "session") {
+				out("  2. Restart or reload, then visit /login (and /register).");
+				out("  3. Protect actions with a filter that calls service(""authenticator"").authenticate(request).");
+				out("  4. Wire reset-link email delivery in app/controllers/Passwords.cfc (see the TODO in create()) —");
+				out("     until then no reset email is actually sent.");
+				out("  5. Rate-limit POST /login in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+			} else if (strategy == "jwt") {
+				out("  2. Set WHEELS_JWT_SECRET in .env (at least 32 random bytes) — startup fails loudly without it.");
+				out("  3. Restart, then POST credentials to /api/session to receive a JWT.");
+				out("  4. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+			} else {
+				out("  2. Restart, then POST credentials to /api/session to receive a bearer token.");
+				out("  3. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+			}
+			out("  Generated code is yours to edit — re-run with --force and review `git diff` to upgrade.");
+		} else {
+			out("Auth generation failed:", "red");
+			for (var err in results.errors) {
+				out("  #err#", "red");
 			}
 		}
 
@@ -5561,7 +5750,8 @@ component extends="modules.BaseModule" {
 		boolean ciMode = false,
 		boolean useTestDB = true,
 		boolean dbExplicit = false,
-		string basePath = ""
+		string basePath = "",
+		numeric timeoutSeconds = 900
 	) {
 		var serverPort = $requireRunningServer([
 			"Start one with: wheels start",
@@ -5630,7 +5820,7 @@ component extends="modules.BaseModule" {
 				testUrl &= "&directory=#filter#";
 			}
 
-			var httpResult = makeHttpRequest(testUrl);
+			var httpResult = makeHttpRequest(testUrl, arguments.timeoutSeconds * 1000);
 
 			// Try to parse JSON result
 			if (isJSON(httpResult)) {
@@ -5673,7 +5863,18 @@ component extends="modules.BaseModule" {
 			}
 		} catch (any e) {
 			runState.crashed = true;
-			out("Test execution failed: #e.message#", "red");
+			// A read timeout here is indistinguishable from a hung app to anyone who has not
+			// seen it before, because the runner produced no document at all — the suite may
+			// well have passed (issue #3352). Say which side gave up, and how to give it longer.
+			if (reFindNoCase("(read timed out|SocketTimeout)", e.message)) {
+				out("Test run timed out after #arguments.timeoutSeconds#s waiting for the suite to finish.", "red");
+				out("The specs may have passed — the CLI stopped waiting, the runner did not stop running.", "yellow");
+				out("Give it longer:  wheels test --timeout=#arguments.timeoutSeconds * 2#", "yellow");
+				out("Or set WHEELS_TEST_TIMEOUT=<seconds> for the whole environment.", "yellow");
+				out("Or scope the run:  wheels test --filter=<subdirectory>", "yellow");
+			} else {
+				out("Test execution failed: #e.message#", "red");
+			}
 		}
 
 		// Exit non-zero when specs failed/errored so CI and shells can detect it.
@@ -6191,7 +6392,27 @@ component extends="modules.BaseModule" {
 
 		fileWrite(
 			targetDir & "/app/views/main/index.cfm",
-			'<h1>Welcome to ' & appName & '</h1>' & nl & '<p>Your Wheels application is running. Edit this file at app/views/main/index.cfm</p>' & nl
+			(
+				'<!---' & nl &
+				tab & 'Starter home page: replace before production.' & nl &
+				tab & 'This development/first-run landing page surfaces environment' & nl &
+				tab & 'details (Wheels version, engine, database, environment) and CLI' & nl &
+				tab & 'commands. Deploy a real homepage so those are not exposed to' & nl &
+				tab & 'anonymous visitors.' & nl &
+				'--->' & nl &
+				'<cfoutput>' & nl &
+				'<h1>Welcome to ' & appName & '</h1>' & nl &
+				'<p>Your <strong>Wheels ##get("version")##</strong> application is running on ##application.wheels.serverName## with ##application.wheels.dataSourceName## (##get("environment")##).</p>' & nl &
+				nl &
+				'<h2>Next steps</h2>' & nl &
+				'<ul>' & nl &
+				tab & '<li><code>wheels g scaffold Post title content:text</code> &mdash; generate a model, controller, and views</li>' & nl &
+				tab & '<li><code>wheels migrate latest</code> &mdash; build the database schema</li>' & nl &
+				tab & '<li><code>wheels test</code> &mdash; run the test suite</li>' & nl &
+				'</ul>' & nl &
+				'<p><small>This page lives at <code>app/views/main/index.cfm</code>; routing is in <code>config/routes.cfm</code>.</small></p>' & nl &
+				'</cfoutput>' & nl
+			)
 		);
 		printCreated(appName & "/app/views/main/index.cfm");
 
@@ -6409,7 +6630,7 @@ component extends="modules.BaseModule" {
 		out("       unzip wheels-core-<version>.zip -d ~/.wheels/modules/wheels/vendor/");
 		out("       wheels new #appName#");
 		out("");
-		out("See: https://guides.wheels.dev/v4-0-0-snapshot/start-here/installing/");
+		out("See: https://guides.wheels.dev/v4-0-0/start-here/installing/");
 
 		throw(
 			type="Wheels.FrameworkNotFound",
@@ -7416,8 +7637,13 @@ component extends="modules.BaseModule" {
 		return result;
 	}
 
-	private string function makeHttpRequest(required string requestUrl) {
-		return makeHttpRequestWithStatus(arguments.requestUrl).body;
+	/**
+	 * @readTimeout Milliseconds to wait for the response. Defaults to the
+	 *              request/response bridge budget; long-running callers such as
+	 *              `wheels test` pass their own (issue #3352).
+	 */
+	private string function makeHttpRequest(required string requestUrl, numeric readTimeout = 120000) {
+		return makeHttpRequestWithStatus(requestUrl = arguments.requestUrl, readTimeout = arguments.readTimeout).body;
 	}
 
 	/**
@@ -7433,14 +7659,15 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function makeHttpRequestWithStatus(
 		required string requestUrl,
-		boolean followRedirects = true
+		boolean followRedirects = true,
+		numeric readTimeout = 120000
 	) {
 		var javaUrl = createObject("java", "java.net.URL").init(arguments.requestUrl);
 		var conn = javaUrl.openConnection();
 		conn.setRequestMethod("GET");
 		conn.setInstanceFollowRedirects(javacast("boolean", arguments.followRedirects));
 		conn.setConnectTimeout(5000);
-		conn.setReadTimeout(120000);
+		conn.setReadTimeout(javacast("int", arguments.readTimeout));
 
 		var responseCode = conn.getResponseCode();
 		var inputStream = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
@@ -7561,7 +7788,8 @@ component extends="modules.BaseModule" {
 					variables.services.scaffold = new services.Scaffold(
 						codeGenService = getService("codegen"),
 						helpers = getService("helpers"),
-						projectRoot = variables.projectRoot
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
 					);
 					break;
 				case "analysis":
@@ -7854,7 +8082,8 @@ component extends="modules.BaseModule" {
 		var testUrl = "http://localhost:#serverPort##runnerPath#?db=sqlite&format=json&directory=#directory#";
 
 		try {
-			var httpResult = makeHttpRequest(testUrl);
+			// same long-running suite over the same 120s-default helper (issue #3352)
+			var httpResult = makeHttpRequest(testUrl, $resolveTestTimeout() * 1000);
 		} catch (any e) {
 			out("Failed to reach test runner at: #testUrl#", "red");
 			out("Is the server running? Try: wheels start", "yellow");

@@ -315,7 +315,7 @@ wheels reload
 3. From the index, click "New post", fill the form, submit — a third post appears on the index page.
 
 <Aside type="note" title="CSRF protection blocks bare-curl POSTs">
-The first `curl` smoke-test is fine because it's a GET. Form-driven POST/PUT/DELETE from a browser also works — the layout exposes `<meta name="csrf-token">` and Turbo attaches the token to every write request. But a bare `curl -X POST` from your shell is rejected with `Wheels.InvalidAuthenticityToken` — that's [CSRF protection](/v4-0-0/security/csrf-protection/) doing its job, not a bug. Use the browser for the write steps in the tutorial; if you script smoke tests later, scrape the token from a `GET /posts/new` first.
+The first `curl` smoke-test is fine because it's a GET. Form-driven POST/PUT/DELETE from a browser also works — the layout exposes `<meta name="csrf-token">` and Turbo attaches the token to every write request. But a bare `curl -X POST` from your shell is rejected with `Wheels.InvalidAuthenticityToken` — that's [CSRF protection](/v4-0-0/deployment/security-hardening/#csrf-protection) doing its job, not a bug. Use the browser for the write steps in the tutorial; if you script smoke tests later, scrape the token from a `GET /posts/new` first.
 </Aside>
 
 ## Troubleshooting

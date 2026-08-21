@@ -58,6 +58,11 @@ component extends="wheels.WheelsTest" {
             });
 
             it("honors the wheels.testClient.baseUrl JVM system property", () => {
+                var caps = new wheels.wheelstest.EngineCapabilities();
+                if (!caps.canWriteSystemProperties()) {
+                    debug("Skipping: JVM system property writes do not round-trip on this engine");
+                    return;
+                }
                 var sys = createObject("java", "java.lang.System");
                 var key = "wheels.testClient.baseUrl";
                 var prior = sys.getProperty(key);

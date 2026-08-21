@@ -50,7 +50,7 @@ Terms that carry a specific Wheels meaning. Each entry links to the guide page w
 
 **Enum.** A declaration that a property takes one of a fixed set of named values, auto-generating an inclusion validation, boolean checkers, and scopes. See [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/).
 
-**Environment.** One of `development`, `testing`, `production`, or `maintenance` — determined by `WHEELS_ENV` and controlling which `config/<environment>/settings.cfm` overrides load. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/).
+**Environment.** One of `development`, `testing`, `production`, or `maintenance` — set by `set(environment="...")` in `config/environment.cfm` and controlling which `config/<environment>/settings.cfm` overrides load. (Exporting `WHEELS_ENV` does *not* change it on a stock app unless you wire `environment.cfm` to read it.) See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/).
 
 ## F
 
@@ -102,7 +102,7 @@ Terms that carry a specific Wheels meaning. Each entry links to the guide page w
 
 **Package.** An optional first-party module distributed as a standalone repository (indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) and activated by being installed into `vendor/<name>/`. `PackageLoader` discovers and loads each on startup inside its own try/catch. See [Packages](/v4-0-0/digging-deeper/packages/).
 
-**`package.json`.** The manifest at the root of every package — `name`, `version`, `wheelsVersion`, `provides.mixins`, `provides.middleware`, `dependencies`. See [Packages](/v4-0-0/digging-deeper/packages/).
+**`package.json`.** The manifest at the root of every package — `name`, `version`, `wheelsVersion`, `provides.mixins`, `provides.middleware`, and the dependency fields `requires` / `replaces` / `suggests` (the loader ignores a legacy `dependencies` key). See [Packages](/v4-0-0/digging-deeper/packages/).
 
 **Partial.** A view fragment whose filename starts with an underscore (`_form.cfm`), included via `includePartial(partial="form")` or rendered directly with `renderPartial`. See [Views, Layouts, Partials](/v4-0-0/basics/views-layouts-partials/).
 
@@ -110,7 +110,7 @@ Terms that carry a specific Wheels meaning. Each entry links to the guide page w
 
 **Primary key.** The column Wheels treats as the row's identity — `id` by convention; override with `setPrimaryKey()`. See [Models and the ORM](/v4-0-0/basics/models-and-the-orm/).
 
-**Priority queue.** A named queue on `wheels_jobs.queue` that the worker drains ahead of others when run with `--queue=critical,default,low`. See [Background Jobs](/v4-0-0/digging-deeper/background-jobs/).
+**Priority queue.** A named queue on `wheels_jobs.queue`. A worker started with `--queue=critical,default,low` polls only the listed queues; ordering *across* them comes from each job's `priority` field (`priority DESC, runAt ASC`), not from the list position. See [Background Jobs](/v4-0-0/digging-deeper/background-jobs/).
 
 ## Q
 

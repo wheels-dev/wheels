@@ -64,13 +64,17 @@ The reload re-runs `PackageLoader`, which rediscovers what's in `vendor/` and re
 Six packages are maintained as first-party modules under the `wheels-dev` GitHub org. All are optional; the framework core runs fine with none of them installed.
 
 - **[`wheels-hotwire`](https://github.com/wheels-dev/wheels-hotwire)** — Turbo Drive, Turbo Frames, Turbo Streams, and Stimulus integration for server-rendered UI. Mixes into controllers (and therefore views). Used heavily in the tutorial app.
-- **[`wheels-basecoat`](https://github.com/wheels-dev/wheels-basecoat)** — UI component helpers styled with Tailwind CSS. shadcn/ui-quality forms, buttons, and cards without React. Mixes into controllers.
+- **[`wheels-basecoat`](https://github.com/wheels-dev/wheels-basecoat)** — UI component helpers styled with Tailwind CSS. shadcn/ui-quality forms, buttons, and cards without React. Mixes into controllers. Add it with `wheels packages add wheels-basecoat` (the verb is `add`, not `install`), then copy CSS and the optional showcase from `vendor/wheels-basecoat/` — not from the raw GitHub tree. The [bonus tutorial chapter](/v4-0-0/start-here/tutorial/08-bonus-basecoat/) walks through both.
 - **[`wheels-sentry`](https://github.com/wheels-dev/wheels-sentry)** — Sentry.io error tracking with framework-aware context enrichment. Captures exceptions with request, user, and route context. Mixes into controllers.
 - **[`wheels-legacy-adapter`](https://github.com/wheels-dev/wheels-legacy-adapter)** — Backward-compatibility shim for Wheels 3.x plugins. Deprecation logging, API adapters, and a scanner that flags 3.x patterns you should modernize. Mixes into controllers.
 - **[`wheels-i18n`](https://github.com/wheels-dev/wheels-i18n)** — Internationalization with JSON-file or database-backed translations, parameter interpolation, and pluralization. Mixes into controllers.
 - **[`wheels-seo-suite`](https://github.com/wheels-dev/wheels-seo-suite)** — Meta tags, Open Graph, Twitter Cards, canonical URLs, XML sitemaps, robots.txt, and an in-page debug/admin panel. Mixes into controllers.
 
-In development mode, the debug bar's **Packages** tab shows both the currently installed packages (from `vendor/`) and a live "Available from registry" table pulled from the same 24-hour registry cache used by the CLI. This lets you discover and compare first-party packages without leaving your browser.
+In development mode, the debug bar's Environment panel lists the currently installed packages (from `vendor/`), and its Tools tab links to `/wheels/packages` for the fuller view — see [Debug Panel](/v4-0-0/digging-deeper/debug-panel/). Registry browsing (what's *available*, not just what's installed) is a CLI feature: `wheels packages list` / `search` / `show`.
+
+<Aside type="note" title="The packages registry is not ForgeBox">
+Two different registries serve the CFML world, and Wheels touches both — for different things. **ForgeBox** (forgebox.io, Ortus) is where CommandBox installs from; Wheels publishes the *framework artifacts* there (`wheels-core`, `wheels-base-template`) so `box install` works. The **Wheels packages registry** ([`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) on GitHub) is what `wheels packages add` installs from — it indexes the first-party packages on this page. A package listed here is not necessarily on ForgeBox and vice versa; if you're CommandBox-only, install packages by extracting their release into `vendor/<name>/` and reloading (the loader doesn't care how files arrived).
+</Aside>
 
 ## The `package.json` manifest
 

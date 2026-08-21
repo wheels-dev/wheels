@@ -54,9 +54,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     /**
      * Return a configured TestClient instance.
      * The base URL is auto-detected from the current server port.
+     *
+     * @testContext When true (default), send the isolation header + cookie so
+     *   fixture HTTP binds the isolated test application (issue #3374). Pass
+     *   false to address the live application (isolation specs).
      */
-    public any function $testClient() {
-        return new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl());
+    public any function $testClient(boolean testContext = true) {
+        // Do not name this local `client` — that is a reserved CFML scope
+        // and Lucee throws "client scope is not enabled" (anti-pattern 11).
+        var httpClient = new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl());
+        if (arguments.testContext) {
+            var ctx = new wheels.events.TestContext();
+            httpClient.withHeader(ctx.headerName(), "1");
+            httpClient.withCookie(ctx.cookieName(), "1");
+        }
+        return httpClient;
     }
 
     /**

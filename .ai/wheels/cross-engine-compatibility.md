@@ -36,6 +36,38 @@ plugin.onPluginLoad(context);
 
 **Why**: Adobe's application scope is implemented differently from a regular CFML struct. Function members get lost or throw errors during serialization.
 
+### Application Scope Unreliable During onApplicationEnd() Teardown (Adobe CF 2023)
+
+On Adobe CF 2023, `onApplicationEnd()` fires synchronously during `applicationStop()` teardown (triggered by a `?reload` restart or idle-timeout reclaim). Inside that teardown the live `application` scope is no longer reliable — bare `application.wo` can resolve against a stale/torn-down scope and land on a Java `String[]`, throwing `Element wo is undefined in a Java object of type class [Ljava.lang.String;` and erroring the whole site until a CF service restart.
+
+The only dependable reference at shutdown is the passed-in `arguments.applicationScope` (already used by the `$wheelsBrowserLauncher` cleanup in the same handler). Route all `onApplicationEnd()` calls through it and guard with `StructKeyExists` so a partially reclaimed scope degrades to a no-op instead of a hard error. Lucee 6/7 and BoxLang are unaffected; this only manifests on Adobe CF during real teardown (issue #3379).
+
+```cfm
+// WRONG — bare application.wo breaks during Adobe CF applicationStop() teardown
+public void function onApplicationEnd(struct ApplicationScope) {
+    application.wo.$include(
+        template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+        argumentCollection = arguments
+    );
+}
+
+// RIGHT — use the passed-in scope, the only reliable reference at shutdown
+public void function onApplicationEnd(struct ApplicationScope) {
+    if (
+        StructKeyExists(arguments.applicationScope, "wo")
+        && StructKeyExists(arguments.applicationScope, "wheels")
+        && StructKeyExists(arguments.applicationScope.wheels, "eventPath")
+    ) {
+        arguments.applicationScope.wo.$include(
+            template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+            argumentCollection = arguments
+        );
+    }
+}
+```
+
+**Existing apps**: apply this same change to `public/Application.cfc` — the CLI template (`wheels new`) and the demo app were fixed in Wheels 4.x (#3380).
+
 ### Closure `this` Captures Declaring Scope
 
 CFML closures bind `this` to the component where they are DEFINED, not where they are ASSIGNED. This trips up test code that dynamically adds methods.
@@ -346,6 +378,42 @@ public void function $myTagWrapper() {
 `$header()` and `$content()` already adopt this shape. Future tag wrappers (`$location`, `$cache`, `$htmlhead`, `$mail`, …) should pick up `$responseCommitted()` rather than reinventing the probe.
 
 **Reference fix**: [#2756](https://github.com/wheels-dev/wheels/pull/2756) — adds `$responseCommitted()` and applies the defensive shape to `$header()` and `$content()`.
+
+### A Parameter Named `request` Makes the Bare `request` Token Ambiguous (Adobe CF 2025)
+
+In a function that declares a parameter named `request`, Adobe CF 2025 does **not** resolve the bare `request` token consistently across expression positions. Passed as a function argument it can resolve to the built-in `request` scope, while a `request.x` member-access expression in the same function resolves to `arguments.request`. A guard written in one position therefore cannot protect an access written in the other — the guard passes and the access throws.
+
+```cfm
+public string function handle(required struct request, required any next) {
+
+    // WRONG — the two `request` tokens can resolve to different things on Adobe 2025.
+    // StructKeyExists sees the key on the built-in scope and returns true; the
+    // member-access expression then resolves to arguments.request, which has no
+    // `wheels` key, and throws `Element WHEELS is undefined in REQUEST`.
+    if (StructKeyExists(request, "wheels")) {
+        StructDelete(request.wheels, "tenant");
+    }
+
+    // RIGHT (a) — IsDefined string-resolves the whole dotted path in a single
+    // evaluation, so the guard and the access cannot disagree.
+    if (IsDefined("request.wheels.tenant")) {
+        StructDelete(request.wheels, "tenant");
+    }
+
+    // RIGHT (b) — assign before use, so the key exists on that path regardless
+    // of how the token resolved.
+    if (!StructKeyExists(request, "wheels")) {
+        request.wheels = {};
+    }
+    request.wheels.tenant = local.tenant;
+}
+```
+
+**Why**: `wheels.middleware.MiddlewareInterface` fixes the signature `handle(required struct request, required any next)`, so *every* middleware component has a parameter named `request` and is exposed to this. Lucee 6/7, BoxLang and Adobe CF 2023 all resolve the bare token to the built-in scope in both positions, so **a green local Lucee run and green Adobe 2023 smokes do NOT cover this** — only the Adobe 2025 matrix legs catch it.
+
+Note the interaction with anti-pattern 11 (reserved scope names shadowing parameters): that entry says never *name* a parameter after a reserved scope. Middleware can't follow that rule — the interface mandates it — so middleware must instead follow the two safe patterns above and never mix them with a bare-token guard.
+
+**Reference fix**: [#3338](https://github.com/wheels-dev/wheels/pull/3338) — the tenant-context hardening for [#3336](https://github.com/wheels-dev/wheels/issues/3336) added a `StructKeyExists(request, "wheels")` guard to `TenantResolver.handle()`; it errored on all five Adobe 2025 database legs (8 specs each) while every other engine stayed green, and was switched to the `IsDefined()` form already used by the same function's `finally` block.
 
 ## Database-Specific Gotchas
 

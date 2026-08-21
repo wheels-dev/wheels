@@ -247,10 +247,10 @@ To run only the browser specs:
 wheels test --filter=browser
 ```
 
-The `--filter` flag narrows the run to specs whose path contains the argument. Other filters accept `models`, `controllers`, or a full directory path. The exact syntax is still settling; see [CLI Reference](/v4-0-0/command-line-tools/) for the current options.
+The `--filter` flag narrows the run to specs whose path contains the argument — `models`, `controllers`, or a full directory path all work. See [Running Tests Locally](/v4-0-0/testing/running-tests-locally/) for the full flag surface.
 
 <Aside type="note">
-  `wheels test` runs against `db/test.sqlite` — a second SQLite file scaffolded alongside `db/development.sqlite` when you ran `wheels new`. The first time the test DB is empty, the framework includes `tests/populate.cfm` to apply your migrations. Subsequent runs reuse the schema until you delete the file. This means `[email protected]` from chapter 6's manual signup walkthrough lives ONLY in `db/development.sqlite` — chapter 7's signup spec gets a clean slate every run. Pass `--no-test-db` if you want app tests to run against the dev DB instead.
+  `wheels test` runs against `db/test.sqlite` — a second SQLite file scaffolded alongside `db/development.sqlite` when you ran `wheels new`. The first time the test DB is empty, the framework includes `tests/populate.cfm` to apply your migrations. Subsequent runs reuse the schema until you delete the file. This means the `alice@example.com` account from chapter 6's manual signup walkthrough lives ONLY in `db/development.sqlite` — chapter 7's signup spec gets a clean slate every run. Pass `--no-test-db` if you want app tests to run against the dev DB instead.
 </Aside>
 
 <Aside type="tip">
@@ -259,9 +259,9 @@ The `--filter` flag narrows the run to specs whose path contains the argument. O
 
 ## Deployment overview
 
-A Wheels app is a Java web application. You package the app (your code plus `vendor/wheels/` plus your config) and run it on a CFML engine — Lucee or Adobe ColdFusion — on whatever server you choose. Two paths are common in 2026: a Docker container shipped with [Kamal](https://kamal-deploy.org/), or a plain VM provisioned with Ansible, Chef, or Puppet. The tutorial recommends Kamal.
+A Wheels app is a Java web application. You package the app (your code plus `vendor/wheels/` plus your config) and run it on a CFML engine — Lucee or Adobe ColdFusion — on whatever server you choose. Two paths are common: the built-in `wheels deploy` command, or managing your own servers (Docker, a plain VM, IIS — whatever your shop runs).
 
-Kamal is the deploy tool extracted from the Rails ecosystem. You describe your app, your servers, and your domain in a `config/deploy.yml`; `kamal setup` provisions the box the first time (installs Docker, pulls your image, wires up a reverse proxy with automatic TLS); `kamal deploy` ships every subsequent change with zero-downtime rolling restarts. Wheels ships a starter `Dockerfile` and a Kamal config template so you can get from "tests pass" to "it's live" in one afternoon. The full walkthrough — image build, secrets, TLS, migrations at boot — lives in [Deployment & Operations](/v4-0-0/deployment/).
+`wheels deploy` is the CLI's built-in deployer, inspired by Rails' Kamal. You describe your app, your servers, and your domain in `config/deploy.yml`; `wheels deploy setup` provisions the box the first time (installs Docker, pulls your image, wires up a reverse proxy with automatic TLS); `wheels deploy` ships every subsequent change with zero-downtime rolling restarts — no Ruby or extra tools to install. The full walkthrough — image build, secrets, TLS, migrations at boot — starts at [Your First Deploy](/v4-0-0/deployment/first-deploy/). If you'd rather run your own infrastructure, [Docker Deployment](/v4-0-0/deployment/docker-deployment/) and [VM and Bare-metal Deployment](/v4-0-0/deployment/vm-deployment/) cover the self-managed paths — no CLI required.
 
 Whichever path you take, the production checklist is the same: serve HTTPS, set `environment=production` in `config/environment.cfm`, disable the development reload endpoint, point the app at a real database (Postgres or MySQL, not the SQLite file you've been using), set up log rotation, and run migrations automatically on each deploy. Each of those gets a dedicated page in the Deployment section.
 

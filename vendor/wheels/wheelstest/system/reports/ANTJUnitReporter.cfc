@@ -117,7 +117,7 @@ component extends="BaseReporter" {
 					<error
 						type=""globalException""
 						message=""#encodeForXMLAttribute( arguments.bundleStats.globalException.message )#""><![CDATA[
-						#arguments.bundleStats.globalException.stackTrace.toString()#
+						#( !isNull( arguments.bundleStats.globalException.stackTrace ) ? arguments.bundleStats.globalException.stackTrace.toString() : '' )#
 					]]></error>
 			</testcase>
 			"
@@ -217,7 +217,7 @@ return;
 			case "error": {
 				out.append(
 					"<error type=""#encodeForXMLAttribute( !isNull( stats.error.type ) ? stats.error.type : '' )#"" message=""#encodeForXMLAttribute( stats.error.message )#""><![CDATA[
-					#stats.error.stackTrace.toString()#
+					#( !isNull( stats.error.stackTrace ) ? stats.error.stackTrace.toString() : '' )#
 					]]></error>"
 				);
 				break;

@@ -48,7 +48,11 @@ New code should pass `columnNames`. Both keep working.
 | `false` (framework default) | `userid` | `userid`, `usertype` |
 | `true` (new-app template default) | `user_id` | `user_id`, `user_type` |
 
-The framework default is `false` so existing apps with applied migrations keep matching their database schemas. The `wheels new` template at `cli/lucli/templates/app/config/settings.cfm` opts new apps into `true` so they match Wheels model `belongsTo` defaults out of the box.
+The framework default is `false` so existing apps with applied migrations keep matching their database schemas. The `wheels new` template at `cli/lucli/templates/app/config/settings.cfm` opts new apps into `true`.
+
+**The model side does not read this flag, and must not.** Association foreign-key defaults resolve against the columns that actually exist — `vendor/wheels/model/sql.cfc::$deriveAssociationForeignKey()` tries the legacy `<modelName><key>` shape first and falls back to `<modelName>_<key>` — so both conventions work, including a schema holding a mix of the two. Making it flag-driven instead would break: this function's result is memoized for the application lifetime (`expandedMetadataFilled`), whereas `references()` re-reads `$get()` on every call, so a runtime flip would change migrations without changing models. Before [#3337](https://github.com/wheels-dev/wheels/issues/3337) the model layer derived `<modelName><key>` unconditionally, which meant a stock `wheels new` app had a migrator and a model layer that could never agree.
+
+The exception is **polymorphic** associations, which pin their foreign key to `<name>id` at registration time — see the note in the root `CLAUDE.md`. Those still need an explicit `foreignKey=` under the underscore convention.
 
 The flag is read via `$get("useUnderscoreReferenceColumns")` inside `references()` at runtime — apps can flip the setting in `config/settings.cfm` without reloading the framework. Migrations already applied to a real database are unaffected; only the column name the *next* migration produces changes.
 

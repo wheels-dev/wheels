@@ -39,17 +39,17 @@ In production, read `WHEELS_ENV` from the process instead so the same artifact c
 </cfscript>
 ```
 
-Wheels boots, calls `config/environment.cfm`, and then loads `config/settings.cfm` followed by `config/<environment>/settings.cfm`. Anything you `set()` in the per-environment file wins (`vendor/wheels/events/onapplicationstart.cfc:325-328`).
+Wheels boots, calls `config/environment.cfm`, and then loads `config/settings.cfm` followed by `config/<environment>/settings.cfm`. Anything you `set()` in the per-environment file wins.
 
 What switching to `production` changes, automatically:
 
-- `showErrorInformation` → `false` — error pages stop leaking stack traces (`vendor/wheels/events/init/debugging.cfm:22-25`).
+- `showErrorInformation` → `false` — error pages stop leaking stack traces.
 - `sendEmailOnError` → `true` — set `errorEmailToAddress` or you'll get nothing.
-- `showDebugInformation` → `false` — the floating debug panel is hidden (`debugging.cfm:26-28`).
-- `cacheActions`, `cacheImages`, `cachePages`, `cachePartials`, `cacheQueries` → all `true` (`vendor/wheels/events/init/caching.cfm:15-21`).
-- `redirectAfterReload` → `true` — the reload URL 302s after success, stripping `reload` and `password` from the query string. Defaults to `false` (`vendor/wheels/events/init/orm.cfm:26`) and flips to `true` for both `production` and `maintenance` (`orm.cfm:52-54`).
-- URL-based environment switching is disabled unless you explicitly re-enable it (`onapplicationstart.cfc:360-369`, resolved by `$resolveAllowEnvironmentSwitchViaUrl()` at `:516-524` — disabled by default in `production`, `testing`, and `maintenance`).
-- Migrations refuse to run `down` (`onapplicationstart.cfc:300-304` inverts only for development).
+- `showDebugInformation` → `false` — the floating debug panel is hidden.
+- `cacheActions`, `cacheImages`, `cachePages`, `cachePartials`, `cacheQueries` → all `true`.
+- `redirectAfterReload` → `true` — the reload URL 302s after success, stripping `reload` and `password` from the query string. Defaults to `false` and flips to `true` for both `production` and `maintenance`.
+- URL-based environment switching is disabled unless you explicitly re-enable it (disabled by default in `production`, `testing`, and `maintenance`).
+- Migrations refuse to run `down` (allowed only in development).
 
 You do not set any of those manually. Setting `environment` to `production` is the switch.
 
@@ -82,35 +82,35 @@ Create `config/production/settings.cfm`. This file is read only when the active 
 
 Nothing in that block is invented. Each key is defined in `vendor/wheels/events/init/`:
 
-| Setting | Default | Source |
-| --- | --- | --- |
-| `dataSourceName` | app folder name (lowercased) | `onapplicationstart.cfc:254-261` |
-| `dataSourceUserName`, `dataSourcePassword` | `""` | `events/init/orm.cfm:2-3` |
-| `reloadPassword` | `""` | `events/init/orm.cfm:25` |
-| `csrfCookieEncryptionSecretKey` | `""` | `events/init/security.cfm:30` |
-| `errorEmailToAddress`, `errorEmailFromAddress` | `""` | `events/init/debugging.cfm:8-9` |
-| `URLRewriting` | detected from CGI | `onapplicationstart.cfc:245-252` |
-| `subpath` | `""` | `onapplicationstart.cfc:307-342` |
+| Setting | Default |
+| --- | --- |
+| `dataSourceName` | app folder name (lowercased) |
+| `dataSourceUserName`, `dataSourcePassword` | `""` |
+| `reloadPassword` | `""` |
+| `csrfCookieEncryptionSecretKey` | `""` |
+| `errorEmailToAddress`, `errorEmailFromAddress` | `""` |
+| `URLRewriting` | detected from CGI |
+| `subpath` | `""` |
 
 <Aside type="note" title="Subfolder deployments">
   If your app is mounted under a URL prefix — `/myapp/`, `/team/site/`, or similar — via a reverse proxy or IIS subfolder, set `subpath` in `config/settings.cfm` (not the per-environment file, since the mount point is the same in every environment): `set(subpath="/myapp")`. Alternatively, export `WHEELS_SUBPATH=/myapp` in the process environment — useful in CommandBox `server.json` `envVars` or an IIS `web.config` `environmentVariables` block. Link, form, and asset helpers that read `application.wheels.webPath` pick up the prefix automatically; without this setting, `cgi.script_name` may not reflect the public mount point and all generated URLs will be missing the prefix.
 </Aside>
 
 <Aside type="caution">
-  `csrfCookieEncryptionSecretKey` is mandatory in production when `csrfStore="cookie"` — Wheels throws `Wheels.Security.MissingCsrfKey` at first CSRF check if it's empty (`vendor/wheels/controller/csrf.cfc:152-161`). Auto-generation is blocked in production on purpose: a regenerated key invalidates every outstanding session token.
+  `csrfCookieEncryptionSecretKey` is mandatory in production when `csrfStore="cookie"` — Wheels throws `Wheels.Security.MissingCsrfKey` at first CSRF check if it's empty. Auto-generation is blocked in production on purpose: a regenerated key invalidates every outstanding session token.
 </Aside>
 
 ## How Wheels reads environment variables
 
-`env("NAME", "default")` is the canonical accessor. It checks `application.env` first, then `server.system.environment`, then returns the default (`vendor/wheels/Global.cfc:597-616`).
+`env("NAME", "default")` is the canonical accessor. It checks `application.env` first, then `server.system.environment`, then returns the default.
 
 `application.env` is populated by the scaffold's `Application.cfc` at `onApplicationStart()`:
 
-1. Reads `.env` at the app root (`cli/lucli/templates/app/public/Application.cfc:52-56`).
-2. Resolves `WHEELS_ENV` from `.env` first, then `java.lang.System.getenv("WHEELS_ENV")` (`Application.cfc:58-73`).
-3. Reads `.env.<environment>` on top if present — so `.env.production` overrides `.env` (`Application.cfc:75-81`).
-4. Interpolates `${VAR}` references between entries (`Application.cfc:84`).
-5. Copies the merged struct to `application.env` inside `onApplicationStart()` (`Application.cfc:103`).
+1. Reads `.env` at the app root.
+2. Resolves `WHEELS_ENV` from `.env` first, then `java.lang.System.getenv("WHEELS_ENV")`.
+3. Reads `.env.<environment>` on top if present — so `.env.production` overrides `.env`.
+4. Interpolates `${VAR}` references between entries.
+5. Copies the merged struct to `application.env` inside `onApplicationStart()`.
 
 The practical rule: **commit nothing secret**. Ship `.env.example` with empty values, inject real values at deploy time. A deploy script, systemd `EnvironmentFile=`, Dockerfile `ENV`, or Kubernetes secret-mount all work.
 
@@ -134,15 +134,15 @@ Each deploy target exports `WHEELS_ENV` before the CFML server boots. `config/en
 
 ### URL-based reload (development only)
 
-`?reload=true&password=<reloadPassword>` re-runs `onApplicationStart`. `?reload=production&password=<reloadPassword>` switches the running app into production (`onapplicationstart.cfc:180-204`). Switching to the environment that's already active is a no-op.
+`?reload=true&password=<reloadPassword>` re-runs `onApplicationStart`. `?reload=production&password=<reloadPassword>` switches the running app into production. Switching to the environment that's already active is a no-op.
 
-Wheels disables URL-based switching **automatically** in production, testing, and maintenance environments unless you explicitly `set(allowEnvironmentSwitchViaUrl=true)` in your per-env settings (`onapplicationstart.cfc:360-369`; `$resolveAllowEnvironmentSwitchViaUrl()` at `:516-524`). Leave it disabled. A cached reload password plus URL switching plus production is a bad combination.
+Wheels disables URL-based switching **automatically** in production, testing, and maintenance environments unless you explicitly `set(allowEnvironmentSwitchViaUrl=true)` in your per-env settings. Leave it disabled. A cached reload password plus URL switching plus production is a bad combination.
 
-The reload password uses a constant-time comparison (`$secureCompare()` in `vendor/wheels/Global.cfc`, called from both `onapplicationstart.cfc` and `public/Application.cfc`) and rate-limits failed attempts per client IP — 5 failures in 5 minutes — on both the cold-start and warm-application paths, logging each rejected or accepted attempt to `wheels_security.log` ([#3062](https://github.com/wheels-dev/wheels/issues/3062)). Rotate it on every production deploy anyway — it's trivial to rotate and the value ends up in nginx logs if someone misconfigures TLS termination.
+The reload password is compared in constant time, rate-limited (5 failures per client IP per 5 minutes), and every attempt is logged to `wheels_security.log` — the full threat model and hardening guidance live in [Security Hardening — Reload password](/v4-0-0/deployment/security-hardening/#reload-password). Rotate it on every production deploy anyway — it's trivial to rotate and the value ends up in web-server logs if someone misconfigures TLS termination.
 
 ### The `maintenance` environment
 
-`set(environment="maintenance")` puts Wheels into planned-downtime mode — `EventMethods.cfc:236-258` responds with HTTP 503 and renders `app/events/onmaintenance.cfm` instead of running the normal request lifecycle, unless the client IP is listed in `ipExceptions`. Use it for long migrations or config rollouts.
+`set(environment="maintenance")` puts Wheels into planned-downtime mode — the framework responds with HTTP 503 and renders `app/events/onmaintenance.cfm` instead of running the normal request lifecycle, unless the client IP is listed in `ipExceptions`. Use it for long migrations or config rollouts.
 
 ## Pre-boot checklist
 
@@ -153,17 +153,17 @@ Run through this before the first production request. Each item maps to a framew
 </Aside>
 
 1. **`environment` is `production`.** Verify with `?controller=wheels&action=info` (dev only) or by checking `application.wheels.environment` in a smoke-test action. If it says `development`, `showErrorInformation` is still `true` and caching is off.
-2. **`reloadPassword` is set and rotated.** An empty password disables `?reload=` **entirely** — both URL-based environment switching and plain `?reload=true` require a non-empty configured password plus a matching `password` parameter (the warm-application gate in `public/Application.cfc` fails closed since [#3062](https://github.com/wheels-dev/wheels/issues/3062), mirroring the cold-start leg in `onapplicationstart.cfc`). Wheels writes a `wheels_security` warning log on boot if it's blank. Set it to a random value unique to this deploy so operators can still reload over HTTP; leave it blank only if you never want URL reload to work.
+2. **`reloadPassword` is set and rotated.** An empty password disables `?reload=` **entirely** — both URL-based environment switching and plain `?reload=true` require a non-empty configured password plus a matching `password` parameter (the gate fails closed, [#3062](https://github.com/wheels-dev/wheels/issues/3062)). Wheels writes a `wheels_security` warning log on boot if it's blank. Set it to a random value unique to this deploy so operators can still reload over HTTP; leave it blank only if you never want URL reload to work. Depth: [Security Hardening — Reload password](/v4-0-0/deployment/security-hardening/#reload-password).
 3. **`showErrorInformation` is `false`.** The `production` switch flips this, but a stray `set(showErrorInformation=true)` in `config/settings.cfm` will leak stack traces. Grep for it.
 4. **`dataSourceName` points at a real database.** Not H2, not `wheelstestdb`, not a shared staging instance. Confirm with a read-only action that calls `model("User").count()` or similar.
-5. **`csrfCookieEncryptionSecretKey` is set** if `csrfStore="cookie"`. `csrfStore` defaults to `"session"` unconditionally (`events/init/security.cfm:3`) — cookie storage is always an explicit opt-in. With `csrfStore="cookie"` and no key, the first CSRF check throws `Wheels.Security.MissingCsrfKey` (`controller/csrf.cfc:148-157`).
-6. **Session storage matches the node topology.** `session` flash storage (the default when session management is on — `events/init/orm.cfm:57-64`; cookie attributes at `:69-73`) requires sticky sessions or a session-replication setup behind the load balancer. With multiple nodes and no stickiness, use `flashStorage="cookie"` explicitly.
-7. **Error email is wired.** `sendEmailOnError` is auto-enabled in production (`debugging.cfm:22-25`). If `errorEmailToAddress` is empty, Wheels still tries to send — `events/EventMethods.cfc:5-13` reads the address at error time — and the mail bounces silently. Set it.
+5. **`csrfCookieEncryptionSecretKey` is set** if `csrfStore="cookie"`. `csrfStore` defaults to `"session"` unconditionally — cookie storage is always an explicit opt-in. With `csrfStore="cookie"` and no key, the first CSRF check throws `Wheels.Security.MissingCsrfKey`.
+6. **Session storage matches the node topology.** `session` flash storage (the default when session management is on) requires sticky sessions or a session-replication setup behind the load balancer. With multiple nodes and no stickiness, use `flashStorage="cookie"` explicitly.
+7. **Error email is wired.** `sendEmailOnError` is auto-enabled in production. If `errorEmailToAddress` is empty, Wheels still tries to send — the address is read at error time — and the mail fails silently. Set it.
 8. **URL rewriting matches the web server.** `set(URLRewriting="On")` only works if nginx/Apache/Tuckey rewrites `/posts/1` to `/index.cfm/posts/1`. If rewrites aren't configured, leave it at `"Partial"` or `"Off"`, or every link breaks.
 9. **`allowEnvironmentSwitchViaUrl` is not re-enabled.** Confirm by grepping `config/production/settings.cfm` — don't set it to `true`. If you need to toggle environments, redeploy.
 10. **Caches are warmed before traffic cutover.** The very first request to a freshly started node is dominated by one-time CFML-to-bytecode compilation — profiling a stock app puts roughly **85% of a ~1.2s cold start in the engine's compiler**, versus sub-millisecond once warm. That cost is paid once per process, so the goal is to move it off the first *real* visitor and onto the deploy sequence:
     - Apps scaffolded with `wheels new` ship a `/up` route (`app/controllers/Up.cfc`). `wheels deploy`'s proxy healthcheck probes `/up` before flipping traffic, so the dispatch → controller → render path is compiled on the new node before it serves anyone. Touch your hottest models in that action (e.g. `model("Post").count()`) to warm their ORM column metadata too — the first query against a model is the other notable one-time cost.
-    - Not using `wheels deploy`? Curl your latency-sensitive endpoints from the deploy script before enabling the node at the load balancer. A single warm-up request per controller is usually enough, since `cacheControllerConfig`, `cacheModelConfig`, `cacheDatabaseSchema`, and `cacheFileChecking` are always-on in every environment (`events/init/caching.cfm:3-7`).
+    - Not using `wheels deploy`? Curl your latency-sensitive endpoints from the deploy script before enabling the node at the load balancer. A single warm-up request per controller is usually enough, since `cacheControllerConfig`, `cacheModelConfig`, `cacheDatabaseSchema`, and `cacheFileChecking` are always-on in every environment.
 11. **Template inspection is set to `never` (engine-level).** In development the CFML engine re-checks each template's source timestamp on every request so edits are picked up live; in production that filesystem stat is pure per-request overhead. Set the engine's template-inspection mode to `never` so it trusts the compiled-class cache and skips the check — Lucee: admin → *Performance/Caching* → "Inspect Templates" = `Never` (or `inspectTemplate="never"` in `.CFConfig.json`); Adobe ColdFusion: enable "Trusted Cache". This is engine configuration, not a Wheels setting, so it isn't flipped by `environment="production"`. Pair it with a warm-up (item 10) and a cache-clear/reload step in your deploy so a new release's templates still recompile once.
 
 ## What production does not change
@@ -171,7 +171,7 @@ Run through this before the first production request. Each item maps to a framew
 A few things you might expect to flip, that don't:
 
 - **Routes are not cached.** `config/routes.cfm` is re-evaluated on every reload. There's no "compiled routes" mode — route dispatch is cheap enough that it doesn't matter.
-- **Migrations are not auto-run.** `autoMigrateDatabase` is `false` in every environment (`onapplicationstart.cfc:282`; the auto-run gate is at `:461-463`). Run `wheels migrate latest` from your deploy script explicitly.
+- **Migrations are not auto-run.** `autoMigrateDatabase` is `false` in every environment. Run migrations explicitly from your deploy flow — `wheels migrate latest`, or [one of the no-CLI paths](/v4-0-0/basics/migrations/#running-migrations-without-the-wheels-cli) — or opt in with `set(autoMigrateDatabase=true)`.
 - **`.env` files are not required.** If you don't ship one, `application.env` stays empty and `env()` falls through to `server.system.environment`. That's fine — it's why systemd `EnvironmentFile=` and Docker `ENV` both work out of the box.
 
 ## Related guides

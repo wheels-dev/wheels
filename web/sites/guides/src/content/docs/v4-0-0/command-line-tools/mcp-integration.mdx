@@ -74,7 +74,7 @@ Every public function in the Wheels Module is auto-discovered as an MCP tool. Na
 | `stats` | Count models, controllers, routes, tests, migrations. |
 | `notes` | Surface `TODO`, `FIXME`, `HACK`, `OPTIMIZE` annotations from the codebase. |
 | `create` | Create an application (currently only `wheels create app <name>`; forwards to `wheels new`). |
-| `upgrade` | Scan the project for breaking changes against a target framework version (read-only). |
+| `upgrade` | Scan the project for breaking changes (`check`, read-only) or swap `vendor/wheels/` to a newer release (`apply`, writes with a backup). |
 | `deploy` | Kamal-style production deploys (full deploy, rollback, config, setup, bootstrap, exec). |
 | `packages` | Search, show, add, update, and remove Wheels packages; manage the registry cache. |
 
@@ -86,6 +86,8 @@ A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenT
 - `console` — interactive CFML REPL. Requires a live stdin/stdout loop, which the MCP transport owns.
 - `new` — scaffolds an entire new project. Destructive and requires interactive prompts for project context.
 - `browser` — multi-step browser testing flow with its own subcommand tree.
+- `jobs` — `jobs work` is a long-lived worker poll loop with no single-call MCP semantics.
+- `mcpToolSpecs` — the per-tool inputSchema registry LuCLI reads; not itself a tool.
 - `mcp` — the meta command itself; exposing it would let an agent recursively launch MCP servers.
 - `d` — short alias for `destroy`, excluded to avoid a duplicate tool entry (the canonical `destroy` is exposed).
 - `g` — short alias for `generate`, excluded for the same duplicate-entry reason as `d`.
@@ -93,6 +95,18 @@ A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenT
 - Any function whose name begins with `$` — internal helpers kept `public` only so unit tests can reach them (a CFML testing carve-out). `mcpHiddenTools()` discovers these structurally via `getMetaData(this)`, so a future `$helper` added to the module cannot accidentally surface as a callable MCP tool without a manual denylist update.
 
 If you need one of these behaviours from an AI IDE, invoke it via a shell tool — don't try to expose it as an MCP tool.
+
+## Troubleshooting
+
+**The server never responds / the IDE shows zero tools.** The most common cause: GUI-launched editors (VS Code, Cursor, Claude Desktop opened from the dock or Start menu) don't inherit your shell's `PATH`, so the bare `"command": "wheels"` in `.mcp.json` can't be found — and most clients fail silently. Fix it by using the absolute binary path:
+
+```json title=".mcp.json"
+{"mcpServers": {"wheels": {"command": "/opt/homebrew/bin/wheels", "args": ["mcp", "wheels"]}}}
+```
+
+(`which wheels` in a terminal prints the path to use — e.g. `/usr/bin/wheels` on apt/yum installs, `%USERPROFILE%\scoop\shims\wheels.exe` on Scoop.) Launching the editor from a terminal (`code .`) also works, since the child inherits the shell environment.
+
+**Tools appear but calls fail.** Run `wheels mcp wheels` by hand in a terminal at your project root — startup errors that the IDE swallows print directly there.
 
 ## Deprecated HTTP endpoint
 
@@ -116,7 +130,7 @@ Migrate to the stdio surface by switching your IDE's MCP server definition to th
   <LinkCard
     title="Installation"
     href="../installation/"
-    description="Install wheels via Homebrew, Chocolatey, or a manual JAR download."
+    description="Install wheels via Homebrew, Scoop, apt/yum, or a manual JAR download."
   />
   <LinkCard
     title="CLI Reference"

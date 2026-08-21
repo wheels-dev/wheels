@@ -47,6 +47,12 @@ component extends="wheels.WheelsTest" {
 				var selfName = "BareCfabortGuardSpec.cfc";
 				var root = ExpandPath("/wheels");
 				var files = DirectoryList(root, true, "path", "*.cfc");
+				// Script-context includes compiled into Global.cfc (issue ##3241)
+				// are not `.cfc` files but must obey the same bare-cfabort ban.
+				var globalIncludes = DirectoryList(root & "/global", false, "path", "*.cfm");
+				for (var includePath in globalIncludes) {
+					ArrayAppend(files, includePath);
+				}
 				var offenders = [];
 
 				for (var filePath in files) {

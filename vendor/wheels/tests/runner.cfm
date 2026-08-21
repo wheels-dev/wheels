@@ -49,6 +49,28 @@
         application.wo.set(viewPath = AssetPath & "views")
         application.wo.set(modelPath = AssetPath & "models")
         application.wo.set(wheelsComponentPath = "/wheels")
+        // Isolated-app boot (issue #3374) mounts browser-fixture controllers
+        // onto controllerPath. Drop that flag so a later $lockedLoadRoutes
+        // cannot append the fixture path after this swap — otherwise
+        // controller("wheels") falls through to the last-path Controller.cfc
+        // stub (no mixins). Test-asset BrowserTest* controllers + tests/routes.cfm
+        // keep /_browser working.
+        application.wo.set(loadBrowserTestFixtures = false)
+        // Drop class caches from the isolated app's onApplicationStart
+        // (and from any prior run). Same reason as the model-cache clear
+        // below: those instances were baked against the live paths.
+        // StructClear — do not call application.wo.$clearControllerInitializationCache()
+        // here: this closure is Adobe 2025 invariant 16b (zero-arg call
+        // through the application scope).
+        if (StructKeyExists(application.wheels, "controllers")) {
+            StructClear(application.wheels.controllers)
+        }
+        if (StructKeyExists(application.wheels, "existingObjectFiles")) {
+            StructClear(application.wheels.existingObjectFiles)
+        }
+        if (StructKeyExists(application.wheels, "nonExistingObjectFiles")) {
+            StructClear(application.wheels.nonExistingObjectFiles)
+        }
 
         /* set migration level for tests*/
         application.wheels.migrationLevel = 2;
@@ -166,143 +188,182 @@
         bundlesDiscovered = local.bundlesDiscovered
     )
 
-    variables.$_setTestboxEnv()
-    if (!structKeyExists(url, "format") || url.format eq "html") {
-        result = testBox.run(
-            reporter = "wheels.wheelstest.system.reports.JSONReporter"
-        );
-        DeJsonResult = DeserializeJSON(result);
-
-        if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
-            application.wo.$header(statuscode=417);
-        } else {
-            application.wo.$header(statuscode=200);
-        }
-    }
-    else if(url.format eq "json"){
-        result = testBox.run(
-            reporter = "wheels.wheelstest.system.reports.JSONReporter"
-        );
-        // `$header()` / `$content()` short-circuit when the servlet response is
-        // already committed (Adobe CF 2023/2025 commits mid-`testBox.run()` once
-        // any test output flushes the buffer). The status-code header is the
-        // signal the CI parser keys on, so best-effort is the right contract —
-        // a committed response keeps whatever statuscode the engine already
-        // wrote, and the JSON body still appends below.
-        application.wo.$content(type="application/json");
-        application.wo.$header(name="Access-Control-Allow-Origin", value="*");
-        DeJsonResult = DeserializeJSON(result);
-        if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
-            if(!structKeyExists(url, "cli") || !url.cli){
-                application.wo.$header(statuscode=417);
+    // ── Concurrency guard (issue #3025) + isolated app (issue #3374) ──
+    // The swap→run→restore window below mutates application.wheels
+    // ($_setTestboxEnv backs it up in application.$$$wheels and swaps
+    // in test config; the finally block swaps it back). When
+    // Application.cfc includes events/testcontext.cfm, test-runner
+    // requests bind `<this.name>_wheelsTest` — a separate CFML application
+    // scope — so this swap never touches the live app's application.wheels.
+    // Apps that have not applied that snippet still swap the live scope;
+    // the exclusive named lock below remains the fallback (precedent:
+    // migrator/TenantMigrator.cfc::$runForTenant).
+    //
+    // Two overlapping test requests used to clobber each other's backup,
+    // which could restore TEST config as the live config until the next
+    // reload=true. Serialize the whole window under an exclusive named lock.
+    //
+    // Re-entrancy: ParallelRunner partitions re-enter this template via
+    // fresh top-level HTTP GETs while the parent request holds the swap and
+    // the lock. Those sub-requests detect the already-applied swap
+    // (application.$$$wheels exists) and skip BOTH the swap and the shared
+    // lock — contending on the parent's lock would deadlock parallel mode.
+    // A unique per-request suffix turns their lock into a no-op.
+    local.runnerOwnsSwap = !StructKeyExists(application, "$$$wheels");
+    local.runnerLockSuffix = local.runnerOwnsSwap ? "" : "_sub_" & CreateUUID();
+    // Timeout must exceed the worst-case full-suite duration on the slowest
+    // engine; matches the requestTimeout at the top of this template.
+    lock name="wheelsTestRunner_#application.applicationName##local.runnerLockSuffix#" type="exclusive" timeout="1800" throwontimeout="true" {
+        try {
+            if (local.runnerOwnsSwap) {
+                variables.$_setTestboxEnv();
             }
-        } else {
-            application.wo.$header(statuscode=200);
-        }
-        // Check if 'only' parameter is provided in the URL
-        if (structKeyExists(url, "only") && url.only eq "failure,error") {
-            allBundles = DeJsonResult.bundleStats;
-            if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){
+            if (!structKeyExists(url, "format") || url.format eq "html") {
+                result = testBox.run(
+                    reporter = "wheels.wheelstest.system.reports.JSONReporter"
+                );
+                DeJsonResult = DeserializeJSON(result);
 
-                // Filter test results
-                filteredBundles = [];
+                if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
+                    application.wo.$header(statuscode=417);
+                } else {
+                    application.wo.$header(statuscode=200);
+                }
+            }
+            else if(url.format eq "json"){
+                result = testBox.run(
+                    reporter = "wheels.wheelstest.system.reports.JSONReporter"
+                );
+                // `$header()` / `$content()` short-circuit when the servlet response is
+                // already committed (Adobe CF 2023/2025 commits mid-`testBox.run()` once
+                // any test output flushes the buffer). The status-code header is the
+                // signal the CI parser keys on, so best-effort is the right contract —
+                // a committed response keeps whatever statuscode the engine already
+                // wrote, and the JSON body still appends below.
+                application.wo.$content(type="application/json");
+                application.wo.$header(name="Access-Control-Allow-Origin", value="*");
+                DeJsonResult = DeserializeJSON(result);
+                if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
+                    if(!structKeyExists(url, "cli") || !url.cli){
+                        application.wo.$header(statuscode=417);
+                    }
+                } else {
+                    application.wo.$header(statuscode=200);
+                }
+                // Check if 'only' parameter is provided in the URL
+                if (structKeyExists(url, "only") && url.only eq "failure,error") {
+                    allBundles = DeJsonResult.bundleStats;
+                    if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){
 
-                for (bundle in DeJsonResult.bundleStats) {
-                    if (bundle.totalError > 0 || bundle.totalFail > 0) {
-                        filteredSuites = [];
+                        // Filter test results
+                        filteredBundles = [];
 
-                        for (suite in bundle.suiteStats) {
-                            if (suite.totalError > 0 || suite.totalFail > 0) {
-                                filteredSpecs = [];
+                        for (bundle in DeJsonResult.bundleStats) {
+                            if (bundle.totalError > 0 || bundle.totalFail > 0) {
+                                filteredSuites = [];
 
-                                for (spec in suite.specStats) {
-                                    if (spec.status eq "Error" || spec.status eq "Failed") {
-                                        arrayAppend(filteredSpecs, spec);
+                                for (suite in bundle.suiteStats) {
+                                    if (suite.totalError > 0 || suite.totalFail > 0) {
+                                        filteredSpecs = [];
+
+                                        for (spec in suite.specStats) {
+                                            if (spec.status eq "Error" || spec.status eq "Failed") {
+                                                arrayAppend(filteredSpecs, spec);
+                                            }
+                                        }
+
+                                        if (arrayLen(filteredSpecs) > 0) {
+                                            suite.specStats = filteredSpecs;
+                                            arrayAppend(filteredSuites, suite);
+                                        }
                                     }
                                 }
 
-                                if (arrayLen(filteredSpecs) > 0) {
-                                    suite.specStats = filteredSpecs;
-                                    arrayAppend(filteredSuites, suite);
+                                if (arrayLen(filteredSuites) > 0) {
+                                    bundle.suiteStats = filteredSuites;
+                                    arrayAppend(filteredBundles, bundle);
                                 }
                             }
                         }
 
-                        if (arrayLen(filteredSuites) > 0) {
-                            bundle.suiteStats = filteredSuites;
-                            arrayAppend(filteredBundles, bundle);
+                        DeJsonResult.bundleStats = filteredBundles;
+                        // Update the result with filtered data
+
+                        // Build lookup of filtered bundles by name for safe access
+                        filteredBundleMap = {};
+                        for (fb in filteredBundles) {
+                            filteredBundleMap[fb.name] = fb;
                         }
-                    }
-                }
 
-                DeJsonResult.bundleStats = filteredBundles;
-                // Update the result with filtered data
-
-                // Build lookup of filtered bundles by name for safe access
-                filteredBundleMap = {};
-                for (fb in filteredBundles) {
-                    filteredBundleMap[fb.name] = fb;
-                }
-
-                for(bundle in allBundles){
-                    writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
-                    writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
-                    writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
-                    writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
-                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
-                    if(bundle.totalFail > 0 || bundle.totalError > 0){
-                        if (structKeyExists(filteredBundleMap, bundle.name)) {
-                            for(suite in filteredBundleMap[bundle.name].suiteStats){
-                                writeOutput("Suite with Error or Failure: #suite.name##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
-                                for(spec in suite.specStats){
-                                    writeOutput("       Spec Name: #spec.name##Chr(13)##Chr(10)#")
-                                    writeOutput("       Error Message: #spec.failMessage##Chr(13)##Chr(10)#")
-                                    writeOutput("       Error Detail: #spec.failDetail##Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                        for(bundle in allBundles){
+                            writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
+                            writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
+                            writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
+                            writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
+                            writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                            if(bundle.totalFail > 0 || bundle.totalError > 0){
+                                if (structKeyExists(filteredBundleMap, bundle.name)) {
+                                    for(suite in filteredBundleMap[bundle.name].suiteStats){
+                                        writeOutput("Suite with Error or Failure: #suite.name##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                                        for(spec in suite.specStats){
+                                            writeOutput("       Spec Name: #spec.name##Chr(13)##Chr(10)#")
+                                            writeOutput("       Error Message: #spec.failMessage##Chr(13)##Chr(10)#")
+                                            writeOutput("       Error Detail: #spec.failDetail##Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                                        }
+                                    }
                                 }
                             }
+                            writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                        }
+
+                    }else{
+                        for(bundle in DeJsonResult.bundleStats){
+                            writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
+                            writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
+                            writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
+                            writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
+                            writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
                         }
                     }
-                    writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
-                }
-
-            }else{
-                for(bundle in DeJsonResult.bundleStats){
-                    writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
-                    writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
-                    writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
-                    writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
-                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                }else{
+                    // Thread the resolved-scope facts (and any warnings) into the JSON
+                    // payload so a rejected directory or a 0-bundle discovery is
+                    // detectable instead of masquerading as a green run (issue #3083).
+                    writeOutput(local.scopeResolver.injectScopeMetadata(
+                        resultJson = result,
+                        scope = local.testScope,
+                        bundlesDiscovered = local.bundlesDiscovered,
+                        warnings = local.scopeWarnings
+                    ))
                 }
             }
-        }else{
-            // Thread the resolved-scope facts (and any warnings) into the JSON
-            // payload so a rejected directory or a 0-bundle discovery is
-            // detectable instead of masquerading as a green run (issue #3083).
-            writeOutput(local.scopeResolver.injectScopeMetadata(
-                resultJson = result,
-                scope = local.testScope,
-                bundlesDiscovered = local.bundlesDiscovered,
-                warnings = local.scopeWarnings
-            ))
+            else if (url.format eq "txt") {
+                result = testBox.run(
+                    reporter = "wheels.wheelstest.system.reports.TextReporter"
+                )
+                application.wo.$content(type="text/plain");
+                writeOutput(result)
+            }
+            else if(url.format eq "junit"){
+                result = testBox.run(
+                    reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter"
+                )
+                application.wo.$content(type="text/xml");
+                writeOutput(result)
+            }
+        } finally {
+            // Reset the original environment. Only the request that created
+            // the backup restores it — sub-requests never touch the live
+            // config — and the restore now also runs when the suite errors
+            // out (previously an exception left test config live until the
+            // next reload). No loops in this finally block (Lucee 7
+            // miscompiles local-scoped loops in finally — invariant 12).
+            if (local.runnerOwnsSwap && StructKeyExists(application, "$$$wheels")) {
+                application.wheels = application.$$$wheels;
+                structDelete(application, "$$$wheels");
+            }
         }
     }
-    else if (url.format eq "txt") {
-        result = testBox.run(
-            reporter = "wheels.wheelstest.system.reports.TextReporter"
-        )
-        application.wo.$content(type="text/plain");
-        writeOutput(result)
-    }
-    else if(url.format eq "junit"){
-        result = testBox.run(
-            reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter"
-        )
-        application.wo.$content(type="text/xml");
-        writeOutput(result)
-    }
-    // reset the original environment
-    application.wheels = application.$$$wheels
-    structDelete(application, "$$$wheels")
     if(!structKeyExists(url, "format") || url.format eq "html"){
         // Use our html template
         type = "Core";

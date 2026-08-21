@@ -47,9 +47,10 @@ component extends="wheels.WheelsTest" {
 				// (since #2903 the gate is a development-only allowlist), so
 				// the only thing we're testing is "did the receiver survive
 				// the dispatch?" If it didn't, the call throws before the
-				// include statement runs. (This spec invokes the ungated
-				// index() handler, so the production-only early-return below
-				// is belt-and-suspenders.)
+				// include statement runs. (This spec invokes index(), which now
+				// calls $blockInProduction() too (a development-only no-op per
+				// the allowlist), so the production-only early-return below is
+				// belt-and-suspenders.)
 				if (
 					StructKeyExists(application, "wheels")
 					&& StructKeyExists(application.wheels, "environment")

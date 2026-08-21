@@ -48,4 +48,4 @@ wheels generate migration create_wheels_jobs_table
 wheels migrate latest
 ```
 
-See [Background Jobs](https://wheels.dev/v4-0-0-snapshot/digging-deeper/) in the guides for retries, backoff, priority queues, and the monitoring dashboard.
+See [Background Jobs](https://guides.wheels.dev/v4-0-0/digging-deeper/background-jobs/) in the guides for retries, backoff, priority queues, and the monitoring dashboard.

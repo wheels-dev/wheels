@@ -134,10 +134,131 @@ component extends="wheels.WheelsTest" {
 				expect(base.supportsCfcache()).toBeTrue();
 			});
 
-			it("RustCFMLAdapter reports supportsCfcache false and isRustCFML true", function() {
-				var rustAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter("0.50.0");
-				expect(rustAdapter.supportsCfcache()).toBeFalse();
+			it("RustCFMLAdapter reports supportsCfcache true (cfcache implemented as of v0.417) and isRustCFML true", function() {
+				var rustAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter("0.417.0");
+				expect(rustAdapter.supportsCfcache()).toBeTrue();
 				expect(rustAdapter.isRustCFML()).toBeTrue();
+			});
+
+			it("supportsImageInfo returns true on the Base default and false on RustCFML", function() {
+				var base = new wheels.engineAdapters.Base("7.0.0");
+				expect(base.supportsImageInfo()).toBeTrue();
+				var rustAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter("0.417.0");
+				expect(rustAdapter.supportsImageInfo()).toBeFalse();
+			});
+
+			it("RustCFMLAdapter imageInfo returns the Base struct shape with zero dimensions", function() {
+				var rustAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter("0.417.0");
+				var info = rustAdapter.imageInfo(source = "/path/to/missing.png");
+				expect(info).toBeStruct();
+				expect(info.width).toBe(0);
+				expect(info.height).toBe(0);
+				expect(info.source).toBe("/path/to/missing.png");
+			});
+
+			it("getCapabilities aggregates capability probes as plain cached data", function() {
+				var base = new wheels.engineAdapters.Base("7.0.0");
+				var caps = base.getCapabilities();
+				expect(caps).toBeStruct();
+				expect(caps.cfcache).toBeTrue();
+				expect(caps.imageInfo).toBeTrue();
+				// Plain data only — application scope must never receive function members (Adobe CF).
+				for (var key in caps) {
+					expect(IsBoolean(caps[key])).toBeTrue("capability '#key#' should be a plain boolean");
+				}
+				// Lazily computed once, then cached.
+				expect(base.getCapabilities()).toBe(caps);
+			});
+
+			it("getCapabilities reflects subclass capability overrides", function() {
+				var rustAdapter = new wheels.engineAdapters.RustCFML.RustCFMLAdapter("0.417.0");
+				var caps = rustAdapter.getCapabilities();
+				expect(caps.cfcache).toBeTrue();
+				expect(caps.imageInfo).toBeFalse();
+			});
+
+			it("the live adapter exposes getCapabilities", function() {
+				var caps = application.wheels.engineAdapter.getCapabilities();
+				expect(caps).toBeStruct();
+				expect(StructKeyExists(caps, "cfcache")).toBeTrue();
+				expect(StructKeyExists(caps, "imageInfo")).toBeTrue();
+			});
+
+		});
+
+		describe("Engine Adapter - Detection Ladder", function() {
+
+			it("resolves RustCFML when the server scope carries BOTH a lucee struct and the RustCFML product marker", function() {
+				// RustCFML impersonates Lucee via a server.lucee struct, so the
+				// productName marker must win over the lucee-struct branch or the
+				// dedicated RustCFML adapter is dead code.
+				var events = CreateObject("component", "wheels.events.onapplicationstart");
+				var fakeServer = {
+					lucee: {version: "7.0.0.243", versionName: "RustCFML"},
+					coldfusion: {productName: "RustCFML", productVersion: "0.417.0"},
+					java: {vendor: "RustCFML (no JVM)"}
+				};
+				var detected = events.$detectEngine(serverScope = fakeServer);
+				expect(detected.serverName).toBe("RustCFML");
+				expect(detected.serverVersion).toBe("0.417.0");
+			});
+
+			it("resolves RustCFML under reportAsLucee impersonation (v0.507+) via the versionName marker", function() {
+				// As of RustCFML v0.507.0 reportAsLucee defaults to true:
+				// productName reports "Lucee" with Lucee's productVersion, and
+				// the real engine version hides behind a Lucee-major prefix in
+				// server.lucee.version. The stable identity marker upstream
+				// documents (and keys its own isRustCFML() on) is
+				// server.lucee.versionName == "RustCFML".
+				var events = CreateObject("component", "wheels.events.onapplicationstart");
+				var fakeServer = {
+					lucee: {version: "7.0.519.0", versionName: "RustCFML"},
+					coldfusion: {productName: "Lucee", productVersion: "2016,0,03,300357"},
+					java: {vendor: "RustCFML (no JVM)"}
+				};
+				var detected = events.$detectEngine(serverScope = fakeServer);
+				expect(detected.serverName).toBe("RustCFML");
+				expect(detected.serverVersion).toBe("0.519.0");
+			});
+
+			it("resolves Lucee when server.lucee exists without the RustCFML product marker", function() {
+				var events = CreateObject("component", "wheels.events.onapplicationstart");
+				var fakeServer = {
+					lucee: {version: "6.2.0.321", versionName: "Gelert"},
+					coldfusion: {productName: "Lucee", productVersion: "6.2.0.321"}
+				};
+				var detected = events.$detectEngine(serverScope = fakeServer);
+				expect(detected.serverName).toBe("Lucee");
+				expect(detected.serverVersion).toBe("6.2.0.321");
+			});
+
+			it("resolves BoxLang before every other branch", function() {
+				var events = CreateObject("component", "wheels.events.onapplicationstart");
+				var fakeServer = {
+					boxlang: {version: "1.3.0"},
+					lucee: {version: "7.0.0"},
+					coldfusion: {productName: "BoxLang", productVersion: "1.3.0"}
+				};
+				var detected = events.$detectEngine(serverScope = fakeServer);
+				expect(detected.serverName).toBe("BoxLang");
+				expect(detected.serverVersion).toBe("1.3.0");
+			});
+
+			it("falls back to Adobe ColdFusion when no other marker matches", function() {
+				var events = CreateObject("component", "wheels.events.onapplicationstart");
+				var fakeServer = {
+					coldfusion: {productName: "ColdFusion Server", productVersion: "2023,0,0,330468"}
+				};
+				var detected = events.$detectEngine(serverScope = fakeServer);
+				expect(detected.serverName).toBe("Adobe ColdFusion");
+				expect(detected.serverVersion).toBe("2023,0,0,330468");
+			});
+
+			it("matches the live application's detected engine when run over the real server scope", function() {
+				var events = CreateObject("component", "wheels.events.onapplicationstart");
+				var detected = events.$detectEngine(serverScope = server);
+				expect(detected.serverName).toBe(application.wheels.serverName);
+				expect(detected.serverVersion).toBe(application.wheels.serverVersion);
 			});
 
 		});

@@ -2,7 +2,11 @@ component output="false" {
 
 	// Put variables we just need internally inside a wheels struct.
 	this.wheels = {};
-	this.wheels.rootPath = GetDirectoryFromPath(GetBaseTemplatePath());
+	// Anchor to this file's directory, not the requested base template's, so
+	// rootPath stays stable when a request bootstraps under a subfolder (e.g.
+	// the test runner) — Hash(rootPath) below seeds this.name, and an unstable
+	// value splits one app across two application scopes (issue #3025/#2887).
+	this.wheels.rootPath = GetDirectoryFromPath(GetCurrentTemplatePath());
 
 	this.name = createUUID();
 	// Give this application a unique name by taking the path to the root and hashing it.
@@ -105,6 +109,13 @@ component output="false" {
 	// config/app.cfm can reference this.env safely (issue #2325).
 	include "../config/app.cfm";
 
+	// Issue #3374: bind test-runner / TestClient / browser requests to a
+	// separate CFML application name so the live application.wheels is never
+	// swapped. No-op when vendor/wheels is absent (examples without a vendor tree).
+	if (FileExists(GetDirectoryFromPath(GetCurrentTemplatePath()) & "../vendor/wheels/events/testcontext.cfm")) {
+		include "../vendor/wheels/events/testcontext.cfm";
+	}
+
 	function onApplicationStart() {
 		application.env = duplicate(this.env);
 
@@ -152,10 +163,26 @@ component output="false" {
 			}
 		}
 
-		application.wo.$include(
-			template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
-			argumentCollection = arguments
-		);
+		// Run the framework's onApplicationEnd event through the Wheels global.
+		// During applicationStop() teardown on Adobe CF 2023 the LIVE `application`
+		// scope is unreliable — bare `application.wo` can resolve against a
+		// stale/torn-down scope and land on a Java String[], throwing "Element wo
+		// is undefined in a Java object of type class [Ljava.lang.String;" and
+		// erroring the whole site until a CF service restart (issue #3379). The
+		// passed-in arguments.applicationScope is the only dependable reference at
+		// shutdown (it is what the $wheelsBrowserLauncher cleanup above uses), so
+		// route the call through it and guard so a partially reclaimed scope
+		// degrades to a no-op instead of a hard error.
+		if (
+			StructKeyExists(arguments.applicationScope, "wo")
+			&& StructKeyExists(arguments.applicationScope, "wheels")
+			&& StructKeyExists(arguments.applicationScope.wheels, "eventPath")
+		) {
+			arguments.applicationScope.wo.$include(
+				template = "#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+				argumentCollection = arguments
+			);
+		}
 	}
 
 	public void function onSessionStart() {
@@ -327,6 +354,25 @@ component output="false" {
 					// Fail silently if logging fails
 				}
 			}
+			// Record WHY a requested reload did not fire so the framework's debug
+			// bar can render a development-only notice instead of a silent no-op
+			// (issue #3311). Recording is environment-agnostic — a request-scope
+			// flag, no output; the message text and the development-environment
+			// gate live framework-side in vendor/wheels/events/onrequestend/debug.cfm
+			// so wording can improve without template drift. Wrong-password and
+			// rate-limited attempts deliberately collapse into one generic reason
+			// so the notice adds no oracle on top of $secureCompare().
+			if (!local.reloadAuthorized && StructKeyExists(request, "wheels")) {
+				local.reloadPasswordConfigured = StructKeyExists(application.wheels, "reloadPassword")
+					&& Len(application.wheels.reloadPassword);
+				if (!local.reloadPasswordConfigured) {
+					request.wheels.reloadRefusedReason = "emptyPassword";
+				} else if (!StructKeyExists(url, "password")) {
+					request.wheels.reloadRefusedReason = "missingPasswordParam";
+				} else {
+					request.wheels.reloadRefusedReason = "refused";
+				}
+			}
 		}
 		if (local.reloadAuthorized) {
 			application.wo.$debugPoint("total,reload");
@@ -390,7 +436,7 @@ component output="false" {
 			&& StructKeyExists(application.wo, "$restoreTestRunnerApplicationScope")
 		) {
 			application.wo.$restoreTestRunnerApplicationScope();
-			application.wo.$include(template = "../../#application.wheels.eventPath#/onabort.cfm");
+			application.wo.$include(template = "#application.wheels.eventPath#/onabort.cfm");
 		}
 		return true;
 	}

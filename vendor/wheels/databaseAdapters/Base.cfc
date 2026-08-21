@@ -164,15 +164,23 @@ component output=false extends="wheels.Global"{
 		local.columnList = "";
 		if (local.startPar > 1 && local.endPar > local.startPar) {
 			local.rawColumns = Mid(arguments.sql, local.startPar, (local.endPar - local.startPar));
-			if ($isBoxLangEngine()) {
-				// BoxLang's ReplaceList behaves differently — use regex to parse the column names.
-				local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
-				local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
-				local.columnList = Trim(local.columnList);
-			} else {
-				// Original Lucee / Adobe CF behavior.
-				local.columnList = ReplaceList(local.rawColumns, "#Chr(10)#,#Chr(13)#, ", ",,");
-			}
+			// One implementation for every engine. This used to fork on
+			// $isBoxLangEngine(), with the ReplaceList form kept for Lucee/Adobe —
+			// but BoxLang's ReplaceList drops the comma delimiters themselves, so
+			// "id,name,age" came back as "idnameage" on any code path that reached
+			// that branch on BoxLang. BaseProbe hard-codes $isBoxLangEngine() to
+			// false, so the unit spec drove exactly that branch on the boxlang legs
+			// and failed on all five databases (#3302) while the sibling spec — which
+			// sets boxlangMode=true — passed. Collapsing the fork removes both the
+			// engine-dependent behaviour and the test-double trap.
+			//
+			// The regex form is also the more correct of the two: ReplaceList
+			// stripped every space, mangling quoted identifiers that legitimately
+			// contain one (e.g. `[order date]`), whereas \s*,\s* only collapses
+			// whitespace adjacent to the delimiters.
+			local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
+			local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
+			local.columnList = Trim(local.columnList);
 		}
 		// Strip identifier quotes from the column list for comparison.
 		return $stripIdentifierQuotes(local.columnList);

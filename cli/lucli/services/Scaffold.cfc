@@ -11,11 +11,16 @@ component {
 	public function init(
 		required any codeGenService,
 		required any helpers,
-		required string projectRoot
+		required string projectRoot,
+		string moduleRoot = ""
 	) {
 		variables.codeGenService = arguments.codeGenService;
 		variables.helpers = arguments.helpers;
 		variables.projectRoot = arguments.projectRoot;
+		// Optional: only needed by generators that read bundled template
+		// directories directly (generateAuth). Ends with a trailing slash
+		// when provided (same convention as the Admin service).
+		variables.moduleRoot = arguments.moduleRoot;
 		return this;
 	}
 
@@ -614,7 +619,472 @@ component {
 		return {success: true, path: filePath, message: "Generated API controller test"};
 	}
 
+	/**
+	 * Generate a complete authentication scaffold over the wheels.auth
+	 * primitives (issue ##3155): User model with PBKDF2 password hashing,
+	 * sessions/passwords/registrations controllers + views (session
+	 * strategy), or an api/Sessions controller (token/jwt strategies),
+	 * a create-table migration, marked route/service/strategy blocks
+	 * injected into config + app events, and generated app specs.
+	 *
+	 * Generated code is code-you-own: every file carries a stamped header
+	 * and re-running with force=true regenerates it (marker blocks are
+	 * replaced in place, never duplicated).
+	 */
+	public struct function generateAuth(
+		string model = "User",
+		string strategy = "session",
+		boolean registration = true,
+		boolean force = false,
+		string cliVersion = ""
+	) {
+		var results = {success: true, generated: [], skipped: [], errors: [], rollback: []};
+		var nl = chr(10);
+		var t = chr(9);
+
+		var strategyName = lCase(trim(arguments.strategy));
+		if (!listFindNoCase("session,token,jwt", strategyName)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown auth strategy: #arguments.strategy#. Valid strategies: session, token, jwt."
+			);
+		}
+		if (!len(variables.moduleRoot)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "The Scaffold service needs a moduleRoot to locate the auth templates."
+			);
+		}
+
+		var modelName = variables.helpers.capitalize(trim(arguments.model));
+		var modelVar = lCase(left(modelName, 1)) & (len(modelName) > 1 ? mid(modelName, 2, len(modelName)) : "");
+		var tableName = lCase(variables.helpers.pluralize(modelName));
+		var isApi = strategyName != "session";
+		var withRegistration = arguments.registration && !isApi;
+
+		var ctx = {
+			modelName: modelName,
+			modelVar: modelVar,
+			tableName: tableName,
+			strategy: strategyName,
+			cliVersion: len(arguments.cliVersion) ? arguments.cliVersion : "dev",
+			generatedDate: dateFormat(now(), "yyyy-mm-dd")
+		};
+		ctx.protectedApiToken = strategyName == "token" ? ",apiTokenDigest" : "";
+		ctx.apiTokenMethods = strategyName == "token" ? $renderAuthTemplate("api-token-methods", ctx) : "";
+		ctx.apiTokenColumn = strategyName == "token"
+			? t & t & t & t & 't.string(columnNames="apiTokenDigest", allowNull=true, limit=64);' & nl
+			: "";
+		// Emits `#linkTo(...)#` into the login view (## collapses to # in this
+		// CFC's string literal; the .txt templates are raw and keep single #).
+		ctx.registrationLink = withRegistration
+			? '<br>##linkTo(route="register", text="Create an account")##'
+			: "";
+
+		try {
+			// 1. Model
+			$writeAuthFile(
+				relPath = "app/models/#modelName#.cfc",
+				content = $renderAuthTemplate("model", ctx),
+				force = arguments.force,
+				results = results,
+				label = "model"
+			);
+
+			// 2. Migration. Never overwritten (even with force) — rewriting an
+			// already-applied migration would desync the tracking table.
+			if (!migrationAlreadyExists(modelName)) {
+				var migrationDir = variables.projectRoot & "/app/migrator/migrations";
+				if (!directoryExists(migrationDir)) {
+					directoryCreate(migrationDir, true);
+				}
+				var migrationPath = migrationDir & "/" & variables.helpers.generateMigrationTimestamp()
+					& "_create_" & tableName & "_table.cfc";
+				fileWrite(migrationPath, $renderAuthTemplate("migration", ctx));
+				arrayAppend(results.generated, {type: "migration", path: migrationPath});
+				arrayAppend(results.rollback, migrationPath);
+			} else {
+				arrayAppend(results.skipped, "migration: create_#tableName#_table already exists (never overwritten — edit it directly)");
+			}
+
+			// 3. Controllers + views + specs per strategy
+			if (isApi) {
+				$writeAuthFile(
+					relPath = "app/controllers/api/Sessions.cfc",
+					content = $renderAuthTemplate("controller-api-sessions-#strategyName#", ctx),
+					force = arguments.force,
+					results = results,
+					label = "controller"
+				);
+				$writeAuthFile(
+					relPath = "tests/specs/controllers/ApiSessionsControllerSpec.cfc",
+					content = $renderAuthTemplate("spec-api-sessions", ctx),
+					force = arguments.force,
+					results = results,
+					label = "test"
+				);
+				arrayAppend(results.skipped, "registration: not applicable to the #strategyName# strategy (no browser sign-up flow)");
+			} else {
+				$writeAuthFile(
+					relPath = "app/controllers/Sessions.cfc",
+					content = $renderAuthTemplate("controller-sessions", ctx),
+					force = arguments.force,
+					results = results,
+					label = "controller"
+				);
+				$writeAuthFile(
+					relPath = "app/controllers/Passwords.cfc",
+					content = $renderAuthTemplate("controller-passwords", ctx),
+					force = arguments.force,
+					results = results,
+					label = "controller"
+				);
+				$writeAuthFile(
+					relPath = "app/views/sessions/new.cfm",
+					content = $renderAuthTemplate("view-sessions-new", ctx),
+					force = arguments.force,
+					results = results,
+					label = "view"
+				);
+				$writeAuthFile(
+					relPath = "app/views/passwords/new.cfm",
+					content = $renderAuthTemplate("view-passwords-new", ctx),
+					force = arguments.force,
+					results = results,
+					label = "view"
+				);
+				$writeAuthFile(
+					relPath = "app/views/passwords/edit.cfm",
+					content = $renderAuthTemplate("view-passwords-edit", ctx),
+					force = arguments.force,
+					results = results,
+					label = "view"
+				);
+				if (withRegistration) {
+					$writeAuthFile(
+						relPath = "app/controllers/Registrations.cfc",
+						content = $renderAuthTemplate("controller-registrations", ctx),
+						force = arguments.force,
+						results = results,
+						label = "controller"
+					);
+					$writeAuthFile(
+						relPath = "app/views/registrations/new.cfm",
+						content = $renderAuthTemplate("view-registrations-new", ctx),
+						force = arguments.force,
+						results = results,
+						label = "view"
+					);
+				}
+				$writeAuthFile(
+					relPath = "tests/specs/controllers/SessionsControllerSpec.cfc",
+					content = $renderAuthTemplate("spec-sessions-controller", ctx),
+					force = arguments.force,
+					results = results,
+					label = "test"
+				);
+			}
+
+			// Model spec (all strategies)
+			$writeAuthFile(
+				relPath = "tests/specs/models/#modelName#AuthSpec.cfc",
+				content = $renderAuthTemplate("spec-model", ctx),
+				force = arguments.force,
+				results = results,
+				label = "test"
+			);
+
+			// 4. Routes — marked block, replaced in place on --force.
+			var routesBlock = "";
+			if (isApi) {
+				routesBlock = $renderAuthTemplate("routes-api", ctx);
+			} else {
+				ctx.registrationRoutes = withRegistration ? $renderAuthTemplate("routes-registration", ctx) : "";
+				routesBlock = $renderAuthTemplate("routes-session", ctx);
+			}
+			$injectAuthBlock(
+				relPath = "config/routes.cfm",
+				block = routesBlock,
+				beginMarker = "// wheels:generate-auth:routes:begin",
+				endMarker = "// wheels:generate-auth:routes:end",
+				force = arguments.force,
+				results = results,
+				anchorMode = "routes",
+				label = "routes"
+			);
+
+			// 5. Service registrations — config/services.cfm (created if absent).
+			$injectAuthBlock(
+				relPath = "config/services.cfm",
+				block = $renderAuthTemplate(isApi ? "services-api" : "services-session", ctx),
+				beginMarker = "// wheels:generate-auth:services:begin",
+				endMarker = "// wheels:generate-auth:services:end",
+				force = arguments.force,
+				results = results,
+				anchorMode = "cfscript",
+				label = "services"
+			);
+
+			// 6. Strategy wiring — app/events/onapplicationstart.cfm (the DI
+			// container isn't available yet in config/app.cfm; see the auth
+			// chapter in the guides).
+			$injectAuthBlock(
+				relPath = "app/events/onapplicationstart.cfm",
+				block = $renderAuthTemplate("bootstrap-#strategyName#", ctx),
+				beginMarker = "// wheels:generate-auth:strategy:begin",
+				endMarker = "// wheels:generate-auth:strategy:end",
+				force = arguments.force,
+				results = results,
+				anchorMode = "cfscript",
+				label = "strategy"
+			);
+		} catch (any e) {
+			results.success = false;
+			arrayAppend(results.errors, e.message);
+			// Roll back on ANY failure, not just typed ScaffoldErrors — an IO
+			// error mid-run must not leave a half-generated scaffold behind.
+			// The rollback list only ever contains files THIS run created, so
+			// pre-existing user files are never deleted.
+			rollbackScaffold(results.rollback);
+		}
+
+		return results;
+	}
+
 	// ── Private helpers ──────────────────────────────
+
+	/**
+	 * Read and render a template from cli/lucli/templates/auth/.
+	 * Simple {{key}} replacement — values are inserted verbatim.
+	 */
+	private string function $renderAuthTemplate(required string template, required struct context) {
+		var path = variables.moduleRoot & "templates/auth/" & arguments.template & ".txt";
+		if (!fileExists(path)) {
+			throw(type = "ScaffoldError", message = "Auth template not found: #path#");
+		}
+		var content = fileRead(path);
+		for (var key in arguments.context) {
+			if (isSimpleValue(arguments.context[key])) {
+				content = replaceNoCase(content, "{{" & key & "}}", arguments.context[key], "all");
+			}
+		}
+		return content;
+	}
+
+	/**
+	 * Write a generated auth file. Existing files are skipped unless force
+	 * is set; only newly created files are registered for rollback so a
+	 * failed run never deletes a user's pre-existing file.
+	 */
+	private boolean function $writeAuthFile(
+		required string relPath,
+		required string content,
+		required boolean force,
+		required struct results,
+		required string label
+	) {
+		var absPath = variables.projectRoot & "/" & arguments.relPath;
+		var existed = fileExists(absPath);
+		if (existed && !arguments.force) {
+			arrayAppend(arguments.results.skipped, "#arguments.label#: #arguments.relPath# already exists (use --force to overwrite)");
+			return false;
+		}
+		var dir = getDirectoryFromPath(absPath);
+		if (!directoryExists(dir)) {
+			directoryCreate(dir, true);
+		}
+		fileWrite(absPath, arguments.content);
+		arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
+		if (!existed) {
+			arrayAppend(arguments.results.rollback, absPath);
+		}
+		return true;
+	}
+
+	/**
+	 * Inject (or, with force, replace in place) a marker-delimited block into
+	 * a config file. anchorMode "routes" inserts inside the mapper() chain —
+	 * at // CLI-Appends-Here, else before .root(), else before the last
+	 * .end() — so the auth routes always precede root/wildcard. anchorMode
+	 * "cfscript" inserts before the file's closing cfscript end tag
+	 * (creating the file with a cfscript wrapper when absent). Tag tokens
+	 * are chr(60)-concatenated below — a literal tag in a string or
+	 * comment trips Lucee's tag scanner and crashes the whole bundle.
+	 */
+	private void function $injectAuthBlock(
+		required string relPath,
+		required string block,
+		required string beginMarker,
+		required string endMarker,
+		required boolean force,
+		required struct results,
+		required string anchorMode,
+		required string label
+	) {
+		var nl = chr(10);
+		var t = chr(9);
+		var scriptOpenTag = chr(60) & "cfscript" & chr(62);
+		var scriptCloseTag = chr(60) & "/cfscript" & chr(62);
+		var absPath = variables.projectRoot & "/" & arguments.relPath;
+		var blockText = reReplace(arguments.block, "[\r\n]+$", "");
+
+		if (!fileExists(absPath)) {
+			if (arguments.anchorMode == "cfscript") {
+				var dir = getDirectoryFromPath(absPath);
+				if (!directoryExists(dir)) {
+					directoryCreate(dir, true);
+				}
+				fileWrite(absPath, scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl);
+				arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
+				arrayAppend(arguments.results.rollback, absPath);
+				return;
+			}
+			arrayAppend(
+				arguments.results.skipped,
+				"#arguments.label#: #arguments.relPath# not found — add this block manually inside the mapper() chain, before .root()/.wildcard():" & nl & blockText
+			);
+			return;
+		}
+
+		var content = fileRead(absPath);
+		var beginPos = find(arguments.beginMarker, content);
+
+		// Replace an existing block in place (idempotent under --force).
+		if (beginPos > 0) {
+			if (!arguments.force) {
+				arrayAppend(arguments.results.skipped, "#arguments.label#: block already present in #arguments.relPath# (use --force to regenerate)");
+				return;
+			}
+			var endPos = find(arguments.endMarker, content, beginPos);
+			if (endPos == 0) {
+				arrayAppend(arguments.results.skipped, "#arguments.label#: begin marker without matching end marker in #arguments.relPath# — fix the file manually");
+				return;
+			}
+			var regionStart = $lineStart(content, beginPos);
+			var regionEnd = $lineEnd(content, endPos + len(arguments.endMarker) - 1);
+			var indent = $lineIndent(content, beginPos);
+			content = left(content, regionStart - 1)
+				& $indentBlock(blockText, indent) & nl
+				& mid(content, regionEnd + 1, len(content));
+			fileWrite(absPath, content);
+			arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
+			return;
+		}
+
+		// First-time insertion.
+		if (arguments.anchorMode == "routes") {
+			var anchorPos = find("// CLI-Appends-Here", content);
+			if (anchorPos == 0) {
+				// Skip commented-out `.root(` lines (anti-pattern ##14) — the
+				// stock routes.cfm ships a commented example above the real one.
+				anchorPos = $findCodePosition(content, ".root(");
+			}
+			// Deliberately NO `.end()` fallback: the last `.end()` closes the
+			// mapper chain AFTER `.wildcard()`, so routes inserted there could
+			// never match (anti-pattern ##6). When neither anchor exists, make
+			// the user place the block instead of injecting dead routes.
+			if (anchorPos == 0) {
+				arrayAppend(
+					arguments.results.skipped,
+					"#arguments.label#: could not find an insertion anchor (// CLI-Appends-Here or an uncommented .root()) in #arguments.relPath# — add this block manually inside the mapper() chain, before .root()/.wildcard():" & nl & blockText
+				);
+				return;
+			}
+			var insertLineStart = $lineStart(content, anchorPos);
+			var anchorIndent = $lineIndent(content, anchorPos);
+			content = left(content, insertLineStart - 1)
+				& $indentBlock(blockText, anchorIndent) & nl
+				& mid(content, insertLineStart, len(content));
+			fileWrite(absPath, content);
+			arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
+			return;
+		}
+
+		// cfscript mode: insert before the last closing tag, else append a block.
+		var closePos = content.lastIndexOf(scriptCloseTag);
+		if (closePos >= 0) {
+			content = left(content, closePos)
+				& nl & $indentBlock(blockText, t) & nl
+				& mid(content, closePos + 1, len(content));
+		} else {
+			content = content & nl & scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl;
+		}
+		fileWrite(absPath, content);
+		arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
+	}
+
+	/**
+	 * Position of the first occurrence of needle that is NOT on a
+	 * line-comment (`// ...`) portion of its line. Returns 0 when only
+	 * commented occurrences exist.
+	 */
+	private numeric function $findCodePosition(required string content, required string needle) {
+		var pos = find(arguments.needle, arguments.content);
+		while (pos > 0) {
+			var lineStartPos = $lineStart(arguments.content, pos);
+			var linePrefix = mid(arguments.content, lineStartPos, pos - lineStartPos);
+			if (!find("//", linePrefix)) {
+				return pos;
+			}
+			pos = find(arguments.needle, arguments.content, pos + 1);
+		}
+		return 0;
+	}
+
+	/**
+	 * 1-based index of the first character of the line containing pos.
+	 */
+	private numeric function $lineStart(required string content, required numeric pos) {
+		var i = arguments.pos;
+		while (i > 1 && mid(arguments.content, i - 1, 1) != chr(10)) {
+			i--;
+		}
+		return i;
+	}
+
+	/**
+	 * 1-based index of the newline terminating the line containing pos
+	 * (or of the last character when the file ends without one).
+	 */
+	private numeric function $lineEnd(required string content, required numeric pos) {
+		var i = arguments.pos;
+		var total = len(arguments.content);
+		while (i <= total && mid(arguments.content, i, 1) != chr(10)) {
+			i++;
+		}
+		return i > total ? total : i;
+	}
+
+	/**
+	 * Leading whitespace of the line containing pos.
+	 */
+	private string function $lineIndent(required string content, required numeric pos) {
+		var i = $lineStart(arguments.content, arguments.pos);
+		var total = len(arguments.content);
+		var indent = "";
+		while (i <= total) {
+			var ch = mid(arguments.content, i, 1);
+			if (ch == chr(9) || ch == " ") {
+				indent &= ch;
+				i++;
+			} else {
+				break;
+			}
+		}
+		return indent;
+	}
+
+	/**
+	 * Prefix every non-empty line of a block with the given indentation.
+	 */
+	private string function $indentBlock(required string block, required string indent) {
+		var lines = listToArray(replace(arguments.block, chr(13), "", "all"), chr(10), true);
+		var indented = [];
+		for (var line in lines) {
+			arrayAppend(indented, len(trim(line)) ? arguments.indent & line : line);
+		}
+		return arrayToList(indented, chr(10));
+	}
 
 	/**
 	 * Detect the indentation used before a given position in content

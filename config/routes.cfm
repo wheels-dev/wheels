@@ -1,7 +1,7 @@
 <cfscript>
 // Use this file to add routes to your application and point the root route to a controller action.
 // Don't forget to issue a reload request (e.g. reload=true) after making changes.
-// See https://wheels.dev/3.1.0/guides/handling-requests-with-controllers/routing for more info.
+// See https://guides.wheels.dev/v4-0-0/basics/routing/ for more info.
 
 mapper()
 	// CLI-Appends-Here

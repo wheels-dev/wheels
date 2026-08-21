@@ -1079,8 +1079,8 @@ component {
 			specStats.failMessage      = e.message;
 			specStats.error            = e;
 			specStats.failDetail       = e.detail;
-			specStats.failExtendedInfo = e.extendedInfo;
-			specStats.failStacktrace   = e.stackTrace;
+			specStats.failExtendedInfo = ( e.extendedInfo ?: "" );
+			specStats.failStacktrace   = ( e.stackTrace ?: "" );
 			specStats.failOrigin       = e.tagContext;
 			specStats.debugBuffer      = duplicate( this.$debugBuffer );
 
@@ -1109,8 +1109,8 @@ component {
 			specStats.failOrigin       = e.tagContext;
 			specStats.failMessage      = e.message;
 			specStats.failDetail       = e.detail;
-			specStats.failExtendedInfo = e.extendedInfo;
-			specStats.failStacktrace   = e.stackTrace;
+			specStats.failExtendedInfo = ( e.extendedInfo ?: "" );
+			specStats.failStacktrace   = ( e.stackTrace ?: "" );
 			specStats.debugBuffer      = duplicate( this.$debugBuffer );
 
 			// Increment recursive pass stats
@@ -1435,8 +1435,8 @@ component {
 			specStats.status           = "Failed";
 			specStats.failMessage      = e.message;
 			specStats.error            = e;
-			specStats.failExtendedInfo = e.extendedInfo;
-			specStats.failStacktrace   = e.stackTrace;
+			specStats.failExtendedInfo = ( e.extendedInfo ?: "" );
+			specStats.failStacktrace   = ( e.stackTrace ?: "" );
 			specStats.failOrigin       = e.tagContext;
 			specStats.debugBuffer      = duplicate( this.$debugBuffer );
 

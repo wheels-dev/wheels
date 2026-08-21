@@ -759,7 +759,18 @@ component output="false" displayName="Test" extends="wheels.Global"{
 						if(arrayLen(local.args) == 2){
 							return invoke(variables, local.functionName[1], variables[local.args[2]]);
 						} else {
-							// Use the Evaluate function to run Built-in functions
+							// Built-in functions. No portable call exists here:
+							// BoxLang has no Evaluate() BIF at all (verified absent
+							// on 1.11.0 — "The method Evaluate does not exist"), and
+							// getBoxRuntime() exists only on BoxLang. executeStatement()
+							// is the faithful equivalent — like Evaluate it takes the
+							// whole expression string, so neither branch has to
+							// re-parse the argument list. Function calls resolve at
+							// runtime, so the BoxLang-only name never has to compile
+							// on Lucee or Adobe (#3302).
+							if (StructKeyExists(server, "boxlang")) {
+								return getBoxRuntime().executeStatement(arguments.expression);
+							}
 							return Evaluate(arguments.expression);
 						}
 					}

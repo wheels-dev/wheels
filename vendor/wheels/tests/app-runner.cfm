@@ -114,48 +114,55 @@
             bundlesDiscovered = local.bundlesDiscovered
         );
 
-        if (!StructKeyExists(url, "format") || url.format == "html") {
-            result = testBox.run(reporter = "wheels.wheelstest.system.reports.JSONReporter");
-            decoded = DeserializeJSON(result);
-            cfheader(statuscode = (decoded.totalFail > 0 || decoded.totalError > 0) ? 417 : 200);
-            // For the html case the framework runner falls through to html.cfm;
-            // for the app-runner we just emit the JSON in this branch too since
-            // app tests are typically requested over JSON (CLI/CI). Users hitting
-            // the URL in a browser still get a structured response they can read.
-            cfcontent(type="application/json");
-            writeOutput(local.dirResolver.injectScopeMetadata(
-                resultJson = result,
-                scope = local.testScope,
-                bundlesDiscovered = local.bundlesDiscovered,
-                warnings = local.scopeWarnings
-            ));
-        } else if (url.format == "json") {
-            result = testBox.run(reporter = "wheels.wheelstest.system.reports.JSONReporter");
-            decoded = DeserializeJSON(result);
-            if (decoded.totalFail > 0 || decoded.totalError > 0) {
-                if (!StructKeyExists(url, "cli") || !url.cli) {
-                    cfheader(statuscode = 417);
+        // Resolve the output format (reporter + content type + whether to
+        // render an HTML report) through TestFormatResolver so the rule is
+        // unit-testable without an HTTP request (see AppRunnerTestFormatSpec,
+        // issue #3251). An unrecognized format resolves to recognized=false:
+        // the runner emits nothing, preserving the historical behavior.
+        local.fmtResolver = new wheels.tests._assets.dispatch.TestFormatResolver();
+        local.output = local.fmtResolver.resolveFormat(url);
+
+        if (local.output.recognized) {
+            result = testBox.run(reporter = local.output.reporter);
+
+            if (local.output.rendersHtml) {
+                // Render the TestBox-style HTML report for the html / no-format
+                // default, mirroring the core runner (vendor/wheels/tests/runner.cfm).
+                // html.cfm has a type="App" branch (package=tests.specs,
+                // route=testbox) built for exactly this. Previously this branch
+                // emitted raw JSON, so a user opening /wheels/app/tests?format=html
+                // in a browser got JSON instead of the report (issue #3251 item 1).
+                decoded = DeserializeJSON(result);
+                cfheader(statuscode = (decoded.totalFail > 0 || decoded.totalError > 0) ? 417 : 200);
+                type = "App";
+                include "html.cfm";
+            } else if (local.output.format == "json") {
+                decoded = DeserializeJSON(result);
+                if (decoded.totalFail > 0 || decoded.totalError > 0) {
+                    if (!StructKeyExists(url, "cli") || !url.cli) {
+                        cfheader(statuscode = 417);
+                    }
+                } else {
+                    cfheader(statuscode = 200);
                 }
+                cfcontent(type = local.output.contentType);
+                cfheader(name="Access-Control-Allow-Origin", value="*");
+                writeOutput(local.dirResolver.injectScopeMetadata(
+                    resultJson = result,
+                    scope = local.testScope,
+                    bundlesDiscovered = local.bundlesDiscovered,
+                    warnings = local.scopeWarnings
+                ));
             } else {
-                cfheader(statuscode = 200);
+                // txt / junit: emit the reporter output verbatim under the
+                // resolved content type.
+                cfcontent(type = local.output.contentType);
+                writeOutput(result);
             }
-            cfcontent(type="application/json");
-            cfheader(name="Access-Control-Allow-Origin", value="*");
-            writeOutput(local.dirResolver.injectScopeMetadata(
-                resultJson = result,
-                scope = local.testScope,
-                bundlesDiscovered = local.bundlesDiscovered,
-                warnings = local.scopeWarnings
-            ));
-        } else if (url.format == "txt") {
-            result = testBox.run(reporter = "wheels.wheelstest.system.reports.TextReporter");
-            cfcontent(type = "text/plain");
-            writeOutput(result);
-        } else if (url.format == "junit") {
-            result = testBox.run(reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter");
-            cfcontent(type = "text/xml");
-            writeOutput(result);
         }
+        // Unrecognized format (empty value / unknown token): no output, and
+        // testBox is not run — html.cfm must not be rendered for an arbitrary
+        // url.format (it 500s on Adobe). Mirrors the pre-fix fall-through.
     } finally {
         // Restore the original datasource (via applyDataSource() so test-run cached model classes are invalidated).
         if (local.swappedDataSource) {

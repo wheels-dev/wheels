@@ -32,7 +32,7 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
-			it("finds exactly 23 interface files", () => {
+			it("finds exactly 24 interface files", () => {
 				var interfaceDir = expandPath("/wheels/interfaces");
 				var files = directoryList(
 					path=interfaceDir,
@@ -40,7 +40,8 @@ component extends="wheels.WheelsTest" {
 					filter="*.cfc",
 					type="file"
 				);
-				expect(arrayLen(files)).toBe(23);
+				// Bump when a wheels.interfaces.* contract is added or removed.
+				expect(arrayLen(files)).toBe(24);
 			});
 
 			it("re-export wrappers extend their original interfaces", () => {

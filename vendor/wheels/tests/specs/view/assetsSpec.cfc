@@ -129,6 +129,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with just source", () => {
+				if (!application.wheels.engineAdapter.supportsImageInfo()) {
+					debug("Skipping: engine cannot probe image dimensions (supportsImageInfo() is false)")
+					return
+				}
 				StructDelete(args, "alt")
 				StructDelete(args, "class")
 				StructDelete(args, "id")
@@ -139,6 +143,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with supplying an alt", () => {
+				if (!application.wheels.engineAdapter.supportsImageInfo()) {
+					debug("Skipping: engine cannot probe image dimensions (supportsImageInfo() is false)")
+					return
+				}
 				StructDelete(args, "class")
 				StructDelete(args, "id")
 				r = '<img alt="#args.alt#" height="121" src="#imagePath#/#args.source#" width="93">'
@@ -148,6 +156,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with supplying an id when caching is on", () => {
+				if (!application.wheels.engineAdapter.supportsImageInfo()) {
+					debug("Skipping: engine cannot probe image dimensions (supportsImageInfo() is false)")
+					return
+				}
 				cacheImages = application.wheels.cacheImages
 				application.wheels.cacheImages = true
 				StructDelete(args, "alt")
@@ -161,6 +173,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with supplying class and id", () => {
+				if (!application.wheels.engineAdapter.supportsImageInfo()) {
+					debug("Skipping: engine cannot probe image dimensions (supportsImageInfo() is false)")
+					return
+				}
 				r = '<img alt="#args.alt#" class="#args.class#" height="121" src="#imagePath#/#args.source#" id="#args.id#" width="93">'
 				e = _controller.imageTag(argumentcollection = args)
 
@@ -191,6 +207,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with specifying height only", () => {
+				if (!application.wheels.engineAdapter.supportsImageInfo()) {
+					debug("Skipping: engine cannot probe image dimensions (supportsImageInfo() is false)")
+					return
+				}
 				StructDelete(args, "alt")
 				StructDelete(args, "class")
 				StructDelete(args, "id")
@@ -202,6 +222,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("works with specifying width only", () => {
+				if (!application.wheels.engineAdapter.supportsImageInfo()) {
+					debug("Skipping: engine cannot probe image dimensions (supportsImageInfo() is false)")
+					return
+				}
 				StructDelete(args, "alt")
 				StructDelete(args, "class")
 				StructDelete(args, "id")

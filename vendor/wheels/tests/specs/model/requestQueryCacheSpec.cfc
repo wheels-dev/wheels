@@ -17,16 +17,16 @@ component extends="wheels.WheelsTest" {
 			it("stores a single entry per unique findAll call when enabled", () => {
 				application.wheels.cacheQueriesDuringRequest = true;
 				model("author").findAll(where = "lastName = 'Djurner'");
-				expect(StructCount(request.wheels["author"])).toBe(1);
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(1);
 				model("author").findAll(where = "lastName = 'Djurner'");
-				expect(StructCount(request.wheels["author"])).toBe(1);
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(1);
 			})
 
 			it("keeps distinct entries for same-shape queries that differ only by where values", () => {
 				application.wheels.cacheQueriesDuringRequest = true;
 				var djurner = model("author").findAll(where = "lastName = 'Djurner'");
 				var petruzzi = model("author").findAll(where = "lastName = 'Petruzzi'");
-				expect(StructCount(request.wheels["author"])).toBe(2);
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(2);
 				expect(djurner.recordCount).toBe(1);
 				expect(petruzzi.recordCount).toBe(1);
 				expect(djurner.lastName).toBe("Djurner");
@@ -36,7 +36,7 @@ component extends="wheels.WheelsTest" {
 			it("does not store query results when cacheQueriesDuringRequest is disabled", () => {
 				application.wheels.cacheQueriesDuringRequest = false;
 				model("author").findAll(where = "lastName = 'Djurner'");
-				expect(StructCount(request.wheels["author"])).toBe(0);
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(0);
 			})
 
 			it("findEach does not accumulate per-batch queries in the request cache", () => {
@@ -52,7 +52,7 @@ component extends="wheels.WheelsTest" {
 					}
 				);
 				// Only the single up-front COUNT query may be cached, the per-batch id/data queries must not accumulate.
-				expect(StructCount(request.wheels["author"])).toBeLTE(1);
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBeLTE(1);
 				expect(result.count).toBe(expectedTotal);
 			})
 
@@ -79,7 +79,7 @@ component extends="wheels.WheelsTest" {
 					}
 				);
 				// Pre-fix the empty case ran a second COUNT (findAll only honors `count` when > 0), which showed up as a second cached entry.
-				expect(StructCount(request.wheels["author"])).toBe(1);
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(1);
 				expect(result.count).toBe(0);
 			})
 
@@ -93,7 +93,7 @@ component extends="wheels.WheelsTest" {
 					}
 				);
 				// Pre-fix the empty case ran a second COUNT (findAll only honors `count` when > 0), which showed up as a second cached entry.
-				expect(StructCount(request.wheels["author"])).toBe(1);
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBe(1);
 				expect(result.batchCount).toBe(0);
 			})
 
@@ -111,7 +111,7 @@ component extends="wheels.WheelsTest" {
 					}
 				);
 				// Only the single up-front COUNT query may be cached, the per-batch id/data queries must not accumulate.
-				expect(StructCount(request.wheels["author"])).toBeLTE(1);
+				expect(StructCount(request.wheels["$queryCache"]["author"])).toBeLTE(1);
 				expect(result.totalRecords).toBe(expectedTotal);
 				expect(result.batchCount).toBeGTE(2);
 			})

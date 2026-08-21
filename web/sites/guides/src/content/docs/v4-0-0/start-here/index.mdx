@@ -1,6 +1,6 @@
 ---
 title: Start Here
-description: Install Wheels, learn the basics, build your first app.
+description: Install Wheels your way — CLI, CommandBox, or plain zips — learn the basics, build your first app.
 type: section
 sidebar:
   order: 1
@@ -8,14 +8,30 @@ sidebar:
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-The entry path for new Wheels developers. Follow it top to bottom.
+The entry path for new Wheels developers — and the place where existing CFML developers pick their tooling story. If you're brand new, go top to bottom; if you know what you want, jump straight to your install path.
+
+## Orientation
 
 <CardGrid>
-  <LinkCard title="Welcome to Wheels" href="/v4-0-0/start-here/welcome/" />
-  <LinkCard title="Why Wheels?" href="/v4-0-0/start-here/why-wheels/" />
-  <LinkCard title="Installing Wheels" href="/v4-0-0/start-here/installing/" />
-  <LinkCard title="Your First 15 Minutes" href="/v4-0-0/start-here/first-15-minutes/" />
-  <LinkCard title="Release Channels" href="/v4-0-0/start-here/release-channels/" />
-  <LinkCard title="Tutorial: Build a Blog" href="/v4-0-0/start-here/tutorial/" />
-  <LinkCard title="CFML Engines" href="/v4-0-0/start-here/cfml-engines/" />
+  <LinkCard title="Welcome to Wheels" href="/v4-0-0/start-here/welcome/" description="What Wheels is, who these guides are for, and how they're organized." />
+  <LinkCard title="Why Wheels?" href="/v4-0-0/start-here/why-wheels/" description="Where Wheels sits next to Rails, Laravel, and the rest of CFML." />
+</CardGrid>
+
+## Install Wheels — three supported paths
+
+<CardGrid>
+  <LinkCard title="Choosing Your Tooling" href="/v4-0-0/start-here/choosing-your-tooling/" description="One page to pick your path — with a glossary of every tool name. If unsure, use the wheels CLI." />
+  <LinkCard title="Installing Wheels (CLI)" href="/v4-0-0/start-here/installing/" description="The default path. Install the wheels CLI on macOS, Windows, or Linux — five minutes." />
+  <LinkCard title="Installing with CommandBox" href="/v4-0-0/start-here/installing-with-commandbox/" description="For box shops: install and serve from ForgeBox, and know exactly what's supported." />
+  <LinkCard title="Manual Installation (zip / GitHub)" href="/v4-0-0/start-here/manual-installation/" description="Two zips, zero dependencies, your own web server. Fully supported." />
+  <LinkCard title="CFML Engines" href="/v4-0-0/start-here/cfml-engines/" description="Running on Adobe ColdFusion or BoxLang instead of the bundled Lucee." />
+  <LinkCard title="Working Without the CLI" href="/v4-0-0/start-here/working-without-the-cli/" description="Every CLI task mapped to its in-framework equivalent — reload, migrate, test, seed." />
+</CardGrid>
+
+## Learn it
+
+<CardGrid>
+  <LinkCard title="Anatomy of a Wheels App" href="/v4-0-0/start-here/app-structure/" description="Every directory, what lives in it, and how the pieces find each other." />
+  <LinkCard title="Your First 15 Minutes" href="/v4-0-0/start-here/first-15-minutes/" description="From installed to a running app with a scaffolded feature." />
+  <LinkCard title="Tutorial: Build a Blog" href="/v4-0-0/start-here/tutorial/" description="Eight chapters from hello-world to tested, deployable app." />
 </CardGrid>
