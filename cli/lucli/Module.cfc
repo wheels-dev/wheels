@@ -5775,19 +5775,32 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Process-exit seam for `wheels test`. Public for specs; hidden from MCP
-	 * via the structural $-prefix sweep. Body is a no-op until the throw
-	 * is wired — $cliTestResultFailed already owns the boolean contract.
+	 * Process-exit seam for `wheels test`. The only Wheels.TestsFailed
+	 * throw site on that path — runTests calls this after the report
+	 * flushes. Composes $cliTestResultFailed. Public for specs; hidden
+	 * from MCP via the structural $-prefix sweep.
 	 */
 	public void function $throwIfCliTestsFailed(required struct result, numeric specsFailedToLoad = 0) {
+		if (
+			$cliTestResultFailed(
+				result = arguments.result,
+				specsFailedToLoad = arguments.specsFailedToLoad
+			)
+		) {
+			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		}
 	}
 
 	/**
-	 * Process-exit seam for `wheels browser test`. Public for specs;
-	 * hidden from MCP via the structural sweep. Body is a no-op until
-	 * the throw is wired.
+	 * Process-exit seam for `wheels browser test`. The only
+	 * Wheels.TestsFailed throw site on that path. Composes
+	 * $browserTestResultFailed. Public for specs; hidden from MCP
+	 * via the structural sweep.
 	 */
 	public void function $throwIfBrowserTestsFailed(required struct data) {
+		if ($browserTestResultFailed(arguments.data)) {
+			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		}
 	}
 
 	/**
@@ -5875,11 +5888,12 @@ component extends="modules.BaseModule" {
 			out("Scope: #filter#", "cyan");
 		}
 
-		var testsFailed = false;
 		// Struct (not a bare local) so the catch-block write persists on
 		// BoxLang — local assignments inside catch are discarded there
-		// (CLAUDE.md cross-engine invariant 11).
-		var runState = {crashed = false};
+		// (CLAUDE.md cross-engine invariant 11). result/specsFailedToLoad
+		// live here too so $throwIfCliTestsFailed can run AFTER the try
+		// (a throw inside would be swallowed as a crashed run).
+		var runState = {crashed = false, hasResult = false, result = {}, specsFailedToLoad = 0};
 
 		try {
 			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
@@ -5919,17 +5933,13 @@ component extends="modules.BaseModule" {
 						displayTestResults(result, verboseOutput, resolvedDir, ciMode);
 				}
 
-				// Record failure so the command can exit non-zero AFTER the output
-				// is flushed. Throwing here would be swallowed by the catch below.
-				// testing.mdx documents a non-zero exit on failure. CLI audit H6.
-				// Fail-closed on #3083 honesty flags and unloadable specs, not
-				// just totalFail/totalError — same gate as test-local.sh.
-				testsFailed = $cliTestResultFailed(
+				// Stash for the post-try throw seam. Throwing here would be
+				// swallowed by the catch below as a crashed run.
+				runState.hasResult = true;
+				runState.result = result;
+				runState.specsFailedToLoad = $countSpecsFailedToLoad(
 					result = result,
-					specsFailedToLoad = $countSpecsFailedToLoad(
-						result = result,
-						testDirectory = resolvedDir
-					)
+					testDirectory = resolvedDir
 				);
 			} else {
 				// Could be an HTML error page. Either way no result document was
@@ -5962,11 +5972,15 @@ component extends="modules.BaseModule" {
 		// Exit non-zero when specs failed/errored so CI and shells can detect it.
 		// Previously runTests always returned "" → `wheels test` exited 0 even when
 		// tests failed, silently green-lighting broken builds. CLI audit H6.
-		if (testsFailed) {
-			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		// Sole Wheels.TestsFailed site for this path — do not throw beside it.
+		if (runState.hasResult) {
+			$throwIfCliTestsFailed(
+				result = runState.result,
+				specsFailedToLoad = runState.specsFailedToLoad
+			);
 		}
 		// A crash during the HTTP/parse phase printed red but exited 0 — the
-		// throw above only covers FAILING tests, not CRASHED runs (#2963).
+		// seam above only covers FAILING tests, not CRASHED runs (#2963).
 		if (runState.crashed) {
 			throw(type = "Wheels.TestRunFailed", message = "Test run crashed before producing results — see the output above.");
 		}
@@ -8174,15 +8188,12 @@ component extends="modules.BaseModule" {
 		if (format == "json") {
 			out(httpResult);
 			if (isJSON(httpResult)) {
-				var jsonData = deserializeJSON(httpResult);
-				if ($browserTestResultFailed(jsonData)) {
-					throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
-				}
+				$throwIfBrowserTestsFailed(deserializeJSON(httpResult));
 			}
 			return "";
 		}
 
-		var testsFailed = false;
+		var parsed = {hasData = false, data = {}};
 		try {
 			var data = deserializeJSON(httpResult);
 			var totalPass = data.totalPass ?: 0;
@@ -8269,10 +8280,11 @@ component extends="modules.BaseModule" {
 				out("the BrowserTest spec may need explicit try/catch around .click() /", "yellow");
 				out(".fill() to surface Playwright exceptions into failMessage.", "yellow");
 			}
-			// Record after the report flushes. Throwing inside this try
+			// Stash after the report flushes. Throwing inside this try
 			// would be swallowed by the parse-error catch as
 			// "Failed to parse test results".
-			testsFailed = $browserTestResultFailed(data);
+			parsed.hasData = true;
+			parsed.data = data;
 		} catch (any e) {
 			out("Failed to parse test results: #e.message#", "red");
 			if (verboseOutput) {
@@ -8280,8 +8292,9 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		if (testsFailed) {
-			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		// Sole Wheels.TestsFailed site for the text path.
+		if (parsed.hasData) {
+			$throwIfBrowserTestsFailed(parsed.data);
 		}
 
 		return "";
