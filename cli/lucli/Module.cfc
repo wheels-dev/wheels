@@ -5742,29 +5742,60 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * True when a `wheels test` JSON result should map to a non-zero CLI
-	 * exit via Wheels.TestsFailed. Public ONLY so the CLI specs can reach
-	 * it (cli/CLAUDE.md "public for specs" carve-out); hidden from MCP via
-	 * the structural $-prefix sweep.
+	 * exit via Wheels.TestsFailed. Aligns with tools/test-local.sh and
+	 * tools/ci/run-tests.sh: Fail/Error, a rejected directory= scope
+	 * (#3083), a vacuous 0-bundle discovery (#3083), or unloadable
+	 * *Spec.cfc files that displayTestResults already WARNs about.
 	 *
-	 * Body currently mirrors runTests' historic check (totalFail +
-	 * totalError only). directoryRejected, bundlesDiscovered=0, and
-	 * unloadable specs still return false — the #3083 honesty gap vs
-	 * tools/test-local.sh / tools/ci/run-tests.sh.
+	 * Public ONLY so the CLI specs can reach it (cli/CLAUDE.md "public
+	 * for specs" carve-out); hidden from MCP via the structural $-prefix
+	 * sweep. bundlesDiscovered is read with structKeyExists — Lucee's
+	 * Elvis treats 0 as empty, which would hide the exact 0-bundle case.
 	 */
 	public boolean function $cliTestResultFailed(required struct result, numeric specsFailedToLoad = 0) {
+		if (structKeyExists(arguments.result, "directoryRejected") && arguments.result.directoryRejected) {
+			return true;
+		}
+		if (structKeyExists(arguments.result, "bundlesDiscovered") && arguments.result.bundlesDiscovered == 0) {
+			return true;
+		}
+		if (arguments.specsFailedToLoad > 0) {
+			return true;
+		}
 		return ((arguments.result.totalFail ?: 0) + (arguments.result.totalError ?: 0)) > 0;
 	}
 
 	/**
 	 * True when a `wheels browser test` JSON result should map to a
-	 * non-zero CLI exit. Public for specs; hidden from MCP via the
-	 * structural sweep.
-	 *
-	 * Body currently mirrors browserTest's historic `return ""` (always
-	 * success) so Fail/Error specs go red until the helper is wired.
+	 * non-zero CLI exit via Wheels.TestsFailed. Public for specs;
+	 * hidden from MCP via the structural sweep.
 	 */
 	public boolean function $browserTestResultFailed(required struct data) {
-		return false;
+		return ((arguments.data.totalFail ?: 0) + (arguments.data.totalError ?: 0)) > 0;
+	}
+
+	/**
+	 * Disk-vs-loaded delta used by displayTestResults' unloadable WARN
+	 * and by runTests' exit decision, so a skipped *Spec.cfc cannot
+	 * warn-and-exit-0. Best-effort: probe failures return 0.
+	 */
+	private numeric function $countSpecsFailedToLoad(required any result, string testDirectory = "") {
+		if (!len(arguments.testDirectory) || !isStruct(arguments.result)) {
+			return 0;
+		}
+		try {
+			var runner = new services.TestRunner(projectRoot = variables.projectRoot);
+			var diskCount = runner.countSpecsOnDisk(arguments.testDirectory);
+			var loadedCount = (structKeyExists(arguments.result, "bundleStats") && isArray(arguments.result.bundleStats))
+				? arrayLen(arguments.result.bundleStats)
+				: 0;
+			if (diskCount > loadedCount) {
+				return diskCount - loadedCount;
+			}
+		} catch (any probeErr) {
+			verbose("Failed-to-load probe failed: #probeErr.message#");
+		}
+		return 0;
 	}
 
 	private string function runTests(
@@ -5875,7 +5906,15 @@ component extends="modules.BaseModule" {
 				// Record failure so the command can exit non-zero AFTER the output
 				// is flushed. Throwing here would be swallowed by the catch below.
 				// testing.mdx documents a non-zero exit on failure. CLI audit H6.
-				testsFailed = ((result.totalFail ?: 0) + (result.totalError ?: 0)) > 0;
+				// Fail-closed on #3083 honesty flags and unloadable specs, not
+				// just totalFail/totalError — same gate as test-local.sh.
+				testsFailed = $cliTestResultFailed(
+					result = result,
+					specsFailedToLoad = $countSpecsFailedToLoad(
+						result = result,
+						testDirectory = resolvedDir
+					)
+				);
 			} else {
 				// Could be an HTML error page. Either way no result document was
 				// produced — the run crashed, which must exit non-zero (#2963).
@@ -6065,9 +6104,9 @@ component extends="modules.BaseModule" {
 		// passed an empty run." We probe the disk and warn if the loaded
 		// bundle count is lower than the on-disk *Spec.cfc count. See
 		// finding #2 in the 2026-04-29 fresh-VM triage.
-		var specsFailedToLoad = 0;
+		var specsFailedToLoad = $countSpecsFailedToLoad(result, arguments.testDirectory);
 		var unloadedSpecPaths = [];
-		if (len(arguments.testDirectory)) {
+		if (specsFailedToLoad > 0 && len(arguments.testDirectory)) {
 			try {
 				var runner = new services.TestRunner(projectRoot = variables.projectRoot);
 				var diskCount = runner.countSpecsOnDisk(arguments.testDirectory);
@@ -6075,7 +6114,6 @@ component extends="modules.BaseModule" {
 					? arrayLen(result.bundleStats)
 					: 0;
 				if (diskCount > loadedCount) {
-					specsFailedToLoad = diskCount - loadedCount;
 					var diskSpecs = runner.listSpecsOnDisk(arguments.testDirectory);
 					var loadedNames = {};
 					if (loadedCount > 0) {
@@ -8119,9 +8157,16 @@ component extends="modules.BaseModule" {
 
 		if (format == "json") {
 			out(httpResult);
+			if (isJSON(httpResult)) {
+				var jsonData = deserializeJSON(httpResult);
+				if ($browserTestResultFailed(jsonData)) {
+					throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+				}
+			}
 			return "";
 		}
 
+		var testsFailed = false;
 		try {
 			var data = deserializeJSON(httpResult);
 			var totalPass = data.totalPass ?: 0;
@@ -8208,11 +8253,19 @@ component extends="modules.BaseModule" {
 				out("the BrowserTest spec may need explicit try/catch around .click() /", "yellow");
 				out(".fill() to surface Playwright exceptions into failMessage.", "yellow");
 			}
+			// Record after the report flushes. Throwing inside this try
+			// would be swallowed by the parse-error catch as
+			// "Failed to parse test results".
+			testsFailed = $browserTestResultFailed(data);
 		} catch (any e) {
 			out("Failed to parse test results: #e.message#", "red");
 			if (verboseOutput) {
 				out(left(httpResult ?: "", 500));
 			}
+		}
+
+		if (testsFailed) {
+			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
 		}
 
 		return "";
