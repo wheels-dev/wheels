@@ -136,6 +136,114 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("$throwIfCliTestsFailed — wheels test process-exit seam (##3083)", () => {
+
+			it("throws Wheels.TestsFailed when directoryRejected: true and totalFail/Error are 0", () => {
+				expect(() =>
+					mod.$throwIfCliTestsFailed({
+						directoryRejected: true,
+						totalFail: 0,
+						totalError: 0,
+						bundlesDiscovered: 314
+					})
+				).toThrow(type = "Wheels.TestsFailed");
+			});
+
+			it("throws Wheels.TestsFailed when bundlesDiscovered: 0 and totalFail/Error are 0", () => {
+				expect(() =>
+					mod.$throwIfCliTestsFailed({
+						directoryRejected: false,
+						totalFail: 0,
+						totalError: 0,
+						bundlesDiscovered: 0
+					})
+				).toThrow(type = "Wheels.TestsFailed");
+			});
+
+			it("throws Wheels.TestsFailed when specsFailedToLoad > 0 and totalFail/Error are 0", () => {
+				expect(() =>
+					mod.$throwIfCliTestsFailed(
+						result = {
+							directoryRejected: false,
+							totalFail: 0,
+							totalError: 0,
+							bundlesDiscovered: 1
+						},
+						specsFailedToLoad = 2
+					)
+				).toThrow(type = "Wheels.TestsFailed");
+			});
+
+			it("throws Wheels.TestsFailed when totalFail > 0", () => {
+				expect(() =>
+					mod.$throwIfCliTestsFailed({
+						totalFail: 1,
+						totalError: 0,
+						bundlesDiscovered: 1
+					})
+				).toThrow(type = "Wheels.TestsFailed");
+			});
+
+			it("throws Wheels.TestsFailed when totalError > 0", () => {
+				expect(() =>
+					mod.$throwIfCliTestsFailed({
+						totalFail: 0,
+						totalError: 3,
+						bundlesDiscovered: 1
+					})
+				).toThrow(type = "Wheels.TestsFailed");
+			});
+
+			it("does not throw on a clean pass", () => {
+				expect(() =>
+					mod.$throwIfCliTestsFailed(
+						result = {
+							directoryRejected: false,
+							totalFail: 0,
+							totalError: 0,
+							bundlesDiscovered: 4
+						},
+						specsFailedToLoad = 0
+					)
+				).notToThrow();
+			});
+
+		});
+
+		describe("$throwIfBrowserTestsFailed — wheels browser test process-exit seam", () => {
+
+			it("throws Wheels.TestsFailed when totalFail > 0", () => {
+				expect(() =>
+					mod.$throwIfBrowserTestsFailed({
+						totalPass: 0,
+						totalFail: 1,
+						totalError: 0
+					})
+				).toThrow(type = "Wheels.TestsFailed");
+			});
+
+			it("throws Wheels.TestsFailed when totalError > 0", () => {
+				expect(() =>
+					mod.$throwIfBrowserTestsFailed({
+						totalPass: 2,
+						totalFail: 0,
+						totalError: 1
+					})
+				).toThrow(type = "Wheels.TestsFailed");
+			});
+
+			it("does not throw on a clean pass", () => {
+				expect(() =>
+					mod.$throwIfBrowserTestsFailed({
+						totalPass: 3,
+						totalFail: 0,
+						totalError: 0
+					})
+				).notToThrow();
+			});
+
+		});
+
 	}
 
 }

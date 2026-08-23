@@ -5775,6 +5775,22 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Process-exit seam for `wheels test`. Public for specs; hidden from MCP
+	 * via the structural $-prefix sweep. Body is a no-op until the throw
+	 * is wired — $cliTestResultFailed already owns the boolean contract.
+	 */
+	public void function $throwIfCliTestsFailed(required struct result, numeric specsFailedToLoad = 0) {
+	}
+
+	/**
+	 * Process-exit seam for `wheels browser test`. Public for specs;
+	 * hidden from MCP via the structural sweep. Body is a no-op until
+	 * the throw is wired.
+	 */
+	public void function $throwIfBrowserTestsFailed(required struct data) {
+	}
+
+	/**
 	 * Disk-vs-loaded delta used by displayTestResults' unloadable WARN
 	 * and by runTests' exit decision, so a skipped *Spec.cfc cannot
 	 * warn-and-exit-0. Best-effort: probe failures return 0.
