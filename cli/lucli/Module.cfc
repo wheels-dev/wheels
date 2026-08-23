@@ -5740,6 +5740,33 @@ component extends="modules.BaseModule" {
 
 	// ── Test Execution ───────────────────────────────
 
+	/**
+	 * True when a `wheels test` JSON result should map to a non-zero CLI
+	 * exit via Wheels.TestsFailed. Public ONLY so the CLI specs can reach
+	 * it (cli/CLAUDE.md "public for specs" carve-out); hidden from MCP via
+	 * the structural $-prefix sweep.
+	 *
+	 * Body currently mirrors runTests' historic check (totalFail +
+	 * totalError only). directoryRejected, bundlesDiscovered=0, and
+	 * unloadable specs still return false — the #3083 honesty gap vs
+	 * tools/test-local.sh / tools/ci/run-tests.sh.
+	 */
+	public boolean function $cliTestResultFailed(required struct result, numeric specsFailedToLoad = 0) {
+		return ((arguments.result.totalFail ?: 0) + (arguments.result.totalError ?: 0)) > 0;
+	}
+
+	/**
+	 * True when a `wheels browser test` JSON result should map to a
+	 * non-zero CLI exit. Public for specs; hidden from MCP via the
+	 * structural sweep.
+	 *
+	 * Body currently mirrors browserTest's historic `return ""` (always
+	 * success) so Fail/Error specs go red until the helper is wired.
+	 */
+	public boolean function $browserTestResultFailed(required struct data) {
+		return false;
+	}
+
 	private string function runTests(
 		string filter = "",
 		string reporter = "simple",
