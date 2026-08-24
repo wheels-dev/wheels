@@ -329,7 +329,7 @@ component {
 		local.rv = Replace(local.rv, "<", "&lt;", "all");
 		local.rv = Replace(local.rv, ">", "&gt;", "all");
 		local.rv = Replace(local.rv, """", "&quot;", "all");
-		local.rv = Replace(local.rv, "'", "&#x27;", "all");
+		local.rv = Replace(local.rv, "'", "&apos;", "all");
 		return local.rv;
 	}
 
