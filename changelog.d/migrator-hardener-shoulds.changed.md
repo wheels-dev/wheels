@@ -1,0 +1,4 @@
+- `updateRecord()` / `removeRecord()` accept `all=true` for an intentional full-table write; empty `where` now throws
+- `AutoMigrator.diff()` accepts `allowColumnRemoval=false` and reports leftover columns on `unmappedColumns` instead of scheduling drops
+- `t.references()` accepts `referenceColumn` (default remains `"id"`)
+- Tenant structs may pass `userName` / `password` for per-tenant migrator credentials

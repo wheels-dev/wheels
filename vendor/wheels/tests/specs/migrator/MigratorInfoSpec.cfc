@@ -39,7 +39,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("$buildInfoOutput returns expected lines for a clean state", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("002");
 				var lines = migrator.$buildInfoOutput();
 				expect(lines).toBeArray();
@@ -51,7 +54,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("$buildInfoOutput marks orphan versions with [?] and NO FILE", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				var lines = migrator.$buildInfoOutput();
@@ -61,7 +67,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("$buildInfoOutput summary counts orphans separately", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				var lines = migrator.$buildInfoOutput();
@@ -70,7 +79,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("$buildInfoOutput omits orphan summary line when no orphans exist", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				var lines = migrator.$buildInfoOutput();
 				var joined = ArrayToList(lines, Chr(10));

@@ -47,7 +47,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("model.create() inside up() persists after the outer transaction commits", () => {
-				if (ctx.isCockroachDB) return;
+				if (ctx.isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				var found = queryExecute(
 					"SELECT id FROM c_o_r_e_tags WHERE name = 'issue2789_via_model_create'",
@@ -58,19 +61,28 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("sets request.$wheelsTransactionWrapper for the duration of up()", () => {
-				if (ctx.isCockroachDB) return;
+				if (ctx.isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				expect(request.$issue2789FlagDuringUp).toBeTrue();
 			});
 
 			it("clears request.$wheelsTransactionWrapper after up() returns", () => {
-				if (ctx.isCockroachDB) return;
+				if (ctx.isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				expect(StructKeyExists(request, "$wheelsTransactionWrapper")).toBeFalse();
 			});
 
 			it("clears request.$wheelsTransactionWrapper after down() returns", () => {
-				if (ctx.isCockroachDB) return;
+				if (ctx.isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				migrator.migrateTo("0");
 				expect(StructKeyExists(request, "$wheelsTransactionWrapper")).toBeFalse();
