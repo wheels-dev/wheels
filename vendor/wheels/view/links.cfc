@@ -607,13 +607,19 @@ component {
 		if (!isStruct(arguments.params)) {
 			return arguments.params;
 		}
+		// Mixin copies can drop the declared default; missing means encode (S8).
+		// Do not read arguments.encode unless it exists (Lucee will throw).
+		local.doEncode = true;
+		if (StructKeyExists(arguments, "encode") && IsBoolean(arguments.encode) && !arguments.encode) {
+			local.doEncode = false;
+		}
 		local.queryString = "";
 		for (local.key in arguments.params) {
 			local.value = arguments.params[local.key];
 			if (!isNull(local.value) && local.value != "") {
 				// encode=true keeps the public helper's existing contract.
 				// $paginationLinkToArgs passes false so URLFor encodes once (S8).
-				if (arguments.encode) {
+				if (local.doEncode) {
 					local.queryString &= (Len(local.queryString) ? "&" : "") & encodeForUrl(local.key) & "=" & encodeForUrl(local.value);
 				} else {
 					local.queryString &= (Len(local.queryString) ? "&" : "") & local.key & "=" & local.value;

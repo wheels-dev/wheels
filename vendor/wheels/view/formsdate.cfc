@@ -335,7 +335,7 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public string function $yearMonthHourMinuteSecondSelectTagContent() {
+	public string function $yearMonthHourMinuteSecondSelectTagContent(any encode = false) {
 		local.args = {};
 		local.args.value = arguments.counter;
 		if (arguments.value == arguments.counter) {
@@ -349,8 +349,9 @@ component {
 		if (arguments.$type == "minute" || arguments.$type == "second") {
 			arguments.optionContent = NumberFormat(arguments.optionContent, "09");
 		}
-		local.encode = StructKeyExists(arguments, "encode") ? arguments.encode : false;
-		return $element(name = "option", content = arguments.optionContent, attributes = local.args, encode = local.encode);
+		// Default false keeps the existing unit tests (they omit encode).
+		// monthSelectTag etc. pass encode through argumentCollection (S1).
+		return $element(name = "option", content = arguments.optionContent, attributes = local.args, encode = arguments.encode);
 	}
 
 	/**

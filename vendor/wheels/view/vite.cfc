@@ -321,12 +321,16 @@ component {
 	 * Encodes a Vite-interpolated URL or path for an HTML attribute (S12).
 	 */
 	public string function $viteEncodeAttr(required string value) {
-		// Safe fingerprinted paths stay literal so existing markup matches.
-		// Anything with attribute-breakers is encoded (S12).
-		if (ReFind("[<>""'&]", arguments.value)) {
-			return EncodeForHTMLAttribute($canonicalize(arguments.value));
-		}
-		return arguments.value;
+		// Encode only attribute breakers so fingerprinted paths stay literal
+		// (`:` and `/` must not become &#x3a; / &#x2f;). Canonicalize first so
+		// a %3Cscript%3E entrypoint cannot slip through (S12).
+		local.rv = $canonicalize(arguments.value);
+		local.rv = Replace(local.rv, "&", "&amp;", "all");
+		local.rv = Replace(local.rv, "<", "&lt;", "all");
+		local.rv = Replace(local.rv, ">", "&gt;", "all");
+		local.rv = Replace(local.rv, """", "&quot;", "all");
+		local.rv = Replace(local.rv, "'", "&#x27;", "all");
+		return local.rv;
 	}
 
 	/**
