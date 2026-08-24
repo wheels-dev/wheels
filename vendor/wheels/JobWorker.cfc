@@ -89,7 +89,18 @@ component {
 
 		// Try to claim each candidate with optimistic locking
 		for (local.row in local.candidates) {
-			local.claimed = $claimJob(local.row.id);
+			try {
+				local.claimFn = this["$claimJob"];
+				local.claimed = local.claimFn(local.row.id);
+			} catch (any e) {
+				// Persist/claim errors are contained — they must not look like an idle skip.
+				local.result.skipped = false;
+				local.result.success = false;
+				local.result.jobId = local.row.id;
+				local.result.jobClass = local.row.jobClass;
+				local.result.error = Left(e.message, 1000);
+				return local.result;
+			}
 			if (local.claimed) {
 				// We claimed it — fetch the payload for just this job, then process
 				local.jobRow = {
@@ -439,8 +450,11 @@ component {
 	/**
 	 * Claim a job using optimistic locking.
 	 * Returns true if this worker successfully claimed the job.
+	 * A lost race (0 rows) returns false. A persist/query error is not a lost
+	 * race — it throws Wheels.JobClaimFailed so processNext can contain it
+	 * without disguising the failure as an idle skip.
 	 */
-	private boolean function $claimJob(required string jobId) {
+	public boolean function $claimJob(required string jobId) {
 		try {
 			// Use the result option to get affected-row count from the same connection
 			// that executed the UPDATE. A separate verification SELECT can fail on
@@ -458,7 +472,10 @@ component {
 			);
 			return (local.updateResult.recordCount ?: 0) > 0;
 		} catch (any e) {
-			return false;
+			throw(
+				type = "Wheels.JobClaimFailed",
+				message = "Failed to claim job #arguments.jobId#: #e.message#"
+			);
 		}
 	}
 

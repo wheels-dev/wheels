@@ -729,9 +729,16 @@ component {
 	}
 
 	public string function $jobClassPrefixes() {
-		local.prefixes = "app.jobs,wheels.tests._assets.jobs";
+		local.prefixes = "app.jobs";
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobClassPrefixes") && Len(application.wheels.jobClassPrefixes)) {
 			local.prefixes = ListAppend(local.prefixes, application.wheels.jobClassPrefixes);
+		}
+		if (
+			!StructKeyExists(application, "wheels")
+			|| !StructKeyExists(application.wheels, "environment")
+			|| CompareNoCase(application.wheels.environment, "production") != 0
+		) {
+			local.prefixes = ListAppend(local.prefixes, "wheels.tests._assets.jobs");
 		}
 		return local.prefixes;
 	}

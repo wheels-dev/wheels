@@ -18,6 +18,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			afterEach(function() {
+				if (StructKeyExists(request, "wheelsHardenerPrevEnv")) {
+					application.wheels.environment = request.wheelsHardenerPrevEnv;
+					StructDelete(request, "wheelsHardenerPrevEnv");
+				}
 				if (StructKeyExists(request, "wheels")) {
 					StructDelete(request.wheels, "tenant");
 				}
@@ -265,7 +269,7 @@ component extends="wheels.WheelsTest" {
 				expect(local.linearCheck.cnt).toBe(1);
 			});
 
-			it("S5/S6: idle queue stays skipped and does not throw", function() {
+			it("S5: idle queue stays skipped and does not throw", function() {
 				local.worker = new wheels.JobWorker();
 				local.result = local.worker.processNext(queues = "test_hard_idle_#CreateUUID()#");
 				expect(local.result.skipped).toBeTrue();
@@ -276,6 +280,65 @@ component extends="wheels.WheelsTest" {
 				local.batch = local.job.processQueue(queue = "test_hard_idle_#CreateUUID()#");
 				expect(local.batch.processed).toBe(0);
 				expect(local.batch.failed).toBe(0);
+			});
+
+			it("S6: claim persist error is not treated as idle skip", function() {
+				// BoxLang catch writes are discarded on a local.-scoped struct (invariant 11).
+				var claim = {threw = false, type = "", returnedFalse = false};
+				local.claimer = new wheels.JobWorker();
+				queryExecute("DROP TABLE wheels_jobs", {}, {datasource = application.wheels.dataSourceName});
+				try {
+					if (local.claimer.$claimJob(jobId = CreateUUID()) == false) {
+						claim.returnedFalse = true;
+					}
+				} catch (any e) {
+					claim.threw = true;
+					claim.type = e.type;
+				} finally {
+					local.restore = new wheels.Job();
+					local.restore.$ensureJobTable();
+				}
+				expect(claim.returnedFalse).toBeFalse();
+				expect(claim.threw).toBeTrue();
+				expect(claim.type).toBe("Wheels.JobClaimFailed");
+
+				local.id = CreateUUID();
+				local.past = DateAdd("s", -30, Now());
+				$insertTestJob(
+					id = local.id,
+					jobClass = "app.jobs.ProcessOrdersJob",
+					queue = "test_hard_s6_claim",
+					createdAt = local.past,
+					updatedAt = local.past
+				);
+				local.s6Worker = new wheels.tests._assets.jobs.ExplodingClaimWorker();
+				var escaped = {type = "", message = ""};
+				local.drainResult = {skipped = true, error = "", success = false};
+				try {
+					local.drainResult = local.s6Worker.processNext(queues = "test_hard_s6_claim");
+				} catch (any e) {
+					escaped.type = e.type;
+					escaped.message = e.message;
+				}
+				expect(escaped.type).toBe("");
+				expect(local.drainResult.skipped).toBeFalse();
+				expect(local.drainResult.success).toBeFalse();
+				expect(Len(local.drainResult.error)).toBeGT(0);
+			});
+
+			it("S8 leftover: app.jobs is first-class; test prefix is extra", function() {
+				local.bridge = new wheels.Job();
+				request.wheelsHardenerPrevEnv = application.wheels.environment;
+				application.wheels.environment = "production";
+				local.prodPrefixes = local.bridge.$jobClassPrefixes();
+				application.wheels.environment = request.wheelsHardenerPrevEnv;
+				StructDelete(request, "wheelsHardenerPrevEnv");
+				expect(ListFirst(local.prodPrefixes)).toBe("app.jobs");
+				expect(ListFindNoCase(local.prodPrefixes, "wheels.tests._assets.jobs")).toBe(0);
+
+				local.testPrefixes = local.bridge.$jobClassPrefixes();
+				expect(ListFirst(local.testPrefixes)).toBe("app.jobs");
+				expect(ListFindNoCase(local.testPrefixes, "wheels.tests._assets.jobs")).toBeGT(0);
 			});
 
 			it("S1: enqueue persists timeout=300 and perform honors it", function() {
