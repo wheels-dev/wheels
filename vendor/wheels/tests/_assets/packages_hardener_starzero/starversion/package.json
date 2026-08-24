@@ -1,0 +1,9 @@
+{
+	"name": "wheels-starversion",
+	"version": "1.0.0",
+	"description": "Hardener S3: wheelsVersion * is not a declared compat list",
+	"wheelsVersion": "*",
+	"provides": {
+		"mixins": "none"
+	}
+}

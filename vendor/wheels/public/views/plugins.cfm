@@ -77,16 +77,16 @@ if (request.wheels.params.format == "json") {
 					Warnings:
 				</div>
 					<cfif $get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)>
-							<cfloop list="#application.wheels.incompatiblePlugins#" index="local.i">The #local.i# plugin may be incompatible with this version of Wheels, please look for a compatible version of the plugin<br></cfloop>
+							<cfloop list="#application.wheels.incompatiblePlugins#" index="local.i">The #EncodeForHTML(local.i)# plugin may be incompatible with this version of Wheels, please look for a compatible version of the plugin<br></cfloop>
 						</cfif>
 						<cfif Len(application.wheels.dependantPlugins)>
-							<cfloop list="#application.wheels.dependantPlugins#" index="local.i"><cfset needs = ListLast(local.i, "|")>The #ListFirst(local.i, "|")# plugin needs the following plugin<cfif ListLen(needs) GT 1>s</cfif> to work properly: #needs#<br></cfloop>
+							<cfloop list="#application.wheels.dependantPlugins#" index="local.i"><cfset needs = ListLast(local.i, "|")>The #EncodeForHTML(ListFirst(local.i, "|"))# plugin needs the following plugin<cfif ListLen(needs) GT 1>s</cfif> to work properly: #EncodeForHTML(needs)#<br></cfloop>
 						</cfif>
 						<cfif isDefined("application.wheels.versionMismatchPlugins") AND Len(application.wheels.versionMismatchPlugins)>
-							<cfloop list="#application.wheels.versionMismatchPlugins#" index="local.mm">Plugin <strong>#ListGetAt(local.mm, 1, "|")#</strong> requires <strong>#ListGetAt(local.mm, 2, "|")#</strong> #ListGetAt(local.mm, 3, "|")# but version <strong>#ListGetAt(local.mm, 4, "|")#</strong> is loaded<br></cfloop>
+							<cfloop list="#application.wheels.versionMismatchPlugins#" index="local.mm">Plugin <strong>#EncodeForHTML(ListGetAt(local.mm, 1, "|"))#</strong> requires <strong>#EncodeForHTML(ListGetAt(local.mm, 2, "|"))#</strong> #EncodeForHTML(ListGetAt(local.mm, 3, "|"))# but version <strong>#EncodeForHTML(ListGetAt(local.mm, 4, "|"))#</strong> is loaded<br></cfloop>
 						</cfif>
 						<cfif isDefined("application.wheels.mixinCollisions") AND arrayLen(application.wheels.mixinCollisions)>
-							<cfloop array="#application.wheels.mixinCollisions#" index="local.c">Method <strong>#local.c.method#</strong> on <strong>#local.c.target#</strong>: provided by <strong>#local.c.firstProvider#</strong>, overridden by <strong>#local.c.secondProvider#</strong><br></cfloop>
+							<cfloop array="#application.wheels.mixinCollisions#" index="local.c">Method <strong>#EncodeForHTML(local.c.method)#</strong> on <strong>#EncodeForHTML(local.c.target)#</strong>: provided by <strong>#EncodeForHTML(local.c.firstProvider)#</strong>, overridden by <strong>#EncodeForHTML(local.c.secondProvider)#</strong><br></cfloop>
 						</cfif>
 			</div>
 		</cfif>
@@ -104,11 +104,11 @@ if (request.wheels.params.format == "json") {
 			<cfloop collection="#$get('plugins')#" item="local.i">
 				<tr>
 					<td>
-						<a href="#urlFor(route="wheelsPluginEntry", name=local.i)#">#local.i#</a>
+						<a href="#urlFor(route="wheelsPluginEntry", name=local.i)#">#EncodeForHTML(local.i)#</a>
 					</td>
 					<td>
 						<cfif StructCount($get("pluginMeta")) IS NOT 0 && structKeyExists($get("pluginMeta"), local.i) AND len($get("pluginMeta")[local.i]['version'])>
-							#$get("pluginMeta")[local.i]['version']#
+							#EncodeForHTML($get("pluginMeta")[local.i]['version'])#
 						<cfelse>
 							<em>Unknown</em>
 						</cfif>

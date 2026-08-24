@@ -1,0 +1,8 @@
+{
+	"name": "wheels-evil-nested",
+	"version": "1.0.0",
+	"description": "Hardener S6: dotted directory name must not become a CreateObject path",
+	"provides": {
+		"mixins": "none"
+	}
+}

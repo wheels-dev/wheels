@@ -1,0 +1,8 @@
+{
+	"name": "wheels-bootresidue",
+	"version": "1.0.0",
+	"description": "Hardener S7: register() binds a service then boot() throws",
+	"provides": {
+		"mixins": "none"
+	}
+}
