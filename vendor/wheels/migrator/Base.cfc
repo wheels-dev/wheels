@@ -10,11 +10,12 @@ component extends="wheels.Global"{
 	public function announce(required string message) {
 		param name="request.$wheelsMigrationOutput" default="";
 		request.$wheelsMigrationOutput = request.$wheelsMigrationOutput & arguments.message & Chr(13) & Chr(10);
+		request.$wheelsMigrationDidAnnounce = true;
 	}
 
 	public string function $getDBType(string dataSource = "") {
 		local.appKey = $appKey();
-		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : $migratorDataSource();
 
 		// Memoize the resolved adapter name per datasource: engine identity is
 		// stable for the life of the application, and discovery paths (e.g.
@@ -121,7 +122,7 @@ component extends="wheels.Global"{
 		local.quotedTable = this.adapter.quoteTableName(arguments.table);
 		try {
 			$query(
-				datasource = application[local.appKey].dataSourceName,
+				datasource = $migratorDataSource(),
 				sql = "SELECT 1 FROM #local.quotedTable# WHERE 1=0"
 			);
 		} catch (any e) {
@@ -131,7 +132,7 @@ component extends="wheels.Global"{
 			local.foreignKeys = $dbinfo(
 				type = "foreignkeys",
 				table = arguments.table,
-				datasource = application[local.appKey].dataSourceName,
+				datasource = $migratorDataSource(),
 				username = application[local.appKey].dataSourceUserName,
 				password = application[local.appKey].dataSourcePassword
 			);
@@ -152,7 +153,7 @@ component extends="wheels.Global"{
 			return;
 		}
 		local.appKey = $appKey();
-		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : $migratorDataSource();
 		// Executed statements may change the schema — drop the request-scoped
 		// column cache so the next $getColumns() re-probes.
 		StructDelete(request, "$wheelsMigratorColumns");
@@ -167,7 +168,7 @@ component extends="wheels.Global"{
 	 */
 	private void function $executeWithParams(required string sql, required array params, string dataSource = "") {
 		local.appKey = $appKey();
-		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : $migratorDataSource();
 		local.prepared = $prepareMigrationSql(sql = arguments.sql, dsName = local.dsName);
 		if (!local.prepared.captured) {
 			queryExecute(local.prepared.sql, arguments.params, {datasource: local.dsName});
@@ -205,6 +206,8 @@ component extends="wheels.Global"{
 			}
 			ArrayAppend(request.$wheelsDebugSQLResult, local.sql);
 		}
+		// Any real SQL (including debug capture) means this step is not announce-only.
+		request.$wheelsMigrationDidExecute = true;
 		return {sql: local.sql, captured: local.captured};
 	}
 
@@ -218,7 +221,7 @@ component extends="wheels.Global"{
 		// Key on the VERBATIM table name: the $dbinfo probe below uses original
 		// case, so case-folding the key would let `Authors` and `authors` share
 		// one slot on case-sensitive databases (#2937 review, #2977).
-		local.cacheKey = application[local.appKey].dataSourceName & "|" & arguments.tableName;
+		local.cacheKey = $migratorDataSource() & "|" & arguments.tableName;
 		if (
 			StructKeyExists(request, "$wheelsMigratorColumns")
 			&& StructKeyExists(request.$wheelsMigratorColumns, local.cacheKey)
@@ -226,7 +229,7 @@ component extends="wheels.Global"{
 			return request.$wheelsMigratorColumns[local.cacheKey];
 		}
 		local.columns = $dbinfo(
-			datasource = application[local.appKey].dataSourceName,
+			datasource = $migratorDataSource(),
 			username = application[local.appKey].dataSourceUserName,
 			password = application[local.appKey].dataSourcePassword,
 			type = "columns",
@@ -281,7 +284,7 @@ component extends="wheels.Global"{
 	private string function $getColumnDefinition(required string tableName, required string columnName) {
 		local.appKey = $appKey();
 		local.columns = $dbinfo(
-			datasource = application[local.appKey].dataSourceName,
+			datasource = $migratorDataSource(),
 			username = application[local.appKey].dataSourceUserName,
 			password = application[local.appKey].dataSourcePassword,
 			type = "columns",

@@ -60,6 +60,7 @@ component {
 			local.totalInserted += (local.batchEnd - local.batchStart + 1);
 		}
 
+		$markMigrationDidWork();
 		$clearRequestCache();
 		return {insertedCount: local.totalInserted};
 	}
@@ -150,6 +151,7 @@ component {
 			local.totalUpserted += (local.batchEnd - local.batchStart + 1);
 		}
 
+		$markMigrationDidWork();
 		$clearRequestCache();
 		return {upsertedCount: local.totalUpserted};
 	}

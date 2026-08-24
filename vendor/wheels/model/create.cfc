@@ -311,6 +311,7 @@ component {
 			sql = local.sql,
 			$primaryKey = local.pks
 		);
+		$markMigrationDidWork();
 		$clearRequestCache();
 		local.generatedKey = variables.wheels.class.adapter.$generatedKey();
 		if (StructKeyExists(local.inserted.result, local.generatedKey)) {

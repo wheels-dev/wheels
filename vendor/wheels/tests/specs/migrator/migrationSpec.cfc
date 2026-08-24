@@ -1091,7 +1091,7 @@ component extends="wheels.WheelsTest" {
 
 				created = g.$query(query = info, dbtype = "query", sql = sql)
 
-				migration.dropForeignKey(table = tableName, keyName = "FK_#tableName#_#referenceTableName#")
+				migration.dropForeignKey(table = tableName, keyName = "FK_#tableName#_#referenceTableName#_barid")
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = referenceTableName, type = "foreignkeys")
 				dropped = g.$query(query = info, dbtype = "query", sql = sql)
 

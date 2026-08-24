@@ -716,7 +716,9 @@ am.writeMigration(d, "rename_name_field");
 
 _Auto-migration is currently CFC-only (`wheels.migrator.AutoMigrator`, shown above). There is no `wheels dbmigrate diff` CLI command — invoking it errors._
 
-Result struct: `{modelName, tableName, addColumns, removeColumns, changeColumns, renameColumns, suggestedRenames}`. Limits: PK renames not detected; rename + type change requires separate migrations; calculated properties excluded.
+Result struct: `{modelName, tableName, addColumns, removeColumns, changeColumns, renameColumns, suggestedRenames}`. Limits: PK renames not detected; rename + type change requires separate migrations; calculated properties excluded. `writeMigration()` / `generateMigrationCFC()` honor `suggestedRenames` as `renameColumn` instead of destructive remove+add.
+
+Announce-only `up()`/`down()` (the default "NOT IMPLEMENTED" stubs and the announce template) do not write `wheels_migrator_versions`. `announce()` plus ORM persist (`model().create()` / `save()` / `delete()` with no `$execute`) still marks or unmarks the version. `redoMigration()` fails closed when `allowMigrationDown` is false — the framework default stays `false` (development still opts in to `true`). Default FK names are `FK_<table>_<refTable>_<column>` so two FKs to the same reference table do not collide.
 
 ### Seeding
 

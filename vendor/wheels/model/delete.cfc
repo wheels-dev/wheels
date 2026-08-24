@@ -196,6 +196,7 @@ component {
 	 */
 	public numeric function $deleteAll() {
 		local.deleted = variables.wheels.class.adapter.$querySetup(sql = arguments.sql, parameterize = arguments.parameterize);
+		$markMigrationDidWork();
 		$clearRequestCache();
 		return local.deleted.result.recordCount;
 	}
@@ -219,6 +220,7 @@ component {
 				sql = arguments.sql,
 				parameterize = arguments.parameterize
 			);
+			$markMigrationDidWork();
 			$clearRequestCache();
 			if (local.deleted.result.recordCount == 1 && $callback("afterDelete", arguments.callbacks)) {
 				local.rv = true;

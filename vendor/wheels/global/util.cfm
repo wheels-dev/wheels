@@ -602,6 +602,22 @@
 		return local.rv;
 	}
 
+	/**
+	 * Datasource the migrator should use for this request.
+	 * Prefer a request-scoped override (TenantMigrator) so tenant runs do
+	 * not mutate application.wheels.dataSourceName, which concurrent
+	 * requests read without the tenant lock.
+	 */
+	public string function $migratorDataSource() {
+		if (IsDefined("request.wheels.migratorDataSource") && Len(ToString(request.wheels.migratorDataSource))) {
+			return ToString(request.wheels.migratorDataSource);
+		}
+		if (IsDefined("request.wheels.tenant.dataSource") && Len(ToString(request.wheels.tenant.dataSource))) {
+			return ToString(request.wheels.tenant.dataSource);
+		}
+		return application[$appKey()].dataSourceName;
+	}
+
 
 	/**
 	 * Generates a 36-character UUID compatible with SQL Server's uniqueidentifier.

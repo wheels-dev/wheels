@@ -352,15 +352,25 @@ component output="false" extends="wheels.Global"{
 	) {
 		local.appKey = $appKey();
 		local.result = {success = true, output = ""};
+		// Fail-closed redo: if down cannot run, do not run up (that would
+		// double-apply) and do not change version tracking.
+		if (arguments.direction == "redo" && !application[local.appKey].allowMigrationDown) {
+			local.result.success = false;
+			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)#Cannot redo migration: allowMigrationDown is false. Running up() without down() would double-apply.#Chr(13) & Chr(10)#";
+			return local.result;
+		}
 		local.divider = arguments.direction == "up" ? "--------" : "-------";
 		transaction action="begin" {
 			try {
 				// Test query to establish datasource for BoxLang compatibility
 				if (structKeyExists(server, "boxlang")) {
-					$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
+					$query(datasource = $migratorDataSource(), sql = "SELECT 1 as test");
 				}
 				local.result.output &= "#Chr(13) & Chr(10)##local.divider# " & arguments.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(arguments.migration.cfcfile)))##Chr(13) & Chr(10)#";
 				request.$wheelsMigrationOutput = "";
+				request.$wheelsMigrationDidExecute = false;
+				request.$wheelsMigrationDidAnnounce = false;
+				request.$wheelsMigrationDidWork = false;
 				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
 				if (application[local.appKey].writeMigratorSQLFiles) {
 					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
@@ -370,17 +380,19 @@ component output="false" extends="wheels.Global"{
 				if (arguments.direction == "down") {
 					arguments.migration.cfc.down();
 					local.result.output &= request.$wheelsMigrationOutput;
-					$removeVersionAsMigrated(arguments.migration.version);
-				} else if (arguments.direction == "redo") {
-					if (application[local.appKey].allowMigrationDown) {
-						arguments.migration.cfc.down();
+					if ($migrationStepMutatedSchema()) {
+						$removeVersionAsMigrated(arguments.migration.version);
 					}
+				} else if (arguments.direction == "redo") {
+					arguments.migration.cfc.down();
 					arguments.migration.cfc.up();
 					local.result.output &= request.$wheelsMigrationOutput;
 				} else {
 					arguments.migration.cfc.up();
 					local.result.output &= request.$wheelsMigrationOutput;
-					$setVersionAsMigrated(arguments.migration.version, arguments.migration.name);
+					if ($migrationStepMutatedSchema()) {
+						$setVersionAsMigrated(arguments.migration.version, arguments.migration.name);
+					}
 				}
 			} catch (any e) {
 				local.result.success = false;
@@ -394,6 +406,29 @@ component output="false" extends="wheels.Global"{
 			transaction action="commit";
 		}
 		return local.result;
+	}
+
+	/**
+	 * True when the just-run up()/down() did real work. Skip version
+	 * tracking only when the step is truly announce-only: announced,
+	 * no $execute, and no ORM/other persist work. announce() plus
+	 * model().create()/save()/delete() still counts.
+	 */
+	private boolean function $migrationStepMutatedSchema() {
+		if (!StructKeyExists(request, "$wheelsMigrationDidExecute")) {
+			request.$wheelsMigrationDidExecute = false;
+		}
+		if (!StructKeyExists(request, "$wheelsMigrationDidAnnounce")) {
+			request.$wheelsMigrationDidAnnounce = false;
+		}
+		if (!StructKeyExists(request, "$wheelsMigrationDidWork")) {
+			request.$wheelsMigrationDidWork = false;
+		}
+		return !(
+			request.$wheelsMigrationDidAnnounce
+			&& !request.$wheelsMigrationDidExecute
+			&& !request.$wheelsMigrationDidWork
+		);
 	}
 
 	/**
@@ -449,7 +484,7 @@ component output="false" extends="wheels.Global"{
 			}
 		}
 		$query(
-			datasource = application[local.appKey].dataSourceName,
+			datasource = $migratorDataSource(),
 			sql = "INSERT INTO #application[local.appKey].migratorTableName# (#local.cols#) VALUES (#local.vals#)"
 		);
 	}
@@ -461,7 +496,7 @@ component output="false" extends="wheels.Global"{
 		local.appKey = $appKey();
 		if (!StructKeyExists(request, "$wheelsDebugSQL"))
 			$query(
-				datasource = application[local.appKey].dataSourceName,
+				datasource = $migratorDataSource(),
 				sql = "DELETE FROM #application[local.appKey].migratorTableName# WHERE version = '#$sanitiseVersion(arguments.version)#'"
 			);
 	}
@@ -549,7 +584,7 @@ component output="false" extends="wheels.Global"{
 
 		try {
 			local.migratedVersions = $query(
-				datasource = application[local.appKey].dataSourceName,
+				datasource = $migratorDataSource(),
 				sql = "SELECT version FROM #application[local.appKey].migratorTableName# WHERE core_level = #application[local.appKey].migrationLevel# ORDER BY version ASC"
 			);
 		} catch (any e) {
@@ -560,11 +595,11 @@ component output="false" extends="wheels.Global"{
 			// table present but unreadable) is rethrown rather than being
 			// misread as an empty migration history.
 			var probeState = {fresh = false};
-			if (!$migratorTableExists(application[local.appKey].dataSourceName, application[local.appKey].migratorTableName)) {
+			if (!$migratorTableExists($migratorDataSource(), application[local.appKey].migratorTableName)) {
 				try {
 					$dbinfo(
 						type = "version",
-						datasource = application[local.appKey].dataSourceName,
+						datasource = $migratorDataSource(),
 						username = application.wheels.dataSourceUserName,
 						password = application.wheels.dataSourcePassword
 					);
@@ -641,7 +676,7 @@ component output="false" extends="wheels.Global"{
 			return;
 		}
 
-		local.dsn = application[local.appKey].dataSourceName;
+		local.dsn = $migratorDataSource();
 		local.levelsTable = application[local.appKey].levelsTableName;
 		local.versionsTable = application[local.appKey].migratorTableName;
 
@@ -888,7 +923,7 @@ component output="false" extends="wheels.Global"{
 		try {
 			local.versionsQuoted = "'" & ArrayToList(local.bareOrphans, "','") & "'";
 			local.rows = $query(
-				datasource = application[local.appKey].dataSourceName,
+				datasource = $migratorDataSource(),
 				sql = "SELECT version, name, applied_at FROM #application[local.appKey].migratorTableName# "
 					& "WHERE version IN (#local.versionsQuoted#) "
 					& "AND core_level = #application[local.appKey].migrationLevel# "
@@ -1188,7 +1223,7 @@ component output="false" extends="wheels.Global"{
 		// own `arguments` scope (CFML closures don't inherit the parent's
 		// `arguments` struct), so we need to pull the value out by reference
 		// before the closure sees it.
-		var dsn = application[arguments.appKey].dataSourceName;
+		var dsn = $migratorDataSource();
 
 		// Always probe with a no-rows query so we don't load data unnecessarily.
 		// `WHERE 1=0` is portable across every adapter we support.
@@ -1262,7 +1297,7 @@ component output="false" extends="wheels.Global"{
 			sql: []
 		};
 		var appKey = $appKey();
-		var dsn = application[appKey].dataSourceName;
+		var dsn = $migratorDataSource();
 
 		// Inline probe (CFML closures don't inherit parent `arguments`, so
 		// `dsn` is captured via lexical scope — see $detectSystemTables for
@@ -1413,7 +1448,7 @@ component output="false" extends="wheels.Global"{
 	public struct function $ensureTrackingColumns(boolean addMissing = true) {
 		var rv = {hasName: false, hasAppliedAt: false, added: [], errors: []};
 		var appKey = $appKey();
-		var dsn = application[appKey].dataSourceName;
+		var dsn = $migratorDataSource();
 		var tableName = application[appKey].migratorTableName;
 
 		try {
