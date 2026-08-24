@@ -125,11 +125,12 @@
 
 		// fixes IIS issue that returns a blank cgi.path_info
 		if (!Len(local.rv.path_info) && Right(local.rv.script_name, 10) == "/index.cfm") {
-			if (Len(local.rv.http_x_rewrite_url)) {
-				// IIS6 1/ IIRF (Ionics Isapi Rewrite Filter)
+			if ($trustProxyHeaders() && Len(local.rv.http_x_rewrite_url)) {
+				// IIS6 1/ IIRF (Ionics Isapi Rewrite Filter). Client-supplied;
+				// only trusted when the app opted in via trustProxyHeaders.
 				local.rv.path_info = ListFirst(local.rv.http_x_rewrite_url, "?");
-			} else if (Len(local.rv.http_x_original_url)) {
-				// IIS7 rewrite default
+			} else if ($trustProxyHeaders() && Len(local.rv.http_x_original_url)) {
+				// IIS7 rewrite default. Same trust gate as X-Forwarded-*.
 				local.rv.path_info = ListFirst(local.rv.http_x_original_url, "?");
 			} else if (Len(local.rv.request_uri)) {
 				// Apache default
@@ -160,9 +161,11 @@
 
 
 	/**
-	 * Internal function. Returns whether the application has opted into trusting `X-Forwarded-*`
-	 * headers via `set(trustProxyHeaders=true)`. Guarded so it is safe to call on a cold start
-	 * before `application.wheels` exists (resolves to `false`, i.e. do not trust).
+	 * Internal function. Returns whether the application has opted into trusting
+	 * proxy-supplied headers via `set(trustProxyHeaders=true)`: `X-Forwarded-*`
+	 * plus the IIS rewrite headers `X-Rewrite-URL` / `X-Original-URL` used by
+	 * `$cgiScope()`. Guarded so it is safe to call on a cold start before
+	 * `application.wheels` exists (resolves to `false`, i.e. do not trust).
 	 */
 	public boolean function $trustProxyHeaders() {
 		return StructKeyExists(application, "wheels")

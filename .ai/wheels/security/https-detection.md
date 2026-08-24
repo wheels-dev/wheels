@@ -135,6 +135,7 @@ component extends="Controller" {
 - Returns `true` for HTTPS connections (port 443)
 - Works behind load balancers and reverse proxies when `set(trustProxyHeaders=true)` is configured
 - `X-Forwarded-Proto` is **not** honored by default; enable with `set(trustProxyHeaders=true)` behind a trusted proxy that overwrites forwarded headers
+- `X-Rewrite-URL` / `X-Original-URL` used to recover a blank `path_info` follow the same `trustProxyHeaders` gate
 - Test both HTTP and HTTPS scenarios during development
 
 ## Common Patterns

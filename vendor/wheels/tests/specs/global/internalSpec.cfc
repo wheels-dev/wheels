@@ -65,6 +65,13 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that $cgiscope", () => {
 
 			beforeEach(() => {
+				_hadTrustProxyHeaders = StructKeyExists(application.wheels, "trustProxyHeaders")
+				if (_hadTrustProxyHeaders) {
+					_originalTrustProxyHeaders = application.wheels.trustProxyHeaders
+				}
+				// These cases document the IIS rewrite-header recovery order.
+				// The headers are client-supplied and require trustProxyHeaders.
+				application.wheels.trustProxyHeaders = true
 				cgi_scope = {}
 				cgi_scope.request_method = ""
 				cgi_scope.http_x_requested_with = ""
@@ -86,6 +93,14 @@ component extends="wheels.WheelsTest" {
 				cgi_scope.redirect_url = "/users/list/redirect_url/index.cfm?controller=wheels&action=wheels&view=test"
 				cgi_scope.http_x_forwarded_for = ""
 				cgi_scope.http_x_forwarded_proto = ""
+			})
+
+			afterEach(() => {
+				if (_hadTrustProxyHeaders) {
+					application.wheels.trustProxyHeaders = _originalTrustProxyHeaders
+				} else {
+					StructDelete(application.wheels, "trustProxyHeaders")
+				}
 			})
 
 			it("checks path info is blank", () => {
