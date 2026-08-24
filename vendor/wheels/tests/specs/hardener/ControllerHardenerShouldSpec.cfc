@@ -13,6 +13,12 @@ component extends="wheels.WheelsTest" {
 		describe("B5 $callAction does not remap real render errors to ViewNotFound", () => {
 
 			beforeEach(() => {
+				// $throwErrorOrShow404Page only Throws when showErrorInformation
+				// is on; otherwise it renders the 404 page and abort — the catch
+				// never sees a typed Wheels.ViewNotFound. Pin the throw path so
+				// CI proves the types without changing production 404 behavior.
+				_priorShowError = application.wheels.showErrorInformation
+				application.wheels.showErrorInformation = true
 				params = {controller = "hardenerLifecycle", action = "noView"}
 				_controller = g.controller("hardenerLifecycle", params)
 				_classData = _controller.$getControllerClassData()
@@ -21,28 +27,27 @@ component extends="wheels.WheelsTest" {
 
 			afterEach(() => {
 				_classData.layouts = _priorLayouts
+				application.wheels.showErrorInformation = _priorShowError
 			})
 
 			it("still maps a genuine missing view to ViewNotFound", () => {
-				var thrown = {type = ""}
-				try {
+				expect(() => {
 					_controller.$callAction(action = "noView")
-				} catch (any e) {
-					thrown.type = e.type
-				}
-				expect(thrown.type).toBe("Wheels.ViewNotFound")
+				}).toThrow("Wheels.ViewNotFound")
 			})
 
 			it("preserves a layout function error when the action view is missing", () => {
+				// Bind the layout fn on this instance so usesLayout / $useLayout
+				// resolve it as a function (same pattern as renderingSpec).
+				var boom = function() {
+					Throw(type = "Wheels.HardenerLayoutError", message = "layout exploded on purpose");
+				};
+				_controller.explodingLayout = boom
 				_controller.usesLayout(template = "explodingLayout")
 
-				var thrown = {type = ""}
-				try {
+				expect(() => {
 					_controller.$callAction(action = "noView")
-				} catch (any e) {
-					thrown.type = e.type
-				}
-				expect(thrown.type).toBe("Wheels.HardenerLayoutError")
+				}).toThrow("Wheels.HardenerLayoutError")
 			})
 
 		})
