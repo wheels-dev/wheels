@@ -3,7 +3,7 @@
 		application.$wheels.functions = {};
 		application.$wheels.functions.autoLink = {link = "all", encode = true};
 		application.$wheels.functions.average = {distinct = false, parameterize = true, ifNull = ""};
-		application.$wheels.functions.belongsTo = {joinType = "outer"};
+		application.$wheels.functions.belongsTo = {joinType = "inner"};
 		application.$wheels.functions.buttonTo = {
 			onlyPath = true,
 			host = "",

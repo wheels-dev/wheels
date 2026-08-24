@@ -1268,12 +1268,12 @@ component extends="wheels.WheelsTest" {
 			// emit FLAT sibling joins so the root FROM table stays in scope for every
 			// ON condition. Wheels 3 over-fired the issue #449 parenthesized grouping
 			// here, scoping the root out and triggering MySQL "Unknown column ... in
-			// 'on clause'". `author.user` is a belongsTo (outer) and `author.posts` /
+			// 'on clause'". `author.user` is a belongsTo (inner) and `author.posts` /
 			// `user.galleries` are hasMany (outer) — exactly the reported shape.
 			it("emits flat joins for a belongsTo-chain nested include (issue ##3245)", () => {
 				actual = g.model("author").$fromClause(include = "posts,user(galleries)")
 
-				// No join here qualifies for grouping: `user` is OUTER at the root
+				// No join here qualifies for grouping: `user` is INNER but sits at the root
 				// (nothing encloses it, and its ON references the root `authors`), and
 				// `galleries` is OUTER. Every join stays at the top level, so the root table
 				// remains in scope for every ON condition.
@@ -1281,22 +1281,22 @@ component extends="wheels.WheelsTest" {
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_authors')#"
 					& " LEFT OUTER JOIN #qi('c_o_r_e_posts')# ON #qi('c_o_r_e_authors')#.#qi('id')# = #qi('c_o_r_e_posts')#.#qi('authorid')# AND #qi('c_o_r_e_posts')#.#qi('deletedat')# IS NULL"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_users')# ON #qi('c_o_r_e_authors')#.#qi('firstname')# = #qi('c_o_r_e_users')#.#qi('firstname')#"
+					& " INNER JOIN #qi('c_o_r_e_users')# ON #qi('c_o_r_e_authors')#.#qi('firstname')# = #qi('c_o_r_e_users')#.#qi('firstname')#"
 					& " LEFT OUTER JOIN #qi('c_o_r_e_galleries')# ON #qi('c_o_r_e_users')#.#qi('id')# = #qi('c_o_r_e_galleries')#.#qi('userid')#"
 				)
 			})
 
 			// Regression for issue #449 (must NOT be undone by the #3245 fix): a genuine
-			// HABTM / `through` bridge nested include. Team.memberTeams is a hasMany
-			// (outer bridge); nested `member` is belongsTo (outer by default), so both
-			// joins stay flat and parent rows are preserved.
+			// HABTM / `through` bridge nested include keeps the parenthesized grouping so
+			// the bridge's INNER join stays scoped to the OUTER-joined bridge table.
+			// Team.memberTeams is a hasMany (outer bridge); its nested `member` inner
+			// join references the bridge table, so the grouping is correct here.
 			it("preserves nested grouping for a HABTM/through bridge include (issue ##449)", () => {
 				actual = g.model("team").$fromClause(include = "memberTeams(member)")
 
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_teams')#"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_memberteams')# ON #qi('c_o_r_e_teams')#.#qi('id')# = #qi('c_o_r_e_memberteams')#.#qi('teamid')#"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_members')# ON #qi('c_o_r_e_memberteams')#.#qi('memberid')# = #qi('c_o_r_e_members')#.#qi('id')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_memberteams')# INNER JOIN #qi('c_o_r_e_members')# ON #qi('c_o_r_e_memberteams')#.#qi('memberid')# = #qi('c_o_r_e_members')#.#qi('id')#) ON #qi('c_o_r_e_teams')#.#qi('id')# = #qi('c_o_r_e_memberteams')#.#qi('teamid')#"
 				)
 			})
 
@@ -1305,8 +1305,8 @@ component extends="wheels.WheelsTest" {
 			// got the nested group's INNER join spliced into it — referencing a table the
 			// query has not introduced yet (ORA-00904 / "unknown column in on clause").
 			// `Post.c_o_r_e_comments` and `Post.classifications` are both hasMany (outer);
-			// `Classification.tag` is a belongsTo (outer by default) whose ON clause
-			// references `classifications`. All three joins stay flat.
+			// `Classification.tag` is a belongsTo (inner) whose ON clause references
+			// `classifications`, so it belongs to the classifications group and nowhere else.
 			it("scopes a nested inner join to its own parent, not to every outer join (issue ##3334)", () => {
 				actual = g.model("post").$fromClause(include = "c_o_r_e_comments,classifications(tag)")
 
@@ -1315,25 +1315,23 @@ component extends="wheels.WheelsTest" {
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_posts')#"
 					& " LEFT OUTER JOIN #qi('c_o_r_e_comments')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_comments')#.#qi('postid')#"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_classifications')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
 				)
 			})
 
 			// Second shape of issue #3334, and a residual case of issue #3245 that the
-			// #3245 gate does not cover: a ROOT-level belongsTo join (`Post.author`)
-			// alongside a nested group. Its ON clause references the root
+			// #3245 gate does not cover: a ROOT-level inner join (`Post.author` is a
+			// belongsTo) alongside a nested group. Its ON clause references the root
 			// `posts` table, so pulling it inside the classifications parentheses scopes
 			// the root out — the same "unknown column in on clause" failure #3245 fixed
 			// for the flat branch. A root-level join has no enclosing group; it stays flat.
-			it("keeps a root-level belongsTo join out of the nested group (issue ##3334)", () => {
+			it("keeps a root-level inner join out of the nested group (issue ##3334)", () => {
 				actual = g.model("post").$fromClause(include = "author,classifications(tag)")
 
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_posts')#"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_authors')# ON #qi('c_o_r_e_posts')#.#qi('authorid')# = #qi('c_o_r_e_authors')#.#qi('id')#"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_classifications')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#"
+					& " INNER JOIN #qi('c_o_r_e_authors')# ON #qi('c_o_r_e_posts')#.#qi('authorid')# = #qi('c_o_r_e_authors')#.#qi('id')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
 				)
 			})
 
@@ -1380,8 +1378,7 @@ component extends="wheels.WheelsTest" {
 			// from the association tree, so include order only reorders the emitted joins.
 			it("emits the same joins wherever the nested group sits in the include (issue ##3334)", () => {
 				comments = " LEFT OUTER JOIN #qi('c_o_r_e_comments')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_comments')#.#qi('postid')#"
-				classifications = " LEFT OUTER JOIN #qi('c_o_r_e_classifications')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
-					& " LEFT OUTER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#"
+				classifications = " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
 
 				expect(g.model("post").$fromClause(include = "c_o_r_e_comments,classifications(tag)")).toBe(
 					"FROM #qi('c_o_r_e_posts')#" & comments & classifications

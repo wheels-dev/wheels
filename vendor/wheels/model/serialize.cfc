@@ -174,9 +174,14 @@ component {
 					Called the afterFind hook, the hook adds the arguments defined in the hook to the object so get the properties using properties() function and then append the property struct to the individual record struct
 				*/
 				if (arguments.callbacks && structKeyExists(this, 'afterFindCallback') && arguments.returnas eq "struct") {
-					$callback("afterFind", arguments.callbacks);
-					local.objectProps = properties();
-					structAppend(local.struct, local.objectProps);
+					// Invoke against the row struct, not the class model. The previous
+					// `$callback("afterFind")` + `properties()` path ran afterFind on
+					// `this` (the shared class) and only worked when create() had leaked
+					// column values onto that singleton.
+					local.afterFindResult = $invoke(method = "afterFindCallback", invokeArgs = local.struct);
+					if (StructKeyExists(local, "afterFindResult") && IsStruct(local.afterFindResult)) {
+						structAppend(local.struct, local.afterFindResult);
+					}
 				}
 
 				ArrayAppend(local.rv, local.struct);
