@@ -1,5 +1,5 @@
 /**
- * Hardener BLOCKERs B1–B3 (dispatch / request lifecycle).
+ * Hardener BLOCKERs B1–B3 plus request-lifecycle SHOULDs ($findRoute, processRequest CSRF).
  *
  * Directory-scoped so `wheels test --core --ci --filter=hardener`
  * discovers this folder (a single-file directory= scope finds 0 bundles).
@@ -219,6 +219,91 @@ component extends="wheels.WheelsTest" {
 				request.cgi["request_method"] = "POST"
 				form._method = "TRACE"
 				expect(dispatch.$getRequestMethod()).toBe("POST")
+			})
+
+		})
+
+		describe("SHOULD $findRoute multi-name does not fail open", () => {
+
+			beforeEach(() => {
+				_originalRoutes = Duplicate(application.wheels.routes)
+				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
+				_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+				application.wheels.routes = [
+					{
+						name = "hardenerWidget",
+						methods = "get",
+						foundvariables = "key",
+						controller = "dummy",
+						action = "show",
+						pattern = "hardener-widgets/[key]"
+					},
+					{
+						name = "hardenerWidget",
+						methods = "post",
+						foundvariables = "",
+						controller = "dummy",
+						action = "create",
+						pattern = "hardener-widgets"
+					}
+				]
+				application.wheels.namedRoutePositions = {hardenerWidget = "1,2"}
+			})
+
+			afterEach(() => {
+				application.wheels.routes = _originalRoutes
+				application.wheels.staticRoutes = _originalStaticRoutes
+				application.wheels.namedRoutePositions = _originalNamedRoutePositions
+			})
+
+			it("throws RouteNotFound when no same-named candidate matches the method", () => {
+				var thrown = {type = ""}
+				try {
+					g.$findRoute(route = "hardenerWidget", method = "delete")
+				} catch (any e) {
+					thrown.type = e.type
+				}
+				expect(thrown.type).toBe("Wheels.RouteNotFound")
+			})
+
+			it("selects the candidate whose variables and method match instead of the last name", () => {
+				var found = g.$findRoute(route = "hardenerWidget", method = "get", key = "1")
+				expect(found.action).toBe("show")
+				expect(found.methods).toBe("get")
+			})
+
+			it("still resolves a matching method when variables are empty", () => {
+				var found = g.$findRoute(route = "hardenerWidget", method = "post")
+				expect(found.action).toBe("create")
+			})
+
+		})
+
+		describe("SHOULD processRequest CSRF ignore is opt-in exception not a silent default flip", () => {
+
+			beforeEach(() => {
+				_originalCgiMethod = request.cgi.request_method
+			})
+
+			afterEach(() => {
+				request.cgi["request_method"] = _originalCgiMethod
+			})
+
+			it("keeps the historic processRequest default of CSRF ignore", () => {
+				var params = {controller = "csrfProtectedWithException", action = "create"}
+				var body = g.processRequest(params = params, method = "post")
+				expect(body).toBe("Create ran.")
+			})
+
+			it("enforces CSRF when processRequest is asked for exception mode", () => {
+				var params = {controller = "csrfProtectedWithException", action = "create"}
+				var thrown = {type = ""}
+				try {
+					g.processRequest(params = params, method = "post", csrf = "exception")
+				} catch (any e) {
+					thrown.type = e.type
+				}
+				expect(thrown.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 		})

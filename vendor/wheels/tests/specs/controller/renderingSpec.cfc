@@ -682,6 +682,10 @@ component extends="wheels.WheelsTest" {
 				request.cgi.http_x_requested_with = ""
 				params = {controller = "dummy", action = "index"}
 				_controller = application.wo.controller("dummy", params)
+				// usesLayout writes class-level state. Clear leftovers so each
+				// example tests one declaration instead of relying on the old
+				// $useLayout wipe of a prior match.
+				ArrayClear(_controller.$getControllerClassData().layouts)
 			})
 
 			it("is using method match", () => {

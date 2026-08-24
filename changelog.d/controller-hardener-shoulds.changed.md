@@ -1,0 +1,2 @@
+- `processAction()` returns `false` when a verification aborts or a before filter returns `false` (the halt signal was previously always `true`)
+- `processRequest()` accepts opt-in `csrf="exception"` / `csrf="abort"`; the historic test-helper default remains `ignore` and production `protectsFromForgery()` is unchanged

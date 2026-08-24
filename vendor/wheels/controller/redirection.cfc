@@ -136,11 +136,13 @@ component {
 			}
 			local.url = arguments.url;
 			if (Len(arguments.params)) {
+				local.params = $constructParams(params = arguments.params, encode = arguments.encode);
 				if (Find("?", arguments.url)) {
-					local.url = "#local.url#&#arguments.params#";
-				} else {
-					local.url = "#local.url#?#arguments.params#";
+					local.params = Replace(local.params, "?", "&");
+				} else if (Left(local.params, 1) == "&") {
+					local.params = Replace(local.params, "&", "?", "one");
 				}
+				local.url &= local.params;
 			}
 		} else {
 			local.url = uRLFor(argumentCollection = arguments);

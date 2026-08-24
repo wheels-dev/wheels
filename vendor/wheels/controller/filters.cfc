@@ -44,8 +44,12 @@ component {
 			}
 			if (arguments.placement == "append") {
 				ArrayAppend(variables.$class.filters, local.filter);
+			} else if (!ArrayLen(variables.$class.filters)) {
+				ArrayAppend(variables.$class.filters, local.filter);
 			} else {
-				ArrayPrepend(variables.$class.filters, local.filter);
+				// Prepend the through-list as a block so "a,b,c" stays a,b,c
+				// in front of the existing chain (not c,b,a).
+				ArrayInsertAt(variables.$class.filters, local.i, local.filter);
 			}
 		}
 	}
@@ -86,14 +90,15 @@ component {
 		}
 
 		// Set all filters to be returned, or loop over them and set only those that match the supplied type to be returned.
+		// Always return a copy so callers cannot mutate the live $class.filters chain.
 		if (arguments.type == "all") {
-			local.rv = variables.$class.filters;
+			local.rv = Duplicate(variables.$class.filters);
 		} else {
 			local.rv = [];
 			local.iEnd = ArrayLen(variables.$class.filters);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				if (LCase(variables.$class.filters[local.i].type) == LCase(arguments.type)) {
-					ArrayAppend(local.rv, variables.$class.filters[local.i]);
+					ArrayAppend(local.rv, Duplicate(variables.$class.filters[local.i]));
 				}
 			}
 		}

@@ -490,13 +490,15 @@
 	 * @returnAs Pass in `struct` to return all information about the request instead of just the final output (`body`).
 	 * @rollback Pass in `true` to roll back all database transactions made during the request.
 	 * @includeFilters Set to `before` to only execute "before" filters, `after` to only execute "after" filters or `false` to skip all filters.
+	 * @csrf CSRF handling for this request. Default `ignore` preserves the historic test helper. Pass `exception` or `abort` to enforce; this is opt-in and does not change the production `protectsFromForgery()` default.
 	 */
 	public any function processRequest(
 		required struct params,
 		string method,
 		string returnAs,
 		string rollback,
-		string includeFilters = true
+		string includeFilters = true,
+		string csrf = "ignore"
 	) {
 		$args(name = "processRequest", args = arguments);
 
@@ -528,8 +530,9 @@
 
 		local.controller = controller(name = arguments.params.controller, params = arguments.params);
 
-		// Set to ignore CSRF errors during testing.
-		local.controller.protectsFromForgery(with = "ignore");
+		// Historic test helper defaults to ignore. Opt in to exception/abort
+		// without flipping the production protectsFromForgery() default.
+		local.controller.protectsFromForgery(with = arguments.csrf);
 
 		local.controller.processAction(includeFilters = arguments.includeFilters);
 		local.response = local.controller.response();
