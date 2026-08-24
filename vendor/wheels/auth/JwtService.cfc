@@ -22,12 +22,16 @@ component output="false" {
 	 * @defaultExpiry Default token lifetime in seconds (default 3600 = 1 hour).
 	 * @issuer Default issuer claim (iss). Empty string means no iss claim added and no iss validation on decode.
 	 * @allowedClockSkew Seconds of clock skew tolerance for expiry checks (default 0).
+	 * @maxRefreshAge Seconds after exp during which refresh() still accepts an expired token. 0 (default) keeps the historic unbounded refresh. Set a positive bound to fail closed.
+	 * @requireExpiry When true (the default), decode() rejects a signed token that has no exp claim. Pass false to opt out.
 	 */
 	public JwtService function init(
 		required string secretKey,
 		numeric defaultExpiry = 3600,
 		string issuer = "",
-		numeric allowedClockSkew = 0
+		numeric allowedClockSkew = 0,
+		numeric maxRefreshAge = 0,
+		boolean requireExpiry = true
 	) {
 		// Fail fast on missing or weak secrets — a short HMAC key makes every issued token brute-forceable
 		if (!Len(arguments.secretKey)) {
@@ -49,6 +53,8 @@ component output="false" {
 		variables.defaultExpiry = arguments.defaultExpiry;
 		variables.issuer = arguments.issuer;
 		variables.allowedClockSkew = arguments.allowedClockSkew;
+		variables.maxRefreshAge = arguments.maxRefreshAge;
+		variables.requireExpiry = arguments.requireExpiry;
 
 		// Cache the Java class handles used on the per-request encode/decode paths
 		variables.messageDigest = CreateObject("java", "java.security.MessageDigest");
@@ -100,7 +106,8 @@ component output="false" {
 	 *
 	 * Verifies the signature and checks expiry/nbf claims. When an issuer was
 	 * configured, the iss claim must be present and match it (case-sensitive).
-	 * Throws on invalid token, bad signature, wrong issuer, or expired token.
+	 * A missing exp claim is rejected by default (requireExpiry=true). Throws on
+	 * invalid token, bad signature, wrong issuer, missing exp, or expired token.
 	 *
 	 * @token The JWT token string to decode.
 	 * @ignoreExpiry If true, skip expiry validation (used for refresh). Default false.
@@ -159,6 +166,13 @@ component output="false" {
 			}
 		}
 
+		if (variables.requireExpiry && !StructKeyExists(local.claims, "exp")) {
+			throw(
+				type = "Wheels.Auth.JWT.MissingExpiry",
+				message = "JWT token is missing a required exp claim"
+			);
+		}
+
 		// Validate time-based claims
 		if (!arguments.ignoreExpiry) {
 			local.now = $epochSeconds();
@@ -207,6 +221,10 @@ component output="false" {
 	 * existing claims but updates iat and exp. The jti claim is removed
 	 * so callers can assign a new one if needed.
 	 *
+	 * When maxRefreshAge is 0 (default), any expired-but-validly-signed token
+	 * can be refreshed. When maxRefreshAge is positive, tokens whose exp is
+	 * older than now - maxRefreshAge are rejected.
+	 *
 	 * @token The existing JWT token to refresh.
 	 * @expiry New token lifetime in seconds. Uses defaultExpiry if not provided.
 	 * @return New signed JWT token string.
@@ -214,6 +232,22 @@ component output="false" {
 	public string function refresh(required string token, numeric expiry = 0) {
 		// Decode with ignoreExpiry=true to allow refreshing expired tokens
 		local.claims = decode(token = arguments.token, ignoreExpiry = true);
+
+		if (variables.maxRefreshAge > 0) {
+			if (!StructKeyExists(local.claims, "exp")) {
+				throw(
+					type = "Wheels.Auth.JWT.RefreshWindowExceeded",
+					message = "JWT token cannot be refreshed because it has no exp claim"
+				);
+			}
+			local.now = $epochSeconds();
+			if (local.claims.exp + variables.maxRefreshAge < local.now) {
+				throw(
+					type = "Wheels.Auth.JWT.RefreshWindowExceeded",
+					message = "JWT token is too old to refresh"
+				);
+			}
+		}
 
 		// Remove time-based claims so encode() regenerates them
 		StructDelete(local.claims, "iat");

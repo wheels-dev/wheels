@@ -1,0 +1,1 @@
+- `JwtService.decode()` now requires an `exp` claim by default (`requireExpiry=true`). Pass `requireExpiry=false` to accept signed tokens with no expiry. `maxRefreshAge` stays `0` (unbounded refresh) unless a positive window is set
