@@ -37,33 +37,64 @@
 	 * @origin string to test against e.g bar.foo.com
 	 */
 	public boolean function $wildcardDomainMatch(required string domain, required string origin) {
-		local.rv = false;
 		local.domainfull = $fullDomainString(arguments.domain);
 		local.originfull = $fullDomainString(arguments.origin);
-
-		// Do we have a wildcard subdomain?
-		local.hasWildcard = ListContainsNoCase(local.domainfull, "*", '.') && Len(local.domainfull > 1);
-
-		// If not, is it an exact match?
-		if (!local.hasWildcard && local.domainfull == local.originfull) {
-			local.rv = true;
+		if (local.domainfull == local.originfull) {
+			return true;
 		}
 
-		// Loop over domain backwards and test the corresponding position in the other array
-		if (local.hasWildcard) {
-			local.domainReversed = ListToArray(Reverse(SpanExcluding(Reverse(local.domainfull), ".")));
-			local.serverNameReversed = ListToArray(Reverse(SpanExcluding(Reverse(local.originfull), ".")));
-			local.wildcardPassed = true;
-			// Check each part with corresponding part in other array
-			for (local.i = 1; i LTE ArrayLen(local.domainReversed); i = i + 1) {
-				if (local.domainReversed[i] != local.serverNameReversed[i] && local.domainReversed[i] DOES NOT CONTAIN '*') {
-					local.wildcardPassed = false;
-					break;
-				}
+		// Compare protocol, port, and every host label. Reverse+SpanExcluding
+		// used to keep only TLD+port, so https://*.example.com matched
+		// https://evil.com. Fail closed on a parse miss or a length mismatch.
+		local.domainParts = $parseFullDomain(local.domainfull);
+		local.originParts = $parseFullDomain(local.originfull);
+		if (
+			!Len(local.domainParts.host)
+			|| !Len(local.originParts.host)
+			|| CompareNoCase(local.domainParts.protocol, local.originParts.protocol)
+			|| CompareNoCase(ToString(local.domainParts.port), ToString(local.originParts.port))
+		) {
+			return false;
+		}
+
+		local.domainLabels = ListToArray(local.domainParts.host, ".");
+		local.originLabels = ListToArray(local.originParts.host, ".");
+		if (ArrayLen(local.domainLabels) != ArrayLen(local.originLabels) || !ArrayLen(local.domainLabels)) {
+			return false;
+		}
+
+		for (local.i = 1; local.i <= ArrayLen(local.domainLabels); local.i++) {
+			if (local.domainLabels[local.i] == "*") {
+				continue;
 			}
-			local.rv = local.wildcardPassed;
+			if (CompareNoCase(local.domainLabels[local.i], local.originLabels[local.i])) {
+				return false;
+			}
 		}
+		return true;
+	}
 
+
+	/**
+	 * Split a $fullDomainString value (https://host:port) into protocol, host, port.
+	 */
+	public struct function $parseFullDomain(required string fullDomain) {
+		local.rv = {protocol = "", host = "", port = ""};
+		local.sep = Find("://", arguments.fullDomain);
+		if (local.sep < 2) {
+			return local.rv;
+		}
+		local.rv.protocol = Left(arguments.fullDomain, local.sep - 1);
+		local.rest = Mid(arguments.fullDomain, local.sep + 3, Len(arguments.fullDomain));
+		local.colon = Find(":", local.rest);
+		if (local.colon < 1) {
+			local.rv.host = local.rest;
+			return local.rv;
+		}
+		if (local.colon > 1) {
+			local.rv.host = Left(local.rest, local.colon - 1);
+		}
+		local.rv.port = Mid(local.rest, local.colon + 1, Len(local.rest));
 		return local.rv;
 	}
 
