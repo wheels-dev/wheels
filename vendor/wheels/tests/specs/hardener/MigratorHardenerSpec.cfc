@@ -23,6 +23,10 @@ component extends="wheels.WheelsTest" {
 			migratePath = "/wheels/tests/_assets/migrator/migrations_2789/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql_2789/"
 		);
+		variables.ormMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/announceorm/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceorm/"
+		);
 		variables.sqlMigrator = CreateObject("component", "wheels.Migrator").init(
 			migratePath = "/wheels/tests/_assets/migrator/migrations/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql/"
@@ -41,12 +45,30 @@ component extends="wheels.WheelsTest" {
 				deleteMigratorVersions(2);
 				StructDelete(request, "$wheelsDebugSQL");
 				StructDelete(request, "$wheelsMigrationDidExecute");
+				StructDelete(request, "$wheelsMigrationDidAnnounce");
+				StructDelete(request, "$wheelsMigrationDidWork");
+				try {
+					queryExecute(
+						"DELETE FROM c_o_r_e_tags WHERE name = 'hardener_b1_announce_then_orm'",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+				} catch (any e) {}
 			});
 
 			afterEach(() => {
 				deleteMigratorVersions(2);
 				StructDelete(request, "$wheelsDebugSQL");
 				StructDelete(request, "$wheelsMigrationDidExecute");
+				StructDelete(request, "$wheelsMigrationDidAnnounce");
+				StructDelete(request, "$wheelsMigrationDidWork");
+				try {
+					queryExecute(
+						"DELETE FROM c_o_r_e_tags WHERE name = 'hardener_b1_announce_then_orm'",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+				} catch (any e) {}
 			});
 
 			it("does not mark an announce-only up() as migrated", () => {
@@ -104,6 +126,62 @@ component extends="wheels.WheelsTest" {
 					expect(rows.recordCount).toBe(
 						1,
 						"Announce-only down() must not DELETE the migrator versions row."
+					);
+				} finally {
+					application.wheels.allowMigrationDown = priorDown;
+				}
+			});
+
+			it("still marks a version migrated when up() announces then creates via ORM without $execute", () => {
+				if (_isCockroachDB) return;
+				variables.ormMigrator.migrateTo("90000000000003");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000003'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(
+					1,
+					"announce() then model().create() with no $execute must still INSERT the migrator versions row."
+				);
+			});
+
+			it("still removes a tracking row when down() announces then deletes via ORM without $execute", () => {
+				if (_isCockroachDB) return;
+				var priorDown = application.wheels.allowMigrationDown;
+				application.wheels.allowMigrationDown = true;
+				try {
+					// Ensure the tracking table exists. up() may or may not
+					// write the row (that write is the sibling hole); the
+					// row is forced present so down() is actually invoked.
+					variables.ormMigrator.migrateTo("90000000000003");
+					queryExecute(
+						"DELETE FROM #application.wheels.migratorTableName# WHERE version = '90000000000003'",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					queryExecute(
+						"INSERT INTO #application.wheels.migratorTableName# (version, core_level) VALUES ('90000000000003', #application.wheels.migrationLevel#)",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					var existing = queryExecute(
+						"SELECT id FROM c_o_r_e_tags WHERE name = 'hardener_b1_announce_then_orm'",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					if (existing.recordCount == 0) {
+						model("Tag").create(name = "hardener_b1_announce_then_orm");
+					}
+					variables.ormMigrator.migrateTo("0");
+					var rows = queryExecute(
+						"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000003'",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					expect(rows.recordCount).toBe(
+						0,
+						"announce() then model delete with no $execute must still DELETE the migrator versions row."
 					);
 				} finally {
 					application.wheels.allowMigrationDown = priorDown;
