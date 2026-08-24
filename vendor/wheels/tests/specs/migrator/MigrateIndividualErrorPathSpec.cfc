@@ -35,7 +35,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns normally when the migration's up() throws", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var rv = "";
 				var threw = false;
 				var thrownMessage = "";
@@ -54,7 +57,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not record a tracking row when the migration throws", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateIndividual("004");
 				var versions = queryExecute(
 					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '004'",

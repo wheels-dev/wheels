@@ -221,12 +221,12 @@ component extends="wheels.databaseAdapters.Abstract" {
         required string sql,
         struct options = {}
     ) {
-        arguments.sql &= " FOREIGN KEY (" & arguments.options.column & ")";
+        arguments.sql &= " FOREIGN KEY (" & quoteColumnName(arguments.options.column) & ")";
 
         if (StructKeyExists(arguments.options, "referenceTable")) {
             if (StructKeyExists(arguments.options, "referenceColumn")) {
-                arguments.sql &= " REFERENCES " & arguments.options.referenceTable;
-                arguments.sql &= " (" & arguments.options.referenceColumn & ")";
+                arguments.sql &= " REFERENCES " & quoteTableName(arguments.options.referenceTable);
+                arguments.sql &= " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
             }
         }
 

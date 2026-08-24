@@ -72,7 +72,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not mark an announce-only up() as migrated", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				variables.announceMigrator.migrateTo("90000000000001");
 				var rows = queryExecute(
 					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000001'",
@@ -86,7 +89,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not mark the default announce-only Migration.up() stub as migrated", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				variables.stubMigrator.migrateTo("90000000000002");
 				var rows = queryExecute(
 					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000002'",
@@ -100,7 +106,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not remove a tracking row when down() is announce-only", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var priorDown = application.wheels.allowMigrationDown;
 				application.wheels.allowMigrationDown = true;
 				try {
@@ -133,7 +142,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("still marks a version migrated when up() announces then creates via ORM without $execute", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				variables.ormMigrator.migrateTo("90000000000003");
 				var rows = queryExecute(
 					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000003'",
@@ -147,7 +159,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("still removes a tracking row when down() announces then deletes via ORM without $execute", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var priorDown = application.wheels.allowMigrationDown;
 				application.wheels.allowMigrationDown = true;
 				try {
@@ -189,7 +204,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("still records a version when up() actually executes SQL", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				try {
 					variables.migration.dropTable("c_o_r_e_bunyips");
 				} catch (any e) {}
@@ -239,7 +257,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not re-run up() when down is blocked by the default allowMigrationDown=false", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var priorDown = application.wheels.allowMigrationDown;
 				application.wheels.allowMigrationDown = true;
 				try {

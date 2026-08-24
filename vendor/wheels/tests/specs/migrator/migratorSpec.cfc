@@ -39,7 +39,10 @@ component extends="wheels.WheelsTest" {
 		describe("Tests that getCurrentMigrationVersion", () => {
 
 			it("is returning expected value", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				for (local.table in ["c_o_r_e_bunyips", "c_o_r_e_dropbears", "c_o_r_e_hoopsnakes"]) {
 					migration.dropTable(local.table)
 				}
@@ -84,7 +87,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is migrating up from 0 to 001", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo(001)
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
 
@@ -95,7 +101,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is migrating up from 0 to 003", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo(003)
 				info1 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
 				info2 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_dropbears")
@@ -110,7 +119,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is migrating down from 003 to 001", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo(003)
 				migrator.migrateTo(001)
 				info1 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
@@ -126,7 +138,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("generates sql files", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				application.wheels.writeMigratorSQLFiles = true
 
 				migrator.migrateTo(002)
@@ -203,7 +218,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("creates wheels_levels and wheels_migrator_versions on a fresh DB", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				application.wheels.migratorTableName = "wheels_migrator_versions";
 				application.wheels.levelsTableName = "wheels_levels";
 				application.wheels.createMigratorTable = true;
@@ -225,7 +243,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("falls back to c_o_r_e_levels when only legacy tables exist", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				application.wheels.migratorTableName = "wheels_migrator_versions";
 				application.wheels.levelsTableName = "wheels_levels";
 				application.wheels.createMigratorTable = true;
@@ -280,7 +301,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns a no-op result when neither legacy nor new tables exist", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				application.wheels.levelsTableName = "wheels_levels";
 				application.wheels.migratorTableName = "wheels_migrator_versions";
 
@@ -291,7 +315,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("renames c_o_r_e_levels -> wheels_levels and c_o_r_e_migrator_versions -> wheels_migrator_versions", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 
 				// Pre-create both legacy tables so renameSystemTables has work to do.
 				queryExecute(
@@ -336,7 +363,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("refuses to rename when both legacy and new tables exist (partial-rename safeguard)", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 
 				// Simulate a half-renamed state: both versions of the levels
 				// table coexist. This shouldn't happen in practice but guards
@@ -363,7 +393,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("dryRun=true returns the SQL list without executing", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 
 				queryExecute(
 					"CREATE TABLE c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50))",

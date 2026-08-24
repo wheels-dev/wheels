@@ -14,6 +14,11 @@ component extends="wheels.migrator.TenantMigrator" {
 		} else {
 			request.hardenerTenantMigratorOverrideDs = "";
 		}
+		if (IsDefined("request.wheels.migratorDataSourceUserName")) {
+			request.hardenerTenantMigratorOverrideUser = request.wheels.migratorDataSourceUserName;
+		} else {
+			request.hardenerTenantMigratorOverrideUser = "";
+		}
 		return super.$executeAction(argumentCollection = arguments);
 	}
 

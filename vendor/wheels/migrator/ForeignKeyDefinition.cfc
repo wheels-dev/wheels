@@ -50,7 +50,7 @@ component extends="Base" {
 	}
 
 	public string function toForeignKeySQL() {
-		local.sql = "CONSTRAINT " & this.name;
+		local.sql = "CONSTRAINT " & this.adapter.quoteTableName(this.name);
 		local.sql = addForeignKeyOptions(local.sql);
 		return local.sql;
 	}

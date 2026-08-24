@@ -113,6 +113,12 @@ component output="false" extends="wheels.Global"{
 				DirectoryCreate(this.paths.sql);
 			}
 			if (local.currentVersion > arguments.version && arguments.missingMigFlag == false) {
+				// S1: do not print a successful "Migrating … down" banner when
+				// down is blocked — that reads as a completed rollback.
+				if (!application[local.appKey].allowMigrationDown) {
+					local.rv &= "Cannot migrate down from #local.currentVersion# to #arguments.version#: allowMigrationDown is false.#Chr(13) & Chr(10)#";
+					return local.rv;
+				}
 				local.rv &= "Migrating from #local.currentVersion# down to #arguments.version#.#Chr(13) & Chr(10)#";
 				for (local.i = ArrayLen(local.migrations); local.i >= 1; local.i--) {
 					local.migration = local.migrations[local.i];
@@ -359,6 +365,17 @@ component output="false" extends="wheels.Global"{
 			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)#Cannot redo migration: allowMigrationDown is false. Running up() without down() would double-apply.#Chr(13) & Chr(10)#";
 			return local.result;
 		}
+		// S5: a CFC that failed to load must not reach .up()/.down().
+		if (StructKeyExists(arguments.migration, "loadError") && Len(ToString(arguments.migration.loadError))) {
+			local.result.success = false;
+			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)#Migration failed to load: #arguments.migration.loadError##Chr(13) & Chr(10)#";
+			return local.result;
+		}
+		if (!StructKeyExists(arguments.migration, "cfc")) {
+			local.result.success = false;
+			local.result.output = "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)#Migration CFC was not loaded.#Chr(13) & Chr(10)#";
+			return local.result;
+		}
 		local.divider = arguments.direction == "up" ? "--------" : "-------";
 		transaction action="begin" {
 			try {
@@ -397,6 +414,9 @@ component output="false" extends="wheels.Global"{
 			} catch (any e) {
 				local.result.success = false;
 				local.result.output &= "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
+				if ($ddlAutoCommits()) {
+					local.result.output &= "Warning: this database auto-commits DDL. The per-migration transaction did not roll back schema changes.#Chr(13) & Chr(10)#";
+				}
 				transaction action="rollback";
 				StructDelete(request, "$wheelsTransactionWrapper");
 				// Skip the commit below — rollback already closed the transaction.
@@ -597,11 +617,12 @@ component output="false" extends="wheels.Global"{
 			var probeState = {fresh = false};
 			if (!$migratorTableExists($migratorDataSource(), application[local.appKey].migratorTableName)) {
 				try {
+					local.creds = $migratorDataSourceCredentials();
 					$dbinfo(
 						type = "version",
 						datasource = $migratorDataSource(),
-						username = application.wheels.dataSourceUserName,
-						password = application.wheels.dataSourcePassword
+						username = local.creds.username,
+						password = local.creds.password
 					);
 					probeState.fresh = true;
 				} catch (any datasourceError) {
@@ -719,11 +740,12 @@ component output="false" extends="wheels.Global"{
 
 			// Version tracking table.
 			if (!$migratorTableExists(local.dsn, local.versionsTable)) {
+				local.creds = $migratorDataSourceCredentials();
 				local.info = $dbinfo(
 					type = "version",
 					datasource = local.dsn,
-					username = application.wheels.dataSourceUserName,
-					password = application.wheels.dataSourcePassword
+					username = local.creds.username,
+					password = local.creds.password
 				);
 				local.dbType = local.info.database_productname;
 				// FK constraint name follows the levels-table prefix so a
@@ -740,7 +762,7 @@ component output="false" extends="wheels.Global"{
 							datasource = local.dsn,
 							sql = "
 								CREATE TABLE #local.versionsTable# (
-									version VARCHAR(25),
+									version VARCHAR(25) PRIMARY KEY,
 									core_level INT NOT NULL DEFAULT 1,
 									CONSTRAINT #local.fkName# FOREIGN KEY (core_level) REFERENCES #local.levelsTable#(id)
 								)
@@ -776,9 +798,9 @@ component output="false" extends="wheels.Global"{
 				} else {
 					// Fresh database — create the tracking table.
 					if (FindNoCase("Oracle", local.dbType)) {
-						local.createSQL = "CREATE TABLE #local.versionsTable# (version VARCHAR2(25), core_level NUMBER DEFAULT 1 NOT NULL)";
+						local.createSQL = "CREATE TABLE #local.versionsTable# (version VARCHAR2(25) PRIMARY KEY, core_level NUMBER DEFAULT 1 NOT NULL)";
 					} else {
-						local.createSQL = "CREATE TABLE #local.versionsTable# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
+						local.createSQL = "CREATE TABLE #local.versionsTable# (version VARCHAR(25) PRIMARY KEY, core_level INT NOT NULL DEFAULT 1)";
 					}
 					try {
 						$query(datasource = local.dsn, sql = local.createSQL);
@@ -793,11 +815,54 @@ component output="false" extends="wheels.Global"{
 					}
 				}
 			}
+			// S3: existing tables created before the PRIMARY KEY DDL still
+			// need a uniqueness constraint. Best-effort — duplicates or
+			// engines that already have the PK land in the catch.
+			$ensureVersionUniqueness(
+				dsn = local.dsn,
+				versionsTable = local.versionsTable
+			);
 		}
 
 		// Table guaranteed present — add the enriched name + applied_at
 		// columns when missing so $setVersionAsMigrated can write them.
 		$maybeEnsureTrackingColumns(local.appKey);
+	}
+
+	/**
+	 * True when the current migrator datasource auto-commits DDL so a
+	 * cftransaction rollback cannot undo CREATE/ALTER/DROP. MySQL (implicit
+	 * commit) and Oracle (DDL auto-commit) are the known cases. Used to
+	 * warn after a failed migration step — full DDL rollback is not possible
+	 * on these engines.
+	 */
+	public boolean function $ddlAutoCommits() {
+		local.appKey = $appKey();
+		local.dbType = "";
+		if (StructKeyExists(application[local.appKey], "$migratorDbType")) {
+			local.dbType = application[local.appKey].$migratorDbType;
+		}
+		return (
+			FindNoCase("MySQL", local.dbType)
+			|| FindNoCase("MariaDB", local.dbType)
+			|| FindNoCase("Oracle", local.dbType)
+		);
+	}
+
+	/**
+	 * Best-effort UNIQUE/PK on the version column for tables created before
+	 * the PRIMARY KEY DDL. A JVM-local lock cannot stop a second process
+	 * inserting a duplicate version row.
+	 */
+	public void function $ensureVersionUniqueness(required string dsn, required string versionsTable) {
+		try {
+			$query(
+				datasource = arguments.dsn,
+				sql = "CREATE UNIQUE INDEX #arguments.versionsTable#_version_uidx ON #arguments.versionsTable# (version)"
+			);
+		} catch (any e) {
+			// Index already present, PK already exists, or duplicate rows.
+		}
 	}
 
 	/**
@@ -1344,11 +1409,12 @@ component output="false" extends="wheels.Global"{
 		// renamed first so any FK constraint pointing at c_o_r_e_levels
 		// follows naturally when levels is renamed last (every supported
 		// engine auto-updates FK references on table rename).
+		var creds = $migratorDataSourceCredentials();
 		var info = $dbinfo(
 			type = "version",
 			datasource = dsn,
-			username = application.wheels.dataSourceUserName,
-			password = application.wheels.dataSourcePassword
+			username = creds.username,
+			password = creds.password
 		);
 		var dbType = info.database_productname;
 
@@ -1481,11 +1547,12 @@ component output="false" extends="wheels.Global"{
 		// can't DEFAULT a TIMESTAMP on ALTER ADD COLUMN). Guarded so it
 		// fires at most once per app process.
 		if (!StructKeyExists(application[appKey], "$migratorDbType")) {
+			var creds = $migratorDataSourceCredentials();
 			var info = $dbinfo(
 				type = "version",
 				datasource = dsn,
-				username = application.wheels.dataSourceUserName,
-				password = application.wheels.dataSourcePassword
+				username = creds.username,
+				password = creds.password
 			);
 			application[appKey].$migratorDbType = info.database_productname;
 		}

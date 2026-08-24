@@ -1,7 +1,9 @@
 component extends="wheels.databaseAdapters.Abstract" {
 
 	variables.sqlTypes = {};
+	variables.sqlTypes['biginteger'] = {name = 'BIGINT'};
 	variables.sqlTypes['binary'] = {name = 'BYTEA'};
+	variables.sqlTypes['char'] = {name = 'CHAR', limit = 1};
 	variables.sqlTypes['boolean'] = {name = 'BOOLEAN'};
 	variables.sqlTypes['date'] = {name = 'DATE'};
 	variables.sqlTypes['datetime'] = {name = 'TIMESTAMP'};
@@ -27,12 +29,12 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * or scaffold `--belongsTo=` on PostgreSQL throws at migrate time. See #2876.
 	 */
 	public string function addForeignKeyOptions(required string sql, struct options = {}) {
-		arguments.sql = arguments.sql & " FOREIGN KEY (" & arguments.options.column & ")";
+		arguments.sql = arguments.sql & " FOREIGN KEY (" & quoteColumnName(arguments.options.column) & ")";
 		if (StructKeyExists(arguments.options, "referenceTable")) {
 			if (StructKeyExists(arguments.options, "referenceColumn")) {
 				arguments.sql = arguments.sql & " REFERENCES ";
-				arguments.sql = arguments.sql & arguments.options.referenceTable;
-				arguments.sql = arguments.sql & " (" & arguments.options.referenceColumn & ")";
+				arguments.sql = arguments.sql & quoteTableName(arguments.options.referenceTable);
+				arguments.sql = arguments.sql & " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
 			}
 		}
 		return arguments.sql;
@@ -126,20 +128,18 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * Rails adaptor appears to be applying default/nulls in separate queries
 	 */
 	public string function changeColumnInTable(required string name, required any column) {
+		local.sql = "ALTER TABLE #quoteTableName(objectCase(arguments.name))# ALTER COLUMN #quoteColumnName(arguments.column.name)# TYPE #arguments.column.sqlType()#";
 		for (local.i in ["default", "allowNull", "afterColumn"]) {
 			if (StructKeyExists(arguments.column, local.i)) {
 				local.opts = {};
 				local.opts.type = arguments.column.type;
 				local.opts[local.i] = arguments.column[local.i];
 				local.columnSQL = addColumnOptions(
-					sql = " ALTER COLUMN #arguments.column.name#",
+					sql = " ALTER COLUMN #quoteColumnName(arguments.column.name)#",
 					options = local.opts,
 					alter = true
 				);
-				if (!StructKeyExists(local, "sql")) {
-					local.sql = "ALTER TABLE #quoteTableName(objectCase(arguments.name))# ALTER COLUMN #objectCase(arguments.column.name)# TYPE #arguments.column.sqlType()#";
-				}
-				if (Len(arguments.column[local.i])) {
+				if (local.i == "allowNull" || Len(ToString(arguments.column[local.i]))) {
 					local.sql = ListAppend(local.sql, local.columnSQL, ",#Chr(13)##Chr(10)#");
 				}
 			}

@@ -260,6 +260,24 @@ component extends="wheels.migrator.Base"{
 	}
 
 	/**
+	 * Inline CREATE TABLE foreign-key fragment. Quotes identifiers through
+	 * the adapter so reserved/mixed-case names stay valid.
+	 */
+	public string function addForeignKeyOptions(required string sql, struct options = {}) {
+		if (StructKeyExists(arguments.options, "column")) {
+			arguments.sql = arguments.sql & " FOREIGN KEY (" & quoteColumnName(arguments.options.column) & ")";
+		}
+		if (
+			StructKeyExists(arguments.options, "referenceTable")
+			&& StructKeyExists(arguments.options, "referenceColumn")
+		) {
+			arguments.sql = arguments.sql & " REFERENCES " & quoteTableName(arguments.options.referenceTable);
+			arguments.sql = arguments.sql & " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
+		}
+		return arguments.sql;
+	}
+
+	/**
 	 * generates sql for foreign key constraint
 	 */
 	public string function foreignKeySQL(
@@ -271,7 +289,7 @@ component extends="wheels.migrator.Base"{
 		string onUpdate = "",
 		string onDelete = ""
 	) {
-		local.sql = "CONSTRAINT #quoteTableName(arguments.name)# FOREIGN KEY (#quoteColumnName(arguments.column)#) REFERENCES #objectCase(arguments.referenceTable)#(#quoteColumnName(arguments.referenceColumn)#)";
+		local.sql = "CONSTRAINT #quoteTableName(arguments.name)# FOREIGN KEY (#quoteColumnName(arguments.column)#) REFERENCES #quoteTableName(arguments.referenceTable)#(#quoteColumnName(arguments.referenceColumn)#)";
 		for (local.item in ListToArray("onUpdate,onDelete")) {
 			if (Len(arguments[local.item])) {
 				switch (arguments[local.item]) {

@@ -807,7 +807,10 @@ component extends="wheels.WheelsTest" {
 				if (isACF2016 && isPostgres) {
 					return
 				}
-				if (isCockroachDB) return;
+				if (isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 
 				tableName = "dbm_addindex_tests"
 				indexName = "idx_to_add"
@@ -832,7 +835,10 @@ component extends="wheels.WheelsTest" {
 				if (isACF2016 && isPostgres) {
 					return
 				}
-				if (isCockroachDB) return;
+				if (isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 
 				tableName = "dbm_addindex_tests"
 				indexName = "idx_to_add_to_multiple_columns"
@@ -947,7 +953,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is changing column", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				if(get("adapterName") eq 'SQLiteModel') {
 					skip("SQLite changeColumn is covered by the SQLite-specific spec above.")
 				}
@@ -980,7 +989,7 @@ component extends="wheels.WheelsTest" {
 					expect(actual.nullable).toBeFalse()
 				}
 				if (ListFindNoCase(actual.columnList, "default_value")) {
-					expect(actual.default_value).toInclude("bar")
+					expect(actual.default_value).toInclude("foo")
 				} else if (structKeyExists(server, "boxlang")) {
 					expect(actual.COLUMN_DEF).toInclude("foo")
 				} else {
@@ -1253,7 +1262,10 @@ component extends="wheels.WheelsTest" {
 				if (isACF2016 && isPostgres) {
 					return
 				}
-				if (isCockroachDB) return;
+				if (isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				tableName = "dbm_removeindex_tests"
 				indexName = "idx_to_remove"
 				t = migration.createTable(name = tableName, force = true)

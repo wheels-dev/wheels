@@ -618,6 +618,26 @@
 		return application[$appKey()].dataSourceName;
 	}
 
+	/**
+	 * Username/password the migrator should use for $dbinfo probes.
+	 * TenantMigrator may set request-scoped overrides so a tenant DS
+	 * with its own credentials does not silently reuse the app DS user.
+	 */
+	public struct function $migratorDataSourceCredentials() {
+		var creds = {username = "", password = ""};
+		if (IsDefined("request.wheels.migratorDataSourceUserName")) {
+			creds.username = ToString(request.wheels.migratorDataSourceUserName);
+			if (IsDefined("request.wheels.migratorDataSourcePassword")) {
+				creds.password = ToString(request.wheels.migratorDataSourcePassword);
+			}
+			return creds;
+		}
+		var appKey = $appKey();
+		creds.username = application[appKey].dataSourceUserName;
+		creds.password = application[appKey].dataSourcePassword;
+		return creds;
+	}
+
 
 	/**
 	 * Generates a 36-character UUID compatible with SQL Server's uniqueidentifier.
