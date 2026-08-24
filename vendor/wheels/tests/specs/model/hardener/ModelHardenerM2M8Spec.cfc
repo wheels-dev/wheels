@@ -126,10 +126,9 @@ component extends="wheels.WheelsTest" {
 
 		describe("M6 belongsTo include default is inner; outer is opt-in", () => {
 
-			afterEach(() => {
-				var associations = g.model("post").$classData().associations;
-				associations.author.joinType = "inner";
-				$resetJoinMemo("post", "author");
+			it("registers belongsTo with joinType inner by default", () => {
+				expect(g.model("post").$classData().associations.author.joinType).toBe("inner");
+				expect(g.model("post").$fromClause(include = "author")).toInclude("INNER JOIN");
 			});
 
 			it("drops parent rows that have no associated record by default", () => {
@@ -141,6 +140,8 @@ component extends="wheels.WheelsTest" {
 						validate = false,
 						transaction = "none"
 					);
+					post.reload();
+					expect(post.authorId).toBeEmpty();
 					var allCount = g.model("post").count();
 					var included = g.model("post").findAll(include = "author");
 					expect(included.recordcount).toBeLT(allCount);
@@ -149,22 +150,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("keeps orphan parents when the association opts in with joinType=outer", () => {
-				var associations = g.model("post").$classData().associations;
-				associations.author.joinType = "outer";
-				$resetJoinMemo("post", "author");
-				transaction action="begin" {
-					var post = g.model("post").findOne();
-					g.model("post").updateByKey(
-						key = post.id,
-						authorId = "",
-						validate = false,
-						transaction = "none"
-					);
-					var allCount = g.model("post").count();
-					var included = g.model("post").findAll(include = "author");
-					expect(included.recordcount).toBe(allCount);
-					transaction action="rollback";
-				}
+				expect(g.model("tag").$classData().associations.parent.joinType).toBe("outer");
+				expect(g.model("tag").$fromClause(include = "parent")).toInclude("LEFT OUTER JOIN");
+				var allCount = g.model("tag").count();
+				var included = g.model("tag").findAll(include = "parent");
+				expect(allCount).toBeGT(0);
+				expect(included.recordcount).toBe(allCount);
 			});
 
 		});
@@ -206,17 +197,6 @@ component extends="wheels.WheelsTest" {
 
 		});
 
-	}
-
-	/**
-	 * Clears $expandedAssociations join memo so a runtime joinType flip is honoured.
-	 */
-	private void function $resetJoinMemo(required string modelName, required string association) {
-		var associations = application.wo.model(arguments.modelName).$classData().associations;
-		if (StructKeyExists(associations, arguments.association)) {
-			StructDelete(associations[arguments.association], "join");
-			StructDelete(associations[arguments.association], "joinVariants");
-		}
 	}
 
 }
