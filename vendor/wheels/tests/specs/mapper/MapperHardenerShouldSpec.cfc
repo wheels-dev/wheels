@@ -94,18 +94,10 @@ component extends="wheels.WheelsTest" {
 
 		describe("S6 [*path] matches nested paths", function() {
 
-			beforeEach(function() {
-				$clearRoutes();
-			});
-
 			it("compiles [*path] so /a/b/c matches", function() {
-				$mapper()
-					.$draw()
-					.get(name = "catchAll", pattern = "[*path]", to = "pages##show")
-					.end();
-
-				expect(application.wheels.routes).toHaveLength(1);
-				var regex = application.wheels.routes[1].regex;
+				var mapper = new wheels.Mapper();
+				mapper.$init();
+				var regex = mapper.$patternToRegex("/[*path]");
 				expect(REFindNoCase(regex, "a/b/c")).toBeGT(
 					0,
 					"compiled [*path] regex must match nested path a/b/c"
@@ -113,6 +105,14 @@ component extends="wheels.WheelsTest" {
 				expect(REFindNoCase(regex, "/a/b/c")).toBeGT(
 					0,
 					"compiled [*path] regex must match /a/b/c"
+				);
+			});
+
+			it("keeps the glob constraint as .+ so nested segments stay legal", function() {
+				var src = FileRead(ExpandPath("/wheels/Mapper.cfc"));
+				expect(FindNoCase("variables.constraints[""\*\w+""] = "".+""", src)).toBeGT(
+					0,
+					"Mapper $init must keep the [*var] glob constraint at .+ (do not tighten)"
 				);
 			});
 

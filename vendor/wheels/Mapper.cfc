@@ -243,6 +243,15 @@ component output="false" {
 		// scope is a special struct type that can cause Duplicate() failures when
 		// stored in shared scopes and later deep-copied. StructCopy() produces a
 		// plain CFML struct that is safe to Duplicate() on all engines.
+		// Honor a drawn verb for the static index even when methods was stripped
+		// (restful=false). Do not store $staticIndexMethods on the route.
+		local.indexMethods = "";
+		if (StructKeyExists(arguments, "methods") && Len(arguments.methods)) {
+			local.indexMethods = arguments.methods;
+		} else if (StructKeyExists(arguments, "$staticIndexMethods")) {
+			local.indexMethods = arguments.$staticIndexMethods;
+			StructDelete(arguments, "$staticIndexMethods");
+		}
 		local.routeStruct = StructCopy(arguments);
 
 		// Add route to Wheels.
@@ -266,8 +275,8 @@ component output="false" {
 				application[$appKey()].staticRoutes = {};
 			}
 
-			if (StructKeyExists(local.routeStruct, "methods")) {
-				local.methodList = ListToArray(local.routeStruct.methods);
+			if (Len(local.indexMethods)) {
+				local.methodList = ListToArray(local.indexMethods);
 			} else {
 				local.methodList = ["get", "post", "put", "patch", "delete", "head"];
 			}

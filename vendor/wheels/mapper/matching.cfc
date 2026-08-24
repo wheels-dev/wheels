@@ -386,7 +386,10 @@ component {
 		}
 
 		// Remove 'methods' argument if settings disable it.
+		// Keep the drawn verb for the static index so restful=false get()
+		// cannot register POST:/ (S4). Ordered matching still sees no methods.
 		if (!variables.methods && StructKeyExists(arguments, "methods")) {
+			arguments.$staticIndexMethods = arguments.methods;
 			StructDelete(arguments, "methods");
 		}
 
