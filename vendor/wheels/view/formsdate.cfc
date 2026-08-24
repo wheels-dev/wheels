@@ -319,7 +319,9 @@ component {
 				local.content &= $yearMonthHourMinuteSecondSelectTagContent(argumentCollection = local.args);
 			}
 		}
-		local.encode = IsBoolean(arguments.encode) && arguments.encode ? "attributes" : false;
+		// Match select(): encode="attributes" (non-boolean) must still encode
+		// attribute values. `IsBoolean && encode` coerced that string to false.
+		local.encode = IsBoolean(arguments.encode) && !arguments.encode ? false : "attributes";
 		return local.before & $element(
 			name = "select",
 			skip = "objectName,property,label,labelPlacement,prepend,append,prependToLabel,appendToLabel,errorElement,errorClass,value,includeBlank,order,separator,startYear,endYear,monthDisplay,monthNames,monthAbbreviations,dateSeparator,dateOrder,timeSeparator,timeOrder,minuteStep,secondStep,association,position,twelveHour,encode",
