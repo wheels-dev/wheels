@@ -116,6 +116,46 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 			});
 
+			it("CommandBox test runners do not invoke testbox run after deprecation error()", () => {
+				// CommandBox error() prints red and does NOT abort. A later
+				// command("testbox run") still executes. C5.
+				var files = [
+					"test/run.cfc",
+					"test/all.cfc",
+					"test/unit.cfc",
+					"test/integration.cfc",
+					"test/coverage.cfc",
+					"test/watch.cfc",
+					"browser/test.cfc"
+				];
+				for (var rel in files) {
+					var src = fileRead(expandPath("/cli/src/commands/wheels/" & rel));
+					expect(findNoCase("testbox run", src)).toBe(
+						0,
+						rel & " must not contain testbox run after error(); CommandBox error() does not abort."
+					);
+				}
+			});
+
+			it("deprecation error() is followed by return so CommandBox cannot fall through", () => {
+				var files = [
+					"test/run.cfc",
+					"test/all.cfc",
+					"test/unit.cfc",
+					"test/integration.cfc",
+					"test/coverage.cfc",
+					"test/watch.cfc",
+					"browser/test.cfc"
+				];
+				for (var rel in files) {
+					var src = fileRead(expandPath("/cli/src/commands/wheels/" & rel));
+					expect(reFindNoCase("error\s*\(\s*""DEPRECATED[^;]*;\s*return\s*;", src)).toBeGT(
+						0,
+						rel & " must return immediately after error(""DEPRECATED..."") — error() does not abort."
+					);
+				}
+			});
+
 		});
 
 		describe("SHOULD 6 — orphan vendor/wheels/controllers/Tests.cfc is gone", () => {
