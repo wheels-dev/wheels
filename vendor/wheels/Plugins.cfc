@@ -613,7 +613,9 @@ component output="false" extends="wheels.Global"{
 			local.plugin = variables.$class.plugins[local.iPlugin];
 			if (StructKeyExists(local.plugin, "onPluginActivate") && IsCustomFunction(local.plugin.onPluginActivate)) {
 				try {
-					local.plugin.onPluginActivate(application);
+					// Same sandbox as onPluginLoad: never pass the live
+					// application scope (or a StructCopy + sync-back).
+					local.plugin.onPluginActivate($pluginHookSandbox(local.iPlugin));
 				} catch (any e) {
 					WriteLog(
 						text = "[Wheels] Plugin '#local.iPlugin#' onPluginActivate failed: #e.message#",
@@ -833,21 +835,26 @@ component output="false" extends="wheels.Global"{
 	 * Builds a context struct (not the application scope directly) to work
 	 * around Adobe CF's limitation on function members in the application scope.
 	 */
+	/**
+	 * Isolated hook context for onPluginLoad / onPluginActivate.
+	 * Never the live application scope and never a StructCopy of it
+	 * (sync-back would plant attacker keys). registerMiddleware writes
+	 * to $class directly.
+	 */
+	public struct function $pluginHookSandbox(required string pluginName) {
+		local.context = {
+			environment = variables.$class.wheelsEnvironment,
+			version = variables.$class.wheelsVersion
+		};
+		$installPluginLoadAPI(arguments.pluginName, local.context);
+		return local.context;
+	}
+
 	private void function $invokeOnPluginLoad(required string pluginKey, required any plugin) {
 		if (!StructKeyExists(arguments.plugin, "onPluginLoad") || !IsCustomFunction(arguments.plugin.onPluginLoad)) {
 			return;
 		}
-		// Sandbox: do not hand the live application scope (or a shallow
-		// copy of it) to onPluginLoad. A StructCopy + sync-back let a
-		// plugin plant top-level application keys and mutate
-		// application.wheels through the shared nested struct. registerMiddleware
-		// is the supported write API and writes to $class directly.
-		local.loadContext = {
-			environment = variables.$class.wheelsEnvironment,
-			version = variables.$class.wheelsVersion
-		};
-		$installPluginLoadAPI(arguments.pluginKey, local.loadContext);
-		arguments.plugin.onPluginLoad(local.loadContext);
+		arguments.plugin.onPluginLoad($pluginHookSandbox(arguments.pluginKey));
 	}
 
 	/**
@@ -1054,7 +1061,7 @@ component output="false" extends="wheels.Global"{
 	 */
 
 	public any function getPlugins() {
-		return variables.$class.plugins;
+		return StructCopy(variables.$class.plugins);
 	}
 
 	public any function getPluginMeta() {
@@ -1074,7 +1081,7 @@ component output="false" extends="wheels.Global"{
 	}
 
 	public any function getMixins() {
-		return variables.$class.mixins;
+		return Duplicate(variables.$class.mixins);
 	}
 
 	public any function getMixinCollisions() {
@@ -1090,7 +1097,7 @@ component output="false" extends="wheels.Global"{
 		if (!StructKeyExists(variables.$class, "methodProviders")) {
 			return {};
 		}
-		return variables.$class.methodProviders;
+		return Duplicate(variables.$class.methodProviders);
 	}
 
 	public array function getPluginMiddleware() {

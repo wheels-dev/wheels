@@ -14,4 +14,11 @@ component {
 			arguments.app.wheels.hardenerPluginPwned = true;
 		}
 	}
+
+	public void function onPluginActivate(required app) {
+		arguments.app.hardenerActivatePwned = true;
+		if (StructKeyExists(arguments.app, "wheels") && IsStruct(arguments.app.wheels)) {
+			arguments.app.wheels.hardenerActivatePwned = true;
+		}
+	}
 }

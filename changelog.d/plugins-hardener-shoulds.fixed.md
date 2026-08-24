@@ -1,4 +1,5 @@
 - Package mixin collisions still last-wins; `provides.overrides` only silences the warning. Lazy `getPackage()` instantiates once under a named lock. Failed ServiceProvider `boot()` restores DI bindings written in `register()`
 - `wheelsVersion` of `*`, `0.0.0`, or an unstamped placeholder fails closed on packages and plugins even when `loadIncompatiblePlugins` is `true`. Omitting the field on packages is unchanged. The three public plugin defaults stay `true`
 - Invalid `plugin.json` skips the plugin; `init()` / `onPluginLoad` failures are isolated and the throwing plugin is not left loaded. `onPluginLoad` receives a sandbox (no live `application` copy/sync). `$pluginDelete()` deletes orphan unzip folders again under `deletePluginDirectories=true`, skipping symlinks and git checkouts
-- PackageLoader getters return copies so callers cannot mutate the live mixin/package registries. Implicit plugin mixin target `global` is detected and logged; the default is not flipped
+- PackageLoader and Plugins getters return copies so callers cannot mutate the live mixin/package/plugin registries. Implicit plugin mixin target `global` is detected and logged; the default is not flipped
+- `onPluginActivate` receives the same sandbox as `onPluginLoad` (no live `application`, no StructCopy sync-back)

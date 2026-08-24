@@ -336,6 +336,84 @@ component extends="wheels.WheelsTest" {
 				expect(fresh).notToHaveKey("$hardenerInjected");
 			});
 
+			it("mutating Plugins getMixins does not change the live mixin registry", () => {
+				var originalPluginComponentPath = application.wheels.pluginComponentPath;
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/collision";
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/collision",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				};
+				try {
+					var pluginObj = $pluginObj(config);
+					var mixins = pluginObj.getMixins();
+					expect(mixins).toHaveKey("controller");
+					mixins.controller["$hardenerInjected"] = "pwned";
+					var fresh = pluginObj.getMixins();
+					expect(fresh.controller).notToHaveKey("$hardenerInjected");
+					expect(fresh.controller).toHaveKey("$CollidingMethod");
+				} finally {
+					application.wheels.pluginComponentPath = originalPluginComponentPath;
+				}
+			});
+
+			it("mutating Plugins getMethodProviders does not change the live provider map", () => {
+				var originalPluginComponentPath = application.wheels.pluginComponentPath;
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/collision";
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/collision",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				};
+				try {
+					var pluginObj = $pluginObj(config);
+					var providers = pluginObj.getMethodProviders();
+					providers["$hardenerInjected"] = {pwned = true};
+					if (StructKeyExists(providers, "controller") && IsStruct(providers.controller)) {
+						providers.controller["$hardenerInjected"] = "pwned";
+					}
+					var fresh = pluginObj.getMethodProviders();
+					expect(fresh).notToHaveKey("$hardenerInjected");
+					if (StructKeyExists(fresh, "controller") && IsStruct(fresh.controller)) {
+						expect(fresh.controller).notToHaveKey("$hardenerInjected");
+					}
+				} finally {
+					application.wheels.pluginComponentPath = originalPluginComponentPath;
+				}
+			});
+
+			it("mutating Plugins getPlugins does not add a key to the live plugin registry", () => {
+				var originalPluginComponentPath = application.wheels.pluginComponentPath;
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/collision";
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/collision",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				};
+				try {
+					var pluginObj = $pluginObj(config);
+					var plugins = pluginObj.getPlugins();
+					expect(StructCount(plugins)).toBeGT(0);
+					plugins["$hardenerInjected"] = {pwned = true};
+					var fresh = pluginObj.getPlugins();
+					expect(fresh).notToHaveKey("$hardenerInjected");
+				} finally {
+					application.wheels.pluginComponentPath = originalPluginComponentPath;
+				}
+			});
+
 		});
 
 		describe("S9 plugin mixin collisions are detected then last-wins", () => {
@@ -435,7 +513,7 @@ component extends="wheels.WheelsTest" {
 
 		});
 
-		describe("S11 onPluginLoad cannot plant application keys via the load context", () => {
+		describe("S11 onPluginLoad / onPluginActivate cannot plant application keys via the hook context", () => {
 
 			it("does not sync attacker keys onto application after onPluginLoad", () => {
 				var originalPluginComponentPath = application.wheels.pluginComponentPath;
@@ -462,6 +540,36 @@ component extends="wheels.WheelsTest" {
 					StructDelete(application, "hardenerPluginPwned");
 					if (StructKeyExists(application.wheels, "hardenerPluginPwned")) {
 						StructDelete(application.wheels, "hardenerPluginPwned");
+					}
+				}
+			});
+
+			it("does not let onPluginActivate plant keys on the live application", () => {
+				var originalPluginComponentPath = application.wheels.pluginComponentPath;
+				StructDelete(application, "hardenerActivatePwned");
+				if (StructKeyExists(application.wheels, "hardenerActivatePwned")) {
+					StructDelete(application.wheels, "hardenerActivatePwned");
+				}
+				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/hardener_mutateapp";
+				var config = {
+					path = "wheels",
+					fileName = "Plugins",
+					method = "$init",
+					pluginPath = "/wheels/tests/_assets/plugins/hardener_mutateapp",
+					deletePluginDirectories = false,
+					overwritePlugins = false,
+					loadIncompatiblePlugins = true
+				};
+				try {
+					var pluginObj = $pluginObj(config);
+					pluginObj.$invokeOnPluginActivate();
+					expect(StructKeyExists(application, "hardenerActivatePwned")).toBeFalse();
+					expect(StructKeyExists(application.wheels, "hardenerActivatePwned")).toBeFalse();
+				} finally {
+					application.wheels.pluginComponentPath = originalPluginComponentPath;
+					StructDelete(application, "hardenerActivatePwned");
+					if (StructKeyExists(application.wheels, "hardenerActivatePwned")) {
+						StructDelete(application.wheels, "hardenerActivatePwned");
 					}
 				}
 			});
