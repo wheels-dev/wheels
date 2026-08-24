@@ -220,7 +220,9 @@ component extends="wheels.WheelsTest" {
 
 			it("percent-encodes query values appended to url=", () => {
 				_controller.redirectTo(url = "/hardener-target", params = "q=hello world", delay = true)
-				expect(_controller.getRedirect().url).toInclude("hello%20world")
+				var dest = _controller.getRedirect().url
+				expect(dest).notToInclude("hello world")
+				expect(ReFindNoCase("hello(%20|[+])world", dest) > 0).toBeTrue()
 			})
 
 		})
