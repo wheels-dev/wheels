@@ -243,13 +243,21 @@
 		// break up the full path string in the path name only and the file name only
 		local.path = GetDirectoryFromPath(arguments.absolutePath);
 		local.file = Replace(arguments.absolutePath, local.path, "");
-		// get all existing files in the directory and place them in a list in application scope
-		local.pathHash = Hash(local.path);
-		if (!StructKeyExists(application[local.appKey].directoryFiles, local.pathHash)) {
+		// Skip the directoryFiles memo when cacheFileChecking is off so a
+		// new file on disk is visible on the next check.
+		local.cacheChecks = StructKeyExists(application[local.appKey], "cacheFileChecking")
+		&& application[local.appKey].cacheFileChecking;
+		if (local.cacheChecks) {
+			local.pathHash = Hash(local.path);
+			if (!StructKeyExists(application[local.appKey].directoryFiles, local.pathHash)) {
+				local.dirInfo = $directory(directory = local.path);
+				application[local.appKey].directoryFiles[local.pathHash] = ValueList(local.dirInfo.name);
+			}
+			local.fileList = application[local.appKey].directoryFiles[local.pathHash];
+		} else {
 			local.dirInfo = $directory(directory = local.path);
-			application[local.appKey].directoryFiles[local.pathHash] = ValueList(local.dirInfo.name);
+			local.fileList = ValueList(local.dirInfo.name);
 		}
-		local.fileList = application[local.appKey].directoryFiles[local.pathHash];
 		// loop through the file list and return the file name if exists regardless of case (the == operator is case insensitive)
 		local.fileArray = ListToArray(local.fileList);
 		local.iEnd = ArrayLen(local.fileArray);
