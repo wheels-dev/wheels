@@ -212,12 +212,8 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Get the client IP address from the request, respecting proxy headers if configured.
 	 */
 	private string function $getClientIp(required struct request) {
-		// Check request struct first (test-friendly).
-		if (StructKeyExists(arguments.request, "remoteAddr")) {
-			return arguments.request.remoteAddr;
-		}
-
-		// Trust proxy: check X-Forwarded-For header.
+		// Trust proxy first so a client-supplied request.remoteAddr cannot
+		// override X-Forwarded-For when the operator opted into proxy trust.
 		if (variables.trustProxy) {
 			try {
 				local.forwarded = "";
@@ -236,6 +232,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			}
 		}
 
+		// Test-friendly override — only after the trustProxy gate.
+		if (StructKeyExists(arguments.request, "remoteAddr")) {
+			return arguments.request.remoteAddr;
+		}
+
 		// Fall back to CGI remote_addr.
 		try {
 			if (StructKeyExists(arguments.request, "cgi") && StructKeyExists(arguments.request.cgi, "remote_addr")) {
@@ -251,8 +252,10 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	/**
 	 * Handle a rate limiter error (lock timeout or DB failure) according to the failOpen setting.
 	 * Returns a struct with `allowed` and `remaining` reflecting the decision.
+	 * Public so specs can observe fail-closed on a default constructor (hardener B1)
+	 * without reaching into the variables scope.
 	 */
-	private struct function $handleError(required string context, required string clientKey) {
+	public struct function $handleError(required string context, required string clientKey) {
 		local.mode = variables.failOpen ? "fail-open" : "fail-closed";
 		writeLog(
 			text = "Rate limiter #arguments.context# (#local.mode#) for key: #arguments.clientKey#",
@@ -535,6 +538,34 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 */
 	public numeric function $storeSize() {
 		return variables.storage == "memory" ? variables.store.size() : 0;
+	}
+
+	/**
+	 * Internal probes. Public ONLY so specs can observe the configured caps
+	 * (hardener B1) instead of asserting toBeInstanceOf on a constructed limiter.
+	 */
+	public numeric function $maxStoreSize() {
+		return variables.maxStoreSize;
+	}
+
+	public numeric function $maxKeyLength() {
+		return variables.maxKeyLength;
+	}
+
+	public numeric function $maxTimestampsPerKey() {
+		return variables.maxTimestampsPerKey;
+	}
+
+	/**
+	 * Sliding-window timestamp count for one client key. Public so specs can
+	 * observe the per-key cap being hit, not just that handle() still returns.
+	 */
+	public numeric function $slidingWindowSize(required string clientKey) {
+		if (variables.storage != "memory" || !variables.store.containsKey(arguments.clientKey)) {
+			return 0;
+		}
+		local.value = variables.store.get(arguments.clientKey);
+		return IsArray(local.value) ? ArrayLen(local.value) : 0;
 	}
 
 	/**

@@ -111,6 +111,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			if (local.reflected) {
 				local.headers["Vary"] = "Origin";
 			}
+			// Max-Age is a preflight header. Only emit it when ACAO is present
+			// so a denied origin is not advertised as a cacheable success.
+			if (UCase($requestMethod(arguments.request)) == "OPTIONS") {
+				local.headers["Access-Control-Max-Age"] = variables.maxAge;
+			}
 		}
 
 		return local.headers;
@@ -126,7 +131,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		} catch (any e) {
 		}
 
-		// Handle preflight OPTIONS request — return empty response immediately.
+		// Handle preflight OPTIONS request — return empty response immediately
+		// only when ACAO was emitted. A denied or unconfigured origin must not
+		// look like a successful preflight (empty 200 + Max-Age).
 		// Prefer the request struct passed to the middleware (the canonical
 		// per-request context, mirroring how RateLimiter resolves remote_addr
 		// from arguments.request.cgi) and fall back to the engine CGI scope
@@ -134,25 +141,26 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		// scope is read-only on Lucee 7, so unit tests that need to exercise
 		// the OPTIONS branch must inject the verb through arguments.request.cgi
 		// — hence the lookup order.
-		local.requestMethod = "GET";
-		if (StructKeyExists(arguments.request, "cgi") && StructKeyExists(arguments.request.cgi, "request_method")) {
-			local.requestMethod = arguments.request.cgi.request_method;
-		} else {
-			try {
-				local.requestMethod = cgi.request_method;
-			} catch (any e) {
-			}
-		}
-
-		if (UCase(local.requestMethod) == "OPTIONS") {
-			try {
-				cfheader(name = "Access-Control-Max-Age", value = variables.maxAge);
-			} catch (any e) {
-			}
+		if (UCase($requestMethod(arguments.request)) == "OPTIONS" && StructKeyExists(local.headers, "Access-Control-Allow-Origin")) {
 			return "";
 		}
 
 		return arguments.next(arguments.request);
+	}
+
+	/**
+	 * Resolve the HTTP verb from the middleware request context, falling back
+	 * to the engine CGI scope. Shared by $headersFor() and handle().
+	 */
+	private string function $requestMethod(required struct request) {
+		if (StructKeyExists(arguments.request, "cgi") && StructKeyExists(arguments.request.cgi, "request_method")) {
+			return arguments.request.cgi.request_method;
+		}
+		try {
+			return cgi.request_method;
+		} catch (any e) {
+		}
+		return "GET";
 	}
 
 }

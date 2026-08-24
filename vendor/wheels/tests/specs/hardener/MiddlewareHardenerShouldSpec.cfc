@@ -1,5 +1,5 @@
 /**
- * Hardener SHOULDs S1–S7 (middleware pipeline).
+ * Hardener SHOULDs S1–S7 and BLOCKER B1 (middleware pipeline).
  *
  * Directory-scoped so `wheels test --core --ci --filter=hardener`
  * discovers this folder (a single-file directory= scope finds 0 bundles).
@@ -9,6 +9,10 @@
  *      genericErrors=true is opt-in.
  *   S5 TenantResolver unmatched still proceeds on the default datasource.
  *      failClosed=true is opt-in.
+ *
+ * B1 RateLimiterSpec default-lock its must observe fail-closed and cap
+ * behavior, not toBeInstanceOf. PluginMiddlewarePipelineSpec instance-ofs
+ * are Dispatch leftovers and are out of scope.
  *
  * CoS lock: Cors allowOrigins="" / allowCredentials=false,
  * RateLimiter failOpen=false / trustProxy=false,
@@ -298,6 +302,89 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(state.threw).toBeTrue();
 				expect(state.type).toBe("Wheels.Middleware.CircularDependency");
+			});
+
+		});
+
+		describe("B1 RateLimiter default locks are observed, not instance-of", function() {
+
+			it("default ctor $handleError is fail-closed", function() {
+				var limiter = new wheels.middleware.RateLimiter();
+				var outcome = limiter.$handleError("hardener-b1", "default-ctor");
+				expect(outcome.allowed).toBeFalse();
+				expect(outcome.remaining).toBe(0);
+			});
+
+			it("failOpen=true is observed on $handleError, not just accepted by init", function() {
+				var limiter = new wheels.middleware.RateLimiter(failOpen = true);
+				var outcome = limiter.$handleError("hardener-b1", "fail-open");
+				expect(outcome.allowed).toBeTrue();
+			});
+
+			it("default maxKeyLength hashes a 129-char key and shares the hashed bucket", function() {
+				var limiter = new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 60);
+				var nextFn = function(req) {
+					return "ok";
+				};
+				var longKey = RepeatString("H", 129);
+				var hashed = Hash(longKey, "SHA-256");
+				expect(limiter.handle(request = {remoteAddr: longKey}, next = nextFn)).toBe("ok");
+				expect(limiter.handle(request = {remoteAddr: hashed}, next = nextFn)).toInclude(
+					"Rate limit exceeded"
+				);
+			});
+
+			it("default maxKeyLength does not hash a 128-char key", function() {
+				var limiter = new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 60);
+				var nextFn = function(req) {
+					return "ok";
+				};
+				var exact = RepeatString("E", 128);
+				var hashed = Hash(exact, "SHA-256");
+				expect(limiter.handle(request = {remoteAddr: exact}, next = nextFn)).toBe("ok");
+				expect(limiter.handle(request = {remoteAddr: hashed}, next = nextFn)).toBe("ok");
+			});
+
+			it("default maxStoreSize is 100000 and a smaller cap is observed via $storeSize", function() {
+				var defaults = new wheels.middleware.RateLimiter();
+				expect(defaults.$maxStoreSize()).toBe(100000);
+
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1000,
+					windowSeconds = 60,
+					strategy = "fixedWindow",
+					maxStoreSize = 5
+				);
+				var nextFn = function(req) {
+					return "ok";
+				};
+				for (var i = 1; i <= 20; i++) {
+					limiter.handle(request = {remoteAddr: "b1-store-#i#"}, next = nextFn);
+					expect(limiter.$storeSize()).toBeLTE(5);
+				}
+			});
+
+			it("default maxTimestampsPerKey is maxRequests * 3 and a smaller cap is observed", function() {
+				var defaults = new wheels.middleware.RateLimiter(
+					maxRequests = 10,
+					strategy = "slidingWindow"
+				);
+				expect(defaults.$maxTimestampsPerKey()).toBe(30);
+
+				var limiter = new wheels.middleware.RateLimiter(
+					maxRequests = 1000,
+					windowSeconds = 60,
+					strategy = "slidingWindow",
+					maxTimestampsPerKey = 5
+				);
+				var nextFn = function(req) {
+					return "ok";
+				};
+				for (var i = 1; i <= 20; i++) {
+					limiter.handle(request = {remoteAddr: "b1-ts"}, next = nextFn);
+				}
+				expect(limiter.$slidingWindowSize("b1-ts")).toBeLTE(6);
+				expect(limiter.$slidingWindowSize("b1-ts")).toBeGT(0);
 			});
 
 		});

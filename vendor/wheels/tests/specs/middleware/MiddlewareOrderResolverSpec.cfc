@@ -123,17 +123,21 @@ component extends="wheels.WheelsTest" {
 					expect(result[2].pluginName).toBe("pluginLogger");
 				});
 
-				it("falls back to priority sort on circular dependency", function() {
+				it("throws on circular dependency", function() {
 					var entries = [
 						$entry("A", "pluginA", {priority: 1, before: "B"}),
 						$entry("B", "pluginB", {priority: 2, before: "A"})
 					];
-					// Circular: A before B AND B before A — should warn and fallback.
-					var result = resolver.resolve(entries);
-					// Fallback is priority-only: A (1) before B (2).
-					expect(ArrayLen(result)).toBe(2);
-					expect(result[1].pluginName).toBe("pluginA");
-					expect(result[2].pluginName).toBe("pluginB");
+					// Circular: A before B AND B before A — fail closed.
+					var state = {threw = false, type = ""};
+					try {
+						resolver.resolve(entries);
+					} catch (any e) {
+						state.threw = true;
+						state.type = e.type;
+					}
+					expect(state.threw).toBeTrue();
+					expect(state.type).toBe("Wheels.Middleware.CircularDependency");
 				});
 
 				it("preserves ordering constraints when duplicate names are present", function() {
