@@ -110,10 +110,18 @@
 		local.routePos = application.wheels.namedRoutePositions[arguments.route];
 		if (Find(",", local.routePos)) {
 			// there are several routes with this name so we need to figure out which one to use by checking the passed in arguments
+			local.foundRoute = false;
+			local.methodSpecified = StructKeyExists(arguments, "method") && Len(arguments.method);
 			local.iEnd = ListLen(local.routePos);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.rv = application.wheels.routes[ListGetAt(local.routePos, local.i)];
-				local.foundRoute = StructKeyExists(arguments, "method") && local.rv.methods == arguments.method;
+				// Method is optional: URLFor / redirectTo do not pass it. When it
+				// is present it must match; when it is absent, variables decide.
+				local.foundRoute = !local.methodSpecified
+				|| (
+					StructKeyExists(local.rv, "methods")
+					&& ListFindNoCase(local.rv.methods, arguments.method)
+				);
 				local.jEnd = ListLen(local.rv.foundvariables);
 				for (local.j = 1; local.j <= local.jEnd; local.j++) {
 					local.variable = ListGetAt(local.rv.foundvariables, local.j);
@@ -124,6 +132,13 @@
 				if (local.foundRoute) {
 					break;
 				}
+			}
+			if (!local.foundRoute) {
+				$throwErrorOrShow404Page(
+					type = "Wheels.RouteNotFound",
+					message = "Could not find a `#arguments.route#` route that matched the supplied arguments.",
+					extendedInfo = "Same-named routes are distinguished by HTTP method and required path variables. Passing a method or variables that match none of the candidates is an error, not a fallback to the last declared route."
+				);
 			}
 		} else {
 			local.rv = application.wheels.routes[local.routePos];

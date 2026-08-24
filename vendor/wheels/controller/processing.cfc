@@ -11,6 +11,10 @@ component {
 	public boolean function processAction(string includeFilters = true) {
 		$runCsrfProtection(action = variables.params.action);
 
+		// Completed is the halt signal: false when a verification aborted or a
+		// before filter returned false. Always-true used to make that signal dead.
+		local.completed = false;
+
 		// Check if action should be cached, and if so, cache statically or set the time to use later when caching just the action.
 		local.cache = 0;
 		if ($get("cacheActions") && $hasCachableActions() && flashIsEmpty() && StructIsEmpty(form)) {
@@ -116,9 +120,11 @@ component {
 			if ($get("showDebugInformation")) {
 				$debugPoint("afterFilters");
 			}
+
+			local.completed = local.runAction;
 		}
 
-		return true;
+		return local.completed;
 	}
 
 	/**
@@ -194,9 +200,9 @@ component {
 					& "/"
 					& LCase(arguments.action)
 					& ".cfm";
-					if (FileExists(ExpandPath(local.file))) {
-						Throw(object = e);
-					} else {
+					// Only remap genuine missing-view includes. A missing action.cfm
+					// used to turn every render/layout exception into ViewNotFound.
+					if ($isMissingViewException(e) && !FileExists(ExpandPath(local.file))) {
 						// For non-HTML formats, provide a more helpful error message
 						if (local.contentType != "html") {
 							$throwErrorOrShow404Page(
@@ -211,6 +217,8 @@ component {
 								extendedInfo = "Create a file named `#LCase(arguments.action)#.cfm` in the `app/views/#LCase(ListChangeDelims(variables.$class.name, '/', '.'))#` directory (create the directory as well if it doesn't already exist)."
 							);
 						}
+					} else {
+						Throw(object = e);
 					}
 				}
 			}
@@ -227,13 +235,30 @@ component {
 		required string category
 	) {
 		$callAction(action = arguments.action);
-		$addToCache(
-			key = arguments.key,
-			value = variables.$instance.response,
-			time = arguments.time,
-			category = arguments.category
-		);
+		// A redirect-only action has no body. Caching that empty string turns
+		// the next hit into a blank 200 with no redirect.
+		if (!$performedRedirect()) {
+			$addToCache(
+				key = arguments.key,
+				value = variables.$instance.response,
+				time = arguments.time,
+				category = arguments.category
+			);
+		}
 		return response();
+	}
+
+	/**
+	 * Internal function. True when an auto-render exception is a missing view
+	 * include rather than a layout/helper/runtime error that happened to fire
+	 * while action.cfm was also absent.
+	 */
+	public boolean function $isMissingViewException(required any exception) {
+		if ($isMissingMappedInclude(arguments.exception)) {
+			return true;
+		}
+		local.type = StructKeyExists(arguments.exception, "type") ? ToString(arguments.exception.type) : "";
+		return FindNoCase("MissingInclude", local.type) > 0 || local.type == "template";
 	}
 
 	/**

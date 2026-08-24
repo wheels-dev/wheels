@@ -531,7 +531,7 @@
 			appendToLabel = "",
 			encode = true
 		};
-		application.$wheels.functions.processRequest = {method = "get", returnAs = "", rollback = false};
+		application.$wheels.functions.processRequest = {method = "get", returnAs = "", rollback = false, csrf = "ignore"};
 		application.$wheels.functions.protectsFromForgery = {with = "exception", only = "", except = ""};
 		application.$wheels.functions.radioButton = {
 			label = "useDefaultLabel",

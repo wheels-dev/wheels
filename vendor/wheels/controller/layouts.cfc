@@ -80,11 +80,10 @@ component {
 	 */
 	public any function $useLayout(required string $action) {
 		local.rv = true;
-		local.layoutType = "template";
+		local.matched = false;
 
 		for (local.layout in variables.$class.layouts) {
-			local.rv = local.layout.useDefault;
-
+			local.layoutType = "template";
 			if (
 				(!StructKeyExists(local.layout, "except") || !ListFindNoCase(local.layout.except, arguments.$action))
 				&& (!StructKeyExists(local.layout, "only") || ListFindNoCase(local.layout.only, arguments.$action))
@@ -101,15 +100,24 @@ component {
 				) {
 					local.invokeArgs = {};
 					local.invokeArgs.action = arguments.$action;
+					StructDelete(local, "result");
 					local.result = $invoke(method = local.layout[local.layoutType], invokeArgs = local.invokeArgs);
 
 					// If the developer doesn't return anything from the function or if they return a blank string it should use the default layout still.
-					if (StructKeyExists(local, "result")) {
+					if (StructKeyExists(local, "result") && !(IsSimpleValue(local.result) && !Len(ToString(local.result)))) {
 						local.rv = local.result;
+					} else {
+						local.rv = local.layout.useDefault;
 					}
 				} else {
 					local.rv = local.layout[local.layoutType];
 				}
+				local.matched = true;
+			} else if (!local.matched) {
+				// Only apply this declaration's useDefault when no prior
+				// usesLayout has matched. A later non-match must not wipe a
+				// chosen layout (that was a silent bypass).
+				local.rv = local.layout.useDefault;
 			}
 		}
 		return local.rv;

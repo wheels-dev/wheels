@@ -111,6 +111,18 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 
+			it("does not store a cache entry for a redirect-only action", () => {
+				var probeKey = "hardener-redirect-probe-key"
+				_controller.$callActionAndAddToCache(
+					action = "cachedRedirect",
+					time = 60,
+					key = probeKey,
+					category = "action"
+				)
+				expect(_controller.$performedRedirect()).toBeTrue()
+				expect(StructKeyExists(application.wheels.cache.action, probeKey)).toBeFalse()
+			})
+
 			it("re-runs the redirect on a second request instead of serving a blank 200", () => {
 				_controller.caches(action = "cachedRedirect")
 
