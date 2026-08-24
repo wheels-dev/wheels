@@ -97,7 +97,7 @@ component extends="wheels.WheelsTest" {
 
 			it("worker path restores tenant context and strips the internal key", function() {
 				local.payload = {orderId = 42};
-				local.payload["$wheelsTenantContext"] = {id = "tenant-1", dataSource = "wheels_test_tenant_ds", config = {}};
+				local.payload["$wheelsTenantContext"] = {id = "tenant-1", dataSource = application.wheels.dataSourceName, config = {}};
 
 				local.worker = new wheels.JobWorker();
 				prepareMock(local.worker);
@@ -116,7 +116,7 @@ component extends="wheels.WheelsTest" {
 				expect(request).toHaveKey("$wheelsJobProbe");
 				expect(request.$wheelsJobProbe.sawInternalKey).toBeFalse();
 				expect(request.$wheelsJobProbe.tenantRestored).toBeTrue();
-				expect(request.$wheelsJobProbe.tenantDataSource).toBe("wheels_test_tenant_ds");
+				expect(request.$wheelsJobProbe.tenantDataSource).toBe(application.wheels.dataSourceName);
 				expect(request.$wheelsJobProbe.tenantId).toBe("tenant-1");
 
 				// And the context must be cleaned up after execution
@@ -126,7 +126,7 @@ component extends="wheels.WheelsTest" {
 			it("in-app path still restores tenant context via the shared helper", function() {
 				local.id = CreateUUID();
 				local.payload = {orderId = 7};
-				local.payload["$wheelsTenantContext"] = {id = "tenant-2", dataSource = "wheels_test_tenant_ds", config = {}};
+				local.payload["$wheelsTenantContext"] = {id = "tenant-2", dataSource = application.wheels.dataSourceName, config = {}};
 				$insertTestJob(
 					id = local.id,
 					jobClass = "wheels.tests._assets.jobs.ProbeJob",
@@ -150,7 +150,7 @@ component extends="wheels.WheelsTest" {
 				expect(local.jobResult.success).toBeTrue();
 				expect(request.$wheelsJobProbe.sawInternalKey).toBeFalse();
 				expect(request.$wheelsJobProbe.tenantRestored).toBeTrue();
-				expect(request.$wheelsJobProbe.tenantDataSource).toBe("wheels_test_tenant_ds");
+				expect(request.$wheelsJobProbe.tenantDataSource).toBe(application.wheels.dataSourceName);
 				expect(IsDefined("request.wheels.tenant")).toBeFalse();
 			});
 
