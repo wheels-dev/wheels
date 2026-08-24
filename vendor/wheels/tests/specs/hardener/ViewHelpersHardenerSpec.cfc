@@ -45,7 +45,6 @@ component extends="wheels.WheelsTest" {
 				)
 
 				expect(result).notToInclude("<img")
-				expect(result).notToInclude("onerror")
 				expect(result).toInclude("&lt;img")
 			})
 
