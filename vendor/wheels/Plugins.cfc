@@ -120,7 +120,19 @@ component output="false" extends="wheels.Global"{
 						WriteLog(type="warning", text="[Wheels] Failed to create plugin directory '#local.plugin.folderPath#': #e.message#");
 					}
 				}
-				$zip(action = "unzip", destination = local.plugin.folderPath, file = local.plugin.file, overwrite = true);
+				try {
+					$zip(action = "unzip", destination = local.plugin.folderPath, file = local.plugin.file, overwrite = true);
+				} catch (any e) {
+					if (e.type == "Wheels.UnsafeZipEntry") {
+						WriteLog(
+							type = "error",
+							text = "[Wheels] Plugin zip '#local.plugin.file#' rejected: #e.message#",
+							file = "wheels"
+						);
+					} else {
+						rethrow;
+					}
+				}
 			}
 		};
 	}
@@ -708,13 +720,18 @@ component output="false" extends="wheels.Global"{
 	 * compatibility version, the current Wheels version, and the
 	 * loadIncompatiblePlugins setting.
 	 */
-	private boolean function $shouldLoadPlugin(
+	public boolean function $shouldLoadPlugin(
 		required string compatVersion,
 		required string wheelsVersion,
 		required boolean loadIncompatible
 	) {
-		return !Len(arguments.compatVersion)
-			|| ListFind(arguments.compatVersion, arguments.wheelsVersion)
+		// Empty / undeclared compatibility fails closed even when
+		// loadIncompatiblePlugins is true. That setting only applies to
+		// plugins that declared a version list which does not match.
+		if (!Len(Trim(arguments.compatVersion))) {
+			return false;
+		}
+		return ListFind(arguments.compatVersion, arguments.wheelsVersion)
 			|| arguments.loadIncompatible;
 	}
 
