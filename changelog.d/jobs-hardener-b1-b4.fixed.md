@@ -1,0 +1,3 @@
+- Job complete/retry/fail UPDATEs now require `status = 'processing'`, so a stolen job's original worker cannot overwrite `completed` or `failed`
+- Persist-fail `enqueue()` returns `persisted=false` and `error` instead of lying with `status=pending`
+- `JobWorker.getMonitorData(queue=)` filters `recentJobs` and `oldestPending` as well as throughput

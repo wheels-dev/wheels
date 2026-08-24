@@ -172,11 +172,11 @@ component {
 					);
 				} catch (any e2) {
 					writeLog(text = "Job enqueue failed after table creation: #e2.message#", type = "error", file = "wheels_jobs");
-					return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = false};
+					return {id = local.id, jobClass = arguments.jobClass, persisted = false, error = e2.message};
 				}
 			} else {
 				writeLog(text = "Job '#arguments.jobClass#' could not be persisted: #e.message#", type = "warning", file = "wheels_jobs");
-				return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = false};
+				return {id = local.id, jobClass = arguments.jobClass, persisted = false, error = e.message};
 			}
 		}
 
@@ -245,9 +245,13 @@ component {
 		try {
 			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
 		} catch (any e) {
-			// Auto-create table and return empty result (no jobs to process yet)
 			$ensureJobTable();
-			return local.result;
+			try {
+				local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
+			} catch (any e2) {
+				ArrayAppend(local.result.errors, e2.message);
+				return local.result;
+			}
 		}
 
 		for (local.row in local.jobs) {
@@ -307,6 +311,9 @@ component {
 				extendedInfo = "`wheels_jobs.jobClass` must name a component extending `wheels.Job`. Only the framework writes this column; a value that names something else means the row was written by something other than `enqueue()`."
 			);
 		}
+		if (StructKeyExists(local.rv, "init")) {
+			local.rv.init();
+		}
 		return local.rv;
 	}
 
@@ -354,6 +361,7 @@ component {
 		// mirroring JobWorker.$scheduleRetry so both paths share one retry schedule.
 		local.backoffBaseDelay = this.baseDelay;
 		local.backoffMaxDelay = this.maxDelay;
+		local.backoffRetryBackoff = this.retryBackoff;
 
 		try {
 			// Instantiate and execute the job
@@ -363,6 +371,9 @@ component {
 			}
 			if (StructKeyExists(local.jobInstance, "maxDelay")) {
 				local.backoffMaxDelay = local.jobInstance.maxDelay;
+			}
+			if (StructKeyExists(local.jobInstance, "retryBackoff")) {
+				local.backoffRetryBackoff = local.jobInstance.retryBackoff;
 			}
 			local.jobData = DeserializeJSON(arguments.jobRow.data);
 
@@ -376,7 +387,7 @@ component {
 			queryExecute(
 				"UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
-				WHERE id = :id",
+				WHERE id = :id AND status = 'processing'",
 				{
 					completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
@@ -402,7 +413,12 @@ component {
 				// Schedule retry with configurable exponential backoff, capped at maxDelay.
 				// Settings were captured from the failing job's class above so subclass
 				// overrides apply (the base instance defaults are only the fallback).
-				local.backoffSeconds = Min(local.backoffBaseDelay * (2 ^ local.currentAttempts), local.backoffMaxDelay);
+				local.backoffSeconds = $backoffDelay(
+					attempts = local.currentAttempts,
+					baseDelay = local.backoffBaseDelay,
+					maxDelay = local.backoffMaxDelay,
+					retryBackoff = local.backoffRetryBackoff
+				);
 				local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 				queryExecute(
@@ -411,7 +427,7 @@ component {
 						lastError = :lastError,
 						runAt = :runAt,
 						updatedAt = :updatedAt
-					WHERE id = :id",
+					WHERE id = :id AND status = 'processing'",
 					{
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
 						runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
@@ -434,7 +450,7 @@ component {
 						failedAt = :failedAt,
 						lastError = :lastError,
 						updatedAt = :updatedAt
-					WHERE id = :id",
+					WHERE id = :id AND status = 'processing'",
 					{
 						failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
@@ -660,6 +676,23 @@ component {
 			writeLog(text = "Failed to auto-create wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
 			return false;
 		}
+	}
+
+	/**
+	 * Retry delay in seconds. `retryBackoff=exponential` is the live schedule
+	 * (`baseDelay * 2^attempts`, capped at `maxDelay`). `linear` is a reserved
+	 * no-op and keeps that same formula.
+	 */
+	public numeric function $backoffDelay(
+		required numeric attempts,
+		numeric baseDelay = this.baseDelay,
+		numeric maxDelay = this.maxDelay,
+		string retryBackoff = this.retryBackoff
+	) {
+		if (CompareNoCase(arguments.retryBackoff, "linear") == 0) {
+			// reserved no-op — exponential remains the schedule
+		}
+		return Min(arguments.baseDelay * (2 ^ arguments.attempts), arguments.maxDelay);
 	}
 
 	/**

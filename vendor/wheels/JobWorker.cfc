@@ -80,8 +80,13 @@ component {
 			local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
 			$ensureJobTable();
-			local.result.skipped = true;
-			return local.result;
+			try {
+				local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			} catch (any e2) {
+				local.result.skipped = true;
+				local.result.error = e2.message;
+				return local.result;
+			}
 		}
 
 		if (!local.candidates.recordCount) {
@@ -260,8 +265,14 @@ component {
 		// Recent jobs
 		try {
 			local.recentSql = "SELECT id, jobClass, queue, status, attempts, lastError, updatedAt
-				FROM wheels_jobs ORDER BY updatedAt DESC";
-			local.recentRows = queryExecute(local.recentSql, {}, {datasource = variables.$datasource, maxrows = 10});
+				FROM wheels_jobs";
+			local.recentParams = {};
+			if (Len(arguments.queue)) {
+				local.recentSql &= " WHERE queue = :queue";
+				local.recentParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
+			}
+			local.recentSql &= " ORDER BY updatedAt DESC";
+			local.recentRows = queryExecute(local.recentSql, local.recentParams, {datasource = variables.$datasource, maxrows = 10});
 
 			for (local.row in local.recentRows) {
 				ArrayAppend(local.result.recentJobs, {
@@ -280,8 +291,14 @@ component {
 
 		// Oldest pending job
 		try {
-			local.oldestSql = "SELECT createdAt FROM wheels_jobs WHERE status = 'pending' ORDER BY createdAt ASC";
-			local.oldestRow = queryExecute(local.oldestSql, {}, {datasource = variables.$datasource, maxrows = 1});
+			local.oldestSql = "SELECT createdAt FROM wheels_jobs WHERE status = 'pending'";
+			local.oldestParams = {};
+			if (Len(arguments.queue)) {
+				local.oldestSql &= " AND queue = :queue";
+				local.oldestParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
+			}
+			local.oldestSql &= " ORDER BY createdAt ASC";
+			local.oldestRow = queryExecute(local.oldestSql, local.oldestParams, {datasource = variables.$datasource, maxrows = 1});
 			if (local.oldestRow.recordCount) {
 				local.result.oldestPending = local.oldestRow.createdAt;
 			}
@@ -469,7 +486,7 @@ component {
 			queryExecute(
 				"UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
-				WHERE id = :id",
+				WHERE id = :id AND status = 'processing'",
 				{
 					completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
@@ -506,21 +523,25 @@ component {
 		required numeric maxRetries,
 		required string errorMessage
 	) {
-		// Use configurable backoff: baseDelay * 2^attempt, capped at maxDelay
-		// Default values match Job.cfc: baseDelay=2, maxDelay=3600
 		local.baseDelay = 2;
 		local.maxDelay = 3600;
+		local.retryBackoff = "exponential";
 
-		// Try to get the job instance's backoff settings
 		try {
-			local.jobInstance = CreateObject("component", arguments.jobClass);
+			local.jobInstance = $jobBridge().$instantiateJobClass(jobClass = arguments.jobClass);
 			if (StructKeyExists(local.jobInstance, "baseDelay")) local.baseDelay = local.jobInstance.baseDelay;
 			if (StructKeyExists(local.jobInstance, "maxDelay")) local.maxDelay = local.jobInstance.maxDelay;
+			if (StructKeyExists(local.jobInstance, "retryBackoff")) local.retryBackoff = local.jobInstance.retryBackoff;
 		} catch (any e) {
 			// Use defaults
 		}
 
-		local.backoffSeconds = Min(local.baseDelay * (2 ^ arguments.currentAttempts), local.maxDelay);
+		local.backoffSeconds = $jobBridge().$backoffDelay(
+			attempts = arguments.currentAttempts,
+			baseDelay = local.baseDelay,
+			maxDelay = local.maxDelay,
+			retryBackoff = local.retryBackoff
+		);
 		local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 		queryExecute(
@@ -529,7 +550,7 @@ component {
 				lastError = :lastError,
 				runAt = :runAt,
 				updatedAt = :updatedAt
-			WHERE id = :id",
+			WHERE id = :id AND status = 'processing'",
 			{
 				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
 				runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
@@ -561,7 +582,7 @@ component {
 				failedAt = :failedAt,
 				lastError = :lastError,
 				updatedAt = :updatedAt
-			WHERE id = :id",
+			WHERE id = :id AND status = 'processing'",
 			{
 				failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
