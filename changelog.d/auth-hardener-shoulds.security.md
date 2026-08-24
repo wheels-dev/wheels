@@ -2,3 +2,4 @@
 - `authenticateWith()` fails closed when the restriction list includes any unregistered strategy name, instead of silently skipping typos
 - `TokenStrategy` usage sample binds the token through the 2-arg query builder instead of interpolating it into `where=`
 - `JwtStrategy` catch-all returns a generic 401 and no longer concatenates `e.message` into the response
+- `JwtService.decode()` fails closed on a missing `exp` claim by default (`requireExpiry=true`; opt out with `requireExpiry=false`)

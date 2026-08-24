@@ -1,1 +1,1 @@
-- `JwtService` accepts opt-in `maxRefreshAge` (refresh window after `exp`) and `requireExpiry` (reject tokens with no `exp`). Defaults stay `0` / `false` — unbounded refresh and missing-exp accept are unchanged
+- `JwtService.decode()` now requires an `exp` claim by default (`requireExpiry=true`). Pass `requireExpiry=false` to accept signed tokens with no expiry. `maxRefreshAge` stays `0` (unbounded refresh) unless a positive window is set

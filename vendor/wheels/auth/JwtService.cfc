@@ -23,7 +23,7 @@ component output="false" {
 	 * @issuer Default issuer claim (iss). Empty string means no iss claim added and no iss validation on decode.
 	 * @allowedClockSkew Seconds of clock skew tolerance for expiry checks (default 0).
 	 * @maxRefreshAge Seconds after exp during which refresh() still accepts an expired token. 0 (default) keeps the historic unbounded refresh. Set a positive bound to fail closed.
-	 * @requireExpiry When true, decode() rejects a signed token that has no exp claim. Default false keeps the historic fail-open.
+	 * @requireExpiry When true (the default), decode() rejects a signed token that has no exp claim. Pass false to opt out.
 	 */
 	public JwtService function init(
 		required string secretKey,
@@ -31,7 +31,7 @@ component output="false" {
 		string issuer = "",
 		numeric allowedClockSkew = 0,
 		numeric maxRefreshAge = 0,
-		boolean requireExpiry = false
+		boolean requireExpiry = true
 	) {
 		// Fail fast on missing or weak secrets — a short HMAC key makes every issued token brute-forceable
 		if (!Len(arguments.secretKey)) {
@@ -106,8 +106,8 @@ component output="false" {
 	 *
 	 * Verifies the signature and checks expiry/nbf claims. When an issuer was
 	 * configured, the iss claim must be present and match it (case-sensitive).
-	 * When requireExpiry is true, a missing exp claim is rejected. Throws on
-	 * invalid token, bad signature, wrong issuer, or expired token.
+	 * A missing exp claim is rejected by default (requireExpiry=true). Throws on
+	 * invalid token, bad signature, wrong issuer, missing exp, or expired token.
 	 *
 	 * @token The JWT token string to decode.
 	 * @ignoreExpiry If true, skip expiry validation (used for refresh). Default false.
