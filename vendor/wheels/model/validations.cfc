@@ -580,19 +580,14 @@ component {
 				try {
 					local[local.key] = $evaluateConditionString(arguments[local.item]);
 				} catch (any e) {
-					if ($get("showErrorInformation")) {
-						Throw(
-							type = "Wheels.InvalidValidationCondition",
-							message = "The `#local.item#` expression `#arguments[local.item]#` could not be evaluated: #e.message#",
-							extendedInfo = "Supported forms: `this.property`, `this.method()` (with named `key='val'` or positional `'val'` arguments), bare `method()` (optionally negated with `!`), and binary comparisons using eq/neq/lt/lte/gt/gte or ==/!=/</<=/>/>=."
-						);
-					}
-					cflog(
-						text = "Wheels: validation `#local.item#` expression `#arguments[local.item]#` could not be evaluated (#e.message#); validation skipped.",
-						type = "error",
-						file = "wheels-errors"
+					// Fail closed regardless of showErrorInformation. Returning
+					// false here means "skip this validation" ($validate), which
+					// is fail-open for a broken condition/unless expression.
+					Throw(
+						type = "Wheels.InvalidValidationCondition",
+						message = "The `#local.item#` expression `#arguments[local.item]#` could not be evaluated: #e.message#",
+						extendedInfo = "Supported forms: `this.property`, `this.method()` (with named `key='val'` or positional `'val'` arguments), bare `method()` (optionally negated with `!`), and binary comparisons using eq/neq/lt/lte/gt/gte or ==/!=/</<=/>/>=."
 					);
-					return false;
 				}
 			}
 		}

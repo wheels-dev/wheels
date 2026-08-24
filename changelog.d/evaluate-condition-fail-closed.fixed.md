@@ -1,0 +1,1 @@
+- Unevaluable validation `condition` / `unless` expressions now throw `Wheels.InvalidValidationCondition` even when `showErrorInformation` is false, instead of silently skipping the validation (#3398)

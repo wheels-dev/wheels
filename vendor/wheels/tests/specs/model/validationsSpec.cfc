@@ -310,13 +310,34 @@ component extends="wheels.WheelsTest" {
 				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
 			})
 
-			it("skips the validation without throwing in production when a condition cannot be evaluated", () => {
+			// M1: $evaluateCondition must fail closed when the expression cannot
+			// be evaluated. Returning false here means "skip this validation"
+			// ($validate: if ($evaluateCondition(...))), which is fail-open.
+			it("throws when a condition cannot be evaluated even if showErrorInformation is false", () => {
 				args.condition = "noSuchMethod()"
 				user.validatesLengthOf(argumentCollection = args)
 				var originalShowErrorInformation = application.wheels.showErrorInformation
 				try {
 					application.wheels.showErrorInformation = false
-					expect(user.valid()).toBeTrue()
+					var callValid = () => {
+						user.valid()
+					}
+					expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+				} finally {
+					application.wheels.showErrorInformation = originalShowErrorInformation
+				}
+			})
+
+			it("throws when an unless expression cannot be evaluated even if showErrorInformation is false", () => {
+				args.unless = "noSuchMethod()"
+				user.validatesLengthOf(argumentCollection = args)
+				var originalShowErrorInformation = application.wheels.showErrorInformation
+				try {
+					application.wheels.showErrorInformation = false
+					var callValid = () => {
+						user.valid()
+					}
+					expect(callValid).toThrow("Wheels.InvalidValidationCondition")
 				} finally {
 					application.wheels.showErrorInformation = originalShowErrorInformation
 				}
