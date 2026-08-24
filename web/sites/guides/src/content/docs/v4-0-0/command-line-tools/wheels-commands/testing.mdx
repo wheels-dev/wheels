@@ -90,7 +90,7 @@ The engine identifiers are `postgres` (not `postgresql`) and `sqlserver` (not `m
 wheels test --filter=models
 ```
 
-Runs every spec under `tests/specs/models/`. Exit code is non-zero if any spec fails or errors.
+Runs every spec under `tests/specs/models/`. The CLI throws `Wheels.TestsFailed` (non-zero exit) when any spec fails or errors, when the runner reports `directoryRejected` or `bundlesDiscovered=0` (a rejected or vacuous `directory=` scope — [#3083](https://github.com/wheels-dev/wheels/issues/3083)), or when compile-skipped `*Spec.cfc` files were skipped by the runner.
 
 #### Testing against different engines
 

@@ -29,7 +29,7 @@ Environment knobs:
 - `DB=mysql bash tools/test-local.sh` — run against a different database; bring up the container yourself first (see the Docker matrix below).
 - `WHEELS_BROWSER_TEST_BASE_URL` — auto-set to `http://localhost:${PORT}` so browser specs hit the same server the script starts.
 
-You can also run the framework suite through the CLI: `wheels test --core`, with `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>` selecting between the `wheelstestdb_*` datasources the matrix wires up (`--db` is only honoured with `--core`).
+You can also run the framework suite through the CLI: `wheels test --core`, with `--db=<sqlite|h2|mysql|postgres|sqlserver|oracle|cockroachdb>` selecting between the `wheelstestdb_*` datasources the matrix wires up (`--db` is only honoured with `--core`). The CLI throws `Wheels.TestsFailed` (non-zero exit) on Fail/Error, on `directoryRejected` / `bundlesDiscovered=0` ([#3083](https://github.com/wheels-dev/wheels/issues/3083)), and on compile-skipped `*Spec.cfc` files. Do not treat a curl of `/wheels/core/tests` as pass/fail from `totalFail`/`totalError` alone — check those honesty fields too.
 
 ## The core test-runner URL
 
@@ -70,12 +70,14 @@ docker compose up -d lucee7 adobe2025
 curl -s -o /tmp/lucee7.json   "http://localhost:60007/wheels/core/tests?db=sqlite&format=json"
 curl -s -o /tmp/adobe2025.json "http://localhost:62025/wheels/core/tests?db=sqlite&format=json"
 
-# Summarize
+# Summarize — fail closed on #3083 honesty fields, not just Fail/Error
 for f in /tmp/lucee7.json /tmp/adobe2025.json; do
   python3 -c "
-import json
+import json, sys
 d = json.load(open('$f'))
-print('$f', d['totalPass'], 'pass', d['totalFail'], 'fail', d['totalError'], 'error')
+print('$f', d.get('totalPass',0), 'pass', d.get('totalFail',0), 'fail', d.get('totalError',0), 'error', 'rejected=', d.get('directoryRejected'), 'bundles=', d.get('bundlesDiscovered'))
+bad = d.get('directoryRejected') or d.get('bundlesDiscovered', 1) == 0 or d.get('totalFail',0) or d.get('totalError',0)
+sys.exit(1 if bad else 0)
 "
 done
 ```

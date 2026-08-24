@@ -36,69 +36,8 @@ component aliases='wheels test:unit' extends="../base" {
         string servername = ""
     ) {
         requireWheelsApp(getCWD());
-        arguments = reconstructArgs(
-            argStruct=arguments,
-            allowedValues={
-                type=["app", "core", "plugin"],
-                format=["txt", "json", "junit", "html"]
-            }
-        );
-        arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
-        
-        // Check if unit test directory exists, create if not
-        var unitTestPath = fileSystemUtil.resolvePath(arguments.directory);
-        if (!directoryExists(unitTestPath)) {
-            directoryCreate(unitTestPath, true, true);
-            createSampleUnitTest(unitTestPath);
-            detailOutput.create("unit test directory: #arguments.directory#");
-        }
-        
-        // Build the test URL using arguments
-        var testUrl = buildTestUrl(
-            type = arguments.type,
-            servername = arguments.servername,
-            format = arguments.format
-        );
-        
-        // Build TestBox command parameters
-        var params = {
-            runner = testUrl,
-            directory = arguments.directory,
-            recurse = true,
-            verbose = arguments.verbose
-        };
-        
-        // Add optional filtering parameters
-        if (len(arguments.bundles)) {
-            params.testbundles = arguments.bundles;
-        }
-        
-        if (len(arguments.labels)) {
-            params.labels = arguments.labels;
-        }
-        
-        if (len(arguments.excludes)) {
-            params.excludes = arguments.excludes;
-        }
-        
-        if (len(arguments.filter)) {
-            // Handle filter parameter - if it ends with "Test", treat as bundle
-            if (reFindNoCase("Test$", arguments.filter)) {
-                params.testBundles = arguments.filter;
-            } else {
-                params.testSpecs = arguments.filter;
-            }
-        }
-        
-        try {
-            // Execute TestBox command
-            command("testbox run").params(argumentCollection = params).run();
-        } catch (any e) {
-            // Let TestBox handle its own output and errors
-            if (!findNoCase("failing exit code", e.message)) {
-                rethrow;
-            }
-        }
+        error("DEPRECATED: CommandBox `wheels test:unit` is frozen and does not fail-closed. Use the LuCLI `wheels` binary (`wheels test`). Removal scheduled for Wheels 5.0. See cli/src/README.md.");
+        return;
     }
     
     /**

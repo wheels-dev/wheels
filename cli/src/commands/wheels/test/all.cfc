@@ -45,77 +45,7 @@ component aliases='wheels test:all' extends="../base" {
         string servername = ""
     ) {
         requireWheelsApp(getCWD());
-        arguments = reconstructArgs(
-            argStruct=arguments,
-            allowedValues={
-                type=["app", "core", "plugin"],
-                format=["txt", "json", "junit", "html"],
-                coverageReporter=["html", "json", "xml"]
-            }
-        );
-        arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
-        
-        // Build the test URL
-        var testUrl = buildTestUrl(
-            type = arguments.type,
-            servername = arguments.servername,
-            format = arguments.format
-        );
-        
-        // Add coverage parameters if enabled
-        if (arguments.coverage) {
-            testUrl &= "&coverage=true";
-            testUrl &= "&coverageBrowserOutputDir=#encodeForURL(arguments.coverageOutputDir)#";
-            // Add coverage reporter format to URL
-            testUrl &= "&coverageReporter=#encodeForURL(arguments.coverageReporter)#";
-        }
-        
-        // Add fail-fast parameter if specified
-        if (arguments.failFast) {
-            testUrl &= "&bail=true";
-        }
-        
-        // Build TestBox command parameters
-        var params = {
-            runner = testUrl,
-            recurse = arguments.recurse,
-            verbose = arguments.verbose
-        };
-        
-        // Add directory parameter if specified
-        if (len(arguments.directory)) {
-            params.directory = arguments.directory;
-        }
-        // Add optional filtering parameters
-        if (len(arguments.bundles)) {
-            params.testbundles = arguments.bundles;
-        }
-        
-        if (len(arguments.labels)) {
-            params.labels = arguments.labels;
-        }
-        
-        if (len(arguments.excludes)) {
-            params.excludes = arguments.excludes;
-        }
-        
-        if (len(arguments.filter)) {
-            // Handle filter parameter
-            if (reFindNoCase("Test$", arguments.filter)) {
-                params.testBundles = arguments.filter;
-            } else {
-                params.testSpecs = arguments.filter;
-            }
-        }
-        
-        try {
-            // Execute TestBox command
-            command('testbox run').params(argumentCollection=params).run();
-        } catch (any e) {
-            // Let TestBox handle its own output and errors
-            if (!findNoCase("failing exit code", e.message)) {
-                rethrow;
-            }
-        }
+        error("DEPRECATED: CommandBox `wheels test:all` is frozen and does not fail-closed. Use the LuCLI `wheels` binary (`wheels test`). Removal scheduled for Wheels 5.0. See cli/src/README.md.");
+        return;
     }
 }
