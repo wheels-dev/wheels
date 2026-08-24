@@ -87,7 +87,7 @@
 			&& StructKeyExists(request.wheels.tenant, "config")
 			&& StructKeyExists(request.wheels.tenant.config, arguments.name)
 			&& !ListFindNoCase(
-				"encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls",
+				"encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls,massAssignmentStrict",
 				arguments.name
 			)
 		) {

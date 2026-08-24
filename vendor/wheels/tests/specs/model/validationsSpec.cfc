@@ -1019,14 +1019,14 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 
-			it("validatesUniquenessOf_takes_softdeletes_into_account", () => {
+			it("validatesUniquenessOf_excludes_softdeletes_by_default", () => {
 				transaction action="begin" {
 					org_post = g.model('post').findOne()
 					properties = org_post.properties()
 					new_post = g.model('post').new(properties)
 					org_post.delete()
 					valid = new_post.valid()
-					expect(valid).toBeFalse()
+					expect(valid).toBeTrue()
 					transaction action="rollback";
 				}
 			})

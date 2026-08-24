@@ -1,0 +1,3 @@
+- `validatesUniquenessOf` now defaults `includeSoftDeletes` to `false`, so a soft-deleted value can be reused unless the caller opts in (`includeSoftDeletes=true`)
+- `belongsTo` now defaults `joinType` to `outer` (`LEFT OUTER JOIN`), so `include` keeps parent rows that have no associated record; pass `joinType="inner"` to require a match
+- Query builder docs now state that single-argument `where()` / `orWhere()` is a raw-SQL passthrough; the 2- and 3-argument forms remain the parameterized contract

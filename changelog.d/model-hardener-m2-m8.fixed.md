@@ -1,0 +1,3 @@
+- `create()` no longer mass-assigns properties onto the shared class model before instantiating the record
+- Nested `hasMany` collection keys no longer use a `GetTickCount` window heuristic to decide "new" vs existing; form identities use a `new-` prefix (or `_new`), and a failed `findByKey` no longer stamps the key as the child primary key
+- `hasChanged()` now treats `StructDelete` of a persisted property as a change

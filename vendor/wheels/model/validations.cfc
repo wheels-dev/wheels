@@ -310,7 +310,7 @@ component {
 		string scope = "",
 		string condition = "",
 		string unless = "",
-		boolean includeSoftDeletes = "true"
+		boolean includeSoftDeletes = "false"
 	) {
 		$args(name = "validatesUniquenessOf", args = arguments);
 		arguments.scope = $listClean(arguments.scope);
@@ -728,7 +728,7 @@ component {
 		required string message,
 		string scope = "",
 		struct properties = "#this.properties()#",
-		boolean includeSoftDeletes = "true"
+		boolean includeSoftDeletes = "false"
 	) {
 		if (!IsBoolean(variables.wheels.class.tableName) || variables.wheels.class.tableName) {
 			local.where = [];

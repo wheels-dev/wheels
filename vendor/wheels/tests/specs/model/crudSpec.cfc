@@ -101,11 +101,11 @@ component extends="wheels.WheelsTest" {
 				StructDelete(author, "firstName")
 				result = author.hasChanged()
 
-				expect(result).toBeFalse()
+				expect(result).toBeTrue()
 
 				result = author.hasChanged("firstName")
 
-				expect(result).toBeFalse()
+				expect(result).toBeTrue()
 
 				result = author.hasChanged("somethingThatDoesNotExist")
 
@@ -1268,12 +1268,12 @@ component extends="wheels.WheelsTest" {
 			// emit FLAT sibling joins so the root FROM table stays in scope for every
 			// ON condition. Wheels 3 over-fired the issue #449 parenthesized grouping
 			// here, scoping the root out and triggering MySQL "Unknown column ... in
-			// 'on clause'". `author.user` is a belongsTo (inner) and `author.posts` /
+			// 'on clause'". `author.user` is a belongsTo (outer) and `author.posts` /
 			// `user.galleries` are hasMany (outer) — exactly the reported shape.
 			it("emits flat joins for a belongsTo-chain nested include (issue ##3245)", () => {
 				actual = g.model("author").$fromClause(include = "posts,user(galleries)")
 
-				// No join here qualifies for grouping: `user` is INNER but sits at the root
+				// No join here qualifies for grouping: `user` is OUTER at the root
 				// (nothing encloses it, and its ON references the root `authors`), and
 				// `galleries` is OUTER. Every join stays at the top level, so the root table
 				// remains in scope for every ON condition.
@@ -1281,7 +1281,7 @@ component extends="wheels.WheelsTest" {
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_authors')#"
 					& " LEFT OUTER JOIN #qi('c_o_r_e_posts')# ON #qi('c_o_r_e_authors')#.#qi('id')# = #qi('c_o_r_e_posts')#.#qi('authorid')# AND #qi('c_o_r_e_posts')#.#qi('deletedat')# IS NULL"
-					& " INNER JOIN #qi('c_o_r_e_users')# ON #qi('c_o_r_e_authors')#.#qi('firstname')# = #qi('c_o_r_e_users')#.#qi('firstname')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_users')# ON #qi('c_o_r_e_authors')#.#qi('firstname')# = #qi('c_o_r_e_users')#.#qi('firstname')#"
 					& " LEFT OUTER JOIN #qi('c_o_r_e_galleries')# ON #qi('c_o_r_e_users')#.#qi('id')# = #qi('c_o_r_e_galleries')#.#qi('userid')#"
 				)
 			})
@@ -1320,17 +1320,17 @@ component extends="wheels.WheelsTest" {
 			})
 
 			// Second shape of issue #3334, and a residual case of issue #3245 that the
-			// #3245 gate does not cover: a ROOT-level inner join (`Post.author` is a
-			// belongsTo) alongside a nested group. Its ON clause references the root
+			// #3245 gate does not cover: a ROOT-level belongsTo join (`Post.author`)
+			// alongside a nested group. Its ON clause references the root
 			// `posts` table, so pulling it inside the classifications parentheses scopes
 			// the root out — the same "unknown column in on clause" failure #3245 fixed
 			// for the flat branch. A root-level join has no enclosing group; it stays flat.
-			it("keeps a root-level inner join out of the nested group (issue ##3334)", () => {
+			it("keeps a root-level belongsTo join out of the nested group (issue ##3334)", () => {
 				actual = g.model("post").$fromClause(include = "author,classifications(tag)")
 
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_posts')#"
-					& " INNER JOIN #qi('c_o_r_e_authors')# ON #qi('c_o_r_e_posts')#.#qi('authorid')# = #qi('c_o_r_e_authors')#.#qi('id')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_authors')# ON #qi('c_o_r_e_posts')#.#qi('authorid')# = #qi('c_o_r_e_authors')#.#qi('id')#"
 					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
 				)
 			})
