@@ -267,6 +267,15 @@
 		if (StructKeyExists(arguments, "password") && !Len(arguments.password)) {
 			StructDelete(arguments, "password");
 		}
+		if (StructKeyExists(arguments, "table") && Len(arguments.table)) {
+			if (!ReFindNoCase("^[A-Za-z_][A-Za-z0-9_]*$", arguments.table)) {
+				Throw(
+					type = "Wheels.InvalidArgument",
+					message = "$dbinfo table name must be a SQL identifier"
+				);
+			}
+			local.tableName = arguments.table;
+		}
 
 		// BoxLang specific fix for index queries (MSSQL/Oracle)
 		if (
@@ -300,12 +309,16 @@
 					INNER JOIN sys.objects t ON i.object_id = t.object_id
 					INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
 					INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
-					WHERE t.name = '#arguments.table#'
+					WHERE t.name = ?
 						AND t.type = 'U'
 						AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
 					ORDER BY i.name, ic.key_ordinal
 				";
-				local.rv = $query(sql = local.sql, datasource = arguments.datasource);
+				local.rv = QueryExecute(
+					PreserveSingleQuotes(local.sql),
+					[local.tableName],
+					{datasource = arguments.datasource}
+				);
 				return local.rv;
 			}
 
@@ -327,11 +340,15 @@
 						'' AS FILTER_CONDITION
 					FROM ALL_INDEXES ai
 					JOIN ALL_IND_COLUMNS ac ON ai.INDEX_NAME = ac.INDEX_NAME AND ai.OWNER = ac.INDEX_OWNER
-					WHERE ai.TABLE_NAME = UPPER('#arguments.table#')
+					WHERE ai.TABLE_NAME = UPPER(?)
 						AND ai.INDEX_TYPE != 'LOB'
 					ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
 				";
-				local.rv = $query(sql = local.sql, datasource = arguments.datasource);
+				local.rv = QueryExecute(
+					PreserveSingleQuotes(local.sql),
+					[local.tableName],
+					{datasource = arguments.datasource}
+				);
 				return local.rv;
 			}
 		}
@@ -339,13 +356,14 @@
 		if (
 			StructKeyExists(arguments, "type") &&
 			arguments.type eq "index" &&
-			$get("adapterName") eq "SQLiteModel"
+			$get("adapterName") eq "SQLiteModel" &&
+			StructKeyExists(local, "tableName")
 		) {
 			local.sql = "
 				SELECT
 					NULL AS TABLE_CAT,
 					NULL AS TABLE_SCHEM,
-					'#arguments.table#' AS TABLE_NAME,
+					'#local.tableName#' AS TABLE_NAME,
 					CASE WHEN il.""unique"" = 0 THEN 1 ELSE 0 END AS NON_UNIQUE,
 					NULL AS INDEX_QUALIFIER,
 					il.name AS INDEX_NAME,
@@ -356,7 +374,7 @@
 					0 AS CARDINALITY,
 					0 AS PAGES,
 					'' AS FILTER_CONDITION
-				FROM pragma_index_list('#arguments.table#') il
+				FROM pragma_index_list('#local.tableName#') il
 				JOIN pragma_index_info(il.name) ii
 
 				UNION ALL
@@ -364,7 +382,7 @@
 				SELECT
 					NULL AS TABLE_CAT,
 					NULL AS TABLE_SCHEM,
-					'#arguments.table#' AS TABLE_NAME,
+					'#local.tableName#' AS TABLE_NAME,
 					0 AS NON_UNIQUE,
 					NULL AS INDEX_QUALIFIER,
 					'PRIMARY' AS INDEX_NAME,
@@ -375,7 +393,7 @@
 					0 AS CARDINALITY,
 					0 AS PAGES,
 					'' AS FILTER_CONDITION
-				FROM pragma_table_info('#arguments.table#')
+				FROM pragma_table_info('#local.tableName#')
 				WHERE pk > 0
 
 				ORDER BY INDEX_NAME, ORDINAL_POSITION;

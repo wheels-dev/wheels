@@ -80,8 +80,12 @@
 		local.server_port = local.cgi.server_port;
 		local.server_protocol =
 		(
-			(StructKeyExists(local.cgi, 'http_x_forwarded_proto') && local.cgi.http_x_forwarded_proto == "https")
-			|| (StructKeyExists(local.cgi, 'server_port_secure') && local.cgi.server_port_secure)
+			(
+				$trustProxyHeaders()
+				&& StructKeyExists(local.cgi, "http_x_forwarded_proto")
+				&& local.cgi.http_x_forwarded_proto == "https"
+			)
+			|| (StructKeyExists(local.cgi, "server_port_secure") && local.cgi.server_port_secure)
 		)
 		 ? "https" : "http";
 		return local.server_protocol & '://' & local.server_name & ':' & local.server_port;

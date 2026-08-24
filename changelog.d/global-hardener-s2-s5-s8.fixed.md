@@ -1,0 +1,3 @@
+- `$fullCgiDomainString()` honors `set(trustProxyHeaders=true)` before reading `X-Forwarded-Proto` (default stays false)
+- `$dbinfo()` rejects non-identifier table names and no longer interpolates `arguments.table` into SQL
+- `$fileExistsNoCase()` lists the directory live when `cacheFileChecking` is false (default stays true)
