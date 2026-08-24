@@ -39,10 +39,15 @@ component output="false" {
 	}
 
 	/**
-	 * Returns the current middleware stack (for inspection/testing).
+	 * Returns a shallow copy of the current middleware stack (for inspection/testing).
+	 * Callers that mutate the returned array cannot change the live pipeline.
 	 */
 	public array function getMiddleware() {
-		return variables.middleware;
+		local.copy = [];
+		if (ArrayLen(variables.middleware)) {
+			ArrayAppend(local.copy, variables.middleware, true);
+		}
+		return local.copy;
 	}
 
 	/**
