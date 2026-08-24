@@ -36,26 +36,30 @@ component {
 		local.rv = "";
 
 		if ($viteDevMode()) {
-			local.devUrl = $get("viteDevServerUrl");
+			local.devUrl = $viteEncodeAttr($get("viteDevServerUrl"));
+			local.entryUrl = $viteEncodeAttr($viteDevUrl(arguments.entrypoint));
 			local.rv = '<script type="module" src="#local.devUrl#/@vite/client"></script>' & Chr(10);
-			local.rv &= '<script type="module" src="#$viteDevUrl(arguments.entrypoint)#"></script>' & Chr(10);
+			local.rv &= '<script type="module" src="#local.entryUrl#"></script>' & Chr(10);
 		} else {
 			local.resolved = $viteResolveAssets(arguments.entrypoint);
 			if (!ArrayLen(local.resolved.scripts)) {
 				return "";
 			}
-			local.buildPath = $get("webPath") & $get("viteBuildPath");
+			local.buildPath = $viteEncodeAttr($get("webPath") & $get("viteBuildPath"));
 
 			for (local.cssFile in local.resolved.styles) {
-				local.rv &= '<link rel="stylesheet" href="#local.buildPath#/#local.cssFile#" />' & Chr(10);
+				local.cssHref = local.buildPath & "/" & $viteEncodeAttr(local.cssFile);
+				local.rv &= '<link rel="stylesheet" href="#local.cssHref#" />' & Chr(10);
 			}
 
-			local.rv &= '<script type="module" src="#local.buildPath#/#local.resolved.scripts[1]#"></script>' & Chr(10);
+			local.scriptSrc = local.buildPath & "/" & $viteEncodeAttr(local.resolved.scripts[1]);
+			local.rv &= '<script type="module" src="#local.scriptSrc#"></script>' & Chr(10);
 
 			// Modulepreload for transitive import chunks — always emitted into <head>
 			// regardless of the `head` arg, since preloads placed in <body> are useless.
 			for (local.chunkFile in local.resolved.preloads) {
-				$viteHtmlHead(text='<link rel="modulepreload" href="#local.buildPath#/#local.chunkFile#" />' & Chr(10));
+				local.preloadHref = local.buildPath & "/" & $viteEncodeAttr(local.chunkFile);
+				$viteHtmlHead(text='<link rel="modulepreload" href="#local.preloadHref#" />' & Chr(10));
 			}
 		}
 
@@ -86,10 +90,12 @@ component {
 		if (!ArrayLen(local.resolved.scripts)) {
 			return "";
 		}
-		local.buildPath = $get("webPath") & $get("viteBuildPath");
-		local.rv = '<link rel="stylesheet" href="#local.buildPath#/#local.resolved.scripts[1]#" />' & Chr(10);
+		local.buildPath = $viteEncodeAttr($get("webPath") & $get("viteBuildPath"));
+		local.styleHref = local.buildPath & "/" & $viteEncodeAttr(local.resolved.scripts[1]);
+		local.rv = '<link rel="stylesheet" href="#local.styleHref#" />' & Chr(10);
 		for (local.cssFile in local.resolved.styles) {
-			local.rv &= '<link rel="stylesheet" href="#local.buildPath#/#local.cssFile#" />' & Chr(10);
+			local.cssHref = local.buildPath & "/" & $viteEncodeAttr(local.cssFile);
+			local.rv &= '<link rel="stylesheet" href="#local.cssHref#" />' & Chr(10);
 		}
 
 		if (arguments.head) {
@@ -124,10 +130,12 @@ component {
 			return "";
 		}
 
-		local.buildPath = $get("webPath") & $get("viteBuildPath");
-		local.rv = '<link rel="modulepreload" href="#local.buildPath#/#local.resolved.scripts[1]#" />' & Chr(10);
+		local.buildPath = $viteEncodeAttr($get("webPath") & $get("viteBuildPath"));
+		local.entryHref = local.buildPath & "/" & $viteEncodeAttr(local.resolved.scripts[1]);
+		local.rv = '<link rel="modulepreload" href="#local.entryHref#" />' & Chr(10);
 		for (local.chunkFile in local.resolved.preloads) {
-			local.rv &= '<link rel="modulepreload" href="#local.buildPath#/#local.chunkFile#" />' & Chr(10);
+			local.chunkHref = local.buildPath & "/" & $viteEncodeAttr(local.chunkFile);
+			local.rv &= '<link rel="modulepreload" href="#local.chunkHref#" />' & Chr(10);
 		}
 
 		if (arguments.head) {
@@ -307,6 +315,13 @@ component {
 				extendedInfo="Available entrypoints: #StructKeyList(arguments.manifest)#. Run your Vite build to generate the manifest, or set(viteStrictManifest=false) to silence this error."
 			);
 		}
+	}
+
+	/**
+	 * Encodes a Vite-interpolated URL or path for an HTML attribute (S12).
+	 */
+	public string function $viteEncodeAttr(required string value) {
+		return EncodeForHTMLAttribute($canonicalize(arguments.value));
 	}
 
 	/**

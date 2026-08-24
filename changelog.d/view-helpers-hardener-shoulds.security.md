@@ -1,0 +1,4 @@
+- View helpers now reject breakout HTML attribute names, restrict `errorElement` / `wrapperElement` to safe tag names, honor `encode` on date `<option>` bodies and `csrfMetaTags`, and skip the CSRF field on `startFormTag` when `action` is an absolute external URL
+- `paginationNav()` encodes outer `nav` attributes, `$paginationSanitizeWrapper` also strips `style` expressions and `data:` URIs, and pagination params are no longer double-encoded
+- Vite script/style/preload tags encode interpolated paths; `imageTag` / asset helpers collapse `..` on local sources; `stripTags` removes comments and newline-split tags; `h()` / `hAttr()` canonicalize first; `errorMessageOn` prepend/append encode once
+- `includeContent(encode=true)` is opt-in (default still returns stored HTML). `linkTo` / `URLFor` external hrefs and `formHelperDataAutoId=true` are unchanged (escalated; no public default flip)

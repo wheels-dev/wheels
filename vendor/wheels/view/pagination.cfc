@@ -583,7 +583,7 @@ component {
 			name = "nav",
 			content = local.content,
 			class = arguments.navClass,
-			encode = false
+			encode = $coerceEncode(arguments.encode, "attributes")
 		);
 	}
 
@@ -669,7 +669,12 @@ component {
 		local.rv = $decodeHtmlEntities(arguments.input);
 		local.rv = reReplaceNoCase(local.rv, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
 		local.rv = reReplaceNoCase(local.rv, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+style\s*=\s*([''"])[^''"]*(expression|javascript)\s*\(?[^''"]*\1', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+style\s*=\s*[^\s>]*(expression|javascript)\s*\(?[^\s>]*', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+(href|src|action|formaction|xlink:href)\s*=\s*([''"])\s*data\s*:[^''"]*\2', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+(href|src|action|formaction|xlink:href)\s*=\s*data\s*:[^\s>]+', '', 'all');
 		local.rv = reReplaceNoCase(local.rv, 'javascript\s*:', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, 'data\s*:', '', 'all');
 		return local.rv;
 	}
 

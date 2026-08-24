@@ -40,13 +40,19 @@ component {
 		arguments.objectName = ListLast(arguments.objectName, ".");
 		local.tagId = "#arguments.objectName#-#arguments.association#-#Replace(arguments.keys, ",", "-", "all")#-#arguments.property#-#arguments.tagValue#";
 		local.tagName = "#arguments.objectName#[#arguments.association#][#arguments.keys#][#arguments.property#]";
+		local.tagValue = arguments.tagValue;
+		StructDelete(arguments, "keys");
+		StructDelete(arguments, "objectName");
+		StructDelete(arguments, "association");
+		StructDelete(arguments, "property");
+		StructDelete(arguments, "tagValue");
+		StructDelete(arguments, "checkIfBlank");
 		return radioButtonTag(
 			name = local.tagName,
 			id = local.tagId,
-			value = arguments.tagValue,
+			value = local.tagValue,
 			checked = local.checked,
-			label = arguments.label,
-			encode = arguments.encode
+			argumentCollection = arguments
 		);
 	}
 

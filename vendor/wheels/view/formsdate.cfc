@@ -321,7 +321,7 @@ component {
 		}
 		// Match select(): encode="attributes" (non-boolean) must still encode
 		// attribute values. `IsBoolean && encode` coerced that string to false.
-		local.encode = IsBoolean(arguments.encode) && !arguments.encode ? false : "attributes";
+		local.encode = $coerceEncode(arguments.encode, "attributes");
 		return local.before & $element(
 			name = "select",
 			skip = "objectName,property,label,labelPlacement,prepend,append,prependToLabel,appendToLabel,errorElement,errorClass,value,includeBlank,order,separator,startYear,endYear,monthDisplay,monthNames,monthAbbreviations,dateSeparator,dateOrder,timeSeparator,timeOrder,minuteStep,secondStep,association,position,twelveHour,encode",
@@ -349,7 +349,7 @@ component {
 		if (arguments.$type == "minute" || arguments.$type == "second") {
 			arguments.optionContent = NumberFormat(arguments.optionContent, "09");
 		}
-		return $element(name = "option", content = arguments.optionContent, attributes = local.args, encode = false);
+		return $element(name = "option", content = arguments.optionContent, attributes = local.args, encode = arguments.encode);
 	}
 
 	/**
