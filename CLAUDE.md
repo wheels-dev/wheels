@@ -412,7 +412,7 @@ model("User").byRole("admin").findAll(page=1, perPage=25);
 user.isDraft();                    // true/false
 model("User").draft().findAll();
 
-// Chainable query builder (injection-safe; values auto-quoted)
+// Chainable query builder (2-/3-arg where is injection-safe; 1-arg is raw SQL)
 model("User")
     .where("status", "active")
     .where("age", ">", 18)

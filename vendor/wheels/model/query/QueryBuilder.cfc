@@ -1,5 +1,5 @@
 /**
- * A chainable, injection-safe query builder for Wheels models.
+ * A chainable query builder for Wheels models.
  * Provides a fluent API alternative to the traditional `findAll(where="...")` string approach.
  *
  * Usage:
@@ -10,8 +10,11 @@
  *       .limit(25)
  *       .get();
  *
- * All values are safely quoted using the model's database adapter, preventing SQL injection.
- * The builder ultimately delegates to the model's standard finder methods (findAll, findOne, etc.).
+ * The 2- and 3-argument `where()` / `orWhere()` forms quote values through the
+ * model's database adapter. The single-argument form is a raw-SQL passthrough
+ * for trusted clauses only — it is not parameterized. Prefer the 2-/3-arg forms
+ * for user input. The builder ultimately delegates to the model's standard
+ * finder methods (findAll, findOne, etc.).
  */
 component output="false" {
 

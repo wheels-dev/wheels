@@ -27,7 +27,8 @@ component {
 		$args(name = "create", args = arguments);
 		$setProperties(
 			argumentCollection = arguments,
-			filterList = "properties,parameterize,reload,validate,transaction,callbacks"
+			filterList = "properties,parameterize,reload,validate,transaction,callbacks",
+			setOnModel = false
 		);
 		local.rv = new (argumentCollection = arguments);
 		local.rv.save(

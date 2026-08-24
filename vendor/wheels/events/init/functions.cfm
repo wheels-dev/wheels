@@ -749,7 +749,8 @@
 		application.$wheels.functions.validatesPresenceOf = {message = "[property] can't be empty"};
 		application.$wheels.functions.validatesUniquenessOf = {
 			message = "[property] has already been taken",
-			allowBlank = false
+			allowBlank = false,
+			includeSoftDeletes = false
 		};
 		application.$wheels.functions.verifies = {handler = ""};
 		application.$wheels.functions.wordTruncate = {length = 5, truncateString = "..."};

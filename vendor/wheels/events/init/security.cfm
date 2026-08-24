@@ -62,4 +62,9 @@
 		// reload rate-limit keying. Leave false unless the app sits behind a trusted reverse proxy
 		// that overwrites — never appends to — these headers.
 		application.$wheels.trustProxyHeaders = false;
+
+		// Mass assignment is open unless accessibleProperties() or
+		// protectedProperties() is configured. Set true to fail closed when
+		// neither list exists — a breaking opt-in, not the framework default.
+		application.$wheels.massAssignmentStrict = false;
 </cfscript>

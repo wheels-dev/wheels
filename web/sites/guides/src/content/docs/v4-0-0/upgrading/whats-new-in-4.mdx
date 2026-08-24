@@ -14,7 +14,7 @@ You know Wheels. You have a 3.x app in production. This page is the ten-minute a
 
 **Built-in dependency injection.** Register services in `config/services.cfm`, resolve with `service()` or `inject()`, scope as transient, singleton, or request. This is the change that removed the WireBox dependency — the container is `vendor/wheels/Injector.cfc`, part of the framework. → [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/)
 
-**Chainable query builder, scopes, and enums.** `model("User").where("status","active").whereNotNull("emailVerifiedAt").orderBy("name").get()` — injection-safe, values auto-quoted. Named scopes compose (`model("User").active().recent().findAll()`), and `enum()` generates checkers and scopes from a property definition. → [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/)
+**Chainable query builder, scopes, and enums.** `model("User").where("status","active").whereNotNull("emailVerifiedAt").orderBy("name").get()` — 2-/3-arg `where` is injection-safe (values auto-quoted); 1-arg `where` is raw SQL. Named scopes compose (`model("User").active().recent().findAll()`), and `enum()` generates checkers and scopes from a property definition. → [Query Builder and Scopes](/v4-0-0/basics/query-builder-and-scopes/)
 
 **Background jobs.** `app/jobs/` CFCs extending `wheels.Job`, with queues, delayed/scheduled enqueue, retries with exponential backoff, and a worker loop (`wheels jobs work`). The `wheels_jobs` table auto-creates on first use. → [Background Jobs](/v4-0-0/digging-deeper/background-jobs/)
 

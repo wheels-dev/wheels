@@ -194,38 +194,26 @@ component {
 		}
 		if (IsStruct(arguments.value)) {
 			for (local.item in arguments.value) {
-				// Check to see if the id is a tickcount, if so the object is new.
-				if (IsNumeric(local.item) && Ceiling(Right(GetTickCount(), 12) / 900000000) == Ceiling(local.item / 900000000)) {
-					ArrayAppend(
-						this[arguments.property],
-						$getAssociationObject(
-							property = arguments.property,
-							value = arguments.value[local.item],
-							association = arguments.association,
-							delete = arguments.delete
-						)
-					);
-					$updateCollectionObject(property = arguments.property, value = arguments.value[local.item]);
-				} else {
-					// Get our primary keys.
+				if (!$isNewNestedCollectionKey(collectionKey = local.item, value = arguments.value[local.item])) {
+					// Existing-row key: copy the struct key into the primary key fields.
 					local.keys = local.model.primaryKey();
 					local.itemArray = ListToArray(local.item, ",", true);
 					local.iEnd = ListLen(local.keys);
 					for (local.i = 1; local.i <= local.iEnd; local.i++) {
 						arguments.value[local.item][ListGetAt(local.keys, local.i)] = local.itemArray[local.i];
 					}
-
-					ArrayAppend(
-						this[arguments.property],
-						$getAssociationObject(
-							property = arguments.property,
-							value = arguments.value[local.item],
-							association = arguments.association,
-							delete = arguments.delete
-						)
-					);
-					$updateCollectionObject(property = arguments.property, value = arguments.value[local.item]);
 				}
+
+				ArrayAppend(
+					this[arguments.property],
+					$getAssociationObject(
+						property = arguments.property,
+						value = arguments.value[local.item],
+						association = arguments.association,
+						delete = arguments.delete
+					)
+				);
+				$updateCollectionObject(property = arguments.property, value = arguments.value[local.item]);
 			}
 		} else if (IsArray(arguments.value)) {
 			for (local.i = 1; local.i <= ArrayLen(arguments.value); local.i++) {
@@ -314,7 +302,7 @@ component {
 			local.args.key = $createPrimaryKeyList(params = arguments.value, keys = local.model.primaryKey());
 			if (IsObject(arguments.value)) {
 				local.object = arguments.value;
-			} else if (Len(local.args.key)) {
+			} else 			if (Len(local.args.key)) {
 				local.object = local.model.findByKey(argumentCollection = local.args);
 			}
 
@@ -324,6 +312,8 @@ component {
 				local.delete = true;
 			}
 			if (!IsObject(local.object) && !local.delete) {
+				// Key was not a persisted PK — do not stamp it onto a new child.
+				$clearNestedPrimaryKeys(value = arguments.value, keys = local.model.primaryKey());
 				StructDelete(local.args, "key");
 				return $invoke(componentReference = local.model, method = "new", invokeArgs = local.args);
 			} else if (Len(local.args.key) && local.delete && arguments.association.nested.delete && arguments.delete) {
@@ -332,6 +322,36 @@ component {
 			}
 		}
 		return local.object;
+	}
+
+	/**
+	 * True when a hasMany nested-properties struct key identifies a new
+	 * child: an explicit `_new` flag, a blank key, or a `new` / `new-*` /
+	 * `new_*` token from `key($returnTickCountWhenNew=true)`.
+	 */
+	public boolean function $isNewNestedCollectionKey(required any collectionKey, required struct value) {
+		if (StructKeyExists(arguments.value, "_new") && IsBoolean(arguments.value["_new"]) && arguments.value["_new"]) {
+			return true;
+		}
+		local.keyString = ToString(arguments.collectionKey);
+		if (!Len(Trim(local.keyString))) {
+			return true;
+		}
+		if (ReFindNoCase("^new([-_].*)?$", local.keyString)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Removes primary-key fields from a nested-properties value struct so a
+	 * failed findByKey does not stamp a form identity onto a new child.
+	 */
+	public void function $clearNestedPrimaryKeys(required struct value, required string keys) {
+		local.iEnd = ListLen(arguments.keys);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			StructDelete(arguments.value, ListGetAt(arguments.keys, local.i));
+		}
 	}
 
 	/**

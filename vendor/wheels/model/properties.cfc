@@ -217,7 +217,7 @@ component {
 			}
 		}
 		if (!Len(local.rv) && arguments.$returnTickCountWhenNew) {
-			local.rv = variables.wheels.tickCountId;
+			local.rv = "new-" & variables.wheels.tickCountId;
 		}
 
 		/* To fix the bug below:
@@ -398,6 +398,9 @@ component {
 						return true;
 					}
 				}
+			} else if (StructKeyExists(variables.$persistedProperties, local.key)) {
+				// Persisted property was removed from the instance (e.g. StructDelete).
+				return true;
 			}
 		}
 		// if we get here, it means that all of the properties that were checked had a value in
@@ -499,20 +502,26 @@ component {
 		}
 
 		// loop through the properties and see if they can be set based off of the accessible properties lists
+		local.hasWhiteList = StructKeyExists(variables.wheels.class.accessibleProperties, "whiteList");
+		local.hasBlackList = StructKeyExists(variables.wheels.class.accessibleProperties, "blackList");
+		local.strictOpen = arguments.$useFilterLists && !local.hasWhiteList && !local.hasBlackList && $get("massAssignmentStrict");
 		for (local.key in arguments.properties) {
 			// required to ignore null keys
 			if (StructKeyExists(arguments.properties, local.key)) {
 				local.accessible = true;
+				if (local.strictOpen) {
+					local.accessible = false;
+				}
 				if (
 					arguments.$useFilterLists &&
-					StructKeyExists(variables.wheels.class.accessibleProperties, "whiteList")
+					local.hasWhiteList
 					&& !StructKeyExists(variables.wheels.class.accessibleProperties.whiteList, local.key)
 				) {
 					local.accessible = false;
 				}
 				if (
 					arguments.$useFilterLists
-					&& StructKeyExists(variables.wheels.class.accessibleProperties, "blackList")
+					&& local.hasBlackList
 					&& StructKeyExists(variables.wheels.class.accessibleProperties.blackList, local.key)
 				) {
 					local.accessible = false;
