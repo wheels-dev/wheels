@@ -1,0 +1,5 @@
+- Announce-only migrations (default `up()`/`down()` stubs and the announce template) no longer mark or unmark versions in `wheels_migrator_versions`
+- `redoMigration()` fails closed when `allowMigrationDown` is false instead of skipping `down()` and re-running `up()` (the `allowMigrationDown` default is unchanged)
+- CREATE TABLE foreign keys now emit `ON UPDATE` / `ON DELETE`; default FK names include the column so two FKs to the same table do not collide
+- `TenantMigrator` no longer mutates `application.wheels.dataSourceName`; tenant runs use a request-scoped datasource
+- `AutoMigrator.generateMigrationCFC()` honors `suggestedRenames` as `renameColumn` instead of destructive remove+add

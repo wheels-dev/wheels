@@ -49,7 +49,7 @@ component extends="wheels.migrator.Base" {
 		local.dbColumns = $dbinfo(
 			type = "columns",
 			table = local.tableName,
-			datasource = application[local.appKey].dataSourceName,
+			datasource = $migratorDataSource(),
 			username = application[local.appKey].dataSourceUserName,
 			password = application[local.appKey].dataSourcePassword
 		);
@@ -252,10 +252,26 @@ component extends="wheels.migrator.Base" {
 		local.upBody = "";
 		local.downBody = "";
 
-		// Emit renameColumns first in up(); reversed renames go last in down()
+		// Emit renameColumns first in up(); reversed renames go last in down().
+		// Honor suggestedRenames as renames too — leaving them as remaining
+		// add/remove would emit destructive drop+add.
 		local.renameColumns = StructKeyExists(arguments.diffResult, "renameColumns")
-			? arguments.diffResult.renameColumns
+			? Duplicate(arguments.diffResult.renameColumns)
 			: [];
+		local.suggestedRenames = StructKeyExists(arguments.diffResult, "suggestedRenames")
+			? arguments.diffResult.suggestedRenames
+			: [];
+		local.skipAdd = {};
+		local.skipRemove = {};
+		for (local.s in local.suggestedRenames) {
+			ArrayAppend(local.renameColumns, local.s);
+			local.skipRemove[LCase(local.s.from)] = true;
+			local.skipAdd[LCase(local.s.to)] = true;
+		}
+		for (local.r in local.renameColumns) {
+			local.skipRemove[LCase(local.r.from)] = true;
+			local.skipAdd[LCase(local.r.to)] = true;
+		}
 		local.iEnd = ArrayLen(local.renameColumns);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.r = local.renameColumns[local.i];
@@ -268,6 +284,9 @@ component extends="wheels.migrator.Base" {
 		local.iEnd = ArrayLen(arguments.diffResult.addColumns);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.col = arguments.diffResult.addColumns[local.i];
+			if (StructKeyExists(local.skipAdd, LCase(local.col.name))) {
+				continue;
+			}
 			local.upBody &= local.tab & local.tab
 				& 'addColumn(table="' & arguments.diffResult.tableName
 				& '", columnType="' & local.col.type
@@ -282,6 +301,9 @@ component extends="wheels.migrator.Base" {
 		local.iEnd = ArrayLen(arguments.diffResult.removeColumns);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.col = arguments.diffResult.removeColumns[local.i];
+			if (StructKeyExists(local.skipRemove, LCase(local.col.name))) {
+				continue;
+			}
 			local.upBody &= local.tab & local.tab
 				& 'removeColumn(table="' & arguments.diffResult.tableName
 				& '", columnName="' & local.col.name & '");' & local.nl;

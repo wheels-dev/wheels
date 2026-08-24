@@ -383,7 +383,13 @@ component extends="Base" {
 		// addReference for the same pattern.
 		$combineArguments(args = arguments, combine = "referenceName,columnName", required = false);
 		$combineArguments(args = arguments, combine = "referenceName,columnNames", required = true);
-		dropForeignKey(arguments.table, "FK_#arguments.table#_#pluralize(arguments.referenceName)#");
+		local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
+		local.column = arguments.referenceName & local.idSuffix;
+		local.refTable = pluralize(arguments.referenceName);
+		dropForeignKey(
+			arguments.table,
+			"FK_#objectCase(arguments.table)#_#objectCase(local.refTable)#_#objectCase(local.column)#"
+		);
 	}
 
 	/**

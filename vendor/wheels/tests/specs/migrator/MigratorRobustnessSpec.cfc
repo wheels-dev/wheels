@@ -130,7 +130,13 @@ component extends="wheels.WheelsTest" {
 
 			it("sets request.$wheelsTransactionWrapper for the duration of up()", () => {
 				if (_isCockroachDB) return;
-				wrapperMigrator.redoMigration("001");
+				var priorDown = application.wheels.allowMigrationDown;
+				application.wheels.allowMigrationDown = true;
+				try {
+					wrapperMigrator.redoMigration("001");
+				} finally {
+					application.wheels.allowMigrationDown = priorDown;
+				}
 				expect(request.$issue2789FlagDuringUp).toBeTrue(
 					"redoMigration() must set request.$wheelsTransactionWrapper while the "
 					& "migration runs (issue ##2789), like every other migration path."
@@ -139,7 +145,13 @@ component extends="wheels.WheelsTest" {
 
 			it("rolls back DML written by up() when the redo fails", () => {
 				if (_isCockroachDB) return;
-				var output = errorPathMigrator.redoMigration("005");
+				var priorDown = application.wheels.allowMigrationDown;
+				application.wheels.allowMigrationDown = true;
+				try {
+					var output = errorPathMigrator.redoMigration("005");
+				} finally {
+					application.wheels.allowMigrationDown = priorDown;
+				}
 				expect(output).toInclude("Error re-running 005");
 				expect(output).toInclude("synthetic failure after DML");
 				var found = queryExecute(

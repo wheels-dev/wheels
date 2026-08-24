@@ -69,6 +69,16 @@ Two caches introduced in #2937 — know their scopes before adding probes:
 - `application[appKey].$migratorAdapterNames` — application-scoped, keyed by datasource name. Memoized migrator adapter name, written by `Base.cfc::$getDBType()`. Survives requests; rebuilt on reload (a datasource's driver can't change without one).
 - `request.$wheelsMigratorColumns` — request-scoped, keyed by `dsName|tableName` (table name VERBATIM — no case folding, since the `$dbinfo` probe uses original case and case-sensitive databases can host `Authors` and `authors` separately). Column list per table, written by `Base.cfc::$getColumns()`, dropped wholesale by `$execute()` so DDL in the same request is reflected on the next read.
 
+## Constraint names and tenant isolation
+
+Default foreign-key names are `FK_<table>_<refTable>_<column>` so two FKs from the same table to the same reference table do not collide. `dropReference()` builds the same name (column suffix follows `useUnderscoreReferenceColumns`). Existing constraints created as `FK_<table>_<refTable>` must be dropped with an explicit `dropForeignKey(keyName=)`.
+
+CREATE TABLE inlines FKs via `toForeignKeySQL()`, which preserves `onUpdate` / `onDelete` (same mapping as `Abstract.foreignKeySQL`). ALTER ADD uses `toSQL()`.
+
+`TenantMigrator` isolates the tenant datasource on `request.wheels.migratorDataSource` (read by `$migratorDataSource()`). It must not swap `application.wheels.dataSourceName`.
+
+Announce-only `up()`/`down()` do not write the version table. `redoMigration()` fails closed when `allowMigrationDown` is false — do not flip that default to `true`.
+
 ## Tests
 
 Specs live in `vendor/wheels/tests/specs/migrator/`. `referencesSpec.cfc` exercises `TableDefinition::references()` (the `columnNames` alias plus the suffix flag) at the unit layer — inspecting `t.columns` / `t.foreignKeys` directly without `t.create()` so the assertions are adapter-independent. `primaryKeySpec.cfc` mirrors that shape for `TableDefinition::primaryKey()` — the `columnName` / `columnNames` aliases plus precedence semantics (#2803). `migrationSpec.cfc` covers Migration.cfc command-version helpers via real DDL roundtrips — its "Tests addReference" describe block guards the `useUnderscoreReferenceColumns` path on `Migration.cfc::addReference()`. Most FK-related tests in `migrationSpec.cfc` skip on SQLite (which doesn't support altering CONSTRAINTS) but run on every other engine in CI.

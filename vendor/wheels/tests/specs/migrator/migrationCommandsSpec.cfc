@@ -100,7 +100,7 @@ component extends="wheels.WheelsTest" {
 
 			it("dropReference accepts columnName alias for the legacy referenceName parameter", () => {
 				// dropReference resolves to dropForeignKey by name pattern
-				// (FK_<table>_<pluralized-reference>). If no such FK exists,
+				// (FK_<table>_<pluralized-reference>_<column>). If no such FK exists,
 				// dropForeignKey errors at the SQL layer — that's fine here;
 				// we only care that the alias resolved before SQL ran.
 				var aliasAccepted = true;

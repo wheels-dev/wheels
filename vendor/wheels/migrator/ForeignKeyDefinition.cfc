@@ -21,8 +21,20 @@ component extends="Base" {
 				this[local.argumentName] = arguments[local.argumentName];
 			}
 		}
-		this.name = "FK_#objectCase(this.table)#_#objectCase(this.referenceTable)#";
+		this.name = $defaultForeignKeyName(this.table, this.referenceTable, this.column);
 		return this;
+	}
+
+	/**
+	 * Default constraint name. Includes the column so two FKs from the same
+	 * table to the same reference table do not collide.
+	 */
+	public string function $defaultForeignKeyName(
+		required string table,
+		required string referenceTable,
+		required string column
+	) {
+		return "FK_#objectCase(arguments.table)#_#objectCase(arguments.referenceTable)#_#objectCase(arguments.column)#";
 	}
 
 	public string function toSQL() {
@@ -55,6 +67,30 @@ component extends="Base" {
 			}
 		}
 		arguments.sql = this.adapter.addForeignKeyOptions(sql = arguments.sql, options = local.options);
+		// CREATE TABLE uses this path; ALTER ADD uses toSQL()/foreignKeySQL().
+		// Adapters historically dropped onUpdate/onDelete here.
+		return $appendReferentialActions(arguments.sql);
+	}
+
+	/**
+	 * Appends ON UPDATE / ON DELETE using the same mapping as Abstract.foreignKeySQL.
+	 */
+	public string function $appendReferentialActions(required string sql) {
+		for (local.item in ListToArray("onUpdate,onDelete")) {
+			if (StructKeyExists(this, local.item) && Len(this[local.item])) {
+				switch (this[local.item]) {
+					case "none":
+						arguments.sql &= " " & UCase(humanize(local.item)) & " NO ACTION";
+						break;
+					case "null":
+						arguments.sql &= " " & UCase(humanize(local.item)) & " SET NULL";
+						break;
+					default:
+						arguments.sql &= " " & UCase(humanize(local.item)) & " CASCADE";
+						break;
+				}
+			}
+		}
 		return arguments.sql;
 	}
 
