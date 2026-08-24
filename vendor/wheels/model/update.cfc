@@ -292,6 +292,7 @@ component {
 	 **/
 	public numeric function $updateAll() {
 		local.updated = variables.wheels.class.adapter.$querySetup(parameterize = arguments.parameterize, sql = arguments.sql);
+		$markMigrationDidWork();
 		$clearRequestCache();
 		return local.updated.result.recordCount;
 	}
@@ -323,6 +324,7 @@ component {
 				ArrayDeleteAt(local.sql, ArrayLen(local.sql));
 				local.sql = $addKeyWhereClause(sql = local.sql);
 				variables.wheels.class.adapter.$querySetup(sql = local.sql, parameterize = arguments.parameterize);
+				$markMigrationDidWork();
 				$clearRequestCache();
 			}
 		}

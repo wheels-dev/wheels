@@ -370,6 +370,7 @@ component output="false" extends="wheels.Global"{
 				request.$wheelsMigrationOutput = "";
 				request.$wheelsMigrationDidExecute = false;
 				request.$wheelsMigrationDidAnnounce = false;
+				request.$wheelsMigrationDidWork = false;
 				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
 				if (application[local.appKey].writeMigratorSQLFiles) {
 					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
@@ -408,19 +409,26 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * True when the just-run up()/down() did real work. Announce-only
-	 * steps (default stubs, announce template) must not update the
-	 * version table. ORM-only migrations (model().create() with no
-	 * $execute) still count — they are not announce-only.
+	 * True when the just-run up()/down() did real work. Skip version
+	 * tracking only when the step is truly announce-only: announced,
+	 * no $execute, and no ORM/other persist work. announce() plus
+	 * model().create()/save()/delete() still counts.
 	 */
 	private boolean function $migrationStepMutatedSchema() {
-		if (request.$wheelsMigrationDidExecute) {
-			return true;
+		if (!StructKeyExists(request, "$wheelsMigrationDidExecute")) {
+			request.$wheelsMigrationDidExecute = false;
 		}
-		if (request.$wheelsMigrationDidAnnounce) {
-			return false;
+		if (!StructKeyExists(request, "$wheelsMigrationDidAnnounce")) {
+			request.$wheelsMigrationDidAnnounce = false;
 		}
-		return true;
+		if (!StructKeyExists(request, "$wheelsMigrationDidWork")) {
+			request.$wheelsMigrationDidWork = false;
+		}
+		return !(
+			request.$wheelsMigrationDidAnnounce
+			&& !request.$wheelsMigrationDidExecute
+			&& !request.$wheelsMigrationDidWork
+		);
 	}
 
 	/**

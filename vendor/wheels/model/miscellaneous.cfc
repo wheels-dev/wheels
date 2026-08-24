@@ -29,6 +29,15 @@ component {
 	}
 
 	/**
+	 * Marks the current migrator step as having done ORM persist work
+	 * (create / save / update / delete) so announce() alone does not
+	 * disqualify the step from version tracking.
+	 */
+	public void function $markMigrationDidWork() {
+		request.$wheelsMigrationDidWork = true;
+	}
+
+	/**
 	 * Use this method to override the data source connection information for this model.
 	 *
 	 * [section: Model Configuration]

@@ -77,7 +77,7 @@ CREATE TABLE inlines FKs via `toForeignKeySQL()`, which preserves `onUpdate` / `
 
 `TenantMigrator` isolates the tenant datasource on `request.wheels.migratorDataSource` (read by `$migratorDataSource()`). It must not swap `application.wheels.dataSourceName`.
 
-Announce-only `up()`/`down()` do not write the version table. `redoMigration()` fails closed when `allowMigrationDown` is false — do not flip that default to `true`.
+Announce-only `up()`/`down()` do not write the version table. `announce()` plus ORM persist (`model().create()` / `save()` / `delete()` with no `$execute`) still marks or unmarks the version. `redoMigration()` fails closed when `allowMigrationDown` is false — do not flip that default to `true`.
 
 ## Tests
 
