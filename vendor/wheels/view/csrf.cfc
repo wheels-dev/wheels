@@ -7,7 +7,7 @@ component {
 	 *
 	 * @encode [see:styleSheetLinkTag].
 	 */
-	public string function csrfMetaTags() {
+	public string function csrfMetaTags(any encode) {
 		$args(name = "csrfMetaTags", args = arguments);
 		local.encode = $coerceEncode(arguments.encode, true);
 		local.metaTags = $tag(

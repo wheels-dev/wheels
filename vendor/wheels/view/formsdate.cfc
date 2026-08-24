@@ -349,7 +349,8 @@ component {
 		if (arguments.$type == "minute" || arguments.$type == "second") {
 			arguments.optionContent = NumberFormat(arguments.optionContent, "09");
 		}
-		return $element(name = "option", content = arguments.optionContent, attributes = local.args, encode = arguments.encode);
+		local.encode = StructKeyExists(arguments, "encode") ? arguments.encode : false;
+		return $element(name = "option", content = arguments.optionContent, attributes = local.args, encode = local.encode);
 	}
 
 	/**

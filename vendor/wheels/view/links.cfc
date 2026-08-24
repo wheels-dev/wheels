@@ -603,7 +603,7 @@ component {
 		return local.result;
 	}
 
-	public string function $paramsToQueryString(required any params) {
+	public string function $paramsToQueryString(required any params, boolean encode = true) {
 		if (!isStruct(arguments.params)) {
 			return arguments.params;
 		}
@@ -611,8 +611,13 @@ component {
 		for (local.key in arguments.params) {
 			local.value = arguments.params[local.key];
 			if (!isNull(local.value) && local.value != "") {
-				// Leave raw; URLFor / $constructParams encode once (S8).
-				local.queryString &= (Len(local.queryString) ? "&" : "") & local.key & "=" & local.value;
+				// encode=true keeps the public helper's existing contract.
+				// $paginationLinkToArgs passes false so URLFor encodes once (S8).
+				if (arguments.encode) {
+					local.queryString &= (Len(local.queryString) ? "&" : "") & encodeForUrl(local.key) & "=" & encodeForUrl(local.value);
+				} else {
+					local.queryString &= (Len(local.queryString) ? "&" : "") & local.key & "=" & local.value;
+				}
 			}
 		}
 		return local.queryString;

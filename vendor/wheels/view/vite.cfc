@@ -321,7 +321,12 @@ component {
 	 * Encodes a Vite-interpolated URL or path for an HTML attribute (S12).
 	 */
 	public string function $viteEncodeAttr(required string value) {
-		return EncodeForHTMLAttribute($canonicalize(arguments.value));
+		// Safe fingerprinted paths stay literal so existing markup matches.
+		// Anything with attribute-breakers is encoded (S12).
+		if (ReFind("[<>""'&]", arguments.value)) {
+			return EncodeForHTMLAttribute($canonicalize(arguments.value));
+		}
+		return arguments.value;
 	}
 
 	/**

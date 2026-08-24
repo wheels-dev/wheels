@@ -741,7 +741,7 @@ component {
 			local.linkArgs.params = arguments.name & "=" & arguments.page;
 			if (StructKeyExists(arguments.args, "params") && Len(arguments.args.params)) {
 				if (IsStruct(arguments.args.params)) {
-					local.linkArgs.params &= "&" & $paramsToQueryString(arguments.args.params);
+					local.linkArgs.params &= "&" & $paramsToQueryString(arguments.args.params, false);
 				} else {
 					local.linkArgs.params &= "&" & arguments.args.params;
 				}
