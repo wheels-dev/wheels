@@ -6,8 +6,8 @@
  *
  * Escalations (no silent public default/API flips):
  *   S6 JwtService.refresh() default stays ignoreExpiry-forever (maxRefreshAge=0).
- *   S7 JwtService.decode() default stays fail-open for missing exp (requireExpiry=false).
  *
+ * S7 JwtService.decode() default is requireExpiry=true (missing exp fails closed).
  * CoS lock: allowedClockSkew=0, issuer="", queryParam="", iterations=600000.
  */
 component extends="wheels.WheelsTest" {
@@ -250,24 +250,11 @@ component extends="wheels.WheelsTest" {
 
 		});
 
-		describe("S7 JwtService.decode missing exp (escalated default)", function() {
+		describe("S7 JwtService.decode missing exp fails closed by default", function() {
 
-			it("default requireExpiry=false still accepts a signed token with no exp", function() {
+			it("default requireExpiry=true rejects a signed token with no exp", function() {
 				var secret = "test-secret-key-for-jwt-specs-padded-to-32-bytes";
 				var jwt = new wheels.auth.JwtService(secretKey = secret);
-				var token = $signHs256(
-					secret,
-					"{""alg"":""HS256"",""typ"":""JWT""}",
-					"{""sub"":1,""iat"":1000}"
-				);
-				var claims = jwt.decode(token);
-				expect(claims.sub).toBe(1);
-				expect(StructKeyExists(claims, "exp")).toBeFalse();
-			});
-
-			it("rejects a signed token with no exp when requireExpiry is true", function() {
-				var secret = "test-secret-key-for-jwt-specs-padded-to-32-bytes";
-				var jwt = new wheels.auth.JwtService(secretKey = secret, requireExpiry = true);
 				var token = $signHs256(
 					secret,
 					"{""alg"":""HS256"",""typ"":""JWT""}",
@@ -276,6 +263,19 @@ component extends="wheels.WheelsTest" {
 				expect(function() {
 					jwt.decode(token);
 				}).toThrow("Wheels.Auth.JWT.MissingExpiry");
+			});
+
+			it("still accepts a signed token with no exp when requireExpiry is false", function() {
+				var secret = "test-secret-key-for-jwt-specs-padded-to-32-bytes";
+				var jwt = new wheels.auth.JwtService(secretKey = secret, requireExpiry = false);
+				var token = $signHs256(
+					secret,
+					"{""alg"":""HS256"",""typ"":""JWT""}",
+					"{""sub"":1,""iat"":1000}"
+				);
+				var claims = jwt.decode(token);
+				expect(claims.sub).toBe(1);
+				expect(StructKeyExists(claims, "exp")).toBeFalse();
 			});
 
 		});
