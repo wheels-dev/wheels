@@ -1,0 +1,9 @@
+{
+	"name": "wheels-solounhinted",
+	"version": "1.0.0",
+	"description": "Hardener B4 fixture: solo unhinted lazy ServiceProvider — no provides.services",
+	"lazy": true,
+	"provides": {
+		"mixins": "none"
+	}
+}
