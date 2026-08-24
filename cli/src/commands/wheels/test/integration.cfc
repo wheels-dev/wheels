@@ -36,6 +36,7 @@ component aliases='wheels test:integration' extends="../base" {
         string servername = ""
     ) {
         requireWheelsApp(getCWD());
+        error("DEPRECATED: CommandBox `wheels test:integration` is frozen and does not fail-closed. Use the LuCLI `wheels` binary (`wheels test`). Removal scheduled for Wheels 5.0. See cli/src/README.md.");
         arguments = reconstructArgs(
             argStruct=arguments,
             allowedValues={
@@ -90,15 +91,7 @@ component aliases='wheels test:integration' extends="../base" {
             }
         }
         
-        try {
-            // Execute TestBox command
-            command("testbox run").params(argumentCollection = params).run();
-        } catch (any e) {
-            // Let TestBox handle its own output and errors
-            if (!findNoCase("failing exit code", e.message)) {
-                rethrow;
-            }
-        }
+        command("testbox run").params(argumentCollection = params).run();
     }
     
     /**

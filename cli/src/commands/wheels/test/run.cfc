@@ -35,6 +35,7 @@ component extends="../base" {
         string reporter = "",
     ) {
         requireWheelsApp(getCWD());
+        error("DEPRECATED: CommandBox `wheels test run` is frozen and does not fail-closed. Use the LuCLI `wheels` binary (`wheels test`). Removal scheduled for Wheels 5.0. See cli/src/README.md.");
         arguments = reconstructArgs(
             argStruct=arguments,
             allowedValues={
@@ -139,18 +140,7 @@ component extends="../base" {
             local.testboxCommand = command("testbox run").params(argumentCollection = params);
             
             // Execute without throwing on non-zero exit codes
-            try {
-                local.testboxCommand.run();
-            } catch (any commandError) {
-                // If it's just an exit code error, ignore it and continue
-                // The actual test output should have been displayed already
-                if (findNoCase("failing exit code", commandError.message)) {
-                    detailOutput.statusWarning("TestBox completed (exit code indicates test results)");
-                } else {
-                    // Re-throw if it's a genuine error
-                    rethrow;
-                }
-            }
+            local.testboxCommand.run();
             
         } catch (any e) {
             detailOutput.error("Error executing TestBox command: #e.message#");

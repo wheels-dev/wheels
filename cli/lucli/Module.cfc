@@ -5767,10 +5767,14 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * True when a `wheels browser test` JSON result should map to a
-	 * non-zero CLI exit via Wheels.TestsFailed. Public for specs;
-	 * hidden from MCP via the structural sweep.
+	 * non-zero CLI exit via Wheels.TestsFailed. Fail/Error, or unloadable
+	 * *Spec.cfc files (same disk-vs-loaded probe as wheels test). Public
+	 * for specs; hidden from MCP via the structural sweep.
 	 */
-	public boolean function $browserTestResultFailed(required struct data) {
+	public boolean function $browserTestResultFailed(required struct data, numeric specsFailedToLoad = 0) {
+		if (arguments.specsFailedToLoad > 0) {
+			return true;
+		}
 		return ((arguments.data.totalFail ?: 0) + (arguments.data.totalError ?: 0)) > 0;
 	}
 
@@ -5797,8 +5801,13 @@ component extends="modules.BaseModule" {
 	 * $browserTestResultFailed. Public for specs; hidden from MCP
 	 * via the structural sweep.
 	 */
-	public void function $throwIfBrowserTestsFailed(required struct data) {
-		if ($browserTestResultFailed(arguments.data)) {
+	public void function $throwIfBrowserTestsFailed(required struct data, numeric specsFailedToLoad = 0) {
+		if (
+			$browserTestResultFailed(
+				data = arguments.data,
+				specsFailedToLoad = arguments.specsFailedToLoad
+			)
+		) {
 			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
 		}
 	}
@@ -6165,10 +6174,11 @@ component extends="modules.BaseModule" {
 
 		if (specsFailedToLoad > 0) {
 			out("");
-			out("WARN  #specsFailedToLoad# spec file(s) failed to compile and were silently skipped:", "yellow");
+			out("WARN  #specsFailedToLoad# spec file(s) failed to compile and were skipped by the runner:", "yellow");
 			for (var unloaded in unloadedSpecPaths) {
 				out("        #unloaded#", "yellow");
 			}
+			out("        The CLI treats this as a failure (Wheels.TestsFailed).", "yellow");
 			out("        Visit /wheels/app/tests in a browser for the parse-error details.", "yellow");
 			out("");
 		}
@@ -8188,7 +8198,11 @@ component extends="modules.BaseModule" {
 		if (format == "json") {
 			out(httpResult);
 			if (isJSON(httpResult)) {
-				$throwIfBrowserTestsFailed(deserializeJSON(httpResult));
+				var jsonData = deserializeJSON(httpResult);
+				$throwIfBrowserTestsFailed(
+					data = jsonData,
+					specsFailedToLoad = $countSpecsFailedToLoad(jsonData, directory)
+				);
 			}
 			return "";
 		}
@@ -8294,7 +8308,10 @@ component extends="modules.BaseModule" {
 
 		// Sole Wheels.TestsFailed site for the text path.
 		if (parsed.hasData) {
-			$throwIfBrowserTestsFailed(parsed.data);
+			$throwIfBrowserTestsFailed(
+				data = parsed.data,
+				specsFailedToLoad = $countSpecsFailedToLoad(parsed.data, directory)
+			);
 		}
 
 		return "";

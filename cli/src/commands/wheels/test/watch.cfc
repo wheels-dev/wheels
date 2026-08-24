@@ -38,6 +38,7 @@ component aliases='wheels test:watch' extends="../base" {
         string servername = ""
     ) {
         requireWheelsApp(getCWD());
+        error("DEPRECATED: CommandBox `wheels test:watch` is frozen and does not fail-closed. Use the LuCLI `wheels` binary (`wheels test`). Removal scheduled for Wheels 5.0. See cli/src/README.md.");
         arguments = reconstructArgs(
             argStruct=arguments,
             allowedValues={

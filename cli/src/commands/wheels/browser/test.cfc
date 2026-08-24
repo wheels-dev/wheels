@@ -24,6 +24,7 @@ component aliases="wheels browser:test, wheels browser test" extends="../base" {
 		string directory = "wheels.tests.specs.wheelstest"
 	) {
 		var projectRoot = getCWD();
+		error("DEPRECATED: CommandBox `wheels browser:test` is frozen and does not fail-closed. Use the LuCLI `wheels` binary (`wheels browser test`). Removal scheduled for Wheels 5.0. See cli/src/README.md.");
 
 		try {
 			var manifest = browserService.getManifest(projectRoot);
