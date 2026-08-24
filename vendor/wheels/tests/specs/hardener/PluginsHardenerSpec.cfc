@@ -49,6 +49,14 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("classifies traversal and absolute entries as escaping", () => {
+				expect(g.$zipEntryEscapesDestination(destDir, "../escaped-sibling.txt")).toBeTrue();
+				expect(g.$zipEntryEscapesDestination(destDir, "../../hardener-b1-pwned.txt")).toBeTrue();
+				expect(g.$zipEntryEscapesDestination(destDir, "/tmp/abs-escaped.txt")).toBeTrue();
+				expect(g.$zipEntryEscapesDestination(destDir, "safe.txt")).toBeFalse();
+				expect(g.$zipEntryEscapesDestination(destDir, "nested/safe.txt")).toBeFalse();
+			});
+
 			it("does not write a ../ zip entry outside the unzip destination", () => {
 				$writeZipWithEntries(zipPath, {
 					"../escaped-sibling.txt" = "pwned-sibling",
@@ -130,6 +138,15 @@ component extends="wheels.WheelsTest" {
 
 		describe("B2 version gate: empty compat fails closed", () => {
 
+			it("empty compat fails closed even when loadIncompatible is true", () => {
+				var pm = CreateObject("component", "wheels.Plugins");
+				expect(pm.$shouldLoadPlugin("", "4.0.0", true)).toBeFalse();
+				expect(pm.$shouldLoadPlugin("   ", "4.0.0", true)).toBeFalse();
+				expect(pm.$shouldLoadPlugin("1.0", "4.0.0", true)).toBeTrue();
+				expect(pm.$shouldLoadPlugin("1.0", "4.0.0", false)).toBeFalse();
+				expect(pm.$shouldLoadPlugin("4.0.0", "4.0.0", false)).toBeTrue();
+			});
+
 			it("does not load a plugin with empty compatibility when loadIncompatiblePlugins is true", () => {
 				originalPluginComponentPath = application.wheels.pluginComponentPath;
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/hardener_emptycompat";
@@ -200,8 +217,8 @@ component extends="wheels.WheelsTest" {
 			it("fails both packages that declare the same manifest name", () => {
 				var graph = new wheels.ModuleGraph();
 				var manifests = {
-					pkgFirst = {name = "wheels-dup", version = "1.0.0"},
-					pkgSecond = {name = "wheels-dup", version = "2.0.0"}
+					"pkgFirst" = {name = "wheels-dup", version = "1.0.0"},
+					"pkgSecond" = {name = "wheels-dup", version = "2.0.0"}
 				};
 				var result = graph.resolve(manifests);
 
@@ -220,9 +237,9 @@ component extends="wheels.WheelsTest" {
 			it("does not resolve requires against a collided name", () => {
 				var graph = new wheels.ModuleGraph();
 				var manifests = {
-					pkgFirst = {name = "wheels-dup", version = "1.0.0"},
-					pkgSecond = {name = "wheels-dup", version = "2.0.0"},
-					pkgConsumer = {
+					"pkgFirst" = {name = "wheels-dup", version = "1.0.0"},
+					"pkgSecond" = {name = "wheels-dup", version = "2.0.0"},
+					"pkgConsumer" = {
 						name = "wheels-consumer",
 						version = "1.0.0",
 						requires = {"wheels-dup" = "*"}

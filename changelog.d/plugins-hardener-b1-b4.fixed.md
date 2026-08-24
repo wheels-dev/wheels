@@ -1,0 +1,4 @@
+- Plugin compatibility with an empty / undeclared version no longer loads, even when `loadIncompatiblePlugins` is `true`. Declared mismatches still honor that setting (default remains `true`)
+- Package manifests with a present-but-empty `wheelsVersion` are rejected; omitting the field is unchanged
+- `ModuleGraph` fails duplicate package.json `name` values instead of last-wins binding `requires` / `replaces` / `suggests`
+- A lazy ServiceProvider that does not hint `provides.services` is still detected (comment-stripped CFC `implements`) and joins register/boot, including when it is the only package

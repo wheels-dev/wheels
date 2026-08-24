@@ -900,21 +900,70 @@ component output="false" {
 	/**
 	 * Returns true when the ServiceProvider lifecycle has work to do: either
 	 * eagerly loaded packages already registered as providers, or lazy
-	 * packages whose manifest hints services (these are instantiated into
-	 * the lifecycle by $invokeServiceProviderRegister). Global.cfc uses this
-	 * as the gate for invoking the lifecycle so a vendor tree containing
-	 * ONLY lazy service-only packages still gets register()/boot() invoked.
+	 * packages that hint provides.services or implement
+	 * ServiceProviderInterface (comment-stripped source scan). Global.cfc
+	 * uses this as the gate so a vendor tree containing ONLY lazy providers
+	 * — hinted or not — still gets register()/boot() invoked.
 	 */
 	public boolean function $hasServiceProviderWork() {
 		if (ArrayLen(variables.serviceProviders) > 0) {
 			return true;
 		}
 		for (local.lazyKey in variables.lazyPackages) {
-			if ($hintsServices(variables.lazyPackages[local.lazyKey].manifest)) {
+			if ($lazyPackageNeedsLifecycle(variables.lazyPackages[local.lazyKey])) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * True when a lazy package must join register()/boot(): it either hints
+	 * provides.services, or its CFC implements ServiceProviderInterface
+	 * (comment-stripped source scan so we do not instantiate just to look).
+	 */
+	private boolean function $lazyPackageNeedsLifecycle(required struct lazyInfo) {
+		if ($hintsServices(arguments.lazyInfo.manifest)) {
+			return true;
+		}
+		return $sourceDeclaresServiceProvider(arguments.lazyInfo.pkgDir, arguments.lazyInfo.dirName);
+	}
+
+	/**
+	 * Comment-stripped scan of the package CFC for
+	 * implements="...ServiceProviderInterface". Anti-pattern 14: never
+	 * substring-match raw CFML source.
+	 */
+	private boolean function $sourceDeclaresServiceProvider(required string pkgDir, required string dirName) {
+		local.cfcPath = arguments.pkgDir & "/" & arguments.dirName & ".cfc";
+		if (!FileExists(local.cfcPath)) {
+			local.cfcFiles = DirectoryList(arguments.pkgDir, false, "name", "*.cfc");
+			if (ArrayLen(local.cfcFiles) == 0) {
+				return false;
+			}
+			local.cfcPath = arguments.pkgDir & "/" & local.cfcFiles[1];
+		}
+		try {
+			local.src = $stripCfmlComments(FileRead(local.cfcPath));
+		} catch (any e) {
+			return false;
+		}
+		return REFindNoCase(
+			"implements[ \t\r\n]*=[ \t\r\n]*[""'][^""']*ServiceProviderInterface",
+			local.src
+		) > 0;
+	}
+
+	/**
+	 * Strips CFML line, block, and tag comments before source scans.
+	 */
+	private string function $stripCfmlComments(required string source) {
+		local.Pattern = CreateObject("java", "java.util.regex.Pattern");
+		local.src = arguments.source;
+		local.src = local.Pattern.compile("<!---.*?--->", local.Pattern.DOTALL).matcher(local.src).replaceAll("");
+		local.src = local.Pattern.compile("/\\*.*?\\*/", local.Pattern.DOTALL).matcher(local.src).replaceAll("");
+		local.src = local.Pattern.compile("//[^\\r\\n]*").matcher(local.src).replaceAll("");
+		return local.src;
 	}
 
 	/**
@@ -944,7 +993,7 @@ component output="false" {
 		// Wheels.DI.ServiceNotFound on some later request).
 		local.lazyKeys = StructKeyArray(variables.lazyPackages);
 		for (local.lazyKey in local.lazyKeys) {
-			if (!$hintsServices(variables.lazyPackages[local.lazyKey].manifest)) {
+			if (!$lazyPackageNeedsLifecycle(variables.lazyPackages[local.lazyKey])) {
 				continue;
 			}
 			try {
@@ -1377,6 +1426,7 @@ component output="false" {
 	 * running Wheels version. Packages that omit the field, use "*", or are
 	 * evaluated against a dev-stamp runtime always pass — a strict constraint
 	 * in that case would break `wheels test run` on unbuilt checkouts.
+	 * A present-but-empty wheelsVersion fails closed.
 	 *
 	 * @manifest Parsed package.json struct
 	 * @return True if the package is compatible with the running Wheels version
@@ -1387,7 +1437,12 @@ component output="false" {
 			return true;
 		}
 		local.constraint = Trim(arguments.manifest.wheelsVersion);
-		if (!Len(local.constraint) || local.constraint == "*") {
+		// Empty string is declared-but-blank — fail closed. Omitted field
+		// (the branch above) and "*" stay permissive.
+		if (!Len(local.constraint)) {
+			return false;
+		}
+		if (local.constraint == "*") {
 			return true;
 		}
 		local.runtime = $normalizeWheelsVersion();

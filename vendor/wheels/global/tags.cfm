@@ -493,11 +493,91 @@
 
 	public any function $zip() {
 		$engineAdapter().prepareZipArgs(arguments);
+		local.action = StructKeyExists(arguments, "action") ? LCase(arguments.action) : "";
+		if (
+			local.action == "unzip"
+			&& StructKeyExists(arguments, "file")
+			&& StructKeyExists(arguments, "destination")
+		) {
+			$assertZipEntriesContained(arguments.file, arguments.destination);
+		}
 		local.args = {};
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
 		}
 		cfzip(attributeCollection = "#local.args#");
+	}
+
+	/**
+	 * Returns true when a zip entry would extract outside destination.
+	 * Rejects empty names, absolute paths, `..` segments, and any entry
+	 * whose canonical path is not contained by the destination directory.
+	 */
+	public boolean function $zipEntryEscapesDestination(required string destination, required string entryName) {
+		local.entry = Replace(arguments.entryName, "\", "/", "all");
+		if (!Len(Trim(local.entry))) {
+			return true;
+		}
+		if (Left(local.entry, 1) == "/" || REFind("^[A-Za-z]:", local.entry)) {
+			return true;
+		}
+		local.segments = ListToArray(local.entry, "/");
+		for (local.seg in local.segments) {
+			if (local.seg == "..") {
+				return true;
+			}
+		}
+		try {
+			local.destFile = CreateObject("java", "java.io.File").init(arguments.destination);
+			local.destCanon = local.destFile.getCanonicalPath();
+			local.sep = CreateObject("java", "java.io.File").separator;
+			local.destPrefix = local.destCanon;
+			if (Right(local.destPrefix, 1) != local.sep) {
+				local.destPrefix = local.destPrefix & local.sep;
+			}
+			local.target = CreateObject("java", "java.io.File").init(local.destFile, local.entry);
+			local.targetCanon = local.target.getCanonicalPath();
+			if (local.targetCanon == local.destCanon) {
+				return false;
+			}
+			return CompareNoCase(Left(local.targetCanon, Len(local.destPrefix)), local.destPrefix) != 0;
+		} catch (any e) {
+			return true;
+		}
+	}
+
+	/**
+	 * Lists entry names in a zip via java.util.zip.ZipFile so every engine
+	 * sees the same names before cfzip writes anything.
+	 */
+	public array function $zipEntryNames(required string zipFile) {
+		local.names = [];
+		local.zf = CreateObject("java", "java.util.zip.ZipFile").init(arguments.zipFile);
+		try {
+			local.entries = local.zf.entries();
+			while (local.entries.hasMoreElements()) {
+				local.entry = local.entries.nextElement();
+				ArrayAppend(local.names, local.entry.getName());
+			}
+		} finally {
+			local.zf.close();
+		}
+		return local.names;
+	}
+
+	/**
+	 * Throws Wheels.UnsafeZipEntry when any entry would escape destination.
+	 */
+	public void function $assertZipEntriesContained(required string zipFile, required string destination) {
+		local.names = $zipEntryNames(arguments.zipFile);
+		for (local.entry in local.names) {
+			if ($zipEntryEscapesDestination(arguments.destination, local.entry)) {
+				Throw(
+					type = "Wheels.UnsafeZipEntry",
+					message = "Zip entry '#local.entry#' escapes destination '#arguments.destination#'"
+				);
+			}
+		}
 	}
 
 
