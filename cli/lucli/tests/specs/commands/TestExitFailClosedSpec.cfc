@@ -134,6 +134,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				).toBeFalse();
 			});
 
+			it("flags unloadable specs (specsFailedToLoad > 0) even when totalFail/Error are 0", () => {
+				expect(
+					mod.$browserTestResultFailed(
+						data = {
+							totalPass: 3,
+							totalFail: 0,
+							totalError: 0
+						},
+						specsFailedToLoad = 2
+					)
+				).toBeTrue();
+			});
+
 		});
 
 		describe("$throwIfCliTestsFailed — wheels test process-exit seam (##3083)", () => {
@@ -240,6 +253,33 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						totalError: 0
 					})
 				).notToThrow();
+			});
+
+			it("throws Wheels.TestsFailed when specsFailedToLoad > 0 and totalFail/Error are 0", () => {
+				expect(() =>
+					mod.$throwIfBrowserTestsFailed(
+						data = {
+							totalPass: 3,
+							totalFail: 0,
+							totalError: 0
+						},
+						specsFailedToLoad = 2
+					)
+				).toThrow(type = "Wheels.TestsFailed");
+			});
+
+		});
+
+		describe("displayTestResults WARN copy — unloadable is fail-closed, not soft-fail", () => {
+
+			it("does not tell the operator that compile-skipped specs were silently skipped", () => {
+				var src = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				expect(src).notToInclude("failed to compile and were silently skipped");
+			});
+
+			it("WARN path names Wheels.TestsFailed so the copy matches the throw seam", () => {
+				var src = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				expect(src).toInclude("The CLI treats this as a failure (Wheels.TestsFailed).");
 			});
 
 		});
