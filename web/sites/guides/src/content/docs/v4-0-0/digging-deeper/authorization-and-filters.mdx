@@ -23,7 +23,7 @@ This page shows you how to use controller filters to enforce access rules. You'l
 
 ## The filter API — recap
 
-Filters register in `config()` with `filters(through="methodName", only="...", except="...", type="before")`. The `through` method must exist on the controller and must be declared `private` — a public filter becomes a routable action. Call `redirectTo()` or `renderText()` inside the filter to short-circuit the request; the action never runs and no further before-filters fire.
+Filters register in `config()` with `filters(through="methodName", only="...", except="...", type="before")`. The `through` method must exist on the controller and must be declared `private` — a public filter becomes a routable action. Call `redirectTo()` or `renderText()` inside the filter to short-circuit the request, or `return false`. In all three cases the action never runs and no further before-filters fire. `type` is case-insensitive.
 
 For the full argument list, placement semantics, and a run-through of the order of operations, see [Controllers and Actions](/v4-0-0/basics/controllers-and-actions/). This page focuses on what to put inside the filter.
 
@@ -59,7 +59,7 @@ component extends="Controller" {
 }
 ```
 
-`except="index,show"` leaves the two read actions public. Every other action — `new`, `create`, `edit`, `update`, `delete` — triggers `authenticate` before the action body runs. The filter returns `void`; short-circuit is signalled by calling `redirectTo`.
+`except="index,show"` leaves the two read actions public. Every other action — `new`, `create`, `edit`, `update`, `delete` — triggers `authenticate` before the action body runs. Short-circuit is signalled by `redirectTo()`, `renderText()`, or `return false`.
 
 <Aside type="caution">
   Keep `super.config()` as the first line of every `config()` override. The default app template's parent `Controller.cfc` calls `protectsFromForgery()` in its `config()` — omit `super.config()` and CSRF protection silently drops for that controller. In development Wheels logs a one-time warning ("Controller 'Posts' overrides config() without calling super.config()...") to `wheels.log` and the debug bar when this happens.

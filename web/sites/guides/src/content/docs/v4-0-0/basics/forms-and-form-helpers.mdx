@@ -39,7 +39,7 @@ Key behaviours:
 
 - Generates `<form action="..." method="post">` with CSRF token auto-included.
 - `route="..."` uses named routes — see [Routing](/v4-0-0/basics/routing/).
-- `method="put"` / `method="delete"` — Wheels emits a hidden `_method` field that gets translated server-side. Browsers only send GET and POST natively, so Wheels (like Rails, Laravel, and friends) uses the hidden field convention to expose the full set of REST verbs.
+- `method="put"` / `method="delete"` — Wheels emits a hidden `_method` field that gets translated server-side. Browsers only send GET and POST natively, so Wheels (like Rails, Laravel, and friends) uses the hidden field convention to expose the full set of REST verbs. The override is honored only on POST and only for `PUT` / `PATCH` / `DELETE`.
 
 ## Object-bound helpers — the core pattern
 

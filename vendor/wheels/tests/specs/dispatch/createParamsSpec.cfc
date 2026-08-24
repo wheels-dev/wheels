@@ -153,6 +153,11 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("sets controller in upper camel case", () => {
+				// Wildcard-style route: no fixed controller, so the incoming
+				// name is the value that gets camelized (B1: a routed
+				// controller name is no longer overridable from the form).
+				args.route.pattern = "/[controller]"
+				StructDelete(args.route, "controller")
 				args.formScope["controller"] = "wheels-test"
 				_params = dispatch.$createParams(argumentCollection = args)
 
@@ -165,6 +170,9 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("sanitizes controller and action params", () => {
+				args.route.pattern = "/[controller]/[action]"
+				StructDelete(args.route, "controller")
+				StructDelete(args.route, "action")
 				args.formScope["controller"] = "../../../wheels%00"
 				args.formScope["action"] = "../../../test*^&%()%00"
 				_params = dispatch.$createParams(argumentCollection = args)

@@ -42,16 +42,18 @@ component {
 		// Continue unless an abort is issued from a verification.
 		if (!$abortIssued()) {
 			// Run before filters if they exist on the controller.
+			local.runAction = true;
 			if (ListFindNoCase("true,before", arguments.includeFilters)) {
-				$runFilters(type = "before", action = variables.params.action);
+				local.runAction = $runFilters(type = "before", action = variables.params.action);
 			}
 
 			if ($get("showDebugInformation")) {
 				$debugPoint("beforeFilters,action");
 			}
 
-			// Only proceed to call the action if the before filter has not already rendered content.
-			if (!$performedRenderOrRedirect()) {
+			// Only proceed to call the action if a before filter has not
+			// returned false and has not already rendered content.
+			if (local.runAction && !$performedRenderOrRedirect()) {
 				// Get content from the cache if it exists there and set it to the request scope. If not, the $callActionAndAddToCache function will run, calling the controller action (which in turn sets the content to the request scope).
 				if (local.cache) {
 					local.category = "action";
@@ -60,33 +62,21 @@ component {
 					local.key = $hashedKey(variables.$class.name, variables.params);
 
 					// Evaluate variables and append to the cache key when specified.
+					// Missing or unresolvable items throw; they are never omitted,
+					// because a silent skip collapses distinct keys into one shared key.
 					if (Len(local.appendToKey)) {
-						for (local.item in ListToArray(local.appendToKey)) {
-							if (IsDefined(local.item)) {
-								// Build the scope lookup once (and keep it in the local scope so it doesn't leak into the controller's variables scope).
-								if (!StructKeyExists(local, "scopeMap")) {
-									local.scopeMap = {
-										"request": request,
-										"arguments": arguments,
-										"application": application,
-										"session": session,
-										"variables": variables
-									};
-								}
-
-								// Extract scope name and variable name from local.item
-								local.scopeName = ListFirst(local.item, ".");
-								local.varName = ListLast(local.item, ".");
-								if (
-									StructKeyExists(local.scopeMap, local.scopeName)
-									&& StructKeyExists(local.scopeMap[local.scopeName], local.varName)
-								) {
-									local.key &= local.scopeMap[local.scopeName][local.varName];
-								} else {
-									Throw(type = "Wheels.KeyNotFound", message = "The `#local.item#` argument was not found.");
-								}
-							}
-						}
+						local.scopeMap = {
+							"request": request,
+							"arguments": arguments,
+							"application": application,
+							"session": session,
+							"variables": variables
+						};
+						local.key = $appendToCacheKey(
+							key = local.key,
+							appendToKey = local.appendToKey,
+							scopeMap = local.scopeMap
+						);
 					}
 
 					local.conditionArgs = {};
@@ -119,7 +109,7 @@ component {
 				$debugPoint("action,afterFilters");
 			}
 
-			if (!$performedRedirect() && ListFindNoCase("true,after", arguments.includeFilters)) {
+			if (local.runAction && !$performedRedirect() && ListFindNoCase("true,after", arguments.includeFilters)) {
 				$runFilters(type = "after", action = variables.params.action);
 			}
 
@@ -244,5 +234,47 @@ component {
 			category = arguments.category
 		);
 		return response();
+	}
+
+	/**
+	 * Internal function. Appends resolved appendToKey segments onto an action cache key.
+	 * Every listed item must resolve; silent omission would share one key across users.
+	 */
+	public string function $appendToCacheKey(required string key, required string appendToKey, required struct scopeMap) {
+		local.rv = arguments.key;
+		local.items = ListToArray(arguments.appendToKey);
+		local.iEnd = ArrayLen(local.items);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.rv &= $resolveAppendToKeyValue(item = local.items[local.i], scopeMap = arguments.scopeMap);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Walks a dotted appendToKey path (scope.a.b.c) and returns
+	 * the simple value. Throws Wheels.KeyNotFound when any segment is missing.
+	 */
+	public string function $resolveAppendToKeyValue(required string item, required struct scopeMap) {
+		local.segments = ListToArray(arguments.item, ".");
+		if (ArrayLen(local.segments) < 2) {
+			Throw(type = "Wheels.KeyNotFound", message = "The `#arguments.item#` argument was not found.");
+		}
+		local.scopeName = local.segments[1];
+		if (!StructKeyExists(arguments.scopeMap, local.scopeName)) {
+			Throw(type = "Wheels.KeyNotFound", message = "The `#arguments.item#` argument was not found.");
+		}
+		local.cursor = arguments.scopeMap[local.scopeName];
+		local.iEnd = ArrayLen(local.segments);
+		for (local.i = 2; local.i <= local.iEnd; local.i++) {
+			local.segment = local.segments[local.i];
+			if (!IsStruct(local.cursor) || !StructKeyExists(local.cursor, local.segment)) {
+				Throw(type = "Wheels.KeyNotFound", message = "The `#arguments.item#` argument was not found.");
+			}
+			local.cursor = local.cursor[local.segment];
+		}
+		if (IsNull(local.cursor) || !IsSimpleValue(local.cursor)) {
+			Throw(type = "Wheels.KeyNotFound", message = "The `#arguments.item#` argument was not found.");
+		}
+		return ToString(local.cursor);
 	}
 }

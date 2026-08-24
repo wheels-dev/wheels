@@ -211,11 +211,12 @@ Wheels does **not** trust `X-Forwarded-*` headers by default. They are ordinary 
 
 ### `trustProxyHeaders` — framework-wide header trust
 
-`set(trustProxyHeaders=true)` (default `false`) governs the framework's own use of forwarded headers across three surfaces:
+`set(trustProxyHeaders=true)` (default `false`) governs the framework's own use of forwarded and rewrite headers:
 
 - **`isSecure()`.** With trust off, only the engine's `server_port_secure` flag counts — a client-supplied `X-Forwarded-Proto: https` is ignored, so a direct-HTTP client can't spoof secure-cookie, CSRF, or HTTPS-redirect decisions. With trust on, `X-Forwarded-Proto: https` from your TLS-terminating proxy makes `isSecure()` return `true`.
 - **Maintenance-mode IP exceptions.** `set(ipExceptions="...")` is matched against the socket address by default, or against the rightmost `X-Forwarded-For` hop when trust is on. The exception list comes from config only — the legacy `?except=` URL parameter has been removed (it let any anonymous client rewrite the exception list for everyone).
 - **Reload rate-limit keying.** Failed `?reload=` password attempts are counted per trusted client IP, so with trust on, clients behind a shared proxy no longer share one lockout bucket.
+- **IIS rewrite path recovery.** When `cgi.path_info` is blank, `$cgiScope()` reads `X-Rewrite-URL` / `X-Original-URL` only if trust is on. Those are ordinary request headers; any client can send them. With trust off, recovery falls through to `request_uri` / `redirect_url`.
 
 ```cfm {test:compile} title="config/production/settings.cfm — app behind a TLS-terminating reverse proxy"
 <cfscript>
