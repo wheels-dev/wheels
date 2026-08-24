@@ -2,6 +2,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 
 	variables.sqlTypes = {};
 	variables.sqlTypes['primaryKey'] = "int NOT NULL IDENTITY (1, 1)";
+	variables.sqlTypes['biginteger'] = {name = 'BIGINT'};
 	variables.sqlTypes['binary'] = {name = 'IMAGE'};
 	variables.sqlTypes['boolean'] = {name = 'BIT'};
 	variables.sqlTypes['date'] = {name = 'date'};
@@ -21,12 +22,12 @@ component extends="wheels.databaseAdapters.Abstract" {
 	}
 
 	public string function addForeignKeyOptions(required string sql, struct options = {}) {
-		arguments.sql = arguments.sql & " FOREIGN KEY (" & arguments.options.column & ")";
+		arguments.sql = arguments.sql & " FOREIGN KEY (" & quoteColumnName(arguments.options.column) & ")";
 		if (StructKeyExists(arguments.options, "referenceTable")) {
 			if (StructKeyExists(arguments.options, "referenceColumn")) {
 				arguments.sql = arguments.sql & " REFERENCES ";
-				arguments.sql = arguments.sql & arguments.options.referenceTable;
-				arguments.sql = arguments.sql & " (" & arguments.options.referenceColumn & ")";
+				arguments.sql = arguments.sql & quoteTableName(arguments.options.referenceTable);
+				arguments.sql = arguments.sql & " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
 			}
 		}
 		return arguments.sql;
@@ -103,20 +104,16 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * generates sql to change an existing column in a table
 	 */
 	public string function changeColumnInTable(required string name, required any column) {
-		local.sql = "";
-		for (local.i in ["default", "allowNull", "afterColumn"]) {
-			if (StructKeyExists(arguments.column, local.i)) {
-				local.opts = {};
-				local.opts.type = arguments.column.type;
-				local.opts[local.i] = arguments.column[local.i];
-				local.columnSQL = addColumnOptions(sql = "", options = local.opts, alter = true);
-				if (local.i == "allowNull") {
-					local.sql = local.sql & "ALTER TABLE #quoteTableName(arguments.name)# ALTER COLUMN #objectCase(arguments.column.name)# #arguments.column.sqlType()# #local.columnSQL#;";
-				} else if (local.i == "default") {
-					// SQL server will throw an exception if a default constraint exists
-					local.sql = local.sql & "ALTER TABLE #quoteTableName(arguments.name)# ADD CONSTRAINT DF_#objectCase(arguments.column.name)# #local.columnSQL# FOR #objectCase(arguments.column.name)#;";
-				}
-			}
+		local.nullSQL = "";
+		if (StructKeyExists(arguments.column, "allowNull")) {
+			local.opts = {type = arguments.column.type, allowNull = arguments.column.allowNull};
+			local.nullSQL = addColumnOptions(sql = "", options = local.opts, alter = true);
+		}
+		local.sql = "ALTER TABLE #quoteTableName(arguments.name)# ALTER COLUMN #quoteColumnName(arguments.column.name)# #arguments.column.sqlType()# #local.nullSQL#;";
+		if (StructKeyExists(arguments.column, "default")) {
+			local.opts = {type = arguments.column.type, "default" = arguments.column["default"]};
+			local.columnSQL = addColumnOptions(sql = "", options = local.opts, alter = true);
+			local.sql = local.sql & "ALTER TABLE #quoteTableName(arguments.name)# ADD CONSTRAINT DF_#objectCase(arguments.column.name)# #local.columnSQL# FOR #quoteColumnName(arguments.column.name)#;";
 		}
 		return local.sql;
 	}

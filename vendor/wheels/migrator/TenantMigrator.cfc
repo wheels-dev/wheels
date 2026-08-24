@@ -111,7 +111,9 @@ component {
 						action = arguments.action,
 						dataSource = local.tenant.dataSource,
 						migratePath = arguments.migratePath,
-						sqlPath = arguments.sqlPath
+						sqlPath = arguments.sqlPath,
+						userName = StructKeyExists(local.tenant, "userName") ? local.tenant.userName : "",
+						password = StructKeyExists(local.tenant, "password") ? local.tenant.password : ""
 					);
 
 					ArrayAppend(local.results.success, {
@@ -152,7 +154,9 @@ component {
 		required string action,
 		required string dataSource,
 		required string migratePath,
-		required string sqlPath
+		required string sqlPath,
+		string userName = "",
+		string password = ""
 	) {
 		if (!Len(Trim(arguments.dataSource))) {
 			Throw(
@@ -169,6 +173,17 @@ component {
 			local.priorOverride = request.wheels.migratorDataSource;
 		}
 		request.wheels.migratorDataSource = arguments.dataSource;
+		local.hadUser = StructKeyExists(request.wheels, "migratorDataSourceUserName");
+		if (local.hadUser) {
+			local.priorUser = request.wheels.migratorDataSourceUserName;
+			local.priorPassword = StructKeyExists(request.wheels, "migratorDataSourcePassword")
+				? request.wheels.migratorDataSourcePassword
+				: "";
+		}
+		if (Len(Trim(arguments.userName))) {
+			request.wheels.migratorDataSourceUserName = arguments.userName;
+			request.wheels.migratorDataSourcePassword = arguments.password;
+		}
 
 		try {
 			lock name="wheels_tenant_migrator_#arguments.dataSource#" type="exclusive" timeout="300" {
@@ -180,6 +195,13 @@ component {
 				request.wheels.migratorDataSource = local.priorOverride;
 			} else {
 				StructDelete(request.wheels, "migratorDataSource");
+			}
+			if (local.hadUser) {
+				request.wheels.migratorDataSourceUserName = local.priorUser;
+				request.wheels.migratorDataSourcePassword = local.priorPassword;
+			} else {
+				StructDelete(request.wheels, "migratorDataSourceUserName");
+				StructDelete(request.wheels, "migratorDataSourcePassword");
 			}
 		}
 	}

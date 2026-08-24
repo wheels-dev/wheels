@@ -13,6 +13,7 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator" {
 	variables.sqlTypes['text'] = {name = 'STRING'};
 	variables.sqlTypes['time'] = {name = 'TIME'};
 	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
+	variables.sqlTypes['char'] = {name = 'CHAR', limit = 1};
 	variables.sqlTypes['uuid'] = {name = 'UUID'};
 
 	/**

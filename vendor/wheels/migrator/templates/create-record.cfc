@@ -33,7 +33,7 @@ component extends="[extends]" hint="[description]" {
 		var state = {};
 		transaction {
 			try {
-				removeRecord(table = 'tableName', where = '');
+				removeRecord(table = 'tableName', where = 'id = 1');
 			} catch (any e) {
 				state.exception = e;
 			}

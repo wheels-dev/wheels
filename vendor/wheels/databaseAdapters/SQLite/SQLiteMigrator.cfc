@@ -29,9 +29,9 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * SQLite supports inline foreign key definitions
 	 */
 	public string function addForeignKeyOptions(required string sql, struct options = {}) {
-		arguments.sql &= " REFERENCES " & arguments.options.referenceTable;
+		arguments.sql &= " REFERENCES " & quoteTableName(arguments.options.referenceTable);
 		if (StructKeyExists(arguments.options, "referenceColumn")) {
-			arguments.sql &= " (" & arguments.options.referenceColumn & ")";
+			arguments.sql &= " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
 		}
 		// Add ON DELETE / ON UPDATE if provided
 		if (StructKeyExists(arguments.options, "onDelete")) {

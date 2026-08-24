@@ -75,9 +75,11 @@ Default foreign-key names are `FK_<table>_<refTable>_<column>` so two FKs from t
 
 CREATE TABLE inlines FKs via `toForeignKeySQL()`, which preserves `onUpdate` / `onDelete` (same mapping as `Abstract.foreignKeySQL`). ALTER ADD uses `toSQL()`.
 
-`TenantMigrator` isolates the tenant datasource on `request.wheels.migratorDataSource` (read by `$migratorDataSource()`). It must not swap `application.wheels.dataSourceName`.
+`TenantMigrator` isolates the tenant datasource on `request.wheels.migratorDataSource` (read by `$migratorDataSource()`). It must not swap `application.wheels.dataSourceName`. Optional per-tenant `userName` / `password` land on `request.wheels.migratorDataSourceUserName` / `migratorDataSourcePassword` (`$migratorDataSourceCredentials()`).
 
-Announce-only `up()`/`down()` do not write the version table. `announce()` plus ORM persist (`model().create()` / `save()` / `delete()` with no `$execute`) still marks or unmarks the version. `redoMigration()` fails closed when `allowMigrationDown` is false — do not flip that default to `true`.
+Announce-only `up()`/`down()` do not write the version table. `announce()` plus ORM persist (`model().create()` / `save()` / `delete()` with no `$execute`) still marks or unmarks the version. `redoMigration()` and `migrateTo` down fail closed when `allowMigrationDown` is false — do not flip that default to `true`.
+
+`updateRecord()` / `removeRecord()` require a `where` clause or explicit `all=true`. AutoMigrator unmapped columns still become `removeColumns` by default; pass `allowColumnRemoval=false` to list them on `unmappedColumns` only. `t.references(referenceColumn=)` defaults to `"id"`. `t.timestamp()` defaults to `columnType="datetime"`. `t.float()` keeps `default=""` / `allowNull=true`.
 
 ## Tests
 

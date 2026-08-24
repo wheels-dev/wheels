@@ -29,11 +29,12 @@ component extends="wheels.Global"{
 			return application[local.appKey].$migratorAdapterNames[local.dsName];
 		}
 
+		local.creds = $migratorDataSourceCredentials();
 		local.info = $dbinfo(
 			type = "version",
 			datasource = local.dsName,
-			username = application[local.appKey].dataSourceUserName,
-			password = application[local.appKey].dataSourcePassword
+			username = local.creds.username,
+			password = local.creds.password
 		);
 		local.adapterName = "";
 		if (
@@ -129,16 +130,35 @@ component extends="wheels.Global"{
 			local.state.tableExists = false;
 		}
 		if (local.state.tableExists) {
+			local.creds = $migratorDataSourceCredentials();
 			local.foreignKeys = $dbinfo(
 				type = "foreignkeys",
 				table = arguments.table,
 				datasource = $migratorDataSource(),
-				username = application[local.appKey].dataSourceUserName,
-				password = application[local.appKey].dataSourcePassword
+				username = local.creds.username,
+				password = local.creds.password
 			);
-			local.foreignKeyList = ValueList(local.foreignKeys.FKCOLUMN_NAME);
+			// S2: FKCOLUMN_NAME is the local column, not the constraint name.
+			// Adobe dropTable() fed that list to dropForeignKey(keyname=).
+			local.foreignKeyList = $foreignKeyConstraintNames(local.foreignKeys);
 		}
 		return local.foreignKeyList;
+	}
+
+	/**
+	 * Constraint names from a cfdbinfo(type="foreignkeys") query.
+	 * Prefers FK_NAME. Never falls back to FKCOLUMN_NAME — that is the
+	 * referencing column, and using it as a constraint name breaks DROP
+	 * on Adobe / non-SQLite.
+	 */
+	public string function $foreignKeyConstraintNames(required query foreignKeys) {
+		if (
+			IsQuery(arguments.foreignKeys)
+			&& ListFindNoCase(arguments.foreignKeys.columnList, "FK_NAME")
+		) {
+			return ValueList(arguments.foreignKeys.FK_NAME);
+		}
+		return "";
 	}
 
 	private void function $execute(required any sql, string dataSource = "") {
@@ -228,10 +248,11 @@ component extends="wheels.Global"{
 		) {
 			return request.$wheelsMigratorColumns[local.cacheKey];
 		}
+		local.creds = $migratorDataSourceCredentials();
 		local.columns = $dbinfo(
 			datasource = $migratorDataSource(),
-			username = application[local.appKey].dataSourceUserName,
-			password = application[local.appKey].dataSourcePassword,
+			username = local.creds.username,
+			password = local.creds.password,
 			type = "columns",
 			table = arguments.tableName
 		);
@@ -283,10 +304,11 @@ component extends="wheels.Global"{
 
 	private string function $getColumnDefinition(required string tableName, required string columnName) {
 		local.appKey = $appKey();
+		local.creds = $migratorDataSourceCredentials();
 		local.columns = $dbinfo(
 			datasource = $migratorDataSource(),
-			username = application[local.appKey].dataSourceUserName,
-			password = application[local.appKey].dataSourcePassword,
+			username = local.creds.username,
+			password = local.creds.password,
 			type = "columns",
 			table = arguments.tableName
 		);

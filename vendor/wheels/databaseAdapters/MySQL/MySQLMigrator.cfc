@@ -25,12 +25,12 @@ component extends="wheels.databaseAdapters.Abstract" {
 	}
 
 	public string function addForeignKeyOptions(required string sql, struct options = {}) {
-		arguments.sql = arguments.sql & " FOREIGN KEY (" & arguments.options.column & ")";
+		arguments.sql = arguments.sql & " FOREIGN KEY (" & quoteColumnName(arguments.options.column) & ")";
 		if (StructKeyExists(arguments.options, "referenceTable")) {
 			if (StructKeyExists(arguments.options, "referenceColumn")) {
 				arguments.sql = arguments.sql & " REFERENCES ";
-				arguments.sql = arguments.sql & arguments.options.referenceTable;
-				arguments.sql = arguments.sql & " (" & arguments.options.referenceColumn & ")";
+				arguments.sql = arguments.sql & quoteTableName(arguments.options.referenceTable);
+				arguments.sql = arguments.sql & " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
 			}
 		}
 		return arguments.sql;

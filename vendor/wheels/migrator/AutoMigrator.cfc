@@ -46,12 +46,13 @@ component extends="wheels.migrator.Base" {
 		}
 
 		local.appKey = $appKey();
+		local.creds = $migratorDataSourceCredentials();
 		local.dbColumns = $dbinfo(
 			type = "columns",
 			table = local.tableName,
 			datasource = $migratorDataSource(),
-			username = application[local.appKey].dataSourceUserName,
-			password = application[local.appKey].dataSourcePassword
+			username = local.creds.username,
+			password = local.creds.password
 		);
 
 		local.actualColumns = {};
@@ -72,6 +73,13 @@ component extends="wheels.migrator.Base" {
 		local.addColumns = [];
 		local.removeColumns = [];
 		local.changeColumns = [];
+		local.unmappedColumns = [];
+		// S9: destructive unmapped→remove stays the default. Opt out with
+		// options.allowColumnRemoval=false (fail-closed listing only).
+		local.allowColumnRemoval = true;
+		if (StructKeyExists(arguments.options, "allowColumnRemoval")) {
+			local.allowColumnRemoval = arguments.options.allowColumnRemoval;
+		}
 
 		for (local.colName in local.expectedColumns) {
 			if (!StructKeyExists(local.actualColumns, local.colName)) {
@@ -92,9 +100,14 @@ component extends="wheels.migrator.Base" {
 				if (IsBoolean(local.actual.isPrimaryKey) && local.actual.isPrimaryKey) {
 					continue;
 				}
-				ArrayAppend(local.removeColumns, {
-					name: local.colName
-				});
+				local.unmapped = {
+					name: local.colName,
+					type: $dbTypeToMigrationType(local.actual.typeName)
+				};
+				ArrayAppend(local.unmappedColumns, local.unmapped);
+				if (local.allowColumnRemoval) {
+					ArrayAppend(local.removeColumns, local.unmapped);
+				}
 			}
 		}
 
@@ -110,11 +123,37 @@ component extends="wheels.migrator.Base" {
 				local.expectedMigType = $cfSqlTypeToMigrationType(local.expected.type);
 				local.actualMigType = $dbTypeToMigrationType(local.actual.typeName);
 
-				if (local.expectedMigType != local.actualMigType && local.actualMigType != "unknown") {
+				local.typeChanged = (local.expectedMigType != local.actualMigType && local.actualMigType != "unknown");
+				local.sizeChanged = (
+					Len(ToString(local.expected.size))
+					&& IsNumeric(local.expected.size)
+					&& Val(local.expected.size) != Val(local.actual.size)
+				);
+				local.scaleChanged = (
+					Len(ToString(local.expected.scale))
+					&& IsNumeric(local.expected.scale)
+					&& Val(local.expected.scale) != Val(local.actual.decimalDigits)
+				);
+				local.nullChanged = (
+					IsBoolean(local.expected.nullable)
+					&& IsBoolean(local.actual.nullable)
+					&& local.expected.nullable != local.actual.nullable
+				);
+				if (local.typeChanged || local.sizeChanged || local.scaleChanged || local.nullChanged) {
 					ArrayAppend(local.changeColumns, {
 						name: local.colName,
-						from: {type: local.actualMigType},
-						to: {type: local.expectedMigType}
+						from: {
+							type: local.actualMigType,
+							size: local.actual.size,
+							scale: local.actual.decimalDigits,
+							nullable: local.actual.nullable
+						},
+						to: {
+							type: local.expectedMigType,
+							size: local.expected.size,
+							scale: local.expected.scale,
+							nullable: local.expected.nullable
+						}
 					});
 				}
 			}
@@ -159,7 +198,8 @@ component extends="wheels.migrator.Base" {
 			removeColumns: local.detection.remainingRemoves,
 			changeColumns: local.changeColumns,
 			renameColumns: local.detection.confirmedRenames,
-			suggestedRenames: local.detection.suggestedRenames
+			suggestedRenames: local.detection.suggestedRenames,
+			unmappedColumns: local.unmappedColumns
 		};
 	}
 
@@ -201,6 +241,9 @@ component extends="wheels.migrator.Base" {
 
 					// Build this model's options: {renames, heuristicThreshold}
 					local.modelOptions = {heuristicThreshold: local.threshold};
+					if (StructKeyExists(arguments.options, "allowColumnRemoval")) {
+						local.modelOptions.allowColumnRemoval = arguments.options.allowColumnRemoval;
+					}
 					if (StructKeyExists(local.perModelHints, local.modelName)
 						&& StructKeyExists(local.perModelHints[local.modelName], "renames")) {
 						local.modelOptions.renames = local.perModelHints[local.modelName].renames;
@@ -251,6 +294,8 @@ component extends="wheels.migrator.Base" {
 		local.tab = Chr(9);
 		local.upBody = "";
 		local.downBody = "";
+		local.tableName = $escapeCfcIdentifier(arguments.diffResult.tableName);
+		local.safeHint = $escapeCfcHint(arguments.migrationName);
 
 		// Emit renameColumns first in up(); reversed renames go last in down().
 		// Honor suggestedRenames as renames too — leaving them as remaining
@@ -276,9 +321,9 @@ component extends="wheels.migrator.Base" {
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.r = local.renameColumns[local.i];
 			local.upBody &= local.tab & local.tab
-				& 'renameColumn(table="' & arguments.diffResult.tableName
-				& '", columnName="' & local.r.from
-				& '", newColumnName="' & local.r.to & '");' & local.nl;
+				& 'renameColumn(table="' & local.tableName
+				& '", columnName="' & $escapeCfcIdentifier(local.r.from)
+				& '", newColumnName="' & $escapeCfcIdentifier(local.r.to) & '");' & local.nl;
 		}
 
 		local.iEnd = ArrayLen(arguments.diffResult.addColumns);
@@ -288,14 +333,14 @@ component extends="wheels.migrator.Base" {
 				continue;
 			}
 			local.upBody &= local.tab & local.tab
-				& 'addColumn(table="' & arguments.diffResult.tableName
-				& '", columnType="' & local.col.type
-				& '", columnName="' & local.col.name & '"'
+				& 'addColumn(table="' & local.tableName
+				& '", columnType="' & $escapeCfcIdentifier(local.col.type)
+				& '", columnName="' & $escapeCfcIdentifier(local.col.name) & '"'
 				& ', allowNull=' & (IsBoolean(local.col.nullable) && local.col.nullable ? "true" : "false")
 				& ');' & local.nl;
 			local.downBody &= local.tab & local.tab
-				& 'removeColumn(table="' & arguments.diffResult.tableName
-				& '", columnName="' & local.col.name & '");' & local.nl;
+				& 'removeColumn(table="' & local.tableName
+				& '", columnName="' & $escapeCfcIdentifier(local.col.name) & '");' & local.nl;
 		}
 
 		local.iEnd = ArrayLen(arguments.diffResult.removeColumns);
@@ -305,32 +350,51 @@ component extends="wheels.migrator.Base" {
 				continue;
 			}
 			local.upBody &= local.tab & local.tab
-				& 'removeColumn(table="' & arguments.diffResult.tableName
-				& '", columnName="' & local.col.name & '");' & local.nl;
-			local.downBody &= local.tab & local.tab
-				& '// TODO: restore column "' & local.col.name & '" — original type unknown' & local.nl;
+				& 'removeColumn(table="' & local.tableName
+				& '", columnName="' & $escapeCfcIdentifier(local.col.name) & '");' & local.nl;
+			if (StructKeyExists(local.col, "type") && Len(local.col.type) && local.col.type != "unknown") {
+				local.downBody &= local.tab & local.tab
+					& 'addColumn(table="' & local.tableName
+					& '", columnType="' & $escapeCfcIdentifier(local.col.type)
+					& '", columnName="' & $escapeCfcIdentifier(local.col.name) & '");' & local.nl;
+			} else {
+				local.downBody &= local.tab & local.tab
+					& '// TODO: restore column "' & $escapeCfcIdentifier(local.col.name) & '" — original type unknown' & local.nl;
+			}
 		}
 
 		local.iEnd = ArrayLen(arguments.diffResult.changeColumns);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.col = arguments.diffResult.changeColumns[local.i];
-			local.upBody &= local.tab & local.tab
-				& 'changeColumn(table="' & arguments.diffResult.tableName
-				& '", columnName="' & local.col.name
-				& '", columnType="' & local.col.to.type & '");' & local.nl;
-			local.downBody &= local.tab & local.tab
-				& 'changeColumn(table="' & arguments.diffResult.tableName
-				& '", columnName="' & local.col.name
-				& '", columnType="' & local.col.from.type & '");' & local.nl;
+			local.upArgs = 'changeColumn(table="' & local.tableName
+				& '", columnName="' & $escapeCfcIdentifier(local.col.name)
+				& '", columnType="' & $escapeCfcIdentifier(local.col.to.type) & '"';
+			if (StructKeyExists(local.col.to, "size") && Len(ToString(local.col.to.size)) && IsNumeric(local.col.to.size)) {
+				local.upArgs &= ', limit=' & Val(local.col.to.size);
+			}
+			if (StructKeyExists(local.col.to, "nullable") && IsBoolean(local.col.to.nullable)) {
+				local.upArgs &= ', allowNull=' & (local.col.to.nullable ? "true" : "false");
+			}
+			local.upBody &= local.tab & local.tab & local.upArgs & ');' & local.nl;
+			local.downArgs = 'changeColumn(table="' & local.tableName
+				& '", columnName="' & $escapeCfcIdentifier(local.col.name)
+				& '", columnType="' & $escapeCfcIdentifier(local.col.from.type) & '"';
+			if (StructKeyExists(local.col.from, "size") && Len(ToString(local.col.from.size)) && IsNumeric(local.col.from.size)) {
+				local.downArgs &= ', limit=' & Val(local.col.from.size);
+			}
+			if (StructKeyExists(local.col.from, "nullable") && IsBoolean(local.col.from.nullable)) {
+				local.downArgs &= ', allowNull=' & (local.col.from.nullable ? "true" : "false");
+			}
+			local.downBody &= local.tab & local.tab & local.downArgs & ');' & local.nl;
 		}
 
 		// Append reversed renames to down() (after other reversals)
 		for (local.i = 1; local.i <= ArrayLen(local.renameColumns); local.i++) {
 			local.r = local.renameColumns[local.i];
 			local.downBody &= local.tab & local.tab
-				& 'renameColumn(table="' & arguments.diffResult.tableName
-				& '", columnName="' & local.r.to
-				& '", newColumnName="' & local.r.from & '");' & local.nl;
+				& 'renameColumn(table="' & local.tableName
+				& '", columnName="' & $escapeCfcIdentifier(local.r.to)
+				& '", newColumnName="' & $escapeCfcIdentifier(local.r.from) & '");' & local.nl;
 		}
 
 		if (!Len(Trim(local.upBody))) {
@@ -340,7 +404,7 @@ component extends="wheels.migrator.Base" {
 			local.downBody = local.tab & local.tab & '// No changes to reverse' & local.nl;
 		}
 
-		local.content = 'component extends="wheels.migrator.Migration" hint="' & arguments.migrationName & '" {' & local.nl;
+		local.content = 'component extends="wheels.migrator.Migration" hint="' & local.safeHint & '" {' & local.nl;
 		local.content &= local.nl;
 		local.content &= local.tab & 'public void function up() {' & local.nl;
 		local.content &= local.upBody;
@@ -391,6 +455,31 @@ component extends="wheels.migrator.Base" {
 	 * Sanitizes a string for use as a filename component.
 	 * Lowercases, collapses non-alphanumeric chars to underscores, and trims edge underscores.
 	 */
+	/**
+	 * Fail-closed identifier for generated CFC source. Rejects quotes,
+	 * hashes, and other CFML/SQL metacharacters so a table/column name
+	 * cannot close a string and inject tags.
+	 */
+	public string function $escapeCfcIdentifier(required string name) {
+		if (!ReFindNoCase("^[A-Za-z_][A-Za-z0-9_]*$", arguments.name)) {
+			Throw(
+				type = "Wheels.Migrator.InvalidIdentifier",
+				message = "Unsafe identifier for generated migration CFC: `#arguments.name#`. Use letters, digits, and underscore only."
+			);
+		}
+		return arguments.name;
+	}
+
+	/**
+	 * Hint attributes are quoted strings. Strip `"` and escape `#` so a
+	 * migration name cannot break out of the generated component tag.
+	 */
+	public string function $escapeCfcHint(required string name) {
+		local.safe = Replace(arguments.name, '"', "", "all");
+		local.safe = Replace(local.safe, "##", "####", "all");
+		return local.safe;
+	}
+
 	public string function $sanitizeFileName(required string name) {
 		local.safe = LCase(arguments.name);
 		local.safe = ReReplace(local.safe, "[^a-z0-9_]+", "_", "all");
