@@ -1,159 +1,111 @@
+/**
+ * B3: live $setCORSHeaders default is deny-all (allowOrigin=""), not Origin=*.
+ *
+ * Does not change CORS production defaults. Does not add B1 wildcard-matcher
+ * cases (https://*.example.com vs evil.com). Those stay HELD.
+ */
 component extends="wheels.WheelsTest" {
 
-	/**
-	 * Note, when testing headers, the result from getPageContext().getResponse().getHeader
-	 * Can't be assigned to a variable, as it will return Java Null:isEmpty
-	 * So you need to directly test it
-	 * Don't JavaCast("null","") to a ColdFusion variable. Unexpected results will occur.
-	 *
-	 * As ACF can't return the actual content of the header in a current page context, we're skipping
-	 * ACF Tests for this suite (!)
-
-
-	function setup() {
-		if ($isLucee()) {
-			$$oldCGIScope = request.cgi;
-			$$oldHeaders = request.wheels.httprequestdata.headers;
-			$$originalRoutes = application.wheels.routes;
-			$$originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {};
-			application.wheels.allowCorsRequests = true;
-			d = $createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
-			$resetHeaders();
-			application.wheels.routes = [];
-			application.wheels.staticRoutes = {};
-			config = {path = "wheels", fileName = "Mapper", method = "$init"};
-		}
+	function beforeAll() {
+		variables.$$oldCGIScope = Duplicate(request.cgi);
+		variables.$$oldHeaders = Duplicate(request.wheels.httprequestdata.headers);
+		variables.$$originalRoutes = Duplicate(application.wheels.routes);
+		variables.$$originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(
+			application.wheels.staticRoutes
+		) : {};
+		config = {path = "wheels", fileName = "Mapper", method = "$init"};
 	}
 
-	function teardown() {
-		if ($isLucee()) {
-			request.cgi = $$oldCGIScope;
-			request.wheels.httprequestdata.headers = $$oldHeaders;
-			application.wheels.routes = $$originalRoutes;
-			application.wheels.staticRoutes = $$originalStaticRoutes;
-			application[$appKey()].allowCorsRequests = false;
-			d = "";
-			$resetHeaders();
-		}
+	function afterAll() {
+		request.cgi = variables.$$oldCGIScope;
+		request.wheels.httprequestdata.headers = variables.$$oldHeaders;
+		application.wheels.routes = variables.$$originalRoutes;
+		application.wheels.staticRoutes = variables.$$originalStaticRoutes;
+		application.wheels.allowCorsRequests = false;
 	}
 
-	function test_$setCORS_Headers_sets_Defaults() {
-		if ($isLucee()) {
-			d.$setCORSHeaders();
-			origin = $getHeader('Access-Control-Allow-Origin');
-			allowHeaders = $getHeader('Access-Control-Allow-Headers');
-			allowMethods = $getHeader('Access-Control-Allow-Methods');
-			assert("origin EQ '*'");
-			assert("allowHeaders EQ 'Origin, Content-Type, X-Auth-Token, X-Requested-By, X-Requested-With'");
-			assert("allowMethods EQ 'GET, POST, PATCH, PUT, DELETE, OPTIONS'");
-		}
-	}
-	function test_$setCORS_Headers_sets_Origin_as_wildcard() {
-		if ($isLucee()) {
-			d.$setCORSHeaders(allowOrigin = "*");
-			origin = $getHeader('Access-Control-Allow-Origin');
-			assert("origin EQ '*'");
-		}
-	}
-	function test_$setCORS_Headers_sets_Origin_as_simple_string() {
-		if ($isLucee()) {
-			request.wheels.httprequestdata.headers['origin'] = "http://www.mydomain.com";
-			d.$setCORSHeaders(allowOrigin = "http://www.mydomain.com");
-			origin = $getHeader('Access-Control-Allow-Origin');
-			assert("origin EQ 'http://www.mydomain.com'");
-		}
-	}
-	function test_$setCORS_Headers_ignores_Origin_as_simple_string() {
-		if ($isLucee()) {
-			request.wheels.httprequestdata.headers['origin'] = "http://www.baddomain.com";
-			d.$setCORSHeaders(allowOrigin = "http://www.mydomain.com");
-			assert("$getHeader('Access-Control-Allow-Origin') IS JavaCast('null', '')");
-		}
-	}
-	function test_$setCORS_Headers_sets_Origin_as_List() {
-		if ($isLucee()) {
-			request.wheels.httprequestdata.headers['origin'] = "https://domain.com";
-			d.$setCORSHeaders(allowOrigin = "http://www.mydomain.com,https://domain.com");
-			origin = $getHeader('Access-Control-Allow-Origin');
-			assert("origin EQ 'https://domain.com'");
-		}
-	}
-	function test_$setCORS_Headers_ignores_Origin_as_List() {
-		if ($isLucee()) {
-			request.wheels.httprequestdata.headers['origin'] = "https://BADdomain.com";
-			d.$setCORSHeaders(allowOrigin = "http://www.mydomain.com,https://domain.com");
-			assert("$getHeader('Access-Control-Allow-Origin') IS JavaCast('null', '')");
-		}
-	}
-	function test_$setCORS_Headers_sets_Credentials() {
-		if ($isLucee()) {
-			d.$setCORSHeaders(allowCredentials = true);
-			result = $getHeader('Access-Control-Allow-Credentials');
-			assert("result");
-		}
-	}
-	function test_$setCORS_Headers_sets_AllowHeaders() {
-		if ($isLucee()) {
-			d.$setCORSHeaders(allowHeaders = "Origin, Content-Type, X-Auth-Token, X-Foo-Bar");
-			result = $getHeader('Access-Control-Allow-Headers');
-			assert("result EQ 'Origin, Content-Type, X-Auth-Token, X-Foo-Bar'");
-		}
-	}
-	function test_$setCORS_Headers_sets_AllowMethods() {
-		if ($isLucee()) {
-			d.$setCORSHeaders(allowMethods = "GET, PUT, PATCH");
-			result = $getHeader('Access-Control-Allow-Methods');
-			assert("result EQ 'GET, PUT, PATCH'");
-		}
-	}
-	function test_$setCORS_Headers_sets_AllowMethodsByRouteGet() {
-		if ($isLucee()) {
-			$mapper()
-				.$draw()
-				.resources(name = "cats")
-				.end();
+	function run() {
 
-			d.$setCORSHeaders(allowMethodsByRoute = true, pathInfo = "/cats", scriptName = "/index.cfm");
+		g = application.wo
 
-			returnedMethods = $getHeader('Access-Control-Allow-Methods');
-			assert("returnedMethods EQ 'GET, POST'");
-		}
-	}
-	function test_$setCORS_Headers_sets_AllowMethodsByRouteShow() {
-		if ($isLucee()) {
-			$mapper()
-				.$draw()
-				.resources(name = "cats")
-				.end();
+		describe("B3 $setCORSHeaders default is deny-all", function() {
 
-			d.$setCORSHeaders(allowMethodsByRoute = true, pathInfo = "/cats/123", scriptName = "/index.cfm");
+			beforeEach(function() {
+				if (!StructKeyExists(request.wheels.httprequestdata, "headers")) {
+					request.wheels.httprequestdata.headers = {};
+				}
+			});
 
-			returnedMethods = $getHeader('Access-Control-Allow-Methods');
-			assert("returnedMethods EQ 'GET, PATCH, PUT, DELETE'");
-		}
-	}**/
-	/**
-	 * Helpers:
+			it("does not emit Access-Control-Allow-Origin=* when allowOrigin is the empty default", function() {
+				if (!StructKeyExists(server, "lucee")) {
+					return;
+				}
+				cfheader(name = "Access-Control-Allow-Origin", value = "SENTINEL-UNSET");
+				g.$setCORSHeaders();
+				expect($headerValue("Access-Control-Allow-Origin")).toBe(
+					"SENTINEL-UNSET",
+					"live default allowOrigin="""" is deny-all; must not write Origin=*"
+				);
+			});
 
-	private function $getHeader(string name) {
-		return GetPageContext().getResponse().getHeader(arguments.name);
+			it("pins the function default and the early return in source", function() {
+				var src = $stripCfmlComments(FileRead(ExpandPath("/wheels/global/cors.cfm")));
+				expect(Find("string allowOrigin = """"", src)).toBeGT(0);
+				expect(Find("if (!Len(arguments.allowOrigin))", src)).toBeGT(0);
+				expect(application.wheels.accessControlAllowOrigin).toBe("");
+			});
+
+			it("still emits * when allowOrigin is passed as wildcard", function() {
+				if (!StructKeyExists(server, "lucee")) {
+					return;
+				}
+				g.$setCORSHeaders(allowOrigin = "*");
+				expect($headerValue("Access-Control-Allow-Origin")).toBe("*");
+			});
+
+			it("emits a matching simple origin", function() {
+				if (!StructKeyExists(server, "lucee")) {
+					return;
+				}
+				request.wheels.httprequestdata.headers["origin"] = "http://www.mydomain.com";
+				g.$setCORSHeaders(allowOrigin = "http://www.mydomain.com");
+				expect($headerValue("Access-Control-Allow-Origin")).toBe("http://www.mydomain.com");
+			});
+
+			it("does not emit a non-matching simple origin", function() {
+				if (!StructKeyExists(server, "lucee")) {
+					return;
+				}
+				cfheader(name = "Access-Control-Allow-Origin", value = "SENTINEL-UNSET");
+				request.wheels.httprequestdata.headers["origin"] = "http://www.baddomain.com";
+				g.$setCORSHeaders(allowOrigin = "http://www.mydomain.com");
+				expect($headerValue("Access-Control-Allow-Origin")).toBe("SENTINEL-UNSET");
+			});
+
+			it("emits a matching origin from an allow list", function() {
+				if (!StructKeyExists(server, "lucee")) {
+					return;
+				}
+				request.wheels.httprequestdata.headers["origin"] = "https://domain.com";
+				g.$setCORSHeaders(allowOrigin = "http://www.mydomain.com,https://domain.com");
+				expect($headerValue("Access-Control-Allow-Origin")).toBe("https://domain.com");
+			});
+
+		});
+
 	}
 
-	private function $resetHeaders() {
-		local.pc = GetPageContext().getResponse();
-		local.pc.setHeader('Access-Control-Allow-Origin', Javacast("null", ""));
-		local.pc.setHeader('Access-Control-Allow-Headers', Javacast("null", ""));
-		local.pc.setHeader('Access-Control-Allow-Methods', Javacast("null", ""));
-		local.pc.setHeader('Access-Control-Allow-Credentials', Javacast("null", ""));
+	public string function $stripCfmlComments(required string source) {
+		var stripped = arguments.source;
+		stripped = reReplace(stripped, "<!---[\s\S]*?--->", "", "all");
+		stripped = reReplace(stripped, "/\*[\s\S]*?\*/", "", "all");
+		stripped = reReplace(stripped, "(?m)//[^\n]*", "", "all");
+		return stripped;
 	}
 
-	private struct function $mapper() {
-		local.args = Duplicate(config);
-		StructAppend(local.args, arguments, true);
-		return $createObjectFromRoot(argumentCollection = local.args);
+	public string function $headerValue(required string name) {
+		var raw = GetPageContext().getResponse().getHeader(arguments.name);
+		return IsNull(raw) ? "" : ToString(raw);
 	}
 
-	private boolean function $isLucee() {
-		return StructKeyExists(server, "lucee");
-	}**/
 }
