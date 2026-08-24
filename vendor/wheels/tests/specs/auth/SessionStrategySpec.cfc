@@ -103,12 +103,12 @@ component extends="wheels.WheelsTest" {
 					expect(captured.principal.id).toBe(99);
 				});
 
-				it("does not error when sessionRotate is called during login", function() {
-					// sessionRotate() is wrapped in try/catch so login works
-					// even on engines that don't support it
+				it("rotates the session identity on login", function() {
+					var beforeId = $sessionIdentityToken();
 					strategy.login(principal = {id = 42});
 					expect(strategy.isLoggedIn()).toBeTrue();
 					expect(strategy.currentUser().id).toBe(42);
+					expect($sessionIdentityToken()).notToBe(beforeId);
 				});
 
 				it("creates intermediate session structs for nested keys", function() {
@@ -128,6 +128,14 @@ component extends="wheels.WheelsTest" {
 					strategy.logout();
 
 					expect(strategy.isLoggedIn()).toBeFalse();
+				});
+
+				it("rotates the session identity on logout", function() {
+					strategy.login(principal = {id = 7});
+					var beforeId = $sessionIdentityToken();
+					strategy.logout();
+					expect(strategy.isLoggedIn()).toBeFalse();
+					expect($sessionIdentityToken()).notToBe(beforeId);
 				});
 
 				it("authenticate fails after logout", function() {
@@ -257,6 +265,18 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	private string function $sessionIdentityToken() {
+		if (StructKeyExists(session, "sessionid") && Len(ToString(session.sessionid))) {
+			return ToString(session.sessionid);
+		}
+		if (StructKeyExists(session, "cfid") || StructKeyExists(session, "cftoken")) {
+			var cfid = StructKeyExists(session, "cfid") ? ToString(session.cfid) : "";
+			var cftoken = StructKeyExists(session, "cftoken") ? ToString(session.cftoken) : "";
+			return cfid & ":" & cftoken;
+		}
+		return "";
 	}
 
 }

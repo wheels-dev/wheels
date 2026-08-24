@@ -14,11 +14,11 @@
  *   var sessionAuth = new wheels.auth.SessionStrategy();
  *   authenticator.registerStrategy(name="session", strategy=sessionAuth);
  *
- *   // After verifying credentials in a login action:
- *   sessionAuth.login(principal={id=user.id, role=user.role});
- *
- *   // In a logout action:
- *   sessionAuth.logout();
+	 *   // After verifying credentials in a login action (rotates the SID):
+	 *   sessionAuth.login(principal={id=user.id, role=user.role});
+	 *
+	 *   // In a logout action (clears the principal and rotates the SID):
+	 *   sessionAuth.logout();
  *
  * [section: Authentication]
  * [category: Strategies]
@@ -97,13 +97,8 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 	 * @principal Struct representing the authenticated identity (user id, roles, etc.).
 	 */
 	public void function login(required struct principal) {
-		// Regenerate session ID to prevent session fixation attacks
-		try {
-			sessionRotate();
-		} catch (any e) {
-			writeLog(text="sessionRotate() unavailable: #e.message#", type="warning", file="wheels_auth");
-		}
-
+		// Rotate first so a failed rotate cannot leave a principal on the old SID.
+		$rotateSession();
 		$setSessionPrincipal(arguments.principal);
 
 		if (IsCustomFunction(variables.onLogin) || IsClosure(variables.onLogin)) {
@@ -114,15 +109,39 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 	/**
 	 * Destroy the authenticated session.
 	 *
-	 * Clears the principal from the session scope and optionally
-	 * invokes the onLogout callback.
+	 * Clears the principal, rotates or invalidates the session ID so the
+	 * old cookie cannot be reused, and optionally invokes onLogout.
 	 */
 	public void function logout() {
 		$clearSessionPrincipal();
+		$rotateSession();
 
 		if (IsCustomFunction(variables.onLogout) || IsClosure(variables.onLogout)) {
 			variables.onLogout();
 		}
+	}
+
+	/**
+	 * Rotate or invalidate the current session ID.
+	 *
+	 * Prefers sessionRotate() (Lucee). Falls back to sessionInvalidate()
+	 * when that BIF is absent (Adobe CF). Does not catch-all: a rotate
+	 * failure must surface so login/logout cannot silently keep the old SID.
+	 */
+	public void function $rotateSession() {
+		local.functions = GetFunctionList();
+		if (StructKeyExists(local.functions, "sessionRotate")) {
+			sessionRotate();
+			return;
+		}
+		if (StructKeyExists(local.functions, "sessionInvalidate")) {
+			sessionInvalidate();
+			return;
+		}
+		throw(
+			type = "Wheels.Auth.SessionRotateUnavailable",
+			message = "Session ID rotation is required at login/logout but neither sessionRotate() nor sessionInvalidate() is available."
+		);
 	}
 
 	/**
