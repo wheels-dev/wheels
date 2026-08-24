@@ -1,0 +1,3 @@
+- `labelPlacement="aroundRight"` now encodes the label under the existing `encode=true` default (`$formAfterElement` no longer raw-concats)
+- Date `<select>` helpers honor `encode="attributes"` the same way `select()` does (attribute values stay encoded)
+- `paginationLinks()` sanitizes `prependToPage` on first/last `alwaysShowAnchors` the same way as numbered pages

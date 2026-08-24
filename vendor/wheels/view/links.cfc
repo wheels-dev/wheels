@@ -20,6 +20,7 @@ component {
 	 * @port Set this to override the current port number.
 	 * @href Pass a link to an external site here if you want to bypass the Wheels routing system altogether and link to an external URL.
 	 * @encode [see:styleSheetLinkTag].
+	 * @sanitizeHref When true, blank out caller-supplied `javascript:` / `data:` hrefs. Default false (B3: default deny is a public-behavior change).
 	 */
 	public string function linkTo(
 		string text,
@@ -34,7 +35,8 @@ component {
 		string protocol,
 		numeric port,
 		string href,
-		any encode
+		any encode,
+		boolean sanitizeHref
 	) {
 		$args(name = "linkTo", args = arguments);
 
@@ -60,11 +62,15 @@ component {
 			}
 			arguments.href = uRLFor(argumentCollection = local.args);
 			local.encodeExcept = "href";
+		} else if (IsBoolean(arguments.sanitizeHref) && arguments.sanitizeHref) {
+			// Opt-in fail-closed gate. Default sanitizeHref=false keeps
+			// javascript:/data: hrefs working (B3 public-behavior escalation).
+			arguments.href = $sanitizeLinkToHref(arguments.href);
 		}
 		if (!StructKeyExists(arguments, "text")) {
 			arguments.text = arguments.href;
 		}
-		local.skip = "text,route,controller,action,key,params,anchor,onlyPath,host,protocol,port,encode";
+		local.skip = "text,route,controller,action,key,params,anchor,onlyPath,host,protocol,port,encode,sanitizeHref";
 		if (Len(arguments.route)) {
 			// variables passed in as route arguments should not be added to the html element
 			local.skip = ListAppend(local.skip, $routeVariables(argumentCollection = arguments));
@@ -77,6 +83,19 @@ component {
 			encode = arguments.encode,
 			encodeExcept = local.encodeExcept
 		);
+	}
+
+	/**
+	 * Opt-in fail-closed href gate for `linkTo(href=)`. Strips javascript:
+	 * and data: schemes (case-insensitive, optional whitespace before `:`).
+	 * Default `sanitizeHref=false` leaves those hrefs unchanged.
+	 */
+	public string function $sanitizeLinkToHref(required string href) {
+		local.trimmed = Trim(arguments.href);
+		if (ReFindNoCase("^(javascript|data)\s*:", local.trimmed)) {
+			return "";
+		}
+		return arguments.href;
 	}
 
 	/**
@@ -301,6 +320,9 @@ component {
 			if (Len(arguments.prepend)) {
 				local.start &= arguments.prepend;
 			}
+			// Sanitize prependToPage before first/last anchors AND the middle
+			// loop. alwaysShowAnchors previously concatenated the raw string.
+			local.sanitizedPrepend = $paginationSanitizeWrapper(arguments.prependToPage);
 			if (arguments.alwaysShowAnchors) {
 				if ((local.currentPage - arguments.windowSize) > 1) {
 					local.pageNumber = 1;
@@ -314,7 +336,7 @@ component {
 					}
 					local.linkToArguments.text = NumberFormat(local.pageNumber);
 					if (Len(arguments.prependToPage) && arguments.prependOnAnchor) {
-						local.start &= arguments.prependToPage;
+						local.start &= local.sanitizedPrepend;
 					}
 					local.start &= linkTo(argumentCollection = local.linkToArguments);
 					if (Len(local.sanitizedAppend) && arguments.appendOnAnchor) {
@@ -322,15 +344,6 @@ component {
 					}
 					local.start &= arguments.anchorDivider;
 				}
-			}
-			// Sanitize prependToPage once before the loop (input doesn't change per iteration).
-			// First decode HTML numeric entities so that encoded payloads like &#111;nmouseover
-			// are normalised before the regex strips event handlers and javascript: URIs.
-			if (Len(arguments.prependToPage)) {
-				local.decodedPrepend = $decodeHtmlEntities(arguments.prependToPage);
-				local.sanitizedPrepend = reReplaceNoCase(local.decodedPrepend, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
-				local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
-				local.sanitizedPrepend = reReplaceNoCase(local.sanitizedPrepend, 'javascript\s*:', '', 'all');
 			}
 
 			local.middle = "";
@@ -422,7 +435,7 @@ component {
 					local.linkToArguments.text = NumberFormat(local.totalPages);
 					local.end &= arguments.anchorDivider;
 					if (Len(arguments.prependToPage) && arguments.prependOnAnchor) {
-						local.end &= arguments.prependToPage;
+						local.end &= local.sanitizedPrepend;
 					}
 					local.end &= linkTo(argumentCollection = local.linkToArguments);
 					if (Len(local.sanitizedAppend) && arguments.appendOnAnchor) {

@@ -479,8 +479,14 @@ component {
 				// if the label should be placed after the tag we return the entire label tag
 				local.rv &= $createLabel(argumentCollection = arguments);
 			} else if (arguments.labelPlacement == "aroundRight") {
-				// if the text should be placed to the right of the form input we return both the text and the closing tag
-				local.rv &= arguments.label & "</label>";
+				// Match $createLabel / $element: encode label text when encode=true.
+				// aroundRight used to concat arguments.label raw, so XSS labels
+				// skipped the encode=true path that around / aroundLeft / after use.
+				local.labelText = arguments.label;
+				if (IsBoolean(arguments.encode) && arguments.encode && $get("encodeHtmlTags")) {
+					local.labelText = EncodeForHTML($canonicalize(arguments.label));
+				}
+				local.rv &= local.labelText & "</label>";
 			} else {
 				// the label argument is either "around" or "aroundLeft" so we only have to return the closing label tag
 				local.rv &= "</label>";

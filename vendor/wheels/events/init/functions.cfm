@@ -224,7 +224,14 @@
 		application.$wheels.functions.imageTag = {onlyPath = true, host = "", protocol = "", port = 0, encode = true};
 		application.$wheels.functions.includePartial = {layout = "", spacer = "", dataFunction = true};
 		application.$wheels.functions.javaScriptIncludeTag = {type = "text/javascript", head = false, encode = true};
-		application.$wheels.functions.linkTo = {onlyPath = true, host = "", protocol = "", port = 0, encode = true};
+		application.$wheels.functions.linkTo = {
+			onlyPath = true,
+			host = "",
+			protocol = "",
+			port = 0,
+			encode = true,
+			sanitizeHref = false
+		};
 		application.$wheels.functions.mailTo = {encode = true};
 		application.$wheels.functions.maximum = {parameterize = true, ifNull = ""};
 		application.$wheels.functions.minimum = {parameterize = true, ifNull = ""};

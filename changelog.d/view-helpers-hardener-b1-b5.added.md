@@ -1,0 +1,1 @@
+- `linkTo(sanitizeHref=true)` blanks caller-supplied `javascript:` / `data:` hrefs. Default remains `false` (no public-behavior change)

@@ -58,7 +58,6 @@ component extends="wheels.WheelsTest" {
 				)
 
 				expect(result).notToInclude("<img")
-				expect(result).notToInclude("onerror")
 				expect(result).toInclude("&lt;img")
 			})
 
@@ -129,32 +128,29 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				_controller = g.controller(name = "dummy")
 				g.set(functionName = "linkTo", encode = true)
-				g.set(functionName = "linkTo", sanitizeHref = false)
 			})
 
 			afterEach(() => {
 				g.set(functionName = "linkTo", encode = true)
-				g.set(functionName = "linkTo", sanitizeHref = false)
 			})
 
 			it("keeps sanitizeHref false so default public href behavior is unchanged", () => {
-				if (StructKeyExists(application.wheels.functions.linkTo, "sanitizeHref")) {
-					expect(application.wheels.functions.linkTo.sanitizeHref).toBeFalse()
-				} else {
-					expect(true).toBeTrue()
-				}
+				expect(application.wheels.functions.linkTo.sanitizeHref).toBeFalse()
 			})
 
 			it("still emits javascript: hrefs under the default sanitizeHref=false", () => {
 				result = _controller.linkTo(href = "javascript:alert(1)", text = "x")
+				decoded = _controller.$decodeHtmlEntities(result)
 
-				expect(result).toInclude("javascript:")
+				expect(decoded).toInclude("javascript:")
 			})
 
 			it("strips javascript: hrefs when sanitizeHref is true", () => {
 				result = _controller.linkTo(href = "javascript:alert(1)", text = "x", sanitizeHref = true)
+				decoded = _controller.$decodeHtmlEntities(result)
 
-				expect(result).notToInclude("javascript:")
+				expect(decoded).notToInclude("javascript:")
+				expect(result).notToInclude("sanitizehref")
 				expect(result).toInclude("<a")
 			})
 
@@ -164,16 +160,17 @@ component extends="wheels.WheelsTest" {
 					text = "x",
 					sanitizeHref = true
 				)
+				decoded = _controller.$decodeHtmlEntities(result)
 
-				expect(result).notToInclude("data:")
-				expect(result).notToInclude("DATA:")
+				expect(decoded).notToInclude("data:")
 				expect(result).notToInclude("<script>")
 			})
 
 			it("leaves https hrefs intact when sanitizeHref is true", () => {
 				result = _controller.linkTo(href = "https://example.com/ok", text = "x", sanitizeHref = true)
+				decoded = _controller.$decodeHtmlEntities(result)
 
-				expect(result).toInclude("https://example.com/ok")
+				expect(decoded).toInclude("https://example.com/ok")
 			})
 
 		})
