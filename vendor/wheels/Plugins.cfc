@@ -28,6 +28,10 @@ component output="false" extends="wheels.Global"{
 		variables.sort = "ASC";
 		/* extract out plugins */
 		$pluginsExtract();
+		/* delete orphan directories that have no corresponding zip */
+		if (variables.$class.deletePluginDirectories) {
+			$pluginDelete();
+		}
 		/* process plugins */
 		$pluginsProcess();
 		/* get versions */
@@ -138,11 +142,39 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Retained for API compatibility. The original orphan-directory cleanup logic
-	 * was neutered by GH#1978 (directory-based plugins are indistinguishable from
-	 * orphaned zip extractions). No longer called from $init().
+	 * Deletes plugin directories that have no corresponding zip when
+	 * deletePluginDirectories is true (the public default). Skips
+	 * symlinks and git checkouts so a directory-based plugin is not
+	 * removed. Orphan zip extractions have neither.
 	 */
 	public void function $pluginDelete() {
+		if (!variables.$class.deletePluginDirectories) {
+			return;
+		}
+		local.folders = $pluginFolders();
+		local.files = $pluginFiles();
+		local.fileList = StructKeyList(local.files);
+		for (local.iFolder in local.folders) {
+			local.folder = local.folders[local.iFolder];
+			if ($isSymlink(local.folder.folderPath)) {
+				continue;
+			}
+			if (DirectoryExists(local.folder.folderPath & "/.git")) {
+				continue;
+			}
+			if (ListContainsNoCase(local.fileList, local.folder.name)) {
+				continue;
+			}
+			try {
+				DirectoryDelete(local.folder.folderPath, true);
+			} catch (any e) {
+				WriteLog(
+					type = "warning",
+					text = "[Wheels] Failed to delete orphan plugin directory '#local.folder.folderPath#': #e.message#",
+					file = "wheels"
+				);
+			}
+		}
 	}
 
 	public void function $pluginsProcess() {
@@ -158,7 +190,36 @@ component output="false" extends="wheels.Global"{
 					file = "wheels"
 				);
 			} catch (any e) {}
-			local.plugin = CreateObject("component", $componentPathToPlugin(local.pluginKey, local.pluginValue.name)).init();
+			if (!$isSafePluginDirName(local.pluginKey)) {
+				WriteLog(
+					text = "[Wheels] Plugin '#local.pluginKey#' skipped: unsafe directory name",
+					type = "error",
+					file = "wheels"
+				);
+				continue;
+			}
+			local.manifestPath = local.pluginValue.folderPath & "/plugin.json";
+			if (FileExists(local.manifestPath)) {
+				local.parsedManifest = $parsePluginManifest(local.manifestPath);
+				if (!local.parsedManifest.valid) {
+					WriteLog(
+						text = "[Wheels] Plugin '#local.pluginKey#' skipped: invalid plugin.json: #ArrayToList(local.parsedManifest.errors, '; ')#",
+						type = "error",
+						file = "wheels"
+					);
+					continue;
+				}
+			}
+			try {
+				local.plugin = CreateObject("component", $componentPathToPlugin(local.pluginKey, local.pluginValue.name)).init();
+			} catch (any e) {
+				WriteLog(
+					text = "[Wheels] Plugin '#local.pluginKey#' init() failed: #e.message#",
+					type = "error",
+					file = "wheels"
+				);
+				continue;
+			}
 			// Determine the compatibility version list. If a plugin.json exists and
 			// declares wheelsVersion, use that instead of the CFC's this.version
 			// property. This lets plugin authors declare compatibility declaratively.
@@ -169,9 +230,9 @@ component output="false" extends="wheels.Global"{
 			}
 			if ($shouldLoadPlugin(local.compatVersion, local.wheelsVersion, variables.$class.loadIncompatiblePlugins)) {
 				variables.$class.plugins[local.pluginKey] = local.plugin;
-				// Per-plugin isolation (same log-and-skip pattern as the
-				// ServiceProvider register/boot phases): a throwing
-				// onPluginLoad must not prevent sibling plugins from loading.
+				// Per-plugin isolation: a throwing onPluginLoad must not
+				// prevent sibling plugins from loading. Fail-closed: the
+				// throwing plugin is unloaded rather than left half-live.
 				try {
 					$invokeOnPluginLoad(local.pluginKey, local.plugin);
 				} catch (any e) {
@@ -180,6 +241,8 @@ component output="false" extends="wheels.Global"{
 						type = "error",
 						file = "wheels"
 					);
+					StructDelete(variables.$class.plugins, local.pluginKey);
+					continue;
 				}
 				// Track plugins that implement ServiceProviderInterface
 				if ($isServiceProvider(local.plugin)) {
@@ -295,6 +358,22 @@ component output="false" extends="wheels.Global"{
 				continue;
 			}
 			for (local.mw in local.manifest.middleware) {
+				if (!StructKeyExists(local.mw, "component") || !IsSimpleValue(local.mw.component)) {
+					WriteLog(
+						type = "error",
+						text = "[Wheels] Plugin '#local.pluginName#' middleware entry is missing a string component path",
+						file = "wheels"
+					);
+					continue;
+				}
+				if (!$isLocalPluginMiddlewareComponent(local.pluginName, local.mw.component)) {
+					WriteLog(
+						type = "error",
+						text = "[Wheels] Plugin '#local.pluginName#' middleware '#local.mw.component#' is not plugin-local and was not registered",
+						file = "wheels"
+					);
+					continue;
+				}
 				local.options = StructKeyExists(local.mw, "options") ? local.mw.options : {};
 				ArrayAppend(variables.$class.pluginMiddleware, {
 					middleware = local.mw.component,
@@ -725,13 +804,15 @@ component output="false" extends="wheels.Global"{
 		required string wheelsVersion,
 		required boolean loadIncompatible
 	) {
-		// Empty / undeclared compatibility fails closed even when
-		// loadIncompatiblePlugins is true. That setting only applies to
-		// plugins that declared a version list which does not match.
-		if (!Len(Trim(arguments.compatVersion))) {
+		// Empty / undeclared / wildcard / placeholder compatibility fails
+		// closed even when loadIncompatiblePlugins is true. That setting
+		// only applies to plugins that declared a version list which
+		// does not match.
+		local.compat = Trim(arguments.compatVersion);
+		if (!Len(local.compat) || $isUndeclaredWheelsVersion(local.compat)) {
 			return false;
 		}
-		return ListFind(arguments.compatVersion, arguments.wheelsVersion)
+		return ListFind(local.compat, arguments.wheelsVersion)
 			|| arguments.loadIncompatible;
 	}
 
@@ -756,26 +837,17 @@ component output="false" extends="wheels.Global"{
 		if (!StructKeyExists(arguments.plugin, "onPluginLoad") || !IsCustomFunction(arguments.plugin.onPluginLoad)) {
 			return;
 		}
-		// Shallow copy: the Adobe CF workaround only requires a plain struct
-		// context (the application scope itself rejects function members), not
-		// a deep clone. Shared keys keep referencing the live objects (DI
-		// container, config struct, framework instance) so nothing forks, and
-		// the per-plugin cost is O(top-level keys) instead of a deep copy of
-		// the entire application scope.
-		local.loadContext = StructCopy(application);
+		// Sandbox: do not hand the live application scope (or a shallow
+		// copy of it) to onPluginLoad. A StructCopy + sync-back let a
+		// plugin plant top-level application keys and mutate
+		// application.wheels through the shared nested struct. registerMiddleware
+		// is the supported write API and writes to $class directly.
+		local.loadContext = {
+			environment = variables.$class.wheelsEnvironment,
+			version = variables.$class.wheelsVersion
+		};
 		$installPluginLoadAPI(arguments.pluginKey, local.loadContext);
 		arguments.plugin.onPluginLoad(local.loadContext);
-		// Sync non-function keys back to the application scope. Closures
-		// injected by $installPluginLoadAPI are skipped to keep application
-		// clean. For shared keys this re-assigns the same reference (a no-op);
-		// the loop matters for keys the plugin added or replaced, and for
-		// arrays on Adobe CF, which copies arrays by value even in a shallow
-		// StructCopy.
-		for (local.contextKey in local.loadContext) {
-			if (!IsCustomFunction(local.loadContext[local.contextKey])) {
-				application[local.contextKey] = local.loadContext[local.contextKey];
-			}
-		}
 	}
 
 	/**
@@ -784,8 +856,42 @@ component output="false" extends="wheels.Global"{
 	 * 2. CFC mixin attribute overrides default
 	 * 3. plugin.json "mixins" field takes highest precedence
 	 */
+	public string function $defaultMixinTarget() {
+		return "global";
+	}
+
+	/**
+	 * True when neither the CFC mixin attribute nor plugin.json mixins
+	 * declared a target, so $resolveMixinTarget will use the historic
+	 * "global" default. Detect+warn only — the default is not flipped.
+	 */
+	public boolean function $usesImplicitGlobalMixin(required struct cfcMeta, struct manifest = {}) {
+		if (StructKeyExists(arguments.cfcMeta, "mixin") && Len(Trim(arguments.cfcMeta.mixin))) {
+			return false;
+		}
+		if (StructKeyExists(arguments.manifest, "mixins") && Len(Trim(arguments.manifest.mixins))) {
+			return false;
+		}
+		return true;
+	}
+
 	private string function $resolveMixinTarget(required string pluginName, required struct cfcMeta) {
-		local.target = "global";
+		local.target = $defaultMixinTarget();
+		local.manifest = {};
+		if (
+			StructKeyExists(variables.$class.pluginMeta, arguments.pluginName)
+			&& IsStruct(variables.$class.pluginMeta[arguments.pluginName])
+			&& StructKeyExists(variables.$class.pluginMeta[arguments.pluginName], "manifest")
+		) {
+			local.manifest = variables.$class.pluginMeta[arguments.pluginName].manifest;
+		}
+		if ($usesImplicitGlobalMixin(arguments.cfcMeta, local.manifest)) {
+			WriteLog(
+				type = "warning",
+				text = "[Wheels] Plugin '#arguments.pluginName#' uses the implicit mixin target 'global' (every mixable component). Declare mixins on the CFC or in plugin.json to narrow the injection surface.",
+				file = "wheels"
+			);
+		}
 		if (StructKeyExists(arguments.cfcMeta, "mixin")) {
 			local.target = arguments.cfcMeta.mixin;
 		}
@@ -1143,6 +1249,40 @@ component output="false" extends="wheels.Global"{
 		} catch (any e) {
 			return false;
 		}
+	}
+
+	public boolean function $isUndeclaredWheelsVersion(required string constraint) {
+		local.value = Trim(arguments.constraint);
+		return local.value == "*"
+			|| local.value == "0.0.0"
+			|| local.value == "0.0.0-dev"
+			|| local.value == "@build.version@";
+	}
+
+	public boolean function $isSafePluginDirName(required string dirName) {
+		return REFind("^[A-Za-z0-9][A-Za-z0-9_-]*$", arguments.dirName) == 1;
+	}
+
+	/**
+	 * Manifest middleware must be a bare CFC identifier (resolved next to
+	 * the plugin) or a dotted path under this plugin. Foreign framework
+	 * paths are not registered.
+	 */
+	public boolean function $isLocalPluginMiddlewareComponent(required string pluginName, required string componentPath) {
+		local.path = Trim(arguments.componentPath);
+		if (!Len(local.path) || Find("..", local.path)) {
+			return false;
+		}
+		if (REFind("^[A-Za-z_][A-Za-z0-9_]*$", local.path)) {
+			return true;
+		}
+		if (!REFind("^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$", local.path)) {
+			return false;
+		}
+		if (local.path == arguments.pluginName || Left(local.path, Len(arguments.pluginName) + 1) == arguments.pluginName & ".") {
+			return true;
+		}
+		return false;
 	}
 
 }

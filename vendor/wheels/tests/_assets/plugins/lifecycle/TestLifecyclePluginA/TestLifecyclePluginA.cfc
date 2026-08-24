@@ -6,17 +6,17 @@ component {
 	}
 
 	public void function onPluginLoad(required app) {
-		if (!StructKeyExists(arguments.app, "$wheelstestLifecycleLog")) {
-			arguments.app.$wheelstestLifecycleLog = [];
+		if (!StructKeyExists(application, "$wheelstestLifecycleLog")) {
+			application.$wheelstestLifecycleLog = [];
 		}
-		ArrayAppend(arguments.app.$wheelstestLifecycleLog, "A:onPluginLoad");
+		ArrayAppend(application.$wheelstestLifecycleLog, "A:onPluginLoad");
 	}
 
 	public void function onPluginActivate(required app) {
-		if (!StructKeyExists(arguments.app, "$wheelstestLifecycleLog")) {
-			arguments.app.$wheelstestLifecycleLog = [];
+		if (!StructKeyExists(application, "$wheelstestLifecycleLog")) {
+			application.$wheelstestLifecycleLog = [];
 		}
-		ArrayAppend(arguments.app.$wheelstestLifecycleLog, "A:onPluginActivate");
+		ArrayAppend(application.$wheelstestLifecycleLog, "A:onPluginActivate");
 	}
 
 	public string function $LifecycleTestMethodA() mixin="controller" {

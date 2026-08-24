@@ -62,7 +62,7 @@ for (local.key in packageMeta) {
 		<div class="ui error message">
 			<div class="header">Package Loading Errors</div>
 			<cfloop array="#failedPackages#" index="local.fp">
-				<p><strong>#local.fp.name#</strong>: #local.fp.error#<cfif Len(local.fp.detail)> &mdash; #local.fp.detail#</cfif></p>
+				<p><strong>#EncodeForHTML(local.fp.name)#</strong>: #EncodeForHTML(local.fp.error)#<cfif Len(local.fp.detail)> &mdash; #EncodeForHTML(local.fp.detail)#</cfif></p>
 			</cfloop>
 		</div>
 	</cfif>
@@ -83,11 +83,11 @@ for (local.key in packageMeta) {
 					<cfset local.pkg = packageMeta[local.pkgKey]>
 					<tr>
 						<td>
-							<a href="#urlFor(route="wheelsPackageEntry", name=local.pkgKey)#">#local.pkg.name#</a>
+							<a href="#urlFor(route="wheelsPackageEntry", name=local.pkgKey)#">#EncodeForHTML(local.pkg.name)#</a>
 						</td>
-						<td>#local.pkg.version#</td>
-						<td>#local.pkg.author#</td>
-						<td>#local.pkg.description#</td>
+						<td>#EncodeForHTML(local.pkg.version)#</td>
+						<td>#EncodeForHTML(local.pkg.author)#</td>
+						<td>#EncodeForHTML(local.pkg.description)#</td>
 						<td>
 							<a class="ui button tiny teal" href="#urlFor(route='wheelsPackageEntry', name=local.pkgKey)#">
 								<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="8 6 8 12" fill="white" style="vertical-align: middle; margin-right: 4px;">

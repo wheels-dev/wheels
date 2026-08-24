@@ -49,6 +49,7 @@ component output="false" {
 		variables.lifecycleContainer = "";
 		variables.lifecycleApp = {};
 		variables.lifecycleBooted = false;
+		variables.lifecycleBindingSnapshots = {};
 		// Per-package CFML mapping registry: alias → absolute package directory.
 		// Populated during load so each installed package gets a static, identifier-
 		// safe alias usable in `new <alias>.Sibling()` even when the on-disk dir
@@ -82,35 +83,35 @@ component output="false" {
 	// ---------------------------------------------------------------------------
 
 	public struct function getPackages() {
-		return variables.packages;
+		return StructCopy(variables.packages);
 	}
 
 	public struct function getPackageMeta() {
-		return variables.packageMeta;
+		return Duplicate(variables.packageMeta);
 	}
 
 	public struct function getMixins() {
-		return variables.mixins;
+		return Duplicate(variables.mixins);
 	}
 
 	public array function getServiceProviders() {
-		return variables.serviceProviders;
+		return Duplicate(variables.serviceProviders);
 	}
 
 	public array function getPackageMiddleware() {
-		return variables.packageMiddleware;
+		return Duplicate(variables.packageMiddleware);
 	}
 
 	public array function getFailedPackages() {
-		return variables.failedPackages;
+		return Duplicate(variables.failedPackages);
 	}
 
 	public struct function getExcludedPackages() {
-		return variables.excludedPackages;
+		return Duplicate(variables.excludedPackages);
 	}
 
 	public array function getLoadOrder() {
-		return variables.loadOrder;
+		return Duplicate(variables.loadOrder);
 	}
 
 	/**
@@ -151,7 +152,7 @@ component output="false" {
 	 * method declarations in the same `variables` scope keyed by name.
 	 */
 	public struct function getMethodProviders() {
-		return variables.$methodProviders;
+		return Duplicate(variables.$methodProviders);
 	}
 
 	/**
@@ -279,6 +280,22 @@ component output="false" {
 			// Package conventions never use dot-prefixed names, and loading a
 			// stray manifest from one would be surprising and unsafe.
 			if (Left(local.dirName, 1) == ".") {
+				continue;
+			}
+
+			// S6: a dotted or traversed dir name becomes extra CreateObject
+			// segments (`prefix.evil.nested.Cfc`). Refuse before parse.
+			if (!$isSafePackageDirName(local.dirName)) {
+				ArrayAppend(variables.failedPackages, {
+					name = local.dirName,
+					error = "Unsafe package directory name",
+					detail = "Package directory '#local.dirName#' must match [A-Za-z0-9_-]+"
+				});
+				WriteLog(
+					text = "[Wheels] Package '#local.dirName#' skipped: unsafe directory name",
+					type = "error",
+					file = "wheels"
+				);
 				continue;
 			}
 
@@ -548,6 +565,7 @@ component output="false" {
 		StructDelete(variables.packageMeta, arguments.dirName);
 		StructDelete(variables.packages, arguments.dirName);
 		StructDelete(variables.lazyPackages, arguments.dirName);
+		StructDelete(variables.lifecycleBindingSnapshots, arguments.dirName);
 		// Drop any mixins this package contributed to each target, plus the
 		// matching method-provider entries so a later package can register the
 		// same method without spurious collision warnings.
@@ -626,6 +644,18 @@ component output="false" {
 		// Collect middleware from manifest
 		if (StructKeyExists(arguments.provides, "middleware") && IsArray(arguments.provides.middleware)) {
 			for (local.mw in arguments.provides.middleware) {
+				if (!StructKeyExists(local.mw, "component") || !IsSimpleValue(local.mw.component)) {
+					Throw(
+						type = "Wheels.PackageUnsafeMiddleware",
+						message = "Package '#arguments.dirName#' middleware entry is missing a string component path"
+					);
+				}
+				if (!$isLocalMiddlewareComponent(arguments.dirName, local.mw.component)) {
+					Throw(
+						type = "Wheels.PackageUnsafeMiddleware",
+						message = "Package '#arguments.dirName#' middleware '#local.mw.component#' is not inside the package"
+					);
+				}
 				local.options = StructKeyExists(local.mw, "options") ? local.mw.options : {};
 				ArrayAppend(variables.packageMiddleware, {
 					middleware = local.mw.component,
@@ -657,6 +687,25 @@ component output="false" {
 			return;
 		}
 
+		// S2: two concurrent getPackage() calls must not both instantiate
+		// and both invoke register()/boot(). Named lock per vendor+dir.
+		lock
+			name = "wheels.packageLoader.lazy.#Hash(variables.vendorPath & chr(0) & arguments.dirName)#"
+			type = "exclusive"
+			timeout = "30"
+		{
+			if (!StructKeyExists(variables.lazyPackages, arguments.dirName)) {
+				return;
+			}
+			$instantiateLazyPackageLocked(arguments.dirName);
+		}
+	}
+
+	/**
+	 * Body of lazy instantiation. Called only while the per-package lock
+	 * in $instantiateLazyPackage is held.
+	 */
+	private void function $instantiateLazyPackageLocked(required string dirName) {
 		local.info = variables.lazyPackages[arguments.dirName];
 
 		local.provides = {};
@@ -1018,8 +1067,10 @@ component output="false" {
 		// would skip the provider after a failing one.
 		local.providerKeys = Duplicate(variables.serviceProviders);
 		for (local.pkgKey in local.providerKeys) {
+			local.snap = $snapshotContainerBindings(arguments.container);
 			try {
 				variables.packages[local.pkgKey].register(arguments.container);
+				variables.lifecycleBindingSnapshots[local.pkgKey] = local.snap;
 			} catch (any e) {
 				WriteLog(
 					text = "[Wheels] Package '#local.pkgKey#' ServiceProvider register() failed: #e.message#",
@@ -1031,6 +1082,7 @@ component output="false" {
 					error = "ServiceProvider register() failed: " & e.message,
 					detail = StructKeyExists(e, "detail") ? e.detail : ""
 				});
+				$restoreContainerBindings(arguments.container, local.snap);
 				$rollbackPackage(local.pkgKey);
 			}
 		}
@@ -1041,9 +1093,8 @@ component output="false" {
 	 *
 	 * Same per-provider isolation as $invokeServiceProviderRegister: a throwing
 	 * boot() is logged, recorded in failedPackages, and rolled back so the
-	 * remaining providers still boot. Services the failing provider already
-	 * registered in the DI container during register() cannot be unwound — the
-	 * Injector has no per-package tracking.
+	 * remaining providers still boot. Bindings the failing provider wrote
+	 * during register() are restored from the pre-register snapshot.
 	 */
 	public void function $invokeServiceProviderBoot(required struct app) {
 		// Capture the app reference and mark the lifecycle complete so a lazy
@@ -1068,9 +1119,38 @@ component output="false" {
 					error = "ServiceProvider boot() failed: " & e.message,
 					detail = StructKeyExists(e, "detail") ? e.detail : ""
 				});
+				if (StructKeyExists(variables.lifecycleBindingSnapshots, local.pkgKey)) {
+					$restoreContainerBindings(
+						variables.lifecycleContainer,
+						variables.lifecycleBindingSnapshots[local.pkgKey]
+					);
+					StructDelete(variables.lifecycleBindingSnapshots, local.pkgKey);
+				}
 				$rollbackPackage(local.pkgKey);
 			}
 		}
+	}
+
+	/**
+	 * Snapshot a container's bindings when it exposes $snapshotBindings.
+	 * FakeContainer and other test doubles without the method return {}.
+	 */
+	private struct function $snapshotContainerBindings(required any container) {
+		if (!IsObject(arguments.container) || !StructKeyExists(arguments.container, "$snapshotBindings")) {
+			return {};
+		}
+		return arguments.container.$snapshotBindings();
+	}
+
+	/**
+	 * Restore a container snapshot taken before register(). No-op when the
+	 * container has no $restoreBindings.
+	 */
+	private void function $restoreContainerBindings(required any container, required struct snapshot) {
+		if (!IsObject(arguments.container) || !StructKeyExists(arguments.container, "$restoreBindings")) {
+			return;
+		}
+		arguments.container.$restoreBindings(arguments.snapshot);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -1399,7 +1479,81 @@ component output="false" {
 				return {ok = false, path = "", detail = "'..' traversal is not allowed"};
 			}
 		}
-		return {ok = true, path = arguments.pkgDir & "/" & local.norm, detail = ""};
+		local.joined = arguments.pkgDir & "/" & local.norm;
+		if ($mappingPathEscapesPackage(arguments.pkgDir, local.joined)) {
+			return {ok = false, path = "", detail = "resolved path escapes the package directory"};
+		}
+		return {ok = true, path = local.joined, detail = ""};
+	}
+
+	/**
+	 * True when canonical(resolved) is not inside canonical(pkgDir).
+	 * Catches a mappings value that is a symlink out of the install tree.
+	 */
+	public boolean function $mappingPathEscapesPackage(required string pkgDir, required string resolvedPath) {
+		try {
+			local.canonPkg = CreateObject("java", "java.io.File").init(arguments.pkgDir).getCanonicalPath();
+			local.canonResolved = CreateObject("java", "java.io.File").init(arguments.resolvedPath).getCanonicalPath();
+		} catch (any e) {
+			return true;
+		}
+		local.pkg = Replace(local.canonPkg, "\", "/", "all");
+		local.resolved = Replace(local.canonResolved, "\", "/", "all");
+		if (Right(local.pkg, 1) != "/") {
+			local.pkg &= "/";
+		}
+		local.pkgRoot = Left(local.pkg, Len(local.pkg) - 1);
+		if (local.resolved == local.pkgRoot) {
+			return false;
+		}
+		return Left(local.resolved & "/", Len(local.pkg)) != local.pkg;
+	}
+
+	/**
+	 * Directory names that would add extra CreateObject segments or
+	 * traverse (`evil.nested`, `../x`) are refused.
+	 */
+	public boolean function $isSafePackageDirName(required string dirName) {
+		return REFind("^[A-Za-z0-9][A-Za-z0-9_-]*$", arguments.dirName) == 1;
+	}
+
+	/**
+	 * Manifest middleware must be a bare CFC identifier or a dotted path
+	 * under this package (`componentPrefix.dirName...`). Foreign paths
+	 * such as `wheels.Dispatch` are refused before CreateObject.
+	 */
+	public boolean function $isLocalMiddlewareComponent(required string dirName, required string componentPath) {
+		local.path = Trim(arguments.componentPath);
+		if (!Len(local.path) || Find("..", local.path)) {
+			return false;
+		}
+		if (REFind("^[A-Za-z_][A-Za-z0-9_]*$", local.path)) {
+			return true;
+		}
+		if (!REFind("^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$", local.path)) {
+			return false;
+		}
+		local.pkgPrefix = variables.componentPrefix & "." & arguments.dirName;
+		if (local.path == local.pkgPrefix || Left(local.path, Len(local.pkgPrefix) + 1) == local.pkgPrefix & ".") {
+			return true;
+		}
+		if (local.path == arguments.dirName || Left(local.path, Len(arguments.dirName) + 1) == arguments.dirName & ".") {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * `*`, `0.0.0`, and the unstamped placeholders are not a declared
+	 * compatibility list. loadIncompatiblePlugins / omitted-field
+	 * permissiveness do not apply to these tokens.
+	 */
+	public boolean function $isUndeclaredWheelsVersion(required string constraint) {
+		local.value = Trim(arguments.constraint);
+		return local.value == "*"
+			|| local.value == "0.0.0"
+			|| local.value == "0.0.0-dev"
+			|| local.value == "@build.version@";
 	}
 
 	// ---------------------------------------------------------------------------
@@ -1437,13 +1591,12 @@ component output="false" {
 			return true;
 		}
 		local.constraint = Trim(arguments.manifest.wheelsVersion);
-		// Empty string is declared-but-blank — fail closed. Omitted field
-		// (the branch above) and "*" stay permissive.
-		if (!Len(local.constraint)) {
+		// Empty / wildcard / placeholder are not a declared compat list.
+		// Omitted field (the branch above) stays permissive for existing
+		// packages that never set wheelsVersion. Runtime 0.0.0 skip below
+		// stays for unstamped local checkouts.
+		if (!Len(local.constraint) || $isUndeclaredWheelsVersion(local.constraint)) {
 			return false;
-		}
-		if (local.constraint == "*") {
-			return true;
 		}
 		local.runtime = $normalizeWheelsVersion();
 		// Unstamped dev build or caller that didn't pass a runtime version:

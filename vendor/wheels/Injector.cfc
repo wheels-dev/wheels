@@ -308,6 +308,39 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 		return structKeyExists(variables.singletonFlags, arguments.name);
 	}
 
+	/**
+	 * Snapshot of mapping tables so a failed ServiceProvider boot() can
+	 * unwind bindings written during register().
+	 */
+	public struct function $snapshotBindings() {
+		return {
+			mappings = Duplicate(variables.mappings),
+			singletonFlags = Duplicate(variables.singletonFlags),
+			requestScopedFlags = Duplicate(variables.requestScopedFlags)
+		};
+	}
+
+	/**
+	 * Restore mapping tables from $snapshotBindings() and drop singleton
+	 * cache entries that are no longer mapped.
+	 */
+	public void function $restoreBindings(required struct snapshot) {
+		variables.mappings = StructKeyExists(arguments.snapshot, "mappings")
+			? Duplicate(arguments.snapshot.mappings)
+			: {};
+		variables.singletonFlags = StructKeyExists(arguments.snapshot, "singletonFlags")
+			? Duplicate(arguments.snapshot.singletonFlags)
+			: {};
+		variables.requestScopedFlags = StructKeyExists(arguments.snapshot, "requestScopedFlags")
+			? Duplicate(arguments.snapshot.requestScopedFlags)
+			: {};
+		for (local.name in StructKeyArray(variables.singletons)) {
+			if (!StructKeyExists(variables.mappings, local.name)) {
+				StructDelete(variables.singletons, local.name);
+			}
+		}
+	}
+
 	// ---------------------------------------------------------------------------
 	// Private helpers
 	// ---------------------------------------------------------------------------
