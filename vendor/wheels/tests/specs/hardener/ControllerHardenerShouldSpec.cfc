@@ -13,13 +13,24 @@ component extends="wheels.WheelsTest" {
 		describe("B5 $callAction does not remap real render errors to ViewNotFound", () => {
 
 			beforeEach(() => {
-				// $throwErrorOrShow404Page only Throws when showErrorInformation
-				// is on; otherwise it renders the 404 page and abort — the catch
-				// never sees a typed Wheels.ViewNotFound. Pin the throw path so
-				// CI proves the types without changing production 404 behavior.
-				_priorShowError = application.wheels.showErrorInformation
-				application.wheels.showErrorInformation = true
-				params = {controller = "hardenerLifecycle", action = "noView"}
+				// Full-suite leftover request.cgi.http_accept (providesSpec
+				// writes application/json / pdf onto the shared cgi struct)
+				// makes $requestContentType() non-html, so $callAction skips
+				// auto-render and both B5 its finish without throwing.
+				// Pin HTML on params AND Accept so the missing-view path runs.
+				_priorAccept = StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "http_accept")
+					? request.cgi.http_accept
+					: ""
+				if (!StructKeyExists(request, "cgi")) {
+					request.cgi = {}
+				}
+				request.cgi.http_accept = "text/html"
+				// Prove the production Throw, not the $throwErrorOrShow404Page
+				// showErrorInformation=true path. $get reads $appKey() so set()
+				// writes the key $callAction's siblings would consult.
+				_priorShowError = g.$get("showErrorInformation")
+				g.set(showErrorInformation = false)
+				params = {controller = "hardenerLifecycle", action = "noView", format = "html"}
 				_controller = g.controller("hardenerLifecycle", params)
 				_classData = _controller.$getControllerClassData()
 				_priorLayouts = Duplicate(_classData.layouts)
@@ -27,7 +38,10 @@ component extends="wheels.WheelsTest" {
 
 			afterEach(() => {
 				_classData.layouts = _priorLayouts
-				application.wheels.showErrorInformation = _priorShowError
+				g.set(showErrorInformation = _priorShowError)
+				if (StructKeyExists(request, "cgi")) {
+					request.cgi.http_accept = _priorAccept
+				}
 			})
 
 			it("still maps a genuine missing view to ViewNotFound", () => {

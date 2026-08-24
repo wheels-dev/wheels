@@ -1,4 +1,4 @@
-- `$callAction()` no longer remaps layout or render exceptions to `Wheels.ViewNotFound` just because `action.cfm` is missing; only genuine missing-view includes become 404
+- `$callAction()` no longer remaps layout or render exceptions to `Wheels.ViewNotFound` just because `action.cfm` is missing; only genuine missing-view includes become typed `Wheels.ViewNotFound`. `$callAction()` now always Throws that type (it no longer include+aborts via `$throwErrorOrShow404Page`). `processAction()` still presents the production 404 page for ViewNotFound, so HTTP 404 for apps is unchanged.
 - `$useLayout()` keeps a chosen `usesLayout` match when a later declaration does not apply, instead of resetting to `useDefault` (layout bypass)
 - Action cache no longer stores a redirect-only empty body
 - `filterChain()` returns a copy so callers cannot mutate the live filter chain
