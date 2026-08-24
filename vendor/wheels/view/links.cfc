@@ -168,7 +168,7 @@ component {
 			// variables passed in as route arguments should not be added to the html element
 			local.skip = ListAppend(local.skip, $routeVariables(argumentCollection = arguments));
 		}
-		local.encode = IsBoolean(arguments.encode) && arguments.encode ? "attributes" : false;
+		local.encode = $coerceEncode(arguments.encode, "attributes");
 		if ($isRequestProtectedFromForgery() && ListFindNoCase("post,put,patch,delete", arguments.method)) {
 			local.content &= authenticityTokenField();
 		}
@@ -309,14 +309,7 @@ component {
 		$encodeArgsForHtml(args = arguments, keys = "prepend,prependToPage,append,appendToPage,anchorDivider");
 
 		if (arguments.showSinglePage || local.totalPages > 1) {
-			// Strip event handlers from appendToPage (parallel to prependToPage sanitization in the loop)
-			if (Len(arguments.appendToPage)) {
-				local.sanitizedAppend = reReplaceNoCase(arguments.appendToPage, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
-				local.sanitizedAppend = reReplaceNoCase(local.sanitizedAppend, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
-				local.sanitizedAppend = reReplaceNoCase(local.sanitizedAppend, 'javascript\s*:', '', 'all');
-			} else {
-				local.sanitizedAppend = arguments.appendToPage;
-			}
+			local.sanitizedAppend = $paginationSanitizeWrapper(arguments.appendToPage);
 			if (Len(arguments.prepend)) {
 				local.start &= arguments.prepend;
 			}
@@ -610,15 +603,27 @@ component {
 		return local.result;
 	}
 
-	public string function $paramsToQueryString(required any params) {
+	public string function $paramsToQueryString(required any params, boolean encode = true) {
 		if (!isStruct(arguments.params)) {
 			return arguments.params;
+		}
+		// Mixin copies can drop the declared default; missing means encode (S8).
+		// Do not read arguments.encode unless it exists (Lucee will throw).
+		local.doEncode = true;
+		if (StructKeyExists(arguments, "encode") && IsBoolean(arguments.encode) && !arguments.encode) {
+			local.doEncode = false;
 		}
 		local.queryString = "";
 		for (local.key in arguments.params) {
 			local.value = arguments.params[local.key];
 			if (!isNull(local.value) && local.value != "") {
-				local.queryString &= (Len(local.queryString) ? "&" : "") & encodeForUrl(local.key) & "=" & encodeForUrl(local.value);
+				// encode=true keeps the public helper's existing contract.
+				// $paginationLinkToArgs passes false so URLFor encodes once (S8).
+				if (local.doEncode) {
+					local.queryString &= (Len(local.queryString) ? "&" : "") & encodeForUrl(local.key) & "=" & encodeForUrl(local.value);
+				} else {
+					local.queryString &= (Len(local.queryString) ? "&" : "") & local.key & "=" & local.value;
+				}
 			}
 		}
 		return local.queryString;

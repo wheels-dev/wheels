@@ -321,8 +321,9 @@ component {
 	 *
 	 * @name Name of layout section to return content for.
 	 * @defaultValue What to display as a default if the section is not defined.
+	 * @encode Opt-in HTML encode of the stored section. Default is omitted (no encode) so layouts that store HTML keep working.
 	 */
-	public string function includeContent(string name = "body", string defaultValue = "") {
+	public string function includeContent(string name = "body", string defaultValue = "", any encode) {
 		if (StructKeyExists(arguments, "default")) {
 			arguments.defaultValue = arguments.default;
 			StructDelete(arguments, "default");
@@ -331,6 +332,10 @@ component {
 			local.rv = ArrayToList(variables.$instance.contentFor[arguments.name], Chr(10));
 		} else {
 			local.rv = arguments.defaultValue;
+		}
+		// Opt-in only. Default remains "no encode" so layouts that store HTML keep working (S10).
+		if (StructKeyExists(arguments, "encode") && IsBoolean(arguments.encode) && arguments.encode && $get("encodeHtmlTags")) {
+			local.rv = EncodeForHTML($canonicalize(local.rv));
 		}
 		return local.rv;
 	}
@@ -372,6 +377,45 @@ component {
 		if (StructKeyExists(request.wheels, "cycle") && StructKeyExists(request.wheels.cycle, arguments.name)) {
 			StructDelete(request.wheels.cycle, arguments.name);
 		}
+	}
+
+	/**
+	 * Internal function. True when `name` is a single HTML/XML attribute token.
+	 * `$tag` lowercases names but used to emit anything, including breakout
+	 * keys such as `"><img src=x onerror=alert(1)`.
+	 */
+	public boolean function $isSafeAttributeName(required string name) {
+		return ReFindNoCase("^[a-z_:][-a-z0-9_:.]*$", arguments.name) == 1;
+	}
+
+	/**
+	 * Internal function. `false` stays false. Any other encode value (true,
+	 * "attributes") becomes `whenTruthy` so helpers share one coercion.
+	 */
+	public any function $coerceEncode(required any encode, whenTruthy = true) {
+		if (IsBoolean(arguments.encode) && !arguments.encode) {
+			return false;
+		}
+		return arguments.whenTruthy;
+	}
+
+	/**
+	 * Internal function. Restricts wrapper tag names (errorElement, etc.) to
+	 * a short alphanumeric token that is not a dangerous HTML element.
+	 */
+	public string function $sanitizeHtmlTagName(required string name, string fallback = "span") {
+		if (!ReFindNoCase("^[a-z][a-z0-9]*$", arguments.name) || Len(arguments.name) > 32) {
+			return arguments.fallback;
+		}
+		if (
+			ListFindNoCase(
+				"script,iframe,object,embed,link,meta,style,svg,math,form,input,button,img,video,audio,source,frame,frameset,base,applet",
+				arguments.name
+			)
+		) {
+			return arguments.fallback;
+		}
+		return LCase(arguments.name);
 	}
 
 	/**
@@ -488,6 +532,9 @@ component {
 		}
 
 		arguments.name = LCase(arguments.name);
+		if (!$isSafeAttributeName(arguments.name)) {
+			return "";
+		}
 
 		// set standard attribute name / value to use as the default to return (e.g. name / value part of <input name="value">)
 		local.rv = " " & arguments.name & "=""";

@@ -67,7 +67,7 @@ component {
 
 		// Encode all prepend / append type arguments if specified.
 		$encodeArgsForHtml(args = arguments, keys = "prepend,append");
-		arguments.encode = IsBoolean(arguments.encode) && !arguments.encode ? false : true;
+		arguments.encode = $coerceEncode(arguments.encode, true);
 
 		// sets a flag to indicate whether we use get or post on this form, used when obfuscating params
 		request.wheels.currentFormMethod = arguments.method;
@@ -151,7 +151,18 @@ component {
 
 		// set the form's action attribute to the URL that we want to send to
 		local.encodeExcept = "";
-		if (!ReFindNoCase("^https?:\/\/", arguments.action)) {
+		local.skipCsrf = false;
+		if (ReFindNoCase("^https?:\/\/", arguments.action)) {
+			// Absolute http(s) action: do not leak the authenticity token to
+			// another origin (S4). Same-host absolute URLs still get the field.
+			local.serverName = StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "server_name")
+				? request.cgi.server_name
+				: "";
+			local.skipCsrf = !Len(local.serverName) || !$isSafeRedirectUrl(
+				url = arguments.action,
+				serverName = local.serverName
+			);
+		} else {
 			arguments.$encodeForHtmlAttribute = true;
 			arguments.action = uRLFor(argumentCollection = arguments);
 			local.encodeExcept = "action";
@@ -181,7 +192,11 @@ component {
 			encode = arguments.encode,
 			encodeExcept = local.encodeExcept
 		) & arguments.append;
-		if ($isRequestProtectedFromForgery() && ListFindNoCase("post,put,patch,delete", arguments.method)) {
+		if (
+			$isRequestProtectedFromForgery()
+			&& ListFindNoCase("post,put,patch,delete", arguments.method)
+			&& !local.skipCsrf
+		) {
 			local.rv &= authenticityTokenField();
 		}
 		if (StructKeyExists(local, "method") && local.method != "get") {
@@ -431,8 +446,9 @@ component {
 		local.rv = "";
 		arguments.label = $getFieldLabel(argumentCollection = arguments);
 		if ($formHasError(argumentCollection = arguments) && Len(arguments.errorElement)) {
+			arguments.errorElement = $sanitizeHtmlTagName(arguments.errorElement);
 			// the input has an error and should be wrapped in a tag so we need to start that wrapper tag
-			local.encode = IsBoolean(arguments.encode) && !arguments.encode ? false : true;
+			local.encode = $coerceEncode(arguments.encode, true);
 			local.rv &= $tag(name = arguments.errorElement, class = arguments.errorClass, encode = local.encode);
 		}
 		if (Len(arguments.label) && arguments.labelPlacement != "after") {
@@ -494,6 +510,7 @@ component {
 			local.rv &= arguments.appendToLabel;
 		}
 		if ($formHasError(argumentCollection = arguments) && Len(arguments.errorElement)) {
+			arguments.errorElement = $sanitizeHtmlTagName(arguments.errorElement);
 			// the input has an error and is wrapped in a tag so we need to close that wrapper tag
 			local.rv &= "</" & arguments.errorElement & ">";
 		}

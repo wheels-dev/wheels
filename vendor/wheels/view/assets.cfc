@@ -37,9 +37,9 @@ component {
 		arguments.sources = $listClean(list = arguments.sources, returnAs = "array", delim = arguments.delim);
 		local.iEnd = ArrayLen(arguments.sources);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = arguments.sources[local.i];
+			local.item = $sanitizeLocalAssetSource(arguments.sources[local.i]);
 			if (ReFindNoCase("^(https?:)?\/\/", local.item)) {
-				arguments.href = arguments.sources[local.i];
+				arguments.href = local.item;
 			} else {
 				if (Left(local.item, 1) == "/") {
 					arguments.href = $get("webPath") & Right(local.item, Len(local.item) - 1);
@@ -92,9 +92,9 @@ component {
 		arguments.sources = $listClean(list = arguments.sources, returnAs = "array", delim = arguments.delim);
 		local.iEnd = ArrayLen(arguments.sources);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = arguments.sources[local.i];
+			local.item = $sanitizeLocalAssetSource(arguments.sources[local.i]);
 			if (ReFindNoCase("^(https?:)?\/\/", local.item)) {
-				arguments.src = arguments.sources[local.i];
+				arguments.src = local.item;
 			} else {
 				if (Left(local.item, 1) == "/") {
 					arguments.src = $get("webPath") & Right(local.item, Len(local.item) - 1);
@@ -196,18 +196,31 @@ component {
 	 */
 	public string function $imageTag() {
 		local.localFile = true;
-		if (Left(arguments.source, 7) == "http://" || Left(arguments.source, 8) == "https://") {
+		if (
+			Left(arguments.source, 7) == "http://"
+			|| Left(arguments.source, 8) == "https://"
+			|| Left(arguments.source, 2) == "//"
+		) {
 			local.localFile = false;
+		} else {
+			arguments.source = $sanitizeLocalAssetSource(arguments.source);
 		}
 		if (!local.localFile) {
 			arguments.src = arguments.source;
 		} else {
 			arguments.src = $get("webPath") & $get("imagePath") & "/" & arguments.source;
 			//added this section for the "/wheels" mapping to work correctly
-			if(arguments.source CONTAINS "/wheels"){
-				local.file = expandPath(SpanExcluding(arguments.source, "?"));
-			}
-			else{
+			if (arguments.source CONTAINS "/wheels") {
+				local.file = ExpandPath(SpanExcluding(arguments.source, "?"));
+				local.wheelsRoot = ExpandPath("/wheels");
+				local.webRoot = GetDirectoryFromPath(GetBaseTemplatePath());
+				if (
+					!$isResolvedPathInside(local.file, local.wheelsRoot)
+					&& !$isResolvedPathInside(local.file, local.webRoot)
+				) {
+					local.file = local.webRoot & $get("imagePath") & "/__wheels_rejected_path__";
+				}
+			} else {
 				local.file = GetDirectoryFromPath(GetBaseTemplatePath());
 				local.file &= $get("imagePath") & "/" & SpanExcluding(arguments.source, "?");
 			}
@@ -268,6 +281,71 @@ component {
 			attributes = arguments,
 			encode = arguments.encode
 		);
+	}
+
+	/**
+	 * Collapses `.` / `..` on local asset sources and blanks javascript:/data:
+	 * schemes. Protocol-relative `//host` URLs are returned unchanged (S15).
+	 */
+	public string function $sanitizeLocalAssetSource(required string source) {
+		local.src = Trim(Replace(arguments.source, "\", "/", "all"));
+		if (!Len(local.src)) {
+			return "";
+		}
+		if (ReFindNoCase("^(javascript|data)\s*:", local.src)) {
+			return "";
+		}
+		if (ReFindNoCase("^(https?:)?\/\/", local.src)) {
+			return local.src;
+		}
+		local.absolute = Left(local.src, 1) == "/";
+		local.parts = ListToArray(local.src, "/");
+		local.out = [];
+		for (local.part in local.parts) {
+			if (local.part == "" || local.part == ".") {
+				continue;
+			}
+			if (local.part == "..") {
+				if (ArrayLen(local.out)) {
+					ArrayDeleteAt(local.out, ArrayLen(local.out));
+				}
+				continue;
+			}
+			ArrayAppend(local.out, local.part);
+		}
+		local.rv = ArrayToList(local.out, "/");
+		if (local.absolute && Len(local.rv)) {
+			local.rv = "/" & local.rv;
+		} else if (local.absolute) {
+			local.rv = "/";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * True when childPath's canonical location is the parent or a descendant.
+	 */
+	public boolean function $isResolvedPathInside(required string childPath, required string parentPath) {
+		var state = {ok = false};
+		try {
+			local.child = CreateObject("java", "java.io.File").init(arguments.childPath).getCanonicalPath();
+			local.parent = CreateObject("java", "java.io.File").init(arguments.parentPath).getCanonicalPath();
+			local.sep = CreateObject("java", "java.io.File").separator;
+			if (CompareNoCase(local.child, local.parent) == 0) {
+				state.ok = true;
+			} else {
+				local.prefix = local.parent;
+				if (Right(local.prefix, 1) != local.sep) {
+					local.prefix &= local.sep;
+				}
+				if (Len(local.child) >= Len(local.prefix) && CompareNoCase(Left(local.child, Len(local.prefix)), local.prefix) == 0) {
+					state.ok = true;
+				}
+			}
+		} catch (any e) {
+			state.ok = false;
+		}
+		return state.ok;
 	}
 
 	/**
