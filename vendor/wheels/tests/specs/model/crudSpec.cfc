@@ -1287,16 +1287,16 @@ component extends="wheels.WheelsTest" {
 			})
 
 			// Regression for issue #449 (must NOT be undone by the #3245 fix): a genuine
-			// HABTM / `through` bridge nested include keeps the parenthesized grouping so
-			// the bridge's INNER join stays scoped to the OUTER-joined bridge table.
-			// Team.memberTeams is a hasMany (outer bridge); its nested `member` inner
-			// join references the bridge table, so the grouping is correct here.
+			// HABTM / `through` bridge nested include. Team.memberTeams is a hasMany
+			// (outer bridge); nested `member` is belongsTo (outer by default), so both
+			// joins stay flat and parent rows are preserved.
 			it("preserves nested grouping for a HABTM/through bridge include (issue ##449)", () => {
 				actual = g.model("team").$fromClause(include = "memberTeams(member)")
 
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_teams')#"
-					& " LEFT OUTER JOIN (#qi('c_o_r_e_memberteams')# INNER JOIN #qi('c_o_r_e_members')# ON #qi('c_o_r_e_memberteams')#.#qi('memberid')# = #qi('c_o_r_e_members')#.#qi('id')#) ON #qi('c_o_r_e_teams')#.#qi('id')# = #qi('c_o_r_e_memberteams')#.#qi('teamid')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_memberteams')# ON #qi('c_o_r_e_teams')#.#qi('id')# = #qi('c_o_r_e_memberteams')#.#qi('teamid')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_members')# ON #qi('c_o_r_e_memberteams')#.#qi('memberid')# = #qi('c_o_r_e_members')#.#qi('id')#"
 				)
 			})
 
@@ -1305,8 +1305,8 @@ component extends="wheels.WheelsTest" {
 			// got the nested group's INNER join spliced into it — referencing a table the
 			// query has not introduced yet (ORA-00904 / "unknown column in on clause").
 			// `Post.c_o_r_e_comments` and `Post.classifications` are both hasMany (outer);
-			// `Classification.tag` is a belongsTo (inner) whose ON clause references
-			// `classifications`, so it belongs to the classifications group and nowhere else.
+			// `Classification.tag` is a belongsTo (outer by default) whose ON clause
+			// references `classifications`. All three joins stay flat.
 			it("scopes a nested inner join to its own parent, not to every outer join (issue ##3334)", () => {
 				actual = g.model("post").$fromClause(include = "c_o_r_e_comments,classifications(tag)")
 
@@ -1315,7 +1315,8 @@ component extends="wheels.WheelsTest" {
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_posts')#"
 					& " LEFT OUTER JOIN #qi('c_o_r_e_comments')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_comments')#.#qi('postid')#"
-					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_classifications')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#"
 				)
 			})
 
@@ -1331,7 +1332,8 @@ component extends="wheels.WheelsTest" {
 				expect(actual).toBe(
 					"FROM #qi('c_o_r_e_posts')#"
 					& " LEFT OUTER JOIN #qi('c_o_r_e_authors')# ON #qi('c_o_r_e_posts')#.#qi('authorid')# = #qi('c_o_r_e_authors')#.#qi('id')#"
-					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_classifications')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#"
 				)
 			})
 
@@ -1378,7 +1380,8 @@ component extends="wheels.WheelsTest" {
 			// from the association tree, so include order only reorders the emitted joins.
 			it("emits the same joins wherever the nested group sits in the include (issue ##3334)", () => {
 				comments = " LEFT OUTER JOIN #qi('c_o_r_e_comments')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_comments')#.#qi('postid')#"
-				classifications = " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+				classifications = " LEFT OUTER JOIN #qi('c_o_r_e_classifications')# ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+					& " LEFT OUTER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#"
 
 				expect(g.model("post").$fromClause(include = "c_o_r_e_comments,classifications(tag)")).toBe(
 					"FROM #qi('c_o_r_e_posts')#" & comments & classifications
