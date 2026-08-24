@@ -1,8 +1,9 @@
 /**
- * Global helper Hardener: B3 deny-all CORS default, S2 proxy proto,
- * S5 $dbinfo table interpolation, S8 cacheFileChecking file list.
+ * Global helper Hardener: B1 wildcard matcher, B2 $get denylist,
+ * B3 deny-all CORS default, S2 proxy proto, S5 $dbinfo table,
+ * S8 cacheFileChecking file list.
  *
- * B1 wildcard matcher, B2 $get denylist, S1/S3/S4/S6/S7/S9/S10 are HELD.
+ * S1/S3/S4/S6/S7/S9/S10 stay HELD.
  *
  * Directory-scoped so `wheels test --core --ci --filter=global` discovers it.
  *
@@ -28,6 +29,67 @@ component extends="wheels.WheelsTest" {
 
 			it("keeps cacheFileChecking true", function() {
 				expect(application.wheels.cacheFileChecking).toBeTrue();
+			});
+
+		});
+
+		describe("B1 $wildcardDomainMatch does not treat TLD+port as enough", function() {
+
+			it("does not match https://evil.com against https://*.example.com", function() {
+				expect(g.$wildcardDomainMatch("https://*.example.com", "https://evil.com")).toBeFalse(
+					"Reverse+SpanExcluding only compared TLD+port so evil.com matched *.example.com"
+				);
+			});
+
+			it("does not match https://notexample.com against https://*.example.com", function() {
+				expect(g.$wildcardDomainMatch("https://*.example.com", "https://notexample.com")).toBeFalse();
+			});
+
+			it("still matches a single-label subdomain of example.com", function() {
+				expect(g.$wildcardDomainMatch("https://*.example.com", "https://foo.example.com")).toBeTrue();
+			});
+
+		});
+
+		describe("B2 $get denylist covers live security keys", function() {
+
+			afterEach(function() {
+				if (StructKeyExists(request, "wheels")) {
+					StructDelete(request.wheels, "tenant");
+				}
+			});
+
+			it("does not let tenant config override live csrf, proxy, CORS, error, or datasource keys", function() {
+				request.wheels.tenant = {
+					id = "evil",
+					dataSource = "ds1",
+					config = {
+						csrfCookieEncryptionAlgorithm = "HACK-ALG",
+						csrfCookieEncryptionSecretKey = "HACK-KEY",
+						csrfCookieEncryptionEncoding = "HACK-ENC",
+						trustProxyHeaders = true,
+						allowCorsRequests = true,
+						accessControlAllowOrigin = "*",
+						accessControlAllowMethods = "HACK",
+						accessControlAllowMethodsByRoute = true,
+						accessControlAllowCredentials = true,
+						accessControlAllowHeaders = "HACK",
+						showErrorInformation = "HACK-ERR",
+						dataSourceName = "hacked_ds"
+					}
+				};
+				expect(g.$get("csrfCookieEncryptionAlgorithm")).notToBe("HACK-ALG");
+				expect(g.$get("csrfCookieEncryptionSecretKey")).notToBe("HACK-KEY");
+				expect(g.$get("csrfCookieEncryptionEncoding")).notToBe("HACK-ENC");
+				expect(g.$get("trustProxyHeaders")).toBeFalse();
+				expect(g.$get("allowCorsRequests")).toBeFalse();
+				expect(g.$get("accessControlAllowOrigin")).toBe("");
+				expect(g.$get("accessControlAllowMethods")).notToBe("HACK");
+				expect(g.$get("accessControlAllowMethodsByRoute")).toBeFalse();
+				expect(g.$get("accessControlAllowCredentials")).toBeFalse();
+				expect(g.$get("accessControlAllowHeaders")).notToBe("HACK");
+				expect(g.$get("showErrorInformation")).notToBe("HACK-ERR");
+				expect(g.$get("dataSourceName")).toBe(application.wheels.dataSourceName);
 			});
 
 		});
