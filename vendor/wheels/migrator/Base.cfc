@@ -10,6 +10,7 @@ component extends="wheels.Global"{
 	public function announce(required string message) {
 		param name="request.$wheelsMigrationOutput" default="";
 		request.$wheelsMigrationOutput = request.$wheelsMigrationOutput & arguments.message & Chr(13) & Chr(10);
+		request.$wheelsMigrationDidAnnounce = true;
 	}
 
 	public string function $getDBType(string dataSource = "") {

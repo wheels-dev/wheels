@@ -369,6 +369,7 @@ component output="false" extends="wheels.Global"{
 				local.result.output &= "#Chr(13) & Chr(10)##local.divider# " & arguments.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(arguments.migration.cfcfile)))##Chr(13) & Chr(10)#";
 				request.$wheelsMigrationOutput = "";
 				request.$wheelsMigrationDidExecute = false;
+				request.$wheelsMigrationDidAnnounce = false;
 				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
 				if (application[local.appKey].writeMigratorSQLFiles) {
 					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
@@ -378,7 +379,7 @@ component output="false" extends="wheels.Global"{
 				if (arguments.direction == "down") {
 					arguments.migration.cfc.down();
 					local.result.output &= request.$wheelsMigrationOutput;
-					if (request.$wheelsMigrationDidExecute) {
+					if ($migrationStepMutatedSchema()) {
 						$removeVersionAsMigrated(arguments.migration.version);
 					}
 				} else if (arguments.direction == "redo") {
@@ -388,7 +389,7 @@ component output="false" extends="wheels.Global"{
 				} else {
 					arguments.migration.cfc.up();
 					local.result.output &= request.$wheelsMigrationOutput;
-					if (request.$wheelsMigrationDidExecute) {
+					if ($migrationStepMutatedSchema()) {
 						$setVersionAsMigrated(arguments.migration.version, arguments.migration.name);
 					}
 				}
@@ -404,6 +405,22 @@ component output="false" extends="wheels.Global"{
 			transaction action="commit";
 		}
 		return local.result;
+	}
+
+	/**
+	 * True when the just-run up()/down() did real work. Announce-only
+	 * steps (default stubs, announce template) must not update the
+	 * version table. ORM-only migrations (model().create() with no
+	 * $execute) still count — they are not announce-only.
+	 */
+	private boolean function $migrationStepMutatedSchema() {
+		if (request.$wheelsMigrationDidExecute) {
+			return true;
+		}
+		if (request.$wheelsMigrationDidAnnounce) {
+			return false;
+		}
+		return true;
 	}
 
 	/**
