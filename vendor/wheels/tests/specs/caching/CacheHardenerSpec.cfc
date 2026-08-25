@@ -1,5 +1,5 @@
 /**
- * Hardener proofs for Cache BLOCKERs B1–B2 and SHOULDs S1–S8.
+ * Hardener proofs for Cache BLOCKERs B1–B2 and SHOULDs S1–S9.
  * Desk IDs are stable. Do not renumber.
  *
  * Directory-scoped so `wheels test --core --ci --filter=caching`
@@ -11,27 +11,15 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
-		describe("CoS lock: cache public defaults stay conservative", function() {
-
-			it("keeps cacheActions/Pages/Partials/Images/Queries off in development only", function() {
-				var src = FileRead(ExpandPath("/wheels/events/init/caching.cfm"));
-				expect(FindNoCase("application.$wheels.cacheActions = false", src)).toBeGT(0);
-				expect(FindNoCase("application.$wheels.cacheImages = false", src)).toBeGT(0);
-				expect(FindNoCase("application.$wheels.cachePages = false", src)).toBeGT(0);
-				expect(FindNoCase("application.$wheels.cachePartials = false", src)).toBeGT(0);
-				expect(FindNoCase("application.$wheels.cacheQueries = false", src)).toBeGT(0);
-				expect(FindNoCase("if (application.$wheels.environment != ""development"")", src)).toBeGT(0);
-			});
+		describe("CoS lock: cacheFileChecking and named-action time/static", function() {
 
 			it("keeps cacheFileChecking true", function() {
 				var src = FileRead(ExpandPath("/wheels/events/init/caching.cfm"));
 				expect(FindNoCase("application.$wheels.cacheFileChecking = true", src)).toBeGT(0);
 			});
 
-			it("keeps caches() empty-action wildcard and time/static defaults", function() {
-				var cachesSrc = FileRead(ExpandPath("/wheels/controller/caching.cfc"));
+			it("keeps caches() time=60 and static=false defaults when an action is named", function() {
 				var fnSrc = FileRead(ExpandPath("/wheels/events/init/functions.cfm"));
-				expect(FindNoCase("arguments.action = ""*""", cachesSrc)).toBeGT(0);
 				expect(FindNoCase("functions.caches = {time = 60, static = false}", fnSrc)).toBeGT(0);
 			});
 
@@ -61,11 +49,12 @@ component extends="wheels.WheelsTest" {
 
 				var className = first.$getControllerClassData().name;
 				var params = {controller = "hardenerLifecycle", action = "cachedShow"};
-				var expectedKey = g.$hashedKey(className, params);
-				expect(StructKeyExists(application.wheels.cache.action, expectedKey)).toBeTrue(
-					"processAction must write the action body under $hashedKey(class, params)"
+				var hashedKey = g.$hashedKey(className, params);
+				var storeKey = g.$actionCacheKey(hashedKey);
+				expect(StructKeyExists(application.wheels.cache.action, storeKey)).toBeTrue(
+					"processAction must write the action body under the session-qualified store key"
 				);
-				expect(g.$getFromCache(key = expectedKey, category = "action")).toBe("b1-write");
+				expect(g.$getFromCache(key = hashedKey, category = "action")).toBe("b1-write");
 				expect(g.$cacheCount("action")).toBe(1);
 
 				request.hardenerCachePayload = "b1-should-not-run";
@@ -73,7 +62,7 @@ component extends="wheels.WheelsTest" {
 				expect(second.processAction()).toBeTrue();
 				expect(second.response()).toBe("b1-write");
 				expect(g.$cacheCount("action")).toBe(1);
-				expect(StructKeyExists(application.wheels.cache.action, expectedKey)).toBeTrue();
+				expect(StructKeyExists(application.wheels.cache.action, storeKey)).toBeTrue();
 			});
 
 		});
@@ -136,10 +125,12 @@ component extends="wheels.WheelsTest" {
 					"session": session,
 					"variables": {}
 				};
-				var expectedKey = first.$appendToCacheKey(
-					key = g.$hashedKey(className, params),
-					appendToKey = "request.cacheProbeA",
-					scopeMap = scopeMap
+				var expectedKey = g.$actionCacheKey(
+					first.$appendToCacheKey(
+						key = g.$hashedKey(className, params),
+						appendToKey = "request.cacheProbeA",
+						scopeMap = scopeMap
+					)
 				);
 				expect(StructKeyExists(application.wheels.cache.action, expectedKey)).toBeTrue(
 					"processAction must keep the first-match appendToKey on the cache key"
@@ -155,6 +146,83 @@ component extends="wheels.WheelsTest" {
 				var third = g.controller("hardenerLifecycle", {controller = "hardenerLifecycle", action = "cachedShow"});
 				third.processAction();
 				expect(third.response()).toBe("b2-miss");
+			});
+
+		});
+
+		describe("S1 caches() requires named actions", function() {
+
+			beforeEach(function() {
+				_controller = g.controller("dummy", {controller = "dummy", action = "dummy"});
+				_controller.$clearCachableActions();
+			});
+
+			it("S1: caches() with no action throws instead of silently becoming *", function() {
+				expect(function() {
+					_controller.caches();
+				}).toThrow("Wheels.InvalidArgument");
+			});
+
+			it("S1: caches(static=true) with no action throws", function() {
+				expect(function() {
+					_controller.caches(static = true);
+				}).toThrow("Wheels.InvalidArgument");
+			});
+
+			it("S1: an explicit * is still allowed when named", function() {
+				_controller.caches(action = "*");
+				expect(_controller.$cachableActions()[1].action).toBe("*");
+			});
+
+		});
+
+		describe("S2 testing stays cache-off like development", function() {
+
+			it("S2: only non-dev/non-test environments enable cacheActions/Pages/Partials/Images/Queries", function() {
+				var src = FileRead(ExpandPath("/wheels/events/init/caching.cfm"));
+				expect(FindNoCase("ListFindNoCase(""development,testing"", application.$wheels.environment)", src)).toBeGT(0);
+				expect(FindNoCase("if (application.$wheels.environment != ""development"")", src)).toBe(0);
+			});
+
+		});
+
+		describe("S3 action cache key includes session/user", function() {
+
+			beforeEach(function() {
+				$beginActionCacheProbe();
+				if (StructKeyExists(session, "user")) {
+					_priorSessionUser = Duplicate(session.user);
+				}
+				_controller = g.controller("hardenerLifecycle", {controller = "hardenerLifecycle", action = "cachedShow"});
+				_controller.$clearCachableActions();
+				_controller.flashClear();
+				_controller.caches(action = "cachedShow");
+			});
+
+			afterEach(function() {
+				_controller.$clearCachableActions();
+				if (StructKeyExists(variables, "_priorSessionUser")) {
+					session.user = _priorSessionUser;
+					StructDelete(variables, "_priorSessionUser");
+				} else {
+					StructDelete(session, "user");
+				}
+				$endActionCacheProbe();
+			});
+
+			it("S3: params-only pages do not leak one session's body to another", function() {
+				session.user = {id = "alice"};
+				request.hardenerCachePayload = "payload-alice";
+				var alice = g.controller("hardenerLifecycle", {controller = "hardenerLifecycle", action = "cachedShow"});
+				alice.processAction();
+				expect(alice.response()).toBe("payload-alice");
+
+				session.user = {id = "bob"};
+				request.hardenerCachePayload = "payload-bob";
+				var bob = g.controller("hardenerLifecycle", {controller = "hardenerLifecycle", action = "cachedShow"});
+				bob.processAction();
+				expect(bob.response()).toBe("payload-bob");
+				expect(g.$cacheCount("action")).toBe(2);
 			});
 
 		});
@@ -224,27 +292,122 @@ component extends="wheels.WheelsTest" {
 				g.$addToCache(key = probeKey, value = "s5-body", time = 60, category = "main");
 				expect(g.$getFromCache(key = probeKey, category = "main")).toBe("s5-body");
 				g.$clearCache("main");
-				expect(g.$getFromCache(key = probeKey, category = "main")).toBeFalse();
+				expect(g.$isCacheMiss(g.$getFromCache(key = probeKey, category = "main"))).toBeTrue();
 			});
 
 		});
 
-		describe("HELD: S7 $clearCache still wipes the bucket with StructClear", function() {
+		describe("S6 clearCachableActions drops this-controller action bodies", function() {
 
-			it("S7: $clearCache keeps StructClear (do not change wipe policy)", function() {
-				var src = FileRead(ExpandPath("/wheels/global/cache.cfm"));
-				expect(FindNoCase("StructClear(application.wheels.cache[arguments.category])", src)).toBeGT(0);
-				expect(FindNoCase("StructClear(application.wheels.cache)", src)).toBeGT(0);
+			beforeEach(function() {
+				$beginActionCacheProbe();
+				_controller = g.controller("hardenerLifecycle", {controller = "hardenerLifecycle", action = "cachedShow"});
+				_controller.$clearCachableActions();
+				_controller.flashClear();
+			});
+
+			afterEach(function() {
+				_controller.$clearCachableActions();
+				$endActionCacheProbe();
+			});
+
+			it("S6: clearCachableActions removes this controller's bodies and leaves others", function() {
+				_controller.caches(action = "cachedShow");
+				request.hardenerCachePayload = "s6-body";
+				var first = g.controller("hardenerLifecycle", {controller = "hardenerLifecycle", action = "cachedShow"});
+				first.processAction();
+				expect(g.$cacheCount("action")).toBeGT(0);
+
+				application.wheels.cache.action["other-controller-decoy"] = {
+					expiresAt = DateAdd("n", 30, Now()),
+					value = "keep-other"
+				};
+
+				_controller.clearCachableActions();
+				expect(StructKeyExists(application.wheels.cache.action, "other-controller-decoy")).toBeTrue();
+				expect(application.wheels.cache.action["other-controller-decoy"].value).toBe("keep-other");
+				expect(g.$cacheCount("action")).toBe(1);
 			});
 
 		});
 
-		describe("HELD: S3 action key does not fold in session by default", function() {
+		describe("S7 $clearCache is targeted", function() {
 
-			it("S3: $hashedKey still seeds only arguments plus cgi.http_host", function() {
+			beforeEach(function() {
+				_originalCache = Duplicate(application.wheels.cache);
+			});
+
+			afterEach(function() {
+				application.wheels.cache = _originalCache;
+			});
+
+			it("S7: no-arg $clearCache() clears each category and keeps the buckets", function() {
+				application.wheels.cache.main["s7-main"] = {expiresAt = DateAdd("n", 30, Now()), value = "m"};
+				application.wheels.cache.action["s7-action"] = {expiresAt = DateAdd("n", 30, Now()), value = "a"};
+				g.$clearCache();
+				expect(application.wheels.cache).toHaveKey("main");
+				expect(application.wheels.cache).toHaveKey("action");
+				expect(IsStruct(application.wheels.cache.main)).toBeTrue();
+				expect(IsStruct(application.wheels.cache.action)).toBeTrue();
+				expect(StructCount(application.wheels.cache.main)).toBe(0);
+				expect(StructCount(application.wheels.cache.action)).toBe(0);
+			});
+
+			it("S7: $clearCache no longer wipes the parent cache struct", function() {
 				var src = FileRead(ExpandPath("/wheels/global/cache.cfm"));
-				expect(FindNoCase("StructInsert(arguments, ListLen(StructKeyList(arguments)) + 1, cgi.http_host, true)", src)).toBeGT(0);
-				expect(FindNoCase("session", src)).toBe(0);
+				expect(ReFindNoCase("StructClear\s*\(\s*application\.wheels\.cache\s*\)", src)).toBe(0);
+			});
+
+		});
+
+		describe("S8 caches(Foo) matches action foo", function() {
+
+			beforeEach(function() {
+				$beginActionCacheProbe();
+				_controller = g.controller("hardenerLifecycle", {controller = "hardenerLifecycle", action = "cachedShow"});
+				_controller.$clearCachableActions();
+				_controller.flashClear();
+			});
+
+			afterEach(function() {
+				_controller.$clearCachableActions();
+				$endActionCacheProbe();
+			});
+
+			it("S8: $cacheSettingsForAction is case-insensitive", function() {
+				_controller.caches(action = "CachedShow", time = 15);
+				var settings = _controller.$cacheSettingsForAction("cachedShow");
+				expect(IsStruct(settings)).toBeTrue();
+				expect(settings.time).toBe(15);
+			});
+
+			it("S8: processAction caches CachedShow when the action is cachedShow", function() {
+				_controller.caches(action = "CachedShow");
+				request.hardenerCachePayload = "s8-body";
+				var first = g.controller("hardenerLifecycle", {controller = "hardenerLifecycle", action = "cachedShow"});
+				first.processAction();
+				expect(first.response()).toBe("s8-body");
+				expect(g.$cacheCount("action")).toBe(1);
+			});
+
+		});
+
+		describe("S9 stored false is not a miss", function() {
+
+			afterEach(function() {
+				g.$clearCache("main");
+			});
+
+			it("S9: a cached boolean false is distinguishable from a miss", function() {
+				g.$clearCache("main");
+				expect(g.$isCacheMiss(g.$getFromCache(key = "s9-missing", category = "main"))).toBeTrue();
+
+				g.$addToCache(key = "s9-false", value = false, time = 60, category = "main");
+				var hit = g.$getFromCache(key = "s9-false", category = "main");
+				expect(g.$isCacheMiss(hit)).toBeFalse();
+				expect(IsStruct(hit)).toBeTrue();
+				expect(hit.$wheelsCacheHit).toBeTrue();
+				expect(hit.value).toBeFalse();
 			});
 
 		});

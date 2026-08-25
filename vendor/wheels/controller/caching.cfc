@@ -14,9 +14,8 @@ component {
 		$args(args = arguments, name = "caches", combine = "action/actions");
 		arguments.action = $listClean(arguments.action);
 
-		// When no actions are passed in we assume that all actions should be cacheable and indicate this with a *.
 		if (!Len(arguments.action)) {
-			arguments.action = "*";
+			Throw(type = "Wheels.InvalidArgument", message = "caches() requires one or more actions.");
 		}
 
 		local.actionsArray = ListToArray(arguments.action);
@@ -42,11 +41,11 @@ component {
 	 * @action Optional. A single action or list of actions to clear. If not provided, clears all cached actions of current controller.
 	 */
 	public void function clearCachableActions(string action = "") {
+		$dropCachedActionBodies(action = arguments.action);
 		if (!Len(arguments.action)) {
 			return $clearCachableActions();
 		}
 
-		// Only remove specific actions from the cache list
 		local.filtered = [];
 		for (local.i = 1; local.i <= ArrayLen(variables.$class.cachableActions); local.i++) {
 			local.cachableAction = variables.$class.cachableActions[local.i];
@@ -78,7 +77,10 @@ component {
 		local.cachableActions = $cachableActions();
 		local.iEnd = ArrayLen(local.cachableActions);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			if (local.cachableActions[local.i].action == arguments.action || local.cachableActions[local.i].action == "*") {
+			if (
+				CompareNoCase(local.cachableActions[local.i].action, arguments.action) == 0
+				|| local.cachableActions[local.i].action == "*"
+			) {
 				local.rv = {};
 				local.rv.time = local.cachableActions[local.i].time;
 				local.rv.static = local.cachableActions[local.i].static;
@@ -95,7 +97,47 @@ component {
 	 * Delete all cache info, only called from the test suite.
 	 */
 	public void function $clearCachableActions() {
+		$dropCachedActionBodies();
 		ArrayClear(variables.$class.cachableActions);
+	}
+
+	/**
+	 * Drops this controller's action bodies from application.wheels.cache.
+	 * Keys are recorded by $addToCache when category is action.
+	 */
+	public void function $dropCachedActionBodies(string action = "") {
+		if (!StructKeyExists(application.wheels, "cacheActionIndex")) {
+			return;
+		}
+		local.controllerName = variables.$class.name;
+		if (!StructKeyExists(application.wheels.cacheActionIndex, local.controllerName)) {
+			return;
+		}
+		local.byAction = application.wheels.cacheActionIndex[local.controllerName];
+		if (!Len(arguments.action)) {
+			for (local.indexedAction in local.byAction) {
+				for (local.key in local.byAction[local.indexedAction]) {
+					$removeFromCache(key = local.key, category = "action");
+				}
+			}
+			StructDelete(application.wheels.cacheActionIndex, local.controllerName);
+			return;
+		}
+		local.keep = {};
+		for (local.indexedAction in local.byAction) {
+			if (ListFindNoCase(arguments.action, local.indexedAction)) {
+				for (local.key in local.byAction[local.indexedAction]) {
+					$removeFromCache(key = local.key, category = "action");
+				}
+			} else {
+				local.keep[local.indexedAction] = local.byAction[local.indexedAction];
+			}
+		}
+		if (StructIsEmpty(local.keep)) {
+			StructDelete(application.wheels.cacheActionIndex, local.controllerName);
+		} else {
+			application.wheels.cacheActionIndex[local.controllerName] = local.keep;
+		}
 	}
 
 	/**

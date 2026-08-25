@@ -6,19 +6,20 @@
 		application.$wheels.cachePlugins = true;
 		application.$wheels.cacheFileChecking = true;
 
-		// Cache settings that are turned off in development mode only.
+		// Cache settings that are off in development and testing.
 		application.$wheels.cacheActions = false;
 		application.$wheels.cacheImages = false;
 		application.$wheels.cachePages = false;
 		application.$wheels.cachePartials = false;
 		application.$wheels.cacheQueries = false;
-		if (application.$wheels.environment != "development") {
+		if (!ListFindNoCase("development,testing", application.$wheels.environment)) {
 			application.$wheels.cacheActions = true;
 			application.$wheels.cacheImages = true;
 			application.$wheels.cachePages = true;
 			application.$wheels.cachePartials = true;
 			application.$wheels.cacheQueries = true;
 		}
+		application.$wheels.cacheActionIndex = {};
 
 		// Other caching settings.
 		application.$wheels.maximumItemsToCache = 5000;

@@ -45,6 +45,39 @@
 		return Hash(local.rv);
 	}
 
+	/**
+	 * Session/user identity folded into action cache keys so params-only
+	 * pages do not leak across sessions.
+	 */
+	public string function $sessionCacheIdentity() {
+		var identity = "";
+		try {
+			if (IsDefined("session.user.id")) {
+				identity = ToString(session.user.id);
+			} else if (IsDefined("session.user") && IsSimpleValue(session.user)) {
+				identity = ToString(session.user);
+			} else if (IsDefined("session.sessionid")) {
+				identity = ToString(session.sessionid);
+			}
+		} catch (any e) {
+		}
+		return identity;
+	}
+
+	/**
+	 * Store key for category=action: hashed key plus session/user identity.
+	 */
+	public string function $actionCacheKey(required string key) {
+		return arguments.key & ":" & $sessionCacheIdentity();
+	}
+
+	/**
+	 * True when $getFromCache returned a miss (boolean false), not a stored false.
+	 */
+	public boolean function $isCacheMiss(required any result) {
+		return IsBoolean(arguments.result) && !arguments.result;
+	}
+
 
 	/**
 	 * Internal function.
@@ -97,6 +130,10 @@
 		string category = "main"
 	) {
 		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
+		local.storeKey = arguments.key;
+		if (arguments.category == "action") {
+			local.storeKey = $actionCacheKey(arguments.key);
+		}
 		local.currentCount = $cacheCount();
 		if (
 			application.wheels.cacheCullPercentage > 0
@@ -142,7 +179,24 @@
 			} else {
 				local.cacheItem.value = Duplicate(arguments.value);
 			}
-			application.wheels.cache[arguments.category][arguments.key] = local.cacheItem;
+			application.wheels.cache[arguments.category][local.storeKey] = local.cacheItem;
+			if (arguments.category == "action" && StructKeyExists(variables, "$class") && StructKeyExists(variables.$class, "name")) {
+				if (!StructKeyExists(application.wheels, "cacheActionIndex")) {
+					application.wheels.cacheActionIndex = {};
+				}
+				local.owner = variables.$class.name;
+				local.actionName = "*";
+				if (StructKeyExists(variables, "params") && IsStruct(variables.params) && StructKeyExists(variables.params, "action")) {
+					local.actionName = variables.params.action;
+				}
+				if (!StructKeyExists(application.wheels.cacheActionIndex, local.owner)) {
+					application.wheels.cacheActionIndex[local.owner] = {};
+				}
+				if (!StructKeyExists(application.wheels.cacheActionIndex[local.owner], local.actionName)) {
+					application.wheels.cacheActionIndex[local.owner][local.actionName] = {};
+				}
+				application.wheels.cacheActionIndex[local.owner][local.actionName][local.storeKey] = true;
+			}
 		}
 		}
 	}
@@ -155,14 +209,21 @@
 		local.rv = false;
 		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
 			try {
-				if (StructKeyExists(application.wheels.cache[arguments.category], arguments.key)) {
-					if (Now() > application.wheels.cache[arguments.category][arguments.key].expiresAt) {
-						$removeFromCache(key = arguments.key, category = arguments.category);
+				local.storeKey = arguments.key;
+				if (arguments.category == "action") {
+					local.storeKey = $actionCacheKey(arguments.key);
+				}
+				if (StructKeyExists(application.wheels.cache[arguments.category], local.storeKey)) {
+					if (Now() > application.wheels.cache[arguments.category][local.storeKey].expiresAt) {
+						$removeFromCache(key = local.storeKey, category = arguments.category);
 					} else {
-						if (IsSimpleValue(application.wheels.cache[arguments.category][arguments.key].value)) {
-							local.rv = application.wheels.cache[arguments.category][arguments.key].value;
+						if (IsSimpleValue(application.wheels.cache[arguments.category][local.storeKey].value)) {
+							local.rv = application.wheels.cache[arguments.category][local.storeKey].value;
 						} else {
-							local.rv = Duplicate(application.wheels.cache[arguments.category][arguments.key].value);
+							local.rv = Duplicate(application.wheels.cache[arguments.category][local.storeKey].value);
+						}
+						if (IsBoolean(local.rv) && !local.rv) {
+							local.rv = {$wheelsCacheHit = true, value = false};
 						}
 					}
 				}
@@ -203,9 +264,27 @@
 	public void function $clearCache(string category = "") {
 		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
 			if (Len(arguments.category)) {
-				StructClear(application.wheels.cache[arguments.category]);
+				if (StructKeyExists(application.wheels.cache, arguments.category) && IsStruct(application.wheels.cache[arguments.category])) {
+					StructClear(application.wheels.cache[arguments.category]);
+				}
 			} else {
-				StructClear(application.wheels.cache);
+				local.categories = StructKeyArray(application.wheels.cache);
+				$clearCacheCategories(categories = local.categories);
+			}
+		}
+	}
+
+	/**
+	 * Clears each category struct in place. Hoisted so $clearCache() can
+	 * call it from the lock body without a for-loop in a finally-like shape
+	 * that Lucee 7 miscompiles (cross-engine invariant 12).
+	 */
+	public void function $clearCacheCategories(required array categories) {
+		local.iEnd = ArrayLen(arguments.categories);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.cacheCategory = arguments.categories[local.i];
+			if (StructKeyExists(application.wheels.cache, local.cacheCategory) && IsStruct(application.wheels.cache[local.cacheCategory])) {
+				StructClear(application.wheels.cache[local.cacheCategory]);
 			}
 		}
 	}

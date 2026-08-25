@@ -119,14 +119,15 @@ component extends="wheels.WheelsTest" {
 					g.$clearCache("action")
 					_controller.flashClear()
 					_controller.caches(action = "test")
-					var expectedKey = g.$hashedKey(_controller.$getControllerClassData().name, params)
+					var hashedKey = g.$hashedKey(_controller.$getControllerClassData().name, params)
+					var storeKey = g.$actionCacheKey(hashedKey)
 					result = _controller.processAction()
 
 					expect(result).toBeTrue()
-					expect(StructKeyExists(application.wheels.cache.action, expectedKey)).toBeTrue()
-					expect(Len(g.$getFromCache(key = expectedKey, category = "action"))).toBeGT(0)
+					expect(StructKeyExists(application.wheels.cache.action, storeKey)).toBeTrue()
+					expect(Len(g.$getFromCache(key = hashedKey, category = "action"))).toBeGT(0)
 
-					application.wheels.cache.action[expectedKey].value = "b1-cache-hit-probe"
+					application.wheels.cache.action[storeKey].value = "b1-cache-hit-probe"
 					var second = g.controller("test", params)
 					second.processAction()
 					expect(second.response()).toBe("b1-cache-hit-probe")
@@ -159,11 +160,17 @@ component extends="wheels.WheelsTest" {
 				expect(r[2].static).toBeTrue()
 			})
 
-			it("is specifying actions to cache with options", () => {
-				_controller.caches(static = true)
+			it("is specifying a named action to cache as static", () => {
+				_controller.caches(action = "dummy", static = true)
 				r = _controller.$cacheSettingsForAction("dummy")
 
 				expect(r.static).toBeTrue()
+			})
+
+			it("throws when caches() is called with no action", () => {
+				expect(() => {
+					_controller.caches(static = true)
+				}).toThrow("Wheels.InvalidArgument")
 			})
 		})
 

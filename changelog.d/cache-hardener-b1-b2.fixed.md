@@ -1,3 +1,9 @@
-- `$cacheSettingsForAction` now first-matches like `processAction` and keeps `appendToKey` on the returned settings
-- Action cache specs observe write, hit, and key instead of only `processAction()` returning true
+- `$cacheSettingsForAction` first-matches like `processAction` and keeps `appendToKey`
+- `caches()` with no action throws `Wheels.InvalidArgument` instead of silently becoming `*`
+- `cacheActions` / `cachePages` / `cachePartials` / `cacheImages` / `cacheQueries` stay off in development and testing
+- Action cache keys include session/user identity so params-only pages do not leak across sessions
+- `clearCachableActions` drops this controller's action bodies, not metadata only
+- `$clearCache()` clears each category in place and no longer `StructClear`s the parent bucket
+- `caches("Foo")` matches action `foo`
+- `$getFromCache` boxes a stored `false` so it is not a miss
 - `$addToCache` / `$getFromCache` / `$clearCache` take a named exclusive `wheelsCacheStore` lock
