@@ -109,10 +109,37 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("is specifying one action to cache and running it", () => {
-				_controller.caches(action = "test")
-				result = _controller.processAction("test", params)
+				var g = application.wo
+				var hadCacheActions = StructKeyExists(application.wheels, "cacheActions")
+				var priorCacheActions = hadCacheActions ? application.wheels.cacheActions : false
+				var originalForm = Duplicate(form)
+				try {
+					application.wheels.cacheActions = true
+					StructClear(form)
+					g.$clearCache("action")
+					_controller.flashClear()
+					_controller.caches(action = "test")
+					var expectedKey = g.$hashedKey(_controller.$getControllerClassData().name, params)
+					result = _controller.processAction()
 
-				expect(result).toBeTrue()
+					expect(result).toBeTrue()
+					expect(StructKeyExists(application.wheels.cache.action, expectedKey)).toBeTrue()
+					expect(Len(g.$getFromCache(key = expectedKey, category = "action"))).toBeGT(0)
+
+					application.wheels.cache.action[expectedKey].value = "b1-cache-hit-probe"
+					var second = g.controller("test", params)
+					second.processAction()
+					expect(second.response()).toBe("b1-cache-hit-probe")
+				} finally {
+					g.$clearCache("action")
+					StructClear(form)
+					StructAppend(form, originalForm, false)
+					if (hadCacheActions) {
+						application.wheels.cacheActions = priorCacheActions
+					} else {
+						StructDelete(application.wheels, "cacheActions")
+					}
+				}
 			})
 
 			it("is specifying multiple actions to cache", () => {
