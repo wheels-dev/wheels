@@ -15,7 +15,9 @@ component {
 	 * A missing policy class throws `Wheels.Policy.NotDefined` in development and
 	 * testing (loud, Pundit-style, to catch typos) and silently denies in
 	 * production — the same environment posture as `tableName()` (##3079). A
-	 * policy class that lacks a method for the action denies.
+	 * policy class that lacks a method for the action throws
+	 * `Wheels.Policy.UnknownAction` (a typo, not a deny). Reserved `init` and
+	 * `scope` still deny as `Wheels.NotAuthorized`. Only boolean `true` grants.
 	 *
 	 * [section: Controller]
 	 * [category: Authorization Functions]
@@ -42,46 +44,29 @@ component {
 		}
 		local.modelName = $policyModelName(arguments.record);
 		local.policy = $policyFor(arguments.record);
-		local.allowed = false;
-		if (
-			IsObject(local.policy)
-			&& Len(local.action)
-			&& !$isReservedPolicyAction(local.action)
-			&& StructKeyExists(local.policy, local.action)
-			&& IsCustomFunction(local.policy[local.action])
-		) {
-			// Dynamic dispatch via the built-in Invoke() — Adobe CF's compiler
-			// rejects a direct `local.policy[local.action]()` call outright
-			// (InvalidIdentifierException at compile time, verified on Adobe
-			// 2023), and extracting the function reference first drops the
-			// receiver binding on BoxLang. Invoke(instance, methodName) is the
-			// cross-engine-proven form (see QueryBuilder/ScopeChain
-			// onMissingMethod). The StructKeyExists + IsCustomFunction guard
-			// mirrors the action-dispatch gate in processing.cfc ($callAction).
-			local.allowed = Invoke(local.policy, local.action);
-			// A policy method that forgets to return yields null — on Adobe CF a
-			// null assignment deletes the variable, so re-materialize the deny.
-			if (IsNull(local.allowed)) {
-				local.allowed = false;
-			}
-		}
-		if (!IsBoolean(local.allowed) || !local.allowed) {
+		local.allowed = $invokePolicyAction(
+			policy = local.policy,
+			action = local.action,
+			modelName = local.modelName
+		);
+		if (!$policyGranted(local.allowed)) {
 			$notAuthorized(action = local.action, modelName = local.modelName);
 		}
 		return arguments.record;
 	}
 
 	/**
-	 * Non-throwing boolean policy check for conditionals and views (views run in
-	 * the controller's `variables` scope, so `can()` is available in templates
+	 * Boolean policy check for conditionals and views (views run in the
+	 * controller's `variables` scope, so `can()` is available in templates
 	 * automatically):
 	 *
 	 * ```
 	 * <cfif can("update", post)>##linkTo(text="Edit", route="editPost", key=post.id)##</cfif>
 	 * ```
 	 *
-	 * Returns `false` (deny) for a guest, for an empty record, and for actions the
-	 * policy has no method for. A missing policy class still throws
+	 * Returns `false` (deny) for a guest, for an empty record, and for a policy
+	 * method that does not return boolean `true`. A missing method throws
+	 * `Wheels.Policy.UnknownAction`. A missing policy class still throws
 	 * `Wheels.Policy.NotDefined` in development/testing so typos fail loud; in
 	 * production it returns `false`.
 	 *
@@ -93,19 +78,13 @@ component {
 	 */
 	public boolean function can(required string action, any record = "") {
 		local.policy = $policyFor(arguments.record);
-		if (
-			!IsObject(local.policy)
-			|| $isReservedPolicyAction(arguments.action)
-			|| !StructKeyExists(local.policy, arguments.action)
-			|| !IsCustomFunction(local.policy[arguments.action])
-		) {
-			return false;
-		}
-		// Dynamic dispatch via Invoke() (see authorize() for the cross-engine
-		// reasoning). The IsNull guard covers a policy method that forgets to
-		// return — null deletes the variable on Adobe CF.
-		local.allowed = Invoke(local.policy, arguments.action);
-		return !IsNull(local.allowed) && IsBoolean(local.allowed) && local.allowed;
+		return $policyGranted(
+			$invokePolicyAction(
+				policy = local.policy,
+				action = arguments.action,
+				modelName = $policyModelName(arguments.record)
+			)
+		);
 	}
 
 	/**
@@ -229,42 +208,70 @@ component {
 	}
 
 	/**
+	 * Internal function. Dispatches a policy action. Missing methods throw
+	 * `Wheels.Policy.UnknownAction`. Reserved `init`/`scope`, an empty action,
+	 * or a missing policy object return false (deny). Dynamic dispatch uses
+	 * Invoke() — Adobe CF rejects `policy[action]()` at compile time, and an
+	 * extracted function reference drops the receiver on BoxLang.
+	 */
+	public any function $invokePolicyAction(required any policy, required string action, string modelName = "") {
+		if (!IsObject(arguments.policy) || !Len(arguments.action) || $isReservedPolicyAction(arguments.action)) {
+			return false;
+		}
+		if (!StructKeyExists(arguments.policy, arguments.action) || !IsCustomFunction(arguments.policy[arguments.action])) {
+			local.target = Len(arguments.modelName) ? " on the `#arguments.modelName#` policy" : "";
+			Throw(
+				type = "Wheels.Policy.UnknownAction",
+				message = "No `#arguments.action#` method#local.target#.",
+				extendedInfo = "A missing policy method is a typo, not a deny. Declare the method to grant, or inherit the default-deny from wheels.Policy for a known action. Reserved `init` and `scope` deny as Wheels.NotAuthorized."
+			);
+		}
+		local.allowed = Invoke(arguments.policy, arguments.action);
+		if (IsNull(local.allowed)) {
+			return false;
+		}
+		return local.allowed;
+	}
+
+	/**
+	 * Internal function. Only boolean `true` grants. CFML string truthies
+	 * (`yes`, `true`) and numeric `1` serialize to something other than the
+	 * JSON boolean `true`, so they deny.
+	 */
+	public boolean function $policyGranted(required any allowed) {
+		if (IsNull(arguments.allowed)) {
+			return false;
+		}
+		return SerializeJSON(arguments.allowed) == "true";
+	}
+
+	/**
 	 * Internal function. Resolves the identity policies are evaluated against, in
 	 * order: (1) the DI service registered as `currentUser` when present, (2) the
 	 * first registered authenticator strategy that exposes a `currentUser()`
 	 * method (e.g. `wheels.auth.SessionStrategy`) and reports a non-empty
-	 * principal, (3) an empty string (guest). Apps customize by registering the
+	 * principal, (3) an empty string (guest). A throwing `currentUser` service
+	 * or authenticator strategy propagates. Apps customize by registering the
 	 * `currentUser` DI service or by overriding this method on their base
 	 * controller.
 	 */
 	public any function $currentUserForPolicy() {
-		// 1. Explicit DI registration wins.
-		try {
-			if (IsDefined("application.wheelsdi") && application.wheelsdi.containsInstance("currentUser")) {
-				return application.wheelsdi.getInstance("currentUser");
-			}
-		} catch (any e) {
-			// A broken resolver must not turn every request into a 500 — fall through to the next seam.
+		if (IsDefined("application.wheelsdi") && application.wheelsdi.containsInstance("currentUser")) {
+			return application.wheelsdi.getInstance("currentUser");
 		}
-		// 2. A configured authenticator whose strategy can report the current user.
-		try {
-			if (IsDefined("application.wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
-				local.authenticator = application.wheelsdi.getInstance("authenticator");
-				local.strategyNames = local.authenticator.getStrategyNames();
-				for (local.strategyName in local.strategyNames) {
-					local.strategy = local.authenticator.getStrategy(local.strategyName);
-					if (StructKeyExists(local.strategy, "currentUser")) {
-						local.candidate = local.strategy.currentUser();
-						if (IsStruct(local.candidate) && !StructIsEmpty(local.candidate)) {
-							return local.candidate;
-						}
+		if (IsDefined("application.wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
+			local.authenticator = application.wheelsdi.getInstance("authenticator");
+			local.strategyNames = local.authenticator.getStrategyNames();
+			for (local.strategyName in local.strategyNames) {
+				local.strategy = local.authenticator.getStrategy(local.strategyName);
+				if (StructKeyExists(local.strategy, "currentUser")) {
+					local.candidate = local.strategy.currentUser();
+					if (IsStruct(local.candidate) && !StructIsEmpty(local.candidate)) {
+						return local.candidate;
 					}
 				}
 			}
-		} catch (any e) {
-			// Session scope unavailable or authenticator misconfigured — treat as guest.
 		}
-		// 3. Guest.
 		return "";
 	}
 

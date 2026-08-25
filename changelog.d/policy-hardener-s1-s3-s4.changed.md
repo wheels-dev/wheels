@@ -1,0 +1,2 @@
+- `authorize()` / `can()` throw `Wheels.Policy.UnknownAction` when the policy has no method for the action, instead of treating a typo as a deny
+- `$currentUserForPolicy()` no longer swallows a throwing DI `currentUser` into the authenticator user, or a throwing authenticator into guest `""`

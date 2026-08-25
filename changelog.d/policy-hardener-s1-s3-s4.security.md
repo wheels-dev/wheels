@@ -1,0 +1,1 @@
+- `authorize()` / `can()` grant only when a policy method returns boolean `true`. The CFML strings `"yes"` and `"true"` no longer authorize
