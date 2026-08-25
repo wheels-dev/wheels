@@ -20,7 +20,6 @@ component output=false extends="wheels.Global"{
 		// Build query
 		cfquery(attributeCollection = args.queryAttributes) {
 			local.pos = 1;
-			local.prev = "";
 
 			for (; pos <= sqlLen; pos++) {
 				local.part = sqlArray[pos];
@@ -28,17 +27,20 @@ component output=false extends="wheels.Global"{
 				if (isStruct(part)) {
 					local.qp = $queryParams(part);
 
-					// Handle NULL for "IS NULL" or "IS NOT NULL"
-					if (
-						!isBinary(part.value) &&
-						part.value == "null" &&
-						pos > 1 &&
-						( right(prev, 2) == "IS" || right(prev, 6) == "IS NOT" )
-					) {
-						writeOutput("NULL");
-					}
-					// Handle parameter lists "(?,?,?)"
-					else if (structKeyExists(qp, "list")) {
+					// The literal string "null" after IS / IS NOT stays a bound
+					// parameter. Do not coerce that string to SQL NULL. A missing
+					// value (cfqueryparam null=true, or a CFML/Java null) is a
+					// different thing and must still bind as SQL NULL.
+					if (structKeyExists(qp, "null") && qp.null) {
+						if (args.parameterize) {
+							if (!structKeyExists(qp, "value") || IsNull(qp.value) || !Len(ToString(qp.value))) {
+								qp.value = "";
+							}
+							cfqueryParam(attributeCollection = qp);
+						} else {
+							writeOutput("NULL");
+						}
+					} else if (structKeyExists(qp, "list")) {
 						writeOutput("(");
 						if (args.parameterize) {
 							cfqueryParam(attributeCollection = qp);
@@ -66,7 +68,6 @@ component output=false extends="wheels.Global"{
 				}
 
 				writeOutput(newLine);
-				prev = part;
 			}
 
 			// LIMIT / OFFSET logic
@@ -536,7 +537,9 @@ component output=false extends="wheels.Global"{
 	 * Internal function.
 	 */
 	public struct function $queryParams(required struct settings) {
-		if (!StructKeyExists(arguments.settings, "value")) {
+		local.hasValue = StructKeyExists(arguments.settings, "value");
+		local.valueIsNull = local.hasValue && IsNull(arguments.settings.value);
+		if (!local.hasValue && !(StructKeyExists(arguments.settings, "null") && arguments.settings.null)) {
 			Throw(
 				type = "Wheels.QueryParamValue",
 				message = "The value for `cfqueryparam` cannot be determined for property `#arguments.settings.property#`.<br>This usually happens due to a syntax error in the WHERE clause (e.g., using unquoted strings or invalid values).",
@@ -545,9 +548,17 @@ component output=false extends="wheels.Global"{
 		}
 		local.rv = {};
 		local.rv.cfsqltype = arguments.settings.type;
-		local.rv.value = arguments.settings.value;
-		if (StructKeyExists(arguments.settings, "null")) {
-			local.rv.null = arguments.settings.null;
+		if (local.valueIsNull || (StructKeyExists(arguments.settings, "null") && arguments.settings.null)) {
+			// CFML/Java null and an explicit SQL-NULL flag bind as SQL NULL.
+			// Do not pass the strings "null" / "[NULL]" as the typed value —
+			// integer cfqueryparam cannot cast them.
+			local.rv.null = true;
+			local.rv.value = "";
+		} else {
+			local.rv.value = arguments.settings.value;
+			if (StructKeyExists(arguments.settings, "null")) {
+				local.rv.null = arguments.settings.null;
+			}
 		}
 		if (StructKeyExists(arguments.settings, "scale") && arguments.settings.scale > 0) {
 			local.rv.scale = arguments.settings.scale;
@@ -593,7 +604,11 @@ component output=false extends="wheels.Global"{
 		if (!StructKeyExists(arguments, "type")) {
 			arguments.type = $getValidationType(arguments.sqlType);
 		}
-		if (!ListFindNoCase("integer,float,boolean", arguments.type) || !Len(arguments.str)) {
+		if (
+			!ListFindNoCase("integer,float,boolean", arguments.type)
+			|| !Len(arguments.str)
+			|| (arguments.type == "boolean" && ListFindNoCase("yes,no", arguments.str))
+		) {
 			local.rv = "'#Replace(arguments.str, "'", "''", "all")#'";
 		} else {
 			$validateValueShape(arguments.str, arguments.type);
@@ -630,6 +645,22 @@ component output=false extends="wheels.Global"{
 				}
 				break;
 		}
+	}
+
+	public void function $throwUnknownColumnType(required string typeName) {
+		Throw(
+			type = "Wheels.UnknownColumnType",
+			message = "The column type `#arguments.typeName#` is not mapped to a CFML SQL type.",
+			extendedInfo = "Add a case for `#arguments.typeName#` to `$getType()` on this database adapter."
+		);
+	}
+
+	public void function $throwIdentityNotFound() {
+		Throw(
+			type = "Wheels.IdentityNotFound",
+			message = "Could not retrieve the generated identity for this INSERT.",
+			extendedInfo = "The driver-supplied key and the sequence / SCOPE_IDENTITY path both missed. Last-resort MAX(ROWID) and @@IDENTITY have been removed."
+		);
 	}
 
 	public void function $throwInvalidValue(required string str, required string expectedType) {

@@ -200,19 +200,21 @@ component extends="wheels.WheelsTest" {
 					expect(ArrayLen(probe.capturedSql)).toBe(0);
 				});
 
-				it("falls back to @@IDENTITY when the batch surfaces no usable resultset", () => {
+				it("throws Wheels.IdentityNotFound when the batch surfaces no usable resultset", () => {
 					var probe = CreateObject("component", "wheels.tests._assets.adapters.MSSQLProbe");
-					ArrayAppend(probe.queryResults, QueryNew("lastId", "integer", [{lastId: 7}]));
-					var rv = probe.$identitySelect(
-						queryAttributes = {},
-						result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
-						primaryKey = "id",
-						returningIdentity = QueryNew("lastId", "varchar", [])
-					);
-					expect(rv).toBeStruct();
-					expect(rv).toHaveKey("identitycol");
-					expect(rv.identitycol).toBe(7);
-					expect(probe.capturedSql[1]).toInclude("@@IDENTITY");
+					var state = {type = ""};
+					try {
+						probe.$identitySelect(
+							queryAttributes = {},
+							result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
+							primaryKey = "id",
+							returningIdentity = QueryNew("lastId", "varchar", [])
+						);
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.IdentityNotFound");
+					expect(ArrayToList(probe.capturedSql, " ")).notToInclude("@@IDENTITY");
 				});
 			});
 		});

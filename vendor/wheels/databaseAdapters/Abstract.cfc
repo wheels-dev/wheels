@@ -72,6 +72,7 @@ component extends="wheels.migrator.Base"{
 	public string function addColumnOptions(required string sql, struct options = "#StructNew()#") {
 		if (StructKeyExists(arguments.options, 'type') && arguments.options.type != 'primaryKey') {
 			if (StructKeyExists(arguments.options, 'default') && optionsIncludeDefault(argumentCollection = arguments.options)) {
+				$rejectEmptyStringDefault(arguments.options);
 				if (
 					arguments.options.default eq "NULL"
 					|| (
@@ -82,18 +83,6 @@ component extends="wheels.migrator.Base"{
 					arguments.sql = arguments.sql & " DEFAULT NULL";
 				} else if (arguments.options.type == 'boolean') {
 					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, 1, 0)#";
-				} else if (
-					arguments.options.default eq ""
-					&& ListFindNoCase("string,text,char", arguments.options.type)
-				) {
-					// Symmetric handling for all string-like types: an empty
-					// `default=""` means "no default clause" (not `DEFAULT ''`).
-					// Without this, `t.string("a", default="")` and
-					// `t.text("b", default="")` produced asymmetric DDL and
-					// the presence-check skip in validatesPresenceOf fired
-					// inconsistently between equivalent column types. See
-					// fresh-VM journal F17.
-					arguments.sql = arguments.sql;
 				} else {
 					arguments.sql = arguments.sql & " DEFAULT #quote(value = arguments.options.default, options = arguments.options)#";
 				}
@@ -107,7 +96,7 @@ component extends="wheels.migrator.Base"{
 			}
 		}
 		if (StructKeyExists(arguments.options, "afterColumn") And Len(Trim(arguments.options.afterColumn)) GT 0) {
-			arguments.sql = arguments.sql & " AFTER #arguments.options.afterColumn#";
+			arguments.sql = arguments.sql & " AFTER " & quoteColumnName(arguments.options.afterColumn);
 		}
 		return arguments.sql;
 	}
@@ -115,6 +104,27 @@ component extends="wheels.migrator.Base"{
 	// what's the purpose of this?
 	public boolean function optionsIncludeDefault(string type, default = "", boolean allowNull = true) {
 		return true;
+	}
+
+	/**
+	 * Fail-loud contract for `default=""` on string-like columns. Abstract
+	 * used to omit the DEFAULT clause; PostgreSQL used to emit `DEFAULT ''`.
+	 * Both now throw `Wheels.InvalidDefault` so the adapters cannot silently
+	 * diverge.
+	 */
+	public void function $rejectEmptyStringDefault(required struct options) {
+		if (
+			StructKeyExists(arguments.options, "default")
+			&& arguments.options.default eq ""
+			&& StructKeyExists(arguments.options, "type")
+			&& ListFindNoCase("string,text,char", arguments.options.type)
+		) {
+			Throw(
+				type = "Wheels.InvalidDefault",
+				message = "An empty string default is not allowed for #arguments.options.type# columns.",
+				extendedInfo = "Omit the default, pass a non-empty value, or use default='NULL'. Abstract used to omit the DEFAULT clause and PostgreSQL used to emit DEFAULT ''."
+			);
+		}
 	}
 
 	/**
@@ -292,20 +302,32 @@ component extends="wheels.migrator.Base"{
 		local.sql = "CONSTRAINT #quoteTableName(arguments.name)# FOREIGN KEY (#quoteColumnName(arguments.column)#) REFERENCES #quoteTableName(arguments.referenceTable)#(#quoteColumnName(arguments.referenceColumn)#)";
 		for (local.item in ListToArray("onUpdate,onDelete")) {
 			if (Len(arguments[local.item])) {
-				switch (arguments[local.item]) {
-					case "none":
-						local.sql = local.sql & " " & UCase(humanize(local.item)) & " NO ACTION";
-						break;
-					case "null":
-						local.sql = local.sql & " " & UCase(humanize(local.item)) & " SET NULL";
-						break;
-					default:
-						local.sql = local.sql & " " & UCase(humanize(local.item)) & " CASCADE";
-						break;
-				}
+				local.sql = local.sql & $referentialActionSQL(item = local.item, action = arguments[local.item]);
 			}
 		}
 		return local.sql;
+	}
+
+	/**
+	 * Maps a known onUpdate/onDelete value. Unknown values throw instead of
+	 * silently becoming CASCADE.
+	 */
+	public string function $referentialActionSQL(required string item, required string action) {
+		switch (arguments.action) {
+			case "none":
+				return " " & UCase(humanize(arguments.item)) & " NO ACTION";
+			case "null":
+				return " " & UCase(humanize(arguments.item)) & " SET NULL";
+			case "cascade":
+			case "true":
+				return " " & UCase(humanize(arguments.item)) & " CASCADE";
+			default:
+				Throw(
+					type = "Wheels.InvalidReferentialAction",
+					message = "The referential action `#arguments.action#` is not supported.",
+					extendedInfo = "Use none, null, cascade, or true. Unknown onUpdate/onDelete values used to silently become CASCADE."
+				);
+		}
 	}
 
 	/**

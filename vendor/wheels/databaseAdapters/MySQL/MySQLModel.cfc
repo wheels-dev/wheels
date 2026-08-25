@@ -88,6 +88,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			case "longtext":
 				local.rv = "cf_sql_longvarchar";
 				break;
+			default:
+				$throwUnknownColumnType(arguments.type);
+				break;
 		}
 		return local.rv;
 	}

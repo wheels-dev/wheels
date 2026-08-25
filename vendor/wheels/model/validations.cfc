@@ -787,7 +787,14 @@ component {
 		// `$shouldInvokeValidation()` skips the validation in that case — so this guard only
 		// ever fires for scopes. Treat absent as blank, which is the branch below that turns
 		// an empty numeric into `IS NULL`.
-		local.value = StructKeyExists(this, arguments.property) ? this[arguments.property] : "";
+		if (!StructKeyExists(this, arguments.property)) {
+			local.value = "";
+		} else {
+			local.value = this[arguments.property];
+			if (IsNull(local.value)) {
+				local.value = "";
+			}
+		}
 		local.part = arguments.property & "=" & variables.wheels.class.adapter.$quoteValue(
 			str = local.value,
 			type = validationTypeForProperty(arguments.property)

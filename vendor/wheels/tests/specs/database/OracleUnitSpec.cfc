@@ -136,38 +136,43 @@ component extends="wheels.WheelsTest" {
 					expect(ArrayToList(probe.capturedSql, " ")).notToInclude("MAX(ROWID)");
 				});
 
-				it("falls back to MAX(ROWID) when no identity sequence is discoverable", () => {
-					// Pre-12c schemas have no user_tab_identity_cols rows — the legacy
-					// last-resort lookup must survive for them.
+				it("throws Wheels.IdentityNotFound when no identity sequence is discoverable", () => {
 					var probe = CreateObject("component", "wheels.tests._assets.adapters.OracleProbe");
 					ArrayAppend(probe.queryResults, QueryNew("sequence_name", "varchar", []));
-					ArrayAppend(probe.queryResults, QueryNew("lastId", "integer", [{lastId: 9}]));
-					var rv = probe.$identitySelect(
-						queryAttributes = {},
-						result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
-						primaryKey = "id",
-						returningIdentity = ""
-					);
-					expect(rv).toBeStruct();
-					expect(rv).toHaveKey("lastId");
-					expect(rv.lastId).toBe(9);
-					expect(probe.capturedSql[2]).toInclude("MAX(ROWID)");
+					var state = {type = ""};
+					try {
+						probe.$identitySelect(
+							queryAttributes = {},
+							result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
+							primaryKey = "id",
+							returningIdentity = ""
+						);
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.IdentityNotFound");
+					expect(ArrayToList(probe.capturedSql, " ")).notToInclude("MAX(ROWID)");
 				});
 
-				it("rejects unsafe sequence names and falls back to MAX(ROWID)", () => {
+				it("rejects unsafe sequence names and throws Wheels.IdentityNotFound", () => {
 					// $query has no parameter binding, so the discovered sequence name is
 					// whitelisted before interpolation — anything unexpected is discarded.
 					var probe = CreateObject("component", "wheels.tests._assets.adapters.OracleProbe");
 					ArrayAppend(probe.queryResults, QueryNew("sequence_name", "varchar", [{sequence_name: "BAD;NAME"}]));
-					var rv = probe.$identitySelect(
-						queryAttributes = {},
-						result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
-						primaryKey = "id",
-						returningIdentity = ""
-					);
-					expect(rv).toBeStruct();
+					var state = {type = ""};
+					try {
+						probe.$identitySelect(
+							queryAttributes = {},
+							result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
+							primaryKey = "id",
+							returningIdentity = ""
+						);
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.IdentityNotFound");
 					expect(ArrayToList(probe.capturedSql, " ")).notToInclude("BAD;NAME");
-					expect(probe.capturedSql[2]).toInclude("MAX(ROWID)");
+					expect(ArrayToList(probe.capturedSql, " ")).notToInclude("MAX(ROWID)");
 				});
 			});
 		});

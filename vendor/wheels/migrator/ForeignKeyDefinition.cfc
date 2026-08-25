@@ -78,17 +78,7 @@ component extends="Base" {
 	public string function $appendReferentialActions(required string sql) {
 		for (local.item in ListToArray("onUpdate,onDelete")) {
 			if (StructKeyExists(this, local.item) && Len(this[local.item])) {
-				switch (this[local.item]) {
-					case "none":
-						arguments.sql &= " " & UCase(humanize(local.item)) & " NO ACTION";
-						break;
-					case "null":
-						arguments.sql &= " " & UCase(humanize(local.item)) & " SET NULL";
-						break;
-					default:
-						arguments.sql &= " " & UCase(humanize(local.item)) & " CASCADE";
-						break;
-				}
+				arguments.sql &= this.adapter.$referentialActionSQL(item = local.item, action = this[local.item]);
 			}
 		}
 		return arguments.sql;

@@ -1,0 +1,2 @@
+- Database adapters no longer coerce the bound string `"null"` after `IS` / `IS NOT` to SQL NULL, drop MySQL TEXT/float `DEFAULT`, leave boolean `yes`/`no` unquoted, advertise fake SQLite advisory locks, default unknown foreign-key actions to `CASCADE`, emit asymmetric empty-string defaults, map unknown column types silently, or fall back to Oracle `MAX(ROWID)` / SQL Server `@@IDENTITY`
+- The unquoted SQL keyword `NULL` and a CFML/Java null still bind as SQL NULL (so an absent uniqueness-scope property does not send the string `[NULL]` to an integer `cfqueryparam`)
