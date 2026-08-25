@@ -2,7 +2,8 @@
  * Authorization policy layer. Desk IDs S1–S9 stay locked.
  * PROVEN: S2 empty-id fail-closed, S5 production InvalidCollection, S6 DI/authenticator
  * identity, S7 guest "", S8 production 403, S9 reserved action=scope/init.
- * HELD: S1 unknown action still throws (no default-deny flip), S3 catch-to-guest,
+ * HELD: S1 unknown action still throws (no default-deny flip), S3 first-catch
+ * wrong-user failover (broken DI currentUser can still hit authenticator),
  * S4 loose CF boolean grant.
  *
  * Directory-scoped so `wheels test --core --ci --filter=Authorization` discovers
@@ -34,6 +35,10 @@ component extends="wheels.WheelsTest" {
 				application.wheels.policyPath = $savedPolicyPath
 				application.wheels.showErrorInformation = $savedShowError
 				StructDelete(request, "$policyTestUser")
+				try {
+					g.$header(statusCode = 200)
+				} catch (any e) {
+				}
 			})
 
 			describe("wheels.Policy base class", () => {
@@ -163,6 +168,10 @@ component extends="wheels.WheelsTest" {
 
 					expect(denied.allowed).toBeFalse()
 					expect(denied.status).toBe(403)
+					try {
+						g.$header(statusCode = 200)
+					} catch (any e) {
+					}
 				})
 
 				it("S9: authorize() with action=scope throws Wheels.NotAuthorized and does not Invoke scope", () => {
