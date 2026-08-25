@@ -1,0 +1,9 @@
+- `$cacheSettingsForAction` first-matches like `processAction` and keeps `appendToKey`
+- `caches()` with no action throws `Wheels.InvalidArgument` instead of silently becoming `*`
+- `cacheActions` / `cachePages` / `cachePartials` / `cacheImages` / `cacheQueries` stay off in development and testing
+- Action cache keys include session/user identity so params-only pages do not leak across sessions
+- `clearCachableActions` drops this controller's action bodies, not metadata only
+- `$clearCache()` clears each category in place and no longer `StructClear`s the parent bucket
+- `caches("Foo")` matches action `foo`
+- `$getFromCache` returns a stored `false` (or other falsey payload) as a hit. A miss is only absent, expired, or culled. `$isCacheMiss()` reads the last lookup, not the value
+- `$addToCache` / `$getFromCache` / `$clearCache` take a named exclusive `wheelsCacheStore` lock
