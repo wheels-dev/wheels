@@ -1,3 +1,13 @@
+/**
+ * Authorization policy layer. Desk IDs S1–S9 stay locked.
+ * PROVEN: S2 empty-id fail-closed, S5 production InvalidCollection, S6 DI/authenticator
+ * identity, S7 guest "", S8 production 403, S9 reserved action=scope/init.
+ * HELD: S1 unknown action still throws (no default-deny flip), S3 catch-to-guest,
+ * S4 loose CF boolean grant.
+ *
+ * Directory-scoped so `wheels test --core --ci --filter=Authorization` discovers
+ * this folder (a single-file directory= scope finds 0 bundles).
+ */
 component extends="wheels.WheelsTest" {
 
 	function run() {
@@ -47,6 +57,25 @@ component extends="wheels.WheelsTest" {
 					expect(g.model("post").count()).toBeGT(0)
 					expect(scoped.count()).toBe(0)
 					expect(scoped.findAll().recordCount).toBe(0)
+				})
+
+				it("S2: empty resolved ids never become a matching-all or invalid-SQL whereIn", () => {
+					spy = CreateObject("component", "wheels.tests._assets.policies.WhereInSpy")
+					basePolicy = CreateObject("component", "wheels.Policy").init(user = {id = 1}, record = "")
+					scoped = basePolicy.scope(spy)
+
+					expect(g.model("post").count()).toBeGT(0)
+					expect(spy.whereInCalls).toBe(0)
+					expect(scoped.count()).toBe(0)
+					expect(scoped.findAll().recordCount).toBe(0)
+				})
+
+				it("S7: Policy.cfc missing user is the guest empty string", () => {
+					guestPolicy = CreateObject("component", "wheels.Policy").init()
+
+					expect(guestPolicy.currentUser()).toBe("")
+					expect(IsSimpleValue(guestPolicy.currentUser())).toBeTrue()
+					expect(IsObject(guestPolicy.currentUser())).toBeFalse()
 				})
 
 				it("default-denies through an app policy that overrides nothing", () => {
@@ -116,6 +145,38 @@ component extends="wheels.WheelsTest" {
 					request.$policyTestUser = {id = author.id}
 
 					expect(() => _controller.authorize(record = false, action = "update")).toThrow(
+						type = "Wheels.NotAuthorized"
+					)
+				})
+
+				it("S8: authorize() denial in production is HTTP 403, not a silent allow", () => {
+					application.wheels.showErrorInformation = false
+					request.$policyTestUser = {id = otherAuthor.id}
+					denied = {allowed = false, status = 0, type = ""}
+					try {
+						_controller.authorize(record = post, action = "update")
+						denied.allowed = true
+					} catch (any e) {
+						denied.type = e.type
+					}
+					denied.status = Val(g.$statusCode())
+
+					expect(denied.allowed).toBeFalse()
+					expect(denied.status).toBe(403)
+				})
+
+				it("S9: authorize() with action=scope throws Wheels.NotAuthorized and does not Invoke scope", () => {
+					request.$policyTestUser = {id = author.id}
+
+					expect(() => _controller.authorize(record = post, action = "scope")).toThrow(
+						type = "Wheels.NotAuthorized"
+					)
+				})
+
+				it("S9: authorize() with action=init throws Wheels.NotAuthorized and does not Invoke init", () => {
+					request.$policyTestUser = {id = author.id}
+
+					expect(() => _controller.authorize(record = post, action = "init")).toThrow(
 						type = "Wheels.NotAuthorized"
 					)
 				})
@@ -190,6 +251,30 @@ component extends="wheels.WheelsTest" {
 
 					expect(() => _controller.policyScope(builder)).toThrow(type = "Wheels.Policy.InvalidCollection")
 				})
+
+				it("S5: production InvalidCollection fail-closes without calling whereIn", () => {
+					application.wheels.showErrorInformation = false
+					spy = CreateObject("component", "wheels.tests._assets.policies.WhereInSpy")
+					scoped = _controller.policyScope(spy)
+
+					expect(spy.whereInCalls).toBe(0)
+					expect(scoped.count()).toBe(0)
+				})
+
+				it("S5: production InvalidCollection does not fall through to whereIn on a collection without whereIn", () => {
+					application.wheels.showErrorInformation = false
+					bad = {notAModel = true}
+					state = {threw = false, count = -1}
+					try {
+						scoped = _controller.policyScope(bad)
+						state.count = scoped.count()
+					} catch (any e) {
+						state.threw = true
+					}
+
+					expect(state.threw).toBeFalse()
+					expect(state.count).toBe(0)
+				})
 			})
 
 			describe("missing policy class", () => {
@@ -226,6 +311,49 @@ component extends="wheels.WheelsTest" {
 					expect(plain.$currentUserForPolicy()).toBe("")
 					expect(plain.can("update", post)).toBeFalse()
 					expect(plain.can("show", post)).toBeTrue()
+				})
+
+				it("S6: policy identity comes from the DI currentUser service", () => {
+					savedDi = application.wheelsdi
+					di = new wheels.Injector(binderPath = "wheels.tests._assets.di.TestBindings")
+					di.map("currentUser").to("wheels.tests._assets.policies.CurrentUserStub")
+					application.wheelsdi = di
+					identity = {id = "", name = ""}
+					try {
+						plain = g.controller("test", {controller = "test", action = "show"})
+						resolved = plain.$currentUserForPolicy()
+						identity.id = resolved.id
+						identity.name = resolved.name
+					} finally {
+						application.wheelsdi = savedDi
+					}
+
+					expect(identity.id).toBe(9001)
+					expect(identity.name).toBe("policy-di-user")
+				})
+
+				it("S6: policy identity comes from the authenticator strategy currentUser()", () => {
+					savedDi = application.wheelsdi
+					di = new wheels.Injector(binderPath = "wheels.tests._assets.di.TestBindings")
+					di.map("authenticator").to("wheels.auth.Authenticator").asSingleton()
+					application.wheelsdi = di
+					identity = {id = "", name = ""}
+					try {
+						auth = di.getInstance("authenticator")
+						strategy = new wheels.auth.SessionStrategy()
+						strategy.login(principal = {id = 4242, name = "policy-auth-user"})
+						auth.registerStrategy(name = "session", strategy = strategy)
+						plain = g.controller("test", {controller = "test", action = "show"})
+						resolved = plain.$currentUserForPolicy()
+						identity.id = resolved.id
+						identity.name = resolved.name
+					} finally {
+						application.wheelsdi = savedDi
+						StructDelete(session, "wheels")
+					}
+
+					expect(identity.id).toBe(4242)
+					expect(identity.name).toBe("policy-auth-user")
 				})
 			})
 
