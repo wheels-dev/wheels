@@ -1,3 +1,7 @@
+/**
+ * InjectorInterface contract specs. S6 skip-missing is proven here and
+ * again under tests/specs/injector so --filter=injector also covers it.
+ */
 component extends="wheels.WheelsTest" {
 
 	function run() {
@@ -73,6 +77,26 @@ component extends="wheels.WheelsTest" {
 					// and, if it ever did, would clobber the live container.
 					var di = new wheels.Injector(binderPath="wheels.Bindings");
 					expect(di.containsInstance("InjectorInterface")).toBeFalse();
+				});
+
+				it("S6: resolve-all skips names that are not mapped", () => {
+					var di = new wheels.Injector(binderPath="wheels.Bindings");
+					var names = [
+						"ModelFinderInterface",
+						"InjectorInterfaceHardenerMissingKey"
+					];
+					var result = {resolved = 0, skipped = 0};
+					for (var name in names) {
+						if (di.containsInstance(name)) {
+							di.getInstance(name);
+							result.resolved = result.resolved + 1;
+						} else {
+							result.skipped = result.skipped + 1;
+						}
+					}
+					expect(result.resolved).toBe(1);
+					expect(result.skipped).toBe(1);
+					expect(di.containsInstance("InjectorInterfaceHardenerMissingKey")).toBeFalse();
 				});
 
 				it("all interface bindings resolve to real components", () => {
