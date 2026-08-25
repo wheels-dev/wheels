@@ -71,10 +71,6 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("reproduces the AWS-documented SigV4 GET Object header-auth test vector", function() {
-					// Official example from AWS "Authenticating Requests: Using the
-					// Authorization Header (AWS Signature Version 4)". Same credentials
-					// and timestamp as the presigned-GET vector; Range is part of the
-					// published canonical request.
 					var signer = new wheels.storage.S3Signer(
 						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
 						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
@@ -165,8 +161,6 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("follows a symlink under root to a file outside (Find('..') does not see the hop)", function() {
-					// DirectoryDelete follows symlinks, so the link must be removed
-					// before afterEach wipes the root. Find("..") does not see this hop.
 					var outside = GetTempDirectory() & "wheels-storage-outside-" & CreateUUID();
 					var linkPath = ctx.root & "/link";
 					DirectoryCreate(outside);

@@ -146,8 +146,6 @@ component output="false" {
 		local.signedHeaderList = "host;x-amz-content-sha256;x-amz-date";
 
 		if (Len(arguments.range)) {
-			// Official AWS GET Object header-auth vector includes Range; insert
-			// in sort order without changing the empty-range canonical request.
 			local.canonicalHeaders = "host:" & variables.host & Chr(10)
 				& "range:" & arguments.range & Chr(10)
 				& "x-amz-content-sha256:" & local.payloadHash & Chr(10)
