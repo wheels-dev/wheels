@@ -70,6 +70,26 @@ component extends="wheels.WheelsTest" {
 					expect(headers.Authorization).toInclude("Signature=");
 				});
 
+				it("includes x-amz-acl in the signed header set when acl is passed", function() {
+					var signer = new wheels.storage.S3Signer(
+						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
+						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+						region = "us-east-1",
+						bucket = "examplebucket"
+					);
+					var headers = signer.signedHeaders(
+						method = "PUT",
+						key = "a.txt",
+						payload = "x",
+						amzDate = "20130524T000000Z",
+						acl = "public-read"
+					);
+
+					expect(headers).toHaveKey("x-amz-acl");
+					expect(headers["x-amz-acl"]).toBe("public-read");
+					expect(headers.Authorization).toInclude("SignedHeaders=host;x-amz-acl;x-amz-content-sha256;x-amz-date");
+				});
+
 				it("reproduces the AWS-documented SigV4 GET Object header-auth test vector", function() {
 					var signer = new wheels.storage.S3Signer(
 						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
@@ -143,21 +163,26 @@ component extends="wheels.WheelsTest" {
 					}).toThrow("Wheels.Storage.InvalidKey");
 				});
 
-				it("resolves empty and slash-only keys as root concatenations, not InvalidKey", function() {
-					var expectedRoot = REReplace(Replace(ctx.root, "\", "/", "all"), "/+$", "");
-					expect(disk.$resolve("")).toBe(expectedRoot & "/");
-					expect(disk.$resolve("/")).toBe(expectedRoot & "//");
-					expect(disk.$resolve("///")).toBe(expectedRoot & "////");
+				it("throws InvalidKey for empty and slash-only keys", function() {
+					expect(function() {
+						disk.$resolve("");
+					}).toThrow("Wheels.Storage.InvalidKey");
+					expect(function() {
+						disk.$resolve("/");
+					}).toThrow("Wheels.Storage.InvalidKey");
+					expect(function() {
+						disk.$resolve("///");
+					}).toThrow("Wheels.Storage.InvalidKey");
 
 					expect(function() {
 						disk.get("");
-					}).toThrow("Wheels.Storage.NotFound");
+					}).toThrow("Wheels.Storage.InvalidKey");
 					expect(function() {
-						disk.get("/");
-					}).toThrow("Wheels.Storage.NotFound");
+						disk.put(key = "", content = "x");
+					}).toThrow("Wheels.Storage.InvalidKey");
 					expect(function() {
-						disk.get("///");
-					}).toThrow("Wheels.Storage.NotFound");
+						disk.put(key = "/", content = "x");
+					}).toThrow("Wheels.Storage.InvalidKey");
 				});
 
 				it("follows a symlink under root to a file outside (Find('..') does not see the hop)", function() {
@@ -186,6 +211,20 @@ component extends="wheels.WheelsTest" {
 					expect(disk.url("a/b.png")).toBe("/uploads/a/b.png");
 				});
 
+				it("rfc3986-encodes spaces and reserved characters in url() and signedUrl()", function() {
+					expect(disk.url("my docs/q3 report.pdf")).toBe("/uploads/my%20docs/q3%20report.pdf");
+					expect(disk.url("a+b*.txt")).toBe("/uploads/a%2Bb%2A.txt");
+
+					var signed = disk.signedUrl(key = "my docs/q3 report.pdf", expiresIn = 600);
+					expect(signed).toInclude("/uploads/my%20docs/q3%20report.pdf?");
+					expect(signed).toInclude("signature=");
+
+					var qs = ListLast(signed, "?");
+					var sig = ReReplace(qs, ".*signature=([a-f0-9]+).*", "\1");
+					var exp = Val(ReReplace(qs, ".*expires=([0-9]+).*", "\1"));
+					expect(disk.verifySignature(key = "my docs/q3 report.pdf", expires = exp, signature = sig)).toBeTrue();
+				});
+
 				it("builds a signed url whose token round-trips through verifySignature", function() {
 					var signed = disk.signedUrl(key = "a/b.png", expiresIn = 600);
 					expect(signed).toInclude("/uploads/a/b.png?expires=");
@@ -202,11 +241,28 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("rejects an expired signed url", function() {
-					var signed = disk.signedUrl(key = "a/b.png", expiresIn = -10);
-					var qs = ListLast(signed, "?");
-					var sig = ReReplace(qs, ".*signature=([a-f0-9]+).*", "\1");
-					var exp = Val(ReReplace(qs, ".*expires=([0-9]+).*", "\1"));
+					var exp = 1;
+					var sig = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
 					expect(disk.verifySignature(key = "a/b.png", expires = exp, signature = sig)).toBeFalse();
+				});
+
+				it("throws InvalidExpiresIn for non-positive or over-max expiresIn", function() {
+					expect(function() {
+						disk.signedUrl(key = "a/b.png", expiresIn = 0);
+					}).toThrow("Wheels.Storage.InvalidExpiresIn");
+					expect(function() {
+						disk.signedUrl(key = "a/b.png", expiresIn = -10);
+					}).toThrow("Wheels.Storage.InvalidExpiresIn");
+					expect(function() {
+						disk.signedUrl(key = "a/b.png", expiresIn = 604801);
+					}).toThrow("Wheels.Storage.InvalidExpiresIn");
+				});
+
+				it("accepts expiresIn at the documented bounds", function() {
+					var minSigned = disk.signedUrl(key = "a/b.png", expiresIn = 1);
+					expect(minSigned).toInclude("expires=");
+					var maxSigned = disk.signedUrl(key = "a/b.png", expiresIn = 604800);
+					expect(maxSigned).toInclude("expires=");
 				});
 
 				it("binds contentDisposition into the signed-url token", function() {
@@ -284,6 +340,25 @@ component extends="wheels.WheelsTest" {
 					expect(presigned).toInclude("X-Amz-Signature=");
 				});
 
+				it("throws InvalidExpiresIn for non-positive or over-max expiresIn", function() {
+					expect(function() {
+						s3.signedUrl(key = "avatars/1.png", expiresIn = 0);
+					}).toThrow("Wheels.Storage.InvalidExpiresIn");
+					expect(function() {
+						s3.signedUrl(key = "avatars/1.png", expiresIn = -10);
+					}).toThrow("Wheels.Storage.InvalidExpiresIn");
+					expect(function() {
+						s3.signedUrl(key = "avatars/1.png", expiresIn = 604801);
+					}).toThrow("Wheels.Storage.InvalidExpiresIn");
+				});
+
+				it("accepts expiresIn at the documented SigV4 bounds", function() {
+					var minSigned = s3.signedUrl(key = "avatars/1.png", expiresIn = 1);
+					expect(minSigned).toInclude("X-Amz-Expires=1");
+					var maxSigned = s3.signedUrl(key = "avatars/1.png", expiresIn = 604800);
+					expect(maxSigned).toInclude("X-Amz-Expires=604800");
+				});
+
 				it("requires bucket/region/credentials", function() {
 					expect(function() {
 						new wheels.storage.drivers.S3Disk(config = {bucket = "b", region = "us-east-1"});
@@ -340,15 +415,47 @@ component extends="wheels.WheelsTest" {
 
 			describe("S3Disk delete()", function() {
 
-				it("returns true after a 2xx, including a second delete of the same missing key", function() {
+				it("HEADs first and returns false when the object is missing", function() {
 					var stubDisk = new wheels.tests._assets.storage.S3DiskDeleteStub(config = {
 						bucket = "myapp",
 						region = "us-east-1",
 						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
 						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 					});
-					expect(stubDisk.delete("gone.txt")).toBeTrue();
-					expect(stubDisk.delete("gone.txt")).toBeTrue();
+					expect(stubDisk.delete("gone.txt")).toBeFalse();
+					expect(stubDisk.lastRequest().method).toBe("HEAD");
+				});
+
+				it("deletes an existing object and returns true", function() {
+					var stubDisk = new wheels.tests._assets.storage.S3DiskDeleteStub(config = {
+						bucket = "myapp",
+						region = "us-east-1",
+						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
+						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+					});
+					stubDisk.seed("here.txt");
+					expect(stubDisk.delete("here.txt")).toBeTrue();
+					expect(stubDisk.lastRequest().method).toBe("DELETE");
+					expect(stubDisk.delete("here.txt")).toBeFalse();
+				});
+
+			});
+
+			describe("S3Disk put() ACL", function() {
+
+				it("sends x-amz-acl private by default and public-read for visibility=public", function() {
+					var stubDisk = new wheels.tests._assets.storage.S3DiskDeleteStub(config = {
+						bucket = "myapp",
+						region = "us-east-1",
+						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
+						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+					});
+					stubDisk.put(key = "a.txt", content = "x");
+					expect(stubDisk.lastRequest().headers["x-amz-acl"]).toBe("private");
+
+					stubDisk.put(key = "b.txt", content = "x", visibility = "public");
+					expect(stubDisk.lastRequest().headers["x-amz-acl"]).toBe("public-read");
+					expect(stubDisk.lastRequest().headers.Authorization).toInclude("SignedHeaders=host;x-amz-acl;x-amz-content-sha256;x-amz-date");
 				});
 
 			});
