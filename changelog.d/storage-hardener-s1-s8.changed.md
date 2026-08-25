@@ -1,0 +1,2 @@
+- `S3Signer.signedHeaders()` accepts an optional `range` argument so the official AWS GET Object header-auth vector can be pinned. The no-range canonical request is unchanged
+- LocalDisk `$resolve` and S3Disk `$request` are public so tests can call and override them. `S3Disk.delete()` still returns true after any 2xx
