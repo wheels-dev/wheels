@@ -148,6 +148,10 @@ component output="false" extends="wheels.Global" {
 	/**
 	 * Idempotent seed helper — creates a record only if a matching one doesn't already exist.
 	 *
+	 * Unique values are bound through findOne(parameterize=true) — not
+	 * quote-escaped into the WHERE string — so an apostrophe (O'Brien) still
+	 * matches the stored row on a later call.
+	 *
 	 * @modelName  The model name (e.g., "Role", "User")
 	 * @uniqueProperties  Comma-delimited list of property names that define uniqueness (used for the WHERE check)
 	 * @properties  Struct of ALL properties for the new record (must include the unique properties)
@@ -159,8 +163,17 @@ component output="false" extends="wheels.Global" {
 	) {
 		local.modelObj = model(arguments.modelName);
 
-		// Build WHERE clause from unique properties
+		// Build a uniqueness WHERE with `?` placeholders and bind the raw
+		// unique values. findOne()'s live contract accepts `parameterize` as
+		// true / a property list / a parameter count — not a value array —
+		// and `$addWhereClauseParameters()` fills cfqueryparam from quoted
+		// literals in the WHERE string. Quote-escaping (`Replace(val, "'",
+		// "''")`) doubled apostrophes in that extracted bind, so a second
+		// seedOnce("O'Brien") missed the stored row and created again.
+		// Resolve each `?` to a quoted literal WITHOUT doubling so the
+		// extractor binds the original value (O'Brien kill-case).
 		local.whereParts = [];
+		local.boundValues = [];
 		local.uniqueList = ListToArray(arguments.uniqueProperties);
 		for (local.prop in local.uniqueList) {
 			local.prop = Trim(local.prop);
@@ -177,7 +190,8 @@ component output="false" extends="wheels.Global" {
 					message = "seedOnce(): the value of unique property '#local.prop#' must be a simple value (string, number, date or boolean) so it can be used in the uniqueness check."
 				);
 			}
-			ArrayAppend(local.whereParts, "#local.prop# = '#Replace(local.val, "'", "''", "all")#'");
+			ArrayAppend(local.whereParts, "#local.prop# = ?");
+			ArrayAppend(local.boundValues, local.val);
 		}
 		local.whereClause = ArrayToList(local.whereParts, " AND ");
 
@@ -189,8 +203,22 @@ component output="false" extends="wheels.Global" {
 			);
 		}
 
-		// Check for existing record
-		local.existing = local.modelObj.findOne(where = local.whereClause);
+		// Split on the original placeholders once and rejoin with quoted
+		// values so a substituted value that itself contains `?` cannot
+		// absorb a later placeholder (same rebuild as ScopeChain.$mergeSpecs).
+		local.clauseParts = ListToArray(local.whereClause, "?", true);
+		local.resolvedWhere = local.clauseParts[1];
+		local.iEnd = ArrayLen(local.clauseParts);
+		for (local.i = 2; local.i <= local.iEnd; local.i++) {
+			local.resolvedWhere &= "'" & local.boundValues[local.i - 1] & "'";
+			local.resolvedWhere &= local.clauseParts[local.i];
+		}
+
+		// Check for existing record — bind via findOne's parameterize path
+		local.existing = local.modelObj.findOne(
+			where = local.resolvedWhere,
+			parameterize = true
+		);
 
 		if (IsObject(local.existing)) {
 			this.totalSkipped++;
@@ -241,6 +269,11 @@ component output="false" extends="wheels.Global" {
 	 * [string]" — created zero rows, yet still returned success=true and the
 	 * CLI printed "Seeding completed." with exit 0.
 	 *
+	 * The write is transactional (same pattern as runSeeds): a thrown error OR
+	 * any failed model entry rolls back the entire generate run so a mixed
+	 * list cannot leave rows. Totals still report the in-transaction counts
+	 * after rollback, matching runSeeds.
+	 *
 	 * @models Comma-delimited list of model names. When blank, every *.cfc under
 	 *         /app/models (excluding _-prefixed files and the framework's
 	 *         parent Model.cfc base class) is used.
@@ -267,46 +300,66 @@ component output="false" extends="wheels.Global" {
 			return result;
 		}
 
-		for (var modelName in modelList) {
+		transaction action="begin" {
 			try {
-				var modelInstance = model(modelName);
-				// $classData().properties is a STRUCT keyed by property name —
-				// each value is the property's metadata struct. Iterate the keys.
-				var properties = modelInstance.$classData().properties;
-				var seededCount = 0;
+				for (var modelName in modelList) {
+					try {
+						var modelInstance = model(modelName);
+						// $classData().properties is a STRUCT keyed by property name —
+						// each value is the property's metadata struct. Iterate the keys.
+						var properties = modelInstance.$classData().properties;
+						var seededCount = 0;
 
-				for (var i = 1; i <= arguments.count; i++) {
-					var record = {};
-					for (var propName in properties) {
-						if (propName != "id" && !ListFindNoCase("createdAt,updatedAt,deletedAt", propName)) {
-							var propType = StructKeyExists(properties[propName], "type") ? properties[propName].type : "string";
-							record[propName] = $generateTestData(propName, propType, i);
+						for (var i = 1; i <= arguments.count; i++) {
+							var record = {};
+							for (var propName in properties) {
+								if (propName != "id" && !ListFindNoCase("createdAt,updatedAt,deletedAt", propName)) {
+									var propType = StructKeyExists(properties[propName], "type") ? properties[propName].type : "string";
+									record[propName] = $generateTestData(propName, propType, i);
+								}
+							}
+							var newRecord = modelInstance.new(record);
+							if (newRecord.save()) {
+								seededCount++;
+							}
 						}
-					}
-					var newRecord = modelInstance.new(record);
-					if (newRecord.save()) {
-						seededCount++;
+
+						var entrySuccess = (seededCount == arguments.count);
+						ArrayAppend(result.seeded, {
+							model = modelName,
+							count = seededCount,
+							success = entrySuccess
+						});
+						result.totalCreated += seededCount;
+						if (!entrySuccess) {
+							result.totalFailed++;
+						}
+					} catch (any modelError) {
+						ArrayAppend(result.seeded, {
+							model = modelName,
+							count = 0,
+							success = false,
+							error = modelError.message
+						});
+						result.totalFailed++;
 					}
 				}
 
-				var entrySuccess = (seededCount == arguments.count);
-				ArrayAppend(result.seeded, {
-					model = modelName,
-					count = seededCount,
-					success = entrySuccess
-				});
-				result.totalCreated += seededCount;
-				if (!entrySuccess) {
-					result.totalFailed++;
+				// Failed entries must not commit silently: roll the whole
+				// generate run back and report them (same as runSeeds).
+				if (result.totalFailed > 0) {
+					transaction action="rollback";
+					result.success = false;
+					result.message = "Database seeding failed. Created #result.totalCreated# records; #result.totalFailed# of #ArrayLen(result.seeded)# #result.totalFailed == 1 ? 'model' : 'models'# failed (#$failedGenerateSummary(result.seeded)#). All changes were rolled back.";
+					return result;
 				}
-			} catch (any modelError) {
-				ArrayAppend(result.seeded, {
-					model = modelName,
-					count = 0,
-					success = false,
-					error = modelError.message
-				});
-				result.totalFailed++;
+
+				transaction action="commit";
+			} catch (any e) {
+				transaction action="rollback";
+				result.success = false;
+				result.message = "Database seeding failed: " & e.message;
+				return result;
 			}
 		}
 
