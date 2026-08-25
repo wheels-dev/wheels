@@ -13,11 +13,18 @@ component extends="wheels.WheelsTest" {
 			describe("Basic transactions", () => {
 
 				it("commit persists data", () => {
+					var marker = "TxCommit" & Replace(CreateUUID(), "-", "", "all");
+					var authorId = "";
 					transaction action="begin" {
-						var author = g.model("author").create(firstName = "TxCommit", lastName = "Test");
-						expect(author.key()).toBeNumeric();
-						transaction action="rollback";
+						var author = g.model("author").create(firstName = marker, lastName = "Test");
+						authorId = author.key();
+						expect(authorId).toBeNumeric();
+						transaction action="commit";
 					}
+					var found = g.model("author").findByKey(authorId);
+					expect(found).toBeInstanceOf("author");
+					expect(found.firstName).toBe(marker);
+					found.delete();
 				});
 
 				it("rollback reverts data", () => {

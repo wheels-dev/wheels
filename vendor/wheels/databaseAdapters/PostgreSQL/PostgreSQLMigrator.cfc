@@ -96,7 +96,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 			}
 		}
 		if (StructKeyExists(arguments.options, "afterColumn") && Len(Trim(arguments.options.afterColumn)) GT 0) {
-			arguments.sql = arguments.sql & " AFTER #arguments.options.afterColumn#";
+			arguments.sql = arguments.sql & " AFTER " & quoteColumnName(arguments.options.afterColumn);
 		}
 		return arguments.sql;
 	}

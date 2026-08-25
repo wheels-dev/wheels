@@ -6,7 +6,23 @@ component extends="wheels.WheelsTest" {
 
 		describe("CockroachDB Type Tests", () => {
 
-			// Guard: only run when connected to CockroachDB
+			describe("$getType mapping always", () => {
+
+				it("maps CockroachDB native types to real CFML SQL types", () => {
+					var adapter = CreateObject("component", "wheels.databaseAdapters.CockroachDB.CockroachDBModel");
+					expect(adapter.$getType(type = "string")).toBe("cf_sql_varchar");
+					expect(adapter.$getType(type = "bytes")).toBe("cf_sql_binary");
+					expect(adapter.$getType(type = "int64")).toBe("cf_sql_bigint");
+					expect(adapter.$getType(type = "bool")).toBe("cf_sql_bit");
+					expect(adapter.$getType(type = "boolean")).toBe("cf_sql_bit");
+					expect(adapter.$getType(type = "varchar")).toBe("cf_sql_varchar");
+					expect(adapter.$getType(type = "text")).toBe("cf_sql_longvarchar");
+					expect(adapter.$getType(type = "timestamp")).toBe("cf_sql_timestamp");
+				});
+
+			});
+
+			// Guard: live table assertions only run when connected to CockroachDB
 			var migration = CreateObject("component", "wheels.migrator.Migration").init();
 			if (migration.adapter.adapterName() != "CockroachDB") return;
 
@@ -72,14 +88,22 @@ component extends="wheels.WheelsTest" {
 			describe("Column introspection", () => {
 
 				it("correctly reads column types from a live table", () => {
-					// Use the authors table which exists in test seed data
-					var authors = g.model("author").findAll(maxRows = 1);
-					expect(authors).toBeQuery();
-
-					// The author model should be functional
-					var author = g.model("author").findFirst();
-					expect(author).toBeInstanceOf("author");
-					expect(author.key()).toBeNumeric();
+					var adapter = g.model("sqlType").$assignAdapter();
+					var cols = adapter.$getColumns("c_o_r_e_sqltypes");
+					expect(cols.recordCount).toBeGT(0);
+					var mapped = {};
+					for (var row in cols) {
+						var colName = LCase(row.column_name);
+						var typeName = LCase(row.type_name);
+						mapped[colName] = adapter.$getType(type = typeName, scale = "", details = "");
+					}
+					expect(mapped).toHaveKey("booleantype");
+					expect(mapped.booleantype).toBe("cf_sql_bit");
+					expect(mapped).toHaveKey("stringvariabletype");
+					expect(mapped.stringvariabletype).toBe("cf_sql_varchar");
+					expect(mapped).toHaveKey("inttype");
+					expect(Len(mapped.inttype)).toBeGT(0);
+					expect(Left(mapped.inttype, 7)).toBe("cf_sql_");
 				});
 
 				it("boolean column type is correctly introspected", () => {

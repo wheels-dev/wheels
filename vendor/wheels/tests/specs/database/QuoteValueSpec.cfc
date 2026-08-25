@@ -44,6 +44,23 @@ component extends="wheels.WheelsTest" {
 				expect(adapter.$quoteValue(str="'")).toBe("''''");
 			});
 
+			it("throws Wheels.InvalidValue for integer payload 0 OR 1=1", () => {
+				expect(function() {
+					adapter.$quoteValue(str = "0 OR 1=1", type = "integer");
+				}).toThrow("Wheels.InvalidValue");
+			});
+
+			it("throws Wheels.InvalidValue for boolean payload maybe", () => {
+				expect(function() {
+					adapter.$quoteValue(str = "maybe", type = "boolean");
+				}).toThrow("Wheels.InvalidValue");
+			});
+
+			it("S8 HOLD leaves boolean yes and no unquoted", () => {
+				expect(adapter.$quoteValue(str = "yes", type = "boolean")).toBe("yes");
+				expect(adapter.$quoteValue(str = "no", type = "boolean")).toBe("no");
+			});
+
 		});
 
 	}
