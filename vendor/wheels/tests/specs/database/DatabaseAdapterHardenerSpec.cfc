@@ -10,34 +10,64 @@ component extends="wheels.WheelsTest" {
 
 		describe("S2 $executeQuery keeps bound string null after IS", () => {
 
-			it("binds the string null after IS and IS NOT", () => {
-				var sql = g.model("post").$whereClause(where = "averagerating IS NULL");
-				sql = g.model("post").$addWhereClauseParameters(sql = sql, where = "averagerating IS NULL");
-				var bound = "";
+			it("keeps the quoted string null as a bound parameter after IS and IS NOT", () => {
+				var sql = g.model("post").$whereClause(where = "title IS 'null'");
+				sql = g.model("post").$addWhereClauseParameters(sql = sql, where = "title IS 'null'");
+				var found = {value = "", flaggedNull = false};
 				for (var part in sql) {
 					if (IsStruct(part) && StructKeyExists(part, "value") && LCase(ToString(part.value)) == "null") {
-						bound = part.value;
+						found.value = part.value;
+						if (StructKeyExists(part, "null") && part.null) {
+							found.flaggedNull = true;
+						}
 					}
 				}
-				expect(LCase(bound)).toBe("null");
-				expect(IsSimpleValue(bound)).toBeTrue();
+				expect(LCase(found.value)).toBe("null");
+				expect(IsSimpleValue(found.value)).toBeTrue();
+				expect(found.flaggedNull).toBeFalse();
+
+				sql = g.model("post").$whereClause(where = "title IS NOT 'null'");
+				sql = g.model("post").$addWhereClauseParameters(sql = sql, where = "title IS NOT 'null'");
+				found = {value = "", flaggedNull = false};
+				for (part in sql) {
+					if (IsStruct(part) && StructKeyExists(part, "value") && LCase(ToString(part.value)) == "null") {
+						found.value = part.value;
+						if (StructKeyExists(part, "null") && part.null) {
+							found.flaggedNull = true;
+						}
+					}
+				}
+				expect(LCase(found.value)).toBe("null");
+				expect(found.flaggedNull).toBeFalse();
+			});
+
+			it("marks the unquoted NULL keyword as SQL NULL", () => {
+				var sql = g.model("post").$whereClause(where = "averagerating IS NULL");
+				sql = g.model("post").$addWhereClauseParameters(sql = sql, where = "averagerating IS NULL");
+				var found = {flaggedNull = false};
+				for (var part in sql) {
+					if (IsStruct(part) && StructKeyExists(part, "null") && part.null) {
+						found.flaggedNull = true;
+					}
+				}
+				expect(found.flaggedNull).toBeTrue();
 
 				sql = g.model("post").$whereClause(where = "averagerating IS NOT NULL");
 				sql = g.model("post").$addWhereClauseParameters(sql = sql, where = "averagerating IS NOT NULL");
-				bound = "";
+				found = {flaggedNull = false};
 				for (part in sql) {
-					if (IsStruct(part) && StructKeyExists(part, "value") && LCase(ToString(part.value)) == "null") {
-						bound = part.value;
+					if (IsStruct(part) && StructKeyExists(part, "null") && part.null) {
+						found.flaggedNull = true;
 					}
 				}
-				expect(LCase(bound)).toBe("null");
+				expect(found.flaggedNull).toBeTrue();
 			});
 
-			it("does not coerce that string to SQL NULL in $executeQuery", () => {
+			it("does not coerce the literal string null after IS in $executeQuery", () => {
 				var src = FileRead(ExpandPath("/wheels/databaseAdapters/Base.cfc"));
 				var start = Find("public struct function $executeQuery", src);
-				var body = Mid(src, start, 2500);
-				expect(body).notToInclude('writeOutput("NULL")');
+				var body = Mid(src, start, 2800);
+				expect(body).notToInclude('part.value == "null"');
 				expect(body).notToInclude('right(prev, 2) == "IS"');
 				expect(body).notToInclude('right(prev, 6) == "IS NOT"');
 			});

@@ -1064,11 +1064,15 @@ component {
 		if (Len(arguments.where)) {
 			local.start = 1;
 			local.originalValues = [];
+			local.sqlNullFlags = [];
 			while (!StructKeyExists(local, "temp") || ArrayLen(local.temp.len) > 1) {
 				local.temp = ReFind(variables.wheels.class.RESQLWhere, arguments.where, local.start, true);
 				if (ArrayLen(local.temp.len) > 1) {
 					local.start = local.temp.pos[4] + local.temp.len[4];
 					local.extractedValue = Mid(arguments.where, local.temp.pos[4], local.temp.len[4]);
+					// Unquoted SQL keyword NULL (from `IS NULL` / `IS NOT NULL`) is a
+					// missing value. The quoted literal `'null'` is a bound string.
+					local.isSqlNullKeyword = (ReFindNoCase("^NULL$", Trim(local.extractedValue)) == 1);
 
 					// Handle comma-separated values in IN clauses
 					if ($engineAdapter().isBoxLang()) {
@@ -1095,6 +1099,7 @@ component {
 							)
 						);
 					}
+					ArrayAppend(local.sqlNullFlags, local.isSqlNullKeyword);
 				}
 			}
 			if (
@@ -1116,8 +1121,13 @@ component {
 						structDelete(arguments.sql[local.i], 'property');
 					}
 					arguments.sql[local.i].value = local.originalValues[local.pos];
-					if (local.originalValues[local.pos] == "") {
+					if (local.originalValues[local.pos] == "" || local.sqlNullFlags[local.pos]) {
 						arguments.sql[local.i].null = true;
+						// Dummy value so integer cfqueryparam does not try to cast
+						// the keyword string "NULL" / "[NULL]" to a number.
+						if (local.sqlNullFlags[local.pos]) {
+							arguments.sql[local.i].value = "";
+						}
 					}
 					local.pos--;
 				}

@@ -27,10 +27,20 @@ component output=false extends="wheels.Global"{
 				if (isStruct(part)) {
 					local.qp = $queryParams(part);
 
-					// The string "null" after IS / IS NOT stays a bound parameter.
-					// Do not coerce it to SQL NULL — a literal NULL is written as
-					// raw SQL by the query builder, not as a parameterized "null".
-					if (structKeyExists(qp, "list")) {
+					// The literal string "null" after IS / IS NOT stays a bound
+					// parameter. Do not coerce that string to SQL NULL. A missing
+					// value (cfqueryparam null=true, or a CFML/Java null) is a
+					// different thing and must still bind as SQL NULL.
+					if (structKeyExists(qp, "null") && qp.null) {
+						if (args.parameterize) {
+							if (!structKeyExists(qp, "value") || IsNull(qp.value) || !Len(ToString(qp.value))) {
+								qp.value = "";
+							}
+							cfqueryParam(attributeCollection = qp);
+						} else {
+							writeOutput("NULL");
+						}
+					} else if (structKeyExists(qp, "list")) {
 						writeOutput("(");
 						if (args.parameterize) {
 							cfqueryParam(attributeCollection = qp);
@@ -527,7 +537,9 @@ component output=false extends="wheels.Global"{
 	 * Internal function.
 	 */
 	public struct function $queryParams(required struct settings) {
-		if (!StructKeyExists(arguments.settings, "value")) {
+		local.hasValue = StructKeyExists(arguments.settings, "value");
+		local.valueIsNull = local.hasValue && IsNull(arguments.settings.value);
+		if (!local.hasValue && !(StructKeyExists(arguments.settings, "null") && arguments.settings.null)) {
 			Throw(
 				type = "Wheels.QueryParamValue",
 				message = "The value for `cfqueryparam` cannot be determined for property `#arguments.settings.property#`.<br>This usually happens due to a syntax error in the WHERE clause (e.g., using unquoted strings or invalid values).",
@@ -536,9 +548,17 @@ component output=false extends="wheels.Global"{
 		}
 		local.rv = {};
 		local.rv.cfsqltype = arguments.settings.type;
-		local.rv.value = arguments.settings.value;
-		if (StructKeyExists(arguments.settings, "null")) {
-			local.rv.null = arguments.settings.null;
+		if (local.valueIsNull || (StructKeyExists(arguments.settings, "null") && arguments.settings.null)) {
+			// CFML/Java null and an explicit SQL-NULL flag bind as SQL NULL.
+			// Do not pass the strings "null" / "[NULL]" as the typed value —
+			// integer cfqueryparam cannot cast them.
+			local.rv.null = true;
+			local.rv.value = "";
+		} else {
+			local.rv.value = arguments.settings.value;
+			if (StructKeyExists(arguments.settings, "null")) {
+				local.rv.null = arguments.settings.null;
+			}
 		}
 		if (StructKeyExists(arguments.settings, "scale") && arguments.settings.scale > 0) {
 			local.rv.scale = arguments.settings.scale;
