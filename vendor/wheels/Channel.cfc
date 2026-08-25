@@ -26,7 +26,15 @@ component {
 	public Channel function init() {
 		// channel -> ConcurrentHashMap of subscriberId -> {callback, createdAt}
 		variables.channels = CreateObject("java", "java.util.concurrent.ConcurrentHashMap").init();
+		variables.eventLog = CreateObject("java", "java.util.concurrent.ConcurrentHashMap").init();
+		variables.maxEventLogSize = 100;
 		return this;
+	}
+
+	public void function $assertChannelName(required string channel) {
+		if (!Len(Trim(arguments.channel))) {
+			throw(type = "Wheels.Channel.InvalidName", message = "Channel name cannot be empty.");
+		}
 	}
 
 	/**
@@ -42,6 +50,7 @@ component {
 		required any callback,
 		string id = CreateUUID()
 	) {
+		$assertChannelName(arguments.channel);
 		// Ensure channel map exists (putIfAbsent is atomic)
 		variables.channels.putIfAbsent(
 			arguments.channel,
@@ -73,6 +82,7 @@ component {
 		required string data,
 		string id = CreateUUID()
 	) {
+		$assertChannelName(arguments.channel);
 		local.timestamp = Now();
 		local.eventPayload = {
 			id: arguments.id,
@@ -81,6 +91,7 @@ component {
 			data: arguments.data,
 			timestamp: local.timestamp
 		};
+		$appendEventLog(arguments.channel, local.eventPayload);
 
 		local.subscriberCount = 0;
 		local.subscribers = variables.channels.get(arguments.channel);
@@ -176,6 +187,46 @@ component {
 	 */
 	public void function removeChannel(required string channel) {
 		variables.channels.remove(arguments.channel);
+		variables.eventLog.remove(arguments.channel);
+	}
+
+	/**
+	 * Return retained events on a channel after lastEventId.
+	 * If lastEventId is not in the retained window, return the retained tail.
+	 */
+	public array function replay(required string channel, required string lastEventId) {
+		$assertChannelName(arguments.channel);
+		local.out = [];
+		local.log = variables.eventLog.get(arguments.channel);
+		if (IsNull(local.log)) {
+			return local.out;
+		}
+		local.snapshot = local.log.toArray();
+		local.seen = false;
+		for (local.evt in local.snapshot) {
+			if (local.seen) {
+				ArrayAppend(local.out, local.evt);
+			}
+			if (local.evt.id == arguments.lastEventId) {
+				local.seen = true;
+			}
+		}
+		if (!local.seen) {
+			return local.snapshot;
+		}
+		return local.out;
+	}
+
+	private void function $appendEventLog(required string channel, required struct eventPayload) {
+		variables.eventLog.putIfAbsent(
+			arguments.channel,
+			CreateObject("java", "java.util.concurrent.ConcurrentLinkedQueue").init()
+		);
+		local.log = variables.eventLog.get(arguments.channel);
+		local.log.offer(arguments.eventPayload);
+		while (local.log.size() > variables.maxEventLogSize) {
+			local.log.poll();
+		}
 	}
 
 }

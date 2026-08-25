@@ -71,15 +71,21 @@
 			return application.wheels.channelDatabaseEngine;
 		}
 
-		// Default: memory adapter
-		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelEngine")) {
-			lock name="wheelsChannelEngine" timeout="10" {
-				if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelEngine")) {
-					application.wheels.channelEngine = CreateObject("component", "wheels.Channel").init();
+		if (local.adapterType == "memory") {
+			if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelEngine")) {
+				lock name="wheelsChannelEngine" timeout="10" {
+					if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelEngine")) {
+						application.wheels.channelEngine = CreateObject("component", "wheels.Channel").init();
+					}
 				}
 			}
+			return application.wheels.channelEngine;
 		}
-		return application.wheels.channelEngine;
+
+		throw(
+			type = "Wheels.Channel.UnknownAdapter",
+			message = "Unknown channel adapter [#local.adapterType#]. Use memory or database."
+		);
 	}
 
 

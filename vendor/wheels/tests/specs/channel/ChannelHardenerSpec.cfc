@@ -331,8 +331,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("subscribeToChannel rejects an empty name before opening SSE", function() {
+				var stubDir = ExpandPath("/testbox/system/stubs");
+				CreateObject("java", "java.io.File").init(stubDir).mkdirs();
 				params = {controller = "dummy", action = "dummy"};
 				_controller = g.controller("dummy", params);
+				prepareMock(_controller);
+				_controller.$(method = "$subscribeMemory");
+				_controller.$(method = "$subscribeDatabase");
 				var state = {threw = false, type = ""};
 				try {
 					_controller.subscribeToChannel(channel = "");
@@ -342,6 +347,8 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(state.threw).toBeTrue();
 				expect(state.type).toBe("Wheels.Channel.InvalidName");
+				expect(ArrayLen(_controller.$callLog().$subscribeMemory)).toBe(0);
+				expect(ArrayLen(_controller.$callLog().$subscribeDatabase)).toBe(0);
 			});
 
 			it("channelSSETag rejects an empty name", function() {

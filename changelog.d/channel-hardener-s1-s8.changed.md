@@ -1,0 +1,5 @@
+- Channel `publish()` throws `Wheels.Channel.PublishFailed` when the database INSERT fails instead of returning `persisted:false`
+- `$getChannelEngine()` throws `Wheels.Channel.UnknownAdapter` for a name that is not `memory` or `database`
+- The memory channel engine replays retained events after `lastEventId` on subscribe
+- `channelSSETag(events=)` registers `addEventListener` for each named event so they are not dropped by `onmessage`
+- Empty and whitespace-only channel names throw `Wheels.Channel.InvalidName`
