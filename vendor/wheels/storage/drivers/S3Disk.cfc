@@ -140,7 +140,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	 * before being attached one-by-one — never `attributeCollection=arguments`,
 	 * which Adobe CF 2023/2025 reject on built-in tags.
 	 */
-	private struct function $request(
+	public struct function $request(
 		required string method,
 		required string key,
 		required struct headers,

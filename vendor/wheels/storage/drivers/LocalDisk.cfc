@@ -148,7 +148,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		return local.diff == 0;
 	}
 
-	private string function $resolve(required string key) {
+	public string function $resolve(required string key) {
 		// Reject traversal — a key must stay inside root.
 		local.clean = Replace(arguments.key, "\", "/", "all");
 		if (Find("..", local.clean)) {

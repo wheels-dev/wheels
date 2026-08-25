@@ -70,6 +70,29 @@ component extends="wheels.WheelsTest" {
 					expect(headers.Authorization).toInclude("Signature=");
 				});
 
+				it("reproduces the AWS-documented SigV4 GET Object header-auth test vector", function() {
+					var signer = new wheels.storage.S3Signer(
+						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
+						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+						region = "us-east-1",
+						bucket = "examplebucket",
+						endpoint = "examplebucket.s3.amazonaws.com"
+					);
+					var headers = signer.signedHeaders(
+						method = "GET",
+						key = "test.txt",
+						payload = "",
+						amzDate = "20130524T000000Z",
+						range = "bytes=0-9"
+					);
+
+					expect(headers["x-amz-content-sha256"]).toBe(
+						"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+					);
+					expect(headers.Authorization).toInclude("SignedHeaders=host;range;x-amz-content-sha256;x-amz-date");
+					expect(headers.Authorization).toInclude("Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41");
+				});
+
 			});
 
 			// ---- LocalDisk --------------------------------------------------
@@ -118,6 +141,45 @@ component extends="wheels.WheelsTest" {
 					expect(function() {
 						disk.put(key = "../escape.txt", content = "x");
 					}).toThrow("Wheels.Storage.InvalidKey");
+				});
+
+				it("resolves empty and slash-only keys as root concatenations, not InvalidKey", function() {
+					var expectedRoot = REReplace(Replace(ctx.root, "\", "/", "all"), "/+$", "");
+					expect(disk.$resolve("")).toBe(expectedRoot & "/");
+					expect(disk.$resolve("/")).toBe(expectedRoot & "//");
+					expect(disk.$resolve("///")).toBe(expectedRoot & "////");
+
+					expect(function() {
+						disk.get("");
+					}).toThrow("Wheels.Storage.NotFound");
+					expect(function() {
+						disk.get("/");
+					}).toThrow("Wheels.Storage.NotFound");
+					expect(function() {
+						disk.get("///");
+					}).toThrow("Wheels.Storage.NotFound");
+				});
+
+				it("follows a symlink under root to a file outside (Find('..') does not see the hop)", function() {
+					var outside = GetTempDirectory() & "wheels-storage-outside-" & CreateUUID();
+					var linkPath = ctx.root & "/link";
+					DirectoryCreate(outside);
+					if (!DirectoryExists(ctx.root)) {
+						DirectoryCreate(ctx.root);
+					}
+					FileWrite(outside & "/secret.txt", CharsetDecode("outside-secret", "utf-8"));
+					$createSymlink(outside, linkPath);
+					try {
+						expect(function() {
+							disk.exists("link/secret.txt");
+						}).notToThrow(type = "Wheels.Storage.InvalidKey");
+						expect(ToString(disk.get("link/secret.txt"))).toBe("outside-secret");
+					} finally {
+						$deleteSymlink(linkPath);
+						if (DirectoryExists(outside)) {
+							DirectoryDelete(outside, true);
+						}
+					}
 				});
 
 				it("builds a public url from the urlPrefix", function() {
@@ -172,6 +234,11 @@ component extends="wheels.WheelsTest" {
 					expect(function() {
 						unsigned.signedUrl(key = "a.png");
 					}).toThrow("Wheels.Storage.MissingSigningKey");
+				});
+
+				it("verifySignature returns false when no signingKey is configured", function() {
+					var unsigned = new wheels.storage.drivers.LocalDisk(config = {root = ctx.root, urlPrefix = "/u"});
+					expect(unsigned.verifySignature(key = "a.png", expires = 4102444800, signature = "deadbeef")).toBeFalse();
 				});
 
 				it("requires a non-empty root", function() {
@@ -271,6 +338,21 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("S3Disk delete()", function() {
+
+				it("returns true after a 2xx, including a second delete of the same missing key", function() {
+					var stubDisk = new wheels.tests._assets.storage.S3DiskDeleteStub(config = {
+						bucket = "myapp",
+						region = "us-east-1",
+						accessKeyId = "AKIAIOSFODNN7EXAMPLE",
+						secretAccessKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+					});
+					expect(stubDisk.delete("gone.txt")).toBeTrue();
+					expect(stubDisk.delete("gone.txt")).toBeTrue();
+				});
+
+			});
+
 			// ---- StorageManager ---------------------------------------------
 
 			describe("StorageManager", function() {
@@ -330,6 +412,29 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	function $toPath(required string filePath) {
+		return CreateObject("java", "java.io.File").init(arguments.filePath).toPath();
+	}
+
+	function $createSymlink(required string target, required string link) {
+		$deleteSymlink(arguments.link);
+		var pb = CreateObject("java", "java.lang.ProcessBuilder")
+			.init(["ln", "-s", arguments.target, arguments.link]);
+		var proc = pb.start();
+		proc.waitFor();
+		if (proc.exitValue() != 0) {
+			throw(type = "Wheels.Test.SymlinkError", message = "Failed to create symlink: #arguments.link# -> #arguments.target#");
+		}
+	}
+
+	function $deleteSymlink(required string link) {
+		var jFiles = CreateObject("java", "java.nio.file.Files");
+		var linkPath = $toPath(arguments.link);
+		if (jFiles.isSymbolicLink(linkPath)) {
+			jFiles.delete(linkPath);
+		}
 	}
 
 }

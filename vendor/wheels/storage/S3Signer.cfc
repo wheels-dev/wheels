@@ -119,13 +119,15 @@ component output="false" {
 	 * @key Object key.
 	 * @payload Request body (binary or string); empty for GET/DELETE/HEAD.
 	 * @amzDate Optional deterministic timestamp override.
+	 * @range Optional Range header value (e.g. "bytes=0-9"). Empty keeps the current signed header set.
 	 * @return Struct of header name => value to attach to the request.
 	 */
 	public struct function signedHeaders(
 		required string method,
 		required string key,
 		any payload = "",
-		string amzDate = ""
+		string amzDate = "",
+		string range = ""
 	) {
 		local.amzDate = Len(arguments.amzDate) ? arguments.amzDate : $amzNow();
 		local.dateStamp = Left(local.amzDate, 8);
@@ -143,6 +145,14 @@ component output="false" {
 			& "x-amz-date:" & local.amzDate & Chr(10);
 		local.signedHeaderList = "host;x-amz-content-sha256;x-amz-date";
 
+		if (Len(arguments.range)) {
+			local.canonicalHeaders = "host:" & variables.host & Chr(10)
+				& "range:" & arguments.range & Chr(10)
+				& "x-amz-content-sha256:" & local.payloadHash & Chr(10)
+				& "x-amz-date:" & local.amzDate & Chr(10);
+			local.signedHeaderList = "host;range;x-amz-content-sha256;x-amz-date";
+		}
+
 		local.canonicalRequest = UCase(arguments.method) & Chr(10)
 			& local.canonicalUri & Chr(10)
 			& "" & Chr(10)
@@ -157,6 +167,15 @@ component output="false" {
 			& "SignedHeaders=" & local.signedHeaderList & ", "
 			& "Signature=" & local.signature;
 
+		if (Len(arguments.range)) {
+			return {
+				"Authorization" = local.authorization,
+				"x-amz-content-sha256" = local.payloadHash,
+				"x-amz-date" = local.amzDate,
+				"Host" = variables.host,
+				"Range" = arguments.range
+			};
+		}
 		return {
 			"Authorization" = local.authorization,
 			"x-amz-content-sha256" = local.payloadHash,
