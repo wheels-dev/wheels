@@ -1,0 +1,11 @@
+- Job complete/retry/fail UPDATEs now require `status = 'processing'`, so a stolen job's original worker cannot overwrite `completed` or `failed`
+- Persist-fail `enqueue()` returns `persisted=false` and `error` instead of lying with `status=pending`
+- `JobWorker.getMonitorData(queue=)` filters `recentJobs` and `oldestPending` as well as throughput
+- Job `timeout` (default 300) is persisted on enqueue and honored by `processNext` / `$processJob`; a hung `perform()` is cut off instead of running until it returns
+- Unknown-database pending SELECTs are bounded with `LIMIT 25` (`candidateLimit`) instead of scanning the whole backlog
+- Enqueue no longer writes `tenant.config` into `wheels_jobs.data`; `$restoreTenantContext` applies `dataSource` only when it is a known app datasource
+- `CreateObject(jobClass)` is allowlisted to `app/jobs` (plus configured `jobClassPrefixes`); a `perform()` method on an off-path class is not enough
+- JobWorker claim persist errors throw `Wheels.JobClaimFailed` and are contained as a failed drain result — they are no longer swallowed as `return false` / idle `skipped`
+- The job-class allowlist treats `app.jobs` (and configured `jobClassPrefixes`) as first-class; `wheels.tests._assets.jobs` is an extra testing prefix only
+- `maxRetries` (default still 3) is retries after the first failure, so a job gets 4 tries before the dead letter
+- `retryFailed` / `purgeCompleted` / `JobWorker.purge` return the real DML count, including `0` when nothing matched

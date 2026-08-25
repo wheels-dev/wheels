@@ -132,15 +132,17 @@ component {
 	) {
 		local.id = CreateUUID();
 
-		// Capture tenant context so jobs run against the correct tenant datasource
+		arguments.data["$wheelsJobTimeout"] = this.timeout;
+
+		// Capture tenant context so jobs run against the correct tenant datasource.
+		// Persist id + dataSource only — never dump tenant.config into the queue row.
 		if (
 			IsDefined("request.wheels.tenant.dataSource")
 			&& Len(request.wheels.tenant.dataSource)
 		) {
 			arguments.data["$wheelsTenantContext"] = {
 				id = StructKeyExists(request.wheels.tenant, "id") ? request.wheels.tenant.id : "",
-				dataSource = request.wheels.tenant.dataSource,
-				config = StructKeyExists(request.wheels.tenant, "config") ? request.wheels.tenant.config : {}
+				dataSource = request.wheels.tenant.dataSource
 			};
 		}
 
@@ -172,11 +174,11 @@ component {
 					);
 				} catch (any e2) {
 					writeLog(text = "Job enqueue failed after table creation: #e2.message#", type = "error", file = "wheels_jobs");
-					return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = false};
+					return {id = local.id, jobClass = arguments.jobClass, persisted = false, error = e2.message};
 				}
 			} else {
 				writeLog(text = "Job '#arguments.jobClass#' could not be persisted: #e.message#", type = "warning", file = "wheels_jobs");
-				return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = false};
+				return {id = local.id, jobClass = arguments.jobClass, persisted = false, error = e.message};
 			}
 		}
 
@@ -245,9 +247,13 @@ component {
 		try {
 			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
 		} catch (any e) {
-			// Auto-create table and return empty result (no jobs to process yet)
 			$ensureJobTable();
-			return local.result;
+			try {
+				local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
+			} catch (any e2) {
+				ArrayAppend(local.result.errors, e2.message);
+				return local.result;
+			}
 		}
 
 		for (local.row in local.jobs) {
@@ -286,6 +292,13 @@ component {
 	 */
 	public any function $instantiateJobClass(required string jobClass, string jobId = "") {
 		local.rowLabel = Len(arguments.jobId) ? " named by queue row [#arguments.jobId#]" : "";
+		if (!$isAllowedJobClass(arguments.jobClass)) {
+			Throw(
+				type = "Wheels.JobClassNotAllowed",
+				message = "The job class `#arguments.jobClass#`#local.rowLabel# is not on an allowed jobs path.",
+				extendedInfo = "CreateObject is restricted to `app.jobs` (and any `jobClassPrefixes` you configure). A `perform()` method is not enough."
+			);
+		}
 		try {
 			local.rv = CreateObject("component", arguments.jobClass);
 		} catch (any e) {
@@ -306,6 +319,9 @@ component {
 				message = "The component `#arguments.jobClass#`#local.rowLabel# is not a job — it has no `perform()` method.",
 				extendedInfo = "`wheels_jobs.jobClass` must name a component extending `wheels.Job`. Only the framework writes this column; a value that names something else means the row was written by something other than `enqueue()`."
 			);
+		}
+		if (StructKeyExists(local.rv, "init")) {
+			local.rv.init();
 		}
 		return local.rv;
 	}
@@ -354,6 +370,7 @@ component {
 		// mirroring JobWorker.$scheduleRetry so both paths share one retry schedule.
 		local.backoffBaseDelay = this.baseDelay;
 		local.backoffMaxDelay = this.maxDelay;
+		local.backoffRetryBackoff = this.retryBackoff;
 
 		try {
 			// Instantiate and execute the job
@@ -364,19 +381,32 @@ component {
 			if (StructKeyExists(local.jobInstance, "maxDelay")) {
 				local.backoffMaxDelay = local.jobInstance.maxDelay;
 			}
+			if (StructKeyExists(local.jobInstance, "retryBackoff")) {
+				local.backoffRetryBackoff = local.jobInstance.retryBackoff;
+			}
 			local.jobData = DeserializeJSON(arguments.jobRow.data);
 
 			// Restore tenant context if the job was enqueued within a tenant scope and
 			// strip the internal $wheelsTenantContext key before passing data to perform()
 			local.hasTenantContext = $restoreTenantContext(local.jobData);
-
-			local.jobInstance.perform(data = local.jobData);
+			local.timeoutSeconds = $takeJobTimeout(local.jobData, local.jobInstance.timeout ?: 300);
+			local.performOutcome = $runPerformWithTimeout(
+				jobInstance = local.jobInstance,
+				jobData = local.jobData,
+				timeoutSeconds = local.timeoutSeconds
+			);
+			if (local.performOutcome.timedOut) {
+				throw(type = "Wheels.JobTimeout", message = local.performOutcome.error);
+			}
+			if (!local.performOutcome.success) {
+				throw(type = "Wheels.JobFailed", message = local.performOutcome.error);
+			}
 
 			// Mark as completed
 			queryExecute(
 				"UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
-				WHERE id = :id",
+				WHERE id = :id AND status = 'processing'",
 				{
 					completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
@@ -398,11 +428,16 @@ component {
 			local.currentAttempts = Val(arguments.jobRow.attempts) + 1;
 			local.maxRetries = Val(arguments.jobRow.maxRetries);
 
-			if (local.currentAttempts < local.maxRetries) {
+			if (local.currentAttempts <= local.maxRetries) {
 				// Schedule retry with configurable exponential backoff, capped at maxDelay.
 				// Settings were captured from the failing job's class above so subclass
 				// overrides apply (the base instance defaults are only the fallback).
-				local.backoffSeconds = Min(local.backoffBaseDelay * (2 ^ local.currentAttempts), local.backoffMaxDelay);
+				local.backoffSeconds = $backoffDelay(
+					attempts = local.currentAttempts,
+					baseDelay = local.backoffBaseDelay,
+					maxDelay = local.backoffMaxDelay,
+					retryBackoff = local.backoffRetryBackoff
+				);
 				local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 				queryExecute(
@@ -411,7 +446,7 @@ component {
 						lastError = :lastError,
 						runAt = :runAt,
 						updatedAt = :updatedAt
-					WHERE id = :id",
+					WHERE id = :id AND status = 'processing'",
 					{
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
 						runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
@@ -434,7 +469,7 @@ component {
 						failedAt = :failedAt,
 						lastError = :lastError,
 						updatedAt = :updatedAt
-					WHERE id = :id",
+					WHERE id = :id AND status = 'processing'",
 					{
 						failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
@@ -473,18 +508,17 @@ component {
 		local.restored = false;
 		if (StructKeyExists(arguments.jobData, "$wheelsTenantContext") && IsStruct(arguments.jobData["$wheelsTenantContext"])) {
 			local.tenantCtx = arguments.jobData["$wheelsTenantContext"];
-			if (StructKeyExists(local.tenantCtx, "dataSource") && Len(local.tenantCtx.dataSource)) {
+			local.ds = StructKeyExists(local.tenantCtx, "dataSource") ? ToString(local.tenantCtx.dataSource) : "";
+			if (Len(local.ds) && $isAllowedJobDataSource(local.ds)) {
 				if (!StructKeyExists(request, "wheels")) {
 					request.wheels = {};
 				}
 				request.wheels.tenant = {
 					id = StructKeyExists(local.tenantCtx, "id") ? local.tenantCtx.id : "",
-					dataSource = local.tenantCtx.dataSource,
-					config = StructKeyExists(local.tenantCtx, "config") ? local.tenantCtx.config : {}
+					dataSource = local.ds
 				};
 				local.restored = true;
 			}
-			// Remove internal key before passing data to perform()
 			StructDelete(arguments.jobData, "$wheelsTenantContext");
 		}
 		return local.restored;
@@ -552,8 +586,15 @@ component {
 		}
 
 		try {
+			local.countSql = "SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'failed'";
+			local.countParams = {};
+			if (Len(arguments.queue)) {
+				local.countSql &= " AND queue = :queue";
+				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
+			}
+			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
 			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			return 1; // DML executed successfully; exact count unreliable across engines
+			return local.countResult.cnt ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -578,8 +619,15 @@ component {
 		}
 
 		try {
+			local.countSql = "SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
+			local.countParams = {cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}};
+			if (Len(arguments.queue)) {
+				local.countSql &= " AND queue = :queue";
+				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
+			}
+			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
 			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			return 1; // DML executed successfully; exact count unreliable across engines
+			return local.countResult.cnt ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -660,6 +708,148 @@ component {
 			writeLog(text = "Failed to auto-create wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
 			return false;
 		}
+	}
+
+	public boolean function $isAllowedJobClass(required string jobClass) {
+		local.name = Replace(Replace(Trim(arguments.jobClass), "/", ".", "all"), "\", ".", "all");
+		local.prefixes = ListToArray($jobClassPrefixes());
+		for (local.prefix in local.prefixes) {
+			local.prefix = Trim(local.prefix);
+			if (!Len(local.prefix)) {
+				continue;
+			}
+			if (CompareNoCase(local.name, local.prefix) == 0) {
+				return true;
+			}
+			if (Len(local.name) > Len(local.prefix) && CompareNoCase(Left(local.name, Len(local.prefix) + 1), local.prefix & ".") == 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public string function $jobClassPrefixes() {
+		local.prefixes = "app.jobs";
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "jobClassPrefixes") && Len(application.wheels.jobClassPrefixes)) {
+			local.prefixes = ListAppend(local.prefixes, application.wheels.jobClassPrefixes);
+		}
+		if (
+			!StructKeyExists(application, "wheels")
+			|| !StructKeyExists(application.wheels, "environment")
+			|| CompareNoCase(application.wheels.environment, "production") != 0
+		) {
+			local.prefixes = ListAppend(local.prefixes, "wheels.tests._assets.jobs");
+		}
+		return local.prefixes;
+	}
+
+	public boolean function $isAllowedJobDataSource(required string dataSource) {
+		return ListFindNoCase($allowedJobDataSources(), arguments.dataSource) > 0;
+	}
+
+	public string function $allowedJobDataSources() {
+		local.names = "";
+		if (StructKeyExists(application, "wheels")) {
+			if (StructKeyExists(application.wheels, "dataSourceName") && Len(application.wheels.dataSourceName)) {
+				local.names = ListAppend(local.names, application.wheels.dataSourceName);
+			}
+			if (StructKeyExists(application.wheels, "coreTestDataSourceName") && Len(application.wheels.coreTestDataSourceName)) {
+				local.names = ListAppend(local.names, application.wheels.coreTestDataSourceName);
+			}
+			if (StructKeyExists(application.wheels, "tenantDataSources")) {
+				if (IsArray(application.wheels.tenantDataSources)) {
+					local.names = ListAppend(local.names, ArrayToList(application.wheels.tenantDataSources));
+				} else if (Len(application.wheels.tenantDataSources)) {
+					local.names = ListAppend(local.names, application.wheels.tenantDataSources);
+				}
+			}
+		}
+		try {
+			local.meta = GetApplicationMetaData();
+			if (IsStruct(local.meta) && StructKeyExists(local.meta, "datasources") && IsStruct(local.meta.datasources)) {
+				for (local.dsName in local.meta.datasources) {
+					local.names = ListAppend(local.names, local.dsName);
+				}
+			}
+		} catch (any e) {
+		}
+		return local.names;
+	}
+
+	public numeric function $takeJobTimeout(required struct jobData, numeric fallback = 300) {
+		local.timeout = arguments.fallback;
+		if (StructKeyExists(arguments.jobData, "$wheelsJobTimeout") && IsNumeric(arguments.jobData["$wheelsJobTimeout"])) {
+			local.timeout = Val(arguments.jobData["$wheelsJobTimeout"]);
+		}
+		StructDelete(arguments.jobData, "$wheelsJobTimeout");
+		if (!IsNumeric(local.timeout) || local.timeout <= 0) {
+			return 300;
+		}
+		return local.timeout;
+	}
+
+	public struct function $runPerformWithTimeout(
+		required any jobInstance,
+		required struct jobData,
+		required numeric timeoutSeconds
+	) {
+		local.rv = {success = false, error = "", timedOut = false};
+		local.timeoutMs = Max(1, Int(arguments.timeoutSeconds)) * 1000;
+		local.threadName = "wheelsJob" & Replace(CreateUUID(), "-", "", "all");
+		local.box = {instance = arguments.jobInstance, data = arguments.jobData, ok = false, err = ""};
+
+		try {
+			thread name="#local.threadName#" action="run" box="#local.box#" {
+				try {
+					attributes.box.instance.perform(data = attributes.box.data);
+					thread.ok = true;
+					thread.err = "";
+				} catch (any e) {
+					thread.ok = false;
+					thread.err = e.message;
+				}
+			}
+			thread action="join" name="#local.threadName#" timeout="#local.timeoutMs#";
+			local.meta = cfthread[local.threadName];
+			local.status = StructKeyExists(local.meta, "status") ? ToString(local.meta.status) : "";
+			if (CompareNoCase(local.status, "COMPLETED") != 0 && CompareNoCase(local.status, "TERMINATED") != 0) {
+				try {
+					thread action="terminate" name="#local.threadName#";
+				} catch (any termErr) {
+				}
+				local.rv.timedOut = true;
+				local.rv.error = "Job timed out after #arguments.timeoutSeconds# seconds";
+				return local.rv;
+			}
+			if (StructKeyExists(local.meta, "ok") && local.meta.ok) {
+				local.rv.success = true;
+				return local.rv;
+			}
+			local.rv.error = (StructKeyExists(local.meta, "err") && Len(local.meta.err)) ? local.meta.err : "Job failed";
+			return local.rv;
+		} catch (any threadErr) {
+			// Fail closed. Inline perform() would hang until the job finished.
+			local.rv.timedOut = true;
+			local.rv.error = "Job timed out after #arguments.timeoutSeconds# seconds";
+			return local.rv;
+		}
+	}
+
+	/**
+	 * Retry delay in seconds. `retryBackoff=exponential` is the live schedule
+	 * (`baseDelay * 2^attempts`, capped at `maxDelay`). `linear` is a reserved
+	 * no-op and keeps that same formula.
+	 */
+	public numeric function $backoffDelay(
+		required numeric attempts,
+		numeric baseDelay = this.baseDelay,
+		numeric maxDelay = this.maxDelay,
+		string retryBackoff = this.retryBackoff
+	) {
+		if (CompareNoCase(arguments.retryBackoff, "linear") == 0) {
+			// reserved no-op — exponential remains the schedule
+		}
+		return Min(arguments.baseDelay * (2 ^ arguments.attempts), arguments.maxDelay);
 	}
 
 	/**

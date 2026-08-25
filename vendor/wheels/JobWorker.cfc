@@ -67,21 +67,19 @@ component {
 		// and maxrows only truncates client-side after the driver fetched everything.
 		local.candidateLimit = 25;
 		local.dbType = $dbType();
-		if (ListFindNoCase("mysql,postgresql,sqlite,h2", local.dbType)) {
-			local.sql &= " LIMIT #local.candidateLimit#";
-		} else if (local.dbType == "sqlserver") {
-			local.sql &= " OFFSET 0 ROWS FETCH NEXT #local.candidateLimit# ROWS ONLY";
-		} else if (local.dbType == "oracle") {
-			local.sql &= " FETCH FIRST #local.candidateLimit# ROWS ONLY";
-		}
-		// Unknown database type: leave unbounded rather than risk a syntax error.
+		local.sql &= $candidateLimitClause(dbType = local.dbType, candidateLimit = local.candidateLimit);
 
 		try {
 			local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
 			$ensureJobTable();
-			local.result.skipped = true;
-			return local.result;
+			try {
+				local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			} catch (any e2) {
+				local.result.skipped = true;
+				local.result.error = e2.message;
+				return local.result;
+			}
 		}
 
 		if (!local.candidates.recordCount) {
@@ -91,7 +89,18 @@ component {
 
 		// Try to claim each candidate with optimistic locking
 		for (local.row in local.candidates) {
-			local.claimed = $claimJob(local.row.id);
+			try {
+				local.claimFn = this["$claimJob"];
+				local.claimed = local.claimFn(local.row.id);
+			} catch (any e) {
+				// Persist/claim errors are contained — they must not look like an idle skip.
+				local.result.skipped = false;
+				local.result.success = false;
+				local.result.jobId = local.row.id;
+				local.result.jobClass = local.row.jobClass;
+				local.result.error = Left(e.message, 1000);
+				return local.result;
+			}
 			if (local.claimed) {
 				// We claimed it — fetch the payload for just this job, then process
 				local.jobRow = {
@@ -102,7 +111,7 @@ component {
 					attempts = local.row.attempts,
 					maxRetries = local.row.maxRetries
 				};
-				local.processResult = $executeJob(local.jobRow);
+				local.processResult = $executeJob(jobRow = local.jobRow, timeout = arguments.timeout);
 				local.result.jobId = local.row.id;
 				local.result.jobClass = local.row.jobClass;
 
@@ -117,7 +126,7 @@ component {
 					local.currentAttempts = Val(local.row.attempts) + 1;
 					local.maxRetries = Val(local.row.maxRetries);
 
-					if (local.currentAttempts < local.maxRetries) {
+					if (local.currentAttempts <= local.maxRetries) {
 						$scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, local.processResult.error);
 					} else {
 						$markFailed(local.row.id, local.row.jobClass, local.maxRetries, local.processResult.error);
@@ -158,7 +167,7 @@ component {
 			local.currentAttempts = Val(local.row.attempts);
 			local.maxRetries = Val(local.row.maxRetries);
 
-			if (local.currentAttempts < local.maxRetries) {
+			if (local.currentAttempts <= local.maxRetries) {
 				// Reschedule for retry
 				$scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #arguments.timeout# seconds");
 				local.recovered++;
@@ -260,8 +269,14 @@ component {
 		// Recent jobs
 		try {
 			local.recentSql = "SELECT id, jobClass, queue, status, attempts, lastError, updatedAt
-				FROM wheels_jobs ORDER BY updatedAt DESC";
-			local.recentRows = queryExecute(local.recentSql, {}, {datasource = variables.$datasource, maxrows = 10});
+				FROM wheels_jobs";
+			local.recentParams = {};
+			if (Len(arguments.queue)) {
+				local.recentSql &= " WHERE queue = :queue";
+				local.recentParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
+			}
+			local.recentSql &= " ORDER BY updatedAt DESC";
+			local.recentRows = queryExecute(local.recentSql, local.recentParams, {datasource = variables.$datasource, maxrows = 10});
 
 			for (local.row in local.recentRows) {
 				ArrayAppend(local.result.recentJobs, {
@@ -280,8 +295,14 @@ component {
 
 		// Oldest pending job
 		try {
-			local.oldestSql = "SELECT createdAt FROM wheels_jobs WHERE status = 'pending' ORDER BY createdAt ASC";
-			local.oldestRow = queryExecute(local.oldestSql, {}, {datasource = variables.$datasource, maxrows = 1});
+			local.oldestSql = "SELECT createdAt FROM wheels_jobs WHERE status = 'pending'";
+			local.oldestParams = {};
+			if (Len(arguments.queue)) {
+				local.oldestSql &= " AND queue = :queue";
+				local.oldestParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
+			}
+			local.oldestSql &= " ORDER BY createdAt ASC";
+			local.oldestRow = queryExecute(local.oldestSql, local.oldestParams, {datasource = variables.$datasource, maxrows = 1});
 			if (local.oldestRow.recordCount) {
 				local.result.oldestPending = local.oldestRow.createdAt;
 			}
@@ -402,8 +423,22 @@ component {
 		}
 
 		try {
+			local.countSql = "SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = :status AND #local.dateColumn# < :cutoff";
+			local.countParams = {
+				status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
+				cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
+			};
+			if (Len(arguments.queue)) {
+				local.countSql &= " AND queue = :queue";
+				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
+			}
+			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
+			local.cnt = local.countResult.cnt ?: 0;
+			if (local.cnt <= 0) {
+				return 0;
+			}
 			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			return 1; // DML executed successfully; exact count unreliable across engines
+			return local.cnt;
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -415,8 +450,11 @@ component {
 	/**
 	 * Claim a job using optimistic locking.
 	 * Returns true if this worker successfully claimed the job.
+	 * A lost race (0 rows) returns false. A persist/query error is not a lost
+	 * race — it throws Wheels.JobClaimFailed so processNext can contain it
+	 * without disguising the failure as an idle skip.
 	 */
-	private boolean function $claimJob(required string jobId) {
+	public boolean function $claimJob(required string jobId) {
 		try {
 			// Use the result option to get affected-row count from the same connection
 			// that executed the UPDATE. A separate verification SELECT can fail on
@@ -434,14 +472,17 @@ component {
 			);
 			return (local.updateResult.recordCount ?: 0) > 0;
 		} catch (any e) {
-			return false;
+			throw(
+				type = "Wheels.JobClaimFailed",
+				message = "Failed to claim job #arguments.jobId#: #e.message#"
+			);
 		}
 	}
 
 	/**
 	 * Execute a job's perform() method.
 	 */
-	private struct function $executeJob(required struct jobRow) {
+	private struct function $executeJob(required struct jobRow, numeric timeout = 300) {
 		local.result = {success = false, error = ""};
 
 		// Initialized before the try so the cleanup below never reads an undefined
@@ -462,14 +503,29 @@ component {
 			// perform() — shared with Job.$processJob so both processing paths run
 			// tenant jobs against the correct tenant datasource.
 			local.hasTenantContext = $jobBridge().$restoreTenantContext(local.jobData);
-
-			local.jobInstance.perform(data = local.jobData);
+			local.fromRow = $jobBridge().$takeJobTimeout(jobData = local.jobData, fallback = 300);
+			local.workerCap = Val(arguments.timeout);
+			if (local.workerCap <= 0) {
+				local.workerCap = 300;
+			}
+			local.timeoutSeconds = Min(local.fromRow, local.workerCap);
+			local.performOutcome = $jobBridge().$runPerformWithTimeout(
+				jobInstance = local.jobInstance,
+				jobData = local.jobData,
+				timeoutSeconds = local.timeoutSeconds
+			);
+			if (local.performOutcome.timedOut) {
+				throw(type = "Wheels.JobTimeout", message = local.performOutcome.error);
+			}
+			if (!local.performOutcome.success) {
+				throw(type = "Wheels.JobFailed", message = local.performOutcome.error);
+			}
 
 			// Mark completed
 			queryExecute(
 				"UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
-				WHERE id = :id",
+				WHERE id = :id AND status = 'processing'",
 				{
 					completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
@@ -506,21 +562,25 @@ component {
 		required numeric maxRetries,
 		required string errorMessage
 	) {
-		// Use configurable backoff: baseDelay * 2^attempt, capped at maxDelay
-		// Default values match Job.cfc: baseDelay=2, maxDelay=3600
 		local.baseDelay = 2;
 		local.maxDelay = 3600;
+		local.retryBackoff = "exponential";
 
-		// Try to get the job instance's backoff settings
 		try {
-			local.jobInstance = CreateObject("component", arguments.jobClass);
+			local.jobInstance = $jobBridge().$instantiateJobClass(jobClass = arguments.jobClass);
 			if (StructKeyExists(local.jobInstance, "baseDelay")) local.baseDelay = local.jobInstance.baseDelay;
 			if (StructKeyExists(local.jobInstance, "maxDelay")) local.maxDelay = local.jobInstance.maxDelay;
+			if (StructKeyExists(local.jobInstance, "retryBackoff")) local.retryBackoff = local.jobInstance.retryBackoff;
 		} catch (any e) {
 			// Use defaults
 		}
 
-		local.backoffSeconds = Min(local.baseDelay * (2 ^ arguments.currentAttempts), local.maxDelay);
+		local.backoffSeconds = $jobBridge().$backoffDelay(
+			attempts = arguments.currentAttempts,
+			baseDelay = local.baseDelay,
+			maxDelay = local.maxDelay,
+			retryBackoff = local.retryBackoff
+		);
 		local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 		queryExecute(
@@ -529,7 +589,7 @@ component {
 				lastError = :lastError,
 				runAt = :runAt,
 				updatedAt = :updatedAt
-			WHERE id = :id",
+			WHERE id = :id AND status = 'processing'",
 			{
 				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
 				runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
@@ -561,7 +621,7 @@ component {
 				failedAt = :failedAt,
 				lastError = :lastError,
 				updatedAt = :updatedAt
-			WHERE id = :id",
+			WHERE id = :id AND status = 'processing'",
 			{
 				failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
@@ -643,6 +703,26 @@ component {
 			variables.$jobBridgeInstance = new wheels.Job();
 		}
 		return variables.$jobBridgeInstance;
+	}
+
+	/**
+	 * SQL fragment that bounds a pending-job candidate SELECT.
+	 * Unknown database types get LIMIT too — an unbounded backlog scan is worse
+	 * than a syntax error that the existing catch already contains.
+	 */
+	public string function $candidateLimitClause(required string dbType, numeric candidateLimit = 25) {
+		local.n = Int(Val(arguments.candidateLimit));
+		if (local.n <= 0) {
+			local.n = 25;
+		}
+		local.normalized = LCase(Trim(arguments.dbType));
+		if (local.normalized == "sqlserver") {
+			return " OFFSET 0 ROWS FETCH NEXT #local.n# ROWS ONLY";
+		}
+		if (local.normalized == "oracle") {
+			return " FETCH FIRST #local.n# ROWS ONLY";
+		}
+		return " LIMIT #local.n#";
 	}
 
 }
