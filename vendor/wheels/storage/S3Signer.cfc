@@ -142,7 +142,6 @@ component output="false" {
 			? "/" & $uriEncodePath(variables.bucket & "/" & arguments.key)
 			: "/" & $uriEncodePath(arguments.key);
 
-		// Headers signed for header-auth: host, x-amz-content-sha256, x-amz-date (sorted).
 		// Optional range / acl insert in code-point order so the S8 no-acl vector
 		// stays byte-identical when both are empty.
 		local.canonicalHeaders = "host:" & variables.host & Chr(10);

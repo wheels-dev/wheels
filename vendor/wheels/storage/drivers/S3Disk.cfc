@@ -89,7 +89,6 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		}
 		local.headers = variables.signer.signedHeaders(method = "DELETE", key = arguments.key);
 		local.result = $request(method = "DELETE", key = arguments.key, headers = local.headers);
-		// Connection failure or 5xx must not masquerade as a successful delete.
 		$assertSuccess(result = local.result, method = "DELETE", key = arguments.key);
 		return true;
 	}
