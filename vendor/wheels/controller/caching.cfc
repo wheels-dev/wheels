@@ -75,7 +75,6 @@ component {
 	 * Get cache info, only called from the test suite
 	 */
 	public any function $cacheSettingsForAction(required string action) {
-		local.rv = false;
 		local.cachableActions = $cachableActions();
 		local.iEnd = ArrayLen(local.cachableActions);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -83,9 +82,13 @@ component {
 				local.rv = {};
 				local.rv.time = local.cachableActions[local.i].time;
 				local.rv.static = local.cachableActions[local.i].static;
+				local.rv.appendToKey = StructKeyExists(local.cachableActions[local.i], "appendToKey")
+					? local.cachableActions[local.i].appendToKey
+					: "";
+				return local.rv;
 			}
 		}
-		return local.rv;
+		return false;
 	}
 
 	/**

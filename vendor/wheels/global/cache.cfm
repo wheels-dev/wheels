@@ -96,6 +96,7 @@
 		numeric time = application.wheels.defaultCacheTime,
 		string category = "main"
 	) {
+		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
 		local.currentCount = $cacheCount();
 		if (
 			application.wheels.cacheCullPercentage > 0
@@ -143,6 +144,7 @@
 			}
 			application.wheels.cache[arguments.category][arguments.key] = local.cacheItem;
 		}
+		}
 	}
 
 
@@ -151,19 +153,21 @@
 	 */
 	public any function $getFromCache(required string key, string category = "main") {
 		local.rv = false;
-		try {
-			if (StructKeyExists(application.wheels.cache[arguments.category], arguments.key)) {
-				if (Now() > application.wheels.cache[arguments.category][arguments.key].expiresAt) {
-					$removeFromCache(key = arguments.key, category = arguments.category);
-				} else {
-					if (IsSimpleValue(application.wheels.cache[arguments.category][arguments.key].value)) {
-						local.rv = application.wheels.cache[arguments.category][arguments.key].value;
+		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
+			try {
+				if (StructKeyExists(application.wheels.cache[arguments.category], arguments.key)) {
+					if (Now() > application.wheels.cache[arguments.category][arguments.key].expiresAt) {
+						$removeFromCache(key = arguments.key, category = arguments.category);
 					} else {
-						local.rv = Duplicate(application.wheels.cache[arguments.category][arguments.key].value);
+						if (IsSimpleValue(application.wheels.cache[arguments.category][arguments.key].value)) {
+							local.rv = application.wheels.cache[arguments.category][arguments.key].value;
+						} else {
+							local.rv = Duplicate(application.wheels.cache[arguments.category][arguments.key].value);
+						}
 					}
 				}
+			} catch (any e) {
 			}
-		} catch (any e) {
 		}
 		return local.rv;
 	}
@@ -197,10 +201,12 @@
 	 * Internal function.
 	 */
 	public void function $clearCache(string category = "") {
-		if (Len(arguments.category)) {
-			StructClear(application.wheels.cache[arguments.category]);
-		} else {
-			StructClear(application.wheels.cache);
+		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
+			if (Len(arguments.category)) {
+				StructClear(application.wheels.cache[arguments.category]);
+			} else {
+				StructClear(application.wheels.cache);
+			}
 		}
 	}
 </cfscript>

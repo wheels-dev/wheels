@@ -1,0 +1,3 @@
+- `$cacheSettingsForAction` now first-matches like `processAction` and keeps `appendToKey` on the returned settings
+- Action cache specs observe write, hit, and key instead of only `processAction()` returning true
+- `$addToCache` / `$getFromCache` / `$clearCache` take a named exclusive `wheelsCacheStore` lock
