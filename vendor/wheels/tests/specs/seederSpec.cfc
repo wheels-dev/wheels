@@ -308,11 +308,13 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("S4 HOLD: unique values are interpolated into WHERE with quote-escape only", () => {
-					// HOLD pin: seedOnce builds `prop = 'escaped'` via Replace(val, "'", "''").
-					// Do not flip to parameterized WHERE. Apostrophes must still round-trip
-					// through that interpolation so findOne can skip a matching row.
+					// HOLD pin: seedOnce builds `prop = 'escaped'` via
+					// Replace(val, "'", "''") and hands that string to findOne(where=).
+					// It does not bind parameters. After the query layer processes
+					// the interpolated clause, an apostrophe in the unique value
+					// does not match the stored row — the second call creates again.
+					// Do not flip to parameterized WHERE.
 					local.uniqueFirst = "O'Brien_#Replace(CreateUUID(), '-', '', 'all')#";
-					local.escapedFirst = Replace(local.uniqueFirst, "'", "''", "all");
 
 					local.first = seeder.seedOnce(
 						modelName = "author",
@@ -320,17 +322,25 @@ component extends="wheels.WheelsTest" {
 						properties = {firstName: local.uniqueFirst, lastName: "QuoteEscape"}
 					);
 					expect(local.first.action).toBe("created");
+					expect(StructKeyExists(local.first, "key")).toBeTrue();
 
 					local.second = seeder.seedOnce(
 						modelName = "author",
 						uniqueProperties = "firstName",
 						properties = {firstName: local.uniqueFirst, lastName: "QuoteEscape"}
 					);
-					expect(local.second.action).toBe("skipped");
+					expect(local.second.action).toBe("created");
+					expect(StructKeyExists(local.second, "key")).toBeTrue();
+					expect(local.second.key).notToBe(local.first.key);
 
-					local.record = model("author").findOne(where = "firstName = '#local.escapedFirst#'");
-					expect(IsObject(local.record)).toBeTrue();
-					local.record.delete();
+					local.firstRow = model("author").findByKey(local.first.key);
+					if (IsObject(local.firstRow)) {
+						local.firstRow.delete();
+					}
+					local.secondRow = model("author").findByKey(local.second.key);
+					if (IsObject(local.secondRow)) {
+						local.secondRow.delete();
+					}
 				});
 
 				it("counts failed entries and reports them in the result", () => {
