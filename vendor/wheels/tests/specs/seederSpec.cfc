@@ -1,9 +1,7 @@
 /**
  * Seeder suite plus hardener proofs for desk IDs S1–S10. Desk IDs stay locked.
  *
- * HOLD (pin unflipped, current behavior only):
- *   S4 — seedOnce interpolates unique values into WHERE (quote-escape only).
- *   S5 — generateSeeds is not transactional (a mixed list can leave rows).
+ * S4 and S5 are flipped (no longer HOLDs). S1–S3 / S6–S10 stay as proven on develop.
  *
  * This is the only seeder spec file. Do not invent wheels.tests.specs.seeder.
  */
@@ -307,13 +305,12 @@ component extends="wheels.WheelsTest" {
 					local.author.delete();
 				});
 
-				it("S4 HOLD: unique values are interpolated into WHERE with quote-escape only", () => {
-					// HOLD pin: seedOnce builds `prop = 'escaped'` via
-					// Replace(val, "'", "''") and hands that string to findOne(where=).
-					// It does not bind parameters. After the query layer processes
-					// the interpolated clause, an apostrophe in the unique value
-					// does not match the stored row — the second call creates again.
-					// Do not flip to parameterized WHERE.
+				it("S4: seedOnce binds unique values so an apostrophe unique key skips on the second call", () => {
+					// Kill-case: quote-escape interpolation (`Replace(val, "'", "''")`
+					// into findOne(where=)) left doubled apostrophes in the bound
+					// value, so the second seedOnce missed the stored O'Brien row
+					// and created again. Placeholders + findOne(parameterize=true)
+					// must skip (action="skipped") and leave a single row.
 					local.uniqueFirst = "O'Brien_#Replace(CreateUUID(), '-', '', 'all')#";
 
 					local.first = seeder.seedOnce(
@@ -329,17 +326,32 @@ component extends="wheels.WheelsTest" {
 						uniqueProperties = "firstName",
 						properties = {firstName: local.uniqueFirst, lastName: "QuoteEscape"}
 					);
-					expect(local.second.action).toBe("created");
-					expect(StructKeyExists(local.second, "key")).toBeTrue();
-					expect(local.second.key).notToBe(local.first.key);
+					expect(local.second.action).toBe("skipped");
+					expect(StructKeyExists(local.second, "key")).toBeFalse();
+
+					// Count matches in CFML — a findOne(where=) assertion would
+					// re-introduce the same apostrophe extraction bug.
+					local.allAuthors = model("author").findAll(select = "id,firstName");
+					local.matchCount = 0;
+					for (local.i = 1; local.i <= local.allAuthors.recordCount; local.i++) {
+						if (local.allAuthors.firstName[local.i] == local.uniqueFirst) {
+							local.matchCount++;
+						}
+					}
+					expect(local.matchCount).toBe(1);
 
 					local.firstRow = model("author").findByKey(local.first.key);
 					if (IsObject(local.firstRow)) {
 						local.firstRow.delete();
 					}
-					local.secondRow = model("author").findByKey(local.second.key);
-					if (IsObject(local.secondRow)) {
-						local.secondRow.delete();
+					local.leftoverQuery = model("author").findAll(select = "id,firstName");
+					for (local.i = 1; local.i <= local.leftoverQuery.recordCount; local.i++) {
+						if (local.leftoverQuery.firstName[local.i] == local.uniqueFirst) {
+							local.leftover = model("author").findByKey(local.leftoverQuery.id[local.i]);
+							if (IsObject(local.leftover)) {
+								local.leftover.delete();
+							}
+						}
 					}
 				});
 
@@ -453,10 +465,12 @@ component extends="wheels.WheelsTest" {
 					expect(StructKeyExists(local.result.seeded[1], "error")).toBeTrue();
 				});
 
-				it("S5 HOLD: generateSeeds is not transactional — a mixed list can leave rows", () => {
-					// HOLD pin: generateSeeds has no transaction. Author rows persist
-					// even though the missing model forces overall success=false.
-					// Do not wrap generateSeeds in a transaction.
+				it("S5: generateSeeds write is transactional — a mixed list leaves no rows", () => {
+					// Mixed list still reports honesty (success=false, totalFailed=1).
+					// totalCreated stays the in-transaction count after rollback,
+					// same as runSeeds (it reports totals even though rows were
+					// rolled back). After the call, no new Author rows remain vs
+					// the before-ids snapshot.
 					local.beforeQuery = model("Author").findAll(select = "id");
 					local.beforeIds = ValueList(local.beforeQuery.id);
 
@@ -476,7 +490,7 @@ component extends="wheels.WheelsTest" {
 
 					local.afterQuery = model("Author").findAll(select = "id");
 					local.afterIds = ValueList(local.afterQuery.id);
-					expect(ListLen(local.afterIds) - ListLen(local.beforeIds)).toBe(1);
+					expect(local.afterIds).toBe(local.beforeIds);
 
 					if (Len(local.beforeIds)) {
 						model("Author").deleteAll(where = "id NOT IN (#local.beforeIds#)", instantiate = false);
