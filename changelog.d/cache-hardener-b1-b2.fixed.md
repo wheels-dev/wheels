@@ -5,5 +5,5 @@
 - `clearCachableActions` drops this controller's action bodies, not metadata only
 - `$clearCache()` clears each category in place and no longer `StructClear`s the parent bucket
 - `caches("Foo")` matches action `foo`
-- `$getFromCache` boxes a stored `false` so it is not a miss
+- `$getFromCache` returns a stored `false` (or other falsey payload) as a hit. A miss is only absent, expired, or culled. `$isCacheMiss()` reads the last lookup, not the value
 - `$addToCache` / `$getFromCache` / `$clearCache` take a named exclusive `wheelsCacheStore` lock

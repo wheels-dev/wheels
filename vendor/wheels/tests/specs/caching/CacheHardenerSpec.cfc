@@ -292,7 +292,8 @@ component extends="wheels.WheelsTest" {
 				g.$addToCache(key = probeKey, value = "s5-body", time = 60, category = "main");
 				expect(g.$getFromCache(key = probeKey, category = "main")).toBe("s5-body");
 				g.$clearCache("main");
-				expect(g.$isCacheMiss(g.$getFromCache(key = probeKey, category = "main"))).toBeTrue();
+				g.$getFromCache(key = probeKey, category = "main");
+				expect(g.$isCacheMiss()).toBeTrue();
 			});
 
 		});
@@ -398,16 +399,29 @@ component extends="wheels.WheelsTest" {
 				g.$clearCache("main");
 			});
 
-			it("S9: a cached boolean false is distinguishable from a miss", function() {
+			it("S9: $addToCache(key, false) then $getFromCache returns false as a hit", function() {
 				g.$clearCache("main");
-				expect(g.$isCacheMiss(g.$getFromCache(key = "s9-missing", category = "main"))).toBeTrue();
+
+				var miss = g.$getFromCache(key = "s9-missing", category = "main");
+				expect(miss).toBeFalse();
+				expect(g.$isCacheMiss()).toBeTrue();
+				expect(StructKeyExists(application.wheels.cache.main, "s9-missing")).toBeFalse();
 
 				g.$addToCache(key = "s9-false", value = false, time = 60, category = "main");
 				var hit = g.$getFromCache(key = "s9-false", category = "main");
-				expect(g.$isCacheMiss(hit)).toBeFalse();
-				expect(IsStruct(hit)).toBeTrue();
-				expect(hit.$wheelsCacheHit).toBeTrue();
-				expect(hit.value).toBeFalse();
+				expect(hit).toBeFalse();
+				expect(g.$isCacheMiss()).toBeFalse();
+				expect(StructKeyExists(application.wheels.cache.main, "s9-false")).toBeTrue();
+			});
+
+			it("S9: other falsey stored payloads are hits, not misses", function() {
+				g.$clearCache("main");
+				g.$addToCache(key = "s9-zero", value = 0, time = 60, category = "main");
+				g.$addToCache(key = "s9-blank", value = "", time = 60, category = "main");
+				expect(g.$getFromCache(key = "s9-zero", category = "main")).toBe(0);
+				expect(g.$isCacheMiss()).toBeFalse();
+				expect(g.$getFromCache(key = "s9-blank", category = "main")).toBe("");
+				expect(g.$isCacheMiss()).toBeFalse();
 			});
 
 		});

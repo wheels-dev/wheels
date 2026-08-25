@@ -72,10 +72,11 @@
 	}
 
 	/**
-	 * True when $getFromCache returned a miss (boolean false), not a stored false.
+	 * True when the last $getFromCache was a miss (absent, expired, or culled).
+	 * A stored falsey value is a hit. Do not infer miss from the returned value.
 	 */
-	public boolean function $isCacheMiss(required any result) {
-		return IsBoolean(arguments.result) && !arguments.result;
+	public boolean function $isCacheMiss() {
+		return !IsDefined("request.wheels.cacheLastHit") || !request.wheels.cacheLastHit;
 	}
 
 
@@ -207,6 +208,7 @@
 	 */
 	public any function $getFromCache(required string key, string category = "main") {
 		local.rv = false;
+		local.hit = false;
 		lock name="#application.applicationName#wheelsCacheStore" type="exclusive" timeout="30" {
 			try {
 				local.storeKey = arguments.key;
@@ -222,14 +224,16 @@
 						} else {
 							local.rv = Duplicate(application.wheels.cache[arguments.category][local.storeKey].value);
 						}
-						if (IsBoolean(local.rv) && !local.rv) {
-							local.rv = {$wheelsCacheHit = true, value = false};
-						}
+						local.hit = true;
 					}
 				}
 			} catch (any e) {
 			}
 		}
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		request.wheels.cacheLastHit = local.hit;
 		return local.rv;
 	}
 
