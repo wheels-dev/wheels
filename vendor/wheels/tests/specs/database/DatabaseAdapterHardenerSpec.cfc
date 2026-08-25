@@ -11,24 +11,26 @@ component extends="wheels.WheelsTest" {
 		describe("S2 HOLD $executeQuery string null after IS", () => {
 
 			it("binds the string null after IS and IS NOT", () => {
-				var result = g.model("post").$whereClause(where = "averagerating IS NULL");
+				var sql = g.model("post").$whereClause(where = "averagerating IS NULL");
+				sql = g.model("post").$addWhereClauseParameters(sql = sql, where = "averagerating IS NULL");
 				var bound = "";
-				for (var part in result) {
-					if (IsStruct(part) && StructKeyExists(part, "value")) {
+				for (var part in sql) {
+					if (IsStruct(part) && StructKeyExists(part, "value") && LCase(ToString(part.value)) == "null") {
 						bound = part.value;
 					}
 				}
-				expect(bound).toBe("null");
+				expect(LCase(bound)).toBe("null");
 				expect(IsSimpleValue(bound)).toBeTrue();
 
-				result = g.model("post").$whereClause(where = "averagerating IS NOT NULL");
+				sql = g.model("post").$whereClause(where = "averagerating IS NOT NULL");
+				sql = g.model("post").$addWhereClauseParameters(sql = sql, where = "averagerating IS NOT NULL");
 				bound = "";
-				for (part in result) {
-					if (IsStruct(part) && StructKeyExists(part, "value")) {
+				for (part in sql) {
+					if (IsStruct(part) && StructKeyExists(part, "value") && LCase(ToString(part.value)) == "null") {
 						bound = part.value;
 					}
 				}
-				expect(bound).toBe("null");
+				expect(LCase(bound)).toBe("null");
 			});
 
 			it("still converts that string to SQL NULL in $executeQuery", () => {
