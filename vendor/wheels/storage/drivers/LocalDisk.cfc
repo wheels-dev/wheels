@@ -73,6 +73,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	}
 
 	public string function signedUrl(required string key, numeric expiresIn = 300, string contentDisposition = "") {
+		$assertExpiresIn(arguments.expiresIn);
 		if (!Len(variables.signingKey)) {
 			throw(
 				type = "Wheels.Storage.MissingSigningKey",
@@ -157,6 +158,14 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 				message = "Storage key [#arguments.key#] must not contain '..'."
 			);
 		}
+		// Empty or slash-only keys resolve to root itself. Throw rather than
+		// let put() write the disk root or get() treat the directory as NotFound.
+		if (!Len(REReplace(local.clean, "/", "", "all"))) {
+			throw(
+				type = "Wheels.Storage.InvalidKey",
+				message = "Storage key [#arguments.key#] must not be empty or slash-only."
+			);
+		}
 		return variables.root & "/" & local.clean;
 	}
 
@@ -178,12 +187,28 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	private string function $joinUrl(required string prefix, required string key) {
 		local.p = REReplace(arguments.prefix, "/+$", "");
 		local.k = REReplace(arguments.key, "^/+", "");
-		return local.p & "/" & local.k;
+		return local.p & "/" & $uriEncodePath(local.k);
 	}
 
 	private string function $uriEncode(required string value) {
-		local.encoded = CreateObject("java", "java.net.URLEncoder").encode(arguments.value, "UTF-8");
-		return Replace(local.encoded, "+", "%20", "all");
+		local.encoded = CreateObject("java", "java.net.URLEncoder").encode(ToString(arguments.value), "UTF-8");
+		local.encoded = Replace(local.encoded, "+", "%20", "all");
+		local.encoded = Replace(local.encoded, "*", "%2A", "all");
+		local.encoded = Replace(local.encoded, "%7E", "~", "all");
+		return local.encoded;
+	}
+
+	private string function $uriEncodePath(required string key) {
+		return Replace($uriEncode(arguments.key), "%2F", "/", "all");
+	}
+
+	private void function $assertExpiresIn(required numeric expiresIn) {
+		if (arguments.expiresIn < 1 || arguments.expiresIn > 604800) {
+			throw(
+				type = "Wheels.Storage.InvalidExpiresIn",
+				message = "signedUrl expiresIn must be between 1 and 604800 seconds (got #arguments.expiresIn#)."
+			);
+		}
 	}
 
 	private numeric function $epochSeconds() {

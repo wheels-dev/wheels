@@ -71,6 +71,7 @@ component output="false" {
 		string contentDisposition = "",
 		string amzDate = ""
 	) {
+		$assertExpiresIn(arguments.expiresIn);
 		local.amzDate = Len(arguments.amzDate) ? arguments.amzDate : $amzNow();
 		local.dateStamp = Left(local.amzDate, 8);
 		local.credentialScope = local.dateStamp & "/" & variables.region & "/" & variables.service & "/aws4_request";
@@ -120,6 +121,7 @@ component output="false" {
 	 * @payload Request body (binary or string); empty for GET/DELETE/HEAD.
 	 * @amzDate Optional deterministic timestamp override.
 	 * @range Optional Range header value (e.g. "bytes=0-9"). Empty keeps the current signed header set.
+	 * @acl Optional x-amz-acl value. Empty keeps the current signed header set (S8 vector).
 	 * @return Struct of header name => value to attach to the request.
 	 */
 	public struct function signedHeaders(
@@ -127,7 +129,8 @@ component output="false" {
 		required string key,
 		any payload = "",
 		string amzDate = "",
-		string range = ""
+		string range = "",
+		string acl = ""
 	) {
 		local.amzDate = Len(arguments.amzDate) ? arguments.amzDate : $amzNow();
 		local.dateStamp = Left(local.amzDate, 8);
@@ -139,19 +142,21 @@ component output="false" {
 			? "/" & $uriEncodePath(variables.bucket & "/" & arguments.key)
 			: "/" & $uriEncodePath(arguments.key);
 
-		// Headers signed for header-auth: host, x-amz-content-sha256, x-amz-date (sorted).
-		local.canonicalHeaders = "host:" & variables.host & Chr(10)
-			& "x-amz-content-sha256:" & local.payloadHash & Chr(10)
-			& "x-amz-date:" & local.amzDate & Chr(10);
-		local.signedHeaderList = "host;x-amz-content-sha256;x-amz-date";
-
+		// Optional range / acl insert in code-point order so the S8 no-acl vector
+		// stays byte-identical when both are empty.
+		local.canonicalHeaders = "host:" & variables.host & Chr(10);
+		local.signedHeaderList = "host";
 		if (Len(arguments.range)) {
-			local.canonicalHeaders = "host:" & variables.host & Chr(10)
-				& "range:" & arguments.range & Chr(10)
-				& "x-amz-content-sha256:" & local.payloadHash & Chr(10)
-				& "x-amz-date:" & local.amzDate & Chr(10);
-			local.signedHeaderList = "host;range;x-amz-content-sha256;x-amz-date";
+			local.canonicalHeaders &= "range:" & arguments.range & Chr(10);
+			local.signedHeaderList &= ";range";
 		}
+		if (Len(arguments.acl)) {
+			local.canonicalHeaders &= "x-amz-acl:" & arguments.acl & Chr(10);
+			local.signedHeaderList &= ";x-amz-acl";
+		}
+		local.canonicalHeaders &= "x-amz-content-sha256:" & local.payloadHash & Chr(10)
+			& "x-amz-date:" & local.amzDate & Chr(10);
+		local.signedHeaderList &= ";x-amz-content-sha256;x-amz-date";
 
 		local.canonicalRequest = UCase(arguments.method) & Chr(10)
 			& local.canonicalUri & Chr(10)
@@ -167,21 +172,19 @@ component output="false" {
 			& "SignedHeaders=" & local.signedHeaderList & ", "
 			& "Signature=" & local.signature;
 
-		if (Len(arguments.range)) {
-			return {
-				"Authorization" = local.authorization,
-				"x-amz-content-sha256" = local.payloadHash,
-				"x-amz-date" = local.amzDate,
-				"Host" = variables.host,
-				"Range" = arguments.range
-			};
-		}
-		return {
+		local.headers = {
 			"Authorization" = local.authorization,
 			"x-amz-content-sha256" = local.payloadHash,
 			"x-amz-date" = local.amzDate,
 			"Host" = variables.host
 		};
+		if (Len(arguments.range)) {
+			local.headers["Range"] = arguments.range;
+		}
+		if (Len(arguments.acl)) {
+			local.headers["x-amz-acl"] = arguments.acl;
+		}
+		return local.headers;
 	}
 
 	/**
@@ -291,6 +294,15 @@ component output="false" {
 	 */
 	private string function $uriEncodePath(required string key) {
 		return Replace($uriEncodeSegment(arguments.key), "%2F", "/", "all");
+	}
+
+	private void function $assertExpiresIn(required numeric expiresIn) {
+		if (arguments.expiresIn < 1 || arguments.expiresIn > 604800) {
+			throw(
+				type = "Wheels.Storage.InvalidExpiresIn",
+				message = "signedUrl expiresIn must be between 1 and 604800 seconds (got #arguments.expiresIn#)."
+			);
+		}
 	}
 
 	/**
