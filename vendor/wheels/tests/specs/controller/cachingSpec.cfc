@@ -37,7 +37,18 @@ component extends="wheels.WheelsTest" {
 
 			it("is getting cache settings for action", () => {
 				_controller = application.wo.controller(name = "dummy")
+				_controller.$clearCachableActions()
 				_controller.caches(action = "dummy1", time = 100)
+				r = _controller.$cacheSettingsForAction("dummy1")
+
+				expect(r.time).toBe(100)
+			})
+
+			it("keeps first-match when two caches() rows name the same action", () => {
+				_controller = application.wo.controller(name = "dummy")
+				_controller.$clearCachableActions()
+				_controller.caches(action = "dummy1", time = 100)
+				_controller.caches(action = "dummy1", time = 5)
 				r = _controller.$cacheSettingsForAction("dummy1")
 
 				expect(r.time).toBe(100)
