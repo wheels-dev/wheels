@@ -148,6 +148,16 @@ component {
 </script>";
 	}
 
+	public boolean function $isChannelBufferItem(required any item) {
+		if (IsStruct(arguments.item)) {
+			return true;
+		}
+		if (IsSimpleValue(arguments.item) && !IsBoolean(arguments.item)) {
+			return true;
+		}
+		return false;
+	}
+
 	public void function $assertChannelName(required string channel) {
 		if (!Len(Trim(arguments.channel))) {
 			throw(type = "Wheels.Channel.InvalidName", message = "Channel name cannot be empty.");
@@ -156,15 +166,33 @@ component {
 
 	public array function $drainChannelBuffer(required any buffer) {
 		local.events = [];
+		try {
+			local.next = arguments.buffer.poll();
+			while (!IsNull(local.next)) {
+				if (!$isChannelBufferItem(local.next)) {
+					break;
+				}
+				ArrayAppend(local.events, local.next);
+				local.next = arguments.buffer.poll();
+			}
+			if (ArrayLen(local.events)) {
+				return local.events;
+			}
+		} catch (any e) {
+		}
 		while (true) {
 			if (!arguments.buffer.size()) {
 				break;
 			}
 			try {
-				ArrayAppend(local.events, arguments.buffer.remove(JavaCast("int", 0)));
-			} catch (any e) {
+				local.item = arguments.buffer.remove(JavaCast("int", 0));
+			} catch (any drainError) {
 				break;
 			}
+			if (!$isChannelBufferItem(local.item)) {
+				break;
+			}
+			ArrayAppend(local.events, local.item);
 		}
 		return local.events;
 	}
@@ -184,10 +212,7 @@ component {
 		local.writer = initSSEStream();
 		local.engine = $getChannelEngine("memory");
 
-		// Thread-safe event buffer using a synchronized list
-		local.buffer = CreateObject("java", "java.util.Collections").synchronizedList(
-			CreateObject("java", "java.util.ArrayList").init()
-		);
+		local.buffer = CreateObject("java", "java.util.concurrent.ConcurrentLinkedQueue").init();
 
 		// Subscribe with a callback that buffers events
 		local.subscriberId = local.engine.subscribe(
@@ -197,7 +222,7 @@ component {
 				if (ArrayLen(eventFilter) && !ArrayFind(eventFilter, event.event)) {
 					return;
 				}
-				buffer.add(event);
+				buffer.offer(event);
 			}
 		);
 
@@ -207,7 +232,7 @@ component {
 				if (ArrayLen(arguments.eventFilter) && !ArrayFind(arguments.eventFilter, local.replayEvt.event)) {
 					continue;
 				}
-				local.buffer.add(local.replayEvt);
+				local.buffer.offer(local.replayEvt);
 			}
 		}
 

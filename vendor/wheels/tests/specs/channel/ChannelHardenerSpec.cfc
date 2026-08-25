@@ -174,9 +174,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("$subscribeMemory sends replayed events and not the lastEventId itself", function() {
-				var stubDir = ExpandPath("/testbox/system/stubs");
-				CreateObject("java", "java.io.File").init(stubDir).mkdirs();
-
 				params = {controller = "dummy", action = "dummy"};
 				_controller = g.controller("dummy", params);
 
@@ -185,14 +182,11 @@ component extends="wheels.WheelsTest" {
 				engine.publish(channel = channelName, event = "note", data = "old", id = "s5-old");
 				engine.publish(channel = channelName, event = "note", data = "new", id = "s5-new");
 
-				var fakeWriter = createStub();
-				fakeWriter.$("checkError").$results(false, true);
+				var fakeWriter = new wheels.tests._assets.channel.SseWriterFake();
 
 				prepareMock(_controller);
 				_controller.$(method = "initSSEStream", returns = fakeWriter);
 				_controller.$(method = "$getChannelEngine", returns = engine);
-				_controller.$(method = "sendSSEEvent");
-				_controller.$(method = "sendSSEComment");
 				_controller.$(method = "closeSSEStream");
 
 				_controller.$subscribeMemory(
@@ -203,10 +197,10 @@ component extends="wheels.WheelsTest" {
 					heartbeatInterval = 60
 				);
 
-				var sent = _controller.$callLog().sendSSEEvent;
-				expect(ArrayLen(sent)).toBe(1);
-				expect(sent[1].id).toBe("s5-new");
-				expect(sent[1].data).toBe("new");
+				var body = ArrayToList(fakeWriter.chunks(), "");
+				expect(Find("id: s5-new", body)).toBeGT(0);
+				expect(Find("data: new", body)).toBeGT(0);
+				expect(Find("id: s5-old", body)).toBe(0);
 			});
 
 		});
