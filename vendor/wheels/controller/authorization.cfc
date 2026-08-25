@@ -46,6 +46,7 @@ component {
 		if (
 			IsObject(local.policy)
 			&& Len(local.action)
+			&& !$isReservedPolicyAction(local.action)
 			&& StructKeyExists(local.policy, local.action)
 			&& IsCustomFunction(local.policy[local.action])
 		) {
@@ -94,6 +95,7 @@ component {
 		local.policy = $policyFor(arguments.record);
 		if (
 			!IsObject(local.policy)
+			|| $isReservedPolicyAction(arguments.action)
 			|| !StructKeyExists(local.policy, arguments.action)
 			|| !IsCustomFunction(local.policy[arguments.action])
 		) {
@@ -131,12 +133,17 @@ component {
 	 */
 	public any function policyScope(required any collection) {
 		local.modelName = $policyModelName(arguments.collection);
-		if (!Len(local.modelName) && $get("showErrorInformation")) {
-			Throw(
-				type = "Wheels.Policy.InvalidCollection",
-				message = "policyScope() could not derive a model from the passed collection.",
-				extendedInfo = "Pass the model class first and chain from the result, e.g. `policyScope(model(""Post"")).active().findAll()`. Query-builder and scope chains that are already in flight cannot be passed to policyScope()."
-			);
+		if (!Len(local.modelName)) {
+			if ($get("showErrorInformation")) {
+				Throw(
+					type = "Wheels.Policy.InvalidCollection",
+					message = "policyScope() could not derive a model from the passed collection.",
+					extendedInfo = "Pass the model class first and chain from the result, e.g. `policyScope(model(""Post"")).active().findAll()`. Query-builder and scope chains that are already in flight cannot be passed to policyScope()."
+				);
+			}
+			// Production InvalidCollection: fail-closed. Do not call whereIn on a
+			// collection we could not resolve (empty IN, matching-all, or no method).
+			return CreateObject("component", "wheels.Policy").init();
 		}
 		local.policy = $policyFor(arguments.collection);
 		if (!IsObject(local.policy)) {
@@ -210,6 +217,15 @@ component {
 	 */
 	public string function $policyClassName(required string modelName) {
 		return capitalize(arguments.modelName) & "Policy";
+	}
+
+	/**
+	 * Internal function. `init` and `scope` are Policy lifecycle methods, not
+	 * grantable actions. authorize()/can() must not Invoke them (missing
+	 * `collection` on scope() is a 500, not Wheels.NotAuthorized).
+	 */
+	public boolean function $isReservedPolicyAction(required string actionName) {
+		return ListFindNoCase("init,scope", arguments.actionName) > 0;
 	}
 
 	/**

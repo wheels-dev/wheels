@@ -98,16 +98,49 @@ component {
 
 	/**
 	 * Narrows a collection to the records the user may see (used by `policyScope()`
-	 * for `index` actions). Default-deny: returns a no-rows chain. The empty
-	 * `whereIn` sets the query builder's injection-safe always-empty flag (see
-	 * ##2736) without interpolating the property name into SQL, so it composes
-	 * with any model, query-builder chain, or scope chain. Override in your
-	 * policy to widen.
+	 * for `index` actions). Default-deny: returns a no-rows chain that does not
+	 * call `whereIn` with an empty id list, so an empty resolved-id set cannot
+	 * become `IN ()` or match every row. Override in your policy to widen.
 	 *
 	 * @collection The model class (or chainable query builder / scope chain) to narrow.
 	 */
 	public any function scope(required any collection) {
-		return arguments.collection.whereIn("id", []);
+		return CreateObject("component", "wheels.Policy").init();
+	}
+
+	/**
+	 * The identity this policy was initialized with. An empty string is a guest.
+	 */
+	public any function currentUser() {
+		return variables.user;
+	}
+
+	/**
+	 * No-rows terminal for the default-deny `scope()` chain.
+	 */
+	public numeric function count() {
+		return 0;
+	}
+
+	/**
+	 * Empty query for the default-deny `scope()` chain.
+	 */
+	public query function findAll() {
+		return QueryNew("id");
+	}
+
+	/**
+	 * Keeps the default-deny chain empty when callers compose after `scope()`.
+	 */
+	public any function where() {
+		return this;
+	}
+
+	/**
+	 * Keeps the default-deny chain empty. Does not interpolate an empty `IN ()`.
+	 */
+	public any function whereIn() {
+		return this;
 	}
 
 }
