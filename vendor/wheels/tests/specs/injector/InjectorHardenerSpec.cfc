@@ -1,8 +1,8 @@
 /**
  * Hardener proofs for Injector desk IDs S1–S10. Desk IDs stay locked.
  *
- * HOLD (pin current behavior, no production flip): S2, S3, S7.
- * PROVE: S1, S4, S5, S6, S8, S9, S10. S4 stays dotted-path fallback.
+ * Flipped: S2 rebind reset, S3 fail-loud / flag the new key, S7 Duplicate copy.
+ * Unchanged on develop: S1, S4, S5, S6, S8, S9, S10. S4 stays dotted-path fallback.
  *
  * Directory-scoped so `wheels test --core --ci --filter=injector` discovers
  * this folder (a single-file directory= scope finds 0 bundles).
@@ -38,81 +38,172 @@ component extends="wheels.WheelsTest" {
 
 			});
 
-			describe("S2 HOLD rebind keeps flags and request cache", () => {
+			describe("S2 rebind resets flags and drops request cache", () => {
 
-				it("S2 HOLD: rebind overwrites the path but keeps the singleton flag", () => {
+				it("S2: rebind overwrites the path and resets the singleton flag", () => {
 					di.map("rebind").to("wheels.tests._assets.di.SimpleService").asSingleton();
 					expect(di.isSingleton("rebind")).toBeTrue();
 					di.map("rebind").to("wheels.tests._assets.di.OptionalDependentService");
 					expect(di.getMappings()["rebind"]).toBe("wheels.tests._assets.di.OptionalDependentService");
-					expect(di.isSingleton("rebind")).toBeTrue();
+					expect(di.isSingleton("rebind")).toBeFalse();
+					expect(di.isRequestScoped("rebind")).toBeFalse();
+					var after = di.getInstance("rebind");
+					expect(after.hasDependency()).toBeFalse();
 				});
 
-				it("S2 HOLD: rebind keeps the request-scoped flag and does not drop request.$wheelsDICache", () => {
+				it("S2: rebind resets the request-scoped flag and drops request.$wheelsDICache", () => {
 					di.map("rebindReq").to("wheels.tests._assets.di.SimpleService").asRequestScoped();
 					structDelete(request, "$wheelsDICache");
 					var first = di.getInstance("rebindReq");
 					first.setMarker("cached");
 					expect(structKeyExists(request, "$wheelsDICache")).toBeTrue();
-					di.map("rebindReq").to("wheels.tests._assets.di.OptionalDependentService");
-					expect(di.isRequestScoped("rebindReq")).toBeTrue();
-					expect(di.getMappings()["rebindReq"]).toBe("wheels.tests._assets.di.OptionalDependentService");
-					expect(structKeyExists(request, "$wheelsDICache")).toBeTrue();
 					expect(structKeyExists(request["$wheelsDICache"], "rebindReq")).toBeTrue();
-					expect(request["$wheelsDICache"]["rebindReq"].getMarker()).toBe("cached");
+					di.map("rebindReq").to("wheels.tests._assets.di.OptionalDependentService");
+					expect(di.isRequestScoped("rebindReq")).toBeFalse();
+					expect(di.isSingleton("rebindReq")).toBeFalse();
+					expect(di.getMappings()["rebindReq"]).toBe("wheels.tests._assets.di.OptionalDependentService");
+					expect(structKeyExists(request, "$wheelsDICache")).toBeFalse();
 				});
 
-				it("S2 HOLD: singleton rebind never structDeletes request.$wheelsDICache", () => {
+				it("S2: singleton rebind structDeletes request.$wheelsDICache including unrelated keys", () => {
 					request["$wheelsDICache"] = {sentinel = true};
 					di.map("rebindSolo").to("wheels.tests._assets.di.SimpleService").asSingleton();
-					di.getInstance("rebindSolo");
-					di.map("rebindSolo").to("wheels.tests._assets.di.OptionalDependentService");
 					expect(structKeyExists(request, "$wheelsDICache")).toBeTrue();
 					expect(request["$wheelsDICache"].sentinel).toBeTrue();
+					di.getInstance("rebindSolo");
+					di.map("rebindSolo").to("wheels.tests._assets.di.OptionalDependentService");
+					expect(structKeyExists(request, "$wheelsDICache")).toBeFalse();
+					expect(di.isSingleton("rebindSolo")).toBeFalse();
+				});
+
+				it("S2: first bind of a new name does not drop request.$wheelsDICache", () => {
+					request["$wheelsDICache"] = {sentinel = true};
+					di.map("firstBind").to("wheels.tests._assets.di.SimpleService");
+					expect(structKeyExists(request, "$wheelsDICache")).toBeTrue();
+					expect(request["$wheelsDICache"].sentinel).toBeTrue();
+					expect(di.isSingleton("firstBind")).toBeFalse();
+				});
+
+				it("S2: rebind of one name does not reset an unrelated mapping's flags", () => {
+					di.map("keepSolo").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					di.map("keepReq").to("wheels.tests._assets.di.SimpleService").asRequestScoped();
+					di.map("rebindOther").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					expect(di.isSingleton("keepSolo")).toBeTrue();
+					expect(di.isRequestScoped("keepReq")).toBeTrue();
+					di.map("rebindOther").to("wheels.tests._assets.di.OptionalDependentService");
+					expect(di.isSingleton("rebindOther")).toBeFalse();
+					expect(di.isSingleton("keepSolo")).toBeTrue();
+					expect(di.isRequestScoped("keepReq")).toBeTrue();
+					expect(di.isSingleton("keepReq")).toBeFalse();
+				});
+
+				it("S2: same-path rebind still resets flags until asSingleton is called again", () => {
+					di.map("samePath").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					var before = di.getInstance("samePath");
+					before.setMarker("stable");
+					di.map("samePath").to("wheels.tests._assets.di.SimpleService");
+					expect(di.isSingleton("samePath")).toBeFalse();
+					var mid = di.getInstance("samePath");
+					expect(mid.getMarker()).toBe("");
+					di.map("samePath").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					expect(di.isSingleton("samePath")).toBeTrue();
 				});
 
 			});
 
-			describe("S3 HOLD lastMappedName empty no-op and previous-key flag", () => {
+			describe("S3 asSingleton / asRequestScoped fail loud and flag the new key", () => {
 
-				it("S3 HOLD: asSingleton is a silent no-op when lastMappedName is empty", () => {
-					di.asSingleton();
+				it("S3: asSingleton throws Wheels.Injector when lastMappedName is empty", () => {
+					var state = {type = ""};
+					try {
+						di.asSingleton();
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.Injector");
 					expect(di.isSingleton("anything")).toBeFalse();
 					expect(structCount(di.getMappings())).toBe(0);
 				});
 
-				it("S3 HOLD: asRequestScoped is a silent no-op when lastMappedName is empty", () => {
-					di.asRequestScoped();
+				it("S3: asRequestScoped throws Wheels.Injector when lastMappedName is empty", () => {
+					var state = {type = ""};
+					try {
+						di.asRequestScoped();
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.Injector");
 					expect(di.isRequestScoped("anything")).toBeFalse();
+					expect(structCount(di.getMappings())).toBe(0);
 				});
 
-				it("S3 HOLD: asSingleton after map() but before to() does not flag the in-progress name", () => {
+				it("S3: empty lastMappedName throw type matches to() without map()", () => {
+					var stateBare = {type = ""};
+					try {
+						di.to("wheels.tests._assets.di.SimpleService");
+					} catch (any e) {
+						stateBare.type = e.type;
+					}
+					var stateSolo = {type = ""};
+					try {
+						di.asSingleton();
+					} catch (any e) {
+						stateSolo.type = e.type;
+					}
+					var stateReq = {type = ""};
+					try {
+						di.asRequestScoped();
+					} catch (any e) {
+						stateReq.type = e.type;
+					}
+					expect(stateBare.type).toBe("Wheels.Injector");
+					expect(stateSolo.type).toBe("Wheels.Injector");
+					expect(stateReq.type).toBe("Wheels.Injector");
+					expect(stateSolo.type).toBe(stateBare.type);
+					expect(stateReq.type).toBe(stateBare.type);
+				});
+
+				it("S3: asSingleton after map() but before to() flags the in-progress name", () => {
 					di.map("incomplete");
 					di.asSingleton();
-					expect(di.isSingleton("incomplete")).toBeFalse();
+					expect(di.isSingleton("incomplete")).toBeTrue();
 					di.to("wheels.tests._assets.di.SimpleService");
 					expect(di.containsInstance("incomplete")).toBeTrue();
-					expect(di.isSingleton("incomplete")).toBeFalse();
+					expect(di.isSingleton("incomplete")).toBeTrue();
+					var first = di.getInstance("incomplete");
+					first.setMarker("incomplete");
+					expect(di.getInstance("incomplete").getMarker()).toBe("incomplete");
 				});
 
-				it("S3 HOLD: map(b).asSingleton().to(...) flags the previous key, not b", () => {
+				it("S3: map(b).asSingleton().to(...) flags b, not the previous key", () => {
 					di.map("previous").to("wheels.tests._assets.di.SimpleService");
 					di.map("b").asSingleton().to("wheels.tests._assets.di.SimpleService");
-					expect(di.isSingleton("previous")).toBeTrue();
-					expect(di.isSingleton("b")).toBeFalse();
+					expect(di.isSingleton("previous")).toBeFalse();
+					expect(di.isSingleton("b")).toBeTrue();
 					var prev = di.getInstance("previous");
 					prev.setMarker("prev");
-					expect(di.getInstance("previous").getMarker()).toBe("prev");
+					expect(di.getInstance("previous").getMarker()).toBe("");
 					var bee = di.getInstance("b");
 					bee.setMarker("bee");
-					expect(di.getInstance("b").getMarker()).toBe("");
+					expect(di.getInstance("b").getMarker()).toBe("bee");
 				});
 
-				it("S3 HOLD: map(b).asRequestScoped().to(...) flags the previous key, not b", () => {
+				it("S3: map(b).asRequestScoped().to(...) flags b, not the previous key", () => {
 					di.map("previousReq").to("wheels.tests._assets.di.SimpleService");
 					di.map("bReq").asRequestScoped().to("wheels.tests._assets.di.SimpleService");
-					expect(di.isRequestScoped("previousReq")).toBeTrue();
-					expect(di.isRequestScoped("bReq")).toBeFalse();
+					expect(di.isRequestScoped("previousReq")).toBeFalse();
+					expect(di.isRequestScoped("bReq")).toBeTrue();
+					expect(di.isSingleton("previousReq")).toBeFalse();
+					expect(di.isSingleton("bReq")).toBeFalse();
+				});
+
+				it("S3: map(b).asSingleton().to(...) on a fresh injector flags b when lastMappedName is empty", () => {
+					di.map("bFresh").asSingleton().to("wheels.tests._assets.di.SimpleService");
+					expect(di.isSingleton("bFresh")).toBeTrue();
+					expect(di.isRequestScoped("bFresh")).toBeFalse();
+					var first = di.getInstance("bFresh");
+					first.setMarker("fresh");
+					expect(di.getInstance("bFresh").getMarker()).toBe("fresh");
 				});
 
 			});
@@ -209,21 +300,35 @@ component extends="wheels.WheelsTest" {
 
 			});
 
-			describe("S7 HOLD getMappings returns the live struct", () => {
+			describe("S7 getMappings returns a Duplicate copy", () => {
 
-				it("S7 HOLD: mutating the struct returned by getMappings() mutates the container", () => {
+				it("S7: mutating the struct returned by getMappings() does not mutate the container", () => {
 					di.map("live").to("wheels.tests._assets.di.SimpleService");
 					var mappings = di.getMappings();
-					mappings["injectedByTest"] = "should-mutate-live";
-					expect(di.containsInstance("injectedByTest")).toBeTrue();
-					expect(di.getMappings()["injectedByTest"]).toBe("should-mutate-live");
+					mappings["injectedByTest"] = "should-not-mutate-live";
+					expect(di.containsInstance("injectedByTest")).toBeFalse();
+					expect(structKeyExists(di.getMappings(), "injectedByTest")).toBeFalse();
+					expect(di.getMappings()["live"]).toBe("wheels.tests._assets.di.SimpleService");
 				});
 
-				it("S7 HOLD: a later map().to() is visible on a previously returned getMappings() struct", () => {
+				it("S7: a later map().to() is not visible on a previously returned getMappings() struct", () => {
 					var mappings = di.getMappings();
+					expect(structCount(mappings)).toBe(0);
 					di.map("later").to("wheels.tests._assets.di.SimpleService");
-					expect(structKeyExists(mappings, "later")).toBeTrue();
-					expect(mappings["later"]).toBe("wheels.tests._assets.di.SimpleService");
+					expect(structKeyExists(mappings, "later")).toBeFalse();
+					expect(structCount(mappings)).toBe(0);
+					expect(di.containsInstance("later")).toBeTrue();
+					expect(di.getMappings()["later"]).toBe("wheels.tests._assets.di.SimpleService");
+				});
+
+				it("S7: deleting or overwriting a key on the copy leaves the live mapping", () => {
+					di.map("keep").to("wheels.tests._assets.di.SimpleService");
+					var mappings = di.getMappings();
+					mappings["keep"] = "overwritten-on-copy";
+					structDelete(mappings, "keep");
+					expect(di.containsInstance("keep")).toBeTrue();
+					expect(di.getMappings()["keep"]).toBe("wheels.tests._assets.di.SimpleService");
+					expect(structKeyExists(mappings, "keep")).toBeFalse();
 				});
 
 			});

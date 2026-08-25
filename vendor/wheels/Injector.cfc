@@ -72,6 +72,16 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	 * @name The alias name for this mapping (e.g. "global", "Plugins")
 	 */
 	public Injector function map(required string name) {
+		// S2: remapping an existing name starts a new lifecycle. Reset
+		// singleton / request flags here (not in to()) so
+		// map(b).asSingleton().to(...) can flag b after the reset.
+		// First bind of a new name is not a rebind — leave request cache
+		// and any unrelated flags alone.
+		if (structKeyExists(variables.mappings, arguments.name)) {
+			structDelete(variables.singletonFlags, arguments.name);
+			structDelete(variables.requestScopedFlags, arguments.name);
+			structDelete(request, "$wheelsDICache");
+		}
 		variables.currentMapping = arguments.name;
 		return this;
 	}
@@ -113,24 +123,22 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	}
 
 	/**
-	 * Mark the most recently completed mapping as a singleton.
-	 * When getInstance() is called for a singleton, the instance is cached.
+	 * Mark the in-progress mapping (map then asSingleton then to) or the
+	 * most recently completed mapping as a singleton. Throws Wheels.Injector
+	 * when neither currentMapping nor lastMappedName is set.
 	 */
 	public Injector function asSingleton() {
-		if (len(variables.lastMappedName)) {
-			variables.singletonFlags[variables.lastMappedName] = true;
-		}
+		variables.singletonFlags[$scopeTarget("asSingleton")] = true;
 		return this;
 	}
 
 	/**
-	 * Mark the most recently completed mapping as request-scoped.
-	 * When getInstance() is called, the instance is cached per-request in request.$wheelsDICache.
+	 * Mark the in-progress mapping (map then asRequestScoped then to) or
+	 * the most recently completed mapping as request-scoped. Throws
+	 * Wheels.Injector when neither currentMapping nor lastMappedName is set.
 	 */
 	public Injector function asRequestScoped() {
-		if (len(variables.lastMappedName)) {
-			variables.requestScopedFlags[variables.lastMappedName] = true;
-		}
+		variables.requestScopedFlags[$scopeTarget("asRequestScoped")] = true;
 		return this;
 	}
 
@@ -287,7 +295,9 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	 * Return all registered mappings (name → componentPath).
 	 */
 	public struct function getMappings() {
-		return variables.mappings;
+		// S7: callers get a Duplicate copy. Mutating the return value
+		// must not change later getMappings() or the live mappings table.
+		return Duplicate(variables.mappings);
 	}
 
 	/**
@@ -353,6 +363,25 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 			return variables.mappings[arguments.name];
 		}
 		return arguments.name;
+	}
+
+	/**
+	 * Name that asSingleton() / asRequestScoped() should flag.
+	 * Prefers the in-progress map() name so map(b).asSingleton().to(...)
+	 * binds b, not the previous lastMappedName. Empty both sides is
+	 * Wheels.Injector — same type as to() without map().
+	 */
+	private string function $scopeTarget(required string methodName) {
+		if (len(variables.currentMapping)) {
+			return variables.currentMapping;
+		}
+		if (len(variables.lastMappedName)) {
+			return variables.lastMappedName;
+		}
+		throw(
+			type = "Wheels.Injector",
+			message = "#arguments.methodName#() called without a preceding map() or to() call."
+		);
 	}
 
 	/**
