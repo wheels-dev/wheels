@@ -42,7 +42,14 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	}
 
 	public any function put(required string key, required any content, string contentType = "application/octet-stream", string visibility = "") {
-		local.headers = variables.signer.signedHeaders(method = "PUT", key = arguments.key, payload = arguments.content);
+		local.visibility = Len(arguments.visibility) ? arguments.visibility : variables.visibility;
+		local.acl = $aclFromVisibility(local.visibility);
+		local.headers = variables.signer.signedHeaders(
+			method = "PUT",
+			key = arguments.key,
+			payload = arguments.content,
+			acl = local.acl
+		);
 		local.result = $request(method = "PUT", key = arguments.key, headers = local.headers, body = arguments.content, contentType = arguments.contentType);
 		$assertSuccess(result = local.result, method = "PUT", key = arguments.key);
 		return arguments.key;
@@ -77,10 +84,12 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	}
 
 	public boolean function delete(required string key) {
+		if (!exists(arguments.key)) {
+			return false;
+		}
 		local.headers = variables.signer.signedHeaders(method = "DELETE", key = arguments.key);
 		local.result = $request(method = "DELETE", key = arguments.key, headers = local.headers);
-		// S3 DELETE is idempotent — 2xx whether or not the object existed — but a
-		// connection failure or 5xx must not masquerade as a successful delete.
+		// Connection failure or 5xx must not masquerade as a successful delete.
 		$assertSuccess(result = local.result, method = "DELETE", key = arguments.key);
 		return true;
 	}
@@ -98,6 +107,17 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	}
 
 	// ---- internals --------------------------------------------------------
+
+	private string function $aclFromVisibility(required string visibility) {
+		local.v = LCase(Trim(arguments.visibility));
+		if (local.v == "public") {
+			return "public-read";
+		}
+		if (local.v == "private" || !Len(local.v)) {
+			return "private";
+		}
+		return arguments.visibility;
+	}
 
 	private string function $objectPath(required string key) {
 		local.k = REReplace(arguments.key, "^/+", "");
