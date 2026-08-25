@@ -1,5 +1,8 @@
-<!--- Test seed file for seederSpec --->
+<!--- S1: main seeds.cfm must actually create a record so runSeeds() is not a no-op. --->
 <cfscript>
-// This seed file is used by the test suite.
-// It intentionally does nothing — tests that need seeded records use seedOnce() directly.
+seedOnce(
+	modelName = "author",
+	uniqueProperties = "firstName",
+	properties = {firstName: "SeederMainOK99", lastName: "MainSeed"}
+);
 </cfscript>

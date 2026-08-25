@@ -1,4 +1,8 @@
-<!--- Test seed file for seederSpec (withenv) --->
+<!--- S2: main seeds run before the environment-specific include. --->
 <cfscript>
-// Main seeds - runs before environment-specific seeds
+seedOnce(
+	modelName = "author",
+	uniqueProperties = "firstName",
+	properties = {firstName: "SeederEnvMain99", lastName: "EnvMain"}
+);
 </cfscript>
