@@ -124,11 +124,13 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("S5: swallows OPTIONS preflight when CORS middleware is registered", () => {
-				application.wheels.middleware = [
-					new wheels.middleware.Cors(allowOrigins = "https://s5.example.test")
-				]
+				// Deny-all Cors still makes $hasPreflightCapableMiddleware true,
+				// so Dispatch short-circuits OPTIONS before $findMatchingRoute.
+				// Do not reflect an Origin header: cfheader leaks into later
+				// $setCORSHeaders specs in this same request (getHeader returns
+				// the first value written, not the last).
+				application.wheels.middleware = [new wheels.middleware.Cors()]
 				request.cgi["request_method"] = "OPTIONS"
-				request.cgi["http_origin"] = "https://s5.example.test"
 				var d = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init")
 				var threw = {flag = false}
 				var result = "s5-preflight-not-reached"
