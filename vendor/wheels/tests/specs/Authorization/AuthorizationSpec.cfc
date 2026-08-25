@@ -34,6 +34,7 @@ component extends="wheels.WheelsTest" {
 				application.wheels.policyPath = $savedPolicyPath
 				application.wheels.showErrorInformation = $savedShowError
 				StructDelete(request, "$policyTestUser")
+				StructDelete(request, "$wheelsIsolateAbort")
 				try {
 					g.$header(statusCode = 200)
 				} catch (any e) {
@@ -178,6 +179,7 @@ component extends="wheels.WheelsTest" {
 
 				it("S8: authorize() denial in production is HTTP 403, not a silent allow", () => {
 					application.wheels.showErrorInformation = false
+					request.$wheelsIsolateAbort = true
 					request.$policyTestUser = {id = otherAuthor.id}
 					denied = {allowed = false, status = 0, type = ""}
 					try {
@@ -187,13 +189,17 @@ component extends="wheels.WheelsTest" {
 						denied.type = e.type
 					}
 					denied.status = Val(g.$statusCode())
+					src = FileRead(ExpandPath("/wheels/controller/authorization.cfc"))
 
 					expect(denied.allowed).toBeFalse()
 					expect(denied.status).toBe(403)
+					expect(denied.type).toBe("Wheels.NotAuthorized")
+					expect(FindNoCase("abort;", src)).toBeGT(0)
 					try {
 						g.$header(statusCode = 200)
 					} catch (any e) {
 					}
+					StructDelete(request, "$wheelsIsolateAbort")
 				})
 
 				it("S9: authorize() with action=scope throws Wheels.NotAuthorized and does not Invoke scope", () => {

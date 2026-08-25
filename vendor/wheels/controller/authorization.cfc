@@ -285,7 +285,7 @@ component {
 	 */
 	public void function $notAuthorized(required string action, string modelName = "") {
 		$header(statusCode = 403);
-		if ($get("showErrorInformation")) {
+		if ($get("showErrorInformation") || StructKeyExists(request, "$wheelsIsolateAbort")) {
 			local.target = Len(arguments.modelName) ? " on `#arguments.modelName#`" : "";
 			Throw(
 				type = "Wheels.NotAuthorized",
