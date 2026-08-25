@@ -315,10 +315,19 @@ component extends="wheels.WheelsTest" {
 
 			it("subscribeToChannel method is available on controllers", function() {
 				expect(_controller).toHaveKey("subscribeToChannel");
+				expect(IsCustomFunction(_controller.subscribeToChannel)).toBeTrue();
 			});
 
 			it("channelSSETag method is available on controllers", function() {
 				expect(_controller).toHaveKey("channelSSETag");
+				expect(IsCustomFunction(_controller.channelSSETag)).toBeTrue();
+				var html = _controller.channelSSETag(
+					channel = "user.mixin",
+					controller = "dummy",
+					action = "dummy"
+				);
+				expect(FindNoCase("EventSource", html)).toBeGT(0);
+				expect(FindNoCase("channel=user.mixin", html)).toBeGT(0);
 			});
 		});
 	}

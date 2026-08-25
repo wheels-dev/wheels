@@ -41,6 +41,7 @@ component {
 		numeric timeout = 300,
 		numeric heartbeatInterval = 15
 	) {
+		$assertChannelName(arguments.channel);
 		// Auto-detect Last-Event-ID from request header
 		if (!Len(arguments.lastEventId)) {
 			try {
@@ -107,6 +108,7 @@ component {
 		string action = "stream",
 		string events = ""
 	) {
+		$assertChannelName(arguments.channel);
 		// Build URL
 		if (Len(arguments.route)) {
 			local.url = urlFor(route = arguments.route);
@@ -125,14 +127,74 @@ component {
 			local.url &= "&events=" & EncodeForURL(arguments.events);
 		}
 
+		local.listeners = "src.onmessage = relay;";
+		if (Len(arguments.events)) {
+			for (local.evtName in ListToArray(arguments.events)) {
+				local.trimmed = Trim(local.evtName);
+				if (Len(local.trimmed) && CompareNoCase(local.trimmed, "message")) {
+					local.listeners &= Chr(10) & "	src.addEventListener('#JSStringFormat(local.trimmed)#', relay);";
+				}
+			}
+		}
+
 		return "<script>
 (function(){
 	var src = new EventSource('#JSStringFormat(local.url)#');
-	src.onmessage = function(e) {
+	function relay(e) {
 		document.dispatchEvent(new CustomEvent('wheels:sse', {detail: {data: e.data, event: e.type, id: e.lastEventId}}));
-	};
+	}
+	#local.listeners#
 })();
 </script>";
+	}
+
+	public boolean function $isChannelBufferItem(required any item) {
+		if (IsStruct(arguments.item)) {
+			return true;
+		}
+		if (IsSimpleValue(arguments.item) && !IsBoolean(arguments.item)) {
+			return true;
+		}
+		return false;
+	}
+
+	public void function $assertChannelName(required string channel) {
+		if (!Len(Trim(arguments.channel))) {
+			throw(type = "Wheels.Channel.InvalidName", message = "Channel name cannot be empty.");
+		}
+	}
+
+	public array function $drainChannelBuffer(required any buffer) {
+		local.events = [];
+		try {
+			local.next = arguments.buffer.poll();
+			while (!IsNull(local.next)) {
+				if (!$isChannelBufferItem(local.next)) {
+					break;
+				}
+				ArrayAppend(local.events, local.next);
+				local.next = arguments.buffer.poll();
+			}
+			if (ArrayLen(local.events)) {
+				return local.events;
+			}
+		} catch (any e) {
+		}
+		while (true) {
+			if (!arguments.buffer.size()) {
+				break;
+			}
+			try {
+				local.item = arguments.buffer.remove(JavaCast("int", 0));
+			} catch (any drainError) {
+				break;
+			}
+			if (!$isChannelBufferItem(local.item)) {
+				break;
+			}
+			ArrayAppend(local.events, local.item);
+		}
+		return local.events;
 	}
 
 	/**
@@ -150,10 +212,7 @@ component {
 		local.writer = initSSEStream();
 		local.engine = $getChannelEngine("memory");
 
-		// Thread-safe event buffer using a synchronized list
-		local.buffer = CreateObject("java", "java.util.Collections").synchronizedList(
-			CreateObject("java", "java.util.ArrayList").init()
-		);
+		local.buffer = CreateObject("java", "java.util.concurrent.ConcurrentLinkedQueue").init();
 
 		// Subscribe with a callback that buffers events
 		local.subscriberId = local.engine.subscribe(
@@ -163,9 +222,19 @@ component {
 				if (ArrayLen(eventFilter) && !ArrayFind(eventFilter, event.event)) {
 					return;
 				}
-				buffer.add(event);
+				buffer.offer(event);
 			}
 		);
+
+		if (Len(arguments.lastEventId)) {
+			local.replayed = local.engine.replay(channel = arguments.channel, lastEventId = arguments.lastEventId);
+			for (local.replayEvt in local.replayed) {
+				if (ArrayLen(arguments.eventFilter) && !ArrayFind(arguments.eventFilter, local.replayEvt.event)) {
+					continue;
+				}
+				local.buffer.offer(local.replayEvt);
+			}
+		}
 
 		try {
 			local.startTime = GetTickCount() / 1000;
@@ -179,15 +248,8 @@ component {
 				}
 
 				// Drain buffer and send events
-				local.size = local.buffer.size();
-				if (local.size > 0) {
-					// Snapshot and clear
-					local.events = [];
-					for (local.i = 1; local.i <= local.size; local.i++) {
-						ArrayAppend(local.events, local.buffer.get(local.i - 1));
-					}
-					local.buffer.clear();
-
+				local.events = $drainChannelBuffer(local.buffer);
+				if (ArrayLen(local.events)) {
 					for (local.evt in local.events) {
 						sendSSEEvent(
 							writer = local.writer,

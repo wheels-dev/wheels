@@ -32,6 +32,12 @@ component {
 		return this;
 	}
 
+	public void function $assertChannelName(required string channel) {
+		if (!Len(Trim(arguments.channel))) {
+			throw(type = "Wheels.Channel.InvalidName", message = "Channel name cannot be empty.");
+		}
+	}
+
 	/**
 	 * Publish an event to the database.
 	 *
@@ -47,6 +53,7 @@ component {
 		required string data,
 		string id = CreateUUID()
 	) {
+		$assertChannelName(arguments.channel);
 		$ensureEventsTable();
 		$maybeCleanup();
 
@@ -76,12 +83,10 @@ component {
 				type="error",
 				file="wheels_channels"
 			);
-			return {
-				id: arguments.id,
-				channel: arguments.channel,
-				event: arguments.event,
-				persisted: false
-			};
+			throw(
+				type = "Wheels.Channel.PublishFailed",
+				message = "Failed to persist channel event on [#arguments.channel#]: #e.message#"
+			);
 		}
 	}
 
@@ -98,6 +103,7 @@ component {
 		string lastEventId = "",
 		date since = DateAdd("n", -5, Now())
 	) {
+		$assertChannelName(arguments.channel);
 		$ensureEventsTable();
 
 		// If lastEventId is provided, find its timestamp and get events at or after it,
