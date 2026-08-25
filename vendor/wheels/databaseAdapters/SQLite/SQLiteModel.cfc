@@ -59,8 +59,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				break;
 
 			default:
-				// SQLite is dynamically typed, so fallback to text if unknown.
-				local.rv = "cf_sql_varchar";
+				$throwUnknownColumnType(arguments.type);
 				break;
 		}
 
@@ -117,13 +116,13 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * SQLite's lock methods are no-ops (file-level locking only) but they
-	 * never throw, so the `withAdvisoryLock` contract is honored: callback
-	 * runs and its return value flows through. Treated as supported for the
-	 * purposes of capability checks.
+	 * SQLite has no advisory-lock primitive — file-level locking only.
+	 * `$acquireAdvisoryLock` / `$releaseAdvisoryLock` stay no-ops and are
+	 * unused because this flag is false. Callers (`withAdvisoryLock`, the
+	 * lockingSpec guard) skip the fake lock instead of pretending it works.
 	 */
 	public boolean function $supportsAdvisoryLocks() {
-		return true;
+		return false;
 	}
 
 	/**

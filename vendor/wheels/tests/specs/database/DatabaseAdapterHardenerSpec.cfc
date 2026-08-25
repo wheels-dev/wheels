@@ -1,6 +1,6 @@
 /**
  * databaseAdapters Hardener S1–S18.
- * S2/S6/S8/S12/S13/S14/S15 stay HELD. S16 proves last-resort only.
+ * Former HOLDs S2/S6/S8/S12/S13/S14/S15/S16 are flipped to the fail-loud contracts.
  */
 component extends="wheels.WheelsTest" {
 
@@ -8,7 +8,7 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo;
 
-		describe("S2 HOLD $executeQuery string null after IS", () => {
+		describe("S2 $executeQuery keeps bound string null after IS", () => {
 
 			it("binds the string null after IS and IS NOT", () => {
 				var sql = g.model("post").$whereClause(where = "averagerating IS NULL");
@@ -33,12 +33,13 @@ component extends="wheels.WheelsTest" {
 				expect(LCase(bound)).toBe("null");
 			});
 
-			it("still converts that string to SQL NULL in $executeQuery", () => {
+			it("does not coerce that string to SQL NULL in $executeQuery", () => {
 				var src = FileRead(ExpandPath("/wheels/databaseAdapters/Base.cfc"));
-				expect(src).toInclude('part.value == "null"');
-				expect(src).toInclude('right(prev, 2) == "IS"');
-				expect(src).toInclude('right(prev, 6) == "IS NOT"');
-				expect(src).toInclude('writeOutput("NULL")');
+				var start = Find("public struct function $executeQuery", src);
+				var body = Mid(src, start, 2500);
+				expect(body).notToInclude('writeOutput("NULL")');
+				expect(body).notToInclude('right(prev, 2) == "IS"');
+				expect(body).notToInclude('right(prev, 6) == "IS NOT"');
 			});
 
 		});
@@ -99,18 +100,18 @@ component extends="wheels.WheelsTest" {
 
 		});
 
-		describe("S6 HOLD MySQL optionsIncludeDefault vs Abstract", () => {
+		describe("S6 MySQL optionsIncludeDefault keeps DEFAULT", () => {
 
-			it("MySQL drops DEFAULT for text and float", () => {
+			it("MySQL emits DEFAULT for text and float", () => {
 				var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLMigrator");
-				expect(mysql.optionsIncludeDefault(type = "text", default = "long body")).toBeFalse();
-				expect(mysql.optionsIncludeDefault(type = "float", default = "1.25")).toBeFalse();
+				expect(mysql.optionsIncludeDefault(type = "text", default = "long body")).toBeTrue();
+				expect(mysql.optionsIncludeDefault(type = "float", default = "1.25")).toBeTrue();
 				expect(mysql.optionsIncludeDefault(type = "string", default = "hello")).toBeTrue();
 				var sql = mysql.addColumnOptions(
 					sql = "",
 					options = {type: "text", default: "long body", allowNull: true}
 				);
-				expect(sql).notToInclude("DEFAULT");
+				expect(sql).toInclude("DEFAULT");
 			});
 
 			it("Abstract optionsIncludeDefault stays always true", () => {
@@ -155,37 +156,38 @@ component extends="wheels.WheelsTest" {
 
 		});
 
-		describe("S12 HOLD SQLite advisory locks stay no-op true", () => {
+		describe("S12 SQLite advisory locks are unsupported", () => {
 
-			it("reports support and acquire does not throw", () => {
+			it("reports no support so acquire is unused", () => {
 				var adapter = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel");
-				expect(adapter.$supportsAdvisoryLocks()).toBeTrue();
+				expect(adapter.$supportsAdvisoryLocks()).toBeFalse();
 				adapter.$acquireAdvisoryLock(name = "hardener_s12", timeout = 1);
 				adapter.$releaseAdvisoryLock(name = "hardener_s12");
 			});
 
 		});
 
-		describe("S13 HOLD foreignKeySQL unknown action is CASCADE", () => {
+		describe("S13 foreignKeySQL unknown action throws", () => {
 
-			it("maps restrict and other unknown values to CASCADE", () => {
-				var adapter = CreateObject("component", "wheels.databaseAdapters.Abstract");
-				var sql = adapter.foreignKeySQL(
-					name = "fk_posts_users",
-					table = "posts",
-					referenceTable = "users",
-					column = "userid",
-					referenceColumn = "id",
-					onUpdate = "restrict",
-					onDelete = "set default"
-				);
-				expect(sql).toInclude("ON UPDATE CASCADE");
-				expect(sql).toInclude("ON DELETE CASCADE");
-				expect(sql).notToInclude("RESTRICT");
-				expect(sql).notToInclude("SET DEFAULT");
+			it("throws Wheels.InvalidReferentialAction for restrict and set default", () => {
+				var state = {adapter = CreateObject("component", "wheels.databaseAdapters.Abstract"), type = ""};
+				try {
+					state.adapter.foreignKeySQL(
+						name = "fk_posts_users",
+						table = "posts",
+						referenceTable = "users",
+						column = "userid",
+						referenceColumn = "id",
+						onUpdate = "restrict",
+						onDelete = "set default"
+					);
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.InvalidReferentialAction");
 			});
 
-			it("still maps none and null", () => {
+			it("still maps none, null, cascade, and true", () => {
 				var adapter = CreateObject("component", "wheels.databaseAdapters.Abstract");
 				var sql = adapter.foreignKeySQL(
 					name = "fk_posts_users",
@@ -198,94 +200,144 @@ component extends="wheels.WheelsTest" {
 				);
 				expect(sql).toInclude("ON UPDATE NO ACTION");
 				expect(sql).toInclude("ON DELETE SET NULL");
+				sql = adapter.foreignKeySQL(
+					name = "fk_posts_users",
+					table = "posts",
+					referenceTable = "users",
+					column = "userid",
+					referenceColumn = "id",
+					onUpdate = "cascade",
+					onDelete = "true"
+				);
+				expect(sql).toInclude("ON UPDATE CASCADE");
+				expect(sql).toInclude("ON DELETE CASCADE");
 			});
 
 		});
 
-		describe("S14 HOLD Abstract vs PG empty string default", () => {
+		describe("S14 empty string default throws Wheels.InvalidDefault", () => {
 
-			it("Abstract omits DEFAULT for string default empty", () => {
-				var adapter = CreateObject("component", "wheels.databaseAdapters.Abstract");
-				var sql = adapter.addColumnOptions(
-					sql = "",
-					options = {type: "string", default: "", allowNull: true}
-				);
-				expect(sql).notToInclude("DEFAULT");
-			});
-
-			it("PostgreSQL emits DEFAULT empty string for string default empty", () => {
-				var adapter = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator");
-				var sql = adapter.addColumnOptions(
-					sql = "",
-					options = {type: "string", default: "", allowNull: true}
-				);
-				expect(sql).toInclude("DEFAULT ''");
-			});
-
-		});
-
-		describe("S15 HOLD unmapped $getType", () => {
-
-			it("PostgreSQL throws Wheels.UnknownColumnType", () => {
-				var adapter = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLModel");
-				expect(function() {
-					adapter.$getType(type = "definitely_not_a_type");
-				}).toThrow("Wheels.UnknownColumnType");
-			});
-
-			it("SQLite falls back to cf_sql_varchar", () => {
-				var adapter = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel");
-				expect(adapter.$getType(type = "definitely_not_a_type")).toBe("cf_sql_varchar");
-			});
-
-			it("MySQL errors without Wheels.UnknownColumnType", () => {
-				var adapter = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
-				var state = {type = ""};
+			it("Abstract throws Wheels.InvalidDefault for string default empty", () => {
+				var state = {adapter = CreateObject("component", "wheels.databaseAdapters.Abstract"), type = ""};
 				try {
-					adapter.$getType(type = "definitely_not_a_type");
+					state.adapter.addColumnOptions(
+						sql = "",
+						options = {type: "string", default: "", allowNull: true}
+					);
 				} catch (any e) {
 					state.type = e.type;
 				}
-				expect(Len(state.type)).toBeGT(0);
-				expect(state.type).notToBe("Wheels.UnknownColumnType");
+				expect(state.type).toBe("Wheels.InvalidDefault");
+			});
+
+			it("PostgreSQL throws Wheels.InvalidDefault for string default empty", () => {
+				var state = {
+					adapter = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator"),
+					type = ""
+				};
+				try {
+					state.adapter.addColumnOptions(
+						sql = "",
+						options = {type: "string", default: "", allowNull: true}
+					);
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.InvalidDefault");
 			});
 
 		});
 
-		describe("S16 HOLD last-resort identity stays", () => {
+		describe("S15 unmapped $getType throws Wheels.UnknownColumnType", () => {
 
-			it("Oracle still emits MAX(ROWID) when no sequence is found", () => {
+			it("PostgreSQL throws Wheels.UnknownColumnType", () => {
+				var state = {
+					adapter = CreateObject("component", "wheels.databaseAdapters.PostgreSQL.PostgreSQLModel"),
+					type = ""
+				};
+				try {
+					state.adapter.$getType(type = "definitely_not_a_type");
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.UnknownColumnType");
+			});
+
+			it("SQLite throws Wheels.UnknownColumnType", () => {
+				var state = {
+					adapter = CreateObject("component", "wheels.databaseAdapters.SQLite.SQLiteModel"),
+					type = ""
+				};
+				try {
+					state.adapter.$getType(type = "definitely_not_a_type");
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.UnknownColumnType");
+			});
+
+			it("MySQL, H2, Oracle, and MSSQL throw Wheels.UnknownColumnType", () => {
+				var paths = [
+					"wheels.databaseAdapters.MySQL.MySQLModel",
+					"wheels.databaseAdapters.H2.H2Model",
+					"wheels.databaseAdapters.Oracle.OracleModel",
+					"wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerModel"
+				];
+				for (var path in paths) {
+					var state = {adapter = CreateObject("component", path), type = ""};
+					try {
+						state.adapter.$getType(type = "definitely_not_a_type");
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.UnknownColumnType");
+				}
+			});
+
+		});
+
+		describe("S16 last-resort identity is gone", () => {
+
+			it("Oracle throws Wheels.IdentityNotFound when no sequence is found", () => {
 				var probe = CreateObject("component", "wheels.tests._assets.adapters.OracleProbe");
 				ArrayAppend(probe.queryResults, QueryNew("sequence_name", "varchar", []));
-				ArrayAppend(probe.queryResults, QueryNew("lastId", "integer", [{lastId: 9}]));
-				var rv = probe.$identitySelect(
-					queryAttributes = {},
-					result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
-					primaryKey = "id",
-					returningIdentity = ""
-				);
-				expect(rv.lastId).toBe(9);
-				expect(probe.capturedSql[2]).toInclude("MAX(ROWID)");
+				var state = {type = ""};
+				try {
+					probe.$identitySelect(
+						queryAttributes = {},
+						result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
+						primaryKey = "id",
+						returningIdentity = ""
+					);
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.IdentityNotFound");
+				expect(ArrayToList(probe.capturedSql, " ")).notToInclude("MAX(ROWID)");
 			});
 
-			it("MSSQL still emits @@IDENTITY when the batch has no resultset", () => {
+			it("MSSQL throws Wheels.IdentityNotFound when the batch has no resultset", () => {
 				var probe = CreateObject("component", "wheels.tests._assets.adapters.MSSQLProbe");
-				ArrayAppend(probe.queryResults, QueryNew("lastId", "integer", [{lastId: 7}]));
-				var rv = probe.$identitySelect(
-					queryAttributes = {},
-					result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
-					primaryKey = "id",
-					returningIdentity = QueryNew("lastId", "varchar", [])
-				);
-				expect(rv.identitycol).toBe(7);
-				expect(probe.capturedSql[1]).toInclude("@@IDENTITY");
+				var state = {type = ""};
+				try {
+					probe.$identitySelect(
+						queryAttributes = {},
+						result = {sql: "INSERT INTO users (firstname) VALUES ('x')"},
+						primaryKey = "id",
+						returningIdentity = QueryNew("lastId", "varchar", [])
+					);
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.IdentityNotFound");
+				expect(ArrayToList(probe.capturedSql, " ")).notToInclude("@@IDENTITY");
 			});
 
-			it("does not remove the last-resort SQL from the adapters", () => {
+			it("does not keep last-resort SQL in the adapters", () => {
 				var oracleSrc = FileRead(ExpandPath("/wheels/databaseAdapters/Oracle/OracleModel.cfc"));
 				var mssqlSrc = FileRead(ExpandPath("/wheels/databaseAdapters/MicrosoftSQLServer/MicrosoftSQLServerModel.cfc"));
-				expect(oracleSrc).toInclude("MAX(ROWID)");
-				expect(mssqlSrc).toInclude("@@IDENTITY");
+				expect(oracleSrc).notToInclude("MAX(ROWID)");
+				expect(mssqlSrc).notToInclude("@@IDENTITY");
 			});
 
 		});

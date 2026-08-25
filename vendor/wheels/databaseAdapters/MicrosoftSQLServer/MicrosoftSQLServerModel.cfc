@@ -76,6 +76,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			case "cursor":
 				local.rv = "cf_sql_refcursor";
 				break;
+			default:
+				$throwUnknownColumnType(arguments.type);
+				break;
 		}
 		return local.rv;
 	}
@@ -312,19 +315,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			return arguments.returningIdentity.lastId[1];
 		}
 
-		// Absolute last resort — only reached when the multi-statement batch did not
-		// surface a usable resultset on this engine/driver combo. @@IDENTITY is
-		// session-scoped and can return a trigger-generated identity from another
-		// table, but keeping it means a same-batch miss degrades to the pre-fix
-		// behavior instead of losing the key entirely.
-		local.query = $query(sql = "SELECT @@IDENTITY AS lastId", argumentCollection = arguments.queryAttributes);
-
-		// Fallback to SCOPE_IDENTITY() if @@IDENTITY returned nothing (other CFML engines).
-		if (!Len(local.query.lastId)) {
-			local.query = $query(sql = "SELECT SCOPE_IDENTITY() AS lastId", argumentCollection = arguments.queryAttributes);
-		}
-
-		return local.query.lastId;
+		$throwIdentityNotFound();
 	}
 
 	/**

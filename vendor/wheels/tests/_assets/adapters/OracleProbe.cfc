@@ -1,8 +1,8 @@
 /**
  * Test double for the Oracle database adapter. Captures every SQL string
  * passed to $query() and serves mock resultsets from a FIFO queue instead of
- * hitting a database, so adapter-unit specs can exercise the CURRVAL /
- * MAX(ROWID) identity fallbacks without a live Oracle connection.
+ * hitting a database, so adapter-unit specs can exercise the CURRVAL
+ * identity path and the IdentityNotFound miss without a live Oracle connection.
  */
 component extends="wheels.databaseAdapters.Oracle.OracleModel" output=false {
 

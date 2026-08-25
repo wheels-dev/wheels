@@ -56,9 +56,9 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.InvalidValue");
 			});
 
-			it("S8 HOLD leaves boolean yes and no unquoted", () => {
-				expect(adapter.$quoteValue(str = "yes", type = "boolean")).toBe("yes");
-				expect(adapter.$quoteValue(str = "no", type = "boolean")).toBe("no");
+			it("quotes boolean yes and no", () => {
+				expect(adapter.$quoteValue(str = "yes", type = "boolean")).toBe("'yes'");
+				expect(adapter.$quoteValue(str = "no", type = "boolean")).toBe("'no'");
 			});
 
 		});

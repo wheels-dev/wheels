@@ -68,22 +68,12 @@ component extends="wheels.databaseAdapters.Abstract" {
 
 	/**
 	 * Whether `addColumnOptions` should emit a DEFAULT clause for the column.
-	 * Returns false for TEXT-family and FLOAT — the inherited Abstract
-	 * `addColumnOptions` short-circuits the entire DEFAULT clause when this
-	 * returns false, so a non-empty `default="long body"` is silently
-	 * suppressed on MySQL. Rationale: pre-8.0.13 MySQL rejects DEFAULT on
-	 * TEXT/BLOB columns outright, and the framework targets the broadest
-	 * supported MySQL surface rather than emitting DDL that fails on older
-	 * servers. The cross-engine contract this implies is asserted in
-	 * `vendor/wheels/tests/specs/migrator/addColumnOptionsSpec.cfc` — keep
-	 * this list and that spec aligned. See #2742.
+	 * Always true — TEXT/float keep their DEFAULT the same way Abstract does.
+	 * Pre-8.0.13 MySQL rejected DEFAULT on TEXT/BLOB; current Wheels targets
+	 * servers that accept it rather than silently dropping the clause.
 	 */
 	public boolean function optionsIncludeDefault(string type, default = "", boolean allowNull = true) {
-		if (ListFindNoCase("text,mediumtext,longtext,float", arguments.type)) {
-			return false;
-		} else {
-			return true;
-		}
+		return true;
 	}
 
 	/**

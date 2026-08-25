@@ -61,6 +61,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	) {
 		if (StructKeyExists(arguments.options, 'type') && arguments.options.type != 'primaryKey') {
 			if (StructKeyExists(arguments.options, 'default') && optionsIncludeDefault(argumentCollection = arguments.options)) {
+				$rejectEmptyStringDefault(arguments.options);
 				if (arguments.alter) {
 					arguments.sql = arguments.sql & " SET";
 				}
@@ -74,11 +75,6 @@ component extends="wheels.databaseAdapters.Abstract" {
 					arguments.sql = arguments.sql & " DEFAULT NULL";
 				} else if (arguments.options.type == 'boolean') {
 					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, true, false)#";
-				} else if (arguments.options.type == 'string' && arguments.options.default eq "") {
-					// Leading space required: when called with alter=true the upstream
-					// concatenates " SET" first, and without this space the resulting
-					// "SETDEFAULT ''" is invalid SQL (PG rejects the merged token).
-					arguments.sql = arguments.sql & " DEFAULT ''";
 				} else {
 					arguments.sql = arguments.sql & " DEFAULT #quote(value = arguments.options.default, options = arguments.options)#";
 				}
