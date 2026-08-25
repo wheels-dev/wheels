@@ -5,7 +5,9 @@
  * - show: everyone (including guests)
  * - update: only the post's author
  * - scope: authors see their own posts; guests see nothing (inherited default-deny)
- * - publish (custom action): intentionally NOT defined — must deny
+ * - publish (custom action): intentionally NOT defined — S1 throws
+ * - yesGrant / trueGrant: return CFML string truthies — S4 must not grant
+ * - boolGrant: boolean true — S4 positive control
  * - create/edit/delete/new: inherited default-deny from the base
  */
 component extends="Policy" {
@@ -31,6 +33,18 @@ component extends="Policy" {
 			return arguments.collection.where("authorid", variables.user.id);
 		}
 		return super.scope(arguments.collection);
+	}
+
+	public any function yesGrant() {
+		return "yes";
+	}
+
+	public any function trueGrant() {
+		return "true";
+	}
+
+	public boolean function boolGrant() {
+		return true;
 	}
 
 }
