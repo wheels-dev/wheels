@@ -105,10 +105,14 @@ component extends="wheels.WheelsTest" {
 				it("creates new transient instances each call", () => {
 					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
 					var first = di.getInstance("simpleService");
+					first.setMarker("first");
 					var second = di.getInstance("simpleService");
-					// Both should be instances but NOT the same object reference
 					expect(first.greet()).toBe("hello");
 					expect(second.greet()).toBe("hello");
+					// Distinct identity: a marker on the first instance must not
+					// appear on the second. greet-only left this branch untested.
+					expect(first.getMarker()).toBe("first");
+					expect(second.getMarker()).toBe("");
 				});
 
 				it("reports containsInstance correctly", () => {
@@ -285,7 +289,15 @@ component extends="wheels.WheelsTest" {
 					di.map("circularServiceA").to("wheels.tests._assets.di.CircularServiceA");
 					di.map("circularServiceB").to("wheels.tests._assets.di.CircularServiceB");
 					di.map("simpleService").to("wheels.tests._assets.di.SimpleService");
-					try { di.getInstance("circularServiceA"); } catch (any e) {}
+					// BoxLang discards local writes inside catch. Use a struct
+					// field without the local. prefix (cross-engine invariant 11).
+					var state = {type = ""};
+					try {
+						di.getInstance("circularServiceA");
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.DI.CircularDependency");
 					// After the error, the stack should be empty (cleanup ran)
 					// and an unrelated resolve should still work.
 					expect(structKeyExists(request.$wheelsDIResolving, "circularServiceA")).toBeFalse();
