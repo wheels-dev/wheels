@@ -1,10 +1,9 @@
 /**
  * Authorization policy layer. Desk IDs S1–S9 stay locked.
- * PROVEN: S2 empty-id fail-closed, S5 production InvalidCollection, S6 DI/authenticator
- * identity, S7 guest "", S8 production 403, S9 reserved action=scope/init.
- * HELD: S1 unknown action still throws (no default-deny flip), S3 first-catch
- * wrong-user failover (broken DI currentUser can still hit authenticator),
- * S4 loose CF boolean grant.
+ * PROVEN: S1 unknown action throws Wheels.Policy.UnknownAction, S2 empty-id
+ * fail-closed, S3 throwing identity seams fail loud, S4 only boolean true
+ * grants, S5 production InvalidCollection, S6 DI/authenticator identity,
+ * S7 guest "", S8 production 403, S9 reserved action=scope/init.
  *
  * Directory-scoped so `wheels test --core --ci --filter=Authorization` discovers
  * this folder (a single-file directory= scope finds 0 bundles).
@@ -35,6 +34,7 @@ component extends="wheels.WheelsTest" {
 				application.wheels.policyPath = $savedPolicyPath
 				application.wheels.showErrorInformation = $savedShowError
 				StructDelete(request, "$policyTestUser")
+				StructDelete(request, "$wheelsIsolateAbort")
 				try {
 					g.$header(statusCode = 200)
 				} catch (any e) {
@@ -138,12 +138,35 @@ component extends="wheels.WheelsTest" {
 					)
 				})
 
-				it("denies a custom action the policy has no method for", () => {
+				it("S1: authorize() throws Wheels.Policy.UnknownAction for a missing policy method", () => {
 					request.$policyTestUser = {id = author.id}
 
 					expect(() => _controller.authorize(record = post, action = "publish")).toThrow(
+						type = "Wheels.Policy.UnknownAction"
+					)
+				})
+
+				it("S4: authorize() denies the CFML string yes", () => {
+					request.$policyTestUser = {id = author.id}
+
+					expect(() => _controller.authorize(record = post, action = "yesGrant")).toThrow(
 						type = "Wheels.NotAuthorized"
 					)
+				})
+
+				it("S4: authorize() denies the CFML string true", () => {
+					request.$policyTestUser = {id = author.id}
+
+					expect(() => _controller.authorize(record = post, action = "trueGrant")).toThrow(
+						type = "Wheels.NotAuthorized"
+					)
+				})
+
+				it("S4: authorize() returns the record when the policy returns boolean true", () => {
+					request.$policyTestUser = {id = author.id}
+					result = _controller.authorize(record = post, action = "boolGrant")
+
+					expect(result.id).toBe(post.id)
 				})
 
 				it("denies the boolean false a missed finder returns", () => {
@@ -156,6 +179,7 @@ component extends="wheels.WheelsTest" {
 
 				it("S8: authorize() denial in production is HTTP 403, not a silent allow", () => {
 					application.wheels.showErrorInformation = false
+					request.$wheelsIsolateAbort = true
 					request.$policyTestUser = {id = otherAuthor.id}
 					denied = {allowed = false, status = 0, type = ""}
 					try {
@@ -165,13 +189,17 @@ component extends="wheels.WheelsTest" {
 						denied.type = e.type
 					}
 					denied.status = Val(g.$statusCode())
+					src = FileRead(ExpandPath("/wheels/controller/authorization.cfc"))
 
 					expect(denied.allowed).toBeFalse()
 					expect(denied.status).toBe(403)
+					expect(denied.type).toBe("Wheels.NotAuthorized")
+					expect(FindNoCase("abort;", src)).toBeGT(0)
 					try {
 						g.$header(statusCode = 200)
 					} catch (any e) {
 					}
+					StructDelete(request, "$wheelsIsolateAbort")
 				})
 
 				it("S9: authorize() with action=scope throws Wheels.NotAuthorized and does not Invoke scope", () => {
@@ -215,10 +243,18 @@ component extends="wheels.WheelsTest" {
 					expect(_controller.can("show", post)).toBeTrue()
 				})
 
-				it("returns false for a custom action the policy has no method for", () => {
+				it("S1: can() throws Wheels.Policy.UnknownAction for a missing policy method", () => {
 					request.$policyTestUser = {id = author.id}
 
-					expect(_controller.can("publish", post)).toBeFalse()
+					expect(() => _controller.can("publish", post)).toThrow(type = "Wheels.Policy.UnknownAction")
+				})
+
+				it("S4: can() denies the CFML strings yes and true and grants boolean true", () => {
+					request.$policyTestUser = {id = author.id}
+
+					expect(_controller.can("yesGrant", post)).toBeFalse()
+					expect(_controller.can("trueGrant", post)).toBeFalse()
+					expect(_controller.can("boolGrant", post)).toBeTrue()
 				})
 
 				it("returns false for an empty record", () => {
@@ -339,6 +375,65 @@ component extends="wheels.WheelsTest" {
 
 					expect(identity.id).toBe(9001)
 					expect(identity.name).toBe("policy-di-user")
+				})
+
+				it("S3: a throwing DI currentUser does not fail over to the authenticator user", () => {
+					savedDi = application.wheelsdi
+					di = new wheels.Injector(binderPath = "wheels.tests._assets.di.TestBindings")
+					di.map("currentUser").to("wheels.tests._assets.policies.CurrentUserThrowingStub")
+					di.map("authenticator").to("wheels.auth.Authenticator").asSingleton()
+					application.wheelsdi = di
+					state = {threw = false, type = "", userId = ""}
+					try {
+						auth = di.getInstance("authenticator")
+						strategy = new wheels.auth.SessionStrategy()
+						strategy.login(principal = {id = 4242, name = "policy-auth-user"})
+						auth.registerStrategy(name = "session", strategy = strategy)
+						plain = g.controller("test", {controller = "test", action = "show"})
+						try {
+							resolved = plain.$currentUserForPolicy()
+							if (IsStruct(resolved) && StructKeyExists(resolved, "id")) {
+								state.userId = resolved.id
+							}
+						} catch (any e) {
+							state.threw = true
+							state.type = e.type
+						}
+					} finally {
+						application.wheelsdi = savedDi
+						StructDelete(session, "wheels")
+					}
+
+					expect(state.threw).toBeTrue()
+					expect(state.userId).toBe("")
+					expect(state.type).toBe("Wheels.Policy.CurrentUserBoom")
+				})
+
+				it("S3: a throwing authenticator currentUser does not become guest empty string", () => {
+					savedDi = application.wheelsdi
+					di = new wheels.Injector(binderPath = "wheels.tests._assets.di.TestBindings")
+					di.map("authenticator").to("wheels.auth.Authenticator").asSingleton()
+					application.wheelsdi = di
+					state = {threw = false, type = "", guest = false}
+					try {
+						auth = di.getInstance("authenticator")
+						throwingStrategy = CreateObject("component", "wheels.tests._assets.policies.ThrowingCurrentUserStrategy")
+						auth.registerStrategy(name = "throwing", strategy = throwingStrategy)
+						plain = g.controller("test", {controller = "test", action = "show"})
+						try {
+							resolved = plain.$currentUserForPolicy()
+							state.guest = (IsSimpleValue(resolved) && resolved == "")
+						} catch (any e) {
+							state.threw = true
+							state.type = e.type
+						}
+					} finally {
+						application.wheelsdi = savedDi
+					}
+
+					expect(state.threw).toBeTrue()
+					expect(state.guest).toBeFalse()
+					expect(state.type).toBe("Wheels.Policy.AuthenticatorBoom")
 				})
 
 				it("S6: policy identity comes from the authenticator strategy currentUser()", () => {
