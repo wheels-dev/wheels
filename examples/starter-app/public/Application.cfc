@@ -249,6 +249,7 @@ component output="false" {
 
 				// Enable the main GUI Component
 				application.wheels.public = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
+				application.wheels.public.$scanAndPromoteIncludedGlobals();
 			} else {
 				application.wheels.enablePublicComponent = application.wheels.debugIPAccess.originalEnablePublicComponent;
 				application.wheels.showDebugInformation = application.wheels.debugIPAccess.originalShowDebugInformation;

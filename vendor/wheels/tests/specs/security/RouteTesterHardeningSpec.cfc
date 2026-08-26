@@ -15,6 +15,7 @@ component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		variables.publicCfc = CreateObject("component", "wheels.Public").$init();
+		variables.publicCfc.$scanAndPromoteIncludedGlobals();
 		variables.helperSource = FileRead(ExpandPath("/wheels/public/helpers.cfm"));
 	}
 

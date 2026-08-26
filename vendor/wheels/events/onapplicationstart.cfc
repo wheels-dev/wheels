@@ -407,6 +407,11 @@ component {
 		// Enable the main GUI Component
 		if (application.$wheels.enablePublicComponent) {
 			application.$wheels.public = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
+			// ##3302 promote after $init returns. Running the scan inside
+			// Public.$init after the helpers.cfm include empties Adobe CF's
+			// super-scope stack on the first compile after a CommandBox cold
+			// start (EmptyStackException at the $createObjectFromRoot line).
+			application.$wheels.public.$scanAndPromoteIncludedGlobals();
 		}
 
 		// Reload the plugins each time we reload the application.

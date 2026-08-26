@@ -1,0 +1,1 @@
+- Adobe CF 2023 + CommandBox no longer throws `EmptyStackException` on the first request after a cold start. `Public.$init()` is include-and-return again (the 4.0.5 shape); `$scanAndPromoteIncludedGlobals()` runs after `$createObjectFromRoot` returns so the #3302 helper-on-`this` promote still happens once the include nest has unwound (#3379)

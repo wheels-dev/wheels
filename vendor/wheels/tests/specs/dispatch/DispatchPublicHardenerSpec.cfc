@@ -172,6 +172,7 @@ component extends="wheels.WheelsTest" {
 					}
 				]
 				publicCfc = CreateObject("component", "wheels.Public").$init()
+				publicCfc.$scanAndPromoteIncludedGlobals()
 			})
 
 			afterEach(() => {
