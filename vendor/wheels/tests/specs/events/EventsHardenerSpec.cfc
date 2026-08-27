@@ -271,7 +271,7 @@ component extends="wheels.WheelsTest" {
 
 			it("keeps the empty cfcatch around the docs-link rewrite", () => {
 				var src = FileRead(ExpandPath("/wheels/events/onerror/wheelserror.cfm"));
-				// Concatenate so the CFML parser does not treat "<cf..." / "</cf..." as tags.
+				// Concatenate so the CFML parser does not treat cf-tag text as tags.
 				var emptyCatch = "<" & "cfcatch><" & "/cfcatch>";
 				var rethrowTag = "<" & "cfrethrow";
 				expect(FindNoCase("<" & "cfcatch>", src)).toBeGT(
