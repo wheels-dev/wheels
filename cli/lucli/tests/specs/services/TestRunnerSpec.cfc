@@ -79,6 +79,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(structKeyExists(result, "message")).toBeTrue();
 				});
 
+				it("S7 PROVE: mirrored helper only accepts HTTP 200 and never hits /wheels/cli/tests", () => {
+					var src = fileRead(expandPath("/cli/lucli/services/TestRunner.cfc"));
+					var startIdx = reFindNoCase("(?m)^[ \t]*public\s+struct\s+function\s+runViaHttp\s*\(", src);
+					expect(startIdx).toBeGT(0);
+					var body = mid(src, startIdx, 1200);
+					expect(body).toInclude("/wheels/core/tests");
+					expect(body).toInclude("/wheels/app/tests");
+					expect(findNoCase("/wheels/cli/tests", body)).toBe(0);
+					expect(body).toInclude('statusCode contains "200"');
+					expect(find('contains "417"', body)).toBe(0);
+				});
+
 			});
 
 			describe("countSpecsOnDisk()", () => {
