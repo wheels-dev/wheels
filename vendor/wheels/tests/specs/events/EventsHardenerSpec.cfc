@@ -277,13 +277,30 @@ component extends="wheels.WheelsTest" {
 
 			it("keeps the empty catch-any around the reloadPassword writeLog", () => {
 				var src = FileRead(ExpandPath("/wheels/events/onapplicationstart.cfc"));
-				var writeLogPos = FindNoCase('writeLog(file="wheels_security"', src);
-				expect(writeLogPos).toBeGT(
+				// Unique to the locked empty-reloadPassword swallow (~371-372).
+				// FindNoCase('writeLog(file="wheels_security"') first-hits the
+				// password-rejected writeLog (~216) and would stay green if
+				// the locked catch (any e) {} was deleted.
+				var marker = "Wheels: reloadPassword is empty";
+				var markerPos = Find(marker, src);
+				expect(markerPos).toBeGT(
 					0,
-					"onapplicationstart.cfc no longer writeLogs an empty reloadPassword warning"
+					"onapplicationstart.cfc no longer writeLogs the empty-reloadPassword warning"
 				);
-				var window = Mid(src, writeLogPos, 500);
-				expect(Find("catch (any e)", window)).toBeGT(0);
+				expect(Find(marker, src, markerPos + 1)).toBe(
+					0,
+					"empty-reloadPassword writeLog marker must be unique"
+				);
+				var lookbackStart = Max(1, markerPos - 80);
+				expect(FindNoCase("writeLog", Mid(src, lookbackStart, 80))).toBeGT(
+					0,
+					"empty-reloadPassword marker must sit on a writeLog call"
+				);
+				var window = Mid(src, markerPos, 300);
+				expect(Find("catch (any e) {}", window)).toBeGT(
+					0,
+					"locked empty-reloadPassword swallow must stay `catch (any e) {}`"
+				);
 				expect(FindNoCase("rethrow", window)).toBe(0);
 				expect(FindNoCase("throw(", window)).toBe(0);
 			});
