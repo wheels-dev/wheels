@@ -151,7 +151,7 @@ component {
 		if (find("/", arguments.name)) {
 			// Single view file: "products/index"
 			var parts = listToArray(arguments.name, "/");
-			if (arrayLen(parts) != 2 || !len(parts[1]) || !len(parts[2])) {
+			if (arrayLen(parts) != 2 || !len(parts[1]) || !len(parts[2]) || $viewPathEscapes(arguments.name)) {
 				result.success = false;
 				result.warnings = ["Invalid view path. Use: controller/viewname (e.g., products/index)"];
 				return result;
@@ -212,7 +212,7 @@ component {
 			case "view":
 				if (find("/", arguments.name)) {
 					var parts = listToArray(arguments.name, "/");
-					if (arrayLen(parts) == 2 && len(parts[1]) && len(parts[2])) {
+					if (arrayLen(parts) == 2 && len(parts[1]) && len(parts[2]) && !$viewPathEscapes(arguments.name)) {
 						arrayAppend(preview, "app/views/" & parts[1] & "/" & parts[2] & ".cfm");
 					} else {
 						arrayAppend(preview, "Invalid view path: " & arguments.name);
@@ -245,6 +245,20 @@ component {
 			singularCap: variables.helpers.capitalize(singular),
 			pluralCap: variables.helpers.capitalize(plural)
 		};
+	}
+
+	/**
+	 * True when a controller/view token would path-join outside app/views/
+	 * (e.g. `../x`, `foo/../bar`, Windows `..\\x`).
+	 */
+	private boolean function $viewPathEscapes(required string name) {
+		if (find("..", arguments.name)) {
+			return true;
+		}
+		if (find(chr(92), arguments.name)) {
+			return true;
+		}
+		return false;
 	}
 
 	private void function deleteFileIfExists(required string path, required struct result) {
