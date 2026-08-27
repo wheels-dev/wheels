@@ -8,7 +8,9 @@
  * PROVE: S2 live $runOnError status map, S3 $mail swallow, S6 writeLog
  * swallow, S7 wheelserror.cfm keep-going cfcatch.
  * HOLD / PIN: S4 non-Wheels JSON/XML serializes the full exception;
- * S5 OPTIONS abort stays, skipped when Cors middleware is active.
+ * S5 OPTIONS abort stays in EventMethods source; live prove is the
+ * Cors-active skip only. RequestStartAbortGuardDouble contains abort
+ * so a false $corsMiddlewareActive() cannot kill the suite.
  * S9 leftover: do not split $runOnError / $runOnRequestStart.
  * S10 leftover: SecurityDefaultsSpec / reloadPasswordSpec already proven.
  */
@@ -200,27 +202,48 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
-			it("OPTIONS does not abort when a wheels.middleware.Cors instance is registered", () => {
-				application.wheels.middleware = [
-					new wheels.middleware.Cors(allowOrigins = "https://app.example")
-				];
+			it("OPTIONS skip is live when Cors middleware is active (abort contained)", () => {
+				// String path — $corsMiddlewareActive() matches this exactly.
+				// IsInstanceOf(new Cors()) is the flakier gate that left the
+				// abort branch reachable and killed LuCLI with HTTP 500.
+				application.wheels.middleware = ["wheels.middleware.Cors"];
 				application.wheels.allowCorsRequests = true;
 				application.wheels.cacheModelConfig = true;
 				application.wheels.cacheControllerConfig = true;
 				application.wheels.cacheDatabaseSchema = true;
 				application.wheels.mixins = {};
+
+				var em = CreateObject("component", "wheels.tests._assets.events.RequestStartAbortGuardDouble").init();
+				expect(em.$corsMiddlewareActive()).toBeTrue(
+					"Cors-active skip cannot be proven unless $corsMiddlewareActive() is true BEFORE OPTIONS is set"
+				);
+				expect(em.$wouldHitOptionsAbort()).toBeFalse();
+
 				if (!StructKeyExists(request, "cgi")) {
 					request.cgi = {};
 				}
 				request.cgi.request_method = "OPTIONS";
 
-				var em = CreateObject("component", "wheels.tests._assets.events.CorsArbitrationEventDouble").init();
-				var state = {completed = false};
-				em.$runOnRequestStart(targetPage = "/index.cfm");
-				state.completed = true;
+				// Re-check after OPTIONS is set: skip must still be the live
+				// path. If not, $runOnRequestStartContained throws a contained
+				// UnitTest error instead of executing the production abort.
+				expect(em.$corsMiddlewareActive()).toBeTrue();
+				expect(em.$wouldHitOptionsAbort()).toBeFalse(
+					"refusing to invoke $runOnRequestStart — OPTIONS abort branch would fire"
+				);
 
+				var state = {completed = false, type = ""};
+				try {
+					em.$runOnRequestStartContained(targetPage = "/index.cfm");
+					state.completed = true;
+				} catch (any e) {
+					state.type = e.type;
+				}
+
+				expect(em.abortContained).toBeFalse("guard must not fire when Cors is active");
+				expect(state.type).toBe("");
 				expect(state.completed).toBeTrue(
-					"$runOnRequestStart OPTIONS must skip abort when Cors middleware is active"
+					"$runOnRequestStart OPTIONS must skip abort when Cors middleware is active (got #state.type#)"
 				);
 				expect(em.corsHeaderCalls).toBe(
 					0,
