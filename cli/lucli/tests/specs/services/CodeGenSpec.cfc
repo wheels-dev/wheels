@@ -51,6 +51,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(find("SENTINEL", fileRead(path))).toBe(0);
 				});
 
+				it("S6 PROVE: missing-template fallback mints expect(true).toBeTrue()", () => {
+					var result = codegen.generateTest(
+						type = "noSuchTemplateType",
+						name = "S6FallbackMint",
+						force = true
+					);
+					expect(result.success).toBeTrue();
+					expect(result.message).toInclude("inline template");
+					var content = fileRead(tempRoot & "/tests/specs/unit/S6FallbackMintSpec.cfc");
+					expect(content).toInclude("expect(true).toBeTrue();");
+				});
+
 			});
 
 			describe("generateModel()", () => {
@@ -265,6 +277,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result.actions).toBeEmpty();
 				});
 
+				it("S2 PROVE: packagePath from listFirst is unvalidated so ../X writes outside app/controllers/", () => {
+					// Current hole: listFirst("../S2Escape","/") is ".." and is
+					// joined as packagePath without validateName. Destination
+					// becomes app/controllers/../S2Escape.cfc → app/S2Escape.cfc.
+					var result = codegen.generateController(
+						name = "../S2Escape",
+						actions = [],
+						force = true
+					);
+					var escapedPath = tempRoot & "/app/S2Escape.cfc";
+					var controllersPath = tempRoot & "/app/controllers/S2Escape.cfc";
+					expect(result.success).toBeTrue();
+					expect(fileExists(escapedPath)).toBeTrue();
+					expect(fileExists(controllersPath)).toBeFalse();
+					if (fileExists(escapedPath)) {
+						fileDelete(escapedPath);
+					}
+				});
+
 			});
 
 			describe("generatePolicy()", () => {
@@ -331,6 +362,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("accepts valid PascalCase name", () => {
 					var result = codegen.validateName("UserProfile", "model");
 					expect(result.valid).toBeTrue();
+				});
+
+				it("S2 PROVE: validateName rejects ../X but generateController never consults it", () => {
+					var result = codegen.validateName("../X", "controller");
+					expect(result.valid).toBeFalse();
 				});
 
 			});
