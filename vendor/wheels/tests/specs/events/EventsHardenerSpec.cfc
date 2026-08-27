@@ -269,17 +269,20 @@ component extends="wheels.WheelsTest" {
 
 		describe("S7 wheelserror.cfm empty cfcatch keep-going", () => {
 
-			it("keeps the empty <cfcatch> around the docs-link rewrite", () => {
+			it("keeps the empty cfcatch around the docs-link rewrite", () => {
 				var src = FileRead(ExpandPath("/wheels/events/onerror/wheelserror.cfm"));
-				expect(FindNoCase("<cfcatch>", src)).toBeGT(
+				// Concatenate so the CFML parser does not treat "<cf..." as a tag.
+				var emptyCatch = "<" & "cfcatch></cfcatch>";
+				var rethrowTag = "<" & "cfrethrow";
+				expect(FindNoCase("<" & "cfcatch>", src)).toBeGT(
 					0,
 					"wheelserror.cfm no longer has a cfcatch around the docs-link rewrite"
 				);
-				expect(FindNoCase("<cfcatch></cfcatch>", src)).toBeGT(
+				expect(FindNoCase(emptyCatch, src)).toBeGT(
 					0,
 					"wheelserror.cfm cfcatch must stay empty (keep-going, no rethrow)"
 				);
-				expect(FindNoCase("<cfrethrow", src)).toBe(0);
+				expect(FindNoCase(rethrowTag, src)).toBe(0);
 			});
 
 			it("still renders extendedInfo when the docs-link rewrite throws", () => {
