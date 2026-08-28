@@ -60,6 +60,11 @@ component output="false" {
 		$collectFiles(arguments.root, local.paths);
 		for (local.path in local.paths) {
 			local.rel = $relPath(arguments.root, local.path);
+			// Read the raw bytes first so a UTF-8 BOM survives the round-trip:
+			// FileRead/FileWrite alone drops it, which leaves BOM'd files with
+			// a one-line diff after $revert (hit by pmx app/lib/oauth2/oauth2.cfc).
+			local.raw = FileReadBinary(local.path);
+			local.hasBom = ArrayLen(local.raw) >= 3 && local.raw[1] == 239 && local.raw[2] == 187 && local.raw[3] == 191;
 			local.content = FileRead(local.path);
 			local.orig = local.content;
 			local.pos = 1;
@@ -76,8 +81,8 @@ component output="false" {
 				local.count++;
 			}
 			if (local.content != local.orig) {
-				$backup(arguments.root, local.rel, local.orig);
-				FileWrite(local.path, local.content);
+				$backup(arguments.root, local.rel, local.raw);
+				$writePreservingBom(local.path, local.content, local.hasBom);
 			}
 		}
 		return local.count;
@@ -96,7 +101,7 @@ component output="false" {
 				if (Left(local.rel, 1) == "/") {
 					local.rel = Right(local.rel, Len(local.rel) - 1);
 				}
-				FileWrite(arguments.root & "/" & local.rel, FileRead(local.b));
+				FileWrite(arguments.root & "/" & local.rel, FileReadBinary(local.b));
 			}
 		}
 		DirectoryDelete(local.backupDir, true);
@@ -226,14 +231,26 @@ component output="false" {
 		return local.rv;
 	}
 
-	/** Write an original to the backup dir (mirroring the rel path). */
-	private void function $backup(required string root, required string rel, required string content) {
+	/** Write an original's raw bytes to the backup dir (mirroring the rel path). */
+	private void function $backup(required string root, required string rel, required any raw) {
 		local.backupPath = arguments.root & "/.coverage-backup/" & arguments.rel;
 		local.parent = GetDirectoryFromPath(local.backupPath);
 		if (!DirectoryExists(local.parent)) {
 			DirectoryCreate(local.parent, true);
 		}
-		FileWrite(local.backupPath, arguments.content);
+		FileWrite(local.backupPath, arguments.raw);
+	}
+
+	/** Write content re-encoded as UTF-8, re-attaching a UTF-8 BOM when the original had one. */
+	private void function $writePreservingBom(required string path, required string content, boolean bom = false) {
+		local.baos = createObject("java", "java.io.ByteArrayOutputStream").init();
+		if (arguments.bom) {
+			local.baos.write(JavaCast("int", 239));
+			local.baos.write(JavaCast("int", 187));
+			local.baos.write(JavaCast("int", 191));
+		}
+		local.baos.write(CharsetDecode(arguments.content, "utf-8"));
+		FileWrite(arguments.path, local.baos.toByteArray());
 	}
 
 	/** Insertion sort by CRAP desc (no closure — cross-engine safe). */
