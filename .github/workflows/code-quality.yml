@@ -1,0 +1,32 @@
+name: Code Quality
+
+# Deterministic complexity gate. Fails a PR only when it adds a NEW function
+# over the complexity threshold, or makes an existing function MORE complex —
+# the "no new change-risk" gate. Existing hotspots are pinned in
+# tools/code-quality/baseline.json and are burned down separately.
+
+on:
+  pull_request:
+    paths:
+      - 'vendor/wheels/**'
+      - 'cli/lucli/**'
+  push:
+    branches: [develop, main]
+
+jobs:
+  complexity-gate:
+    name: Complexity gate (no new/regressed complexity > 30)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Gate framework core
+        run: |
+          python3 tools/code-quality/cfml-complexity.py vendor/wheels \
+            --gate 30 --baseline tools/code-quality/baseline.json
+      - name: Gate CLI
+        run: |
+          python3 tools/code-quality/cfml-complexity.py cli/lucli \
+            --gate 30 --baseline tools/code-quality/baseline-cli.json
