@@ -6,17 +6,17 @@ Wheels' TestBox coverage service is a no-op stub, so real coverage has to come
 from source instrumentation. This tool:
 
   1. `instrument` — inserts a coverage counter at the top of every function
-     body under a source root (writing `application.__wheels_cov[<id>] = true`),
+     body under a source root (writing `server.__wheels_cov[<id>] = true`),
      backing up the originals so `revert` restores them exactly.
-  2. After you run the test suite and dump `application.__wheels_cov` to JSON,
+  2. After you run the test suite and dump `server.__wheels_cov` to JSON,
      `combine` joins it with per-function complexity (cfml-complexity.py) and
      emits a CRAP ranking.
   3. `revert` — restores the original (uninstrumented) sources.
 
 Usage:
   python3 cfml-coverage.py instrument vendor/wheels
-  # ... run the suite, dump application.__wheels_cov to coverage.json ...
-  python3 cfml-coverage.py combine vendor/wheels coverage.json complexity.json --coverage 100
+  # ... run the suite, dump server.__wheels_cov to coverage.json ...
+  python3 cfml-coverage.py combine vendor/wheels coverage.json complexity.json
   python3 cfml-coverage.py revert vendor/wheels
 """
 import os, re, sys, json, shutil, argparse
@@ -30,8 +30,15 @@ def _backup_dir(root):
     """Sibling of the instrumented root, so the walk never re-instruments it."""
     return os.path.join(os.path.dirname(os.path.abspath(root)), '.cfml-cov-backup')
 
-COUNTER = '<cfset application.__wheels_cov["{id}"] = true>'
-SCRIPT_COUNTER = '{counter} '   # inline after the opening brace
+# CFScript components (the .cfc files) use script syntax — no tags inside a
+# function body. Tag-based .cfm/.cfc use <cfset>. Both are self-initializing.
+# server scope is process-wide and is not iterated by request-scope-sensitive
+# middleware/rate-limiter code, unlike request scope.
+SCRIPT_COUNTER = ('server.__wheels_cov = isDefined("server.__wheels_cov")'
+                  ' ? server.__wheels_cov : {{}};'
+                  ' server.__wheels_cov["{id}"] = true;')
+TAG_COUNTER = ('<cfset server.__wheels_cov = isDefined("server.__wheels_cov")'
+               ' ? server.__wheels_cov : {{}}><cfset server.__wheels_cov["{id}"] = true>')
 
 
 def _files(root):
@@ -52,16 +59,16 @@ def instrument(root):
         with open(path, encoding='utf-8', errors='replace') as fh:
             text = fh.read()
         rel = _rel(path, root)
-        # script functions: insert counter right after the opening brace
+        # script functions: insert a script-syntax counter right after '{'
         out = text
         for m in reversed(list(SCRIPT_FN.finditer(text))):
             brace = m.end()  # position just after '{'
-            ctr = COUNTER.format(id=f"{rel}:{m.group(1)}")
+            ctr = SCRIPT_COUNTER.format(id=f"{rel}:{m.group(1)}")
             out = out[:brace] + ctr + out[brace:]
             n += 1
-        # tag functions: insert counter right after the opening tag
+        # tag functions: insert a <cfset> counter right after the opening tag
         for m in reversed(list(TAG_FN.finditer(out))):
-            ctr = COUNTER.format(id=f"{rel}:{m.group(1)}")
+            ctr = TAG_COUNTER.format(id=f"{rel}:{m.group(1)}")
             out = out[:m.end()] + ctr + out[m.end():]
             n += 1
         if out != text:
@@ -88,13 +95,20 @@ def crap(comp, cov):
     return (comp ** 2) * ((1 - cov / 100.0) ** 3) + comp
 
 
+def _cov_key(complexity_id):
+    """Map complexity id 'rel:line:function' -> coverage key 'rel:function'."""
+    rel_line, function = complexity_id.rsplit(':', 1)
+    rel = rel_line.rsplit(':', 1)[0]
+    return f"{rel}:{function}"
+
+
 def combine(root, coverage_path, complexity_path):
     cov = json.load(open(coverage_path))
     complexity = {r['id']: r['complexity'] for r in json.load(open(complexity_path))}
     # cov keys are "<rel>:<fn>"; complexity ids are "<rel>:<line>:<fn>"
     rows = []
     for cid, comp in complexity.items():
-        covered = cid in cov
+        covered = _cov_key(cid) in cov
         cv = 100.0 if covered else 0.0
         rows.append({'id': cid, 'complexity': comp, 'covered': covered, 'crap': round(crap(comp, cv), 1)})
     # rank uncovered complex functions first (highest risk)
