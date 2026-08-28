@@ -100,7 +100,7 @@ component output="false" {
 
 	/** Run the app test suite over HTTP (the runner dumps coverage when ?coverage=true). */
 	public struct function $runSuite(required numeric serverPort, boolean useTestDb = true) {
-		local.url = "http://localhost:" & arguments.serverPort & "/wheels/app/tests?format=json&coverage=true&useTestDB=" & (arguments.useTestDb ? "true" : "false") & "&reload=true";
+		local.url = "http://localhost:" & arguments.serverPort & "/wheels/app/tests?format=json&coverage=true&useTestDB=" & (arguments.useTestDb ? "true" : "false");
 		local.http = new http(url = local.url, method = "GET", timeout = 1800);
 		local.result = local.http.send().getPrefix();
 		return { status = local.result.statusCode ?: "0", body = local.result.fileContent ?: "" };
