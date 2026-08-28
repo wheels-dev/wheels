@@ -63,7 +63,6 @@ component {
 		any encode
 	) {
 		$args(name = "startFormTag", args = arguments);
-		local.routeAndMethodMatch = false;
 
 		// Encode all prepend / append type arguments if specified.
 		$encodeArgsForHtml(args = arguments, keys = "prepend,append");
@@ -72,82 +71,9 @@ component {
 		// sets a flag to indicate whether we use get or post on this form, used when obfuscating params
 		request.wheels.currentFormMethod = arguments.method;
 
-		// Check to see if a route exists if not specified.
-		// The linear scan over all routes is memoized per request (mirroring URLFor's `urlForCache`).
-		// Only successful lookups are cached, and a cached route name is re-validated against the
-		// current route table so route changes within a request (e.g. the test suite) stay correct.
-		if (!Len(arguments.route) && Len(arguments.controller) && Len(arguments.action) && Len(arguments.method)) {
-			if (!StructKeyExists(request.wheels, "startFormTagRouteCache")) {
-				request.wheels.startFormTagRouteCache = {};
-			}
-			local.routeCache = request.wheels.startFormTagRouteCache;
-			local.routeCacheKey = arguments.controller & "##" & arguments.action & "##" & arguments.method;
-			if (
-				StructKeyExists(local.routeCache, local.routeCacheKey)
-				&& StructKeyExists(application.wheels.namedRoutePositions, local.routeCache[local.routeCacheKey])
-			) {
-				arguments.route = local.routeCache[local.routeCacheKey];
-				local.routeAndMethodMatch = true;
-			} else {
-				for (local.route in application.wheels.routes) {
-					if (
-						StructKeyExists(local.route, "controller")
-						&& local.route.controller == arguments.controller
-						&& StructKeyExists(local.route, "action")
-						&& local.route.action == arguments.action
-						&& ListFindNoCase(local.route.methods, arguments.method)
-					) {
-						arguments.route = local.route.name;
-						local.routeAndMethodMatch = true;
-						local.routeCache[local.routeCacheKey] = local.route.name;
-						break;
-					}
-				}
-			}
-		}
-
-		// if we have a route and method, tap
-		if (Len(arguments.route) && StructKeyExists(arguments, "method")) {
-			// Throw error if no route was found.
-			if (!StructKeyExists(application.wheels.namedRoutePositions, arguments.route)) {
-				$throwErrorOrShow404Page(
-					type = "Wheels.RouteNotFound",
-					message = "Could not find the `#arguments.route#` route.",
-					extendedInfo = "Make sure there is a route configured in your `config/routes.cfm` file named `#arguments.route#`."
-				);
-			}
-
-			// check to see if the route specified has a method to match the one passed in
-			if (!local.routeAndMethodMatch) {
-				for (local.position in ListToArray(application.wheels.namedRoutePositions[arguments.route])) {
-					if (
-						StructKeyExists(application.wheels.routes[local.position], "methods")
-						&& ListFindNoCase(application.wheels.routes[local.position].methods, arguments.method)
-					) {
-						local.routeAndMethodMatch = true;
-					}
-				}
-			}
-
-			if (local.routeAndMethodMatch) {
-				// save the method passed in
-				local.method = arguments.method;
-
-				if (arguments.method != "get") {
-					arguments.method = "post";
-				}
-			}
-		}
-
-		// HTML forms only support the `get` and `post` verbs. When the route / verb match above did
-		// not run (or did not match), other verbs (`put`, `patch`, `delete`) were previously rendered
-		// verbatim, causing browsers to silently fall back to a `get` submission - leaking the
-		// authenticity token into the URL and bypassing non-GET CSRF verification. Always rewrite
-		// them to `post` plus a `_method` hidden field instead.
-		if (!StructKeyExists(local, "method") && Len(arguments.method) && !ListFindNoCase("get,post", arguments.method)) {
-			local.method = arguments.method;
-			arguments.method = "post";
-		}
+		// Resolve the route and method (mutating arguments.route / arguments.method) and remember
+		// the original verb for the `_method` hidden field (empty string when none applies).
+		local.method = $startFormTagMethod(args = arguments);
 
 		// set the form's action attribute to the URL that we want to send to
 		local.encodeExcept = "";
@@ -199,7 +125,7 @@ component {
 		) {
 			local.rv &= authenticityTokenField();
 		}
-		if (StructKeyExists(local, "method") && local.method != "get") {
+		if (Len(local.method) && local.method != "get") {
 			local.methodField = hiddenFieldTag(name = "_method", value = local.method);
 			// Delete the id="_method" part of the string.
 			// There could be multiple forms on a page and duplicate "id" attributes are not allowed in HTML.
@@ -207,6 +133,97 @@ component {
 			local.rv &= local.methodField;
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. Resolves the route and method for startFormTag: finds a named route
+	 * matching controller/action/method, verifies the route's method, and rewrites non-get/post
+	 * verbs to `post` while remembering the original verb for the `_method` hidden field.
+	 * Mutates `args.route` and `args.method` in place and returns the original verb (empty string
+	 * when none applies).
+	 */
+	public string function $startFormTagMethod(required struct args) {
+		local.routeAndMethodMatch = false;
+
+		// Check to see if a route exists if not specified.
+		// The linear scan over all routes is memoized per request (mirroring URLFor's `urlForCache`).
+		// Only successful lookups are cached, and a cached route name is re-validated against the
+		// current route table so route changes within a request (e.g. the test suite) stay correct.
+		if (!Len(args.route) && Len(args.controller) && Len(args.action) && Len(args.method)) {
+			if (!StructKeyExists(request.wheels, "startFormTagRouteCache")) {
+				request.wheels.startFormTagRouteCache = {};
+			}
+			local.routeCache = request.wheels.startFormTagRouteCache;
+			local.routeCacheKey = args.controller & "##" & args.action & "##" & args.method;
+			if (
+				StructKeyExists(local.routeCache, local.routeCacheKey)
+				&& StructKeyExists(application.wheels.namedRoutePositions, local.routeCache[local.routeCacheKey])
+			) {
+				args.route = local.routeCache[local.routeCacheKey];
+				local.routeAndMethodMatch = true;
+			} else {
+				for (local.route in application.wheels.routes) {
+					if (
+						StructKeyExists(local.route, "controller")
+						&& local.route.controller == args.controller
+						&& StructKeyExists(local.route, "action")
+						&& local.route.action == args.action
+						&& ListFindNoCase(local.route.methods, args.method)
+					) {
+						args.route = local.route.name;
+						local.routeAndMethodMatch = true;
+						local.routeCache[local.routeCacheKey] = local.route.name;
+						break;
+					}
+				}
+			}
+		}
+
+		// if we have a route and method, tap
+		if (Len(args.route) && StructKeyExists(args, "method")) {
+			// Throw error if no route was found.
+			if (!StructKeyExists(application.wheels.namedRoutePositions, args.route)) {
+				$throwErrorOrShow404Page(
+					type = "Wheels.RouteNotFound",
+					message = "Could not find the `#args.route#` route.",
+					extendedInfo = "Make sure there is a route configured in your `config/routes.cfm` file named `#args.route#`."
+				);
+			}
+
+			// check to see if the route specified has a method to match the one passed in
+			if (!local.routeAndMethodMatch) {
+				for (local.position in ListToArray(application.wheels.namedRoutePositions[args.route])) {
+					if (
+						StructKeyExists(application.wheels.routes[local.position], "methods")
+						&& ListFindNoCase(application.wheels.routes[local.position].methods, args.method)
+					) {
+						local.routeAndMethodMatch = true;
+					}
+				}
+			}
+
+			if (local.routeAndMethodMatch) {
+				// save the method passed in
+				local.method = args.method;
+
+				if (args.method != "get") {
+					args.method = "post";
+				}
+				return local.method;
+			}
+		}
+
+		// HTML forms only support the `get` and `post` verbs. When the route / verb match above did
+		// not run (or did not match), other verbs (`put`, `patch`, `delete`) were previously rendered
+		// verbatim, causing browsers to silently fall back to a `get` submission - leaking the
+		// authenticity token into the URL and bypassing non-GET CSRF verification. Always rewrite
+		// them to `post` plus a `_method` hidden field instead.
+		if (Len(args.method) && !ListFindNoCase("get,post", args.method)) {
+			local.method = args.method;
+			args.method = "post";
+			return local.method;
+		}
+		return "";
 	}
 
 	/**
