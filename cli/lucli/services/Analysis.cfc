@@ -547,26 +547,41 @@ component {
 	}
 
 	private string function extractFunctionBody(required string content, required numeric startPos) {
-		var braceCount = 0;
-		var i = arguments.startPos;
+		var bodyStart = $findFunctionBodyStart(arguments.content, arguments.startPos);
+		var bodyEnd = $findFunctionBodyEnd(arguments.content, bodyStart);
+		return mid(arguments.content, bodyStart, max(0, bodyEnd - bodyStart - 1));
+	}
 
-		// Find opening brace
+	/**
+	 * Return the 1-indexed position just past the first `{` at or after
+	 * `startPos` (the function body start), or `len(content) + 1` when no
+	 * opening brace exists.
+	 */
+	private numeric function $findFunctionBodyStart(required string content, required numeric startPos) {
+		var i = arguments.startPos;
 		while (i <= len(arguments.content)) {
-			if (mid(arguments.content, i, 1) == "{") { braceCount = 1; i++; break; }
+			// chr(123) is `{` — avoids a brace literal in a string, which
+			// throws off brace-counting source analyzers.
+			if (mid(arguments.content, i, 1) == chr(123)) { i++; break; }
 			i++;
 		}
+		return i;
+	}
 
-		// Track start position, then find closing brace
-		var bodyStart = i;
+	/**
+	 * Return the 1-indexed position one past the closing brace that balances
+	 * the function body opened at `bodyStart`.
+	 */
+	private numeric function $findFunctionBodyEnd(required string content, required numeric bodyStart) {
+		var braceCount = 1;
+		var i = arguments.bodyStart;
 		while (i <= len(arguments.content) && braceCount > 0) {
 			var char = mid(arguments.content, i, 1);
-			if (char == "{") braceCount++;
-			else if (char == "}") braceCount--;
+			if (char == chr(123)) braceCount++;
+			else if (char == chr(125)) braceCount--;
 			i++;
 		}
-
-		// Single mid() call instead of per-character concatenation
-		return mid(arguments.content, bodyStart, max(0, i - bodyStart - 1));
+		return i;
 	}
 
 	private numeric function getLineNumber(required string content, required numeric pos) {

@@ -393,39 +393,17 @@ component {
 		required string source,
 		required string providesKey
 	) {
-		var manifest = {};
-		try {
-			manifest = deserializeJSON(fileRead(arguments.manifestPath));
-		} catch (any e) {
-			return;
-		}
-		if (!isStruct(manifest)) return;
+		var manifest = $readManifest(arguments.manifestPath);
+		if (!structCount(manifest)) return;
 
-		var provides = len(arguments.providesKey) && structKeyExists(manifest, arguments.providesKey) && isStruct(manifest[arguments.providesKey])
-			? manifest[arguments.providesKey]
-			: manifest;
-
-		var targetsRaw = "";
-		if (structKeyExists(provides, "mixins") && isSimpleValue(provides.mixins)) {
-			targetsRaw = trim(provides.mixins);
-		} else if (structKeyExists(manifest, "mixins") && isSimpleValue(manifest.mixins)) {
-			targetsRaw = trim(manifest.mixins);
-		}
+		var provides = $resolveProvides(manifest, arguments.providesKey);
+		var targetsRaw = $resolveTargetsRaw(provides, manifest);
 		if (!len(targetsRaw) || targetsRaw == "none") return;
 
-		var overrides = {};
-		if (structKeyExists(provides, "overrides") && isArray(provides.overrides)) {
-			for (var ov in provides.overrides) {
-				if (isSimpleValue(ov) && len(trim(ov))) overrides[lCase(trim(ov))] = true;
-			}
-		}
+		var overrides = $collectOverrides(provides);
 
-		var cfcPath = arguments.pkgDir & "/" & arguments.name & ".cfc";
-		if (!fileExists(cfcPath)) {
-			var cfcs = directoryList(arguments.pkgDir, false, "name", "*.cfc");
-			if (!arrayLen(cfcs)) return;
-			cfcPath = arguments.pkgDir & "/" & cfcs[1];
-		}
+		var cfcPath = $resolveProviderCfc(arguments.pkgDir, arguments.name);
+		if (!len(cfcPath)) return;
 
 		// Collect methods from the main CFC and its in-package extends chain.
 		// Each value is either "" (use manifest target) or a per-method mixin
@@ -433,13 +411,95 @@ component {
 		var methods = {};
 		$scanCfcRecursive(arguments.pkgDir, cfcPath, methods, {});
 
+		$appendProviderRecords(arguments.providerStore, methods, targetsRaw, overrides, arguments.name, arguments.source);
+	}
+
+	/**
+	 * Read and deserialize a manifest file. Returns an empty struct when the
+	 * file can't be read/parsed or the payload isn't a struct, so callers can
+	 * short-circuit on `structCount()`.
+	 */
+	private struct function $readManifest(required string manifestPath) {
+		var manifest = {};
+		try {
+			manifest = deserializeJSON(fileRead(arguments.manifestPath));
+		} catch (any e) {
+			return {};
+		}
+		if (!isStruct(manifest)) return {};
+		return manifest;
+	}
+
+	/**
+	 * Resolve the `provides` sub-struct (packages nest under a key; plugins
+	 * are flat and fall back to the manifest itself).
+	 */
+	private struct function $resolveProvides(required struct manifest, required string providesKey) {
+		if (len(arguments.providesKey) && structKeyExists(arguments.manifest, arguments.providesKey) && isStruct(arguments.manifest[arguments.providesKey])) {
+			return arguments.manifest[arguments.providesKey];
+		}
+		return arguments.manifest;
+	}
+
+	/**
+	 * Resolve the comma-separated mixin targets string from the provides
+	 * struct, falling back to the manifest root (legacy layout).
+	 */
+	private string function $resolveTargetsRaw(required struct provides, required struct manifest) {
+		var targetsRaw = "";
+		if (structKeyExists(arguments.provides, "mixins") && isSimpleValue(arguments.provides.mixins)) {
+			targetsRaw = trim(arguments.provides.mixins);
+		} else if (structKeyExists(arguments.manifest, "mixins") && isSimpleValue(arguments.manifest.mixins)) {
+			targetsRaw = trim(arguments.manifest.mixins);
+		}
+		return targetsRaw;
+	}
+
+	/**
+	 * Collect `provides.overrides` method names into a lookup struct.
+	 */
+	private struct function $collectOverrides(required struct provides) {
+		var overrides = {};
+		if (structKeyExists(arguments.provides, "overrides") && isArray(arguments.provides.overrides)) {
+			for (var ov in arguments.provides.overrides) {
+				if (isSimpleValue(ov) && len(trim(ov))) overrides[lCase(trim(ov))] = true;
+			}
+		}
+		return overrides;
+	}
+
+	/**
+	 * Resolve the main CFC path for a package/plugin, falling back to the
+	 * first .cfc in the directory. Returns "" when none exists.
+	 */
+	private string function $resolveProviderCfc(required string pkgDir, required string name) {
+		var cfcPath = arguments.pkgDir & "/" & arguments.name & ".cfc";
+		if (!fileExists(cfcPath)) {
+			var cfcs = directoryList(arguments.pkgDir, false, "name", "*.cfc");
+			if (!arrayLen(cfcs)) return "";
+			cfcPath = arguments.pkgDir & "/" & cfcs[1];
+		}
+		return cfcPath;
+	}
+
+	/**
+	 * Expand each method's targets and append provider records to the store.
+	 */
+	private void function $appendProviderRecords(
+		required struct providerStore,
+		required struct methods,
+		required string targetsRaw,
+		required struct overrides,
+		required string name,
+		required string source
+	) {
 		// Expand targets (global = all supported mixin component types).
 		// Wrap in listToArray so Adobe CF's for...in iterates elements, not chars.
 		var allTargets = "application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test";
-		var defaultTargetsRaw = targetsRaw;
+		var defaultTargetsRaw = arguments.targetsRaw;
 
-		for (var methodName in methods) {
-			var perMethod = trim(methods[methodName]);
+		for (var methodName in arguments.methods) {
+			var perMethod = trim(arguments.methods[methodName]);
 			var effective = len(perMethod) ? perMethod : defaultTargetsRaw;
 			if (!len(effective) || effective == "none") continue;
 			var expanded = (effective == "global") ? allTargets : effective;
@@ -455,7 +515,7 @@ component {
 					source = arguments.source,
 					target = target,
 					method = methodName,
-					acknowledged = structKeyExists(overrides, lCase(methodName))
+					acknowledged = structKeyExists(arguments.overrides, lCase(methodName))
 				});
 			}
 		}

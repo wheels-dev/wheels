@@ -38,9 +38,12 @@ component extends="wheels.WheelsTest" {
 			var fullSource = "";
 			if (fileExists(modulePath)) {
 				fullSource = fileRead(modulePath);
-				var start = find("currentMajor <= 3 && targetMajor >= 4", fullSource);
+				// The 3.x -> 4.x checks live in the $upgradeBuildChecks helper
+				// (extracted from runUpgradeCheck); the branch condition is now
+				// arguments-qualified and the block ends at the helper's return.
+				var start = find("arguments.currentMajor <= 3 && arguments.targetMajor >= 4", fullSource);
 				if (start > 0) {
-					var endIdx = find("// Run checks", fullSource, start);
+					var endIdx = find("return checks;", fullSource, start);
 					var sliceLen = endIdx > 0 ? endIdx - start : len(fullSource) - start + 1;
 					block = sliceLen > 0 ? mid(fullSource, start, sliceLen) : "";
 				}

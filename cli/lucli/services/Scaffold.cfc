@@ -42,19 +42,7 @@ component {
 
 		try {
 			// Add foreign key columns for belongsTo relationships
-			var props = duplicate(arguments.properties);
-			if (len(arguments.belongsTo)) {
-				for (var parent in listToArray(arguments.belongsTo)) {
-					var fkName = lCase(parent) & "Id";
-					var hasFK = false;
-					for (var p in props) {
-						if (p.name == fkName) { hasFK = true; break; }
-					}
-					if (!hasFK) {
-						arrayAppend(props, {name: fkName, type: "integer"});
-					}
-				}
-			}
+			var props = $addForeignKeyColumns(arguments.properties, arguments.belongsTo);
 
 			// 1. Generate Model. Issue #2327: existing model is no longer fatal —
 			// scaffold skips and continues so users can scaffold the controller +
@@ -175,6 +163,27 @@ component {
 		}
 
 		return results;
+	}
+
+	/**
+	 * Append foreign-key columns for belongsTo relationships that aren't
+	 * already present in the properties list.
+	 */
+	private array function $addForeignKeyColumns(required array properties, required string belongsTo) {
+		var props = duplicate(arguments.properties);
+		if (len(arguments.belongsTo)) {
+			for (var parent in listToArray(arguments.belongsTo)) {
+				var fkName = lCase(parent) & "Id";
+				var hasFK = false;
+				for (var p in props) {
+					if (p.name == fkName) { hasFK = true; break; }
+				}
+				if (!hasFK) {
+					arrayAppend(props, {name: fkName, type: "integer"});
+				}
+			}
+		}
+		return props;
 	}
 
 	/**
@@ -1180,13 +1189,47 @@ component {
 	 * Map property type to Wheels migration column type
 	 */
 	private string function mapToWheelsType(required string type) {
-		switch (lCase(arguments.type)) {
-			case "string": return "string";
-			case "text": return "text";
+		var t = lCase(arguments.type);
+
+		var numeric = $mapWheelsNumericType(t);
+		if (len(numeric)) return numeric;
+
+		var textual = $mapWheelsTextualType(t);
+		if (len(textual)) return textual;
+
+		return $mapWheelsOtherType(t);
+	}
+
+	/**
+	 * Map numeric property types to their Wheels migration column type.
+	 */
+	private string function $mapWheelsNumericType(required string type) {
+		switch (arguments.type) {
 			case "integer": case "int": return "integer";
 			case "biginteger": case "bigint": return "biginteger";
 			case "float": case "double": return "float";
 			case "decimal": case "numeric": return "decimal";
+			default: return "";
+		}
+	}
+
+	/**
+	 * Map textual property types to their Wheels migration column type.
+	 */
+	private string function $mapWheelsTextualType(required string type) {
+		switch (arguments.type) {
+			case "string": return "string";
+			case "text": return "text";
+			default: return "";
+		}
+	}
+
+	/**
+	 * Map boolean/temporal/binary/uuid property types (and the default) to
+	 * their Wheels migration column type.
+	 */
+	private string function $mapWheelsOtherType(required string type) {
+		switch (arguments.type) {
 			case "boolean": case "bool": return "boolean";
 			case "date": return "date";
 			case "datetime": case "timestamp": return "datetime";

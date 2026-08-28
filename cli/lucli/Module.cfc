@@ -515,95 +515,110 @@ component extends="modules.BaseModule" {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
-			out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
-			out("");
-			out("Types:", "bold");
-			out("  app           Create a new Wheels application (alias for 'wheels new')");
-			out("  model         Generate a model CFC");
-			out("  controller    Generate a controller CFC");
-			out("  view          Generate a view template");
-			out("  migration     Generate a database migration");
-			out("  scaffold      Generate model + controller + views + migration + tests + routes");
-			out("  api-resource  Generate API-only model + controller + migration + tests + routes (no views)");
-			out("  route         Add a resource route to config/routes.cfm");
-			out("  test          Generate a test spec file");
-			out("  property      Generate an add-column migration for a model property");
-			out("  helper        Generate a helper file in app/helpers/");
-			out("  policy        Generate an authorization policy in app/policies/ (default-deny)");
-			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
-			out("  admin         Generate admin CRUD interface for an existing model");
-			out("  auth          Generate a full authentication scaffold (session, token, or JWT)");
-			out("");
-			out("Examples:", "bold");
-			out("  wheels generate app myapp");
-			out("  wheels generate model User name email:string active:boolean");
-			out("  wheels generate controller Users index show create");
-			out("  wheels generate migration CreateUsers");
-			out("  wheels generate scaffold Post title body:text publishedAt:datetime");
-			out("  wheels generate api-resource Product name price:decimal sku:string");
-			out("  wheels generate route posts");
-			out("  wheels generate test model User");
-			out("  wheels generate property User email:string");
-			out("  wheels generate helper formatting");
-			out("  wheels generate policy Post");
-			out("  wheels generate snippets auth");
-			out("  wheels generate admin User");
-			out("  wheels generate auth");
-			out("  wheels generate auth --strategy=jwt");
+			$printGenerateUsage();
 			return "";
 		}
 
 		var type = args[1];
 		var remaining = args.len() > 1 ? args.slice(2) : [];
 
-		switch (lCase(type)) {
+		return $generateDispatch(type, remaining);
+	}
+
+	/**
+	 * Print the `wheels generate` usage/help banner.
+	 */
+	private void function $printGenerateUsage() {
+		out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
+		out("");
+		out("Types:", "bold");
+		out("  app           Create a new Wheels application (alias for 'wheels new')");
+		out("  model         Generate a model CFC");
+		out("  controller    Generate a controller CFC");
+		out("  view          Generate a view template");
+		out("  migration     Generate a database migration");
+		out("  scaffold      Generate model + controller + views + migration + tests + routes");
+		out("  api-resource  Generate API-only model + controller + migration + tests + routes (no views)");
+		out("  route         Add a resource route to config/routes.cfm");
+		out("  test          Generate a test spec file");
+		out("  property      Generate an add-column migration for a model property");
+		out("  helper        Generate a helper file in app/helpers/");
+		out("  policy        Generate an authorization policy in app/policies/ (default-deny)");
+		out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
+		out("  admin         Generate admin CRUD interface for an existing model");
+		out("  auth          Generate a full authentication scaffold (session, token, or JWT)");
+		out("");
+		out("Examples:", "bold");
+		out("  wheels generate app myapp");
+		out("  wheels generate model User name email:string active:boolean");
+		out("  wheels generate controller Users index show create");
+		out("  wheels generate migration CreateUsers");
+		out("  wheels generate scaffold Post title body:text publishedAt:datetime");
+		out("  wheels generate api-resource Product name price:decimal sku:string");
+		out("  wheels generate route posts");
+		out("  wheels generate test model User");
+		out("  wheels generate property User email:string");
+		out("  wheels generate helper formatting");
+		out("  wheels generate policy Post");
+		out("  wheels generate snippets auth");
+		out("  wheels generate admin User");
+		out("  wheels generate auth");
+		out("  wheels generate auth --strategy=jwt");
+	}
+
+	/**
+	 * Dispatch a generator type to its handler. The lCase mapping keeps
+	 * `wheels generate MODEL User` behaving identically to `model`.
+	 */
+	private any function $generateDispatch(required string type, required array remaining) {
+		switch (lCase(arguments.type)) {
 			case "app":
 			case "a":
 				// Delegate to wheels new — pass remaining args as __arguments
-				__arguments = remaining;
+				__arguments = arguments.remaining;
 				return new();
 			case "model":
 			case "m":
-				return generateModel(remaining);
+				return generateModel(arguments.remaining);
 			case "controller":
 			case "c":
-				return generateController(remaining);
+				return generateController(arguments.remaining);
 			case "view":
 			case "v":
-				return generateView(remaining);
+				return generateView(arguments.remaining);
 			case "migration":
 			case "migrate":
-				return generateMigration(remaining);
+				return generateMigration(arguments.remaining);
 			case "scaffold":
 			case "s":
-				return generateScaffold(remaining);
+				return generateScaffold(arguments.remaining);
 			case "api-resource":
 			case "api":
-				return generateApiResource(remaining);
+				return generateApiResource(arguments.remaining);
 			case "route":
 			case "r":
-				return generateRoute(remaining);
+				return generateRoute(arguments.remaining);
 			case "test":
-				return generateTest(remaining);
+				return generateTest(arguments.remaining);
 			case "property":
 			case "prop":
-				return generateProperty(remaining);
+				return generateProperty(arguments.remaining);
 			case "helper":
 			case "h":
-				return generateHelper(remaining);
+				return generateHelper(arguments.remaining);
 			case "policy":
-				return generatePolicy(remaining);
+				return generatePolicy(arguments.remaining);
 			case "snippets":
-				return generateSnippets(remaining);
+				return generateSnippets(arguments.remaining);
 			case "admin":
-				return generateAdmin(remaining);
+				return generateAdmin(arguments.remaining);
 			case "auth":
-				return generateAuth(remaining);
+				return generateAuth(arguments.remaining);
 			default:
-				out("Unknown generator type: #type#", "red");
+				out("Unknown generator type: #arguments.type#", "red");
 				out("Run 'wheels generate' for available types.");
 				// throw maps to non-zero exit; return "" would silently succeed.
-				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #type#");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #arguments.type#");
 		}
 	}
 
@@ -1396,42 +1411,7 @@ component extends="modules.BaseModule" {
 				return "";
 			}
 
-			// Normalise patterns so the leading "/" is shown exactly once. The
-			// framework stores routes with the leading slash already present,
-			// but defensively handle the case where it isn't.
-			var formatPattern = function(p) {
-				p = p ?: "";
-				return left(p, 1) == "/" ? p : "/" & p;
-			};
-
-			// Compute column widths from the data so the table aligns cleanly.
-			var maxMethod  = len("METHOD");
-			var maxPattern = len("PATTERN");
-			var maxAction  = len("CONTROLLER##ACTION");
-			for (var route in result.routes) {
-				var methodWidth  = len(uCase(route.methods ?: ""));
-				var patternWidth = len(formatPattern(route.pattern));
-				var actionWidth  = len((route.controller ?: "") & "##" & (route.action ?: ""));
-				if (methodWidth  > maxMethod)  maxMethod  = methodWidth;
-				if (patternWidth > maxPattern) maxPattern = patternWidth;
-				if (actionWidth  > maxAction)  maxAction  = actionWidth;
-			}
-
-			out(lJustify("METHOD", maxMethod) & "  " & lJustify("PATTERN", maxPattern) & "  " & "CONTROLLER##ACTION", "bold");
-			out(repeatString("-", maxMethod + maxPattern + maxAction + 4));
-
-			for (var route in result.routes) {
-				var line = lJustify(uCase(route.methods ?: ""), maxMethod)
-					& "  " & lJustify(formatPattern(route.pattern), maxPattern)
-					& "  " & (route.controller ?: "") & "##" & (route.action ?: "");
-				if (structKeyExists(route, "name") && len(route.name)) {
-					line &= "  (" & route.name & ")";
-				}
-				out(line);
-			}
-
-			out("");
-			out("#arrayLen(result.routes)# route(s)", "cyan");
+			$printRoutesTable(result.routes);
 		} catch (any e) {
 			// Inner Wheels.RoutesFailed paths already printed a diagnostic; only HTTP/unexpected errors need one here.
 			if (e.type != "Wheels.RoutesFailed") {
@@ -1440,6 +1420,47 @@ component extends="modules.BaseModule" {
 			rethrow;
 		}
 		return "";
+	}
+
+	/**
+	 * Print the aligned route table. Patterns are normalised so the leading
+	 * "/" is shown exactly once (the framework stores them with it already,
+	 * but this defensively handles the case where it isn't).
+	 */
+	private void function $printRoutesTable(required array routes) {
+		var formatPattern = function(p) {
+			p = p ?: "";
+			return left(p, 1) == "/" ? p : "/" & p;
+		};
+
+		// Compute column widths from the data so the table aligns cleanly.
+		var maxMethod  = len("METHOD");
+		var maxPattern = len("PATTERN");
+		var maxAction  = len("CONTROLLER##ACTION");
+		for (var route in arguments.routes) {
+			var methodWidth  = len(uCase(route.methods ?: ""));
+			var patternWidth = len(formatPattern(route.pattern));
+			var actionWidth  = len((route.controller ?: "") & "##" & (route.action ?: ""));
+			if (methodWidth  > maxMethod)  maxMethod  = methodWidth;
+			if (patternWidth > maxPattern) maxPattern = patternWidth;
+			if (actionWidth  > maxAction)  maxAction  = actionWidth;
+		}
+
+		out(lJustify("METHOD", maxMethod) & "  " & lJustify("PATTERN", maxPattern) & "  " & "CONTROLLER##ACTION", "bold");
+		out(repeatString("-", maxMethod + maxPattern + maxAction + 4));
+
+		for (var route in arguments.routes) {
+			var line = lJustify(uCase(route.methods ?: ""), maxMethod)
+				& "  " & lJustify(formatPattern(route.pattern), maxPattern)
+				& "  " & (route.controller ?: "") & "##" & (route.action ?: "");
+			if (structKeyExists(route, "name") && len(route.name)) {
+				line &= "  (" & route.name & ")";
+			}
+			out(line);
+		}
+
+		out("");
+		out("#arrayLen(arguments.routes)# route(s)", "cyan");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1675,72 +1696,88 @@ component extends="modules.BaseModule" {
 			// Skip empty lines
 			if (!len(line)) continue;
 
-			// Handle REPL commands
-			switch (lCase(line)) {
-				case "/exit":
-				case "/quit":
-				case "/q":
-					out("Bye!", "cyan");
-					running = false;
-					continue;
-
-				case "/help":
-				case "/h":
-					printConsoleHelp();
-					continue;
-
-				case "/env":
-					consoleExec(evalUrl, "__env__", password);
-					continue;
-
-				case "/reload":
-					out("Reloading application...", "cyan");
-					try {
-						// Same 302-vs-200 honesty contract as the reload
-						// command (#3059) — but interactive, so failures
-						// print red instead of throwing.
-						var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
-						var reloadVerdict = $evaluateReloadResponse(
-							makeHttpRequestWithStatus(reloadUrl, false).statusCode
-						);
-						if (reloadVerdict.success) {
-							out("Application reloaded.", "green");
-						} else {
-							out(reloadVerdict.message, "red");
-						}
-					} catch (any e) {
-						out("Reload failed: #e.message#", "red");
-					}
-					continue;
-
-				case "/clear":
-					// ANSI clear screen
-					System.out.print(chr(27) & "[2J" & chr(27) & "[H");
-					System.out.flush();
-					continue;
-
-				case "/models":
-					consoleExec(evalUrl, "structKeyArray(application.wheels.models).sort('textnocase')", password);
-					continue;
-
-				case "/routes":
-					consoleExec(evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", password);
-					continue;
-
-				case "/version":
-					consoleExec(evalUrl, "application.wheels.version", password);
-					continue;
-
-				case "/ds":
-				case "/datasource":
-					consoleExec(evalUrl, "application.wheels.dataSourceName", password);
-					continue;
+			// Handle REPL commands; unhandled input falls through to evaluation.
+			var verdict = $consoleHandleCommand(line, evalUrl, password, serverPort, System);
+			if (verdict == "exit") {
+				running = false;
+				continue;
+			}
+			if (verdict == "handled") {
+				continue;
 			}
 
 			// Evaluate expression
 			consoleExec(evalUrl, line, password);
 		}
 
+		return "";
+	}
+
+	/**
+	 * Handle one REPL command line. Returns "exit" to end the loop, "handled"
+	 * when the line was a slash command, or "" when it should be evaluated as
+	 * an expression by the caller.
+	 */
+	private string function $consoleHandleCommand(required string line, required string evalUrl, required string password, required string serverPort, required any javaSystem) {
+		switch (lCase(arguments.line)) {
+			case "/exit":
+			case "/quit":
+			case "/q":
+				out("Bye!", "cyan");
+				return "exit";
+
+			case "/help":
+			case "/h":
+				printConsoleHelp();
+				return "handled";
+
+			case "/env":
+				consoleExec(arguments.evalUrl, "__env__", arguments.password);
+				return "handled";
+
+			case "/reload":
+				out("Reloading application...", "cyan");
+				try {
+					// Same 302-vs-200 honesty contract as the reload
+					// command (#3059) — but interactive, so failures
+					// print red instead of throwing.
+					var reloadUrl = "http://localhost:#arguments.serverPort#/?reload=true&password=#arguments.password#";
+					var reloadVerdict = $evaluateReloadResponse(
+						makeHttpRequestWithStatus(reloadUrl, false).statusCode
+					);
+					if (reloadVerdict.success) {
+						out("Application reloaded.", "green");
+					} else {
+						out(reloadVerdict.message, "red");
+					}
+				} catch (any e) {
+					out("Reload failed: #e.message#", "red");
+				}
+				return "handled";
+
+			case "/clear":
+				// ANSI clear screen
+				arguments.javaSystem.out.print(chr(27) & "[2J" & chr(27) & "[H");
+				arguments.javaSystem.out.flush();
+				return "handled";
+
+			case "/models":
+				consoleExec(arguments.evalUrl, "structKeyArray(application.wheels.models).sort('textnocase')", arguments.password);
+				return "handled";
+
+			case "/routes":
+				consoleExec(arguments.evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", arguments.password);
+				return "handled";
+
+			case "/version":
+				consoleExec(arguments.evalUrl, "application.wheels.version", arguments.password);
+				return "handled";
+
+			case "/ds":
+			case "/datasource":
+				consoleExec(arguments.evalUrl, "application.wheels.dataSourceName", arguments.password);
+				return "handled";
+		}
 		return "";
 	}
 
@@ -2387,260 +2424,332 @@ component extends="modules.BaseModule" {
 			$deployBuildSshPool(opts.configPath)
 		);
 
-		switch (sub) {
+		// Dispatch by verb family. Each family mirrors the exact set of case
+		// labels the previous single switch handled; case-sensitive listFind
+		// preserves the same matching semantics (`wheels deploy DEPLOY` still
+		// falls through to the throw below).
+		if (listFind("deploy,redeploy,rollback,config,init,setup,version,audit,docs,details,remove", sub)) {
+			return $deployMain(dmc, opts, positional, sub);
+		}
+		if (listFind("app,proxy,registry,build,accessory,prune,lock", sub)) {
+			return $deploySshVerb(opts, positional, sub);
+		}
+		if (listFind("bootstrap,exec,server", sub)) {
+			return $deployServerVerb(opts, positional, sub);
+		}
+		if (listFind("fetch-secrets,extract-secrets,print-secrets,secrets", sub)) {
+			return $deploySecretsVerb(opts, positional, sub);
+		}
+		throw(message = "Unknown deploy subcommand: #sub#");
+	}
+
+	/**
+	 * Dispatch the direct DeployMainCli verbs. Extracted from deploy() to keep
+	 * its dispatcher under the complexity gate.
+	 */
+	private any function $deployMain(required any dmc, required struct opts, required array positional, required string sub) {
+		switch (arguments.sub) {
 			case "deploy":
-				return dmc.deploy(opts);
+				return arguments.dmc.deploy(arguments.opts);
 			case "redeploy":
-				return dmc.redeploy(opts);
+				return arguments.dmc.redeploy(arguments.opts);
 			case "rollback":
-				if (arrayLen(positional) < 2) {
-					throw(message="rollback requires a version argument: wheels deploy rollback <version>");
+				if (arrayLen(arguments.positional) < 2) {
+					throw(message = "rollback requires a version argument: wheels deploy rollback <version>");
 				}
-				opts.version = positional[2];
-				return dmc.rollback(opts);
+				arguments.opts.version = arguments.positional[2];
+				return arguments.dmc.rollback(arguments.opts);
 			case "config":
-				return dmc.config(opts);
+				return arguments.dmc.config(arguments.opts);
 			case "init":
-				return dmc.init_stub(opts);
+				return arguments.dmc.init_stub(arguments.opts);
 			case "setup":
-				return dmc.setup(opts);
+				return arguments.dmc.setup(arguments.opts);
 			case "version":
-				return dmc.version();
+				return arguments.dmc.version();
 			case "audit":
-				return dmc.audit(opts);
+				return arguments.dmc.audit(arguments.opts);
 			case "docs":
 				// `docs [SECTION]` — section is the optional second positional.
-				opts.section = arrayLen(positional) >= 2 ? positional[2] : "";
-				return dmc.docs(opts);
+				arguments.opts.section = arrayLen(arguments.positional) >= 2 ? arguments.positional[2] : "";
+				return arguments.dmc.docs(arguments.opts);
 			case "details":
-				return dmc.details(opts);
+				return arguments.dmc.details(arguments.opts);
 			case "remove":
-				return dmc.remove(opts);
+				return arguments.dmc.remove(arguments.opts);
+		}
+	}
+
+	/**
+	 * Dispatch the nested SSH-pool verbs (app/proxy/registry/build/accessory/
+	 * prune/lock) to their per-verb helpers.
+	 */
+	private any function $deploySshVerb(required struct opts, required array positional, required string sub) {
+		switch (arguments.sub) {
 			case "app":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy app requires a verb");
-				}
-				var appVerb = positional[2];
-				var appCli = new modules.wheels.services.deploy.cli.DeployAppCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (appVerb) {
-					case "boot":
-					case "start":
-					case "stop":
-					case "details":
-					case "containers":
-					case "images":
-					case "logs":
-					case "live":
-					case "maintenance":
-					case "remove":
-						return invoke(appCli, appVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy app verb: #appVerb#");
-				}
+				return $deployApp(arguments.opts, arguments.positional);
 			case "proxy":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy proxy requires a verb");
-				}
-				var proxyVerb = positional[2];
-				var proxyCli = new modules.wheels.services.deploy.cli.DeployProxyCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (proxyVerb) {
-					case "boot":
-					case "reboot":
-					case "start":
-					case "stop":
-					case "restart":
-					case "details":
-					case "logs":
-					case "remove":
-						return invoke(proxyCli, proxyVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy proxy verb: #proxyVerb#");
-				}
+				return $deployProxy(arguments.opts, arguments.positional);
 			case "registry":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy registry requires a verb");
-				}
-				var registryVerb = positional[2];
-				var registryCli = new modules.wheels.services.deploy.cli.DeployRegistryCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (registryVerb) {
-					case "setup":
-					case "login":
-					case "logout":
-					case "remove":
-						return invoke(registryCli, registryVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy registry verb: #registryVerb#");
-				}
+				return $deployRegistry(arguments.opts, arguments.positional);
 			case "build":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy build requires a verb");
-				}
-				var buildVerb = positional[2];
-				var buildCli = new modules.wheels.services.deploy.cli.DeployBuildCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (buildVerb) {
-					case "deliver":
-					case "push":
-					case "pull":
-					case "create":
-					case "remove":
-					case "details":
-					case "dev":
-						return invoke(buildCli, buildVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy build verb: #buildVerb#");
-				}
+				return $deployBuild(arguments.opts, arguments.positional);
 			case "accessory":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy accessory requires a verb");
-				}
-				var accVerb = positional[2];
-				opts.name = arrayLen(positional) >= 3 ? positional[3] : "";
-				var accCli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (accVerb) {
-					case "boot":
-					case "reboot":
-					case "start":
-					case "stop":
-					case "restart":
-					case "details":
-					case "logs":
-					case "remove":
-						return invoke(accCli, accVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy accessory verb: #accVerb#");
-				}
+				return $deployAccessory(arguments.opts, arguments.positional);
 			case "prune":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy prune requires a verb (all/images/containers)");
-				}
-				var pruneVerb = positional[2];
-				if (!listFindNoCase("all,images,containers", pruneVerb)) {
-					throw(message="Unknown wheels deploy prune verb: " & pruneVerb);
-				}
-				var pruneCli = new modules.wheels.services.deploy.cli.DeployPruneCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				return invoke(pruneCli, pruneVerb, [opts]);
-			// `bootstrap` and `exec` are top-level aliases for `server bootstrap`
-			// and `server exec`. LuCLI's picocli root registers `server` as a
-			// top-level subcommand for Lucee instance management, so the nested
-			// `wheels deploy server <verb>` form gets shortcut into LuCLI's
-			// own server help before module dispatch — see #2677. These flat
-			// aliases sidestep the collision entirely. The original `server`
-			// branch below is retained for Kamal parity and direct callers
-			// (MCP, internal tests) that don't go through LuCLI's picocli root.
+				return $deployPrune(arguments.opts, arguments.positional);
+			case "lock":
+				return $deployLock(arguments.opts, arguments.positional);
+		}
+	}
+
+	private any function $deployApp(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy app requires a verb");
+		}
+		var appVerb = arguments.positional[2];
+		var appCli = new modules.wheels.services.deploy.cli.DeployAppCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (appVerb) {
+			case "boot":
+			case "start":
+			case "stop":
+			case "details":
+			case "containers":
+			case "images":
+			case "logs":
+			case "live":
+			case "maintenance":
+			case "remove":
+				return invoke(appCli, appVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy app verb: #appVerb#");
+		}
+	}
+
+	private any function $deployProxy(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy proxy requires a verb");
+		}
+		var proxyVerb = arguments.positional[2];
+		var proxyCli = new modules.wheels.services.deploy.cli.DeployProxyCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (proxyVerb) {
+			case "boot":
+			case "reboot":
+			case "start":
+			case "stop":
+			case "restart":
+			case "details":
+			case "logs":
+			case "remove":
+				return invoke(proxyCli, proxyVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy proxy verb: #proxyVerb#");
+		}
+	}
+
+	private any function $deployRegistry(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy registry requires a verb");
+		}
+		var registryVerb = arguments.positional[2];
+		var registryCli = new modules.wheels.services.deploy.cli.DeployRegistryCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (registryVerb) {
+			case "setup":
+			case "login":
+			case "logout":
+			case "remove":
+				return invoke(registryCli, registryVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy registry verb: #registryVerb#");
+		}
+	}
+
+	private any function $deployBuild(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy build requires a verb");
+		}
+		var buildVerb = arguments.positional[2];
+		var buildCli = new modules.wheels.services.deploy.cli.DeployBuildCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (buildVerb) {
+			case "deliver":
+			case "push":
+			case "pull":
+			case "create":
+			case "remove":
+			case "details":
+			case "dev":
+				return invoke(buildCli, buildVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy build verb: #buildVerb#");
+		}
+	}
+
+	private any function $deployAccessory(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy accessory requires a verb");
+		}
+		var accVerb = arguments.positional[2];
+		arguments.opts.name = arrayLen(arguments.positional) >= 3 ? arguments.positional[3] : "";
+		var accCli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (accVerb) {
+			case "boot":
+			case "reboot":
+			case "start":
+			case "stop":
+			case "restart":
+			case "details":
+			case "logs":
+			case "remove":
+				return invoke(accCli, accVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy accessory verb: #accVerb#");
+		}
+	}
+
+	private any function $deployPrune(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy prune requires a verb (all/images/containers)");
+		}
+		var pruneVerb = arguments.positional[2];
+		if (!listFindNoCase("all,images,containers", pruneVerb)) {
+			throw(message = "Unknown wheels deploy prune verb: " & pruneVerb);
+		}
+		var pruneCli = new modules.wheels.services.deploy.cli.DeployPruneCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		return invoke(pruneCli, pruneVerb, [arguments.opts]);
+	}
+
+	private any function $deployLock(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) throw(message = "wheels deploy lock requires a verb (acquire/release/status)");
+		var lockVerb = arguments.positional[2];
+		if (!listFindNoCase("acquire,release,status", lockVerb)) {
+			throw(message = "Unknown wheels deploy lock verb: " & lockVerb);
+		}
+		var lockCli = new modules.wheels.services.deploy.cli.DeployLockCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		return invoke(lockCli, lockVerb, [arguments.opts]);
+	}
+
+	/**
+	 * Dispatch `bootstrap`/`exec` (flat aliases for `server bootstrap` /
+	 * `server exec`) and the nested `server` verb. LuCLI's picocli root
+	 * registers `server` as a top-level subcommand for Lucee instance
+	 * management, so the nested `wheels deploy server <verb>` form gets
+	 * shortcut into LuCLI's own server help before module dispatch — see
+	 * #2677. These flat aliases sidestep the collision entirely. The nested
+	 * `server` branch is retained for Kamal parity and direct callers
+	 * (MCP, internal tests) that don't go through LuCLI's picocli root.
+	 */
+	private any function $deployServerVerb(required struct opts, required array positional, required string sub) {
+		switch (arguments.sub) {
 			case "bootstrap":
 				// #2957 DEP-7: build the pool from deploy.yml's ssh: block like
 				// every other verb — a bare `new SshPool()` here meant the only
 				// CLI-reachable bootstrap form ignored ssh.user/port/keys.
 				var bootstrapCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					$deployBuildSshPool(opts.configPath)
+					$deployBuildSshPool(arguments.opts.configPath)
 				);
-				return bootstrapCli.bootstrap(opts);
+				return bootstrapCli.bootstrap(arguments.opts);
 			case "exec":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy exec requires a command");
+				if (arrayLen(arguments.positional) < 2) {
+					throw(message = "wheels deploy exec requires a command");
 				}
 				// Preserve multi-token commands: join all positional args after `exec`.
 				var execCmdParts = [];
-				for (var ei = 2; ei <= arrayLen(positional); ei++) {
-					arrayAppend(execCmdParts, positional[ei]);
+				for (var ei = 2; ei <= arrayLen(arguments.positional); ei++) {
+					arrayAppend(execCmdParts, arguments.positional[ei]);
 				}
-				opts.cmd = arrayToList(execCmdParts, " ");
+				arguments.opts.cmd = arrayToList(execCmdParts, " ");
 				// #2957 DEP-7: same ssh-config seeding as the nested `server` branch.
 				var execCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					$deployBuildSshPool(opts.configPath)
+					$deployBuildSshPool(arguments.opts.configPath)
 				);
-				return execCli.exec(opts);
+				return execCli.exec(arguments.opts);
 			case "server":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy server requires a verb (exec or bootstrap)");
+				if (arrayLen(arguments.positional) < 2) {
+					throw(message = "wheels deploy server requires a verb (exec or bootstrap)");
 				}
-				var serverVerb = positional[2];
+				var serverVerb = arguments.positional[2];
 				if (serverVerb == "exec") {
-					if (arrayLen(positional) < 3) {
-						throw(message="wheels deploy server exec requires a command");
+					if (arrayLen(arguments.positional) < 3) {
+						throw(message = "wheels deploy server exec requires a command");
 					}
 					// Preserve multi-token commands: join all positional args after the verb.
 					var cmdParts = [];
-					for (var ci = 3; ci <= arrayLen(positional); ci++) {
-						arrayAppend(cmdParts, positional[ci]);
+					for (var ci = 3; ci <= arrayLen(arguments.positional); ci++) {
+						arrayAppend(cmdParts, arguments.positional[ci]);
 					}
-					opts.cmd = arrayToList(cmdParts, " ");
+					arguments.opts.cmd = arrayToList(cmdParts, " ");
 				}
 				var serverCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					$deployBuildSshPool(opts.configPath)
+					$deployBuildSshPool(arguments.opts.configPath)
 				);
 				switch (serverVerb) {
 					case "exec":
-						return serverCli.exec(opts);
+						return serverCli.exec(arguments.opts);
 					case "bootstrap":
-						return serverCli.bootstrap(opts);
+						return serverCli.bootstrap(arguments.opts);
 					default:
-						throw(message="Unknown wheels deploy server verb: #serverVerb#");
+						throw(message = "Unknown wheels deploy server verb: #serverVerb#");
 				}
-			case "lock":
-				if (arrayLen(positional) < 2) throw(message="wheels deploy lock requires a verb (acquire/release/status)");
-				var lockVerb = positional[2];
-				if (!listFindNoCase("acquire,release,status", lockVerb)) {
-					throw(message="Unknown wheels deploy lock verb: " & lockVerb);
-				}
-				var lockCli = new modules.wheels.services.deploy.cli.DeployLockCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				return invoke(lockCli, lockVerb, [opts]);
-			// `fetch-secrets`, `extract-secrets`, and `print-secrets` are
-			// top-level aliases for `secrets fetch`/`extract`/`print`. LuCLI's
-			// picocli root registers `secrets` as a top-level subcommand for
-			// the local secrets store (init/set/list/rm/get/provider), so the
-			// nested `wheels deploy secrets <verb>` form gets shortcut into
-			// LuCLI's own secrets help before module dispatch — see #2697.
-			// These flat aliases sidestep the collision entirely, mirroring
-			// the `bootstrap`/`exec` pattern from #2677. The original
-			// `secrets` branch below is retained for Kamal parity and direct
-			// callers (MCP, internal tests) that don't go through LuCLI's
-			// picocli root.
+		}
+	}
+
+	/**
+	 * Dispatch the secrets verbs (`fetch-secrets`/`extract-secrets`/
+	 * `print-secrets` flat aliases + the nested `secrets` verb). LuCLI's
+	 * picocli root registers `secrets` as a top-level subcommand for the local
+	 * secrets store (init/set/list/rm/get/provider), so the nested
+	 * `wheels deploy secrets <verb>` form gets shortcut into LuCLI's own
+	 * secrets help before module dispatch — see #2697. These flat aliases
+	 * sidestep the collision entirely, mirroring the `bootstrap`/`exec`
+	 * pattern from #2677. The nested `secrets` branch is retained for Kamal
+	 * parity and direct callers (MCP, internal tests) that don't go through
+	 * LuCLI's picocli root.
+	 */
+	private any function $deploySecretsVerb(required struct opts, required array positional, required string sub) {
+		switch (arguments.sub) {
 			case "fetch-secrets":
-				opts.keys = [];
-				for (var fsi = 2; fsi <= arrayLen(positional); fsi++) arrayAppend(opts.keys, positional[fsi]);
+				arguments.opts.keys = [];
+				for (var fsi = 2; fsi <= arrayLen(arguments.positional); fsi++) arrayAppend(arguments.opts.keys, arguments.positional[fsi]);
 				var fetchSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
-				return fetchSecretsCli.fetch(opts);
+				return fetchSecretsCli.fetch(arguments.opts);
 			case "extract-secrets":
-				opts.key = arrayLen(positional) >= 2 ? positional[2] : "";
+				arguments.opts.key = arrayLen(arguments.positional) >= 2 ? arguments.positional[2] : "";
 				var extractSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
-				return extractSecretsCli.extract(opts);
+				return extractSecretsCli.extract(arguments.opts);
 			case "print-secrets":
 				var printSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
-				return printSecretsCli.print(opts);
+				return printSecretsCli.print(arguments.opts);
 			case "secrets":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy secrets requires a verb (fetch/extract/print)");
+				if (arrayLen(arguments.positional) < 2) {
+					throw(message = "wheels deploy secrets requires a verb (fetch/extract/print)");
 				}
-				var secVerb = positional[2];
+				var secVerb = arguments.positional[2];
 				if (!listFindNoCase("fetch,extract,print", secVerb)) {
-					throw(message="Unknown wheels deploy secrets verb: " & secVerb);
+					throw(message = "Unknown wheels deploy secrets verb: " & secVerb);
 				}
 				if (secVerb == "fetch") {
-					opts.keys = [];
-					for (var si = 3; si <= arrayLen(positional); si++) arrayAppend(opts.keys, positional[si]);
+					arguments.opts.keys = [];
+					for (var si = 3; si <= arrayLen(arguments.positional); si++) arrayAppend(arguments.opts.keys, arguments.positional[si]);
 				}
 				if (secVerb == "extract") {
-					opts.key = arrayLen(positional) >= 3 ? positional[3] : "";
+					arguments.opts.key = arrayLen(arguments.positional) >= 3 ? arguments.positional[3] : "";
 				}
 				var secCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
-				return invoke(secCli, secVerb, [opts]);
-			default:
-				throw(message="Unknown deploy subcommand: #sub#");
+				return invoke(secCli, secVerb, [arguments.opts]);
 		}
 	}
 
@@ -5042,35 +5151,12 @@ component extends="modules.BaseModule" {
 	 */
 	private string function runUpgradeCheck(string targetVersion = "", string format = "", boolean strict = false) {
 		var jsonMode = lCase(arguments.format) == "json";
-		// Detect current version. Prefer wheels.json (post-rename) and fall back
-		// to box.json so apps with pre-rename vendor/wheels/ committed in their
-		// repo still work. The fallback can be removed two releases after the
-		// wheels.json rename ships in stable.
-		var manifestPath = variables.projectRoot & "/vendor/wheels/wheels.json";
-		if (!fileExists(manifestPath)) {
-			manifestPath = variables.projectRoot & "/vendor/wheels/box.json";
-		}
-		var currentVersion = "unknown";
-		if (fileExists(manifestPath)) {
-			try {
-				var manifestData = deserializeJSON(fileRead(manifestPath));
-				currentVersion = manifestData.version ?: "unknown";
-			} catch (any e) {}
-		}
+		var currentVersion = $upgradeResolveCurrentVersion();
 
 		// Determine target version
-		var target = arguments.targetVersion;
+		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode);
 		if (!len(target)) {
-			try {
-				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
-				var response = makeHttpRequest(apiUrl);
-				var releaseData = deserializeJSON(response);
-				target = replace(releaseData.tag_name, "v", "");
-			} catch (any e) {
-				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
-				out(jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
-				return "";
-			}
+			return "";
 		}
 
 		if (!jsonMode) {
@@ -5090,20 +5176,128 @@ component extends="modules.BaseModule" {
 			out("");
 		}
 
-		// Check database. Each entry may set `severity` to either "breaking"
-		// (the default — flagged in red, gated by major-version-bump scenarios)
-		// or "advisory" (cyan, runs regardless of version-jump — for opt-in
-		// convention changes the user can adopt at their convenience).
+		var checks = $upgradeBuildChecks(currentMajor, targetMajor);
+
+		// Run checks. Matched checks land in `issues` (severity=breaking) or
+		// `advisories` (severity=advisory); unmatched land in `passed`.
+		var checkResults = $upgradeRunChecks(checks);
+		var issues = checkResults.issues;
+		var advisories = checkResults.advisories;
+		var passed = checkResults.passed;
+
+		// The version-appropriate guide + the soft-landing adapter, surfaced
+		// whenever breaking findings are reported (and always in JSON output).
+		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
+			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
+
+		// `success` must reflect every condition that produces a non-zero
+		// exit, otherwise `jq .success` and `$?` disagree when --strict is
+		// active with advisory-only findings (#2963 review round 1).
+		var strictAdvisoryFail = arguments.strict && arrayLen(advisories) > 0;
+
+		// JSON mode — one machine-readable document, no human report. The
+		// breaking-findings throw below still fires so pipelines can gate on
+		// the exit code without parsing stdout.
+		if (jsonMode) {
+			out(serializeJSON({
+				"currentVersion": currentVersion,
+				"targetVersion": target,
+				"success": arrayLen(issues) == 0 && !strictAdvisoryFail,
+				"strict": arguments.strict,
+				"breaking": issues,
+				"advisories": advisories,
+				"passed": passed,
+				"guide": guideUrl
+			}));
+		} else {
+			$upgradePrintReport(issues, advisories, passed, guideUrl, targetMajor);
+		}
+
+		// Throw after the full report flushes — breaking findings exit
+		// non-zero (CI gate), advisories and all-clear exit 0. Mirrors
+		// validate()'s Wheels.ValidationFailed convention.
+		if (arrayLen(issues)) {
+			throw(
+				type = "Wheels.UpgradeCheckFailed",
+				message = "Upgrade check found #arrayLen(issues)# breaking change(s) — see the report above."
+			);
+		}
+
+		// #2963: --strict escalates advisory findings to the same hard-fail
+		// path. Reuses Wheels.UpgradeCheckFailed so CI pipelines that already
+		// filter on the breaking-case type pick the strict case up too. The
+		// breaking branch above already returned, so this fires only when
+		// strict mode is on AND at least one advisory matched but no
+		// breaking finding did.
+		if (arguments.strict && arrayLen(advisories)) {
+			throw(
+				type = "Wheels.UpgradeCheckFailed",
+				message = "Upgrade check found #arrayLen(advisories)# advisory finding(s) and --strict is set — see the report above."
+			);
+		}
+
+		return "";
+	}
+
+	/**
+	 * Detect the app's current Wheels version. Prefer wheels.json (post-rename)
+	 * and fall back to box.json so apps with pre-rename vendor/wheels/ committed
+	 * in their repo still work. The fallback can be removed two releases after
+	 * the wheels.json rename ships in stable.
+	 */
+	private string function $upgradeResolveCurrentVersion() {
+		var manifestPath = variables.projectRoot & "/vendor/wheels/wheels.json";
+		if (!fileExists(manifestPath)) {
+			manifestPath = variables.projectRoot & "/vendor/wheels/box.json";
+		}
+		var currentVersion = "unknown";
+		if (fileExists(manifestPath)) {
+			try {
+				var manifestData = deserializeJSON(fileRead(manifestPath));
+				currentVersion = manifestData.version ?: "unknown";
+			} catch (any e) {}
+		}
+		return currentVersion;
+	}
+
+	/**
+	 * Determine the target version: the explicit --to= value when supplied,
+	 * otherwise the latest GitHub release. Returns "" (after printing the
+	 * error) when the release fetch fails so the caller can bail out early.
+	 */
+	private string function $upgradeResolveTargetVersion(required string targetVersion, required boolean jsonMode) {
+		var target = arguments.targetVersion;
+		if (!len(target)) {
+			try {
+				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
+				var response = makeHttpRequest(apiUrl);
+				var releaseData = deserializeJSON(response);
+				target = replace(releaseData.tag_name, "v", "");
+			} catch (any e) {
+				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
+				out(arguments.jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
+				return "";
+			}
+		}
+		return target;
+	}
+
+	/**
+	 * Build the upgrade-check definitions for the given current/target major
+	 * version pair. Each entry may set `severity` to "breaking" (default,
+	 * gated by major-version-bump scenarios) or "advisory" (runs regardless).
+	 */
+	private array function $upgradeBuildChecks(required numeric currentMajor, required numeric targetMajor) {
 		var checks = [];
 
 		// 2.x -> 3.x
-		if (currentMajor <= 2 && targetMajor >= 3) {
+		if (arguments.currentMajor <= 2 && arguments.targetMajor >= 3) {
 			// 2.x plugins lived at the webroot's /plugins (the previous
 			// `app/plugins` path never existed in any Wheels layout, so the
 			// check was dead). The 3.x -> 4.x block adds an identical root
 			// /plugins check, so skip this one on a 2.x -> 4.x jump to avoid
 			// reporting the same directory twice.
-			if (targetMajor < 4) {
+			if (arguments.targetMajor < 4) {
 				arrayAppend(checks, {
 					description: "Legacy plugin directory",
 					pattern: "",
@@ -5123,7 +5317,7 @@ component extends="modules.BaseModule" {
 		}
 
 		// 3.x -> 4.x
-		if (currentMajor <= 3 && targetMajor >= 4) {
+		if (arguments.currentMajor <= 3 && arguments.targetMajor >= 4) {
 			arrayAppend(checks, {
 				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
 				pattern: "",
@@ -5316,7 +5510,7 @@ component extends="modules.BaseModule" {
 		// reading only config/settings.cfm would miss it (#2808). Comment-
 		// strip each file first so a commented-out
 		// `// set(useUnderscoreReferenceColumns=true);` doesn't satisfy the
-		// guard (Anti-Pattern #14 — same shape as line 970).
+		// guard (Anti-Pattern #14).
 		var underscoreFlagAlreadySet = false;
 		var configDir = variables.projectRoot & "/config";
 		if (directoryExists(configDir)) {
@@ -5366,220 +5560,194 @@ component extends="modules.BaseModule" {
 			fix: "If migrations under app/migrator/migrations/ were applied before this flag was set, the database still has `<name>id` columns. New migrations will create `<name>_id`. For full consistency, write a data migration to rename old reference columns."
 		});
 
-		// Run checks. Matched checks land in `issues` (severity=breaking) or
-		// `advisories` (severity=advisory); unmatched land in `passed`.
-		var issues = [];
-		var advisories = [];
-		var passed = [];
+		return checks;
+	}
 
-		for (var check in checks) {
-			var severity = structKeyExists(check, "severity") ? check.severity : "breaking";
-			var matched = false;
-			var matchEntry = {};
+	/**
+	 * Build the file set to scan for a single grep check. Checks may use
+	 * `scanDir` + `extensions` (recursive scan of one directory) and/or
+	 * `scanTargets` (mixed list of file paths and directory roots — needed
+	 * by the `wheels snippets` rename check).
+	 */
+	private array function $upgradeCollectScanFiles(required struct check) {
+		var filesToScan = [];
 
-			if (check.checkType == "directory") {
-				var dirPath = variables.projectRoot & "/" & check.path;
-				if (directoryExists(dirPath)) {
-					var contents = directoryList(dirPath, false, "name");
-					if (arrayLen(contents)) {
-						matched = true;
-						matchEntry = {description: check.description, fix: check.fix, matches: [check.path & "/"]};
+		if (structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)) {
+			var scanPath = variables.projectRoot & "/" & arguments.check.scanDir;
+			if (directoryExists(scanPath)) {
+				for (var ext in listToArray(arguments.check.extensions)) {
+					var dirFiles = directoryList(scanPath, true, "path", "*." & ext);
+					for (var f in dirFiles) arrayAppend(filesToScan, f);
+				}
+			}
+		}
+
+		if (structKeyExists(arguments.check, "scanTargets") && isArray(arguments.check.scanTargets)) {
+			for (var scanTarget in arguments.check.scanTargets) {
+				var targetPath = variables.projectRoot & "/" & scanTarget.path;
+				if (fileExists(targetPath)) {
+					arrayAppend(filesToScan, targetPath);
+				} else if (directoryExists(targetPath)) {
+					var recurse = structKeyExists(scanTarget, "recurse") ? scanTarget.recurse : true;
+					// Avoid Elvis `?:` on `check.extensions` — Adobe CF
+					// throws when the key is absent. The `wheels snippets`
+					// check has no top-level `extensions`, so this branch
+					// is reached on every Adobe CF run when a target is a
+					// directory without its own `extensions` key.
+					var exts = structKeyExists(scanTarget, "extensions") ? scanTarget.extensions
+						: (structKeyExists(arguments.check, "extensions") ? arguments.check.extensions : "");
+					for (var ext in listToArray(exts)) {
+						var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
+						for (var f in dirFiles2) arrayAppend(filesToScan, f);
 					}
 				}
-			} else if (check.checkType == "grep") {
-				// Build the file set to scan. Checks may use `scanDir` +
-				// `extensions` (recursive scan of one directory) and/or
-				// `scanTargets` (mixed list of file paths and directory
-				// roots — needed by the `wheels snippets` rename check that
-				// has to look at Makefile, package.json, .github/workflows/,
-				// and top-level *.sh files in one shot).
-				var filesToScan = [];
+			}
+		}
 
-				if (structKeyExists(check, "scanDir") && len(check.scanDir)) {
-					var scanPath = variables.projectRoot & "/" & check.scanDir;
-					if (directoryExists(scanPath)) {
-						for (var ext in listToArray(check.extensions)) {
-							var dirFiles = directoryList(scanPath, true, "path", "*." & ext);
-							for (var f in dirFiles) arrayAppend(filesToScan, f);
-						}
-					}
+		return filesToScan;
+	}
+
+	/**
+	 * Execute a single upgrade check, returning its severity, matched flag,
+	 * and matchEntry (populated only when matched).
+	 */
+	private struct function $upgradeExecuteCheck(required struct check) {
+		var severity = structKeyExists(arguments.check, "severity") ? arguments.check.severity : "breaking";
+		var matched = false;
+		var matchEntry = {};
+
+		if (arguments.check.checkType == "directory") {
+			var dirPath = variables.projectRoot & "/" & arguments.check.path;
+			if (directoryExists(dirPath)) {
+				var contents = directoryList(dirPath, false, "name");
+				if (arrayLen(contents)) {
+					matched = true;
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [arguments.check.path & "/"]};
 				}
+			}
+		} else if (arguments.check.checkType == "grep") {
+			var filesToScan = $upgradeCollectScanFiles(arguments.check);
 
-				if (structKeyExists(check, "scanTargets") && isArray(check.scanTargets)) {
-					// `scanTarget`, not `target` — the function-level `target`
-					// above holds the target VERSION string and a same-named
-					// loop var would shadow (then clobber) it.
-					for (var scanTarget in check.scanTargets) {
-						var targetPath = variables.projectRoot & "/" & scanTarget.path;
-						if (fileExists(targetPath)) {
-							arrayAppend(filesToScan, targetPath);
-						} else if (directoryExists(targetPath)) {
-							var recurse = structKeyExists(scanTarget, "recurse") ? scanTarget.recurse : true;
-							// Avoid Elvis `?:` on `check.extensions` — Adobe CF
-							// throws when the key is absent. The `wheels snippets`
-							// check has no top-level `extensions`, so this branch
-							// is reached on every Adobe CF run when a target is a
-							// directory without its own `extensions` key.
-							var exts = structKeyExists(scanTarget, "extensions") ? scanTarget.extensions
-								: (structKeyExists(check, "extensions") ? check.extensions : "");
-							for (var ext in listToArray(exts)) {
-								var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
-								for (var f in dirFiles2) arrayAppend(filesToScan, f);
-							}
-						}
-					}
-				}
-
-				var matches = [];
-				for (var filePath in filesToScan) {
-					// Strip CFML comments before grepping (Anti-Pattern #14):
-					// a commented-out `// t.references(...)` or
-					// `/* set(...) */` must not satisfy the pattern. Multi-line
-					// block comments collapse and may shift reported line
-					// numbers — same tradeoff `stripCfmlComments` callers at
-					// lines 970 and 5532 already accept.
-					var content = stripCfmlComments(fileRead(filePath));
-					var lines = listToArray(content, chr(10), true);
-					for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
-						if (reFindNoCase(check.pattern, lines[lineNum])) {
-							var relPath = replace(filePath, variables.projectRoot & "/", "");
-							arrayAppend(matches, "#relPath#:#lineNum#");
-						}
-					}
-				}
-
-				// `absent: true` inverts the check — warn when the pattern
-				// is NOT found anywhere in the scanned set. Used for "you
-				// should be setting csrfCookieEncryptionSecretKey somewhere" style
-				// checks. If nothing was scannable (e.g. config/ missing),
-				// treat as pass to avoid noisy false positives.
-				var isAbsent = structKeyExists(check, "absent") && check.absent;
-				if (isAbsent) {
-					if (arrayLen(filesToScan) && !arrayLen(matches)) {
-						matched = true;
-						var hint = structKeyExists(check, "scanDir") && len(check.scanDir)
-							? check.scanDir & "/ (no occurrences found)"
-							: "(no occurrences found)";
-						matchEntry = {description: check.description, fix: check.fix, matches: [hint]};
-					}
-				} else {
-					if (arrayLen(matches)) {
-						matched = true;
-						matchEntry = {description: check.description, fix: check.fix, matches: matches};
+			var matches = [];
+			for (var filePath in filesToScan) {
+				// Strip CFML comments before grepping (Anti-Pattern #14):
+				// a commented-out `// t.references(...)` or
+				// `/* set(...) */` must not satisfy the pattern. Multi-line
+				// block comments collapse and may shift reported line
+				// numbers — same tradeoff other `stripCfmlComments` callers
+				// accept.
+				var content = stripCfmlComments(fileRead(filePath));
+				var lines = listToArray(content, chr(10), true);
+				for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
+					if (reFindNoCase(arguments.check.pattern, lines[lineNum])) {
+						var relPath = replace(filePath, variables.projectRoot & "/", "");
+						arrayAppend(matches, "#relPath#:#lineNum#");
 					}
 				}
 			}
 
+			// `absent: true` inverts the check — warn when the pattern
+			// is NOT found anywhere in the scanned set. Used for "you
+			// should be setting csrfCookieEncryptionSecretKey somewhere" style
+			// checks. If nothing was scannable (e.g. config/ missing),
+			// treat as pass to avoid noisy false positives.
+			var isAbsent = structKeyExists(arguments.check, "absent") && arguments.check.absent;
+			if (isAbsent) {
+				if (arrayLen(filesToScan) && !arrayLen(matches)) {
+					matched = true;
+					var hint = structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)
+						? arguments.check.scanDir & "/ (no occurrences found)"
+						: "(no occurrences found)";
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [hint]};
+				}
+			} else {
+				if (arrayLen(matches)) {
+					matched = true;
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
+				}
+			}
+		}
+
+		return {severity: severity, matched: matched, matchEntry: matchEntry};
+	}
+
+	/**
+	 * Run all checks, bucketing matched entries into issues (breaking) or
+	 * advisories (advisory) and unmatched descriptions into passed.
+	 */
+	private struct function $upgradeRunChecks(required array checks) {
+		var issues = [];
+		var advisories = [];
+		var passed = [];
+
+		for (var check in arguments.checks) {
+			var result = $upgradeExecuteCheck(check);
 			// Bucket the result by severity. Advisories surface as opt-in
 			// recommendations alongside (but distinct from) breaking changes.
-			if (matched) {
-				if (severity == "advisory") {
-					arrayAppend(advisories, matchEntry);
+			if (result.matched) {
+				if (result.severity == "advisory") {
+					arrayAppend(advisories, result.matchEntry);
 				} else {
-					arrayAppend(issues, matchEntry);
+					arrayAppend(issues, result.matchEntry);
 				}
 			} else {
 				arrayAppend(passed, check.description);
 			}
 		}
 
-		// The version-appropriate guide + the soft-landing adapter, surfaced
-		// whenever breaking findings are reported (and always in JSON output).
-		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
-			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
+		return {issues: issues, advisories: advisories, passed: passed};
+	}
 
-		// `success` must reflect every condition that produces a non-zero
-		// exit, otherwise `jq .success` and `$?` disagree when --strict is
-		// active with advisory-only findings (#2963 review round 1).
-		var strictAdvisoryFail = arguments.strict && arrayLen(advisories) > 0;
-
-		// JSON mode — one machine-readable document, no human report. The
-		// breaking-findings throw below still fires so pipelines can gate on
-		// the exit code without parsing stdout.
-		if (jsonMode) {
-			out(serializeJSON({
-				"currentVersion": currentVersion,
-				"targetVersion": target,
-				"success": arrayLen(issues) == 0 && !strictAdvisoryFail,
-				"strict": arguments.strict,
-				"breaking": issues,
-				"advisories": advisories,
-				"passed": passed,
-				"guide": guideUrl
-			}));
-		} else {
-			// Output — three sections in priority order: Breaking → Recommended → All Clear
-			if (arrayLen(issues)) {
-				out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
-				for (var issue in issues) {
-					out("  ! #issue.description#", "yellow");
-					for (var match in issue.matches) {
-						out("    #match#");
-					}
-					out("    -> #issue.fix#", "cyan");
-					out("");
+	/**
+	 * Print the human-readable upgrade report (three sections in priority
+	 * order: Breaking → Recommended → All Clear), then the apply guidance.
+	 */
+	private void function $upgradePrintReport(required array issues, required array advisories, required array passed, required string guideUrl, required numeric targetMajor) {
+		if (arrayLen(arguments.issues)) {
+			out("Breaking Changes (#arrayLen(arguments.issues)# found):", "yellow");
+			for (var issue in arguments.issues) {
+				out("  ! #issue.description#", "yellow");
+				for (var match in issue.matches) {
+					out("    #match#");
 				}
-				out("Upgrade guide: #guideUrl#", "cyan");
-				if (targetMajor >= 4) {
-					out("Soft landing: wheels packages add wheels-legacy-adapter (shims renderPage()/renderPageToString() while you migrate)", "cyan");
-				}
+				out("    -> #issue.fix#", "cyan");
 				out("");
 			}
-
-			if (arrayLen(advisories)) {
-				out("Recommended Improvements (#arrayLen(advisories)# found):", "cyan");
-				for (var advisory in advisories) {
-					out("  ~ #advisory.description#", "cyan");
-					for (var match in advisory.matches) {
-						out("    #match#");
-					}
-					// Advisory fix lines are intentionally uncolored so the
-					// section header and description carry the cyan accent and
-					// opt-in items read lighter than breaking-change fixes
-					// (which use cyan on the fix line for stronger emphasis).
-					out("    -> #advisory.fix#");
-					out("");
-				}
+			out("Upgrade guide: #arguments.guideUrl#", "cyan");
+			if (arguments.targetMajor >= 4) {
+				out("Soft landing: wheels packages add wheels-legacy-adapter (shims renderPage()/renderPageToString() while you migrate)", "cyan");
 			}
-
-			if (arrayLen(passed)) {
-				out("All Clear (#arrayLen(passed)# checks):", "green");
-				for (var p in passed) {
-					out("  + #p#", "green");
-				}
-			}
-
 			out("");
-			// The framework swap is `wheels upgrade apply` (#3035) —
-			// `brew upgrade wheels` only updates the CLI binary, never the
-			// app's vendored framework copy.
-			out("Apply with: wheels upgrade apply");
 		}
 
-		// Throw after the full report flushes — breaking findings exit
-		// non-zero (CI gate), advisories and all-clear exit 0. Mirrors
-		// validate()'s Wheels.ValidationFailed convention.
-		if (arrayLen(issues)) {
-			throw(
-				type = "Wheels.UpgradeCheckFailed",
-				message = "Upgrade check found #arrayLen(issues)# breaking change(s) — see the report above."
-			);
+		if (arrayLen(arguments.advisories)) {
+			out("Recommended Improvements (#arrayLen(arguments.advisories)# found):", "cyan");
+			for (var advisory in arguments.advisories) {
+				out("  ~ #advisory.description#", "cyan");
+				for (var match in advisory.matches) {
+					out("    #match#");
+				}
+				// Advisory fix lines are intentionally uncolored so the
+				// section header and description carry the cyan accent and
+				// opt-in items read lighter than breaking-change fixes
+				// (which use cyan on the fix line for stronger emphasis).
+				out("    -> #advisory.fix#");
+				out("");
+			}
 		}
 
-		// #2963: --strict escalates advisory findings to the same hard-fail
-		// path. Reuses Wheels.UpgradeCheckFailed so CI pipelines that already
-		// filter on the breaking-case type pick the strict case up too. The
-		// breaking branch above already returned, so this fires only when
-		// strict mode is on AND at least one advisory matched but no
-		// breaking finding did.
-		if (arguments.strict && arrayLen(advisories)) {
-			throw(
-				type = "Wheels.UpgradeCheckFailed",
-				message = "Upgrade check found #arrayLen(advisories)# advisory finding(s) and --strict is set — see the report above."
-			);
+		if (arrayLen(arguments.passed)) {
+			out("All Clear (#arrayLen(arguments.passed)# checks):", "green");
+			for (var p in arguments.passed) {
+				out("  + #p#", "green");
+			}
 		}
 
-		return "";
+		out("");
+		// The framework swap is `wheels upgrade apply` (#3035) —
+		// `brew upgrade wheels` only updates the CLI binary, never the
+		// app's vendored framework copy.
+		out("Apply with: wheels upgrade apply");
 	}
 
 	// ── Upgrade Apply (bundled-source swap, #3035) ───
@@ -6061,42 +6229,9 @@ component extends="modules.BaseModule" {
 		// it by reference on Adobe CF (closures capture struct refs reliably
 		// but plain `var` captures can copy on Adobe — see CLAUDE.md).
 		var ctx = {tests: []};
-		var walkSuite = function(suite) {
-			for (var sp in (suite.specStats ?: [])) {
-				arrayAppend(ctx.tests, {
-					name: sp.name ?: "(unnamed)",
-					status: sp.status ?: "Failed",
-					failMessage: sp.failMessage ?: "",
-					// failOrigin can be an array of stack-frame structs, not a
-					// string. Coerce to a string here so the YAML emitter below
-					// (tapEscapeYaml) never receives an array and crashes the
-					// whole TAP run on the first failing spec. See CLI audit H6.
-					failOrigin: $tapOriginString(sp.failOrigin ?: ""),
-					skipped: (sp.status ?: "") == "Skipped"
-				});
-			}
-			// Suite-level errors (e.g. spec-file failed to compile, beforeAll
-			// threw) are reported on the suite itself with empty specStats —
-			// surface them as a synthetic test so they don't disappear.
-			if (
-				arrayIsEmpty(suite.specStats ?: [])
-				&& listFindNoCase("Failed,Error", suite.status ?: "")
-			) {
-				arrayAppend(ctx.tests, {
-					name: (suite.name ?: "(unnamed suite)") & " (suite-level)",
-					status: suite.status,
-					failMessage: suite.globalException ?: "",
-					failOrigin: "",
-					skipped: false
-				});
-			}
-			for (var inner in (suite.suiteStats ?: [])) {
-				walkSuite(inner);
-			}
-		};
 		for (var bundle in (arguments.result.bundleStats ?: [])) {
 			for (var suite in (bundle.suiteStats ?: [])) {
-				walkSuite(suite);
+				$tapWalkSuite(suite, ctx);
 			}
 		}
 
@@ -6117,6 +6252,46 @@ component extends="modules.BaseModule" {
 				}
 				out("  ...");
 			}
+		}
+	}
+
+	/**
+	 * Recursively flatten one suite (and its nested suites) into ctx.tests as
+	 * sequential TAP entries, including a synthetic entry for suite-level
+	 * errors. ctx is a struct so the shared list is visible by reference
+	 * across recursive calls on Adobe CF.
+	 */
+	private void function $tapWalkSuite(required any suite, required struct ctx) {
+		for (var sp in (arguments.suite.specStats ?: [])) {
+			arrayAppend(arguments.ctx.tests, {
+				name: sp.name ?: "(unnamed)",
+				status: sp.status ?: "Failed",
+				failMessage: sp.failMessage ?: "",
+				// failOrigin can be an array of stack-frame structs, not a
+				// string. Coerce to a string here so the YAML emitter below
+				// (tapEscapeYaml) never receives an array and crashes the
+				// whole TAP run on the first failing spec. See CLI audit H6.
+				failOrigin: $tapOriginString(sp.failOrigin ?: ""),
+				skipped: (sp.status ?: "") == "Skipped"
+			});
+		}
+		// Suite-level errors (e.g. spec-file failed to compile, beforeAll
+		// threw) are reported on the suite itself with empty specStats —
+		// surface them as a synthetic test so they don't disappear.
+		if (
+			arrayIsEmpty(arguments.suite.specStats ?: [])
+			&& listFindNoCase("Failed,Error", arguments.suite.status ?: "")
+		) {
+			arrayAppend(arguments.ctx.tests, {
+				name: (arguments.suite.name ?: "(unnamed suite)") & " (suite-level)",
+				status: arguments.suite.status,
+				failMessage: arguments.suite.globalException ?: "",
+				failOrigin: "",
+				skipped: false
+			});
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$tapWalkSuite(inner, arguments.ctx);
 		}
 	}
 
@@ -6187,19 +6362,52 @@ component extends="modules.BaseModule" {
 		// bundle count is lower than the on-disk *Spec.cfc count. See
 		// finding #2 in the 2026-04-29 fresh-VM triage.
 		var specsFailedToLoad = $countSpecsFailedToLoad(result, arguments.testDirectory);
+		var unloadedSpecPaths = $collectUnloadedSpecs(result, arguments.testDirectory, specsFailedToLoad);
+
+		if (specsFailedToLoad > 0) {
+			$printFailedToLoadWarning(specsFailedToLoad, unloadedSpecPaths);
+		}
+
+		// Display bundle/suite/spec tree if verbose and bundles exist
+		if (arguments.verboseOutput && structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
+			$printVerboseTree(result);
+		}
+
+		// Summary line
+		var duration = totalDuration > 0 ? " (#numberFormat(totalDuration / 1000, '0.00')#s)" : "";
+		$printTestSummaryAndDetails(result, arguments.verboseOutput, totalPass, totalFail, totalError, duration, specsFailedToLoad);
+
+		// CI mode (--ci): emit GitHub Actions-style error annotations so each
+		// failure/error surfaces inline in CI logs and PR-check annotations.
+		// testing.mdx documents --ci as tightening output for GitHub Actions
+		// and similar runners; before #3113 the flag was parsed and threaded
+		// through to here but never consumed — byte-identical to a plain run.
+		if (arguments.ciMode) {
+			for (var annotation in $buildCiAnnotations(arguments.result)) {
+				out(annotation);
+			}
+		}
+	}
+
+	/**
+	 * Probe the disk for specs that failed to load (returning their paths)
+	 * when the TestBox bundle count is lower than the on-disk *Spec.cfc count.
+	 * Best-effort — never lets a probe failure crash the test report.
+	 */
+	private array function $collectUnloadedSpecs(required any result, required string testDirectory, required numeric specsFailedToLoad) {
 		var unloadedSpecPaths = [];
-		if (specsFailedToLoad > 0 && len(arguments.testDirectory)) {
+		if (arguments.specsFailedToLoad > 0 && len(arguments.testDirectory)) {
 			try {
 				var runner = new services.TestRunner(projectRoot = variables.projectRoot);
 				var diskCount = runner.countSpecsOnDisk(arguments.testDirectory);
-				var loadedCount = (structKeyExists(result, "bundleStats") && isArray(result.bundleStats))
-					? arrayLen(result.bundleStats)
+				var loadedCount = (structKeyExists(arguments.result, "bundleStats") && isArray(arguments.result.bundleStats))
+					? arrayLen(arguments.result.bundleStats)
 					: 0;
 				if (diskCount > loadedCount) {
 					var diskSpecs = runner.listSpecsOnDisk(arguments.testDirectory);
 					var loadedNames = {};
 					if (loadedCount > 0) {
-						for (var b in result.bundleStats) {
+						for (var b in arguments.result.bundleStats) {
 							loadedNames[b.name ?: ""] = true;
 						}
 					}
@@ -6214,48 +6422,65 @@ component extends="modules.BaseModule" {
 				verbose("Failed-to-load probe failed: #probeErr.message#");
 			}
 		}
+		return unloadedSpecPaths;
+	}
 
-		if (specsFailedToLoad > 0) {
-			out("");
-			out("WARN  #specsFailedToLoad# spec file(s) failed to compile and were silently skipped:", "yellow");
-			for (var unloaded in unloadedSpecPaths) {
-				out("        #unloaded#", "yellow");
-			}
-			out("        Visit /wheels/app/tests in a browser for the parse-error details.", "yellow");
-			out("");
+	/**
+	 * Print the "specs failed to load" warning block (and the parse-error hint).
+	 */
+	private void function $printFailedToLoadWarning(required numeric specsFailedToLoad, required array unloadedSpecPaths) {
+		out("");
+		out("WARN  #arguments.specsFailedToLoad# spec file(s) failed to compile and were silently skipped:", "yellow");
+		for (var unloaded in arguments.unloadedSpecPaths) {
+			out("        #unloaded#", "yellow");
 		}
+		out("        Visit /wheels/app/tests in a browser for the parse-error details.", "yellow");
+		out("");
+	}
 
-		// Display bundle/suite/spec tree if verbose and bundles exist
-		if (arguments.verboseOutput && structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
-			for (var bundle in result.bundleStats) {
-				out("Bundle: #bundle.name ?: 'Unknown'#", "bold");
-				if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
-					for (var suite in bundle.suiteStats) {
-						displaySuite(suite, "  ");
-					}
+	/**
+	 * Print the bundle/suite/spec tree for a verbose run.
+	 */
+	private void function $printVerboseTree(required any result) {
+		for (var bundle in arguments.result.bundleStats) {
+			out("Bundle: #bundle.name ?: 'Unknown'#", "bold");
+			if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
+				for (var suite in bundle.suiteStats) {
+					displaySuite(suite, "  ");
 				}
 			}
-			out("");
 		}
+		out("");
+	}
 
-		// Summary line
-		var duration = totalDuration > 0 ? " (#numberFormat(totalDuration / 1000, '0.00')#s)" : "";
-
-		if (totalFail == 0 && totalError == 0) {
-			if (specsFailedToLoad > 0) {
-				out("#totalPass# passed, #specsFailedToLoad# failed to load#duration#", "yellow");
+	/**
+	 * Print the summary line, then (on failure and outside verbose mode) the
+	 * per-suite failure details with the flat-failures fallback.
+	 */
+	private void function $printTestSummaryAndDetails(
+		required any result,
+		required boolean verboseOutput,
+		required numeric totalPass,
+		required numeric totalFail,
+		required numeric totalError,
+		required string duration,
+		required numeric specsFailedToLoad
+	) {
+		if (arguments.totalFail == 0 && arguments.totalError == 0) {
+			if (arguments.specsFailedToLoad > 0) {
+				out("#arguments.totalPass# passed, #arguments.specsFailedToLoad# failed to load#arguments.duration#", "yellow");
 			} else {
-				out("#totalPass# passed#duration#", "green");
+				out("#arguments.totalPass# passed#arguments.duration#", "green");
 			}
 		} else {
-			var failedToLoadStr = specsFailedToLoad > 0 ? ", #specsFailedToLoad# failed to load" : "";
-			out("#totalPass# passed, #totalFail# failed, #totalError# error(s)#failedToLoadStr##duration#", "red");
+			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
+			out("#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#", "red");
 			out("");
 
 			// Show failure details (skip if verbose already displayed them via displaySuite)
 			if (!arguments.verboseOutput) {
-				if (structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
-					for (var bundle in result.bundleStats) {
+				if (structKeyExists(arguments.result, "bundleStats") && isArray(arguments.result.bundleStats)) {
+					for (var bundle in arguments.result.bundleStats) {
 						if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
 							displayFailures(bundle.suiteStats);
 						}
@@ -6263,25 +6488,14 @@ component extends="modules.BaseModule" {
 				}
 
 				// Fallback: check for flat failures array
-				if (structKeyExists(result, "failures") && isArray(result.failures)) {
-					for (var failure in result.failures) {
+				if (structKeyExists(arguments.result, "failures") && isArray(arguments.result.failures)) {
+					for (var failure in arguments.result.failures) {
 						out("  FAIL: #failure.name ?: 'unknown'#", "red");
 						if (structKeyExists(failure, "message")) {
 							out("    #failure.message#", "yellow");
 						}
 					}
 				}
-			}
-		}
-
-		// CI mode (--ci): emit GitHub Actions-style error annotations so each
-		// failure/error surfaces inline in CI logs and PR-check annotations.
-		// testing.mdx documents --ci as tightening output for GitHub Actions
-		// and similar runners; before #3113 the flag was parsed and threaded
-		// through to here but never consumed — byte-identical to a plain run.
-		if (arguments.ciMode) {
-			for (var annotation in $buildCiAnnotations(arguments.result)) {
-				out(annotation);
 			}
 		}
 	}
@@ -6302,41 +6516,13 @@ component extends="modules.BaseModule" {
 			return annotations;
 		}
 
-		// Walk bundle → suite (recursively) → spec, collecting failures. Mirror
-		// the emitTapResults() walker: the closure references itself by name and
-		// appends to a parent struct field (not a bare array) so the mutation is
-		// seen by reference — the established pattern on the CLI's bundled Lucee.
+		// Walk bundle → suite (recursively) → spec, collecting failures into a
+		// shared ctx struct (not a bare array) so the mutation is seen by
+		// reference across recursive calls on the CLI's bundled Lucee.
 		var ctx = {failures: []};
-		var walkSuite = function(suite) {
-			for (var spec in (suite.specStats ?: [])) {
-				var status = spec.status ?: "";
-				if (status == "Failed" || status == "Error") {
-					var message = "";
-					if (status == "Failed") {
-						message = spec.failMessage ?: "";
-					} else if (structKeyExists(spec, "error") && isStruct(spec.error)) {
-						message = spec.error.message ?: "";
-					}
-					arrayAppend(ctx.failures, {name: (spec.name ?: "(unnamed spec)"), message: message});
-				}
-			}
-			// Suite-level failure with no specs (compile error, beforeAll threw).
-			if (
-				arrayIsEmpty(suite.specStats ?: [])
-				&& listFindNoCase("Failed,Error", suite.status ?: "")
-			) {
-				arrayAppend(ctx.failures, {
-					name: (suite.name ?: "(unnamed suite)") & " (suite-level)",
-					message: suite.globalException ?: ""
-				});
-			}
-			for (var inner in (suite.suiteStats ?: [])) {
-				walkSuite(inner);
-			}
-		};
 		for (var bundle in (arguments.result.bundleStats ?: [])) {
 			for (var suite in (bundle.suiteStats ?: [])) {
-				walkSuite(suite);
+				$ciWalkSuite(suite, ctx);
 			}
 		}
 
@@ -6348,6 +6534,39 @@ component extends="modules.BaseModule" {
 			);
 		}
 		return annotations;
+	}
+
+	/**
+	 * Recursively collect failed/errored specs (and suite-level failures) from
+	 * one suite into ctx.failures. ctx is a struct so the shared list is
+	 * visible by reference across recursive calls.
+	 */
+	private void function $ciWalkSuite(required any suite, required struct ctx) {
+		for (var spec in (arguments.suite.specStats ?: [])) {
+			var status = spec.status ?: "";
+			if (status == "Failed" || status == "Error") {
+				var message = "";
+				if (status == "Failed") {
+					message = spec.failMessage ?: "";
+				} else if (structKeyExists(spec, "error") && isStruct(spec.error)) {
+					message = spec.error.message ?: "";
+				}
+				arrayAppend(arguments.ctx.failures, {name: (spec.name ?: "(unnamed spec)"), message: message});
+			}
+		}
+		// Suite-level failure with no specs (compile error, beforeAll threw).
+		if (
+			arrayIsEmpty(arguments.suite.specStats ?: [])
+			&& listFindNoCase("Failed,Error", arguments.suite.status ?: "")
+		) {
+			arrayAppend(arguments.ctx.failures, {
+				name: (arguments.suite.name ?: "(unnamed suite)") & " (suite-level)",
+				message: arguments.suite.globalException ?: ""
+			});
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$ciWalkSuite(inner, arguments.ctx);
+		}
 	}
 
 	/**
@@ -8150,65 +8369,15 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function browserTest(array args = []) {
-		var format = "text";
-		var verboseOutput = false;
-		var basePath = "";
-		// Default to the APP's browser specs (tests/specs/browser/) — not the
-		// framework's internal browser specs. Onboarding finding F11 reported
-		// `wheels browser test` running 0 tests because it pointed at
-		// `wheels.tests.specs.wheelstest`, the framework's own browser-DSL
-		// test directory, which contains no app code. Override with
-		// `--directory=...` for advanced use.
-		var directory = "tests.specs.browser";
-
-		for (var i = 2; i <= arrayLen(args); i++) {
-			var arg = args[i];
-			if (arg == "--verbose" || arg == "-v") {
-				verboseOutput = true;
-			} else if (reFindNoCase("^--format=", arg)) {
-				format = valueAfterEquals(arg);
-			} else if (reFindNoCase("^--directory=", arg)) {
-				directory = valueAfterEquals(arg);
-			} else if (reFindNoCase("^--base-path=", arg)) {
-				basePath = valueAfterEquals(arg);
-			} else if (!arg.startsWith("--")) {
-				directory = arg;
-			}
-		}
+		var opts = $browserParseArgs(arguments.args);
+		var format = opts.format;
+		var verboseOutput = opts.verboseOutput;
+		var basePath = opts.basePath;
+		var directory = opts.directory;
 
 		// Pre-flight: verify Playwright JARs
 		var manifestPath = variables.projectRoot & "/vendor/wheels/browser-manifest.json";
-		if (!fileExists(manifestPath)) {
-			out("browser-manifest.json not found at: #manifestPath#", "red");
-			return "";
-		}
-		var manifest = deserializeJSON(fileRead(manifestPath));
-		var installDir = $resolveBrowserInstallDir();
-
-		var allInstalled = true;
-		var missingJars = [];
-		var mismatchedJars = [];
-		for (var entry in manifest.classpath) {
-			var jarPath = installDir & "/lib/" & entry.filename;
-			if (!fileExists(jarPath)) {
-				allInstalled = false;
-				arrayAppend(missingJars, entry.filename);
-			} else if ($sha256(jarPath) != lCase(entry.sha256)) {
-				allInstalled = false;
-				arrayAppend(mismatchedJars, entry.filename);
-			}
-		}
-
-		if (!allInstalled) {
-			out("Playwright not installed.", "red");
-			if (arrayLen(missingJars)) {
-				out("Missing: #arrayToList(missingJars, ', ')#", "yellow");
-			}
-			if (arrayLen(mismatchedJars)) {
-				out("SHA mismatch: #arrayToList(mismatchedJars, ', ')#", "yellow");
-			}
-			out("");
-			out("Run: wheels browser setup");
+		if (!$browserVerifyPlaywright(manifestPath)) {
 			return "";
 		}
 
@@ -8255,83 +8424,10 @@ component extends="modules.BaseModule" {
 			out("Pass: #totalPass#  Fail: #totalFail#  Error: #totalError#");
 			out("");
 
-			// Recursive walk so we catch nested suites and surface failures
-			// at the suite level (empty specStats but status == Failed/Error)
-			// as well as per-spec failures. Playwright failures often error
-			// out before any `it` runs — the only artifact is on the suite,
-			// which the previous loop ignored. Onboarding F13.
-			// Mutable state on a parent struct so closures see it by reference
-			// on Adobe CF — see CLAUDE.md cross-engine notes.
-			var ctx = {failureCount: 0, verbose: verboseOutput};
-			var walkSuite = function(suite) {
-				var specs = suite.specStats ?: [];
-				for (var sp in specs) {
-					if (listFindNoCase("Failed,Error", sp.status ?: "")) {
-						ctx.failureCount++;
-						out("  #sp.status ?: ''#: #sp.name ?: 'unknown'#", "red");
-						var msg = sp.failMessage ?: "";
-						if (len(msg)) {
-							// Print failMessage by default. Without --verbose
-							// truncate to 400 chars (enough to see the
-							// assertion + selector context). With --verbose
-							// dump the whole thing.
-							var shown = ctx.verbose ? msg : left(msg, 400);
-							out("    #shown#", "yellow");
-							if (!ctx.verbose && len(msg) > 400) {
-								out("    (truncated; pass --verbose for full output)", "yellow");
-							}
-						}
-						if (len(sp.failOrigin ?: "")) {
-							out("    at: #sp.failOrigin#", "yellow");
-						}
-					}
-				}
-				// Suite-level errors (no spec ever ran — e.g. compile error,
-				// beforeAll threw, Playwright init blew up).
-				if (
-					arrayIsEmpty(specs)
-					&& listFindNoCase("Failed,Error", suite.status ?: "")
-				) {
-					ctx.failureCount++;
-					out("  #suite.status#: #suite.name ?: '(unnamed suite)'# (suite-level)", "red");
-					var sg = suite.globalException ?: "";
-					if (len(sg)) {
-						var shown = ctx.verbose ? sg : left(sg, 400);
-						out("    #shown#", "yellow");
-						if (!ctx.verbose && len(sg) > 400) {
-							out("    (truncated; pass --verbose for full output)", "yellow");
-						}
-					}
-				}
-				for (var inner in (suite.suiteStats ?: [])) {
-					walkSuite(inner);
-				}
-			};
-			for (var bundle in (data.bundleStats ?: [])) {
-				for (var suite in (bundle.suiteStats ?: [])) {
-					walkSuite(suite);
-				}
-				// Bundle-level error (compile error in spec file).
-				if (len(bundle.globalException ?: "")) {
-					ctx.failureCount++;
-					out("  Bundle error: #bundle.name ?: '(unnamed)'#", "red");
-					var bg = bundle.globalException;
-					var shown = ctx.verbose ? bg : left(bg, 400);
-					out("    #shown#", "yellow");
-					if (!ctx.verbose && len(bg) > 400) {
-						out("    (truncated; pass --verbose for full output)", "yellow");
-					}
-				}
-			}
+			var failureCount = $browserPrintFailures(data, verboseOutput);
 
-			if (totalFail == 0 && totalError == 0) {
-				out("All browser tests passed.", "green");
-			} else if (ctx.failureCount > 0 && (totalError + totalFail) > 0) {
-				out("");
-				out("If failure messages above don't show selector/Playwright detail,", "yellow");
-				out("the BrowserTest spec may need explicit try/catch around .click() /", "yellow");
-				out(".fill() to surface Playwright exceptions into failMessage.", "yellow");
-			}
+			$browserPrintSummary(totalFail, totalError, failureCount);
+
 			// Stash after the report flushes. Throwing inside this try
 			// would be swallowed by the parse-error catch as
 			// "Failed to parse test results".
@@ -8350,6 +8446,167 @@ component extends="modules.BaseModule" {
 		}
 
 		return "";
+	}
+
+	/**
+	 * Parse `wheels browser test` arguments. Defaults to the APP's browser
+	 * specs (tests/specs/browser/) — not the framework's internal browser
+	 * specs (Onboarding finding F11). Override with `--directory=...`.
+	 */
+	private struct function $browserParseArgs(required array args) {
+		var format = "text";
+		var verboseOutput = false;
+		var basePath = "";
+		var directory = "tests.specs.browser";
+
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			var arg = arguments.args[i];
+			if (arg == "--verbose" || arg == "-v") {
+				verboseOutput = true;
+			} else if (reFindNoCase("^--format=", arg)) {
+				format = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--directory=", arg)) {
+				directory = valueAfterEquals(arg);
+			} else if (reFindNoCase("^--base-path=", arg)) {
+				basePath = valueAfterEquals(arg);
+			} else if (!arg.startsWith("--")) {
+				directory = arg;
+			}
+		}
+
+		return {format: format, verboseOutput: verboseOutput, basePath: basePath, directory: directory};
+	}
+
+	/**
+	 * Pre-flight: verify the Playwright JARs in browser-manifest.json are
+	 * present and SHA-matched. Prints guidance and returns false when not.
+	 */
+	private boolean function $browserVerifyPlaywright(required string manifestPath) {
+		if (!fileExists(arguments.manifestPath)) {
+			out("browser-manifest.json not found at: #arguments.manifestPath#", "red");
+			return false;
+		}
+		var manifest = deserializeJSON(fileRead(arguments.manifestPath));
+		var installDir = $resolveBrowserInstallDir();
+
+		var allInstalled = true;
+		var missingJars = [];
+		var mismatchedJars = [];
+		for (var entry in manifest.classpath) {
+			var jarPath = installDir & "/lib/" & entry.filename;
+			if (!fileExists(jarPath)) {
+				allInstalled = false;
+				arrayAppend(missingJars, entry.filename);
+			} else if ($sha256(jarPath) != lCase(entry.sha256)) {
+				allInstalled = false;
+				arrayAppend(mismatchedJars, entry.filename);
+			}
+		}
+
+		if (!allInstalled) {
+			out("Playwright not installed.", "red");
+			if (arrayLen(missingJars)) {
+				out("Missing: #arrayToList(missingJars, ', ')#", "yellow");
+			}
+			if (arrayLen(mismatchedJars)) {
+				out("SHA mismatch: #arrayToList(mismatchedJars, ', ')#", "yellow");
+			}
+			out("");
+			out("Run: wheels browser setup");
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Print per-spec/suite/bundle failures for a text-format browser run,
+	 * returning the total failure count. Recursive walk so nested suites and
+	 * suite-level failures (empty specStats but status Failed/Error) surface —
+	 * Onboarding F13.
+	 */
+	private numeric function $browserPrintFailures(required any data, required boolean verboseOutput) {
+		var ctx = {failureCount: 0, verbose: arguments.verboseOutput};
+		for (var bundle in (arguments.data.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				$browserWalkSuite(suite, ctx);
+			}
+			// Bundle-level error (compile error in spec file).
+			if (len(bundle.globalException ?: "")) {
+				ctx.failureCount++;
+				out("  Bundle error: #bundle.name ?: '(unnamed)'#", "red");
+				var bg = bundle.globalException;
+				var shown = ctx.verbose ? bg : left(bg, 400);
+				out("    #shown#", "yellow");
+				if (!ctx.verbose && len(bg) > 400) {
+					out("    (truncated; pass --verbose for full output)", "yellow");
+				}
+			}
+		}
+		return ctx.failureCount;
+	}
+
+	/**
+	 * Recursively print failures for one suite (and its nested suites),
+	 * incrementing the shared ctx.failureCount. ctx is a struct so the shared
+	 * counter is visible by reference across recursive calls on Adobe CF.
+	 */
+	private void function $browserWalkSuite(required any suite, required struct ctx) {
+		var specs = arguments.suite.specStats ?: [];
+		for (var sp in specs) {
+			if (listFindNoCase("Failed,Error", sp.status ?: "")) {
+				arguments.ctx.failureCount++;
+				out("  #sp.status ?: ''#: #sp.name ?: 'unknown'#", "red");
+				var msg = sp.failMessage ?: "";
+				if (len(msg)) {
+					// Print failMessage by default. Without --verbose
+					// truncate to 400 chars (enough to see the
+					// assertion + selector context). With --verbose
+					// dump the whole thing.
+					var shown = arguments.ctx.verbose ? msg : left(msg, 400);
+					out("    #shown#", "yellow");
+					if (!arguments.ctx.verbose && len(msg) > 400) {
+						out("    (truncated; pass --verbose for full output)", "yellow");
+					}
+				}
+				if (len(sp.failOrigin ?: "")) {
+					out("    at: #sp.failOrigin#", "yellow");
+				}
+			}
+		}
+		// Suite-level errors (no spec ever ran — e.g. compile error,
+		// beforeAll threw, Playwright init blew up).
+		if (
+			arrayIsEmpty(specs)
+			&& listFindNoCase("Failed,Error", arguments.suite.status ?: "")
+		) {
+			arguments.ctx.failureCount++;
+			out("  #arguments.suite.status#: #arguments.suite.name ?: '(unnamed suite)'# (suite-level)", "red");
+			var sg = arguments.suite.globalException ?: "";
+			if (len(sg)) {
+				var shown = arguments.ctx.verbose ? sg : left(sg, 400);
+				out("    #shown#", "yellow");
+				if (!arguments.ctx.verbose && len(sg) > 400) {
+					out("    (truncated; pass --verbose for full output)", "yellow");
+				}
+			}
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$browserWalkSuite(inner, arguments.ctx);
+		}
+	}
+
+	/**
+	 * Print the closing browser-test summary line(s).
+	 */
+	private void function $browserPrintSummary(required numeric totalFail, required numeric totalError, required numeric failureCount) {
+		if (arguments.totalFail == 0 && arguments.totalError == 0) {
+			out("All browser tests passed.", "green");
+		} else if (arguments.failureCount > 0 && (arguments.totalError + arguments.totalFail) > 0) {
+			out("");
+			out("If failure messages above don't show selector/Playwright detail,", "yellow");
+			out("the BrowserTest spec may need explicit try/catch around .click() /", "yellow");
+			out(".fill() to surface Playwright exceptions into failMessage.", "yellow");
+		}
 	}
 
 	private string function $resolveBrowserInstallDir() {
