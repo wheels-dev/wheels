@@ -3,171 +3,196 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "initialized")) {
 			$restoreTestRunnerApplicationScope();
 			if (application.wheels.sendEmailOnError) {
-				local.args = {};
-				$args(name = "sendEmail", args = local.args);
-				local.args.from = application.wheels.errorEmailAddress;
-				if (Len(application.wheels.errorEmailFromAddress)) {
-					local.args.from = application.wheels.errorEmailFromAddress;
-				}
-				local.args.to = application.wheels.errorEmailAddress;
-				if (Len(application.wheels.errorEmailToAddress)) {
-					local.args.to = application.wheels.errorEmailToAddress;
-				}
-				if (Len(local.args.from) && Len(local.args.to)) {
-					if (StructKeyExists(application.wheels, "errorEmailServer") && Len(application.wheels.errorEmailServer)) {
-						local.args.server = application.wheels.errorEmailServer;
-					}
-					local.args.subject = application.wheels.errorEmailSubject;
-					local.rootCause = "";
-					if (
-						StructKeyExists(arguments.exception, "rootCause") && StructKeyExists(arguments.exception.rootCause, "message")
-					) {
-						local.rootCause = arguments.exception.rootCause.message;
-					}
-					if (application.wheels.includeErrorInEmailSubject && Len(local.rootCause)) {
-						local.args.subject &= ": " & local.rootCause;
-					}
-					local.args.type = "html";
-					local.args.tagContent = $includeAndReturnOutput(
-						$template = "/wheels/events/onerror/cfmlerror.cfm",
-						exception = arguments.exception
-					);
-					StructDelete(local.args, "layouts", false);
-					StructDelete(local.args, "detectMultiPart", false);
-					try {
-						$mail(argumentCollection = local.args);
-					} catch (any e) {
-					}
-				}
+				$runOnErrorSendEmail(arguments.exception);
 			}
 			// Fire registered onError callbacks (packages like Sentry hook in here).
 			$fireOnErrorCallbacks(arguments.exception);
 			if (application.wheels.showErrorInformation) {
 				// Detect request format for format-specific error handling
 				local.format = $getRequestFormat();
-				
-				if ($engineAdapter().isBoxLang()) {
-					if (StructKeyExists(arguments.exception, "type") && Left(arguments.exception.type, 6) == "Wheels") {
-						local.wheelsError = arguments.exception;
-					} else if (
-						StructKeyExists(arguments.exception, "cause")
-						&& !IsNull(arguments.exception.cause) && IsStruct(arguments.exception.cause)
-						&& StructKeyExists(arguments.exception.cause, "rootCause")
-						&& !IsNull(arguments.exception.cause.rootCause)
-						&& IsStruct(arguments.exception.cause.rootCause)
-						&& StructKeyExists(arguments.exception.cause.rootCause, "type")
-						&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
-					) {
-						local.wheelsError = arguments.exception.cause.rootCause;
-					}
+				local.wheelsError = $runOnErrorResolveWheelsError(arguments.exception);
+				if (!StructIsEmpty(local.wheelsError)) {
+					local.rv = $runOnErrorRenderWheelsError(local.wheelsError, local.format);
 				} else {
-					if (StructKeyExists(arguments.exception, "rootCause") && Left(arguments.exception.rootCause.type, 6) == "Wheels") {
-						local.wheelsError = arguments.exception.rootCause;
-					} else if (
-						StructKeyExists(arguments.exception, "cause")
-						&& !IsNull(arguments.exception.cause) && IsStruct(arguments.exception.cause)
-						&& StructKeyExists(arguments.exception.cause, "rootCause")
-						&& !IsNull(arguments.exception.cause.rootCause)
-						&& IsStruct(arguments.exception.cause.rootCause)
-						&& StructKeyExists(arguments.exception.cause.rootCause, "type")
-						&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
-					) {
-						local.wheelsError = arguments.exception.cause.rootCause;
-					}
-				}
-				if (StructKeyExists(local, "wheelsError")) {
-					// Map Wheels error types to HTTP status codes. Any
-					// `Wheels.*NotFound` (RouteNotFound, RecordNotFound,
-					// ViewNotFound, etc) is a 404, as is `Wheels.ActionNotAllowed`
-					// — the action-dispatch gate blocks framework helpers and
-					// $-prefixed internals by treating them as missing actions
-					// (#2845, #3075); `Wheels.NotAuthorized` — a policy denial
-					// from the authorization layer (#3156) — is a 403; everything
-					// else is a 500.
-					// Set the status BEFORE writing the body so the response
-					// header is committed at the right code regardless of
-					// when the servlet engine flushes (HTML-format Wheels
-					// errors used to render with HTTP 200 because no
-					// $header(statusCode=...) fired before the body was
-					// written — see GH #2319). Note: $throwErrorOrShow404Page
-					// already calls $header(statusCode=404) before throwing
-					// (and the authorization mixin's $notAuthorized() calls
-					// $header(statusCode=403)), but onError reaches us via
-					// Application.cfc which can reset the response, so we
-					// re-assert the status here.
-					if (
-						StructKeyExists(local.wheelsError, "type")
-						&& ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", local.wheelsError.type)
-					) {
-						$header(statusCode = 404);
-					} else if (
-						StructKeyExists(local.wheelsError, "type")
-						&& ReFindNoCase("^Wheels\.NotAuthorized$", local.wheelsError.type)
-					) {
-						$header(statusCode = 403);
-					} else {
-						$header(statusCode = 500);
-					}
-					local.rv = "";
-					if (local.format == "json") {
-						$header(name = "Content-Type", value = "application/json");
-						local.rv = SerializeJSON(local.wheelsError);
-					} else if (local.format == "xml") {
-						$header(name = "Content-Type", value = "text/xml");
-						local.rv = $toXml(local.wheelsError);
-					} else {
-						// Default HTML error display
-						if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
-							local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_header_simple.cfm");
-						}
-						local.rv &= $includeAndReturnOutput(
-							$template = "/wheels/events/onerror/wheelserror.cfm",
-							wheelsError = local.wheelsError
-						);
-						if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
-							local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_footer_simple.cfm");
-						}
-					}
-				} else {
-					if (local.format == "json") {
-						$header(name = "Content-Type", value = "application/json");
-						$header(statusCode = 500);
-						local.rv = SerializeJSON(arguments.exception);
-					} else if (local.format == "xml") {
-						$header(name = "Content-Type", value = "text/xml");
-						$header(statusCode = 500);
-						local.rv = $toXml(arguments.exception);
-					} else {
-						// Default behavior: throw the exception for HTML display
-						Throw(object = arguments.exception);
-					}
+					local.rv = $runOnErrorRenderException(arguments.exception, local.format);
 				}
 			} else {
-				$header(statusCode = 500);
-				
-				local.format = $getRequestFormat();
-				local.formatSpecificTemplate = "#application.wheels.eventPath#/onerror.#local.format#.cfm";
-
-				if (FileExists(ExpandPath(local.formatSpecificTemplate))) {
-					local.errorTemplate = local.formatSpecificTemplate;
-				} else {
-					local.errorTemplate = "#application.wheels.eventPath#/onerror.cfm";
-				}
-				
-				local.rv = $includeAndReturnOutput(
-					$template = local.errorTemplate,
-					eventName = arguments.eventName,
-					exception = arguments.exception
-				);
-				
-				if (local.format == "json") {
-					$header(name = "Content-Type", value = "application/json");
-				} else if (local.format == "xml") {
-					$header(name = "Content-Type", value = "application/xml");
-				}
+				local.rv = $runOnErrorRenderTemplate(arguments.exception, arguments.eventName);
 			}
 		} else {
 			Throw(object = arguments.exception);
+		}
+		return local.rv;
+	}
+
+	public void function $runOnErrorSendEmail(required exception) {
+		local.args = {};
+		$args(name = "sendEmail", args = local.args);
+		local.args.from = application.wheels.errorEmailAddress;
+		if (Len(application.wheels.errorEmailFromAddress)) {
+			local.args.from = application.wheels.errorEmailFromAddress;
+		}
+		local.args.to = application.wheels.errorEmailAddress;
+		if (Len(application.wheels.errorEmailToAddress)) {
+			local.args.to = application.wheels.errorEmailToAddress;
+		}
+		if (Len(local.args.from) && Len(local.args.to)) {
+			if (StructKeyExists(application.wheels, "errorEmailServer") && Len(application.wheels.errorEmailServer)) {
+				local.args.server = application.wheels.errorEmailServer;
+			}
+			local.args.subject = application.wheels.errorEmailSubject;
+			local.rootCause = "";
+			if (
+				StructKeyExists(arguments.exception, "rootCause") && StructKeyExists(arguments.exception.rootCause, "message")
+			) {
+				local.rootCause = arguments.exception.rootCause.message;
+			}
+			if (application.wheels.includeErrorInEmailSubject && Len(local.rootCause)) {
+				local.args.subject &= ": " & local.rootCause;
+			}
+			local.args.type = "html";
+			local.args.tagContent = $includeAndReturnOutput(
+				$template = "/wheels/events/onerror/cfmlerror.cfm",
+				exception = arguments.exception
+			);
+			StructDelete(local.args, "layouts", false);
+			StructDelete(local.args, "detectMultiPart", false);
+			try {
+				$mail(argumentCollection = local.args);
+			} catch (any e) {
+			}
+		}
+	}
+
+	public struct function $runOnErrorResolveWheelsError(required exception) {
+		// Returns {} when the exception is not a Wheels-raised error.
+		local.wheelsError = {};
+		if ($engineAdapter().isBoxLang()) {
+			if (StructKeyExists(arguments.exception, "type") && Left(arguments.exception.type, 6) == "Wheels") {
+				local.wheelsError = arguments.exception;
+			} else if (
+				StructKeyExists(arguments.exception, "cause")
+				&& !IsNull(arguments.exception.cause) && IsStruct(arguments.exception.cause)
+				&& StructKeyExists(arguments.exception.cause, "rootCause")
+				&& !IsNull(arguments.exception.cause.rootCause)
+				&& IsStruct(arguments.exception.cause.rootCause)
+				&& StructKeyExists(arguments.exception.cause.rootCause, "type")
+				&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
+			) {
+				local.wheelsError = arguments.exception.cause.rootCause;
+			}
+		} else {
+			if (StructKeyExists(arguments.exception, "rootCause") && Left(arguments.exception.rootCause.type, 6) == "Wheels") {
+				local.wheelsError = arguments.exception.rootCause;
+			} else if (
+				StructKeyExists(arguments.exception, "cause")
+				&& !IsNull(arguments.exception.cause) && IsStruct(arguments.exception.cause)
+				&& StructKeyExists(arguments.exception.cause, "rootCause")
+				&& !IsNull(arguments.exception.cause.rootCause)
+				&& IsStruct(arguments.exception.cause.rootCause)
+				&& StructKeyExists(arguments.exception.cause.rootCause, "type")
+				&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
+			) {
+				local.wheelsError = arguments.exception.cause.rootCause;
+			}
+		}
+		return local.wheelsError;
+	}
+
+	public string function $runOnErrorRenderWheelsError(required wheelsError, required format) {
+		// Map Wheels error types to HTTP status codes. Any
+		// `Wheels.*NotFound` (RouteNotFound, RecordNotFound,
+		// ViewNotFound, etc) is a 404, as is `Wheels.ActionNotAllowed`
+		// — the action-dispatch gate blocks framework helpers and
+		// $-prefixed internals by treating them as missing actions
+		// (#2845, #3075); `Wheels.NotAuthorized` — a policy denial
+		// from the authorization layer (#3156) — is a 403; everything
+		// else is a 500.
+		// Set the status BEFORE writing the body so the response
+		// header is committed at the right code regardless of
+		// when the servlet engine flushes (HTML-format Wheels
+		// errors used to render with HTTP 200 because no
+		// $header(statusCode=...) fired before the body was
+		// written — see GH #2319). Note: $throwErrorOrShow404Page
+		// already calls $header(statusCode=404) before throwing
+		// (and the authorization mixin's $notAuthorized() calls
+		// $header(statusCode=403)), but onError reaches us via
+		// Application.cfc which can reset the response, so we
+		// re-assert the status here.
+		if (
+			StructKeyExists(arguments.wheelsError, "type")
+			&& ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.wheelsError.type)
+		) {
+			$header(statusCode = 404);
+		} else if (
+			StructKeyExists(arguments.wheelsError, "type")
+			&& ReFindNoCase("^Wheels\.NotAuthorized$", arguments.wheelsError.type)
+		) {
+			$header(statusCode = 403);
+		} else {
+			$header(statusCode = 500);
+		}
+		local.rv = "";
+		if (arguments.format == "json") {
+			$header(name = "Content-Type", value = "application/json");
+			local.rv = SerializeJSON(arguments.wheelsError);
+		} else if (arguments.format == "xml") {
+			$header(name = "Content-Type", value = "text/xml");
+			local.rv = $toXml(arguments.wheelsError);
+		} else {
+			// Default HTML error display
+			if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
+				local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_header_simple.cfm");
+			}
+			local.rv &= $includeAndReturnOutput(
+				$template = "/wheels/events/onerror/wheelserror.cfm",
+				wheelsError = arguments.wheelsError
+			);
+			if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
+				local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_footer_simple.cfm");
+			}
+		}
+		return local.rv;
+	}
+
+	public string function $runOnErrorRenderException(required exception, required format) {
+		if (arguments.format == "json") {
+			$header(name = "Content-Type", value = "application/json");
+			$header(statusCode = 500);
+			local.rv = SerializeJSON(arguments.exception);
+		} else if (arguments.format == "xml") {
+			$header(name = "Content-Type", value = "text/xml");
+			$header(statusCode = 500);
+			local.rv = $toXml(arguments.exception);
+		} else {
+			// Default behavior: throw the exception for HTML display
+			Throw(object = arguments.exception);
+		}
+		return local.rv;
+	}
+
+	public string function $runOnErrorRenderTemplate(required exception, required eventName) {
+		$header(statusCode = 500);
+
+		local.format = $getRequestFormat();
+		local.formatSpecificTemplate = "#application.wheels.eventPath#/onerror.#local.format#.cfm";
+
+		if (FileExists(ExpandPath(local.formatSpecificTemplate))) {
+			local.errorTemplate = local.formatSpecificTemplate;
+		} else {
+			local.errorTemplate = "#application.wheels.eventPath#/onerror.cfm";
+		}
+
+		local.rv = $includeAndReturnOutput(
+			$template = local.errorTemplate,
+			eventName = arguments.eventName,
+			exception = arguments.exception
+		);
+
+		if (local.format == "json") {
+			$header(name = "Content-Type", value = "application/json");
+		} else if (local.format == "xml") {
+			$header(name = "Content-Type", value = "application/xml");
 		}
 		return local.rv;
 	}
