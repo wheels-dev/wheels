@@ -533,78 +533,70 @@ component extends="wheels.migrator.Base" {
 		}
 	}
 
+	variables.dbTypeMap = {
+		"int": "integer",
+		"int4": "integer",
+		"integer": "integer",
+		"mediumint": "integer",
+		"smallint": "integer",
+		"tinyint": "integer",
+		"bigint": "biginteger",
+		"int8": "biginteger",
+		"int64": "biginteger",
+		"varchar": "string",
+		"character varying": "string",
+		"nvarchar": "string",
+		"char": "string",
+		"nchar": "string",
+		"text": "text",
+		"ntext": "text",
+		"clob": "text",
+		"character large object": "text",
+		"mediumtext": "text",
+		"longtext": "text",
+		"tinytext": "text",
+		"datetime": "datetime",
+		"timestamp": "datetime",
+		"timestamp without time zone": "datetime",
+		"timestamp with time zone": "datetime",
+		"date": "date",
+		"time": "time",
+		"time without time zone": "time",
+		"time with time zone": "time",
+		"bit": "boolean",
+		"boolean": "boolean",
+		"bool": "boolean",
+		"decimal": "decimal",
+		"numeric": "decimal",
+		"money": "decimal",
+		"smallmoney": "decimal",
+		"float": "float",
+		"float4": "float",
+		"float8": "float",
+		"double": "float",
+		"double precision": "float",
+		"real": "float",
+		"binary": "binary",
+		"varbinary": "binary",
+		"image": "binary",
+		"blob": "binary",
+		"bytea": "binary",
+		"longblob": "binary",
+		"mediumblob": "binary",
+		"tinyblob": "binary",
+		"uniqueidentifier": "string"
+	};
+
 	/**
 	 * Maps raw database type names (from cfdbinfo) to Wheels migration types.
 	 * Used to compare the actual DB schema against the model's expected types.
 	 */
 	public string function $dbTypeToMigrationType(required string dbType) {
-		switch (LCase(arguments.dbType)) {
-			case "int":
-			case "int4":
-			case "integer":
-			case "mediumint":
-			case "smallint":
-			case "tinyint":
-				return "integer";
-			case "bigint":
-			case "int8":
-			case "int64":
-				return "biginteger";
-			case "varchar":
-			case "character varying":
-			case "nvarchar":
-			case "char":
-			case "nchar":
-				return "string";
-			case "text":
-			case "ntext":
-			case "clob":
-			case "character large object":
-			case "mediumtext":
-			case "longtext":
-			case "tinytext":
-				return "text";
-			case "datetime":
-			case "timestamp":
-			case "timestamp without time zone":
-			case "timestamp with time zone":
-				return "datetime";
-			case "date":
-				return "date";
-			case "time":
-			case "time without time zone":
-			case "time with time zone":
-				return "time";
-			case "bit":
-			case "boolean":
-			case "bool":
-				return "boolean";
-			case "decimal":
-			case "numeric":
-			case "money":
-			case "smallmoney":
-				return "decimal";
-			case "float":
-			case "float4":
-			case "float8":
-			case "double":
-			case "double precision":
-			case "real":
-				return "float";
-			case "binary":
-			case "varbinary":
-			case "image":
-			case "blob":
-			case "bytea":
-			case "longblob":
-			case "mediumblob":
-			case "tinyblob":
-				return "binary";
-			case "uniqueidentifier":
-				return "string";
-			default:
-				return "unknown";
+		local.key = LCase(arguments.dbType);
+		if (StructKeyExists(variables.dbTypeMap, local.key)) {
+			return variables.dbTypeMap[local.key];
 		}
+		return "unknown";
 	}
 
 }
