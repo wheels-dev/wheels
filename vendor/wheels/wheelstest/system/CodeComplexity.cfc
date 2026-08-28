@@ -37,7 +37,11 @@ component output="false" {
 	variables.scriptFn = variables.wb & "function" & variables.ws & "+[A-Za-z_$][" & variables.ww & "$]*" & variables.ws & "*" & variables.bs & "(";
 	variables.tagFn = "<" & "cffunction" & variables.wb & "[^>]*?" & variables.wb & "name";
 	variables.blockComment = "/" & variables.bs & "*.*?" & variables.bs & "*/";
-	variables.lineComment = "(?m)(?<!:)//[^" & variables.nn & "]*";
+	// No lookbehind here: Lucee routes such patterns to its ORO fallback,
+	// which rejects `(?<!...)` ("Sequence (?<...) not recognized"). Mask
+	// `://` first so a bare `//[^\r\n]*` cannot eat the tail of URL strings.
+	variables.urlProtocol = "://";
+	variables.lineComment = "//[^" & variables.bs & "r" & variables.bs & "n]*";
 	variables.tagComment = "<!---.*?--->";
 
 	/**
@@ -114,6 +118,7 @@ component output="false" {
 	public string function $stripComments(required string text) {
 		local.rv = reReplace(arguments.text, variables.tagComment, "", "all");
 		local.rv = reReplace(local.rv, variables.blockComment, "", "all");
+		local.rv = reReplace(local.rv, variables.urlProtocol, "__WHEELS_PROTO__", "all");
 		local.rv = reReplace(local.rv, variables.lineComment, "", "all");
 		return local.rv;
 	}

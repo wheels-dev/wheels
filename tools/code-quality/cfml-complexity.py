@@ -12,7 +12,9 @@ Modes:
   --baseline write           dump {file:function:line -> complexity} JSON
   --gate N --baseline F      fail (exit 1) if any function exceeds N that is
                              new (absent from baseline) or regressed (complexity
-                             grew vs baseline). Existing hotspots pass.
+                             grew vs baseline). Existing hotspots pass; functions
+                             are matched by name (file:function), so edits that
+                             shift line numbers elsewhere in a file are fine.
 
 Usage:
   python3 cfml-complexity.py [root] --top 40
@@ -151,10 +153,34 @@ def main():
         baseline = {}
         if args.baseline and os.path.exists(args.baseline):
             baseline = json.load(open(args.baseline))
+        # Match baseline entries by (file, function) rather than exact
+        # file:line:function id: inserting lines elsewhere in a file shifts
+        # every later function's line number, which used to make unchanged
+        # over-threshold functions look "new" and fail the gate spuriously.
+        # When a file defines several same-named functions, fall back to the
+        # nearest line within LINE_WINDOW.
+        LINE_WINDOW = 250
+        bindex = defaultdict(list)
+        for bid, bcomp in baseline.items():
+            parts = bid.rsplit(':', 2)
+            if len(parts) == 3:
+                bfile, bline, bfn = parts
+                try:
+                    bindex[(bfile, bfn)].append((int(bline), bcomp))
+                except ValueError:
+                    pass
         violations = []
         for r in rows:
             if r['complexity'] > args.gate:
-                prev = baseline.get(r['id'])
+                prev = None
+                cands = bindex.get((r['rel'], r['function']))
+                if cands:
+                    if len(cands) == 1:
+                        prev = cands[0][1]
+                    else:
+                        nearest = min(cands, key=lambda c: abs(c[0] - r['line']))
+                        if abs(nearest[0] - r['line']) <= LINE_WINDOW:
+                            prev = nearest[1]
                 if prev is None or r['complexity'] > prev:
                     violations.append(r)
         if violations:
