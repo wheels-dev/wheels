@@ -134,21 +134,24 @@ component extends="wheels.WheelsTest" {
 
 			it("MySQL emits DEFAULT for text and float", () => {
 				var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLMigrator");
-				expect(mysql.optionsIncludeDefault(type = "text", default = "long body")).toBeTrue();
-				expect(mysql.optionsIncludeDefault(type = "float", default = "1.25")).toBeTrue();
-				expect(mysql.optionsIncludeDefault(type = "string", default = "hello")).toBeTrue();
+				// Positional args: Adobe's parser rejects `default` as a named
+				// argument (reserved word — MissingNameException at compile time).
+				expect(mysql.optionsIncludeDefault("text", "long body")).toBeTrue();
+				expect(mysql.optionsIncludeDefault("float", "1.25")).toBeTrue();
+				expect(mysql.optionsIncludeDefault("string", "hello")).toBeTrue();
 				var sql = mysql.addColumnOptions(
 					sql = "",
-					options = {type: "text", default: "long body", allowNull: true}
+					options = {type: "text", "default": "long body", allowNull: true}
 				);
 				expect(sql).toInclude("DEFAULT");
 			});
 
 			it("Abstract optionsIncludeDefault stays always true", () => {
-				var abstract = CreateObject("component", "wheels.databaseAdapters.Abstract");
-				expect(abstract.optionsIncludeDefault(type = "text", default = "long body")).toBeTrue();
-				expect(abstract.optionsIncludeDefault(type = "float", default = "1.25")).toBeTrue();
-				expect(abstract.optionsIncludeDefault()).toBeTrue();
+				// "abstract" is a reserved word on Adobe CF — use a safe variable name.
+				var abstractMigrator = CreateObject("component", "wheels.databaseAdapters.Abstract");
+				expect(abstractMigrator.optionsIncludeDefault("text", "long body")).toBeTrue();
+				expect(abstractMigrator.optionsIncludeDefault("float", "1.25")).toBeTrue();
+				expect(abstractMigrator.optionsIncludeDefault()).toBeTrue();
 			});
 
 		});
@@ -252,7 +255,7 @@ component extends="wheels.WheelsTest" {
 				try {
 					state.adapter.addColumnOptions(
 						sql = "",
-						options = {type: "string", default: "", allowNull: true}
+						options = {type: "string", "default": "", allowNull: true}
 					);
 				} catch (any e) {
 					state.type = e.type;
@@ -268,7 +271,7 @@ component extends="wheels.WheelsTest" {
 				try {
 					state.adapter.addColumnOptions(
 						sql = "",
-						options = {type: "string", default: "", allowNull: true}
+						options = {type: "string", "default": "", allowNull: true}
 					);
 				} catch (any e) {
 					state.type = e.type;
