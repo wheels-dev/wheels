@@ -9,46 +9,17 @@ component {
 		// --- Query Scopes ---
 		// Check if the called method matches a named scope defined in config().
 		// Returns a ScopeChain proxy that supports further chaining and terminal finder methods.
-		if (
-			StructKeyExists(variables.wheels.class, "scopes")
-			&& StructKeyExists(variables.wheels.class.scopes, arguments.missingMethodName)
-		) {
-			local.scopeDef = variables.wheels.class.scopes[arguments.missingMethodName];
-			if (StructKeyExists(local.scopeDef, "handler") && Len(local.scopeDef.handler)) {
-				local.sanitizedArgs = $sanitizeScopeHandlerArgs(arguments.missingMethodArguments);
-				local.spec = $invoke(method = local.scopeDef.handler, invokeArgs = local.sanitizedArgs);
-			} else {
-				local.spec = Duplicate(local.scopeDef);
-			}
-			local.rv = new wheels.model.query.ScopeChain(modelReference = this, specs = [local.spec]);
-			return local.rv;
+		local.scopeResult = $onMissingMethodResolveScope(arguments.missingMethodName, arguments.missingMethodArguments);
+		if (local.scopeResult.handled) {
+			return local.scopeResult.rv;
 		}
 
 		// --- Enum is<Value>() boolean checkers ---
 		// For a property with enum(property="status", values="draft,published,archived"),
 		// generates isDraft(), isPublished(), isArchived() that return true/false.
-		if (
-			Left(arguments.missingMethodName, 2) == "is"
-			&& Len(arguments.missingMethodName) > 2
-			&& StructKeyExists(variables.wheels.class, "enums")
-		) {
-			local.valueName = Right(arguments.missingMethodName, Len(arguments.missingMethodName) - 2);
-			// Check against each enum definition
-			for (local.enumProp in variables.wheels.class.enums) {
-				local.enumDef = variables.wheels.class.enums[local.enumProp];
-				// Match case-insensitively against enum value names
-				for (local.name in ListToArray(local.enumDef.names)) {
-					if (CompareNoCase(local.valueName, local.name) == 0) {
-						// Found a match — return true if the property equals the stored value
-						if (StructKeyExists(this, local.enumProp)) {
-							local.rv = (Compare(this[local.enumProp], local.enumDef.values[local.name]) == 0);
-						} else {
-							local.rv = false;
-						}
-						return local.rv;
-					}
-				}
-			}
+		local.enumResult = $onMissingMethodResolveEnumChecker(arguments.missingMethodName);
+		if (local.enumResult.handled) {
+			return local.enumResult.rv;
 		}
 
 		// --- Chainable Query Builder entry points ---
@@ -64,44 +35,141 @@ component {
 			return Invoke(local.builder, arguments.missingMethodName, arguments.missingMethodArguments);
 		}
 
+		// --- Dynamic property helpers (hasChanged, changedFrom, isPresent, isBlank, columnFor, toggle, has<Property>, update<Property>) ---
+		local.propertyResult = $onMissingMethodResolveDynamicProperty(arguments.missingMethodName, arguments.missingMethodArguments);
+		if (local.propertyResult.handled) {
+			local.rv = local.propertyResult.rv;
+		} else {
+			// --- Dynamic finders (findOneBy / findAllBy / findOrCreateBy) and associations ---
+			local.finderResult = $onMissingMethodResolveDynamicFinder(arguments.missingMethodName, arguments.missingMethodArguments);
+			if (local.finderResult.handled) {
+				local.rv = local.finderResult.rv;
+			} else {
+				local.rv = $associationMethod(argumentCollection = arguments);
+			}
+		}
+
+		if (!StructKeyExists(local, "rv")) {
+			Throw(
+				type = "Wheels.MethodNotFound",
+				message = "The method `#arguments.missingMethodName#` was not found in the `#variables.wheels.class.modelName#` model.",
+				extendedInfo = "Check your spelling or add the method to the model's CFC file."
+			);
+		}
+
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Resolves a dynamic method call against the named query scopes
+	 * defined in config(). Returns `{ handled, rv }` with `handled = true` when the
+	 * method matches a scope and `rv` holding the resulting ScopeChain.
+	 */
+	public any function $onMissingMethodResolveScope(required string missingMethodName, required struct missingMethodArguments) {
+		local.result = { handled = false, rv = "" };
+		if (
+			StructKeyExists(variables.wheels.class, "scopes")
+			&& StructKeyExists(variables.wheels.class.scopes, arguments.missingMethodName)
+		) {
+			local.scopeDef = variables.wheels.class.scopes[arguments.missingMethodName];
+			if (StructKeyExists(local.scopeDef, "handler") && Len(local.scopeDef.handler)) {
+				local.sanitizedArgs = $sanitizeScopeHandlerArgs(arguments.missingMethodArguments);
+				local.spec = $invoke(method = local.scopeDef.handler, invokeArgs = local.sanitizedArgs);
+			} else {
+				local.spec = Duplicate(local.scopeDef);
+			}
+			local.result.rv = new wheels.model.query.ScopeChain(modelReference = this, specs = [local.spec]);
+			local.result.handled = true;
+		}
+		return local.result;
+	}
+
+	/**
+	 * Internal function. Resolves the enum `is<Value>()` boolean checker form.
+	 * Returns `{ handled, rv }` with `handled = true` when the method name matches an
+	 * enum value name.
+	 */
+	public any function $onMissingMethodResolveEnumChecker(required string missingMethodName) {
+		local.result = { handled = false, rv = false };
+		if (
+			Left(arguments.missingMethodName, 2) == "is"
+			&& Len(arguments.missingMethodName) > 2
+			&& StructKeyExists(variables.wheels.class, "enums")
+		) {
+			local.valueName = Right(arguments.missingMethodName, Len(arguments.missingMethodName) - 2);
+			// Check against each enum definition
+			for (local.enumProp in variables.wheels.class.enums) {
+				local.enumDef = variables.wheels.class.enums[local.enumProp];
+				// Match case-insensitively against enum value names
+				for (local.name in ListToArray(local.enumDef.names)) {
+					if (CompareNoCase(local.valueName, local.name) == 0) {
+						// Found a match — return true if the property equals the stored value
+						if (StructKeyExists(this, local.enumProp)) {
+							local.result.rv = (Compare(this[local.enumProp], local.enumDef.values[local.name]) == 0);
+						} else {
+							local.result.rv = false;
+						}
+						local.result.handled = true;
+						return local.result;
+					}
+				}
+			}
+		}
+		return local.result;
+	}
+
+	/**
+	 * Internal function. Resolves the dynamic property method forms (`hasChanged`,
+	 * `changedFrom`, `isPresent`, `isBlank`, `columnFor`, `toggle`, `has<Property>`,
+	 * `update<Property>`). Returns `{ handled, rv }`.
+	 */
+	public any function $onMissingMethodResolveDynamicProperty(required string missingMethodName, required struct missingMethodArguments) {
+		local.result = { handled = false, rv = "" };
 		if (
 			Right(arguments.missingMethodName, 10) == "hasChanged"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "hasChanged", ""))
 		) {
-			local.rv = hasChanged(property = ReplaceNoCase(arguments.missingMethodName, "hasChanged", ""));
+			local.result.rv = hasChanged(property = ReplaceNoCase(arguments.missingMethodName, "hasChanged", ""));
+			local.result.handled = true;
 		} else if (
 			Right(arguments.missingMethodName, 11) == "changedFrom"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "changedFrom", ""))
 		) {
-			local.rv = changedFrom(property = ReplaceNoCase(arguments.missingMethodName, "changedFrom", ""));
+			local.result.rv = changedFrom(property = ReplaceNoCase(arguments.missingMethodName, "changedFrom", ""));
+			local.result.handled = true;
 		} else if (
 			Right(arguments.missingMethodName, 9) == "IsPresent"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "IsPresent", ""))
 		) {
-			local.rv = propertyIsPresent(property = ReplaceNoCase(arguments.missingMethodName, "IsPresent", ""));
+			local.result.rv = propertyIsPresent(property = ReplaceNoCase(arguments.missingMethodName, "IsPresent", ""));
+			local.result.handled = true;
 		} else if (
 			Right(arguments.missingMethodName, 7) == "IsBlank"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "IsBlank", ""))
 		) {
-			local.rv = propertyIsBlank(property = ReplaceNoCase(arguments.missingMethodName, "IsBlank", ""));
+			local.result.rv = propertyIsBlank(property = ReplaceNoCase(arguments.missingMethodName, "IsBlank", ""));
+			local.result.handled = true;
 		} else if (
 			Left(arguments.missingMethodName, 9) == "columnFor"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "columnFor", ""))
 		) {
-			local.rv = columnForProperty(property = ReplaceNoCase(arguments.missingMethodName, "columnFor", ""));
+			local.result.rv = columnForProperty(property = ReplaceNoCase(arguments.missingMethodName, "columnFor", ""));
+			local.result.handled = true;
 		} else if (
 			Left(arguments.missingMethodName, 6) == "toggle"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "toggle", ""))
 		) {
-			local.rv = toggle(
+			local.result.rv = toggle(
 				property = ReplaceNoCase(arguments.missingMethodName, "toggle", ""),
 				argumentCollection = arguments.missingMethodArguments
 			);
+			local.result.handled = true;
 		} else if (
 			Left(arguments.missingMethodName, 3) == "has"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "has", ""))
 		) {
-			local.rv = hasProperty(property = ReplaceNoCase(arguments.missingMethodName, "has", ""));
+			local.result.rv = hasProperty(property = ReplaceNoCase(arguments.missingMethodName, "has", ""));
+			local.result.handled = true;
 		} else if (
 			Left(arguments.missingMethodName, 6) == "update"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "update", ""))
@@ -113,11 +181,23 @@ component {
 					extendedInfo = "Pass in a value to the dynamic updateProperty in the `value` argument."
 				);
 			}
-			local.rv = updateProperty(
+			local.result.rv = updateProperty(
 				property = ReplaceNoCase(arguments.missingMethodName, "update", ""),
 				value = arguments.missingMethodArguments.value
 			);
-		} else if (
+			local.result.handled = true;
+		}
+		return local.result;
+	}
+
+	/**
+	 * Internal function. Resolves the dynamic finder forms (`findOneByX`, `findAllByX`,
+	 * `findOrCreateByX`). Mutates `missingMethodArguments` in place and returns
+	 * `{ handled, rv }`.
+	 */
+	public any function $onMissingMethodResolveDynamicFinder(required string missingMethodName, required struct missingMethodArguments) {
+		local.result = { handled = false, rv = "" };
+		if (
 			Left(arguments.missingMethodName, 9) == "findOneBy"
 			|| Left(arguments.missingMethodName, 9) == "findAllBy"
 		) {
@@ -173,7 +253,7 @@ component {
 
 			// construct where clause
 			local.addToWhere = ArrayToList(local.addToWhere, " AND ");
-			
+
 			if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
 				arguments.missingMethodArguments.where = "(" & arguments.missingMethodArguments.where & ") AND (" & local.addToWhere & ")";
 			} else {
@@ -188,25 +268,16 @@ component {
 
 			// call finder method
 			if (Left(arguments.missingMethodName, 9) == "findOneBy") {
-				local.rv = findOne(argumentCollection = arguments.missingMethodArguments);
+				local.result.rv = findOne(argumentCollection = arguments.missingMethodArguments);
 			} else {
-				local.rv = findAll(argumentCollection = arguments.missingMethodArguments);
+				local.result.rv = findAll(argumentCollection = arguments.missingMethodArguments);
 			}
+			local.result.handled = true;
 		} else if (Left(arguments.missingMethodName, 14) == "findOrCreateBy") {
-			local.rv = $findOrCreateBy(argumentCollection = arguments);
-		} else {
-			local.rv = $associationMethod(argumentCollection = arguments);
+			local.result.rv = $findOrCreateBy(argumentCollection = arguments);
+			local.result.handled = true;
 		}
-
-		if (!StructKeyExists(local, "rv")) {
-			Throw(
-				type = "Wheels.MethodNotFound",
-				message = "The method `#arguments.missingMethodName#` was not found in the `#variables.wheels.class.modelName#` model.",
-				extendedInfo = "Check your spelling or add the method to the model's CFC file."
-			);
-		}
-
-		return local.rv;
+		return local.result;
 	}
 
 	/**
@@ -330,212 +401,25 @@ component {
 					&& local.assoc.polymorphic
 					&& local.assoc.type == "belongsTo"
 				) {
-					local.name = ReplaceNoCase(arguments.missingMethodName, local.key, "object");
-					local.foreignKeyProp = local.assoc.foreignKey;
-					local.foreignTypeProp = local.assoc.foreignType;
-
-					if (local.name == "object") {
-						// Read the type column to determine which model to query.
-						if (StructKeyExists(this, local.foreignTypeProp) && Len(this[local.foreignTypeProp])
-							&& StructKeyExists(this, local.foreignKeyProp) && Len(this[local.foreignKeyProp])) {
-							local.componentReference = model(this[local.foreignTypeProp]);
-							local.method = "findByKey";
-							arguments.missingMethodArguments.key = this[local.foreignKeyProp];
-						}
-					} else if (local.name == "hasObject") {
-						// Check if the foreign key is non-empty.
-						if (StructKeyExists(this, local.foreignKeyProp) && Len(this[local.foreignKeyProp])
-							&& StructKeyExists(this, local.foreignTypeProp) && Len(this[local.foreignTypeProp])) {
-							local.componentReference = model(this[local.foreignTypeProp]);
-							local.method = "exists";
-							arguments.missingMethodArguments.key = this[local.foreignKeyProp];
-						} else {
-							local.rv = false;
-						}
-					}
-
-					if (Len(local.method) && StructKeyExists(local, "componentReference")) {
-						local.rv = $invoke(
-							componentReference = local.componentReference,
-							method = local.method,
-							invokeArgs = arguments.missingMethodArguments
-						);
+					local.polyResult = $associationMethodResolvePolymorphicBelongsTo(
+						missingMethodName = arguments.missingMethodName,
+						key = local.key,
+						assoc = local.assoc,
+						missingMethodArguments = arguments.missingMethodArguments
+					);
+					if (local.polyResult.handled) {
+						local.rv = local.polyResult.rv;
 					}
 					continue;
 				}
 
-				local.info = $expandedAssociations(include = local.key);
-				local.info = local.info[1];
-				local.componentReference = model(local.info.modelName);
-				local.isPolymorphic = StructKeyExists(local.info, "as") && Len(local.info.as) && StructKeyExists(local.info, "foreignType");
-				if (local.info.type == "hasOne") {
-					local.where = $keyWhereString(properties = local.info.foreignKey, keys = primaryKeys());
-					if (local.isPolymorphic) {
-						local.where = "(#local.where#) AND (#local.info.foreignType# = '#variables.wheels.class.modelName#')";
-					}
-					if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
-						local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
-					}
-
-					// create a generic method name (example: "hasProfile" becomes "hasObject")
-					local.name = ReplaceNoCase(arguments.missingMethodName, local.key, "object");
-
-					if (local.name == "object") {
-						local.method = "findOne";
-						arguments.missingMethodArguments.where = local.where;
-					} else if (local.name == "hasObject") {
-						local.method = "exists";
-						arguments.missingMethodArguments.where = local.where;
-					} else if (local.name == "newObject") {
-						local.method = "new";
-						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
-						if (local.isPolymorphic) {
-							arguments.missingMethodArguments[local.info.foreignType] = variables.wheels.class.modelName;
-						}
-					} else if (local.name == "createObject") {
-						local.method = "create";
-						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
-						if (local.isPolymorphic) {
-							arguments.missingMethodArguments[local.info.foreignType] = variables.wheels.class.modelName;
-						}
-					} else if (local.name == "removeObject") {
-						local.method = "updateOne";
-						arguments.missingMethodArguments.where = local.where;
-						$setForeignKeyValues(
-							missingMethodArguments = arguments.missingMethodArguments,
-							keys = local.info.foreignKey,
-							setToNull = true
-						);
-					} else if (local.name == "deleteObject") {
-						local.method = "deleteOne";
-						arguments.missingMethodArguments.where = local.where;
-					} else if (local.name == "setObject") {
-						local.resolved = $resolveAssociationTarget(
-							missingMethodArguments = arguments.missingMethodArguments,
-							componentReference = local.componentReference,
-							argumentName = local.key,
-							methodName = local.name,
-							objectMethod = "update",
-							keyMethod = "updateByKey"
-						);
-						local.method = local.resolved.method;
-						local.componentReference = local.resolved.componentReference;
-						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
-					}
-				} else if (local.info.type == "hasMany") {
-					if (structKeyExists(local.info, "joinKey") AND Len(local.info.joinKey) AND local.info.joinKey NEQ primaryKeys()) {
-						local.where = $keyWhereString(properties = local.info.foreignKey, keys = local.info.joinKey);
-					} else {
-						local.where = $keyWhereString(properties = local.info.foreignKey, keys = primaryKeys());
-					}
-					if (local.isPolymorphic) {
-						local.where = "(#local.where#) AND (#local.info.foreignType# = '#variables.wheels.class.modelName#')";
-					}
-					if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
-						local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
-					}
-					local.singularKey = singularize(local.key);
-
-					// create a generic method name (example: "hasComments" becomes "hasObjects")
-					local.name = ReplaceNoCase(arguments.missingMethodName, local.key, "objects");
-					if (local.name == arguments.missingMethodName) {
-						// we should never change anything more than once so if the plural version was already replaced we do not need to replace the singular one
-						local.name = ReplaceNoCase(local.name, local.singularKey, "object");
-					}
-
-					if (local.name == "objects") {
-						local.method = "findAll";
-						arguments.missingMethodArguments.where = local.where;
-					} else if (local.name == "addObject") {
-						local.resolved = $resolveAssociationTarget(
-							missingMethodArguments = arguments.missingMethodArguments,
-							componentReference = local.componentReference,
-							argumentName = local.singularKey,
-							methodName = local.name,
-							objectMethod = "update",
-							keyMethod = "updateByKey"
-						);
-						local.method = local.resolved.method;
-						local.componentReference = local.resolved.componentReference;
-						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
-					} else if (local.name == "removeObject") {
-						local.resolved = $resolveAssociationTarget(
-							missingMethodArguments = arguments.missingMethodArguments,
-							componentReference = local.componentReference,
-							argumentName = local.singularKey,
-							methodName = local.name,
-							objectMethod = "update",
-							keyMethod = "updateByKey"
-						);
-						local.method = local.resolved.method;
-						local.componentReference = local.resolved.componentReference;
-						$setForeignKeyValues(
-							missingMethodArguments = arguments.missingMethodArguments,
-							keys = local.info.foreignKey,
-							setToNull = true
-						);
-					} else if (local.name == "deleteObject") {
-						local.resolved = $resolveAssociationTarget(
-							missingMethodArguments = arguments.missingMethodArguments,
-							componentReference = local.componentReference,
-							argumentName = local.singularKey,
-							methodName = local.name,
-							objectMethod = "delete",
-							keyMethod = "deleteByKey"
-						);
-						local.method = local.resolved.method;
-						local.componentReference = local.resolved.componentReference;
-						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
-					} else if (local.name == "hasObjects") {
-						local.method = "exists";
-						arguments.missingMethodArguments.where = local.where;
-					} else if (local.name == "newObject") {
-						local.method = "new";
-						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
-						if (local.isPolymorphic) {
-							arguments.missingMethodArguments[local.info.foreignType] = variables.wheels.class.modelName;
-						}
-					} else if (local.name == "createObject") {
-						local.method = "create";
-						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
-						if (local.isPolymorphic) {
-							arguments.missingMethodArguments[local.info.foreignType] = variables.wheels.class.modelName;
-						}
-					} else if (local.name == "objectCount") {
-						local.method = "count";
-						arguments.missingMethodArguments.where = local.where;
-					} else if (local.name == "findOneObject") {
-						local.method = "findOne";
-						arguments.missingMethodArguments.where = local.where;
-					} else if (local.name == "removeAllObjects") {
-						local.method = "updateAll";
-						arguments.missingMethodArguments.where = local.where;
-						$setForeignKeyValues(
-							missingMethodArguments = arguments.missingMethodArguments,
-							keys = local.info.foreignKey,
-							setToNull = true
-						);
-					} else if (local.name == "deleteAllObjects") {
-						local.method = "deleteAll";
-						arguments.missingMethodArguments.where = local.where;
-					}
-				} else if (local.info.type == "belongsTo") {
-					local.where = $keyWhereString(keys = local.info.foreignKey, properties = local.componentReference.primaryKeys());
-					if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
-						local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
-					}
-
-					// create a generic method name (example: "hasAuthor" becomes "hasObject")
-					local.name = ReplaceNoCase(arguments.missingMethodName, local.key, "object");
-
-					if (local.name == "object") {
-						local.method = "findByKey";
-						arguments.missingMethodArguments.key = $propertyValue(name = local.info.foreignKey);
-					} else if (local.name == "hasObject") {
-						local.method = "exists";
-						arguments.missingMethodArguments.key = $propertyValue(name = local.info.foreignKey);
-					}
-				}
+				local.resolved = $associationMethodResolve(
+					key = local.key,
+					missingMethodName = arguments.missingMethodName,
+					missingMethodArguments = arguments.missingMethodArguments
+				);
+				local.method = local.resolved.method;
+				local.componentReference = local.resolved.componentReference;
 			}
 			if (Len(local.method)) {
 				local.rv = $invoke(
@@ -549,6 +433,310 @@ component {
 		if (StructKeyExists(local, "rv")) {
 			return local.rv;
 		}
+	}
+
+	/**
+	 * Internal function. Resolves a polymorphic `belongsTo` association method, reading
+	 * the type column to choose the target model. Returns `{ handled, rv }` where
+	 * `handled` is true only when the original code would have set `local.rv` (either
+	 * `false` for an empty key or the `$invoke` result).
+	 */
+	public any function $associationMethodResolvePolymorphicBelongsTo(
+		required string missingMethodName,
+		required string key,
+		required struct assoc,
+		required struct missingMethodArguments
+	) {
+		local.result = { handled = false, rv = "" };
+		local.name = ReplaceNoCase(arguments.missingMethodName, arguments.key, "object");
+		local.foreignKeyProp = arguments.assoc.foreignKey;
+		local.foreignTypeProp = arguments.assoc.foreignType;
+		local.method = "";
+
+		if (local.name == "object") {
+			// Read the type column to determine which model to query.
+			if (StructKeyExists(this, local.foreignTypeProp) && Len(this[local.foreignTypeProp])
+				&& StructKeyExists(this, local.foreignKeyProp) && Len(this[local.foreignKeyProp])) {
+				local.componentReference = model(this[local.foreignTypeProp]);
+				local.method = "findByKey";
+				arguments.missingMethodArguments.key = this[local.foreignKeyProp];
+			}
+		} else if (local.name == "hasObject") {
+			// Check if the foreign key is non-empty.
+			if (StructKeyExists(this, local.foreignKeyProp) && Len(this[local.foreignKeyProp])
+				&& StructKeyExists(this, local.foreignTypeProp) && Len(this[local.foreignTypeProp])) {
+				local.componentReference = model(this[local.foreignTypeProp]);
+				local.method = "exists";
+				arguments.missingMethodArguments.key = this[local.foreignKeyProp];
+			} else {
+				local.result.rv = false;
+				local.result.handled = true;
+			}
+		}
+
+		if (Len(local.method) && StructKeyExists(local, "componentReference")) {
+			local.result.rv = $invoke(
+				componentReference = local.componentReference,
+				method = local.method,
+				invokeArgs = arguments.missingMethodArguments
+			);
+			local.result.handled = true;
+		}
+		return local.result;
+	}
+
+	/**
+	 * Internal function. Resolves a non-polymorphic association method by expanding the
+	 * association, resolving the target component, and dispatching on the association
+	 * type. Returns `{ method, componentReference }`.
+	 */
+	public any function $associationMethodResolve(
+		required string key,
+		required string missingMethodName,
+		required struct missingMethodArguments
+	) {
+		local.info = $expandedAssociations(include = arguments.key);
+		local.info = local.info[1];
+		local.componentReference = model(local.info.modelName);
+		if (local.info.type == "hasOne") {
+			return $associationMethodResolveHasOne(
+				info = local.info,
+				componentReference = local.componentReference,
+				missingMethodArguments = arguments.missingMethodArguments,
+				key = arguments.key,
+				missingMethodName = arguments.missingMethodName
+			);
+		} else if (local.info.type == "hasMany") {
+			return $associationMethodResolveHasMany(
+				info = local.info,
+				componentReference = local.componentReference,
+				missingMethodArguments = arguments.missingMethodArguments,
+				key = arguments.key,
+				missingMethodName = arguments.missingMethodName
+			);
+		} else if (local.info.type == "belongsTo") {
+			return $associationMethodResolveBelongsTo(
+				info = local.info,
+				componentReference = local.componentReference,
+				missingMethodArguments = arguments.missingMethodArguments,
+				key = arguments.key,
+				missingMethodName = arguments.missingMethodName
+			);
+		}
+		return { method = "", componentReference = local.componentReference };
+	}
+
+	/**
+	 * Internal function. Resolves a `hasOne` association method. Mutates
+	 * `missingMethodArguments` in place and returns `{ method, componentReference }`.
+	 */
+	public any function $associationMethodResolveHasOne(
+		required struct info,
+		required any componentReference,
+		required struct missingMethodArguments,
+		required string key,
+		required string missingMethodName
+	) {
+		local.componentReference = arguments.componentReference;
+		local.isPolymorphic = StructKeyExists(arguments.info, "as") && Len(arguments.info.as) && StructKeyExists(arguments.info, "foreignType");
+		local.method = "";
+		local.where = $keyWhereString(properties = arguments.info.foreignKey, keys = primaryKeys());
+		if (local.isPolymorphic) {
+			local.where = "(#local.where#) AND (#arguments.info.foreignType# = '#variables.wheels.class.modelName#')";
+		}
+		if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
+			local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
+		}
+
+		// create a generic method name (example: "hasProfile" becomes "hasObject")
+		local.name = ReplaceNoCase(arguments.missingMethodName, arguments.key, "object");
+
+		if (local.name == "object") {
+			local.method = "findOne";
+			arguments.missingMethodArguments.where = local.where;
+		} else if (local.name == "hasObject") {
+			local.method = "exists";
+			arguments.missingMethodArguments.where = local.where;
+		} else if (local.name == "newObject") {
+			local.method = "new";
+			$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = arguments.info.foreignKey);
+			if (local.isPolymorphic) {
+				arguments.missingMethodArguments[arguments.info.foreignType] = variables.wheels.class.modelName;
+			}
+		} else if (local.name == "createObject") {
+			local.method = "create";
+			$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = arguments.info.foreignKey);
+			if (local.isPolymorphic) {
+				arguments.missingMethodArguments[arguments.info.foreignType] = variables.wheels.class.modelName;
+			}
+		} else if (local.name == "removeObject") {
+			local.method = "updateOne";
+			arguments.missingMethodArguments.where = local.where;
+			$setForeignKeyValues(
+				missingMethodArguments = arguments.missingMethodArguments,
+				keys = arguments.info.foreignKey,
+				setToNull = true
+			);
+		} else if (local.name == "deleteObject") {
+			local.method = "deleteOne";
+			arguments.missingMethodArguments.where = local.where;
+		} else if (local.name == "setObject") {
+			local.resolved = $resolveAssociationTarget(
+				missingMethodArguments = arguments.missingMethodArguments,
+				componentReference = local.componentReference,
+				argumentName = arguments.key,
+				methodName = local.name,
+				objectMethod = "update",
+				keyMethod = "updateByKey"
+			);
+			local.method = local.resolved.method;
+			local.componentReference = local.resolved.componentReference;
+			$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = arguments.info.foreignKey);
+		}
+		return { method = local.method, componentReference = local.componentReference };
+	}
+
+	/**
+	 * Internal function. Resolves a `hasMany` association method. Mutates
+	 * `missingMethodArguments` in place and returns `{ method, componentReference }`.
+	 */
+	public any function $associationMethodResolveHasMany(
+		required struct info,
+		required any componentReference,
+		required struct missingMethodArguments,
+		required string key,
+		required string missingMethodName
+	) {
+		local.componentReference = arguments.componentReference;
+		local.isPolymorphic = StructKeyExists(arguments.info, "as") && Len(arguments.info.as) && StructKeyExists(arguments.info, "foreignType");
+		local.method = "";
+		if (structKeyExists(arguments.info, "joinKey") AND Len(arguments.info.joinKey) AND arguments.info.joinKey NEQ primaryKeys()) {
+			local.where = $keyWhereString(properties = arguments.info.foreignKey, keys = arguments.info.joinKey);
+		} else {
+			local.where = $keyWhereString(properties = arguments.info.foreignKey, keys = primaryKeys());
+		}
+		if (local.isPolymorphic) {
+			local.where = "(#local.where#) AND (#arguments.info.foreignType# = '#variables.wheels.class.modelName#')";
+		}
+		if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
+			local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
+		}
+		local.singularKey = singularize(arguments.key);
+
+		// create a generic method name (example: "hasComments" becomes "hasObjects")
+		local.name = ReplaceNoCase(arguments.missingMethodName, arguments.key, "objects");
+		if (local.name == arguments.missingMethodName) {
+			// we should never change anything more than once so if the plural version was already replaced we do not need to replace the singular one
+			local.name = ReplaceNoCase(local.name, local.singularKey, "object");
+		}
+
+		if (local.name == "objects") {
+			local.method = "findAll";
+			arguments.missingMethodArguments.where = local.where;
+		} else if (local.name == "addObject") {
+			local.resolved = $resolveAssociationTarget(
+				missingMethodArguments = arguments.missingMethodArguments,
+				componentReference = local.componentReference,
+				argumentName = local.singularKey,
+				methodName = local.name,
+				objectMethod = "update",
+				keyMethod = "updateByKey"
+			);
+			local.method = local.resolved.method;
+			local.componentReference = local.resolved.componentReference;
+			$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = arguments.info.foreignKey);
+		} else if (local.name == "removeObject") {
+			local.resolved = $resolveAssociationTarget(
+				missingMethodArguments = arguments.missingMethodArguments,
+				componentReference = local.componentReference,
+				argumentName = local.singularKey,
+				methodName = local.name,
+				objectMethod = "update",
+				keyMethod = "updateByKey"
+			);
+			local.method = local.resolved.method;
+			local.componentReference = local.resolved.componentReference;
+			$setForeignKeyValues(
+				missingMethodArguments = arguments.missingMethodArguments,
+				keys = arguments.info.foreignKey,
+				setToNull = true
+			);
+		} else if (local.name == "deleteObject") {
+			local.resolved = $resolveAssociationTarget(
+				missingMethodArguments = arguments.missingMethodArguments,
+				componentReference = local.componentReference,
+				argumentName = local.singularKey,
+				methodName = local.name,
+				objectMethod = "delete",
+				keyMethod = "deleteByKey"
+			);
+			local.method = local.resolved.method;
+			local.componentReference = local.resolved.componentReference;
+			$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = arguments.info.foreignKey);
+		} else if (local.name == "hasObjects") {
+			local.method = "exists";
+			arguments.missingMethodArguments.where = local.where;
+		} else if (local.name == "newObject") {
+			local.method = "new";
+			$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = arguments.info.foreignKey);
+			if (local.isPolymorphic) {
+				arguments.missingMethodArguments[arguments.info.foreignType] = variables.wheels.class.modelName;
+			}
+		} else if (local.name == "createObject") {
+			local.method = "create";
+			$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = arguments.info.foreignKey);
+			if (local.isPolymorphic) {
+				arguments.missingMethodArguments[arguments.info.foreignType] = variables.wheels.class.modelName;
+			}
+		} else if (local.name == "objectCount") {
+			local.method = "count";
+			arguments.missingMethodArguments.where = local.where;
+		} else if (local.name == "findOneObject") {
+			local.method = "findOne";
+			arguments.missingMethodArguments.where = local.where;
+		} else if (local.name == "removeAllObjects") {
+			local.method = "updateAll";
+			arguments.missingMethodArguments.where = local.where;
+			$setForeignKeyValues(
+				missingMethodArguments = arguments.missingMethodArguments,
+				keys = arguments.info.foreignKey,
+				setToNull = true
+			);
+		} else if (local.name == "deleteAllObjects") {
+			local.method = "deleteAll";
+			arguments.missingMethodArguments.where = local.where;
+		}
+		return { method = local.method, componentReference = local.componentReference };
+	}
+
+	/**
+	 * Internal function. Resolves a non-polymorphic `belongsTo` association method.
+	 * Mutates `missingMethodArguments` in place and returns `{ method, componentReference }`.
+	 */
+	public any function $associationMethodResolveBelongsTo(
+		required struct info,
+		required any componentReference,
+		required struct missingMethodArguments,
+		required string key,
+		required string missingMethodName
+	) {
+		local.method = "";
+		local.where = $keyWhereString(keys = arguments.info.foreignKey, properties = arguments.componentReference.primaryKeys());
+		if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
+			local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
+		}
+
+		// create a generic method name (example: "hasAuthor" becomes "hasObject")
+		local.name = ReplaceNoCase(arguments.missingMethodName, arguments.key, "object");
+
+		if (local.name == "object") {
+			local.method = "findByKey";
+			arguments.missingMethodArguments.key = $propertyValue(name = arguments.info.foreignKey);
+		} else if (local.name == "hasObject") {
+			local.method = "exists";
+			arguments.missingMethodArguments.key = $propertyValue(name = arguments.info.foreignKey);
+		}
+		return { method = local.method, componentReference = arguments.componentReference };
 	}
 
 	/**

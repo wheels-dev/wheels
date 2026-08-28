@@ -1,110 +1,85 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	variables.postgresTypeMap = {
+		"bigint": "cf_sql_bigint",
+		"int8": "cf_sql_bigint",
+		"bigserial": "cf_sql_bigint",
+		"serial8": "cf_sql_bigint",
+		"bool": "cf_sql_bit",
+		"boolean": "cf_sql_bit",
+		"bit": "cf_sql_bit",
+		"varbit": "cf_sql_bit",
+		"bytea": "cf_sql_binary",
+		"char": "cf_sql_char",
+		"character": "cf_sql_char",
+		"date": "cf_sql_timestamp",
+		"datetime": "cf_sql_timestamp",
+		"timestamp": "cf_sql_timestamp",
+		"timestamptz": "cf_sql_timestamp",
+		"decimal": "cf_sql_decimal",
+		"double": "cf_sql_decimal",
+		"precision": "cf_sql_decimal",
+		"float": "cf_sql_decimal",
+		"float4": "cf_sql_decimal",
+		"float8": "cf_sql_decimal",
+		"integer": "cf_sql_integer",
+		"int": "cf_sql_integer",
+		"int4": "cf_sql_integer",
+		"serial": "cf_sql_integer",
+		"oid": "cf_sql_integer",
+		"numeric": "cf_sql_numeric",
+		"smallmoney": "cf_sql_numeric",
+		"money": "cf_sql_numeric",
+		"real": "cf_sql_real",
+		"smallint": "cf_sql_smallint",
+		"smallserial": "cf_sql_smallint",
+		"int2": "cf_sql_smallint",
+		"json": "cf_sql_longvarchar",
+		"jsonb": "cf_sql_longvarchar",
+		"text": "cf_sql_longvarchar",
+		"cidr": "cf_sql_longvarchar",
+		"inet": "cf_sql_longvarchar",
+		"xml": "cf_sql_longvarchar",
+		"time": "cf_sql_time",
+		"timetz": "cf_sql_time",
+		"varchar": "cf_sql_varchar",
+		"varying": "cf_sql_varchar",
+		"bpchar": "cf_sql_varchar",
+		"uuid": "cf_sql_varchar",
+		"macaddr": "cf_sql_varchar",
+		"macaddr8": "cf_sql_varchar",
+		"point": "cf_sql_other",
+		"line": "cf_sql_other",
+		"lseg": "cf_sql_other",
+		"box": "cf_sql_other",
+		"path": "cf_sql_other",
+		"polygon": "cf_sql_other",
+		"circle": "cf_sql_other",
+		"geography": "cf_sql_other"
+	};
+
 	/**
 	 * Map database types to the ones used in CFML.
 	 * Using oid cols should probably be avoided, included here for completeness.
 	 * PostgreSQL has deprecated the money type, included here for completeness.
 	 */
 	public string function $getType(required string type, string scale, string details) {
-		switch (arguments.type) {
-			case "bigint":
-			case "int8":
-			case "bigserial":
-			case "serial8":
-				local.rv = "cf_sql_bigint";
-				break;
-			case "bool":
-			case "boolean":
-			case "bit":
-			case "varbit":
-				local.rv = "cf_sql_bit";
-				break;
-			case "bytea":
-				local.rv = "cf_sql_binary";
-				break;
-			case "char":
-			case "character":
-				local.rv = "cf_sql_char";
-				break;
-			case "date":
-			case "datetime":
-			case "timestamp":
-			case "timestamptz":
-				local.rv = "cf_sql_timestamp";
-				break;
-			case "decimal":
-			case "double":
-			case "precision":
-			case "float":
-			case "float4":
-			case "float8":
-				local.rv = "cf_sql_decimal";
-				break;
-			case "integer":
-			case "int":
-			case "int4":
-			case "serial":
-			case "oid":
-				local.rv = "cf_sql_integer";
-				break;
-			case "numeric":
-			case "smallmoney":
-			case "money":
-				local.rv = "cf_sql_numeric";
-				break;
-			case "real":
-				local.rv = "cf_sql_real";
-				break;
-			case "smallint":
-			case "smallserial":
-			case "int2":
-				local.rv = "cf_sql_smallint";
-				break;
-			case "json":
-			case "jsonb":
-			case "text":
-			case "cidr":
-			case "inet":
-			case "xml":
-				local.rv = "cf_sql_longvarchar";
-				break;
-			case "time":
-			case "timetz":
-				local.rv = "cf_sql_time";
-				break;
-			case "varchar":
-			case "varying":
-			case "bpchar":
-			case "uuid":
-			case "macaddr":
-			case "macaddr8":
-				local.rv = "cf_sql_varchar";
-				break;
-			case "point":
-			case "line":
-			case "lseg":
-			case "box":
-			case "path":
-			case "polygon":
-			case "circle":
-			case "geography":
-				local.rv = "cf_sql_other";
-				break;
-			default:
-				// Without this branch `local.rv` is never assigned and the return throws
-				// `key [RV] doesn't exist` — an error that names nothing useful and reads
-				// like a framework bug. The classic source was catalog bleed: a table whose
-				// name collides with an `information_schema` view picked up phantom columns
-				// typed `"information_schema"."sql_identifier"` (issue #3349, fixed in
-				// `$getColumnInfo()` below). Anything reaching here now is a genuinely
-				// unmapped PostgreSQL type, so say so.
-				Throw(
-					type = "Wheels.UnknownColumnType",
-					message = "The PostgreSQL column type `#arguments.type#` is not mapped to a CFML SQL type.",
-					extendedInfo = "Add a case for `#arguments.type#` to `$getType()` in `vendor/wheels/databaseAdapters/PostgreSQL/PostgreSQLModel.cfc`. If the type name looks schema-qualified (e.g. `""information_schema"".""sql_identifier""`), the column is not yours — it came from a catalog view sharing your table's name."
-				);
+		local.key = LCase(arguments.type);
+		if (StructKeyExists(variables.postgresTypeMap, local.key)) {
+			return variables.postgresTypeMap[local.key];
 		}
-		return local.rv;
+		// Without this branch `local.rv` is never assigned and the return throws
+		// `key [RV] doesn't exist` — an error that names nothing useful and reads
+		// like a framework bug. The classic source was catalog bleed: a table whose
+		// name collides with an `information_schema` view picked up phantom columns
+		// typed `"information_schema"."sql_identifier"` (issue #3349, fixed in
+		// `$getColumnInfo()` below). Anything reaching here now is a genuinely
+		// unmapped PostgreSQL type, so say so.
+		Throw(
+			type = "Wheels.UnknownColumnType",
+			message = "The PostgreSQL column type `#arguments.type#` is not mapped to a CFML SQL type.",
+			extendedInfo = "Add a case for `#arguments.type#` to `$getType()` in `vendor/wheels/databaseAdapters/PostgreSQL/PostgreSQLModel.cfc`. If the type name looks schema-qualified (e.g. `""information_schema"".""sql_identifier""`), the column is not yours — it came from a catalog view sharing your table's name."
+		);
 	}
 
 	/**

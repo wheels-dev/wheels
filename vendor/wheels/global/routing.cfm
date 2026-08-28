@@ -313,6 +313,144 @@
 
 
 	/**
+	 * Internal function. Resolves a (controller, action) pair to a named route
+	 * via the application-scoped memo, mutating `args.route` (and `args.controller`
+	 * when empty) in place when a match is found. Extracted from URLFor; behavior
+	 * is unchanged.
+	 */
+	public void function $urlForResolveRouteFromMemo(required struct args, required struct params) {
+		if (!Len(arguments.args.route) && Len(arguments.args.action)) {
+			if (!Len(arguments.args.controller)) {
+				arguments.args.controller = arguments.params.controller;
+			}
+			// Look up actual route paths instead of providing default Wheels path generation.
+			// Loop over all routes to find matching one, break the loop on first match.
+			// The (controller, action) → route-name memo lives in application scope and
+			// negative-caches misses (empty string sentinel) so wildcard-`[controller]`
+			// apps — where `$addRoute` strips the `controller` key, guaranteeing no
+			// match — don't re-scan the route table for every link helper. The cache
+			// is invalidated by `$addRoute` and `$lockedLoadRoutes`.
+			local.appKey = $appKey();
+			if (!StructKeyExists(application[local.appKey], "urlForCache")) {
+				application[local.appKey].urlForCache = {};
+			}
+			local.cache = application[local.appKey].urlForCache;
+			local.key = arguments.args.controller & "##" & arguments.args.action;
+			if (!StructKeyExists(local.cache, local.key)) {
+				local.found = "";
+				local.iEnd = ArrayLen(application[local.appKey].routes);
+				for (local.i = 1; local.i <= local.iEnd; local.i++) {
+					local.route = application[local.appKey].routes[local.i];
+					local.controllerMatch = StructKeyExists(local.route, "controller") && local.route.controller == arguments.args.controller;
+					local.actionMatch = StructKeyExists(local.route, "action") && local.route.action == arguments.args.action;
+					if (local.controllerMatch && local.actionMatch) {
+						local.found = local.route.name;
+						break;
+					}
+				}
+				local.cache[local.key] = local.found;
+			}
+			if (Len(local.cache[local.key])) {
+				arguments.args.route = local.cache[local.key];
+			}
+		}
+	}
+
+
+	/**
+	 * Internal function. Fills in `args.action` / `args.controller` from the
+	 * matched route or request params when they were not supplied. Extracted from
+	 * URLFor; behavior is unchanged.
+	 */
+	public void function $urlForControllerActionFallback(required struct args, required struct route, required struct params) {
+		// Handle action
+		if (!Len(arguments.args.action)) {
+			if (StructKeyExists(arguments.route, "action")) {
+				arguments.args.action = arguments.route.action;
+			} else if (Len(arguments.args.controller)) {
+				arguments.args.action = "index";
+			} else if (StructKeyExists(arguments.params, "action")) {
+				arguments.args.action = arguments.params.action;
+			}
+		}
+		// Handle controller
+		if (!Len(arguments.args.controller)) {
+			if (StructKeyExists(arguments.route, "controller")) {
+				arguments.args.controller = arguments.route.controller;
+			} else if (StructKeyExists(arguments.params, "controller")) {
+				arguments.args.controller = arguments.params.controller;
+			}
+		}
+	}
+
+
+	/**
+	 * Internal function. Substitutes route/path variables into the URL, appending
+	 * unmatched variables to `args.params` and returning the updated path. Extracted
+	 * from URLFor; behavior (including the Wheels.IncorrectRoutingArguments throw)
+	 * is unchanged.
+	 */
+	public string function $urlForSubstituteVariables(
+		required string rv,
+		required struct args,
+		required string foundVariables,
+		required string coreVariables,
+		required struct route
+	) {
+		local.rv = arguments.rv;
+		for (local.i = 1; local.i <= ListLen(arguments.foundVariables); local.i++) {
+			local.property = ListGetAt(arguments.foundVariables, local.i);
+			local.reg = "\[\*?#local.property#\]";
+
+			// Read necessary variables from different sources.
+			if (StructKeyExists(arguments.args, local.property) && Len(arguments.args[local.property])) {
+				local.value = arguments.args[local.property];
+			} else if (StructKeyExists(arguments.route, local.property)) {
+				local.value = arguments.route[local.property];
+			} else if (Len(arguments.args.route) && arguments.args.$URLRewriting != "Off") {
+				Throw(
+					type = "Wheels.IncorrectRoutingArguments",
+					message = "Incorrect Arguments",
+					extendedInfo = "The route chosen by Wheels `#arguments.route.name#` requires the argument `#local.property#`. Pass the argument `#local.property#` or change your routes to reflect the proper variables needed."
+				);
+			} else {
+				continue;
+			}
+
+			// If value is a model object, get its key value.
+			if (IsObject(local.value)) {
+				local.value = local.value.key();
+			}
+
+			// Any value we find from above, URL encode it here.
+			if (arguments.args.encode && $get("encodeURLs")) {
+				local.value = EncodeForURL($canonicalize(local.value));
+				if (arguments.args.$encodeForHtmlAttribute) {
+					local.value = EncodeForHTMLAttribute(local.value);
+				}
+			}
+
+			// If property is not in pattern, store it in the params argument.
+			if (!ReFind(local.reg, local.rv)) {
+				if (!ListFindNoCase(arguments.coreVariables, local.property)) {
+					arguments.args.params = ListAppend(arguments.args.params, "#local.property#=#local.value#", "&");
+				}
+				continue;
+			}
+
+			// Transform value before setting it in pattern.
+			if (local.property == "controller" || local.property == "action") {
+				local.value = hyphenize(local.value);
+			} else if (application.wheels.obfuscateUrls) {
+				local.value = obfuscateParam(local.value);
+			}
+			local.rv = ReReplace(local.rv, local.reg, local.value);
+		}
+		return local.rv;
+	}
+
+
+	/**
 	 * Creates an internal URL based on supplied arguments.
 	 *
 	 * [section: Global Helpers]
@@ -363,40 +501,7 @@
 		}
 
 		// Look up actual route paths instead of providing default Wheels path generation.
-		// Loop over all routes to find matching one, break the loop on first match.
-		// The (controller, action) → route-name memo lives in application scope and
-		// negative-caches misses (empty string sentinel) so wildcard-`[controller]`
-		// apps — where `$addRoute` strips the `controller` key, guaranteeing no
-		// match — don't re-scan the route table for every link helper. The cache
-		// is invalidated by `$addRoute` and `$lockedLoadRoutes`.
-		if (!Len(arguments.route) && Len(arguments.action)) {
-			if (!Len(arguments.controller)) {
-				arguments.controller = local.params.controller;
-			}
-			local.appKey = $appKey();
-			if (!StructKeyExists(application[local.appKey], "urlForCache")) {
-				application[local.appKey].urlForCache = {};
-			}
-			local.cache = application[local.appKey].urlForCache;
-			local.key = arguments.controller & "##" & arguments.action;
-			if (!StructKeyExists(local.cache, local.key)) {
-				local.found = "";
-				local.iEnd = ArrayLen(application[local.appKey].routes);
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.route = application[local.appKey].routes[local.i];
-					local.controllerMatch = StructKeyExists(local.route, "controller") && local.route.controller == arguments.controller;
-					local.actionMatch = StructKeyExists(local.route, "action") && local.route.action == arguments.action;
-					if (local.controllerMatch && local.actionMatch) {
-						local.found = local.route.name;
-						break;
-					}
-				}
-				local.cache[local.key] = local.found;
-			}
-			if (Len(local.cache[local.key])) {
-				arguments.route = local.cache[local.key];
-			}
-		}
+		$urlForResolveRouteFromMemo(args = arguments, params = local.params);
 
 		// Start building the URL to return by setting the sub folder path and script name portion.
 		// Script name index.cfm will be removed later if applicable (e.g. when URL rewriting is on).
@@ -423,77 +528,16 @@
 		}
 
 		// Shared fallback logic for controller/action
-		if (StructKeyExists(local, "params")) {
-			// Handle action
-			if (!Len(arguments.action)) {
-				if (StructKeyExists(local.route, "action")) {
-					arguments.action = local.route.action;
-				} else if (Len(arguments.controller)) {
-					arguments.action = "index";
-				} else if (StructKeyExists(local.params, "action")) {
-					arguments.action = local.params.action;
-				}
-			}
-
-			// Handle controller
-			if (!Len(arguments.controller)) {
-				if (StructKeyExists(local.route, "controller")) {
-					arguments.controller = local.route.controller;
-				} else if (StructKeyExists(local.params, "controller")) {
-					arguments.controller = local.params.controller;
-				}
-			}
-		}
+		$urlForControllerActionFallback(args = arguments, route = local.route, params = local.params);
 
 		// Replace each params variable with the correct value.
-		for (local.i = 1; local.i <= ListLen(local.foundVariables); local.i++) {
-			local.property = ListGetAt(local.foundVariables, local.i);
-			local.reg = "\[\*?#local.property#\]";
-
-			// Read necessary variables from different sources.
-			if (StructKeyExists(arguments, local.property) && Len(arguments[local.property])) {
-				local.value = arguments[local.property];
-			} else if (StructKeyExists(local.route, local.property)) {
-				local.value = local.route[local.property];
-			} else if (Len(arguments.route) && arguments.$URLRewriting != "Off") {
-				Throw(
-					type = "Wheels.IncorrectRoutingArguments",
-					message = "Incorrect Arguments",
-					extendedInfo = "The route chosen by Wheels `#local.route.name#` requires the argument `#local.property#`. Pass the argument `#local.property#` or change your routes to reflect the proper variables needed."
-				);
-			} else {
-				continue;
-			}
-
-			// If value is a model object, get its key value.
-			if (IsObject(local.value)) {
-				local.value = local.value.key();
-			}
-
-			// Any value we find from above, URL encode it here.
-			if (arguments.encode && $get("encodeURLs")) {
-				local.value = EncodeForURL($canonicalize(local.value));
-				if (arguments.$encodeForHtmlAttribute) {
-					local.value = EncodeForHTMLAttribute(local.value);
-				}
-			}
-
-			// If property is not in pattern, store it in the params argument.
-			if (!ReFind(local.reg, local.rv)) {
-				if (!ListFindNoCase(local.coreVariables, local.property)) {
-					arguments.params = ListAppend(arguments.params, "#local.property#=#local.value#", "&");
-				}
-				continue;
-			}
-
-			// Transform value before setting it in pattern.
-			if (local.property == "controller" || local.property == "action") {
-				local.value = hyphenize(local.value);
-			} else if (application.wheels.obfuscateUrls) {
-				local.value = obfuscateParam(local.value);
-			}
-			local.rv = ReReplace(local.rv, local.reg, local.value);
-		}
+		local.rv = $urlForSubstituteVariables(
+			rv = local.rv,
+			args = arguments,
+			foundVariables = local.foundVariables,
+			coreVariables = local.coreVariables,
+			route = local.route
+		);
 
 		// Clean up unused keys in pattern.
 		local.rv = ReReplace(local.rv, "((&|\?)\w+=|\/|\.)\[\*?\w+\]", "", "ALL");

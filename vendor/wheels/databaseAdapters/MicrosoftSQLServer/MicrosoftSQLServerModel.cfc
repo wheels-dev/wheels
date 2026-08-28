@@ -1,86 +1,50 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	variables.mssqlTypeMap = {
+		"bigint": "cf_sql_bigint",
+		"binary": "cf_sql_binary",
+		"geography": "cf_sql_binary",
+		"geometry": "cf_sql_binary",
+		"timestamp": "cf_sql_binary",
+		"bit": "cf_sql_bit",
+		"char": "cf_sql_char",
+		"nchar": "cf_sql_char",
+		"uniqueidentifier": "cf_sql_char",
+		"date": "cf_sql_date",
+		"datetime": "cf_sql_timestamp",
+		"datetime2": "cf_sql_timestamp",
+		"smalldatetime": "cf_sql_timestamp",
+		"datetimeoffset": "cf_sql_timestamp",
+		"decimal": "cf_sql_decimal",
+		"money": "cf_sql_decimal",
+		"smallmoney": "cf_sql_decimal",
+		"float": "cf_sql_float",
+		"int": "cf_sql_integer",
+		"image": "cf_sql_longvarbinary",
+		"text": "cf_sql_longvarchar",
+		"ntext": "cf_sql_longvarchar",
+		"xml": "cf_sql_longvarchar",
+		"numeric": "cf_sql_numeric",
+		"real": "cf_sql_real",
+		"smallint": "cf_sql_smallint",
+		"time": "cf_sql_time",
+		"tinyint": "cf_sql_tinyint",
+		"varbinary": "cf_sql_varbinary",
+		"varchar": "cf_sql_varchar",
+		"nvarchar": "cf_sql_varchar",
+		"hierarchyid": "cf_sql_varchar",
+		"cursor": "cf_sql_refcursor"
+	};
+
 	/**
 	 * Map database types to the ones used in CFML.
 	 */
 	public string function $getType(required string type, string scale, string details) {
-		switch (arguments.type) {
-			case "bigint":
-				local.rv = "cf_sql_bigint";
-				break;
-			case "binary":
-			case "geography":
-			case "geometry":
-			case "timestamp":
-				local.rv = "cf_sql_binary";
-				break;
-			case "bit":
-				local.rv = "cf_sql_bit";
-				break;
-			case "char":
-			case "nchar":
-			case "uniqueidentifier":
-				local.rv = "cf_sql_char";
-				break;
-			case "date":
-				local.rv = "cf_sql_date";
-				break;
-			case "datetime":
-			case "datetime2":
-			case "smalldatetime":
-			case "datetimeoffset":
-				local.rv = "cf_sql_timestamp";
-				break;
-			case "decimal":
-			case "money":
-			case "smallmoney":
-				local.rv = "cf_sql_decimal";
-				break;
-			case "float":
-				local.rv = "cf_sql_float";
-				break;
-			case "int":
-				local.rv = "cf_sql_integer";
-				break;
-			case "image":
-				local.rv = "cf_sql_longvarbinary";
-				break;
-			case "text":
-			case "ntext":
-			case "xml":
-				local.rv = "cf_sql_longvarchar";
-				break;
-			case "numeric":
-				local.rv = "cf_sql_numeric";
-				break;
-			case "real":
-				local.rv = "cf_sql_real";
-				break;
-			case "smallint":
-				local.rv = "cf_sql_smallint";
-				break;
-			case "time":
-				local.rv = "cf_sql_time";
-				break;
-			case "tinyint":
-				local.rv = "cf_sql_tinyint";
-				break;
-			case "varbinary":
-				local.rv = "cf_sql_varbinary";
-				break;
-			case "varchar":
-			case "nvarchar":
-			case "hierarchyid":
-				local.rv = "cf_sql_varchar";
-				break;
-			case "cursor":
-				local.rv = "cf_sql_refcursor";
-				break;
-			default:
-				$throwUnknownColumnType(arguments.type);
-				break;
+		local.key = LCase(arguments.type);
+		if (StructKeyExists(variables.mssqlTypeMap, local.key)) {
+			return variables.mssqlTypeMap[local.key];
 		}
-		return local.rv;
+		$throwUnknownColumnType(arguments.type);
 	}
 
 	/**

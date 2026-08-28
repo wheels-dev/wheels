@@ -120,19 +120,12 @@ component output="false" extends="wheels.Global"{
 					return local.rv;
 				}
 				local.rv &= "Migrating from #local.currentVersion# down to #arguments.version#.#Chr(13) & Chr(10)#";
-				for (local.i = ArrayLen(local.migrations); local.i >= 1; local.i--) {
-					local.migration = local.migrations[local.i];
-					if (local.migration.version <= arguments.version) {
-						break;
-					}
-					if (local.migration.status == "migrated" && application[local.appKey].allowMigrationDown) {
-						local.step = $runMigrationStep(migration = local.migration, direction = "down");
-						local.rv &= local.step.output;
-						if (!local.step.success) {
-							break;
-						}
-					}
-				}
+				local.rv = $migrateToDownLoop(
+					rv = local.rv,
+					migrations = local.migrations,
+					version = arguments.version,
+					allowMigrationDown = application[local.appKey].allowMigrationDown
+				);
 			} else {
 				if(arguments.missingMigFlag){
 					// Note: this path used to delete the current version's
@@ -155,20 +148,65 @@ component output="false" extends="wheels.Global"{
 				} else {
 					local.rv &= "Migrating from #local.currentVersion# up to #arguments.version#.#Chr(13) & Chr(10)#";
 				}
-				for (local.migration in local.migrations) {
-					if (local.migration.version <= arguments.version && local.migration.status != "migrated") {
-						local.step = $runMigrationStep(migration = local.migration, direction = "up");
-						local.rv &= local.step.output;
-						if (!local.step.success) {
-							break;
-						}
-					} else if (local.migration.version > arguments.version) {
-						break;
-					}
-				};
+				local.rv = $migrateToUpLoop(
+					rv = local.rv,
+					migrations = local.migrations,
+					version = arguments.version
+				);
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. Applies the `down` migration loop for migrateTo, iterating migrations
+	 * from newest to oldest and running down() on migrated ones above the target version. Appends
+	 * each step's output to `rv` and returns the accumulated output string.
+	 */
+	public string function $migrateToDownLoop(
+		required string rv,
+		required array migrations,
+		required string version,
+		required boolean allowMigrationDown
+	) {
+		for (local.i = ArrayLen(arguments.migrations); local.i >= 1; local.i--) {
+			local.migration = arguments.migrations[local.i];
+			if (local.migration.version <= arguments.version) {
+				break;
+			}
+			if (local.migration.status == "migrated" && arguments.allowMigrationDown) {
+				local.step = $runMigrationStep(migration = local.migration, direction = "down");
+				arguments.rv &= local.step.output;
+				if (!local.step.success) {
+					break;
+				}
+			}
+		}
+		return arguments.rv;
+	}
+
+	/**
+	 * Internal function. Applies the `up` migration loop for migrateTo, iterating migrations in
+	 * order and running up() on pending ones at or below the target version. Appends each step's
+	 * output to `rv` and returns the accumulated output string.
+	 */
+	public string function $migrateToUpLoop(
+		required string rv,
+		required array migrations,
+		required string version
+	) {
+		for (local.migration in arguments.migrations) {
+			if (local.migration.version <= arguments.version && local.migration.status != "migrated") {
+				local.step = $runMigrationStep(migration = local.migration, direction = "up");
+				arguments.rv &= local.step.output;
+				if (!local.step.success) {
+					break;
+				}
+			} else if (local.migration.version > arguments.version) {
+				break;
+			}
+		}
+		return arguments.rv;
 	}
 
 	/**

@@ -1413,76 +1413,12 @@ component {
 			// below); the lock is only taken before the marker exists so the hot path stays
 			// lock-free, and the values are derived solely from class data so filling them
 			// once per application lifetime is equivalent to the previous per-call rewrite
-			if (!StructKeyExists(local.classAssociations[local.name], "expandedMetadataFilled")) {
-				lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
-					if (!StructKeyExists(local.classAssociations[local.name], "expandedMetadataFilled")) {
-						if (!Len(local.classAssociations[local.name].foreignKey)) {
-							// The foreign key column lives on a different side depending on the association
-							// type: for `belongsTo` it is a column on THIS model's table, for `hasMany` /
-							// `hasOne` it is a column on the ASSOCIATED model's table. Resolve the default
-							// against whichever side actually owns it so both the legacy `<modelName><key>`
-							// form and the `<modelName>_<key>` form that `useUnderscoreReferenceColumns`
-							// makes the migrator emit are honoured (#3337).
-							if (local.classAssociations[local.name].type == "belongsTo") {
-								local.fkNameSource = local.associatedClass;
-								local.fkColumnOwner = local.class;
-							} else {
-								local.fkNameSource = local.class;
-								local.fkColumnOwner = local.associatedClass;
-							}
-							local.classAssociations[local.name].foreignKey = $deriveAssociationForeignKey(
-								columnOwner = local.fkColumnOwner,
-								modelName = local.fkNameSource.$classData().modelName,
-								keys = local.fkNameSource.$classData().keys
-							);
-							// A derived default matching no column on the owning side can only fail later,
-							// deep inside the join builder, as `key [xxx] doesn't exist` — a message naming
-							// neither the association nor the `foreignKey=` argument that fixes it. Report it
-							// here instead, while both candidate shapes are still in hand (#3337). Runs inside
-							// the memo so the success path costs one check per application lifetime, and only
-							// for defaults derived here — an explicit `foreignKey=` is the developer's call.
-							if (application.wheels.showErrorInformation) {
-								$assertDerivedForeignKeyResolves(
-									associationName = local.name,
-									foreignKey = local.classAssociations[local.name].foreignKey,
-									columnOwner = local.fkColumnOwner,
-									modelName = local.fkNameSource.$classData().modelName,
-									keys = local.fkNameSource.$classData().keys
-								);
-							}
-						}
-						if (!Len(local.classAssociations[local.name].joinKey)) {
-							if (local.classAssociations[local.name].type == "belongsTo") {
-								local.classAssociations[local.name].joinKey = local.associatedClass.$classData().keys;
-							} else {
-								local.classAssociations[local.name].joinKey = local.class.$classData().keys;
-							}
-						}
-						local.classAssociations[local.name].tableName = local.associatedClass.$classData().tableName;
-						local.classAssociations[local.name].columnList = local.associatedClass.$classData().columnList;
-						local.classAssociations[local.name].properties = local.associatedClass.$classData().properties;
-						local.classAssociations[local.name].propertyList = local.associatedClass.$classData().propertyList;
-
-						/*
-							To fix the issue below:
-							https://github.com/wheels-dev/wheels/issues/580
-
-							Add aliasedPropertyList in the associated class that will be used to check the duplicate column
-						*/
-						local.classAssociations[local.name].aliasedPropertyList = local.associatedClass.$classData().aliasedPropertyList;
-
-						local.classAssociations[local.name].calculatedProperties = local.associatedClass.$classData().calculatedProperties;
-						local.classAssociations[local.name].calculatedPropertyList = local.associatedClass.$classData().calculatedPropertyList;
-						// TODO: deprecate the lists above in favour of these structs to avoid listFind
-						local.classAssociations[local.name].columnStruct = local.associatedClass.$classData().columnStruct;
-						local.classAssociations[local.name].propertyStruct = local.associatedClass.$classData().propertyStruct;
-
-						// the marker is written last so readers that skip the lock only ever
-						// observe a fully-populated metadata set
-						local.classAssociations[local.name].expandedMetadataFilled = true;
-					}
-				}
-			}
+			$expandedAssociationsMetadata(
+				associationName = local.name,
+				association = local.classAssociations[local.name],
+				ownerClass = local.class,
+				associatedClass = local.associatedClass
+			);
 
 			// the JOIN string depends on the calling context (soft-delete handling and whether the
 			// table needs to be aliased), so memoize it per context variant instead of globally
@@ -1490,91 +1426,14 @@ component {
 			local.joinVariantKey = "sd" & (arguments.includeSoftDeletes ? 1 : 0) & "_alias" & (local.aliasJoin ? 1 : 0);
 
 			// create the join string if it hasn't already been done for this context variant
-			if (
-				!StructKeyExists(local.classAssociations[local.name], "joinVariants")
-				|| !StructKeyExists(local.classAssociations[local.name].joinVariants, local.joinVariantKey)
-			) {
-				local.joinType = UCase(ReplaceNoCase(local.classAssociations[local.name].joinType, "outer", "left outer", "one"));
-				local.join = local.joinType & " JOIN " & variables.wheels.class.adapter.$quoteIdentifier(local.classAssociations[local.name].tableName);
-				// alias the table as the association name when joining to itself
-				if (local.aliasJoin) {
-					local.join = variables.wheels.class.adapter.$tableAlias(
-						local.join,
-						local.classAssociations[local.name].pluralizedName
-					);
-				}
-
-				local.join &= " ON ";
-				local.toAppend = "";
-				local.jEnd = ListLen(local.classAssociations[local.name].foreignKey);
-				for (local.j = 1; local.j <= local.jEnd; local.j++) {
-					local.key1 = ListGetAt(local.classAssociations[local.name].foreignKey, local.j);
-					if (local.classAssociations[local.name].type == "belongsTo") {
-						local.key2 = ListFindNoCase(local.classAssociations[local.name].joinKey, local.key1);
-						if (local.key2) {
-							local.key2 = ListGetAt(local.classAssociations[local.name].joinKey, local.key2);
-						} else {
-							local.key2 = ListGetAt(local.classAssociations[local.name].joinKey, local.j);
-						}
-						local.first = local.key1;
-						local.second = local.key2;
-					} else {
-						local.key2 = ListFindNoCase(local.classAssociations[local.name].joinKey, local.key1);
-						if (local.key2) {
-							local.key2 = ListGetAt(local.classAssociations[local.name].joinKey, local.key2);
-						} else {
-							local.key2 = ListGetAt(local.classAssociations[local.name].joinKey, local.j);
-						}
-						local.first = local.key2;
-						local.second = local.key1;
-					}
-
-					// alias the table as the association name when joining to itself
-					local.tableName = local.classAssociations[local.name].tableName;
-					if (local.aliasJoin) {
-						local.tableName = local.classAssociations[local.name].pluralizedName;
-					}
-					local.toAppend = ListAppend(
-						local.toAppend,
-						"#variables.wheels.class.adapter.$quoteIdentifier(local.class.$classData().tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(local.class.$classData().properties[local.first].column)# = #variables.wheels.class.adapter.$quoteIdentifier(local.tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(local.associatedClass.$classData().properties[local.second].column)#"
-					);
-					if (!arguments.includeSoftDeletes && local.associatedClass.$softDeletion()) {
-						local.toAppend = ListAppend(
-							local.toAppend,
-							"#variables.wheels.class.adapter.$quoteIdentifier(local.associatedClass.tableName())#.#variables.wheels.class.adapter.$quoteIdentifier(local.associatedClass.$softDeleteColumn())# IS NULL"
-						);
-					}
-				}
-
-				// Polymorphic hasMany/hasOne with `as`: add type discriminator to JOIN ON clause.
-				if (
-					StructKeyExists(local.classAssociations[local.name], "as")
-					&& Len(local.classAssociations[local.name].as)
-					&& StructKeyExists(local.classAssociations[local.name], "foreignType")
-				) {
-					local.typeColumn = local.classAssociations[local.name].foreignType;
-					local.typeValue = local.class.$classData().modelName;
-					local.toAppend = ListAppend(
-						local.toAppend,
-						"#variables.wheels.class.adapter.$quoteIdentifier(local.tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(local.typeColumn)# = '#local.typeValue#'"
-					);
-				}
-
-				// store the built string under a double-checked named lock so a concurrent first hit
-				// for another context cannot poison the shared application-scoped association struct;
-				// the lock is only taken on memo miss so the hot path stays lock-free
-				lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
-					if (!StructKeyExists(local.classAssociations[local.name], "joinVariants")) {
-						local.classAssociations[local.name].joinVariants = {};
-					}
-					local.classAssociations[local.name].joinVariants[local.joinVariantKey] = local.join & Replace(
-						local.toAppend,
-						",",
-						" AND ",
-						"all"
-					);
-				}
-			}
+			$expandedAssociationsJoin(
+				association = local.classAssociations[local.name],
+				aliasJoin = local.aliasJoin,
+				joinVariantKey = local.joinVariantKey,
+				includeSoftDeletes = arguments.includeSoftDeletes,
+				ownerClass = local.class,
+				associatedClass = local.associatedClass
+			);
 
 			// loop over each character in the delimiter sequence and move up / down the levels as appropriate
 			local.jEnd = Len(local.delimSequence);
@@ -1616,6 +1475,191 @@ component {
 			ArrayAppend(local.rv, local.entry);
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. Fills the context-independent association metadata (foreignKey, joinKey,
+	 * tableName, column/property lists and the computed-property structs) under a double-checked
+	 * named lock so a concurrent first hit cannot interleave partial writes into the shared
+	 * application-scoped association struct. Values are derived solely from class data, so filling
+	 * them once per application lifetime is equivalent to the previous per-call rewrite.
+	 */
+	public void function $expandedAssociationsMetadata(
+		required string associationName,
+		required struct association,
+		required any ownerClass,
+		required any associatedClass
+	) {
+		if (!StructKeyExists(arguments.association, "expandedMetadataFilled")) {
+			lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
+				if (!StructKeyExists(arguments.association, "expandedMetadataFilled")) {
+					if (!Len(arguments.association.foreignKey)) {
+						// The foreign key column lives on a different side depending on the association
+						// type: for `belongsTo` it is a column on THIS model's table, for `hasMany` /
+						// `hasOne` it is a column on the ASSOCIATED model's table. Resolve the default
+						// against whichever side actually owns it so both the legacy `<modelName><key>`
+						// form and the `<modelName>_<key>` form that `useUnderscoreReferenceColumns`
+						// makes the migrator emit are honoured (#3337).
+						if (arguments.association.type == "belongsTo") {
+							local.fkNameSource = arguments.associatedClass;
+							local.fkColumnOwner = arguments.ownerClass;
+						} else {
+							local.fkNameSource = arguments.ownerClass;
+							local.fkColumnOwner = arguments.associatedClass;
+						}
+						arguments.association.foreignKey = $deriveAssociationForeignKey(
+							columnOwner = local.fkColumnOwner,
+							modelName = local.fkNameSource.$classData().modelName,
+							keys = local.fkNameSource.$classData().keys
+						);
+						// A derived default matching no column on the owning side can only fail later,
+						// deep inside the join builder, as `key [xxx] doesn't exist` — a message naming
+						// neither the association nor the `foreignKey=` argument that fixes it. Report it
+						// here instead, while both candidate shapes are still in hand (#3337). Runs inside
+						// the memo so the success path costs one check per application lifetime, and only
+						// for defaults derived here — an explicit `foreignKey=` is the developer's call.
+						if (application.wheels.showErrorInformation) {
+							$assertDerivedForeignKeyResolves(
+								associationName = arguments.associationName,
+								foreignKey = arguments.association.foreignKey,
+								columnOwner = local.fkColumnOwner,
+								modelName = local.fkNameSource.$classData().modelName,
+								keys = local.fkNameSource.$classData().keys
+							);
+						}
+					}
+					if (!Len(arguments.association.joinKey)) {
+						if (arguments.association.type == "belongsTo") {
+							arguments.association.joinKey = arguments.associatedClass.$classData().keys;
+						} else {
+							arguments.association.joinKey = arguments.ownerClass.$classData().keys;
+						}
+					}
+					arguments.association.tableName = arguments.associatedClass.$classData().tableName;
+					arguments.association.columnList = arguments.associatedClass.$classData().columnList;
+					arguments.association.properties = arguments.associatedClass.$classData().properties;
+					arguments.association.propertyList = arguments.associatedClass.$classData().propertyList;
+
+					/*
+						To fix the issue below:
+						https://github.com/wheels-dev/wheels/issues/580
+
+						Add aliasedPropertyList in the associated class that will be used to check the duplicate column
+					*/
+					arguments.association.aliasedPropertyList = arguments.associatedClass.$classData().aliasedPropertyList;
+
+					arguments.association.calculatedProperties = arguments.associatedClass.$classData().calculatedProperties;
+					arguments.association.calculatedPropertyList = arguments.associatedClass.$classData().calculatedPropertyList;
+					// TODO: deprecate the lists above in favour of these structs to avoid listFind
+					arguments.association.columnStruct = arguments.associatedClass.$classData().columnStruct;
+					arguments.association.propertyStruct = arguments.associatedClass.$classData().propertyStruct;
+
+					// the marker is written last so readers that skip the lock only ever
+					// observe a fully-populated metadata set
+					arguments.association.expandedMetadataFilled = true;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Internal function. Builds and memoizes the JOIN fragment for one association/context variant.
+	 * The join string depends on the calling context (soft-delete handling and whether the table
+	 * needs to be aliased), so it is stored per variant under a double-checked named lock.
+	 */
+	public void function $expandedAssociationsJoin(
+		required struct association,
+		required boolean aliasJoin,
+		required string joinVariantKey,
+		required boolean includeSoftDeletes,
+		required any ownerClass,
+		required any associatedClass
+	) {
+		if (
+			!StructKeyExists(arguments.association, "joinVariants")
+			|| !StructKeyExists(arguments.association.joinVariants, arguments.joinVariantKey)
+		) {
+			local.joinType = UCase(ReplaceNoCase(arguments.association.joinType, "outer", "left outer", "one"));
+			local.join = local.joinType & " JOIN " & variables.wheels.class.adapter.$quoteIdentifier(arguments.association.tableName);
+			// alias the table as the association name when joining to itself
+			if (arguments.aliasJoin) {
+				local.join = variables.wheels.class.adapter.$tableAlias(
+					local.join,
+					arguments.association.pluralizedName
+				);
+			}
+
+			local.join &= " ON ";
+			local.toAppend = "";
+			local.jEnd = ListLen(arguments.association.foreignKey);
+			for (local.j = 1; local.j <= local.jEnd; local.j++) {
+				local.key1 = ListGetAt(arguments.association.foreignKey, local.j);
+				if (arguments.association.type == "belongsTo") {
+					local.key2 = ListFindNoCase(arguments.association.joinKey, local.key1);
+					if (local.key2) {
+						local.key2 = ListGetAt(arguments.association.joinKey, local.key2);
+					} else {
+						local.key2 = ListGetAt(arguments.association.joinKey, local.j);
+					}
+					local.first = local.key1;
+					local.second = local.key2;
+				} else {
+					local.key2 = ListFindNoCase(arguments.association.joinKey, local.key1);
+					if (local.key2) {
+						local.key2 = ListGetAt(arguments.association.joinKey, local.key2);
+					} else {
+						local.key2 = ListGetAt(arguments.association.joinKey, local.j);
+					}
+					local.first = local.key2;
+					local.second = local.key1;
+				}
+
+				// alias the table as the association name when joining to itself
+				local.tableName = arguments.association.tableName;
+				if (arguments.aliasJoin) {
+					local.tableName = arguments.association.pluralizedName;
+				}
+				local.toAppend = ListAppend(
+					local.toAppend,
+					"#variables.wheels.class.adapter.$quoteIdentifier(arguments.ownerClass.$classData().tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(arguments.ownerClass.$classData().properties[local.first].column)# = #variables.wheels.class.adapter.$quoteIdentifier(local.tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(arguments.associatedClass.$classData().properties[local.second].column)#"
+				);
+				if (!arguments.includeSoftDeletes && arguments.associatedClass.$softDeletion()) {
+					local.toAppend = ListAppend(
+						local.toAppend,
+						"#variables.wheels.class.adapter.$quoteIdentifier(arguments.associatedClass.tableName())#.#variables.wheels.class.adapter.$quoteIdentifier(arguments.associatedClass.$softDeleteColumn())# IS NULL"
+					);
+				}
+			}
+
+			// Polymorphic hasMany/hasOne with `as`: add type discriminator to JOIN ON clause.
+			if (
+				StructKeyExists(arguments.association, "as")
+				&& Len(arguments.association.as)
+				&& StructKeyExists(arguments.association, "foreignType")
+			) {
+				local.typeColumn = arguments.association.foreignType;
+				local.typeValue = arguments.ownerClass.$classData().modelName;
+				local.toAppend = ListAppend(
+					local.toAppend,
+					"#variables.wheels.class.adapter.$quoteIdentifier(local.tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(local.typeColumn)# = '#local.typeValue#'"
+				);
+			}
+
+			// store the built string under a double-checked named lock so a concurrent first hit
+			// for another context cannot poison the shared application-scoped association struct;
+			// the lock is only taken on memo miss so the hot path stays lock-free
+			lock name="wheelsJoinMemo#application.applicationName#" type="exclusive" timeout="10" {
+				if (!StructKeyExists(arguments.association, "joinVariants")) {
+					arguments.association.joinVariants = {};
+				}
+				arguments.association.joinVariants[arguments.joinVariantKey] = local.join & Replace(
+					local.toAppend,
+					",",
+					" AND ",
+					"all"
+				);
+			}
+		}
 	}
 
 	/**

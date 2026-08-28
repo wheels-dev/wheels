@@ -1,5 +1,46 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	variables.mysqlTypeMap = {
+		"bigint": "cf_sql_bigint",
+		"binary": "cf_sql_binary",
+		"geometry": "cf_sql_binary",
+		"point": "cf_sql_binary",
+		"linestring": "cf_sql_binary",
+		"polygon": "cf_sql_binary",
+		"multipoint": "cf_sql_binary",
+		"multilinestring": "cf_sql_binary",
+		"multipolygon": "cf_sql_binary",
+		"geometrycollection": "cf_sql_binary",
+		"bit": "cf_sql_bit",
+		"bool": "cf_sql_bit",
+		"blob": "cf_sql_blob",
+		"tinyblob": "cf_sql_blob",
+		"mediumblob": "cf_sql_blob",
+		"longblob": "cf_sql_blob",
+		"char": "cf_sql_char",
+		"date": "cf_sql_date",
+		"decimal": "cf_sql_decimal",
+		"double": "cf_sql_double",
+		"float": "cf_sql_float",
+		"int": "cf_sql_integer",
+		"mediumint": "cf_sql_integer",
+		"smallint": "cf_sql_smallint",
+		"year": "cf_sql_smallint",
+		"time": "cf_sql_time",
+		"datetime": "cf_sql_timestamp",
+		"timestamp": "cf_sql_timestamp",
+		"tinyint": "cf_sql_tinyint",
+		"varbinary": "cf_sql_varbinary",
+		"varchar": "cf_sql_varchar",
+		"enum": "cf_sql_varchar",
+		"set": "cf_sql_varchar",
+		"tinytext": "cf_sql_varchar",
+		"json": "cf_sql_longvarchar",
+		"text": "cf_sql_longvarchar",
+		"mediumtext": "cf_sql_longvarchar",
+		"longtext": "cf_sql_longvarchar"
+	};
+
 	/**
 	 * Map database types to the ones used in CFML.
 	 */
@@ -15,84 +56,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			}
 		}
 
-		switch (arguments.type) {
-			case "bigint":
-				local.rv = "cf_sql_bigint";
-				break;
-			case "binary":
-			case "geometry":
-			case "point":
-			case "linestring":
-			case "polygon":
-			case "multipoint":
-			case "multilinestring":
-			case "multipolygon":
-			case "geometrycollection":
-				local.rv = "cf_sql_binary";
-				break;
-			case "bit":
-			case "bool":
-				local.rv = "cf_sql_bit";
-				break;
-			case "blob":
-			case "tinyblob":
-			case "mediumblob":
-			case "longblob":
-				local.rv = "cf_sql_blob";
-				break;
-			case "char":
-				local.rv = "cf_sql_char";
-				break;
-			case "date":
-				local.rv = "cf_sql_date";
-				break;
-			case "decimal":
-				local.rv = "cf_sql_decimal";
-				break;
-			case "double":
-				local.rv = "cf_sql_double";
-				break;
-			case "float":
-				local.rv = "cf_sql_float";
-				break;
-			case "int":
-			case "mediumint":
-				local.rv = "cf_sql_integer";
-				break;
-			case "smallint":
-			case "year":
-				local.rv = "cf_sql_smallint";
-				break;
-			case "time":
-				local.rv = "cf_sql_time";
-				break;
-			case "datetime":
-			case "timestamp":
-				local.rv = "cf_sql_timestamp";
-				break;
-			case "tinyint":
-				local.rv = "cf_sql_tinyint";
-				break;
-			case "varbinary":
-				local.rv = "cf_sql_varbinary";
-				break;
-			case "varchar":
-			case "enum":
-			case "set":
-			case "tinytext":
-				local.rv = "cf_sql_varchar";
-				break;
-			case "json":
-			case "text":
-			case "mediumtext":
-			case "longtext":
-				local.rv = "cf_sql_longvarchar";
-				break;
-			default:
-				$throwUnknownColumnType(arguments.type);
-				break;
+		local.key = LCase(arguments.type);
+		if (StructKeyExists(variables.mysqlTypeMap, local.key)) {
+			return variables.mysqlTypeMap[local.key];
 		}
-		return local.rv;
+		$throwUnknownColumnType(arguments.type);
 	}
 
 	/**
