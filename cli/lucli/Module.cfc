@@ -867,7 +867,7 @@ component extends="modules.BaseModule" {
 			.parse(arguments.coll);
 		return {
 			top = Val(parsed.top),
-			useTestDb = parsed.testDb
+			useTestDb = parsed["test-db"]
 		};
 	}
 
