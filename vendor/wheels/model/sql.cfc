@@ -550,8 +550,7 @@ component {
 			arguments.list = $mergeCalculatedIntoList(arguments.list, arguments.includeCalculated);
 		}
 
-		// go through the properties and map them to the database unless the developer passed in a table name or an alias in which case we assume they know what they're doing and leave the select clause as is
-
+		// go through the properties and map them to the database
 		/* To fix the issue below:
 			https://github.com/wheels-dev/wheels/issues/1048
 
@@ -588,93 +587,19 @@ component {
 					continue;
 				}
 
-				// loop through all classes (current and all included ones)
-				local.jEnd = ArrayLen(local.classes);
-				for (local.j = 1; local.j <= local.jEnd; local.j++) {
-					local.toAppend = "";
-					local.classData = local.classes[local.j];
-
-					local.associationKey = local.classData.modelName;
-					if (structKeyExists(local.classData, "pluralizedName") && local.classData.pluralizedName != "") {
-						local.associationKey &= "_" & local.classData.pluralizedName;
-					}
-
-					// Init the tracking list for this association
-					if (!structKeyExists(local.addedPropertiesByModel, local.associationKey)) {
-						local.addedPropertiesByModel[local.associationKey] = "";
-					}
-
-					// if we find the property in this model and it's not already added we go ahead and add it to the select clause
-					if (
-						(
-							StructKeyExists(local.classData.propertyStruct, local.iItem)
-							|| StructKeyExists(local.classData.calculatedProperties, local.iItem)
-							|| ListFindNoCase(local.classData.aliasedPropertyList, local.iItem)
-						)
-						&& !ListFindNoCase(local.addedPropertiesByModel[local.associationKey], local.iItem)
-					) {
-						// if expanded column aliases is enabled then mark all columns from included classes as duplicates in order to prepend them with their class name
-						local.flagAsDuplicate = false;
-
-						/*
-							To fix the issue below:
-							https://github.com/wheels-dev/wheels/issues/580
-
-							Get the column passed in the select argument with the included table's name prepended to it and replace table name to get the original name.
-
-							For example,
-							If the developer includes "comment" table and passes commentCreatedAt column name in select, then get the createdAt column in comment table and return that.
-
-							This is only valid for id,createdAt,updatedAt,deletedAt columns.
-						*/
-						if(Len(arguments.include) && ListFindNoCase(local.classData.aliasedPropertyList, local.iItem)){
-							local.iItem = replaceNoCase(local.iItem, local.classData.modelName, '');
-							local.flagAsDuplicate = true;
-						}
-
-						if (arguments.clause == "select") {
-							if (local.duplicateCount) {
-								// always flag as a duplicate when a property with this name has already been added
-								local.flagAsDuplicate = true;
-							} else if (local.j > 1) {
-								if (arguments.useExpandedColumnAliases) {
-									// when on included models and using the new setting we flag every property as a duplicate so that the model name always gets prepended
-									local.flagAsDuplicate = true;
-								} else if (!arguments.useExpandedColumnAliases && arguments.returnAs != "query") {
-									// with the old setting we only do it when we're returning object(s) since when creating instances on none base models we need the model name prepended
-									local.flagAsDuplicate = true;
-								}
-							}
-						}
-						if (local.flagAsDuplicate) {
-							local.toAppend &= "[[duplicate]]" & local.j;
-						}
-						if (StructKeyExists(local.classData.propertyStruct, local.iItem)) {
-							local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & ".";
-							if (StructKeyExists(local.classData.columnStruct, local.iItem)) {
-								local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.iItem);
-							} else {
-								local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[local.iItem].column);
-								if (arguments.clause == "select") {
-									local.toAppend &= " AS " & local.iItem;
-								}
-							}
-						} else if (StructKeyExists(local.classData.calculatedProperties, local.iItem)) {
-							local.sql = Replace(local.classData.calculatedProperties[local.iItem].sql, ",", "[[comma]]", "all");
-							if (arguments.clause == "select" || !ReFind("^(SELECT )?(AVG|COUNT|MAX|MIN|SUM)\(.*\)", local.sql)) {
-								local.toAppend &= "(" & local.sql & ")";
-								if (arguments.clause == "select") {
-									local.toAppend &= " AS " & local.iItem;
-								}
-							}
-						}
-						local.addedPropertiesByModel[local.associationKey] = ListAppend(
-							local.addedPropertiesByModel[local.associationKey],
-							local.iItem
-						);
-						break;
-					}
-				}
+				// loop through all classes (current and all included ones) to map the item
+				local.cell = $createSQLFieldListItem(
+					item = local.iItem,
+					classes = local.classes,
+					clause = arguments.clause,
+					useExpandedColumnAliases = arguments.useExpandedColumnAliases,
+					returnAs = arguments.returnAs,
+					include = arguments.include,
+					addedPropertiesByModel = local.addedPropertiesByModel,
+					duplicateCount = local.duplicateCount
+				);
+				local.iItem = local.cell.item;
+				local.toAppend = local.cell.toAppend;
 
 				/*
 					To fix the bug below:
@@ -683,7 +608,7 @@ component {
 					Added an exception in case the column specified in the select or group argument does not exist in the database.
 					This will only be in case when not using "table.column" or "column AS something" since in those cases Wheels passes through the select clause unchanged.
 				*/
-				if (!Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.associationKey], local.iItem) EQ 0) {
+				if (!Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.cell.associationKey], local.iItem) EQ 0) {
 					if (application.wheels.throwOnColumnNotFound) {
 						Throw(
 							type = "Wheels.ColumnNotFound",
@@ -704,7 +629,12 @@ component {
 				}
 			}
 
-			// let's replace eventual duplicates in the clause by prepending the class name
+		// let's replace eventual duplicates in the clause by prepending the class name
+			if (Len(arguments.include) && arguments.clause == "select") {
+				local.rv = $createSQLFieldListDuplicatePrefix(local.classes, local.rv);
+			}
+
+
 			if (Len(arguments.include) && arguments.clause == "select") {
 				local.newSelect = "";
 				local.addedProperties = "";
@@ -780,6 +710,187 @@ component {
 		// 	}
 		// }
 		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * Maps one select/groupBy list item against the current + included model
+	 * classes, building the quoted column/calculated-property fragment (or
+	 * leaving it empty when the item does not map). Extracted from
+	 * $createSQLFieldList to keep its cyclomatic complexity down.
+	 * `addedPropertiesByModel` is mutated by reference; the possibly-rewritten
+	 * item and the association key of the last class inspected are returned.
+	 */
+	public struct function $createSQLFieldListItem(
+		required string item,
+		required array classes,
+		required string clause,
+		required boolean useExpandedColumnAliases,
+		required string returnAs,
+		required string include,
+		required any addedPropertiesByModel,
+		required numeric duplicateCount
+	) {
+		local.toAppend = "";
+		local.associationKey = "";
+		local.jEnd = ArrayLen(arguments.classes);
+		for (local.j = 1; local.j <= local.jEnd; local.j++) {
+			local.classData = arguments.classes[local.j];
+
+			local.associationKey = local.classData.modelName;
+			if (structKeyExists(local.classData, "pluralizedName") && local.classData.pluralizedName != "") {
+				local.associationKey &= "_" & local.classData.pluralizedName;
+			}
+
+			// Init the tracking list for this association
+			if (!structKeyExists(arguments.addedPropertiesByModel, local.associationKey)) {
+				arguments.addedPropertiesByModel[local.associationKey] = "";
+			}
+
+			// if we find the property in this model and it's not already added we go ahead and add it to the select clause
+			if (
+				(
+					StructKeyExists(local.classData.propertyStruct, arguments.item)
+					|| StructKeyExists(local.classData.calculatedProperties, arguments.item)
+					|| ListFindNoCase(local.classData.aliasedPropertyList, arguments.item)
+				)
+				&& !ListFindNoCase(arguments.addedPropertiesByModel[local.associationKey], arguments.item)
+			) {
+				// if expanded column aliases is enabled then mark all columns from included classes as duplicates in order to prepend them with their class name
+				local.flagAsDuplicate = false;
+
+				/*
+					To fix the issue below:
+					https://github.com/wheels-dev/wheels/issues/580
+
+					Get the column passed in the select argument with the included table's name prepended to it and replace table name to get the original name.
+
+					For example,
+					If the developer includes "comment" table and passes commentCreatedAt column name in select, then get the createdAt column in comment table and return that.
+
+					This is only valid for id,createdAt,updatedAt,deletedAt columns.
+				*/
+				if(Len(arguments.include) && ListFindNoCase(local.classData.aliasedPropertyList, arguments.item)){
+					arguments.item = replaceNoCase(arguments.item, local.classData.modelName, '');
+					local.flagAsDuplicate = true;
+				}
+
+				if (arguments.clause == "select") {
+					if (arguments.duplicateCount) {
+						// always flag as a duplicate when a property with this name has already been added
+						local.flagAsDuplicate = true;
+					} else if (local.j > 1) {
+						if (arguments.useExpandedColumnAliases) {
+							// when on included models and using the new setting we flag every property as a duplicate so that the model name always gets prepended
+							local.flagAsDuplicate = true;
+						} else if (!arguments.useExpandedColumnAliases && arguments.returnAs != "query") {
+							// with the old setting we only do it when we're returning object(s) since when creating instances on none base models we need the model name prepended
+							local.flagAsDuplicate = true;
+						}
+					}
+				}
+				if (local.flagAsDuplicate) {
+					local.toAppend &= "[[duplicate]]" & local.j;
+				}
+				if (StructKeyExists(local.classData.propertyStruct, arguments.item)) {
+					local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & ".";
+					if (StructKeyExists(local.classData.columnStruct, arguments.item)) {
+						local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(arguments.item);
+					} else {
+						local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[arguments.item].column);
+						if (arguments.clause == "select") {
+							local.toAppend &= " AS " & arguments.item;
+						}
+					}
+				} else if (StructKeyExists(local.classData.calculatedProperties, arguments.item)) {
+					local.sql = Replace(local.classData.calculatedProperties[arguments.item].sql, ",", "[[comma]]", "all");
+					if (arguments.clause == "select" || !ReFind("^(SELECT )?(AVG|COUNT|MAX|MIN|SUM)\(.*\)", local.sql)) {
+						local.toAppend &= "(" & local.sql & ")";
+						if (arguments.clause == "select") {
+							local.toAppend &= " AS " & arguments.item;
+						}
+					}
+				}
+				arguments.addedPropertiesByModel[local.associationKey] = ListAppend(
+					arguments.addedPropertiesByModel[local.associationKey],
+					arguments.item
+				);
+				break;
+			}
+		}
+		return {toAppend = local.toAppend, item = arguments.item, associationKey = local.associationKey};
+	}
+
+	/**
+	 * Internal function.
+	 * Resolves duplicate markers produced by $createSQLFieldListItem: prepends
+	 * the model name (or join alias) to duplicated property names so included
+	 * classes' columns do not collide in the select clause. Extracted from
+	 * $createSQLFieldList to keep its cyclomatic complexity down.
+	 */
+	public string function $createSQLFieldListDuplicatePrefix(required array classes, required string rv) {
+		local.newSelect = "";
+		local.addedProperties = "";
+		local.filteredArray = ListToArray(arguments.rv);
+		local.iEnd = ArrayLen(local.filteredArray);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.iItem = local.filteredArray[local.i];
+
+			// get the property part, done by taking everything from the end of the string to a . or a space (which would be found when using " AS ")
+			local.property = Reverse(SpanExcluding(Reverse(local.iItem), ". "));
+
+			// Strip dialect quotes added above so alias matching and downstream concatenation work on bare identifiers.
+			local.property = variables.wheels.class.adapter.$stripIdentifierQuotes(local.property);
+
+			// check if this one has been flagged as a duplicate, we get the number of classes to skip and also remove the flagged info from the item
+			local.duplicateCount = 0;
+			local.matches = ReFind("^\[\[duplicate\]\](\d+)(.+)$", local.iItem, 1, true);
+			if (local.matches.pos[1] > 0) {
+				local.duplicateCount = Mid(local.iItem, local.matches.pos[2], local.matches.len[2]);
+				local.iItem = Mid(local.iItem, local.matches.pos[3], local.matches.len[3]);
+			}
+
+			if (!local.duplicateCount) {
+				// this is not a duplicate so we can just insert it as is
+				local.newItem = local.iItem;
+				local.newProperty = local.property;
+			} else {
+				// this is a duplicate so we prepend the class name and then insert it unless a property with the resulting name already exist
+				local.classData = arguments.classes[local.duplicateCount];
+
+				// Initialize aliasFound
+				local.aliasFound = false;
+				local.alias = "";
+
+				// Check for join and extract alias
+				if (StructKeyExists(local.classData, "join")) {
+					local.match = ReFindNoCase("\sAS\s+(\w+)", local.classData.join, 1, true);
+					if (ArrayLen(local.match.len) >= 2 && local.match.len[2] > 0) {
+						local.alias = Mid(local.classData.join, local.match.pos[2], local.match.len[2]);
+						local.aliasFound = CompareNoCase(local.alias, local.classData.pluralizedName) EQ 0;
+					}
+				}
+
+				// Construct newProperty using alias or modelName
+				local.newProperty = (local.aliasFound ? local.alias : local.classData.modelName) & local.property;
+
+				// Determine newItem based on presence of " AS " in iItem
+				if (Find(" AS ", local.iItem)) {
+					local.newItem = ReplaceNoCase(local.iItem, " AS " & local.property, " AS " & local.newProperty);
+				} else {
+					if (local.aliasFound) {
+						local.newItem = local.alias & "." & variables.wheels.class.adapter.$quoteIdentifier(local.property) & " AS " & local.newProperty;
+					} else {
+						local.newItem = local.iItem & " AS " & local.newProperty;
+					}
+				}
+			}
+			if (!ListFindNoCase(local.addedProperties, local.newProperty)) {
+				local.newSelect = ListAppend(local.newSelect, local.newItem);
+				local.addedProperties = ListAppend(local.addedProperties, local.newProperty);
+			}
+		}
+		return local.newSelect;
 	}
 
 	/**
