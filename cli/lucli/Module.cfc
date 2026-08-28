@@ -187,6 +187,7 @@ component extends="modules.BaseModule" {
 			"stop",     // dev server lifecycle (stateful)
 			"browser",  // multi-step browser testing flow
 			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
+			"coverage", // instruments app/ on disk then runs the suite — stateful, not single-call MCP semantics
 			"mcpToolSpecs", // per-tool inputSchema registry read by LuCLI — not itself a tool
 			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
 			// unit-test them directly (the cli/CLAUDE.md "public for specs"
@@ -817,6 +818,53 @@ component extends="modules.BaseModule" {
 			filter, reporter, format, verboseOutput, coreTests,
 			db, ciMode, useTestDB, dbExplicit, basePath, timeoutSeconds
 		);
+	}
+
+	/**
+	 * Coverage: instrument app/ with function-level coverage counters, run the
+	 * app test suite against the running server, and report a CRAP ranking
+	 * (Change Risk Anti-Patterns: complexity^2 x (1 - coverage)^3 + complexity).
+	 * The instrumentation is reverted afterward (originals restored exactly).
+	 */
+	public string function coverage() {
+		var opts = parseCoverageArgs(structuredArgs(arguments));
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Coverage requires a running server bound to this project.",
+				"Start it with: wheels start"
+			],
+			requireProjectConfig = true
+		);
+		var appRoot = variables.projectRoot;
+		var svc = new services.coverage.CoverageService();
+		var instrumented = 0;
+		try {
+			instrumented = svc.$instrument(appRoot & "/app");
+			$purgeServerCfclasses();
+			var suite = svc.$runSuite(serverPort, opts.useTestDb);
+			var coverage = svc.$collect();
+			var rows = svc.$analyze(appRoot & "/app", coverage);
+			return svc.$report(rows, opts.top, instrumented, suite.status);
+		} catch (any e) {
+			return "Coverage run failed: " & e.message & " " & (e.detail ?: "");
+		} finally {
+			svc.$revert(appRoot & "/app");
+		}
+	}
+
+	/**
+	 * Parse args for `wheels coverage`: --top N (report length) and
+	 * --no-test-db (test-db=false).
+	 */
+	private struct function parseCoverageArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.option(name = "top", default = "15")
+			.flag(name = "test-db", default = true)
+			.parse(arguments.coll);
+		return {
+			top = Val(parsed.top),
+			useTestDb = parsed.testDb
+		};
 	}
 
 	/**

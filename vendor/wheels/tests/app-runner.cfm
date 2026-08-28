@@ -29,6 +29,12 @@
     local.testScope = local.dirResolver.resolveScope(url);
     local.testDirectory = local.testScope.resolved;
 
+    // Coverage mode (`wheels coverage`): reset the function-level counter map
+    // so the dump at the end of this request reflects only THIS run.
+    if (StructKeyExists(url, "coverage") && url.coverage) {
+        server.__wheels_cov = {};
+    }
+
     // Resolve the target datasource. When url.useTestDB=true and a
     // <dataSourceName>_test datasource is registered, swap to it for
     // the duration of this run. Mirrors Rails' RAILS_ENV=test convention
@@ -170,6 +176,15 @@
                 wheelsScope = application.wheels,
                 name = local.originalDataSource
             );
+        }
+        // Coverage mode (`wheels coverage`): dump the function-level counter
+        // map to an absolute path the CLI reads. Failure must never break the
+        // test response, so this is best-effort.
+        if (StructKeyExists(url, "coverage") && url.coverage) {
+            try {
+                FileWrite("/tmp/wheels-app-coverage.json", SerializeJSON(server.__wheels_cov));
+            } catch (any e) {
+            }
         }
     }
 </cfscript>
