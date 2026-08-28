@@ -846,7 +846,11 @@ component extends="modules.BaseModule" {
 			var rows = svc.$analyze(appRoot & "/app", coverage);
 			return svc.$report(rows, opts.top, instrumented, suite.status);
 		} catch (any e) {
-			return "Coverage run failed: " & e.message & " " & (e.detail ?: "");
+			throw(
+				type = "Wheels.CoverageFailed",
+				message = e.message,
+				detail = e.detail ?: ""
+			);
 		} finally {
 			svc.$revert(appRoot & "/app");
 		}
