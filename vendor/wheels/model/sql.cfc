@@ -459,6 +459,62 @@ component {
 
 	/**
 	 * Internal function.
+	 * Builds the default select list (all columns plus select-enabled calculated
+	 * properties) for the given set of classes. Extracted from $createSQLFieldList
+	 * to keep that function's cyclomatic complexity down.
+	 */
+	public string function $defaultSelectList(required array classes) {
+		local.rv = "";
+		local.iEnd = ArrayLen(arguments.classes);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.classData = arguments.classes[local.i];
+			local.rv = ListAppend(local.rv, local.classData.propertyList);
+			if (StructCount(local.classData.calculatedProperties)) {
+				for (local.key in local.classData.calculatedProperties) {
+					if (local.classData.calculatedProperties[local.key].select) {
+						local.rv = ListAppend(local.rv, local.key);
+					}
+				}
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * Additively merges `includeCalculated` property names into a select list
+	 * (issue #3252). Extracted from $createSQLFieldList.
+	 */
+	public string function $mergeCalculatedIntoList(required string list, required string includeCalculated) {
+		local.rv = arguments.list;
+		local.calcArray = ListToArray(arguments.includeCalculated);
+		local.calcEnd = ArrayLen(local.calcArray);
+		for (local.c = 1; local.c <= local.calcEnd; local.c++) {
+			local.calcName = Trim(local.calcArray[local.c]);
+			if (!Len(local.calcName)) {
+				continue;
+			}
+			if (!StructKeyExists(variables.wheels.class.calculatedProperties, local.calcName)) {
+				// Dev/testing fail loud on a typo; no-op in production (mirrors existing
+				// dev-only validation such as Wheels.PaginationNav.InvalidArgument).
+				if (ListFindNoCase("development,testing", get("environment"))) {
+					Throw(
+						type = "Wheels.CalculatedPropertyNotFound",
+						message = "The calculated property `#local.calcName#` was not found on the `#variables.wheels.class.modelName#` model.",
+						extendedInfo = "The `includeCalculated` argument only accepts the names of calculated properties declared via `property(name=""..."", sql=""..."")` in the model's `config()`. Declared calculated properties: #StructKeyList(variables.wheels.class.calculatedProperties)#."
+					);
+				}
+				continue;
+			}
+			if (!ListFindNoCase(local.rv, local.calcName)) {
+				local.rv = ListAppend(local.rv, local.calcName);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public string function $createSQLFieldList(
 		required string clause,
@@ -486,48 +542,12 @@ component {
 
 		// add properties to select if the developer did not specify any
 		if (!Len(arguments.list)) {
-			local.iEnd = ArrayLen(local.classes);
-			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.classData = local.classes[local.i];
-				arguments.list = ListAppend(arguments.list, local.classData.propertyList);
-				if (StructCount(local.classData.calculatedProperties)) {
-					for (local.key in local.classData.calculatedProperties) {
-						if (local.classData.calculatedProperties[local.key].select) {
-							arguments.list = ListAppend(arguments.list, local.key);
-						}
-					}
-				}
-			}
+			arguments.list = $defaultSelectList(local.classes);
 		}
 
 		// Additively opt in any calculated properties named via `includeCalculated` (issue #3252).
-		// These are typically declared `select=false`, so they are absent from the default list
-		// above; merging them here keeps every base column in place (additive, never replacing).
 		if (Len(arguments.includeCalculated)) {
-			local.calcArray = ListToArray(arguments.includeCalculated);
-			local.calcEnd = ArrayLen(local.calcArray);
-			for (local.c = 1; local.c <= local.calcEnd; local.c++) {
-				local.calcName = Trim(local.calcArray[local.c]);
-				if (!Len(local.calcName)) {
-					continue;
-				}
-				if (!StructKeyExists(variables.wheels.class.calculatedProperties, local.calcName)) {
-					// Dev/testing fail loud on a typo; no-op in production (mirrors existing
-					// dev-only validation such as Wheels.PaginationNav.InvalidArgument).
-					if (ListFindNoCase("development,testing", get("environment"))) {
-						Throw(
-							type = "Wheels.CalculatedPropertyNotFound",
-							message = "The calculated property `#local.calcName#` was not found on the `#variables.wheels.class.modelName#` model.",
-							extendedInfo = "The `includeCalculated` argument only accepts the names of calculated properties declared via `property(name=""..."", sql=""..."")` in the model's `config()`. Declared calculated properties: #StructKeyList(variables.wheels.class.calculatedProperties)#."
-						);
-					}
-					continue;
-				}
-				// dedup: $createSQLFieldList already de-duplicates, but skip obvious repeats
-				if (!ListFindNoCase(arguments.list, local.calcName)) {
-					arguments.list = ListAppend(arguments.list, local.calcName);
-				}
-			}
+			arguments.list = $mergeCalculatedIntoList(arguments.list, arguments.includeCalculated);
 		}
 
 		// go through the properties and map them to the database unless the developer passed in a table name or an alias in which case we assume they know what they're doing and leave the select clause as is
