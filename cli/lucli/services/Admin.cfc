@@ -179,13 +179,27 @@ component {
 		var colType = lCase(col.type ?: "string");
 		var colName = lCase(col.name);
 
-		// Name-based conventions
-		if (findNoCase("email", colName)) return "emailField";
-		if (colName == "url" || colName == "website") return "urlField";
-		if (findNoCase("phone", colName) || findNoCase("tel", colName)) return "telField";
+		var byName = $mapColumnToFormHelperByName(colName);
+		if (len(byName)) return byName;
 
-		// Type-based mapping
-		switch (colType) {
+		return $mapColumnToFormHelperByType(colType);
+	}
+
+	/**
+	 * Name-based form helper conventions (checked before the type mapping).
+	 */
+	private string function $mapColumnToFormHelperByName(required string colName) {
+		if (findNoCase("email", arguments.colName)) return "emailField";
+		if (arguments.colName == "url" || arguments.colName == "website") return "urlField";
+		if (findNoCase("phone", arguments.colName) || findNoCase("tel", arguments.colName)) return "telField";
+		return "";
+	}
+
+	/**
+	 * Type-based form helper mapping.
+	 */
+	private string function $mapColumnToFormHelperByType(required string colType) {
+		switch (arguments.colType) {
 			case "text": case "clob": case "longtext":
 				return "textArea";
 			case "boolean": case "bit": case "cf_sql_bit":

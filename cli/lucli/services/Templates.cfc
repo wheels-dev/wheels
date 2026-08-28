@@ -66,122 +66,13 @@ component {
 	public string function processTemplate(required string content, required struct context) {
 		var processed = arguments.content;
 
-		// Replace {{variable}} with context values (skip special keys)
-		var skipKeys = ["belongsTo", "hasMany", "hasOne", "belongsToRelationships", "hasManyRelationships", "properties", "actions"];
-		for (var key in arguments.context) {
-			if (arrayFindNoCase(skipKeys, key)) continue;
-			var value = arguments.context[key];
-			if (isSimpleValue(value)) {
-				processed = reReplace(processed, "\{\{#key#\}\}", toString(value), "all");
-			}
-		}
-
-		// Handle name variations
-		if (structKeyExists(arguments.context, "name")) {
-			var name = arguments.context.name;
-			processed = reReplace(processed, "\{\{nameSingular\}\}", name, "all");
-			processed = reReplace(processed, "\{\{namePlural\}\}", variables.helpers.pluralize(name), "all");
-			processed = reReplace(processed, "\{\{nameSingularLower\}\}", lCase(name), "all");
-			processed = reReplace(processed, "\{\{namePluralLower\}\}", lCase(variables.helpers.pluralize(name)), "all");
-			processed = reReplace(processed, "\{\{nameSingularUpper\}\}", uCase(name), "all");
-			processed = reReplace(processed, "\{\{namePluralUpper\}\}", uCase(variables.helpers.pluralize(name)), "all");
-		}
-
-		// Process relationship placeholders
+		processed = $processTemplateVariables(processed, arguments.context);
 		processed = processRelationships(processed, arguments.context);
-
-		// Process {{validations}} placeholder. Prefer the pre-built `validations`
-		// code string from context (populated by CodeGen.generateModel); fall back
-		// to deriving from the legacy `attributes` string shape for callers that
-		// still use it.
-		var validationCode = "";
-		if (structKeyExists(arguments.context, "validations") && isSimpleValue(arguments.context.validations)) {
-			validationCode = arguments.context.validations;
-		} else if (structKeyExists(arguments.context, "attributes") && len(arguments.context.attributes)) {
-			var attributesStruct = parseAttributes(arguments.context.attributes);
-			validationCode = generateValidationCode(attributesStruct);
-		}
-		processed = reReplace(processed, "\{\{validations\}\}", validationCode, "all");
-
-		// Process {{enums}} placeholder. Mirrors {{validations}}: CodeGen.generateModel
-		// pre-builds an `enums` code string of enum(property=..., values=...) lines for
-		// any name:enum:a,b,c properties. Explicit (not just the generic {{key}} loop)
-		// so it's substituted even when empty. CLI audit M2.
-		var enumCode = (structKeyExists(arguments.context, "enums") && isSimpleValue(arguments.context.enums)) ? arguments.context.enums : "";
-		processed = reReplace(processed, "\{\{enums\}\}", enumCode, "all");
-
-		// Process actions for controllers
-		if (structKeyExists(arguments.context, "actions") && isArray(arguments.context.actions)) {
-			var actionsCode = generateActionsCode(arguments.context.actions);
-			processed = replace(processed, "|Actions|", actionsCode, "all");
-		} else {
-			processed = replace(processed, "|Actions|", "", "all");
-		}
-
-		// Process helper functions
-		if (structKeyExists(arguments.context, "functions") && isArray(arguments.context.functions)) {
-			var helperFunctionsCode = generateHelperFunctionsCode(arguments.context.functions, arguments.context);
-			processed = replace(processed, "|HelperFunctions|", helperFunctionsCode, "all");
-		} else {
-			processed = replace(processed, "|HelperFunctions|", "", "all");
-		}
-
-		// Process description comment
-		if (structKeyExists(arguments.context, "description") && len(trim(arguments.context.description))) {
-			var descComment = "/**" & chr(10) & " * " & arguments.context.description & chr(10) & " */" & chr(10);
-			processed = replace(processed, "|DescriptionComment|", descComment, "all");
-		} else {
-			processed = replace(processed, "|DescriptionComment|", "", "all");
-		}
-
-		// Process custom table name
-		if (structKeyExists(arguments.context, "tableName") && len(trim(arguments.context.tableName))) {
-			var tableNameCall = 'table("' & arguments.context.tableName & '");' & chr(10) & chr(9) & chr(9);
-			processed = replace(processed, "|TableName|", tableNameCall, "all");
-		} else {
-			processed = replace(processed, "|TableName|", "", "all");
-		}
-
-		// Process form fields
-		if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties) && structKeyExists(arguments.context, "modelName")) {
-			var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
-			var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName, belongsToList);
-			processed = replace(processed, "|FormFields|", formFieldsCode, "all");
-		} else {
-			processed = replace(processed, "|FormFields|", "", "all");
-		}
-
-		// Process |DisplayProperty| — the column name used for human-readable
-		// scaffold headings/links. Defaults to `id` (matches legacy behavior),
-		// but if the properties list contains a string column we use that
-		// instead so scaffolded show.cfm/index.cfm don't lead with a numeric
-		// primary key. Onboarding F4.
-		processed = replace(
-			processed,
-			"|DisplayProperty|",
-			pickDisplayProperty(arguments.context.properties ?: []),
-			"all"
-		);
-
-		// Process controller includes for associations
-		if (structKeyExists(arguments.context, "belongsTo") && len(arguments.context.belongsTo)) {
-			processed = addControllerIncludes(processed, arguments.context.belongsTo);
-		}
-
-		// Process CLI-Appends markers for index/show views
-		if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties)) {
-			var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
-			processed = processViewMarkers(processed, arguments.context, belongsToList);
-		}
-
-		// Process pipe-delimited object name placeholders (must be last)
-		if (structKeyExists(arguments.context, "modelName")) {
-			var modelName = listLast(arguments.context.modelName, "/");
-			processed = replace(processed, "|ObjectNameSingular|", lCase(modelName), "all");
-			processed = replace(processed, "|ObjectNamePlural|", lCase(variables.helpers.pluralize(modelName)), "all");
-			processed = replace(processed, "|ObjectNameSingularC|", modelName, "all");
-			processed = replace(processed, "|ObjectNamePluralC|", variables.helpers.pluralize(modelName), "all");
-		}
+		processed = $processCodegenPlaceholders(processed, arguments.context);
+		processed = $processControllerPlaceholders(processed, arguments.context);
+		processed = $processFormPlaceholders(processed, arguments.context);
+		processed = $processAssociationPlaceholders(processed, arguments.context);
+		processed = $processObjectNamePlaceholders(processed, arguments.context);
 
 		// Final cleanup: remove orphan whitespace-only lines left behind by
 		// empty placeholders (e.g. `\t\t{{hasManyRelationships}}` when no
@@ -191,6 +82,161 @@ component {
 		processed = collapseEmptyLines(processed);
 
 		return processed;
+	}
+
+	/**
+	 * Replace {{variable}} with context values (skip special keys) and expand
+	 * the name-variation placeholders ({{nameSingular}}, {{namePlural}}, ...).
+	 */
+	private string function $processTemplateVariables(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		var skipKeys = ["belongsTo", "hasMany", "hasOne", "belongsToRelationships", "hasManyRelationships", "properties", "actions"];
+		for (var key in arguments.context) {
+			if (arrayFindNoCase(skipKeys, key)) continue;
+			var value = arguments.context[key];
+			if (isSimpleValue(value)) {
+				result = reReplace(result, "\{\{#key#\}\}", toString(value), "all");
+			}
+		}
+
+		// Handle name variations
+		if (structKeyExists(arguments.context, "name")) {
+			var name = arguments.context.name;
+			result = reReplace(result, "\{\{nameSingular\}\}", name, "all");
+			result = reReplace(result, "\{\{namePlural\}\}", variables.helpers.pluralize(name), "all");
+			result = reReplace(result, "\{\{nameSingularLower\}\}", lCase(name), "all");
+			result = reReplace(result, "\{\{namePluralLower\}\}", lCase(variables.helpers.pluralize(name)), "all");
+			result = reReplace(result, "\{\{nameSingularUpper\}\}", uCase(name), "all");
+			result = reReplace(result, "\{\{namePluralUpper\}\}", uCase(variables.helpers.pluralize(name)), "all");
+		}
+
+		return result;
+	}
+
+	/**
+	 * Process {{validations}} and {{enums}} placeholders. Both prefer the
+	 * pre-built code string from context (populated by CodeGen.generateModel);
+	 * {{validations}} falls back to deriving from the legacy `attributes`
+	 * string shape for callers that still use it. CLI audit M2.
+	 */
+	private string function $processCodegenPlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		var validationCode = "";
+		if (structKeyExists(arguments.context, "validations") && isSimpleValue(arguments.context.validations)) {
+			validationCode = arguments.context.validations;
+		} else if (structKeyExists(arguments.context, "attributes") && len(arguments.context.attributes)) {
+			var attributesStruct = parseAttributes(arguments.context.attributes);
+			validationCode = generateValidationCode(attributesStruct);
+		}
+		result = reReplace(result, "\{\{validations\}\}", validationCode, "all");
+
+		var enumCode = (structKeyExists(arguments.context, "enums") && isSimpleValue(arguments.context.enums)) ? arguments.context.enums : "";
+		result = reReplace(result, "\{\{enums\}\}", enumCode, "all");
+
+		return result;
+	}
+
+	/**
+	 * Process |Actions|, |HelperFunctions| and |DescriptionComment| placeholders.
+	 */
+	private string function $processControllerPlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		if (structKeyExists(arguments.context, "actions") && isArray(arguments.context.actions)) {
+			var actionsCode = generateActionsCode(arguments.context.actions);
+			result = replace(result, "|Actions|", actionsCode, "all");
+		} else {
+			result = replace(result, "|Actions|", "", "all");
+		}
+
+		if (structKeyExists(arguments.context, "functions") && isArray(arguments.context.functions)) {
+			var helperFunctionsCode = generateHelperFunctionsCode(arguments.context.functions, arguments.context);
+			result = replace(result, "|HelperFunctions|", helperFunctionsCode, "all");
+		} else {
+			result = replace(result, "|HelperFunctions|", "", "all");
+		}
+
+		if (structKeyExists(arguments.context, "description") && len(trim(arguments.context.description))) {
+			var descComment = "/**" & chr(10) & " * " & arguments.context.description & chr(10) & " */" & chr(10);
+			result = replace(result, "|DescriptionComment|", descComment, "all");
+		} else {
+			result = replace(result, "|DescriptionComment|", "", "all");
+		}
+
+		return result;
+	}
+
+	/**
+	 * Process |TableName|, |FormFields| and |DisplayProperty| placeholders.
+	 */
+	private string function $processFormPlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		if (structKeyExists(arguments.context, "tableName") && len(trim(arguments.context.tableName))) {
+			var tableNameCall = 'table("' & arguments.context.tableName & '");' & chr(10) & chr(9) & chr(9);
+			result = replace(result, "|TableName|", tableNameCall, "all");
+		} else {
+			result = replace(result, "|TableName|", "", "all");
+		}
+
+		if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties) && structKeyExists(arguments.context, "modelName")) {
+			var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
+			var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName, belongsToList);
+			result = replace(result, "|FormFields|", formFieldsCode, "all");
+		} else {
+			result = replace(result, "|FormFields|", "", "all");
+		}
+
+		// |DisplayProperty| is the column name used for human-readable scaffold
+		// headings/links. Defaults to `id` (matches legacy behavior), but if the
+		// properties list contains a string column we use that instead so
+		// scaffolded show.cfm/index.cfm don't lead with a numeric primary key.
+		result = replace(
+			result,
+			"|DisplayProperty|",
+			pickDisplayProperty(arguments.context.properties ?: []),
+			"all"
+		);
+
+		return result;
+	}
+
+	/**
+	 * Process controller includes and CLI-Appends view markers, both driven by
+	 * the association context (belongsTo / properties).
+	 */
+	private string function $processAssociationPlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		if (structKeyExists(arguments.context, "belongsTo") && len(arguments.context.belongsTo)) {
+			result = addControllerIncludes(result, arguments.context.belongsTo);
+		}
+
+		if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties)) {
+			var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
+			result = processViewMarkers(result, arguments.context, belongsToList);
+		}
+
+		return result;
+	}
+
+	/**
+	 * Process pipe-delimited object name placeholders (must be last).
+	 */
+	private string function $processObjectNamePlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		if (structKeyExists(arguments.context, "modelName")) {
+			var modelName = listLast(arguments.context.modelName, "/");
+			result = replace(result, "|ObjectNameSingular|", lCase(modelName), "all");
+			result = replace(result, "|ObjectNamePlural|", lCase(variables.helpers.pluralize(modelName)), "all");
+			result = replace(result, "|ObjectNameSingularC|", modelName, "all");
+			result = replace(result, "|ObjectNamePluralC|", variables.helpers.pluralize(modelName), "all");
+		}
+
+		return result;
 	}
 
 	/**
