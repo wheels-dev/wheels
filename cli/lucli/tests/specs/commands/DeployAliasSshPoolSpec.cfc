@@ -35,12 +35,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("the flat bootstrap alias builds its pool from the deploy config", () => {
 				var body = $caseBody('case "bootstrap":', 'case "exec":');
-				expect(body).toInclude("$deployBuildSshPool(opts.configPath)");
+				expect(body).toInclude("$deployBuildSshPool(arguments.opts.configPath)");
 			});
 
 			it("the flat exec alias builds its pool from the deploy config", () => {
 				var body = $caseBody('case "exec":', 'case "server":');
-				expect(body).toInclude("$deployBuildSshPool(opts.configPath)");
+				expect(body).toInclude("$deployBuildSshPool(arguments.opts.configPath)");
 			});
 
 		});
