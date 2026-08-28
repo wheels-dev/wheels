@@ -276,6 +276,40 @@ component {
 
 	/**
 	 * Internal function.
+	 * Handles the `shortcut` association form — a `findAll` through a join model.
+	 * Extracted from $associationMethod to keep its cyclomatic complexity down.
+	 * Mutates `missingMethodArguments` in place and returns the resolved method +
+	 * componentReference for the caller's final $invoke.
+	 */
+	public struct function $handleShortcutAssociation(required string key, required struct missingMethodArguments) {
+		local.joinAssociation = $expandedAssociations(include = arguments.key);
+		local.joinAssociation = local.joinAssociation[1];
+		local.info = model(local.joinAssociation.modelName).$expandedAssociations(
+			include = ListFirst(variables.wheels.class.associations[arguments.key].through)
+		);
+		local.info = local.info[1];
+		local.componentReference = model(local.info.modelName);
+		local.include = ListLast(variables.wheels.class.associations[arguments.key].through);
+		if (StructKeyExists(arguments.missingMethodArguments, "include")) {
+			local.include = "#local.include#(#arguments.missingMethodArguments.include#)";
+		}
+		arguments.missingMethodArguments.include = local.include;
+		local.where = $keyWhereString(
+			properties = local.joinAssociation.foreignKey,
+			keys = primaryKeys()
+		);
+		if (StructKeyExists(arguments.missingMethodArguments, "where")) {
+			local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
+		}
+		arguments.missingMethodArguments.where = local.where;
+		if (!StructKeyExists(arguments.missingMethodArguments, "returnIncluded")) {
+			arguments.missingMethodArguments.returnIncluded = false;
+		}
+		return { method = "findAll", componentReference = local.componentReference };
+	}
+
+	/**
+	 * Internal function.
 	 */
 	public any function $associationMethod() {
 		for (local.key in variables.wheels.class.associations) {
@@ -284,31 +318,9 @@ component {
 				StructKeyExists(variables.wheels.class.associations[local.key], "shortcut")
 				&& arguments.missingMethodName == variables.wheels.class.associations[local.key].shortcut
 			) {
-				local.method = "findAll";
-				local.joinAssociation = $expandedAssociations(include = local.key);
-				local.joinAssociation = local.joinAssociation[1];
-				local.joinClass = local.joinAssociation.modelName;
-				local.info = model(local.joinClass).$expandedAssociations(
-					include = ListFirst(variables.wheels.class.associations[local.key].through)
-				);
-				local.info = local.info[1];
-				local.componentReference = model(local.info.modelName);
-				local.include = ListLast(variables.wheels.class.associations[local.key].through);
-				if (StructKeyExists(arguments.missingMethodArguments, "include")) {
-					local.include = "#local.include#(#arguments.missingMethodArguments.include#)";
-				}
-				arguments.missingMethodArguments.include = local.include;
-				local.where = $keyWhereString(
-					properties = local.joinAssociation.foreignKey,
-					keys = primaryKeys()
-				);
-				if (StructKeyExists(arguments.missingMethodArguments, "where")) {
-					local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
-				}
-				arguments.missingMethodArguments.where = local.where;
-				if (!StructKeyExists(arguments.missingMethodArguments, "returnIncluded")) {
-					arguments.missingMethodArguments.returnIncluded = false;
-				}
+				local.shortcut = $handleShortcutAssociation(local.key, arguments.missingMethodArguments);
+				local.method = local.shortcut.method;
+				local.componentReference = local.shortcut.componentReference;
 			} else if (ListFindNoCase(variables.wheels.class.associations[local.key].methods, arguments.missingMethodName)) {
 				local.assoc = variables.wheels.class.associations[local.key];
 
