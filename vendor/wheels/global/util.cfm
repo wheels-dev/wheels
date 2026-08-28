@@ -288,49 +288,14 @@
 		}
 
 		// If no explicit type passed, try to detect a sensible one
-		if (!Len(detectedType)) {
-			if (IsArray(val)) {
-				detectedType = "array";
-			} else if (IsStruct(val)) {
-				detectedType = "struct";
-			} else if (IsBinary(val)) {
-				detectedType = "binary";
-			} else if (IsNumeric(val)) {
-				detectedType = "integer";
-			} else if (IsDate(val)) {
-				detectedType = "datetime";
-			} else {
-				detectedType = "string";
-			}
+		if (!Len(local.detectedType)) {
+			local.detectedType = $convertToStringDetectType(local.val);
 		}
 
 		// --- EARLY DATE/TIME PROMOTION ---
 		// If the caller provided a non-datetime type (eg "string") but the value looks like a date/time,
 		// promote it to datetime so the switch branch will canonicalize properly.
-		if (
-			detectedType NEQ "datetime"
-			AND IsSimpleValue(val)
-			AND Len(Trim(val))
-		) {
-			local.s = Trim(val);
-
-			// Match patterns loosely so they work for plain dates too
-			local.patternAMPM = '^\d{1,2}/\d{1,2}/\d{4}(\s+\d{1,2}:\d{2}(\s*(AM|PM))?)?$';
-			local.patternISO = '^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$';
-			local.patternSlash = '^\s*\d{1,2}/\d{1,2}/\d{4}\s*$';
-
-
-			// Day name or other verbose formats are ignored to avoid false positives
-			if (
-				ReFindNoCase(local.patternAMPM, local.s) OR ReFindNoCase(local.patternISO, local.s) OR ReFindNoCase(
-					local.patternSlash,
-					local.s
-				)
-			) {
-				// Promote to datetime so the datetime branch will run below
-				detectedType = "datetime";
-			}
-		}
+		local.detectedType = $convertToStringPromoteDatetime(local.val, local.detectedType);
 
 		// Pre-process date strings with AM/PM that may be parsed differently per engine
 		if (
@@ -341,138 +306,234 @@
 		) {
 			// Manually parse the slash date to avoid engine-specific interpretation,
 			// disambiguating day/month through $parseSlashDate()
-			local.parts = ListToArray(arguments.value, " ");
-			local.datePart = local.parts[1];
-			local.timePart = local.parts[2];
-			local.amPm = local.parts[3];
-
-			local.dateComponents = ListToArray(local.datePart, "/");
-			local.timeComponents = ListToArray(local.timePart, ":");
-
-			local.parsedDate = $parseSlashDate(
-				d1 = Val(local.dateComponents[1]),
-				d2 = Val(local.dateComponents[2]),
-				year = Val(local.dateComponents[3])
-			);
-			local.hour = Val(local.timeComponents[1]);
-			local.minute = Val(local.timeComponents[2]);
-
-			if (local.amPm == "PM" && local.hour != 12) {
-				local.hour += 12;
-			} else if (local.amPm == "AM" && local.hour == 12) {
-				local.hour = 0;
-			}
-			val = CreateDateTime(
-				Year(local.parsedDate),
-				Month(local.parsedDate),
-				Day(local.parsedDate),
-				local.hour,
-				local.minute,
-				0
-			);
-			detectedType = "datetime";
+			local.val = $convertToStringBoxLangSlashDatetime(arguments.value);
+			local.detectedType = "datetime";
 		}
 
 		// --- SWITCH ON (possibly promoted) TYPE ---
-		switch (detectedType) {
+		switch (local.detectedType) {
 			case "array":
-				return ArrayToList(val);
+				return ArrayToList(local.val);
 			case "struct":
-				local.kList = ListSort(StructKeyList(val), "textnocase", "asc");
-				local.out = "";
-				for (local.k in ListToArray(local.kList)) {
-					local.out = ListAppend(local.out, local.k & "=" & val[local.k]);
-				}
-				return local.out;
+				return $convertToStringStruct(local.val);
 			case "binary":
-				return ToString(val);
+				return ToString(local.val);
 			case "float":
 			case "integer":
-				if (!Len(val)) {
-					return "";
-				}
-				if (val == "true") {
-					return "1";
-				}
-				return Val(val);
+				return $convertToStringNumber(local.val);
 			case "boolean":
-				if (Len(val)) {
-					return (val IS true) ? "true" : "false";
-				}
-				return "";
+				return $convertToStringBoolean(local.val);
 			case "datetime":
-				// If it's already a date object, canonicalize
-				if (IsDate(val)) {
-					return DateFormat(val, "yyyy-mm-dd") & " " & TimeFormat(val, "HH:mm:ss");
-				}
+				return $convertToStringDatetime(local.val);
+			default:
+				// Default: return raw value as string (no conversion)
+				return local.val;
+		}
+	}
 
-				// If it is a string that looks like a date, try parsing
-				if (IsSimpleValue(val)) {
-					local.s2 = Trim(val);
-					// Try ParseDateTime (which handles many formats)
-					try {
-						local.dt = ParseDateTime(local.s2);
+
+	/**
+	 * Internal function.
+	 * Detects a sensible conversion type for a value when the caller did not
+	 * pass an explicit type.
+	 */
+	public string function $convertToStringDetectType(required any val) {
+		if (IsArray(arguments.val)) {
+			return "array";
+		} else if (IsStruct(arguments.val)) {
+			return "struct";
+		} else if (IsBinary(arguments.val)) {
+			return "binary";
+		} else if (IsNumeric(arguments.val)) {
+			return "integer";
+		} else if (IsDate(arguments.val)) {
+			return "datetime";
+		}
+		return "string";
+	}
+
+
+	/**
+	 * Internal function.
+	 * Promotes a non-datetime simple value to "datetime" when it looks like a
+	 * date/time, so the switch branch canonicalizes it instead of returning it raw.
+	 */
+	public string function $convertToStringPromoteDatetime(required any val, required string detectedType) {
+		if (arguments.detectedType NEQ "datetime" AND IsSimpleValue(arguments.val) AND Len(Trim(arguments.val))) {
+			local.s = Trim(arguments.val);
+
+			// Match patterns loosely so they work for plain dates too
+			local.patternAMPM = '^\d{1,2}/\d{1,2}/\d{4}(\s+\d{1,2}:\d{2}(\s*(AM|PM))?)?$';
+			local.patternISO = '^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$';
+			local.patternSlash = '^\s*\d{1,2}/\d{1,2}/\d{4}\s*$';
+
+			// Day name or other verbose formats are ignored to avoid false positives
+			if (
+				ReFindNoCase(local.patternAMPM, local.s) OR ReFindNoCase(local.patternISO, local.s) OR ReFindNoCase(
+					local.patternSlash,
+					local.s
+				)
+			) {
+				return "datetime";
+			}
+		}
+		return arguments.detectedType;
+	}
+
+
+	/**
+	 * Internal function.
+	 * Manually parses a BoxLang AM/PM slash date to avoid engine-specific
+	 * interpretation, disambiguating day/month through $parseSlashDate().
+	 */
+	public date function $convertToStringBoxLangSlashDatetime(required string value) {
+		local.parts = ListToArray(arguments.value, " ");
+		local.datePart = local.parts[1];
+		local.timePart = local.parts[2];
+		local.amPm = local.parts[3];
+
+		local.dateComponents = ListToArray(local.datePart, "/");
+		local.timeComponents = ListToArray(local.timePart, ":");
+
+		local.parsedDate = $parseSlashDate(
+			d1 = Val(local.dateComponents[1]),
+			d2 = Val(local.dateComponents[2]),
+			year = Val(local.dateComponents[3])
+		);
+		local.hour = Val(local.timeComponents[1]);
+		local.minute = Val(local.timeComponents[2]);
+
+		if (local.amPm == "PM" && local.hour != 12) {
+			local.hour += 12;
+		} else if (local.amPm == "AM" && local.hour == 12) {
+			local.hour = 0;
+		}
+		return CreateDateTime(
+			Year(local.parsedDate),
+			Month(local.parsedDate),
+			Day(local.parsedDate),
+			local.hour,
+			local.minute,
+			0
+		);
+	}
+
+
+	/**
+	 * Internal function.
+	 * Serializes a struct to a sorted "key=value,key=value" list.
+	 */
+	public string function $convertToStringStruct(required any val) {
+		local.kList = ListSort(StructKeyList(arguments.val), "textnocase", "asc");
+		local.out = "";
+		for (local.k in ListToArray(local.kList)) {
+			local.out = ListAppend(local.out, local.k & "=" & arguments.val[local.k]);
+		}
+		return local.out;
+	}
+
+
+	/**
+	 * Internal function.
+	 * Serializes a numeric value (float/integer) to its string form.
+	 */
+	public string function $convertToStringNumber(required any val) {
+		if (!Len(arguments.val)) {
+			return "";
+		}
+		if (arguments.val == "true") {
+			return "1";
+		}
+		return Val(arguments.val);
+	}
+
+
+	/**
+	 * Internal function.
+	 * Serializes a boolean value to "true"/"false" (or "" when empty).
+	 */
+	public string function $convertToStringBoolean(required any val) {
+		if (Len(arguments.val)) {
+			return (arguments.val IS true) ? "true" : "false";
+		}
+		return "";
+	}
+
+
+	/**
+	 * Internal function.
+	 * Canonicalizes a datetime value (date object or date-like string) to
+	 * "yyyy-mm-dd HH:mm:ss".
+	 */
+	public string function $convertToStringDatetime(required any val) {
+		// If it's already a date object, canonicalize
+		if (IsDate(arguments.val)) {
+			return DateFormat(arguments.val, "yyyy-mm-dd") & " " & TimeFormat(arguments.val, "HH:mm:ss");
+		}
+
+		// If it is a string that looks like a date, try parsing
+		if (IsSimpleValue(arguments.val)) {
+			local.s2 = Trim(arguments.val);
+			// Try ParseDateTime (which handles many formats)
+			try {
+				local.dt = ParseDateTime(local.s2);
+				if (IsDate(local.dt)) {
+					return DateFormat(local.dt, "yyyy-mm-dd") & " " & TimeFormat(local.dt, "HH:mm:ss");
+				}
+			} catch (any e) {
+				// fallback parsing attempts for common formats
+
+				// 1) ISO YYYY-MM-DD[ hh[:mm[:ss]]]
+				// Single-backslash escapes: in CFML "\\d" is a literal
+				// backslash + d in the compiled regex, which never matches a
+				// digit — the branch was dead. Mirrors the already-fixed
+				// slash-format branch below (#2933 carry-forward, #2977).
+				if (ReFind("(?i)^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$", local.s2)) {
+					local.parts = ReReplace(local.s2, "^(\d{4})-(\d{2})-(\d{2}).*$", "\1-\2-\3", "all");
+					local.timePart = ReReplace(local.s2, ".*[ T](\d{1,2}:\d{2}(?::\d{2})?).*$", "\1", "all");
+					if (Len(local.timePart) AND local.timePart NEQ local.s2) {
+						// has time
+						local.dt = ParseDateTime(local.parts & " " & local.timePart);
 						if (IsDate(local.dt)) {
 							return DateFormat(local.dt, "yyyy-mm-dd") & " " & TimeFormat(local.dt, "HH:mm:ss");
 						}
-					} catch (any e) {
-						// fallback parsing attempts for common formats
+					} else {
+						// date only
+						local.dt = CreateDate(
+							Val(ListGetAt(local.parts, 1, "-")),
+							Val(ListGetAt(local.parts, 2, "-")),
+							Val(ListGetAt(local.parts, 3, "-"))
+						);
+						return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
+					}
+				}
 
-						// 1) ISO YYYY-MM-DD[ hh[:mm[:ss]]]
-						// Single-backslash escapes: in CFML "\\d" is a literal
-						// backslash + d in the compiled regex, which never matches a
-						// digit — the branch was dead. Mirrors the already-fixed
-						// slash-format branch below (#2933 carry-forward, #2977).
-						if (ReFind("(?i)^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$", local.s2)) {
-							local.parts = ReReplace(local.s2, "^(\d{4})-(\d{2})-(\d{2}).*$", "\1-\2-\3", "all");
-							local.timePart = ReReplace(local.s2, ".*[ T](\d{1,2}:\d{2}(?::\d{2})?).*$", "\1", "all");
-							if (Len(local.timePart) AND local.timePart NEQ local.s2) {
-								// has time
-								local.dt = ParseDateTime(local.parts & " " & local.timePart);
-								if (IsDate(local.dt)) {
-									return DateFormat(local.dt, "yyyy-mm-dd") & " " & TimeFormat(local.dt, "HH:mm:ss");
-								}
-							} else {
-								// date only
-								local.dt = CreateDate(
-									Val(ListGetAt(local.parts, 1, "-")),
-									Val(ListGetAt(local.parts, 2, "-")),
-									Val(ListGetAt(local.parts, 3, "-"))
-								);
-								return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
+				// 2) Slash format DD/MM/YYYY or MM/DD/YYYY — disambiguated by $parseSlashDate()
+				if (ReFind("^\d{1,2}/\d{1,2}/\d{4}", local.s2)) {
+					local.comps = ListToArray(local.s2, "/");
+					local.dt = $parseSlashDate(
+						d1 = Val(local.comps[1]),
+						d2 = Val(local.comps[2]),
+						year = Val(local.comps[3])
+					);
+					// if time exists in same string, try to parse it using ParseDateTime
+					if (ReFind("\d{1,2}:\d{2}", local.s2)) {
+						try {
+							local.dt2 = ParseDateTime(local.s2);
+							if (IsDate(local.dt2)) {
+								return DateFormat(local.dt2, "yyyy-mm-dd") & " " & TimeFormat(local.dt2, "HH:mm:ss");
 							}
-						}
-
-						// 2) Slash format DD/MM/YYYY or MM/DD/YYYY — disambiguated by $parseSlashDate()
-						if (ReFind("^\d{1,2}/\d{1,2}/\d{4}", local.s2)) {
-							local.comps = ListToArray(local.s2, "/");
-							local.dt = $parseSlashDate(
-								d1 = Val(local.comps[1]),
-								d2 = Val(local.comps[2]),
-								year = Val(local.comps[3])
-							);
-							// if time exists in same string, try to parse it using ParseDateTime
-							if (ReFind("\d{1,2}:\d{2}", local.s2)) {
-								try {
-									local.dt2 = ParseDateTime(local.s2);
-									if (IsDate(local.dt2)) {
-										return DateFormat(local.dt2, "yyyy-mm-dd") & " " & TimeFormat(local.dt2, "HH:mm:ss");
-									}
-								} catch (any e2) {
-									// fallback to midnight
-									return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
-								}
-							}
+						} catch (any e2) {
+							// fallback to midnight
 							return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
 						}
 					}
+					return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
 				}
-				// If we reach here, parsing failed — return original string to allow comparison
-				return val;
-			default:
-				// Default: return raw value as string (no conversion)
-				return val;
+			}
 		}
+		// If we reach here, parsing failed — return original string to allow comparison
+		return arguments.val;
 	}
 
 
