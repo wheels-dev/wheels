@@ -37,7 +37,11 @@ component output="false" {
 	variables.tagDecision = "<" & "cf(?:if|elseif|loop|while|case|defaultcase|catch)" & variables.bs & "b";
 	variables.tagComment = "<!---.*?--->";
 	variables.blockComment = "/" & variables.bs & "*.*?" & variables.bs & "*/";
-	variables.lineComment = "(?m)(?<!:)//[^" & variables.bs & "n]*";
+	// No lookbehind here: Lucee routes such patterns to its ORO fallback,
+	// which rejects `(?<!...)` ("Sequence (?<...) not recognized"). Mask
+	// `://` first so a bare `//[^\r\n]*` cannot eat the tail of URL strings.
+	variables.urlProtocol = "://";
+	variables.lineComment = "//[^" & variables.bs & "r" & variables.bs & "n]*";
 
 	// Self-initializing counter, written into script function bodies. Single-
 	// quoted so the embedded double quotes need no escaping.
@@ -183,6 +187,7 @@ component output="false" {
 	private string function $stripComments(required string text) {
 		local.rv = reReplace(arguments.text, variables.tagComment, "", "all");
 		local.rv = reReplace(local.rv, variables.blockComment, "", "all");
+		local.rv = reReplace(local.rv, variables.urlProtocol, "__WHEELS_PROTO__", "all");
 		local.rv = reReplace(local.rv, variables.lineComment, "", "all");
 		return local.rv;
 	}
