@@ -64,7 +64,9 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		}
 	}
 
-	public struct function $runOnErrorResolveWheelsError(required exception) {
+	// Untyped return: this returns either {} or a cfcatch/exception object,
+	// and Adobe's struct return-type validator rejects the latter.
+	public any function $runOnErrorResolveWheelsError(required exception) {
 		// Returns {} when the exception is not a Wheels-raised error.
 		local.wheelsError = {};
 		if ($engineAdapter().isBoxLang()) {
