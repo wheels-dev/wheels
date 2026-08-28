@@ -1022,46 +1022,9 @@ component {
 		local.multiple = StructKeyExists(arguments, "multiple") && (!IsBoolean(arguments.multiple) || arguments.multiple);
 		local.rv = "";
 		if (IsQuery(arguments.options)) {
-			if (!Len(arguments.valueField) || !Len(arguments.textField)) {
-				// order the columns according to their ordinal position in the database table
-				local.columns = "";
-				local.info = GetMetadata(arguments.options);
-				local.iEnd = ArrayLen(local.info);
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.columns = ListAppend(local.columns, local.info[local.i].name);
-				}
-				if (!Len(local.columns)) {
-					arguments.valueField = "";
-					arguments.textField = "";
-				} else if (ListLen(local.columns) == 1) {
-					arguments.valueField = ListGetAt(local.columns, 1);
-					arguments.textField = ListGetAt(local.columns, 1);
-				} else {
-					// take the first numeric field in the query as the value field and the first non numeric as the text field
-					local.columnsArray = ListToArray(local.columns);
-					local.iEnd = arguments.options.RecordCount;
-					local.jEnd = ArrayLen(local.columnsArray);
-					for (local.i = 1; local.i <= local.iEnd; local.i++) {
-						for (local.j = 1; local.j <= local.jEnd; local.j++) {
-							if (!Len(arguments.valueField) && IsNumeric(arguments.options[local.columnsArray[local.j]][local.i])) {
-								arguments.valueField = local.columnsArray[local.j];
-							}
-							if (!Len(arguments.textField) && !IsNumeric(arguments.options[local.columnsArray[local.j]][local.i])) {
-								arguments.textField = local.columnsArray[local.j];
-							}
-						}
-						// stop scanning rows as soon as both fields have been inferred
-						if (Len(arguments.valueField) && Len(arguments.textField)) {
-							break;
-						}
-					}
-					if (!Len(arguments.valueField) || !Len(arguments.textField)) {
-						// the query does not contain both a numeric and a text column so we'll just use the first and second column instead
-						arguments.valueField = ListGetAt(local.columns, 1);
-						arguments.textField = ListGetAt(local.columns, 2);
-					}
-				}
-			}
+			local.cols = $optionsForSelectColumns(arguments.options, arguments.valueField, arguments.textField);
+			arguments.valueField = local.cols.valueField;
+			arguments.textField = local.cols.textField;
 			local.iEnd = arguments.options.RecordCount;
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.rv &= $option(
@@ -1075,7 +1038,6 @@ component {
 		} else if (IsStruct(arguments.options)) {
 			// Sort struct keys alphabetically.
 			local.sortedKeys = ListSort(StructKeyList(arguments.options), "textnocase");
-
 			local.sortedKeysArray = ListToArray(local.sortedKeys);
 			local.iEnd = ArrayLen(local.sortedKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -1093,76 +1055,149 @@ component {
 			if (IsSimpleValue(arguments.options)) {
 				arguments.options = ListToArray(arguments.options);
 			}
-
 			local.iEnd = ArrayLen(arguments.options);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.optionValue = "";
-				local.optionText = "";
-				// see if the value in the array cell is an array, which means the programmer is using multidimensional arrays. if it is, use the first dimension for the key and the second for the value if it exists.
-				if (IsSimpleValue(arguments.options[local.i])) {
-					local.optionValue = arguments.options[local.i];
-					local.optionText = humanize(arguments.options[local.i]);
-				} else if (IsArray(arguments.options[local.i]) && ArrayLen(arguments.options[local.i]) >= 2) {
-					local.optionValue = arguments.options[local.i][1];
-					local.optionText = arguments.options[local.i][2];
-				} else if (
-					IsStruct(arguments.options[local.i])
-					&& StructKeyExists(arguments.options[local.i], "value")
-					&& StructKeyExists(arguments.options[local.i], "text")
-				) {
-					local.optionValue = arguments.options[local.i]["value"];
-					local.optionText = arguments.options[local.i]["text"];
-				} else if (IsObject(arguments.options[local.i])) {
-					local.object = arguments.options[local.i];
-					if (!Len(arguments.valueField) || !Len(arguments.textField)) {
-						local.propertyNames = local.object.propertyNames();
-						local.propertyNamesArray = ListToArray(local.propertyNames);
-						local.jEnd = ArrayLen(local.propertyNamesArray);
-						for (local.j = 1; local.j <= local.jEnd; local.j++) {
-							local.propertyName = local.propertyNamesArray[local.j];
-							if (StructKeyExists(local.object, local.propertyName)) {
-								local.propertyValue = local.object[local.propertyName];
-								if (!Len(arguments.valueField) && IsNumeric(local.propertyValue)) {
-									arguments.valueField = local.propertyName;
-								}
-								if (!Len(arguments.textField) && !IsNumeric(local.propertyValue)) {
-									arguments.textField = local.propertyName;
-								}
-							}
-						}
-					}
-					if (StructKeyExists(local.object, arguments.valueField)) {
-						local.optionValue = local.object[arguments.valueField];
-					}
-					if (StructKeyExists(local.object, arguments.textField)) {
-						local.optionText = local.object[arguments.textField];
-					}
-				} else if (IsStruct(arguments.options[local.i])) {
-					local.object = arguments.options[local.i];
-					if (StructCount(local.object) == 1) {
-						// When the struct only has one element then use the key / value pair.
-						local.key = StructKeyList(local.object);
-						local.optionValue = LCase(local.key);
-						local.optionText = local.object[local.key];
-					} else {
-						if (StructKeyExists(local.object, arguments.valueField)) {
-							local.optionValue = local.object[arguments.valueField];
-						}
-						if (StructKeyExists(local.object, arguments.textField)) {
-							local.optionText = local.object[arguments.textField];
-						}
-					}
-				}
+				local.cell = $optionsForSelectCell(arguments.options[local.i], arguments.valueField, arguments.textField);
+				arguments.valueField = local.cell.valueField;
+				arguments.textField = local.cell.textField;
 				local.rv &= $option(
 					objectValue = local.value,
-					optionValue = local.optionValue,
-					optionText = local.optionText,
+					optionValue = local.cell.optionValue,
+					optionText = local.cell.optionText,
 					encode = arguments.encode,
 					multiple = local.multiple
 				);
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Resolve the value/text columns for a query passed to $optionsForSelect:
+	 * infer them from the first numeric and first non-numeric column when they
+	 * aren't provided.
+	 */
+	public struct function $optionsForSelectColumns(
+		required any options,
+		required string valueField,
+		required string textField
+	) {
+		if (!Len(arguments.valueField) || !Len(arguments.textField)) {
+			// order the columns according to their ordinal position in the database table
+			local.columns = "";
+			local.info = GetMetadata(arguments.options);
+			local.iEnd = ArrayLen(local.info);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				local.columns = ListAppend(local.columns, local.info[local.i].name);
+			}
+			if (!Len(local.columns)) {
+				arguments.valueField = "";
+				arguments.textField = "";
+			} else if (ListLen(local.columns) == 1) {
+				arguments.valueField = ListGetAt(local.columns, 1);
+				arguments.textField = ListGetAt(local.columns, 1);
+			} else {
+				// take the first numeric field in the query as the value field and the first non numeric as the text field
+				local.columnsArray = ListToArray(local.columns);
+				local.iEnd = arguments.options.RecordCount;
+				local.jEnd = ArrayLen(local.columnsArray);
+				for (local.i = 1; local.i <= local.iEnd; local.i++) {
+					for (local.j = 1; local.j <= local.jEnd; local.j++) {
+						if (!Len(arguments.valueField) && IsNumeric(arguments.options[local.columnsArray[local.j]][local.i])) {
+							arguments.valueField = local.columnsArray[local.j];
+						}
+						if (!Len(arguments.textField) && !IsNumeric(arguments.options[local.columnsArray[local.j]][local.i])) {
+							arguments.textField = local.columnsArray[local.j];
+						}
+					}
+					// stop scanning rows as soon as both fields have been inferred
+					if (Len(arguments.valueField) && Len(arguments.textField)) {
+						break;
+					}
+				}
+				if (!Len(arguments.valueField) || !Len(arguments.textField)) {
+					// the query does not contain both a numeric and a text column so we'll just use the first and second column instead
+					arguments.valueField = ListGetAt(local.columns, 1);
+					arguments.textField = ListGetAt(local.columns, 2);
+				}
+			}
+		}
+		return {valueField = arguments.valueField, textField = arguments.textField};
+	}
+
+	/**
+	 * Resolve the option value/text for a single array cell passed to
+	 * $optionsForSelect (simple value, [value,text] pair, {value,text} struct,
+	 * object, or single-key struct). Returns the resolved fields plus any
+	 * valueField/textField inferred while inspecting an object cell.
+	 */
+	public struct function $optionsForSelectCell(
+		required any cell,
+		required string valueField,
+		required string textField
+	) {
+		local.optionValue = "";
+		local.optionText = "";
+		if (IsSimpleValue(arguments.cell)) {
+			local.optionValue = arguments.cell;
+			local.optionText = humanize(arguments.cell);
+		} else if (IsArray(arguments.cell) && ArrayLen(arguments.cell) >= 2) {
+			local.optionValue = arguments.cell[1];
+			local.optionText = arguments.cell[2];
+		} else if (
+			IsStruct(arguments.cell)
+			&& StructKeyExists(arguments.cell, "value")
+			&& StructKeyExists(arguments.cell, "text")
+		) {
+			local.optionValue = arguments.cell["value"];
+			local.optionText = arguments.cell["text"];
+		} else if (IsObject(arguments.cell)) {
+			local.object = arguments.cell;
+			if (!Len(arguments.valueField) || !Len(arguments.textField)) {
+				local.propertyNames = local.object.propertyNames();
+				local.propertyNamesArray = ListToArray(local.propertyNames);
+				local.jEnd = ArrayLen(local.propertyNamesArray);
+				for (local.j = 1; local.j <= local.jEnd; local.j++) {
+					local.propertyName = local.propertyNamesArray[local.j];
+					if (StructKeyExists(local.object, local.propertyName)) {
+						local.propertyValue = local.object[local.propertyName];
+						if (!Len(arguments.valueField) && IsNumeric(local.propertyValue)) {
+							arguments.valueField = local.propertyName;
+						}
+						if (!Len(arguments.textField) && !IsNumeric(local.propertyValue)) {
+							arguments.textField = local.propertyName;
+						}
+					}
+				}
+			}
+			if (StructKeyExists(local.object, arguments.valueField)) {
+				local.optionValue = local.object[arguments.valueField];
+			}
+			if (StructKeyExists(local.object, arguments.textField)) {
+				local.optionText = local.object[arguments.textField];
+			}
+		} else if (IsStruct(arguments.cell)) {
+			local.object = arguments.cell;
+			if (StructCount(local.object) == 1) {
+				// When the struct only has one element then use the key / value pair.
+				local.key = StructKeyList(local.object);
+				local.optionValue = LCase(local.key);
+				local.optionText = local.object[local.key];
+			} else {
+				if (StructKeyExists(local.object, arguments.valueField)) {
+					local.optionValue = local.object[arguments.valueField];
+				}
+				if (StructKeyExists(local.object, arguments.textField)) {
+					local.optionText = local.object[arguments.textField];
+				}
+			}
+		}
+		return {
+			optionValue = local.optionValue,
+			optionText = local.optionText,
+			valueField = arguments.valueField,
+			textField = arguments.textField
+		};
 	}
 
 	/**

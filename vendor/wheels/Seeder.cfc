@@ -427,102 +427,133 @@ component output="false" extends="wheels.Global" {
 	public any function $generateTestData(required string propertyName, string propertyType = "string", numeric index = 1) {
 		local.name = LCase(arguments.propertyName);
 
-		// Email fields
-		if (FindNoCase("email", local.name)) {
-			return "test#arguments.index#@example.com";
+		// Name-pattern branches (checked before any type-based branch, matching
+		// the original ordering of the if-chain).
+		local.byName = $generateTestDataByName(local.name, arguments.index);
+		if (local.byName.handled) {
+			return local.byName.value;
 		}
 
-		// Name fields
-		if (FindNoCase("firstname", local.name) || local.name == "fname") {
-			local.firstNames = ["John", "Jane", "Bob", "Alice", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"];
-			return local.firstNames[(arguments.index - 1) mod ArrayLen(local.firstNames) + 1];
-		}
-
-		if (FindNoCase("lastname", local.name) || local.name == "lname") {
-			local.lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"];
-			return local.lastNames[(arguments.index - 1) mod ArrayLen(local.lastNames) + 1];
-		}
-
-		if (local.name == "name" || FindNoCase("username", local.name)) {
-			return "TestUser#arguments.index#";
-		}
-
-		// Phone fields
-		if (FindNoCase("phone", local.name) || FindNoCase("mobile", local.name)) {
-			return "555-#NumberFormat(1000 + arguments.index, '0000')#";
-		}
-
-		// Address fields
-		if (FindNoCase("address", local.name) || FindNoCase("street", local.name)) {
-			return "#arguments.index# Test Street";
-		}
-
-		if (FindNoCase("city", local.name)) {
-			local.cities = ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego"];
-			return local.cities[(arguments.index - 1) mod ArrayLen(local.cities) + 1];
-		}
-
-		if (FindNoCase("state", local.name) || FindNoCase("province", local.name)) {
-			local.states = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"];
-			return local.states[(arguments.index - 1) mod ArrayLen(local.states) + 1];
-		}
-
-		if (FindNoCase("zip", local.name) || FindNoCase("postal", local.name)) {
-			return NumberFormat(10000 + arguments.index, "00000");
-		}
-
-		// URL fields
-		if (FindNoCase("url", local.name) || FindNoCase("website", local.name)) {
-			return "https://example#arguments.index#.com";
-		}
-
-		// Password fields
-		if (FindNoCase("password", local.name)) {
-			return "TestPass#arguments.index#!";
-		}
-
-		// Boolean fields
-		if (arguments.propertyType == "boolean" || FindNoCase("active", local.name) || FindNoCase("enabled", local.name) || FindNoCase("published", local.name)) {
-			return (arguments.index mod 2) == 1;
-		}
-
-		// Numeric fields
-		if (arguments.propertyType == "integer" || arguments.propertyType == "numeric") {
-			if (FindNoCase("age", local.name)) {
-				return 20 + (arguments.index mod 50);
-			}
-			if (FindNoCase("price", local.name) || FindNoCase("cost", local.name) || FindNoCase("amount", local.name)) {
-				return (arguments.index * 10) + 0.99;
-			}
-			if (FindNoCase("quantity", local.name) || FindNoCase("count", local.name)) {
-				return arguments.index * 5;
-			}
-			return arguments.index;
-		}
-
-		// Date fields
-		if (arguments.propertyType == "date" || arguments.propertyType == "datetime" || FindNoCase("date", local.name) || FindNoCase("birthday", local.name) || FindNoCase("dob", local.name)) {
-			return DateAdd("d", -arguments.index, Now());
-		}
-
-		// Text/description fields
-		if (arguments.propertyType == "text" || FindNoCase("description", local.name) || FindNoCase("content", local.name) || FindNoCase("body", local.name)) {
-			return "This is test content #arguments.index#. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
-		}
-
-		// Title fields
-		if (FindNoCase("title", local.name) || FindNoCase("subject", local.name)) {
-			return "Test Title #arguments.index#";
-		}
-
-		// Status fields
-		if (FindNoCase("status", local.name)) {
-			local.statuses = ["pending", "active", "completed", "cancelled"];
-			return local.statuses[(arguments.index - 1) mod ArrayLen(local.statuses) + 1];
+		// Type-based branches, in the original order.
+		local.byType = $generateTestDataByType(arguments.propertyType, local.name, arguments.index);
+		if (local.byType.handled) {
+			return local.byType.value;
 		}
 
 		// Default string value
 		return "#arguments.propertyName# Test #arguments.index#";
+	}
+
+	/**
+	 * Internal function. Name-pattern branches of $generateTestData: every
+	 * check that runs before the first type-based branch. Returns
+	 * {handled: true/false, value: ...}.
+	 */
+	public struct function $generateTestDataByName(required string name, required numeric index) {
+		// Email fields
+		if (FindNoCase("email", arguments.name)) {
+			return {handled = true, value = "test#arguments.index#@example.com"};
+		}
+
+		// Name fields
+		if (FindNoCase("firstname", arguments.name) || arguments.name == "fname") {
+			local.firstNames = ["John", "Jane", "Bob", "Alice", "Charlie", "Diana", "Edward", "Fiona", "George", "Helen"];
+			return {handled = true, value = local.firstNames[(arguments.index - 1) mod ArrayLen(local.firstNames) + 1]};
+		}
+
+		if (FindNoCase("lastname", arguments.name) || arguments.name == "lname") {
+			local.lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"];
+			return {handled = true, value = local.lastNames[(arguments.index - 1) mod ArrayLen(local.lastNames) + 1]};
+		}
+
+		if (arguments.name == "name" || FindNoCase("username", arguments.name)) {
+			return {handled = true, value = "TestUser#arguments.index#"};
+		}
+
+		// Phone fields
+		if (FindNoCase("phone", arguments.name) || FindNoCase("mobile", arguments.name)) {
+			return {handled = true, value = "555-#NumberFormat(1000 + arguments.index, '0000')#"};
+		}
+
+		// Address fields
+		if (FindNoCase("address", arguments.name) || FindNoCase("street", arguments.name)) {
+			return {handled = true, value = "#arguments.index# Test Street"};
+		}
+
+		if (FindNoCase("city", arguments.name)) {
+			local.cities = ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego"];
+			return {handled = true, value = local.cities[(arguments.index - 1) mod ArrayLen(local.cities) + 1]};
+		}
+
+		if (FindNoCase("state", arguments.name) || FindNoCase("province", arguments.name)) {
+			local.states = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"];
+			return {handled = true, value = local.states[(arguments.index - 1) mod ArrayLen(local.states) + 1]};
+		}
+
+		if (FindNoCase("zip", arguments.name) || FindNoCase("postal", arguments.name)) {
+			return {handled = true, value = NumberFormat(10000 + arguments.index, "00000")};
+		}
+
+		// URL fields
+		if (FindNoCase("url", arguments.name) || FindNoCase("website", arguments.name)) {
+			return {handled = true, value = "https://example#arguments.index#.com"};
+		}
+
+		// Password fields
+		if (FindNoCase("password", arguments.name)) {
+			return {handled = true, value = "TestPass#arguments.index#!"};
+		}
+
+		return {handled = false, value = ""};
+	}
+
+	/**
+	 * Internal function. Type-based branches of $generateTestData (plus the
+	 * late name-only title/status checks), preserving the original order of
+	 * the if-chain. Returns {handled: true/false, value: ...}.
+	 */
+	public struct function $generateTestDataByType(required string propertyType, required string name, required numeric index) {
+		// Boolean fields
+		if (arguments.propertyType == "boolean" || FindNoCase("active", arguments.name) || FindNoCase("enabled", arguments.name) || FindNoCase("published", arguments.name)) {
+			return {handled = true, value = (arguments.index mod 2) == 1};
+		}
+
+		// Numeric fields
+		if (arguments.propertyType == "integer" || arguments.propertyType == "numeric") {
+			if (FindNoCase("age", arguments.name)) {
+				return {handled = true, value = 20 + (arguments.index mod 50)};
+			}
+			if (FindNoCase("price", arguments.name) || FindNoCase("cost", arguments.name) || FindNoCase("amount", arguments.name)) {
+				return {handled = true, value = (arguments.index * 10) + 0.99};
+			}
+			if (FindNoCase("quantity", arguments.name) || FindNoCase("count", arguments.name)) {
+				return {handled = true, value = arguments.index * 5};
+			}
+			return {handled = true, value = arguments.index};
+		}
+
+		// Date fields
+		if (arguments.propertyType == "date" || arguments.propertyType == "datetime" || FindNoCase("date", arguments.name) || FindNoCase("birthday", arguments.name) || FindNoCase("dob", arguments.name)) {
+			return {handled = true, value = DateAdd("d", -arguments.index, Now())};
+		}
+
+		// Text/description fields
+		if (arguments.propertyType == "text" || FindNoCase("description", arguments.name) || FindNoCase("content", arguments.name) || FindNoCase("body", arguments.name)) {
+			return {handled = true, value = "This is test content #arguments.index#. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."};
+		}
+
+		// Title fields
+		if (FindNoCase("title", arguments.name) || FindNoCase("subject", arguments.name)) {
+			return {handled = true, value = "Test Title #arguments.index#"};
+		}
+
+		// Status fields
+		if (FindNoCase("status", arguments.name)) {
+			local.statuses = ["pending", "active", "completed", "cancelled"];
+			return {handled = true, value = local.statuses[(arguments.index - 1) mod ArrayLen(local.statuses) + 1]};
+		}
+
+		return {handled = false, value = ""};
 	}
 
 	/**

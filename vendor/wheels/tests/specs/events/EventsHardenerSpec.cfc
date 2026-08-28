@@ -30,7 +30,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("EventMethods.$runOnError source holds the frozen 404/403/500 map", () => {
-				var body = $functionBody("EventMethods.cfc", "$runOnError");
+				// The live mapping lives in the $runOnErrorRenderWheelsError helper
+				// that $runOnError dispatches to (the helper IS the live path).
+				var body = $functionBody("EventMethods.cfc", "$runOnErrorRenderWheelsError");
 				expect(Find('ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$"', body)).toBeGT(
 					0,
 					"live $runOnError no longer maps Wheels.*NotFound / ActionNotAllowed via the frozen regex"
@@ -117,7 +119,8 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("keeps the empty catch-any around $mail in EventMethods source", () => {
-				var body = $functionBody("EventMethods.cfc", "$runOnError");
+				// The email dispatch lives in the $runOnErrorSendEmail helper.
+				var body = $functionBody("EventMethods.cfc", "$runOnErrorSendEmail");
 				var mailPos = Find("$mail(argumentCollection", body);
 				expect(mailPos).toBeGT(0, "$runOnError no longer calls $mail");
 				var window = Mid(body, mailPos, 180);
@@ -161,7 +164,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("live $runOnError source serializes arguments.exception (HOLD: no redact flip)", () => {
-				var body = $functionBody("EventMethods.cfc", "$runOnError");
+				// The non-Wheels JSON/XML rendering lives in the
+				// $runOnErrorRenderException helper.
+				var body = $functionBody("EventMethods.cfc", "$runOnErrorRenderException");
 				expect(Find("SerializeJSON(arguments.exception)", body)).toBeGT(
 					0,
 					"non-Wheels JSON path must keep SerializeJSON(arguments.exception)"
