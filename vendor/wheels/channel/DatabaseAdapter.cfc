@@ -296,7 +296,7 @@ component {
 
 			queryExecute("
 				CREATE TABLE wheels_events (
-					id #local.varcharType#(36) NOT NULL PRIMARY KEY,
+					id #local.varcharType#(255) NOT NULL PRIMARY KEY,
 					channel #local.varcharType#(255) NOT NULL,
 					event #local.varcharType#(255) NOT NULL,
 					data #local.textType#,
