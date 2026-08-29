@@ -1212,10 +1212,19 @@ component {
 							local.processedValue = Mid(local.processedValue, 2, Len(local.processedValue) - 2);
 						}
 						if (Find("'", local.processedValue) > 0 || Find(Chr(34), local.processedValue) > 0) {
-							local.cleanedValue = local.processedValue;							
-							local.cleanedValue = ReReplace(local.cleanedValue, "'([^']*)'", "\1", "ALL");
+							local.cleanedValue = local.processedValue;
+							// Unquote token delimiters only: fold quote-comma-quote
+							// separators into plain commas first (IN-lists), then strip
+							// one pair of outer quotes. The previous `'([^']*)'`
+							// regex-strip ate inner apostrophes — "O'Brien" came back
+							// as "OBrien" with a leaked trailing quote.
+							local.cleanedValue = ReReplace(local.cleanedValue, "'\s*,\s*'", ",", "ALL");
 							local.doubleQuote = Chr(34);
-							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#([^#local.doubleQuote#]*)#local.doubleQuote#", "\1", "ALL");
+							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#\s*,\s*#local.doubleQuote#", ",", "ALL");
+							local.cleanedValue = ReReplace(local.cleanedValue, "^'", "", "ONE");
+							local.cleanedValue = ReReplace(local.cleanedValue, "'$", "", "ONE");
+							local.cleanedValue = ReReplace(local.cleanedValue, "^#local.doubleQuote#", "", "ONE");
+							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#$", "", "ONE");
 							ArrayAppend(local.originalValues, local.cleanedValue);
 						} else {
 							ArrayAppend(local.originalValues, local.processedValue);

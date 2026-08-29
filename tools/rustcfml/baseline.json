@@ -1,9 +1,9 @@
 {
   "engineVersion": "v0.635.2",
   "totals": {
-    "totalSpecs": 5354,
-    "totalPass": 5250,
-    "totalFail": 24,
+    "totalSpecs": 5375,
+    "totalPass": 5272,
+    "totalFail": 23,
     "totalError": 58,
     "totalSkipped": 22
   },
@@ -13,7 +13,6 @@
     "wheels.tests.specs.channel.ChannelHardenerSpec :: S5 memory lastEventId replay :: returns an empty array when lastEventId is the newest event",
     "wheels.tests.specs.dispatch.setCorsHeadersSpec :: B3 $setCORSHeaders default is deny-all :: does not emit Access-Control-Allow-Origin=* when allowOrigin is the empty default",
     "wheels.tests.specs.global.GlobalHardenerSpec :: B3 $setCORSHeaders default allowOrigin is deny-all, not Origin=* :: does not emit Access-Control-Allow-Origin=* on the default call",
-    "wheels.tests.specs.global.GlobalSurfaceIdentitySpec :: Global.cfc public mixin surface (issue #3241) :: invalid-request guard is deeper than the front controller, not the include file",
     "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns false when no files changed",
     "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns true when a new cfm file appears",
     "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns true when a tracked cfm file is modified",
