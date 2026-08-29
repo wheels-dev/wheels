@@ -212,7 +212,7 @@ component extends="wheels.WheelsTest" {
 				// https://github.com/wheels-dev/wheels/issues/3077 — an absolute `directory`
 				// outside the web root must be used verbatim, not re-resolved via ExpandPath
 				// (which web-root-prefixes the path on Adobe CF).
-				local.outsideDir = GetTempDirectory() & "dlprobe3077_outside"
+				local.outsideDir = $tempPath("dlprobe3077_outside")
 				if (!DirectoryExists(local.outsideDir)) {
 					// Adobe CF's DirectoryCreate accepts exactly one parameter (the extra
 					// createPath boolean is Lucee-only) and rejects extras at COMPILE time,
@@ -243,7 +243,7 @@ component extends="wheels.WheelsTest" {
 				// https://github.com/wheels-dev/wheels/issues/3077 — the `/wheels` mapping
 				// fallback substring-matched ANY absolute path containing "/wheels"
 				// (e.g. /var/www/wheels/uploads), silently rewriting it.
-				local.wheelsDir = GetTempDirectory() & "wheels3077-dl"
+				local.wheelsDir = $tempPath("wheels3077-dl")
 				if (!DirectoryExists(local.wheelsDir)) {
 					// Single-argument form only: the createPath boolean is Lucee-only and
 					// Adobe rejects it at compile time (crashes the whole bundle).
