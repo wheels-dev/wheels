@@ -137,7 +137,7 @@ component extends="wheels.WheelsTest" {
 						var content = fileRead(absolute);
 
 						expect(
-							reFind('local\.environmentSwitchAlreadyApplied\s*=\s*StructKeyExists\(url,\s*"reload"\)', content) > 0
+							reFind('local\.environmentSwitchAlreadyApplied\s*=\s*(this\.\$isEnvironmentSwitchAlreadyApplied\(\)|StructKeyExists\(url,\s*"reload"\))', content) > 0
 						).toBeTrue(
 							relPath & " must compute environmentSwitchAlreadyApplied before the reload "
 							& "gate (issue ##3030)."
@@ -149,7 +149,7 @@ component extends="wheels.WheelsTest" {
 							& "redirected request does not restart again (issue ##3030)."
 						);
 						expect(
-							reFind("&&\s*!local\.environmentSwitchAlreadyApplied", content) > 0
+							reFind("&&\s*!(local|arguments)\.environmentSwitchAlreadyApplied", content) > 0
 						).toBeTrue(
 							relPath & " must skip the applicationStop() gate when the requested "
 							& "environment is already active — without this the preserved parameters "

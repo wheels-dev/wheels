@@ -1,3 +1,64 @@
+<cfscript>
+	function $cfmlErrorTagContext(required struct exception) {
+		if (
+			StructKeyExists(arguments.exception, "cause")
+			&& StructKeyExists(arguments.exception.cause, "tagContext")
+			&& ArrayLen(arguments.exception.cause.tagContext)
+		) {
+			return Duplicate(arguments.exception.cause.tagContext);
+		} else if (
+			StructKeyExists(arguments.exception, "rootCause")
+			&& StructKeyExists(arguments.exception.rootCause, "tagContext")
+			&& ArrayLen(arguments.exception.rootCause.tagContext)
+		) {
+			return Duplicate(arguments.exception.rootCause.tagContext);
+		} else if (
+			StructKeyExists(arguments.exception, "tagContext")
+			&& ArrayLen(arguments.exception.tagContext)
+		) {
+			return Duplicate(arguments.exception.tagContext);
+		}
+		return [];
+	}
+
+	function $cfmlErrorNormalizePath(required string path) {
+		local.norm = arguments.path;
+		local.norm = ReReplace(local.norm, "[" & Chr(92) & "(.*?)" & Chr(92) & "]", "." & Chr(92) & "1", "all");
+		local.norm = ReReplace(local.norm, "^" & Chr(92) & ".", "", "one");
+		return local.norm;
+	}
+
+	function $cfmlErrorSanitizeScope(required struct scope, required string skip, required string scopeName) {
+		local.hide = "wheels";
+		local.sanitizedScope = Duplicate(arguments.scope);
+		for (local.j in ListToArray(arguments.skip)) {
+			local.normalizedPath = $cfmlErrorNormalizePath(local.j);
+			if (local.normalizedPath CONTAINS "." AND ListFirst(local.normalizedPath, ".") EQ arguments.scopeName) {
+				local.relativePath = ListRest(local.normalizedPath, ".");
+				local.keyList = ListToArray(local.relativePath, ".");
+				local.ref = local.sanitizedScope;
+				local.depth = ArrayLen(local.keyList);
+				for (local.k = 1; local.k LTE local.depth; local.k++) {
+					local.key = local.keyList[local.k];
+					if (local.k EQ local.depth) {
+						if (StructKeyExists(local.ref, local.key)) {
+							StructDelete(local.ref, local.key);
+						}
+					} else {
+						if (StructKeyExists(local.ref, local.key) AND IsStruct(local.ref[local.key])) {
+							local.ref = local.ref[local.key];
+						} else {
+							break;
+						}
+					}
+				}
+			} else if (ListFindNoCase(arguments.skip, arguments.scopeName)) {
+				local.hide = ListAppend(local.hide, local.j);
+			}
+		}
+		return {hide = local.hide, sanitizedScope = local.sanitizedScope};
+	}
+</cfscript>
 <cfoutput>
 	<!--- cfformat-ignore-start --->
 	<div class="ui container" style="padding-bottom:2em;">
@@ -23,24 +84,7 @@
 		</h1>
 
 		<!--- Tag Context / Location --->
-		<cfif
-			StructKeyExists(arguments.exception, "cause")
-			&& StructKeyExists(arguments.exception.cause, "tagContext")
-			&& ArrayLen(arguments.exception.cause.tagContext)
-		>
-			<cfset local.tagContext = Duplicate(arguments.exception.cause.tagContext)>
-		<cfelseif
-			StructKeyExists(arguments.exception, "rootCause")
-			&& StructKeyExists(arguments.exception.rootCause, "tagContext")
-			&& ArrayLen(arguments.exception.rootCause.tagContext)
-		>
-			<cfset local.tagContext = Duplicate(arguments.exception.rootCause.tagContext)>
-		<cfelseif
-			StructKeyExists(arguments.exception, "tagContext")
-			&& ArrayLen(arguments.exception.tagContext)
-		>
-			<cfset local.tagContext = Duplicate(arguments.exception.tagContext)>
-		</cfif>
+		<cfset local.tagContext = $cfmlErrorTagContext(arguments.exception)>
 
 		<cfif StructKeyExists(local, "tagContext") AND ArrayLen(local.tagContext)>
 			<div style="margin:1.5em 0;">
@@ -140,38 +184,9 @@
 						<cfset local.scope = local.scopeMap[local.i]>
 						<cfif IsStruct(local.scope)>
 							<cfset local.scopeIdx = local.scopeIdx + 1>
-							<cfset local.hide = "wheels">
-							<cfset local.sanitizedScope = duplicate(local.scope)>
-
-							<cfloop list="#local.skip#" index="local.j">
-								<!--- Normalize the key path --->
-								<cfset local.normalizedPath = $normalizePath(local.j)>
-								<cfif local.normalizedPath CONTAINS "." AND ListFirst(local.normalizedPath, ".") EQ local.scopeName>
-									<!--- Get nested path relative to the scope --->
-									<cfset local.relativePath = ListRest(local.normalizedPath, ".")>
-									<cfset local.keyList = ListToArray(local.relativePath, ".")>
-
-									<!--- Walk into the sanitized struct and mask the nested key --->
-									<cfset local.ref = local.sanitizedScope>
-									<cfset local.depth = ArrayLen(local.keyList)>
-									<cfloop from="1" to="#local.depth#" index="local.k">
-										<cfset local.key = local.keyList[local.k]>
-										<cfif local.k EQ local.depth>
-											<cfif StructKeyExists(local.ref, local.key)>
-												<cfset StructDelete(local.ref, local.key)>
-											</cfif>
-										<cfelse>
-											<cfif StructKeyExists(local.ref, local.key) AND isStruct(local.ref[local.key])>
-												<cfset local.ref = local.ref[local.key]>
-											<cfelse>
-												<cfbreak>
-											</cfif>
-										</cfif>
-									</cfloop>
-								<cfelseif ListFindNoCase(local.skip, local.scopeName)>
-									<cfset local.hide = ListAppend(local.hide, local.j)>
-								</cfif>
-							</cfloop>
+							<cfset local.scopeMask = $cfmlErrorSanitizeScope(local.scope, local.skip, local.scopeName)>
+							<cfset local.hide = local.scopeMask.hide>
+							<cfset local.sanitizedScope = local.scopeMask.sanitizedScope>
 
 							<div style="margin-bottom:8px;">
 								<div onclick="var el=document.getElementById('scope-#LCase(local.scopeName)#');el.style.display=el.style.display==='none'?'block':'none';this.querySelector('svg').style.transform=el.style.display==='none'?'':'rotate(90deg)';" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 16px;background:##181825;border:1px solid ##45475a;border-radius:6px;user-select:none;">
