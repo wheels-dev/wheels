@@ -97,11 +97,16 @@ except Exception as exc:
 totals = {k: int(data.get(k, 0)) for k in
           ("totalSpecs", "totalPass", "totalFail", "totalError", "totalSkipped")}
 
-failing = set()
+failing = {}
 def walk(node, bundle, path):
     for spec in node.get("specStats", []):
         if spec.get("status") not in ("Passed", "Skipped"):
-            failing.add(f"{bundle} :: {path} :: {spec.get('name', '?')}")
+            key = f"{bundle} :: {path} :: {spec.get('name', '?')}"
+            failing[key] = {
+                "status": spec.get("status", "?"),
+                "message": str(spec.get("failMessage") or "").replace("\n", " | "),
+                "detail": str(spec.get("failDetail") or "").replace("\n", " | "),
+            }
     for nested in node.get("nestedSuiteStats", []) or []:
         walk(nested, bundle, f"{path} > {nested.get('name', '?')}")
 
@@ -109,7 +114,11 @@ for b in data.get("bundleStats", []):
     name = b.get("name", "?")
     ge = b.get("globalException") or {}
     if isinstance(ge, dict) and ge.get("message"):
-        failing.add(f"{name} :: (bundle-level exception)")
+        failing[f"{name} :: (bundle-level exception)"] = {
+            "status": "Exception",
+            "message": str(ge.get("message") or "").replace("\n", " | "),
+            "detail": str(ge.get("detail") or "").replace("\n", " | "),
+        }
     for su in b.get("suiteStats", []):
         walk(su, name, su.get("name", "?"))
 
@@ -127,7 +136,7 @@ if mode == "write":
     payload = {
         "engineVersion": version,
         "totals": totals,
-        "failing": sorted(failing),
+        "failing": sorted(failing.keys()),
     }
     with open(baseline_path, "w") as fh:
         json.dump(payload, fh, indent=2)
@@ -142,8 +151,8 @@ except Exception:
     sys.exit(1)
 
 known = set(baseline.get("failing", []))
-new = sorted(failing - known)
-fixed = sorted(known - failing)
+new = sorted(failing.keys() - known)
+fixed = sorted(known - failing.keys())
 
 # Coarse totals backstop: the failing[] walk only sees per-spec entries and
 # bundle-level exceptions, so a regression surfacing through a response shape
@@ -164,7 +173,15 @@ if fixed:
     summary_lines.append("  (baseline can be refreshed with --write-baseline)")
 if new:
     summary_lines.append(f"NEW FAILURES vs baseline ({len(new)}):")
-    summary_lines += [f"  - {item}" for item in new]
+    for item in new:
+        summary_lines.append(f"  - {item}")
+        info = failing.get(item, {})
+        msg = info.get("message", "")
+        if msg:
+            summary_lines.append(f"      [{info.get('status', '?')}] {msg[:400]}")
+        detail = info.get("detail", "")
+        if detail and detail != msg:
+            summary_lines.append(f"      detail: {detail[:400]}")
 if totals_worse:
     summary_lines.append("TOTALS REGRESSION vs baseline (no named entry — check response shape):")
     summary_lines += [f"  - {item}" for item in totals_worse]
