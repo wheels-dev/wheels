@@ -276,9 +276,18 @@ component {
 				local.recentParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
 			local.recentSql &= " ORDER BY updatedAt DESC";
-			local.recentRows = queryExecute(local.recentSql, local.recentParams, {datasource = variables.$datasource, maxrows = 10});
+			// Bound in SQL text via the dialect clause, not the driver maxrows
+			// option: BoxLang's JDBC layer calls setLargeMaxRows(), which the
+			// PostgreSQL driver does not implement ("is not yet implemented") —
+			// the query throws and the catch below returned an empty
+			// recentJobs. The CFML break is a belt-and-braces backstop.
+			local.recentSql &= $candidateLimitClause(dbType = $dbType(), candidateLimit = 10);
+			local.recentRows = queryExecute(local.recentSql, local.recentParams, {datasource = variables.$datasource});
 
 			for (local.row in local.recentRows) {
+				if (ArrayLen(local.result.recentJobs) >= 10) {
+					break;
+				}
 				ArrayAppend(local.result.recentJobs, {
 					id = local.row.id,
 					jobClass = local.row.jobClass,
@@ -302,7 +311,10 @@ component {
 				local.oldestParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
 			local.oldestSql &= " ORDER BY createdAt ASC";
-			local.oldestRow = queryExecute(local.oldestSql, local.oldestParams, {datasource = variables.$datasource, maxrows = 1});
+			// Bound in SQL text (see the recentJobs note on driver maxrows) —
+			// the ORDER BY puts the oldest pending row first.
+			local.oldestSql &= $candidateLimitClause(dbType = $dbType(), candidateLimit = 1);
+			local.oldestRow = queryExecute(local.oldestSql, local.oldestParams, {datasource = variables.$datasource});
 			if (local.oldestRow.recordCount) {
 				// This reads through a raw queryExecute, so the Wheels adapter's
 				// date canonicalization never runs. Adobe's JDBC driver returns
@@ -339,7 +351,10 @@ component {
 					local.selectParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 				}
 				local.selectSql &= " ORDER BY failedAt ASC";
-				local.failedJobs = queryExecute(local.selectSql, local.selectParams, {datasource = variables.$datasource, maxrows = arguments.limit});
+				// Bound in SQL text (BoxLang + PostgreSQL throws on the driver
+				// maxrows option — setLargeMaxRows is not implemented).
+				local.selectSql &= $candidateLimitClause(dbType = $dbType(), candidateLimit = arguments.limit);
+				local.failedJobs = queryExecute(local.selectSql, local.selectParams, {datasource = variables.$datasource});
 
 				if (!local.failedJobs.recordCount) return 0;
 
