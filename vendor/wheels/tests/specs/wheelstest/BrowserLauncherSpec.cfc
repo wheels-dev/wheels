@@ -204,6 +204,10 @@ component extends="wheels.WheelsTest" {
             });
 
             it("$findZeroArgMethod throws BrowserLauncherReflectionError when method missing", () => {
+                if (!variables.jvmAvailable) {
+                    debug("Skipping: JVM class loading unavailable on this engine");
+                    return;
+                }
                 // Pure reflection helper — testable on any Java class without
                 // needing Playwright JARs loaded. Use String which has no
                 // 'thisDoesNotExist' method.
@@ -217,6 +221,10 @@ component extends="wheels.WheelsTest" {
         describe("$findSetter", () => {
 
             it("finds a one-arg setter by name on a JDK class", () => {
+                if (!variables.jvmAvailable) {
+                    debug("Skipping: JVM class loading unavailable on this engine");
+                    return;
+                }
                 // java.util.Date has setTime(long) — one-arg setter
                 var klass = createObject("java", "java.util.Date").getClass();
                 var method = launcher.$findSetter(klass=klass, name="setTime");
@@ -225,6 +233,10 @@ component extends="wheels.WheelsTest" {
             });
 
             it("throws BrowserOptionError for nonexistent setter", () => {
+                if (!variables.jvmAvailable) {
+                    debug("Skipping: JVM class loading unavailable on this engine");
+                    return;
+                }
                 var klass = createObject("java", "java.util.Date").getClass();
                 expect(() => {
                     launcher.$findSetter(klass=klass, name="setNonexistent");
@@ -236,12 +248,20 @@ component extends="wheels.WheelsTest" {
         describe("$castForParam", () => {
 
             it("casts numeric to java.lang.Double for double param type", () => {
+                if (!variables.jvmAvailable) {
+                    debug("Skipping: JVM class loading unavailable on this engine");
+                    return;
+                }
                 var paramType = createObject("java", "java.lang.Double").TYPE;
                 var result = launcher.$castForParam(value=5000, paramType=paramType);
                 expect(result.getClass().getName()).toBe("java.lang.Double");
             });
 
             it("casts numeric to java.lang.Integer for int param type", () => {
+                if (!variables.jvmAvailable) {
+                    debug("Skipping: JVM class loading unavailable on this engine");
+                    return;
+                }
                 var paramType = createObject("java", "java.lang.Integer").TYPE;
                 var result = launcher.$castForParam(value=42, paramType=paramType);
                 expect(result.getClass().getName()).toBe("java.lang.Integer");

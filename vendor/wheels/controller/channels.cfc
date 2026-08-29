@@ -166,6 +166,21 @@ component {
 
 	public array function $drainChannelBuffer(required any buffer) {
 		local.events = [];
+		// Engine-agnostic struct buffer ({items = []}) used by $subscribeMemory:
+		// structs pass by reference on every engine, so the drain mutates the
+		// caller's live buffer (a plain array argument would be copied by value
+		// on Adobe CF and never drain).
+		if (IsStruct(arguments.buffer) && StructKeyExists(arguments.buffer, "items") && IsArray(arguments.buffer.items)) {
+			while (ArrayLen(arguments.buffer.items)) {
+				local.item = arguments.buffer.items[1];
+				if (!$isChannelBufferItem(local.item)) {
+					break;
+				}
+				ArrayAppend(local.events, local.item);
+				ArrayDeleteAt(arguments.buffer.items, 1);
+			}
+			return local.events;
+		}
 		try {
 			local.next = arguments.buffer.poll();
 			while (!IsNull(local.next)) {
@@ -212,7 +227,7 @@ component {
 		local.writer = initSSEStream();
 		local.engine = $getChannelEngine("memory");
 
-		local.buffer = CreateObject("java", "java.util.concurrent.ConcurrentLinkedQueue").init();
+		local.buffer = {items = []};
 
 		// Subscribe with a callback that buffers events
 		local.subscriberId = local.engine.subscribe(
@@ -222,7 +237,7 @@ component {
 				if (ArrayLen(eventFilter) && !ArrayFind(eventFilter, event.event)) {
 					return;
 				}
-				buffer.offer(event);
+				ArrayAppend(buffer.items, event);
 			}
 		);
 
@@ -232,7 +247,7 @@ component {
 				if (ArrayLen(arguments.eventFilter) && !ArrayFind(arguments.eventFilter, local.replayEvt.event)) {
 					continue;
 				}
-				local.buffer.offer(local.replayEvt);
+				ArrayAppend(local.buffer.items, local.replayEvt);
 			}
 		}
 

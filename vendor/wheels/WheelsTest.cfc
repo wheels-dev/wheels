@@ -8,8 +8,22 @@
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
-    // Pseudo-constructor (runs automatically)
-    if (structKeyExists(application, "wo")) {
+    // Pseudo-constructor (runs automatically). Kept so specs that EXTEND
+    // WheelsTest get their helpers bound during child compilation.
+    $bindApplicationHelpers();
+
+    /**
+     * Bind application.wo's helpers into this instance (both variables and
+     * this scope). Runs from the pseudo-constructor above AND from init():
+     * RustCFML skips pseudo-constructor code when instantiating an
+     * already-compiled component directly (new wheels.WheelsTest()), so
+     * init() covers that path. The binding is idempotent, so engines that
+     * run both paths are unaffected.
+     */
+    public any function $bindApplicationHelpers() {
+        if (!structKeyExists(application, "wo")) {
+            return this;
+        }
         // Iterate struct keys on application.wo and bind every UDF. This
         // catches both methods declared on Global.cfc (visible to
         // getMetaData) AND helpers merged in via cfinclude (e.g.
@@ -36,6 +50,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             variables[local.key] = application.wo[local.key];
             this[local.key]      = application.wo[local.key];
         }
+        return this;
+    }
+
+    /**
+     * Constructor — re-runs the helper binding so a directly instantiated
+     * WheelsTest works on engines that skip pseudo-constructor code for
+     * already-compiled components (RustCFML). Matches BaseSpec's remote
+     * access modifier, which Adobe requires of overrides.
+     */
+    remote WheelsTest function init() {
+        $bindApplicationHelpers();
+        return this;
     }
 
     /**

@@ -110,7 +110,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not emit Access-Control-Allow-Origin=* on the default call", function() {
-				if (!StructKeyExists(server, "lucee")) {
+				if (!g.$engineAdapter().isLucee()) { // RustCFML emulates server.lucee — the engine adapter is authoritative
 					return;
 				}
 				cfheader(name = "Access-Control-Allow-Origin", value = "SENTINEL-UNSET");

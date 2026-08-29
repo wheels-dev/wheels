@@ -545,6 +545,19 @@
 				return true;
 			}
 		}
+		if ($engineAdapter().isRustCFML()) {
+			// JVM-free engine: java.io.File shims are unreliable for canonical
+			// paths. Lexical containment is the correct check there — `..`
+			// segments and absolute paths were already rejected above, so a
+			// normalized join that stays under the normalized destination is
+			// contained (RustCFML has no symlink resolution to bypass).
+			local.normDestination = $normalizeZipPath(arguments.destination);
+			local.normJoined = $normalizeZipPath(arguments.destination & "/" & local.entry);
+			if (Len(local.normJoined) == Len(local.normDestination)) {
+				return false;
+			}
+			return CompareNoCase(Left(local.normJoined, Len(local.normDestination)), local.normDestination) != 0;
+		}
 		try {
 			local.destFile = CreateObject("java", "java.io.File").init(arguments.destination);
 			local.destCanon = local.destFile.getCanonicalPath();
@@ -560,16 +573,56 @@
 			}
 			return CompareNoCase(Left(local.targetCanon, Len(local.destPrefix)), local.destPrefix) != 0;
 		} catch (any e) {
+			// Canonical resolution failing means "cannot verify" — fail closed.
 			return true;
 		}
 	}
 
 	/**
-	 * Lists entry names in a zip via java.util.zip.ZipFile so every engine
-	 * sees the same names before cfzip writes anything.
+	 * Lexically normalize a filesystem path: collapse `.` and `..` segments
+	 * and duplicate separators. Used by the RustCFML fallback in
+	 * $zipEntryEscapesDestination (the JVM engines resolve canonical paths
+	 * instead).
+	 */
+	public string function $normalizeZipPath(required string path) {
+		local.norm = Replace(Replace(arguments.path, "\", "/", "all"), "//", "/", "all");
+		local.parts = [];
+		for (local.part in ListToArray(local.norm, "/")) {
+			if (local.part == ".." && ArrayLen(local.parts)) {
+				ArrayDeleteAt(local.parts, ArrayLen(local.parts));
+			} else if (local.part != "." && Len(local.part)) {
+				ArrayAppend(local.parts, local.part);
+			}
+		}
+		return "/" & ArrayToList(local.parts, "/");
+	}
+
+	/**
+	 * Lists entry names in a zip via the native cfzip tag so every engine
+	 * (including JVM-free RustCFML) sees the same names before cfzip writes
+	 * anything.
 	 */
 	public array function $zipEntryNames(required string zipFile) {
 		local.names = [];
+		if ($engineAdapter().isRustCFML()) {
+			// JVM-free engine: no java.util.zip — use the native cfzip list
+			// action (script-callable there). Normalize the name-variable and
+			// direct-return variants the same way the engine-agnostic paths do.
+			local.listResult = cfzip(action = "list", file = arguments.zipFile, name = "local.zipListResult");
+			if (!IsQuery(local.listResult) && IsDefined("local.zipListResult") && IsQuery(local.zipListResult)) {
+				local.listResult = local.zipListResult;
+			}
+			if (!IsQuery(local.listResult)) {
+				return local.names;
+			}
+			for (local.row in local.listResult) {
+				ArrayAppend(local.names, local.row.name);
+			}
+			return local.names;
+		}
+		// JVM engines (Lucee/Adobe/BoxLang): java.util.zip.ZipFile is
+		// uniform and does not depend on how each engine exposes the cfzip
+		// tag from script (Lucee has no script-callable cfzip at all).
 		local.zf = CreateObject("java", "java.util.zip.ZipFile").init(arguments.zipFile);
 		try {
 			local.entries = local.zf.entries();

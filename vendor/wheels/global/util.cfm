@@ -248,6 +248,19 @@
 
 	/**
 	 * Internal function.
+	 * URL-encode a value for query strings with a normalized space form.
+	 * Engines differ: Lucee emits "+" for a space (form-encoding style) while
+	 * RustCFML emits "%20". A literal "+" in the input is %2B-encoded by every
+	 * engine, so any remaining "%20" is a space — normalize to "+" so generated
+	 * URLs are byte-identical across engines and match the spec contract.
+	 */
+	public string function $encodeUrlParam(required string value) {
+		return Replace(EncodeForURL($canonicalize(arguments.value)), "%20", "+", "all");
+	}
+
+
+	/**
+	 * Internal function.
 	 * Disambiguates a D1/D2/YYYY slash date: a component greater than 12 cannot
 	 * be a month so the format is unambiguous; otherwise the engine adapter's
 	 * locale preference decides (MM/DD/YYYY on Lucee / Adobe, DD/MM/YYYY on

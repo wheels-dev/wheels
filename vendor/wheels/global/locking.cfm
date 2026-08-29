@@ -20,15 +20,20 @@
 		numeric timeout = 30
 	) {
 		local.rv = $invoke(method = arguments.condition, invokeArgs = arguments.conditionArgs);
-		if (IsBoolean(local.rv) AND NOT local.rv) {
+		if (StructKeyExists(local, "rv") AND IsBoolean(local.rv) AND NOT local.rv) {
 			lock timeout="#arguments.timeout#" name="#arguments.name#" {
 				local.rv = $invoke(method = arguments.condition, invokeArgs = arguments.conditionArgs);
-				if (IsBoolean(local.rv) AND NOT local.rv) {
+				if (StructKeyExists(local, "rv") AND IsBoolean(local.rv) AND NOT local.rv) {
 					local.rv = $invoke(method = arguments.execute, invokeArgs = arguments.executeArgs)
 				}
 			}
 		}
-		return local.rv;
+		// Guard the read: on RustCFML assigning a void return DELETES the
+		// key (null-assignment semantics), where JVM engines materialize a
+		// null value. StructKeyExists keeps both engines uniform.
+		if (StructKeyExists(local, "rv")) {
+			return local.rv;
+		}
 	}
 
 

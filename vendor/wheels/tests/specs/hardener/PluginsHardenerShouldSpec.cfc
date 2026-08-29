@@ -199,6 +199,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects a mappings path that is a symlink out of the package tree", () => {
+
+				// RustCFML is JVM-free: the zip/symlink fixtures are built with
+				// java.util.zip / java.nio.file, which the engine cannot run.
+				// The pure-CFML classifier contract is covered elsewhere in this file.
+				if (g.$engineAdapter().isRustCFML()) {
+					return;
+				}
 				var pkgDir = symlinkRoot & "/symlinkescape";
 				DirectoryCreate(pkgDir);
 				var outside = symlinkRoot & "/outside-target";
@@ -614,6 +621,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("keeps a folder that has a matching zip", () => {
+
+				// RustCFML is JVM-free: the zip/symlink fixtures are built with
+				// java.util.zip / java.nio.file, which the engine cannot run.
+				// The pure-CFML classifier contract is covered elsewhere in this file.
+				if (g.$engineAdapter().isRustCFML()) {
+					return;
+				}
 				var kept = deleteRoot & "/keptplugin";
 				DirectoryCreate(kept);
 				FileWrite(kept & "/Keptplugin.cfc", "component { function init() { this.version = ""99.9.9""; return this; } }");
