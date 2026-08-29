@@ -171,6 +171,15 @@ if fixed:
     summary_lines.append(f"NEWLY PASSING vs baseline ({len(fixed)}):")
     summary_lines += [f"  + {item}" for item in fixed]
     summary_lines.append("  (baseline can be refreshed with --write-baseline)")
+if failing:
+    known_now = sorted(failing.keys())
+    summary_lines.append(f"FAILING SPECS (all {len(known_now)}):")
+    for item in known_now:
+        summary_lines.append(f"  * {item}")
+        info = failing.get(item, {})
+        msg = info.get("message", "")
+        if msg:
+            summary_lines.append(f"      [{info.get('status', '?')}] {msg[:400]}")
 if new:
     summary_lines.append(f"NEW FAILURES vs baseline ({len(new)}):")
     for item in new:
