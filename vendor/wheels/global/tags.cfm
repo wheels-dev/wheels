@@ -604,17 +604,34 @@
 	 */
 	public array function $zipEntryNames(required string zipFile) {
 		local.names = [];
-		local.listResult = cfzip(action = "list", file = arguments.zipFile, name = "local.zipListResult");
-		// Lucee populates the `name` variable and returns void; Adobe CF and
-		// BoxLang return the listing query directly — normalize either way.
-		if (!IsQuery(local.listResult) && IsDefined("local.zipListResult") && IsQuery(local.zipListResult)) {
-			local.listResult = local.zipListResult;
-		}
-		if (!IsQuery(local.listResult)) {
+		if ($engineAdapter().isRustCFML()) {
+			// JVM-free engine: no java.util.zip — use the native cfzip list
+			// action (script-callable there). Normalize the name-variable and
+			// direct-return variants the same way the engine-agnostic paths do.
+			local.listResult = cfzip(action = "list", file = arguments.zipFile, name = "local.zipListResult");
+			if (!IsQuery(local.listResult) && IsDefined("local.zipListResult") && IsQuery(local.zipListResult)) {
+				local.listResult = local.zipListResult;
+			}
+			if (!IsQuery(local.listResult)) {
+				return local.names;
+			}
+			for (local.row in local.listResult) {
+				ArrayAppend(local.names, local.row.name);
+			}
 			return local.names;
 		}
-		for (local.row in local.listResult) {
-			ArrayAppend(local.names, local.row.name);
+		// JVM engines (Lucee/Adobe/BoxLang): java.util.zip.ZipFile is
+		// uniform and does not depend on how each engine exposes the cfzip
+		// tag from script (Lucee has no script-callable cfzip at all).
+		local.zf = CreateObject("java", "java.util.zip.ZipFile").init(arguments.zipFile);
+		try {
+			local.entries = local.zf.entries();
+			while (local.entries.hasMoreElements()) {
+				local.entry = local.entries.nextElement();
+				ArrayAppend(local.names, local.entry.getName());
+			}
+		} finally {
+			local.zf.close();
 		}
 		return local.names;
 	}

@@ -55,19 +55,7 @@
 		} else {
 			arguments.executeArgs.$locked = true;
 			lock name="#arguments.name#" type="#arguments.type#" timeout="#arguments.timeout#" {
-				// Call the method on `this` directly instead of through
-				// $invoke()/cfinvoke. The direct call is byte-equivalent on
-				// every engine but skips the cfinvoke returnVariable
-				// writeback, which RustCFML cannot resolve when the invoked
-				// method returns no value (it reports "Variable 'rv' is
-				// undefined" after a full test-suite run).
-				if (StructKeyExists(variables, arguments.execute)) {
-					local.lockedFn = this[arguments.execute];
-					local.rv = local.lockedFn(argumentCollection = "#arguments.executeArgs#");
-				} else {
-					// onMissingMethod fallback, matching $invoke's behavior.
-					local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
-				}
+				local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
 			}
 		}
 		if (StructKeyExists(local, "rv")) {
