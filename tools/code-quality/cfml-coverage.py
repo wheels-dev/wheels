@@ -22,8 +22,29 @@ Usage:
 import os, re, sys, json, shutil, argparse
 
 SCRIPT_FN = re.compile(r'\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{', re.S)
-TAG_FN = re.compile(r'(<cffunction\b[^>]*?\bname\s*=\s*["\']?[A-Za-z_$][\w$]*[^>]*?>)', re.I)
+# Guarded closure assignments (include-idempotent templates):
+#   variables.$helper = function(args) { ... };
+CLOSURE_FN = re.compile(r'\bvariables\s*\.\s*\$?([A-Za-z_$][\w$]*)\s*=\s*function\s*\([^)]*\)\s*\{', re.S)
+# Capture the name only (group 1); the opening tag itself is not part of the id —
+# embedding it produced ids full of quotes, i.e. invalid CFML in the counter.
+TAG_FN = re.compile(r'<cffunction\b[^>]*?\bname\s*=\s*["\']?([A-Za-z_$][\w$]*)', re.I)
 EXCLUDE_DIRS = {'tests', 'rocketunit_tests'}
+
+DSTRING = re.compile(r'"(?:[^"\\]|\\.)*"', re.S)
+SSTRING = re.compile(r"'(?:[^'\\]|\\.)*'", re.S)
+LINE_COMMENT = re.compile(r'//[^\n]*')
+BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
+TAG_COMMENT = re.compile(r'<!---.*?--->', re.S)
+
+
+def _mask(text):
+    """Mask strings and comments with same-length spaces so function patterns
+    never match inside them (JS `function name(){` in a CFML string literal
+    used to get a counter inserted mid-string — a parse error). Offsets are
+    preserved, so matches map back onto the original text unchanged."""
+    for pat in (DSTRING, SSTRING, LINE_COMMENT, BLOCK_COMMENT, TAG_COMMENT):
+        text = pat.sub(lambda m: ' ' * len(m.group(0)), text)
+    return text
 
 
 def _backup_dir(root):
@@ -59,17 +80,23 @@ def instrument(root):
         with open(path, encoding='utf-8', errors='replace') as fh:
             text = fh.read()
         rel = _rel(path, root)
-        # script functions: insert a script-syntax counter right after '{'
+        masked = _mask(text)
+        # Collect every insertion point against the original (masked) offsets
+        # first, then apply them right-to-left so earlier insertions never
+        # shift later positions.
+        matches = []
+        for pat in (SCRIPT_FN, CLOSURE_FN):
+            for m in pat.finditer(masked):
+                matches.append((m.end(), 'script', m.group(1)))
+        for m in TAG_FN.finditer(masked):
+            brace = masked.find('>', m.end())
+            if brace >= 0:
+                matches.append((brace + 1, 'tag', m.group(1)))
+        matches.sort(key=lambda t: -t[0])
         out = text
-        for m in reversed(list(SCRIPT_FN.finditer(text))):
-            brace = m.end()  # position just after '{'
-            ctr = SCRIPT_COUNTER.format(id=f"{rel}:{m.group(1)}")
-            out = out[:brace] + ctr + out[brace:]
-            n += 1
-        # tag functions: insert a <cfset> counter right after the opening tag
-        for m in reversed(list(TAG_FN.finditer(out))):
-            ctr = TAG_COUNTER.format(id=f"{rel}:{m.group(1)}")
-            out = out[:m.end()] + ctr + out[m.end():]
+        for pos, kind, name in matches:
+            ctr = (SCRIPT_COUNTER if kind == 'script' else TAG_COUNTER).format(id=f"{rel}:{name}")
+            out = out[:pos] + ctr + out[pos:]
             n += 1
         if out != text:
             backup = os.path.join(_backup_dir(root), rel)
@@ -104,7 +131,13 @@ def _cov_key(complexity_id):
 
 def combine(root, coverage_path, complexity_path):
     cov = json.load(open(coverage_path))
-    complexity = {r['id']: r['complexity'] for r in json.load(open(complexity_path))}
+    raw_complexity = json.load(open(complexity_path))
+    if isinstance(raw_complexity, dict):
+        # cfml-complexity.py --baseline write emits {id: complexity}
+        complexity = {rid: int(comp) for rid, comp in raw_complexity.items()}
+    else:
+        # --json emits a list of rows with id/complexity
+        complexity = {r['id']: int(r['complexity']) for r in raw_complexity}
     # cov keys are "<rel>:<fn>"; complexity ids are "<rel>:<line>:<fn>"
     rows = []
     for cid, comp in complexity.items():
