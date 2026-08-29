@@ -20,15 +20,20 @@
 		numeric timeout = 30
 	) {
 		local.rv = $invoke(method = arguments.condition, invokeArgs = arguments.conditionArgs);
-		if (IsBoolean(local.rv) AND NOT local.rv) {
+		if (StructKeyExists(local, "rv") AND IsBoolean(local.rv) AND NOT local.rv) {
 			lock timeout="#arguments.timeout#" name="#arguments.name#" {
 				local.rv = $invoke(method = arguments.condition, invokeArgs = arguments.conditionArgs);
-				if (IsBoolean(local.rv) AND NOT local.rv) {
+				if (StructKeyExists(local, "rv") AND IsBoolean(local.rv) AND NOT local.rv) {
 					local.rv = $invoke(method = arguments.execute, invokeArgs = arguments.executeArgs)
 				}
 			}
 		}
-		return local.rv;
+		// Guard the read: on RustCFML assigning a void return DELETES the
+		// key (null-assignment semantics), where JVM engines materialize a
+		// null value. StructKeyExists keeps both engines uniform.
+		if (StructKeyExists(local, "rv")) {
+			return local.rv;
+		}
 	}
 
 
@@ -50,7 +55,19 @@
 		} else {
 			arguments.executeArgs.$locked = true;
 			lock name="#arguments.name#" type="#arguments.type#" timeout="#arguments.timeout#" {
-				local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
+				// Call the method on `this` directly instead of through
+				// $invoke()/cfinvoke. The direct call is byte-equivalent on
+				// every engine but skips the cfinvoke returnVariable
+				// writeback, which RustCFML cannot resolve when the invoked
+				// method returns no value (it reports "Variable 'rv' is
+				// undefined" after a full test-suite run).
+				if (StructKeyExists(variables, arguments.execute)) {
+					local.lockedFn = this[arguments.execute];
+					local.rv = local.lockedFn(argumentCollection = "#arguments.executeArgs#");
+				} else {
+					// onMissingMethod fallback, matching $invoke's behavior.
+					local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
+				}
 			}
 		}
 		if (StructKeyExists(local, "rv")) {

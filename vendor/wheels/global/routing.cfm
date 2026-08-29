@@ -176,7 +176,7 @@
 			local.params = ListToArray(local.paramsArray[local.i], "=");
 			local.name = local.params[1];
 			if (arguments.encode && $get("encodeURLs")) {
-				local.name = EncodeForURL($canonicalize(local.name));
+				local.name = $encodeUrlParam(local.name);
 				if (arguments.$encodeForHtmlAttribute) {
 					local.name = EncodeForHTMLAttribute(local.name);
 				}
@@ -186,7 +186,7 @@
 			if (ArrayLen(local.params) == 2) {
 				local.value = local.params[2];
 				if (arguments.encode && $get("encodeURLs")) {
-					local.value = EncodeForURL($canonicalize(local.value));
+					local.value = $encodeUrlParam(local.value);
 					if (arguments.$encodeForHtmlAttribute) {
 						local.value = EncodeForHTMLAttribute(local.value);
 					}
@@ -424,7 +424,7 @@
 
 			// Any value we find from above, URL encode it here.
 			if (arguments.args.encode && $get("encodeURLs")) {
-				local.value = EncodeForURL($canonicalize(local.value));
+				local.value = $encodeUrlParam(local.value);
 				if (arguments.args.$encodeForHtmlAttribute) {
 					local.value = EncodeForHTMLAttribute(local.value);
 				}

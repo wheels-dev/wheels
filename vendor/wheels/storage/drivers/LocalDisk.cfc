@@ -191,11 +191,32 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	}
 
 	private string function $uriEncode(required string value) {
-		local.encoded = CreateObject("java", "java.net.URLEncoder").encode(ToString(arguments.value), "UTF-8");
-		local.encoded = Replace(local.encoded, "+", "%20", "all");
-		local.encoded = Replace(local.encoded, "*", "%2A", "all");
-		local.encoded = Replace(local.encoded, "%7E", "~", "all");
-		return local.encoded;
+		// RFC3986 percent-encoding over UTF-8 bytes. Built on BinaryEncode/hex
+		// instead of java.net.URLEncoder so it is byte-identical on engines
+		// without a JVM (RustCFML): unreserved bytes (A-Z a-z 0-9 - _ . ~)
+		// pass through, everything else becomes %XX with uppercase hex —
+		// the canonical form AWS SigV4 and the public-url specs expect.
+		// Byte extraction via base64 round-trip: CharsetEncode() returns a
+		// Java byte[] (not a CFML binary) on some Lucee 7.0.0.x builds, which
+		// BinaryEncode cannot consume. ToBase64 + BinaryDecode produces a
+		// proper binary on every engine for the same UTF-8 bytes.
+		local.bin = BinaryDecode(ToBase64(ToString(arguments.value), "utf-8"), "base64");
+		local.hex = UCase(BinaryEncode(local.bin, "hex"));
+		local.out = "";
+		for (local.i = 1; local.i < Len(local.hex); local.i += 2) {
+			local.byteVal = InputBaseN(Mid(local.hex, local.i, 2), 16);
+			if (
+				(local.byteVal >= 48 && local.byteVal <= 57)
+				|| (local.byteVal >= 65 && local.byteVal <= 90)
+				|| (local.byteVal >= 97 && local.byteVal <= 122)
+				|| local.byteVal == 45 || local.byteVal == 46 || local.byteVal == 95 || local.byteVal == 126
+			) {
+				local.out &= Chr(local.byteVal);
+			} else {
+				local.out &= "%" & Mid(local.hex, local.i, 2);
+			}
+		}
+		return local.out;
 	}
 
 	private string function $uriEncodePath(required string key) {

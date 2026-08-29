@@ -195,21 +195,27 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 		try {
 			local.canonicalRoot = CreateObject("java", "java.io.File").init(ExpandPath("/")).getCanonicalPath();
-			// Treat the requested path as web-root-relative. The old raw
-			// ExpandPath() resolved bare relative paths against the current
-			// template directory and let `../` climb out of the application
-			// entirely; java.io.File(parent, child) keeps absolute child
-			// paths contained too, and getCanonicalPath() collapses any
-			// remaining traversal before the confinement check below.
-			local.canonicalTarget = CreateObject("java", "java.io.File").init(local.canonicalRoot, arguments.output).getCanonicalPath();
+			local.separator = CreateObject("java", "java.io.File").separator;
+			// Join in CFML instead of the java.io.File(parent, child)
+			// constructor: RustCFML's java.io.File shim ignores the child
+			// argument, so the two-argument form resolves to the parent
+			// alone. Joining first keeps an absolute child contained the
+			// same way java.io.File(parent, child) does on JVM engines.
+			local.canonicalTarget = CreateObject("java", "java.io.File").init(local.canonicalRoot & local.separator & arguments.output).getCanonicalPath();
 		} catch (any e) {
 			return "";
 		}
-		local.separator = CreateObject("java", "java.io.File").separator;
-		if (Right(local.canonicalRoot, 1) != local.separator) {
-			local.canonicalRoot &= local.separator;
+		// Lexically collapse "." and ".." for the confinement check so the
+		// prefix comparison below also holds on engines whose java.io.File
+		// shim does not canonicalize traversal (RustCFML). Both sides are
+		// normalized the same way, so the check is equivalent on JVM engines
+		// (whose getCanonicalPath() already produced canonical paths).
+		local.normalizedTarget = $normalizeZipPath(Replace(local.canonicalTarget, "\", "/", "all"));
+		local.normalizedRoot = $normalizeZipPath(Replace(local.canonicalRoot, "\", "/", "all"));
+		if (Right(local.normalizedRoot, 1) != "/") {
+			local.normalizedRoot &= "/";
 		}
-		if (CompareNoCase(Left(local.canonicalTarget, Len(local.canonicalRoot)), local.canonicalRoot) != 0) {
+		if (CompareNoCase(Left(local.normalizedTarget, Len(local.normalizedRoot)), local.normalizedRoot) != 0) {
 			return "";
 		}
 		return local.canonicalTarget;

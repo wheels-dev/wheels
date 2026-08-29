@@ -1,9 +1,10 @@
 /**
  * Core in-memory pub/sub engine for Wheels SSE channels.
  *
- * Application-scoped singleton managing channel subscriptions with
- * ConcurrentHashMap for thread safety. Used by the global publish()
- * function and the subscribeToChannel() controller mixin.
+ * Application-scoped singleton managing channel subscriptions. Stores are
+ * plain CFML structs and arrays guarded by a named lock, so the engine is
+ * engine-agnostic (no JVM classes) and runs on RustCFML too. Used by the
+ * global publish() function and the subscribeToChannel() controller mixin.
  *
  * Usage:
  *   // Subscribe (typically done by subscribeToChannel controller mixin)
@@ -21,13 +22,15 @@
 component {
 
 	/**
-	 * Initialize the channel engine with ConcurrentHashMap stores.
+	 * Initialize the channel engine with plain CFML stores.
 	 */
 	public Channel function init() {
-		// channel -> ConcurrentHashMap of subscriberId -> {callback, createdAt}
-		variables.channels = CreateObject("java", "java.util.concurrent.ConcurrentHashMap").init();
-		variables.eventLog = CreateObject("java", "java.util.concurrent.ConcurrentHashMap").init();
+		// channel -> struct of subscriberId -> {callback, createdAt}
+		variables.channels = {};
+		// channel -> array of retained event payloads (capped tail)
+		variables.eventLog = {};
 		variables.maxEventLogSize = 100;
+		variables.lockName = "wheelsChannelEngine";
 		return this;
 	}
 
@@ -51,17 +54,15 @@ component {
 		string id = CreateUUID()
 	) {
 		$assertChannelName(arguments.channel);
-		// Ensure channel map exists (putIfAbsent is atomic)
-		variables.channels.putIfAbsent(
-			arguments.channel,
-			CreateObject("java", "java.util.concurrent.ConcurrentHashMap").init()
-		);
-
-		local.subscribers = variables.channels.get(arguments.channel);
-		local.subscribers.put(arguments.id, {
-			callback: arguments.callback,
-			createdAt: Now()
-		});
+		lock name="#variables.lockName#" type="exclusive" timeout="10" {
+			if (!StructKeyExists(variables.channels, arguments.channel)) {
+				variables.channels[arguments.channel] = {};
+			}
+			variables.channels[arguments.channel][arguments.id] = {
+				callback: arguments.callback,
+				createdAt: Now()
+			};
+		}
 
 		return arguments.id;
 	}
@@ -91,25 +92,38 @@ component {
 			data: arguments.data,
 			timestamp: local.timestamp
 		};
-		$appendEventLog(arguments.channel, local.eventPayload);
 
-		local.subscriberCount = 0;
-		local.subscribers = variables.channels.get(arguments.channel);
+		// Snapshot the callbacks under the lock; invoke them AFTER the lock
+		// is released so a callback that publishes or subscribes again cannot
+		// deadlock on a non-reentrant exclusive named lock.
+		local.callbacks = [];
+		lock name="#variables.lockName#" type="exclusive" timeout="10" {
+			if (!StructKeyExists(variables.eventLog, arguments.channel)) {
+				variables.eventLog[arguments.channel] = [];
+			}
+			ArrayAppend(variables.eventLog[arguments.channel], local.eventPayload);
+			while (ArrayLen(variables.eventLog[arguments.channel]) > variables.maxEventLogSize) {
+				ArrayDeleteAt(variables.eventLog[arguments.channel], 1);
+			}
 
-		if (!IsNull(local.subscribers)) {
-			// Snapshot iteration — safe even if subscribers are added/removed during iteration
-			local.entries = local.subscribers.entrySet().toArray();
-			for (local.entry in local.entries) {
-				local.subscriberCount++;
-				try {
-					local.entry.getValue().callback(local.eventPayload);
-				} catch (any e) {
-					writeLog(
-						text="Channel subscriber error on [#arguments.channel#]: #e.message#",
-						type="error",
-						file="wheels_channels"
-					);
+			if (StructKeyExists(variables.channels, arguments.channel) && StructCount(variables.channels[arguments.channel])) {
+				local.subIds = ListToArray(StructKeyList(variables.channels[arguments.channel]));
+				for (local.subId in local.subIds) {
+					ArrayAppend(local.callbacks, variables.channels[arguments.channel][local.subId].callback);
 				}
+			}
+		}
+
+		local.subscriberCount = ArrayLen(local.callbacks);
+		for (local.callback in local.callbacks) {
+			try {
+				local.callback(local.eventPayload);
+			} catch (any e) {
+				writeLog(
+					text="Channel subscriber error on [#arguments.channel#]: #e.message#",
+					type="error",
+					file="wheels_channels"
+				);
 			}
 		}
 
@@ -130,26 +144,22 @@ component {
 	 * @return True if the subscriber was found and removed.
 	 */
 	public boolean function unsubscribe(required string channel, required string subscriberId) {
-		local.subscribers = variables.channels.get(arguments.channel);
-		if (IsNull(local.subscribers)) {
-			return false;
-		}
-		local.removed = local.subscribers.remove(arguments.subscriberId);
-
-		// Prune the per-channel map once its last subscriber leaves so per-entity
-		// channel names (e.g. "user.42") don't accumulate empty maps in this
-		// app-scoped singleton for the application lifetime. The atomic two-argument
-		// remove(key, value) only removes the entry if the channel still maps to this
-		// same subscriber map, so it never discards a replacement map created by a
-		// concurrent subscribe(). Known (tiny) race: a subscriber that lands in this
-		// exact map between the isEmpty() check and the remove() is orphaned and
-		// receives no events until its connection times out and the client
-		// re-subscribes.
-		if (local.subscribers.isEmpty()) {
-			variables.channels.remove(arguments.channel, local.subscribers);
+		local.removed = false;
+		lock name="#variables.lockName#" type="exclusive" timeout="10" {
+			if (StructKeyExists(variables.channels, arguments.channel)) {
+				local.removed = StructKeyExists(variables.channels[arguments.channel], arguments.subscriberId);
+				StructDelete(variables.channels[arguments.channel], arguments.subscriberId);
+				// Prune the per-channel struct once its last subscriber leaves
+				// so per-entity channel names (e.g. "user.42") don't accumulate
+				// empty structs in this app-scoped singleton for the application
+				// lifetime.
+				if (StructIsEmpty(variables.channels[arguments.channel])) {
+					StructDelete(variables.channels, arguments.channel);
+				}
+			}
 		}
 
-		return !IsNull(local.removed);
+		return local.removed;
 	}
 
 	/**
@@ -159,11 +169,13 @@ component {
 	 * @return The subscriber count.
 	 */
 	public numeric function subscriberCount(required string channel) {
-		local.subscribers = variables.channels.get(arguments.channel);
-		if (IsNull(local.subscribers)) {
-			return 0;
+		local.count = 0;
+		lock name="#variables.lockName#" type="exclusive" timeout="10" {
+			if (StructKeyExists(variables.channels, arguments.channel)) {
+				local.count = StructCount(variables.channels[arguments.channel]);
+			}
 		}
-		return local.subscribers.size();
+		return local.count;
 	}
 
 	/**
@@ -173,9 +185,11 @@ component {
 	 */
 	public array function getChannels() {
 		local.result = [];
-		local.keys = variables.channels.keySet().toArray();
-		for (local.key in local.keys) {
-			ArrayAppend(local.result, local.key);
+		lock name="#variables.lockName#" type="exclusive" timeout="10" {
+			local.channelNames = StructKeyList(variables.channels);
+			if (Len(local.channelNames)) {
+				local.result = ListToArray(local.channelNames);
+			}
 		}
 		return local.result;
 	}
@@ -186,8 +200,10 @@ component {
 	 * @channel The channel name to remove.
 	 */
 	public void function removeChannel(required string channel) {
-		variables.channels.remove(arguments.channel);
-		variables.eventLog.remove(arguments.channel);
+		lock name="#variables.lockName#" type="exclusive" timeout="10" {
+			StructDelete(variables.channels, arguments.channel);
+			StructDelete(variables.eventLog, arguments.channel);
+		}
 	}
 
 	/**
@@ -196,37 +212,25 @@ component {
 	 */
 	public array function replay(required string channel, required string lastEventId) {
 		$assertChannelName(arguments.channel);
-		local.out = [];
-		local.log = variables.eventLog.get(arguments.channel);
-		if (IsNull(local.log)) {
-			return local.out;
-		}
-		local.snapshot = local.log.toArray();
-		local.seen = false;
-		for (local.evt in local.snapshot) {
-			if (local.seen) {
-				ArrayAppend(local.out, local.evt);
+		local.rv = [];
+		lock name="#variables.lockName#" type="exclusive" timeout="10" {
+			if (StructKeyExists(variables.eventLog, arguments.channel)) {
+				local.out = [];
+				local.seen = false;
+				for (local.evt in variables.eventLog[arguments.channel]) {
+					if (local.seen) {
+						ArrayAppend(local.out, local.evt);
+					}
+					if (local.evt.id == arguments.lastEventId) {
+						local.seen = true;
+					}
+				}
+				// Return a copy, not the live retained array, so callers
+				// cannot corrupt the event log by mutating the result.
+				local.rv = local.seen ? local.out : Duplicate(variables.eventLog[arguments.channel]);
 			}
-			if (local.evt.id == arguments.lastEventId) {
-				local.seen = true;
-			}
 		}
-		if (!local.seen) {
-			return local.snapshot;
-		}
-		return local.out;
-	}
-
-	private void function $appendEventLog(required string channel, required struct eventPayload) {
-		variables.eventLog.putIfAbsent(
-			arguments.channel,
-			CreateObject("java", "java.util.concurrent.ConcurrentLinkedQueue").init()
-		);
-		local.log = variables.eventLog.get(arguments.channel);
-		local.log.offer(arguments.eventPayload);
-		while (local.log.size() > variables.maxEventLogSize) {
-			local.log.poll();
-		}
+		return local.rv;
 	}
 
 }

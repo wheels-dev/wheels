@@ -239,15 +239,32 @@ component output="false" {
 	}
 
 	/**
-	 * HMAC-SHA256 with a binary key, returning raw bytes. Uses javax.crypto.Mac
-	 * directly so successive rounds can key off the previous round's binary
-	 * output — the built-in HMac() takes only string keys.
+	 * HMAC-SHA256 with a binary key, returning raw bytes. Prefers
+	 * javax.crypto.Mac so successive rounds can key off the previous round's
+	 * binary output (the built-in Hmac() takes only string keys on JVM
+	 * engines). Falls back to the engine's native hmac(), which hashes binary
+	 * keys verbatim, when the Mac shim cannot produce binary output
+	 * (RustCFML's shim returns signed-byte arrays). The IsBinary check keeps
+	 * the fallback decision inside the function body: the binary return-type
+	 * coercion runs outside the body on every engine, so returning the
+	 * array directly would throw an uncatchable cast error on RustCFML.
 	 */
 	private binary function $hmac(required binary key, required string message) {
-		local.mac = CreateObject("java", "javax.crypto.Mac").getInstance("HmacSHA256");
-		local.keySpec = CreateObject("java", "javax.crypto.spec.SecretKeySpec").init(arguments.key, "HmacSHA256");
-		local.mac.init(local.keySpec);
-		return local.mac.doFinal(CharsetDecode(arguments.message, "UTF-8"));
+		try {
+			local.mac = CreateObject("java", "javax.crypto.Mac").getInstance("HmacSHA256");
+			local.keySpec = CreateObject("java", "javax.crypto.spec.SecretKeySpec").init(arguments.key, "HmacSHA256");
+			local.mac.init(local.keySpec);
+			local.raw = local.mac.doFinal(CharsetDecode(arguments.message, "UTF-8"));
+		} catch (any e) {
+			local.raw = "not-binary";
+		}
+		if (IsBinary(local.raw)) {
+			return local.raw;
+		}
+		// JVM-free engine (RustCFML): native hmac() takes the binary key
+		// verbatim and returns uppercase hex.
+		local.hex = Hmac(arguments.message, arguments.key, "HMACSHA256");
+		return BinaryDecode(local.hex, "hex");
 	}
 
 	/**
@@ -277,16 +294,33 @@ component output="false" {
 
 	/**
 	 * RFC3986 encode a single value (slashes ARE encoded). Built on
-	 * java.net.URLEncoder with the AWS-required fix-ups so it is byte-identical
-	 * across engines.
+	 * BinaryEncode/hex instead of java.net.URLEncoder so it is byte-identical
+	 * across engines, including JVM-free RustCFML: unreserved bytes
+	 * (A-Z a-z 0-9 - _ . ~) pass through, everything else becomes %XX with
+	 * uppercase hex — the canonical form AWS SigV4 requires.
 	 */
 	private string function $uriEncodeSegment(required any value) {
-		local.encoder = CreateObject("java", "java.net.URLEncoder");
-		local.encoded = local.encoder.encode(ToString(arguments.value), "UTF-8");
-		local.encoded = Replace(local.encoded, "+", "%20", "all");
-		local.encoded = Replace(local.encoded, "*", "%2A", "all");
-		local.encoded = Replace(local.encoded, "%7E", "~", "all");
-		return local.encoded;
+		// Byte extraction via base64 round-trip: CharsetEncode() returns a
+		// Java byte[] (not a CFML binary) on some Lucee 7.0.0.x builds, which
+		// BinaryEncode cannot consume. ToBase64 + BinaryDecode produces a
+		// proper binary on every engine for the same UTF-8 bytes.
+		local.bin = BinaryDecode(ToBase64(ToString(arguments.value), "utf-8"), "base64");
+		local.hex = UCase(BinaryEncode(local.bin, "hex"));
+		local.out = "";
+		for (local.i = 1; local.i < Len(local.hex); local.i += 2) {
+			local.byteVal = InputBaseN(Mid(local.hex, local.i, 2), 16);
+			if (
+				(local.byteVal >= 48 && local.byteVal <= 57)
+				|| (local.byteVal >= 65 && local.byteVal <= 90)
+				|| (local.byteVal >= 97 && local.byteVal <= 122)
+				|| local.byteVal == 45 || local.byteVal == 46 || local.byteVal == 95 || local.byteVal == 126
+			) {
+				local.out &= Chr(local.byteVal);
+			} else {
+				local.out &= "%" & Mid(local.hex, local.i, 2);
+			}
+		}
+		return local.out;
 	}
 
 	/**

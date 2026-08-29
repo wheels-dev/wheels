@@ -14,6 +14,18 @@ component {
 		string transaction = "commit",
 		string isolation = "read_committed"
 	) {
+		// Validate before any state changes: RustCFML (and permissive engines)
+		// accept unknown isolation levels instead of failing the begin tag.
+		// Fail here so an invalid level throws uniformly on every engine and
+		// the open-transaction marker is never set for a transaction that
+		// cannot begin (TransactionMarkerResetSpec).
+		if (!ListFindNoCase("read_uncommitted,read_committed,repeatable_read,serializable", arguments.isolation)) {
+			Throw(
+				type = "Wheels.InvalidTransactionIsolation",
+				message = "The transaction isolation level `#arguments.isolation#` is not supported.",
+				extendedInfo = "Valid isolation levels are read_uncommitted, read_committed, repeatable_read, and serializable."
+			);
+		}
 		local.methodArgs = $setProperties(
 			argumentCollection = arguments,
 			properties = {},
