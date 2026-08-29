@@ -1,0 +1,52 @@
+name: RustCFML
+
+# JVM-free RustCFML engine leg on pull requests and develop pushes.
+#
+# Runs the core suite against the engine pinned in tools/rustcfml/ENGINE_VERSION
+# and compares failures against tools/rustcfml/baseline.json: the leg fails only
+# on NEW failures (or a totals regression), so upstream engine bugs tracked in
+# the baseline do not block work. To bump the pin: update ENGINE_VERSION, run
+#   bash tools/rustcfml/run-suite.sh --write-baseline
+# on Linux, and commit both files together.
+
+on:
+  pull_request:
+    paths:
+      - "vendor/wheels/**"
+      - "app/**"
+      - "config/**"
+      - "cli/**"
+      - "tools/rustcfml/**"
+      - ".github/workflows/rustcfml-ci.yml"
+  push:
+    branches: [develop]
+    paths:
+      - "vendor/wheels/**"
+      - "app/**"
+      - "config/**"
+      - "cli/**"
+      - "tools/rustcfml/**"
+      - ".github/workflows/rustcfml-ci.yml"
+
+jobs:
+  rustcfml:
+    name: "RustCFML (Linux)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Read pinned engine version
+        id: engine
+        run: echo "version=$(tr -d '[:space:]' < tools/rustcfml/ENGINE_VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Cache engine binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/wheels-rustcfml
+          key: rustcfml-${{ steps.engine.outputs.version }}-linux-x86_64
+
+      - name: Run core suite against pinned RustCFML
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/rustcfml/run-suite.sh
