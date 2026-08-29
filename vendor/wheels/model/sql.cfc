@@ -1213,18 +1213,18 @@ component {
 						}
 						if (Find("'", local.processedValue) > 0 || Find(Chr(34), local.processedValue) > 0) {
 							local.cleanedValue = local.processedValue;
-							// Unquote token delimiters only: fold quote-comma-quote
-							// separators into plain commas first (IN-lists), then strip
-							// one pair of outer quotes. The previous `'([^']*)'`
-							// regex-strip ate inner apostrophes — "O'Brien" came back
-							// as "OBrien" with a leaked trailing quote.
-							local.cleanedValue = ReReplace(local.cleanedValue, "'\s*,\s*'", ",", "ALL");
-							local.doubleQuote = Chr(34);
-							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#\s*,\s*#local.doubleQuote#", ",", "ALL");
-							local.cleanedValue = ReReplace(local.cleanedValue, "^'", "", "ONE");
-							local.cleanedValue = ReReplace(local.cleanedValue, "'$", "", "ONE");
-							local.cleanedValue = ReReplace(local.cleanedValue, "^#local.doubleQuote#", "", "ONE");
-							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#$", "", "ONE");
+							// IN-lists keep their quoted items verbatim (byte-identical
+							// to the Lucee/Adobe ReplaceList path — the list branch of
+							// $queryParams unquotes via $cleanInStatementValue).
+							// Single values drop exactly one pair of outer quotes so
+							// inner apostrophes survive ("O'Brien" — the previous
+							// regex-strip ate them and seedOnce re-created rows).
+							if (!(Find("','", local.cleanedValue) > 0 || Find("#Chr(34)#,#Chr(34)#", local.cleanedValue) > 0)) {
+								local.cleanedValue = ReReplace(local.cleanedValue, "^'", "", "ONE");
+								local.cleanedValue = ReReplace(local.cleanedValue, "'$", "", "ONE");
+								local.cleanedValue = ReReplace(local.cleanedValue, "^#Chr(34)#", "", "ONE");
+								local.cleanedValue = ReReplace(local.cleanedValue, "#Chr(34)#$", "", "ONE");
+							}
 							ArrayAppend(local.originalValues, local.cleanedValue);
 						} else {
 							ArrayAppend(local.originalValues, local.processedValue);
