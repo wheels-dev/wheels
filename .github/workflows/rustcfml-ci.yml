@@ -10,14 +10,12 @@ name: RustCFML
 # on Linux, and commit both files together.
 
 on:
+  # No path filter on pull_request: the leg is a required branch-protection
+  # check, and a path-gated required check would block merges whenever the
+  # workflow skips. The pinned-engine suite is ~2 minutes, so running it on
+  # every PR to develop is cheap.
   pull_request:
-    paths:
-      - "vendor/wheels/**"
-      - "app/**"
-      - "config/**"
-      - "cli/**"
-      - "tools/rustcfml/**"
-      - ".github/workflows/rustcfml-ci.yml"
+    branches: [develop]
   push:
     branches: [develop]
     paths:
