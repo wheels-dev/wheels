@@ -38,6 +38,13 @@ TAG_DECISION = re.compile(r'<cf(if|elseif|loop|while|case|defaultcase|catch)\b',
 
 SCRIPT_FN = re.compile(r'\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)', re.S)
 TAG_FN = re.compile(r'<cffunction\b[^>]*?\bname\s*=\s*["\']?([A-Za-z_$][\w$]*)', re.I)
+# Guarded closure assignments used by include-idempotent templates:
+#   variables.$helper = function(args) { ... };
+# Adobe CF declares script/tag functions unconditionally even inside an <cfif>
+# guard (double-include throws "routine declared twice"), so includable
+# templates assign closures through variables instead. Count these exactly like
+# named script functions so template-level complexity stays out of the gate.
+CLOSURE_FN = re.compile(r'\bvariables\s*\.\s*\$?([A-Za-z_$][\w$]*)\s*=\s*function\s*\([^)]*\)', re.S)
 
 EXCLUDE_DIRS = {'tests', 'rocketunit_tests'}
 
@@ -85,6 +92,10 @@ def extract_functions(text):
     out = []
     for m in SCRIPT_FN.finditer(text):
         body = _brace_body(text, m.start())
+        if body is not None:
+            out.append((m.group(1), body, text.count('\n', 0, m.start()) + 1))
+    for m in CLOSURE_FN.finditer(text):
+        body = _brace_body(text, m.end())
         if body is not None:
             out.append((m.group(1), body, text.count('\n', 0, m.start()) + 1))
     for m in TAG_FN.finditer(text):

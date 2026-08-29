@@ -11,131 +11,139 @@ param name="request.wheels.params.version";
  * developer merely visits cannot auto-submit a command.
  */
 
-function $migratorEnforceLocalhost() {
-	// ── Security: localhost only ────────────────────
-	local.remoteAddr = cgi.REMOTE_ADDR;
-	local.isLocalhost = false;
-	try {
-		local.remoteInet = createObject("java", "java.net.InetAddress").getByName(local.remoteAddr);
-		local.isLocalhost = local.remoteInet.isLoopbackAddress();
-	} catch (any e) {
+if (!StructKeyExists(variables, "$migratorEnforceLocalhost")) {
+	variables.$migratorEnforceLocalhost = function() {
+		// ── Security: localhost only ────────────────────
+		local.remoteAddr = cgi.REMOTE_ADDR;
 		local.isLocalhost = false;
-	}
-	if (!local.isLocalhost) {
-		cfheader(statuscode=403);
-		cfcontent(type="text/plain", reset=true);
-		writeOutput("Migrator commands are restricted to localhost");
-		abort;
-	}
+		try {
+			local.remoteInet = createObject("java", "java.net.InetAddress").getByName(local.remoteAddr);
+			local.isLocalhost = local.remoteInet.isLoopbackAddress();
+		} catch (any e) {
+			local.isLocalhost = false;
+		}
+		if (!local.isLocalhost) {
+			cfheader(statuscode=403);
+			cfcontent(type="text/plain", reset=true);
+			writeOutput("Migrator commands are restricted to localhost");
+			abort;
+		}
+	};
 }
 
-function $migratorEnforceNoForwardedClients() {
-	// ── Security: X-Forwarded-For proxy bypass prevention ──
-	if (len(trim(cgi.HTTP_X_FORWARDED_FOR))) {
-		local.forwardedIps = listToArray(cgi.HTTP_X_FORWARDED_FOR);
-		for (local.ip in local.forwardedIps) {
-			try {
-				local.fwdInet = createObject("java", "java.net.InetAddress").getByName(trim(local.ip));
-				if (!local.fwdInet.isLoopbackAddress()) {
+if (!StructKeyExists(variables, "$migratorEnforceNoForwardedClients")) {
+	variables.$migratorEnforceNoForwardedClients = function() {
+		// ── Security: X-Forwarded-For proxy bypass prevention ──
+		if (len(trim(cgi.HTTP_X_FORWARDED_FOR))) {
+			local.forwardedIps = listToArray(cgi.HTTP_X_FORWARDED_FOR);
+			for (local.ip in local.forwardedIps) {
+				try {
+					local.fwdInet = createObject("java", "java.net.InetAddress").getByName(trim(local.ip));
+					if (!local.fwdInet.isLoopbackAddress()) {
+						cfheader(statuscode=403);
+						cfcontent(type="text/plain", reset=true);
+						writeOutput("Migrator commands are restricted to localhost");
+						abort;
+					}
+				} catch (any e) {
 					cfheader(statuscode=403);
 					cfcontent(type="text/plain", reset=true);
 					writeOutput("Migrator commands are restricted to localhost");
 					abort;
 				}
-			} catch (any e) {
-				cfheader(statuscode=403);
-				cfcontent(type="text/plain", reset=true);
-				writeOutput("Migrator commands are restricted to localhost");
-				abort;
 			}
 		}
-	}
+	};
 }
 
-function $migratorVerifyCsrfToken() {
-	// ── Security: anti-CSRF token via custom request header ──
-	// The token is generated when the migrator GUI renders (../views/migrator.cfm)
-	// and must round-trip in the X-Wheels-Csrf-Token header. Cross-site pages
-	// cannot set custom headers without a CORS preflight (which this endpoint
-	// never approves), so auto-submitted GET/form requests are blocked. Fails
-	// closed when no token has been issued yet.
-	local.suppliedCsrfToken = "";
-	local.requestHeaders = GetHTTPRequestData().headers;
-	if (structKeyExists(local.requestHeaders, "X-Wheels-Csrf-Token") && isSimpleValue(local.requestHeaders["X-Wheels-Csrf-Token"])) {
-		local.suppliedCsrfToken = local.requestHeaders["X-Wheels-Csrf-Token"];
-	}
-	local.csrfTokenValid = false;
-	if (
-		len(local.suppliedCsrfToken)
-		&& structKeyExists(application, "wheels")
-		&& structKeyExists(application.wheels, "$migratorCsrfToken")
-		&& len(application.wheels.$migratorCsrfToken)
-	) {
-		// Constant-time comparison to prevent timing attacks
-		local.inputBytes = Hash(local.suppliedCsrfToken, "SHA-256").getBytes("UTF-8");
-		local.expectedBytes = Hash(application.wheels.$migratorCsrfToken, "SHA-256").getBytes("UTF-8");
-		local.csrfTokenValid = CreateObject("java", "java.security.MessageDigest").isEqual(local.inputBytes, local.expectedBytes);
-	}
-	if (!local.csrfTokenValid) {
-		cfheader(statuscode=403);
-		cfcontent(type="text/plain", reset=true);
-		writeOutput("Missing or invalid migrator CSRF token. Open /wheels/migrator and use the GUI buttons.");
-		abort;
-	}
+if (!StructKeyExists(variables, "$migratorVerifyCsrfToken")) {
+	variables.$migratorVerifyCsrfToken = function() {
+		// ── Security: anti-CSRF token via custom request header ──
+		// The token is generated when the migrator GUI renders (../views/migrator.cfm)
+		// and must round-trip in the X-Wheels-Csrf-Token header. Cross-site pages
+		// cannot set custom headers without a CORS preflight (which this endpoint
+		// never approves), so auto-submitted GET/form requests are blocked. Fails
+		// closed when no token has been issued yet.
+		local.suppliedCsrfToken = "";
+		local.requestHeaders = GetHTTPRequestData().headers;
+		if (structKeyExists(local.requestHeaders, "X-Wheels-Csrf-Token") && isSimpleValue(local.requestHeaders["X-Wheels-Csrf-Token"])) {
+			local.suppliedCsrfToken = local.requestHeaders["X-Wheels-Csrf-Token"];
+		}
+		local.csrfTokenValid = false;
+		if (
+			len(local.suppliedCsrfToken)
+			&& structKeyExists(application, "wheels")
+			&& structKeyExists(application.wheels, "$migratorCsrfToken")
+			&& len(application.wheels.$migratorCsrfToken)
+		) {
+			// Constant-time comparison to prevent timing attacks
+			local.inputBytes = Hash(local.suppliedCsrfToken, "SHA-256").getBytes("UTF-8");
+			local.expectedBytes = Hash(application.wheels.$migratorCsrfToken, "SHA-256").getBytes("UTF-8");
+			local.csrfTokenValid = CreateObject("java", "java.security.MessageDigest").isEqual(local.inputBytes, local.expectedBytes);
+		}
+		if (!local.csrfTokenValid) {
+			cfheader(statuscode=403);
+			cfcontent(type="text/plain", reset=true);
+			writeOutput("Missing or invalid migrator CSRF token. Open /wheels/migrator and use the GUI buttons.");
+			abort;
+		}
+	};
 }
 
-function $migratorComputeResult() {
-	local.executeAction = StructKeyExists(request.wheels.params, "confirm") && request.wheels.params.confirm ? true : false;
-	local.missingMigFlag = StructKeyExists(request.wheels.params, "missingMigFlag") && request.wheels.params.missingMigFlag ? true : false;
+if (!StructKeyExists(variables, "$migratorComputeResult")) {
+	variables.$migratorComputeResult = function() {
+		local.executeAction = StructKeyExists(request.wheels.params, "confirm") && request.wheels.params.confirm ? true : false;
+		local.missingMigFlag = StructKeyExists(request.wheels.params, "missingMigFlag") && request.wheels.params.missingMigFlag ? true : false;
 
-	local.message = "";
-	local.result = "";
+		local.message = "";
+		local.result = "";
 
-	// To actually perform a destructive action, we need ?confirm=1 in the URL
-	// So POST to /wheels/migrator/migrateto/[VERSION] will request confirmation of that action
-	if (local.executeAction) {
-		local.migrator = application.wheels.migrator;
-		switch (request.wheels.params.command) {
-			case "migrateTo":
-				local.result = local.migrator.migrateTo(request.wheels.params.version, local.missingMigFlag);
-				break;
-			case "migrateTolatest":
-				local.result = local.migrator.migrateToLatest();
-				break;
-			case "undoMigration":
-				local.result = local.migrator.migrateTo(request.wheels.params.version);
-				break;
-			case "redoMigration":
-				local.result = local.migrator.redoMigration(request.wheels.params.version);
-				break;
-			case "migrateIndividual":
-				local.result = local.migrator.migrateIndividual(request.wheels.params.version);
-				break;
-			default:
+		// To actually perform a destructive action, we need ?confirm=1 in the URL
+		// So POST to /wheels/migrator/migrateto/[VERSION] will request confirmation of that action
+		if (local.executeAction) {
+			local.migrator = application.wheels.migrator;
+			switch (request.wheels.params.command) {
+				case "migrateTo":
+					local.result = local.migrator.migrateTo(request.wheels.params.version, local.missingMigFlag);
+					break;
+				case "migrateTolatest":
+					local.result = local.migrator.migrateToLatest();
+					break;
+				case "undoMigration":
+					local.result = local.migrator.migrateTo(request.wheels.params.version);
+					break;
+				case "redoMigration":
+					local.result = local.migrator.redoMigration(request.wheels.params.version);
+					break;
+				case "migrateIndividual":
+					local.result = local.migrator.migrateIndividual(request.wheels.params.version);
+					break;
+				default:
+			}
+		} else {
+			switch (request.wheels.params.command) {
+				case "migrateTo":
+					local.message = "This will migrate the database schema to #request.wheels.params.version#";
+					break;
+				case "migrateTolatest":
+					local.message = "This will migrate the database schema to the latest version";
+					break;
+				case "redoMigration":
+					local.message = "This will redo the database migration at #request.wheels.params.version#";
+					break;
+				case "migrateIndividual":
+					local.message = "This will run migration #request.wheels.params.version# individually (out of sequence)";
+					break;
+				default:
+			}
 		}
-	} else {
-		switch (request.wheels.params.command) {
-			case "migrateTo":
-				local.message = "This will migrate the database schema to #request.wheels.params.version#";
-				break;
-			case "migrateTolatest":
-				local.message = "This will migrate the database schema to the latest version";
-				break;
-			case "redoMigration":
-				local.message = "This will redo the database migration at #request.wheels.params.version#";
-				break;
-			case "migrateIndividual":
-				local.message = "This will run migration #request.wheels.params.version# individually (out of sequence)";
-				break;
-			default:
-		}
-	}
 
-	return {
-		executeAction: local.executeAction,
-		missingMigFlag: local.missingMigFlag,
-		message: local.message,
-		result: local.result
+		return {
+			executeAction: local.executeAction,
+			missingMigFlag: local.missingMigFlag,
+			message: local.message,
+			result: local.result
+		};
 	};
 }
 

@@ -180,12 +180,12 @@ component extends="wheels.WheelsTest" {
 				// 404'd (issue ##3241). ExpandPath("/wheels/Global.cfc") is
 				// the pre-split baseline.
 				var globalCfc = Replace(ExpandPath("/wheels/Global.cfc"), "\", "/", "all");
-				var frontController = Replace(
-					ExpandPath(GetDirectoryFromPath(globalCfc) & "../../public/index.cfm"),
-					"\",
-					"/",
-					"all"
-				);
+				// Derive the front controller from the resolved Global.cfc path
+				// instead of traversing "../../public/index.cfm": Adobe CF does
+				// not canonicalize ".." inside ExpandPath() (it mangles the
+				// result and FileExists turns false), while Lucee does — the
+				// string-replace form resolves identically on every engine.
+				var frontController = Replace(globalCfc, "vendor/wheels/Global.cfc", "public/index.cfm");
 				expect(FileExists(globalCfc)).toBeTrue();
 				expect(FileExists(frontController)).toBeTrue();
 				expect(ListLen(frontController, "/")).toBeLTE(

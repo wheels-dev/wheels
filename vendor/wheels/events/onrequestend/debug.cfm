@@ -1,62 +1,75 @@
 <cfscript>
-	function $debugBarSkipRequest(required struct reqHeaders) {
-		return (StructKeyExists(arguments.reqHeaders, "X-Requested-With") AND arguments.reqHeaders["X-Requested-With"] IS "XMLHttpRequest")
-			OR (StructKeyExists(arguments.reqHeaders, "HX-Request"))
-			OR (StructKeyExists(arguments.reqHeaders, "Turbo-Frame"))
-			OR (StructKeyExists(arguments.reqHeaders, "X-Fetch") AND arguments.reqHeaders["X-Fetch"] IS "true")
-			OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format));
+	// Template-scope helpers are guarded closure assignments, not function
+	// declarations: this file can be included more than once per request
+	// (onrequestend plus an in-process render), and Adobe CF declares script
+	// or tag functions unconditionally — a second include throws "routine
+	// declared twice". The guard makes every include idempotent.
+	if (!StructKeyExists(variables, "$debugBarSkipRequest")) {
+		variables.$debugBarSkipRequest = function(required struct reqHeaders) {
+			return (StructKeyExists(arguments.reqHeaders, "X-Requested-With") AND arguments.reqHeaders["X-Requested-With"] IS "XMLHttpRequest")
+				OR (StructKeyExists(arguments.reqHeaders, "HX-Request"))
+				OR (StructKeyExists(arguments.reqHeaders, "Turbo-Frame"))
+				OR (StructKeyExists(arguments.reqHeaders, "X-Fetch") AND arguments.reqHeaders["X-Fetch"] IS "true")
+				OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format));
+		};
 	}
 
-	function $debugEnvColor(required string envClass) {
-		if (arguments.envClass IS "production") {
-			return "##dc3545";
-		} else if (arguments.envClass IS "testing") {
-			return "##fd7e14";
-		} else if (arguments.envClass IS "maintenance") {
-			return "##ffc107";
-		}
-		return "##28a745";
+	if (!StructKeyExists(variables, "$debugEnvColor")) {
+		variables.$debugEnvColor = function(required string envClass) {
+			if (arguments.envClass IS "production") {
+				return "##dc3545";
+			} else if (arguments.envClass IS "testing") {
+				return "##fd7e14";
+			} else if (arguments.envClass IS "maintenance") {
+				return "##ffc107";
+			}
+			return "##28a745";
+		};
 	}
 
-	function $debugTimingBreakdown(required struct execution) {
-		local.timingBreakdown = [];
-		if (arguments.execution.total GT 0) {
-			local.keys = StructSort(arguments.execution, "numeric", "desc");
-			for (local.ti = 1; local.ti LTE ArrayLen(local.keys); local.ti++) {
-				local.tkey = local.keys[local.ti];
-				if (local.tkey IS NOT "total" AND arguments.execution[local.tkey] GT 0) {
-					ArrayAppend(
-						local.timingBreakdown,
-						{
-							name = LCase(local.tkey),
-							ms = arguments.execution[local.tkey],
-							pct = Round((arguments.execution[local.tkey] / arguments.execution.total) * 100)
-						}
-					);
+	if (!StructKeyExists(variables, "$debugTimingBreakdown")) {
+		variables.$debugTimingBreakdown = function(required struct execution) {
+			local.timingBreakdown = [];
+			if (arguments.execution.total GT 0) {
+				local.keys = StructSort(arguments.execution, "numeric", "desc");
+				for (local.ti = 1; local.ti LTE ArrayLen(local.keys); local.ti++) {
+					local.tkey = local.keys[local.ti];
+					if (local.tkey IS NOT "total" AND arguments.execution[local.tkey] GT 0) {
+						ArrayAppend(
+							local.timingBreakdown,
+							{
+								name = LCase(local.tkey),
+								ms = arguments.execution[local.tkey],
+								pct = Round((arguments.execution[local.tkey] / arguments.execution.total) * 100)
+							}
+						);
+					}
 				}
 			}
-		}
-		return local.timingBreakdown;
+			return local.timingBreakdown;
+		};
 	}
 
-	function $debugParamsList(required struct params) {
-		local.paramsList = [];
-		for (local.pi in arguments.params) {
-			if (local.pi IS NOT "fieldnames" AND local.pi IS NOT "route" AND local.pi IS NOT "controller" AND local.pi IS NOT "action" AND local.pi IS NOT "key") {
-				if (IsSimpleValue(arguments.params[local.pi])) {
-					ArrayAppend(
-						local.paramsList,
-						{name = LCase(local.pi), value = arguments.params[local.pi], type = "string"}
-					);
-				} else if (IsStruct(arguments.params[local.pi]) OR IsArray(arguments.params[local.pi])) {
-					ArrayAppend(
-						local.paramsList,
-						{name = LCase(local.pi), value = SerializeJSON(arguments.params[local.pi]), type = "json"}
-					);
+	if (!StructKeyExists(variables, "$debugParamsList")) {
+		variables.$debugParamsList = function(required struct params) {
+			local.paramsList = [];
+			for (local.pi in arguments.params) {
+				if (local.pi IS NOT "fieldnames" AND local.pi IS NOT "route" AND local.pi IS NOT "controller" AND local.pi IS NOT "action" AND local.pi IS NOT "key") {
+					if (IsSimpleValue(arguments.params[local.pi])) {
+						ArrayAppend(
+							local.paramsList,
+							{name = LCase(local.pi), value = arguments.params[local.pi], type = "string"}
+						);
+					} else if (IsStruct(arguments.params[local.pi]) OR IsArray(arguments.params[local.pi])) {
+						ArrayAppend(
+							local.paramsList,
+							{name = LCase(local.pi), value = SerializeJSON(arguments.params[local.pi]), type = "json"}
+						);
+					}
 				}
 			}
-		}
-		return local.paramsList;
+			return local.paramsList;
+		};
 	}
 </cfscript>
 <!--- Skip debug bar for AJAX, HTMX, Turbo, and fetch requests to avoid breaking partial responses --->

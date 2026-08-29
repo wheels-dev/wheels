@@ -326,8 +326,13 @@ component {
 
 	/**
 	 * True when a hasMany nested-properties struct key identifies a new
-	 * child: an explicit `_new` flag, a blank key, or a `new` / `new-*` /
-	 * `new_*` token from `key($returnTickCountWhenNew=true)`.
+	 * child: an explicit `_new` flag, a blank key, a `new` / `new-*` /
+	 * `new_*` token from `key($returnTickCountWhenNew=true)`, or a stale
+	 * GetTickCount-style numeric beyond the signed 32-bit range. The last
+	 * form can never be a persisted primary key stamped from a form, and it
+	 * must not reach findByKey — Adobe's cfqueryparam throws "Invalid data
+	 * ... for CFSQLTYPE CF_SQL_INTEGER" at bind time for out-of-range
+	 * integers (Lucee coerces silently, which is why only Adobe legs fail).
 	 */
 	public boolean function $isNewNestedCollectionKey(required any collectionKey, required struct value) {
 		if (StructKeyExists(arguments.value, "_new") && IsBoolean(arguments.value["_new"]) && arguments.value["_new"]) {
@@ -338,6 +343,9 @@ component {
 			return true;
 		}
 		if (ReFindNoCase("^new([-_].*)?$", local.keyString)) {
+			return true;
+		}
+		if (IsNumeric(local.keyString) && Val(local.keyString) > 2147483647) {
 			return true;
 		}
 		return false;
