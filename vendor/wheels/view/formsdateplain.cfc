@@ -463,8 +463,12 @@ component {
 				break;
 		}
 
-		// Handle February.
-		if (local.month == 2 && ((!IsLeapYear(local.year) && local.day > 29) || (IsLeapYear(local.year) && local.day > 28))) {
+		// Handle February: clamp the day to the month's actual maximum
+		// (29 in a leap year, 28 otherwise). The previous thresholds were
+		// inverted — day 29 in a non-leap February slipped through to
+		// CreateDate(2026, 2, 29), an invalid date that Lucee/Adobe silently
+		// roll over to March 1 but RustCFML's strict datetime cast rejects.
+		if (local.month == 2 && ((!IsLeapYear(local.year) && local.day > 28) || (IsLeapYear(local.year) && local.day > 29))) {
 			if (IsLeapYear(local.year)) {
 				local.day = 29;
 			} else {

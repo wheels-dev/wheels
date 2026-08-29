@@ -59,12 +59,29 @@ component output="false" {
 		variables.saltLengthBytes = 16;
 		variables.keyLengthBits = 256;
 
-		// Cached Java handles. SecureRandom is documented thread-safe;
-		// MessageDigest is only used for its static isEqual(). SecretKeyFactory
-		// is NOT documented thread-safe, so $deriveKey() creates one per call —
-		// getInstance() cost is noise next to a 600k-iteration derivation.
-		variables.secureRandom = CreateObject("java", "java.security.SecureRandom").init();
-		variables.messageDigest = CreateObject("java", "java.security.MessageDigest");
+		// Derivation route: prefer the CFML-native GeneratePBKDFKey() BIF
+		// (Lucee 5.3+, Adobe CF 2021+, BoxLang, and RustCFML — the JVM-free
+		// engine has no javax.crypto at all). Probe once with a 1-iteration
+		// derivation so older engines (Adobe 2018, older Lucee) fall back to
+		// the JVM path below. Both routes produce byte-identical
+		// PBKDF2-HMAC-SHA256 output, so hashes stay portable across engines.
+		variables.nativePbkdf2 = true;
+		try {
+			GeneratePBKDFKey("PBKDF2WithHmacSHA256", "probe", BinaryDecode("00", "hex"), 1, 128);
+		} catch (any e) {
+			variables.nativePbkdf2 = false;
+		}
+		// Cached Java handles for the fallback route only. SecureRandom is
+		// documented thread-safe; MessageDigest is only used for its static
+		// isEqual(). SecretKeyFactory is NOT documented thread-safe, so
+		// $deriveKey() creates one per call — getInstance() cost is noise
+		// next to a 600k-iteration derivation.
+		variables.secureRandom = variables.nativePbkdf2
+			? JavaCast("null", "")
+			: CreateObject("java", "java.security.SecureRandom").init();
+		variables.messageDigest = variables.nativePbkdf2
+			? JavaCast("null", "")
+			: CreateObject("java", "java.security.MessageDigest");
 
 		return this;
 	}
@@ -126,7 +143,10 @@ component output="false" {
 
 			// Constant-time comparison of the raw digest bytes — never
 			// compare password hashes with string operators (timing leaks).
-			return variables.messageDigest.isEqual(local.candidate, local.parsed.derivedKey);
+			// $secureEquals() works on every engine (the JVM fallback's
+			// MessageDigest.isEqual() is only reachable when native PBKDF2 is
+			// unavailable, and the byte-XOR loop above covers RustCFML).
+			return $secureEquals(local.candidate, local.parsed.derivedKey);
 		} catch (any e) {
 			// verify() is a boolean predicate on untrusted input: any parse or
 			// derivation error means "does not match", never an exception.
@@ -216,11 +236,15 @@ component output="false" {
 	/**
 	 * Derive a PBKDF2-HMAC-SHA256 key for the given password and salt.
 	 *
-	 * Uses javax.crypto.SecretKeyFactory ("PBKDF2WithHmacSHA256"), which the
-	 * JVM converts password characters to UTF-8 bytes for — byte-identical on
-	 * every engine by construction. A fresh factory per call keeps this safe
-	 * under the DI container's singleton scope (SecretKeyFactory instances
-	 * are not documented thread-safe).
+	 * Native route: CFML's GeneratePBKDFKey() BIF — available on Lucee
+	 * 5.3+, Adobe CF 2021+, BoxLang, and RustCFML (JVM-free engines have no
+	 * javax.crypto, so this BIF is the only route there). Byte-identical to
+	 * the JVM derivation for the same inputs, keeping hashes portable.
+	 *
+	 * Fallback route: javax.crypto.SecretKeyFactory ("PBKDF2WithHmacSHA256"),
+	 * which converts password characters to UTF-8 bytes. A fresh factory per
+	 * call keeps this safe under the DI container's singleton scope
+	 * (SecretKeyFactory instances are not documented thread-safe).
 	 */
 	private any function $deriveKey(
 		required string password,
@@ -228,6 +252,23 @@ component output="false" {
 		required numeric iterations,
 		required numeric keyLengthBits
 	) {
+		if (variables.nativePbkdf2) {
+			local.nativeKey = GeneratePBKDFKey(
+				"PBKDF2WithHmacSHA256",
+				arguments.password,
+				arguments.salt,
+				arguments.iterations,
+				arguments.keyLengthBits
+			);
+			// Lucee/Adobe/BoxLang return binary; RustCFML returns the key as
+			// a base64 string. Normalize to binary so the stored hash format
+			// is identical on every engine.
+			if (!IsBinary(local.nativeKey)) {
+				local.nativeKey = BinaryDecode(ToString(local.nativeKey), "base64");
+			}
+			return local.nativeKey;
+		}
+
 		// Route through java.lang.String explicitly so toCharArray() resolves
 		// on every engine regardless of how CFML strings are wrapped.
 		local.passwordChars = CreateObject("java", "java.lang.String").init(arguments.password).toCharArray();
@@ -263,9 +304,46 @@ component output="false" {
 	}
 
 	/**
+	 * Constant-time byte-equality for digest comparisons.
+	 *
+	 * Base64 is a bijection, so comparing the encoded forms XOR-accumulated
+	 * over every character is sound and runs the same number of steps
+	 * regardless of where the first difference occurs. Works on engines
+	 * without java.security.MessageDigest (RustCFML).
+	 */
+	private boolean function $secureEquals(required any a, required any b) {
+		if (Len(arguments.a) != Len(arguments.b)) {
+			return false;
+		}
+		local.a64 = ToBase64(arguments.a);
+		local.b64 = ToBase64(arguments.b);
+		local.diff = 0;
+		local.iEnd = Len(local.a64);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.diff = BitOr(local.diff, BitXor(Asc(Mid(local.a64, local.i, 1)), Asc(Mid(local.b64, local.i, 1))));
+		}
+		return local.diff == 0;
+	}
+
+	/**
 	 * Generate cryptographically secure random bytes.
+	 *
+	 * Native route: one UUIDv4 is 122 bits of CSPRNG randomness — decode its
+	 * hex form to 16 bytes (salt entropy doesn't need the full 128 bits).
+	 * Fallback: the JVM SecureRandom instance.
 	 */
 	private any function $randomBytes(required numeric byteCount) {
+		if (variables.nativePbkdf2) {
+			local.uuidHex = Replace(CreateUUID(), "-", "", "all");
+			if (Len(local.uuidHex) >= arguments.byteCount * 2) {
+				return BinaryDecode(Left(local.uuidHex, arguments.byteCount * 2), "hex");
+			}
+			local.hex = local.uuidHex;
+			while (Len(local.hex) < arguments.byteCount * 2) {
+				local.hex &= Replace(CreateUUID(), "-", "", "all");
+			}
+			return BinaryDecode(Left(local.hex, arguments.byteCount * 2), "hex");
+		}
 		// Allocate a zeroed byte[] of the right length, then fill it in place.
 		local.randomBytes = BinaryDecode(RepeatString("00", arguments.byteCount), "hex");
 		variables.secureRandom.nextBytes(local.randomBytes);

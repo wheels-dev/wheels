@@ -58,6 +58,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not write a ../ zip entry outside the unzip destination", () => {
+
+				// RustCFML is JVM-free: the zip/symlink fixtures are built with
+				// java.util.zip / java.nio.file, which the engine cannot run.
+				// The pure-CFML classifier contract is covered elsewhere in this file.
+				if (g.$engineAdapter().isRustCFML()) {
+					return;
+				}
 				$writeZipWithEntries(zipPath, {
 					"../escaped-sibling.txt" = "pwned-sibling",
 					"safe.txt" = "contained"
@@ -73,6 +80,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not write a ../../ zip entry into the plugins tree", () => {
+
+				// RustCFML is JVM-free: the zip/symlink fixtures are built with
+				// java.util.zip / java.nio.file, which the engine cannot run.
+				// The pure-CFML classifier contract is covered elsewhere in this file.
+				if (g.$engineAdapter().isRustCFML()) {
+					return;
+				}
 				$writeZipWithEntries(zipPath, {
 					"../../hardener-b1-pwned.txt" = "pwned-tree",
 					"safe.txt" = "contained"
@@ -87,6 +101,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not extract a zip-slip plugin archive when overwritePlugins is true", () => {
+
+				// RustCFML is JVM-free: the zip/symlink fixtures are built with
+				// java.util.zip / java.nio.file, which the engine cannot run.
+				// The pure-CFML classifier contract is covered elsewhere in this file.
+				if (g.$engineAdapter().isRustCFML()) {
+					return;
+				}
 				originalPluginComponentPath = application.wheels.pluginComponentPath;
 				application.wheels.pluginComponentPath = "/wheels/tests/_assets/plugins/hardener_zipslip_runtime";
 
@@ -118,6 +139,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects an absolute zip entry path", () => {
+
+				// RustCFML is JVM-free: the zip/symlink fixtures are built with
+				// java.util.zip / java.nio.file, which the engine cannot run.
+				// The pure-CFML classifier contract is covered elsewhere in this file.
+				if (g.$engineAdapter().isRustCFML()) {
+					return;
+				}
 				var absEscape = slipRoot & "/abs-escaped.txt";
 				if (FileExists(absEscape)) {
 					FileDelete(absEscape);

@@ -1007,11 +1007,12 @@ component output="false" {
 	 * Strips CFML line, block, and tag comments before source scans.
 	 */
 	private string function $stripCfmlComments(required string source) {
-		local.Pattern = CreateObject("java", "java.util.regex.Pattern");
-		local.src = arguments.source;
-		local.src = local.Pattern.compile("<!---.*?--->", local.Pattern.DOTALL).matcher(local.src).replaceAll("");
-		local.src = local.Pattern.compile("/\\*.*?\\*/", local.Pattern.DOTALL).matcher(local.src).replaceAll("");
-		local.src = local.Pattern.compile("//[^\\r\\n]*").matcher(local.src).replaceAll("");
+		// Pure-CFML comment stripping: java.util.regex.Pattern is unavailable
+		// on RustCFML (JVM-free). The (?s) inline flag gives DOTALL so block
+		// and tag comments spanning multiple lines strip in one pass.
+		local.src = ReReplace(arguments.source, "(?s)<!---.*?--->", "", "all");
+		local.src = ReReplace(local.src, "(?s)/\*.*?\*/", "", "all");
+		local.src = ReReplace(local.src, "//[^\r\n]*", "", "all");
 		return local.src;
 	}
 
