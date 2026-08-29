@@ -2,13 +2,15 @@
 // Check for JSON format request
 param name="request.wheels.params.format" default="html";
 
-if(!application.wheels.enablePluginsComponent)
-	throw(type="wheels.plugins", message="The Wheels Plugin component is disabled...");
+function $pluginsEnsureEnabled() {
+	if(!application.wheels.enablePluginsComponent)
+		throw(type="wheels.plugins", message="The Wheels Plugin component is disabled...");
+}
 
-loadedPlugins = application.wheels.plugins;
+function $pluginsRenderJson() {
+	loadedPlugins = application.wheels.plugins;
 
-// If JSON format is requested, return JSON response
-if (request.wheels.params.format == "json") {
+	// If JSON format is requested, return JSON response
 	local.pluginsData = {
 		"version": application.wheels.version,
 		"timestamp": now(),
@@ -64,6 +66,11 @@ if (request.wheels.params.format == "json") {
 	abort;
 }
 
+$pluginsEnsureEnabled();
+
+if (request.wheels.params.format == "json") {
+	$pluginsRenderJson();
+}
 </cfscript>
 <cfinclude template="../layout/_header.cfm">
 <cfoutput>

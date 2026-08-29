@@ -1,10 +1,67 @@
+<cfscript>
+	function $debugBarSkipRequest(required struct reqHeaders) {
+		return (StructKeyExists(arguments.reqHeaders, "X-Requested-With") AND arguments.reqHeaders["X-Requested-With"] IS "XMLHttpRequest")
+			OR (StructKeyExists(arguments.reqHeaders, "HX-Request"))
+			OR (StructKeyExists(arguments.reqHeaders, "Turbo-Frame"))
+			OR (StructKeyExists(arguments.reqHeaders, "X-Fetch") AND arguments.reqHeaders["X-Fetch"] IS "true")
+			OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format));
+	}
+
+	function $debugEnvColor(required string envClass) {
+		if (arguments.envClass IS "production") {
+			return "##dc3545";
+		} else if (arguments.envClass IS "testing") {
+			return "##fd7e14";
+		} else if (arguments.envClass IS "maintenance") {
+			return "##ffc107";
+		}
+		return "##28a745";
+	}
+
+	function $debugTimingBreakdown(required struct execution) {
+		local.timingBreakdown = [];
+		if (arguments.execution.total GT 0) {
+			local.keys = StructSort(arguments.execution, "numeric", "desc");
+			for (local.ti = 1; local.ti LTE ArrayLen(local.keys); local.ti++) {
+				local.tkey = local.keys[local.ti];
+				if (local.tkey IS NOT "total" AND arguments.execution[local.tkey] GT 0) {
+					ArrayAppend(
+						local.timingBreakdown,
+						{
+							name = LCase(local.tkey),
+							ms = arguments.execution[local.tkey],
+							pct = Round((arguments.execution[local.tkey] / arguments.execution.total) * 100)
+						}
+					);
+				}
+			}
+		}
+		return local.timingBreakdown;
+	}
+
+	function $debugParamsList(required struct params) {
+		local.paramsList = [];
+		for (local.pi in arguments.params) {
+			if (local.pi IS NOT "fieldnames" AND local.pi IS NOT "route" AND local.pi IS NOT "controller" AND local.pi IS NOT "action" AND local.pi IS NOT "key") {
+				if (IsSimpleValue(arguments.params[local.pi])) {
+					ArrayAppend(
+						local.paramsList,
+						{name = LCase(local.pi), value = arguments.params[local.pi], type = "string"}
+					);
+				} else if (IsStruct(arguments.params[local.pi]) OR IsArray(arguments.params[local.pi])) {
+					ArrayAppend(
+						local.paramsList,
+						{name = LCase(local.pi), value = SerializeJSON(arguments.params[local.pi]), type = "json"}
+					);
+				}
+			}
+		}
+		return local.paramsList;
+	}
+</cfscript>
 <!--- Skip debug bar for AJAX, HTMX, Turbo, and fetch requests to avoid breaking partial responses --->
 <cfset local.reqHeaders = GetHTTPRequestData().headers>
-<cfif (StructKeyExists(local.reqHeaders, "X-Requested-With") AND local.reqHeaders["X-Requested-With"] IS "XMLHttpRequest")
-OR (StructKeyExists(local.reqHeaders, "HX-Request"))
-OR (StructKeyExists(local.reqHeaders, "Turbo-Frame"))
-OR (StructKeyExists(local.reqHeaders, "X-Fetch") AND local.reqHeaders["X-Fetch"] IS "true")
-OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format))>
+<cfif $debugBarSkipRequest(local.reqHeaders)>
 	<cfexit>
 </cfif>
 <!---
@@ -26,50 +83,11 @@ OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.fo
 	GetDirectoryFromPath(GetBaseTemplatePath()) & ".git/HEAD"
 ) : "">
 <cfset local.envClass = LCase($get("environment"))>
-<cfif local.envClass IS "production">
-	<cfset local.envColor = "##dc3545">
-	<cfelseif local.envClass IS "testing">
-	<cfset local.envColor = "##fd7e14">
-	<cfelseif local.envClass IS "maintenance">
-	<cfset local.envColor = "##ffc107">
-	<cfelse>
-	<cfset local.envColor = "##28a745">
-</cfif>
+<cfset local.envColor = $debugEnvColor(local.envClass)>
 <!--- Collect execution timing breakdown --->
-<cfset local.timingBreakdown = []>
-<cfif request.wheels.execution.total GT 0>
-	<cfset local.keys = StructSort(request.wheels.execution, "numeric", "desc")>
-	<cfloop from="1" to="#ArrayLen(local.keys)#" index="local.ti">
-		<cfset local.tkey = local.keys[local.ti]>
-		<cfif local.tkey IS NOT "total" AND request.wheels.execution[local.tkey] GT 0>
-			<cfset ArrayAppend(
-				local.timingBreakdown,
-				{
-					name = LCase(local.tkey),
-					ms = request.wheels.execution[local.tkey],
-					pct = Round((request.wheels.execution[local.tkey] / request.wheels.execution.total) * 100)
-				}
-			)>
-		</cfif>
-	</cfloop>
-</cfif>
+<cfset local.timingBreakdown = $debugTimingBreakdown(request.wheels.execution)>
 <!--- Collect parameters --->
-<cfset local.paramsList = []>
-<cfloop collection="#request.wheels.params#" item="local.pi">
-	<cfif local.pi IS NOT "fieldnames" AND local.pi IS NOT "route" AND local.pi IS NOT "controller" AND local.pi IS NOT "action" AND local.pi IS NOT "key">
-		<cfif IsSimpleValue(request.wheels.params[local.pi])>
-			<cfset ArrayAppend(
-				local.paramsList,
-				{name = LCase(local.pi), value = request.wheels.params[local.pi], type = "string"}
-			)>
-		<cfelseif IsStruct(request.wheels.params[local.pi]) OR IsArray(request.wheels.params[local.pi])>
-			<cfset ArrayAppend(
-				local.paramsList,
-				{name = LCase(local.pi), value = SerializeJSON(request.wheels.params[local.pi]), type = "json"}
-			)>
-		</cfif>
-	</cfif>
-</cfloop>
+<cfset local.paramsList = $debugParamsList(request.wheels.params)>
 <!--- Code complexity (static, cached in CodeComplexity.load; a failure degrades
 	to an empty summary so the debug bar never breaks the request). --->
 <cfset local.codeComplexityAnalyzer = CreateObject("component", "wheels.wheelstest.system.CodeComplexity")>
