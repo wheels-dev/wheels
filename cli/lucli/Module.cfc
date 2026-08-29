@@ -571,40 +571,32 @@ component extends="modules.BaseModule" {
 	 * `wheels generate MODEL User` behaving identically to `model`.
 	 */
 	private any function $generateDispatch(required string type, required array remaining) {
-		switch (lCase(arguments.type)) {
+		var canonical = $canonicalGeneratorType(lCase(arguments.type));
+
+		switch (canonical) {
 			case "app":
-			case "a":
 				// Delegate to wheels new — pass remaining args as __arguments
 				__arguments = arguments.remaining;
 				return new();
 			case "model":
-			case "m":
 				return generateModel(arguments.remaining);
 			case "controller":
-			case "c":
 				return generateController(arguments.remaining);
 			case "view":
-			case "v":
 				return generateView(arguments.remaining);
 			case "migration":
-			case "migrate":
 				return generateMigration(arguments.remaining);
 			case "scaffold":
-			case "s":
 				return generateScaffold(arguments.remaining);
 			case "api-resource":
-			case "api":
 				return generateApiResource(arguments.remaining);
 			case "route":
-			case "r":
 				return generateRoute(arguments.remaining);
 			case "test":
 				return generateTest(arguments.remaining);
 			case "property":
-			case "prop":
 				return generateProperty(arguments.remaining);
 			case "helper":
-			case "h":
 				return generateHelper(arguments.remaining);
 			case "policy":
 				return generatePolicy(arguments.remaining);
@@ -619,6 +611,27 @@ component extends="modules.BaseModule" {
 				out("Run 'wheels generate' for available types.");
 				// throw maps to non-zero exit; return "" would silently succeed.
 				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #arguments.type#");
+		}
+	}
+
+	/**
+	 * Normalize a generator type (or its single-letter alias) to its canonical
+	 * handler key so $generateDispatch can switch over the 15 real generators
+	 * instead of 25 type+alias labels.
+	 */
+	private string function $canonicalGeneratorType(required string type) {
+		switch (arguments.type) {
+			case "a": return "app";
+			case "m": return "model";
+			case "c": return "controller";
+			case "v": return "view";
+			case "migrate": return "migration";
+			case "s": return "scaffold";
+			case "api": return "api-resource";
+			case "r": return "route";
+			case "prop": return "property";
+			case "h": return "helper";
+			default: return arguments.type;
 		}
 	}
 
@@ -2816,24 +2829,24 @@ component extends="modules.BaseModule" {
 			return $packagesHelp();
 		}
 
-		switch (sub) {
+		return $dispatchPackages(sub, positional, opts);
+	}
+
+	/**
+	 * Dispatch a `wheels packages` subcommand to the matching Packages CLI.
+	 * opts is mutated in place (by struct reference) so the caller's options
+	 * carry the resolved query/name/target before the CLI sees them.
+	 */
+	private any function $dispatchPackages(required string sub, required array positional, required struct opts) {
+		switch (arguments.sub) {
 			case "list":
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.list(opts);
+				return $packagesMainCli().list(arguments.opts);
 			case "search":
-				if (arrayLen(positional) < 2) {
-					throw(message="search requires a query: wheels packages search <query>");
-				}
-				opts.query = positional[2];
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.search(opts);
+				arguments.opts.query = $packagesRequireArg(arguments.positional, "search requires a query: wheels packages search <query>");
+				return $packagesMainCli().search(arguments.opts);
 			case "show":
-				if (arrayLen(positional) < 2) {
-					throw(message="show requires a name: wheels packages show <name>");
-				}
-				opts.name = positional[2];
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.show(opts);
+				arguments.opts.name = $packagesRequireArg(arguments.positional, "show requires a name: wheels packages show <name>");
+				return $packagesMainCli().show(arguments.opts);
 			case "install":
 				// LuCLI's built-in extension installer intercepts the
 				// literal verb `install` on the user-facing CLI surface
@@ -2849,36 +2862,51 @@ component extends="modules.BaseModule" {
 				// Fall through to the `add` branch (same validation,
 				// same error shape, same install behavior).
 			case "add":
-				if (arrayLen(positional) < 2) {
-					throw(message="add requires a name: wheels packages add <name>[@<version>]");
-				}
-				opts.target = positional[2];
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.add(opts);
+				arguments.opts.target = $packagesRequireArg(arguments.positional, "add requires a name: wheels packages add <name>[@<version>]");
+				return $packagesMainCli().add(arguments.opts);
 			case "update":
-				opts.target = arrayLen(positional) >= 2 ? positional[2] : "";
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.update(opts);
+				arguments.opts.target = arrayLen(arguments.positional) >= 2 ? arguments.positional[2] : "";
+				return $packagesMainCli().update(arguments.opts);
 			case "remove":
-				if (arrayLen(positional) < 2) {
-					throw(message="remove requires a name: wheels packages remove <name>");
-				}
-				opts.target = positional[2];
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.remove(opts);
+				arguments.opts.target = $packagesRequireArg(arguments.positional, "remove requires a name: wheels packages remove <name>");
+				return $packagesMainCli().remove(arguments.opts);
 			case "registry":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels packages registry requires a verb (refresh or info)");
-				}
-				var regVerb = positional[2];
-				if (!listFindNoCase("refresh,info", regVerb)) {
-					throw(message="Unknown wheels packages registry verb: #regVerb#");
-				}
-				var regCli = new modules.wheels.services.packages.PackagesRegistryCli();
-				return invoke(regCli, regVerb, [opts]);
+				return $dispatchPackagesRegistry(arguments.positional, arguments.opts);
 			default:
-				throw(message="Unknown packages subcommand: #sub#. The install verb is `add` (not `install`): wheels packages add <name>");
+				throw(message="Unknown packages subcommand: #arguments.sub#. The install verb is `add` (not `install`): wheels packages add <name>");
 		}
+	}
+
+	/**
+	 * Return a fresh PackagesMainCli for a single subcommand dispatch.
+	 */
+	private any function $packagesMainCli() {
+		return new modules.wheels.services.packages.PackagesMainCli();
+	}
+
+	/**
+	 * Return positional[2] or throw the verb's missing-argument message.
+	 */
+	private string function $packagesRequireArg(required array positional, required string message) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = arguments.message);
+		}
+		return arguments.positional[2];
+	}
+
+	/**
+	 * Dispatch the `registry` sub-verb (refresh|info) to PackagesRegistryCli.
+	 */
+	private any function $dispatchPackagesRegistry(required array positional, required struct opts) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message="wheels packages registry requires a verb (refresh or info)");
+		}
+		var regVerb = arguments.positional[2];
+		if (!listFindNoCase("refresh,info", regVerb)) {
+			throw(message="Unknown wheels packages registry verb: #regVerb#");
+		}
+		var regCli = new modules.wheels.services.packages.PackagesRegistryCli();
+		return invoke(regCli, regVerb, [arguments.opts]);
 	}
 
 	// Hand-written help for `wheels packages`. Owned by the module rather than
@@ -4706,44 +4734,11 @@ component extends="modules.BaseModule" {
 		// here didn't honor (#3080).
 		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
 
-		var serverPort = 0;
-		if (mutatingAction) {
-			serverPort = $requireRunningServer(
-				hints = [
-					"Migrations require a running server bound to this project.",
-					"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
-				],
-				requireProjectConfig = true
-			);
-		} else {
-			serverPort = $requireRunningServer(
-				hints = ["Start one with: wheels start"],
-				requireProjectConfig = false
-			);
-			// Transparency for the fallback attach: with no project-bound port
-			// we cannot prove the server on a common port belongs to this
-			// project — a sibling app's server would report the WRONG
-			// project's migration state. Say which port we attached to and
-			// how to pin it.
-			if (!detectServerPort(requireProjectConfig = true)) {
-				out(
-					"Attached to localhost:#serverPort# via the common-port fallback (no project-bound port in lucee.json / .env).",
-					"yellow"
-				);
-				out("If this is not this project's server, set 'port' in lucee.json (or PORT in .env) and re-run.", "yellow");
-			}
-		}
+		var serverPort = $resolveMigrationServerPort(mutatingAction);
 
 		out("Running migration: #action#...", "cyan");
 
-		var command = "";
-		switch (action) {
-			case "latest": command = "migrateToLatest"; break;
-			case "up":     command = "migrateUp"; break;
-			case "down":   command = "migrateDown"; break;
-			case "info":   command = "info"; break;
-			case "doctor": command = "doctor"; break;
-		}
+		var command = $migrationCommand(action);
 
 		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
 
@@ -4796,6 +4791,55 @@ component extends="modules.BaseModule" {
 			out("Migration #action# completed.", color);
 		}
 
+		return "";
+	}
+
+	/**
+	 * Resolve the server to target for a migration run. Schema-mutating
+	 * actions (latest/up/down) require a server bound to this project's own
+	 * port; read-only actions (info/doctor) keep the common-port fallback.
+	 */
+	private numeric function $resolveMigrationServerPort(required boolean mutatingAction) {
+		if (arguments.mutatingAction) {
+			return $requireRunningServer(
+				hints = [
+					"Migrations require a running server bound to this project.",
+					"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+				],
+				requireProjectConfig = true
+			);
+		}
+
+		var serverPort = $requireRunningServer(
+			hints = ["Start one with: wheels start"],
+			requireProjectConfig = false
+		);
+		// Transparency for the fallback attach: with no project-bound port
+		// we cannot prove the server on a common port belongs to this
+		// project — a sibling app's server would report the WRONG
+		// project's migration state. Say which port we attached to and
+		// how to pin it.
+		if (!detectServerPort(requireProjectConfig = true)) {
+			out(
+				"Attached to localhost:#serverPort# via the common-port fallback (no project-bound port in lucee.json / .env).",
+				"yellow"
+			);
+			out("If this is not this project's server, set 'port' in lucee.json (or PORT in .env) and re-run.", "yellow");
+		}
+		return serverPort;
+	}
+
+	/**
+	 * Map a migration action to its /wheels/cli bridge command.
+	 */
+	private string function $migrationCommand(required string action) {
+		switch (arguments.action) {
+			case "latest": return "migrateToLatest";
+			case "up": return "migrateUp";
+			case "down": return "migrateDown";
+			case "info": return "info";
+			case "doctor": return "doctor";
+		}
 		return "";
 	}
 
@@ -4909,14 +4953,10 @@ component extends="modules.BaseModule" {
 
 		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {};
 		var success = parsed.success ?: false;
-		var message = parsed.message ?: "";
 		var renameResult = parsed.renameResult ?: {renamed: [], errors: [], sql: [], skipped: ""};
 
 		if (!success) {
-			out("Rename failed.", "red");
-			for (var err in (renameResult.errors ?: [])) {
-				out("  #err#", "red");
-			}
+			$printRenameFailures(renameResult);
 			return "";
 		}
 
@@ -4928,24 +4968,48 @@ component extends="modules.BaseModule" {
 
 		// Dry-run path: print SQL.
 		if (arguments.dryRun) {
-			if (ArrayLen(renameResult.sql ?: [])) {
-				out("Would execute:");
-				for (var sql in renameResult.sql) {
-					out("  " & sql, "cyan");
-				}
-			}
+			$printRenameDryRunSql(renameResult);
 			return "";
 		}
 
 		// Success path: print what was renamed.
+		$printRenameSuccess(renameResult);
+
+		return "";
+	}
+
+	/**
+	 * Print the rename failure summary (plus any per-table errors).
+	 */
+	private void function $printRenameFailures(required struct renameResult) {
+		out("Rename failed.", "red");
+		for (var err in (arguments.renameResult.errors ?: [])) {
+			out("  #err#", "red");
+		}
+	}
+
+	/**
+	 * Print the dry-run SQL preview.
+	 */
+	private void function $printRenameDryRunSql(required struct renameResult) {
+		if (ArrayLen(arguments.renameResult.sql ?: [])) {
+			out("Would execute:");
+			for (var sql in arguments.renameResult.sql) {
+				out("  " & sql, "cyan");
+			}
+		}
+	}
+
+	/**
+	 * Print the success summary (tables renamed + the cosmetic FK-name note).
+	 */
+	private void function $printRenameSuccess(required struct renameResult) {
 		out("Renamed:", "green");
-		for (var rename in (renameResult.renamed ?: [])) {
+		for (var rename in (arguments.renameResult.renamed ?: [])) {
 			out("  " & rename, "green");
 		}
 		out("");
 		out("Note: the foreign-key constraint name is still `fk_core_level`. Constraint names are scoped to their table and only rename via DROP/CREATE; this is cosmetic and will not affect functionality.", "yellow");
-
-		return "";
 	}
 
 	// ── Seed Execution ──────────────────────────────
@@ -8554,23 +8618,7 @@ component extends="modules.BaseModule" {
 		var specs = arguments.suite.specStats ?: [];
 		for (var sp in specs) {
 			if (listFindNoCase("Failed,Error", sp.status ?: "")) {
-				arguments.ctx.failureCount++;
-				out("  #sp.status ?: ''#: #sp.name ?: 'unknown'#", "red");
-				var msg = sp.failMessage ?: "";
-				if (len(msg)) {
-					// Print failMessage by default. Without --verbose
-					// truncate to 400 chars (enough to see the
-					// assertion + selector context). With --verbose
-					// dump the whole thing.
-					var shown = arguments.ctx.verbose ? msg : left(msg, 400);
-					out("    #shown#", "yellow");
-					if (!arguments.ctx.verbose && len(msg) > 400) {
-						out("    (truncated; pass --verbose for full output)", "yellow");
-					}
-				}
-				if (len(sp.failOrigin ?: "")) {
-					out("    at: #sp.failOrigin#", "yellow");
-				}
+				$browserPrintSpecFailure(sp, arguments.ctx);
 			}
 		}
 		// Suite-level errors (no spec ever ran — e.g. compile error,
@@ -8579,19 +8627,53 @@ component extends="modules.BaseModule" {
 			arrayIsEmpty(specs)
 			&& listFindNoCase("Failed,Error", arguments.suite.status ?: "")
 		) {
-			arguments.ctx.failureCount++;
-			out("  #arguments.suite.status#: #arguments.suite.name ?: '(unnamed suite)'# (suite-level)", "red");
-			var sg = arguments.suite.globalException ?: "";
-			if (len(sg)) {
-				var shown = arguments.ctx.verbose ? sg : left(sg, 400);
-				out("    #shown#", "yellow");
-				if (!arguments.ctx.verbose && len(sg) > 400) {
-					out("    (truncated; pass --verbose for full output)", "yellow");
-				}
-			}
+			$browserPrintSuiteFailure(arguments.suite, arguments.ctx);
 		}
 		for (var inner in (arguments.suite.suiteStats ?: [])) {
 			$browserWalkSuite(inner, arguments.ctx);
+		}
+	}
+
+	/**
+	 * Print one failed/error spec and bump the shared failure counter.
+	 */
+	private void function $browserPrintSpecFailure(required any sp, required struct ctx) {
+		arguments.ctx.failureCount++;
+		out("  #arguments.sp.status ?: ''#: #arguments.sp.name ?: 'unknown'#", "red");
+		var msg = arguments.sp.failMessage ?: "";
+		if (len(msg)) {
+			$browserPrintFailureDetail(msg, arguments.ctx.verbose);
+		}
+		if (len(arguments.sp.failOrigin ?: "")) {
+			out("    at: #arguments.sp.failOrigin#", "yellow");
+		}
+	}
+
+	/**
+	 * Print a suite-level error (no spec ever ran) and bump the shared counter.
+	 */
+	private void function $browserPrintSuiteFailure(required any suite, required struct ctx) {
+		arguments.ctx.failureCount++;
+		out("  #arguments.suite.status#: #arguments.suite.name ?: '(unnamed suite)'# (suite-level)", "red");
+		var sg = arguments.suite.globalException ?: "";
+		if (len(sg)) {
+			$browserPrintFailureDetail(sg, arguments.ctx.verbose);
+		}
+	}
+
+	/**
+	 * Print a failure message, truncated to 400 chars unless verbose. Kept as a
+	 * helper because the spec-failure and suite-failure paths share this exact
+	 * truncate-and-annotate shape.
+	 */
+	private void function $browserPrintFailureDetail(required string message, required boolean verbose) {
+		// Print failMessage by default. Without --verbose truncate to 400
+		// chars (enough to see the assertion + selector context). With
+		// --verbose dump the whole thing.
+		var shown = arguments.verbose ? arguments.message : left(arguments.message, 400);
+		out("    #shown#", "yellow");
+		if (!arguments.verbose && len(arguments.message) > 400) {
+			out("    (truncated; pass --verbose for full output)", "yellow");
 		}
 	}
 

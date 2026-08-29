@@ -304,7 +304,15 @@ component {
 			local.oldestSql &= " ORDER BY createdAt ASC";
 			local.oldestRow = queryExecute(local.oldestSql, local.oldestParams, {datasource = variables.$datasource, maxrows = 1});
 			if (local.oldestRow.recordCount) {
-				local.result.oldestPending = local.oldestRow.createdAt;
+				// This reads through a raw queryExecute, so the Wheels adapter's
+				// date canonicalization never runs. Adobe's JDBC driver returns
+				// timestamp columns as epoch-millis longs (java.lang.Long) on
+				// SQLite — normalize them so the public oldestPending contract
+				// is always a CFML date. Lucee/MySQL/etc. return real date
+				// objects, which IsNumeric() leaves untouched.
+				local.result.oldestPending = IsNumeric(local.oldestRow.createdAt)
+					? DateAdd("s", Int(local.oldestRow.createdAt / 1000), CreateDate(1970, 1, 1))
+					: local.oldestRow.createdAt;
 			}
 		} catch (any e) {
 			// Ignore

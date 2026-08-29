@@ -139,6 +139,8 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 
     The same torn-down-scope rule applies to `onSessionEnd()`. Adobe's `SessionTracker.SessionCleanUpAgent` can call it after the live application scope is already reclaimed, so bare `application.wo.$simpleLock` throws the same `Element wo is undefined...` error. Route through `arguments.applicationScope.wo` and guard with `StructKeyExists(arguments.applicationScope, "wo")` only — this path uses `$simpleLock`, not `$include`, so do not add the `wheels` / `eventPath` checks used by `onApplicationEnd()`. Existing 4.0.x apps must paste the same edit into their own `public/Application.cfc`.
 
+20. **BoxLang's `DirectoryList()` returns a fixed-size array — `ArrayAppend` on it throws with NO message.** The exception surfaces as an `Error`-status spec with an empty `failMessage`/`failDetail`, and TestBox blames the closure's first line rather than the append. Copy into a fresh array before appending: `var files = []; for (var f in DirectoryList(...)) { ArrayAppend(files, f); }`. Iterating the result directly (`for (var f in DirectoryList(...))`) is fine. Hit by `BareCfabortGuardSpec` (Aug 29 matrix dispatch — BoxLang mysql+sqlite legs). Also note BoxLang's loose `==` coerces boolean-ish strings numerically — `"1" == "yes"` and `"0" == "no"` are TRUE, and `ListFindNoCase("yes,no", "1")` returns 1 / `("yes,no", "0")` returns 2 for the same reason. Use `CompareNoCase(a, b) == 0` (or `Compare`) for string equality decisions; hit by `QuoteValueSpec`.
+
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
 curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \

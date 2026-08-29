@@ -496,8 +496,8 @@ component extends="wheels.migrator.Migration" hint="Create posts table" {
         transaction {
             try {
                 t = createTable(name="posts");
-                t.string(columnNames="title", default="", allowNull=true, limit=255);
-                t.text(columnNames="body", default="", allowNull=true);
+                t.string(columnNames="title", allowNull=true, limit=255);
+                t.text(columnNames="body", allowNull=true);
                 t.string(columnNames="status", default="draft", allowNull=false, limit=20);
                 t.datetime(columnNames="publishedAt", allowNull=true);
                 t.timestamps();

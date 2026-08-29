@@ -1,0 +1,3 @@
+- Fixed the remaining compatibility-matrix failures: `IS NULL` / `IS NOT NULL` and null parameters now render as inline SQL NULL on every engine (PostgreSQL, CockroachDB, and SQL Server rejected the bound-parameter form), Adobe CF no longer binds SQL NULL for `"Null"`-valued string properties, and BoxLang legs no longer fail on boolean quoting, `DirectoryList` array appends, apostrophe values in `seedOnce`, or channel event ordering (microsecond `createdAt` precision).
+- `JobWorker.getMonitorData().oldestPending` now always returns a CFML date, including on Adobe CF + SQLite where the driver returns epoch-millis longs.
+- The onboarding harness and the tutorial docs no longer use `default=""` on string columns, matching the empty-string-default hardening.

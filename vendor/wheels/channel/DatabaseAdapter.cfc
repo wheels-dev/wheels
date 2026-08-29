@@ -288,10 +288,20 @@ component {
 				local.varcharType = "VARCHAR";
 				local.textType = "CLOB";
 				local.datetimeType = "TIMESTAMP";
+			} else if (local.dbType == "sqlserver") {
+				local.varcharType = "VARCHAR";
+				local.textType = "TEXT";
+				local.datetimeType = "DATETIME2";
 			} else {
 				local.varcharType = "VARCHAR";
 				local.textType = "TEXT";
-				local.datetimeType = "DATETIME";
+				// DATETIME(6): sub-second precision so poll() can order events
+				// by createdAt deterministically. Plain DATETIME keeps only
+				// second precision — two publishes within the same second tie,
+				// and the (channel, createdAt) index then falls back to
+				// primary-key (UUID) order, which is arbitrary (BoxLang legs
+				// observed the reversal; Lucee/Adobe were just lucky).
+				local.datetimeType = "DATETIME(6)";
 			}
 
 			queryExecute("

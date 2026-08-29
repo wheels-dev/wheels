@@ -27,19 +27,17 @@ component output=false extends="wheels.Global"{
 				if (isStruct(part)) {
 					local.qp = $queryParams(part);
 
-					// The literal string "null" after IS / IS NOT stays a bound
-					// parameter. Do not coerce that string to SQL NULL. A missing
-					// value (cfqueryparam null=true, or a CFML/Java null) is a
-					// different thing and must still bind as SQL NULL.
+					// A missing value (unquoted NULL keyword after IS / IS NOT,
+					// cfqueryparam null=true, or a CFML/Java null) renders as the
+					// inline SQL NULL literal — never as a bound parameter.
+					// PostgreSQL, CockroachDB, and SQL Server all reject a bound
+					// parameter in `IS $1` position ("syntax error at or near
+					// "$1""), and `= $1` with a NULL parameter silently matches
+					// nothing on most engines. The quoted literal 'null' is a
+					// different thing: it has qp.null=false and stays a bound
+					// string parameter in the normal branch below.
 					if (structKeyExists(qp, "null") && qp.null) {
-						if (args.parameterize) {
-							if (!structKeyExists(qp, "value") || IsNull(qp.value) || !Len(ToString(qp.value))) {
-								qp.value = "";
-							}
-							cfqueryParam(attributeCollection = qp);
-						} else {
-							writeOutput("NULL");
-						}
+						writeOutput("NULL");
 					} else if (structKeyExists(qp, "list")) {
 						writeOutput("(");
 						if (args.parameterize) {
@@ -613,7 +611,7 @@ component output=false extends="wheels.Global"{
 		if (
 			!ListFindNoCase("integer,float,boolean", arguments.type)
 			|| !Len(arguments.str)
-			|| (arguments.type == "boolean" && ListFindNoCase("yes,no", arguments.str))
+			|| (arguments.type == "boolean" && (CompareNoCase(arguments.str, "yes") == 0 || CompareNoCase(arguments.str, "no") == 0))
 		) {
 			local.rv = "'#Replace(arguments.str, "'", "''", "all")#'";
 		} else {
