@@ -2,30 +2,12 @@
   "engineVersion": "v0.635.2",
   "totals": {
     "totalSpecs": 5375,
-    "totalPass": 5332,
+    "totalPass": 5350,
     "totalFail": 1,
-    "totalError": 20,
+    "totalError": 2,
     "totalSkipped": 22
   },
   "failing": [
-    "wheels.tests.specs.cli.RewriteConfigInstallerSpec :: cli.lucli.services.RewriteConfigInstaller :: emits a rewrite.config that passes 3.x-convention static-asset dirs through to the default servlet",
-    "wheels.tests.specs.cli.RewriteConfigInstallerSpec :: cli.lucli.services.RewriteConfigInstaller :: emits a rewrite.config using positive-match [L]-flagged passthrough rules, not negated RewriteCond chains",
-    "wheels.tests.specs.cli.RewriteConfigInstallerSpec :: cli.lucli.services.RewriteConfigInstaller :: is a no-op when the project already ships its own rewrite.config (idempotent)",
-    "wheels.tests.specs.cli.RewriteConfigInstallerSpec :: cli.lucli.services.RewriteConfigInstaller :: returns installed=false with a reason when the source template can't be read",
-    "wheels.tests.specs.cli.RewriteConfigInstallerSpec :: cli.lucli.services.RewriteConfigInstaller :: writes the project-level rewrite.config when the project doesn't have one",
-    "wheels.tests.specs.controller.miscellaneousSpec :: Tests that sendfile :: does not rewrite an absolute directory containing the '/wheels' substring",
-    "wheels.tests.specs.controller.miscellaneousSpec :: Tests that sendfile :: serves a file from an absolute directory outside the web root",
-    "wheels.tests.specs.migrator.migrationSpec :: Tests addIndex :: creates an index on multiple columns",
-    "wheels.tests.specs.packages.LoadRegistryPackagesSpec :: Public.$loadRegistryPackages :: captures registry errors into the error field without throwing",
-    "wheels.tests.specs.packages.LoadRegistryPackagesSpec :: Public.$loadRegistryPackages :: lets non-Wheels.Packages errors bubble up as real bugs",
-    "wheels.tests.specs.packages.LoadRegistryPackagesSpec :: Public.$loadRegistryPackages :: returns empty packages and no error in staging (gate allows development only)",
-    "wheels.tests.specs.packages.LoadRegistryPackagesSpec :: Public.$loadRegistryPackages :: returns empty packages and no error when environment is production",
-    "wheels.tests.specs.packages.LoadRegistryPackagesSpec :: Public.$loadRegistryPackages :: returns packages from the registry in development",
-    "wheels.tests.specs.packages.ManifestCacheEnsureDirSpec :: ManifestCache directory creation :: creates deeply nested cache directories whose parents do not yet exist",
-    "wheels.tests.specs.packages.ManifestCacheEnsureDirSpec :: ManifestCache directory creation :: creates the manifests subdirectory when only the root exists",
-    "wheels.tests.specs.packages.RegistryFetchManifestSpec :: Registry.fetchManifest validation :: listAll() skips a malformed manifest instead of crashing",
-    "wheels.tests.specs.packages.RegistryFetchManifestSpec :: Registry.fetchManifest validation :: rejects a stale on-disk cache entry that fails the versions invariant (B's nuance)",
-    "wheels.tests.specs.wheelstest.BrowserTestArtifactDirSpec :: BrowserTest artifact directory creation :: creates deeply nested artifact directories whose parents do not yet exist (regression #2614)",
-    "wheels.tests.specs.wheelstest.BrowserTestArtifactDirSpec :: BrowserTest artifact directory creation :: is a no-op when the artifact directory already exists"
+    "wheels.tests.specs.migrator.migrationSpec :: Tests addIndex :: creates an index on multiple columns"
   ]
 }

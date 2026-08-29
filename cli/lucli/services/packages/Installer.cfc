@@ -84,8 +84,14 @@ component {
 			DirectoryCreate(local.vendorDir, true);
 		}
 
-		// Download to a temp file.
-		local.tmpFile = GetTempDirectory() & "wheels-pkg-" & CreateUUID() & ".tar.gz";
+		// Download to a temp file. Normalize the separator: engines differ on
+		// whether GetTempDirectory() carries a trailing slash (RustCFML does
+		// not), and a bare concatenation would target the filesystem root.
+		local.tmpDir = GetTempDirectory();
+		if (Right(local.tmpDir, 1) != "/" && Right(local.tmpDir, 1) != "\") {
+			local.tmpDir &= "/";
+		}
+		local.tmpFile = local.tmpDir & "wheels-pkg-" & CreateUUID() & ".tar.gz";
 		try {
 			variables.http.download(arguments.version.tarball, local.tmpFile);
 

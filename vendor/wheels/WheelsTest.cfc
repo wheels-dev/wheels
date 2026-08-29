@@ -78,6 +78,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     }
 
     /**
+     * Join a suffix onto the engine's temp directory with the separator
+     * normalized. RustCFML's GetTempDirectory() omits the trailing slash
+     * (Lucee and Adobe include it), so a bare concatenation produces a path
+     * at the filesystem root on Linux — `/tmpwheels-…` instead of
+     * `/tmp/wheels-…` — and every file operation fails with a permission
+     * error. Use this helper for BOTH construction and cleanup so the
+     * RemoveChars/Replace sweeps in specs' finally blocks key on the same
+     * normalized form.
+     */
+    public string function $tempPath(required string suffix) {
+        local.tmp = GetTempDirectory();
+        if (Right(local.tmp, 1) != "/" && Right(local.tmp, 1) != "\") {
+            local.tmp &= "/";
+        }
+        return local.tmp & arguments.suffix;
+    }
+
+    /**
      * Return a configured TestClient instance.
      * The base URL is auto-detected from the current server port.
      *

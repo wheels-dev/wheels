@@ -32,7 +32,7 @@ component extends="wheels.WheelsTest" {
 
 			it("writes the project-level rewrite.config when the project doesn't have one", () => {
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
-				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
+				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
 				try {
 					expect(fileExists(projectRoot & "/rewrite.config")).toBeFalse(
@@ -54,7 +54,7 @@ component extends="wheels.WheelsTest" {
 
 			it("is a no-op when the project already ships its own rewrite.config (idempotent)", () => {
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
-				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
+				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
 				try {
 					fileWrite(projectRoot & "/rewrite.config", "## user-customized rules");
@@ -82,7 +82,7 @@ component extends="wheels.WheelsTest" {
 
 			it("emits a rewrite.config that passes 3.x-convention static-asset dirs through to the default servlet", () => {
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
-				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
+				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
 				try {
 					installer.install(projectRoot=projectRoot, sourceTemplate=ctx.templatePath);
@@ -117,7 +117,7 @@ component extends="wheels.WheelsTest" {
 				// every static file 404s. The fix is positive-match skip
 				// rules with the [L] flag.
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
-				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
+				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
 				try {
 					installer.install(projectRoot=projectRoot, sourceTemplate=ctx.templatePath);
@@ -147,7 +147,7 @@ component extends="wheels.WheelsTest" {
 
 			it("returns installed=false with a reason when the source template can't be read", () => {
 				var installer = new cli.lucli.services.RewriteConfigInstaller();
-				var projectRoot = getTempDirectory() & "wheels-rewriteinstaller-#createUUID()#";
+				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
 				try {
 					var missing = getTempDirectory() & "wheels-no-such-template-#createUUID()#.config";
