@@ -1,62 +1,74 @@
 <cfscript>
-	function $cfmlErrorTagContext(required struct exception) {
-		if (
-			StructKeyExists(arguments.exception, "cause")
-			&& StructKeyExists(arguments.exception.cause, "tagContext")
-			&& ArrayLen(arguments.exception.cause.tagContext)
-		) {
-			return Duplicate(arguments.exception.cause.tagContext);
-		} else if (
-			StructKeyExists(arguments.exception, "rootCause")
-			&& StructKeyExists(arguments.exception.rootCause, "tagContext")
-			&& ArrayLen(arguments.exception.rootCause.tagContext)
-		) {
-			return Duplicate(arguments.exception.rootCause.tagContext);
-		} else if (
-			StructKeyExists(arguments.exception, "tagContext")
-			&& ArrayLen(arguments.exception.tagContext)
-		) {
-			return Duplicate(arguments.exception.tagContext);
-		}
-		return [];
+	// Template-scope helpers are guarded closure assignments, not function
+	// declarations: this file can be included more than once per request, and
+	// Adobe CF declares script or tag functions unconditionally — a second
+	// include throws "routine declared twice". The guard makes every include
+	// idempotent. The exception argument is deliberately untyped: Adobe's type
+	// validator rejects a cfcatch object passed to a struct-typed parameter.
+	if (!StructKeyExists(variables, "$cfmlErrorTagContext")) {
+		variables.$cfmlErrorTagContext = function(required exception) {
+			if (
+				StructKeyExists(arguments.exception, "cause")
+				&& StructKeyExists(arguments.exception.cause, "tagContext")
+				&& ArrayLen(arguments.exception.cause.tagContext)
+			) {
+				return Duplicate(arguments.exception.cause.tagContext);
+			} else if (
+				StructKeyExists(arguments.exception, "rootCause")
+				&& StructKeyExists(arguments.exception.rootCause, "tagContext")
+				&& ArrayLen(arguments.exception.rootCause.tagContext)
+			) {
+				return Duplicate(arguments.exception.rootCause.tagContext);
+			} else if (
+				StructKeyExists(arguments.exception, "tagContext")
+				&& ArrayLen(arguments.exception.tagContext)
+			) {
+				return Duplicate(arguments.exception.tagContext);
+			}
+			return [];
+		};
 	}
 
-	function $cfmlErrorNormalizePath(required string path) {
-		local.norm = arguments.path;
-		local.norm = ReReplace(local.norm, "[" & Chr(92) & "(.*?)" & Chr(92) & "]", "." & Chr(92) & "1", "all");
-		local.norm = ReReplace(local.norm, "^" & Chr(92) & ".", "", "one");
-		return local.norm;
+	if (!StructKeyExists(variables, "$cfmlErrorNormalizePath")) {
+		variables.$cfmlErrorNormalizePath = function(required string path) {
+			local.norm = arguments.path;
+			local.norm = ReReplace(local.norm, "[" & Chr(92) & "(.*?)" & Chr(92) & "]", "." & Chr(92) & "1", "all");
+			local.norm = ReReplace(local.norm, "^" & Chr(92) & ".", "", "one");
+			return local.norm;
+		};
 	}
 
-	function $cfmlErrorSanitizeScope(required struct scope, required string skip, required string scopeName) {
-		local.hide = "wheels";
-		local.sanitizedScope = Duplicate(arguments.scope);
-		for (local.j in ListToArray(arguments.skip)) {
-			local.normalizedPath = $cfmlErrorNormalizePath(local.j);
-			if (local.normalizedPath CONTAINS "." AND ListFirst(local.normalizedPath, ".") EQ arguments.scopeName) {
-				local.relativePath = ListRest(local.normalizedPath, ".");
-				local.keyList = ListToArray(local.relativePath, ".");
-				local.ref = local.sanitizedScope;
-				local.depth = ArrayLen(local.keyList);
-				for (local.k = 1; local.k LTE local.depth; local.k++) {
-					local.key = local.keyList[local.k];
-					if (local.k EQ local.depth) {
-						if (StructKeyExists(local.ref, local.key)) {
-							StructDelete(local.ref, local.key);
-						}
-					} else {
-						if (StructKeyExists(local.ref, local.key) AND IsStruct(local.ref[local.key])) {
-							local.ref = local.ref[local.key];
+	if (!StructKeyExists(variables, "$cfmlErrorSanitizeScope")) {
+		variables.$cfmlErrorSanitizeScope = function(required struct scope, required string skip, required string scopeName) {
+			local.hide = "wheels";
+			local.sanitizedScope = Duplicate(arguments.scope);
+			for (local.j in ListToArray(arguments.skip)) {
+				local.normalizedPath = $cfmlErrorNormalizePath(local.j);
+				if (local.normalizedPath CONTAINS "." AND ListFirst(local.normalizedPath, ".") EQ arguments.scopeName) {
+					local.relativePath = ListRest(local.normalizedPath, ".");
+					local.keyList = ListToArray(local.relativePath, ".");
+					local.ref = local.sanitizedScope;
+					local.depth = ArrayLen(local.keyList);
+					for (local.k = 1; local.k LTE local.depth; local.k++) {
+						local.key = local.keyList[local.k];
+						if (local.k EQ local.depth) {
+							if (StructKeyExists(local.ref, local.key)) {
+								StructDelete(local.ref, local.key);
+							}
 						} else {
-							break;
+							if (StructKeyExists(local.ref, local.key) AND IsStruct(local.ref[local.key])) {
+								local.ref = local.ref[local.key];
+							} else {
+								break;
+							}
 						}
 					}
+				} else if (ListFindNoCase(arguments.skip, arguments.scopeName)) {
+					local.hide = ListAppend(local.hide, local.j);
 				}
-			} else if (ListFindNoCase(arguments.skip, arguments.scopeName)) {
-				local.hide = ListAppend(local.hide, local.j);
 			}
-		}
-		return {hide = local.hide, sanitizedScope = local.sanitizedScope};
+			return {hide = local.hide, sanitizedScope = local.sanitizedScope};
+		};
 	}
 </cfscript>
 <cfoutput>

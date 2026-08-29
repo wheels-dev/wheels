@@ -739,10 +739,15 @@ component {
 			local.linkArgs[arguments.name] = arguments.page;
 		} else {
 			local.linkArgs.params = arguments.name & "=" & arguments.page;
-			if (StructKeyExists(arguments.args, "params") && Len(arguments.args.params)) {
+			if (StructKeyExists(arguments.args, "params")) {
 				if (IsStruct(arguments.args.params)) {
-					local.linkArgs.params &= "&" & $paramsToQueryString(arguments.args.params, false);
-				} else {
+					// Adobe's Len() only accepts simple values — struct params
+					// must be stringified (and StructCount'd) before any Len().
+					local.paramsString = $paramsToQueryString(arguments.args.params, false);
+					if (Len(local.paramsString)) {
+						local.linkArgs.params &= "&" & local.paramsString;
+					}
+				} else if (Len(arguments.args.params)) {
 					local.linkArgs.params &= "&" & arguments.args.params;
 				}
 			}

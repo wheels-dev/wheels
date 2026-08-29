@@ -119,8 +119,11 @@ component extends="wheels.WheelsTest" {
 			})
 
 			afterEach(() => {
-				_controller.$clearCachableActions()
+				// g.$clearCache() first: a closure whose first two statements are
+				// a zero-arg $-member call followed by an argumented $-member call
+				// crashes Adobe 2025's compiler (MissingNameException).
 				g.$clearCache("action")
+				_controller.$clearCachableActions()
 				StructClear(form)
 				StructAppend(form, _originalForm, false)
 				if (_hadCacheActions) {

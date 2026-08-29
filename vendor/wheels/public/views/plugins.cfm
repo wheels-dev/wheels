@@ -2,68 +2,72 @@
 // Check for JSON format request
 param name="request.wheels.params.format" default="html";
 
-function $pluginsEnsureEnabled() {
-	if(!application.wheels.enablePluginsComponent)
-		throw(type="wheels.plugins", message="The Wheels Plugin component is disabled...");
+if (!StructKeyExists(variables, "$pluginsEnsureEnabled")) {
+	variables.$pluginsEnsureEnabled = function() {
+		if(!application.wheels.enablePluginsComponent)
+			throw(type="wheels.plugins", message="The Wheels Plugin component is disabled...");
+	};
 }
 
-function $pluginsRenderJson() {
-	loadedPlugins = application.wheels.plugins;
+if (!StructKeyExists(variables, "$pluginsRenderJson")) {
+	variables.$pluginsRenderJson = function() {
+		loadedPlugins = application.wheels.plugins;
 
-	// If JSON format is requested, return JSON response
-	local.pluginsData = {
-		"version": application.wheels.version,
-		"timestamp": now(),
-		"plugins": {
-			"enabled": application.wheels.enablePluginsComponent,
-			"loaded": {}
+		// If JSON format is requested, return JSON response
+		local.pluginsData = {
+			"version": application.wheels.version,
+			"timestamp": now(),
+			"plugins": {
+				"enabled": application.wheels.enablePluginsComponent,
+				"loaded": {}
+			}
+		};
+
+		// Add loaded plugins
+		for (local.pluginName in loadedPlugins) {
+			local.pluginsData.plugins.loaded[local.pluginName] = loadedPlugins[local.pluginName];
 		}
+
+		// Add incompatible plugins if any
+		if (isDefined("application.wheels.incompatiblePlugins") && len(application.wheels.incompatiblePlugins)) {
+			local.pluginsData.plugins.incompatible = listToArray(application.wheels.incompatiblePlugins);
+		}
+
+		// Add dependent plugins if any
+		if (isDefined("application.wheels.dependantPlugins") && len(application.wheels.dependantPlugins)) {
+			local.pluginsData.plugins.dependent = [];
+			for (local.dep in listToArray(application.wheels.dependantPlugins)) {
+				arrayAppend(local.pluginsData.plugins.dependent, {
+					"plugin": listFirst(local.dep, "|"),
+					"needs": listLast(local.dep, "|")
+				});
+			}
+		}
+
+		// Add version mismatch plugins if any
+		if (isDefined("application.wheels.versionMismatchPlugins") && len(application.wheels.versionMismatchPlugins)) {
+			local.pluginsData.plugins.versionMismatches = [];
+			for (local.mm in listToArray(application.wheels.versionMismatchPlugins)) {
+				arrayAppend(local.pluginsData.plugins.versionMismatches, {
+					"plugin": listGetAt(local.mm, 1, "|"),
+					"dependency": listGetAt(local.mm, 2, "|"),
+					"required": listGetAt(local.mm, 3, "|"),
+					"loaded": listGetAt(local.mm, 4, "|")
+				});
+			}
+		}
+
+		// Add mixin collisions if any
+		if (isDefined("application.wheels.mixinCollisions") && arrayLen(application.wheels.mixinCollisions)) {
+			local.pluginsData.plugins.mixinCollisions = application.wheels.mixinCollisions;
+		}
+
+		local.pluginsData.plugins.count = structCount(loadedPlugins);
+
+		cfcontent(type="application/json", reset=true);
+		writeOutput(serializeJSON(local.pluginsData));
+		abort;
 	};
-
-	// Add loaded plugins
-	for (local.pluginName in loadedPlugins) {
-		local.pluginsData.plugins.loaded[local.pluginName] = loadedPlugins[local.pluginName];
-	}
-
-	// Add incompatible plugins if any
-	if (isDefined("application.wheels.incompatiblePlugins") && len(application.wheels.incompatiblePlugins)) {
-		local.pluginsData.plugins.incompatible = listToArray(application.wheels.incompatiblePlugins);
-	}
-
-	// Add dependent plugins if any
-	if (isDefined("application.wheels.dependantPlugins") && len(application.wheels.dependantPlugins)) {
-		local.pluginsData.plugins.dependent = [];
-		for (local.dep in listToArray(application.wheels.dependantPlugins)) {
-			arrayAppend(local.pluginsData.plugins.dependent, {
-				"plugin": listFirst(local.dep, "|"),
-				"needs": listLast(local.dep, "|")
-			});
-		}
-	}
-
-	// Add version mismatch plugins if any
-	if (isDefined("application.wheels.versionMismatchPlugins") && len(application.wheels.versionMismatchPlugins)) {
-		local.pluginsData.plugins.versionMismatches = [];
-		for (local.mm in listToArray(application.wheels.versionMismatchPlugins)) {
-			arrayAppend(local.pluginsData.plugins.versionMismatches, {
-				"plugin": listGetAt(local.mm, 1, "|"),
-				"dependency": listGetAt(local.mm, 2, "|"),
-				"required": listGetAt(local.mm, 3, "|"),
-				"loaded": listGetAt(local.mm, 4, "|")
-			});
-		}
-	}
-
-	// Add mixin collisions if any
-	if (isDefined("application.wheels.mixinCollisions") && arrayLen(application.wheels.mixinCollisions)) {
-		local.pluginsData.plugins.mixinCollisions = application.wheels.mixinCollisions;
-	}
-
-	local.pluginsData.plugins.count = structCount(loadedPlugins);
-
-	cfcontent(type="application/json", reset=true);
-	writeOutput(serializeJSON(local.pluginsData));
-	abort;
 }
 
 $pluginsEnsureEnabled();
