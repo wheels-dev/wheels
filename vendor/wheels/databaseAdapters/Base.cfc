@@ -538,7 +538,13 @@ component output=false extends="wheels.Global"{
 	 */
 	public struct function $queryParams(required struct settings) {
 		local.hasValue = StructKeyExists(arguments.settings, "value");
-		local.valueIsNull = local.hasValue && IsNull(arguments.settings.value);
+		// Adobe CF's IsNull() misreports dotted-path arguments that hold the
+		// string "Null" as null (value-dependent quirk — the same string via a
+		// plain variable, bracket access, ToString, or Duplicate reads NO).
+		// Guard with IsSimpleValue() first: a real CFML/Java null is never a
+		// simple value, and the string "Null" always is, so the short-circuit
+		// keeps the check form- and engine-independent.
+		local.valueIsNull = local.hasValue && !IsSimpleValue(arguments.settings.value) && IsNull(arguments.settings.value);
 		if (!local.hasValue && !(StructKeyExists(arguments.settings, "null") && arguments.settings.null)) {
 			Throw(
 				type = "Wheels.QueryParamValue",
