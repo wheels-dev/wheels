@@ -35,6 +35,12 @@ shopt -u dotglob
 cp LICENSE "${BUILD_DIR}/"
 cp NOTICE "${BUILD_DIR}/"
 
+# Ship the CONSUMER AI doc tier into the starter app root and defensively
+# strip maintainer-only paths (defense in depth — see prepare-core.sh and
+# docs/superpowers/plans/2026-08-30-ai-docs-two-tier.md).
+echo "Shipping consumer AI docs..."
+./tools/build/scripts/ship-consumer-docs.sh ship "${BUILD_DIR}"
+
 # Check Copied files
 echo "These files were copied"
 ls -la "${BUILD_DIR}/"

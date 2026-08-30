@@ -24,6 +24,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(templateRoot & "app/global/functions.cfm")).toBeTrue();
 			});
 
+			it("ships the consumer AI doc tier (CLAUDE.md / AGENTS.md / .ai/README.md)", () => {
+				// Two-tier AI docs: every `wheels new` scaffold ships the
+				// consumer application-developer docs (see
+				// docs/superpowers/plans/2026-08-30-ai-docs-two-tier.md and
+				// tools/build/scripts/ship-consumer-docs.sh).
+				expect(fileExists(templateRoot & "CLAUDE.md")).toBeTrue();
+				expect(fileExists(templateRoot & "AGENTS.md")).toBeTrue();
+				expect(fileExists(templateRoot & ".ai/README.md")).toBeTrue();
+			});
+
 			it("ships app/views/helpers.cfm (used by layout rendering)", () => {
 				expect(fileExists(templateRoot & "app/views/helpers.cfm")).toBeTrue();
 			});
