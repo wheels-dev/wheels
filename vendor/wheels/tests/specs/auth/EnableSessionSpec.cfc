@@ -1,0 +1,67 @@
+component extends="wheels.WheelsTest" {
+
+	function run() {
+
+		describe("enableSession() wiring facade", function() {
+
+			beforeEach(function() {
+				g = application.wo;
+				_originalDi = application.wheelsdi;
+			});
+
+			afterEach(function() {
+				// Restore the live container so other specs are unaffected.
+				application.wheelsdi = _originalDi;
+			});
+
+			it("maps the singletons, registers the session strategy, and returns it", function() {
+				// Fresh container: constructing it re-registers itself at
+				// application.wheelsdi, which injector()/service() read.
+				var di = new wheels.Injector(binderPath = "wheels.tests._assets.di.TestBindings");
+
+				var strategy = g.enableSession(sessionKey = "wheels.auth.spec");
+
+				expect(strategy).toBeInstanceOf("wheels.auth.SessionStrategy");
+				expect(di.isSingleton("authenticator")).toBeTrue();
+				expect(di.isSingleton("sessionStrategy")).toBeTrue();
+				var authenticator = di.getInstance("authenticator");
+				expect(authenticator.hasStrategy("session")).toBeTrue();
+				expect(authenticator.getStrategy("session")).toBe(strategy);
+				expect(strategy.getSessionKey()).toBe("wheels.auth.spec");
+			});
+
+			it("is idempotent — a second call adds no duplicate registration", function() {
+				var di = new wheels.Injector(binderPath = "wheels.tests._assets.di.TestBindings");
+
+				g.enableSession();
+				var second = g.enableSession();
+
+				var authenticator = di.getInstance("authenticator");
+				expect(authenticator.getStrategy("session")).toBe(second);
+				var names = authenticator.getStrategyNames();
+				expect(arrayLen(names)).toBe(1);
+			});
+
+			it("coexists with a pre-mapped authenticator", function() {
+				var di = new wheels.Injector(binderPath = "wheels.tests._assets.di.TestBindings");
+				di.map("authenticator").to("wheels.auth.Authenticator").asSingleton();
+				var preMapped = di.getInstance("authenticator");
+
+				g.enableSession();
+
+				expect(di.getInstance("authenticator")).toBe(preMapped);
+				expect(preMapped.hasStrategy("session")).toBeTrue();
+			});
+
+			it("throws a pointer error when no DI container exists", function() {
+				application.wheelsdi = "";
+				expect(function() {
+					g.enableSession();
+				}).toThrow("Wheels.Injector");
+			});
+
+		});
+
+	}
+
+}
