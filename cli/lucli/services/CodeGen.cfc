@@ -342,8 +342,13 @@ component {
 			content &= t & t & '})' & nl;
 			content &= t & '}' & nl;
 			content &= '}' & nl;
-			fileWrite(filePath, content);
-			result = {success: true, path: filePath, message: "Generated from inline template"};
+			if (request.$wheelsGenerateDryRun ?: false) {
+				arrayAppend(request.$wheelsDryRunPaths, filePath);
+				result = {success: true, path: filePath, message: "Dry run — not written", dryRun: true};
+			} else {
+				fileWrite(filePath, content);
+				result = {success: true, path: filePath, message: "Generated from inline template"};
+			}
 		}
 
 		return result;

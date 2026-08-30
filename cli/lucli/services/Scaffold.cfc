@@ -24,6 +24,26 @@ component {
 		return this;
 	}
 
+
+	/**
+	 * Dry-run-aware file writer. `wheels generate --dry-run` sets
+	 * request.$wheelsGenerateDryRun; writes are then recorded (for the
+	 * caller to print) and skipped. Creates the parent directory on the
+	 * real path.
+	 */
+	private string function $write(required string path, required string content) {
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, arguments.path);
+			return arguments.path;
+		}
+		var dir = getDirectoryFromPath(arguments.path);
+		if (!directoryExists(dir)) {
+			directoryCreate(dir, true);
+		}
+		FileWrite(arguments.path, arguments.content);
+		return arguments.path;
+	}
+
 	/**
 	 * Generate a complete scaffold (model, controller, views, migration, tests, routes)
 	 */
@@ -308,7 +328,7 @@ component {
 
 		var content = generateMigrationContent(className, tableName, arguments.properties, arguments.primaryKey);
 		var migrationPath = migrationDir & "/" & fileName;
-		fileWrite(migrationPath, content);
+		$write(migrationPath, content);
 
 		return migrationPath;
 	}
@@ -353,7 +373,7 @@ component {
 			var fullMarker = indent & markerPattern;
 			if (find(fullMarker, content)) {
 				content = replace(content, fullMarker, indent & resourceRoute & chr(10) & fullMarker, 'all');
-				fileWrite(routesPath, content);
+				$write(routesPath, content);
 				return true;
 			}
 
@@ -362,7 +382,7 @@ component {
 				var lastEnd = content.lastIndexOf('.end()');
 				if (lastEnd >= 0) {
 					content = mid(content, 1, lastEnd) & resourceRoute & chr(10) & chr(9) & mid(content, lastEnd + 1, len(content));
-					fileWrite(routesPath, content);
+					$write(routesPath, content);
 					return true;
 				}
 			}
@@ -517,7 +537,7 @@ component {
 					var before = mid(content, 1, insertPos);
 					var after = mid(content, insertPos + 1, len(content));
 					content = before & resourceLine & nl & after;
-					fileWrite(routesPath, content);
+					$write(routesPath, content);
 					return true;
 				}
 			}
@@ -541,7 +561,7 @@ component {
 
 			if (find(fullMarker, content)) {
 				content = replace(content, fullMarker, apiBlock & fullMarker, 'all');
-				fileWrite(routesPath, content);
+				$write(routesPath, content);
 				return true;
 			}
 
@@ -555,7 +575,7 @@ component {
 					content &= t & t & '.resources(name="#resourceName#", except="new,edit")' & nl;
 					content &= t & '.end()' & nl & t;
 					content &= after;
-					fileWrite(routesPath, content);
+					$write(routesPath, content);
 					return true;
 				}
 			}
@@ -624,7 +644,7 @@ component {
 		c &= t & '}' & nl;
 		c &= '}' & nl;
 
-		fileWrite(filePath, c);
+		$write(filePath, c);
 		return {success: true, path: filePath, message: "Generated API controller test"};
 	}
 
@@ -709,7 +729,7 @@ component {
 				}
 				var migrationPath = migrationDir & "/" & variables.helpers.generateMigrationTimestamp()
 					& "_create_" & tableName & "_table.cfc";
-				fileWrite(migrationPath, $renderAuthTemplate("migration", ctx));
+				$write(migrationPath, $renderAuthTemplate("migration", ctx));
 				arrayAppend(results.generated, {type: "migration", path: migrationPath});
 				arrayAppend(results.rollback, migrationPath);
 			} else {
@@ -902,7 +922,7 @@ component {
 		if (!directoryExists(dir)) {
 			directoryCreate(dir, true);
 		}
-		fileWrite(absPath, arguments.content);
+		$write(absPath, arguments.content);
 		arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 		if (!existed) {
 			arrayAppend(arguments.results.rollback, absPath);
@@ -943,7 +963,7 @@ component {
 				if (!directoryExists(dir)) {
 					directoryCreate(dir, true);
 				}
-				fileWrite(absPath, scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl);
+				$write(absPath, scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl);
 				arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 				arrayAppend(arguments.results.rollback, absPath);
 				return;
@@ -975,7 +995,7 @@ component {
 			content = left(content, regionStart - 1)
 				& $indentBlock(blockText, indent) & nl
 				& mid(content, regionEnd + 1, len(content));
-			fileWrite(absPath, content);
+			$write(absPath, content);
 			arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 			return;
 		}
@@ -1004,7 +1024,7 @@ component {
 			content = left(content, insertLineStart - 1)
 				& $indentBlock(blockText, anchorIndent) & nl
 				& mid(content, insertLineStart, len(content));
-			fileWrite(absPath, content);
+			$write(absPath, content);
 			arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 			return;
 		}
@@ -1018,7 +1038,7 @@ component {
 		} else {
 			content = content & nl & scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl;
 		}
-		fileWrite(absPath, content);
+		$write(absPath, content);
 		arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 	}
 
