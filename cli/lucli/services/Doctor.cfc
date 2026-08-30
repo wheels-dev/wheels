@@ -31,6 +31,8 @@ component {
 		checkCliInstallFreshness(results);
 		checkFrameworkSourceBundled(results);
 		checkMixinCollisions(results);
+		checkLegacyExtensionSurface(results);
+		checkRawParamsMassAssignment(results);
 
 		// Determine overall status
 		if (arrayLen(results.issues)) {
@@ -380,6 +382,79 @@ component {
 	}
 
 	/**
+	 * Detect the legacy extension surface that 5.0 removes: tests extending
+	 * the RocketUnit-era `wheels.Test` / `wheels.Testbox` bases, and a
+	 * populated `plugins/` directory. Mirrors the `wheels upgrade check`
+	 * heuristics so `wheels doctor` surfaces the same migration guidance.
+	 *
+	 * Both are warnings, not issues — a legacy surface still works today but
+	 * must be migrated before the 5.0 removal.
+	 */
+	private void function checkLegacyExtensionSurface(required struct results) {
+		var testDir = variables.projectRoot & "/tests";
+		if (directoryExists(testDir)) {
+			var legacyTests = [];
+			var legacyBasePattern = "extends\s*=\s*[""']wheels\.Test(box)?[""']";
+			for (var filePath in directoryList(testDir, true, "path", "*.cfc")) {
+				var content = $stripCfmlComments(fileRead(filePath));
+				if (reFindNoCase(legacyBasePattern, content)) {
+					arrayAppend(legacyTests, replace(filePath, variables.projectRoot & "/", ""));
+				}
+			}
+			if (arrayLen(legacyTests)) {
+				arrayAppend(
+					arguments.results.warnings,
+					"Legacy test base class (wheels.Test / wheels.Testbox) detected: "
+					& arrayToList(legacyTests, ", ") & " — change to extends wheels.WheelsTest"
+				);
+			}
+		}
+
+		var pluginsDir = variables.projectRoot & "/plugins";
+		if (directoryExists(pluginsDir)) {
+			var childDirs = [];
+			for (var entry in directoryList(pluginsDir, false, "name")) {
+				if (directoryExists(pluginsDir & "/" & entry)) arrayAppend(childDirs, entry);
+			}
+			if (arrayLen(childDirs)) {
+				arrayAppend(
+					arguments.results.warnings,
+					"legacy plugins/ detected — migrate to vendor/ packages"
+				);
+			}
+		}
+	}
+
+	/**
+	 * Flag raw `params.*` handed straight to a mass-assignment model call —
+	 * the classic mass-assignment vector (create/update/updateAll/new/save/
+	 * findByKey with an unpermitted params struct). Scans controllers and
+	 * models; comments are stripped first (anti-pattern #14) so commented-out
+	 * lines don't produce false positives.
+	 */
+	private void function checkRawParamsMassAssignment(required struct results) {
+		var scanDirs = ["app/controllers", "app/models"];
+		var massAssignmentPattern = "\b(create|update|updateAll|new|save|findByKey)\s*\(\s*params\.";
+		for (var scanDir in scanDirs) {
+			var absDir = variables.projectRoot & "/" & scanDir;
+			if (!directoryExists(absDir)) continue;
+			for (var filePath in directoryList(absDir, true, "path", "*.cfc")) {
+				var content = $stripCfmlComments(fileRead(filePath));
+				var lines = listToArray(content, chr(10), true);
+				for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
+					if (reFindNoCase(massAssignmentPattern, lines[lineNum])) {
+						var relPath = replace(filePath, variables.projectRoot & "/", "");
+						arrayAppend(
+							arguments.results.warnings,
+							"Raw params mass assignment: #relPath#:#lineNum# — #trim(lines[lineNum])#"
+						);
+					}
+				}
+			}
+		}
+	}
+
+	/**
 	 * Reads a manifest + main CFC and appends provider records keyed by target+method.
 	 *
 	 * @providerStore Out-param struct keyed "target::method" → array of records
@@ -630,6 +705,20 @@ component {
 		var s = arguments.source;
 		s = reReplace(s, "<!---[\s\S]*?--->", " ", "all");
 		s = reReplace(s, "/\*[\s\S]*?\*/", " ", "all");
+		return s;
+	}
+
+	/**
+	 * Strip ALL CFML comment forms — tag comments, block comments, AND `//`
+	 * line comments (mirrors Analysis.cfc::$stripCfmlComments). Kept separate
+	 * from $stripCfmlBlockComments() because the mixin scanner deliberately
+	 * avoids stripping `//` (it can appear inside string-literal URLs),
+	 * whereas source-grep checks like the legacy test-base scan and the raw
+	 * params scan must remove line comments too (anti-pattern #14).
+	 */
+	private string function $stripCfmlComments(required string source) {
+		var s = $stripCfmlBlockComments(arguments.source);
+		s = reReplace(s, "//[^\r\n]*", "", "all");
 		return s;
 	}
 

@@ -26,6 +26,69 @@ component extends="wheels.WheelsTest" {
 					expect(bi.version()).toBe("0.0.0-dev");
 				});
 
+				it("falls back to the sibling wheels.json version when unstamped (dev mode)", () => {
+					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					directoryCreate(dir, true);
+					var manifestPath = dir & "/wheels.json";
+					fileWrite(manifestPath, '{"version": "4.1.2"}');
+					try {
+						var bi = new wheels.BuildInfo();
+						expect(bi.version(manifestPath = manifestPath)).toBe("4.1.2");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
+				it("falls back to the sibling box.json when wheels.json is absent", () => {
+					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					directoryCreate(dir, true);
+					var manifestPath = dir & "/box.json";
+					fileWrite(manifestPath, '{"version": "3.5.0"}');
+					try {
+						var bi = new wheels.BuildInfo();
+						expect(bi.version(manifestPath = manifestPath)).toBe("3.5.0");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
+				it("returns 0.0.0-dev when no manifest exists", () => {
+					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					directoryCreate(dir, true);
+					try {
+						var bi = new wheels.BuildInfo();
+						expect(bi.version(manifestPath = dir & "/wheels.json")).toBe("0.0.0-dev");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
+				it("returns 0.0.0-dev when the manifest version is still a placeholder", () => {
+					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					directoryCreate(dir, true);
+					var manifestPath = dir & "/wheels.json";
+					fileWrite(manifestPath, '{"version": "@build.version@"}');
+					try {
+						var bi = new wheels.BuildInfo();
+						expect(bi.version(manifestPath = manifestPath)).toBe("0.0.0-dev");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
+				it("stamped BuildInfo version wins over the manifest", () => {
+					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					directoryCreate(dir, true);
+					var manifestPath = dir & "/wheels.json";
+					fileWrite(manifestPath, '{"version": "9.9.9"}');
+					try {
+						var bi = new wheels.BuildInfo({version: "4.0.0"});
+						expect(bi.version(manifestPath = manifestPath)).toBe("4.0.0");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
 			});
 
 			describe("isDev() / isSnapshot()", () => {

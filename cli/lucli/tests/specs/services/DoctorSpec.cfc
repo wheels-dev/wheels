@@ -116,6 +116,102 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(passedText).toInclude("Write permission");
 			});
 
+			describe("checkLegacyExtensionSurface", () => {
+
+				it("warns on legacy wheels.Test and wheels.Testbox test bases", () => {
+					fileWrite(tempRoot & "/tests/specs/legacy_spec.cfc", 'component extends="wheels.Test" {}');
+					fileWrite(tempRoot & "/tests/specs/testbox_spec.cfc", 'component extends="wheels.Testbox" {}');
+					try {
+						var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+						var results = doctor.runChecks();
+						var warningText = arrayToList(results.warnings, " ");
+						expect(warningText).toInclude("Legacy test base class");
+						expect(warningText).toInclude("legacy_spec.cfc");
+						expect(warningText).toInclude("testbox_spec.cfc");
+					} finally {
+						fileDelete(tempRoot & "/tests/specs/legacy_spec.cfc");
+						fileDelete(tempRoot & "/tests/specs/testbox_spec.cfc");
+					}
+				});
+
+				it("does not warn on the modern wheels.WheelsTest base", () => {
+					fileWrite(tempRoot & "/tests/specs/modern_spec.cfc", 'component extends="wheels.WheelsTest" {}');
+					try {
+						var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+						var results = doctor.runChecks();
+						var warningText = arrayToList(results.warnings, " ");
+						expect(warningText).notToInclude("Legacy test base class");
+					} finally {
+						fileDelete(tempRoot & "/tests/specs/modern_spec.cfc");
+					}
+				});
+
+				it("warns on a populated plugins/ directory", () => {
+					directoryCreate(tempRoot & "/plugins/foo", true);
+					fileWrite(tempRoot & "/plugins/foo/plugin.cfc", "component {}");
+					try {
+						var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+						var results = doctor.runChecks();
+						var warningText = arrayToList(results.warnings, " ");
+						expect(warningText).toInclude("legacy plugins/ detected");
+					} finally {
+						directoryDelete(tempRoot & "/plugins", true);
+					}
+				});
+
+				it("does not warn when plugins/ is absent", () => {
+					var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+					var results = doctor.runChecks();
+					var warningText = arrayToList(results.warnings, " ");
+					expect(warningText).notToInclude("legacy plugins/ detected");
+				});
+
+			});
+
+			describe("checkRawParamsMassAssignment", () => {
+
+				it("warns on raw params mass assignment in controllers", () => {
+					fileWrite(tempRoot & "/app/controllers/Users.cfc", 'component { model("user").create(params.user); }');
+					try {
+						var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+						var results = doctor.runChecks();
+						var warningText = arrayToList(results.warnings, " ");
+						expect(warningText).toInclude("Raw params mass assignment");
+						expect(warningText).toInclude("Users.cfc");
+						expect(warningText).toInclude("params.user");
+					} finally {
+						fileDelete(tempRoot & "/app/controllers/Users.cfc");
+					}
+				});
+
+				it("warns on raw params mass assignment in models", () => {
+					fileWrite(tempRoot & "/app/models/User.cfc", 'component { function persist() { model("user").save(params.user); } }');
+					try {
+						var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+						var results = doctor.runChecks();
+						var warningText = arrayToList(results.warnings, " ");
+						expect(warningText).toInclude("Raw params mass assignment");
+						expect(warningText).toInclude("User.cfc");
+						expect(warningText).toInclude("params.user");
+					} finally {
+						fileDelete(tempRoot & "/app/models/User.cfc");
+					}
+				});
+
+				it("does not warn on commented-out raw params", () => {
+					fileWrite(tempRoot & "/app/models/User.cfc", 'component { // model("user").create(params.user); function run() {} }');
+					try {
+						var doctor = new cli.lucli.services.Doctor(projectRoot = tempRoot);
+						var results = doctor.runChecks();
+						var warningText = arrayToList(results.warnings, " ");
+						expect(warningText).notToInclude("Raw params mass assignment");
+					} finally {
+						fileDelete(tempRoot & "/app/models/User.cfc");
+					}
+				});
+
+			});
+
 			describe("CLI install freshness (##2223)", () => {
 
 				it("is silent when no installedModuleRoot is provided", () => {
