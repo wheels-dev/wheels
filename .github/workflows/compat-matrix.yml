@@ -589,20 +589,21 @@ jobs:
           path: /tmp/junit-results/
 
   #############################################
-  # RustCFML (experimental, JVM-free engine)
+  # RustCFML (JVM-free engine)
   #############################################
-  # Informational lane, never a merge gate. The engine is pinned in
+  # Supported engine leg: the release-matrix counterpart of the required
+  # PR check in .github/workflows/rustcfml-ci.yml (which runs the same
+  # suite on every pull request to develop). The engine is pinned in
   # tools/rustcfml/ENGINE_VERSION (upstream ships multiple releases/day, so
   # tracking latest would make this lane flake on engine churn). Pass criteria
   # is "no NEW failures vs tools/rustcfml/baseline.json" — known residual
-  # errors (no-JVM limitations, open upstream issues) live in the baseline.
-  # To bump the pin: update ENGINE_VERSION, run
+  # errors (open upstream issues, listed in the baseline notes) live in the
+  # baseline. To bump the pin: update ENGINE_VERSION, run
   #   bash tools/rustcfml/run-suite.sh --write-baseline
-  # locally, and commit both files together.
+  # on Linux, and commit both files together.
   rustcfml:
-    name: "rustcfml (experimental)"
+    name: "rustcfml"
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5

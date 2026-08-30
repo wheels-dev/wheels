@@ -2,11 +2,11 @@
 # Run the Wheels core suite on the pinned RustCFML engine build and compare the
 # outcome against the checked-in known-failure baseline (tools/rustcfml/baseline.json).
 #
-# RustCFML is a JVM-free CFML engine under active development. This lane is
-# informational: it is never a merge gate. Pass criteria is "no NEW failures
-# versus the baseline", not zero failures — a set of known residual errors
-# (no-JVM limitations and open upstream engine issues) is expected and tracked
-# in the baseline file.
+# RustCFML is a supported JVM-free CFML engine. This script backs both the
+# required PR check (.github/workflows/rustcfml-ci.yml) and the release-matrix
+# leg (compat-matrix.yml). Pass criteria is "no NEW failures versus the
+# baseline", not zero failures — residual engine bugs are tracked in
+# tools/rustcfml/baseline.json with upstream issue links in the "_notes" key.
 #
 # Usage:
 #   bash tools/rustcfml/run-suite.sh                  # compare against baseline
@@ -138,6 +138,14 @@ if mode == "write":
         "totals": totals,
         "failing": sorted(failing.keys()),
     }
+    # Preserve the human-maintained "_notes" (upstream issue links) across
+    # regenerations.
+    try:
+        existing = json.load(open(baseline_path))
+        if isinstance(existing.get("_notes"), list):
+            payload["_notes"] = existing["_notes"]
+    except Exception:
+        pass
     with open(baseline_path, "w") as fh:
         json.dump(payload, fh, indent=2)
         fh.write("\n")

@@ -1,5 +1,5 @@
 {
-  "engineVersion": "v0.635.2",
+  "engineVersion": "v0.637.0",
   "totals": {
     "totalSpecs": 5375,
     "totalPass": 5350,
@@ -9,5 +9,10 @@
   },
   "failing": [
     "wheels.tests.specs.migrator.migrationSpec :: Tests addIndex :: creates an index on multiple columns"
+  ],
+  "_notes": [
+    "Known residual failures are upstream RustCFML engine bugs; each entry above maps to an open issue on https://github.com/RustCFML/RustCFML:",
+    "migrationSpec 'creates an index on multiple columns' -> https://github.com/RustCFML/RustCFML/issues/377 (query-of-query recordCount corruption after repeated QoQs).",
+    "Earlier tracked bugs now fixed framework-side or upstream were: #376 Hash(binary), #378 java.io.File two-arg constructor, #379 void-assignment key deletion, #380 GetTempDirectory separator, #381 new-operator name lowercasing."
   ]
 }
