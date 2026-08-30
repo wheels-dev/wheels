@@ -33,7 +33,7 @@ CLI, and `app/` is a demo app for hand-testing.
 ## Where things live
 
 - `CLAUDE.md` — invariants, anti-patterns, test/verification workflow (read first)
-- `.ai/` — deep reference docs (CFML language + Wheels internals), searched on demand
+- `.ai/` — deep reference docs (maintainer runbooks and Wheels internals), searched on demand
 - `docs/superpowers/` — design specs and plans (read before large changes)
 - `.claude/commands/` — wheels-bot prompts run by the bot-*.yml workflows
 - `docs/consumer-ai/` — the consumer AI doc tier (ships in artifacts)
