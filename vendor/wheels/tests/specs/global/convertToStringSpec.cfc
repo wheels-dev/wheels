@@ -50,5 +50,73 @@ component extends="wheels.WheelsTest" {
 				expect(result).toBe("2024-06-25 10:30:00")
 			})
 		})
+
+		describe("Tests that $convertToString type detection", () => {
+
+			it("detects arrays without an explicit type", () => {
+				result = g.$convertToString(value = ["a", "b", "c"])
+
+				expect(result).toBe("a,b,c")
+			})
+
+			it("detects structs without an explicit type", () => {
+				result = g.$convertToString(value = {firstName = "Tony", lastName = "Petruzzi"})
+
+				// Struct stringification is engine-specific (Lucee renders
+				// KEY=VALUE pairs) — assert the data survives, not the shape.
+				expect(result).toInclude("Tony")
+				expect(result).toInclude("Petruzzi")
+			})
+
+			it("detects integers without an explicit type", () => {
+				result = g.$convertToString(value = 42)
+
+				expect(result).toBe("42")
+			})
+
+			it("detects floats without an explicit type", () => {
+				result = g.$convertToString(value = 3.14)
+
+				expect(result).toBe("3.14")
+			})
+
+			it("detects booleans without an explicit type", () => {
+				result = g.$convertToString(value = true)
+
+				expect(result).toBe("true")
+			})
+
+			it("detects datetime values without an explicit type", () => {
+				result = g.$convertToString(value = CreateDateTime(2024, 6, 25, 10, 30, 0))
+
+				expect(result).toBe("2024-06-25 10:30:00")
+			})
+
+			it("detects binaries without an explicit type", () => {
+				result = g.$convertToString(value = CharsetDecode("hello", "utf-8"))
+
+				// ToString(binary) renders engine-specifically (Lucee emits the
+				// byte values) — assert the branch returned something non-empty.
+				expect(result).notToBe("")
+			})
+
+			it("falls back to string for plain text without an explicit type", () => {
+				result = g.$convertToString(value = "just some text")
+
+				expect(result).toBe("just some text")
+			})
+
+			it("reports the detected type directly via $convertToStringDetectType", () => {
+				expect(g.$convertToStringDetectType(val = [1])).toBe("array")
+				expect(g.$convertToStringDetectType(val = {a = 1})).toBe("struct")
+				// IsArray() on a Java byte[] is engine-dependent (true on
+				// Lucee) — the binary branch only fires where the engine
+				// distinguishes the two shapes.
+				expect(["binary", "array"]).toInclude(g.$convertToStringDetectType(val = CharsetDecode("x", "utf-8")))
+				expect(g.$convertToStringDetectType(val = 5)).toBe("integer")
+				expect(g.$convertToStringDetectType(val = CreateDate(2024, 6, 25))).toBe("datetime")
+				expect(g.$convertToStringDetectType(val = "text")).toBe("string")
+			})
+		})
 	}
 }

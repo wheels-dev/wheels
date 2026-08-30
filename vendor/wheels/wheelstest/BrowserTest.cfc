@@ -79,7 +79,26 @@ component extends="wheels.WheelsTest" {
             this.browserTestSkipped = true;
             return;
         }
-        variables.$browser = variables.$launcher.acquireBrowser(engine=this.browserEngine);
+        try {
+            variables.$browser = variables.$launcher.acquireBrowser(engine=this.browserEngine);
+        } catch (Wheels.BrowserLaunchTimedOut e) {
+            // Watchdog trip: the Playwright driver stalled (broken node
+            // runtime / stuck install step). Skipping beats wedging the whole
+            // suite for as long as the driver hangs — previously this blocked
+            // the test-runner lock indefinitely and every later test request
+            // queued behind it.
+            this.browserTestSkipped = true;
+            debug(e.message);
+            return;
+        } catch (Wheels.BrowserLaunchFailed e) {
+            // Playwright installed but unusable (missing browser binary,
+            // corrupt driver). Skip browser coverage rather than failing the
+            // run for a local environment issue; `wheels browser setup`
+            // repairs it.
+            this.browserTestSkipped = true;
+            debug(e.message);
+            return;
+        }
         variables.$baseUrl = $resolveBaseUrl();
     }
 
