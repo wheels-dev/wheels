@@ -91,7 +91,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		xdescribe("wheels deploy fetch-secrets (top-level alias for ##2697)", () => {
+		describe("wheels deploy fetch-secrets (top-level alias for ##2697)", () => {
 
 			it("dispatches to DeploySecretsCli.fetch and forwards the adapter flag", () => {
 				// Pass an unknown adapter so the call short-circuits inside
@@ -127,7 +127,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		xdescribe("wheels deploy extract-secrets (top-level alias for ##2697)", () => {
+		describe("wheels deploy extract-secrets (top-level alias for ##2697)", () => {
 
 			it("dispatches to DeploySecretsCli.extract and returns the matched value", () => {
 				// extract() reads opts.from (the KEY=VALUE block) and opts.key
@@ -155,7 +155,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		xdescribe("wheels deploy print-secrets (top-level alias for ##2697)", () => {
+		describe("wheels deploy print-secrets (top-level alias for ##2697)", () => {
 
 			it("dispatches to DeploySecretsCli.print and returns a string", () => {
 				// The dispatcher hands control to DeploySecretsCli.print, which
