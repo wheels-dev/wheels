@@ -2733,6 +2733,11 @@ component extends="modules.BaseModule" {
 	 * LuCLI's picocli root.
 	 */
 	private any function $deploySecretsVerb(required struct opts, required array positional, required string sub) {
+		// Secrets resolution defaults to the module's cwd-derived project
+		// root — an explicit --projectRoot flag still wins. (Before this,
+		// the CLIs fell back to expandPath("./"), which resolves against the
+		// harness webroot rather than the user's project directory.)
+		arguments.opts.projectRoot = arguments.opts.projectRoot ?: variables.projectRoot;
 		switch (arguments.sub) {
 			case "fetch-secrets":
 				arguments.opts.keys = [];

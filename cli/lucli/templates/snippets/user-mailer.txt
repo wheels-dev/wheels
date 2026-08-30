@@ -1,31 +1,44 @@
-component extends="wheels.Mailer" {
+component {
 
 	/**
 	 * Send welcome email to a new user.
+	 *
+	 * Mailers are plain CFCs (no framework base class) that wrap the
+	 * controller's sendEmail() behind a named method. sendEmail() needs a
+	 * request-capable controller instance, so each method obtains one
+	 * through the controller() factory.
 	 */
-	public void function sendWelcome(required any user) {
-		mail(
-			to=arguments.user.email,
-			from="noreply@example.com",
-			subject="Welcome to the app!",
-			template="/app/views/mailers/user/welcome",
-			layout="/app/views/mailers/layout",
-			user=arguments.user
+	public any function sendWelcome(required any user) {
+		local.mailer = new wheels.Global().controller(
+			name = "Mailer",
+			params = { controller: "mailer", action: "sendWelcome" }
+		);
+		return local.mailer.sendEmail(
+			template = "/mailers/user/welcome",
+			layout = "/mailers/layout",
+			from = "noreply@example.com",
+			to = arguments.user.email,
+			subject = "Welcome, #arguments.user.firstName#!",
+			user = arguments.user
 		);
 	}
 
 	/**
 	 * Send password reset instructions.
 	 */
-	public void function sendPasswordReset(required any user, required string token) {
-		mail(
-			to=arguments.user.email,
-			from="noreply@example.com",
-			subject="Password Reset",
-			template="/app/views/mailers/user/password_reset",
-			layout="/app/views/mailers/layout",
-			user=arguments.user,
-			token=arguments.token
+	public any function sendPasswordReset(required any user, required string token) {
+		local.mailer = new wheels.Global().controller(
+			name = "Mailer",
+			params = { controller: "mailer", action: "sendPasswordReset" }
+		);
+		return local.mailer.sendEmail(
+			template = "/mailers/user/password_reset",
+			layout = "/mailers/layout",
+			from = "noreply@example.com",
+			to = arguments.user.email,
+			subject = "Reset your password",
+			user = arguments.user,
+			token = arguments.token
 		);
 	}
 
