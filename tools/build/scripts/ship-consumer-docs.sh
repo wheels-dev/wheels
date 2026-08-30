@@ -5,7 +5,7 @@
 # The framework repo carries TWO AI doc tiers:
 #
 #   MAINTAINER tier (repo only, never shipped):
-#     CLAUDE.md, AGENTS.md, .ai/, .claude/, docs/superpowers/, docs/plans/
+#     CLAUDE.md, AGENTS.md, .ai/, .claude/
 #     — cross-engine invariants, test infrastructure, release engineering.
 #     Excluded from git archives via .gitattributes and never copied by
 #     prepare-*.sh.
@@ -34,7 +34,6 @@
 #   - tools/build/scripts/prepare-core.sh        (calls `ship`)
 #   - tools/build/scripts/prepare-starterApp.sh  (calls `ship`)
 #   - .github/workflows/release.yml              (calls `check` + artifact assertions)
-#   - docs/superpowers/plans/2026-08-30-ai-docs-two-tier.md (design doc)
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

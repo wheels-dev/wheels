@@ -443,8 +443,7 @@ mirroring CI. Browser-driven specs need Playwright installed once:
 
 - Human guides: https://guides.wheels.dev (start-here, core-concepts, testing, deployment)
 - Framework API reference: `/wheels/ai` endpoints on any running app
-  (see `docs/AI_INTEGRATION_GUIDE.md` when present) — JSON docs optimized
-  for AI consumption.
+  — JSON docs optimized for AI consumption.
 - MCP: add `wheels` to `.mcp.json` (`{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}`)
   and prefer `mcp__wheels__*` tools over CLI commands.
 

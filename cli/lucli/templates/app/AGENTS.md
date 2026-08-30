@@ -35,4 +35,4 @@ Claude Code also reads the more detailed `CLAUDE.md` next to this file.
 - `CLAUDE.md` — the full application-developer quick reference shipped with the framework.
 - `.ai/README.md` — index of the bundled reference subset.
 - https://guides.wheels.dev — the human documentation site (start-here, core-concepts, testing, deployment).
-- `/wheels/ai` — JSON documentation endpoints on a running app (see `docs/AI_INTEGRATION_GUIDE.md`).
+- `/wheels/ai` — JSON documentation endpoints on a running app.

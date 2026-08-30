@@ -23,9 +23,6 @@
 #      exits 0 with a warning when `wheels deploy` is unreachable. So this step
 #      is a no-op today, and becomes a real gate automatically the moment the
 #      LuCLI/Module.cfc routing lands.
-#
-# See `docs/superpowers/plans/2026-04-21-phase1-retrospective.md` for the
-# full deploy-gap write-up.
 
 name: Deploy Subsystem CI
 

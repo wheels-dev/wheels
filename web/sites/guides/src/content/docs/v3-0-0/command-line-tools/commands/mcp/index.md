@@ -238,6 +238,5 @@ The MCP integration continues to evolve with:
 ## Related Documentation
 
 - [Wheels CLI Overview](/v3-0-0/command-line-tools/commands/)
-- [AI Integration Guide](/v3-0-0/AI_INTEGRATION_GUIDE/)
 - [Development Server](/v3-0-0/command-line-tools/commands/core/server/)
 - [Code Generation](/v3-0-0/command-line-tools/commands/generate/)
