@@ -187,6 +187,12 @@ TAG_COUNTER = ('<cfset server.__wheels_cov = isDefined("server.__wheels_cov")'
 def _files(root):
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
+        # migrator/templates/* are generator payloads — the scaffolding copied
+        # into a user's app/db/migrate on `wheels migrate`. The originals never
+        # execute, so instrumenting them only adds permanently-uncovered noise.
+        if os.path.relpath(dirpath, root).replace(os.sep, '/').endswith('migrator/templates'):
+            dirnames[:] = []
+            continue
         for fn in filenames:
             if fn.lower().endswith(('.cfc', '.cfm')):
                 yield os.path.join(dirpath, fn)
@@ -207,8 +213,14 @@ def instrument(root):
         # first, then apply them right-to-left so earlier insertions never
         # shift later positions.
         matches = [(pos, 'script', name) for pos, name in _script_insertion_points(masked)]
-        for m in TAG_FN.finditer(masked):
-            brace = masked.find('>', m.end())
+        # Tag-based cffunctions: match against the ORIGINAL text — masked
+        # attribute values (blanked quotes) make `name\s*=\s*["']?...` skip
+        # the value and capture the NEXT attribute's name. Filter out matches
+        # that start inside a masked (comment/string) region.
+        for m in TAG_FN.finditer(text):
+            if m.start() < len(masked) and masked[m.start()] == ' ':
+                continue
+            brace = text.find('>', m.end())
             if brace >= 0:
                 matches.append((brace + 1, 'tag', m.group(1)))
         matches.sort(key=lambda t: -t[0])
@@ -259,7 +271,23 @@ def combine(root, coverage_path, complexity_path):
         complexity = {r['id']: int(r['complexity']) for r in raw_complexity}
     # cov keys are "<rel>:<fn>"; complexity ids are "<rel>:<line>:<fn>"
     rows = []
+    skipped_templates = 0
     for cid, comp in complexity.items():
+        rel = cid.split(':')[0]
+        # Whole-file pseudo-entries (`<template>`) come from tag-based .cfm
+        # views, interface declarations, and abstract stubs — they are not
+        # executable functions, so function-level coverage cannot measure
+        # them. They'd otherwise count as permanently uncovered noise.
+        if cid.endswith(':<template>'):
+            skipped_templates += 1
+            continue
+        # migrator/templates/* are generator payloads (scaffolding copied into
+        # user apps on `wheels migrate`) — the originals never execute. The
+        # instrumenter skips them, so they'd otherwise read as uncovered.
+        # (The complexity GATE still checks them; only coverage excludes them.)
+        if rel.startswith('migrator/templates/'):
+            skipped_templates += 1
+            continue
         covered = _cov_key(cid) in cov
         cv = 100.0 if covered else 0.0
         rows.append({'id': cid, 'complexity': comp, 'covered': covered, 'crap': round(crap(comp, cv), 1)})
@@ -269,7 +297,8 @@ def combine(root, coverage_path, complexity_path):
     for r in rows[:50]:
         print(f'{r["crap"]:7.1f}  {r["complexity"]:4d}  {"yes" if r["covered"] else "no ":>3}  {r["id"]}')
     n_cov = sum(1 for r in rows if r['covered'])
-    print(f'\nfunction coverage: {n_cov}/{len(rows)} ({100*n_cov/max(1,len(rows)):.1f}%)')
+    print(f'\nfunction coverage: {n_cov}/{len(rows)} ({100*n_cov/max(1,len(rows)):.1f}%)'
+          + (f' (excluded {skipped_templates} template pseudo-entries)' if skipped_templates else ''))
     json.dump(rows, open('crap-report.json', 'w'), indent=2)
     print('wrote crap-report.json')
 

@@ -63,8 +63,9 @@ python3 tools/code-quality/cfml-coverage.py combine vendor/wheels \
 python3 tools/code-quality/cfml-coverage.py revert vendor/wheels
 ```
 
-Baseline (Lucee 7 + SQLite, measured 2026-08): **~71% function coverage**
-(1,937/2,723 functions). Known caveats:
+Baseline (Lucee 7 + SQLite, measured 2026-08): **83.2% function coverage**
+(2,175/2,614 functions — template pseudo-entries and migrator generator
+templates excluded from the denominator). Known caveats:
 
 - Coverage is per-leg: `databaseAdapters/*` paths for MySQL/Oracle/SQLServer/
   CockroachDB only execute on those matrix legs — a SQLite-only measurement
