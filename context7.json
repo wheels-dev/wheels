@@ -4,8 +4,7 @@
   "folders": [
     "docs/api",
     "web/sites/guides/src/content/docs",
-		"app/snippets",
-		"guides"
+    "app/snippets"
   ],
   "excludeFolders": [
     "cli",
@@ -13,8 +12,8 @@
     "examples",
     "vendor",
     "test-artifacts",
-		"tests",
-		"tools"
+    "tests",
+    "tools"
   ],
   "excludeFiles": [
     "CHANGELOG.md",
@@ -30,10 +29,10 @@
     "Use the built-in ORM for database operations when possible",
     "Routing follows RESTful conventions by default",
     "Database migrations are handled through the built-in migration system",
-		"Use the CLI for generating components and running migrations",
-		"Follow the community coding standards for CFML",
-		"Documentation should be kept up-to-date with code changes",
-		"Tests should be written for all new features and bug fixes"
+    "Use the CLI for generating components and running migrations",
+    "Follow the community coding standards for CFML",
+    "Documentation should be kept up-to-date with code changes",
+    "Tests should be written for all new features and bug fixes"
   ],
   "versions": [
     {

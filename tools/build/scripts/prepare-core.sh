@@ -62,6 +62,15 @@ for item in "${DOCS_ALLOWLIST[@]}"; do
     fi
 done
 
+# Ship the CONSUMER AI doc tier (CLAUDE.md + AGENTS.md + .ai/) into the
+# artifact root and defensively strip any maintainer-only doc paths that a
+# future `cp -r vendor/wheels/*` change might drag in. Maintainer docs
+# (root CLAUDE.md invariants, .ai/, docs/superpowers) must never reach a
+# `box install` consumer — see
+# docs/superpowers/plans/2026-08-30-ai-docs-two-tier.md.
+echo "Shipping consumer AI docs..."
+./tools/build/scripts/ship-consumer-docs.sh ship "${BUILD_DIR}/wheels"
+
 # Copy template files. The package now ships TWO manifests:
 #
 #   wheels.json — the new Wheels-native manifest (slim schema, what the framework
