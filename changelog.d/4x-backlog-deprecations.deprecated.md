@@ -1,0 +1,1 @@
+- `wheels.Test` (RocketUnit) now emits a one-time deprecation warning; removal is planned for Wheels 5.0.

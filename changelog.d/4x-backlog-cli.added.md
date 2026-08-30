@@ -1,0 +1,3 @@
+- Added `wheels migrate diff` (alias `dbmigrate diff`) — preview or `--write` AutoMigrator schema diffs with rename hints.
+- Added `wheels generate --dry-run` — print would-be generated files without writing anything.
+- Added offline mode (`--offline` / `WHEELS_OFFLINE=1`) — skips the CLI update check and fails fast on registry network calls.

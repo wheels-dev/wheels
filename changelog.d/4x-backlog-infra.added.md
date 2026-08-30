@@ -1,0 +1,3 @@
+- Added `boot` deploy config section (Kamal-compatible `limit`/`wait`).
+- Added `wheels doctor` checks for legacy `wheels.Test` specs, legacy `plugins/`, and raw `params.` mass assignment.
+- Fixed the debug bar showing `0.0.0-dev` on installs where `BuildInfo.cfc` ships unstamped (now falls back to the sibling manifest version).
