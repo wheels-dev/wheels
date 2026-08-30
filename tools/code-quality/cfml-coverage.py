@@ -21,35 +21,157 @@ Usage:
 """
 import os, re, sys, json, shutil, argparse
 
-SCRIPT_FN = re.compile(r'\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{', re.S)
+SCRIPT_FN = re.compile(r'\bfunction\s+([A-Za-z_$][\w$]*)\s*\(')
 # Guarded closure assignments (include-idempotent templates):
 #   variables.$helper = function(args) { ... };
-CLOSURE_FN = re.compile(r'\bvariables\s*\.\s*\$?([A-Za-z_$][\w$]*)\s*=\s*function\s*\([^)]*\)\s*\{', re.S)
+CLOSURE_FN = re.compile(r'\bvariables\s*\.\s*\$?([A-Za-z_$][\w$]*)\s*=\s*function\s*\(')
 # Capture the name only (group 1); the opening tag itself is not part of the id —
 # embedding it produced ids full of quotes, i.e. invalid CFML in the counter.
 TAG_FN = re.compile(r'<cffunction\b[^>]*?\bname\s*=\s*["\']?([A-Za-z_$][\w$]*)', re.I)
 EXCLUDE_DIRS = {'tests', 'rocketunit_tests'}
 
-DSTRING = re.compile(r'"(?:[^"\\]|\\.)*"', re.S)
-SSTRING = re.compile(r"'(?:[^'\\]|\\.)*'", re.S)
-LINE_COMMENT = re.compile(r'//[^\n]*')
-BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.S)
-TAG_COMMENT = re.compile(r'<!---.*?--->', re.S)
-
 
 def _mask(text):
-    """Mask strings and comments with same-length spaces so function patterns
-    never match inside them (JS `function name(){` in a CFML string literal
-    used to get a counter inserted mid-string — a parse error). Offsets are
-    preserved, so matches map back onto the original text unchanged."""
-    for pat in (DSTRING, SSTRING, LINE_COMMENT, BLOCK_COMMENT, TAG_COMMENT):
-        text = pat.sub(lambda m: ' ' * len(m.group(0)), text)
-    return text
+    """Blank strings and comments with same-length spaces via a single-pass
+    scanner, so function patterns never match inside them (JS
+    `function name(){` in a CFML string literal used to get a counter
+    inserted mid-string — a parse error). Offsets are preserved, so matches
+    map back onto the original text unchanged.
+
+    A regex cascade can't do this: the correct order depends on the content
+    (`/*` inside a string literal must not open a block comment; an
+    apostrophe inside a comment must not open a single-quoted string), so
+    the scanner tracks every state at once and only emits code characters.
+    """
+    out = []
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < n else ''
+        # tag comment <!--- ... --->
+        if ch == '<' and text.startswith('<!---', i):
+            end = text.find('--->', i + 5)
+            end = n if end < 0 else end + 4
+            out.append(' ' * (end - i))
+            i = end
+            continue
+        # line comment // ...
+        if ch == '/' and nxt == '/':
+            end = text.find('\n', i)
+            end = n if end < 0 else end
+            out.append(' ' * (end - i))
+            i = end
+            continue
+        # block comment /* ... */
+        if ch == '/' and nxt == '*':
+            end = text.find('*/', i + 2)
+            end = n if end < 0 else end + 2
+            out.append(' ' * (end - i))
+            i = end
+            continue
+        # strings (both quote styles; CFML's only string-literal escape is
+        # DOUBLING the quote — `table(""tbl_users"")` — so a backslash is
+        # ordinary content: `"\"` is a one-backslash string, and treating \
+        # as an escape would skip the real closing quote and desync the scan).
+        # Double-quoted strings additionally support #expr# interpolation,
+        # which re-enters expression mode: nested string literals inside the
+        # expression pair independently and do NOT close the outer string —
+        # e.g. `"#Replace(x, "'", "''", "all")#'"`.
+        if ch == '"' or ch == "'":
+            quote = ch
+            j = i + 1
+            while j < n:
+                if quote == '"' and text[j] == '#':
+                    if j + 1 < n and text[j + 1] == '#':
+                        # '##' is a literal hash — skip both, stay in string
+                        j += 2
+                        continue
+                    # Enter interpolation: find the closing '#', consuming
+                    # nested string literals wholesale.
+                    k = j + 1
+                    while k < n:
+                        ck = text[k]
+                        if ck == '#':
+                            k += 1
+                            break
+                        if ck == '"' or ck == "'":
+                            q = ck
+                            k += 1
+                            while k < n:
+                                if text[k] == q:
+                                    if k + 1 < n and text[k + 1] == q:
+                                        k += 2
+                                        continue
+                                    k += 1
+                                    break
+                                k += 1
+                            continue
+                        k += 1
+                    j = k
+                    continue
+                if text[j] == quote:
+                    if j + 1 < n and text[j + 1] == quote:
+                        # CFML doubled-quote escape — skip both, stay in string
+                        j += 2
+                        continue
+                    j += 1
+                    break
+                j += 1
+            out.append(' ' * (j - i))
+            i = j
+            continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)
 
 
 def _backup_dir(root):
     """Sibling of the instrumented root, so the walk never re-instruments it."""
     return os.path.join(os.path.dirname(os.path.abspath(root)), '.cfml-cov-backup')
+
+
+def _balanced_close(masked, open_paren):
+    """Index just past the ')' that closes the '(' at open_paren, or -1.
+
+    Signatures routinely contain nested parens — `struct properties =
+    this.properties()`, `required date now = Now()`, closures in defaults —
+    which a flat `[^)]*` scan terminates at the FIRST ')', silently skipping
+    the whole function. Counting depth instead finds the real end.
+    """
+    depth = 0
+    i = open_paren
+    while i < len(masked):
+        ch = masked[i]
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return -1
+
+
+def _script_insertion_points(masked):
+    """Yield (position, name) pairs for counter insertion in script code.
+
+    Position = index just past the '{' that opens the function body. Only
+    signatures whose closing ')' is followed (modulo whitespace) by '{' count —
+    a line that merely forwards/declares has no body to instrument.
+    """
+    for pat in (SCRIPT_FN, CLOSURE_FN):
+        for m in pat.finditer(masked):
+            open_paren = m.end() - 1
+            close = _balanced_close(masked, open_paren)
+            if close < 0:
+                continue
+            j = close
+            while j < len(masked) and masked[j] in ' \t\r\n':
+                j += 1
+            if j < len(masked) and masked[j] == '{':
+                yield j + 1, m.group(1)
+
 
 # CFScript components (the .cfc files) use script syntax — no tags inside a
 # function body. Tag-based .cfm/.cfc use <cfset>. Both are self-initializing.
@@ -84,10 +206,7 @@ def instrument(root):
         # Collect every insertion point against the original (masked) offsets
         # first, then apply them right-to-left so earlier insertions never
         # shift later positions.
-        matches = []
-        for pat in (SCRIPT_FN, CLOSURE_FN):
-            for m in pat.finditer(masked):
-                matches.append((m.end(), 'script', m.group(1)))
+        matches = [(pos, 'script', name) for pos, name in _script_insertion_points(masked)]
         for m in TAG_FN.finditer(masked):
             brace = masked.find('>', m.end())
             if brace >= 0:
