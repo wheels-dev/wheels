@@ -1,8 +1,8 @@
 # Cross-Engine Compatibility Guide
 
-Wheels runs on multiple CFML engines (Lucee 5/6/7, Adobe CF 2018-2025, BoxLang) and databases (H2, MySQL, PostgreSQL, SQL Server, CockroachDB). Each engine has runtime differences that can cause code to pass on one engine but fail on another. This guide documents the known gotchas.
+Wheels runs on multiple CFML engines (Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, BoxLang) and databases (SQLite, H2, MySQL, PostgreSQL, SQL Server, CockroachDB, Oracle). Each engine has runtime differences that can cause code to pass on one engine but fail on another. This guide documents the known gotchas.
 
-**RustCFML (best-effort, experimental):** [RustCFML](https://github.com/RustCFML/RustCFML) — a young, JVM-free CFML interpreter written in Rust — is recognized as a first-class engine in the adapter layer (`server.coldfusion.productName == "RustCFML"` → `RustCFMLAdapter`), but it is NOT yet part of the CI matrix and cannot fully boot the framework today. The confirmed divergence handled in-framework is the **missing `cfcache` built-in** (the cfcache-backed cache degrades to a no-op via the adapter's `supportsCfcache()=false`). Remaining blockers are tracked upstream — chiefly an argument-scope-fidelity gap (undeclared/`argumentCollection`-forwarded named args lose their names) and no Query-of-Queries — so treat RustCFML support as in-progress.
+**RustCFML (supported, JVM-free):** [RustCFML](https://github.com/RustCFML/RustCFML) — a young, JVM-free CFML interpreter written in Rust — is a supported engine. It has a required PR check (`.github/workflows/rustcfml-ci.yml`) and a release-matrix leg (`compat-matrix.yml`), running the full core suite against a pinned build (`tools/rustcfml/ENGINE_VERSION`, currently v0.637.0) with ~5,350 passing specs. Pass criteria is "no NEW failures versus `tools/rustcfml/baseline.json`" — one known failure (a Query-of-Queries bug, RustCFML/RustCFML#377) is baselined there, with the other tracked upstream issues listed in the baseline's `_notes`. The suite skips browser specs and JVM-dependent paths via `EngineCapabilities.hasJvmClassLoading()`. Remaining blockers are tracked upstream — chiefly an argument-scope-fidelity gap (undeclared/`argumentCollection`-forwarded named args lose their names) and no Query-of-Queries — so treat RustCFML support as young but gated, not experimental.
 
 ## Engine-Specific Gotchas
 
@@ -356,13 +356,13 @@ cfimage(attributeCollection = local.args);
 
 **Why**: Adobe CF 2023 and 2025 impose a stricter type check on `attributeCollection` and require a plain CFML struct, not the special `arguments` scope object. The struct-copy pattern is safe and idiomatic across all engines. `$header()` is the dispatch-path blocker (runs on every request) — the others surface as soon as the corresponding helper is called.
 
-**Reference fix**: [#2750](https://github.com/wheels-dev/wheels/pull/2750) (closes #2741) — patches all 13 affected wrappers in `vendor/wheels/Global.cfc` uniformly: `$header`, `$cache`, `$content`, `$mail`, `$directory`, `$file`, `$location`, `$htmlhead`, `$image`, `$dbinfo`, `$invoke`, `$wddx`, `$zip`. `$dbinfo()` rebuilds the local copy before each of its four `cfdbinfo` calls because the catch path mutates `arguments` between calls — a useful pattern when a helper writes through `arguments` between tag invocations.
+**Reference fix**: [#2750](https://github.com/wheels-dev/wheels/pull/2750) (closes #2741) — patches all 13 affected tag wrappers in `vendor/wheels/global/tags.cfm` (included into the `wheels.Global` mixin at runtime) uniformly: `$header`, `$cache`, `$content`, `$mail`, `$directory`, `$file`, `$location`, `$htmlhead`, `$image`, `$dbinfo`, `$invoke`, `$wddx`, `$zip`. `$dbinfo()` rebuilds the local copy before each of its four `cfdbinfo` calls because the catch path mutates `arguments` between calls — a useful pattern when a helper writes through `arguments` between tag invocations.
 
 ### `cfheader` / `cfcontent` on a Committed Response (Adobe CF 2023/2025)
 
 Adobe CF 2023/2025 throws `InvalidHeaderException: Failed to add HTML header` from `cfheader`, and a similar exception from `cfcontent`, once the servlet response has been committed (the output buffer flushed). This bites hardest inside `onError` handlers, where partial view output has typically already flushed before the handler runs — the secondary `cfheader` failure then replaces the original exception in the response. Lucee and BoxLang tolerate the same call as a no-op.
 
-Use the canonical `$responseCommitted()` probe — `public boolean function $responseCommitted()` in `vendor/wheels/Global.cfc` — to short-circuit defensively. Wrap the actual tag call in `try/catch` and re-probe in the catch to rethrow only when the response is still uncommitted (a genuine caller bug):
+Use the canonical `$responseCommitted()` probe — `public boolean function $responseCommitted()` in `vendor/wheels/global/tags.cfm` (mixed into `wheels.Global` at runtime) — to short-circuit defensively. Wrap the actual tag call in `try/catch` and re-probe in the catch to rethrow only when the response is still uncommitted (a genuine caller bug):
 
 ```cfm
 public void function $myTagWrapper() {
@@ -419,11 +419,10 @@ Note the interaction with anti-pattern 11 (reserved scope names shadowing parame
 
 ## Database-Specific Gotchas
 
-### H2 Database (Test Default)
+### H2 Database (Lucee-Only Matrix Leg)
 
-H2 is the embedded database used by default in tests. Key differences:
+H2 is a Lucee-only database in the compat matrix (SQLite is the default for local tests and the PR CI leg). Key differences:
 - Case-sensitive by default for identifiers
-- `NOW()` is supported (Wheels normalizes this)
 - Some MySQL-specific functions (e.g., `GROUP_CONCAT`) not available
 - Simpler locking model than production databases
 
@@ -463,15 +462,17 @@ public boolean function $lowerCaseColumnNames() {
 
 ### Migration Date Functions
 
-Use `NOW()` for cross-database compatibility in migrations:
+Use `CURRENT_TIMESTAMP` for cross-database dates in migrations — it works on MySQL, PostgreSQL, SQL Server, H2, AND SQLite:
 
 ```cfm
-// WRONG — database-specific
-execute("INSERT INTO users (name, createdAt) VALUES ('Admin', CURRENT_TIMESTAMP)");
+// WRONG — NOW() fails on SQLite (the `wheels new` default DB) and SQL Server
+execute("INSERT INTO users (name, createdAt) VALUES ('Admin', NOW())");
 
-// RIGHT — NOW() works across MySQL, PostgreSQL, SQL Server, H2
-execute("INSERT INTO users (name, createdAt, updatedAt) VALUES ('Admin', NOW(), NOW())");
+// RIGHT — CURRENT_TIMESTAMP is portable across every supported database
+execute("INSERT INTO users (name, createdAt, updatedAt) VALUES ('Admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
 ```
+
+This matches root `CLAUDE.md` anti-pattern #5 — keep the two in agreement.
 
 ### Parameter Binding in Migrations
 
@@ -481,8 +482,8 @@ Direct SQL with `execute()` is more reliable than parameter binding for seed dat
 // WRONG — parameter binding unreliable in migrations
 execute(sql="INSERT INTO roles (name) VALUES (?)", parameters=[{value="admin"}]);
 
-// RIGHT — direct SQL
-execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
+// RIGHT — direct SQL with a portable timestamp
+execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
 ```
 
 ### PostgreSQL / CockroachDB — Migration DDL Differences
@@ -527,9 +528,9 @@ if (isMySQLFamily) {
 }
 ```
 
-### CockroachDB (Soft-Fail in CI)
+### CockroachDB (Full Matrix Leg)
 
-CockroachDB is in CI but marked as soft-fail — test failures are logged as warnings, not build failures. Controlled by `SOFT_FAIL_DBS` in `.github/workflows/tests.yml`.
+CockroachDB is a full (non-soft-fail) leg of the compat matrix — each engine × cockroachdb combination runs as its own parallel job in `.github/workflows/compat-matrix.yml`. The only remaining soft-fail database is Oracle (`SOFT_FAIL_DBS="oracle"` in the same workflow, tracked in #2663).
 
 ### Oracle — Multi-Row INSERT and RETURNING Incompatibility
 
@@ -571,10 +572,18 @@ There is no rollback to forfeit on Oracle — the implicit commit makes each DDL
 
 ### Local Test Procedure
 
-Always test on at least TWO engines before pushing — Lucee and Adobe catch different bugs:
+The canonical local matrix runner is `tools/test-matrix.sh` (mirrors compat-matrix.yml exactly):
 
 ```bash
-cd /path/to/wheels/rig    # repo root with compose.yml
+tools/test-matrix.sh                      # Lucee 7 + SQLite (fastest)
+tools/test-matrix.sh lucee7 mysql
+tools/test-matrix.sh --all               # full matrix
+```
+
+Always test on at least TWO engines before pushing — Lucee and Adobe catch different bugs. The low-level equivalent (useful when iterating on one container) is:
+
+```bash
+cd /path/to/wheels/repo    # repo root with compose.yml
 
 docker compose up -d lucee6 adobe2025
 

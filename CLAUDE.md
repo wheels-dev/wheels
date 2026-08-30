@@ -46,7 +46,7 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 7. **`private` mixin functions are not integrated.** `$integrateComponents()` only copies `public` methods into model/controller objects. ALL helpers in `vendor/wheels/model/*.cfc`, view helpers, etc. MUST use `public` access with `$` prefix for internal scope. BoxLang passes; Lucee/Adobe fail.
 8. **`Left(str, 0)` crashes Lucee 7.** Guard: `len > 0 ? Left(str, len) : ""`.
 9. **`toBeInstanceOf("component")` fails on BoxLang** — returns the FQN, not the literal `"component"`. Use `toBeWheelsModel()` for finder results.
-10. **Adobe CF 2023 and 2025 reject the `arguments` scope as `attributeCollection` on *any* built-in CFML tag.** Affects every `cfheader` / `cfcache` / `cfcontent` / `cfmail` / `cfdirectory` / `cffile` / `cflocation` / `cfhtmlhead` / `cfimage` / `cfdbinfo` / `cfinvoke` / `cfwddx` / `cfzip` wrapper. Covers both the string-interpolated (`attributeCollection = "#arguments#"`) and direct-struct (`attributeCollection = arguments`) forms. Adobe 2023/2025 throw — `cfheader`'s message is `"Failed to add HTML header"`; other tags surface their own — and `$header()` is catastrophic because it runs on every request. Copy to a plain struct first: `local.args = {}; for (local.key in arguments) { local.args[local.key] = arguments[local.key]; }`. Lucee 6/7, BoxLang, and Adobe 2018/2021 accept both forms; Adobe 2023/2025 require the plain struct. The 13 sites in `vendor/wheels/Global.cfc` were patched uniformly in [#2750](https://github.com/wheels-dev/wheels/pull/2750).
+10. **Adobe CF 2023 and 2025 reject the `arguments` scope as `attributeCollection` on *any* built-in CFML tag.** Affects every `cfheader` / `cfcache` / `cfcontent` / `cfmail` / `cfdirectory` / `cffile` / `cflocation` / `cfhtmlhead` / `cfimage` / `cfdbinfo` / `cfinvoke` / `cfwddx` / `cfzip` wrapper. Covers both the string-interpolated (`attributeCollection = "#arguments#"`) and direct-struct (`attributeCollection = arguments`) forms. Adobe 2023/2025 throw — `cfheader`'s message is `"Failed to add HTML header"`; other tags surface their own — and `$header()` is catastrophic because it runs on every request. Copy to a plain struct first: `local.args = {}; for (local.key in arguments) { local.args[local.key] = arguments[local.key]; }`. Lucee 6/7, BoxLang, and Adobe 2018/2021 accept both forms; Adobe 2023/2025 require the plain struct. The 13 tag wrappers in `vendor/wheels/global/tags.cfm` (mixed into `wheels.Global` at runtime) were patched uniformly in [#2750](https://github.com/wheels-dev/wheels/pull/2750).
 11. **Anything written through `local.` inside `catch` doesn't persist on BoxLang.** Catch body runs under a nested `local` that gets discarded on exit, so `expect(local.X)` after the catch reads the un-touched outer value. Use a struct field: `var state = {flag = false}; ... state.flag = true;`. Bare `var bareName` + unscoped `bareName = true` also works but the struct form mirrors `TenantResolverSpec` and is the prior-art pattern.
 
     **The struct form only works if you access it WITHOUT the `local.` prefix.** `local.state.flag = true` inside a catch fails exactly like a scalar `local.X = ...` — the nested `local` shadows `local.state`, so the write lands on a discarded copy rather than mutating the outer struct. The prefix is what breaks it, not the assignment shape:
@@ -421,7 +421,7 @@ Java 21 + Wheels CLI 4.0.0+ required for `tools/test-local.sh`. Docker required 
 
 ### Onboarding harness
 
-`tools/test-onboarding.sh` simulates a brand-new-user fresh-install flow without touching your daily wheels install. Use when fixing CLI/framework/template code that affects `wheels new` → `wheels start` → `wheels migrate latest`. Validates cliff fixes BEFORE asking for a fresh-VM tutorial run. ~90s end-to-end across 7 phases. Deep reference: [.ai/wheels/testing/onboarding-harness.md](.ai/wheels/testing/onboarding-harness.md).
+`tools/test-onboarding.sh` simulates a brand-new-user fresh-install flow without touching your daily wheels install. Use when fixing CLI/framework/template code that affects `wheels new` → `wheels start` → `wheels migrate latest`. Validates cliff fixes BEFORE asking for a fresh-VM tutorial run. ~90s end-to-end across 15 phases. Deep reference: [.ai/wheels/testing/onboarding-harness.md](.ai/wheels/testing/onboarding-harness.md).
 
 ### Browser tests
 
@@ -496,20 +496,17 @@ Prefer MCP tools when the Wheels MCP server is available. Fall back to CLI other
 
 ## Reference Docs (verified to exist)
 
-Search `.ai/` for deeper documentation:
+Search `.ai/` for deeper documentation. The tree is deliberately small —
+the code is the source of truth, and the CFML-language / generic-pattern
+reference tiers were removed (they drifted and modern models no longer
+need them). What remains is maintainer-only runbook knowledge that is not
+recoverable from reading the code:
 
 - [.ai/wheels/cross-engine-compatibility.md](.ai/wheels/cross-engine-compatibility.md) — Start here for Lucee/Adobe gotchas
 - [.ai/wheels/deploy.md](.ai/wheels/deploy.md) — `wheels deploy` Kamal port (extracted from CLAUDE.md)
 - [.ai/wheels/wheels-bot.md](.ai/wheels/wheels-bot.md) — Bot architecture (extracted from CLAUDE.md)
 - [.ai/wheels/testing/browser-testing.md](.ai/wheels/testing/browser-testing.md) — Browser DSL (extracted from CLAUDE.md)
 - [.ai/wheels/testing/onboarding-harness.md](.ai/wheels/testing/onboarding-harness.md) — Fresh-install simulation
-- [.ai/wheels/controllers/api.md](.ai/wheels/controllers/api.md) — API controller patterns
-- [.ai/wheels/views/query-association-patterns.md](.ai/wheels/views/query-association-patterns.md) — Loop / include patterns
-- [.ai/wheels/security/https-detection.md](.ai/wheels/security/https-detection.md)
-- [.ai/wheels/channels/channels.md](.ai/wheels/channels/channels.md)
-- [.ai/wheels/snippets/model-snippets.md](.ai/wheels/snippets/model-snippets.md), [controller-snippets.md](.ai/wheels/snippets/controller-snippets.md)
-- [.ai/wheels/troubleshooting/common-errors.md](.ai/wheels/troubleshooting/common-errors.md), [form-helper-errors.md](.ai/wheels/troubleshooting/form-helper-errors.md)
 - [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md) — Orphan-version handling + `migrate doctor` / `forget` / `pretend` reconciliation commands (#2780)
-- [.ai/cfml/](.ai/cfml/) — CFML language reference (syntax, components, control flow)
 
 **External:** user-facing guides at `web/sites/guides/src/content/docs/v4-0-0/` (deployment, command-line-tools/mcp-integration, etc.) — these ship to guides.wheels.dev. Use when you need the version Wheels users read.

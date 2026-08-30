@@ -64,16 +64,23 @@ Phase 7:  wheels packages list (regression check — fixed in #2309)
 Phase 8:  wheels routes returns route table not API JSON dump (issue #2317)
 Phase 9:  wheels test prints non-zero counts when a spec exists (issue #2318)
 Phase 10: dev error pages return 5xx/4xx not HTTP 200 (issue #2319)
+Phase 11: wheels generate scaffold tolerates existing model (issue #2327)
+Phase 12: wheels browser setup fetches Playwright (issue #2332)
+Phase 13: wheels destroy controller removes both .cfc and views/ (issue #2330)
+Phase 14: wheels generate model produces clean output (issue #2329)
+Phase 15: dev toolbar shows real version (issue #2333)
 ```
 
 Each phase emits `✓` (pass), `✗` (fail), or `-` (skip) lines. The summary
 counts add up across all phases. A failure in Phase 1-3 aborts subsequent
 phases (no point running migrations against a server that didn't start).
 
-Phases 8-10 are SKIP-clean while their issues are open and flip to PASS once
-fixed. The harness stays green during normal development and lights up
-regressions automatically — you don't need to remember to re-enable a check
-when an issue closes.
+Phases 8-15 are SKIP-clean while their gating issues are open and flip to
+PASS once the fix is detectable in the worktree. All of those issues
+(#2317, #2318, #2319, #2327, #2332, #2330, #2329, #2333) have since been
+fixed, so on a current worktree the phases run and pass. The harness stays
+green during normal development and lights up regressions automatically —
+you don't need to remember to re-enable a check when an issue closes.
 
 ## Modes
 
@@ -124,11 +131,11 @@ onboarding journal. Lookup table:
 |---|---|---|
 | F1 | bundleName forces broken OSGi resolution | fixed (bundleName stripped from template) |
 | F2/F5 | `wheels migrate latest` silently no-ops | fixed (correct command name) |
-| F3 | duplicate `create blog/Application.cfc` lines | open ([#2311](https://github.com/wheels-dev/wheels/issues/2311), didn't reproduce locally) |
+| F3 | duplicate `create blog/Application.cfc` lines | fixed ([#2311](https://github.com/wheels-dev/wheels/issues/2311), closed without local repro; covered by Phase 2) |
 | F3-orig | seedOnce non-idempotent | likely downstream of F1 (column case-folding); covered by Phase 5 |
 | F4 | tutorial file tree out of date | fixed (regenerated from real `wheels new`) |
 | F7 | `cli.lucli.X` doesn't resolve in copy installs | fixed (rewrote to `modules.wheels.X`) |
-| F7 follow-up | `wheels.SemVer` not loaded in CLI context | open ([#2310](https://github.com/wheels-dev/wheels/issues/2310)) |
+| F7 follow-up | `wheels.SemVer` not loaded in CLI context | fixed ([#2310](https://github.com/wheels-dev/wheels/issues/2310)) |
 
 ## Required state
 
@@ -169,8 +176,8 @@ easier to audit and modify in one place than spread across modules.
 
 ## Why a separate harness vs extending `tools/test-local.sh`
 
-`tools/test-local.sh` runs the framework's own unit-test suite (3328+ specs)
-inside a running Wheels server. It assumes the framework is correctly
+`tools/test-local.sh` runs the framework's own unit-test suite (5487 specs
+across 397 spec files) inside a running Wheels server. It assumes the framework is correctly
 loaded — which is the very assumption a brand-new user can't make. The
 onboarding harness exists below that assumption: it boots from
 `wheels new` and proves the cliff is closed at every step the user
