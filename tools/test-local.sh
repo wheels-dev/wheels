@@ -43,6 +43,14 @@ RESULT_FILE="${WHEELS_TEST_RESULT_FILE:-/tmp/wheels-local-test-results-$(echo "$
 # the ${VAR:-default} preserves the CI override.
 export WHEELS_BROWSER_TEST_BASE_URL="${WHEELS_BROWSER_TEST_BASE_URL:-http://localhost:${PORT}}"
 
+# Playwright Java runs `node driver/cli.js install` (a full browser
+# download/check) on first launch unless this is set; on a machine where that
+# subprocess stalls, the launch blocks forever and wedges the entire test run
+# behind the test-runner lock. Browsers are preinstalled by `wheels browser
+# setup`, so the install step is always skippable — and the BrowserLauncher
+# watchdog (BrowserLauncher.cfc) still bounds any launch that does stall.
+export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD="${PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD:-1}"
+
 cd "$PROJECT_ROOT"
 
 # ── Ensure SQLite test databases exist ──────────────
