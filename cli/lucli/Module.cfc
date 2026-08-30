@@ -107,8 +107,16 @@ component extends="modules.BaseModule" {
 	 * into a completely different invocation.
 	 */
 	private struct function structuredArgs(struct callerArgs = {}) {
+		// Command specs set `mod.__arguments = [...]` from OUTSIDE the
+		// component, which Lucee stores on the `this` scope; internal
+		// delegation assigns the unprefixed (variables) name. Consume either
+		// shape so both callers reach the same dispatch.
 		var raw = __arguments ?: [];
+		if (!arrayLen(raw) && structKeyExists(this, "__arguments")) {
+			raw = this.__arguments;
+		}
 		__arguments = [];
+		structDelete(this, "__arguments");
 		if (!structIsEmpty(arguments.callerArgs)) {
 			return arguments.callerArgs;
 		}
@@ -2433,15 +2441,20 @@ component extends="modules.BaseModule" {
 		var positional = $deployStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "deploy";
 
-		var dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
-			$deployBuildSshPool(opts.configPath)
-		);
+		// DeployMainCli is constructed lazily — only the deploy/main verb
+		// family needs the SSH pool, which eagerly loads config/deploy.yml.
+		// Building it up front broke the secrets verbs (fetch/extract/print),
+		// which are config-independent, whenever no deploy.yml existed.
+		var dmc = "";
 
 		// Dispatch by verb family. Each family mirrors the exact set of case
 		// labels the previous single switch handled; case-sensitive listFind
 		// preserves the same matching semantics (`wheels deploy DEPLOY` still
 		// falls through to the throw below).
 		if (listFind("deploy,redeploy,rollback,config,init,setup,version,audit,docs,details,remove", sub)) {
+			dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
+				$deployBuildSshPool(opts.configPath)
+			);
 			return $deployMain(dmc, opts, positional, sub);
 		}
 		if (listFind("app,proxy,registry,build,accessory,prune,lock", sub)) {
