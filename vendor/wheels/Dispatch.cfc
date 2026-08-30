@@ -788,7 +788,14 @@ component output="false" extends="wheels.Global"{
 		// Run the finder outside the try so query errors (DB connection failures, missing
 		// tables at query time, SQL errors) propagate instead of being masked as a missing
 		// model class.
-		local.instance = local.modelClass.findByKey(local.rv.key);
+		if (StructKeyExists(arguments.route, "bindBy") && Len(Trim(arguments.route.bindBy))) {
+			// bindBy="slug" looks the record up by a non-PK column via the
+			// parameterized dynamic finder. invoke() form (not a bracket call)
+			// per Cross-Engine Invariant 4.
+			local.instance = invoke(local.modelClass, "findOneBy" & arguments.route.bindBy, { 1 = local.rv.key });
+		} else {
+			local.instance = local.modelClass.findByKey(local.rv.key);
+		}
 
 		// If no record was found, throw a 404.
 		if (IsBoolean(local.instance) && !local.instance) {
