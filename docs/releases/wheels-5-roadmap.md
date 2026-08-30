@@ -3,6 +3,7 @@
 **Status:** Roadmap (decided direction, open items flagged explicitly)
 **Date:** 2026-06-20
 **Supersedes:** the earlier `wheels-5-roadmap-recommendations.md` draft, which is now folded into this single document.
+**Audit note (2026-08-30):** verified against the codebase — none of §5 has landed yet; the RustCFML bullet in §6 has been updated to reflect its graduation to a supported engine. Current-version (4.x) candidates are tracked separately in [wheels-4.x-backlog.md](wheels-4.x-backlog.md).
 
 This is the one document that describes what Wheels 5 is for, what it will and will not do, and why. It is written to be acted on, not just discussed. Where a decision is genuinely still open it is listed in [§11 Open decisions](#11-open-decisions) with a recommended default; everything else is a committed direction.
 
@@ -161,7 +162,7 @@ Earlier drafts elevated two single-author projects to strategic pillars. That is
 
 - **BoxLang** — *first-class supported engine, not the primary optimization target.* BoxLang is real (Ortus, 1.0 GA May 2025) but its adoption is vendor-narrated, not measured. The hedge is sound, but it is not permanent: **re-evaluate quarterly.** If adoption inflects, "not primary" can age badly.
 - **LuCLI** — *vendored, with an explicit continuity plan.* The `wheels` binary is already a branded fork of LuCLI in [`cli/lucli/`](../../cli/lucli/). LuCLI upstream is a self-declared **alpha (v0.4.0, "expect breaking changes"), single-maintainer** project. The continuity plan is the mitigation, not a relationship: **we own the vendored fork.** We contribute genuinely-generic improvements upstream where convenient, but Wheels' release cadence never blocks on upstream LuCLI, and we do not assume API stability we don't control.
-- **RustCFML** — *monitor only; not a roadmap pillar.* It is public ([`github.com/pixl8/RustCFML`](https://github.com/pixl8/RustCFML), Alex Skinner), but it is a ~26-star, AI-authored, single-author experiment **with no ORM** — meaning it cannot run Wheels' model layer at all. It is interesting signal for "AI maintains CFML" (which informs §5.6), nothing more. It does not appear in support tables, gates, or positioning. (Earlier drafts both stated "no public project exists" — false — and made it "the strongest alternative to vertical integration" — unsupportable. Both are corrected here.)
+- **RustCFML** — *supported engine (updated 2026-08-30).* After this roadmap was written, RustCFML graduated from "monitor only" into a supported engine: required PR check (`.github/workflows/rustcfml-ci.yml`), a pinned build (`tools/rustcfml/ENGINE_VERSION`, currently v0.637.0), a baseline gate (`tools/rustcfml/baseline.json` — ~5,350 of 5,375 core specs pass, including the model layer), and a compat-matrix leg. Remaining gaps (argument-scope fidelity, Query-of-Queries) are tracked upstream. The June 2026 posture ("no ORM", "cannot run the model layer", "monitor only") no longer describes reality.
 
 There is no separate "partnership workstream," no RFC directory gate, and no strategic conformance program in 5.0. Coordination stays lightweight: GitHub issues, milestones, and labels.
 
@@ -193,7 +194,7 @@ There is no separate "partnership workstream," no RFC directory gate, and no str
 A small team needs **two** tiers plus a release gate — not five.
 
 - **Tier 1 — PR fast lane (blocks merge, target < 10 min).** Lucee latest + SQLite: core WheelsTest, CLI tests, generated-app smoke, minimal browser smoke, `wheels doctor`. Seed already exists in [`pr.yml`](../../.github/workflows/pr.yml).
-- **Tier 2 — Nightly full matrix.** All supported engine/DB combinations from the manifest; publishes a dashboard, uploads JUnit/JSON, opens/updates issues for persistent failures. Seed already exists in [`compat-matrix.yml`](../../.github/workflows/compat-matrix.yml).
+- **Tier 2 — Scheduled full matrix.** All supported engine/DB combinations from the manifest; publishes a dashboard, uploads JUnit/JSON, opens/updates issues for persistent failures. Seed already exists in [`compat-matrix.yml`](../../.github/workflows/compat-matrix.yml) (currently a weekly cron; nightly cadence is an open §11 question).
 - **Release gate.** Full matrix green-or-documented, generated-app lifecycle, upgrade tests from latest Wheels 4, **public distribution canaries** (Homebrew/Scoop/apt/yum installed on a clean system), browser tests, docs gate. A clean public install path is part of the trust story and is release-blocking.
 
 Generated-app smoke testing (run the same `wheels` binary users install: `new` → `generate scaffold` → `migrate latest` → `test` → `start`) catches template/CLI/docs drift that internal unit tests cannot, and is the cheapest high-value test we have.

@@ -20,7 +20,7 @@ CLI, and `app/` is a demo app for hand-testing.
 2. **Two-tier docs.** AI docs for APPLICATION developers live in
    `docs/consumer-ai/` and ship in every distribution (ForgeBox core,
    starter app, `wheels new` scaffolds). Maintainer docs (this file,
-   `CLAUDE.md`, `.ai/`, `docs/superpowers/`) never ship. If you change a
+   `CLAUDE.md`, `.ai/`) never ship. If you change a
    user-facing quick reference, update the consumer copy too —
    `tools/build/scripts/ship-consumer-docs.sh check` enforces the split in
    CI.
@@ -34,6 +34,7 @@ CLI, and `app/` is a demo app for hand-testing.
 
 - `CLAUDE.md` — invariants, anti-patterns, test/verification workflow (read first)
 - `.ai/` — deep reference docs (maintainer runbooks and Wheels internals), searched on demand
-- `docs/superpowers/` — design specs and plans (read before large changes)
+- `docs/releases/wheels-5-roadmap.md` — the committed 5.0 direction
+- `docs/releases/wheels-4.x-backlog.md` — candidate items for the current 4.x line
 - `.claude/commands/` — wheels-bot prompts run by the bot-*.yml workflows
 - `docs/consumer-ai/` — the consumer AI doc tier (ships in artifacts)

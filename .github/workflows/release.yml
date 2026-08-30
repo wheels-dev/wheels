@@ -257,14 +257,13 @@ jobs:
           validate_package "build-wheels-core/wheels" "Wheels Core"
           validate_package "build-wheels-starterApp" "Wheels Starter App"
 
-          # Two-tier AI docs assertions (see
-          # docs/superpowers/plans/2026-08-30-ai-docs-two-tier.md):
+          # Two-tier AI docs assertions:
           #   1. source-tree check — consumer tier exists and the root
           #      CLAUDE.md still points at it;
           #   2. artifact check — every distributed package carries the
           #      CONSUMER docs (CLAUDE.md + AGENTS.md) and must NOT leak
           #      maintainer-only paths (.ai deep reference set beyond the
-          #      consumer README, docs/superpowers, docs/plans, .claude/).
+          #      consumer README, .claude/, .github/).
           echo ""
           echo "=========================================="
           echo "Validating two-tier AI docs"

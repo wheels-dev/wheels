@@ -87,6 +87,3 @@ Fixtures at `cli/lucli/tests/_fixtures/deploy/configs/` (`minimal.yml`, `full.ym
 
 - User guides: `web/sites/guides/src/content/docs/v4-0-0/deployment/` (first-deploy, production-config, accessories, secrets, hooks, migrating-from-kamal, security-hardening, docker-deployment)
 - In-source CLI docs: `cli/lucli/services/deploy/cli/docs/` (per-verb)
-- Design spec: [docs/superpowers/specs/2026-04-20-wheels-deploy-kamal-port-design.md](../../docs/superpowers/specs/2026-04-20-wheels-deploy-kamal-port-design.md)
-- Implementation plan: [docs/superpowers/plans/2026-04-20-wheels-deploy-kamal-port.md](../../docs/superpowers/plans/2026-04-20-wheels-deploy-kamal-port.md)
-- Retrospective: [docs/superpowers/plans/2026-04-21-phase1-retrospective.md](../../docs/superpowers/plans/2026-04-21-phase1-retrospective.md)

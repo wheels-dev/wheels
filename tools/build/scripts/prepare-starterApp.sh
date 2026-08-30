@@ -37,7 +37,7 @@ cp NOTICE "${BUILD_DIR}/"
 
 # Ship the CONSUMER AI doc tier into the starter app root and defensively
 # strip maintainer-only paths (defense in depth — see prepare-core.sh and
-# docs/superpowers/plans/2026-08-30-ai-docs-two-tier.md).
+# ship-consumer-docs.sh).
 echo "Shipping consumer AI docs..."
 ./tools/build/scripts/ship-consumer-docs.sh ship "${BUILD_DIR}"
 
