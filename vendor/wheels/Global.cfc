@@ -531,6 +531,24 @@ component output="false" {
 		}
 	}
 
+	// Auth wiring facade (enableSession) — same mapping-absolute include
+	// ladder as lifecycle.cfm above.
+	try {
+		include "/wheels/global/auth.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/auth.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/auth.cfm";
+		}
+	}
+
 	// User-defined global functions
 	try {
 		include "/app/global/functions.cfm";
