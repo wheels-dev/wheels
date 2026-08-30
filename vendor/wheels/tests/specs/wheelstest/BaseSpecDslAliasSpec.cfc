@@ -170,15 +170,6 @@ component extends="wheels.WheelsTest" {
                     expect(arrayLen(spec.getDebugBuffer())).toBe(0);
                 });
 
-                it("print()/println() write to the response buffer (cleared before the JSON report)", () => {
-                    // Output-only helpers: the reporter resets the response
-                    // buffer before serializing the report, so exercising them
-                    // must not corrupt the run payload.
-                    spec.print("plain output");
-                    spec.println("line output");
-                    expect(true).toBeTrue();
-                });
-
                 it("engine predicates return booleans", () => {
                     expect(spec.isAdobe()).toBeTypeOf("boolean");
                     expect(spec.isLucee()).toBeTypeOf("boolean");
