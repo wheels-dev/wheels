@@ -14,12 +14,12 @@ component {
 	public any function init() {
 		// Only keys the runtime actually reads (Config.cfc accessors + the
 		// commands/ consumers behind them). Keys Kamal supports but this port
-		// doesn't implement yet (boot, logging, retain_containers, hooks, …)
-		// are deliberately ABSENT so they fail loudly instead of being
+		// doesn't implement yet (logging, retain_containers, hooks, …) are
+		// deliberately ABSENT so they fail loudly instead of being
 		// accepted-and-ignored (##3088).
 		variables.allowedKeys = [
 			"service", "image", "servers", "registry", "builder", "env",
-			"ssh", "proxy", "accessories"
+			"ssh", "proxy", "boot", "accessories"
 		];
 		// Pre-build a case-insensitive struct lookup so the hot path doesn't
 		// depend on arrayContainsNoCase (not available on every engine).
@@ -48,6 +48,7 @@ component {
 		// validated rather than quoted (##2956).
 		$validateName(arguments.parsed.service, "service", arguments.filePath);
 		$validateServers(arguments.parsed.servers, arguments.filePath);
+		$validateBoot(arguments.parsed, arguments.filePath);
 		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {
 			for (var accName in arguments.parsed.accessories) {
 				$validateName(accName, "accessory", arguments.filePath);
@@ -68,6 +69,37 @@ component {
 					for (var host in entry.hosts) $validateHost(host, arguments.filePath);
 				}
 			}
+		}
+	}
+
+	/**
+	 * Validate the `boot:` block. `limit` accepts a non-negative number or a
+	 * Kamal percentage string ("25%"); `wait` is a non-negative number of
+	 * seconds. A non-struct `boot` value is left to the Config accessor's
+	 * default-{} handling rather than rejected here.
+	 */
+	public void function $validateBoot(required struct parsed, required string filePath) {
+		if (!structKeyExists(arguments.parsed, "boot")) return;
+		var boot = arguments.parsed.boot;
+		if (!isStruct(boot)) return;
+		if (structKeyExists(boot, "limit")) $validateBootNumber(boot.limit, "boot.limit", arguments.filePath);
+		if (structKeyExists(boot, "wait")) $validateBootNumber(boot.wait, "boot.wait", arguments.filePath);
+	}
+
+	public void function $validateBootNumber(required any value, required string key, required string filePath) {
+		var ok = false;
+		if (isNumeric(arguments.value)) {
+			ok = arguments.value >= 0;
+		} else if (isSimpleValue(arguments.value)) {
+			var s = trim(arguments.value);
+			if (len(s) && right(s, 1) == "%") s = left(s, len(s) - 1);
+			ok = len(s) && isNumeric(s) && val(s) >= 0;
+		}
+		if (!ok) {
+			$raise(
+				arguments.filePath,
+				"invalid #arguments.key#: '#arguments.value#' (must be a non-negative number or percentage)"
+			);
 		}
 	}
 
