@@ -1,0 +1,1 @@
+- Fixed the legacy RocketUnit runner crashing the whole suite (HTTP 500, "variable [MESSAGE] doesn't exist" on Lucee 7) whenever a single test threw — test errors are recorded per-test again instead of aborting the run.
