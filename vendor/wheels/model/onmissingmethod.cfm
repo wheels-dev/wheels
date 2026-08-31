@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * This method is not designed to be called directly from your code, but provides functionality for dynamic finders such as `findOneByEmail()`
 	 *
@@ -821,4 +821,4 @@ component {
 		}
 		return local.rv;
 	}
-}
+</cfscript>

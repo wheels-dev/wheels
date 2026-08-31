@@ -1,4 +1,4 @@
-component {
+<cfscript>
 
 	/**
 	 * Inserts multiple records into the database in a single batch operation.
@@ -227,5 +227,4 @@ component {
 
 		return arguments.records;
 	}
-
-}
+</cfscript>

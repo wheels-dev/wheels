@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Internal function.
 	 * Creates this model's slot in the per-request query cache if it doesn't exist yet.
@@ -456,4 +456,4 @@ component {
 		}
 		$timestampProperty(property = variables.wheels.class[local.settingName]);
 	}
-}
+</cfscript>

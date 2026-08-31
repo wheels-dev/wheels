@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Internal function.
 	 */
@@ -1919,6 +1919,4 @@ component {
 		}
 		return local.rv;
 	}
-
-
-}
+</cfscript>

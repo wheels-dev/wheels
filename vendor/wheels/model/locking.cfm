@@ -1,13 +1,4 @@
-/**
- * Provides advisory lock and pessimistic row locking support for Wheels models.
- *
- * Advisory locks are database-level, application-coordinated locks that don't lock any rows or tables.
- * They are useful for coordinating exclusive access to shared resources (e.g., preventing duplicate
- * background job processing, serializing access to external APIs).
- *
- * Pessimistic row locking (SELECT ... FOR UPDATE) is handled via the QueryBuilder's `forUpdate()` method.
- */
-component {
+<cfscript>
 
 	/**
 	 * Executes a callback while holding a database advisory lock.
@@ -48,5 +39,4 @@ component {
 			return local.result;
 		}
 	}
-
-}
+</cfscript>

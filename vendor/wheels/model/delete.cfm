@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Deletes all records that match the `where` argument.
 	 * By default, objects will not be instantiated and therefore callbacks and validations are not invoked.
@@ -228,4 +228,4 @@ component {
 		}
 		return local.rv;
 	}
-}
+</cfscript>

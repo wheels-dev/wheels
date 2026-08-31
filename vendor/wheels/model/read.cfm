@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Returns records from the database table mapped to this model according to the arguments passed in (use the `where` argument to decide which records to get, use the `order` argument to set the order in which those records should be returned, and so on).
 	 * The records will be returned as either a `cfquery` result set, an array of objects, or an array of structs (depending on what the `returnAs` argument is set to).
@@ -831,4 +831,4 @@ component {
 		}
 		return this.count(argumentCollection = local.countArgs);
 	}
-}
+</cfscript>

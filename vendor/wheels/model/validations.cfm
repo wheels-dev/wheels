@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Whether or not to enable default validations for this model.
 	 *
@@ -1054,4 +1054,4 @@ component {
 				throw("Unsupported operator in condition: " & arguments.operator);
 		}
 	}
-}
+</cfscript>

@@ -38,10 +38,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("records a throwing test as an error instead of crashing the suite", function() {
-				// RustCFML's legacy-runner surface (Invoke()/evaluate) has known
-				// gaps; the handler itself is covered by the spec above on every
-				// engine.
-				if (g.$engineAdapter().isRustCFML()) return;
+				// RustCFML's and BoxLang's legacy-runner surface (Invoke()/
+				// evaluate) has known gaps; the handler itself is covered by the
+				// spec above on every engine.
+				if (g.$engineAdapter().isRustCFML() || g.$engineAdapter().isBoxLang()) return;
 				var testCase = new wheels.tests._assets.global.RocketUnitThrowingTest();
 				expect(function() {
 					testCase.$runTest(_resultKey);

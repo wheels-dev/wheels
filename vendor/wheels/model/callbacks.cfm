@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Registers method(s) that should be called after a new object is created.
 	 *
@@ -360,4 +360,4 @@ component {
 	public any function $coerceOracleTimestamp(required any value) {
 		return $engineAdapter().coerceOracleObject(arguments.value);
 	}
-}
+</cfscript>

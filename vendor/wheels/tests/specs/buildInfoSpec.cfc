@@ -31,7 +31,9 @@ component extends="wheels.WheelsTest" {
 					// getTempDirectory() (permission-denied), while the webroot is always
 					// writable in CI. Deleted in the finally block below.
 					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
-					directoryCreate(dir, true);
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
 					var manifestPath = dir & "/wheels.json";
 					fileWrite(manifestPath, '{"version": "4.1.2"}');
 					try {
@@ -47,7 +49,9 @@ component extends="wheels.WheelsTest" {
 					// getTempDirectory() (permission-denied), while the webroot is always
 					// writable in CI. Deleted in the finally block below.
 					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
-					directoryCreate(dir, true);
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
 					var manifestPath = dir & "/box.json";
 					fileWrite(manifestPath, '{"version": "3.5.0"}');
 					try {
@@ -63,7 +67,9 @@ component extends="wheels.WheelsTest" {
 					// getTempDirectory() (permission-denied), while the webroot is always
 					// writable in CI. Deleted in the finally block below.
 					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
-					directoryCreate(dir, true);
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
 					try {
 						var bi = new wheels.BuildInfo();
 						expect(bi.version(manifestPath = dir & "/wheels.json")).toBe("0.0.0-dev");
@@ -77,7 +83,9 @@ component extends="wheels.WheelsTest" {
 					// getTempDirectory() (permission-denied), while the webroot is always
 					// writable in CI. Deleted in the finally block below.
 					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
-					directoryCreate(dir, true);
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
 					var manifestPath = dir & "/wheels.json";
 					fileWrite(manifestPath, '{"version": "@build.version@"}');
 					try {
@@ -93,7 +101,9 @@ component extends="wheels.WheelsTest" {
 					// getTempDirectory() (permission-denied), while the webroot is always
 					// writable in CI. Deleted in the finally block below.
 					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
-					directoryCreate(dir, true);
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
 					var manifestPath = dir & "/wheels.json";
 					fileWrite(manifestPath, '{"version": "9.9.9"}');
 					try {

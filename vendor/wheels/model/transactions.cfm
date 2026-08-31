@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Runs the specified method within a single database transaction.
 	 *
@@ -131,4 +131,4 @@ component {
 	public string function $hashedConnectionArgs() {
 		return Hash(variables.wheels.class.dataSource & variables.wheels.class.username & variables.wheels.class.password);
 	}
-}
+</cfscript>
