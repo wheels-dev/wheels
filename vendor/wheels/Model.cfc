@@ -6,6 +6,9 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		// instances inherit it with no per-instance integration copy. Dynamic
 		// plugin/package mixins still apply at onDIcomplete() via
 		// $pluginObj().$initializeMixins(variables).
+		//
+		// init() is the one hook every creation path runs (model(), new(),
+		// finder rows), so the super<name> override aliases register here.
 		$registerModelSuperAliases();
 		return this;
 	}
