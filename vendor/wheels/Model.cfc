@@ -637,16 +637,14 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 			// Attempt to grab the already‐loaded model object, or force‐load it
 			if ( structKeyExists( application.wheels.models, arguments.name ) ) {
-				// Fast path: model is already in the application cache
-				local.modelObj = application.wheels.models[ arguments.name ];
-
-				// At this point, local.modelObj is guaranteed to exist
-				variables.wheels.class = $simpleLock(
-					execute = "$classData",
-					name    = local.lockName,
-					object  = local.modelObj,
-					type    = "readOnly"
-				);
+				// Fast path: model is already in the application cache. The entry
+				// is only written after $createModelClass finishes building the
+				// class (config() + column processing), so a present entry is
+				// always a complete class — reading the class struct needs no
+				// lock (#3213: the per-instance $simpleLock was pure overhead on
+				// the hot path; concurrent first loads are handled by the slow
+				// path above).
+				variables.wheels.class = application.wheels.models[arguments.name].$classData();
 			}
 		}
 

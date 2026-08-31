@@ -457,6 +457,20 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	// ---------------------------------------------------------------------------
 
 	/**
+	 * Whether this name carries an explicit mapping or lifecycle flag in the
+	 * container — the #3213 model fast path in $createObjectFromRoot must fall
+	 * back to the full DI construction path when it does.
+	 */
+	public boolean function hasExplicitMapping(required string name) {
+		return (
+			StructKeyExists(variables.mappings, arguments.name)
+			|| StructKeyExists(variables.factories, arguments.name)
+			|| StructKeyExists(variables.singletonFlags, arguments.name)
+			|| StructKeyExists(variables.requestScopedFlags, arguments.name)
+		);
+	}
+
+	/**
 	 * Resolve an alias to its component path, or return the name as-is if no mapping exists.
 	 */
 	private string function resolveMapping(required string name) {
