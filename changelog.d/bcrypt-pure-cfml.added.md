@@ -1,0 +1,1 @@
+- Added `bcryptHash()`, `bcryptVerify()`, and `bcryptNeedsRehash()` global helpers — pure-CFML, OpenBSD/htpasswd/jBCrypt-compatible bcrypt password hashing with no Java objects, CFX, or external libraries.

@@ -549,6 +549,24 @@ component output="false" {
 		}
 	}
 
+	// bcrypt password helpers (bcryptHash / bcryptVerify / bcryptNeedsRehash) —
+	// same mapping-absolute include ladder as auth.cfm above.
+	try {
+		include "/wheels/global/security.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/security.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/security.cfm";
+		}
+	}
+
 	// User-defined global functions
 	try {
 		include "/app/global/functions.cfm";
