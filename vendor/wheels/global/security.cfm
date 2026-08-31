@@ -46,18 +46,13 @@ public boolean function bcryptVerify(required string password, required string h
 	}
 }
 
-public boolean function bcryptNeedsRehash(required string hash, numeric cost = 10) {
-	$bcryptValidateCost(arguments.cost);
-	local.parsed = $bcryptParseHash(arguments.hash);
-	if (!local.parsed.valid) {
-		return true;
-	}
-	return local.parsed.cost != arguments.cost;
-}
-
 // ---------------------------------------------------------------------------
 // Internal helpers (public with $ prefix — cross-engine invariant #7)
 // ---------------------------------------------------------------------------
+//
+// NOTE: bcryptNeedsRehash() lives in the always-included security-extra.cfm
+// (self-contained regex cost parse) because RustCFML skips this file —
+// it provides bcryptHash/bcryptVerify as native builtins.
 
 public void function $bcryptValidateCost(required numeric cost) {
 	if (arguments.cost < 4 || arguments.cost > 31) {

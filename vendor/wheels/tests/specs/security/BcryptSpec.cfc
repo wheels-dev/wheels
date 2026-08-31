@@ -1,12 +1,28 @@
 /**
- * Tests the pure-CFML bcrypt password helpers — bcryptHash, bcryptVerify,
+ * Tests the bcrypt password helpers — bcryptHash, bcryptVerify,
  * and bcryptNeedsRehash — for OpenBSD / htpasswd / jBCrypt compatibility.
+ *
+ * On Lucee/Adobe/BoxLang these come from the pure-CFML implementation in
+ * global/security.cfm. RustCFML ships bcryptHash/bcryptVerify as NATIVE
+ * builtins (Global.cfc skips security.cfm there to avoid the name
+ * collision), so specs that pin pure-CFML specifics — the $2b$ prefix and
+ * the Wheels.InvalidArgument cost validation — are skipped on that engine.
+ * bcryptNeedsRehash has no engine builtin and ships everywhere via
+ * security-extra.cfm.
  */
 component extends="wheels.WheelsTest" {
 
 	function run() {
 
 		describe("bcrypt password helpers", function() {
+
+			beforeEach(function() {
+				g = application.wo;
+				// True when the pure-CFML security.cfm include was skipped
+				// (native bcryptHash/bcryptVerify builtins are in use).
+				_nativeBuiltin = !StructKeyExists(g, "$bcryptHashCore");
+				_needsRehashAvailable = StructKeyExists(g, "bcryptNeedsRehash");
+			});
 
 			it("verifies a known external $2b$ vector", function() {
 				// Checksum independently produced by OpenBSD's htpasswd (Apache)
@@ -35,15 +51,21 @@ component extends="wheels.WheelsTest" {
 			it("round-trips a cost-4 hash", function() {
 				var hash = bcryptHash("abc", 4);
 				expect(Len(hash)).toBe(60);
-				expect(Left(hash, 7)).toBe("$2b$04$");
+				if (!_nativeBuiltin) {
+					// RustCFML's native bcrypt crate emits the $2a$ prefix;
+					// the pure-CFML implementation always emits $2b$.
+					expect(Left(hash, 7)).toBe("$2b$04$");
+				}
 				expect(bcryptVerify("abc", hash)).toBeTrue();
 				expect(bcryptVerify("not-abc", hash)).toBeFalse();
 			});
 
-			it("formats the hash as $2b$ + 2-digit cost + 22-char salt + 31-char checksum", function() {
+			it("formats the hash as <version>$ + 2-digit cost + 22-char salt + 31-char checksum", function() {
 				var hash = bcryptHash("abc", 4);
 				expect(Len(hash)).toBe(60);
-				expect(Left(hash, 4)).toBe("$2b$");
+				if (!_nativeBuiltin) {
+					expect(Left(hash, 4)).toBe("$2b$");
+				}
 				expect(Mid(hash, 5, 2)).toBe("04");
 				expect(Mid(hash, 7, 1)).toBe("$");
 				expect(Len(Mid(hash, 8, 22))).toBe(22);
@@ -51,6 +73,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("throws for an out-of-range cost", function() {
+				if (_nativeBuiltin) return;
 				expect(function() {
 					bcryptHash("abc", 3);
 				}).toThrow("Wheels.InvalidArgument");
@@ -61,12 +84,14 @@ component extends="wheels.WheelsTest" {
 
 			it("accepts boundary costs without throwing", function() {
 				expect(Len(bcryptHash("abc", 4))).toBe(60);
-				expect(function() {
-					$bcryptValidateCost(4);
-				}).notToThrow();
-				expect(function() {
-					$bcryptValidateCost(31);
-				}).notToThrow();
+				if (!_nativeBuiltin) {
+					expect(function() {
+						$bcryptValidateCost(4);
+					}).notToThrow();
+					expect(function() {
+						$bcryptValidateCost(31);
+					}).notToThrow();
+				}
 			});
 
 			it("never throws on malformed or foreign-format hashes", function() {
@@ -91,10 +116,11 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("reports whether a hash needs rehashing", function() {
+				if (!_needsRehashAvailable) return;
 				var hash = bcryptHash("abc", 4);
-				expect(bcryptNeedsRehash(hash, 4)).toBeFalse();
-				expect(bcryptNeedsRehash(hash, 10)).toBeTrue();
-				expect(bcryptNeedsRehash("malformed", 10)).toBeTrue();
+				expect(g.bcryptNeedsRehash(hash, 4)).toBeFalse();
+				expect(g.bcryptNeedsRehash(hash, 10)).toBeTrue();
+				expect(g.bcryptNeedsRehash("malformed", 10)).toBeTrue();
 			});
 
 			it("uses a fresh salt per call", function() {

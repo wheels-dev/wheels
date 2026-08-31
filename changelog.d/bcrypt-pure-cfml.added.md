@@ -1,1 +1,1 @@
-- Added `bcryptHash()`, `bcryptVerify()`, and `bcryptNeedsRehash()` global helpers — pure-CFML, OpenBSD/htpasswd/jBCrypt-compatible bcrypt password hashing with no Java objects, CFX, or external libraries.
+- Added `bcryptHash()`, `bcryptVerify()`, and `bcryptNeedsRehash()` global helpers — pure-CFML, OpenBSD/htpasswd/jBCrypt-compatible bcrypt password hashing with no Java objects, CFX, or external libraries. RustCFML, which ships `bcryptHash()`/`bcryptVerify()` as native builtins, uses those for the same API.
