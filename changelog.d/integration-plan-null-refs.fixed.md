@@ -1,0 +1,1 @@
+- Fixed a flaky bare `NullPointerException` during model instantiation on Lucee 7 by validating the cached component-integration plan once per request and rebuilding it in place when it contains null function references — a null ref was previously copied into every materialized model/controller instance.
