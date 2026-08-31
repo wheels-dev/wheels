@@ -331,7 +331,7 @@ component output="false" displayName="Test" extends="wheels.Global"{
 				} catch (any e) {
 					message = e.message;
 
-					if (e.ErrorCode eq "__FAIL__") {
+					if (StructKeyExists(e, "errorCode") && e.errorCode eq "__FAIL__") {
 						/*
 							fail() throws __FAIL__ exception
 						*/
@@ -341,34 +341,17 @@ component output="false" displayName="Test" extends="wheels.Global"{
 						numTestFailures = numTestFailures + 1;
 					} else {
 						/*
-							another exception thrown
+							another exception thrown. Message assembly lives in
+							$testErrorMessage so the catch body only ever reads
+							the exception object — on Lucee 7 the pre-existing
+							inline chain (which read `message`, `newline`, and an
+							undeclared `template` inside the catch) could throw
+							"variable [MESSAGE] doesn't exist" for some exception
+							shapes, masking the test error with a suite-wide 500
+							(#3458).
 						*/
 						status = "Error";
-						if (ArrayLen(e.tagContext)) {
-							template = "#ListLast(e.tagContext[1].template, "/")#:#e.tagContext[1].line#";
-							tagContext = "<ul>";
-							for (context in e.tagContext) {
-								tagContext = tagContext & '<li>#context.template#:#context.line#</li>';
-							};
-							tagContext = tagContext & "</ul>";
-						} else {
-							template = "";
-							tagContext = "[Unknown tagContext]";
-						}
-
-						if (Len(template)) {
-							message = message & newline & template;
-						}
-						if (StructKeyExists(e, "sql") and Len(e.sql)) {
-							message = message & newline & newline & e.sql;
-						}
-						if (Len(e.extendedInfo)) {
-							message = message & newline & newLine & e.extendedInfo;
-						}
-						message = message & newline & newline & tagContext;
-						if (Len(e.detail)) {
-							message = message & newline & newline & e.detail;
-						}
+						message = $testErrorMessage(e);
 						request[resultkey].ok = false;
 						request[resultkey].numErrors = request[resultkey].numErrors + 1;
 						numTestErrors = numTestErrors + 1;
@@ -417,6 +400,55 @@ component output="false" displayName="Test" extends="wheels.Global"{
 		request[resultkey].end = Now();
 
 		return numTestErrors eq 0;
+	}
+
+	/**
+	 * Builds the recorded message for a test error from a cfcatch object.
+	 * Kept as a separate public helper (cross-engine invariant #7) so the
+	 * catch block in $runTest never reads function-scoped locals — on Lucee 7
+	 * reading a var-declared local inside a catch can fail with
+	 * "variable [MESSAGE] doesn't exist" for certain exception shapes, which
+	 * turned a single failing test into a suite-wide 500 (#3458).
+	 *
+	 * Every field read is guarded with StructKeyExists: native (Java)
+	 * exceptions wrapped by the engine do not carry the full cfcatch shape.
+	 *
+	 * @e The cfcatch object describing the error.
+	 */
+	public string function $testErrorMessage(required any e) {
+		var newline = Chr(10) & Chr(13);
+		var rv = "";
+		if (StructKeyExists(arguments.e, "message") && !IsNull(arguments.e.message) && Len(arguments.e.message)) {
+			rv = arguments.e.message;
+		}
+
+		var template = "";
+		var tagContext = "";
+		if (StructKeyExists(arguments.e, "tagContext") && IsArray(arguments.e.tagContext) && ArrayLen(arguments.e.tagContext)) {
+			template = "#ListLast(arguments.e.tagContext[1].template, "/")#:#arguments.e.tagContext[1].line#";
+			tagContext = "<ul>";
+			for (var context in arguments.e.tagContext) {
+				tagContext = tagContext & '<li>#context.template#:#context.line#</li>';
+			}
+			tagContext = tagContext & "</ul>";
+		} else {
+			tagContext = "[Unknown tagContext]";
+		}
+
+		if (Len(template)) {
+			rv = rv & newline & template;
+		}
+		if (StructKeyExists(arguments.e, "sql") && Len(arguments.e.sql)) {
+			rv = rv & newline & newline & arguments.e.sql;
+		}
+		if (StructKeyExists(arguments.e, "extendedInfo") && Len(arguments.e.extendedInfo)) {
+			rv = rv & newline & newline & arguments.e.extendedInfo;
+		}
+		rv = rv & newline & newline & tagContext;
+		if (StructKeyExists(arguments.e, "detail") && Len(arguments.e.detail)) {
+			rv = rv & newline & newline & arguments.e.detail;
+		}
+		return rv;
 	}
 
 	/*
