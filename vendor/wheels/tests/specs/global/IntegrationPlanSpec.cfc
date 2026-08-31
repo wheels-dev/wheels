@@ -14,7 +14,7 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(function() {
 				g = application.wo;
-				_planPath = "wheels.model";
+				_planPath = "wheels.controller";
 				_checkKey = LCase(_planPath);
 				// Make sure a cached plan exists before tests poke at it.
 				g.$componentIntegrationPlan(_planPath);
@@ -34,13 +34,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("builds a model plan with no null references", function() {
-				var plan = g.$buildComponentIntegrationPlan("wheels.model");
+				var plan = g.$buildComponentIntegrationPlan("wheels.controller");
 				expect(ArrayLen(plan)).toBeGT(0);
 				expect(g.$integrationPlanHasNullRefs(plan)).toBeFalse();
 			});
 
 			it("detects entries with missing or null references", function() {
-				var plan = g.$buildComponentIntegrationPlan("wheels.model");
+				var plan = g.$buildComponentIntegrationPlan("wheels.controller");
 				var poisoned = $shallowCopyPlan(plan);
 				StructDelete(poisoned[1].publicMethods[1], "ref");
 				expect(g.$integrationPlanHasNullRefs(poisoned)).toBeTrue();

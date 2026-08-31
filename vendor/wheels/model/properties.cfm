@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Use this method to specify which properties can be set through mass assignment.
 	 *
@@ -975,4 +975,4 @@ component {
 		}
 		return arguments.sql;
 	}
-}
+</cfscript>

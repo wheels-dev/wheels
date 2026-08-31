@@ -2,8 +2,96 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 
 	function init(){
-		$integrateComponents("wheels.model");
+		// The model mixin surface is compile-time included below (#3213), so
+		// instances inherit it with no per-instance integration copy. Dynamic
+		// plugin/package mixins still apply at onDIcomplete() via
+		// $pluginObj().$initializeMixins(variables).
+		$registerModelSuperAliases();
 		return this;
+	}
+
+	/**
+	 * Preserves the `super<name>` override convention (#3325) under the
+	 * inheritance fast path (#3213): when an app model (or its Model.cfc base)
+	 * declares a method that shadows a model mixin, the framework original is
+	 * registered on the instance as `super<name>` so the override can delegate
+	 * to it. The mixin original lives in the instance's variables scope
+	 * (populated by this component's compile-time includes before the subclass
+	 * constructor runs), so aliasing is a reference copy.
+	 *
+	 * The declared-surface scan is cached per concrete class in the request
+	 * scope; the per-instance cost is one cache lookup plus one reference copy
+	 * per override (typically zero).
+	 *
+	 * The original ref is read from a shared wheels.Model prototype instance:
+	 * on the subclass instance `variables[name]` resolves to the app's own
+	 * override (declared methods shadow the parent's include-injected UDFs),
+	 * so the original is only unambiguously reachable on a wheels.Model
+	 * instance that carries no subclass surface.
+	 */
+	private void function $registerModelSuperAliases() {
+		if (!StructKeyExists(request, "wheelsModelOverrideCache")) {
+			request.wheelsModelOverrideCache = {};
+		}
+		local.className = getMetaData(this).fullname;
+		if (!StructKeyExists(request.wheelsModelOverrideCache, local.className)) {
+			local.names = [];
+			local.meta = getMetaData(this);
+			// Collect function names declared by the app's model classes —
+			// walking the extends chain up to (but not including) wheels.Model.
+			while (
+				StructKeyExists(local.meta, "extends")
+				&& StructKeyExists(local.meta.extends, "fullname")
+				&& local.meta.extends.fullname != "wheels.Model"
+			) {
+				local.fns = StructKeyExists(local.meta, "functions") ? local.meta.functions : [];
+				local.fEnd = ArrayLen(local.fns);
+				for (local.f = 1; local.f <= local.fEnd; local.f++) {
+					if (
+						StructKeyExists(variables, local.fns[local.f].name)
+						&& IsCustomFunction(variables[local.fns[local.f].name])
+					) {
+						ArrayAppend(local.names, local.fns[local.f].name);
+					}
+				}
+				local.meta = local.meta.extends;
+			}
+			request.wheelsModelOverrideCache[local.className] = local.names;
+		}
+		for (local.n in request.wheelsModelOverrideCache[local.className]) {
+			local.superName = "super" & local.n;
+			if (Left(local.n, 5) == "super" || StructKeyExists(this, local.superName)) {
+				continue;
+			}
+			local.originalRef = $modelSuperPrototype().$superOriginal(local.n);
+			if (IsCustomFunction(local.originalRef)) {
+				variables[local.superName] = local.originalRef;
+				this[local.superName] = local.originalRef;
+			}
+		}
+	}
+
+	/**
+	 * Shared wheels.Model instance whose include-injected variables carry the
+	 * unshadowed framework originals — used to register `super<name>` aliases
+	 * for app-level model overrides (#3213, #3325).
+	 */
+	private any function $modelSuperPrototype() {
+		if (!StructKeyExists(application.wheels, "modelSuperPrototype")) {
+			application.wheels.modelSuperPrototype = CreateObject("component", "wheels.Model");
+		}
+		return application.wheels.modelSuperPrototype;
+	}
+
+	/**
+	 * Returns the include-injected original for a mixin method name from this
+	 * instance's variables scope ("" when absent).
+	 */
+	public any function $superOriginal(required string name) {
+		if (StructKeyExists(variables, arguments.name) && IsCustomFunction(variables[arguments.name])) {
+			return variables[arguments.name];
+		}
+		return "";
 	}
 
 	/**
@@ -681,6 +769,29 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		}
 	}
 	
+
+	// Model mixin surface, compile-time included so every model instance
+	// inherits it (same pattern as the global surface, issue ##3241).
+	// Alphabetical — this was the runtime integration plan's file order.
+	include "model/associations.cfm";
+	include "model/bulk.cfm";
+	include "model/calculations.cfm";
+	include "model/callbacks.cfm";
+	include "model/create.cfm";
+	include "model/delete.cfm";
+	include "model/errors.cfm";
+	include "model/locking.cfm";
+	include "model/miscellaneous.cfm";
+	include "model/nestedproperties.cfm";
+	include "model/onmissingmethod.cfm";
+	include "model/properties.cfm";
+	include "model/read.cfm";
+	include "model/serialize.cfm";
+	include "model/sql.cfm";
+	include "model/transactions.cfm";
+	include "model/update.cfm";
+	include "model/validations.cfm";
+
 	function onDIcomplete(){
 		$engineAdapter().prepareDIComplete(variables, this);
 		// Shared application-cached instance — constructing wheels.Plugins here

@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Creates a new object, saves it to the database (if the validation permits it), and returns it.
 	 * If the validation fails, the unsaved object (with errors added to it) is still returned.
@@ -336,5 +336,4 @@ component {
 			&& arguments.columnMeta.size == 36
 		);
 	}
-
-}
+</cfscript>

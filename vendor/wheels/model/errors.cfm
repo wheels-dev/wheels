@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Adds an error on a specific property.
 	 *
@@ -169,4 +169,4 @@ component {
 			return false;
 		}
 	}
-}
+</cfscript>

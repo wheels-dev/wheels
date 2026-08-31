@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Updates all properties for the records that match the `where` argument.
 	 * Property names and values can be passed in either using named arguments or as a struct to the `properties` argument.
@@ -331,4 +331,4 @@ component {
 
 		return true;
 	}
-}
+</cfscript>

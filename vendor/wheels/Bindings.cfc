@@ -16,14 +16,17 @@ component {
 		//   bind("ModelFinderInterface").to("my.CustomFinder")
 
 		// Model subsystem
+		// The model mixin surface is compile-time included into wheels.Model
+		// (#3213), so every subsystem interface's default implementation
+		// resolves to the class that carries all of it.
 		arguments.injector
-			.bind("ModelFinderInterface").to("wheels.model.read")
-			.bind("ModelPersistenceInterface").to("wheels.model.create")
-			.bind("ModelValidationInterface").to("wheels.model.validations")
-			.bind("ModelErrorInterface").to("wheels.model.errors")
-			.bind("ModelCallbackInterface").to("wheels.model.callbacks")
-			.bind("ModelAssociationInterface").to("wheels.model.associations")
-			.bind("ModelPropertyInterface").to("wheels.model.properties");
+			.bind("ModelFinderInterface").to("wheels.Model")
+			.bind("ModelPersistenceInterface").to("wheels.Model")
+			.bind("ModelValidationInterface").to("wheels.Model")
+			.bind("ModelErrorInterface").to("wheels.Model")
+			.bind("ModelCallbackInterface").to("wheels.Model")
+			.bind("ModelAssociationInterface").to("wheels.Model")
+			.bind("ModelPropertyInterface").to("wheels.Model");
 
 		// Controller subsystem
 		arguments.injector

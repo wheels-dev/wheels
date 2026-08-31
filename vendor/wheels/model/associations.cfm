@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Sets up a `belongsTo` association between this model and the specified one.
 	 * Use this association when this model contains a foreign key referencing another model.
@@ -267,4 +267,4 @@ component {
 			property(name = arguments.propertyName, type = "integer");
 		}
 	}
-}
+</cfscript>

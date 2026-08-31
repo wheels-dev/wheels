@@ -1,4 +1,4 @@
-component {
+<cfscript>
 	/**
 	 * Calculates the average value for a given property.
 	 * Uses the SQL function `AVG`.
@@ -283,4 +283,4 @@ component {
 
 		return local.rv;
 	}
-}
+</cfscript>
