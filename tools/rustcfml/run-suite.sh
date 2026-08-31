@@ -110,24 +110,6 @@ def walk(node, bundle, path):
     for nested in node.get("nestedSuiteStats", []) or []:
         walk(nested, bundle, f"{path} > {nested.get('name', '?')}")
 
-def dump_nonpass(node, bundle, path, depth=0):
-    if depth > 12:
-        return
-    if isinstance(node, dict):
-        for k, v in node.items():
-            if k == "specStats" and isinstance(v, list):
-                for spec in v:
-                    if isinstance(spec, dict) and spec.get("status") not in (None, "Passed", "Skipped"):
-                        print(f"  DIAG {bundle} :: {path} :: {spec.get('name','?')} [{spec.get('status','?')}] :: {str(spec.get('failMessage') or '')[:200]}")
-            elif k in ("suiteStats", "nestedSuiteStats") and isinstance(v, list):
-                for n2 in v:
-                    dump_nonpass(n2, bundle, f"{path} > {n2.get('name','?')}" if isinstance(n2, dict) else path, depth+1)
-    elif isinstance(node, list):
-        for n2 in node:
-            dump_nonpass(n2, bundle, path, depth+1)
-print("DIAGNOSTIC: all non-pass entries:")
-for bd in data.get("bundleStats", []):
-    dump_nonpass(bd, bd.get("name","?"), "")
 for b in data.get("bundleStats", []):
     name = b.get("name", "?")
     ge = b.get("globalException") or {}

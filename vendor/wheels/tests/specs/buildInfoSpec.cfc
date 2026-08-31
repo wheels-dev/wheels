@@ -27,7 +27,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("falls back to the sibling wheels.json version when unstamped (dev mode)", () => {
-					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
 					directoryCreate(dir, true);
 					var manifestPath = dir & "/wheels.json";
 					fileWrite(manifestPath, '{"version": "4.1.2"}');
@@ -40,7 +43,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("falls back to the sibling box.json when wheels.json is absent", () => {
-					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
 					directoryCreate(dir, true);
 					var manifestPath = dir & "/box.json";
 					fileWrite(manifestPath, '{"version": "3.5.0"}');
@@ -53,7 +59,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("returns 0.0.0-dev when no manifest exists", () => {
-					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
 					directoryCreate(dir, true);
 					try {
 						var bi = new wheels.BuildInfo();
@@ -64,7 +73,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("returns 0.0.0-dev when the manifest version is still a placeholder", () => {
-					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
 					directoryCreate(dir, true);
 					var manifestPath = dir & "/wheels.json";
 					fileWrite(manifestPath, '{"version": "@build.version@"}');
@@ -77,7 +89,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("stamped BuildInfo version wins over the manifest", () => {
-					var dir = getTempDirectory() & "wheels-buildinfo-" & createUUID();
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
 					directoryCreate(dir, true);
 					var manifestPath = dir & "/wheels.json";
 					fileWrite(manifestPath, '{"version": "9.9.9"}');
