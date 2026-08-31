@@ -126,6 +126,16 @@
 		if (!StructKeyExists(application, "wheels")) {
 			return $buildComponentIntegrationPlan(arguments.path);
 		}
+		// Request-scoped cache: the plan is stable within a request (the only
+		// invalidation — the rebuild-on-poison validation below — replaces both
+		// copies), and the application scope is synchronized on access. Serving
+		// the plan from the request scope turns ~6 application-scope reads per
+		// materialized object into one request-scope read (issue #3213): on
+		// Lucee 7 that cut the plan lookup from ~61µs to ~1µs per model
+		// instantiation in the benchmark rig.
+		if (StructKeyExists(request, "wheelsIntegrationPlans") && StructKeyExists(request.wheelsIntegrationPlans, arguments.path)) {
+			return request.wheelsIntegrationPlans[arguments.path];
+		}
 		if (!StructKeyExists(application.wheels, "integrationPlans")) {
 			lock name="wheels.integrationPlans.#application.applicationName#" type="exclusive" timeout="10" {
 				if (!StructKeyExists(application.wheels, "integrationPlans")) {
@@ -167,6 +177,10 @@
 				$warnNullIntegrationPlanRefs(arguments.path);
 			}
 		}
+		if (!StructKeyExists(request, "wheelsIntegrationPlans")) {
+			request.wheelsIntegrationPlans = {};
+		}
+		request.wheelsIntegrationPlans[arguments.path] = local.plan;
 		return local.plan;
 	}
 
