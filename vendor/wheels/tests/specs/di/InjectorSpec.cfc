@@ -2,6 +2,36 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 
+		describe("hasExplicitMapping", function() {
+
+			it("is false for an unmapped name", function() {
+				var di = new wheels.Injector(binderPath = "wheels.Bindings");
+				expect(di.hasExplicitMapping("wheels.tests._assets.di.SimpleService")).toBeFalse();
+			});
+
+			it("is true once a name is mapped or flagged", function() {
+				var di = new wheels.Injector(binderPath = "wheels.Bindings");
+				di.map("plain").to("wheels.tests._assets.di.SimpleService");
+				expect(di.hasExplicitMapping("plain")).toBeTrue();
+
+				var di2 = new wheels.Injector(binderPath = "wheels.Bindings");
+				di2.map("fact").toFactory(function(ctx) {
+					return "built";
+				});
+				expect(di2.hasExplicitMapping("fact")).toBeTrue();
+
+				var di3 = new wheels.Injector(binderPath = "wheels.Bindings");
+				di3.map("single").to("wheels.tests._assets.di.SimpleService").asSingleton();
+				expect(di3.hasExplicitMapping("single")).toBeTrue();
+
+				var di4 = new wheels.Injector(binderPath = "wheels.Bindings");
+				di4.map("req").to("wheels.tests._assets.di.SimpleService").asRequestScoped();
+				expect(di4.hasExplicitMapping("req")).toBeTrue();
+			});
+
+		});
+
+
 		describe("Injector", () => {
 
 			beforeEach(() => {

@@ -90,6 +90,12 @@ interface {
 	public boolean function containsInstance(required string name);
 
 	/**
+	 * Whether this name carries an explicit mapping or lifecycle flag
+	 * (map().to(), toFactory(), asSingleton(), asRequestScoped()).
+	 */
+	public boolean function hasExplicitMapping(required string name);
+
+	/**
 	 * Mark the current mapping as a singleton (one instance per app lifecycle).
 	 *
 	 * @return The Injector (for chaining).

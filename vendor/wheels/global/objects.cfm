@@ -88,6 +88,24 @@
 		local.argumentCollection = arguments;
 		if (local.method EQ 'init') {
 			local.rv = application.wheelsdi.getInstance(name = "#local.component#", initArguments = local.argumentCollection);
+		} else if (local.method EQ '$initModelObject' && !application.wheelsdi.hasExplicitMapping("#local.component#")) {
+			// Model-instance fast path (#3213): direct CreateObject + structured
+			// call skips the DI resolve/auto-wire and the reflective Invoke on
+			// the hottest path in the framework (every new() and finder row).
+			// onDIcomplete still runs so plugin/package mixins keep applying;
+			// models explicitly mapped in the container take the legacy path.
+			local.instance = CreateObject("component", local.component);
+			local.rv = local.instance.$initModelObject(
+				name = local.argumentCollection.name,
+				properties = local.argumentCollection.properties,
+				persisted = local.argumentCollection.persisted,
+				row = local.argumentCollection.row ?: 1,
+				base = local.argumentCollection.base ?: true,
+				useFilterLists = local.argumentCollection.useFilterLists ?: true
+			);
+			if (StructKeyExists(local.instance, "onDIcomplete")) {
+				local.instance.onDIcomplete();
+			}
 		} else {
 			local.instance = application.wheelsdi.getInstance(name = "#local.component#");
 			local.rv = Invoke(local.instance, local.method, local.argumentCollection);
