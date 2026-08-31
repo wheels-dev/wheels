@@ -107,8 +107,16 @@ component extends="modules.BaseModule" {
 	 * into a completely different invocation.
 	 */
 	private struct function structuredArgs(struct callerArgs = {}) {
+		// Command specs set `mod.__arguments = [...]` from OUTSIDE the
+		// component, which Lucee stores on the `this` scope; internal
+		// delegation assigns the unprefixed (variables) name. Consume either
+		// shape so both callers reach the same dispatch.
 		var raw = __arguments ?: [];
+		if (!arrayLen(raw) && structKeyExists(this, "__arguments")) {
+			raw = this.__arguments;
+		}
 		__arguments = [];
+		structDelete(this, "__arguments");
 		if (!structIsEmpty(arguments.callerArgs)) {
 			return arguments.callerArgs;
 		}
@@ -247,12 +255,33 @@ component extends="modules.BaseModule" {
 			"analyze" = analyzeArgSpec().toInputSchema(),
 			"destroy" = destroyArgSpec().toInputSchema(),
 			"doctor"  = verboseFlagSpec().toInputSchema(),
+			"migrate" = migrateArgSpec().toInputSchema(),
 			"notes"   = notesArgSpec().toInputSchema(),
 			"seed"    = seedArgSpec().toInputSchema(),
 			"stats"   = verboseFlagSpec().toInputSchema(),
 			"test"    = testArgSpec().toInputSchema(),
 			"upgrade" = upgradeArgSpec().toInputSchema()
 		};
+	}
+
+	/**
+	 * ArgSpec for `wheels migrate`. Positional action covers the whole
+	 * surface (latest/up/down/info/doctor/forget/pretend/
+	 * rename-system-tables/diff); the option set describes the diff action
+	 * so MCP clients can drive schema diffs declaratively.
+	 */
+	private any function migrateArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "action", default = "latest", description = "Migration action: latest, up, down, info, doctor, forget, pretend, rename-system-tables, diff")
+			.positional(name = "version", default = "", description = "Version for forget/pretend")
+			.flag(name = "yes", default = false, description = "Confirm forget/pretend")
+			.flag(name = "dry-run", default = false, description = "Preview rename-system-tables without writing")
+			.positional(name = "model", default = "", description = "Model to diff (diff action; omit for all models)")
+			.option(name = "rename", default = "", description = "Rename hint OLD:NEW (repeatable; Model.OLD:NEW for diffAll)")
+			.option(name = "hints", default = "", description = 'Rename hints JSON ({"renames":{"old":"new"}})')
+			.option(name = "threshold", default = "", description = "Heuristic rename threshold between 0 and 1")
+			.option(name = "name", default = "", description = "Migration name when writing a single-model diff")
+			.flag(name = "write", default = false, description = "Write migration file(s) instead of previewing");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -441,7 +470,7 @@ component extends="modules.BaseModule" {
 		help &= "  generate            Generate model, controller, scaffold, migration, etc." & nl;
 		help &= "  destroy (or d)      Remove generated files" & nl & nl;
 		help &= "Database:" & nl;
-		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)" & nl;
+		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables, diff)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
 		help &= "Background Jobs:" & nl;
@@ -504,6 +533,26 @@ component extends="modules.BaseModule" {
 		return help;
 	}
 
+
+	/**
+	 * Dry-run-aware write for generator paths inside Module.cfc (the
+	 * migration builders and $writeGeneratedContent). Mirrors
+	 * Scaffold.cfc::$write — `wheels generate --dry-run` records the
+	 * would-be path and skips the write.
+	 */
+	private string function $generateWrite(required string path, required string content) {
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, arguments.path);
+			return arguments.path;
+		}
+		var dir = getDirectoryFromPath(arguments.path);
+		if (!directoryExists(dir)) {
+			directoryCreate(dir, true);
+		}
+		FileWrite(arguments.path, arguments.content);
+		return arguments.path;
+	}
+
 	// ─────────────────────────────────────────────────
 	//  generate — Code generation
 	// ─────────────────────────────────────────────────
@@ -519,10 +568,44 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var type = args[1];
-		var remaining = args.len() > 1 ? args.slice(2) : [];
+		// --dry-run: print would-be paths and write nothing. Recognized
+		// anywhere in the argv (before or after the type/name).
+		var dryRun = false;
+		var cleaned = [];
+		for (var a in args) {
+			if (a == "--dry-run") {
+				dryRun = true;
+			} else {
+				arrayAppend(cleaned, a);
+			}
+		}
+		if (dryRun) {
+			request.$wheelsGenerateDryRun = true;
+			request.$wheelsDryRunPaths = [];
+			out("Dry run — nothing will be written.", "cyan");
+		}
 
-		return $generateDispatch(type, remaining);
+		var type = cleaned[1];
+		var remaining = arrayLen(cleaned) > 1 ? cleaned.slice(2) : [];
+
+		var result = $generateDispatch(type, remaining);
+
+		if (dryRun) {
+			var paths = request.$wheelsDryRunPaths ?: [];
+			if (arrayLen(paths)) {
+				out("");
+				out("Would create:", "bold");
+				for (var p in paths) {
+					out("  #p#");
+				}
+			} else {
+				out("(no files would be written)", "yellow");
+			}
+			structDelete(request, "$wheelsGenerateDryRun");
+			structDelete(request, "$wheelsDryRunPaths");
+		}
+
+		return result;
 	}
 
 	/**
@@ -644,7 +727,16 @@ component extends="modules.BaseModule" {
 	 */
 	public string function migrate() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		// --offline is a documented no-op here: migrate never makes external
+		// network calls (the bridge is localhost). Consuming the flag keeps
+		// scripts portable and future-proofs any update check added later.
+		$consumeOfflineFlag(args);
 		var action = arrayLen(args) ? lCase(args[1]) : "latest";
+		// MCP and structured callers may pass action="diff" which re-emits as
+		// --action=diff — normalize to the positional form.
+		if (left(action, 9) == "--action=") {
+			action = lCase(mid(action, 10, 9999));
+		}
 
 		switch (action) {
 			case "latest":
@@ -683,9 +775,11 @@ component extends="modules.BaseModule" {
 					out("Rename failed: #e.message#", "red");
 					rethrow;
 				}
+			case "diff":
+				return runMigrationDiff(args);
 			default:
 				out("Unknown migration action: #action#", "red");
-				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables]");
+				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables|diff]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown migration action: #action#");
 		}
 	}
@@ -2298,6 +2392,13 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * hint: Alias for migrate (historical CommandBox-style name)
+	 */
+	public string function dbmigrate() {
+		return migrate(argumentCollection = arguments);
+	}
+
+	/**
 	 * hint: Alias for generate
 	 */
 	public string function g() {
@@ -2433,15 +2534,20 @@ component extends="modules.BaseModule" {
 		var positional = $deployStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "deploy";
 
-		var dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
-			$deployBuildSshPool(opts.configPath)
-		);
+		// DeployMainCli is constructed lazily — only the deploy/main verb
+		// family needs the SSH pool, which eagerly loads config/deploy.yml.
+		// Building it up front broke the secrets verbs (fetch/extract/print),
+		// which are config-independent, whenever no deploy.yml existed.
+		var dmc = "";
 
 		// Dispatch by verb family. Each family mirrors the exact set of case
 		// labels the previous single switch handled; case-sensitive listFind
 		// preserves the same matching semantics (`wheels deploy DEPLOY` still
 		// falls through to the throw below).
 		if (listFind("deploy,redeploy,rollback,config,init,setup,version,audit,docs,details,remove", sub)) {
+			dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
+				$deployBuildSshPool(opts.configPath)
+			);
 			return $deployMain(dmc, opts, positional, sub);
 		}
 		if (listFind("app,proxy,registry,build,accessory,prune,lock", sub)) {
@@ -2733,6 +2839,11 @@ component extends="modules.BaseModule" {
 	 * LuCLI's picocli root.
 	 */
 	private any function $deploySecretsVerb(required struct opts, required array positional, required string sub) {
+		// Secrets resolution defaults to the module's cwd-derived project
+		// root — an explicit --projectRoot flag still wins. (Before this,
+		// the CLIs fell back to expandPath("./"), which resolves against the
+		// harness webroot rather than the user's project directory.)
+		arguments.opts.projectRoot = arguments.opts.projectRoot ?: variables.projectRoot;
 		switch (arguments.sub) {
 			case "fetch-secrets":
 				arguments.opts.keys = [];
@@ -2810,6 +2921,7 @@ component extends="modules.BaseModule" {
 	 */
 	public string function packages() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		$consumeOfflineFlag(args);
 		var opts = $packagesArgsToOptions(args);
 		var positional = $packagesStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "list";
@@ -3136,6 +3248,7 @@ component extends="modules.BaseModule" {
 	 */
 	public string function db() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		$consumeOfflineFlag(args);
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels db <command>", "yellow");
@@ -3864,7 +3977,7 @@ component extends="modules.BaseModule" {
 		// uncompilable file (literal extends="|DBMigrateExtends|"). The inline
 		// builder emits a correct extends="wheels.migrator.Migration" body and
 		// was already the path every dev-checkout install used. See CLI audit H4.
-		fileWrite(filePath, buildEmptyMigration(migrationName));
+		$generateWrite(filePath, buildEmptyMigration(migrationName));
 
 		printCreated("app/migrator/migrations/#fileName#");
 		return "";
@@ -4055,7 +4168,7 @@ component extends="modules.BaseModule" {
 
 		content &= '}' & nl;
 
-		fileWrite(migrationDir & "/" & fileName, content);
+		$generateWrite(migrationDir & "/" & fileName, content);
 		printCreated("app/migrator/migrations/#fileName#");
 		out("");
 		out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
@@ -4610,7 +4723,7 @@ component extends="modules.BaseModule" {
 		if (!directoryExists(dir)) {
 			directoryCreate(dir, true);
 		}
-		fileWrite(fullPath, arguments.content);
+		$generateWrite(fullPath, arguments.content);
 		return arguments.relativePath;
 	}
 
@@ -5010,6 +5123,273 @@ component extends="modules.BaseModule" {
 		}
 		out("");
 		out("Note: the foreign-key constraint name is still `fk_core_level`. Constraint names are scoped to their table and only rename via DROP/CREATE; this is cosmetic and will not affect functionality.", "yellow");
+	}
+
+	// ── migrate diff (AutoMigrator schema diff) ─────
+
+	/**
+	 * Detect and consume a global `--offline` flag (or WHEELS_OFFLINE=1
+	 * environment variable): the CLI must not phone home. migrate/db accept
+	 * the flag (a no-op for their localhost bridge); new() skips its update
+	 * check; packages fails fast with a clear message.
+	 */
+	public boolean function $consumeOfflineFlag(required array args) {
+		var found = false;
+		for (var a in arguments.args) {
+			if (a == "--offline") {
+				found = true;
+				break;
+			}
+		}
+		if (found) {
+			variables.offline = true;
+		}
+		if ($isOffline()) {
+			request.$wheelsOffline = true;
+		}
+		return found;
+	}
+
+	/**
+	 * True when offline mode is active: --offline flag seen, or
+	 * WHEELS_OFFLINE=1 / true in the environment.
+	 */
+	public boolean function $isOffline() {
+		if (structKeyExists(variables, "offline") && variables.offline) {
+			return true;
+		}
+		try {
+			var env = server.system.environment.WHEELS_OFFLINE ?: "";
+			return env == "1" || compareNoCase(env, "true") == 0;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * `wheels migrate diff [Model] [--rename OLD:NEW] [--hints JSON]
+	 * [--threshold 0-1] [--name migrationName] [--write]`
+	 *
+	 * Previews the schema diff between a model (or all models) and the
+	 * database via the AutoMigrator bridge. Read-only unless --write.
+	 */
+	private string function runMigrationDiff(required array args) {
+		var opts = $parseMigrateDiffArgs(args);
+
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Diffing migrations requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
+
+		out(opts.write ? "Writing migration diff..." : "Previewing migration diff...", "cyan");
+
+		var diffUrl = "http://localhost:#serverPort#/wheels/cli?command=diff&format=json" & $buildDiffBridgeUrl(opts);
+
+		var httpResult = "";
+		try {
+			httpResult = opts.write ? makeBridgePost(diffUrl) : makeHttpRequest(diffUrl);
+		} catch (any httpErr) {
+			throw(
+				type = "MigrationError",
+				message = "Diff failed (connection error): #httpErr.message#",
+				detail = httpErr.detail ?: ""
+			);
+		}
+
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {};
+		if (!(parsed.success ?: false)) {
+			out(parsed.message ?: "Diff failed.", "red");
+			return "";
+		}
+
+		$renderDiffResult(parsed, opts.write);
+		return "";
+	}
+
+	/**
+	 * Parse the `migrate diff` argv into a normalized opts struct.
+	 * Public for specs. Accepted forms:
+	 *   wheels migrate diff                          → diffAll preview
+	 *   wheels migrate diff User                     → single-model preview
+	 *   --rename OLD:NEW (repeatable)                → renames hint
+	 *   --rename User.OLD:NEW (diffAll form)         → per-model renames hint
+	 *   --hints '{"renames":{...}}'                  → raw hints JSON, merged
+	 *   --threshold 0.85 --name my_migration --write
+	 */
+	public struct function $parseMigrateDiffArgs(required array args) {
+		var rv = {
+			model = "",
+			hints = {},
+			threshold = "",
+			name = "",
+			write = false
+		};
+
+		// Positional: args[2] is the model when it isn't a flag.
+		var hasModel = false;
+		if (arrayLen(arguments.args) >= 2 && left(arguments.args[2], 2) != "--") {
+			rv.model = arguments.args[2];
+			hasModel = true;
+		}
+
+		// --rename is repeatable: --rename a b is one pair (space form) OR
+		// --rename=a:b (equals form). Collect raw tokens first.
+		var renames = [];
+		var i = hasModel ? 3 : 2;
+		while (i <= arrayLen(arguments.args)) {
+			var token = arguments.args[i];
+			if (token == "--rename" && i < arrayLen(arguments.args)) {
+				arrayAppend(renames, arguments.args[i + 1]);
+				i++;
+			} else if (left(token, 9) == "--rename=" && len(token) > 9) {
+				arrayAppend(renames, mid(token, 10, 9999));
+			} else if (left(token, 8) == "--hints=" && len(token) > 8) {
+				try {
+					var decoded = deserializeJSON(mid(token, 9, 9999));
+					if (isStruct(decoded)) {
+						structAppend(rv.hints, decoded, true);
+					}
+				} catch (any e) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "--hints must be valid JSON: #e.message#"
+					);
+				}
+			} else if (left(token, 12) == "--threshold=" && len(token) > 12) {
+				var threshold = mid(token, 13, 9999);
+				if (!isNumeric(threshold) || threshold < 0 || threshold > 1) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "--threshold must be a number between 0 and 1."
+					);
+				}
+				rv.threshold = threshold;
+			} else if (left(token, 7) == "--name=" && len(token) > 7) {
+				rv.name = mid(token, 8, 9999);
+			} else if (token == "--write") {
+				rv.write = true;
+			}
+			i++;
+		}
+
+		// Normalize the collected rename pairs into hints.renames.
+		if (arrayLen(renames)) {
+			var renamesOut = {};
+			for (var pair in renames) {
+				if (find(":", pair) == 0) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "Invalid --rename pair '#pair#' — expected OLD:NEW (or Model.OLD:NEW for diffAll)."
+					);
+				}
+				var oldName = trim(listFirst(pair, ":"));
+				var newName = trim(listLast(pair, ":"));
+				if (!len(oldName) || !len(newName)) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "Invalid --rename pair '#pair#' — expected OLD:NEW (or Model.OLD:NEW for diffAll)."
+					);
+				}
+				if (len(rv.model)) {
+					renamesOut[oldName] = newName;
+				} else if (find(".", oldName) > 0) {
+					// diffAll form: Model.OLD:NEW → hints.renames.Model.OLD = NEW
+					var modelName = trim(listFirst(oldName, "."));
+					var column = trim(listLast(oldName, "."));
+					if (!structKeyExists(renamesOut, modelName)) {
+						renamesOut[modelName] = {};
+					}
+					renamesOut[modelName][column] = newName;
+				} else {
+					renamesOut[oldName] = newName;
+				}
+			}
+			rv.hints.renames = structKeyExists(rv.hints, "renames") ? rv.hints.renames : {};
+			structAppend(rv.hints.renames, renamesOut, false);
+		}
+
+		return rv;
+	}
+
+	/**
+	 * Build the /wheels/cli query-string suffix for the diff command.
+	 * Pure string building — public for specs.
+	 */
+	public string function $buildDiffBridgeUrl(required struct opts) {
+		var query = "";
+		if (len(arguments.opts.model)) {
+			query &= "&modelName=#urlEncodedFormat(arguments.opts.model)#";
+		}
+		if (structCount(arguments.opts.hints)) {
+			query &= "&hints=#urlEncodedFormat(serializeJSON(arguments.opts.hints))#";
+		}
+		if (len(arguments.opts.threshold)) {
+			query &= "&threshold=#urlEncodedFormat(arguments.opts.threshold)#";
+		}
+		if (arguments.opts.write) {
+			query &= "&write=true";
+			if (len(arguments.opts.name)) {
+				query &= "&name=#urlEncodedFormat(arguments.opts.name)#";
+			}
+		}
+		return query;
+	}
+
+	/**
+	 * Render a diff bridge response. Human-readable column listing per
+	 * model, with a trailer when previewing.
+	 */
+	private void function $renderDiffResult(required struct parsed, required boolean write) {
+		var isSingle = structKeyExists(arguments.parsed, "model");
+		var diffs = isSingle ? { "": arguments.parsed.model } : (arguments.parsed.models ?: {});
+
+		var anyOutput = false;
+		for (var modelKey in diffs) {
+			var diff = diffs[modelKey];
+			var heading = structKeyExists(diff, "modelName") ? diff.modelName : modelKey;
+			out("");
+			out("--- #heading# ---", "bold");
+
+			for (var col in (diff.addColumns ?: [])) {
+				out("  + add    #col#", "green");
+				anyOutput = true;
+			}
+			for (var col in (diff.removeColumns ?: [])) {
+				out("  - remove #col#", "red");
+				out("      (if this is a rename, use --rename #col#:newName)", "yellow");
+				anyOutput = true;
+			}
+			for (var col in (diff.changeColumns ?: [])) {
+				out("  ~ change #col#", "yellow");
+				anyOutput = true;
+			}
+			for (var col in (diff.renameColumns ?: [])) {
+				out("  ~ rename #col#", "yellow");
+				anyOutput = true;
+			}
+			for (var suggestion in (diff.suggestedRenames ?: [])) {
+				var sugOld = suggestion.oldName ?: "?";
+				var sugNew = suggestion.newName ?: "?";
+				var sugConf = suggestion.confidence ?: "";
+				out("  ? suggest #sugOld# -> #sugNew# (#sugConf#)", "cyan");
+				anyOutput = true;
+			}
+		}
+
+		if (!anyOutput) {
+			out("No differences found — models and database are in sync.", "green");
+		}
+
+		if (!arguments.write) {
+			out("");
+			out("Preview only — pass --write to commit the migration file(s).", "yellow");
+		} else {
+			out("");
+			out("Migration file(s) written.", "green");
+		}
 	}
 
 	// ── Seed Execution ──────────────────────────────
@@ -6870,14 +7250,17 @@ component extends="modules.BaseModule" {
 		// failed/slow network check. See services/UpdateChecker.cfc for the
 		// channel-aware logic + 24h cache. Wrapped in try/catch as a final
 		// belt for any failure mode the service itself doesn't already
-		// internalize (e.g., the createObject call throwing).
+		// internalize (e.g., the createObject call throwing). Skipped
+		// entirely in offline mode (--offline / WHEELS_OFFLINE=1).
 		try {
-			var checker = new services.UpdateChecker();
-			var updateResult = checker.check(currentVersion=super.version());
-			if (updateResult.hasUpdate) {
-				out("");
-				out("A newer wheels (#updateResult.channel#) is available: #updateResult.latest# (you have #updateResult.current#)", "yellow");
-				out("  Upgrade: #updateResult.upgradeCommand#", "yellow");
+			if (!$isOffline()) {
+				var checker = new services.UpdateChecker();
+				var updateResult = checker.check(currentVersion=super.version());
+				if (updateResult.hasUpdate) {
+					out("");
+					out("A newer wheels (#updateResult.channel#) is available: #updateResult.latest# (you have #updateResult.current#)", "yellow");
+					out("  Upgrade: #updateResult.upgradeCommand#", "yellow");
+				}
 			}
 		} catch (any e) {
 			// Silently swallow — never let an update check delay or break

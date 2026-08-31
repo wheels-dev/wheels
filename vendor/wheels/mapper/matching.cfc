@@ -419,6 +419,11 @@ component {
 			arguments.binding = variables.scopeStack[1].binding;
 		}
 
+		// Inherit bindBy from scope stack.
+		if (!StructKeyExists(arguments, "bindBy") && StructKeyExists(variables.scopeStack[1], "bindBy")) {
+			arguments.bindBy = variables.scopeStack[1].bindBy;
+		}
+
 		// Add shallow path to pattern.
 		// Or, add scoped path to pattern.
 		if ($shallow()) {

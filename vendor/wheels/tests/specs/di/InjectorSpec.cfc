@@ -401,6 +401,115 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("Factories (toFactory)", () => {
+
+				it("resolves a transient factory on every call", () => {
+					var counter = {n: 0};
+					var build = function(ctx) {
+						counter.n = counter.n + 1;
+						return {n: counter.n, fromFactory: true};
+					};
+					di.map("factoryThing").toFactory(build);
+
+					var first = di.getInstance("factoryThing");
+					var second = di.getInstance("factoryThing");
+
+					expect(first).toHaveKey("fromFactory");
+					expect(second).toHaveKey("fromFactory");
+					expect(first.n).toBe(1);
+					expect(second.n).toBe(2);
+				});
+
+				it("passes the container so factories can compose other services", () => {
+					di.map("simpleService").to("wheels.tests._assets.di.SimpleService").asSingleton();
+					var build = function(ctx) {
+						return {inner: ctx.getInstance("simpleService")};
+					};
+					di.map("composed").toFactory(build);
+
+					var composed = di.getInstance("composed");
+
+					expect(composed.inner).toBeInstanceOf("wheels.tests._assets.di.SimpleService");
+					expect(composed.inner).toBe(di.getInstance("simpleService"));
+				});
+
+				it("singleton factories run once", () => {
+					var calls = {count: 0};
+					var build = function(ctx) {
+						calls.count = calls.count + 1;
+						return {n: calls.count};
+					};
+					di.map("singletonFactory").toFactory(build).asSingleton();
+
+					var first = di.getInstance("singletonFactory");
+					var second = di.getInstance("singletonFactory");
+
+					expect(calls.count).toBe(1);
+					expect(first).toBe(second);
+				});
+
+				it("request-scoped factories run once per request", () => {
+					var calls = {count: 0};
+					var build = function(ctx) {
+						calls.count = calls.count + 1;
+						return {n: calls.count};
+					};
+					di.map("requestFactory").toFactory(build).asRequestScoped();
+
+					var first = di.getInstance("requestFactory");
+					var second = di.getInstance("requestFactory");
+
+					expect(calls.count).toBe(1);
+					expect(first).toBe(second);
+				});
+
+				it("throws Wheels.Injector without a preceding map()", () => {
+					expect(() => di.toFactory(function(ctx) { return {}; }))
+						.toThrow("Wheels.Injector");
+				});
+
+				it("throws Wheels.Injector for a non-closure argument", () => {
+					di.map("notAFactory");
+					expect(() => di.toFactory("app.lib.Something")).toThrow("Wheels.Injector");
+				});
+
+				it("to() after toFactory() replaces the factory", () => {
+					di.map("switching").toFactory(function(ctx) { return {fromFactory: true}; });
+					di.map("switching").to("wheels.tests._assets.di.SimpleService");
+
+					expect(di.isFactory("switching")).toBeFalse();
+					expect(di.getInstance("switching")).toBeInstanceOf("wheels.tests._assets.di.SimpleService");
+				});
+
+				it("toFactory() after to() replaces the path binding", () => {
+					di.map("switching2").to("wheels.tests._assets.di.SimpleService");
+					di.map("switching2").toFactory(function(ctx) { return {fromFactory: true}; });
+
+					expect(di.isFactory("switching2")).toBeTrue();
+					expect(di.getInstance("switching2")).toHaveKey("fromFactory");
+				});
+
+				it("containsInstance and isFactory report factory bindings", () => {
+					di.map("reporting").toFactory(function(ctx) { return {}; });
+
+					expect(di.containsInstance("reporting")).toBeTrue();
+					expect(di.isFactory("reporting")).toBeTrue();
+					expect(di.isFactory("simpleService")).toBeFalse();
+				});
+
+				it("snapshot/restore unwinds factory registrations", () => {
+					var snap = di.$snapshotBindings();
+					di.map("ephemeral").toFactory(function(ctx) { return {}; });
+
+					expect(di.containsInstance("ephemeral")).toBeTrue();
+
+					di.$restoreBindings(snap);
+
+					expect(di.containsInstance("ephemeral")).toBeFalse();
+				});
+
+			});
+
 		});
 
 	}

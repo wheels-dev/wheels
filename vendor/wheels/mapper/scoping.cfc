@@ -26,6 +26,7 @@ component {
 		struct constraints,
 		any middleware,
 		any binding,
+		any bindBy,
 		any callback,
 		string $call = "scope"
 	) {

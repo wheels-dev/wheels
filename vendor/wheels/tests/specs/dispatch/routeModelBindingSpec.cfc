@@ -253,6 +253,65 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("when bindBy is set on a route", function() {
+
+				it("resolves the record by a non-PK column and lands it in params", function() {
+					var post = g.model("Post").findOne(order="id");
+					if (IsBoolean(post) && !post) {
+						post = g.model("Post").create(
+							authorId = 1,
+							title = "BindBy Slug Test",
+							body = "Test body",
+							views = 0
+						);
+					}
+
+					var params = {controller = "posts", action = "show", key = post.title};
+					var route = {binding = true, bindBy = "title"};
+
+					var result = _dispatch.$resolveRouteModelBinding(params = params, route = route);
+
+					expect(result).toHaveKey("post");
+					expect(result.post.key()).toBe(post.key());
+					// Original key param should be preserved.
+					expect(result.key).toBe(post.title);
+				});
+
+				it("throws RecordNotFound when no record matches the bound column", function() {
+					var params = {controller = "posts", action = "show", key = "no-such-title-xyz"};
+					var route = {binding = true, bindBy = "title"};
+
+					expect(function() {
+						_dispatch.$resolveRouteModelBinding(params = params, route = route);
+					}).toThrow("Wheels.RecordNotFound");
+				});
+
+				it("ignores bindBy when binding is disabled", function() {
+					var params = {controller = "posts", action = "show", key = "anything"};
+					var route = {bindBy = "title"};
+
+					var result = _dispatch.$resolveRouteModelBinding(params = params, route = route);
+
+					expect(result).notToHaveKey("post");
+				});
+
+				it("combines with an explicit binding model name", function() {
+					var author = g.model("Author").findOne(order="id");
+					if (IsBoolean(author) && !author) {
+						author = g.model("Author").create(firstName = "BindBy", lastName = "Author");
+					}
+
+					var params = {controller = "posts", action = "show", key = author.lastName};
+					var route = {binding = "Author", bindBy = "lastName"};
+
+					var result = _dispatch.$resolveRouteModelBinding(params = params, route = route);
+
+					expect(result).toHaveKey("author");
+					expect(result.author.key()).toBe(author.key());
+				});
+
+			});
+
 		});
 
 	}

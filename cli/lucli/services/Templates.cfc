@@ -49,6 +49,13 @@ component {
 
 		var destinationPath = variables.projectRoot & "/" & arguments.destination;
 
+		// Dry run (request.$wheelsGenerateDryRun set by `wheels generate
+		// --dry-run`): record the would-be path, write nothing.
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, destinationPath);
+			return {success: true, path: destinationPath, message: "Dry run — not written", dryRun: true};
+		}
+
 		// Ensure destination directory exists
 		var destinationDir = getDirectoryFromPath(destinationPath);
 		if (!directoryExists(destinationDir)) {

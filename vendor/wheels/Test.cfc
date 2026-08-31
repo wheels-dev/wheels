@@ -811,6 +811,14 @@ component output="false" displayName="Test" extends="wheels.Global"{
 			variables.this = this;
 		}
 		new wheels.Plugins().$initializeMixins(variables);
+		// Legacy RocketUnit base — warn once per application instance (deduped
+		// per feature by $deprecated). Removal is planned for Wheels 5.0; see
+		// docs/releases/wheels-5-roadmap.md §5.4.
+		$deprecated(
+			feature = "rocketunit-test-base",
+			message = "wheels.Test (RocketUnit) is deprecated and will be removed in Wheels 5.0. Migrate test components to extend=""wheels.WheelsTest"" and use the BDD syntax (describe/it/expect).",
+			docUrl = "https://guides.wheels.dev/v4-0-0/testing/"
+		);
 	}
 
 }

@@ -39,6 +39,22 @@ component {
 		return variables.cache;
 	}
 
+
+	/**
+	 * Offline gate for network paths. `wheels packages` sets
+	 * request.$wheelsOffline when --offline / WHEELS_OFFLINE=1 is active;
+	 * cached reads still work, fresh fetches fail fast with a clear
+	 * message instead of hanging on a blocked request.
+	 */
+	private void function $rejectWhenOffline(required string verb) {
+		if (request.$wheelsOffline ?: false) {
+			Throw(
+				type = "Wheels.Packages.Offline",
+				message = "Offline mode is enabled (--offline / WHEELS_OFFLINE=1) — the package registry requires network access. Cached registry data is still available."
+			);
+		}
+	}
+
 	/**
 	 * Returns the list of package names in the registry. Serves cached
 	 * data if fresh; otherwise hits the GitHub contents API.
@@ -47,6 +63,7 @@ component {
 		if (variables.cache.hasFreshIndex()) {
 			return variables.cache.readIndex();
 		}
+		$rejectWhenOffline("list");
 		local.url = "https://api.github.com/repos/#variables.registryRepo#/contents/packages?ref=#variables.branch#";
 		local.resp = variables.http.get(local.url);
 		if (local.resp.status != 200) {
@@ -85,6 +102,7 @@ component {
 			$validateManifest(arguments.name, local.cached);
 			return local.cached;
 		}
+		$rejectWhenOffline("fetch");
 		local.url = "https://raw.githubusercontent.com/#variables.registryRepo#/#variables.branch#/packages/#arguments.name#/manifest.json";
 		local.resp = variables.http.get(local.url);
 		if (local.resp.status == 404) {

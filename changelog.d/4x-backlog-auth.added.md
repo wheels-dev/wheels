@@ -1,0 +1,1 @@
+- Added `enableSession()` — one-line session-auth wiring for `config/services.cfm`.
