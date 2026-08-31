@@ -12,9 +12,12 @@
  * verifies existing $2$, $2a$, $2x$, and $2y$ hashes (the checksum is
  * identical across the "minor" variants for byte values below 0x80).
  *
- * Every 32-bit word is a CFML number. Results are masked with
- * BitAnd(x, 4294967295) whenever the sign matters for later byte extraction,
- * and bytes are split with BitSHRN (logical shift) + BitAnd(x, 255).
+ * Every 32-bit word is a CFML number kept inside the SIGNED 32-bit range
+ * (see $bcryptWord32): Adobe CF's bit functions reject operands that cannot
+ * fit in a signed integer (#3463), and the signed representation carries
+ * the identical bit pattern on every engine. Bytes are extracted with the
+ * arithmetic $bcryptByte — bit shifts on full words are unsafe on Adobe
+ * (int-range validation) and Lucee (BitSHRN treats negatives as 64-bit).
  */
 
 public string function bcryptHash(required string password, numeric cost = 10) {
@@ -86,10 +89,10 @@ public string function $bcryptHashCore(required numeric cost, required array sal
 	local.out = [];
 	for (local.j = 1; local.j <= 6; local.j++) {
 		local.w = local.ctext[local.j];
-		ArrayAppend(local.out, BitAnd(BitSHRN(local.w, 24), 255));
-		ArrayAppend(local.out, BitAnd(BitSHRN(local.w, 16), 255));
-		ArrayAppend(local.out, BitAnd(BitSHRN(local.w, 8), 255));
-		ArrayAppend(local.out, BitAnd(local.w, 255));
+		ArrayAppend(local.out, $bcryptByte(local.w, 24));
+		ArrayAppend(local.out, $bcryptByte(local.w, 16));
+		ArrayAppend(local.out, $bcryptByte(local.w, 8));
+		ArrayAppend(local.out, $bcryptByte(local.w, 0));
 	}
 	ArrayDeleteAt(local.out, 24);
 
@@ -102,12 +105,15 @@ public string function $bcryptHashCore(required numeric cost, required array sal
  * the password alternately as key material (jBCrypt ekskey/key semantics).
  */
 public struct function $bcryptEksSetup(required numeric cost, required array salt, required array key) {
+	// Adobe CF passes arrays BY VALUE, so in-place mutation inside
+	// $bcryptExpandKey would be discarded there (#3463) — every pass
+	// re-assigns the returned state.
 	local.state = $bcryptInitState();
-	$bcryptExpandKey(local.state.P, local.state.S, arguments.key, arguments.salt);
+	local.state = $bcryptExpandKey(local.state.P, local.state.S, arguments.key, arguments.salt);
 	local.rounds = 2 ^ arguments.cost;
 	for (local.r = 1; local.r <= local.rounds; local.r++) {
-		$bcryptExpandKey(local.state.P, local.state.S, arguments.key, []);
-		$bcryptExpandKey(local.state.P, local.state.S, arguments.salt, []);
+		local.state = $bcryptExpandKey(local.state.P, local.state.S, arguments.key, []);
+		local.state = $bcryptExpandKey(local.state.P, local.state.S, arguments.salt, []);
 	}
 	return local.state;
 }
@@ -123,30 +129,71 @@ public array function $bcryptEncrypt(required array P, required array S, require
 	local.S = arguments.S;
 	local.l = arguments.L;
 	local.r = arguments.R;
-	local.mask = 4294967295;
 	local.l = BitXor(local.l, local.P[1]);
 	for (local.k = 1; local.k <= 8; local.k++) {
 		// F(l) folded into r, then P[2k].
-		local.a = BitAnd(BitSHRN(local.l, 24), 255);
-		local.b = BitAnd(BitSHRN(local.l, 16), 255);
-		local.c = BitAnd(BitSHRN(local.l, 8), 255);
-		local.d = BitAnd(local.l, 255);
-		local.n = BitAnd(local.S[local.a + 1] + local.S[local.b + 257], local.mask);
+		local.a = $bcryptByte(local.l, 24);
+		local.b = $bcryptByte(local.l, 16);
+		local.c = $bcryptByte(local.l, 8);
+		local.d = $bcryptByte(local.l, 0);
+		local.n = $bcryptWord32(local.S[local.a + 1] + local.S[local.b + 257]);
 		local.n = BitXor(local.n, local.S[local.c + 513]);
-		local.n = BitAnd(local.n + local.S[local.d + 769], local.mask);
+		local.n = $bcryptWord32(local.n + local.S[local.d + 769]);
 		local.r = BitXor(BitXor(local.r, local.n), local.P[2 * local.k]);
 
 		// F(r) folded into l, then P[2k + 1].
-		local.a = BitAnd(BitSHRN(local.r, 24), 255);
-		local.b = BitAnd(BitSHRN(local.r, 16), 255);
-		local.c = BitAnd(BitSHRN(local.r, 8), 255);
-		local.d = BitAnd(local.r, 255);
-		local.n = BitAnd(local.S[local.a + 1] + local.S[local.b + 257], local.mask);
+		local.a = $bcryptByte(local.r, 24);
+		local.b = $bcryptByte(local.r, 16);
+		local.c = $bcryptByte(local.r, 8);
+		local.d = $bcryptByte(local.r, 0);
+		local.n = $bcryptWord32(local.S[local.a + 1] + local.S[local.b + 257]);
 		local.n = BitXor(local.n, local.S[local.c + 513]);
-		local.n = BitAnd(local.n + local.S[local.d + 769], local.mask);
+		local.n = $bcryptWord32(local.n + local.S[local.d + 769]);
 		local.l = BitXor(BitXor(local.l, local.n), local.P[2 * local.k + 1]);
 	}
 	return [BitXor(local.r, local.P[18]), local.l];
+}
+
+/**
+ * Normalize a 32-bit word into the signed range. All P/S/key words are
+ * stored as signed ints so Adobe CF's bit functions — which reject operands
+ * that cannot fit in a signed 32-bit integer ("Cannot convert the value
+ * 4.294967295E9 to an integer") — accept them (#3463). The bit pattern is
+ * unchanged; Lucee/BoxLang/RustCFML treat signed values identically.
+ */
+public numeric function $bcryptWord32(required numeric w) {
+	if (arguments.w > 2147483647) {
+		return arguments.w - 4294967296;
+	}
+	if (arguments.w < -2147483648) {
+		return arguments.w + 4294967296;
+	}
+	return arguments.w;
+}
+
+/**
+ * Extract byte `shift/8` (shift in 8, 16, 24, or 0) from a signed 32-bit
+ * word using pure arithmetic. No engine bit function sees an operand above
+ * 2^31-1: Adobe CF rejects such operands ("Cannot convert the value
+ * 4.294967295E9 to an integer") and Lucee's BitSHRN misinterprets negative
+ * operands as 64-bit patterns, so bit-shifting a full word is unsafe on
+ * both (#3463).
+ */
+public numeric function $bcryptByte(required numeric w, required numeric shift) {
+	// Pure arithmetic only. Adobe CF converts the OPERANDS of both `mod`
+	// and bit functions to signed 32-bit integers, and re-validates
+	// arguments-scope writes against the declared type — so words above
+	// 2^31-1 must never reach any of them (#3463). `x mod 256` becomes
+	// `x - 256 * Int(x / 256)`.
+	var u = arguments.w;
+	if (u < 0) {
+		u = u + 4294967296;
+	}
+	if (arguments.shift == 0) {
+		return u - 256 * Int(u / 256);
+	}
+	var q = Int(u / (2 ^ arguments.shift));
+	return q - 256 * Int(q / 256);
 }
 
 /**
@@ -168,11 +215,11 @@ public struct function $bcryptInitState() {
 	local.S = [];
 	local.pos = 1;
 	for (local.i = 1; local.i <= 18; local.i++) {
-		ArrayAppend(local.P, InputBaseN(Mid(local.hex, local.pos, 8), 16));
+		ArrayAppend(local.P, $bcryptWord32(InputBaseN(Mid(local.hex, local.pos, 8), 16)));
 		local.pos = local.pos + 8;
 	}
 	for (local.i = 1; local.i <= 1024; local.i++) {
-		ArrayAppend(local.S, InputBaseN(Mid(local.hex, local.pos, 8), 16));
+		ArrayAppend(local.S, $bcryptWord32(InputBaseN(Mid(local.hex, local.pos, 8), 16)));
 		local.pos = local.pos + 8;
 	}
 	return { P = local.P, S = local.S };
@@ -184,7 +231,7 @@ public struct function $bcryptInitState() {
  * running block before enciphering. Pass an empty dataBytes array for the
  * zero-data pass used inside the EksBlowfish round loop.
  */
-public void function $bcryptExpandKey(required array P, required array S, required array keyMaterial, required array dataBytes) {
+public struct function $bcryptExpandKey(required array P, required array S, required array keyMaterial, required array dataBytes) {
 	local.P = arguments.P;
 	local.S = arguments.S;
 	for (local.i = 1; local.i <= 18; local.i++) {
@@ -224,6 +271,7 @@ public void function $bcryptExpandKey(required array P, required array S, requir
 		local.S[local.i] = local.l;
 		local.S[local.i + 1] = local.r;
 	}
+	return {P = local.P, S = local.S};
 }
 
 /**
@@ -236,7 +284,11 @@ public numeric function $bcryptCyclicWord(required array bytes, required numeric
 	local.b1 = arguments.bytes[((arguments.offset + 1) % local.n) + 1];
 	local.b2 = arguments.bytes[((arguments.offset + 2) % local.n) + 1];
 	local.b3 = arguments.bytes[((arguments.offset + 3) % local.n) + 1];
-	return BitAnd(BitSHLN(local.b0, 24) + BitSHLN(local.b1, 16) + BitSHLN(local.b2, 8) + local.b3, 4294967295);
+	// The shifted bytes sum to the correct 32-bit word in two's complement;
+	// $bcryptWord32 keeps it inside the signed range so Adobe CF's bit
+	// functions (which reject operands above 2^31-1) accept every later
+	// use of the word (#3463).
+	return $bcryptWord32(BitSHLN(local.b0, 24) + BitSHLN(local.b1, 16) + BitSHLN(local.b2, 8) + local.b3);
 }
 
 /**
