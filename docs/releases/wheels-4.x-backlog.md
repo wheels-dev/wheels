@@ -5,9 +5,9 @@ audit of the (since-removed) plans corpus. Everything else shipped or was
 deliberately superseded. The 5.0 scope lives separately in
 [wheels-5-roadmap.md](wheels-5-roadmap.md).
 
-> Items marked **Done** shipped on the 2026-08-30 4.x-backlog branch;
-> items marked **Deferred** are deliberately out of scope for now (see
-> reasons).
+> Items marked **Done** shipped on the 2026-08-30/31 4.x-backlog branch
+> series (PRs #3452–#3455); items marked **Deferred** are deliberately out
+> of scope for now (see reasons).
 
 ## Shipped-era leftovers
 
@@ -38,7 +38,10 @@ deliberately superseded. The 5.0 scope lives separately in
 
 9. ~~bcrypt password-hash helper (#4)~~ — **Done.** Pure-CFML `bcryptHash` /
    `bcryptVerify` / `bcryptNeedsRehash` in `vendor/wheels/global/security.cfm`
-   (standard `$2b$` 60-char hashes, OpenBSD-compatible, cross-engine).
+   (standard `$2b$` 60-char hashes, OpenBSD-compatible) on
+   Lucee/Adobe/BoxLang; RustCFML, which ships `bcryptHash`/`bcryptVerify` as
+   native builtins, serves the same API and gets `bcryptNeedsRehash` from the
+   always-included `security-extra.cfm`.
 10. ~~`wheels.auth.enableSession` facade (#6)~~ — **Done.** `enableSession()`
     global helper wires the authenticator + session strategy singletons and
     registers the `session` strategy idempotently from `config/services.cfm`.
