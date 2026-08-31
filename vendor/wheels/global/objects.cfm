@@ -139,7 +139,69 @@
 				application.wheels.integrationPlans[arguments.path] = local.plan;
 			}
 		}
-		return application.wheels.integrationPlans[arguments.path];
+		local.plan = application.wheels.integrationPlans[arguments.path];
+
+		// Once per request (per path), validate the cached plan. On Lucee 7 a
+		// cached function reference can come back as Java null (#3457) — e.g.
+		// when the plan was first built while the engine was still compiling
+		// the mixin component. A null ref is then written into every
+		// materialized instance's variables/this scope, and Lucee throws a
+		// bare NullPointerException when it later enumerates the component.
+		// Rebuild the plan in place when that happens.
+		//
+		// The flag lives in a request-scope struct rather than a dotted
+		// request-scope key: RustCFML resolves dots in request-scope keys as
+		// paths (nested writes, missed deletes), so a flat dotted key never
+		// round-trips there.
+		if (!StructKeyExists(request, "wheelsIntegrationPlanChecks")) {
+			request.wheelsIntegrationPlanChecks = {};
+		}
+		local.planKey = LCase(arguments.path);
+		if (!StructKeyExists(request.wheelsIntegrationPlanChecks, local.planKey)) {
+			request.wheelsIntegrationPlanChecks[local.planKey] = true;
+			if ($integrationPlanHasNullRefs(local.plan)) {
+				local.plan = $buildComponentIntegrationPlan(arguments.path);
+				lock name="wheels.integrationPlans.#application.applicationName#" type="exclusive" timeout="10" {
+					application.wheels.integrationPlans[arguments.path] = local.plan;
+				}
+				$warnNullIntegrationPlanRefs(arguments.path);
+			}
+		}
+		return local.plan;
+	}
+
+	/**
+	 * Internal. Whether any entry in an integration plan carries a null (or
+	 * missing) function reference — a plan in that state would write null
+	 * members into every materialized instance (#3457).
+	 */
+	public boolean function $integrationPlanHasNullRefs(required array plan) {
+		for (local.comp in arguments.plan) {
+			for (local.pm in local.comp.publicMethods) {
+				if (!StructKeyExists(local.pm, "ref") || IsNull(local.pm.ref)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Internal. One-time warning when a cached integration plan had to be
+	 * rebuilt because it contained null function references (#3457).
+	 */
+	public void function $warnNullIntegrationPlanRefs(required string path) {
+		try {
+			if (StructKeyExists(getFunctionList(), "writeLog")) {
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Wheels rebuilt a cached component integration plan for '#arguments.path#' because it contained null function references (see issue ##3457). If this repeats on every request, the engine's class cache may be stale — restart the server."
+				);
+			}
+		} catch (any e) {
+			// Logging must never fail the request.
+		}
 	}
 
 
@@ -169,10 +231,19 @@
 			local.fEnd = ArrayLen(local.fns);
 			for (local.f = 1; local.f <= local.fEnd; local.f++) {
 				if (local.fns[local.f].access == "public") {
-					ArrayAppend(local.publicMethods, {
-						name = local.fns[local.f].name,
-						ref = local.instance[local.fns[local.f].name]
-					});
+					local.ref = local.instance[local.fns[local.f].name];
+					// Guard against engines returning a null function reference
+					// while the mixin component is still compiling (#3457) —
+					// caching a null ref would write a null member into every
+					// materialized instance.
+					if (!IsNull(local.ref)) {
+						ArrayAppend(local.publicMethods, {
+							name = local.fns[local.f].name,
+							ref = local.ref
+						});
+					} else {
+						$warnNullIntegrationPlanRefs("#arguments.path#.#local.componentName# (build)");
+					}
 				}
 			}
 			ArrayAppend(local.rv, {
