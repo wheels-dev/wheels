@@ -28,6 +28,9 @@ component extends="wheels.WheelsTest" {
 				if (StructKeyExists(request.wheelsIntegrationPlanChecks, _checkKey)) {
 					StructDelete(request.wheelsIntegrationPlanChecks, _checkKey);
 				}
+				if (StructKeyExists(request.wheelsIntegrationPlans, _checkKey)) {
+					StructDelete(request.wheelsIntegrationPlans, _checkKey);
+				}
 			});
 
 			it("builds a model plan with no null references", function() {
@@ -47,13 +50,30 @@ component extends="wheels.WheelsTest" {
 				_originalPlan = application.wheels.integrationPlans[_planPath];
 				application.wheels.integrationPlans[_planPath] = $shallowCopyPlan(_originalPlan);
 				StructDelete(application.wheels.integrationPlans[_planPath][1].publicMethods[1], "ref");
-				// force re-validation within this request
+				// force re-validation within this request (both the once-per-request
+				// flag and the request-scope plan cache must be cleared so the
+				// poisoned application-scope plan is re-read)
 				if (StructKeyExists(request.wheelsIntegrationPlanChecks, _checkKey)) {
 					StructDelete(request.wheelsIntegrationPlanChecks, _checkKey);
+				}
+				if (StructKeyExists(request.wheelsIntegrationPlans, _checkKey)) {
+					StructDelete(request.wheelsIntegrationPlans, _checkKey);
 				}
 				var plan = g.$componentIntegrationPlan(_planPath);
 				expect(g.$integrationPlanHasNullRefs(plan)).toBeFalse();
 				expect(application.wheels.integrationPlans[_planPath]).toBe(plan);
+			});
+
+			it("serves the plan from the request scope after its first use", function() {
+				if (StructKeyExists(request.wheelsIntegrationPlans, _checkKey)) {
+					StructDelete(request.wheelsIntegrationPlans, _checkKey);
+				}
+				var first = g.$componentIntegrationPlan(_planPath);
+				expect(request.wheelsIntegrationPlans[_planPath]).toBe(first);
+				// a second call returns the same request-cached array without
+				// touching the application scope again
+				var second = g.$componentIntegrationPlan(_planPath);
+				expect(second).toBe(first);
 			});
 
 		});

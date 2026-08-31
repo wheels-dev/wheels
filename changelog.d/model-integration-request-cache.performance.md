@@ -1,0 +1,1 @@
+- Reduced per-instance model/controller materialization overhead by serving the cached component-integration plan from the request scope after its first use in a request, instead of re-reading the synchronized application scope on every instantiation (#3213).
