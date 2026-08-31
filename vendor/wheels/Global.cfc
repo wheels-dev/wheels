@@ -549,6 +549,46 @@ component output="false" {
 		}
 	}
 
+	// bcrypt password helpers (bcryptHash / bcryptVerify + internals).
+	// RustCFML ships bcryptHash/bcryptVerify as NATIVE builtins — defining
+	// our own copies collides ("The name [bcryptHash] is already used by a
+	// built in Function") and breaks boot. Skip the include on engines that
+	// provide the builtins; their native implementations serve the same
+	// public API. bcryptNeedsRehash has no engine builtin, so it lives in
+	// the always-included security-extra.cfm below.
+	if (!StructKeyExists(getFunctionList(), "bcryptHash")) {
+		try {
+			include "/wheels/global/security.cfm";
+		} catch (any e) {
+			if (!$isMissingMappedInclude(e)) {
+				rethrow;
+			}
+			try {
+				include "global/security.cfm";
+			} catch (any e2) {
+				if (!$isMissingMappedInclude(e2)) {
+					rethrow;
+				}
+				include "../vendor/wheels/global/security.cfm";
+			}
+		}
+	}
+	try {
+		include "/wheels/global/security-extra.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/security-extra.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/security-extra.cfm";
+		}
+	}
+
 	// User-defined global functions
 	try {
 		include "/app/global/functions.cfm";

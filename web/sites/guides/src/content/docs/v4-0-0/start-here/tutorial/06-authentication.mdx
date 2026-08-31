@@ -117,7 +117,7 @@ Four pieces to notice:
 - `authenticate(password)` re-hashes the candidate password with the stored salt and compares. Equal means the user typed the right password.
 
 <Aside type="caution">
-  SHA-256 with a per-user salt is **educational, not production-grade**. For a real app, use bcrypt — either via a CFX tag, a Java bcrypt library added to `box.json`, or the forthcoming `wheels-security` package. The mechanism (salt, hash, compare) stays the same; only the hash function changes. Bcrypt is slow by design, which is exactly what you want for passwords — it makes brute-forcing expensive. SHA-256 is fast, which makes it the wrong choice here if you have any alternative.
+  SHA-256 with a per-user salt is **educational, not production-grade**. Wheels ships pure-CFML bcrypt out of the box, so a real app should use it instead of SHA-256: `this.passwordHash = bcryptHash(this.password)` produces a self-describing 60-character `$2b$` hash (drop the separate `passwordSalt` column and reserve 60 chars for `passwordHash`), and `bcryptVerify(arguments.password, this.passwordHash)` checks a candidate in constant time — no CFX tag or Java library needed. The mechanism (salt, hash, compare) stays the same; only the hash function changes. Bcrypt is slow by design, which is exactly what you want for passwords — it makes brute-forcing expensive. SHA-256 is fast, which makes it the wrong choice here if you have any alternative.
 </Aside>
 
 ### Migrate the users table
