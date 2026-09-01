@@ -1,6 +1,6 @@
 ---
 title: "Code Quality"
-description: wheels analyze and wheels validate — read-only diagnostics that surface anti-patterns, complex functions, code smells, and validation errors across models, controllers, views, and routes.
+description: wheels analyze, wheels validate, and wheels coverage — read-only diagnostics plus a change-risk ranking (complexity × test coverage) for the files most likely to break.
 type: reference
 sidebar:
   order: 7
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Two commands cluster here, both read-only and both backed by the same `analysis` service. `wheels analyze` produces a long-form report with metrics, anti-patterns, and complexity hotspots. `wheels validate` runs a tighter, error-focused pass over models, controllers, routes, and views and reports pass/fail.
+Two read-only diagnostics cluster here — `wheels analyze` (a long-form report with metrics, anti-patterns, and complexity hotspots) and `wheels validate` (a tighter, error-focused pass over models, controllers, routes, and views) — plus `wheels coverage`, which instruments the app, runs the suite, and ranks files by change risk.
 
 **You'll use this for:**
 
@@ -130,6 +130,31 @@ Validation found 2 issue(s):
 <Aside type="note" title="analyze vs validate">
 Both commands read the same files through the same service, but they answer different questions. `wheels analyze` is **observational** — here's what your code looks like, here are metrics, here are hotspots. `wheels validate` is **pass/fail** — either there are no errors (exit green) or there are errors you need to fix. Reach for `analyze` during development or a refactor; reach for `validate` right before committing or deploying.
 </Aside>
+
+### `wheels coverage`
+
+Ranks your app's files by change risk — the CRAP score (cyclomatic complexity × test coverage) — so you can see which files are hardest to change safely. Unlike `analyze`'s static complexity, coverage adds the *tested* half: it instruments `app/` with function-level counters, runs the app test suite against a running server, and reports a ranked list. The instrumentation is reverted automatically afterward.
+
+#### Synopsis
+
+``` title="synopsis"
+wheels coverage [--top=N] [--no-test-db]
+```
+
+#### Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--top=N` | `15` | How many files to list in the ranking. |
+| `--no-test-db` | off | Run against the main database instead of the isolated test database. |
+
+#### Example
+
+```bash {test:cli cmd="wheels coverage"}
+wheels coverage
+```
+
+Pairs with the debug bar's **Code Complexity** panel: complexity is static and always visible; `wheels coverage` adds the test-coverage half of the CRAP score on demand. Files at the top of the ranking are the ones to touch with tests in hand.
 
 ## Common workflows
 

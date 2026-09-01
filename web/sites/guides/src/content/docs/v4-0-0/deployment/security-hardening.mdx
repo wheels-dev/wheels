@@ -150,6 +150,18 @@ component extends="Controller" {
 
 For an entire JSON API under `/api`, inherit from a controller that calls `protectsFromForgery(with="ignore")` instead of the default exception-throwing base.
 
+## Mass assignment
+
+`params.user` flows straight into `new()` and `update()` on a scaffolded form, which means a request that adds an `isAdmin=1` field can set columns you didn't intend. The default is open for backward compatibility; opt in to fail-closed with:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(massAssignmentStrict=true);
+</cfscript>
+```
+
+With it on, any model that defines neither `accessibleProperties()` nor `protectedProperties()` fails closed on mass assignment instead of accepting every posted property. Define one of those two lists per model to state the intended surface explicitly — see [Models and the ORM](/v4-0-0/basics/models-and-the-orm/) for the property-list API.
+
 ## Reload password
 
 `reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, **both are disabled**: the reload gate in `public/Application.cfc` fails closed and requires a non-empty configured password plus a matching `password` parameter before it will restart anything, mirroring the environment-switch leg in `vendor/wheels/events/onapplicationstart.cfc`. The security warning Wheels logs on boot when the password is blank states exactly that. (Before [#3062](https://github.com/wheels-dev/wheels/issues/3062) a blank password left plain `?reload=true` open to any anonymous client — an internet-reachable restart-DoS — so still set a real password anywhere reload should work.)

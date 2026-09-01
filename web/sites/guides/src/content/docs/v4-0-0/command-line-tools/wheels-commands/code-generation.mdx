@@ -27,6 +27,14 @@ The `g` alias is supported for every form (`wheels g model User`). `wheels creat
 
 Running `wheels generate` with no arguments prints the list of supported types and one-line examples. Unknown types print `Unknown generator type: <type>` and exit without writing anything.
 
+Every generator accepts `--dry-run`, which prints the would-be file paths and generated content but writes nothing:
+
+```bash title="example"
+wheels generate model Post title:string --dry-run
+```
+
+Previewing is the safe way to see exactly what a generator will create — files, injected config blocks, and all — before it touches the project.
+
 ### Supported types
 
 | Type | Alias | Writes |
