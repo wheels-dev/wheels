@@ -16,7 +16,7 @@ excerpt: >-
   complexity panel at it, the score said everything — and the coverage run
   said the test suite had never touched it. 4.1 ships the two tools that make
   that obvious before the September bug goes out.
-coverImage: '/blog-images/4-1/wheels-coverage-and-the-complexity-panel.svg'
+coverImage: '/blog-images/4-1/wheels-coverage-and-the-complexity-panel.png'
 ---
 
 The controller was nine hundred lines. It did billing, refunds, invoicing, a CSV export, and it was the only place in the app that reached into the payment provider. Nobody was comfortable with it, but it worked, and nobody had the time to be uncomfortable *and* finish a sprint.

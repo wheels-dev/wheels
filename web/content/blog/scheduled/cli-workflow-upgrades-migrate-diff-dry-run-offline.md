@@ -15,7 +15,7 @@ excerpt: >-
   code review approved a generator run that had already written files. Both
   were "the CLI guessed wrong." 4.1 adds diff, dry-run, and offline mode —
   and the honesty fixes that make a green build mean something.
-coverImage: '/blog-images/4-1/cli-workflow-upgrades-migrate-diff-dry-run-offline.svg'
+coverImage: '/blog-images/4-1/cli-workflow-upgrades-migrate-diff-dry-run-offline.png'
 ---
 
 Two incidents. Both were "the CLI guessed," and both were only caught because someone looked closely at a diff.

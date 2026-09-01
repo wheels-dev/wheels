@@ -15,7 +15,7 @@ excerpt: >-
   three subtle bugs it exists to prevent — the ones that only surface after
   the second deploy, or only on a reload, or only for a user who was already
   logged in. Here's what happens when the wiring goes right.
-coverImage: '/blog-images/4-1/one-line-session-auth-with-enablesession.svg'
+coverImage: '/blog-images/4-1/one-line-session-auth-with-enablesession.png'
 ---
 
 The invitation email was two sentences. *We need login on the admin panel by Thursday. You can use the auth layer, right?* Sure. You can. The auth layer has everything: an `Authenticator`, named strategies, a `SessionStrategy`, `authenticateWith`. You've never wired it by hand, but how hard can fifteen lines be?
