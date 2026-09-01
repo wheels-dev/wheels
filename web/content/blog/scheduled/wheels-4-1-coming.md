@@ -15,7 +15,7 @@ excerpt: >-
   where a security pass made the things you always assumed were safe actually
   be safe, and where the framework got meaningfully faster. Here's what's
   coming, and the story behind it.
-coverImage: '/blog-images/4-1/wheels-4-1-coming.svg'
+coverImage: '/blog-images/4-1/wheels-4-1-coming.png'
 ---
 
 Most release previews are a list. This one has a plot, so let me set the scene.

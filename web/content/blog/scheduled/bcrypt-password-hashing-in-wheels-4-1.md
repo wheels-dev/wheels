@@ -15,7 +15,7 @@ excerpt: >-
   it into Wheels 4.1 starts with a pentest finding and a migration that took
   three weeks. Here's the helpers, the cost trade-off, and the part where
   Adobe CF made us question our sanity.
-coverImage: '/blog-images/4-1/bcrypt-password-hashing-in-wheels-4-1.svg'
+coverImage: '/blog-images/4-1/bcrypt-password-hashing-in-wheels-4-1.png'
 ---
 
 The email was four lines long, and it was fine. *Your passwords are hashed with plain SHA-256, no salt, and the database backup from March is on a shared drive.* That's not a vulnerability, that's a sentence.

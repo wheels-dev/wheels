@@ -14,7 +14,7 @@ excerpt: >-
   /posts/4821. Nobody shares /posts/4821. bindBy="slug" exists to make
   resource URLs say something — and it comes with one mistake you can make
   that quietly breaks your site.
-coverImage: '/blog-images/4-1/pretty-urls-with-route-bindby.svg'
+coverImage: '/blog-images/4-1/pretty-urls-with-route-bindby.png'
 ---
 
 The support conversation goes like this: *"the article about migrating to 4.1? sure — here's the link."* The customer opens it, and their browser shows `/posts/4821`.

@@ -15,7 +15,7 @@ excerpt: >-
   override that worked on a GET, a zip that could escape its directory. 4.1
   closes them by failing closed. Here's the story area by area, and what you
   have to check on the way up.
-coverImage: '/blog-images/4-1/the-wheels-4-1-security-hardening-pass.svg'
+coverImage: '/blog-images/4-1/the-wheels-4-1-security-hardening-pass.png'
 ---
 
 Every framework has a layer of things you assume are safe because *surely* nobody would write it that way. A policy that returns `"yes"` authorizes. A `_method` field that works on a GET. A plugin zip that unzips wherever it wants. A route that trusts a header the client set.

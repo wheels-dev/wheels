@@ -25,3 +25,11 @@ in the past publish on the next successful run instead of being stranded.
 - Keep the `slug` unique across both directories.
 - Do not edit `publishedAt` after a post has moved to `posts/` without good
   reason — the site sorts by it.
+
+## Cover images
+
+Covers for a series live under `web/sites/blog/public/blog-images/<series>/`
+in both `.svg` (the editable source) and `.png` (rasterized at 1200x630, which
+is what social/OG scrapers accept — SVG is not supported in `og:image`). Set
+`coverImage` to the `.png` path. To regenerate the PNGs from a new SVG, render
+with a headless browser at `--window-size=1200,630`, or `rsvg-convert`.

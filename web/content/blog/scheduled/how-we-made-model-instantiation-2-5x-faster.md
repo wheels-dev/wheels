@@ -16,7 +16,7 @@ excerpt: >-
   benchmark rig to prove him wrong. He was right. Here's the three-month
   investigation, two unrelated bugs it surfaced, and the lesson about
   trusting micro-benchmarks.
-coverImage: '/blog-images/4-1/how-we-made-model-instantiation-2-5x-faster.svg'
+coverImage: '/blog-images/4-1/how-we-made-model-instantiation-2-5x-faster.png'
 ---
 
 The issue was polite, which is usually how bad news arrives. [@chapmandu](https://github.com/chapmandu) had ported a real app from Wheels 2.5 to 4.0.3, and his RocketUnit suite went from **274 seconds to 1,599** — nearly six times slower. He asked whether we'd ever done a performance comparison.
