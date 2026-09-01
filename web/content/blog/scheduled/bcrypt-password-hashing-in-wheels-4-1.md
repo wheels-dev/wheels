@@ -16,6 +16,10 @@ excerpt: >-
   three weeks. Here's the helpers, the cost trade-off, and the part where
   Adobe CF made us question our sanity.
 coverImage: '/blog-images/4-1/bcrypt-password-hashing-in-wheels-4-1.png'
+announcement:
+  title: 'bcrypt is in Wheels 4.1'
+  body: |
+    New post: **[bcrypt for your passwords](https://blog.wheels.dev/blog/bcrypt-password-hashing-in-wheels-4-1)** — the story behind `bcryptHash()`, `bcryptVerify()`, and `bcryptNeedsRehash()`: pure CFML, no JARs, verified against OpenBSD and jBCrypt vectors.
 ---
 
 The email was four lines long, and it was fine. *Your passwords are hashed with plain SHA-256, no salt, and the database backup from March is on a shared drive.* That's not a vulnerability, that's a sentence.

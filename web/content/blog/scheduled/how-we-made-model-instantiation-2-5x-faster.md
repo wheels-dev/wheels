@@ -17,6 +17,10 @@ excerpt: >-
   investigation, two unrelated bugs it surfaced, and the lesson about
   trusting micro-benchmarks.
 coverImage: '/blog-images/4-1/how-we-made-model-instantiation-2-5x-faster.png'
+announcement:
+  title: '2.5x faster model instantiation'
+  body: |
+    New post: **[2.5x faster, the long way](https://blog.wheels.dev/blog/how-we-made-model-instantiation-2-5x-faster)** — how model materialization got 2.5x faster, the long way.
 ---
 
 The issue was polite, which is usually how bad news arrives. [@chapmandu](https://github.com/chapmandu) had ported a real app from Wheels 2.5 to 4.0.3, and his RocketUnit suite went from **274 seconds to 1,599** — nearly six times slower. He asked whether we'd ever done a performance comparison.

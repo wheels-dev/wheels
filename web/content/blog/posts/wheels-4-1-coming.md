@@ -16,6 +16,15 @@ excerpt: >-
   be safe, and where the framework got meaningfully faster. Here's what's
   coming, and the story behind it.
 coverImage: '/blog-images/4-1/wheels-4-1-coming.png'
+announcement:
+  title: 'Wheels 4.1 is coming — the release series begins'
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/3475'
+  body: |
+    The first post in the **Wheels 4.1** release series is live:
+
+    👉 **[Wheels 4.1 is coming](https://blog.wheels.dev/blog/wheels-4-1-coming)**
+
+    Over the next ten days we're publishing a short series on what's landing in 4.1.0 — bcrypt password hashing, one-line session auth, pretty URLs with `bindBy=`, DI factories, CLI upgrades, a 2.5x model-instantiation speedup, the security-hardening pass, and the new coverage tooling. The full release lands September 10.
 ---
 
 Most release previews are a list. This one has a plot, so let me set the scene.

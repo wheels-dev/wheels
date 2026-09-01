@@ -40,6 +40,12 @@ jobs:
           fetch-depth: 1
           token: ${{ steps.app-token.outputs.token }}
 
+      # Node for the discussion-announcement helper (web/scripts/...mjs).
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
       - name: Publish due posts
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

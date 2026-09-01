@@ -16,6 +16,10 @@ excerpt: >-
   were "the CLI guessed wrong." 4.1 adds diff, dry-run, and offline mode —
   and the honesty fixes that make a green build mean something.
 coverImage: '/blog-images/4-1/cli-workflow-upgrades-migrate-diff-dry-run-offline.png'
+announcement:
+  title: 'CLI upgrades: diff, dry-run, offline'
+  body: |
+    New post: **[CLI workflows that never guess](https://blog.wheels.dev/blog/cli-workflow-upgrades-migrate-diff-dry-run-offline)** — `wheels migrate diff`, `wheels generate --dry-run`, and offline mode.
 ---
 
 Two incidents. Both were "the CLI guessed," and both were only caught because someone looked closely at a diff.

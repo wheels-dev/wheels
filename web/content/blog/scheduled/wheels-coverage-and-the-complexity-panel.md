@@ -17,6 +17,10 @@ excerpt: >-
   said the test suite had never touched it. 4.1 ships the two tools that make
   that obvious before the September bug goes out.
 coverImage: '/blog-images/4-1/wheels-coverage-and-the-complexity-panel.png'
+announcement:
+  title: 'Find your riskiest code'
+  body: |
+    New post: **[Find your riskiest code](https://blog.wheels.dev/blog/wheels-coverage-and-the-complexity-panel)** — `wheels coverage` and the new code-complexity panel rank your change-riskiest files.
 ---
 
 The controller was nine hundred lines. It did billing, refunds, invoicing, a CSV export, and it was the only place in the app that reached into the payment provider. Nobody was comfortable with it, but it worked, and nobody had the time to be uncomfortable *and* finish a sprint.

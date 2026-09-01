@@ -15,6 +15,10 @@ excerpt: >-
   resource URLs say something — and it comes with one mistake you can make
   that quietly breaks your site.
 coverImage: '/blog-images/4-1/pretty-urls-with-route-bindby.png'
+announcement:
+  title: 'Pretty URLs with bindBy'
+  body: |
+    New post: **[Pretty URLs with bindBy](https://blog.wheels.dev/blog/pretty-urls-with-route-bindby)** — bind a resource route's `:key` segment to any column, so URLs carry slugs instead of primary keys.
 ---
 
 The support conversation goes like this: *"the article about migrating to 4.1? sure — here's the link."* The customer opens it, and their browser shows `/posts/4821`.
