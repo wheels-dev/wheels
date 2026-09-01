@@ -1,0 +1,48 @@
+name: Blog — Publish Scheduled Posts
+
+# Every morning (06:00 UTC), moves blog posts whose publishedAt date is
+# today or earlier from web/content/blog/scheduled/ into
+# web/content/blog/posts/, commits as wheels-bot[bot], and pushes. The push
+# triggers the blog deploy (web-deploy.yml detects web/content/blog/posts/
+# changes), so the posts go live without further intervention. Catch-up
+# semantics: a missed day publishes on the next successful run.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: blog-publish-scheduled
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish posts scheduled for today
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      # App-token pushes trigger downstream workflows (GITHUB_TOKEN pushes
+      # do not), which is what makes the blog deploy fire.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Publish due posts
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          chmod +x .github/scripts/blog-publish-scheduled.sh
+          bash .github/scripts/blog-publish-scheduled.sh
