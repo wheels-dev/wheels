@@ -1,5 +1,5 @@
 ---
-title: 'The Wheels 4.1 security hardening pass'
+title: 'Fail closed, everywhere: the hardening pass and the assumptions that weren''t true'
 slug: the-wheels-4-1-security-hardening-pass
 publishedAt: '2026-09-08T14:00:00.000Z'
 updatedAt: null
@@ -10,65 +10,54 @@ tags:
 categories:
   - Releases
 excerpt: >-
-  4.1 shipped a release-cycle hardening pass across the framework: fail-closed
-  auth and policies, controller retargeting protection, mass-assignment
-  opt-in, zip-slip and path-escape fixes, view-helper encoding, and storage
-  key validation. Here's what changed, area by area, and what (if anything)
-  you need to do about it.
-coverImage: null
+  A security review of Wheels 4.0 found a pile of "surely that's safe" that
+  weren't: a policy that treated the string "yes" as true, a form method
+  override that worked on a GET, a zip that could escape its directory. 4.1
+  closes them by failing closed. Here's the story area by area, and what you
+  have to check on the way up.
+coverImage: '/blog-images/4-1/the-wheels-4-1-security-hardening-pass.svg'
 ---
 
-Alongside the feature work, 4.1 ran a systematic hardening pass over the framework's trust boundaries. The theme across all of it: **fail closed**. Where 4.0 sometimes guessed, 4.1 refuses — loudly, and with a typed error you can catch.
+Every framework has a layer of things you assume are safe because *surely* nobody would write it that way. A policy that returns `"yes"` authorizes. A `_method` field that works on a GET. A plugin zip that unzips wherever it wants. A route that trusts a header the client set.
 
-Here's the tour, area by area.
+You assume those are safe. Then you review the code.
 
-## Authentication and authorization
+The 4.1 hardening pass was the release where we stopped assuming and started reading. The theme across every fix: **fail closed.** Where 4.0 sometimes guessed at what you meant, 4.1 refuses — loudly, with a typed error you can catch.
 
-- **Session rotation.** `SessionStrategy.login()` and `logout()` rotate or invalidate the session ID, and rotation failures are no longer swallowed by a catch-all.
-- **JWTs require expiry by default.** `JwtService.decode()` now demands an `exp` claim unless you explicitly pass `requireExpiry=false`. A signed token with no expiry was a token with no revocation story.
-- **Policies require true.** `authorize()`/`can()` grant only when a policy method returns boolean `true` — the CFML strings `"yes"` and `"true"` no longer authorize. Unknown actions throw `Wheels.Policy.UnknownAction` instead of treating a typo as a deny (a typo that denies is a bug that hides).
-- **`authenticateWith()` fails closed** when the restriction list names a strategy that doesn't exist, instead of silently skipping the typo.
-- **Empty policy scopes return a no-rows chain** rather than calling `whereIn("id", [])` — which, per the anti-pattern we've burned on before, was a SQL syntax error waiting for an empty collection.
+## The ones that will bite you first
 
-## Controllers and requests
+**A policy that authorized on `"yes"`.** Policies return a boolean; authorize only when `true`. Except CFML is loose, and a policy method that returned the string `"yes"` — which CFML cheerfully coerces — happily authorized. Now `authorize()`/`can()` grant only on a literal boolean `true`. The strings `"yes"` and `"true"` deny. If you have a policy returning strings, it denies now. That's the point.
 
-- **Controller/action retargeting is gone.** Query strings, form fields, or JSON bodies can no longer retarget the routed `controller`/`action` — `$ensureControllerAndAction` pins them. Wildcard path names are unchanged.
-- **`form._method` is honored only on POST**, and only for `PUT`/`PATCH`/`DELETE` — GET can't become a state-changing verb.
-- **Before filters that return `false` now halt** the action and remaining filters (redirects and renders still halt as before). The authz fail-closed signal actually fails closed.
-- **Client-supplied rewrite headers** (`X-Rewrite-URL`, `X-Original-URL`) are ignored unless you opt in with `set(trustProxyHeaders=true)`.
-- **`$wildcardDomainMatch` compares every host label**, so `https://*.example.com` no longer matches `https://evil.com`.
+**A method override that worked on a GET.** `form._method` is a nice Rails-ism. It's also a footgun: if it's honored on a GET, then a prefetched link can become a DELETE. 4.1 honors `form._method` only on POST, and only for `PUT`/`PATCH`/`DELETE`. GET can't become state-changing, POST can't become CSRF-safe.
 
-## Models and mass assignment
+**A route you could retarget with a query string.** The routed `controller`/`action` used to be overridable by query parameters, form fields, or a JSON body. An attacker could make one URL dispatch somewhere unexpected. 4.1 pins them — `$ensureControllerAndAction` — so only the path defines what runs. Wildcard path names are unchanged.
 
-- **Strict mode.** `set(massAssignmentStrict=true)` fail-closes `create`/`update`/`save` for models with neither `accessibleProperties()` nor `protectedProperties()`. The default remains open for compatibility — flip it on new apps and never look back.
-- **`create()` no longer leaks properties onto the shared class model** before instantiating the record, and nested `hasMany` keys no longer use a `GetTickCount` window to decide "new" vs existing (form identities use a `new-` prefix).
-- **Uniqueness scopes now exclude soft-deleted rows by default** (`includeSoftDeletes=false`), so a soft-deleted value can be reused.
+**A wildcard that matched too much.** `https://*.example.com` didn't just match subdomains; it matched `https://evil.com`. Host-label comparison now checks every label.
 
-## Plugins and packages
+## The ones that were quietly dangerous
 
-- **Zip-slip is fixed.** Plugin zip extraction rejects absolute paths, `..` segments, and canonical escapes before writing a single file.
-- **Package manifests with empty `wheelsVersion` are rejected**; invalid `plugin.json` skips the plugin instead of half-loading it.
-- **Admin pages no longer `cfinclude` on-disk `index.cfm` files** from packages, and homepage links are `EncodeForHTML`-encoded http(s)-only.
-- **PackageLoader refuses dotted/traversed directory names** and mappings whose realpath lands outside the package — including symlink escapes.
+**Mass assignment.** `create()`/`update()`/`save()` would happily assign whatever came in `params`, and if a model had neither `accessibleProperties()` nor `protectedProperties()`, there was nothing to stop a crafted `params.isAdmin=true`. New apps can opt into `set(massAssignmentStrict=true)`, which fail-closes those models. Default stays open for compatibility — but flip it.
 
-## Views and output
+**`create()` leaking onto the class.** Creating a record used to assign properties onto the *shared class model* before instantiating the record. Fixing that uncovered a cousin: `hasChanged()` now treats a deleted persisted property as a change, and nested `hasMany` keys no longer use a `GetTickCount` window to guess "new" vs existing.
 
-- **Breakout attribute names are rejected** in view helpers, `errorElement`/`wrapperElement` are restricted to safe tags, and `encode` is honored on date option bodies and `csrfMetaTags`.
-- **`linkTo(sanitizeHref=true)` blanks `javascript:`/`data:` hrefs** (opt-in; the default stays `false`).
-- **Pagination and asset helpers encode interpolated paths**, collapse `..` on local sources, and stop double-encoding pagination params.
+**Plugin zips that escaped.** Zip extraction didn't reject `..` segments or absolute paths. `wheels destroy view` didn't reject `../x`. Both are closed — extraction refuses zip-slip before writing, and `destroy view` stays under `app/views/`.
 
-## Middleware and storage
+**View helpers that let attributes break out.** Breakout attribute names are rejected, `errorElement`/`wrapperElement` are restricted to safe tags, and `linkTo(sanitizeHref=true)` blanks `javascript:`/`data:` hrefs (opt-in, default unchanged).
 
-- **`Pipeline.getMiddleware()` returns a copy** — callers can't mutate the live stack.
-- **RateLimiter honors `trustProxy`** before a client-supplied `remoteAddr`.
-- **Circular middleware dependencies throw** `Wheels.Middleware.CircularDependency` instead of silently falling back to priority ordering.
-- **LocalDisk refuses empty and slash-only keys** so `put()` can't write the disk root, and S3 `put()` sends a signed `x-amz-acl` so visibility settings are actually enforced.
+## The ones a red-team would find
 
-## What you need to do
+- **Policy scopes** that returned `whereIn("id", [])` on empty — SQL syntax error waiting for a collection. Now fail-closed with a no-rows chain.
+- **`authenticateWith()`** that silently skipped a typo'd strategy name. Now fails closed. `JwtService.decode()` requires an `exp` claim by default; `SessionStrategy.login()`/`logout()` rotate the session ID.
+- **Middleware that mutated the live stack.** `Pipeline.getMiddleware()` and the package/plugin getters return copies now. `RateLimiter` honors `trustProxy` before a client-supplied `remoteAddr`. Circular middleware dependencies throw instead of silently reordering.
+- **Storage keys.** LocalDisk refuses empty and slash-only keys — `put()` can't write the disk root — and S3 `put()` sends a signed `x-amz-acl` so visibility is honored.
 
-For most apps: **nothing**. The changes are either opt-in (strict mass assignment, `sanitizeHref`, `genericErrors`) or bug fixes that make existing defaults behave the way they were always documented to. The two things worth a look on an upgrade:
+## What you actually have to do
 
-1. Grep for `whereIn`/`whereNotIn` with possibly-empty arrays and for `form._method` usage — both now behave more strictly.
-2. If you wrote policy methods returning `"yes"` strings, they deny now. That's the point.
+For most apps: **nothing.** The changes are opt-in (strict mass assignment, `sanitizeHref`, `genericErrors`) or bug fixes that make existing defaults behave as documented. The two worth a look on upgrade:
 
-The full list is in the 4.1.0 changelog. Security releases shouldn't be exciting; this one's excitement is that the checks you always assumed existed now actually exist.
+1. **Grep for policy methods returning strings.** They deny now.
+2. **Grep for `form._method` usage and possibly-empty `whereIn` arrays.** Both behave more strictly.
+
+The full list is in the [4.1.0 changelog](https://github.com/wheels-dev/wheels/blob/main/CHANGELOG.md). Security releases aren't supposed to be exciting. This one's excitement is that the checks you always assumed existed now actually exist — and that "fail closed" stopped being a slogan and became the default.
+
+Next up: read the next post — finding your riskiest code, and the 900-line controller. (See the [series index](https://blog.wheels.dev/posts/wheels-4-1-coming/).)

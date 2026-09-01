@@ -1,5 +1,5 @@
 ---
-title: 'Pretty URLs with route bindBy='
+title: 'Pretty URLs with bindBy: the unshareable link'
 slug: pretty-urls-with-route-bindby
 publishedAt: '2026-09-04T14:00:00.000Z'
 updatedAt: null
@@ -10,16 +10,24 @@ tags:
 categories:
   - Releases
 excerpt: >-
-  Wheels 4.1 routes can bind their :key segment to a non-primary-key column:
-  bindBy="slug" turns /posts/my-first-post into Post.findBySlug("my-first-post")
-  without hand-writing a finder route. Here's how binding works, when to use
-  it, and what to do when the bound column isn't unique.
-coverImage: null
+  A support engineer pastes a link into a customer chat, and they get
+  /posts/4821. Nobody shares /posts/4821. bindBy="slug" exists to make
+  resource URLs say something — and it comes with one mistake you can make
+  that quietly breaks your site.
+coverImage: '/blog-images/4-1/pretty-urls-with-route-bindby.svg'
 ---
 
-Resource routes in Wheels have always bound their `:key` segment to the model's primary key — `/posts/42` means `Post.findByKey(42)`. That's the right default for internal IDs, but it's the wrong URL for humans. `/posts/42` tells your users nothing; `/posts/wheels-4-1-released` tells them everything, and it's what gets shared, bookmarked, and pasted into chat.
+The support conversation goes like this: *"the article about migrating to 4.1? sure — here's the link."* The customer opens it, and their browser shows `/posts/4821`.
 
-Wheels 4.1 adds the missing piece:
+That's the whole conversation. There is no article "about migrating" in a URL like that. There's a number. And numbers don't survive being pasted into a group chat, because nobody can read them back, nobody can tell if they're the *right* article, and everyone ends up sending `https://example.com/posts/4821` with a separate sentence saying "it's the one about migrations."
+
+That link is why `bindBy` exists.
+
+## The one option
+
+Wheels resource routes have always bound their `:key` segment to the model's primary key: `/posts/4821` means `Post.findByKey(4821)`. Correct, predictable, and unreadable by humans.
+
+4.1 adds one option that changes which column the key binds through:
 
 ```cfm
 mapper()
@@ -27,47 +35,49 @@ mapper()
     .end();
 ```
 
-With that one option, every `:key` in the generated routes resolves through the parameterized dynamic finder `findOneBySlug()` instead of `findByKey()`. `/posts/wheels-4-1-released` runs `Post.findOneBySlug("wheels-4-1-released")`, and `linkTo(post)` generates the pretty URL instead of the numeric one.
+With that, every key in the generated routes resolves through the parameterized dynamic finder `findOneBySlug()` instead of `findByKey()`. `/posts/wheels-4-1-released` runs `Post.findOneBySlug("wheels-4-1-released")`, and `linkTo(post)` starts generating the readable URL everywhere — posts index, show links, next/previous, RSS, you name it.
 
-## What `bindBy` is not
+## The finder is yours
 
-Two terms that are easy to conflate:
-
-- **`binding=`** (existing) maps *extra* route parameters to a model lookup used by `renderPage`-style page binding.
-- **`bindBy=`** (new) changes *which column the key segment binds through*.
-
-They're orthogonal, and they compose. A route can bind its key to a slug and still declare additional bindings for secondary parameters.
-
-## How the lookup happens
-
-Under the hood, binding resolves through the same parameterized finder convention the rest of the model layer uses. `bindBy="slug"` looks for a `findOneBySlug` method on the model — either the one Wheels generates automatically from your column set, or your own:
+Binding resolves through the same convention the rest of the model layer uses: it looks for a `findOneBySlug` method on the model, and it will happily use the one you write:
 
 ```cfm
 // app/models/Post.cfc
 component extends="Model" {
     function findOneBySlug(required string slug) {
-        // case-insensitive, or tenant-scoped, or include-soft-deletes:
+        // tenant-scoped, case-insensitive, or include soft-deletes:
         return this.findOne(where = "slug = '#arguments.slug#'", includeSoftDeletes = true);
     }
 }
 ```
 
-Because it's a normal finder, everything a finder can do is available: scoping, ordering, returning `false` for not-found so the framework 404s correctly. If the finder doesn't exist, you get a clear error at request time — which beats the silent numeric-lookup fallback every day of the week.
+Because it's an ordinary finder, everything a finder can do is available — scoping, ordering, returning `false` for not-found so the framework 404s correctly. If the finder doesn't exist, you get a loud error at request time. That's a real improvement over a silent fallback, and it's the detail that makes `bindBy` trustworthy: it never guesses.
 
-## When to reach for it
+## Two ways to get it wrong
 
-- **Content models with slugs** — posts, pages, docs. The classic case.
-- **Usernames** — `/users/ada` instead of `/users/4821` for public profiles.
-- **Anything with a natural, stable key** — SKUs, handles, codes.
+This is the story part. There are two mistakes that make `bindBy` bite, and the first one is the one that'll come up in code review.
 
-And when *not* to:
+**Non-unique columns.** The natural instinct is to bind to whatever the human-readable field is. If that field isn't unique, `bindBy` returns the *first* record that matches. Two posts with the same title, and your pretty URL silently serves the wrong one. There's no router-side validation to save you — uniqueness is on you, and it's the thing to double-check before flipping the switch. Slugs and usernames are usually safe; display names and titles are the ones that drift.
 
-- **Non-unique columns.** If two rows can share the bound value, the finder returns the first match and you've built a confusion generator. `bindBy` is for unique columns — the uniqueness is on you, not the router.
-- **Mutable keys.** If the bound value can change (display names, titles edited in place), your URLs rot. Slugs and usernames are usually stable in a way titles aren't.
-- **Admin surfaces.** Internal CRUD with numeric IDs is fine staying numeric; pretty URLs buy nothing behind the login wall.
+**Mutable keys.** If the bound value can change, your URLs rot. A title edited in place changes the URL, and every bookmark and shared link quietly turns into a 404. Slugs are stable by design; "edited title" URLs are a support-desk generator.
 
-## One thing to plan for
+The cheat sheet: bind to a column that's **unique and doesn't change**. That's it. Everything else is the framework doing exactly what you asked.
 
-Pretty keys interact with pagination, nested resources, and route precedence exactly like numeric keys — the binding is resolved after the route matches, so nothing about matching changes. But your `linkTo` calls change their output, which means one place to check after flipping a resource to `bindBy`: anything that hard-coded `/posts/#id#` as a string instead of using the helpers. Those were always fragile; `bindBy` just makes them visible.
+## What binding is and isn't
 
-If you want the full tour of the routing layer before adding `bindBy` to your routes file, the [routing deep dive](https://blog.wheels.dev/posts/associations-deep-dive-wheels-4/) and the route-precedence behavior in the guides are the place to start.
+Two terms in Wheels routing that get conflated:
+
+- **`binding=`** (existing) maps *extra* route parameters to a model lookup for page-style binding.
+- **`bindBy=`** (new) changes *which column the key segment binds through*.
+
+They're orthogonal and they compose — a route can bind its key to a slug and still declare additional bindings for secondary parameters.
+
+And `bindBy` doesn't touch route precedence or matching. The binding is resolved *after* the route matches, so nothing about which route wins changes. The only behavioral shift you'll notice: `linkTo()` output, which means one thing to audit after flipping it — any place that hand-built `/posts/#id#` as a string instead of using the helper. Those were always fragile; `bindBy` just makes them visible.
+
+## The un-anonymous link
+
+The support conversation ends differently now. *"The article about migrating to 4.1? Here — /posts/migrating-to-wheels-4-1."* The customer knows it's the right one before they click. They can repeat it in a meeting. It survives being texted.
+
+That's the real win, and it's why the option belongs in the router rather than in a thousand `linkTo` calls: readability isn't an accessory to a resource route — it's the whole reason the route exists.
+
+Next up in the series: read the next post — DI factories, and the service that couldn't decide where its files lived. (See the [series index](https://blog.wheels.dev/posts/wheels-4-1-coming/).)
