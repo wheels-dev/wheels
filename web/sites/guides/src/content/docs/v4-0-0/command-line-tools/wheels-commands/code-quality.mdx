@@ -150,9 +150,11 @@ wheels coverage [--top=N] [--no-test-db]
 
 #### Example
 
-```bash {test:cli cmd="wheels coverage"}
+```bash
 wheels coverage
 ```
+
+`wheels coverage` needs a running server (it instruments `app/`, then runs the suite against it) — start one with `wheels start` first.
 
 Pairs with the debug bar's **Code Complexity** panel: complexity is static and always visible; `wheels coverage` adds the test-coverage half of the CRAP score on demand. Files at the top of the ranking are the ones to touch with tests in hand.
 
