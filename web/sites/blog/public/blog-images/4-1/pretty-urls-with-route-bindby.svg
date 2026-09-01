@@ -15,5 +15,5 @@
   <text x="96" y="150" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="4" fill="#8ac926">ROUTING</text>
   <text x="96" y="316" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="800" fill="#f4f3f7">Pretty URLs with bindBy</text>
   <text x="96" y="540" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="600" letter-spacing="2" fill="#8b8a95">WHEELS 4.1.0 BLOG SERIES</text>
-  <g stroke="#e63946" stroke-width="6" stroke-linecap="round"><line x1="96" y1="478" x2="112" y2="494"/><line x1="128" y1="478" x2="144" y2="494"/></g>
+
 </svg>
