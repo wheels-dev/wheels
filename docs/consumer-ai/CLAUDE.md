@@ -17,6 +17,7 @@ ships to consumers.
 - **Parameters**: `params.key` for URL key, `params.user` for form struct, `params.user.firstName` for nested.
 - **extends**: Models extend `"Model"`, controllers extend `"Controller"`, tests extend `"wheels.WheelsTest"`. (Legacy: `"wheels.Test"` was RocketUnit — never use for new tests.)
 - **Validation property param**: `property` (singular) for single, `properties` (plural) for list: `validatesPresenceOf(properties="name,email")`.
+- **Mass assignment**: open by default for compatibility. `set(massAssignmentStrict=true)` fail-closes it — a model with neither `accessibleProperties()` nor `protectedProperties()` then rejects unlisted posted properties. Define one of the two lists per model.
 
 ## Model Quick Reference
 
@@ -122,11 +123,14 @@ Resolves `params.key` into a model instance before the action runs. Lands in `pa
 ```cfm
 .resources(name="users", binding=true)                // params.user
 .resources(name="posts", binding="BlogPost")          // params.blogPost
+.resources(name="posts", binding=true, bindBy="slug") // params.post via findOneBySlug(value=key)
 .scope(path="/api", binding=true, callback=function(map) {  // all nested resources bound
     map.resources("users");
 })
 set(routeModelBinding=true);                          // global, in config/settings.cfm
 ```
+
+`bindBy="slug"` resolves the `:key` segment through the parameterized dynamic finder (`findOneBySlug(value=key)`) instead of `findByKey()`, so URLs can carry slugs or usernames rather than primary keys. It's ignored unless binding is enabled.
 
 ## Pagination View Helpers
 
@@ -186,7 +190,7 @@ mapper()
 .end();
 ```
 
-Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`. Custom: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
+Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`, `wheels.middleware.AuthMiddleware` (authenticate + attach the result; `genericErrors=true` emits a generic `Unauthorized` JSON body instead of `authResult.error`), `wheels.middleware.TenantResolver` (resolve the active tenant; `failClosed=true` 403s unmatched tenants instead of proceeding on the default datasource). Custom: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
 
 **Singleton lifecycle contract**: both global and route-scoped middleware (including string-path entries) are resolved once and cached for the application lifetime. The same instance handles every matching request — stateful middleware (e.g. in-memory `RateLimiter` on a `.scope()`) accumulates state across requests as intended. Implication: every middleware component must be safe to share across concurrent requests (use CFML locks for any mutable state).
 
@@ -224,6 +228,64 @@ local.di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
 ```
 
 Resolve with `service("emailService")` anywhere, or `inject("emailService, currentUser")` in controller `config()`. Scopes: transient (default), `.asSingleton()`, `.asRequestScoped()`. Auto-wiring: `init()` params matching registered names are auto-resolved when no `initArguments` passed.
+
+Construction that needs logic uses `.toFactory()` — bind a name to a closure that builds the instance (receives the `Injector`) and honors the chained lifecycle flag:
+
+```cfm
+local.di.map("jwtStrategy").toFactory(function(container) {
+    return new wheels.auth.JwtStrategy(jwtService = new wheels.auth.JwtService(secretKey = env("JWT_SECRET")));
+}).asSingleton();
+// service("jwtStrategy") returns the factory's result — no .build() indirection
+```
+
+## Authentication & Authorization
+
+One-command scaffold (4.0.6+): `wheels generate auth` emits a `User` model (PBKDF2 hashing via the `passwordHasher` service), `Sessions`/`Passwords`/`Registrations` controllers + views, a create-users migration, and wiring. Flags: `--model=<Name>` (default `User`), `--strategy=session|token|jwt`, `--registration`/`--no-registration`, `--force`.
+
+Built-in strategies under `wheels.auth.*`: `Authenticator` (registry that tries strategies in order), `SessionStrategy`, `TokenStrategy`, `JwtStrategy`. Wire by hand in `config/services.cfm`, or collapse session wiring to one line:
+
+```cfm
+// config/services.cfm — registers + wires SessionStrategy (idempotent)
+enableSession(sessionKey = "wheels.auth");
+```
+
+Password hashing: `wheels.auth.PasswordHasher` (PBKDF2-SHA256, 600k iterations; `hash()` / `verify()` / `needsRehash()`), and global pure-CFML bcrypt helpers (OpenBSD/jBCrypt-compatible):
+
+```cfm
+hash = bcryptHash(plaintext);                // cost defaults to 10
+ok = bcryptVerify(plaintext, hash);          // constant-time
+if (bcryptNeedsRehash(hash)) { /* rehash + save */ }
+```
+
+Authorization policies (4.0.6+): `wheels.Policy` base class + `app/policies/<Model>Policy.cfc`, generated with `wheels generate policy <Model>`. Helpers: `authorize(model)` (throws `Wheels.NotAuthorized` → 403 on deny, returns the record on allow), `can("action", model)` (boolean), `policyScope(model("Post"))` (no-rows scope on deny). Default-deny: every action denies unless the policy defines it.
+
+## Storage
+
+Named disks behind one interface — `put` / `get` / `exists` / `delete` / `url` / `signedUrl` — resolved through `wheels.storage.StorageManager`. Drivers: `local` (filesystem + URL prefix) and `s3` (from-scratch SigV4 over `cfhttp`, no AWS SDK).
+
+```cfm
+// config/settings.cfm
+set(storage = {
+    default = "local",
+    disks = {
+        local = { driver="local", root=ExpandPath("../storage/uploads"), urlPrefix="/uploads", signingKey=env("STORAGE_SIGNING_KEY") },
+        s3 = { driver="s3", bucket="my-bucket", region="us-east-1", accessKeyId=env("S3_KEY"), secretAccessKey=env("S3_SECRET") }
+    }
+});
+
+// config/services.cfm
+local.di.map("storage").toFactory(function() {
+    return new wheels.storage.StorageManager(config = get("storage"));
+});
+```
+
+```cfm
+service("storage").disk().put("avatars/42.png", bytes, contentType="image/png", visibility="public");
+bytes = service("storage").disk().get("avatars/42.png");
+url = service("storage").disk("s3").signedUrl(key="reports/q3.pdf", expiresIn=900);
+```
+
+`disk()` returns the default disk; `disk("name")` a named one. `get()` returns binary; `put()` round-trips bytes exactly. Errors: `Wheels.Storage.NotFound`, `.UnknownDisk`, `.UnknownDriver`, `.InvalidKey`, `.InvalidExpiresIn` (`expiresIn` must be `1..604800`), `.MissingSigningKey` (local `signedUrl()` without a `signingKey`).
 
 ## Package System
 
@@ -309,7 +371,7 @@ var all = am.diffAll({hints: {"User": {renames: {"full_name": "fullName"}}}, heu
 am.writeMigration(d, "rename_name_field");
 ```
 
-_Auto-migration is currently CFC-only (`wheels.migrator.AutoMigrator`, shown above). There is no `wheels dbmigrate diff` CLI command — invoking it errors._
+A CLI wrapper exists too: `wheels migrate diff` (alias `dbmigrate diff`) previews the same AutoMigrator diffs and, with `--write`, emits migration files. `--rename OLD:NEW` (repeatable; `Model.OLD:NEW` when diffing all models) supplies rename hints, `--hints` takes JSON, `--model` limits the diff to one model, and `--name` names the written migration.
 
 Result struct: `{modelName, tableName, addColumns, removeColumns, changeColumns, renameColumns, suggestedRenames}`. Limits: PK renames not detected; rename + type change requires separate migrations; calculated properties excluded. `writeMigration()` / `generateMigrationCFC()` honor `suggestedRenames` as `renameColumn` instead of destructive remove+add.
 
