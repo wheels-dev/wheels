@@ -16,6 +16,10 @@ excerpt: >-
   closes them by failing closed. Here's the story area by area, and what you
   have to check on the way up.
 coverImage: '/blog-images/4-1/the-wheels-4-1-security-hardening-pass.png'
+announcement:
+  title: 'The 4.1 security hardening pass'
+  body: |
+    New post: **[Fail closed, everywhere](https://blog.wheels.dev/blog/the-wheels-4-1-security-hardening-pass)** — the hardening pass that makes Wheels fail closed by default.
 ---
 
 Every framework has a layer of things you assume are safe because *surely* nobody would write it that way. A policy that returns `"yes"` authorizes. A `_method` field that works on a GET. A plugin zip that unzips wherever it wants. A route that trusts a header the client set.

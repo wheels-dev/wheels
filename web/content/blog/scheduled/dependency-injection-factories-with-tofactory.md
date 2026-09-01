@@ -15,6 +15,10 @@ excerpt: >-
   caller. toFactory() gives a DI container a *how* — and it's the difference
   between one closed arrow and ten open switch statements.
 coverImage: '/blog-images/4-1/dependency-injection-factories-with-tofactory.png'
+announcement:
+  title: 'DI factories with toFactory()'
+  body: |
+    New post: **[Factories for your container](https://blog.wheels.dev/blog/dependency-injection-factories-with-tofactory)** — `Injector.toFactory()` binds a name to a closure that builds the instance.
 ---
 
 The routing was fine. The uploads were fine. Then the app went to production and every picture was gone, because locally they landed on a disk and in production they were supposed to land in S3 — and the storage service had a `useS3` flag that each of the ten call sites checked in its own way.

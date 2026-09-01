@@ -24,6 +24,7 @@ TODAY="$(date -u +%Y-%m-%d)"
 echo "Publishing scheduled posts due on or before $TODAY (UTC)..."
 
 published=()
+moved_paths=()
 for file in "$SOURCE_DIR"/*.md; do
   # Skip the README (it has no publishedAt).
   [ -e "$file" ] || continue
@@ -46,12 +47,19 @@ for file in "$SOURCE_DIR"/*.md; do
   echo "  publishing: $(basename "$file") (due $due_date)"
   git mv "$file" "$TARGET_DIR/$(basename "$file")"
   published+=("$(basename "$file" .md)")
+  moved_paths+=("$TARGET_DIR/$(basename "$file")")
 done
 
 if [ ${#published[@]} -eq 0 ]; then
   echo "Nothing due today. Done."
   exit 0
 fi
+
+# Post each newly-published post's `announcement` frontmatter to the GitHub
+# Discussions board. The script writes the discussion URL back into the post's
+# frontmatter (idempotency marker), and the commit below includes it.
+echo "Posting discussion announcements for ${#moved_paths[@]} post(s)..."
+node web/scripts/blog-announce-discussion.mjs "${moved_paths[@]}"
 
 git config user.name "wheels-bot[bot]"
 git config user.email "wheels-bot[bot]@users.noreply.github.com"

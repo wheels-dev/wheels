@@ -17,6 +17,18 @@ const posts = defineCollection({
 		excerpt: z.string().default(''),
 		coverImage: z.string().nullable().optional(),
 		legacyId: z.string().optional(),
+		// Discussion announcement posted to the repo's Discussions board when
+		// the post is published. `discussionUrl` is written back by the
+		// scheduler after the discussion is created (idempotency marker).
+		announcement: z
+			.object({
+				title: z.string(),
+				body: z.string(),
+				category: z.string().default('Announcements'),
+				discussionUrl: z.string().nullable().optional(),
+			})
+			.nullable()
+			.optional(),
 	}),
 });
 

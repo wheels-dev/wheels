@@ -17,6 +17,10 @@ excerpt: >-
   single issue filed by @chapmandu — and the release is better because it
   didn't start with a features list.
 coverImage: '/blog-images/4-1/wheels-4-1-0-released.png'
+announcement:
+  title: 'Wheels 4.1.0 is out'
+  body: |
+    **[Wheels 4.1.0 is released](https://blog.wheels.dev/blog/wheels-4-1-0-released)** — the full changelog and where to get it.
 ---
 
 Wheels 4.1.0 is out. If you've followed [the series](https://blog.wheels.dev/posts/wheels-4-1-coming/), you know this release has a plot, and it starts with [@chapmandu](https://github.com/chapmandu) asking, politely, whether we'd ever benchmarked Wheels 4 against 2.5.
