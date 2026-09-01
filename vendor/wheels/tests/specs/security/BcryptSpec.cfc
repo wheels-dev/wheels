@@ -9,6 +9,14 @@
  * the Wheels.InvalidArgument cost validation — are skipped on that engine.
  * bcryptNeedsRehash has no engine builtin and ships everywhere via
  * security-extra.cfm.
+ *
+ * The reference vectors are cost 4. The algorithm is byte-identical at every
+ * cost — cost only sets the EksBlowfish iteration count (2^cost) — so a cost-4
+ * vector from Apache htpasswd proves OpenBSD/jBCrypt compatibility as strongly
+ * as a cost-10 one, while running ~64x faster. On BoxLang/Adobe the pure-CFML
+ * Blowfish is slow (each function/arithmetic op in the hot loop is far cheaper
+ * on Lucee), so cost 10 would make one verify take minutes; cost 4 keeps the
+ * suite fast on every engine (#3478).
  */
 component extends="wheels.WheelsTest" {
 
@@ -24,27 +32,28 @@ component extends="wheels.WheelsTest" {
 				_needsRehashAvailable = StructKeyExists(g, "bcryptNeedsRehash");
 			});
 
-			it("verifies a known external $2b$ vector", function() {
-				// Checksum independently produced by OpenBSD's htpasswd (Apache)
-				// for "password"; $2b$ and $2y$ share one checksum for ASCII input.
-				var vector = "$2b$10$cChtdYuXHh8.R4SfJfmfPO7cP7waTgEn6ygtxos.KTNU/rMVTVAKS";
+			it("verifies a known external $2b$ vector at cost 4", function() {
+				// Checksum produced by Apache htpasswd (-B -C 4) for "password";
+				// $2b$ and $2y$ share one checksum for ASCII input.
+				var vector = "$2b$04$CHLQLI9srqpRn1u2xmb0y.AxWynQnwFQuBZ1PRGMsiTbMm/yojzLq";
 				expect(bcryptVerify("password", vector)).toBeTrue();
 			});
 
 			it("rejects a wrong password for the known vector", function() {
-				var vector = "$2b$10$cChtdYuXHh8.R4SfJfmfPO7cP7waTgEn6ygtxos.KTNU/rMVTVAKS";
+				var vector = "$2b$04$CHLQLI9srqpRn1u2xmb0y.AxWynQnwFQuBZ1PRGMsiTbMm/yojzLq";
 				expect(bcryptVerify("wrong-password", vector)).toBeFalse();
 			});
 
 			it("rejects a tampered checksum for the known vector", function() {
-				var vector = "$2b$10$cChtdYuXHh8.R4SfJfmfPO7cP7waTgEn6ygtxos.KTNU/rMVTVAKS";
-				var tampered = Replace(vector, "7cP7", "6cP7", "all");
+				var vector = "$2b$04$CHLQLI9srqpRn1u2xmb0y.AxWynQnwFQuBZ1PRGMsiTbMm/yojzLq";
+				var tampered = Replace(vector, "yojzLq", "yojzLp", "all");
 				expect(bcryptVerify("password", tampered)).toBeFalse();
 			});
 
-			it("verifies a $2a$ jBCrypt reference vector", function() {
-				// Official jBCrypt test vector for "abc" at cost 8.
-				var vector = "$2a$08$Ro0CUfOqk6cXEKf3dyaM7OhSCvnwM9s4wIX9JeLapehKK5YdLxKcm";
+			it("verifies a $2a$ reference vector at cost 4", function() {
+				// Apache htpasswd (-B -C 4) checksum for "abc"; $2a$ shares the
+				// checksum with $2b$/$2y$ for ASCII input.
+				var vector = "$2a$04$Ug8H2OLfZyHBFJgGLjAby.CQYnorLi9T8QxhGDv8GAGT5DpIcmSje";
 				expect(bcryptVerify("abc", vector)).toBeTrue();
 			});
 
