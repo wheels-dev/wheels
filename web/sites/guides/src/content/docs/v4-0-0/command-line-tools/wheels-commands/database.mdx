@@ -28,7 +28,7 @@ Apply or roll back migration files in `app/migrator/migrations/`.
 #### Synopsis
 
 ``` title="synopsis"
-wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables]
+wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables|diff]
 ```
 
 Running `wheels migrate` with no subcommand defaults to `latest`. Unknown subcommands print `Unknown migration action: <name>` and exit without touching the schema.
@@ -66,6 +66,25 @@ Records a version as applied without running its `up()`: `wheels migrate pretend
 ##### `rename-system-tables`
 
 Migrates legacy framework bookkeeping tables to their current `wheels_`-prefixed names. Run once when upgrading a project whose system tables predate the current naming.
+
+##### `diff`
+
+Diffs your models against the live schema via `AutoMigrator` and prints the would-be changes without writing anything. Add `--write` to emit migration files instead. This is the read-only way to answer "what would migrations say if I generated them now?" — it never mutates the database.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--model=<Name>` | all models | Diff a single model instead of every model. |
+| `--rename=<OLD:NEW>` | — | Repeatable rename hint; use `Model.OLD:NEW` when diffing all models. |
+| `--hints=<json>` | — | Rename hints as JSON: `{"renames":{"old":"new"}}`. |
+| `--threshold=<n>` | — | Heuristic rename-detection threshold between `0` and `1`. |
+| `--name=<Name>` | — | Migration name when writing a single-model diff with `--write`. |
+| `--write` | off | Write migration file(s) instead of previewing. |
+
+```bash title="example"
+wheels migrate diff --rename=Post.slug:Post.permalink
+```
+
+The `dbmigrate diff` alias is equivalent to `wheels migrate diff`.
 
 #### Example
 

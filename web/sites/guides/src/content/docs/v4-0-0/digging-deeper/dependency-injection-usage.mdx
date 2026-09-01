@@ -109,37 +109,29 @@ Same instance inside filters, actions, views, and any service called during the 
 
 ## Factory registration
 
-The Wheels injector's public API is `map(name).to(componentPath).asSingleton() | .asRequestScoped()`. There is no `toFactory()` — `.to()` takes a dotted component path, not a callback. When construction needs logic (reading env vars, composing from other services, branching on environment), wrap it in a plain CFC whose `init()` returns the real instance.
+When construction needs logic — reading env vars, composing from other services, branching on environment — use `toFactory()`. It binds a name to a closure that builds the instance, receives the container, and honors the lifecycle flag you chain:
 
-```cfm {test:compile} title="app/lib/JwtStrategyFactory.cfc"
-component {
-    public any function init() {
-        variables.instance = new wheels.auth.JwtStrategy(
-            jwtService=new wheels.auth.JwtService(
-                secretKey=application.wo.get("jwtSecret"),
-                issuer="my-app"
-            )
-        );
-        return this;
-    }
-
-    public any function build() {
-        return variables.instance;
-    }
-}
-```
-
-Register the factory as a singleton, then have callers ask it for the built instance:
-
-```cfm {test:compile} title="config/services.cfm — factory pattern"
+```cfm {test:compile} title="config/services.cfm — toFactory()"
 local.di = injector();
-local.di.map("jwtStrategyFactory").to("app.lib.JwtStrategyFactory").asSingleton();
-
-// consumers do:
-// var jwt = service("jwtStrategyFactory").build();
+local.di.map("jwtStrategy").toFactory(function(container) {
+    return new wheels.auth.JwtStrategy(
+        jwtService = new wheels.auth.JwtService(
+            secretKey = env("JWT_SECRET"),
+            issuer = "my-app"
+        )
+    );
+});
 ```
 
-If you need the factory output to *itself* be registered under a name (so consumers call `service("jwtStrategy")` directly), register the strategy at app-init time after the factory has built it — the authenticator-wiring pattern in [Authentication Patterns](/v4-0-0/digging-deeper/authentication-patterns/) does exactly this.
+Consumers resolve the result directly — the factory's return value *is* the binding, so there's no `.build()` indirection:
+
+```cfm {test:compile}
+var jwt = service("jwtStrategy");
+```
+
+Chain a lifecycle as usual: `.asSingleton()` builds once and caches the result, `.asRequestScoped()` rebuilds once per request, and the default is transient (a fresh instance per `service()` call). The closure receives the `Injector` as its argument, so you can resolve other registered names with `container.getInstance("name")` while composing. Calling `to()` after `toFactory()` replaces the factory binding entirely, and vice versa.
+
+If you prefer an explicit CFC over a closure, the older wrapper pattern still works — a singleton CFC whose `build()` method returns the real instance. `toFactory()` removes that indirection for the common case.
 
 ## Auto-wiring `init()` parameters
 

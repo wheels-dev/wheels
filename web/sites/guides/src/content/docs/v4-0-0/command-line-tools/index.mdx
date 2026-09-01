@@ -45,6 +45,19 @@ You don't install them separately, and you don't switch contexts between them. E
   />
 </CardGrid>
 
+## Global flags
+
+A few flags apply to every command, anywhere on the command line:
+
+| Flag | Env var | Effect |
+|---|---|---|
+| `--offline` | `WHEELS_OFFLINE=1` | Skips the CLI update check and fails fast on any registry network call, instead of waiting on a timeout. Useful for CI and air-gapped machines. |
+
+```bash title="example"
+wheels generate model User --offline
+WHEELS_OFFLINE=1 wheels migrate latest
+```
+
 ## Wheels commands
 
 Framework-specific commands contributed by the Wheels Module. These are what you reach for daily.

@@ -12,8 +12,8 @@ This page shows you how to wire authentication into a Wheels app using the built
 
 **You'll learn:**
 
-- How to register `wheels.auth.SessionStrategy` for classic cookie-based login
-- How to hash passwords today, given the current bcrypt gap
+- How to register `wheels.auth.SessionStrategy` for classic cookie-based login — or skip the wiring with `enableSession()`
+- How to hash passwords with the built-in `bcryptHash()` / `bcryptVerify()` / `bcryptNeedsRehash()` helpers
 - How to add `wheels.auth.JwtStrategy` and `wheels.auth.TokenStrategy` for API auth
 - How to combine strategies so session auth protects HTML routes and token auth protects `/api/*`
 
@@ -101,6 +101,16 @@ if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsIns
   The short `service("authenticator")` form and the long `application.wo.service("authenticator")` form resolve to the same instance. Use the short one in controllers, views, and other files that are already running inside the framework; the long form is only needed at app-init time when the global helper isn't in scope yet.
 </Aside>
 
+### The one-line shortcut: `enableSession()`
+
+Hand-wiring the session strategy spans two files — the singleton registration in `config/services.cfm` plus the `registerStrategy()` call in an app-init hook. `enableSession()` collapses both into one idempotent call made from `config/services.cfm`:
+
+```cfm {test:compile} title="config/services.cfm"
+enableSession(sessionKey = "wheels.auth");
+```
+
+It registers `wheels.auth.SessionStrategy` under `sessionKey` (default `"wheels.auth"`) and wires it into the authenticator, so the `registerStrategy()` block above is unnecessary. Optional `onLogin` / `onLogout` callbacks receive the principal struct. The helper belongs in `services.cfm` on purpose — the DI container is available there (it is **not** available in `config/app.cfm`, which loads before the container is built). Manual wiring keeps working; `enableSession()` is the convenience path.
+
 ### Log in, log out, protect actions
 
 After verifying the password in your `Sessions` controller, call `sessionStrategy.login(principal)` to stash the identity. `logout()` tears it down:
@@ -164,11 +174,11 @@ The filter must be `private`. A `public` filter becomes a routable action — Wh
 
 Model-level hashing stays the same regardless of which strategy you use — the strategy doesn't touch passwords, it just round-trips a principal struct after you've already verified credentials.
 
-<Aside type="caution">
-  **Bcrypt is not shipped with Wheels 4.0.** `hash(pw, "BCRYPT")` throws "bcrypt MessageDigest not available" in the bundled Lucee. Until that lands, the examples below use salted SHA-256, which is educational but **not production-grade** — SHA-256 is fast, which makes brute-force attacks cheap. For a real deployment, add a Java bcrypt library to `box.json`, use a CFX tag, or wait for the forthcoming `wheels-security` package. The mechanism (generate salt, hash `password + salt`, compare) stays the same — only the hash function changes. Bundling a stronger password hash is on the framework's radar — watch the [releases page](https://github.com/wheels-dev/wheels/releases) for `wheels-security`.
+<Aside type="tip">
+  **Bcrypt ships with Wheels 4.1.** `bcryptHash()`, `bcryptVerify()`, and `bcryptNeedsRehash()` are global helpers — pure-CFML bcrypt with no Java objects, CFX tags, or external libraries, byte-compatible with OpenBSD `$2b$` / jBCrypt hashes and verified against `$2$`, `$2a$`, `$2x$`, and `$2y$` inputs. Use them directly; there's no reason to hand-roll a salted hash anymore.
 </Aside>
 
-The stopgap pattern is a `beforeValidation` callback that hashes plaintext and clears it, plus an `authenticate(password)` instance method. The hash callback registers `beforeValidation` rather than `beforeSave` so the NOT NULL `passwordHash` and `passwordSalt` columns are populated by the time Wheels' automatic `validatesPresenceOf` rules check them — registering on `beforeSave` causes every signup to fail with `Passwordhash can't be empty`:
+The pattern is a `beforeValidation` callback that hashes plaintext and clears it, plus an `authenticate(password)` instance method that verifies against the stored hash:
 
 ```cfm {test:compile} title="app/models/User.cfc"
 component extends="Model" {
@@ -187,25 +197,32 @@ component extends="Model" {
 
     private function hashPassword() {
         if (StructKeyExists(this, "password") && Len(this.password)) {
-            if (!StructKeyExists(this, "passwordSalt") || !Len(this.passwordSalt ?: "")) {
-                this.passwordSalt = generateSecretKey("AES");
-            }
-            this.passwordHash = Hash(this.password & this.passwordSalt, "SHA-256");
+            this.passwordHash = bcryptHash(this.password);
             StructDelete(this, "password");
         }
     }
 
     public boolean function authenticate(required string password) {
-        if (!Len(this.passwordHash ?: "") || !Len(this.passwordSalt ?: "")) {
+        if (!Len(this.passwordHash ?: "")) {
             return false;
         }
-        var candidate = Hash(arguments.password & this.passwordSalt, "SHA-256");
-        return (candidate == this.passwordHash);
+        return bcryptVerify(arguments.password, this.passwordHash);
     }
 }
 ```
 
-`normalizeEmail` runs before validation so uniqueness sees a canonical address. `hashPassword` only fires when `this.password` is set (the caller just assigned a new one), generates a per-user salt on first write, and scrubs the plaintext before the save hits the database. When bcrypt ships, swap `Hash(... "SHA-256")` for the bcrypt equivalent — nothing else changes.
+`normalizeEmail` runs before validation so uniqueness sees a canonical address. `hashPassword` only fires when `this.password` is set (the caller just assigned a new one) and scrubs the plaintext before the save hits the database. One `passwordHash` column is all you need — the salt and cost are embedded in the bcrypt hash string, so there's no separate `passwordSalt` column to migrate.
+
+When you later raise the cost factor, `bcryptNeedsRehash()` flags stored hashes that predate it so you can rehash on login:
+
+```cfm {test:compile} title="transparent work-factor upgrade"
+if (bcryptNeedsRehash(user.passwordHash)) {
+    user.passwordHash = bcryptHash(params.password);
+    user.save();
+}
+```
+
+`bcryptHash(password, cost)` takes an optional cost (default `10`); `bcryptNeedsRehash(hash, cost)` compares the stored hash's cost against your target. `bcryptVerify()` compares in constant time, so the `authenticate()` above is safe as written. The `wheels generate auth` scaffold does all of this for you — this section is the hand-rolled equivalent.
 
 ## Token auth with `TokenStrategy`
 
@@ -388,7 +405,7 @@ You don't have to. `Authenticator`, `SessionStrategy`, `TokenStrategy`, and `Jwt
 ## Security pitfalls
 
 - **Session fixation.** `SessionStrategy.login()` calls `sessionRotate()` automatically on engines that support it (Lucee). If you're on an engine without session rotation, issue a new session ID manually before storing the principal.
-- **Timing-safe comparison.** The stopgap `authenticate()` uses `==` to compare hashes, which is not timing-safe. Under load an attacker can measure response times to recover the hash byte-by-byte. Swap for a constant-time comparator (`Compare()` in CFML is not guaranteed constant-time either — use a dedicated Java helper) when you ship bcrypt.
+- **Timing-safe comparison.** `bcryptVerify()` compares in constant time, so the `authenticate()` example above is safe as written. If you compare hashes yourself anywhere else, don't use `==` — under load an attacker can measure response times to recover the hash byte-by-byte.
 - **Secret rotation.** `JwtService` takes a single `secretKey`. Rotating it invalidates every outstanding token. For gradual rotation, validate against a list of current + previous secrets during the cutover window; the shipped `JwtService` doesn't do this natively, so you'll need to wrap it.
 - **JWT revocation.** JWTs are stateless by design — you cannot revoke an issued token before it expires unless you maintain a server-side deny-list and check it on every request. Keep token expiry short (minutes, not days) and use a refresh-token flow if you need long sessions.
 - **Token leakage in URLs.** Query-string tokens are disabled by default on both `TokenStrategy` and `JwtStrategy` (`queryParam=""`). Query strings show up in access logs, referer headers, and browser history — prefer the `Authorization` header, and only set `queryParam` if you must support URL-based keys.

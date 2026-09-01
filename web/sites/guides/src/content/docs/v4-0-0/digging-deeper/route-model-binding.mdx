@@ -15,6 +15,7 @@ This page shows you how to stop writing `findByKey(params.key)` at the top of ev
 - How per-resource `binding=true` auto-loads records into `params.<singular>`
 - How `set(routeModelBinding=true)` makes it the default for every resource
 - How `binding="ModelName"` overrides the convention-derived class name
+- How `bindBy="slug"` binds the segment to a non-primary-key column
 - How scope-level binding cascades to every nested resource
 - What happens when the record doesn't exist — `Wheels.RecordNotFound` and the 404
 - The dev-mode hint the framework writes to the Wheels log when binding is off but the route looks like a binding candidate
@@ -107,6 +108,34 @@ mapper()
 <Aside type="tip">
   The silent skip applies only to **conventional** binding (`binding=true`): when the convention-derived model class doesn't exist (for example, the resource is routing to a controller that doesn't have a backing model), the dispatcher skips binding instead of throwing. This keeps non-model resources — health checks, static pages, API gateways — working without extra configuration. An **explicit** name is different: if `binding="BlogPost"` names a model class that can't be resolved, the dispatcher rethrows the failure as a configuration error — you asked for that class by name, so a typo should surface, not vanish.
 </Aside>
+
+## Binding on a non-primary-key column
+
+By default binding resolves `params.key` with `findByKey()` — the URL segment is expected to be a primary key. When your URLs carry something friendlier — a slug, a username, a permalink — pass `bindBy=` to resolve the segment against that column through the parameterized dynamic finder instead:
+
+```cfm {test:compile} title="config/routes.cfm"
+<cfscript>
+mapper()
+    .resources(name="posts", binding=true, bindBy="slug")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+With `bindBy="slug"`, a request to `/posts/hello-world` runs `model("Post").findOneBySlug(value="hello-world")` and stores the result in `params.post` — exactly as if you'd written the lookup yourself. The segment value is bound as the finder argument, never interpolated into a `where=` string.
+
+`bindBy` composes with an explicit model class, so you can bind a segment to a column on a non-conventional model:
+
+```cfm {test:compile} title="config/routes.cfm"
+<cfscript>
+mapper()
+    .resources(name="authors", binding="User", bindBy="username")
+    .wildcard()
+.end();
+</cfscript>
+```
+
+The 404 behavior is unchanged: if the dynamic finder returns no record, the dispatcher raises `Wheels.RecordNotFound` before your action runs. `bindBy` only has an effect when binding is enabled — set without `binding=true` (or the global default), it's ignored.
 
 ## Scope-level binding
 

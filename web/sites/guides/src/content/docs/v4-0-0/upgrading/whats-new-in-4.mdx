@@ -32,6 +32,19 @@ You know Wheels. You have a 3.x app in production. This page is the ten-minute a
 
 Smaller but daily-life: composable pagination (`paginationNav()` with Bootstrap/Tailwind presets), idempotent seeding (`seedOnce()`), migration reconciliation for shared dev databases (`migrate doctor`/`forget`/`pretend`), HTML5 form helpers, and a rebuilt debug bar.
 
+## New since 4.0 — the 4.0.6 and 4.1 wave
+
+The 4.0.x line kept shipping. The highlights you'll actually reach for:
+
+- **Storage.** Local and S3 file storage behind one interface — named disks, `put`/`get`/`exists`/`delete`/`url`/`signedUrl`, and from-scratch SigV4 signing with no AWS SDK. → [Storage](/v4-0-0/digging-deeper/storage/)
+- **Password hashing, solved.** `wheels.auth.PasswordHasher` (PBKDF2, 600k iterations) plus pure-CFML bcrypt via `bcryptHash()` / `bcryptVerify()` / `bcryptNeedsRehash()` — no more hand-rolled salted SHA-256. → [Authentication Patterns](/v4-0-0/digging-deeper/authentication-patterns/)
+- **Authorization policies.** `wheels.Policy` with `authorize()` / `can()` / `policyScope()` and a `wheels generate policy` generator. → [Authorization Policies](/v4-0-0/digging-deeper/authorization-policies/)
+- **`enableSession()`.** One-line session-auth wiring in `config/services.cfm`. → [Authentication Patterns](/v4-0-0/digging-deeper/authentication-patterns/)
+- **Route binding on any column.** `bindBy="slug"` resolves a resource's `:key` segment through the dynamic finder. → [Route Model Binding](/v4-0-0/digging-deeper/route-model-binding/)
+- **`toFactory()`.** Register a DI binding with a closure that builds the instance. → [Dependency Injection Usage](/v4-0-0/digging-deeper/dependency-injection-usage/)
+- **A sharper CLI.** `wheels migrate diff`, `wheels generate --dry-run`, a global `--offline` flag, and `wheels coverage` for CRAP-ranked change risk. → [Database](/v4-0-0/command-line-tools/wheels-commands/database/), [Code Quality](/v4-0-0/command-line-tools/wheels-commands/code-quality/)
+- **Fail-closed mass assignment.** `set(massAssignmentStrict=true)` rejects posted properties a model didn't explicitly allow. → [Security Hardening](/v4-0-0/deployment/security-hardening/)
+
 ## The tooling story, honestly
 
 4.0 ships a first-party CLI — `wheels new`, generators, `migrate`, `test`, `console`, `deploy` — built on the LuCLI runtime and installed via Homebrew, Scoop, or apt/yum. Three sentences for the teams watching this warily:

@@ -38,12 +38,14 @@ set(middleware = [
 
 ## Built-in middleware
 
-Four components ship in `wheels.middleware`:
+Six components ship in `wheels.middleware`:
 
 - **`RequestId`** — stamps a unique correlation ID on every request. Sets `request.wheels.requestId` for downstream code and returns an `X-Request-Id` response header for log correlation.
 - **`SecurityHeaders`** — applies OWASP response headers: `X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, `Referrer-Policy`, and optionally `Content-Security-Policy`, `Strict-Transport-Security`, and `Permissions-Policy`. HSTS auto-enables in production when left unset.
 - **`Cors`** — handles the `OPTIONS` preflight and sets `Access-Control-*` response headers. Requires an explicit `allowOrigins` — the default is empty so a missing configuration fails closed rather than opens the app to every origin.
 - **`RateLimiter`** — throttles requests per client using fixed-window, sliding-window, or token-bucket strategies. Backed by in-memory counters by default; swap to `storage="database"` for shared state across nodes.
+- **`AuthMiddleware`** — authenticates a request and attaches the result. Accepts `genericErrors=true` to emit a generic `Unauthorized` JSON body on 401; the default 401 still includes `authResult.error` (more detail, at the cost of revealing why auth failed).
+- **`TenantResolver`** — resolves the active tenant per request. Accepts `failClosed=true` to 403 unmatched tenants; without it, unmatched requests proceed on the default datasource.
 
 ## Route-scoped middleware
 
