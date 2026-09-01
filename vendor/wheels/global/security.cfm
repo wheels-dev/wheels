@@ -79,9 +79,46 @@ public string function $bcryptHashCore(required numeric cost, required array sal
 	local.ctext = [1332899944, 1700884034, 1701343084, 1684370003, 1668446532, 1869963892];
 	for (local.i = 1; local.i <= 64; local.i++) {
 		for (local.j = 1; local.j <= 3; local.j++) {
-			local.enc = $bcryptEncrypt(local.P, local.S, local.ctext[2 * local.j - 1], local.ctext[2 * local.j]);
-			local.ctext[2 * local.j - 1] = local.enc[1];
-			local.ctext[2 * local.j] = local.enc[2];
+			local.l = local.ctext[2 * local.j - 1];
+			local.r = local.ctext[2 * local.j];
+			local.l = BitXor(local.l, local.P[1]);
+			for (local.k = 1; local.k <= 8; local.k++) {
+				// F(l) folded via inlined $bcryptByte / $bcryptWord32
+				local.u = local.l + 4294967296 * (local.l < 0);
+				local.a = Int(local.u / 16777216); local.a = local.a - 256 * Int(local.a / 256);
+				local.u = local.l + 4294967296 * (local.l < 0);
+				local.b = Int(local.u / 65536); local.b = local.b - 256 * Int(local.b / 256);
+				local.u = local.l + 4294967296 * (local.l < 0);
+				local.c = Int(local.u / 256); local.c = local.c - 256 * Int(local.c / 256);
+				local.u = local.l + 4294967296 * (local.l < 0);
+				local.d = local.u - 256 * Int(local.u / 256);
+				local.n = local.S[local.a + 1] + local.S[local.b + 257];
+				local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+				local.n = BitXor(local.n, local.S[local.c + 513]);
+				local.n = local.n + local.S[local.d + 769];
+				local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+				local.r = BitXor(BitXor(local.r, local.n), local.P[2 * local.k]);
+				// F(r) folded via inlined $bcryptByte / $bcryptWord32
+				local.u = local.r + 4294967296 * (local.r < 0);
+				local.a = Int(local.u / 16777216); local.a = local.a - 256 * Int(local.a / 256);
+				local.u = local.r + 4294967296 * (local.r < 0);
+				local.b = Int(local.u / 65536); local.b = local.b - 256 * Int(local.b / 256);
+				local.u = local.r + 4294967296 * (local.r < 0);
+				local.c = Int(local.u / 256); local.c = local.c - 256 * Int(local.c / 256);
+				local.u = local.r + 4294967296 * (local.r < 0);
+				local.d = local.u - 256 * Int(local.u / 256);
+				local.n = local.S[local.a + 1] + local.S[local.b + 257];
+				local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+				local.n = BitXor(local.n, local.S[local.c + 513]);
+				local.n = local.n + local.S[local.d + 769];
+				local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+				local.l = BitXor(BitXor(local.l, local.n), local.P[2 * local.k + 1]);
+			}
+			local.tmp = local.l;
+			local.l = BitXor(local.r, local.P[18]);
+			local.r = local.tmp;
+			local.ctext[2 * local.j - 1] = local.l;
+			local.ctext[2 * local.j] = local.r;
 		}
 	}
 
@@ -118,41 +155,6 @@ public struct function $bcryptEksSetup(required numeric cost, required array sal
 	return local.state;
 }
 
-/**
- * Blowfish encrypt of one 64-bit block (L, R) -> [L', R'].
- * 16 Feistel rounds using P[1] (initial) and P[2..17] (rounds), ending with
- * the final P[18] XOR. S is a flat 4x256 array: box k lives at
- * S[k*256 + byte + 1] (box 0 = S[1..256]).
- */
-public array function $bcryptEncrypt(required array P, required array S, required numeric L, required numeric R) {
-	local.P = arguments.P;
-	local.S = arguments.S;
-	local.l = arguments.L;
-	local.r = arguments.R;
-	local.l = BitXor(local.l, local.P[1]);
-	for (local.k = 1; local.k <= 8; local.k++) {
-		// F(l) folded into r, then P[2k].
-		local.a = $bcryptByte(local.l, 24);
-		local.b = $bcryptByte(local.l, 16);
-		local.c = $bcryptByte(local.l, 8);
-		local.d = $bcryptByte(local.l, 0);
-		local.n = $bcryptWord32(local.S[local.a + 1] + local.S[local.b + 257]);
-		local.n = BitXor(local.n, local.S[local.c + 513]);
-		local.n = $bcryptWord32(local.n + local.S[local.d + 769]);
-		local.r = BitXor(BitXor(local.r, local.n), local.P[2 * local.k]);
-
-		// F(r) folded into l, then P[2k + 1].
-		local.a = $bcryptByte(local.r, 24);
-		local.b = $bcryptByte(local.r, 16);
-		local.c = $bcryptByte(local.r, 8);
-		local.d = $bcryptByte(local.r, 0);
-		local.n = $bcryptWord32(local.S[local.a + 1] + local.S[local.b + 257]);
-		local.n = BitXor(local.n, local.S[local.c + 513]);
-		local.n = $bcryptWord32(local.n + local.S[local.d + 769]);
-		local.l = BitXor(BitXor(local.l, local.n), local.P[2 * local.k + 1]);
-	}
-	return [BitXor(local.r, local.P[18]), local.l];
-}
 
 /**
  * Normalize a 32-bit word into the signed range. All P/S/key words are
@@ -251,9 +253,42 @@ public struct function $bcryptExpandKey(required array P, required array S, requ
 			local.r = BitXor(local.r, $bcryptCyclicWord(arguments.dataBytes, local.doff));
 			local.doff = local.doff + 4;
 		}
-		local.enc = $bcryptEncrypt(local.P, local.S, local.l, local.r);
-		local.l = local.enc[1];
-		local.r = local.enc[2];
+		local.l = BitXor(local.l, local.P[1]);
+		for (local.k = 1; local.k <= 8; local.k++) {
+			// F(l) folded via inlined $bcryptByte / $bcryptWord32
+			local.u = local.l + 4294967296 * (local.l < 0);
+			local.a = Int(local.u / 16777216); local.a = local.a - 256 * Int(local.a / 256);
+			local.u = local.l + 4294967296 * (local.l < 0);
+			local.b = Int(local.u / 65536); local.b = local.b - 256 * Int(local.b / 256);
+			local.u = local.l + 4294967296 * (local.l < 0);
+			local.c = Int(local.u / 256); local.c = local.c - 256 * Int(local.c / 256);
+			local.u = local.l + 4294967296 * (local.l < 0);
+			local.d = local.u - 256 * Int(local.u / 256);
+			local.n = local.S[local.a + 1] + local.S[local.b + 257];
+			local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+			local.n = BitXor(local.n, local.S[local.c + 513]);
+			local.n = local.n + local.S[local.d + 769];
+			local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+			local.r = BitXor(BitXor(local.r, local.n), local.P[2 * local.k]);
+			// F(r) folded via inlined $bcryptByte / $bcryptWord32
+			local.u = local.r + 4294967296 * (local.r < 0);
+			local.a = Int(local.u / 16777216); local.a = local.a - 256 * Int(local.a / 256);
+			local.u = local.r + 4294967296 * (local.r < 0);
+			local.b = Int(local.u / 65536); local.b = local.b - 256 * Int(local.b / 256);
+			local.u = local.r + 4294967296 * (local.r < 0);
+			local.c = Int(local.u / 256); local.c = local.c - 256 * Int(local.c / 256);
+			local.u = local.r + 4294967296 * (local.r < 0);
+			local.d = local.u - 256 * Int(local.u / 256);
+			local.n = local.S[local.a + 1] + local.S[local.b + 257];
+			local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+			local.n = BitXor(local.n, local.S[local.c + 513]);
+			local.n = local.n + local.S[local.d + 769];
+			local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+			local.l = BitXor(BitXor(local.l, local.n), local.P[2 * local.k + 1]);
+		}
+		local.tmp = local.l;
+		local.l = BitXor(local.r, local.P[18]);
+		local.r = local.tmp;
 		local.P[local.i] = local.l;
 		local.P[local.i + 1] = local.r;
 	}
@@ -265,9 +300,42 @@ public struct function $bcryptExpandKey(required array P, required array S, requ
 			local.r = BitXor(local.r, $bcryptCyclicWord(arguments.dataBytes, local.doff));
 			local.doff = local.doff + 4;
 		}
-		local.enc = $bcryptEncrypt(local.P, local.S, local.l, local.r);
-		local.l = local.enc[1];
-		local.r = local.enc[2];
+		local.l = BitXor(local.l, local.P[1]);
+		for (local.k = 1; local.k <= 8; local.k++) {
+			// F(l) folded via inlined $bcryptByte / $bcryptWord32
+			local.u = local.l + 4294967296 * (local.l < 0);
+			local.a = Int(local.u / 16777216); local.a = local.a - 256 * Int(local.a / 256);
+			local.u = local.l + 4294967296 * (local.l < 0);
+			local.b = Int(local.u / 65536); local.b = local.b - 256 * Int(local.b / 256);
+			local.u = local.l + 4294967296 * (local.l < 0);
+			local.c = Int(local.u / 256); local.c = local.c - 256 * Int(local.c / 256);
+			local.u = local.l + 4294967296 * (local.l < 0);
+			local.d = local.u - 256 * Int(local.u / 256);
+			local.n = local.S[local.a + 1] + local.S[local.b + 257];
+			local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+			local.n = BitXor(local.n, local.S[local.c + 513]);
+			local.n = local.n + local.S[local.d + 769];
+			local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+			local.r = BitXor(BitXor(local.r, local.n), local.P[2 * local.k]);
+			// F(r) folded via inlined $bcryptByte / $bcryptWord32
+			local.u = local.r + 4294967296 * (local.r < 0);
+			local.a = Int(local.u / 16777216); local.a = local.a - 256 * Int(local.a / 256);
+			local.u = local.r + 4294967296 * (local.r < 0);
+			local.b = Int(local.u / 65536); local.b = local.b - 256 * Int(local.b / 256);
+			local.u = local.r + 4294967296 * (local.r < 0);
+			local.c = Int(local.u / 256); local.c = local.c - 256 * Int(local.c / 256);
+			local.u = local.r + 4294967296 * (local.r < 0);
+			local.d = local.u - 256 * Int(local.u / 256);
+			local.n = local.S[local.a + 1] + local.S[local.b + 257];
+			local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+			local.n = BitXor(local.n, local.S[local.c + 513]);
+			local.n = local.n + local.S[local.d + 769];
+			local.n = local.n - 4294967296 * (local.n > 2147483647) + 4294967296 * (local.n < -2147483648);
+			local.l = BitXor(BitXor(local.l, local.n), local.P[2 * local.k + 1]);
+		}
+		local.tmp = local.l;
+		local.l = BitXor(local.r, local.P[18]);
+		local.r = local.tmp;
 		local.S[local.i] = local.l;
 		local.S[local.i + 1] = local.r;
 	}
