@@ -2,7 +2,7 @@
   "$schema": "https://wheels.dev/schema/wheels.json/v1.json",
   "name": "Wheels.fw",
   "version": "4.1.0",
-  "description": "Wheels \u2014 CFML MVC framework",
+  "description": "Wheels — CFML MVC framework",
   "homepage": "https://wheels.dev",
   "documentation": "https://wheels.dev/guides/",
   "license": "Apache-2.0",
