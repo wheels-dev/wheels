@@ -1,0 +1,227 @@
+# PR compatibility gate: runs the full core test suite on the engines that
+# most often diverge from Lucee — BoxLang and Adobe 2023 — on the cheapest
+# database (SQLite, no external container).
+#
+# This is the subset of compat-matrix.yml that catches the class of bug the
+# weekly matrix exists for (cross-engine regressions), at PR time instead of
+# at release preflight. The full engine x database matrix stays weekly +
+# manual (compat-matrix.yml); SQLite is sufficient to catch engine-specific
+# breakage, which is independent of the database.
+#
+# Path-gated to framework/CLI changes so docs/web/blog PRs don't pay for
+# Docker image builds. Register the two matrix legs (boxlang + sqlite and
+# adobe2023 + sqlite) as required branch-protection checks; the path filter
+# means non-framework PRs simply won't emit the checks (absent != failed).
+
+name: Wheels PR Compat Gate
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'vendor/wheels/**'
+      - 'cli/lucli/**'
+      # Self-test: run when the gate itself changes.
+      - '.github/workflows/compat-pr.yml'
+
+concurrency:
+  group: compat-pr-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  compat:
+    name: "${{ matrix.cfengine }} + sqlite"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        cfengine: [boxlang, adobe2023]
+    env:
+      PORT_boxlang: 60001
+      PORT_adobe2023: 62023
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Download ojdbc10 for Adobe engines
+        if: matrix.cfengine == 'adobe2023'
+        run: |
+          mkdir -p ./.engine/adobe2023/WEB-INF/lib
+          wget -q https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar \
+            -O ./.engine/adobe2023/WEB-INF/lib/ojdbc10.jar
+
+      - name: Start CF engine
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+        run: |
+          set -e
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          until docker compose build --no-cache "$CFENGINE"; do
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
+              exit 1
+            fi
+            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 30
+          done
+          docker compose up -d "$CFENGINE"
+
+      - name: Wait for CF engine to be ready
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+        run: |
+          PORT_VAR="PORT_${CFENGINE}"
+          PORT="${!PORT_VAR}"
+          CONTAINER="wheels-${CFENGINE}-1"
+          echo "Waiting for ${CFENGINE} on port ${PORT}..."
+
+          MAX_WAIT=60
+          WAIT_COUNT=0
+          RESTARTS=0
+          MAX_RESTARTS=3
+          LAST_HTTP_CODE="000"
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+
+            CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "missing")
+            if [ "$CONTAINER_STATUS" = "exited" ] || [ "$CONTAINER_STATUS" = "dead" ] || [ "$CONTAINER_STATUS" = "missing" ]; then
+              RESTARTS=$((RESTARTS + 1))
+              if [ "$RESTARTS" -le "$MAX_RESTARTS" ]; then
+                echo "Container $CONTAINER has status '$CONTAINER_STATUS' — restarting (attempt $RESTARTS/$MAX_RESTARTS)..."
+                docker compose up -d "${CFENGINE}"
+                sleep 10
+                continue
+              else
+                echo "::error::Container $CONTAINER failed to start after $MAX_RESTARTS restart attempts"
+                docker logs "$CONTAINER" 2>&1 | tail -100
+                exit 1
+              fi
+            fi
+
+            LAST_HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" 2>/dev/null || true)
+            LAST_HTTP_CODE=${LAST_HTTP_CODE:-000}
+            if echo "$LAST_HTTP_CODE" | grep -qE "^(200|302|404)$"; then
+              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT)"
+              break
+            fi
+
+            if [ $((WAIT_COUNT % 10)) -eq 0 ]; then
+              echo "  attempt $WAIT_COUNT/$MAX_WAIT: container=$CONTAINER_STATUS, http=$LAST_HTTP_CODE"
+            fi
+
+            if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
+              sleep 5
+            fi
+          done
+
+          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+            echo "::error::CF engine not ready after ${MAX_WAIT} attempts (last HTTP code: $LAST_HTTP_CODE)"
+            echo "=== Container logs (raw, last 200 lines) ==="
+            docker logs "$CONTAINER" 2>&1 | tail -200
+            exit 1
+          fi
+
+      - name: Install CFPM packages
+        if: matrix.cfengine == 'adobe2023'
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Attempt $RETRY_COUNT of $MAX_RETRIES: Installing CFPM packages..."
+            if docker exec wheels-adobe2023-1 box cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle; then
+              echo "CFPM packages installed successfully"
+              exit 0
+            fi
+            echo "CFPM installation failed on attempt $RETRY_COUNT"
+            if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+              echo "Waiting 10 seconds before retry..."
+              sleep 10
+              docker exec wheels-adobe2023-1 box server restart || true
+              sleep 10
+            fi
+          done
+          echo "Failed to install CFPM packages after $MAX_RETRIES attempts"
+          exit 1
+
+      - name: Run test suite for sqlite
+        run: |
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT="${!PORT_VAR}"
+          BASE_URL="http://localhost:${PORT}/wheels/core/tests"
+          DB="sqlite"
+          RESULT_FILE="/tmp/${{ matrix.cfengine }}-sqlite-result.txt"
+
+          # Warm-up: trigger Wheels onApplicationStart before the test run.
+          echo "Warming up Wheels application before first test run..."
+          curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/" || true
+          sleep 2
+
+          TEST_URL="${BASE_URL}?db=${DB}&format=json"
+
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          HTTP_CODE="000"
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
+            HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
+              --max-time 900 \
+              --write-out "%{http_code}" \
+              "$TEST_URL" || echo "000")
+            echo "HTTP Code: ${HTTP_CODE}"
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; then
+              break
+            fi
+            if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+              echo "Transient error (HTTP ${HTTP_CODE}), waiting 15 seconds before retry..."
+              sleep 15
+            fi
+          done
+
+          # Zero-test guard (#3302): a compile-wiped leg returns HTTP 200 with
+          # totalSpecs=0. Every engine runs the same ~4,700-spec core suite.
+          MIN_SPECS=4000
+          TOTAL_SPECS="-1"
+          FAIL_COUNT="-1"
+          if [ -f "$RESULT_FILE" ] && { [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; }; then
+            read -r FAIL_COUNT TOTAL_SPECS <<< "$(python3 -c "
+          import json, sys
+          try:
+            d = json.load(open('$RESULT_FILE'))
+            print(int(d.get('totalFail', 0) + d.get('totalError', 0)), int(d.get('totalSpecs', 0)))
+          except:
+            print(-1, -1)
+          " 2>/dev/null || echo "-1 -1")"
+          fi
+
+          echo "${{ matrix.cfengine }} + ${DB}: ${FAIL_COUNT} failures, ${TOTAL_SPECS} specs"
+
+          if [ "$HTTP_CODE" = "200" ] && [ "$FAIL_COUNT" = "0" ] && [ "$TOTAL_SPECS" -ge "$MIN_SPECS" ]; then
+            echo "PASSED: ${{ matrix.cfengine }} + ${DB} (${TOTAL_SPECS} testcases)"
+          else
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "::error::${{ matrix.cfengine }} + ${DB}: HTTP ${HTTP_CODE} (expected 200)"
+            elif [ "$FAIL_COUNT" != "0" ]; then
+              echo "::error::${{ matrix.cfengine }} + ${DB}: ${FAIL_COUNT} failures/errors"
+            else
+              echo "::error::${{ matrix.cfengine }} + ${DB}: only ${TOTAL_SPECS} testcases (floor ${MIN_SPECS}) — suite likely compile-wiped"
+            fi
+            if [ -f "$RESULT_FILE" ]; then
+              echo "=== Result head (first 2000 bytes) ==="
+              head -c 2000 "$RESULT_FILE"
+              echo
+            fi
+            echo "=== Container logs (last 100 lines) ==="
+            docker logs "wheels-${{ matrix.cfengine }}-1" 2>&1 | tail -100
+            exit 1
+          fi
