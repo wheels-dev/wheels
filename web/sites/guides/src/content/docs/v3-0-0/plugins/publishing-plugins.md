@@ -23,33 +23,28 @@ Some scripted commands also require the git CLI, although these are technically 
 
 If you've not got a [forgebox.io](http://forgebox.io/) account you can either [register directly on forgebox](https://www.forgebox.io/security/registration) or very quickly via CommandBox itself
 
-{% code title="CommandBox" %}
-```shell
+```shell title="CommandBox"
 # Register for an account
 $ forgebox register
 ```
-{% endcode %}
 
 Once you've got your credentials, you should be good to go.
 
 If you've already got an account, you need to login at least once, which will store an API token for future use:
 
-{% code title="CommandBox" %}
-```shell
+```shell title="CommandBox"
 # Login
 $ forgebox login
 
 # (optional) Check which account you're logged in with
 $ forgebox whoami
 ```
-{% endcode %}
 
 ### Ensure you've got a box.json in your plugin root
 
 Forgebox uses your local `box.json` - you'll need one! Critical package information like the name of your plugin and the location are stored here. You can create one manually, or you can run:
 
-{% code title="Shell" %}
-```shell
+```shell title="Shell"
 # Create a basic box.json
 $ init
 
@@ -59,14 +54,12 @@ $ init name="My Funky Plugin" slug=my-funky-plugin version=1.0.0 type="wheels-pl
 # Or use the wizard
 $ init --wizard
 ```
-{% endcode %}
 
 ### Ensure you've set some critical box.json attributes
 
 In order for other Wheels users to quickly identify and install your plugin via the Wheels CLI, make sure you set the following `box.json` attributes - whilst a standard `box.json` might only have `name, version,author`, we need a little more information. Here's a template to get you started: (replace the values in CAPS)
 
-{% code title="box.json" %}
-```json
+```json title="box.json"
 {
   // Required:
  "name":"PLUGIN-NAME",
@@ -98,12 +91,10 @@ In order for other Wheels users to quickly identify and install your plugin via 
   }
 }
 ```
-{% endcode %}
 
 Your completed `box.json` might look something like this:
 
-{% code title="box.json" %}
-```json
+```json title="box.json"
 {
   // Required:
  "name":"Shortcodes",
@@ -135,21 +126,18 @@ Your completed `box.json` might look something like this:
   }
 }
 ```
-{% endcode %}
 
 ### Using the forgebox staging server (optional)
 
 If this is the first time you've done this, you might want to try the forgebox staging server. That way you can make sure your publishing process is spot on without having lots of unnecessary versions pushed up. You can view the staging server version at [http://forgebox.stg.ortussolutions.com/](http://forgebox.stg.ortussolutions.com/)
 
-{% code title="CommandBox" %}
-```shell
+```shell title="CommandBox"
 # Add staging server configuration
 $ config set endpoints.forgebox.APIURL=http://forgebox.stg.ortussolutions.com/api/v1
 
 # Revert back to production configuration
 $ config clear endpoints.forgebox.APIURL
 ```
-{% endcode %}
 
 Remember this configuration will "stick", so make sure you change it back afterwards. (I find once changed, it might not kick in until you reload the CommandBox shell via `r`).
 
@@ -162,12 +150,10 @@ Both Wheels CLI and Forgebox are expecting a tagged release with the plugin cont
 
 > Note: Git dislikes nested repos, so it's best to setup a test wheels site specifically for plugin development/deployment. Then `git init` within each plugin directory itself, but not at the root. (e.g. `/plugins/PluginName/`)
 
-{% code title="CommandBox" %}
-```shell
+```shell title="CommandBox"
 # from CommandBox prompt, within plugin directory
 $ run-script patch-release
 ```
-{% endcode %}
 
 ForgeBox does not store your actual package files like npm, but points to your download location.
 
@@ -183,8 +169,7 @@ Once you run this command, you can run `forgebox show my-package` to confirm it'
 
 By adding the following block to our `box.json`, we can more easily deploy new versions with a single command:
 
-{% code title="box.json" %}
-```json
+```json title="box.json"
 "scripts":{
     "postVersion":"package set location='GITHUBUSERNAME/GITHUB-REPONAME#v`package version`'",
     "patch-release":"bump --patch",
@@ -193,14 +178,12 @@ By adding the following block to our `box.json`, we can more easily deploy new v
     "postPublish":"!git push --follow-tags && publish"
   }
 ```
-{% endcode %}
 
 Obviously, you'll need to change `location='GITHUBUSERNAME/GITHUB-REPONAME#v` to your repo.
 
 With these in place, **once you've committed your changes to your local repository**, you can now do:
 
-{% code title="CommandBox" %}
-```shell
+```shell title="CommandBox"
 # Don't forget to commit your changes. You can access git directly from commandbox using !
 $ !git add .
 $ !git commit -m "my new changes"
@@ -214,7 +197,6 @@ $ run-script minor-release
 # Move from 1.0.0 -> 2.0.0
 $ run-script major-release
 ```
-{% endcode %}
 
 This will:&#x20;
 
@@ -225,8 +207,7 @@ This will:&#x20;
 
 This saves you having to manually update the version number too!
 
-{% code title="Commandbox" %}
-```shell
+```shell title="Commandbox"
 # Example output of a patch release
 $ run-script patch-release
 
@@ -256,7 +237,6 @@ To https://github.com/neokoenig/wheels-cli.git
 
 Package published successfully in [forgebox]
 ```
-{% endcode %}
 
 Lastly, you can double check it's made it into the plugins list via `wheels plugins list`
 
@@ -264,8 +244,7 @@ Lastly, you can double check it's made it into the plugins list via `wheels plug
 
 Likewise, you can unpublish a plugin, but keep in mind people might be relying on your plugin, so don't do this lightly!
 
-{% code title="CommandBox" %}
-```shell
+```shell title="CommandBox"
 // Remove all versions of a package
 $ unpublish
 
@@ -275,4 +254,3 @@ $ unpublish 1.2.3
 // Skip the user confirmation prompt
 $ unpublish 1.2.3 --force
 ```
-{% endcode %}

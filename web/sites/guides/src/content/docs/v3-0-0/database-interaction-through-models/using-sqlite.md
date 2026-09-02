@@ -86,8 +86,7 @@ Download the SQLite module for Boxlang from [ForgeBox](https://forgebox.io/view/
 
 Create a `CFConfig.json` in your project root:
 
-{% code title="CFConfig.json" %}
-```json
+```json title="CFConfig.json"
 {
   "datasources": {
     "myapp": {
@@ -98,7 +97,6 @@ Create a `CFConfig.json` in your project root:
   }
 }
 ```
-{% endcode %}
 
 #### Using ColdFusion Administrator
 
@@ -113,15 +111,13 @@ Create a `CFConfig.json` in your project root:
 
 Update your Wheels configuration to use SQLite:
 
-{% code title="/config/settings.cfm" %}
-```javascript
+```javascript title="/config/settings.cfm"
 <cfscript>
 set(dataSourceName = "myapp");
 set(dataSourceUserName = "");  // SQLite doesn't use authentication
 set(dataSourcePassword = "");
 </cfscript>
 ```
-{% endcode %}
 
 ## Working with SQLite in Wheels
 
@@ -129,8 +125,7 @@ set(dataSourcePassword = "");
 
 SQLite works seamlessly with Wheels' ActiveRecord pattern:
 
-{% code title="/app/models/User.cfc" %}
-```javascript
+```javascript title="/app/models/User.cfc"
 component extends="Model" {
     function config() {
         // Associations work normally
@@ -146,7 +141,6 @@ component extends="Model" {
     }
 }
 ```
-{% endcode %}
 
 ### Creating Records
 
@@ -278,8 +272,7 @@ wheels g migration CreateUsersTable
 wheels dbmigrate latest
 ```
 
-{% code title="/app/migrator/migrations/20231030112345_create_users_table.cfc" %}
-```javascript
+```javascript title="/app/migrator/migrations/20231030112345_create_users_table.cfc"
 component extends="wheels.migrator.Migration" {
 
     function up() {
@@ -300,7 +293,6 @@ component extends="wheels.migrator.Migration" {
     }
 }
 ```
-{% endcode %}
 
 ## Limitations and Workarounds
 
@@ -408,8 +400,7 @@ SQLite is excellent for automated testing:
 
 Use in-memory databases for ultra-fast tests:
 
-{% code title="/config/test/settings.cfm" %}
-```javascript
+```javascript title="/config/test/settings.cfm"
 <cfscript>
 // Use in-memory database for tests
 set(dataSourceName = "test_db");
@@ -418,7 +409,6 @@ set(dataSourceName = "test_db");
 // "connectionString": "jdbc:sqlite::memory:"
 </cfscript>
 ```
-{% endcode %}
 
 ### Per-Test Isolation
 
@@ -482,8 +472,7 @@ For SQLite, connection pooling behavior depends on your CFML engine and use case
 - Limited connection pool may be beneficial with WAL mode enabled
 - Without WAL mode, multiple connections can cause SQLITE_BUSY errors
 
-{% code title="CFConfig.json" %}
-```json
+```json title="CFConfig.json"
 {
   "datasources": {
     "myapp": {
@@ -495,7 +484,6 @@ For SQLite, connection pooling behavior depends on your CFML engine and use case
   }
 }
 ```
-{% endcode %}
 
 If using WAL mode for better concurrency:
 
@@ -603,8 +591,7 @@ myapp/
 └── .gitignore                  # Add *.db here
 ```
 
-{% code title=".gitignore" %}
-```
+```gitignore title=".gitignore"
 # Ignore SQLite database files
 db/*.db
 db/*.db-journal
@@ -614,7 +601,6 @@ db/*.db-shm
 # Keep directory structure
 !db/.gitkeep
 ```
-{% endcode %}
 
 ## Migration from SQLite to Production Database
 
@@ -622,15 +608,13 @@ When moving to production, you'll typically migrate from SQLite to a more robust
 
 ### 1. Update Configuration
 
-{% code title="/config/production/settings.cfm" %}
-```javascript
+```javascript title="/config/production/settings.cfm"
 <cfscript>
 set(dataSourceName = "myapp_production");
 set(dataSourceUserName = "dbuser");
 set(dataSourcePassword = "dbpassword");
 </cfscript>
 ```
-{% endcode %}
 
 ### 2. Export Data
 

@@ -15,14 +15,12 @@ As you'll soon realize, the [linkTo()](https://wheels.dev/api/v2.5.0/controller.
 
 When installing CFWheels, if you open the file at `config/routes.cfm`, you'll see something like this:
 
-{% code title="config/routes.cfm" %}
-```javascript
+```javascript title="config/routes.cfm"
 mapper()
     .wildcard()
     .root(to="wheels##wheels", method="get")
 .end();
 ```
-{% endcode %}
 
 The call to [wildcard()](https://wheels.dev/api/v2.5.0/v2.2/mapper.wildcard.html) allows a simple linking structure where we can use the [linkTo()](https://wheels.dev/api/v2.5.0/controller.linkto.html) helper to link to a combination of controller and action.
 
@@ -46,8 +44,7 @@ When you're using [linkTo()](https://wheels.dev/api/v2.5.0/controller.linkto.htm
 
 Let's work with a set of sample routes to practice creating links:
 
-{% code title="config/routes.cfm" %}
-```javascript
+```javascript title="config/routes.cfm"
 mapper()
     .get(name="newWidget", pattern="widgets/new", to="widgets##new")
     .get(name="widget", pattern="widgets/[key]", to="widgets##show")
@@ -55,7 +52,6 @@ mapper()
     .root(to="wheels##wheels")
 .end();
 ```
-{% endcode %}
 
 With this in place, we can load the webroot of our application and click the "View Routes" link in the debugging footer to get a list of our routes. You'll see information presented similarly to this:
 
@@ -95,8 +91,7 @@ That will produce this markup:
 
 If you have a route with multiple parameters, you must pass all of the placeholders as arguments:
 
-{% code title="Example" %}
-```html
+```html title="Example"
 <!--- config/routes.cfm --->
 <cfscript>
 mapper()
@@ -122,7 +117,6 @@ mapper()
 <!--- HTML generated --->
 <a href="/widgets/5/variations/20.pdf">A fine variation (PDF)</a>
 ```
-{% endcode %}
 
 ### Linking to Resources
 
@@ -132,13 +126,11 @@ Once you setup a resource in `config/routes.cfm`, the key is to inspect the rout
 
 Consider this sample `posts` resource:
 
-{% code title="config/routes.cfm" %}
-```javascript
+```javascript title="config/routes.cfm"
 mapper()
     .resources("posts")
 .end();
 ```
-{% endcode %}
 
 We would see these linkable routes generated related to the posts. (See the chapter on [Form Helpers and Showing Errors](/2.5.0/guides/displaying-views-to-users/form-helpers-and-showing-errors) for information about posting forms to the rest of the routes.)
 
@@ -151,8 +143,7 @@ We would see these linkable routes generated related to the posts. (See the chap
 
 If we wanted to link to the various pages within that resource, we may write something like this on the index:
 
-{% code title="views/posts/index.cfm" %}
-```html
+```html title="views/posts/index.cfm"
 <nav class="global-nav">
     #linkTo(text="All Posts", route="posts")#
 </nav>
@@ -171,7 +162,6 @@ If we wanted to link to the various pages within that resource, we may write som
     </cfloop>
 </ul>
 ```
-{% endcode %}
 
 The above code would generate markup like this:
 

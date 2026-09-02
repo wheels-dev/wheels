@@ -54,11 +54,9 @@ You change the current environment by modifying the `config/environment.cfm` fil
 
 Issuing a reload request is the easiest way to go from one environment to another. It's done by passing in reload as a parameter in the URL, like this:
 
-{% code title="HTTP" %}
-```
+```txt title="HTTP"
 http://www.mysite.com/?reload=true
 ```
-{% endcode %}
 
 This tells CFWheels to reload the entire framework (it will also run your code in the `events/onapplicationstart.cfm`file), thus picking up any changes made in the `config/environment.cfm` file.
 
@@ -66,11 +64,9 @@ This tells CFWheels to reload the entire framework (it will also run your code i
 
 There's also a shortcut for lazy developers who don't want to change this file at all. To use it, just issue the reload request like this instead:
 
-{% code title="HTTP" %}
-```
+```txt title="HTTP"
 http://www.mysite.com/?reload=testing
 ```
-{% endcode %}
 
 This will make CFWheels skip your `config/environment.cfm` file and just use the URL value instead (`testing`, in this case).
 
@@ -78,11 +74,9 @@ This will make CFWheels skip your `config/environment.cfm` file and just use the
 
 For added protection, you can set the `reloadPassword` variable in `config/settings.cfm`. When set, a reload request will only be honored when the correct password is also supplied, like this:
 
-{% code title="HTTP" %}
-```
+```txt title="HTTP"
 http://www.mysite.com/?reload=testing&password=mypass
 ```
-{% endcode %}
 
 {% hint style="warning" %}
 #### Don't forget your reload password in production

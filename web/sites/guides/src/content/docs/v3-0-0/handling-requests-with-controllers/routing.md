@@ -11,11 +11,9 @@ The Wheels routing system inspects a request's HTTP verb and URL and decides whi
 
 Consider the following request:
 
-{% code title="HTTP" %}
-```http
+```http title="HTTP"
 GET /products/5
 ```
-{% endcode %}
 
 The routing system may match the request to a route like this, which tells Wheels to load the `show` action on the `Products` controller:
 
@@ -59,13 +57,11 @@ A _pattern_ is a URL path, sometimes with _parameters_ in `[squareBrackets]`. Pa
 
 You'll see patterns like these in routes:
 
-{% code title="Example Route Patterns" %}
-```
+```txt title="Example Route Patterns"
 posts/[key]/[slug]
 posts/[key]
 posts
 ```
-{% endcode %}
 
 In this example, `key` and `slug` are parameters that must be present in the URL for the first route to match, and they are required when linking to the route. In the controller, these parameters will be available at `params.key` and `params.slug`, respectively.&#x20;
 
@@ -97,13 +93,11 @@ You'll want to pay close attention to how resource-based routing works because t
 
 If we have a `products` table and want to have a section of our application for managing the products, we can set up the routes using the [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) method like this in `/config/routes.cfm`:
 
-{% code title="/config/routes.cfm" %}
-```javascript
+```javascript title="/config/routes.cfm"
 mapper()
     .resources("products")
 .end();
 ```
-{% endcode %}
 
 This will set up the following routes, pointing to specific actions within the `products` controller:
 
@@ -177,8 +171,7 @@ We strongly recommend that you not allow any `GET` requests to modify resources 
 
 Consider a few examples:
 
-{% code title="/config/routes.cfm" %}
-```javascript
+```javascript title="/config/routes.cfm"
 mapper()
     .patch(name="heartbeat", to="sessions##update")
 
@@ -194,7 +187,6 @@ mapper()
     .get(name="dashboard", controller="dashboards", action="show")
 .end();
 ```
-{% endcode %}
 
 Rather than creating a whole resource for simple one-off actions or pages, you can create individual endpoints for them.
 
@@ -202,8 +194,7 @@ Notice that you can use the `to="controller##action"` or use separate `controlle
 
 In fact, you could mock a `users` resource using these methods like so (though obviously there is little practical reason for doing so):
 
-{% code title="/config/routes.cfm" %}
-```javascript
+```javascript title="/config/routes.cfm"
 mapper()
     // The following is roughly equivalent to .resources("users")
     .get(name="newUser", pattern="users/new", to="users##new")
@@ -216,12 +207,10 @@ mapper()
     .get(name="users", to="users##index")
 .end();
 ```
-{% endcode %}
 
 If you need to limit the actions that are exposed by [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) and [resource()](https://wheels.dev/api/v3.0.0/mapper.resource.html), you can also pass in `only` or `except`arguments:
 
-{% code title="/config/routes.cfm" %}
-```javascript
+```javascript title="/config/routes.cfm"
 mapper()
     // Only offer endpoints for cart show, update, and delete:
     // -  GET /cart
@@ -239,7 +228,6 @@ mapper()
     .resources(name="wishlists", except="delete")
 .end();
 ```
-{% endcode %}
 
 ### Browser Support for PUT, PATCH, and DELETE
 
@@ -295,11 +283,9 @@ Let's consider an example where we want to enable CRUD for a `customer` and its 
 
 In this situation, we'd perhaps want for our URL to look like this for editing a specific customer's appointment:
 
-{% code title="HTTP" %}
-```
+```txt title="HTTP"
 GET /customers/489/appointments/1909/edit
 ```
-{% endcode %}
 
 To code up this nested resource, we'd write this code in `/config/routes.cfm`:
 
@@ -360,11 +346,9 @@ mapper()
 
 Wheels 1.x had a default routing pattern: `[controller]/[action]/[key]`. The convention for URLs was as follows:
 
-{% code title="HTTP" %}
-```http
+```http title="HTTP"
 GET /news/show/5
 ```
-{% endcode %}
 
 With this convention, the URL above told Wheels to invoke the `show` action in the `news` controller. It also passed a parameter called `key` to the action, with a value of `5`.
 

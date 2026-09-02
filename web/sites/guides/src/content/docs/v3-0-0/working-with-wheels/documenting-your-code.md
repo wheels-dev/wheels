@@ -28,8 +28,7 @@ Each function in the core is now appropriately marked up with javaDoc style comm
 
 Example Core Function
 
-{% code title="Example Core Function" %}
-```java
+```java title="Example Core Function"
 /**
  * Removes all HTML tags from a string.
  *
@@ -44,7 +43,6 @@ public string function stripTags(required string html) {
     return local.rv;
 }
 ```
-{% endcode %}
 
 The `[section]` and `[category]` tags categorise the function as appropriate, and the `@html` part describes the function’s parameter. The additional parameter data, such as whether it’s required, type and any defaults are automatically parsed too. This results in a display like:
 

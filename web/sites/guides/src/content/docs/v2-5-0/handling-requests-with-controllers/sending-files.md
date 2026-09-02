@@ -31,23 +31,19 @@ Also, remember that the [sendFile()](https://wheels.dev/api/v2.5.0/controller.se
 
 Here's the `sendTutorial` action:
 
-{% code title="Example" %}
-```javascript
+```javascript title="Example"
 function sendTutorial() {
     sendFile(file="wheels_tutorial_20081028_J657D6HX.pdf");
 }
 ```
-{% endcode %}
 
 That's one ugly file name though, eh? Let's present it to the user in a nicer way by suggesting a different name to the browser:
 
-{% code title="Example" %}
-```javascript
+```javascript title="Example"
 function sendTutorial() {
     sendFile(file="wheels_tutorial_20081028_J657D6HX.pdf", name="Tutorial.pdf");
 }
 ```
-{% endcode %}
 
 Much better! :)
 
@@ -71,8 +67,7 @@ function for complete details.
 
 You can even send files which are stored in `ram://` - this is particularly useful when you're dynamically creating files (such as PDF reports) which don't need to be written to the file system.
 
-{% code title="Example" %}
-```javascript
+```javascript title="Example"
 // Create the PDF.
 cfwheels = cfdocument(format='pdf') {
  writeOutput(Now());
@@ -84,7 +79,6 @@ fileWrite("ram://cfwheels.pdf", cfwheels);
 // Send it.
 sendFile(file="ram://cfwheels.pdf");
 ```
-{% endcode %}
 
 ### Securing Access to Files
 
@@ -101,13 +95,11 @@ The easiest one is to just lock down access to the folder using your web server.
 
 If that is not an option, the other option is simply to move the files folder out of the web root, thus making it inaccessible. If you move the folder, you'll need to accommodate for this in your code by changing your [sendFile()](https://wheels.dev/api/v2.5.0/controller.sendfile.html) calls to specify the path as well, like this:
 
-{% code title="Example" %}
-```javascript
+```javascript title="Example"
 function sendTutorial() {
     sendFile(file="../../tutorials/wheels_tutorial_20081028_J657D6HX.pdf");
 }
 ```
-{% endcode %}
 
 This assumes you've moved the folder two levels up in your file system and into\
 a folder named "tutorials".
