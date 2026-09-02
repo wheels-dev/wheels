@@ -19,7 +19,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Overview
 
-``` title="Synopsis"
+```txt title="
 wheels generate <type> <name> [attributes...] [flags]
 ```
 
@@ -87,7 +87,7 @@ Generate a model CFC and, when properties are supplied, a matching create-table 
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate model <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>] [--hasOne=<list>]
 ```
 
@@ -109,7 +109,7 @@ Generate a controller CFC and view files for each read-only action.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate controller <Name> [action ...]
 ```
 
@@ -131,7 +131,7 @@ Generate a single view template.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate view <controller> <action>
 ```
 
@@ -153,7 +153,7 @@ Generate a blank migration file.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate migration <Name>
 ```
 
@@ -175,7 +175,7 @@ Generate a complete CRUD resource.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate scaffold <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>]
 ```
 
@@ -210,7 +210,7 @@ Generate a JSON-only resource — model, controller, migration, tests, and a nam
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate api-resource <Name> [property:type ...] [--belongsTo=<list>] [--hasMany=<list>]
 ```
 
@@ -232,7 +232,7 @@ Add a single resource route to `config/routes.cfm`.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate route <name>
 ```
 
@@ -256,7 +256,7 @@ Generate a BDD test spec file.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate test <type> <Name>
 ```
 
@@ -280,7 +280,7 @@ Generate an add-column migration for an existing model.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate property <ModelName> <property:type>
 ```
 
@@ -304,7 +304,7 @@ Generate a helper CFC under `app/helpers/`.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate helper <name> [functionName ...] [--force]
 ```
 
@@ -326,7 +326,7 @@ Stamp out a named code pattern.
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate snippets [pattern] [--force]
 wheels generate snippets templates [--force]
 ```
@@ -392,7 +392,7 @@ Generate a complete authentication scaffold on the built-in `wheels.auth` primit
 
 #### Synopsis
 
-``` title="Synopsis"
+```txt title="
 wheels generate auth [ModelName] [--model=User] [--strategy=session|token|jwt] [--registration|--no-registration] [--force]
 ```
 
