@@ -1,4 +1,5 @@
 import { defineConfig } from 'astro/config';
+import remarkGfm from 'remark-gfm';
 import starlight from '@astrojs/starlight';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -66,6 +67,12 @@ function buildSidebarForVersion(version) {
 
 export default defineConfig({
 	site: 'https://guides.wheels.dev',
+	// Astro 7 stopped applying GFM to MDX content pages by default, so tables
+	// in .mdx guides rendered as raw pipe text. Re-enable remark-gfm so it
+	// applies to both .md and .mdx (Starlight merges this with its defaults).
+	markdown: {
+		remarkPlugins: [remarkGfm],
+	},
 	redirects: {
 		// v4.0.0 GA (2026-05-12) renamed the URL slug `v4-0-0-snapshot` to `v4-0-0`.
 		// Astro's static `redirects` map doesn't support [...spread] sources
