@@ -11,8 +11,7 @@ Similar to Apache, IIS 7 will pick up the rewrite rules from a file located in t
 
 This requires that the [URL Rewrite Module](http://www.iis.net/downloads/microsoft/url-rewrite) is installed. It's an IIS extension from Microsoft that you can download for free.
 
-{% code title="web.config" %}
-```
+```xml title="web.config"
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <system.webServer>
@@ -30,7 +29,6 @@ This requires that the [URL Rewrite Module](http://www.iis.net/downloads/microso
     </system.webServer>
 </configuration>
 ```
-{% endcode %}
 
 {% hint style="info" %}
 #### Missing Lucee Assets?

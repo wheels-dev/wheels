@@ -25,13 +25,11 @@ Use the [get()](https://wheels.dev/api/v3.0.0/controller.get.html) function to a
 
 
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 if (get("environment") == "production") {
     // Do something for production environment
 }
 ```
-{% endcode %}
 
 ### Setting CFML Application Configurations
 
@@ -39,8 +37,7 @@ In CFML's standard `Application.cfc`, you can normally set values for your appli
 
 Here is an example of what can go in `config/app.cfm`:
 
-{% code title="config/app.cfm" %}
-```javascript
+```javascript title="config/app.cfm"
 this.name = "TheNextSiteToBeatTwitter";
 this.sessionManagement = false;
 
@@ -49,7 +46,6 @@ this.customTagPaths = ListAppend(
   ExpandPath("../customtags")
 );
 ```
-{% endcode %}
 
 ### Using Environment Variables in config/app.cfm
 
@@ -59,8 +55,7 @@ this.customTagPaths = ListAppend(
 
 Use `this.env` to access values from your `.env` file:
 
-{% code title="config/app.cfm" %}
-```javascript
+```javascript title="config/app.cfm"
 // Access environment variables using this.env
 this.name = this.env["APP_NAME"] ?: "MyWheelsApp";
 
@@ -80,12 +75,10 @@ this.datasources["primary"] = {
     password: this.env["DB_PASSWORD"]
 };
 ```
-{% endcode %}
 
 #### Example .env File
 
-{% code title=".env" %}
-```bash
+```bash title=".env"
 # Application Settings
 APP_NAME=MyWheelsApp
 WHEELS_ENV=development
@@ -99,7 +92,6 @@ DB_PASSWORD=secret123
 DB_CLASS=com.mysql.cj.jdbc.Driver
 DB_CONNECTION_STRING=jdbc:mysql://localhost:3306/myapp_dev?useSSL=false
 ```
-{% endcode %}
 
 #### Environment-Specific Configuration
 
@@ -119,8 +111,7 @@ Wheels will automatically load the appropriate file `(.env.[environment])` based
 3. **Use the null coalescing operator** - Provide defaults: `this.env["KEY"] ?: "default"`
 4. **Document required variables** - List all required environment variables in your README
 
-{% code title=".env.example" %}
-```bash
+```bash title=".env.example"
 # Copy this file to .env and fill in your values
 # Never commit .env to version control!
 
@@ -131,7 +122,6 @@ DB_NAME=your_database
 DB_USER=your_username
 DB_PASSWORD=your_password
 ```
-{% endcode %}
 
 ### Types of Configurations Available
 
@@ -160,11 +150,9 @@ Not only are the environments useful for separating your production settings fro
 
 The setting for the current environment can be found in `config/environment.cfm` and should look something like this:
 
-{% code title="config/environment.cfm" %}
-```javascript
+```javascript title="config/environment.cfm"
 set(environment="development");
 ```
-{% endcode %}
 
 **Full Listing of Environment Settings**
 
@@ -180,11 +168,9 @@ set(environment="development");
 
 Sometimes it is useful for our applications to "force" URL rewriting. By default, Wheels will try to determine what type of URL rewriting to perform and set it up for you. But you can force in or out this setting by using the example below:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(urlRewriting="Off");
 ```
-{% endcode %}
 
 The code above will tell Wheels to skip its automatic detection of the URL Rewriting capabilities and just set it as `"Off"`.
 
@@ -200,13 +186,11 @@ The data source configuration is what tells Wheels which database to use for all
 
 #### Basic Data Source Configuration
 
-{% code title="config/settings.cfm" %}
-```javascript
+```javascript title="config/settings.cfm"
 set(dataSourceName="yourDataSourceName");
 set(dataSourceUserName="yourDataSourceUsername");
 set(dataSourcePassword="yourDataSourcePassword");
 ```
-{% endcode %}
 
 #### Using Environment Variables for Data Sources
 
@@ -214,8 +198,7 @@ set(dataSourcePassword="yourDataSourcePassword");
 
 **In `config/app.cfm`** (recommended for datasource configuration):
 
-{% code title="config/app.cfm" %}
-```javascript
+```javascript title="config/app.cfm"
 // Use this.env to access .env file variables
 this.datasources["myapp"] = {
     class: this.env["DB_CLASS"],
@@ -224,7 +207,6 @@ this.datasources["myapp"] = {
     password: this.env["DB_PASSWORD"]
 };
 ```
-{% endcode %}
 
 See [Using Environment Variables in config/app.cfm](#using-environment-variables-in-configappcfm) for more details on working with environment variables.
 
@@ -234,11 +216,9 @@ OK, here it's where the fun begins! Wheels includes a lot of functions to make y
 
 Let's look at a little of example:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(functionName="findAll", perPage=20);
 ```
-{% endcode %}
 
 That little line of code will make all calls to the [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) method in Wheels return a maximum number of 20 record per page (if pagination is enabled for that [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) call). How great is that? You don't need to set the `perPage` value for every single call to [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) if you have a different requirement than the Wheels default of 10 records.
 
@@ -248,12 +228,10 @@ You'll generally want to configure how Wheels handles errors and debugging infor
 
 For example, let's say that we want to enable debugging information in our "development" environment temporarily:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 // config/development/settings.cfm
 set(showDebugInformation=false);
 ```
-{% endcode %}
 
 **Full Listing of Debugging and Error Settings**
 
@@ -275,11 +253,9 @@ Wheels does a pretty good job at caching the framework and its output to speed u
 
 Let's say your application generates dynamic routes and you need it to check the routes on each request. This task will be as simple as this line of code:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(cacheRoutes=false);
 ```
-{% endcode %}
 
 **Full Listing of Caching Settings**
 
@@ -309,11 +285,9 @@ The Wheels ORM provides many sensible conventions and defaults, but sometimes yo
 
 For example, if we wanted to prefix all of the database table names in our application with `blog_` but didn't want to include that at the beginning of model names, we would do this:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(tableNamePrefix="blog_");
 ```
-{% endcode %}
 
 Now your `post` model will map to the `blog_posts` table, `comment` model will map to the `blog_comments` table, etc.
 
@@ -338,11 +312,9 @@ There are several settings that make plugin development more convenient. We reco
 
 If you want to keep what's stored in a plugin's zip file from overwriting changes that you made in its expanded folder, set this in `config/development/settings.cfm`:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(overwritePlugins=false);
 ```
-{% endcode %}
 
 See the chapter on [Installing and Using Plugins](https://wheels.dev/3.0.0/guides/plugins/installing-and-using-plugins) for more information.
 

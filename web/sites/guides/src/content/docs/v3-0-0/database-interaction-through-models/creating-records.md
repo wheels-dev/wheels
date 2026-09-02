@@ -38,11 +38,9 @@ newAuthor = model("author").new(params.newAuthor);
 
 If you want to save a new author to the database right away, you can use the [create()](https://wheels.dev/api/v3.0.0/model.create.html) method instead.
 
-{% code title="" %}
-```javascript
+```javascript title=""
 model("author").create(params.newAuthor);
 ```
-{% endcode %}
 
 ### The Primary Key
 

@@ -9,19 +9,15 @@ URL rewriting is a completely optional feature of Wheels, and all it does is get
 
 For example, with no URL rewriting, a URL in your application could look like this:
 
-{% code title="HTTP" %}
-```
+```txt title="HTTP"
 http://localhost:8080/index.cfm/blog/new
 ```
-{% endcode %}
 
 After turning on URL rewriting, it would look like this:
 
-{% code title="HTTP" %}
-```
+```txt title="HTTP"
 http://localhost:8080/blog/new
 ```
-{% endcode %}
 
 Combine this with the routing functionality of Wheels, and you get the capability of creating some really human-friendly (easier to remember, say over the phone, etc.) and search engine friendly (easier to crawl, higher PageRank, etc.) URLs.
 

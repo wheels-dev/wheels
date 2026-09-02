@@ -37,8 +37,7 @@ Next, open up the `Create_User_Table.cfc` template we just created. There are tw
 
 The important concept to grasp is that **anything which up() does, down() must undo**.
 
-{% code title="up()" %}
-```javascript
+```javascript title="up()"
 function up() {
  hasError = false;
  transaction {
@@ -59,27 +58,22 @@ function up() {
     }
 }
 ```
-{% endcode %}
 
 Our default `up()` function will look something like this. Most of it you can actually ignore, as it's just wrapped in a transaction with some error handling. The important lines to look at are:
 
-{% code title="up()" %}
-```javascript
+```javascript title="up()"
 t = createTable(name='tableName');
 t.timestamps();
 t.create();
 ```
-{% endcode %}
 
 `createTable()` is the command to actually make the table: so we need to change this to `users`.
 
-{% code title="up()" %}
-```javascript
+```javascript title="up()"
 t = createTable(name='users');
 t.timestamps();
 t.create();
 ```
-{% endcode %}
 
 `t.timestamps();` creates CFWheels [automatic timestamp](/2.5.0/guides/database-interaction-through-models/automatic-time-stamps) columns of `createdAt`,`updatedAt` and `deletedAt`.
 
@@ -93,8 +87,7 @@ Remember, the `down()` function needs to reverse these changes. so in our `down(
 
 Whilst we could execute this template in it's current state (we have an up function which creates, and a down function which drops) we wouldn't get much in the actual table. We can use the same migration file to add additional lines to create some columns to store things like `firstname`. Here's an example of a slightly more fleshed out migration file to give you some inspiration:
 
-{% code title="up()" %}
-```javascript
+```javascript title="up()"
 t = createTable(name='users');
 t.string(
  columnNames='firstname,lastname,password',
@@ -119,7 +112,6 @@ t.datetime(columnNames='pwlastresetat', default='', null=true);
 t.timestamps();
 t.create();
 ```
-{% endcode %}
 
 As you can see, you can create multiple columns in a single call, set default values, whether to allow null values, and so on.
 

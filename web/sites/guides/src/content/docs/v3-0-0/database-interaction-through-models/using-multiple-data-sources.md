@@ -33,8 +33,7 @@ One thing to keep in mind when using multiple data sources with Wheels is that i
 
 Let's say you have the following models set up:
 
-{% code title="/app/models/Photo.cfc" %}
-```javascript
+```javascript title="/app/models/Photo.cfc"
 component extends="Model" {
 
   function config(){
@@ -44,10 +43,8 @@ component extends="Model" {
 
 }
 ```
-{% endcode %}
 
-{% code title="/app/models/PhotoGallery.cfc" %}
-```javascript
+```javascript title="/app/models/PhotoGallery.cfc"
 component extends="Model" {
 
   function config(){
@@ -56,12 +53,9 @@ component extends="Model" {
 
 }
 ```
-{% endcode %}
 
 Because the `photo` model is the main model being used in the following example, its data source (`myFirstDatabase`) will be the one used in the query that [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) ends up executing.
 
-{% code title="FindAll Call" %}
-```javascript
+```javascript title="FindAll Call"
 myPhotos = model("photo").findAll(include="photoGalleries");
 ```
-{% endcode %}

@@ -11,21 +11,17 @@ The Wheels convention of using an auto-incrementing integer value as the primary
 
 When URL obfuscation is turned off (which is the default setting in Wheels), this is how a lot of your URLs will end up looking:
 
-{% code title="HTTP" %}
-```
+```txt title="HTTP"
 http://localhost:8080/user/profile/99
 ```
-{% endcode %}
 
 Here, `99` is the primary key value of a record in your users table.
 
 After enabling URL obfuscation, this is how those URLs will look instead:
 
-{% code title="HTTP" %}
-```
+```txt title="HTTP"
 http://localhost:8080/user/profile/b7ab9a50
 ```
-{% endcode %}
 
 The value `99` has now been obfuscated by Wheels to `b7ab9a50`. This makes it harder for nosy users to substitute the value to see how many records are in your users table, to name just one example.
 

@@ -21,29 +21,24 @@ In this example, we'll wire up some simple JavaScript code that calls a Wheels a
 First, let's make sure we've got an appropriate route setup. It might be you're still using the default `wildcard()` route which will create some default `GET` routes for the `controller/action` pattern, but we'll add a new route here just for practice. We are going to create a route named `sayHello` and direct it to the `hello` action of the `say` controller. There are two ways you could write this code a long hand method specifying the controller and action separately as well as a short hand method that combines the two into a single parameter.
 
 The longhand way would look like:
-{% code title="/config/routes.cfm" %}
-```javascript
+```javascript title="/config/routes.cfm"
 mapper()
   .get(name="sayHello", controller="say", action="hello")
 .end()
 ```
-{% endcode %}
 
 The shorthand method would look like:
-{% code title="/config/routes.cfm" %}
-```javascript
+```javascript title="/config/routes.cfm"
 mapper()
   .get(name="sayHello", to="say##hello")
 .end()
 ```
-{% endcode %}
 
 You can decide which method you prefer. Both sets of code above are equivalent.
 
 Then, let's create a link to a controller's action in a view file, like so:
 
-{% code title="/app/views/say/hello.cfm" %}
-```html
+```html title="/app/views/say/hello.cfm"
 <cfoutput>
 
 <!--- View code --->
@@ -54,14 +49,12 @@ Then, let's create a link to a controller's action in a view file, like so:
 
 </cfoutput>
 ```
-{% endcode %}
 
 That piece of code by itself will work just like you expect it to. When you click the link, you will load the `hello` action inside the `say` controller.
 
 But let's make it into an asynchronous request. Add this JavaScript (either on the page inside `script` tags or in a separate `.js` file included via [javaScriptIncludeTag()](https://wheels.dev/api/v3.0.0/controller.javaScriptIncludeTag.html) ):
 
-{% code title="JavaScript" %}
-```javascript
+```javascript title="JavaScript"
 (function($) {
     // Listen to the "click" event of the "alert-button" link and make an AJAX request
     $("#alert-button").on("click", function(event) {
@@ -80,7 +73,6 @@ But let's make it into an asynchronous request. Add this JavaScript (either on t
     });
 })(jQuery);
 ```
-{% endcode %}
 
 With that code, we are listening to the `click` event of the hyperlink, which will make an asynchronous request to the `hello` action in the `say` controller. Additionally, the JavaScript call is passing a URL parameter called `format` set to `json`.
 
@@ -88,8 +80,7 @@ Note that the `success` block inserts keys from the response into the empty `h1`
 
 The last thing that we need to do is implement the `say/hello` action. Note that the request expects a `dataType` of `JSON`. By default, Wheels controllers only generate HTML responses, but there is an easy way to generate JSON instead using Wheels's [provides()](https://wheels.dev/api/v3.0.0/controller.provides.html) and [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderWith.html) functions:
 
-{% code title="/app/controllers/Say.cfc" %}
-```javascript
+```javascript title="/app/controllers/Say.cfc"
 component extends="Controller" {
     function config() {
         provides("html,json");
@@ -106,7 +97,6 @@ component extends="Controller" {
     }
 }
 ```
-{% endcode %}
 
 In this controller's `config()` method, we use the [provides()](https://wheels.dev/api/v3.0.0/controller.provides.html) function to indicate that we want all actions in the controller to be able to respond with the data in HTML or JSON formats. Note that the client calling the action can request the type by passing a URL parameter named format or by sending the `format` in the request header.
 
