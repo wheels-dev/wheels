@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { GUIDES_VERSIONS } from '@wheels-dev/ui/data/versions';
+import cfmlGrammar from './languages/cfml.tmLanguage.json';
+import cfscriptGrammar from './languages/cfscript.tmLanguage.json';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -146,6 +148,41 @@ export default defineConfig({
 				// every token color and the theme's own background. Starlight picks
 				// the first for `data-theme="dark"` and the second for light mode.
 				themes: ['github-dark-high-contrast', 'github-light'],
+				// Shiki ships no CFML grammar, so ```cfm blocks rendered as plain
+				// text. Load the TextMate grammars (atom-language-cfml, converted
+				// to JSON) vendored under ./languages/.
+				//
+				// `langs` is a Shiki *plugin* option, so it must be nested under
+				// `shiki` — a top-level `langs` key is ignored (the ExpressiveCode
+				// config type is `shiki?: PluginShikiOptions`).
+				//
+				// Shiki v4's LanguageRegistration extends the raw TextMate grammar:
+				// `scopeName`, `patterns`, `repository`, `injections` must sit at
+				// the TOP level, with `name` as the language id. Nesting the raw
+				// grammar under `{ id, grammar }` registers it under `undefined`
+				// keys and crashes the loader. Spread the raw JSON and override
+				// `name`/`aliases` instead.
+				shiki: {
+					langs: [
+						{ ...cfmlGrammar, name: 'cfm', aliases: ['cfml', 'coldfusion'] },
+						{ ...cfscriptGrammar },
+					],
+					// Resolve fence languages the guides actually use to a Shiki
+					// language id (bundled, or one of the vendored grammars above)
+					// so they highlight instead of falling back to plain text with
+					// a "language could not be found" warning.
+					langAlias: {
+						// CFML family → vendored grammars.
+						cfc: 'cfscript', // component extends="…" { … } — pure CFScript
+						boxlang: 'cfm', // BoxLang .bxm/.bx — tag-based CFML
+						markup: 'cfm', // fences hold CFML tags + HTML (cfml grammar is HTML-based)
+						warpscript: 'cfscript', // legacy typo in the beginner tutorial (CFML set() calls)
+						// Standard renames → bundled Shiki ids.
+						env: 'dotenv',
+						'shell-session': 'console',
+						gitignore: 'ini',
+					},
+				},
 			},
 			customCss: [
 				'@wheels-dev/ui/styles/tokens.css',
