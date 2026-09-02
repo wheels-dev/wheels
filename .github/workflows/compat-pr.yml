@@ -8,21 +8,19 @@
 # manual (compat-matrix.yml); SQLite is sufficient to catch engine-specific
 # breakage, which is independent of the database.
 #
-# Path-gated to framework/CLI changes so docs/web/blog PRs don't pay for
-# Docker image builds. Register the two matrix legs (boxlang + sqlite and
-# adobe2023 + sqlite) as required branch-protection checks; the path filter
-# means non-framework PRs simply won't emit the checks (absent != failed).
+# The workflow triggers on EVERY PR (no path filter) and reports a success
+# no-op when the PR doesn't touch framework/CLI code. This is required
+# because the two legs are registered as required branch-protection checks,
+# and a path-gated required check blocks merges whenever the workflow skips
+# (the failure mode documented in rustcfml-ci.yml). Gating the heavy Docker
+# steps on a framework-changed flag keeps the check green for docs/web PRs
+# without paying for image builds.
 
 name: Wheels PR Compat Gate
 
 on:
   pull_request:
     branches: [develop]
-    paths:
-      - 'vendor/wheels/**'
-      - 'cli/lucli/**'
-      # Self-test: run when the gate itself changes.
-      - '.github/workflows/compat-pr.yml'
 
 concurrency:
   group: compat-pr-${{ github.head_ref || github.ref }}
@@ -49,15 +47,30 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect framework changes
+        id: changes
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}" 2>/dev/null || true
+          if git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- \
+              vendor/wheels cli/lucli .github/workflows/compat-pr.yml; then
+            echo "framework_changed=false" >> "$GITHUB_OUTPUT"
+            echo "No framework/CLI changes — skipping the compat suites (no-op success)."
+          else
+            echo "framework_changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download ojdbc10 for Adobe engines
-        if: matrix.cfengine == 'adobe2023'
+        if: steps.changes.outputs.framework_changed == 'true' && matrix.cfengine == 'adobe2023'
         run: |
           mkdir -p ./.engine/adobe2023/WEB-INF/lib
           wget -q https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar \
             -O ./.engine/adobe2023/WEB-INF/lib/ojdbc10.jar
 
       - name: Start CF engine
+        if: steps.changes.outputs.framework_changed == 'true'
         env:
           CFENGINE: ${{ matrix.cfengine }}
         run: |
@@ -76,6 +89,7 @@ jobs:
           docker compose up -d "$CFENGINE"
 
       - name: Wait for CF engine to be ready
+        if: steps.changes.outputs.framework_changed == 'true'
         env:
           CFENGINE: ${{ matrix.cfengine }}
         run: |
@@ -131,7 +145,7 @@ jobs:
           fi
 
       - name: Install CFPM packages
-        if: matrix.cfengine == 'adobe2023'
+        if: steps.changes.outputs.framework_changed == 'true' && matrix.cfengine == 'adobe2023'
         run: |
           MAX_RETRIES=3
           RETRY_COUNT=0
@@ -154,6 +168,7 @@ jobs:
           exit 1
 
       - name: Run test suite for sqlite
+        if: steps.changes.outputs.framework_changed == 'true'
         run: |
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
@@ -161,7 +176,6 @@ jobs:
           DB="sqlite"
           RESULT_FILE="/tmp/${{ matrix.cfengine }}-sqlite-result.txt"
 
-          # Warm-up: trigger Wheels onApplicationStart before the test run.
           echo "Warming up Wheels application before first test run..."
           curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/" || true
           sleep 2
@@ -188,8 +202,6 @@ jobs:
             fi
           done
 
-          # Zero-test guard (#3302): a compile-wiped leg returns HTTP 200 with
-          # totalSpecs=0. Every engine runs the same ~4,700-spec core suite.
           MIN_SPECS=4000
           TOTAL_SPECS="-1"
           FAIL_COUNT="-1"
