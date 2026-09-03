@@ -58,8 +58,16 @@ fi
 # Post each newly-published post's `announcement` frontmatter to the GitHub
 # Discussions board. The script writes the discussion URL back into the post's
 # frontmatter (idempotency marker), and the commit below includes it.
+#
+# Best-effort: a discussion-announcement failure must NOT strand the post
+# publish. The announcement is additive — the post goes live regardless, and
+# the failure is surfaced in the run log (not by failing the run). Typical
+# cause is the wheels-bot GitHub App missing the "Discussions" permission.
 echo "Posting discussion announcements for ${#moved_paths[@]} post(s)..."
-node web/scripts/blog-announce-discussion.mjs "${moved_paths[@]}"
+if ! node web/scripts/blog-announce-discussion.mjs "${moved_paths[@]}"; then
+  echo "WARNING: discussion announcement failed — publishing the post(s) anyway." >&2
+  echo "  (Check that the wheels-bot GitHub App has the Discussions read/write permission.)" >&2
+fi
 
 git config user.name "wheels-bot[bot]"
 git config user.email "wheels-bot[bot]@users.noreply.github.com"
