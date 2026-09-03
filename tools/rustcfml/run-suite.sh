@@ -23,7 +23,10 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$DIR/../.." && pwd)"
-VERSION="$(tr -d '[:space:]' < "$DIR/ENGINE_VERSION")"
+# RUSTCFML_VERSION overrides the pinned ENGINE_VERSION so the version-check
+# workflow can run the suite against a candidate release before committing a
+# bump (tools/rustcfml/check-version.sh).
+VERSION="${RUSTCFML_VERSION:-$(tr -d '[:space:]' < "$DIR/ENGINE_VERSION")}"
 BASELINE="$DIR/baseline.json"
 PORT="${RUSTCFML_PORT:-8513}"
 MODE="compare"

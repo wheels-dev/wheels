@@ -1,0 +1,52 @@
+name: RustCFML — version check
+
+# Daily: check github.com/RustCFML/RustCFML for a newer release than the pinned
+# tools/rustcfml/ENGINE_VERSION. When one exists, run the full core suite
+# against it (compare mode vs the pinned baseline). If GREEN, bump the pin and
+# regenerate baseline.json via a PR; if the suite has new failures, the run
+# stays red and the pin is left unchanged for a human to investigate.
+
+on:
+  schedule:
+    - cron: '30 8 * * *'   # daily, 08:30 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    name: Check for newer RustCFML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 1
+
+      - name: Check for a newer release and run the suite
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/rustcfml/check-version.sh
+
+      - name: Open bump PR
+        if: env.RUSTCFML_LATEST != ''
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: "auto-bump/rustcfml-${{ env.RUSTCFML_LATEST }}"
+          title: "chore(rustcfml): bump engine pin to ${{ env.RUSTCFML_LATEST }}"
+          body: |
+            Automated RustCFML engine bump (daily version check).
+
+            **Pinned** `${{ env.RUSTCFML_PINNED }}` → **`${{ env.RUSTCFML_LATEST }}`**.
+
+            The full core suite ran **green** against the new engine, so this PR
+            bumps `tools/rustcfml/ENGINE_VERSION` and regenerates
+            `tools/rustcfml/baseline.json` to the new engine's result set.
+
+            If the suite had shown new failures, the pin would have been left
+            unchanged and this PR would not exist.
+          commit-message: "chore(rustcfml): bump engine pin to ${{ env.RUSTCFML_LATEST }}"
+          delete-branch: true
