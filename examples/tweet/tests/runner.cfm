@@ -1,6 +1,6 @@
 <cfsetting requestTimeOut="1800">
 <cfscript>
-    // Parameter defaults - handle all TestBox CLI parameters
+    // Parameter defaults - handle all test CLI parameters
     param name="url.directory" default="tests.specs";
     param name="url.bundles" default="";
     param name="url.recurse" default="true" type="boolean";
@@ -21,7 +21,7 @@
     param name="url.coverageBlacklist" default="*Test.cfc,*Spec.cfc";
     param name="url.coverageBrowserOutputDir" default="/tests/results/coverage";
     
-    // Build TestBox options
+    // Build test options
     testBoxOptions = {};
     
     // Determine if using bundles or directory
@@ -94,7 +94,7 @@
         testBoxOptions.bail = true;
     }
     
-    // Initialize TestBox with options
+    // Initialize the test runner with options
     if (len(url.bundles)) {
         testBox = new wheels.wheelstest.system.TestBox(bundles=url.bundles);
     } else {
@@ -104,7 +104,7 @@
         );
     }
 
-    setTestboxEnvironment()
+    setTestEnvironment()
 
     if (!structKeyExists(url, "format") || url.format eq "html") {
         // Determine reporter for HTML format
@@ -257,11 +257,11 @@
         include "/wheels/tests_testbox/html.cfm";
     }
 
-    private function setTestboxEnvironment() {
+    private function setTestEnvironment() {
         // creating backup for original environment
         application.$$$wheels = Duplicate(application.wheels)
 
-        // load testbox routes
+        // load test routes
         application.wo.$include(template = "/tests/routes.cfm")
         application.wo.$setNamedRoutePositions()
 

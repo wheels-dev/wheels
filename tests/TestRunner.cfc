@@ -1,6 +1,6 @@
 component {
     // Setup the test environment
-    function setTestboxEnvironment() {
+    function setTestEnvironment() {
         // creating backup for original environment
         if (structKeyExists(server, "boxlang")) {
             application.$$$wheels = {}
@@ -13,7 +13,7 @@ component {
             application.$$$wheels = Duplicate(application.wheels)
         }
 
-        // load testbox routes
+        // load test routes
         application.wo.$include(template = "/tests/routes.cfm")
         application.wo.$setNamedRoutePositions()
 

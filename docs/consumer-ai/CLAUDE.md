@@ -493,7 +493,7 @@ component extends="wheels.WheelsTest" {
 ### Running tests locally
 
 ```bash
-wheels test                      # run the app's tests/specs/ (TestBox)
+wheels test                      # run the app's tests/specs/ (WheelsTest)
 wheels test tests/specs/models   # a subdirectory of specs
 ```
 

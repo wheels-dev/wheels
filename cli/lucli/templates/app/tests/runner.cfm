@@ -2,7 +2,7 @@
 	tests/runner.cfm — entry point for /wheels/app/tests in the browser
 	and `wheels test run` from the CLI. By default this defers to the
 	framework's built-in app-test runner, which scans `tests/specs/` via
-	TestBox and emits a structured result the CLI knows how to parse.
+	WheelsTest and emits a structured result the CLI knows how to parse.
 
 	Customise this file when you need pre-test setup the framework
 	runner doesn't cover — e.g. registering a custom reporter,

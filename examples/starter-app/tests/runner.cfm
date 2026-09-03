@@ -2,7 +2,7 @@
 <cfscript>
     testBox = new wheels.wheelstest.system.TestBox(directory="tests.specs")
 
-    setTestboxEnvironment()
+    setTestEnvironment()
 
     if (!structKeyExists(url, "format") || url.format eq "html") {
         result = testBox.run(
@@ -117,11 +117,11 @@
         include "/wheels/tests_testbox/html.cfm";
     }
 
-    private function setTestboxEnvironment() {
+    private function setTestEnvironment() {
         // creating backup for original environment
         application.$$$wheels = Duplicate(application.wheels)
 
-        // load testbox routes
+        // load test routes
         application.wo.$include(template = "/tests/routes.cfm")
         application.wo.$setNamedRoutePositions()
 
