@@ -1,4 +1,4 @@
 <cfscript>
-    // Write the routes for your Application's Testbox Tests here
+    // Write the routes for your application's tests here
 
 </cfscript>
