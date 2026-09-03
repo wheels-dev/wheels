@@ -193,6 +193,7 @@ component extends="modules.BaseModule" {
 			"console",  // interactive CFML REPL — not usable over stdio
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
+			"engines",  // dev server lifecycle (stateful — RustCFML backend)
 			"browser",  // multi-step browser testing flow
 			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
 			"coverage", // instruments app/ on disk then runs the suite — stateful, not single-call MCP semantics
@@ -1350,6 +1351,63 @@ component extends="modules.BaseModule" {
 		}
 
 		executeCommand("server", ["stop"], variables.projectRoot);
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  engines — manage the dev-server engine backend
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * `wheels engines rustcfml install|start|stop|status` — the RustCFML
+	 * (JVM-free CFML) engine backend. Deliberately separate from
+	 * `start`/`stop` (Lucee via LuCLI) so the two lifecycles never share a
+	 * registry. Hidden from MCP like the other stateful server commands.
+	 */
+	public string function engines() {
+		var coll = structuredArgs(arguments);
+		var opts = new services.ArgSpec()
+			.positional(name = "engine", default = "", description = "Engine name: rustcfml")
+			.positional(name = "action", default = "", description = "Action: install, start, stop, status")
+			.option(name = "port", default = "8513", description = "Port for `start` (default 8513)")
+			.parse(coll);
+
+		var engine = lCase(trim(opts.engine));
+		var action = lCase(trim(opts.action));
+
+		if (engine != "rustcfml") {
+			out("Unknown engine '#opts.engine#'. Supported: rustcfml", "yellow");
+			out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+			return "";
+		}
+
+		var svc = new services.rustcfml.RustCFMLEngine();
+		switch (action) {
+			case "install":
+				out("Installing RustCFML...", "cyan");
+				out("Installed: " & svc.install(), "green");
+				break;
+			case "start":
+				var st = svc.start(variables.projectRoot, val(opts.port));
+				out("RustCFML server started (pid " & st.pid & ") at http://localhost:" & st.port, "green");
+				out("Log: " & st.log, "cyan");
+				break;
+			case "stop":
+				out(svc.stop(variables.projectRoot)
+					? "RustCFML server stopped."
+					: "No RustCFML server recorded for this project.", "cyan");
+				break;
+			case "status":
+				var status = svc.status(variables.projectRoot);
+				if (status.running) {
+					out("RustCFML running (pid " & status.pid & ") at http://localhost:" & status.port, "green");
+				} else {
+					out("No RustCFML server running for this project.", "yellow");
+				}
+				break;
+			default:
+				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "yellow");
+		}
 		return "";
 	}
 
