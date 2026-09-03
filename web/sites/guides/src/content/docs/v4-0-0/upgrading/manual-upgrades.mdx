@@ -32,6 +32,10 @@ One file: `wheels-core-<version>.zip` from the [GitHub releases page](https://gi
 
 If you deploy from git and `vendor/wheels/` is committed (common for deliberate-workflow teams), do the swap on a branch and let your normal review/deploy pipeline carry it out — the framework upgrades like any other code change.
 
+<Aside type="caution" title="Upgrading to 4.1.0 on Adobe ColdFusion?">
+4.1.0 hardens `public/Application.cfc`'s `onError` and `onSessionEnd` handlers against a torn-down application scope during `applicationStop()` and session reaping ([#3379](https://github.com/wheels-dev/wheels/issues/3379)). The `vendor/wheels/` swap above does **not** update this app-owned file. On Adobe CF 2023/2025, diff your `public/Application.cfc` against the 4.1.0 base template and adopt the guarded handlers — or run `wheels upgrade check`, which flags the drift automatically.
+</Aside>
+
 ## The 3.x → 4.0 upgrade
 
 The mechanics are the same swap, but 4.0 changes framework behavior and some app-side files, so there's required reading and a few extra steps:
