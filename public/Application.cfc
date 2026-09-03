@@ -478,49 +478,69 @@ component output="false" {
 		// already lost — fall back to a minimal HTML response rather than
 		// cascading into "The key [WO] does not exist." (issue ##2773).
 		if (!StructKeyExists(application, "wo")) {
-			setting requestTimeout=30;
-			// Surface a real 5xx so monitoring tools and CDNs don't cache this
-			// failure as a successful response. Use a plain struct for
-			// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
-			// scope on built-in tags (CLAUDE.md cross-engine invariant ##10).
-			try {
-				local.statusArgs = {statusCode: 500, statusText: "Internal Server Error"};
-				cfheader(attributeCollection=local.statusArgs);
-			} catch (any headerErr) {
-				// Header may already have been written; the body still renders.
-			}
-			WriteOutput("<h1>Application Error</h1>");
-			WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
-			try {
-				if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
-					WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
-				}
-			} catch (any fallbackErr) {
-				// Last-ditch render must never throw.
-			}
+			$renderMinimalError(arguments.Exception);
 			return;
 		}
 
-		// In case the error was caused by a timeout we have to add extra time for error handling.
-		// We have to check if onErrorRequestTimeout exists since errors can be triggered before the application.wheels struct has been created.
-		local.requestTimeout = application.wo.$getRequestTimeout() + 30;
-		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "onErrorRequestTimeout")) {
-			local.requestTimeout = application.wheels.onErrorRequestTimeout;
+		try {
+			// In case the error was caused by a timeout we have to add extra time for error handling.
+			// We have to check if onErrorRequestTimeout exists since errors can be triggered before the application.wheels struct has been created.
+			local.requestTimeout = application.wo.$getRequestTimeout() + 30;
+			if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "onErrorRequestTimeout")) {
+				local.requestTimeout = application.wheels.onErrorRequestTimeout;
+			}
+			setting requestTimeout=local.requestTimeout;
+
+			application.wo.$initializeRequestScope();
+			arguments.componentReference = "wheels.events.EventMethods";
+
+			local.lockName = "reloadLock" & this.name;
+			local.rv = application.wo.$simpleLock(
+				name = local.lockName,
+				execute = "$runOnError",
+				executeArgs = arguments,
+				type = "readOnly",
+				timeout = 180
+			);
+			WriteOutput(local.rv);
+		} catch (any e) {
+			// Adobe CF can tear down the application scope mid-onError during
+			// applicationStop() (issue ##3379): application.wo resolves to a
+			// Java String[] and every dereference throws "Element wo is
+			// undefined in a Java object of type class [Ljava.lang.String".
+			// The StructKeyExists guard above can pass and the scope still be
+			// reclaimed before the dereferences below run, so degrade to the
+			// minimal fallback rather than cascade the torn-down-scope error
+			// over the real one.
+			$renderMinimalError(arguments.Exception);
 		}
-		setting requestTimeout=local.requestTimeout;
+	}
 
-		application.wo.$initializeRequestScope();
-		arguments.componentReference = "wheels.events.EventMethods";
-
-		local.lockName = "reloadLock" & this.name;
-		local.rv = application.wo.$simpleLock(
-			name = local.lockName,
-			execute = "$runOnError",
-			executeArgs = arguments,
-			type = "readOnly",
-			timeout = 180
-		);
-		WriteOutput(local.rv);
+	// Shared minimal error response for the two onError failure modes: the
+	// Wheels global never came up (issue ##2773), and the application scope
+	// being torn down mid-onError (issue ##3379). Kept in one place so both
+	// paths render identically.
+	private void function $renderMinimalError( required any Exception ) {
+		setting requestTimeout=30;
+		// Surface a real 5xx so monitoring tools and CDNs don't cache this
+		// failure as a successful response. Use a plain struct for
+		// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
+		// scope on built-in tags (CLAUDE.md cross-engine invariant ##10).
+		try {
+			local.statusArgs = {statusCode: 500, statusText: "Internal Server Error"};
+			cfheader(attributeCollection=local.statusArgs);
+		} catch (any headerErr) {
+			// Header may already have been written; the body still renders.
+		}
+		WriteOutput("<h1>Application Error</h1>");
+		WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
+		try {
+			if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
+				WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
+			}
+		} catch (any fallbackErr) {
+			// Last-ditch render must never throw.
+		}
 	}
 
 	public boolean function onMissingTemplate( string targetPage ) {
