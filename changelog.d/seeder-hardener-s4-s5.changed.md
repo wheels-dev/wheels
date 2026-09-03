@@ -1,2 +1,0 @@
-- `seedOnce()` binds unique-property values in the uniqueness WHERE so an apostrophe (`O'Brien`) no longer creates a duplicate row on the second call
-- `generateSeeds()` wraps the write in a transaction and rolls back on any model failure, so a mixed list cannot leave rows

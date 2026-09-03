@@ -26,6 +26,194 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ---
 
+# [4.1.0](https://github.com/wheels-dev/wheels/releases/tag/v4.1.0) => 2026-09-10
+
+### Added
+
+- `wheels upgrade check` now diffs app-owned template files (`public/Application.cfc`, `public/index.cfm`) against the CLI's bundled app template and reports any drift as an advisory — surfacing framework-side hardening (such as the Adobe teardown guards in `onError`/`onSessionEnd`) that a `vendor/wheels/`-only swap never delivers to existing apps (#3379)
+- Added `enableSession()` — one-line session-auth wiring for `config/services.cfm`.
+- Added `wheels migrate diff` (alias `dbmigrate diff`) — preview or `--write` AutoMigrator schema diffs with rename hints.
+- Added `wheels generate --dry-run` — print would-be generated files without writing anything.
+- Added offline mode (`--offline` / `WHEELS_OFFLINE=1`) — skips the CLI update check and fails fast on registry network calls.
+- Added `boot` deploy config section (Kamal-compatible `limit`/`wait`).
+- Added `wheels doctor` checks for legacy `wheels.Test` specs, legacy `plugins/`, and raw `params.` mass assignment.
+- Fixed the debug bar showing `0.0.0-dev` on installs where `BuildInfo.cfc` ships unstamped (now falls back to the sibling manifest version).
+- Added `Injector.toFactory()` — bind a name to a closure that builds the instance (receives the container, honors singleton/request-scoped flags).
+- Added route `bindBy=` — bind a resource route's `:key` segment to a non-primary-key column via the parameterized dynamic finder (e.g. `bindBy="slug"`).
+- Added `bcryptHash()`, `bcryptVerify()`, and `bcryptNeedsRehash()` global helpers — pure-CFML, OpenBSD/htpasswd/jBCrypt-compatible bcrypt password hashing with no Java objects, CFX, or external libraries. RustCFML, which ships `bcryptHash()`/`bcryptVerify()` as native builtins, uses those for the same API.
+- Added a "Code Complexity" panel to the development debug bar that shows cyclomatic complexity per file in `app/` — computed statically (1 + decision points) and cached for the application lifetime, so it costs one scan per reload. Complements the maintainer-side complexity gate (`tools/code-quality/cfml-complexity.py` + `.github/workflows/code-quality.yml`) and the function-coverage tool (`tools/code-quality/cfml-coverage.py`); test coverage for CRAP scoring is a separate `wheels coverage` run.
+- `set(massAssignmentStrict=true)` fail-closes mass assignment when a model has neither `accessibleProperties()` nor `protectedProperties()`; the default remains open for compatibility
+- `linkTo(sanitizeHref=true)` blanks caller-supplied `javascript:` / `data:` hrefs. Default remains `false` (no public-behavior change)
+- Added a `wheels coverage` command that instruments `app/` with function-level coverage counters, runs the app test suite against the running server, and reports a CRAP ranking (cyclomatic complexity × test coverage) of your most change-risky files. The instrumentation is reverted automatically afterward. Pairs with the debug bar's Complexity panel: complexity is static and always visible; `wheels coverage` adds the test-coverage half of the CRAP score on demand.
+
+### Changed
+
+- Guides for `wheels test` now state the CLI throws `Wheels.TestsFailed` on `directoryRejected`, `bundlesDiscovered=0`, and compile-skipped specs — not only Fail/Error — so a vacuous or rejected scope is not documented as exit 0 (#3083)
+- Legacy CommandBox `wheels test` / `browser:test` refuse with a deprecation `error()` then `return` and no longer invoke TestBox (`testbox run`). Unrouted `vendor/wheels/controllers/Tests.cfc` is removed; `/wheels/core/tests` and `/wheels/app/tests` stay on `Public.cfc` (#3083)
+- `JwtService.decode()` now requires an `exp` claim by default (`requireExpiry=true`). Pass `requireExpiry=false` to accept signed tokens with no expiry. `maxRefreshAge` stays `0` (unbounded refresh) unless a positive window is set
+- Channel `publish()` throws `Wheels.Channel.PublishFailed` when the database INSERT fails instead of returning `persisted:false`
+- `$getChannelEngine()` throws `Wheels.Channel.UnknownAdapter` for a name that is not `memory` or `database`
+- The memory channel engine replays retained events after `lastEventId` on subscribe
+- `channelSSETag(events=)` registers `addEventListener` for each named event so they are not dropped by `onmessage`
+- Empty and whitespace-only channel names throw `Wheels.Channel.InvalidName`
+- `processAction()` returns `false` when a verification aborts or a before filter returns `false` (the halt signal was previously always `true`)
+- `processRequest()` accepts opt-in `csrf="exception"` / `csrf="abort"`; the historic test-helper default remains `ignore` and production `protectsFromForgery()` is unchanged
+- Database adapters no longer coerce the bound string `"null"` after `IS` / `IS NOT` to SQL NULL, drop MySQL TEXT/float `DEFAULT`, leave boolean `yes`/`no` unquoted, advertise fake SQLite advisory locks, default unknown foreign-key actions to `CASCADE`, emit asymmetric empty-string defaults, map unknown column types silently, or fall back to Oracle `MAX(ROWID)` / SQL Server `@@IDENTITY`
+- The unquoted SQL keyword `NULL` and a CFML/Java null still bind as SQL NULL (so an absent uniqueness-scope property does not send the string `[NULL]` to an integer `cfqueryparam`)
+- Injector rebind of an existing name resets singleton and request-scoped flags and drops `request.$wheelsDICache`
+- `asSingleton()` / `asRequestScoped()` throw `Wheels.Injector` when no mapping is in progress. `map(b).asSingleton().to(...)` flags `b`, not the previous key
+- `getMappings()` returns a `Duplicate` copy. Mutating the return value does not change later `getMappings()` or the live mappings table
+- `AuthMiddleware` accepts `genericErrors=true` to emit a generic `Unauthorized` JSON body; the default 401 still includes `authResult.error`
+- `TenantResolver` accepts `failClosed=true` to 403 unmatched tenants; unmatched requests still proceed on the default datasource unless opted in
+- `updateRecord()` / `removeRecord()` accept `all=true` for an intentional full-table write; empty `where` now throws
+- `AutoMigrator.diff()` accepts `allowColumnRemoval=false` and reports leftover columns on `unmappedColumns` instead of scheduling drops
+- `t.references()` accepts `referenceColumn` (default remains `"id"`)
+- Tenant structs may pass `userName` / `password` for per-tenant migrator credentials
+- `validatesUniquenessOf` now defaults `includeSoftDeletes` to `false`, so a soft-deleted value can be reused unless the caller opts in (`includeSoftDeletes=true`)
+- Query builder docs now state that single-argument `where()` / `orWhere()` is a raw-SQL passthrough; the 2- and 3-argument forms remain the parameterized contract
+- `authorize()` / `can()` throw `Wheels.Policy.UnknownAction` when the policy has no method for the action, instead of treating a typo as a deny
+- `$currentUserForPolicy()` no longer swallows a throwing DI `currentUser` into the authenticator user, or a throwing authenticator into guest `""`
+- `seedOnce()` binds unique-property values in the uniqueness WHERE so an apostrophe (`O'Brien`) no longer creates a duplicate row on the second call
+- `generateSeeds()` wraps the write in a transaction and rolls back on any model failure, so a mixed list cannot leave rows
+- LocalDisk `$resolve` throws `Wheels.Storage.InvalidKey` for empty and slash-only keys instead of concatenating onto `root`
+- LocalDisk `url()` and `signedUrl()` RFC3986-encode object keys the same way S3 does (spaces and reserved characters)
+- `S3Disk.delete()` HEADs first and returns false when the object is missing. An existing object still deletes and returns true
+- `S3Disk.put()` sends a signed `x-amz-acl` (`public` maps to `public-read`; default and `private` send `private`)
+- `signedUrl()` / `presignGetUrl()` throw `Wheels.Storage.InvalidExpiresIn` when `expiresIn` is outside `1..604800`
+- `S3Signer.signedHeaders()` accepts an optional `range` argument so the official AWS GET Object header-auth vector can be pinned. The no-range canonical request is unchanged
+- LocalDisk `$resolve` and S3Disk `$request` are public so tests can call and override them. `S3Disk.delete()` still returns true after any 2xx
+- `hasManyRadioButton()` now forwards extra HTML attributes (`class`, `rel`, …) the same way `hasManyCheckBox()` does, matching its documented passthrough
+- `buttonTo(encode="attributes")` now encodes attribute values the same way `select()` does (`encode=false` still leaves them raw)
+
+### Deprecated
+
+- `wheels.Test` (RocketUnit) now emits a one-time deprecation warning; removal is planned for Wheels 5.0.
+
+### Performance
+
+- Model instances are now created with a direct constructor call instead of the DI container's resolve/auto-wire path plus a reflective invoke, and the per-instance class-struct read no longer takes a named lock — roughly 1.5x faster model materialization on top of the previous #3213 work (#3462).
+- Model instances now inherit the full model API from compile-time includes instead of copying ~270 method references into each instance at runtime — roughly 2x faster model object materialization (#3213).
+- Reduced per-instance model/controller materialization overhead by serving the cached component-integration plan from the request scope after its first use in a request, instead of re-reading the synchronized application scope on every instantiation (#3213).
+
+### Fixed
+
+- `wheels test` now exits non-zero when the runner reports `directoryRejected`, `bundlesDiscovered=0`, or unloadable specs (same honesty as `tools/test-local.sh` / `tools/ci/run-tests.sh`); `wheels browser test` exits non-zero on Fail/Error instead of always returning success (#3083)
+- The Packages admin page (`/wheels/packages`) no longer calls `HTMLEditFormat`, which is missing on Adobe ColdFusion 2025 and caused HTTP 500. Registry names, descriptions, versions, errors, and homepage links are encoded with `EncodeForHTML` instead, matching the rest of the `/wheels` admin surface (#3378)
+- Adobe CF can reclaim the application scope mid-`onError` during `applicationStop()`, so the `StructKeyExists(application, "wo")` guard could pass and the following `application.wo.*` dereferences still throw "Element wo is undefined in a Java object of type class [Ljava.lang.String" — masking the original error. Shipped `Application.cfc` copies now wrap the post-guard handling in its own `try`/`catch` and degrade to a shared `$renderMinimalError()` fallback; the two example apps (`starter-app`, `tweet`) were also brought up to the same guarded shape. Existing apps upgrading from 4.0.x must apply the same change to their own `public/Application.cfc` — the `vendor/wheels/` swap alone does not update app-owned files (#3379)
+- Adobe's session reaper (`SessionTracker.SessionCleanUpAgent`) can call `onSessionEnd` after the live application scope is already torn down; shipped `Application.cfc` copies now route `$simpleLock` through `arguments.applicationScope.wo` (guarded with `StructKeyExists`) so a reclaimed scope is a no-op instead of "Element wo is undefined...". Existing apps upgrading from 4.0.x must apply the same change to their own `public/Application.cfc` (#3379)
+- `Public.$init` no longer nests the `/wheels/public/helpers.cfm` include in the same method as `$scanAndPromoteIncludedGlobals()`. That nest threw `EmptyStackException` from Adobe `popSuperScope` on the first request after a CommandBox cold start on Adobe CF 2023; the 4.0.6 helper-promote onto `this` is unchanged (#3379)
+- The built-in app-test runner (`vendor/wheels/tests/app-runner.cfm`) swapped `application.wheels.dataSourceName` to `<name>_test` without a lock, so two overlapping `wheels test` runs could capture the already-swapped value as their "original" and strand the shared application scope on the test datasource (or silently run specs against the live database mid-run). The capture → swap → run → restore window is now serialized under the same exclusive named lock as the core runner (`wheelsTestRunner_<applicationName>`), the original datasource is captured inside the lock, and a re-entrancy marker lets nested requests skip the swap and the shared lock instead of deadlocking (#3427)
+- Fixed Adobe CF 2023/2025 failures from the compatibility matrix: the dev-mode debug bar and CFML error page no longer throw "routine declared twice" when their templates are included more than once per request, `create()`/`save()` no longer bind SQL NULL for string values such as `"Null"`, nested `hasMany` properties no longer stamp stale GetTickCount-style keys as child primary keys, and pagination helpers accept struct `params` again.
+- Fixed the pure-CFML bcrypt helpers throwing (or producing wrong hashes) on Adobe CF 2023: 32-bit words are normalized to the signed range and bytes are extracted arithmetically so values above 2^31-1 never reach Adobe's int-converting bit operations, and the EksBlowfish key schedule no longer relies on arrays being passed by reference (Adobe passes them by value), so hashes now match OpenBSD/jBCrypt vectors on every engine.
+- `$cacheSettingsForAction` first-matches like `processAction` and keeps `appendToKey`
+- `caches()` with no action throws `Wheels.InvalidArgument` instead of silently becoming `*`
+- `cacheActions` / `cachePages` / `cachePartials` / `cacheImages` / `cacheQueries` stay off in development and testing
+- Action cache keys include session/user identity so params-only pages do not leak across sessions
+- `clearCachableActions` drops this controller's action bodies, not metadata only
+- `$clearCache()` clears each category in place and no longer `StructClear`s the parent bucket
+- `caches("Foo")` matches action `foo`
+- `$getFromCache` returns a stored `false` (or other falsey payload) as a hit. A miss is only absent, expired, or culled. `$isCacheMiss()` reads the last lookup, not the value
+- `$addToCache` / `$getFromCache` / `$clearCache` take a named exclusive `wheelsCacheStore` lock
+- Memory channel drain no longer `clear()`s the live buffer, so events published during the drain loop are not dropped
+- `$callAction()` no longer remaps layout or render exceptions to `Wheels.ViewNotFound` just because `action.cfm` is missing; only genuine missing-view includes become typed `Wheels.ViewNotFound`. `$callAction()` now always Throws that type (it no longer include+aborts via `$throwErrorOrShow404Page`). `processAction()` still presents the production 404 page for ViewNotFound, so HTTP 404 for apps is unchanged.
+- `$useLayout()` keeps a chosen `usesLayout` match when a later declaration does not apply, instead of resetting to `useDefault` (layout bypass)
+- Action cache no longer stores a redirect-only empty body
+- `filterChain()` returns a copy so callers cannot mutate the live filter chain
+- `$findRoute()` throws `Wheels.RouteNotFound` when no same-named candidate matches, instead of returning the last declaration
+- `filters(placement="prepend")` keeps multi-`through` order (`a,b,c` stays `a,b,c` in front of the existing chain)
+- `redirectTo(url=)` encodes `params` the same way `back=true` does
+- A blank string returned from a layout function uses the default layout, matching the documented contract
+- `addColumnOptions` quotes `AFTER` through `quoteColumnName` so a hostile column name cannot be interpolated raw
+- Microsoft SQL Server `quoteTableName` quotes `schema.table` as `[schema].[table]` instead of mixing MySQL backticks inside brackets
+- Oracle `createTable` scopes `col` and `fk` so the composite-key and foreign-key loops resolve on Adobe CF
+- Unevaluable validation `condition` / `unless` expressions now throw `Wheels.InvalidValidationCondition` even when `showErrorInformation` is false, instead of silently skipping the validation (#3398)
+- `$fullCgiDomainString()` honors `set(trustProxyHeaders=true)` before reading `X-Forwarded-Proto` (default stays false)
+- `$dbinfo()` rejects non-identifier table names and no longer interpolates `arguments.table` into SQL
+- `$fileExistsNoCase()` lists the directory live when `cacheFileChecking` is false (default stays true)
+- Fixed a flaky bare `NullPointerException` during model instantiation on Lucee 7 by validating the cached component-integration plan once per request and rebuilding it in place when it contains null function references — a null ref was previously copied into every materialized model/controller instance.
+- Job complete/retry/fail UPDATEs now require `status = 'processing'`, so a stolen job's original worker cannot overwrite `completed` or `failed`
+- Persist-fail `enqueue()` returns `persisted=false` and `error` instead of lying with `status=pending`
+- `JobWorker.getMonitorData(queue=)` filters `recentJobs` and `oldestPending` as well as throughput
+- Job `timeout` (default 300) is persisted on enqueue and honored by `processNext` / `$processJob`; a hung `perform()` is cut off instead of running until it returns
+- Unknown-database pending SELECTs are bounded with `LIMIT 25` (`candidateLimit`) instead of scanning the whole backlog
+- Enqueue no longer writes `tenant.config` into `wheels_jobs.data`; `$restoreTenantContext` applies `dataSource` only when it is a known app datasource
+- `CreateObject(jobClass)` is allowlisted to `app/jobs` (plus configured `jobClassPrefixes`); a `perform()` method on an off-path class is not enough
+- JobWorker claim persist errors throw `Wheels.JobClaimFailed` and are contained as a failed drain result — they are no longer swallowed as `return false` / idle `skipped`
+- The job-class allowlist treats `app.jobs` (and configured `jobClassPrefixes`) as first-class; `wheels.tests._assets.jobs` is an extra testing prefix only
+- `maxRetries` (default still 3) is retries after the first failure, so a job gets 4 tries before the dead letter
+- `retryFailed` / `purgeCompleted` / `JobWorker.purge` return the real DML count, including `0` when nothing matched
+- `$mapper(restful=false)` plus a static `get()` no longer indexes `POST:/` in `staticRoutes`. The stored route still omits `methods`, so ordered matching is unchanged. `mapper(restful=true)` is unchanged.
+- Fixed the remaining compatibility-matrix failures: `IS NULL` / `IS NOT NULL` and null parameters now render as inline SQL NULL on every engine (PostgreSQL, CockroachDB, and SQL Server rejected the bound-parameter form), Adobe CF no longer binds SQL NULL for `"Null"`-valued string properties, and BoxLang legs no longer fail on boolean quoting, `DirectoryList` array appends, apostrophe values in `seedOnce`, or channel event ordering (microsecond `createdAt` precision).
+- `JobWorker.getMonitorData().oldestPending` now always returns a CFML date, including on Adobe CF + SQLite where the driver returns epoch-millis longs.
+- The onboarding harness and the tutorial docs no longer use `default=""` on string columns, matching the empty-string-default hardening.
+- Announce-only migrations (default `up()`/`down()` stubs and the announce template) no longer mark or unmark versions in `wheels_migrator_versions`. `announce()` plus ORM persist (`model().create()` / `save()` / `delete()` with no `$execute`) still marks or unmarks the version
+- `redoMigration()` fails closed when `allowMigrationDown` is false instead of skipping `down()` and re-running `up()` (the `allowMigrationDown` default is unchanged)
+- CREATE TABLE foreign keys now emit `ON UPDATE` / `ON DELETE`; default FK names include the column so two FKs to the same table do not collide
+- `TenantMigrator` no longer mutates `application.wheels.dataSourceName`; tenant runs use a request-scoped datasource
+- `AutoMigrator.generateMigrationCFC()` honors `suggestedRenames` as `renameColumn` instead of destructive remove+add
+- Migrator down no longer reports a successful rollback when `allowMigrationDown` is false; the default stays `false`
+- Adobe `dropTable()` now drops foreign keys by `FK_NAME` instead of `FKCOLUMN_NAME`
+- New `wheels_migrator_versions` tables use a PRIMARY KEY on `version`; existing tables get a best-effort unique index
+- `updateRecord()` / `removeRecord()` require a `where` clause or explicit `all=true` instead of touching every row
+- Migrations that fail to load are not run; MySQL/Oracle failures warn that DDL is not rolled back
+- AutoMigrator rejects unsafe identifiers, restores typed dropped columns in `down()`, and can opt out of destructive unmapped-column drops via `allowColumnRemoval=false`
+- `create()` no longer mass-assigns properties onto the shared class model before instantiating the record
+- Nested `hasMany` collection keys no longer use a `GetTickCount` window heuristic to decide "new" vs existing; form identities use a `new-` prefix (or `_new`), and a failed `findByKey` no longer stamps the key as the child primary key
+- `hasChanged()` now treats `StructDelete` of a persisted property as a change
+- `findAll(returnAs="struct")` invokes `afterFind` against each row struct instead of the shared class model, so callbacks that read persisted columns no longer depend on `create()` leaking onto the class
+- Plugin compatibility with an empty / undeclared version no longer loads, even when `loadIncompatiblePlugins` is `true`. Declared mismatches still honor that setting (default remains `true`)
+- Package manifests with a present-but-empty `wheelsVersion` are rejected; omitting the field is unchanged
+- `ModuleGraph` fails duplicate package.json `name` values instead of last-wins binding `requires` / `replaces` / `suggests`
+- A lazy ServiceProvider that does not hint `provides.services` is still detected (comment-stripped CFC `implements`) and joins register/boot, including when it is the only package
+- Package mixin collisions still last-wins; `provides.overrides` only silences the warning. Lazy `getPackage()` instantiates once under a named lock. Failed ServiceProvider `boot()` restores DI bindings written in `register()`
+- `wheelsVersion` of `*`, `0.0.0`, or an unstamped placeholder fails closed on packages and plugins even when `loadIncompatiblePlugins` is `true`. Omitting the field on packages is unchanged. The three public plugin defaults stay `true`
+- Invalid `plugin.json` skips the plugin; `init()` / `onPluginLoad` failures are isolated and the throwing plugin is not left loaded. `onPluginLoad` receives a sandbox (no live `application` copy/sync). `$pluginDelete()` deletes orphan unzip folders again under `deletePluginDirectories=true`, skipping symlinks and git checkouts
+- PackageLoader and Plugins getters return copies so callers cannot mutate the live mixin/package/plugin registries. Implicit plugin mixin target `global` is detected and logged; the default is not flipped
+- `onPluginActivate` receives the same sandbox as `onPluginLoad` (no live `application`, no StructCopy sync-back)
+- `Policy.scope()` fail-closes with a no-rows chain when the resolved id list is empty, instead of calling `whereIn("id", [])`
+- `policyScope()` in production returns that empty chain after `InvalidCollection` and does not call `whereIn` on the unresolved collection
+- `authorize()` / `can()` deny reserved `init` and `scope` actions instead of Invoking those Policy methods
+- Fixed the legacy RocketUnit runner crashing the whole suite (HTTP 500, "variable [MESSAGE] doesn't exist" on Lucee 7) whenever a single test threw — test errors are recorded per-test again instead of aborting the run.
+- Made the in-memory channel engine, S3 SigV4 URL signing, query-string URL encoding, named-lock dispatch, and the CLI dump-path resolver engine-agnostic (no JVM-only classes), so the framework's core test suite runs clean on the JVM-free RustCFML engine.
+
+### Security
+
+- `SessionStrategy.login()` / `logout()` rotate or invalidate the session ID and no longer swallow rotate failures in a catch-all
+- `authenticateWith()` fails closed when the restriction list includes any unregistered strategy name, instead of silently skipping typos
+- `TokenStrategy` usage sample binds the token through the 2-arg query builder instead of interpolating it into `where=`
+- `JwtStrategy` catch-all returns a generic 401 and no longer concatenates `e.message` into the response
+- `JwtService.decode()` fails closed on a missing `exp` claim by default (`requireExpiry=true`; opt out with `requireExpiry=false`)
+- `wheels destroy view` now rejects path-join escapes such as `../x` so deletes stay under `app/views/`
+- Routed `controller` / `action` can no longer be retargeted by query string, form fields, or JSON body (`$ensureControllerAndAction`). Wildcard `[controller]` / `[action]` path names are unchanged
+- `$cgiScope()` no longer trusts client-supplied `X-Rewrite-URL` / `X-Original-URL` unless `set(trustProxyHeaders=true)` (same opt-in as `X-Forwarded-*`)
+- `form._method` is honored only on POST and only for `PUT` / `PATCH` / `DELETE`, so GET/HEAD cannot become a state-changing verb and POST cannot become a CSRF-safe verb
+- A before filter that returns `false` now skips the action and remaining filters (authz fail-closed). `redirectTo()` / `renderText()` still halt as before
+- `caches(appendToKey=)` walks the full dotted path and throws `Wheels.KeyNotFound` when a segment is missing, instead of silently omitting it and sharing one cache key
+- Filter `type` is case-insensitive (`Before` / `before`, `After` / `after`)
+- `$wildcardDomainMatch()` compares every host label, so `https://*.example.com` no longer matches `https://evil.com`
+- `$get()` refuses per-tenant overrides of live CSRF cookie, proxy, CORS, `showErrorInformation`, and `dataSourceName` keys
+- `Pipeline.getMiddleware()` returns a shallow copy so callers cannot mutate the live stack
+- `RateLimiter.$getClientIp()` honors `trustProxy` / `X-Forwarded-For` before a client-supplied `request.remoteAddr`
+- `MiddlewareOrderResolver` throws `Wheels.Middleware.CircularDependency` on a cycle instead of falling back to priority-only order
+- `Cors` no longer short-circuits OPTIONS or emits `Access-Control-Max-Age` when no `Access-Control-Allow-Origin` is set
+- `TenantResolver` usage sample binds the subdomain through the 2-arg query builder instead of interpolating it into `where=`
+- RateLimiter default-lock specs now observe fail-closed (`$handleError` on a default constructor) and the store-size / key-length / timestamp-per-key caps when those caps are hit, instead of `toBeInstanceOf`
+- Plugin zip extraction (`$pluginsExtract` / `$zip` unzip) now rejects zip-slip entries (absolute paths, `..` segments, or a canonical path outside the destination) before writing files. `overwritePlugins` stays `true`.
+- Package and plugin admin pages no longer `cfinclude` on-disk `index.cfm` files, and homepage links only render `http(s)` URLs encoded with `EncodeForHTML` (javascript: and unescaped list fields were still live after #3378)
+- PackageLoader refuses dotted/traversed directory names, foreign middleware `CreateObject` paths, and plural `mappings` values that realpath outside the package (including symlink escapes)
+- `authorize()` / `can()` grant only when a policy method returns boolean `true`. The CFML strings `"yes"` and `"true"` no longer authorize
+- LocalDisk refuses empty and slash-only keys so `put()` cannot write the disk root
+- S3 `put()` honours visibility by sending a signed `x-amz-acl` header
+- `labelPlacement="aroundRight"` now encodes the label under the existing `encode=true` default (`$formAfterElement` no longer raw-concats)
+- Date `<select>` helpers honor `encode="attributes"` the same way `select()` does (attribute values stay encoded)
+- `paginationLinks()` sanitizes `prependToPage` on first/last `alwaysShowAnchors` the same way as numbered pages
+- View helpers now reject breakout HTML attribute names, restrict `errorElement` / `wrapperElement` to safe tag names, honor `encode` on date `<option>` bodies and `csrfMetaTags`, and skip the CSRF field on `startFormTag` when `action` is an absolute external URL
+- `paginationNav()` encodes outer `nav` attributes, `$paginationSanitizeWrapper` also strips `style` expressions and `data:` URIs, and pagination params are no longer double-encoded
+- Vite script/style/preload tags encode interpolated paths; `imageTag` / asset helpers collapse `..` on local sources; `stripTags` removes comments and newline-split tags; `h()` / `hAttr()` canonicalize first; `errorMessageOn` prepend/append encode once
+- `includeContent(encode=true)` is opt-in (default still returns stored HTML). `linkTo` / `URLFor` external hrefs and `formHelperDataAutoId=true` are unchanged (escalated; no public default flip)
+
+---
+
 # [4.0.6](https://github.com/wheels-dev/wheels/releases/tag/v4.0.6) => 2026-08-20
 
 ### Added

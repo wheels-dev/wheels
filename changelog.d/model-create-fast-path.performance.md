@@ -1,1 +1,0 @@
-- Model instances are now created with a direct constructor call instead of the DI container's resolve/auto-wire path plus a reflective invoke, and the per-instance class-struct read no longer takes a named lock — roughly 1.5x faster model materialization on top of the previous #3213 work (#3462).

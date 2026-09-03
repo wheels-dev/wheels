@@ -1,1 +1,0 @@
-- `wheels destroy view` now rejects path-join escapes such as `../x` so deletes stay under `app/views/`

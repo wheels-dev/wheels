@@ -1,1 +1,0 @@
-- Model instances now inherit the full model API from compile-time includes instead of copying ~270 method references into each instance at runtime — roughly 2x faster model object materialization (#3213).

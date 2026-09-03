@@ -1,1 +1,0 @@
-- Memory channel drain no longer `clear()`s the live buffer, so events published during the drain loop are not dropped

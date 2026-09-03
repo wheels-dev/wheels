@@ -1,3 +1,0 @@
-- `Policy.scope()` fail-closes with a no-rows chain when the resolved id list is empty, instead of calling `whereIn("id", [])`
-- `policyScope()` in production returns that empty chain after `InvalidCollection` and does not call `whereIn` on the unresolved collection
-- `authorize()` / `can()` deny reserved `init` and `scope` actions instead of Invoking those Policy methods

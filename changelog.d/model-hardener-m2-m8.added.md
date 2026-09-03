@@ -1,1 +1,0 @@
-- `set(massAssignmentStrict=true)` fail-closes mass assignment when a model has neither `accessibleProperties()` nor `protectedProperties()`; the default remains open for compatibility

@@ -1,2 +1,0 @@
-- Added `Injector.toFactory()` — bind a name to a closure that builds the instance (receives the container, honors singleton/request-scoped flags).
-- Added route `bindBy=` — bind a resource route's `:key` segment to a non-primary-key column via the parameterized dynamic finder (e.g. `bindBy="slug"`).

@@ -1,1 +1,0 @@
-- Guides for `wheels test` now state the CLI throws `Wheels.TestsFailed` on `directoryRejected`, `bundlesDiscovered=0`, and compile-skipped specs — not only Fail/Error — so a vacuous or rejected scope is not documented as exit 0 (#3083)

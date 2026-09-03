@@ -1,2 +1,0 @@
-- Package and plugin admin pages no longer `cfinclude` on-disk `index.cfm` files, and homepage links only render `http(s)` URLs encoded with `EncodeForHTML` (javascript: and unescaped list fields were still live after #3378)
-- PackageLoader refuses dotted/traversed directory names, foreign middleware `CreateObject` paths, and plural `mappings` values that realpath outside the package (including symlink escapes)

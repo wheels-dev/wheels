@@ -1,3 +1,0 @@
-- `addColumnOptions` quotes `AFTER` through `quoteColumnName` so a hostile column name cannot be interpolated raw
-- Microsoft SQL Server `quoteTableName` quotes `schema.table` as `[schema].[table]` instead of mixing MySQL backticks inside brackets
-- Oracle `createTable` scopes `col` and `fk` so the composite-key and foreign-key loops resolve on Adobe CF

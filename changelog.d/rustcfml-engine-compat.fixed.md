@@ -1,1 +1,0 @@
-- Made the in-memory channel engine, S3 SigV4 URL signing, query-string URL encoding, named-lock dispatch, and the CLI dump-path resolver engine-agnostic (no JVM-only classes), so the framework's core test suite runs clean on the JVM-free RustCFML engine.

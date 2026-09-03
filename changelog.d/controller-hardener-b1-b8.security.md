@@ -1,6 +1,0 @@
-- Routed `controller` / `action` can no longer be retargeted by query string, form fields, or JSON body (`$ensureControllerAndAction`). Wildcard `[controller]` / `[action]` path names are unchanged
-- `$cgiScope()` no longer trusts client-supplied `X-Rewrite-URL` / `X-Original-URL` unless `set(trustProxyHeaders=true)` (same opt-in as `X-Forwarded-*`)
-- `form._method` is honored only on POST and only for `PUT` / `PATCH` / `DELETE`, so GET/HEAD cannot become a state-changing verb and POST cannot become a CSRF-safe verb
-- A before filter that returns `false` now skips the action and remaining filters (authz fail-closed). `redirectTo()` / `renderText()` still halt as before
-- `caches(appendToKey=)` walks the full dotted path and throws `Wheels.KeyNotFound` when a segment is missing, instead of silently omitting it and sharing one cache key
-- Filter `type` is case-insensitive (`Before` / `before`, `After` / `after`)

@@ -1,1 +1,0 @@
-- `wheels test` now exits non-zero when the runner reports `directoryRejected`, `bundlesDiscovered=0`, or unloadable specs (same honesty as `tools/test-local.sh` / `tools/ci/run-tests.sh`); `wheels browser test` exits non-zero on Fail/Error instead of always returning success (#3083)

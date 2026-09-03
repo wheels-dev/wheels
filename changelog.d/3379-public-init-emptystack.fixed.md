@@ -1,1 +1,0 @@
-- `Public.$init` no longer nests the `/wheels/public/helpers.cfm` include in the same method as `$scanAndPromoteIncludedGlobals()`. That nest threw `EmptyStackException` from Adobe `popSuperScope` on the first request after a CommandBox cold start on Adobe CF 2023; the 4.0.6 helper-promote onto `this` is unchanged (#3379)
