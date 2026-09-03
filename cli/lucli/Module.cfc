@@ -1590,7 +1590,7 @@ component extends="modules.BaseModule" {
 			// table as JSON. (The previous endpoint, /wheels/ai?context=routing,
 			// returns AI-documentation about routing patterns — not what users
 			// asking "what routes does my app have?" expect to see.)
-			var routesUrl = "http://localhost:#serverPort#/wheels/cli?command=routes&format=json";
+			var routesUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=routes&format=json";
 			var httpResult = makeHttpRequest(routesUrl);
 
 			var result = "";
@@ -1841,7 +1841,7 @@ component extends="modules.BaseModule" {
 		}
 
 		// Verify connectivity with a ping
-		var evalUrl = "http://localhost:#serverPort#/wheels/console/eval";
+		var evalUrl = "#serverUrlBase(serverPort)#/wheels/console/eval";
 		try {
 			var pingResult = makeHttpPost(evalUrl, serializeJSON({expression: "__ping__", password: password}));
 			if (isJSON(pingResult)) {
@@ -3473,7 +3473,7 @@ component extends="modules.BaseModule" {
 			requireProjectConfig = true
 		);
 
-		var workUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsProcessNext&format=json";
+		var workUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=jobsProcessNext&format=json";
 		if (len(arguments.opts.queue)) {
 			workUrl &= "&queues=" & urlEncodedFormat(arguments.opts.queue);
 		}
@@ -3554,7 +3554,7 @@ component extends="modules.BaseModule" {
 			hints = ["Start one with: wheels start"]
 		);
 
-		var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsStatus&format=json";
+		var statusUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=jobsStatus&format=json";
 		if (len(arguments.opts.queue)) {
 			statusUrl &= "&queue=" & urlEncodedFormat(arguments.opts.queue);
 		}
@@ -4513,7 +4513,7 @@ component extends="modules.BaseModule" {
 		// Introspect the model via the server
 		out("Introspecting model: #modelName#...", "cyan");
 		try {
-			var introspectUrl = "http://localhost:#serverPort#/wheels/cli?command=introspect&model=#modelName#&format=json";
+			var introspectUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=introspect&model=#modelName#&format=json";
 			var response = makeHttpRequest(introspectUrl);
 			// parseCliResponse surfaces framework errors via thrown exceptions —
 			// issue #2315.
@@ -4947,7 +4947,7 @@ component extends="modules.BaseModule" {
 
 		var command = $migrationCommand(action);
 
-		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
+		var migrateUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=#command#&format=json";
 
 		// latest/up/down change the schema — the framework's /wheels/cli
 		// bridge requires POST + the reload password for state-changing
@@ -5095,7 +5095,7 @@ component extends="modules.BaseModule" {
 		// non-digits before SQL use (no injection path), but raw URL-special
 		// characters (&, =, %) in the CLI argument could still inject
 		// spurious query parameters before reaching that point.
-		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
+		var reconcileUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
 
 		// forget/pretend mutate the tracking table — POST + reload password.
 		var httpResult = "";
@@ -5142,7 +5142,7 @@ component extends="modules.BaseModule" {
 
 		out(arguments.dryRun ? "Previewing system-table rename..." : "Renaming legacy c_o_r_e_* system tables to wheels_*...", "cyan");
 
-		var renameUrl = "http://localhost:#serverPort#/wheels/cli?command=renameSystemTables&format=json"
+		var renameUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=renameSystemTables&format=json"
 			& (arguments.dryRun ? "&dryRun=true" : "");
 
 		// renameSystemTables alters tables — POST + reload password (the
@@ -5280,7 +5280,7 @@ component extends="modules.BaseModule" {
 
 		out(opts.write ? "Writing migration diff..." : "Previewing migration diff...", "cyan");
 
-		var diffUrl = "http://localhost:#serverPort#/wheels/cli?command=diff&format=json" & $buildDiffBridgeUrl(opts);
+		var diffUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=diff&format=json" & $buildDiffBridgeUrl(opts);
 
 		var httpResult = "";
 		try {
@@ -5499,7 +5499,7 @@ component extends="modules.BaseModule" {
 
 		out("Running database seeds...", "cyan");
 
-		var seedUrl = "http://localhost:#serverPort#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
+		var seedUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
 		if (len(environment)) {
 			seedUrl &= "&environment=#environment#";
 		}
@@ -5586,7 +5586,7 @@ component extends="modules.BaseModule" {
 		var serverPort = $requireRunningServer();
 
 		try {
-			var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+			var statusUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=dbStatus&format=json";
 			var response = makeHttpRequest(statusUrl);
 			// Use parseCliResponse so a framework success:false surfaces with
 			// the canonical `messages` payload instead of leaving the user
@@ -5630,7 +5630,7 @@ component extends="modules.BaseModule" {
 		var serverPort = $requireRunningServer();
 
 		try {
-			var versionUrl = "http://localhost:#serverPort#/wheels/cli?command=dbVersion&format=json";
+			var versionUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=dbVersion&format=json";
 			var response = makeHttpRequest(versionUrl);
 			// Use parseCliResponse so framework errors surface — issue #2315.
 			var data = parseCliResponse(response, "Database version");
@@ -5639,7 +5639,7 @@ component extends="modules.BaseModule" {
 
 			if (detailed) {
 				// Also fetch status for extra detail
-				var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+				var statusUrl = "#serverUrlBase(serverPort)#/wheels/cli?command=dbStatus&format=json";
 				var statusResponse = makeHttpRequest(statusUrl);
 				var statusData = parseCliResponse(statusResponse, "Database status");
 
@@ -6696,7 +6696,7 @@ component extends="modules.BaseModule" {
 		var runState = {crashed = false, hasResult = false, result = {}, specsFailedToLoad = 0};
 
 		try {
-			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
+			var testUrl = "#serverUrlBase(serverPort)##testPath#?format=#format#&db=#db#";
 			// App tests default to running against the <appname>_test
 			// datasource so chapter-6-style manual signups in the dev DB
 			// don't bleed into chapter-7 specs. Core tests already pick
@@ -8268,6 +8268,15 @@ component extends="modules.BaseModule" {
 		boolean requireProjectConfig = false,
 		array commonPorts = [8080, 60000, 3000, 8500]
 	) {
+		// 0. Check the RustCFML backend's recorded state first — a live
+		// RustCFML server serves its own port (default 8513), which never
+		// appears in lucee.json/.env/common ports.
+		var rustSvc = new services.rustcfml.RustCFMLEngine();
+		var rustStatus = rustSvc.status(variables.projectRoot);
+		if (rustStatus.running && structKeyExists(rustStatus, "port") && rustStatus.port > 0) {
+			return rustStatus.port;
+		}
+
 		// 1. Check lucee.json
 		var luceeJson = variables.projectRoot & "/lucee.json";
 		if (fileExists(luceeJson)) {
@@ -8306,6 +8315,21 @@ component extends="modules.BaseModule" {
 		}
 
 		return false;
+	}
+
+	/**
+	 * The origin prefix for an HTTP URL to the running server. On Lucee this is
+	 * the bare host:port; on RustCFML the path-info router needs an
+	 * `/index.cfm` entry point (RustCFML/RustCFML#194), so the base carries
+	 * that suffix. Callers interpolate `#serverUrlBase(serverPort)#` in place
+	 * of the old `http://localhost:#serverPort#`.
+	 */
+	private string function $serverUrlBase(required numeric serverPort) {
+		var svc = new services.rustcfml.RustCFMLEngine();
+		if (svc.status(variables.projectRoot).running) {
+			return "http://localhost:#arguments.serverPort#/index.cfm";
+		}
+		return "http://localhost:#arguments.serverPort#";
 	}
 
 	/**
@@ -8978,7 +9002,7 @@ component extends="modules.BaseModule" {
 		// runner on a subpath-mounted app the same way `wheels test` does.
 		var resolvedBasePath = $resolveTestBasePath(basePath);
 		var runnerPath = $buildTestRunnerPath(false, resolvedBasePath);
-		var testUrl = "http://localhost:#serverPort##runnerPath#?db=sqlite&format=json&directory=#directory#";
+		var testUrl = "#serverUrlBase(serverPort)##runnerPath#?db=sqlite&format=json&directory=#directory#";
 
 		try {
 			// same long-running suite over the same 120s-default helper (issue #3352)
