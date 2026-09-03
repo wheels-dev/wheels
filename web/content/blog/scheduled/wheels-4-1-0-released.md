@@ -52,7 +52,7 @@ Model instantiation is **~2.5× faster than 4.0.3** on our benchmark rig — the
 ## And the rest
 
 - **Developer tooling:** a Code Complexity panel and the `wheels coverage` CRAP-ranking command — [the tool that would have caught the September bug](https://blog.wheels.dev/posts/wheels-coverage-and-the-complexity-panel/).
-- **Engine compatibility:** the Adobe CF 2023/2025 matrix failures are fixed, and the core suite runs clean on the JVM-free RustCFML engine.
+- **Engine compatibility:** the Adobe CF 2023/2025 matrix failures are fixed, the core suite runs clean on the JVM-free RustCFML engine, and the Adobe `applicationStop()` teardown crash ("Element wo is undefined", which could error a whole site until a CF restart) is gone — `onApplicationEnd`, `onSessionEnd`, and `onError` now survive a torn-down application scope.
 - **Deploy:** Kamal-compatible `boot` config (`limit`/`wait`).
 - **Deprecations:** `wheels.Test` (RocketUnit) now warns once; removal is planned for Wheels 5.0. If you still run RocketUnit suites, that's your heads-up.
 
@@ -64,6 +64,8 @@ wheels upgrade apply
 ```
 
 The upgrade is additive — the behavior-changing items are opt-in (strict mass assignment, `sanitizeHref`, JWT `requireExpiry`) or bug fixes to documented defaults. The changelog's "changed" section is the complete list of the latter; it's a ten-minute read and worth doing before you deploy.
+
+One manual step if you run **Adobe CF 2023/2025**: the teardown hardening ships in `public/Application.cfc`, which the `vendor/wheels/` swap doesn't touch. `wheels upgrade check` now flags that drift automatically — diff your `public/Application.cfc` against the bundled template and adopt the guarded `onError`/`onSessionEnd` handlers before you deploy. (Lucee and BoxLang apps are unaffected.)
 
 ## The thanks
 
