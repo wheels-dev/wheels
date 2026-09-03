@@ -1,2 +1,0 @@
-- LocalDisk refuses empty and slash-only keys so `put()` cannot write the disk root
-- S3 `put()` honours visibility by sending a signed `x-amz-acl` header

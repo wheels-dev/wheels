@@ -1,6 +1,0 @@
-- Migrator down no longer reports a successful rollback when `allowMigrationDown` is false; the default stays `false`
-- Adobe `dropTable()` now drops foreign keys by `FK_NAME` instead of `FKCOLUMN_NAME`
-- New `wheels_migrator_versions` tables use a PRIMARY KEY on `version`; existing tables get a best-effort unique index
-- `updateRecord()` / `removeRecord()` require a `where` clause or explicit `all=true` instead of touching every row
-- Migrations that fail to load are not run; MySQL/Oracle failures warn that DDL is not rolled back
-- AutoMigrator rejects unsafe identifiers, restores typed dropped columns in `down()`, and can opt out of destructive unmapped-column drops via `allowColumnRemoval=false`

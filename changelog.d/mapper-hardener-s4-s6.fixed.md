@@ -1,1 +1,0 @@
-- `$mapper(restful=false)` plus a static `get()` no longer indexes `POST:/` in `staticRoutes`. The stored route still omits `methods`, so ordered matching is unchanged. `mapper(restful=true)` is unchanged.

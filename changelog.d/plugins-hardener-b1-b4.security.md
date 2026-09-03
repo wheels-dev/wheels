@@ -1,1 +1,0 @@
-- Plugin zip extraction (`$pluginsExtract` / `$zip` unzip) now rejects zip-slip entries (absolute paths, `..` segments, or a canonical path outside the destination) before writing files. `overwritePlugins` stays `true`.

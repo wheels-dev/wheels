@@ -1,2 +1,0 @@
-- `AuthMiddleware` accepts `genericErrors=true` to emit a generic `Unauthorized` JSON body; the default 401 still includes `authResult.error`
-- `TenantResolver` accepts `failClosed=true` to 403 unmatched tenants; unmatched requests still proceed on the default datasource unless opted in

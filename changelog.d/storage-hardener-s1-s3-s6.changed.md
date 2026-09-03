@@ -1,5 +1,0 @@
-- LocalDisk `$resolve` throws `Wheels.Storage.InvalidKey` for empty and slash-only keys instead of concatenating onto `root`
-- LocalDisk `url()` and `signedUrl()` RFC3986-encode object keys the same way S3 does (spaces and reserved characters)
-- `S3Disk.delete()` HEADs first and returns false when the object is missing. An existing object still deletes and returns true
-- `S3Disk.put()` sends a signed `x-amz-acl` (`public` maps to `public-read`; default and `private` send `private`)
-- `signedUrl()` / `presignGetUrl()` throw `Wheels.Storage.InvalidExpiresIn` when `expiresIn` is outside `1..604800`

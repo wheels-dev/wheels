@@ -1,6 +1,0 @@
-- `Pipeline.getMiddleware()` returns a shallow copy so callers cannot mutate the live stack
-- `RateLimiter.$getClientIp()` honors `trustProxy` / `X-Forwarded-For` before a client-supplied `request.remoteAddr`
-- `MiddlewareOrderResolver` throws `Wheels.Middleware.CircularDependency` on a cycle instead of falling back to priority-only order
-- `Cors` no longer short-circuits OPTIONS or emits `Access-Control-Max-Age` when no `Access-Control-Allow-Origin` is set
-- `TenantResolver` usage sample binds the subdomain through the 2-arg query builder instead of interpolating it into `where=`
-- RateLimiter default-lock specs now observe fail-closed (`$handleError` on a default constructor) and the store-size / key-length / timestamp-per-key caps when those caps are hit, instead of `toBeInstanceOf`

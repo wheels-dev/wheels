@@ -1,3 +1,0 @@
-- Injector rebind of an existing name resets singleton and request-scoped flags and drops `request.$wheelsDICache`
-- `asSingleton()` / `asRequestScoped()` throw `Wheels.Injector` when no mapping is in progress. `map(b).asSingleton().to(...)` flags `b`, not the previous key
-- `getMappings()` returns a `Duplicate` copy. Mutating the return value does not change later `getMappings()` or the live mappings table

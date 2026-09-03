@@ -1,2 +1,0 @@
-- `$wildcardDomainMatch()` compares every host label, so `https://*.example.com` no longer matches `https://evil.com`
-- `$get()` refuses per-tenant overrides of live CSRF cookie, proxy, CORS, `showErrorInformation`, and `dataSourceName` keys

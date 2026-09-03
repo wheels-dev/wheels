@@ -1,1 +1,0 @@
-- Legacy CommandBox `wheels test` / `browser:test` refuse with a deprecation `error()` then `return` and no longer invoke TestBox (`testbox run`). Unrouted `vendor/wheels/controllers/Tests.cfc` is removed; `/wheels/core/tests` and `/wheels/app/tests` stay on `Public.cfc` (#3083)

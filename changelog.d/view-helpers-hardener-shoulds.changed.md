@@ -1,2 +1,0 @@
-- `hasManyRadioButton()` now forwards extra HTML attributes (`class`, `rel`, …) the same way `hasManyCheckBox()` does, matching its documented passthrough
-- `buttonTo(encode="attributes")` now encodes attribute values the same way `select()` does (`encode=false` still leaves them raw)
