@@ -1,0 +1,1 @@
+- `wheels upgrade check` now diffs app-owned template files (`public/Application.cfc`, `public/index.cfm`) against the CLI's bundled app template and reports any drift as an advisory — surfacing framework-side hardening (such as the Adobe teardown guards in `onError`/`onSessionEnd`) that a `vendor/wheels/`-only swap never delivers to existing apps (#3379)

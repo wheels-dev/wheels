@@ -6004,6 +6004,21 @@ component extends="modules.BaseModule" {
 			fix: "If migrations under app/migrator/migrations/ were applied before this flag was set, the database still has `<name>id` columns. New migrations will create `<name>_id`. For full consistency, write a data migration to rename old reference columns."
 		});
 
+		// App template drift — compare public/Application.cfc and
+		// public/index.cfm against the CLI's bundled app template. Always-on
+		// (not major-gated): the current release's template changes must be
+		// visible to patch/minor upgraders too, not just 3.x → 4.x jumpers.
+		// Most recently the Adobe teardown guards (##3379). Advisory because
+		// customized apps legitimately drift — the point is to surface the
+		// diff, not to demand a byte-for-byte match.
+		arrayAppend(checks, {
+			description: "App template drift — public/Application.cfc or public/index.cfm differs from the bundled template",
+			checkType: "templateDiff",
+			severity: "advisory",
+			files: ["public/Application.cfc", "public/index.cfm"],
+			fix: "Diff these files against the CLI's bundled template and reconcile. The current release hardens public/Application.cfc's onError/onSessionEnd/onApplicationEnd against Adobe teardown crashes (##3379) — keep your local customizations (this.name, mappings, env loading) while adopting the framework changes."
+		});
+
 		return checks;
 	}
 
@@ -6109,6 +6124,33 @@ component extends="modules.BaseModule" {
 					matched = true;
 					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
 				}
+			}
+		} else if (arguments.check.checkType == "templateDiff") {
+			// Compare app-owned template files against the CLI's bundled app
+			// template (the same source `wheels new` scaffolds from). Drift
+			// means the app may be missing framework-side hardening that
+			// shipped in the target release — most recently the Adobe
+			// teardown guards in public/Application.cfc (##3379). Advisory:
+			// customized apps legitimately drift; reconcile, never overwrite.
+			var driftFiles = [];
+			for (var relFile in arguments.check.files) {
+				var templatePath = variables.moduleRoot & "templates/app/" & relFile;
+				if (!fileExists(templatePath)) {
+					// Broken install — no reference to compare against.
+					continue;
+				}
+				var userPath = variables.projectRoot & "/" & relFile;
+				var differs = !fileExists(userPath);
+				if (!differs) {
+					differs = (compare(fileRead(userPath), fileRead(templatePath)) != 0);
+				}
+				if (differs) {
+					arrayAppend(driftFiles, relFile);
+				}
+			}
+			if (arrayLen(driftFiles)) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: driftFiles};
 			}
 		}
 
