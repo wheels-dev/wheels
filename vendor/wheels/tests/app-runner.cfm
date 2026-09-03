@@ -44,146 +44,179 @@
     // docs/superpowers/plans/2026-04-29-fresh-vm-onboarding-findings.md.
     // The swap goes through applyDataSource() so cached model classes re-initialize against the test datasource.
     local.dbResolver = new wheels.tests._assets.dispatch.TestDbResolver();
-    local.originalDataSource = application.wheels.dataSourceName;
-    local.targetDataSource = local.originalDataSource;
-    local.swappedDataSource = false;
-    if (StructKeyExists(url, "useTestDB") && url.useTestDB) {
-        local.candidate = local.originalDataSource & "_test";
-        local.registered = GetApplicationMetaData().datasources;
-        if (StructKeyExists(local.registered, local.candidate)) {
-            local.targetDataSource = local.candidate;
-            local.dbResolver.applyDataSource(
-                wheelsScope = application.wheels,
-                name = local.candidate
-            );
-            local.swappedDataSource = true;
-        }
-    }
 
-    try {
-        // If the test database has no migrator-versions table, include
-        // the user's tests/populate.cfm to bootstrap schema. Skip
-        // silently when the file doesn't exist (advanced users with
-        // their own setup).
-        local.populatePath = ExpandPath("/tests/populate.cfm");
-        if (local.swappedDataSource && FileExists(local.populatePath)) {
-            try {
-                local.dbinfo = application.wo.$dbinfo(
-                    datasource = local.targetDataSource,
-                    type = "tables"
-                );
-                local.tableList = ValueList(local.dbinfo.table_name);
-                if (!FindNoCase(application.wheels.migratorTableName, local.tableList)) {
-                    include "/tests/populate.cfm";
+    // The swap->run->restore window mutates application.wheels.dataSourceName,
+    // a value shared by every concurrent request on the app instance. Two
+    // overlapping test runs used to race the capture/restore — one could
+    // capture the already-swapped value as its "original" and strand the app
+    // on the test datasource (issue #3427). Serialize the whole window under
+    // an exclusive named lock (precedent: vendor/wheels/tests/runner.cfm
+    // #3373, and migrator/TenantMigrator.cfc::$runForTenant).
+    //
+    // Re-entrancy: a spec that re-enters /wheels/app/tests while the parent
+    // request holds the swap + lock would deadlock on the shared lock. The
+    // runner-owns-swap flag plus a unique per-request suffix turn a re-entrant
+    // request's lock into a no-op, matching the core runner.
+    local.runnerOwnsSwap = !StructKeyExists(application, "$$$appTestOriginalDataSource");
+    local.runnerLockSuffix = local.runnerOwnsSwap ? "" : "_sub_" & CreateUUID();
+    // Timeout must exceed the worst-case full-suite duration; matches the
+    // requestTimeout at the top of this template.
+    lock name="wheelsTestRunner_#application.applicationName##local.runnerLockSuffix#" type="exclusive" timeout="1800" throwontimeout="true" {
+        try {
+            // Resolve the target datasource INSIDE the lock: the previous
+            // owner restores before releasing, so the captured value is the
+            // configured datasource, never a stranded test DB.
+            local.originalDataSource = application.wheels.dataSourceName;
+            local.targetDataSource = local.originalDataSource;
+            local.swappedDataSource = false;
+            if (local.runnerOwnsSwap) {
+                // Record the pre-swap datasource as the ownership marker so
+                // re-entrant sub-requests skip the swap and the shared lock.
+                application.$$$appTestOriginalDataSource = local.originalDataSource;
+                if (StructKeyExists(url, "useTestDB") && url.useTestDB) {
+                    local.candidate = local.originalDataSource & "_test";
+                    local.registered = GetApplicationMetaData().datasources;
+                    if (StructKeyExists(local.registered, local.candidate)) {
+                        local.targetDataSource = local.candidate;
+                        local.dbResolver.applyDataSource(
+                            wheelsScope = application.wheels,
+                            name = local.candidate
+                        );
+                        local.swappedDataSource = true;
+                    }
                 }
-            } catch (any populateErr) {
-                // Surface populate.cfm errors as JSON; don't silently
-                // run specs against an empty test DB.
-                cfheader(statuscode = 500);
-                cfcontent(type = "application/json");
+            }
+
+            // If the test database has no migrator-versions table, include
+            // the user's tests/populate.cfm to bootstrap schema. Skip
+            // silently when the file doesn't exist (advanced users with
+            // their own setup).
+            local.populatePath = ExpandPath("/tests/populate.cfm");
+            if (local.swappedDataSource && FileExists(local.populatePath)) {
+                try {
+                    local.dbinfo = application.wo.$dbinfo(
+                        datasource = local.targetDataSource,
+                        type = "tables"
+                    );
+                    local.tableList = ValueList(local.dbinfo.table_name);
+                    if (!FindNoCase(application.wheels.migratorTableName, local.tableList)) {
+                        include "/tests/populate.cfm";
+                    }
+                } catch (any populateErr) {
+                    // Surface populate.cfm errors as JSON; don't silently
+                    // run specs against an empty test DB.
+                    cfheader(statuscode = 500);
+                    cfcontent(type = "application/json");
+                    writeOutput(SerializeJSON({
+                        success: false,
+                        error: "tests/populate.cfm failed",
+                        message: populateErr.message,
+                        detail: populateErr.detail
+                    }));
+                    abort;
+                }
+            }
+
+            try {
+                testBox = new wheels.wheelstest.system.TestBox(
+                    directory = local.testDirectory,
+                    options   = { coverage = { enabled = false } }
+                );
+            } catch (any e) {
+                cfheader(statuscode="500");
+                cfcontent(type="application/json");
                 writeOutput(SerializeJSON({
                     success: false,
-                    error: "tests/populate.cfm failed",
-                    message: populateErr.message,
-                    detail: populateErr.detail
+                    error: "Failed to create TestBox instance",
+                    message: e.message
                 }));
                 abort;
             }
-        }
 
-        try {
-            testBox = new wheels.wheelstest.system.TestBox(
-                directory = local.testDirectory,
-                options   = { coverage = { enabled = false } }
+            // Sort bundles for stable output
+            local.sortedBundles = testBox.getBundles();
+            arraySort(local.sortedBundles, "textNoCase");
+            testBox.setBundles(local.sortedBundles);
+
+            // Surface a rejected directory or a 0-bundle discovery so neither
+            // silently reports green for the wrong scope (issue #3083).
+            local.bundlesDiscovered = ArrayLen(local.sortedBundles);
+            local.scopeWarnings = local.dirResolver.scopeWarnings(
+                scope = local.testScope,
+                bundlesDiscovered = local.bundlesDiscovered
             );
-        } catch (any e) {
-            cfheader(statuscode="500");
-            cfcontent(type="application/json");
-            writeOutput(SerializeJSON({
-                success: false,
-                error: "Failed to create TestBox instance",
-                message: e.message
-            }));
-            abort;
-        }
 
-        // Sort bundles for stable output
-        local.sortedBundles = testBox.getBundles();
-        arraySort(local.sortedBundles, "textNoCase");
-        testBox.setBundles(local.sortedBundles);
+            // Resolve the output format (reporter + content type + whether to
+            // render an HTML report) through TestFormatResolver so the rule is
+            // unit-testable without an HTTP request (see AppRunnerTestFormatSpec,
+            // issue #3251). An unrecognized format resolves to recognized=false:
+            // the runner emits nothing, preserving the historical behavior.
+            local.fmtResolver = new wheels.tests._assets.dispatch.TestFormatResolver();
+            local.output = local.fmtResolver.resolveFormat(url);
 
-        // Surface a rejected directory or a 0-bundle discovery so neither
-        // silently reports green for the wrong scope (issue #3083).
-        local.bundlesDiscovered = ArrayLen(local.sortedBundles);
-        local.scopeWarnings = local.dirResolver.scopeWarnings(
-            scope = local.testScope,
-            bundlesDiscovered = local.bundlesDiscovered
-        );
+            if (local.output.recognized) {
+                result = testBox.run(reporter = local.output.reporter);
 
-        // Resolve the output format (reporter + content type + whether to
-        // render an HTML report) through TestFormatResolver so the rule is
-        // unit-testable without an HTTP request (see AppRunnerTestFormatSpec,
-        // issue #3251). An unrecognized format resolves to recognized=false:
-        // the runner emits nothing, preserving the historical behavior.
-        local.fmtResolver = new wheels.tests._assets.dispatch.TestFormatResolver();
-        local.output = local.fmtResolver.resolveFormat(url);
-
-        if (local.output.recognized) {
-            result = testBox.run(reporter = local.output.reporter);
-
-            if (local.output.rendersHtml) {
-                // Render the TestBox-style HTML report for the html / no-format
-                // default, mirroring the core runner (vendor/wheels/tests/runner.cfm).
-                // html.cfm has a type="App" branch (package=tests.specs,
-                // route=testbox) built for exactly this. Previously this branch
-                // emitted raw JSON, so a user opening /wheels/app/tests?format=html
-                // in a browser got JSON instead of the report (issue #3251 item 1).
-                decoded = DeserializeJSON(result);
-                cfheader(statuscode = (decoded.totalFail > 0 || decoded.totalError > 0) ? 417 : 200);
-                type = "App";
-                include "html.cfm";
-            } else if (local.output.format == "json") {
-                decoded = DeserializeJSON(result);
-                if (decoded.totalFail > 0 || decoded.totalError > 0) {
-                    if (!StructKeyExists(url, "cli") || !url.cli) {
-                        cfheader(statuscode = 417);
+                if (local.output.rendersHtml) {
+                    // Render the TestBox-style HTML report for the html / no-format
+                    // default, mirroring the core runner (vendor/wheels/tests/runner.cfm).
+                    // html.cfm has a type="App" branch (package=tests.specs,
+                    // route=testbox) built for exactly this. Previously this branch
+                    // emitted raw JSON, so a user opening /wheels/app/tests?format=html
+                    // in a browser got JSON instead of the report (issue #3251 item 1).
+                    decoded = DeserializeJSON(result);
+                    cfheader(statuscode = (decoded.totalFail > 0 || decoded.totalError > 0) ? 417 : 200);
+                    type = "App";
+                    include "html.cfm";
+                } else if (local.output.format == "json") {
+                    decoded = DeserializeJSON(result);
+                    if (decoded.totalFail > 0 || decoded.totalError > 0) {
+                        if (!StructKeyExists(url, "cli") || !url.cli) {
+                            cfheader(statuscode = 417);
+                        }
+                    } else {
+                        cfheader(statuscode = 200);
                     }
+                    cfcontent(type = local.output.contentType);
+                    cfheader(name="Access-Control-Allow-Origin", value="*");
+                    writeOutput(local.dirResolver.injectScopeMetadata(
+                        resultJson = result,
+                        scope = local.testScope,
+                        bundlesDiscovered = local.bundlesDiscovered,
+                        warnings = local.scopeWarnings
+                    ));
                 } else {
-                    cfheader(statuscode = 200);
+                    // txt / junit: emit the reporter output verbatim under the
+                    // resolved content type.
+                    cfcontent(type = local.output.contentType);
+                    writeOutput(result);
                 }
-                cfcontent(type = local.output.contentType);
-                cfheader(name="Access-Control-Allow-Origin", value="*");
-                writeOutput(local.dirResolver.injectScopeMetadata(
-                    resultJson = result,
-                    scope = local.testScope,
-                    bundlesDiscovered = local.bundlesDiscovered,
-                    warnings = local.scopeWarnings
-                ));
-            } else {
-                // txt / junit: emit the reporter output verbatim under the
-                // resolved content type.
-                cfcontent(type = local.output.contentType);
-                writeOutput(result);
             }
-        }
-        // Unrecognized format (empty value / unknown token): no output, and
-        // testBox is not run — html.cfm must not be rendered for an arbitrary
-        // url.format (it 500s on Adobe). Mirrors the pre-fix fall-through.
-    } finally {
-        // Restore the original datasource (via applyDataSource() so test-run cached model classes are invalidated).
-        if (local.swappedDataSource) {
-            local.dbResolver.applyDataSource(
-                wheelsScope = application.wheels,
-                name = local.originalDataSource
-            );
-        }
-        // Coverage mode (`wheels coverage`): dump the function-level counter
-        // map to an absolute path the CLI reads. Failure must never break the
-        // test response, so this is best-effort.
-        if (StructKeyExists(url, "coverage") && url.coverage) {
-            try {
-                FileWrite("/tmp/wheels-app-coverage.json", SerializeJSON(server.__wheels_cov));
-            } catch (any e) {
+            // Unrecognized format (empty value / unknown token): no output, and
+            // testBox is not run — html.cfm must not be rendered for an arbitrary
+            // url.format (it 500s on Adobe). Mirrors the pre-fix fall-through.
+        } finally {
+            // Restore the original datasource (via applyDataSource() so test-run
+            // cached model classes are invalidated). Only the request that
+            // performed the swap restores it — re-entrant sub-requests never
+            // touch the live config.
+            if (local.runnerOwnsSwap) {
+                if (local.swappedDataSource) {
+                    local.dbResolver.applyDataSource(
+                        wheelsScope = application.wheels,
+                        name = local.originalDataSource
+                    );
+                }
+                structDelete(application, "$$$appTestOriginalDataSource");
+            }
+            // Coverage mode (`wheels coverage`): dump the function-level counter
+            // map to an absolute path the CLI reads. Failure must never break the
+            // test response, so this is best-effort.
+            if (StructKeyExists(url, "coverage") && url.coverage) {
+                try {
+                    FileWrite("/tmp/wheels-app-coverage.json", SerializeJSON(server.__wheels_cov));
+                } catch (any e) {
+                }
             }
         }
     }
