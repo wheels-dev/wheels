@@ -47,6 +47,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(findNoCase("redirectOutput", src) > 0).toBeTrue();
 			});
 
+			it("wires `wheels start --engine=rustcfml` and auto-detecting `stop` to the backend", () => {
+				var src = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				expect(findNoCase('engine == "rustcfml"', src) > 0).toBeTrue();
+				expect(findNoCase("new services.rustcfml.RustCFMLEngine()", src) > 0).toBeTrue();
+				expect(findNoCase("rustSvc.status(variables.projectRoot)", src) > 0).toBeTrue();
+			});
+
 		});
 
 	}

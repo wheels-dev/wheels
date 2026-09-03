@@ -1197,11 +1197,36 @@ component extends="modules.BaseModule" {
 		// isn't on PATH after `brew install wheels` — the user gets an
 		// unactionable error from a fresh `wheels start`. Onboarding F1/F2.
 		var force = false;
+		var engine = "lucee";
+		var enginePort = 0;
 		var passThrough = [];
-		for (var a in args) {
-			if (a == "--force") { force = true; }
-			else { arrayAppend(passThrough, a); }
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var a = args[i];
+			if (a == "--force") {
+				force = true;
+			} else if (a == "--engine") {
+				if (i < arrayLen(args)) { engine = lCase(args[i + 1]); i++; }
+			} else if (left(a, 9) == "--engine=") {
+				engine = lCase(mid(a, 10, len(a) - 9));
+			} else if (a == "--port") {
+				if (i < arrayLen(args)) { enginePort = val(args[i + 1]); i++; }
+			} else if (left(a, 7) == "--port=") {
+				enginePort = val(mid(a, 8, len(a) - 7));
+			} else {
+				arrayAppend(passThrough, a);
+			}
 		}
+
+		// RustCFML backend — separate lifecycle from LuCLI (no JDK/Lucee
+		// Express), so it never touches the server registry below.
+		if (engine == "rustcfml") {
+			var rustSvc = new services.rustcfml.RustCFMLEngine();
+			var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
+			out("RustCFML server started (pid " & rustState.pid & ") at http://localhost:" & rustState.port, "green");
+			out("Log: " & rustState.log, "cyan");
+			return "";
+		}
+
 		var registry = getService("serverRegistry");
 		var serverName = registry.serverNameFor(variables.projectRoot);
 		var reg = registry.inspect(serverName, variables.projectRoot);
@@ -1293,6 +1318,17 @@ component extends="modules.BaseModule" {
 	 * hint: Stop the running Wheels development server
 	 */
 	public string function stop() {
+		// RustCFML backend — if a recorded RustCFML server is alive, stop it
+		// before touching LuCLI's registry. Auto-detected, so `wheels stop`
+		// works regardless of which engine was started.
+		var rustSvc = new services.rustcfml.RustCFMLEngine();
+		var rustStatus = rustSvc.status(variables.projectRoot);
+		if (rustStatus.running) {
+			rustSvc.stop(variables.projectRoot);
+			out("RustCFML server stopped.", "cyan");
+			return "";
+		}
+
 		out("Stopping Wheels server...", "cyan");
 
 		// If LuCLI's stop won't find a registered server for this directory
