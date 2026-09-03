@@ -77,5 +77,29 @@ deliberately superseded. The 5.0 scope lives separately in
     directories, and raw `params.` mass assignment into `create`/`update`/`save`
     (warn-only, comment-stripped scan).
 
+## New candidate (2026-09-03)
+
+21. **RustCFML engine backend for the `wheels` CLI** — **Candidate.** Let
+    users run the bundled dev server on the JVM-free RustCFML engine
+    (`wheels start --engine=rustcfml`) instead of Lucee. The framework side is
+    already done — the core suite (5,300+ specs) runs green against a pinned
+    RustCFML build on every PR, with one tracked upstream bug (query-of-query
+    `recordCount`, RustCFML/RustCFML#377) recorded in
+    `tools/rustcfml/baseline.json` — and the binary download/cache/version-pin
+    logic already exists in `tools/rustcfml/run-suite.sh` (platform detection,
+    `~/.cache/wheels-rustcfml`, `gh release download`). The gap is CLI-side:
+    an engine-backend abstraction in `cli/lucli/` (Lucee via LuCLI's `server`
+    command vs. RustCFML via its own `--serve` launcher), a process/port
+    registry for `start`/`stop`, re-pointing the HTTP-based commands
+    (`test`/`migrate`/`seed`/`routes`/`jobs`) with the `/index.cfm/` path-info
+    workaround (RustCFML#194), and surfacing the caveats: no JVM
+    (`CreateObject("java", …)` and any `java.*` app code fails, browser tests
+    skip with `BrowserJvmUnavailable`, `cfimage` degrades), one known upstream
+    bug, and a younger runtime. Medium feature; first cut = `wheels engines
+    rustcfml install` (download the pinned binary) + `wheels start
+    --engine=rustcfml` (wrap `rustcfml --serve public`). The current manual
+    path is documented in
+    [cfml-engines.mdx](/v4-0-0/start-here/cfml-engines/).
+
 The full per-plan audit trail lives in git history (the plans were removed
 in the 2026-08-30 cleanup commit).
