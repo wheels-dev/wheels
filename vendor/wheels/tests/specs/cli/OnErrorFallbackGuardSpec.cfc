@@ -26,7 +26,9 @@ component extends="wheels.WheelsTest" {
 			var repoRoot = expandPath("/wheels/../..");
 			var targets = [
 				"cli/lucli/templates/app/public/Application.cfc",
-				"public/Application.cfc"
+				"public/Application.cfc",
+				"examples/starter-app/public/Application.cfc",
+				"examples/tweet/public/Application.cfc"
 			];
 
 			for (var rel in targets) {
