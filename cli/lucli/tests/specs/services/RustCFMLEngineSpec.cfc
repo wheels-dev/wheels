@@ -57,7 +57,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("prefixes /index.cfm on the server URL base so RustCFML path-info routes resolve", () => {
 				var src = fileRead(expandPath("/cli/lucli/Module.cfc"));
 				expect(findNoCase("$serverUrlBase", src) > 0).toBeTrue();
-				expect(findNoCase("serverUrlBase(serverPort)", src) > 0).toBeTrue();
+				expect(findNoCase("$serverUrlBase(serverPort)", src) > 0).toBeTrue();
 				expect(findNoCase("/index.cfm", src) > 0).toBeTrue();
 			});
 
