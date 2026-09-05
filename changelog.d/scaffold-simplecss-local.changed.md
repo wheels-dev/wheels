@@ -1,0 +1,1 @@
+- Scaffolded apps now bundle simple.css locally in `public/stylesheets/simple.css` (MIT, ~10 KB) instead of loading it from a CDN, so fresh apps and demos render with the default styling offline. It remains a classless stylesheet — remove the `<link>` in `app/views/layout.cfm` (and the file) to use your own CSS, with no markup cleanup needed.
