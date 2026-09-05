@@ -1,0 +1,12 @@
+|DescriptionComment|component extends="Model" {
+
+	function config() {
+		|TableName|
+		{{belongsToRelationships}}
+		{{hasManyRelationships}}
+		{{hasOneRelationships}}
+		{{validations}}
+		{{enums}}
+	}
+
+}

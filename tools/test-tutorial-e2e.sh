@@ -93,15 +93,11 @@ run_cli() { "$CLI" wheels "$@"; }
 # ── Isolated module home (worktree cli/lucli as the wheels module) ─────────
 export LUCLI_HOME
 mkdir -p "$LUCLI_HOME/modules"
-# Copy the worktree module, then inject the build-time codegen templates that
-# live in cli/src/templates/ — the release pipeline copies these into
-# templates/codegen/ (they are absent from a fresh cli/lucli/ checkout, so the
-# scaffold would otherwise skip view generation with "Template not found:
-# crud/index.txt"). A copy (not symlink) keeps the worktree clean; the e2e flow
-# doesn't exercise the `packages` command that needs the `cli.lucli` real path.
+# Copy the worktree module. Codegen/crud templates are committed at
+# cli/lucli/templates/codegen/, so the copied module is self-contained. A copy
+# (not symlink) keeps the worktree clean; the e2e flow doesn't exercise the
+# `packages` command that needs the `cli.lucli` real-path ancestor walk.
 cp -R "$PROJECT_ROOT/cli/lucli" "$LUCLI_HOME/modules/wheels"
-mkdir -p "$LUCLI_HOME/modules/wheels/templates/codegen"
-cp -R "$PROJECT_ROOT/cli/src/templates/." "$LUCLI_HOME/modules/wheels/templates/codegen/"
 export WHEELS_FRAMEWORK_PATH="$PROJECT_ROOT/vendor/wheels"
 
 # Reuse an existing Lucee Express if available to skip the ~74MB re-download.
@@ -192,6 +188,12 @@ run_cli migrate latest > "$TMPDIR/migrate.log" 2>&1 \
     && pass "migrate latest exited 0" || { fail "migrate latest failed"; cat "$TMPDIR/migrate.log"; }
 
 reload_app
+echo "==> console: create a Post"
+# The scaffold adds validatesPresenceOf("title,body,publishedAt"), so pass all three.
+printf '%s\n' 'model("Post").create(title="Console Post", body="Created from the console", publishedAt=Now())' \
+    | run_cli console > "$TMPDIR/console.log" 2>&1 \
+    && pass "console create exited 0" || { fail "console create failed"; cat "$TMPDIR/console.log"; }
+
 echo "==> routes"
 run_cli routes > "$TMPDIR/routes.log" 2>&1 \
     && pass "routes exited 0" || { fail "routes failed"; cat "$TMPDIR/routes.log"; }
@@ -212,6 +214,11 @@ echo ""
 echo "==> HTTP surface"
 assert_http "/posts" 200 "GET /posts"
 assert_http "/posts.json" 200 "GET /posts.json (format suffix)"
+if curl -s "http://localhost:$PORT/posts" | grep -q "Console Post"; then
+    pass "console-created Post appears in /posts"
+else
+    fail "console-created Post missing from /posts"
+fi
 
 # ── Beat 7: api-resource + .json ──────────────────────────────────────────
 echo ""

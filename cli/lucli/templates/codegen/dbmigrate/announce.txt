@@ -1,0 +1,11 @@
+component extends="|DBMigrateExtends|" hint="|DBMigrateDescription|" {
+
+	function up() {
+		announce('');
+	}
+
+	function down() {
+		announce('');
+	}
+
+}

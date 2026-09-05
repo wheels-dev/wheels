@@ -1,0 +1,64 @@
+|DescriptionComment|component extends="Controller" {
+
+	/**
+	* View all |ObjectNamePluralC|
+	**/
+	function index() {
+		|ObjectNamePlural|=model("|ObjectNameSingularC|").findAll();
+	}
+
+	/**
+	* View |ObjectNameSingularC|
+	**/
+	function show() {
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").findByKey(params.key);
+	}
+
+	/**
+	* Add New |ObjectNameSingularC|
+	**/
+	function new() {
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").new();
+	}
+
+	/**
+	* Create |ObjectNameSingularC|
+	**/
+	function create() {
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").new(params.|ObjectNameSingular|);
+		if(|ObjectNameSingular|.save()){
+			redirectTo(route="|ObjectNameSingular|", key=|ObjectNameSingular|.id);
+		} else {
+			renderView(action="new");
+		}
+	}
+
+	/**
+	* Edit |ObjectNameSingularC|
+	**/
+	function edit() {
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").findByKey(params.key);
+	}
+
+	/**
+	* Update |ObjectNameSingularC|
+	**/
+	function update() {
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").findByKey(params.key);
+		if(|ObjectNameSingular|.update(params.|ObjectNameSingular|)){
+			redirectTo(route="|ObjectNameSingular|", key=|ObjectNameSingular|.id);
+		} else {
+			renderView(action="edit");
+		}
+	}
+
+	/**
+	* Delete |ObjectNameSingularC|
+	**/
+	function delete() {
+		|ObjectNameSingular|=model("|ObjectNameSingularC|").findByKey(params.key);
+		|ObjectNameSingular|.delete();
+		redirectTo(route="|ObjectNamePlural|");
+	}
+
+}

@@ -1,0 +1,11 @@
+<cfparam name="|ObjectNamePlural|" default="">
+<cfoutput>
+<h1>|ObjectNamePluralC|</h1>
+<p>#linkTo(route="new|ObjectNameSingularC|", text="New |ObjectNameSingular|")#</p>
+<cfloop query="|ObjectNamePlural|">
+	<article>
+		<h2>#linkTo(route="|ObjectNameSingular|", key=|ObjectNamePlural|.id, text=|ObjectNamePlural|.|DisplayProperty|)#</h2>
+		<!--- CLI-Appends-Here --->
+	</article>
+</cfloop>
+</cfoutput>

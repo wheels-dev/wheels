@@ -319,12 +319,8 @@ jobs:
           MODULE_VERSION: ${{ env.WHEELS_VERSION }}
         run: |
           mkdir -p "artifacts/wheels/${MODULE_VERSION}"
-          # Bundle codegen templates into the module so Templates.cfc::resolveTemplateDir()
-          # finds them at moduleRoot/templates/codegen/ in installed distributions.
-          # Without this, every template-driven generator (model, controller, view,
-          # scaffold, helper, api-resource) fails or emits empty output. See #1944.
-          mkdir -p cli/lucli/templates/codegen
-          cp -R cli/src/templates/. cli/lucli/templates/codegen/
+          # Codegen/crud templates are committed at cli/lucli/templates/codegen/
+          # (single source of truth), so no build-time copy from cli/src/ is needed.
           # Substitute @build.version@ placeholders in the LuCLI module before
           # tarring. Without this, module.json ships with the literal placeholder
           # (or a stale hardcoded version), causing BaseModule.version() to return
