@@ -596,8 +596,15 @@ component {
 	private string function generateIndexArticleBody(required array properties, string belongsTo = "") {
 		var blocks = [];
 		var foreignKeys = buildForeignKeyList(arguments.belongsTo);
+		// The display property already appears in the article's <h2> link, and
+		// framework-managed columns are noise in a list — don't repeat them.
+		var displayProperty = pickDisplayProperty(arguments.properties);
+		var skipped = ["id", "createdAt", "updatedAt", "deletedAt"];
 
 		for (var prop in arguments.properties) {
+			if (prop.name == displayProperty || arrayFindNoCase(skipped, prop.name)) {
+				continue;
+			}
 			var label = variables.helpers.capitalize(prop.name);
 			if (arrayFindNoCase(foreignKeys, prop.name)) {
 				// findAll() returns a flat query — association objects are not
