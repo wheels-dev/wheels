@@ -1,0 +1,106 @@
+|DescriptionComment|component extends="app.controllers.Controller" {
+
+	function config() {
+		super.config();
+
+		// CSRF protection — verifies authenticity token on state-changing requests
+		protectsFromForgery();
+
+		// Verify key param exists for member actions
+		verifies(except="index,new,create", params="key", paramsTypes="integer", handler="objectNotFound");
+	}
+
+	/**
+	* List all |ObjectNamePluralC|
+	**/
+	function index() {
+		param name="params.q" default="";
+		param name="params.sort" default="";
+		param name="params.direction" default="asc";
+		param name="params.page" type="numeric" default=1;
+
+		var where = [];
+		if (len(params.q)) {
+			var sanitizedQ = ReplaceList(params.q, "%,_,[", "\%,\_,\[");
+			where.append("|SearchWhereClause|");
+		}
+
+		// Sanitize sort parameters to prevent injection
+		var validDirection = listFindNoCase("asc,desc", params.direction) ? params.direction : "asc";
+		var sortOrder = len(params.sort) && reFindNoCase("^[a-zA-Z_][a-zA-Z0-9_]*$", params.sort)
+			? "#params.sort# #validDirection#"
+			: "";
+
+		|ObjectNamePlural| = model("|ObjectNameSingularC|").findAll(
+			where = arrayToList(where, " AND "),
+			order = sortOrder,
+			page = params.page,
+			perPage = 25
+		);
+	}
+
+	/**
+	* View |ObjectNameSingularC| detail
+	**/
+	function show() {
+		|ObjectNameSingular| = model("|ObjectNameSingularC|").findByKey(params.key);
+	}
+
+	/**
+	* New |ObjectNameSingularC| form
+	**/
+	function new() {
+		|ObjectNameSingular| = model("|ObjectNameSingularC|").new();
+		|ForeignKeyLoaders|
+	}
+
+	/**
+	* Create |ObjectNameSingularC|
+	**/
+	function create() {
+		|ObjectNameSingular| = model("|ObjectNameSingularC|").create(params.|ObjectNameSingular|);
+		if (|ObjectNameSingular|.hasErrors()) {
+			|ForeignKeyLoaders|
+			renderView(action="new");
+		} else {
+			redirectTo(action="index", success="|ObjectNameSingularC| successfully created");
+		}
+	}
+
+	/**
+	* Edit |ObjectNameSingularC| form
+	**/
+	function edit() {
+		|ObjectNameSingular| = model("|ObjectNameSingularC|").findByKey(params.key);
+		|ForeignKeyLoaders|
+	}
+
+	/**
+	* Update |ObjectNameSingularC|
+	**/
+	function update() {
+		|ObjectNameSingular| = model("|ObjectNameSingularC|").findByKey(params.key);
+		if (|ObjectNameSingular|.update(params.|ObjectNameSingular|)) {
+			redirectTo(action="index", success="|ObjectNameSingularC| successfully updated");
+		} else {
+			|ForeignKeyLoaders|
+			renderView(action="edit");
+		}
+	}
+
+	/**
+	* Delete |ObjectNameSingularC|
+	**/
+	function delete() {
+		|ObjectNameSingular| = model("|ObjectNameSingularC|").deleteByKey(params.key);
+		redirectTo(action="index", success="|ObjectNameSingularC| successfully deleted");
+	}
+
+	/**
+	* Redirect away if verifies fails or object can't be found
+	**/
+	private function objectNotFound() {
+		redirectTo(action="index", error="That |ObjectNameSingularC| wasn't found");
+	}
+
+}

@@ -1,0 +1,2 @@
+<h1>New |ObjectNameSingular|</h1>
+<cfoutput>#includePartial("form")#</cfoutput>

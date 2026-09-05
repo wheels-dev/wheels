@@ -1,0 +1,17 @@
+component extends="wheels.WheelsTest" {
+
+	function run() {
+
+		describe("{{testName}}", () => {
+
+			beforeEach(() => {
+				helper = new app.helpers.{{targetName}}();
+			})
+
+			it("should be instantiable", () => {
+				expect(helper).toBeInstanceOf("app.helpers.{{targetName}}");
+			})
+
+		})
+	}
+}

@@ -1,0 +1,73 @@
+import { defineConfig } from 'vite';
+
+/**
+ * Wheels + Vite Configuration
+ *
+ * Development: Run `npx vite` alongside CommandBox (`server start`).
+ * The Vite dev server handles JS/CSS with Hot Module Replacement (HMR),
+ * while CommandBox serves your CFML pages.
+ *
+ * Production: Run `npx vite build` to compile assets into public/build/
+ * with fingerprinted filenames and a manifest for cache busting.
+ *
+ * In your layout, use the Wheels view helpers:
+ *   #viteScriptTag("src/main.js")#   — JS entry (includes HMR client in dev)
+ *   #viteStyleTag("src/main.css")#   — CSS entry (no-op in dev, Vite injects via JS)
+ */
+export default defineConfig({
+  build: {
+    // Output to public/build/ — matches Wheels viteBuildPath setting
+    outDir: 'public/build',
+
+    // Generate .vite/manifest.json — matches Wheels viteManifestFile setting
+    manifest: true,
+
+    // JS/CSS/image assets go into assets/ subfolder
+    assetsDir: 'assets',
+
+    // Define your application entry point(s)
+    rollupOptions: {
+      input: 'src/main.js',
+    },
+
+    // Empty the output directory before each build
+    emptyOutDir: true,
+  },
+
+  server: {
+    // Vite dev server port — matches Wheels viteDevServerUrl setting
+    port: |vitePort|,
+    strictPort: true,
+
+    // Allow cross-origin requests from CommandBox server
+    cors: true,
+
+    // Set origin so asset URLs resolve correctly when loaded from CommandBox pages
+    origin: 'http://localhost:|vitePort|',
+
+    // Proxy configuration for single-URL development workflow.
+    //
+    // With this proxy enabled, you can open http://localhost:|vitePort| and get
+    // both Vite-served assets (with HMR) and CFML pages from CommandBox.
+    //
+    // Without the proxy, use http://localhost:|serverPort| (CommandBox serves pages,
+    // assets load from Vite via the viteScriptTag() helper).
+    proxy: {
+      '/': {
+        target: 'http://localhost:|serverPort|',
+        changeOrigin: true,
+        // Let Vite handle its own internal paths and source files
+        bypass(req) {
+          if (
+            req.url.startsWith('/src/') ||
+            req.url.startsWith('/node_modules/') ||
+            req.url.startsWith('/@') ||
+            req.url.startsWith('/__vite')
+          ) {
+            return req.url;
+          }
+        },
+      },
+    },
+  },
+});

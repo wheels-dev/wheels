@@ -1,0 +1,82 @@
+<!--- Admin: |ObjectNamePluralC| Index --->
+<cfparam name="|ObjectNamePlural|" default="">
+<cfparam name="params.q" default="">
+<cfparam name="params.sort" default="">
+<cfparam name="params.direction" default="asc">
+<cfscript>
+/**
+ * Sort link helper for admin table headers.
+ * Toggles direction when clicking the currently sorted column.
+ */
+string function _sortLink(required string col, required string label) {
+	var dir = "asc";
+	if (params.sort == col && params.direction == "asc") dir = "desc";
+	var qs = "sort=" & col & "&direction=" & dir;
+	if (len(params.q)) qs &= "&q=" & encodeForURL(params.q);
+	var icon = "";
+	if (params.sort == col) icon = (params.direction == "asc") ? " &#9650;" : " &#9660;";
+	return '<a href="' & urlFor(route="|ObjectNamePluralC|") & '?' & qs & '">' & label & icon & '</a>';
+}
+</cfscript>
+<cfoutput>
+<div class="container-fluid py-4">
+
+	<div class="d-flex justify-content-between align-items-center mb-4">
+		<h1>|ObjectNamePluralC|</h1>
+		<div>
+			#linkTo(route="new|ObjectNameSingularC|", text="New |ObjectNameSingularC|", class="btn btn-primary")#
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-body">
+			#startFormTag(route="|ObjectNamePluralC|", method="get", class="row g-3")#
+				<div class="col-md-10">
+					#textFieldTag(name="q", value=params.q, placeholder="Search |ObjectNamePluralC|...", class="form-control")#
+				</div>
+				<div class="col-md-2">
+					#submitTag(value="Search", class="btn btn-outline-secondary w-100")#
+				</div>
+			#endFormTag()#
+		</div>
+	</div>
+
+	<cfif |ObjectNamePlural|.recordcount>
+		<div class="card">
+			<div class="table-responsive">
+				<table class="table table-hover table-sm mb-0">
+					<thead class="table-light">
+						<tr>
+							{{AdminTableHeaders}}
+							<th class="text-end">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						<cfloop query="|ObjectNamePlural|">
+							<tr>
+								{{AdminTableCells}}
+								<td class="text-end text-nowrap">
+									<div class="btn-group btn-group-sm">
+										#linkTo(route="|ObjectNameSingularC|", key=id, text="View", class="btn btn-outline-info")#
+										#linkTo(route="edit|ObjectNameSingularC|", key=id, text="Edit", class="btn btn-outline-primary")#
+										#buttonTo(route="|ObjectNameSingularC|", method="delete", key=id, text="Delete", confirm="Are you sure?", inputClass="btn btn-outline-danger btn-sm")#
+									</div>
+								</td>
+							</tr>
+						</cfloop>
+					</tbody>
+				</table>
+			</div>
+			<div class="card-footer">
+				#paginationNav()#
+			</div>
+		</div>
+	<cfelse>
+		<div class="alert alert-info">
+			No |ObjectNamePluralC| found.
+			#linkTo(route="new|ObjectNameSingularC|", text="Create the first one")#
+		</div>
+	</cfif>
+
+</div>
+</cfoutput>

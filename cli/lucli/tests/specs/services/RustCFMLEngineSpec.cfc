@@ -59,6 +59,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(findNoCase("$serverUrlBase", src) > 0).toBeTrue();
 				expect(findNoCase("$serverUrlBase(serverPort)", src) > 0).toBeTrue();
 				expect(findNoCase("/index.cfm", src) > 0).toBeTrue();
+
+				// Regression guard: the helper is private `$serverUrlBase`. A call
+				// site missing the `$` (bare `serverUrlBase(serverPort)`) throws
+				// "No matching function [serverUrlBase] found" at runtime. Strip the
+				// prefixed form and assert no bare call remains.
+				var stripped = reReplaceNoCase(src, "\$serverUrlBase\(serverPort\)", "", "all");
+				expect(findNoCase("serverUrlBase(serverPort)", stripped) == 0).toBeTrue();
 			});
 
 		});

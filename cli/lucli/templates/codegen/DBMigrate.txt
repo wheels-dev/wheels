@@ -1,0 +1,39 @@
+component extends="wheels.migrator.Migration" hint="|DBMigrateHINT|" {
+
+	function up() {
+		var state = {};
+		transaction {
+			try {
+				|DBMigrateUP|
+			} catch (any e) {
+				state.exception = e;
+			}
+
+			if (StructKeyExists(state, "exception")) {
+				transaction action="rollback";
+				throw(errorCode="1", detail=state.exception.detail, message=state.exception.message, type="any");
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+	function down() {
+		var state = {};
+		transaction {
+		  try {
+				|DBMigrateDOWN|
+			} catch (any e) {
+				state.exception = e;
+			}
+
+			if (StructKeyExists(state, "exception")) {
+				transaction action="rollback";
+				throw(errorCode="1", detail=state.exception.detail, message=state.exception.message, type="any");
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+}

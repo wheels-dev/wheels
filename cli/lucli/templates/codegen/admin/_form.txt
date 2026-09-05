@@ -1,0 +1,5 @@
+<!--- |ObjectNameSingularC| Admin Form --->
+<cfoutput>
+|AdminFormFields|
+<!--- CLI-Appends-Here --->
+</cfoutput>
