@@ -658,8 +658,15 @@ component {
 	private string function generateShowViewProperties(required array properties, required string modelName, string belongsTo = "") {
 		var displayCode = [];
 		var foreignKeys = buildForeignKeyList(arguments.belongsTo);
+		// The display property already appears in the <h1>, and framework-managed
+		// columns are noise — don't repeat them in the detail list.
+		var displayProperty = pickDisplayProperty(arguments.properties);
+		var skipped = ["id", "createdAt", "updatedAt", "deletedAt"];
 
 		for (var prop in arguments.properties) {
+			if (prop.name == displayProperty || arrayFindNoCase(skipped, prop.name)) {
+				continue;
+			}
 			var propDisplay = '<p>' & chr(10);
 			if (arrayFindNoCase(foreignKeys, prop.name)) {
 				var assocName = left(prop.name, len(prop.name) - 2);
