@@ -16,10 +16,10 @@
 			      public/stylesheets/simple.css so the app renders polished offline.
 			      It is a classless stylesheet — it styles plain semantic HTML without
 			      any markup changes, so scaffolded views look good out of the box and
-			      removing it needs no markup cleanup. Delete this link (and the file)
+			      removing it needs no markup cleanup. Delete this line (and the file)
 			      to bring your own CSS, or swap for a richer kit — e.g.
 			      `wheels packages add wheels-basecoat`. --->
-			<link rel="stylesheet" href="/stylesheets/simple.css">
+			<cfoutput>#styleSheetLinkTag(sources="simple")#</cfoutput>
 		</head>
 
 		<body>
