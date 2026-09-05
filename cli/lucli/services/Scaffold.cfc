@@ -1158,7 +1158,10 @@ component {
 
 			var cfType = mapToWheelsType(prop.type);
 			var params = "columnNames='#prop.name#'";
-			params &= ", default=''";
+			// No `default=''` — the migrator hardener (S14) rejects empty-string
+			// defaults on string/text/char columns, and for numeric/temporal
+			// types `default=''` just rendered DEFAULT NULL anyway. Omitting the
+			// default yields NULL for nullable columns, which is the same thing.
 			params &= ", allowNull=" & (structKeyExists(prop, "required") && prop.required ? "false" : "true");
 
 			switch (cfType) {
