@@ -1,6 +1,16 @@
 |DescriptionComment|component extends="Controller" {
 
 	/**
+	 * Controller config. `super.config()` inherits CSRF protection
+	 * (`protectsFromForgery()`) from app/controllers/Controller.cfc. Keep it,
+	 * and keep the call when you add your own filters — without it `startFormTag`
+	 * silently stops emitting the hidden `authenticityToken` input.
+	 */
+	function config() {
+		super.config();
+	}
+
+	/**
 	* View all |ObjectNamePluralC|
 	**/
 	function index() {
