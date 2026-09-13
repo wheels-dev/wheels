@@ -63,10 +63,14 @@ jobs:
           # The ephemeral runner is already isolation enough for CI.
           HOMEBREW_NO_SANDBOX_LINUX: "1"
         run: |
-          brew tap wheels-dev/wheels || true
-          # Homebrew 5.1+ refuses to load formulae from untrusted third-party
-          # taps; trust must be granted explicitly (no-op on older brew).
+          # Trust BEFORE tap. Homebrew now validates every formula in a tap while
+          # cloning it, and on Linuxbrew refuses untrusted ones at that moment —
+          # the clone itself fails with "Invalid formula ... Refusing to load formula
+          # from untrusted tap", so a trust command placed after the tap runs too
+          # late. `brew trust` accepts a tap that is not installed yet (no-op on
+          # older brew that lacks the command).
           brew trust wheels-dev/wheels || true
+          brew tap wheels-dev/wheels || true
           brew install wheels
 
       - name: Patch wheels wrapper JAVA_HOME for Linux
