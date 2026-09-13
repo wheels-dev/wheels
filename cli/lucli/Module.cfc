@@ -2238,19 +2238,15 @@ component extends="modules.BaseModule" {
 		// Interactive `/exit` still returns 0 so a typo does not fail the
 		// whole session.
 		var System = createObject("java", "java.lang.System");
-		var reader = createObject("java", "java.io.BufferedReader").init(
-			createObject("java", "java.io.InputStreamReader").init(System.in)
-		);
+		var reader = $consoleReader(System);
 
 		var running = true;
 		var hadError = false;
 		while (running) {
-			// Print prompt
-			System.out.print("wheels> ");
-			System.out.flush();
-
-			// Read input
-			var line = reader.readLine();
+			// Read input. The reader owns the prompt: JLine has to draw it
+			// itself to redraw the line on left/right/history edits, and a
+			// separately printed prompt would be duplicated on every redraw.
+			var line = $consoleReadLine(reader, "wheels> ", System);
 
 			// Handle EOF (Ctrl+D or end of a pipe)
 			if (isNull(line)) {
@@ -2291,6 +2287,137 @@ component extends="modules.BaseModule" {
 		}
 
 		return "";
+	}
+
+	/**
+	 * Build the console's input reader.
+	 *
+	 * On a real terminal this is a JLine 3 LineReader — bundled in the LuCLI
+	 * runtime already — which is what turns arrow keys into cursor movement
+	 * and history recall. A plain BufferedReader over System.in receives the
+	 * raw escape bytes instead, so ← printed `^[[D` and ↑ printed `^[[A`.
+	 * History persists to ~/.wheels/console_history so ↑ also recalls
+	 * previous sessions.
+	 *
+	 * When stdin is NOT a terminal — `printf '...' | wheels console`, the
+	 * tutorial e2e, CI — System.console() is null and we keep the plain
+	 * reader. That path is byte-for-byte what shipped before: no prompt
+	 * redraw, no escape handling, and EOF still ends the session. JLine's
+	 * "dumb" terminal would work too, but there is nothing to gain from
+	 * running a line editor against a pipe and real risk in a different
+	 * EOF/interrupt contract for scripts that already pass.
+	 *
+	 * Returns a struct {jline: boolean, reader: any} so the read helper can
+	 * branch without re-detecting.
+	 */
+	private struct function $consoleReader(required any javaSystem) {
+		// Plain reader, built once up front. NOT a closure: inside a closure
+		// `arguments` is the closure's own empty scope, so `arguments.javaSystem`
+		// there threw "key doesn't exist" — on the piped path, which is the
+		// one CI and the tutorial e2e exercise. (Cross-Engine Invariant 3.)
+		var plain = {
+			jline: false,
+			reader: createObject("java", "java.io.BufferedReader").init(
+				createObject("java", "java.io.InputStreamReader").init(arguments.javaSystem.in)
+			)
+		};
+		if (isNull(arguments.javaSystem.console())) {
+			return plain;
+		}
+		try {
+			var terminal = createObject("java", "org.jline.terminal.TerminalBuilder").builder()
+				.system(true)
+				.build();
+			var historyDir = $userHome() & "/.wheels";
+			if (!directoryExists(historyDir)) {
+				directoryCreate(historyDir, true);
+			}
+			var lineReader = createObject("java", "org.jline.reader.LineReaderBuilder").builder()
+				.terminal(terminal)
+				.variable("history-file", historyDir & "/console_history")
+				.variable("history-size", javaCast("int", 500))
+				.build();
+			$bindConsoleArrowKeys(lineReader);
+			return {jline: true, reader: lineReader};
+		} catch (any e) {
+			// An exotic terminal JLine cannot drive must not kill the REPL —
+			// degrade to the plain reader, which always works.
+			return plain;
+		}
+	}
+
+	/**
+	 * Read one line from the console reader. Returns the line, or null at
+	 * EOF — Ctrl+D interactively, end of input on a pipe — so the REPL loop's
+	 * existing isNull() check works unchanged on both paths.
+	 *
+	 * Ctrl+C on the JLine path abandons the current line rather than
+	 * exiting, matching every other shell; the loop just prompts again.
+	 */
+	private any function $consoleReadLine(required struct reader, required string prompt, required any javaSystem) {
+		if (!arguments.reader.jline) {
+			arguments.javaSystem.out.print(arguments.prompt);
+			arguments.javaSystem.out.flush();
+			return arguments.reader.reader.readLine();
+		}
+		try {
+			return arguments.reader.reader.readLine(arguments.prompt);
+		} catch (any e) {
+			// Match on the Java class name rather than a typed catch clause:
+			// a Java exception's CFML `type` is engine-dependent, and a miss
+			// here would turn Ctrl+D into a stack trace. `e.type` carries the
+			// FQN on Lucee; fall back to the message for the wrapped form.
+			var javaType = e.type ?: "";
+			if (findNoCase("EndOfFileException", javaType) || findNoCase("EndOfFileException", e.message ?: "")) {
+				return javaCast("null", "");
+			}
+			if (findNoCase("UserInterruptException", javaType) || findNoCase("UserInterruptException", e.message ?: "")) {
+				return "";
+			}
+			rethrow;
+		}
+	}
+
+	private string function $userHome() {
+		return createObject("java", "java.lang.System").getProperty("user.home");
+	}
+
+	/**
+	 * Bind the arrow keys explicitly, in BOTH terminal cursor modes.
+	 *
+	 * Terminals send arrows as `ESC [ D` (normal cursor mode) or `ESC O D`
+	 * (application mode, after the app sends terminfo's `smkx`). JLine binds
+	 * whichever form terminfo advertises — on this runtime that was only the
+	 * `ESC O` form, so the `ESC [ D` a real terminal actually sends arrived
+	 * with ESC consumed and `[D` left in the buffer as text: `1+2[D[D[D9`.
+	 * Introspected on the live reader: `emacs ESC[D -> UNBOUND` while
+	 * terminfo key_left = `\EOD`.
+	 *
+	 * Binding both forms costs nothing and removes the dependency on the
+	 * terminal honouring keypad-transmit mode. Applied to every keymap the
+	 * reader may select so the choice of emacs/vi mode does not matter.
+	 */
+	private void function $bindConsoleArrowKeys(required any lineReader) {
+		var esc = chr(27);
+		var bindings = [
+			{seqs: [esc & "[D", esc & "OD"], widget: "backward-char"},
+			{seqs: [esc & "[C", esc & "OC"], widget: "forward-char"},
+			{seqs: [esc & "[A", esc & "OA"], widget: "up-line-or-history"},
+			{seqs: [esc & "[B", esc & "OB"], widget: "down-line-or-history"},
+			{seqs: [esc & "[H", esc & "OH", esc & "[1~"], widget: "beginning-of-line"},
+			{seqs: [esc & "[F", esc & "OF", esc & "[4~"], widget: "end-of-line"}
+		];
+		var keyMaps = arguments.lineReader.getKeyMaps();
+		for (var name in ["main", "emacs", "viins"]) {
+			if (!keyMaps.containsKey(name)) continue;
+			var km = keyMaps.get(name);
+			for (var b in bindings) {
+				var ref = createObject("java", "org.jline.reader.Reference").init(b.widget);
+				for (var seq in b.seqs) {
+					km.bind(ref, seq);
+				}
+			}
+		}
 	}
 
 	/**
@@ -8947,6 +9074,15 @@ component extends="modules.BaseModule" {
 	/**
 	 * Parse generator arguments into properties and associations
 	 * E.g., ["name", "email:string", "--belongsTo=user", "active:boolean"]
+	 *
+	 * Unknown `--flags` are an ERROR, not a no-op. Every command-level flag
+	 * (--force, --dry-run) is stripped by the caller before this runs, so the
+	 * only `--` tokens that legitimately reach here are the three association
+	 * flags. Anything else is a typo — and a silently dropped typo is the
+	 * worst possible outcome for a generator: `--belogsTo=post` produced a
+	 * clean-looking scaffold with no association and no parent wiring, and
+	 * nothing in the output hinted why (live-demo rehearsal, 2026-09-13).
+	 * This is the second flag this loop has swallowed — see #2327 for --force.
 	 */
 	private struct function parseGeneratorArgs(required array args) {
 		var result = {
@@ -8955,6 +9091,7 @@ component extends="modules.BaseModule" {
 			hasMany: [],
 			hasOne: []
 		};
+		var known = ["--belongsTo", "--hasMany", "--hasOne"];
 
 		for (var arg in args) {
 			// Named association flags
@@ -8967,7 +9104,18 @@ component extends="modules.BaseModule" {
 			} else if (reFindNoCase("^--hasOne=", arg)) {
 				var rels = listToArray(valueAfterEquals(arg));
 				result.hasOne.append(rels, true);
-			} else if (!arg.startsWith("--")) {
+			} else if (arg.startsWith("--")) {
+				var flagName = listFirst(arg, "=");
+				var hint = $closestFlag(flagName, known);
+				var message = "Unknown flag " & flagName & "."
+					& (len(hint) ? " Did you mean " & hint & "?" : "")
+					& " Association flags are --belongsTo=, --hasMany=, --hasOne=.";
+				// Print red AND throw: the red line is what the presenter reads,
+				// the throw is what makes `&&` chains and the exit code honest.
+				// Same contract as $consoleFail (##2229 / ##2941).
+				out(message, "red");
+				throw(type = "Wheels.CLI.UnknownFlag", message = message);
+			} else {
 				// Property: name, name:type, name:type{N}, name:type{P,S},
 				// or name:enum:value1,value2,...
 				arrayAppend(result.properties, $parsePropertyArg(arg));
@@ -8975,6 +9123,43 @@ component extends="modules.BaseModule" {
 		}
 
 		return result;
+	}
+
+	/**
+	 * Nearest known flag for a "did you mean" hint. A typo is almost always
+	 * within two edits of what was intended (--belogsTo -> --belongsTo is
+	 * one); anything further is not a useful suggestion, so return "".
+	 */
+	private string function $closestFlag(required string typed, required array known) {
+		var best = "";
+		var bestDistance = 3;
+		for (var candidate in arguments.known) {
+			var d = $editDistance(lCase(arguments.typed), lCase(candidate));
+			if (d < bestDistance) {
+				bestDistance = d;
+				best = candidate;
+			}
+		}
+		return best;
+	}
+
+	/** Levenshtein distance — small inputs only (flag names), so O(n*m) is fine. */
+	private numeric function $editDistance(required string a, required string b) {
+		var la = len(arguments.a);
+		var lb = len(arguments.b);
+		if (!la) return lb;
+		if (!lb) return la;
+		var prev = [];
+		for (var j = 0; j <= lb; j++) arrayAppend(prev, j);
+		for (var i = 1; i <= la; i++) {
+			var cur = [i];
+			for (var j = 1; j <= lb; j++) {
+				var cost = mid(arguments.a, i, 1) == mid(arguments.b, j, 1) ? 0 : 1;
+				arrayAppend(cur, min(min(prev[j + 1] + 1, cur[j] + 1), prev[j] + cost));
+			}
+			prev = cur;
+		}
+		return prev[lb + 1];
 	}
 
 	/**
