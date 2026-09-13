@@ -68,15 +68,45 @@ wheels generate scaffold Post 'title:string{50}' body:text publishedAt:datetime 
 
 ```bash
 wheels routes
+```
+
+**See:** **41 route(s)** — and every one of them is under `/wheels/…`,
+plus `/up`, the two wildcards, and `/`. Not one is *yours*.
+
+**Say:** "Forty-one routes and I haven't written any. That's the framework's
+own tooling — docs, tests, migrator, the console endpoint — mounted under
+`/wheels`. Remember the number."
+
+```bash
 wheels generate scaffold Post 'title:string{50}' body:text publishedAt:datetime
 wheels migrate latest
 wheels seed --generate
 wheels reload
-wheels routes
+wheels routes --filter=posts
 ```
 
-**See:** `Created table posts` · `Seeded: 10 created, 0 skipped` · the
-`posts` resource routes.
+**See:** `Created table posts` · `Seeded: 10 created, 0 skipped` · then a
+table of exactly **16 route(s)**, all `posts#…` — index, show, new, edit,
+create, update, delete, each in plain and `.[format]` form, with `PATCH` and
+`PUT` both mapped to `update`.
+
+**Say:** "Forty-one became fifty-seven. Sixteen routes from one line."
+
+Open `config/routes.cfm` and point at that line:
+
+```cfm
+.resources("posts")
+```
+
+**Why it matters.** The scaffold didn't just write files — it *registered*
+the resource. `.resources()` expands to the full REST surface, so the routes
+you see are the routes the framework will actually dispatch. `--filter`
+keeps the projector honest: the audience sees the sixteen that changed, not
+fifty-seven lines to hunt through.
+
+> If you want the raw total for the "fifty-seven" line, run plain
+> `wheels routes` and read the last line. The filter view alone is enough
+> for the point.
 
 Open `app/models/Post.cfc`:
 
