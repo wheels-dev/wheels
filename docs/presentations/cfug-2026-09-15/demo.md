@@ -232,7 +232,7 @@ Open `app/models/Post.cfc`. Keep the generated validations and add these
 lines inside `config()`:
 
 ```cfm
-validatesExclusionOf(property="title", list="Untitled");
+validatesExclusionOf(property="title", list="Untitled", allowBlank=true);
 hasMany(name="comments");
 ```
 

@@ -123,6 +123,11 @@ wheels reload
 **Body can't be empty**. Submit with title **Untitled** → **Title is
 reserved**.
 
+> `allowBlank=true` on the exclusion rule matters. Without it a blank title
+> trips *both* the presence rule and the exclusion rule, and the empty form
+> shows three errors instead of two. Each validation should complain about
+> exactly one thing.
+
 **Why it matters.** The generator gave you a starting point, not a cage.
 You add a business rule in one line and the form enforces it — no controller
 change, no view change. The `hasMany` is deliberate setup for Beat 4: watch
