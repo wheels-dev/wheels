@@ -143,6 +143,25 @@ if [ -n "$EXISTING_PID" ]; then
 else
   echo "Starting Wheels CLI server on port ${PORT}..."
 
+  # lucee.json pins BOTH ports (8080 + shutdown 8081). `--port` moves only the
+  # HTTP port, so `PORT=9090` still tried to bind shutdown 8081 and died with
+  # "port conflicts detected:" (empty list) whenever any other Wheels app held
+  # it. Pin a free shutdown port next to the HTTP port for this run; cleanup()
+  # already restores lucee.json.bak — this is what actually creates it.
+  if [ "$PORT" != "8080" ] && [ -f lucee.json ]; then
+    SHUTDOWN_PORT=$((PORT + 1))
+    while lsof -nP -iTCP:"$SHUTDOWN_PORT" -sTCP:LISTEN >/dev/null 2>&1; do
+      SHUTDOWN_PORT=$((SHUTDOWN_PORT + 1))
+    done
+    cp lucee.json lucee.json.bak
+    RESTORED_LUCEE_JSON=true
+    sed -i.tmp -E \
+      -e "s/(\"port\"[[:space:]]*:[[:space:]]*)[0-9]+/\1${PORT}/" \
+      -e "s/(\"shutdownPort\"[[:space:]]*:[[:space:]]*)[0-9]+/\1${SHUTDOWN_PORT}/" \
+      lucee.json && rm -f lucee.json.tmp
+    echo "Pinned lucee.json to port ${PORT}, shutdown ${SHUTDOWN_PORT} for this run"
+  fi
+
   # Locate Lucee Express's lib/ext so we can drop the SQLite JDBC there.
   # `|| true` keeps `set -e` from killing the script when the directory is
   # missing — `find` exits non-zero on missing path args (stderr suppressed

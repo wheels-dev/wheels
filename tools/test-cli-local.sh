@@ -56,6 +56,13 @@ listener_pid() {
 
 # ── Lifecycle ───────────────────────────────────────
 cleanup() {
+  # Put lucee.json back first, on EVERY exit path — success, a red suite, or
+  # Ctrl-C — so an overridden PORT never leaves the repo dirty. Guarded: the
+  # restore helper is defined further down, and an early exit (e.g. the
+  # ownership refusal above it) reaches this trap before it exists.
+  if declare -F restore_lucee_json >/dev/null 2>&1; then
+    restore_lucee_json
+  fi
   if [ "${STARTED_SERVER:-false}" = "true" ]; then
     echo "Stopping test server..."
     ( cd "$PROJECT_ROOT" && lucli server stop >/dev/null 2>&1 ) || true
@@ -101,6 +108,36 @@ if [ -n "$EXISTING_PID" ]; then
   echo "Using existing server on port ${PORT} (PID ${EXISTING_PID}, this project)"
 else
   echo "Starting LuCLI server on port ${PORT}..."
+
+  # lucee.json pins BOTH ports (8080 + shutdown 8081). `--port` moves only the
+  # HTTP port, so `PORT=8180` still tried to bind shutdown 8081 and died with
+  # LuCLI's "port conflicts detected:" (empty list) whenever any other Wheels
+  # app — e.g. a live blogdemo — held it. Mirror what `wheels start` does:
+  # pick a free shutdown port next to the HTTP port and pin both for this run,
+  # then put the file back exactly as it was so the repo is never left dirty.
+  LUCEE_JSON="$PROJECT_ROOT/lucee.json"
+  LUCEE_JSON_BACKUP=""
+  next_free_port() {
+    local p="$1"
+    while lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; do p=$((p + 1)); done
+    echo "$p"
+  }
+  restore_lucee_json() {
+    if [ -n "$LUCEE_JSON_BACKUP" ] && [ -f "$LUCEE_JSON_BACKUP" ]; then
+      mv "$LUCEE_JSON_BACKUP" "$LUCEE_JSON"
+      LUCEE_JSON_BACKUP=""
+    fi
+  }
+  if [ "$PORT" != "8080" ] && [ -f "$LUCEE_JSON" ]; then
+    SHUTDOWN_PORT="$(next_free_port $((PORT + 1)))"
+    LUCEE_JSON_BACKUP="$(mktemp /tmp/lucee.json.XXXXXX)"
+    cp "$LUCEE_JSON" "$LUCEE_JSON_BACKUP"
+    sed -i.tmp -E \
+      -e "s/(\"port\"[[:space:]]*:[[:space:]]*)[0-9]+/\1${PORT}/" \
+      -e "s/(\"shutdownPort\"[[:space:]]*:[[:space:]]*)[0-9]+/\1${SHUTDOWN_PORT}/" \
+      "$LUCEE_JSON" && rm -f "${LUCEE_JSON}.tmp"
+    echo "Pinned lucee.json to port ${PORT}, shutdown ${SHUTDOWN_PORT} for this run"
+  fi
 
   start_lucli() {
     nohup lucli server run --port="$PORT" --force > /tmp/wheels-cli-test-server.log 2>&1 &

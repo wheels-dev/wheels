@@ -93,6 +93,71 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("parseGeneratorArgs — unknown flags", () => {
+
+			// A misspelled association flag used to fall through every branch
+			// and vanish. `--belogsTo=post` then produced a clean-looking
+			// scaffold with no association and no parent wiring, and nothing
+			// in the output hinted why (live-demo rehearsal, 2026-09-13).
+			// This is the second flag this loop swallowed — #2327 was --force.
+
+			it("rejects a misspelled association flag instead of ignoring it", () => {
+				expect(() => {
+					probe.$parseGeneratorArgs(["body:text", "--belogsTo=post"]);
+				}).toThrow(type = "Wheels.CLI.UnknownFlag");
+			});
+
+			it("names the flag and suggests the nearest real one", () => {
+				var message = "";
+				try {
+					probe.$parseGeneratorArgs(["--belogsTo=post"]);
+				} catch (Wheels.CLI.UnknownFlag e) {
+					message = e.message;
+				}
+				expect(message).toInclude("--belogsTo");
+				expect(message).toInclude("Did you mean --belongsTo?");
+			});
+
+			it("suggests --hasMany for --hasMnay", () => {
+				var message = "";
+				try {
+					probe.$parseGeneratorArgs(["--hasMnay=post"]);
+				} catch (Wheels.CLI.UnknownFlag e) {
+					message = e.message;
+				}
+				expect(message).toInclude("Did you mean --hasMany?");
+			});
+
+			it("omits the suggestion when nothing is close", () => {
+				var message = "";
+				try {
+					probe.$parseGeneratorArgs(["--completely-wrong=1"]);
+				} catch (Wheels.CLI.UnknownFlag e) {
+					message = e.message;
+				}
+				expect(message).toInclude("Unknown flag --completely-wrong");
+				expect(message).notToInclude("Did you mean");
+				// Still lists the valid flags so the user is never stranded.
+				expect(message).toInclude("--belongsTo=");
+			});
+
+			it("still accepts the three real flags in any case", () => {
+				var parsed = probe.$parseGeneratorArgs([
+					"--BELONGSTO=user", "--hasmany=comments", "--HasOne=profile"
+				]);
+				expect(parsed.belongsTo[1]).toBe("user");
+				expect(parsed.hasMany[1]).toBe("comments");
+				expect(parsed.hasOne[1]).toBe("profile");
+			});
+
+			it("does not treat a property token containing dashes as a flag", () => {
+				// Only a leading `--` is a flag; a dash inside a name is data.
+				var parsed = probe.$parseGeneratorArgs(["display-name:string"]);
+				expect(parsed.properties[1].name).toBe("display-name");
+			});
+
+		});
+
 	}
 
 }

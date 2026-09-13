@@ -1,0 +1,1 @@
+- `wheels generate` now rejects a misspelled association flag instead of silently ignoring it. `--belogsTo=post` used to produce a clean-looking scaffold with no association and no parent wiring; it now fails with `Unknown flag --belogsTo. Did you mean --belongsTo?` and writes nothing
