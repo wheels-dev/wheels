@@ -60,6 +60,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(schema.properties.strict.type).toBe("boolean");
 			});
 
+			it("advertises routes' filter and format so an assistant can ask for a subset", () => {
+				// `routes` migrated from hand-rolled parsing to ArgSpec: the
+				// wrapper's help had promised --filter and --format for as long
+				// as the command existed, and neither was ever read.
+				var schema = probe.mcpToolSpecs().routes;
+				expect(schema.properties).toHaveKey("filter");
+				expect(schema.properties).toHaveKey("format");
+			});
+
 			it("describes every property so MCP clients see usable parameter docs", () => {
 				var specs = probe.mcpToolSpecs();
 				for (var toolName in specs) {
