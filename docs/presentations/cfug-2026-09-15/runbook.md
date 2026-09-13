@@ -67,6 +67,7 @@ wheels generate scaffold Post 'title:string{50}' body:text publishedAt:datetime 
 **Say:** "Dry run first. It tells me exactly what it's about to do."
 
 ```bash
+wheels routes
 wheels generate scaffold Post 'title:string{50}' body:text publishedAt:datetime
 wheels migrate latest
 wheels seed --generate
@@ -110,7 +111,7 @@ proper 404 instead of a 500. That guard is in every scaffolded controller.
 Open `app/models/Post.cfc` and add two lines inside `config()`:
 
 ```cfm
-validatesExclusionOf(property="title", list="Untitled");
+validatesExclusionOf(property="title", list="Untitled", allowBlank=true);
 hasMany(name="comments");
 ```
 
