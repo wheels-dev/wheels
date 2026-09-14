@@ -265,8 +265,10 @@ let me create by accident."
 
 Now authorization — a different question from authentication. This is a
 five-step arc; each step is one edit, one reload, one browser check. Stay
-**logged out** for steps 1–4. Keep `/posts`, `/posts/1` and `/posts/new`
-open in three tabs so you can refresh all three after each reload.
+**logged out** for steps 1–4; step 5 is where you log in. Keep `/posts`,
+`/posts/1`, `/posts/new` and `/posts/1/edit` open in four tabs so you can
+refresh them all after each reload. The arc lands on a realistic blog:
+**anyone reads, members write, only an admin deletes.**
 
 ### Step 1 — a policy that nobody asks
 
@@ -345,41 +347,71 @@ routable action."
 > probe which IDs exist. Point at the two `filters()` lines — order is the
 > code.
 
-### Step 4 — open one door for everyone
+### Step 4 — now make it a blog
 
-In `PostPolicy.cfc`, change `index()`:
-
-```cfm
-public boolean function index() {
-    return true;
-}
-```
-
-```bash
-wheels reload
-```
-
-**See:** `/posts` **200** · `/posts/1` **403** · `/posts/new` **403**.
-
-**Say:** "The list is public again. Everything else is still locked. I
-opened exactly the door I meant to."
-
-### Step 5 — open one door for logged-in users
-
-Change `show()`:
+Everything is shut. Open it the way a real blog would: **anyone reads,
+members write, only an admin deletes.** Replace the seven method bodies in
+`PostPolicy.cfc` and add two private helpers at the bottom:
 
 ```cfm
-public boolean function show() {
+public boolean function index()  { return true; }
+public boolean function show()   { return true; }
+public boolean function new()    { return isLoggedIn(); }
+public boolean function create() { return isLoggedIn(); }
+public boolean function edit()   { return isLoggedIn(); }
+public boolean function update() { return isLoggedIn(); }
+public boolean function delete() { return isAdmin(); }
+
+private boolean function isLoggedIn() {
     return IsStruct(variables.user) && !StructIsEmpty(variables.user);
 }
+
+private boolean function isAdmin() {
+    return isLoggedIn()
+        && StructKeyExists(variables.user, "role")
+        && variables.user.role == "admin";
+}
 ```
 
 ```bash
 wheels reload
 ```
 
-**Browser:** refresh `/posts/1` logged out → **403**. Log in. Same URL →
-**200**. Try `/posts/new` → still **403** — only `show` was granted.
+**See, logged out:** `/posts` **200** · `/posts/1` **200** · `/posts/new`
+**403** · `/posts/1/edit` **403**.
+
+**Say:** "Readers read. That's a blog. Anyone can see the list and any
+post; nobody anonymous can touch the New or Edit forms."
+
+### Step 5 — log in and prove the middle tier
+
+Log in. Refresh the same tabs.
+
+**See, logged in:** `/posts/new` **200** · `/posts/1/edit` **200**. Open a
+post and press **Delete** → **403**, and the post is still there.
+
+**Say:** "A member can write and edit. But delete asks `isAdmin()`, and
+this account has no `role` — so the same person who just edited a post is
+refused when they try to remove one. Three tiers, one file, and the
+controller never changed after Step 3."
+
+**Where does `role` come from?** It doesn't exist yet — and that's the
+honest part worth saying aloud. The policy sees `variables.user`, which is
+the struct the login code puts in the session: today that's
+`{id, email}`. Making `isAdmin()` real is three small edits you can
+describe without typing them:
+
+1. **A column.** `wheels generate migration add_role_to_users`, then
+   `addColumn(table="users", columnType="string", columnName="role", default="member")`.
+2. **Put it in the session.** The generated `Sessions.cfc` and
+   `Registrations.cfc` each have one `login(principal={id: …, email: …})`
+   line — add `role: user.role`. The framework's own `SessionStrategy`
+   docs show exactly this shape.
+3. **Nothing in the policy.** `isAdmin()` already reads `variables.user.role`.
+
+Then `UPDATE users SET role='admin'` for one account, log in again, and
+Delete works — verified: the same user goes from **403** to a successful
+delete. Everything else is a *policy* decision, not a framework one.
 
 **Why it matters.** Authentication answers *who are you*. Authorization
 answers *are you allowed*. Wheels keeps them separate on purpose: policies
@@ -392,6 +424,10 @@ magic deciding access — and the filter shows how cheaply you go from
 | `authorize(record)` | **gate** — throw 403 if denied |
 | `can("update", post)` | **ask** — show or hide a button without throwing |
 | `policyScope(model("Post")).findAll()` | **narrow** — a list shows only what this user may see |
+
+> `can()` is how you'd finish the blog UI: wrap the Edit and Delete buttons
+> in `<cfif can("update", post)>` / `<cfif can("delete", post)>` so readers
+> never see controls they can't use. Same policy, no throw.
 
 **Before Beat 6 — remove the `authorizePost` filter line and the private
 method, and reload.** The scaffold's controller specs aren't logged in;
@@ -591,7 +627,7 @@ And the tests are the check on whatever it changes.
 2. **Scaffold:** one declaration → migration + model + validation, in sync.
 3. **Own it:** add a rule in one line; the form enforces it.
 4. **Associations:** scaffolding the child wires the parent. Both sides.
-5. **Auth:** bcrypt done right, once. **Policy:** deny by default, but *you* say where the gate goes — one line for one action, one filter for all of them.
+5. **Auth:** bcrypt done right, once. **Policy:** deny by default, *you* say where the gate goes — then three tiers in one file: readers read, members write, admins delete.
 6. **Tests:** generated with everything; caught a real break in seconds.
 7. **API:** same models, same rules, one command.
 8. **AI:** conventions the agent can read, tests that check what it did.

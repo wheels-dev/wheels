@@ -374,15 +374,24 @@ Run this as a five-step arc, one edit and one reload per step, checking
    All three **403**. `/posts/99999` stays **404** because the scaffold's
    `requireRecord` filter is declared first — nonexistent records 404 before
    the policy is consulted, so 403-vs-404 cannot be used to probe IDs.
-4. **Open one door for everyone.** `index()` → `return true;`. `/posts`
-   **200**, the other two still **403**.
-5. **Open one door for logged-in users.** `show()` →
-   `return IsStruct(variables.user) && !StructIsEmpty(variables.user);`.
-   Logged out `/posts/1` **403**; log in → **200**; `/posts/new` still
-   **403**.
+4. **Make it a blog.** Grant `index()`/`show()` to everyone, `new`/
+   `create`/`edit`/`update` to `isLoggedIn()`, and `delete` to `isAdmin()`
+   (two private helpers in the policy; `isAdmin()` checks
+   `variables.user.role == "admin"`). Logged out: `/posts` **200** ·
+   `/posts/1` **200** · `/posts/new` **403** · `/posts/1/edit` **403**.
+5. **Log in.** `/posts/new` and `/posts/1/edit` **200**; pressing Delete →
+   **403** with `Wheels.NotAuthorized` for the `delete` action and the row
+   untouched. `role` does not exist yet — say so. Making it real is three
+   edits, all verified: a migration adding `users.role` (default `member`),
+   `role: user.role` added to the `login(principal=…)` line in the generated
+   `Sessions.cfc` and `Registrations.cfc`, and nothing in the policy. Promote
+   one account with `UPDATE users SET role='admin'`, log in again, and the
+   same user's Delete succeeds (303, `deletedAt` set). `can("delete", post)`
+   around the Delete button hides it for guests and members and shows it
+   for admin — verified 0 / 0 / 1.
 
 **Say:** “Default-deny at the policy, opt-in at the controller. One line
-gates one action; one filter gates them all. The generated login code
+gates one action; one filter gates them all; then three tiers in one file. The generated login code
 handles password hashing instead of asking us to invent it.”
 
 **Before Beat 6, remove the `authorizePost` filter and its private method,
