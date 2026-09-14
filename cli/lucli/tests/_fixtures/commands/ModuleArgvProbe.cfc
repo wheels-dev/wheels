@@ -47,6 +47,14 @@ component extends="cli.lucli.Module" {
 		return parseSeedArgs(arguments.coll);
 	}
 
+	public array function $filterRoutesProbe(required array routes, required string filter) {
+		return $filterRoutes(arguments.routes, arguments.filter);
+	}
+
+	public struct function $parseRoutesArgs(required struct coll) {
+		return routesArgSpec().parse(arguments.coll);
+	}
+
 	public struct function $parseNotesArgs(required struct coll) {
 		return parseNotesArgs(arguments.coll);
 	}

@@ -1,0 +1,1 @@
+- `wheels routes --filter=<text>` and `--format=json` now work. Both were advertised in the command's help for as long as it existed and neither was ever read — the command printed every route unconditionally. `--filter` matches name, pattern or `controller#action` (case-insensitive, literal); `--format=json` emits the filtered array with lower-case keys so `jq .pattern` works

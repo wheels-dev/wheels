@@ -251,7 +251,7 @@ component extends="modules.BaseModule" {
 	 * the MCP advertisement cannot drift.
 	 *
 	 * Commands still on hand-rolled token parsing (generate, migrate, db,
-	 * deploy, routes, info, reload, validate, create — tracked by #2861)
+	 * deploy, info, reload, validate, create — tracked by #2861)
 	 * gain entries here as they migrate to ArgSpec.
 	 */
 	public struct function mcpToolSpecs() {
@@ -263,6 +263,7 @@ component extends="modules.BaseModule" {
 			"generate" = generateArgSpec().toInputSchema(),
 			"migrate" = migrateArgSpec().toInputSchema(),
 			"notes"   = notesArgSpec().toInputSchema(),
+			"routes"  = routesArgSpec().toInputSchema(),
 			"seed"    = seedArgSpec().toInputSchema(),
 			"stats"   = verboseFlagSpec().toInputSchema(),
 			"test"    = testArgSpec().toInputSchema(),
@@ -1938,7 +1939,20 @@ component extends="modules.BaseModule" {
 	/**
 	 * hint: List all configured routes with method, path, and controller action
 	 */
+	private any function routesArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "filter", default = "", description = "Show only routes whose name, pattern or controller##action contains this text (case-insensitive)")
+			.option(name = "format", default = "text", description = "Output format: text (aligned table) or json");
+	}
+
 	public string function routes() {
+		// Both flags were advertised in the wrapper's help for as long as the
+		// command has existed, and neither was ever read — the command fetched
+		// every route and printed the table unconditionally. Found while
+		// rehearsing `wheels routes --filter=posts` as a before/after for the
+		// scaffold beat: it returned all 57 routes, which on stage reads as a
+		// bug in front of the audience.
+		var opts = routesArgSpec().parse(structuredArgs(arguments));
 		var serverPort = $requireRunningServer();
 
 		try {
@@ -1963,12 +1977,36 @@ component extends="modules.BaseModule" {
 				throw(type = "Wheels.RoutesFailed", message = "Failed to fetch routes: #result.message ?: 'unknown error'#");
 			}
 
-			if (!structKeyExists(result, "routes") || !arrayLen(result.routes)) {
-				out("No routes configured.", "yellow");
+			var routes = structKeyExists(result, "routes") ? result.routes : [];
+			if (len(opts.filter)) {
+				routes = $filterRoutes(routes, opts.filter);
+			}
+
+			if (lCase(opts.format) == "json") {
+				// Machine-readable: the filtered array and nothing else on stdout.
+				// Rebuild each route with quoted lower-case keys — a CFML struct
+				// serializes its keys UPPER-CASE, and `jq .pattern` on {"PATTERN":..}
+				// silently yields null. Field set matches the text table.
+				var shaped = [];
+				for (var route in routes) {
+					arrayAppend(shaped, {
+						"methods":    route.methods ?: "",
+						"pattern":    route.pattern ?: "",
+						"controller": route.controller ?: "",
+						"action":     route.action ?: "",
+						"name":       route.name ?: ""
+					});
+				}
+				out(serializeJSON(shaped), "");
 				return "";
 			}
 
-			$printRoutesTable(result.routes);
+			if (!arrayLen(routes)) {
+				out(len(opts.filter) ? "No routes match '#opts.filter#'." : "No routes configured.", "yellow");
+				return "";
+			}
+
+			$printRoutesTable(routes);
 		} catch (any e) {
 			// Inner Wheels.RoutesFailed paths already printed a diagnostic; only HTTP/unexpected errors need one here.
 			if (e.type != "Wheels.RoutesFailed") {
@@ -1977,6 +2015,28 @@ component extends="modules.BaseModule" {
 			rethrow;
 		}
 		return "";
+	}
+
+	/**
+	 * Keep routes whose name, pattern, or controller##action contains the
+	 * filter text — the three fields the help text names. Case-insensitive
+	 * substring, not a regex: a presenter typing `--filter=posts` should not
+	 * have to think about escaping, and `[key]` in a pattern must be literal.
+	 */
+	private array function $filterRoutes(required array routes, required string filter) {
+		var needle = lCase(arguments.filter);
+		var kept = [];
+		for (var route in arguments.routes) {
+			var haystack = lCase(
+				(route.name ?: "") & " "
+				& (route.pattern ?: "") & " "
+				& (route.controller ?: "") & "##" & (route.action ?: "")
+			);
+			if (find(needle, haystack)) {
+				arrayAppend(kept, route);
+			}
+		}
+		return kept;
 	}
 
 	/**
