@@ -239,11 +239,11 @@ design decision). Add this to `app/views/layout.cfm`, inside the
 `<cfoutput>`, **before `#flashMessages()#`, in both branches**:
 
 ```cfm
-<nav aria-label="Demo navigation">
-    #linkTo(route="posts", text="Posts")#
-    #linkTo(route="login", text="Log in")#
-    #buttonTo(route="logout", method="delete", text="Log out")#
-</nav>
+<div class="wheels-actions">
+	#linkTo(route="posts", text="Posts", class="button")#
+	#linkTo(route="login", text="Log in", class="button")#
+	#buttonTo(route="logout", method="delete", text="Log out")#
+</div>
 ```
 
 ```bash
