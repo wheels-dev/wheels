@@ -218,7 +218,7 @@ separately from the SQL.
 
 ---
 
-## Beat 5 — authentication and authorization (≈10 min)
+## Beat 5 — authentication and authorization (≈13 min)
 
 ```bash
 wheels generate auth --strategy=session
@@ -263,15 +263,108 @@ wheels reload
 token. A GET link that logs you out is a security hole the framework won't
 let me create by accident."
 
-Now authorization — a different question from authentication:
+Now authorization — a different question from authentication. This is a
+five-step arc; each step is one edit, one reload, one browser check. Stay
+**logged out** for steps 1–4. Keep `/posts`, `/posts/1` and `/posts/new`
+open in three tabs so you can refresh all three after each reload.
+
+### Step 1 — a policy that nobody asks
 
 ```bash
 wheels generate policy Post
+wheels reload
 ```
 
-Open `app/policies/PostPolicy.cfc`. **Every method returns `false`.**
+Open `app/policies/PostPolicy.cfc`. **Every method returns `false`.** Now
+refresh the three tabs.
 
-**Say:** "Default deny. Nothing is allowed until I say so."
+**See:** `/posts` **200** · `/posts/1` **200** · `/posts/new` **200**.
+Everything still loads.
+
+**Say:** "Every method says no — and nothing changed. The policy is
+deny-by-default, but a policy is a *question*. Nobody's asked it yet. That's
+on purpose: a framework that locked down your whole app the moment you
+generated a file would break things you can't see. You say where the gate
+goes."
+
+### Step 2 — gate one action
+
+In `app/controllers/Posts.cfc`, add one line to `show()` **after** the
+finder:
+
+```cfm
+function show() {
+    post=model("Post").findByKey(key=params.key, include="comments");
+    authorize(post);
+}
+```
+
+```bash
+wheels reload
+```
+
+**See:** `/posts` **200** · `/posts/1` **403** · `/posts/new` **200**.
+
+**Say:** "One line. Now `show` asks the policy, the policy says no, 403.
+The other two never asked, so they're still open. Enforcement is per
+action and explicit."
+
+### Step 3 — gate every action with one filter
+
+Remove the `authorize(post);` line from `show()`. Then in `config()`, add a
+filter, and add the private method it names at the bottom of the
+controller:
+
+```cfm
+function config() {
+    super.config();
+    filters(through="requireRecord", only="show,edit,update,delete");
+    filters(through="authorizePost");
+}
+
+private function authorizePost() {
+    authorize(model("Post"));
+}
+```
+
+```bash
+wheels reload
+```
+
+**See:** `/posts` **403** · `/posts/1` **403** · `/posts/new` **403**.
+
+**Say:** "Now everything's shut. `authorize()` takes the model class, not
+just a record, and it reads the current action off the request — so
+`/posts` asks `index()`, `/posts/new` asks `new()`. One filter, one line,
+every action. The private method is what makes it a filter and not a
+routable action."
+
+> Type `/posts/99999` — it's **404**, not 403. The scaffold's `requireRecord`
+> filter is declared first, so a nonexistent record 404s *before* the policy
+> is consulted. That's the right order: an attacker can't use 403-vs-404 to
+> probe which IDs exist. Point at the two `filters()` lines — order is the
+> code.
+
+### Step 4 — open one door for everyone
+
+In `PostPolicy.cfc`, change `index()`:
+
+```cfm
+public boolean function index() {
+    return true;
+}
+```
+
+```bash
+wheels reload
+```
+
+**See:** `/posts` **200** · `/posts/1` **403** · `/posts/new` **403**.
+
+**Say:** "The list is public again. Everything else is still locked. I
+opened exactly the door I meant to."
+
+### Step 5 — open one door for logged-in users
 
 Change `show()`:
 
@@ -281,30 +374,29 @@ public boolean function show() {
 }
 ```
 
-In `app/controllers/Posts.cfc`, add one line in `show()` **after** the
-finder:
-
-```cfm
-authorize(post);
-```
-
 ```bash
 wheels reload
 ```
 
-**Browser:** log out, visit `/posts/1` → **403**. Log in, same URL →
-**200**.
+**Browser:** refresh `/posts/1` logged out → **403**. Log in. Same URL →
+**200**. Try `/posts/new` → still **403** — only `show` was granted.
 
 **Why it matters.** Authentication answers *who are you*. Authorization
 answers *are you allowed*. Wheels keeps them separate on purpose: policies
-are plain CFCs you can unit-test, and calling `authorize()` is explicit —
-no hidden magic deciding access for you. Notice also that a soft-deleted
-post returns **404** even when logged out: the not-found guard runs *before*
-the policy, so an attacker can't probe which IDs exist.
+are plain CFCs you can unit-test, `authorize()` is explicit — no hidden
+magic deciding access — and the filter shows how cheaply you go from
+"gate one action" to "gate them all." The three tools map to three intents:
 
-**Before Beat 6 — remove the `authorize(post);` line and reload.** The
-scaffold's controller specs aren't logged in; leaving it in makes them fail
-for a reason that has nothing to do with the framework.
+| call | intent |
+|---|---|
+| `authorize(record)` | **gate** — throw 403 if denied |
+| `can("update", post)` | **ask** — show or hide a button without throwing |
+| `policyScope(model("Post")).findAll()` | **narrow** — a list shows only what this user may see |
+
+**Before Beat 6 — remove the `authorizePost` filter line and the private
+method, and reload.** The scaffold's controller specs aren't logged in;
+leaving the filter in makes them fail for a reason that has nothing to do
+with the framework. Keep the policy file.
 
 ---
 
@@ -485,7 +577,7 @@ And the tests are the check on whatever it changes.
 | `wheels start` says port in use | It already picked the next free shutdown port; read the line it printed. If 8080 itself is taken: `lsof -nP -iTCP:8080` and stop that process. |
 | A page 500s after an edit | `wheels reload`. Lucee caches compiled templates. |
 | Validation edit "didn't take" | You edited the model but didn't reload. `wheels reload`, refresh. |
-| `wheels test` fails after Beat 5 | You left `authorize(post);` in. Remove it, reload. |
+| `wheels test` fails after Beat 5 | You left the `authorizePost` filter in. Remove the `filters()` line and the private method, reload. |
 | Browser looks unstyled | Hard-refresh (⌘⇧R). |
 | A seed count differs from this card | `created + skipped` should equal the number of `seedOnce` blocks. If it does, you're fine — say the real number. |
 | Comments don't appear on `/posts/N` | Check `Posts.cfc` `show()` has `include="comments"`. If not, add it and reload. |
@@ -499,7 +591,7 @@ And the tests are the check on whatever it changes.
 2. **Scaffold:** one declaration → migration + model + validation, in sync.
 3. **Own it:** add a rule in one line; the form enforces it.
 4. **Associations:** scaffolding the child wires the parent. Both sides.
-5. **Auth:** bcrypt done right, once. **Policy:** default-deny, explicit.
+5. **Auth:** bcrypt done right, once. **Policy:** deny by default, but *you* say where the gate goes — one line for one action, one filter for all of them.
 6. **Tests:** generated with everything; caught a real break in seconds.
 7. **API:** same models, same rules, one command.
 8. **AI:** conventions the agent can read, tests that check what it did.

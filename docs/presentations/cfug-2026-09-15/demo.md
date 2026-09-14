@@ -352,28 +352,43 @@ Do not put a real password in a projected console command.
 
 ```bash
 wheels generate policy Post
+wheels reload
 ```
 
-The generated policy denies access until you grant it. In
-`app/policies/PostPolicy.cfc`, change `show()` to:
+Run this as a five-step arc, one edit and one reload per step, checking
+`/posts`, `/posts/1` and `/posts/new` after each. Stay logged out for steps
+1–4. Every status below was measured on a stock app at build 2490.
 
-```cfm
-public boolean function show() {
-    return IsStruct(variables.user) && !StructIsEmpty(variables.user);
-}
-```
+1. **Policy exists, nothing enforces it.** All three routes still **200**.
+   The generated policy denies every action, but a policy is only consulted
+   where a controller calls `authorize()`. Generating the file changes
+   nothing on its own — by design.
+2. **Gate one action.** Add `authorize(post);` to `Posts.show()` after the
+   finder (keep `include="comments"`). `/posts` **200** · `/posts/1` **403**
+   · `/posts/new` **200**.
+3. **Gate every action.** Remove that line; add
+   `filters(through="authorizePost");` to `config()` and a
+   `private function authorizePost() { authorize(model("Post")); }`.
+   `authorize()` accepts the model class and defaults the action to
+   `params.action`, so one filter dispatches to `index()`/`show()`/`new()`.
+   All three **403**. `/posts/99999` stays **404** because the scaffold's
+   `requireRecord` filter is declared first — nonexistent records 404 before
+   the policy is consulted, so 403-vs-404 cannot be used to probe IDs.
+4. **Open one door for everyone.** `index()` → `return true;`. `/posts`
+   **200**, the other two still **403**.
+5. **Open one door for logged-in users.** `show()` →
+   `return IsStruct(variables.user) && !StructIsEmpty(variables.user);`.
+   Logged out `/posts/1` **403**; log in → **200**; `/posts/new` still
+   **403**.
 
-In `Posts.show()`, add `authorize(post);` **after** the existing finder.
-Keep `include="comments"`. Reload, then verify logged out → **403** and
-logged in → **200** on the same Post.
+**Say:** “Default-deny at the policy, opt-in at the controller. One line
+gates one action; one filter gates them all. The generated login code
+handles password hashing instead of asking us to invent it.”
 
-**Say:** “Default-deny. Adding a policy is explicit, and so is calling it.
-The generated login code handles password hashing instead of asking us to
-invent it.”
-
-**Before Beat 6, remove the temporary `authorize(post);` and reload.** The
-scaffold's CRUD specs are not logged in. Keep the policy file; do not
-present the unauthenticated CRUD test failure as a framework failure.
+**Before Beat 6, remove the `authorizePost` filter and its private method,
+then reload.** The scaffold's CRUD specs are not logged in. Keep the policy
+file; do not present the unauthenticated CRUD test failure as a framework
+failure.
 
 ## Beat 6 — red, green (slide 18, ≈8 min)
 
