@@ -49,7 +49,7 @@ component extends="cli.lucli.Module" {
 
 	/**
 	 * Point the probe at a different project root. resolveProjectRoot() runs in
-	 * the constructor, so a spec that needs `wheels map setup` to write into a
+	 * the constructor, so a spec that needs `wheels setup agents` to write into a
 	 * temp project sets it here rather than touching variables directly.
 	 */
 	public void function $setProjectRoot(required string path) {
@@ -58,8 +58,8 @@ component extends="cli.lucli.Module" {
 
 	// NOTE the `Probe` suffix — a shim named exactly after the private helper
 	// resolves to ITSELF (public wins) and recurses until the stack blows.
-	public string function $mcpSetupProbe(required array args) {
-		return $mcpSetup(arguments.args);
+	public string function $setupMcpProbe(required array args) {
+		return $setupMcp(arguments.args);
 	}
 
 	public array function $filterRoutesProbe(required array routes, required string filter) {

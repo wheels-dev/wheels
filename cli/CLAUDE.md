@@ -77,7 +77,7 @@ Be aware these can be intercepted by the runtime/launcher rather than reaching `
 
 `wheels mcp wheels` launches the stdio MCP server. Tools are auto-discovered from `Module.cfc`
 public functions; stateful/interactive commands are hidden via `mcpHiddenTools()`.
-`wheels map setup` writes `.mcp.json` for you (merging, not clobbering). It is `map` and not
+`wheels setup agents` writes `.mcp.json` and `.opencode.json` for you (merging, not clobbering). It is `setup agents` and not
 `mcp setup` because LuCLI owns `mcp` as a runtime verb — `wheels mcp <name>` means "run module
 <name>", so an `mcp` subcommand never reaches `Module.cfc`. See the root `CLAUDE.md`
 "CLI / MCP" section and `web/.../command-line-tools/mcp-integration` for details.
