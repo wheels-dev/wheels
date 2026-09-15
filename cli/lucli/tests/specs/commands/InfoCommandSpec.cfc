@@ -43,7 +43,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		describe("wheels mcp", () => {
 
 			it("runs without error", () => {
-				mod.mcp();
+				mod.map();
 				expect(true).toBeTrue();
 			});
 
