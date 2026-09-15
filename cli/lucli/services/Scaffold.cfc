@@ -58,7 +58,10 @@ component {
 		boolean tests = true,
 		boolean force = false
 	) {
-		var results = {success: true, generated: [], modified: [], skipped: [], errors: [], rollback: []};
+		// `routes` is its own field, not part of `modified`: config/routes.cfm is a
+		// shared project file, not a per-model artifact, and the parent-wiring
+		// specs assert the exact contents of `modified`.
+		var results = {success: true, generated: [], modified: [], routes: [], skipped: [], errors: [], rollback: []};
 		var pluralName = variables.helpers.pluralize(arguments.name);
 
 		try {
@@ -185,7 +188,14 @@ component {
 			// onboarding cliff (finding F4): scaffolding `Post` produced
 			// `.resources("post")`, which conflicted with hand-added plural routes
 			// and broke the controller convention.
-			updateRoutes(pluralName);
+			//
+			// updateRoutes() returns whether it actually changed the file, and
+			// that was discarded — so a real scaffold silently rewrote
+			// config/routes.cfm while --dry-run listed it. The dry run was more
+			// honest than the run. Report it like any other change.
+			if (updateRoutes(pluralName)) {
+				arrayAppend(results.routes, {type: "routes", path: variables.projectRoot & "/config/routes.cfm"});
+			}
 
 			// Parent files belong to the user, even under --force. Only make
 			// narrowly recognized edits; report everything else for manual wiring.

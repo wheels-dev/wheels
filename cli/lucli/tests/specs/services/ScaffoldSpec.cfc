@@ -432,6 +432,35 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(count).toBe(1);
 				});
 
+				it("reports the routes.cfm change in its own results.routes field", () => {
+					// updateRoutes() always returned this boolean; the scaffold threw
+					// it away, so a real run silently rewrote config/routes.cfm while
+					// --dry-run listed it. The dry run was more honest than the run.
+					var result = scaffold.generateScaffold(
+						name = "Sprocket",
+						properties = [{name: "title", type: "string"}],
+						force = true
+					);
+					expect(result.success).toBeTrue();
+					expect(arrayLen(result.routes)).toBe(1);
+					expect(result.routes[1].path).toInclude("config/routes.cfm");
+				});
+
+				it("does not report a routes change when the resource line already exists", () => {
+					scaffold.generateScaffold(
+						name = "Cog",
+						properties = [{name: "title", type: "string"}],
+						force = true
+					);
+					// Re-scaffold: updateRoutes() finds the existing line and skips.
+					var second = scaffold.generateScaffold(
+						name = "Cog",
+						properties = [{name: "title", type: "string"}],
+						force = true
+					);
+					expect(arrayLen(second.routes)).toBe(0);
+				});
+
 			});
 
 			describe("generateApiResource()", () => {

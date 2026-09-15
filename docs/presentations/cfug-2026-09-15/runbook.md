@@ -61,10 +61,13 @@ coding agents too — that's Beat 8.
 wheels generate scaffold Post 'title:string{50}' body:text publishedAt:datetime --dry-run
 ```
 
-**See:** eleven `Would create` lines and **no files written**. Check
+**See:** a `Would write:` list of **eleven** project-relative paths — the ten
+you'd expect plus `config/routes.cfm` — and **no files written**. Check
 `ls app/models` — empty.
 
-**Say:** "Dry run first. It tells me exactly what it's about to do."
+**Say:** "Dry run first. Nothing is written, and it names every file it
+*would* touch — including `config/routes.cfm`, which the real run reports as
+a modification rather than pretending it didn't touch anything."
 
 ```bash
 wheels routes

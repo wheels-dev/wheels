@@ -635,9 +635,14 @@ component extends="modules.BaseModule" {
 			var paths = request.$wheelsDryRunPaths ?: [];
 			if (arrayLen(paths)) {
 				out("");
-				out("Would create:", "bold");
+				// "write", not "create": the list legitimately contains paths that
+				// would be MODIFIED (a --belongsTo scaffold rewrites the parent
+				// model, controller and show view), and calling those "created"
+				// is wrong. Paths are shown relative to the project so the root
+				// isn't repeated on every line.
+				out("Would write:", "bold");
 				for (var p in paths) {
-					out("  #p#");
+					out("  #replace(p, variables.projectRoot & "/", "")#");
 				}
 			} else {
 				out("(no files would be written)", "yellow");
@@ -4740,9 +4745,18 @@ component extends="modules.BaseModule" {
 				var relPath = listLast(item.path, "/\");
 				printCreated("#item.type#: #relPath#");
 			}
-			for (var item in results.modified ?: []) {
+			// A dry run writes nothing, so `modify` lines would be a lie. The
+			// would-be-modified paths still reach the caller's list (Scaffold.cfc
+			// records them through the same interception), so nothing is lost.
+			for (var item in ($isDryRun() ? [] : (results.modified ?: []))) {
 				var relPath = replace(item.path, variables.projectRoot & "/", "");
 				out("  modify  #item.type#: #relPath#", "green");
+			}
+			// config/routes.cfm is rewritten outside `generated`, so without this
+			// the real run silently edited it while --dry-run listed it — the dry
+			// run was more honest than the run.
+			for (var item in ($isDryRun() ? [] : (results.routes ?: []))) {
+				out("  modify  #item.type#: #replace(item.path, variables.projectRoot & "/", "")#", "green");
 			}
 			// Issue #2327: scaffold can succeed with skipped artifacts. Surface
 			// what was skipped so users know why their existing model wasn't
@@ -4751,10 +4765,14 @@ component extends="modules.BaseModule" {
 				out("  skip    #note#", "yellow");
 			}
 
-			out("");
-			out("Scaffold complete! Next steps:", "green");
-			out("  1. Run migrations: wheels migrate latest");
-			out("  2. Start server: wheels start");
+			// "Run migrations / start server" is nonsense after a dry run —
+			// nothing was written to migrate or serve.
+			if (!$isDryRun()) {
+				out("");
+				out("Scaffold complete! Next steps:", "green");
+				out("  1. Run migrations: wheels migrate latest");
+				out("  2. Start server: wheels start");
+			}
 		} else {
 			out("Scaffold failed:", "red");
 			for (var err in results.errors) {
@@ -10011,6 +10029,14 @@ component extends="modules.BaseModule" {
 	 * tracking session) emit unconditionally.
 	 */
 	private void function printCreated(required string path) {
+		// Dry run: the caller prints one authoritative "Would write" list after
+		// dispatch, so the per-file `create` lines here would duplicate it — and
+		// worse, they read as though the files were actually written. This is the
+		// single choke point for every generator, so gating here covers all 30
+		// call sites at once.
+		if ($isDryRun()) {
+			return;
+		}
 		if (structKeyExists(variables, "$createdPathTracker")) {
 			if (structKeyExists(variables.$createdPathTracker, arguments.path)) {
 				verbose("printCreated: duplicate emit suppressed for #arguments.path#");
@@ -10019,6 +10045,16 @@ component extends="modules.BaseModule" {
 			variables.$createdPathTracker[arguments.path] = true;
 		}
 		out("  create  #path#", "green");
+	}
+
+	/**
+	 * True while `wheels generate --dry-run` is suppressing writes. Writes are
+	 * intercepted in Templates.cfc / Scaffold.cfc and their destinations
+	 * collected on the request, so any output that implies a file already
+	 * exists must check this.
+	 */
+	private boolean function $isDryRun() {
+		return request.$wheelsGenerateDryRun ?: false;
 	}
 
 	/**
