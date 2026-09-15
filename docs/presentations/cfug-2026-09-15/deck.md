@@ -7,8 +7,10 @@ This is the speaker outline for the **25-slide PowerPoint**
 Slide numbers below match that file. It replaces the earlier 23-slide,
 five-part outline, which described a different demo.
 
-The executable sequence is [`demo.md`](demo.md): eight live beats on slides
-13–20, approximately 50 minutes, after roughly 25 minutes of context.
+The current executable sequence is [`runbook.md`](runbook.md): eight live beats
+on slides 13–20, approximately 50 minutes, after roughly 25 minutes of context.
+Use its separately copyable commands, unique app name and explicit port;
+[`demo.md`](demo.md) preserves earlier rehearsal history and optional follow-ups.
 The PowerPoint still needs the edits in
 [`slide-corrections.md`](slide-corrections.md); these Markdown changes do
 not rewrite its slide text or speaker notes.
@@ -235,12 +237,14 @@ wheels generate policy Post
 **bcrypt → `passwordHash`**, using `bcryptHash`, `bcryptVerify`,
 `bcryptNeedsRehash`. Register, logout, wrong login, correct login.
 
-> Notes: Add the layout navigation/logout button described in demo.md;
-> auth generation does not add it for you. Password minimum is 12
-> characters. Show the stored bcrypt shape, not a real user's password.
-> Edit policy show, add `authorize(post)` after the finder, reload: logged
-> out 403, logged in 200. Remove that temporary authorization before the
-> unauthenticated CRUD tests. Keep the comments eager load.
+> Notes: Follow runbook.md's layout edit and five-step policy arc: unused
+> deny-all policy; one-action gate; all-action filter; readers read/members
+> write/admins delete; login proves member edits but denies deletion. No role
+> column/admin promotion is staged. A missing record's 404 versus an existing
+> denied record's 403 reveals existence; it is not anti-enumeration. Remove
+> ONLY the demo authorizePost filter/helper before unauthenticated CRUD specs;
+> retain requireRecord, Comments eager loading, auth and CSRF. Password minimum
+> is 12 characters; show the bcrypt shape, not a real user's password.
 
 ## Slide 18 — Beat 6: red, green
 
@@ -279,30 +283,37 @@ curl -i http://localhost:8080/api/products
 > `/api` is a namespace, not versioning. Verify diff/coverage and the suite
 > after API generation during rehearsal; don't claim success from old notes.
 
-## Slide 20 — Beat 8: Wheels and AI coding agents
+## Slide 20 — Beat 8: Wheels and Harness add Tags to Posts
 
 ```bash
-wheels mcp wheels
+wheels setup agents
 ```
 
-```json
-{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
-```
+1. Write/merge `.mcp.json` and `.opencode.json` in the **demo app**.
+2. Open Harness there; configure/import the Wheels server if needed, reconnect/
+   reload tools and verify actual discovery against this app's routes.
+3. Paste [harness-tags-prompt.md](harness-tags-prompt.md): **implement**, not plan.
+4. Show **Post↔Tags**, not disconnected Tags CRUD: multi-select, edit, clear all,
+   re-add, validation preservation, saved names on list/show, Tags management.
+5. Verify migration round-trips, repeat-safe seeds, app tests and browser behavior.
 
-The client launches the stdio server in the app. Generated AI docs and the
-error page's Copy button provide context.
-
-> Notes: Show actual tools/list, not a frozen count. On installed build
-> 2482, MCP generate ignored attributes and wrote an empty Tag: inspect the
-> model/migration before proceeding, or use positional CLI generation.
-> The after-auth generated seed also returned success without durable rows.
-> Do not call that baseline a completed data loop. Positional generation +
-> convention Tag seeding was verified. The separately patched CLI also
-> passed real reordered-key MCP generation, migration, durable convention
-> seeding, HTTP content and 30 app specs (1359 strict CLI specs). That is
-> local-patch proof, not a globally upgraded Homebrew installation. Details
-> are in demo.md. Check committed rows, not just HTTP 200 or passing specs.
-> The protocol server is not a REPL.
+> Notes: Setup writes configuration; it does not install Harness or automatically
+> enable MCP. The client launches `wheels mcp wheels`; the stdio process is not a
+> REPL. Inspect the real advertised tools/schemas instead of promising a count.
+> Disclose CLI fallback if MCP is unavailable. Preserve Comments, auth, CSRF,
+> styling and the current public Post CRUD after the temporary policy gate was
+> removed; no vendor changes or unrequested admin role. On 2026-09-15 build 2500,
+> the exact prompt passed **36 → 97 specs**, repeat seeds and independent browser/
+> database review via CLI fallback. This is Lucee/SQLite, with a SQLite-specific
+> join migration—not cross-database or native Harness GUI MCP proof. Invalid CSRF
+> blocks mutation but returns existing development-mode 500, not 403. Report the
+> current result rather than promising a fixed future count or the old Tag's 46.
+> One later Post GET returned an unexplained missing-WO 500; three test/HTTP replay
+> cycles passed but did not establish a fix. Disclose the runbook's stability caveat.
+> Rehearse implementation beforehand if it exceeds five minutes, and disclose a
+> prepared result. Current commands/evidence are in runbook.md; old build-2482/
+> 2488 and local-patch history remains in demo.md. A green scaffold suite or HTTP
+> 200 alone is not proof of persisted assignment.
 
 ---
 
