@@ -187,6 +187,11 @@ component extends="modules.BaseModule" {
 		var hidden = [
 			"main",     // bare `wheels` no-args dispatch target — not an MCP tool
 			"mcp",      // meta command — prints MCP setup instructions
+			// writes .mcp.json into the project. An assistant provisioning its own
+			// MCP config is a side-effecting setup step, not a query — the same
+			// reasoning as `docs` below. (Also unreachable: LuCLI owns `mcp` at the
+			// runtime level, which is why this command is `map`, not `mcp setup`.)
+			"map",
 			"d",        // alias for destroy
 			"g",        // alias for generate
 			"new",      // scaffolds a whole new Wheels project
@@ -512,7 +517,9 @@ component extends="modules.BaseModule" {
 		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
-		help &= "  mcp                 Configure Wheels MCP server for AI assistants" & nl;
+		// `map`, not `mcp`: the runtime owns `mcp` (wheels mcp <name> runs a module),
+		// so listing it here pointed users at a command that cannot help them.
+		help &= "  map                 Write .mcp.json so AI assistants can query this app" & nl;
 		help &= "  version             Show Wheels CLI version" & nl;
 		help &= "  help                Show this help" & nl & nl;
 		help &= "For command-specific help: wheels <command> --help" & nl & nl;
@@ -2204,14 +2211,37 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Show MCP server configuration instructions
+	 * hint: Wire this project up for AI assistants — `wheels map setup` writes .mcp.json
+	 *
+	 * Named `map`, not `mcp setup`. LuCLI owns the `mcp` verb at the runtime level:
+	 * `wheels mcp <name>` means "run module <name>", so `wheels mcp setup` is
+	 * resolved to a module lookup and never reaches this component
+	 * ("mcp: module not found: 'setup'"). Any subcommand under `mcp` is therefore
+	 * unreachable — `map` is a free top-level verb that reaches the module.
 	 */
-	public string function mcp() {
+	public string function map() {
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		var subcommand = arrayLen(args) ? lCase(args[1]) : "";
+
+		switch (subcommand) {
+			case "setup":
+				return $mcpSetup(args);
+			case "":
+				break;
+			default:
+				out("Unknown map subcommand: #args[1]#", "red");
+				out("Usage: wheels map [setup]");
+				out("  wheels map         Show MCP configuration instructions");
+				out("  wheels map setup   Write .mcp.json in this project");
+				return "";
+		}
+
 		out("MCP is built into the Wheels CLI. Run:", "bold");
 		out("  wheels mcp wheels");
 		out("");
-		out("Configure in Claude Code (.mcp.json):", "bold");
-		out('  {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}');
+		out("Configure in Claude Code:", "bold");
+		out("  wheels map setup      Write .mcp.json in this project");
+		out('  (or add by hand: {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}})');
 		out("");
 		out("For OpenCode, Cursor, and other AI IDEs, see:");
 		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
@@ -2221,6 +2251,102 @@ component extends="modules.BaseModule" {
 		out("in tools/list — the server entry in .mcp.json namespaces them per client).");
 		out("Stateful/interactive commands (start, stop, new, console, ...) are hidden");
 		out("from MCP tools/list via mcpHiddenTools() — they remain CLI-only.");
+		return "";
+	}
+
+	/**
+	 * `wheels map setup` — write .mcp.json in the project root.
+	 *
+	 * Merges rather than overwrites: a project's .mcp.json usually lists other
+	 * servers too (a browser MCP, a database MCP), and clobbering those to add
+	 * one entry would be a hostile default. The `wheels` entry is added or
+	 * corrected, everything else is left byte-for-byte as the user wrote it.
+	 *
+	 * Fails closed on malformed JSON instead of rewriting it. A .mcp.json that
+	 * doesn't parse is either hand-edited mid-flight or has a syntax error the
+	 * user needs to see; silently replacing it would discard whatever they were
+	 * writing and hide the mistake.
+	 */
+	private string function $mcpSetup(required array args) {
+		var force = false;
+		for (var a in arguments.args) {
+			if (a == "--force") force = true;
+		}
+
+		if (!$isWheelsProjectDir(variables.projectRoot)) {
+			out("Not in a Wheels project directory.", "yellow");
+			out("Run this from the root of a Wheels app (the directory holding config/settings.cfm).");
+			return "";
+		}
+
+		var configPath = variables.projectRoot & "/.mcp.json";
+		var serverEntry = {command: "wheels", args: ["mcp", "wheels"]};
+		var config = {mcpServers: {}};
+		var existed = fileExists(configPath);
+
+		if (existed) {
+			var raw = fileRead(configPath);
+			if (len(trim(raw))) {
+				try {
+					config = deserializeJSON(raw);
+				} catch (any e) {
+					out(".mcp.json exists but is not valid JSON — leaving it untouched.", "red");
+					out("  #configPath#");
+					out("  Fix the syntax (or delete the file) and re-run `wheels map setup`.");
+					throw(
+						type = "Wheels.McpSetup.InvalidJson",
+						message = ".mcp.json is not valid JSON: #e.message#"
+					);
+				}
+			}
+			if (!IsStruct(config)) {
+				out(".mcp.json does not contain a JSON object — leaving it untouched.", "red");
+				throw(
+					type = "Wheels.McpSetup.InvalidShape",
+					message = ".mcp.json must be a JSON object with an mcpServers key."
+				);
+			}
+			if (!structKeyExists(config, "mcpServers") || !IsStruct(config.mcpServers)) {
+				config.mcpServers = {};
+			}
+		}
+
+		var existing = config.mcpServers.wheels ?: {};
+		var alreadyCorrect = IsStruct(existing)
+			&& (existing.command ?: "") == serverEntry.command
+			&& IsArray(existing.args ?: "")
+			&& arrayLen(existing.args) == 2
+			&& existing.args[1] == "mcp"
+			&& existing.args[2] == "wheels"
+			&& structCount(existing) == 2;
+
+		if (alreadyCorrect && !force) {
+			out("Already configured — .mcp.json lists the wheels server.", "green");
+			out("  #configPath#");
+			return "";
+		}
+
+		config.mcpServers.wheels = serverEntry;
+		fileWrite(configPath, serializeJSON(config));
+
+		if (!existed) {
+			out("Created .mcp.json", "green");
+		} else if (alreadyCorrect) {
+			out("Rewrote .mcp.json", "green");
+		} else if (structKeyExists(existing, "command") || structCount(existing)) {
+			out("Updated the wheels entry in .mcp.json", "green");
+		} else {
+			out("Added the wheels server to .mcp.json", "green");
+		}
+		out("  #configPath#");
+		var otherServers = structCount(config.mcpServers) - 1;
+		if (otherServers > 0) {
+			out("  #otherServers# other server(s) preserved.", "");
+		}
+		out("");
+		out("Next:", "bold");
+		out("  Restart your AI assistant so it picks up the new server,");
+		out("  then ask it to run `wheels routes` to confirm the connection.");
 		return "";
 	}
 

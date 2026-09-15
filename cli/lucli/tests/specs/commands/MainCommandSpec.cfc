@@ -70,12 +70,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("hides main() from MCP tools/list", () => {
 				// main() is a CLI-only no-args dispatch target. It would be noise
 				// as an MCP tool — hide it via mcpHiddenTools(), same convention
-				// as `mcp`, `start`, `stop`, etc. Window sized to cover the full
-				// returned-array literal including the $-prefixed spec-only
-				// entries past the comment block.
+				// as `mcp`, `start`, `stop`, etc.
+				//
+				// Bounded by the function's own closing brace, not a fixed
+				// character window. A hard-coded 1500 was silently overrun the
+				// first time a new entry was inserted mid-list, and the failure
+				// ("needle not found") points at the assertion rather than the
+				// window that caused it.
 				var startIdx = reFindNoCase("(?m)^[ \t]*public\s+array\s+function\s+mcpHiddenTools\s*\(", variables.source);
 				expect(startIdx).toBeGT(0);
-				var body = mid(variables.source, startIdx, 1500);
+				var endIdx = find(chr(10) & chr(9) & "}", variables.source, startIdx);
+				expect(endIdx).toBeGT(startIdx, "could not find the end of mcpHiddenTools()");
+				var body = mid(variables.source, startIdx, endIdx - startIdx);
 				expect(body).toInclude("""main""");
 				expect(body).toInclude("""$normalizeTestFilter""");
 				expect(body).toInclude("""$resolveAppTestDataSource""");
