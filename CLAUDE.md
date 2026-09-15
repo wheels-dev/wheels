@@ -470,7 +470,8 @@ User-facing `fix`/`feat` PRs add a **fragment file**, never a direct `CHANGELOG.
 {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
 ```
 
-Run `wheels map setup` to write `.mcp.json` in the current project (it merges, preserving any other servers you already list). It is `map`, not `mcp setup`: LuCLI owns the `mcp` verb at the runtime level (`wheels mcp <name>` = "run module <name>"), so nothing under `mcp` reaches `Module.cfc` — see the MCP integration guide for OpenCode/Cursor variants.
+Run `wheels setup agents` to write `.mcp.json` and `.opencode.json` in the current project (it merges, preserving any other servers you already list). It is `setup agents`, not `setup mcp`: LuCLI intercepts the literal token `mcp` in **any** argument position
+(`wheels info mcp` is intercepted too), so no argument may be spelled `mcp`. `setup agents` avoids the token entirely — see the MCP integration guide for OpenCode/Cursor variants.
 
 Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (live-verified on the released 4.0.3 CLI): `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (18 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only tools (`main`, `mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`, `jobs`) are hidden via `mcpHiddenTools()`.
 

@@ -187,11 +187,11 @@ component extends="modules.BaseModule" {
 		var hidden = [
 			"main",     // bare `wheels` no-args dispatch target — not an MCP tool
 			"mcp",      // meta command — prints MCP setup instructions
-			// writes .mcp.json into the project. An assistant provisioning its own
-			// MCP config is a side-effecting setup step, not a query — the same
-			// reasoning as `docs` below. (Also unreachable: LuCLI owns `mcp` at the
-			// runtime level, which is why this command is `map`, not `mcp setup`.)
-			"map",
+			// write .mcp.json / .opencode.json into the project. An assistant
+			// provisioning its own MCP config is a side-effecting setup step, not
+			// a query — the same reasoning as `docs` below.
+			"setup",
+			"map",      // deprecated forwarder for the same thing (snapshot 2499)
 			"d",        // alias for destroy
 			"g",        // alias for generate
 			"new",      // scaffolds a whole new Wheels project
@@ -517,9 +517,7 @@ component extends="modules.BaseModule" {
 		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
-		// `map`, not `mcp`: the runtime owns `mcp` (wheels mcp <name> runs a module),
-		// so listing it here pointed users at a command that cannot help them.
-		help &= "  map                 Write .mcp.json so AI assistants can query this app" & nl;
+		help &= "  setup               Configure this app for external tools (setup agents: AI assistants)" & nl;
 		help &= "  version             Show Wheels CLI version" & nl;
 		help &= "  help                Show this help" & nl & nl;
 		help &= "For command-specific help: wheels <command> --help" & nl & nl;
@@ -2211,36 +2209,57 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Wire this project up for AI assistants — `wheels map setup` writes .mcp.json
+	 * hint: `wheels setup agents` — write .mcp.json and .opencode.json for AI assistants
 	 *
-	 * Named `map`, not `mcp setup`. LuCLI owns the `mcp` verb at the runtime level:
-	 * `wheels mcp <name>` means "run module <name>", so `wheels mcp setup` is
-	 * resolved to a module lookup and never reaches this component
-	 * ("mcp: module not found: 'setup'"). Any subcommand under `mcp` is therefore
-	 * unreachable — `map` is a free top-level verb that reaches the module.
+	 * `setup agents`, and the target is deliberately NOT spelled `mcp`: LuCLI
+	 * intercepts that literal token in ANY argument position — not just
+	 * argv[1] — so `wheels setup mcp` (and even `wheels info mcp`) is routed to
+	 * the runtime's module runner and answers "mcp: missing module name".
+	 * `ai` is reserved the same way. Verified live, both. `setup` and
+	 * `configure` are free top-level verbs (`init` is not — BaseModule has it).
+	 */
+	/**
+	 * hint: Deprecated spelling — `wheels map setup` forwards to `setup agents`
+	 *
+	 * `map setup` shipped in snapshot 2499 before we learned that the literal
+	 * token `mcp` is intercepted by the runtime in any argv position. Kept as a
+	 * thin forwarder so that spelling keeps working.
 	 */
 	public string function map() {
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		if (!arrayLen(args) || lCase(args[1]) == "setup") {
+			return $setupMcp(args);
+		}
+		return setup();
+	}
+
+	public string function setup() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var subcommand = arrayLen(args) ? lCase(args[1]) : "";
 
 		switch (subcommand) {
-			case "setup":
-				return $mcpSetup(args);
+			// NOT "mcp": LuCLI intercepts that literal token in ANY argument
+			// position, not just argv[1] — `wheels setup mcp` and even
+			// `wheels info mcp` are routed to the runtime's module runner
+			// ("mcp: missing module name"). `ai` is reserved the same way.
+			// Verified live. See $setupMcp() for the full constraint.
+			case "agents":
+				return $setupMcp(args);
 			case "":
 				break;
 			default:
-				out("Unknown map subcommand: #args[1]#", "red");
-				out("Usage: wheels map [setup]");
-				out("  wheels map         Show MCP configuration instructions");
-				out("  wheels map setup   Write .mcp.json in this project");
+				out("Unknown setup target: #args[1]#", "red");
+				out("Usage: wheels setup [agents]");
+				out("  wheels setup            Show what can be set up");
+				out("  wheels setup agents     Write .mcp.json and .opencode.json here");
 				return "";
 		}
 
 		out("MCP is built into the Wheels CLI. Run:", "bold");
 		out("  wheels mcp wheels");
 		out("");
-		out("Configure in Claude Code:", "bold");
-		out("  wheels map setup      Write .mcp.json in this project");
+		out("Set it up:", "bold");
+		out("  wheels setup agents       Write .mcp.json and .opencode.json here");
 		out('  (or add by hand: {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}})');
 		out("");
 		out("For OpenCode, Cursor, and other AI IDEs, see:");
@@ -2255,7 +2274,7 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * `wheels map setup` — write .mcp.json in the project root.
+	 * `wheels setup agents` — write the AI-client configs in the project root.
 	 *
 	 * Merges rather than overwrites: a project's .mcp.json usually lists other
 	 * servers too (a browser MCP, a database MCP), and clobbering those to add
@@ -2267,7 +2286,7 @@ component extends="modules.BaseModule" {
 	 * user needs to see; silently replacing it would discard whatever they were
 	 * writing and hide the mistake.
 	 */
-	private string function $mcpSetup(required array args) {
+	private string function $setupMcp(required array args) {
 		var force = false;
 		for (var a in arguments.args) {
 			if (a == "--force") force = true;
@@ -2279,75 +2298,150 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var configPath = variables.projectRoot & "/.mcp.json";
-		var serverEntry = {command: "wheels", args: ["mcp", "wheels"]};
-		var config = {mcpServers: {}};
-		var existed = fileExists(configPath);
+		// Two clients, two shapes. Claude Code reads `.mcp.json` (mcpServers +
+		// separate command/args); OpenCode reads `.opencode.json` (an `mcp` key,
+		// `type: "local"`, and command+args as ONE array). Both are written —
+		// that is what the wrapper's own `wheels mcp` help has always promised.
+		var targets = [
+			{
+				file: ".mcp.json",
+				label: "Claude Code",
+				rootKey: "mcpServers",
+				entry: {command: "wheels", args: ["mcp", "wheels"]},
+				schema: ""
+			},
+			{
+				file: ".opencode.json",
+				label: "OpenCode",
+				rootKey: "mcp",
+				entry: {type: "local", command: ["wheels", "mcp", "wheels"], enabled: true},
+				schema: "https://opencode.ai/config.json"
+			}
+		];
 
-		if (existed) {
-			var raw = fileRead(configPath);
-			if (len(trim(raw))) {
-				try {
-					config = deserializeJSON(raw);
-				} catch (any e) {
-					out(".mcp.json exists but is not valid JSON — leaving it untouched.", "red");
-					out("  #configPath#");
-					out("  Fix the syntax (or delete the file) and re-run `wheels map setup`.");
-					throw(
-						type = "Wheels.McpSetup.InvalidJson",
-						message = ".mcp.json is not valid JSON: #e.message#"
-					);
-				}
+		// Load and validate everything BEFORE writing anything: a bad
+		// .opencode.json must not leave a half-applied setup with .mcp.json
+		// already rewritten.
+		var loaded = [];
+		for (var t in targets) {
+			arrayAppend(loaded, $loadMcpConfig(variables.projectRoot & "/" & t.file, t));
+		}
+
+		var changed = [];
+		for (var i = 1; i <= arrayLen(targets); i++) {
+			var t = targets[i];
+			var state = loaded[i];
+			var config = state.config;
+			if (!structKeyExists(config, t.rootKey) || !IsStruct(config[t.rootKey])) {
+				config[t.rootKey] = {};
 			}
-			if (!IsStruct(config)) {
-				out(".mcp.json does not contain a JSON object — leaving it untouched.", "red");
-				throw(
-					type = "Wheels.McpSetup.InvalidShape",
-					message = ".mcp.json must be a JSON object with an mcpServers key."
-				);
+			if (len(t.schema) && !structKeyExists(config, "$schema")) {
+				config["$schema"] = t.schema;
 			}
-			if (!structKeyExists(config, "mcpServers") || !IsStruct(config.mcpServers)) {
-				config.mcpServers = {};
+			var existing = config[t.rootKey].wheels ?: {};
+			var correct = $mcpEntryMatches(existing, t.entry);
+			if (!correct || force) {
+				config[t.rootKey].wheels = t.entry;
+				fileWrite(state.path, serializeJSON(config));
+				arrayAppend(changed, {
+					file: t.file,
+					path: state.path,
+					verb: !state.existed ? "Created" : (correct ? "Rewrote" : (structCount(existing) ? "Updated" : "Added")),
+					others: structCount(config[t.rootKey]) - 1
+				});
+			} else {
+				arrayAppend(changed, {file: t.file, path: state.path, verb: "", others: structCount(config[t.rootKey]) - 1});
 			}
 		}
 
-		var existing = config.mcpServers.wheels ?: {};
-		var alreadyCorrect = IsStruct(existing)
-			&& (existing.command ?: "") == serverEntry.command
-			&& IsArray(existing.args ?: "")
-			&& arrayLen(existing.args) == 2
-			&& existing.args[1] == "mcp"
-			&& existing.args[2] == "wheels"
-			&& structCount(existing) == 2;
+		var wrote = [];
+		for (var c in changed) {
+			if (len(c.verb)) arrayAppend(wrote, c);
+		}
 
-		if (alreadyCorrect && !force) {
-			out("Already configured — .mcp.json lists the wheels server.", "green");
-			out("  #configPath#");
+		if (!arrayLen(wrote) && !force) {
+			out("Already configured — both client configs list the wheels server.", "green");
+			for (var c in changed) {
+				out("  #c.path#");
+			}
 			return "";
 		}
 
-		config.mcpServers.wheels = serverEntry;
-		fileWrite(configPath, serializeJSON(config));
-
-		if (!existed) {
-			out("Created .mcp.json", "green");
-		} else if (alreadyCorrect) {
-			out("Rewrote .mcp.json", "green");
-		} else if (structKeyExists(existing, "command") || structCount(existing)) {
-			out("Updated the wheels entry in .mcp.json", "green");
-		} else {
-			out("Added the wheels server to .mcp.json", "green");
-		}
-		out("  #configPath#");
-		var otherServers = structCount(config.mcpServers) - 1;
-		if (otherServers > 0) {
-			out("  #otherServers# other server(s) preserved.", "");
+		for (var c in changed) {
+			if (len(c.verb)) {
+				out("#c.verb# #c.file#", "green");
+			} else {
+				out("Already configured: #c.file#", "");
+			}
+			out("  #c.path#");
+			if (c.others > 0) {
+				out("  #c.others# other server(s) preserved.", "");
+			}
 		}
 		out("");
 		out("Next:", "bold");
 		out("  Restart your AI assistant so it picks up the new server,");
 		out("  then ask it to run `wheels routes` to confirm the connection.");
 		return "";
+	}
+
+	/**
+	 * Read one client config for `setup agents`. Missing is fine (a fresh object is
+	 * returned). Malformed JSON is NOT: it fails closed rather than being
+	 * rewritten, because a file that doesn't parse is either mid-edit or has a
+	 * syntax error the user needs to see, and silently replacing it would
+	 * discard their work and hide the mistake.
+	 */
+	private struct function $loadMcpConfig(required string path, required struct target) {
+		var state = {path: arguments.path, existed: fileExists(arguments.path), config: {}};
+		if (!state.existed) return state;
+
+		var raw = fileRead(arguments.path);
+		if (!len(trim(raw))) return state;
+
+		try {
+			state.config = deserializeJSON(raw);
+		} catch (any e) {
+			out("#arguments.target.file# exists but is not valid JSON — leaving it untouched.", "red");
+			out("  #arguments.path#");
+			out("  Fix the syntax (or delete the file) and re-run `wheels setup agents`.");
+			throw(
+				type = "Wheels.McpSetup.InvalidJson",
+				message = "#arguments.target.file# is not valid JSON: #e.message#"
+			);
+		}
+		if (!IsStruct(state.config)) {
+			out("#arguments.target.file# does not contain a JSON object — leaving it untouched.", "red");
+			out("  #arguments.path#");
+			throw(
+				type = "Wheels.McpSetup.InvalidShape",
+				message = "#arguments.target.file# must be a JSON object."
+			);
+		}
+		return state;
+	}
+
+	/**
+	 * True when an existing entry already matches what setup would write. Only
+	 * the fields setup owns are compared, so a hand-added `env`, `disabled`, or
+	 * any other client-specific key does not make setup consider it wrong and
+	 * rewrite the file on every run.
+	 */
+	private boolean function $mcpEntryMatches(required any existing, required struct entry) {
+		if (!IsStruct(arguments.existing)) return false;
+		for (var key in arguments.entry) {
+			if (!structKeyExists(arguments.existing, key)) return false;
+			if (IsArray(arguments.entry[key])) {
+				if (!IsArray(arguments.existing[key])) return false;
+				if (arrayLen(arguments.existing[key]) != arrayLen(arguments.entry[key])) return false;
+				for (var i = 1; i <= arrayLen(arguments.entry[key]); i++) {
+					if (arguments.existing[key][i] != arguments.entry[key][i]) return false;
+				}
+			} else if (arguments.existing[key] != arguments.entry[key]) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	// ─────────────────────────────────────────────────
