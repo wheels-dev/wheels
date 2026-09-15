@@ -1,4 +1,11 @@
-# Demo runbook — Rails-Style CFML
+# Demo notes and rehearsal history — Rails-Style CFML
+
+**Present from [runbook.md](runbook.md):** it is the current numbered, independently
+copyable command sequence, with safe unique-name/explicit-port preflight and the
+current validation record. This file preserves the earlier detailed rehearsal
+history and optional follow-ups; its older grouped commands, fixed app name/port
+and build-specific counts are not the current stage script. Beat 8 below points
+to the updated Harness Post↔Tags implementation, not the old Tags-only scaffold.
 
 Build a blog live with Wheels 4.1. This script follows the **eight demo beats
 on slides 13–20** of
@@ -69,9 +76,10 @@ audit found two independent problems:
   prove persistence.
 
 The separately successful explicit Product API requests and pre-auth
-Post/Comment seed checks remain valid. Use positional CLI generation and
-convention seeding for the fallback below, or verify corrected local code;
-**do not imply that these later corrections are in the installed build**.
+Post/Comment seed checks remain valid. The historical fallback used positional
+CLI generation and convention seeding, followed by separately corrected local
+code; **those results do not change the failed installed-build baseline**.
+The current runbook validates the current installation independently.
 
 **Independent convention-seed rehearsal:** in a fresh app, the Post-only
 seed produced **2 created / 0 skipped**, then **0 / 2**. The two parent IDs
@@ -83,7 +91,7 @@ was also checked on the earlier prepopulated app.
 
 **Separate local correction/fallback evidence:** rebuilding the empty Tag
 with positional CLI attributes gave the intended name/slug schema. The
-convention Tag seed below committed `CFUG Demo` / `cfug-demo`, repeated
+historical convention Tag seed committed `CFUG Demo` / `cfug-demo`, repeated
 without adding a Tag, and displayed it in the browser. The correctly
 shaped app then passed **46/46**, rather than the empty-Tag run's 44.
 Applying the three local Seeder corrections separately produced durable
@@ -105,15 +113,14 @@ held **2 Posts, 2 Comments, 1 Tag**; MCP `test` passed **30/30** without
 changing those live counts. This verifies the locally patched CLI, **not a
 global Homebrew upgrade or the original installed MCP implementation**.
 
-> **Reading a convention-seed count.** `created + skipped` always equals the
-> number of `seedOnce` blocks in `app/db/seeds.cfm`; each block lands in
-> `created` or `skipped` depending on whether its row already exists. The
-> `1/4` → `0/5` above is a **five-block file** — the four prepared
-> Post/Comment blocks from `seeds-with-comments.cfm` (all already present by
-> then) plus the Tag block. Following the main track instead, `app/db/seeds.cfm`
-> holds **only** the Tag block, so the same two runs report **`1 created / 0
-> skipped`** then **`0 / 1`**. Both are correct. A repeat run that reports
-> anything other than `0 created / <block count> skipped` is the actual bug.
+> **Reading the historical convention-seed counts.** In these fixed-block
+> files each `seedOnce` invocation landed in `created` or `skipped`. The
+> `1/4` → `0/5` above used a **five-block file**: the four prepared Post/Comment
+> blocks from `seeds-with-comments.cfm` plus the Tag block. The old standalone
+> Tag track used just one block, yielding **1 created / 0 skipped → 0 / 1**.
+> Both recorded results are valid. The current Post↔Tags prompt has a different
+> seed shape, possibly with loops, so inspect actual invocation and row counts;
+> do not apply this historical block-count formula to arbitrary seed code.
 
 The optional binding check reproduced the plain-bound Post's missing
 Comments and the query-to-array error from the old workaround. Explicit
@@ -357,7 +364,8 @@ wheels reload
 
 Run this as a five-step arc, one edit and one reload per step, checking
 `/posts`, `/posts/1` and `/posts/new` after each. Stay logged out for steps
-1–4. Every status below was measured on a stock app at build 2490.
+1–4. The earlier notes recorded these statuses on a stock app at build 2490;
+that is historical evidence, separate from the current runbook validation.
 
 1. **Policy exists, nothing enforces it.** All three routes still **200**.
    The generated policy denies every action, but a policy is only consulted
@@ -373,7 +381,8 @@ Run this as a five-step arc, one edit and one reload per step, checking
    `params.action`, so one filter dispatches to `index()`/`show()`/`new()`.
    All three **403**. `/posts/99999` stays **404** because the scaffold's
    `requireRecord` filter is declared first — nonexistent records 404 before
-   the policy is consulted, so 403-vs-404 cannot be used to probe IDs.
+   the policy is consulted. Different 403/404 responses DO reveal whether IDs
+   exist; this preserves missing-record behavior, not anti-enumeration.
 4. **Make it a blog.** Grant `index()`/`show()` to everyone, `new`/
    `create`/`edit`/`update` to `isLoggedIn()`, and `delete` to `isAdmin()`
    (two private helpers in the policy; `isAdmin()` checks
@@ -381,14 +390,16 @@ Run this as a five-step arc, one edit and one reload per step, checking
    `/posts/1` **200** · `/posts/new` **403** · `/posts/1/edit` **403**.
 5. **Log in.** `/posts/new` and `/posts/1/edit` **200**; pressing Delete →
    **403** with `Wheels.NotAuthorized` for the `delete` action and the row
-   untouched. `role` does not exist yet — say so. Making it real is three
-   edits, all verified: a migration adding `users.role` (default `member`),
-   `role: user.role` added to the `login(principal=…)` line in the generated
-   `Sessions.cfc` and `Registrations.cfc`, and nothing in the policy. Promote
-   one account with `UPDATE users SET role='admin'`, log in again, and the
-   same user's Delete succeeds (303, `deletedAt` set). `can("delete", post)`
-   around the Delete button hides it for guests and members and shows it
-   for admin — verified 0 / 0 / 1.
+   untouched. `role` does not exist yet — say so. The current staged recipe
+   proves member denial, NOT successful admin deletion. A role migration,
+   safe promotion of one account, role-bearing principals in registration/
+   login and re-login are optional implementation work, not executed steps.
+
+   **Historical note only:** the prior build-2490 notes recorded a separate
+   role-enabled experiment: admin delete redirected 303 with `deletedAt` set;
+   conditional Delete-button visibility was 0 / 0 / 1 for guest/member/admin.
+   No complete repeatable admin recipe accompanies that evidence here, so it
+   must not be presented as part of the current end-to-end validation.
 
 **Say:** “Default-deny at the policy, opt-in at the controller. One line
 gates one action; one filter gates them all; then three tiers in one file. The generated login code
@@ -475,95 +486,118 @@ these passed with 200, 422, 404 and 204 respectively.
 Name, don't implement: middleware, SSE, jobs, local/S3 storage, multi-tenancy
 and deploy. This is the first beat to shorten if the evening runs long.
 
-## Beat 8 — Wheels and AI coding agents (slide 20, ≈5 min)
+## Beat 8 — Wheels and Harness add Tags to Posts (slide 20, ≈5 min presentation)
 
-Show the stdio MCP entry point:
+Use [runbook.md, Beat 8](runbook.md#beat-8--wheels-and-harness-add-tags-to-posts-5-min-presentation)
+for the stage sequence and current results. Full implementation and verification
+may exceed the five-minute presentation budget; rehearse first and disclose any
+prepared fallback. The target is **Tags assigned to existing Posts**, not a
+separate Tags-only scaffold.
+
+### 1. Generate the client configuration in the demo app
 
 ```bash
-wheels mcp wheels
+wheels setup agents
 ```
 
-This starts a protocol server, not an interactive REPL; let the MCP client
-launch it, or stop it before returning to normal terminal commands. The
-module name is required. Show `.mcp.json` for the **demo app**, not the
-framework repository:
+This writes/merges `.mcp.json` and `.opencode.json`, preserving other server
+entries and failing closed on malformed JSON. It does **not** install Harness or
+automatically enable its tools. Inspect the app's generated Wheels entry:
 
 ```json
 {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
 ```
 
-Verify `initialize` and `tools/list` with the configured client. The
-rehearsal returned **19 tools**; show the actual list rather than assuming
-that count on another build. Optional agent loop: generate a Tag with
-`name:string{30} slug:string`, **inspect the generated fields**, migrate,
-reload, create valid sample data, and visit `/tags`.
+### 2. Reconnect and verify, rather than assuming
 
-**On installed build 2482, use positional CLI generation for this step:**
+Open Harness in the **demo app root**. Configure/import the Wheels server with
+the client's supported mechanism if it was not discovered: command `wheels`,
+arguments `mcp`, `wheels`. Reconnect/reload tools (or restart the assistant), inspect
+the actual advertised schemas/list, and invoke the advertised routes tool against
+this app. Do not promise a fixed tool count or invent prefixed tool names.
+The client launches the stdio process; it is not a terminal REPL. If only terminal
+tools are available, disclose a **CLI fallback**, not a successful MCP connection.
+
+### 3. Ask Harness to implement the feature
+
+Paste the complete single block from [harness-tags-prompt.md](harness-tags-prompt.md).
+The same prompt is embedded in the primary runbook. It requires:
+
+- Tag name max 30 and unique slug; PostTag with persisted FKs and unique pair;
+  verified Wheels many-to-many APIs and atomic synchronization.
+- Existing Post new/edit multi-selection, clear-all/re-add, error preservation,
+  and readable Tags on Post list/show. Tags navigation and compact management.
+- Comments, bcrypt/session auth, CSRF and styling preserved. No vendor edits;
+  no re-enabling the temporary policy filter removed before Beat 6.
+- Reversible migration round-trips before seeding; repeat-safe convention seeds
+  resolving actual Post/Tag IDs and preserving unrelated data.
+- Tests of both association directions, duplicates, invalid inputs, create/edit/
+  clear, transaction rollback, repeat seeding and actual permission behavior;
+  browser verification of the real UI. Implement, don't just plan; no commit/push.
+
+### 4. Verify the persisted result
+
+Review the agent's migration round-trip evidence, then independently repeat the
+completed convention seed:
 
 ```bash
-wheels generate scaffold Tag 'name:string{30}' slug:string
-```
-
-The baseline MCP call accepted `attributes` but silently generated an
-empty Tag. Before migrating, inspect `app/models/Tag.cfc` for name/slug
-presence and the name maximum of 30, and inspect its migration for both
-columns. With a corrected MCP implementation, repeat the same inspection
-and include a request with reordered JSON keys. A successful response is
-not evidence that the requested fields were generated. If the empty Tag
-migration was already applied, use the prepared fallback app or reconcile
-that disposable migration deliberately; don't stack a second create-table
-migration or assume `--force` replaces an already-applied schema.
-
-**Do not use the installed build's after-auth generated seed on stage.**
-It reported **30 created, 2 skipped**, but committed no new Tag/Product
-rows. Use the explicit convention alternative below. Local Seeder fixes
-were verified separately with durable counts, but must be present in the
-actual app before demonstrating the repaired all-model generated path.
-
-After migrating the **correct name/slug schema**, add this block to
-`app/db/seeds.cfm` (create the file if absent; preserve existing blocks).
-This fallback was verified after positional CLI generation and through the
-separately patched stdio MCP client. It is not a claim that the original
-installed MCP generated-data loop passed:
-
-```cfm
-<cfscript>
-seedOnce(modelName="Tag", uniqueProperties="slug", properties={
-    name: "CFUG Demo",
-    slug: "cfug-demo"
-});
-</cfscript>
+wheels seed --mode=convention
 ```
 
 ```bash
 wheels seed --mode=convention
-wheels seed --mode=convention
-wheels console
 ```
 
-In the new console request, check the specific persisted row:
-
-```cfm
-model("Tag").findOne(where="slug = 'cfug-demo'")
+```bash
+wheels reload
 ```
 
-Type `/exit`, then load `/tags` and confirm **CFUG Demo** is visible. Check
-that the second seed added zero Tags. If using the MCP client to run the
-seed, select its convention mode explicitly. This avoids autogenerated
-User/Product records; do not switch back to all-model generated seeding
-until its persistence is independently verified.
+```bash
+wheels test
+```
 
-> **Expected counts on the main track:** the first run reports **`1 created /
-> 0 skipped`** and the repeat **`0 / 1`** — one `seedOnce` block in the file,
-> so the two numbers always sum to one. (The recorded `1/4` → `0/5` in the
-> rehearsal evidence came from a five-block `seeds.cfm`, i.e. the prepared
-> Post/Comment fallback plus Tag. See the note above.)
+Inspect committed records in another request. The second seed must add no
+Post/Tag/join duplicates. Final counts depend on the implemented seed and tests;
+the pre-feature baseline is **36**, not a promise of a fixed **46** after Tags.
 
-**Say:** “The agent can ask the running project, not just its memory of a
-framework. The generated AI docs and the error page's Copy button give it
-context. Tests remain the check on what it changes.”
+**Browser:** Tags nav/management → Post with two Tags → edit selection → clear all
+→ refresh → re-add → invalid Post preserves fields/selections → list/show display
+saved names. Confirm Comments remain usable, auth/logout/CSRF still work, and
+permissions match the actual app. A 200 or a green generated scaffold suite is
+not proof that assignment persisted.
 
-Return to slides 21–25. Recap only what actually ran; acknowledge any cuts.
+**Current validation — 2026-09-15, Homebrew build 2500:** the exact prompt was
+implemented through a disclosed CLI fallback, then independently reviewed in the
+browser and database. The suite passed **97/97** (36 retained + 61 new); both literal
+Beat 8.4 convention-seed repeats returned **0 created / 6 skipped**, after the
+initial **6 / 0 → 0 / 6**. Final counts were **24 physical Posts** (one already
+soft-deleted), **11 Comments, 1 User, 1 Product, 3 Tags and 6 joins**, unchanged by
+repeat seeds/tests. Assignment/edit/clear/re-add, invalid selections and field
+preservation, tag management and existing Comments/auth passed. The agent's
+**19 browser checks** were followed by separate reviewer checks and screenshot
+inspection. Hashes confirmed 10 protected app sources and 1,717 vendor files
+unchanged. See the primary runbook for all evidence and limitations: this is
+Lucee/SQLite with a SQLite-specific join migration; public CRUD remains public;
+invalid CSRF is blocked without mutation but returns development-mode **500**, not
+403. The separately verified **19-tool stdio server** is not a native Harness GUI
+connection.
+
+**Stability caveat:** after those functional passes, one extra `/posts/11` request
+returned **500** with a missing-`WO` server-log message; the initial response body
+was not retained. Three further full-test → fresh-HTTP cycles passed **97/97 each**
+and **9/9 HTTP 200**, but the intermittent error was **not reproduced or fixed**.
+Its cause remains unknown; do not attribute it conclusively to Tags or the
+framework, or call later green runs a resolution. See the runbook's stability note.
+
+**Historical boundary:** the build-2482 failures and separately patched MCP and
+convention-seed successes remain in the rehearsal history above. Those runs
+proved at most a standalone Tag scaffold/seed, not this many-to-many feature.
+Build 2488's September 13 standalone Tag result (46 specs) is likewise historical;
+current full-run evidence lives in the primary runbook's validation table.
+
+**Say:** “The agent added a feature to the app we already own. Conventions guide
+it; persisted data, tests and the browser check its work.” Return to slides 21–25
+and recap only what actually ran.
 
 ---
 

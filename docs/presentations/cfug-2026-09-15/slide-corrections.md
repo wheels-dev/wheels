@@ -5,10 +5,12 @@ Slide numbers refer to that **25-slide** file, including its speaker notes.
 The binary has **not** been rewritten by the Markdown corrections.
 Apply these in PowerPoint, save, then inspect slide show and presenter view.
 
-The aligned references are [`deck.md`](deck.md) and [`demo.md`](demo.md).
+The current executable reference is [`runbook.md`](runbook.md), with one terminal
+command per copyable Bash block, a unique app name and explicit HTTP port.
+[`deck.md`](deck.md) is the outline; [`demo.md`](demo.md) preserves prior evidence.
 The demo remains eight beats, with Post `title:string{50} body:text
 publishedAt:datetime`, generated seeds, associations, auth/policy, tests,
-API and MCP. The dated convention seeds are an explicit recovery option,
+API and Harness-driven Post↔Tags assignment. The dated convention seeds are an explicit recovery option,
 not a silent replacement for the live generated-seed track.
 
 ## Must correct before presenting
@@ -56,10 +58,13 @@ not a silent replacement for the live generated-seed track.
   Add the deliberate layout navigation edit from demo.md, including
   `buttonTo(route="logout", method="delete", text="Log out")` in both
   layout branches. The generator does not add the control itself.
-- [ ] **Slide 17 — policy/test boundary.** Keep the 403 logged-out / 200
-  logged-in demonstration. Preserve `include="comments"` in Posts.show.
-  Remove temporary `authorize(post)` and reload before unauthenticated
-  CRUD tests. Generating a policy alone does not enforce it.
+- [ ] **Slide 17 — five-step policy/test boundary.** Keep the unused policy →
+  one-action gate → all-action filter → readers read/members write/admins delete
+  → member login arc from runbook.md. Admin promotion is optional discussion,
+  not validated staged work. Different 404/403 codes disclose record existence;
+  remove the anti-enumeration claim. Before tests remove ONLY the temporary
+  authorizePost filter/helper and any leftover one-action gate; keep requireRecord,
+  `include="comments"`, auth and CSRF. An unused policy alone enforces nothing.
 - [ ] **Slide 18 — remove warm-up workaround.** Delete the instruction to
   run the first failing suite off-screen. The current generated controller
   spec persists its parent and uses that ID. Rehearsal on build 2482 passed
@@ -75,24 +80,20 @@ not a silent replacement for the live generated-seed track.
   Remove the blanket instruction not to run the suite after API
   generation. If another build regresses, report that result rather than
   hiding it. Info, migrate diff and coverage also passed in this rehearsal.
-- [ ] **Slide 20 — current MCP evidence.** Keep `wheels mcp wheels` and
-  the app-scoped client config. Verify actual tools/list and the intended
-  project. Build 2482 returned 19 tools, Tag commands returned success,
-  `/tags` returned 200 and the suite passed 44/44. **The final row-count
-  audit nevertheless found no durable generated Tag/Product rows after
-  auth; the Tag page was empty.** Remove any “completed data loop” claim.
-  MCP generate had also ignored `attributes`: Tag's config was empty,
-  migration only ID/timestamps. Inspect requested fields before migrating.
-  Reported 30 created / 2 skipped was not proof of committed data. The
-  positional CLI + convention Tag fallback now has durable/browser proof
-  and a correctly shaped 46-spec suite; local Seeder patches have separate
-  row-count evidence. The separately patched CLI passed 1359 strict CLI
-  specs plus real stdio reordered-key generation, SQL schema/migration,
-  durable convention seed, HTTP content and 30 app specs. Its isolated MCP
-  client used aligned registry/cache paths with the normal app server.
-  Keep local-patch proof distinct from the failed installed build; there
-  was no global Homebrew module replacement. The explicit Product API
-  payload was independently verified. The stdio server is not a REPL.
+- [ ] **Slide 20 — setup agents and a real feature.** Show `wheels setup agents`
+  in the demo app: it merges `.mcp.json` / `.opencode.json`, not a Harness install
+  or automatic live connection. Configure/import if necessary; reconnect/reload
+  tools and verify actual schemas/list against the intended project. The client
+  launches `wheels mcp wheels`; the protocol server is not a REPL. Disclose CLI
+  fallback if MCP is unavailable. Use [harness-tags-prompt.md](harness-tags-prompt.md)
+  to implement Tags **on existing Posts**: persisted many-to-many joins, constraints,
+  atomic multi-selection/edit/clear/re-add, validation preservation, Tags navigation/
+  management and readable names. Preserve Comments/auth/CSRF, round-trip migrations
+  before seeding, resolve real IDs in repeat-safe seeds, test and inspect the browser.
+  Pre-Tags baseline is 36; final count must come from the current run, not a frozen
+  46. Historical build-2482/2488 and local-patch evidence remains in demo.md; it did
+  not validate Post↔Tag assignment. A successful command/HTTP 200/green scaffold
+  suite is insufficient. Rehearse the implementation and disclose prepared results.
 - [ ] **Slide 21 — result claims.** Remove “versioned” from the `/api/products`
   description: an `/api` namespace alone does not version an API. Recap
   only the features actually shown, including any disclosed fallback.
