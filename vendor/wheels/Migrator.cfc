@@ -455,6 +455,23 @@ component output="false" extends="wheels.Global"{
 				if ($ddlAutoCommits()) {
 					local.result.output &= "Warning: this database auto-commits DDL. The per-migration transaction did not roll back schema changes.#Chr(13) & Chr(10)#";
 				}
+				// A failed step must never be silent. This output is RETURNED, not
+				// thrown, so the failure is only visible to a caller that inspects the
+				// string. The CLI does (it maps the "Error migrating" signature to a
+				// non-zero exit — #3081), but the application-start auto-migrate path in
+				// events/onapplicationstart.cfc discards it entirely: a migration that
+				// cannot run stalls every migration queued behind it while the app boots
+				// healthy and nothing is written anywhere. Log at the point of failure so
+				// every entry point records it, not just the ones that read the report.
+				writeLog(
+					file = "wheels",
+					type = "error",
+					text = $migrationFailureLogMessage(
+						migration = arguments.migration,
+						direction = arguments.direction,
+						error = e
+					)
+				);
 				transaction action="rollback";
 				StructDelete(request, "$wheelsTransactionWrapper");
 				// Skip the commit below — rollback already closed the transaction.
@@ -464,6 +481,34 @@ component output="false" extends="wheels.Global"{
 			transaction action="commit";
 		}
 		return local.result;
+	}
+
+	/**
+	 * Log text for a migration step that threw. Kept separate from the writeLog
+	 * call so specs can pin the shape without reading a log file, and so the
+	 * message stays stable for grep- and alert-based tooling: it always carries
+	 * the direction, the version and the migration's CFC file, then the engine's
+	 * message and (when present) its detail.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public string function $migrationFailureLogMessage(
+		required struct migration,
+		required string direction,
+		required any error
+	) {
+		local.version = arguments.migration.version ?: "";
+		local.cfcfile = arguments.migration.cfcfile ?: "";
+		local.detail = Trim(arguments.error.detail ?: "");
+
+		local.text = "Migration step failed (" & arguments.direction & " " & local.version
+			& (Len(local.cfcfile) ? ", " & local.cfcfile : "")
+			& "): " & (arguments.error.message ?: "");
+		if (Len(local.detail)) {
+			local.text &= " | " & local.detail;
+		}
+		return local.text;
 	}
 
 	/**
