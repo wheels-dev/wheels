@@ -1,1 +1,0 @@
-- `model(...).new()`, `.create()`, and `.update()` no longer leak the internal `allowExplicitTimestamps` write-path control flag into `properties()` and `SerializeJSON` output — the flag is now stored in the private `variables` scope and only consulted when stamping `createdAt`/`updatedAt`, so API payloads no longer include an `allowExplicitTimestamps` key

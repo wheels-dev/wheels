@@ -1,1 +1,0 @@
-- `wheels generate scaffold` and `wheels generate api-resource` now honour `useUnderscoreReferenceColumns` when adding the `belongsTo` foreign-key column: with the flag set (the `wheels new` default) the generated migration emits `<name>_id` (e.g. `user_id`) instead of a hard-coded camelCase `userId`, matching what `t.references()` produces (#3337)

@@ -1,0 +1,225 @@
+---
+title: CI Integration
+description: Run your app's test suite in GitHub Actions — with the wheels CLI or with CommandBox — plus reporters, browser gating, caching, and the failure modes that eat CI minutes.
+type: howto
+sidebar:
+  order: 10
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+CI for a Wheels app is the local loop wrapped in YAML: install a runtime, start the app, run the suite, fail the build on red. This page gives that shape twice — once with the `wheels` CLI, once without it (CommandBox) — plus the pieces you add as your suite grows: reporters, browser-test gating, cross-engine matrices, and caching.
+
+**You'll learn:**
+
+- A minimum-viable GitHub Actions workflow for a scaffolded Wheels app — with and without the CLI
+- Which reporter names the CLI accepts and how CI consumes the output
+- How to opt browser specs in or out with `WHEELS_CI` and `WHEELS_BROWSER_CI_ENABLE`
+- Cross-engine matrices, soft-fail cells, and caching
+- Common CI failures and what they actually mean
+
+<Aside type="note">
+  You should already know how to run tests locally — see [Running Tests Locally](/v4-1-0/testing/running-tests-locally/). Contributing to the framework itself? Its CI reference implementation lives in the repo's `.github/workflows/` and is covered from [Running the Framework Test Suite](/v4-1-0/contributing/running-framework-tests/).
+</Aside>
+
+## Minimum viable — with the wheels CLI
+
+The `wheels` CLI installs on an `ubuntu-latest` runner from the signed apt repository — the same commands as the [installation guide](/v4-1-0/command-line-tools/installation/#linux-apt--yum) — and the package pulls OpenJDK 21 in as a dependency, so there's no separate Java step:
+
+```yaml title=".github/workflows/tests.yml"
+name: tests
+on: [pull_request, push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      WHEELS_CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the wheels CLI
+        run: |
+          curl -fsSL https://apt.wheels.dev/wheels.gpg \
+            | sudo gpg --dearmor -o /usr/share/keyrings/wheels.gpg
+          echo "deb [signed-by=/usr/share/keyrings/wheels.gpg] https://apt.wheels.dev stable main" \
+            | sudo tee /etc/apt/sources.list.d/wheels.list
+          sudo apt-get update && sudo apt-get install -y wheels
+          wheels --version
+
+      - name: Start the app
+        run: wheels start
+
+      - name: Run the suite
+        run: wheels test --ci
+```
+
+Treat this as the shape, not gospel — the step that varies per app is the database. A fresh `wheels new` app tests against SQLite (`wheels test` swaps onto the `<datasource>_test` database and `tests/populate.cfm` builds the schema), which works on a bare runner. If your app tests against MySQL or Postgres, add a [service container](https://docs.github.com/en/actions/using-containerized-services/about-service-containers) and make sure the test datasource points at it.
+
+Two details worth knowing:
+
+- **`WHEELS_CI=true`** is a signal for the test harness — most visibly it gates browser specs (below). Set it on every CI job.
+- **`wheels test --ci`** throws `Wheels.TestsFailed` (non-zero exit) on Fail/Error, on `directoryRejected` / `bundlesDiscovered=0`, and on compile-skipped specs, and emits one GitHub Actions `::error` annotation per failed or errored spec so failures surface inline in the PR checks ([#3113](https://github.com/wheels-dev/wheels/issues/3113), [#3083](https://github.com/wheels-dev/wheels/issues/3083)).
+
+## Minimum viable — without the wheels CLI
+
+CommandBox shops (or anyone who'd rather not add a tool to CI) run the same suite through the [test-runner URL](/v4-1-0/testing/running-tests-locally/#without-the-wheels-cli). Ortus publishes a setup action for CommandBox:
+
+```yaml title=".github/workflows/tests.yml"
+name: tests
+on: [pull_request, push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      WHEELS_CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up CommandBox
+        uses: Ortus-Solutions/setup-commandbox@v2
+
+      - name: Install dependencies and start the server
+        run: |
+          box install
+          box server start
+
+      - name: Run the suite
+        run: |
+          curl -s --max-time 600 -o results.json \
+            "http://localhost:8080/wheels/app/tests?format=json"
+          python3 -c "
+          import json
+          d = json.load(open('results.json'))
+          print(d.get('totalPass',0), 'pass', d.get('totalFail',0), 'fail', d.get('totalError',0), 'error')
+          rejected = d.get('directoryRejected')
+          vacuous = d.get('bundlesDiscovered', 1) == 0
+          failed = d.get('totalFail',0) or d.get('totalError',0)
+          raise SystemExit(0 if not (rejected or vacuous or failed) else 1)
+          "
+```
+
+Adjust the port to whatever your `server.json` declares. Two constraints:
+
+- **The app must run as `development`** — the `/wheels/*` runner surfaces are development-only ([#2903](https://github.com/wheels-dev/wheels/pull/2903)). A CI job is exactly the place that's fine; just don't point this at a production-configured deployment.
+- **The runner uses the app's configured datasource** (no `<datasource>_test` auto-swap without the CLI) — configure the CI app's datasource to a throwaway database and let `tests/populate.cfm` build it.
+
+A filtered run that names a directory the runner doesn't recognize silently runs the **full** suite ([#3083](https://github.com/wheels-dev/wheels/issues/3083)) — the payload sets `directoryRejected: true`. When you filter in CI (`&directory=tests.specs.models`), fail the job on `directoryRejected` or `bundlesDiscovered=0` (the snippet above does). Prefer `wheels test --ci`, which throws `Wheels.TestsFailed` for those cases.
+
+## Reporter output for CI
+
+`wheels test` accepts `--reporter=<name>`; the CLI always requests JSON from the runner, then formats it:
+
+| Flag | Behaviour |
+| --- | --- |
+| `--reporter=simple` (default) | Human-readable summary: `N passed (Xs)` on green, failure details on red |
+| `--reporter=json` | Emits the raw JSON result document — pipe to `jq` or a post-processor |
+| `--reporter=tap` | Emits TAP version 13 (`1..N`, `ok` / `not ok` lines) for TAP-consuming tooling |
+| `--ci` | GitHub Actions `::error` annotations per failure, on top of the non-zero exit code |
+| `--verbose` / `-v` | Full bundle → suite → spec tree with the default reporter |
+
+Without the CLI, `?format=json` on the runner URL gives you the same document to post-process. If you want PR annotations on the "Files changed" tab, emit JUnit XML from the JSON and feed it to `EnricoMi/publish-unit-test-result-action`.
+
+## Browser test gating in CI
+
+Browser specs need the Playwright JARs (~370MB) and Chromium, so the framework ships an opt-in gate. Two environment variables decide whether `BrowserTest` specs execute or skip gracefully:
+
+- **`WHEELS_CI=true`** — mark the environment as CI
+- **`WHEELS_BROWSER_CI_ENABLE=true`** (or `1` or `yes`) — opt browser specs in
+
+If `WHEELS_CI` is set and the opt-in isn't, `BrowserTest.cfc` sets `this.browserTestSkipped = true` in `beforeAll` and every browser `it` skips automatically — the suite stays green; the browser tests simply don't count.
+
+When you do opt in, cache the Playwright install — it's the slowest single step in the workflow:
+
+```yaml title=".github/workflows/tests.yml (fragment)"
+- name: Cache Playwright
+  uses: actions/cache@v4
+  with:
+    path: |
+      ~/.wheels/browser/lib
+      ~/.cache/ms-playwright
+    key: playwright-${{ hashFiles('vendor/wheels/browser-manifest.json') }}
+    restore-keys: |
+      playwright-
+
+- name: Install Playwright
+  run: wheels browser setup
+```
+
+The cache key hashes `browser-manifest.json` so a Playwright version bump invalidates the cache automatically.
+
+## Cross-engine matrix
+
+Your app deploys to one engine, but if you support several (or you're mid-migration), a matrix over CommandBox's `cfengine` values runs the suite on each — every cell is an independent runner:
+
+```yaml title=".github/workflows/tests.yml (fragment)"
+jobs:
+  matrix-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cfengine: ["lucee@6", "lucee@7", "adobe@2023", "adobe@2025"]
+    env:
+      WHEELS_CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Ortus-Solutions/setup-commandbox@v2
+      - name: Start server on ${{ matrix.cfengine }}
+        run: box server start cfengine=${{ matrix.cfengine }}
+      - name: Run the suite
+        run: |
+          curl -s --max-time 600 -o results.json \
+            "http://localhost:8080/wheels/app/tests?format=json"
+          python3 -c "import json; d=json.load(open('results.json')); \
+            raise SystemExit(0 if d.get('totalFail',0)==0 and d.get('totalError',0)==0 else 1)"
+```
+
+`fail-fast: false` matters: without it, one Adobe failure kills the Lucee cells before you learn whether Lucee was green.
+
+### Soft-fail cells
+
+When one cell has known failures that shouldn't block PRs while a fix is in flight, mark just that cell:
+
+```yaml title=".github/workflows/tests.yml (fragment)"
+strategy:
+  fail-fast: false
+  matrix:
+    cfengine: ["lucee@7", "adobe@2025"]
+    include:
+      - cfengine: "adobe@2025"
+        soft_fail: true
+steps:
+  - name: Run the suite
+    continue-on-error: ${{ matrix.soft_fail == true }}
+    run: ...
+```
+
+Drop the flag as soon as the underlying tests are fixed, so failures block again.
+
+## Caching
+
+Beyond Playwright (above): on the CLI path, the runtime home is `~/.wheels` (Lucee Express downloads ~60MB on first start); on the CommandBox path, CommandBox caches engines under `~/.CommandBox`. Both are cacheable with `actions/cache@v4` keyed on a version file, though on hosted runners the win is modest — measure before adding cache complexity.
+
+## Common CI failures
+
+- **Runner can't find Java** — on the apt path the package installs OpenJDK 21 and the wrapper exports `JAVA_HOME`; if you install the CLI another way, add `actions/setup-java@v4` (it exports `JAVA_HOME` for subsequent steps).
+- **404 from `/wheels/app/tests`** — the CI app isn't running as `development` (the allowlist), or the port doesn't match your `server.json`.
+- **Server starts but the first test request times out** — the first hit pays the full app bootstrap. Warm it with a plain `curl -s http://localhost:8080/ > /dev/null` before the test curl, and keep `--max-time 600`.
+- **Playwright JARs missing, browser specs silently skip** — expected until you opt in; add `wheels browser setup` plus the cache block.
+- **Tests pass locally but fail in CI on another engine** — almost always a cross-engine difference (Adobe's `application` scope, struct member functions, closure `this` capture). Reproduce the same engine locally before debugging CI logs.
+- **Test job green, PR still red** — check the reporter job; `publish-unit-test-result-action` reports independently of the test step's exit code.
+
+## Other CI systems
+
+GitLab CI, CircleCI, Jenkins, Buildkite — the shape is identical: install a runtime (the `wheels` CLI or CommandBox), start the app in `development`, hit the runner, fail on red. The only Wheels-specific pieces are the JSON endpoint (`/wheels/app/tests?format=json`), the `--ci` flag, and the `WHEELS_CI` / `WHEELS_BROWSER_CI_ENABLE` gating variables.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Running Tests Locally" href="/v4-1-0/testing/running-tests-locally/" description="The local loop this page wraps — with the CLI and without." />
+  <LinkCard title="Browser Tests" href="/v4-1-0/testing/browser-tests/" description="Installing Playwright, writing browser specs, and the lifecycle." />
+  <LinkCard title="Fixtures & Test Data" href="/v4-1-0/testing/fixtures-and-test-data/" description="The populate.cfm lifecycle your CI database depends on." />
+  <LinkCard title="Running the Framework Test Suite" href="/v4-1-0/contributing/running-framework-tests/" description="The framework repo's own CI patterns, for contributors." />
+</CardGrid>

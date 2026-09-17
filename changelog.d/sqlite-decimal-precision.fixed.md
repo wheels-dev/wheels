@@ -1,1 +1,0 @@
-- SQLite `decimal` columns now use `NUMERIC` instead of `REAL` storage, so a generated `price:decimal` column binds through `cf_sql_decimal` (BigDecimal) and round-trips values exactly — `149.99` reads back as `149.99` rather than `149.990005493164` (32-bit float noise)

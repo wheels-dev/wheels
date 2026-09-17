@@ -1,0 +1,33 @@
+---
+title: "wheels deploy accessory logs"
+description: Tail the named accessory's container logs.
+type: reference
+sidebar:
+  label: "logs"
+  order: 7
+---
+
+`docker logs` on the named accessory, on every host it's pinned to.
+
+## Synopsis
+
+```txt title="
+wheels deploy accessory logs <name|all> [--tail=<N>] [--follow] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `<name>` | **Required positional.** Accessory name, or `all` to fan out. |
+| `--tail=<N>` | Trailing lines per host. Default 100. |
+| `--follow` | Stream logs continuously. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Example
+
+```bash title="example"
+wheels deploy accessory logs db --tail=500
+wheels deploy accessory logs redis --follow
+```

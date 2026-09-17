@@ -1,1 +1,0 @@
-- Documented that `sendEmail(writeToFile=)` writes the rendered text/HTML body only — not a MIME `.eml` — so Outlook shows raw HTML tags on a `.eml` path while live `cfmail` delivery still renders. Restored v4 `sendEmail` examples and replaced the v3 `.eml` sample with `.html` (#3529)

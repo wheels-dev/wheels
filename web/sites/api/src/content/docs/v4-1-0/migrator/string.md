@@ -1,0 +1,55 @@
+---
+title: string()
+description: "adds string columns to table definition"
+sidebar:
+  label: string()
+  order: 0
+---
+
+## Signature
+
+`string()` — returns `any`
+
+**Available in:** `tabledefinition`
+**Category:** Table Definition Functions
+
+## Description
+
+adds string columns to table definition
+
+
+
+## Parameters
+
+<div class="wd-params-table">
+
+| Name | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| `columnNames` | `string` | no | — |  |
+| `limit` | `any` | no | — |  |
+| `default` | `any` | no | — |  |
+| `allowNull` | `boolean` | no | — |  |
+
+</div>
+
+## Examples
+
+<pre><code class='javascript'>// 1. Add a single string column to a new table
+t = createTable(name='users');
+	t.string(columnNames='username', limit=100, allowNull=false);
+	t.string(columnNames='email', limit=255, allowNull=false);
+	t.timestamps();
+t.create();
+
+// 2. Add multiple string columns at once with a default value
+t = createTable(name='products');
+	t.string(columnNames='name,sku,status', limit=100, default='', allowNull=false);
+	t.integer(columnNames='stock', default=0, allowNull=false);
+	t.timestamps();
+t.create();
+
+// 3. Alter an existing table to add a string column with a limit
+t = changeTable(name='orders');
+	t.string(columnNames='trackingNumber', limit=50, allowNull=true);
+t.change();
+</code></pre>

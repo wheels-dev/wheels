@@ -1,1 +1,0 @@
-- Scaffolded views now render every action as a button. `Edit`, `New <model>` and `← all <models>` were plain links sitting beside a `Delete` button; they all carry simple.css's `.button` class now, so links and form buttons are visually identical. The action row is a `<div>` rather than a `<p>` because `buttonTo` emits a `<form>`, which a paragraph cannot legally contain

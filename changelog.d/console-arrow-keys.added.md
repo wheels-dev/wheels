@@ -1,1 +1,0 @@
-- `wheels console` now has real line editing: ← → move the cursor, ↑ ↓ recall history (persisted across sessions in `~/.wheels/console_history`), Home/End jump to the line ends. Previously arrow keys printed raw escape sequences. Piped sessions (`printf ... | wheels console`) are unchanged

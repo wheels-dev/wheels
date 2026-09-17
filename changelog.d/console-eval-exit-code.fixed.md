@@ -1,1 +1,0 @@
-- `wheels console` now exits non-zero when a piped/EOF session had an evaluation error, a connection/ping failure, or a returned model with validation errors (previously always exited 0, which hid failed `create()` calls from scripts and the tutorial e2e)

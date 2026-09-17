@@ -1,1 +1,0 @@
-- CLI generators (`model`, `scaffold`, `api-resource`) accept Rails-style column size modifiers (`title:string{50}`, `price:decimal{10,2}`) and emit the custom `limit` / `precision` / `scale` in the generated migration

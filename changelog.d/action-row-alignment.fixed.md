@@ -1,1 +1,0 @@
-- Scaffolded action rows are top-aligned and the Delete button sits flush with its siblings. `buttonTo` wraps its button in a `<form>`, and simple.css's bottom margin on that nested button made the form taller than the neighbouring links — under `align-items: center` Delete floated 4px above Edit and "← all"

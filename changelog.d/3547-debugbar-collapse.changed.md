@@ -1,1 +1,0 @@
-- Debug bar: clicking the X now slides the bar left to a logo-sized black strip with the stylized red W, instead of a floating "Debug" button. Clicking the collapsed logo expands the bar back across the bottom of the page (#3547)

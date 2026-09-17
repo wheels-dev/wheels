@@ -1,1 +1,0 @@
-- Fix the CLI/MCP `generate` tool dropping named `attributes` and depending on named-argument order. Model and scaffold generation now preserve the requested fields, including string limits, decimal precision/scale and enum values, while retaining positional CLI behavior.

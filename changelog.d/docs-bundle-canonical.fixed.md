@@ -1,1 +1,0 @@
-- Fixed the local docs bundle advertising URLs that do not exist: building with a mount `base` made Astro emit `https://guides.wheels.dev/wheels-docs/guides/v4-0-0/` as the canonical link, `og:url` and sitemap entry, because it concatenates `site` with the local base. The bundle build now strips the mount prefix from those absolute URLs so they describe the real page

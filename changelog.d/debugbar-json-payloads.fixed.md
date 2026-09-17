@@ -1,2 +1,0 @@
-- Fixed `/wheels/info?format=json` always returning `{"error": "key [DATASOURCE] doesn't exist"}`: the JSON branch read a non-existent `db.datasource.*` key instead of the `db.info.*` struct the helper actually returns, and the payload now also carries `adapterName` and `jdbcVersion`
-- Fixed `/wheels/migrator?format=json` omitting the anti-CSRF token: the token is now generated above the JSON branch so a single request returns both the migrator state and the token, and the HTML page shares the same token

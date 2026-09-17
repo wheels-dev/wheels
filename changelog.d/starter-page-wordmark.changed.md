@@ -1,1 +1,0 @@
-- The scaffolded starter page now uses the official Wheels wordmark instead of an inline SVG mark with a text label. It ships in two files — the default for light backgrounds and a white-lettering inverse for dark ones — swapped automatically via `prefers-color-scheme`, so the logo stays legible in either theme

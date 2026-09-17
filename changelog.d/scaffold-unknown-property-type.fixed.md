@@ -1,1 +1,0 @@
-- `wheels generate scaffold` and `wheels generate api-resource` now reject unknown property types (e.g. `user:references`) with a clear error instead of silently emitting a plain `string`/VARCHAR column with no foreign key

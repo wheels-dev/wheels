@@ -1,1 +1,0 @@
-- Scaffolded (and new-app) forms now stack labels above full-width inputs and nest validation errors in the field block, styled in red with an icon and `Error:` prefix so the cue is not color-only (#3549, #3550)

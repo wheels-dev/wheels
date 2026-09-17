@@ -1,1 +1,0 @@
-- `wheels new` apps now style flash messages as colored boxes instead of bare text: `success` (created/updated/deleted) renders in a green box, `notice` in a blue box, and `warning` in an amber box — matching the existing red validation-error box, with icon prefixes and dark-mode variants

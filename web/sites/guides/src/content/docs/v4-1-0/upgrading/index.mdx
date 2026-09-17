@@ -1,0 +1,64 @@
+---
+title: Upgrading Wheels
+description: Versioning policy, release cadence, and how to move your app across major versions of the framework.
+type: section
+sidebar:
+  order: 9
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Upgrade an existing app to a new version of Wheels. Start with the policy, then follow the version-specific guide for the jump you're making.
+
+## Versioning policy
+
+Wheels follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). The `CHANGELOG.md` at the repo root declares this explicitly and follows the Keep a Changelog format — release sections include the standard `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, and `Security` headings alongside more granular ones (`Bug Fixes`, `Breaking Changes`, per-layer enhancement groups, and others), so don't expect every release to use exactly those six.
+
+- **Major** (`3.x` → `4.x`) — breaking changes are allowed. Read the upgrade guide for that jump before you touch code.
+- **Minor** (`4.0` → `4.1`) — additive only. New features, no breaking changes to supported APIs.
+- **Patch** (`4.0.0` → `4.0.1`) — bug fixes and security patches. Safe to apply without reading release notes, though you still should.
+
+Deprecations land in a minor release with a log warning and stay functional until the next major. Check the `Deprecated` section of every release you pass through.
+
+## Where to find the current version
+
+Two sources, in order of authority:
+
+- **Runtime** — `application.$wheels.version` is the runtime truth. It is populated at application start from `BuildInfo`, which reads `vendor/wheels/wheels.json`. Don't go looking for a readable literal in `vendor/wheels/events/onapplicationstart.cfc` — there isn't one. In the source repo the manifest carries the placeholder `@build.version@`; the build pipeline substitutes the real semver (e.g. `4.0.3`) in distributed apps.
+- `CHANGELOG.md` — the most recent non-`[Unreleased]` heading.
+
+If the two disagree, the runtime value wins — that's the version your app actually boots against.
+
+## Release cadence
+
+Wheels doesn't ship on a fixed schedule. Releases go out when the changelog entries warrant one and the test matrix is green. The git tag history is the authoritative record — `git tag --sort=-v:refname` (or the [GitHub releases page](https://github.com/wheels-dev/wheels/releases)) shows the latest release; the 4.0 line went GA 2026-05-12 with `v4.0.0`. Pre-GA builds were tagged in a `v4.0.0-SNAPSHOT+N` series — the `+N` suffix is a continuous build number, not a release.
+
+Don't assume a release date. Watch the [releases page on GitHub](https://github.com/wheels-dev/wheels/releases) and subscribe to the repo if you need to know when a tagged build lands.
+
+## Upgrade philosophy
+
+Four rules, in order:
+
+1. **Read the version-specific guide first.** The pages below enumerate every breaking change and the migration path for each one. Skimming is a false economy.
+2. **One major at a time.** Going from 2.x to 4.x means doing the 2.x→3.x upgrade, verifying your app boots and tests pass, then doing 3.x→4.x. The guides assume you're coming from the previous major, not two back.
+3. **Upgrade the framework separately from the engine.** Wheels runs on Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023/2025, and BoxLang. Change one variable at a time — framework version, then engine version, not both together. When something breaks you'll know which change caused it.
+4. **Run your full test suite against the new version before deploying.** If you don't have one, the upgrade is also the moment to start — even a handful of smoke tests will catch 90% of regressions.
+
+<Aside type="caution">
+  Wheels 4.0 deprecates the legacy `plugins/` system in favor of first-party packages distributed as standalone repos (indexed by the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry) and installed into `vendor/<name>/`. If your 3.x app depends on plugins, read [Packages](/v4-1-0/digging-deeper/packages/) alongside the 3.x→4.x guide — it explains the new activation model.
+</Aside>
+
+## Upgrade guides
+
+<CardGrid>
+  <LinkCard
+    title="3.x to 4.x"
+    description="The current critical upgrade path. Covers middleware pipeline, package system replacing plugins, chainable query builder, route model binding, and every breaking change in 4.0."
+    href="/v4-1-0/upgrading/3x-to-4x/"
+  />
+  <LinkCard
+    title="2.x to 3.x"
+    description="The CFWheels to Wheels rebrand and the foundational directory and config changes in 3.0. Kept here as a pointer for apps still on 2.x. (The WheelsTest BDD migration came later, in 4.0.)"
+    href="/v4-1-0/upgrading/2x-to-3x/"
+  />
+</CardGrid>

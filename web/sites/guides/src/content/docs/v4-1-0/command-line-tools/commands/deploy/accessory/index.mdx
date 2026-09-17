@@ -1,0 +1,37 @@
+---
+title: "wheels deploy accessory"
+description: Sidecar container lifecycle — mirrors app verbs, scoped to a named accessory.
+type: reference
+sidebar:
+  label: "accessory"
+  order: 40
+---
+
+Sidecar container lifecycle. Every accessory verb takes the accessory name as a **positional argument** (or `all` for fan-out) and targets the pinned host(s) for that accessory: `wheels deploy accessory boot db`.
+
+## Verbs
+
+| Verb | Purpose |
+|------|---------|
+| [`boot`](/v4-1-0/command-line-tools/commands/deploy/accessory/boot/) | First-time install + run. |
+| [`reboot`](/v4-1-0/command-line-tools/commands/deploy/accessory/reboot/) | Stop, remove, re-install. |
+| [`start`](/v4-1-0/command-line-tools/commands/deploy/accessory/start/) | `docker start`. |
+| [`stop`](/v4-1-0/command-line-tools/commands/deploy/accessory/stop/) | `docker stop`. |
+| [`restart`](/v4-1-0/command-line-tools/commands/deploy/accessory/restart/) | `docker restart`. |
+| [`details`](/v4-1-0/command-line-tools/commands/deploy/accessory/details/) | `docker ps --filter`. |
+| [`logs`](/v4-1-0/command-line-tools/commands/deploy/accessory/logs/) | Tail accessory logs. |
+| [`remove`](/v4-1-0/command-line-tools/commands/deploy/accessory/remove/) | Stop + remove the container. |
+
+## Common arguments and flags
+
+| Argument / flag | Description |
+|------|-------------|
+| `<name>` | **Required positional.** Accessory name, or `all` to fan out. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+Omitting the name throws `DeployAccessoryCli.MissingName`. There is no `--name=` flag — the deploy parser ignores it, so `--name=db` also ends in `DeployAccessoryCli.MissingName`.
+
+## Relationship to `wheels deploy`
+
+Accessory verbs are **not** part of the rolling app deploy. `wheels deploy` leaves accessories alone — that's deliberate, so routine rollouts can't accidentally bounce your database. See [Accessories](/v4-1-0/deployment/accessories/).

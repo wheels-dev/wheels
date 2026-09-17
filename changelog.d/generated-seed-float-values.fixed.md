@@ -1,1 +1,0 @@
-- Generated seeds now recognize the `float` validation type used by decimal and floating-point database columns, so numeric fields such as a scaffolded Product's `price` receive numbers instead of strings that cause every generated row to be skipped.
