@@ -1,1 +1,0 @@
-- `wheels migrate diff` no longer crashes with `Can't cast Complex Object Type [Struct] to String` when rendering a generate-auth User table — nested `changeColumns.from`/`to` structs and other non-scalar diff fields are printed by name/type instead of interpolated wholesale

@@ -1,1 +1,0 @@
-- `wheels test` now reloads the isolated `_wheelsTest` application before an app-test run, so resources scaffolded after the first test run — e.g. `wheels generate api-resource` adding an `/api` namespace, a model, and its routes — are visible to the specs instead of erroring with "Could not find the `apiProducts` route" against a stale cached route table (RETEST-2461 B)

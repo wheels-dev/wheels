@@ -1,0 +1,197 @@
+---
+title: "Testing"
+description: wheels test and wheels browser setup — run the test suite from the command line, filter to specific directories, and install Playwright so browser specs can run.
+type: reference
+sidebar:
+  order: 5
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Two commands cover the testing surface at the CLI level. `wheels test` runs the BDD suite against your chosen engine and database, and `wheels browser setup` downloads the Playwright JARs and Chromium needed for browser specs.
+
+**You'll use this for:**
+
+- Running the test suite before you push — either the whole thing or a filtered slice.
+- Narrowing to a specific directory while iterating on one area of the codebase.
+- Installing the Playwright dependencies the first time you run browser specs in a workspace.
+
+## Overview
+
+This page is a CLI reference. It covers flag syntax, subcommand shape, and invocation examples. The deeper material — how to author specs, the matcher API, fixtures, the browser DSL, the CI gate — lives in the Testing section and is linked below.
+
+<CardGrid>
+  <LinkCard
+    title="Running Tests Locally"
+    href="../../../testing/running-tests-locally/"
+    description="Author-facing guide to invoking the suite and interpreting output."
+  />
+  <LinkCard
+    title="CI Integration"
+    href="../../../testing/ci-integration/"
+    description="GitHub Actions matrix, browser gating, and soft-fail databases."
+  />
+  <LinkCard
+    title="Browser Tests"
+    href="../../../testing/browser-tests/"
+    description="The Playwright-backed DSL, fixture routes, and the CI enable flag."
+  />
+</CardGrid>
+
+### `wheels test`
+
+Run the Wheels BDD test suite. Auto-detects core tests when `vendor/wheels/tests/` exists; otherwise runs the app suite under `tests/specs/`.
+
+#### Synopsis
+
+```txt title="
+wheels test [--filter=<dir>] [--db=<engine>] [--verbose] [--ci] [--core] [--base-path=<path>] [flags]
+```
+
+A bare positional argument is treated as the filter directory — `wheels test models` is equivalent to `wheels test --filter=models`.
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `--filter=<dir>` | Substring or path match against spec directories. Narrows the run to a subset (e.g., `models`, `controller`, `browser`). Bare names are auto-prefixed (`models` → `tests.specs.models`). Also accepted as a positional arg. |
+| `--directory=<dir>` | Alias for `--filter` (tutorial chapter 7). When both are supplied, `--directory` wins. |
+| `--db=<engine>` | Database engine for `--core` matrix runs only. Ignored for app tests (with a warning) — see [below](#testing-against-different-engines). |
+| `--reporter=<name>` | `simple` (default, colourful), `json` (raw runner JSON), `tap` (TAP v13 for CI consumers). |
+| `--verbose`, `-v` | Print the full bundle → suite → spec tree (one `[PASS]`/`[FAIL]` line per spec) instead of only the summary line. Applies to the default `simple` reporter. The launcher consumes the flag globally, so any position works (`wheels test --verbose`, `wheels test -v`, `wheels -v test`). CLI binaries built on a LuCLI runtime that predates the [#3113](https://github.com/wheels-dev/wheels/issues/3113) launcher fix drop the signal before it reaches the test command and print the plain summary. |
+| `--ci` | CI mode: emits one GitHub Actions `::error` workflow-command annotation per failed or errored spec, so failures surface inline in CI logs and PR-check panels. Exit code is non-zero on failure regardless. |
+| `--core` | Run framework self-tests (`vendor/wheels/tests/specs/`) instead of your app suite. App tests are the default; `--core` is the explicit opt-in. |
+| `--no-test-db` | Disable the auto-swap to `<datasource>_test`. App tests run against your dev datasource, with whatever data is already in it. |
+| `--base-path=<path>` | URL prefix the app is mounted under (e.g. `/myapp`). Auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` in `config/settings.cfm` when omitted. Leave unset for root-mounted apps (the default). |
+
+#### `--db` is for `--core` runs only
+
+The framework's matrix self-tests (`--core`) wire up a `wheelstestdb_<engine>` datasource per supported engine — that's what `--db` selects between. App tests don't have an analogous matrix because your app has one configured datasource at a time, and switching mid-run would break test isolation. This matches the convention every comparable framework uses (Rails reads `DATABASE_URL`, Laravel uses `phpunit.xml` `<env>` blocks, Symfony uses `APP_ENV=test`, etc.) — DB selection is a process-level decision, not a per-invocation flag.
+
+If you pass `--db` to an app run, the CLI prints a warning and ignores it. The preamble shows the actual datasource the suite will run against (`<your-datasource>_test` by default, or your bare datasource with `--no-test-db`).
+
+| Value | Engine | Where used |
+|---|---|---|
+| `sqlite` | SQLite (default; no external server) | `--core` only |
+| `h2` | H2 (embedded) | `--core` only (Lucee only) |
+| `mysql` | MySQL | `--core` only |
+| `postgres` | PostgreSQL | `--core` only |
+| `sqlserver` | Microsoft SQL Server | `--core` only |
+| `oracle` | Oracle | `--core` only |
+| `cockroachdb` | CockroachDB | `--core` only |
+
+<Aside type="caution" title="Name gotchas">
+The engine identifiers are `postgres` (not `postgresql`) and `sqlserver` (not `mssql`). Anything else is rejected by the runner.
+</Aside>
+
+#### Example
+
+```bash title="example"
+wheels test --filter=models
+```
+
+Runs every spec under `tests/specs/models/`. The CLI throws `Wheels.TestsFailed` (non-zero exit) when any spec fails or errors, when the runner reports `directoryRejected` or `bundlesDiscovered=0` (a rejected or vacuous `directory=` scope — [#3083](https://github.com/wheels-dev/wheels/issues/3083)), or when compile-skipped `*Spec.cfc` files were skipped by the runner.
+
+#### Testing against different engines
+
+App tests run against your project's configured datasource. To run the same suite against a different engine, register a second datasource in your engine (Lucee admin, Adobe CF Administrator, BoxLang config) and point your app at it via the env var your `config/settings.cfm` already reads. For example:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(dataSourceName=env("WHEELS_DATASOURCE", "myapp"));
+</cfscript>
+```
+
+```bash title="run against MySQL"
+WHEELS_DATASOURCE=myapp_mysql wheels test
+```
+
+```bash title="run against the framework's matrix"
+wheels test --core --db=mysql
+```
+
+This mirrors how Rails (`DATABASE_URL=...`), Laravel (`DB_CONNECTION=...`), Symfony (`APP_ENV=test`), Django (`DJANGO_SETTINGS_MODULE`), and Phoenix (`MIX_ENV`) handle multi-engine testing — the engine choice is a process-level concern, not a per-invocation CLI flag. A flag would force the framework to reload the datasource pool mid-run, which breaks transactional test isolation.
+
+For full-matrix CI (every engine × every database), see [`tools/test-matrix.sh`](../../../testing/ci-integration/) — it spins up the engine + DB containers and invokes the test endpoint per cell.
+
+### `wheels browser setup`
+
+Download the Playwright Java JARs and a Chromium binary into `.wheels/browser/` so browser specs can run. This is a one-time setup per workspace — roughly 370MB on first install.
+
+#### Synopsis
+
+```txt title="
+wheels browser setup [--force]
+```
+
+`wheels browser` is an umbrella that also exposes a `test` subcommand (`wheels browser test`) for running only the browser spec directory. Most users only need `setup` at the CLI level and then run browser specs through the normal `wheels test` path.
+
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `--force` | Re-download every JAR even if the local SHA-256 matches the manifest. Useful after a manifest bump. |
+
+Chromium is the only engine wired into the browser DSL today; `wheels browser test` does not yet support selecting Firefox or WebKit.
+
+#### Example
+
+```bash title="example"
+wheels browser setup
+```
+
+Reads `vendor/wheels/browser-manifest.json`, downloads each missing or mismatched JAR, verifies SHA-256, and installs a matching Chromium build. Subsequent runs skip files that already match the manifest.
+
+<Aside type="note" title="When setup is required">
+Specs that extend `wheels.wheelstest.BrowserTest` short-circuit gracefully when the JARs aren't present — they mark themselves skipped rather than failing. Run `wheels browser setup` once per workspace before you expect browser specs to actually exercise the DSL. The [Browser Tests](../../../testing/browser-tests/) guide covers the `WHEELS_BROWSER_CI_ENABLE` gate that controls the same behavior in CI.
+</Aside>
+
+## Common workflows
+
+```bash title="common workflows"
+# Run the whole suite against SQLite (the default)
+wheels test
+
+# Narrow to one area while iterating
+wheels test --filter=models
+
+# CI run on GitHub Actions — --ci adds one ::error annotation per failed or
+# errored spec (exit codes are firm with or without it); for machine-readable
+# output use a reporter
+wheels test --ci
+wheels test --reporter=tap
+
+# First-time browser setup, then exercise the browser specs
+wheels browser setup
+wheels test --filter=browser
+```
+
+## Related commands
+
+<CardGrid>
+  <LinkCard
+    title="Running Tests Locally"
+    href="../../../testing/running-tests-locally/"
+    description="Author-facing walkthrough of the test runner and its output."
+  />
+  <LinkCard
+    title="CI Integration"
+    href="../../../testing/ci-integration/"
+    description="GitHub Actions matrix, browser gating, and soft-fail handling."
+  />
+  <LinkCard
+    title="Browser Tests"
+    href="../../../testing/browser-tests/"
+    description="The Playwright-backed DSL, fixture routes, and assertions."
+  />
+  <LinkCard
+    title="Creating a Project"
+    href="../creating-a-project/"
+    description="wheels new — scaffolds the project the test suite runs inside."
+  />
+  <LinkCard
+    title="Code Generation"
+    href="../code-generation/"
+    description="wheels generate — scaffolds that emit matching specs alongside code."
+  />
+</CardGrid>

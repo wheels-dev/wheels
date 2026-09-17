@@ -1,0 +1,34 @@
+---
+title: "wheels deploy prune all"
+description: Prune both old containers and old images on every host.
+type: reference
+sidebar:
+  label: "all"
+  order: 1
+---
+
+Prune old containers and old images on every host, keeping the most recent stopped containers per host (`--keep=<n>`, default 5).
+
+## Synopsis
+
+```txt title="
+wheels deploy prune all [--keep=<n>] [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--keep=<n>` | How many old (stopped) containers to keep per host. Default 5. There is no `deploy.yml` equivalent — Kamal's `retain_containers:` is rejected by the config validator. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Runs [`prune containers`](/v4-1-0/command-line-tools/commands/deploy/prune/containers/) then [`prune images`](/v4-1-0/command-line-tools/commands/deploy/prune/images/) on every host. The current live container and everything in the retention window survives.
+
+## Example
+
+```bash title="Example"
+wheels deploy prune all
+```

@@ -1,1 +1,0 @@
-- Debug bar: collapsing via the X now animates a stylesheet-driven width slide to a logo-only black strip (stylized red W). The root container no longer pins `width:100%` inline next to `all:initial`, which blocked the transition and left a hovering-button look (#3547)

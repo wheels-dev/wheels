@@ -1,2 +1,0 @@
-- Debug bar: Copy buttons on the message blocks worth pasting into a coding agent — the reload-refused notice, configuration warnings, deprecations, the Warnings section, failing migration output and failing test output. Each copies plain text behind a short header rather than raw markup
-- Debug bar: tab labels collapse to icons below the width where they stop fitting, with the tab name shown in a hover tooltip, instead of clipping the close button off-screen

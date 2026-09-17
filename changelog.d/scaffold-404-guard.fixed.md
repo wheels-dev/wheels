@@ -1,1 +1,0 @@
-- Scaffolded controllers now return **404** for a key that matches no record, including a soft-deleted one. Previously `show`, `edit`, `update` and `delete` called `findByKey` bare, and a missing row made the action operate on an empty value — the view threw and the user saw a 500. A `requireRecord` before-filter now throws `Wheels.RecordNotFound`, which the framework maps to 404

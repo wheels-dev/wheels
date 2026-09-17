@@ -5,9 +5,11 @@ on:
     branches: [develop]
     paths:
       - 'web/sites/guides/src/content/docs/v4-0-0/**'
+      - 'web/sites/guides/src/content/docs/v4-1-0/**'
       - 'web/sites/guides/scripts/verify-docs/**'
       - 'web/sites/guides/package.json'
       - 'web/sites/guides/src/sidebars/v4-0-0.json'
+      - 'web/sites/guides/src/sidebars/v4-1-0.json'
       - '.github/workflows/docs-verify.yml'
       # The harness exercises the checkout's CLI module (overlaid onto the
       # installed brew CLI below), so CLI changes can flip {test:cli} blocks

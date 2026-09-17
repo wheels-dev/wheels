@@ -1,1 +1,0 @@
-- Fixed debug bar tables rendering with the host page's light `tr:nth-child(2n)` / `th` styling bleeding through on dark themes, which banded the Warnings, Code Complexity and Migrator tables white-on-dark. The tables now carry `class="wdb-table"` instead of inline styles, and the host-bleed resets are scoped to any table inside the bar rather than a single class

@@ -1,1 +1,0 @@
-- Development error page now includes a Copy button that copies a JSON dump of the exception (type, message, suggested action, file and line, source snippet, and app/framework stack frames) to the clipboard for pasting into a coding agent (#3552)

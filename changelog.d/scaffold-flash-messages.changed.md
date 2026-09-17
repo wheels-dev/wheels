@@ -1,1 +1,0 @@
-- Scaffolded CRUD controllers now set a success flash message on create, update, and delete (e.g. "Post was created successfully."), which the default layout renders via `flashMessages()`. This matches the feedback Rails/Laravel scaffolds provide out of the box.

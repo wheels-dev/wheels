@@ -1,3 +1,0 @@
-- Fixed `wheels docs fetch` failing with `Can't cast Complex Object Type [URL scope] to String`: the download URL was held in a variable named `url`, which shadows CFML's reserved URL scope, so the HTTP client received the scope struct instead of the string
-- Fixed `wheels docs fetch --force` being silently ignored — the flag was read from a helper that inspected `docsFetch()`'s own (empty) arguments scope rather than the parsed argv
-- Fixed the offline docs bundle never being published: `wheels docs fetch` and the Homebrew formula both resolve `wheels-docs-<version>.zip` from the release tag, but no workflow built it, so the download always 404'd. `release.yml` now builds the bundle and attaches it alongside the core and module zips

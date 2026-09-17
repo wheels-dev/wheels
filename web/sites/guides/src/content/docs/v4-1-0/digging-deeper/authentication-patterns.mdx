@@ -1,0 +1,421 @@
+---
+title: Authentication Patterns
+description: Session auth, JWT tokens, API tokens — rolling your own vs using Wheels' built-in strategies.
+type: howto
+sidebar:
+  order: 1
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to wire authentication into a Wheels app using the built-in strategies. You'll register an `Authenticator` in the DI container, add `SessionStrategy` for browser logins, layer in `JwtStrategy` or `TokenStrategy` for API clients, and combine them so one app serves both HTML and JSON without branching logic in every controller.
+
+**You'll learn:**
+
+- How to register `wheels.auth.SessionStrategy` for classic cookie-based login — or skip the wiring with `enableSession()`
+- How to hash passwords with the built-in `bcryptHash()` / `bcryptVerify()` / `bcryptNeedsRehash()` helpers
+- How to add `wheels.auth.JwtStrategy` and `wheels.auth.TokenStrategy` for API auth
+- How to combine strategies so session auth protects HTML routes and token auth protects `/api/*`
+
+<Aside type="note">
+  You should already know: Wheels controllers, filters, and the `session` scope (see [Controllers and Actions](/v4-1-0/basics/controllers-and-actions/)), plus the end-to-end login flow walked through in [Tutorial Part 6: Authentication](/v4-1-0/start-here/tutorial/06-authentication/). This page assumes you've read both and picks up where Part 6b leaves off.
+</Aside>
+
+## Scaffold it in one command
+
+Everything this page wires up by hand can be generated in one shot:
+
+```bash
+wheels generate auth
+wheels migrate latest
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--model=<Name>` | `User` | Model (and table, pluralised) to generate. |
+| `--strategy=<name>` | `session` | `session` (browser login), `token` (opaque API bearer tokens), or `jwt` (stateless signed tokens). |
+| `--registration` / `--no-registration` | on | Include the public sign-up flow (session strategy only). |
+| `--force` | off | Overwrite generated files and regenerate the injected config blocks in place. |
+
+The session strategy emits a `User` model with bcrypt hashing via the framework's `bcryptHash()` / `bcryptVerify()` helpers, `Sessions`/`Passwords`/`Registrations` controllers and views, a create-users migration, the route/service/strategy wiring described below, and app specs. The generated files are **code you own** — edit them freely, and re-run with `--force` plus a `git diff` review when you want to pick up generator improvements. See the [`wheels generate auth` reference](/v4-1-0/command-line-tools/wheels-commands/code-generation/#wheels-generate-auth) for the full file list.
+
+The rest of this page explains the primitives the scaffold sits on — read on to understand what was generated, customize it, or wire things up by hand.
+
+## The pieces
+
+Wheels ships four auth components under `wheels.auth.*`:
+
+| Component | Role |
+|-----------|------|
+| `Authenticator` | Registry that tries registered strategies in order and returns the first success. |
+| `SessionStrategy` | Reads a principal struct from the `session` scope. Handles login/logout. |
+| `TokenStrategy` | Validates an `Authorization: Bearer <token>` header (or an opt-in query parameter) against a validator callback or a static token map. |
+| `JwtStrategy` | Validates a signed JWT (`Authorization: Bearer <jwt>`) via `JwtService`. |
+
+Each strategy implements a small interface (`getName()`, `supports(request)`, `authenticate(request)`). The authenticator picks the first strategy whose `supports()` returns true, runs its `authenticate()`, and returns a result struct:
+
+```cfm title="illustrative — do not type"
+{
+    success: true,
+    principal: { id: 42, email: "alice@example.com", role: "admin" },
+    strategy: "session",
+    error: "",
+    statusCode: 200
+}
+```
+
+Controllers care about `result.success` and `result.principal`. They do not care which strategy produced the result — that's the whole point of the registry.
+
+## Session auth with `SessionStrategy`
+
+The built-in session flow is what Tutorial Part 6b walks you through. Register once in `config/services.cfm`, wire the strategy into the authenticator, then call `service("authenticator").authenticate(request)` from a filter.
+
+### Register the authenticator and strategy
+
+```cfm {test:compile} title="config/services.cfm"
+local.di = injector();
+
+local.di.map("authenticator").to("wheels.auth.Authenticator").asSingleton();
+local.di.map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton();
+```
+
+Both are singletons — one instance per app lifetime. The authenticator holds its strategy registry in instance state, so a singleton is the correct scope.
+
+Wire the session strategy into the authenticator on app init. The `hasStrategy` check just avoids needlessly re-registering on a warm reload — duplicates can't stack either way, because `registerStrategy()` replaces any existing entry with the same name:
+
+```cfm {test:compile} title="config/app.cfm or equivalent init hook"
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
+    local.auth = service("authenticator");
+    local.sessionStrategy = service("sessionStrategy");
+    if (!local.auth.hasStrategy("session")) {
+        local.auth.registerStrategy(name="session", strategy=local.sessionStrategy);
+    }
+}
+```
+
+<Aside type="caution">
+  Use the `local.` prefix — never a bare `var` — for variables at the top level of these init hooks. They run as included templates, and Adobe ColdFusion rejects a template-level `var` at compile time ([#3063](https://github.com/wheels-dev/wheels/issues/3063)), turning every request into an HTTP 500. `var` is still correct *inside* function and closure bodies.
+</Aside>
+
+<Aside type="tip">
+  The short `service("authenticator")` form and the long `application.wo.service("authenticator")` form resolve to the same instance. Use the short one in controllers, views, and other files that are already running inside the framework; the long form is only needed at app-init time when the global helper isn't in scope yet.
+</Aside>
+
+### The one-line shortcut: `enableSession()`
+
+Hand-wiring the session strategy spans two files — the singleton registration in `config/services.cfm` plus the `registerStrategy()` call in an app-init hook. `enableSession()` collapses both into one idempotent call made from `config/services.cfm`:
+
+```cfm {test:compile} title="config/services.cfm"
+enableSession(sessionKey = "wheels.auth");
+```
+
+It registers `wheels.auth.SessionStrategy` under `sessionKey` (default `"wheels.auth"`) and wires it into the authenticator, so the `registerStrategy()` block above is unnecessary. Optional `onLogin` / `onLogout` callbacks receive the principal struct. The helper belongs in `services.cfm` on purpose — the DI container is available there (it is **not** available in `config/app.cfm`, which loads before the container is built). Manual wiring keeps working; `enableSession()` is the convenience path.
+
+### Log in, log out, protect actions
+
+After verifying the password in your `Sessions` controller, call `sessionStrategy.login(principal)` to stash the identity. `logout()` tears it down:
+
+```cfm {test:compile} title="app/controllers/Sessions.cfc"
+component extends="Controller" {
+    function new() {
+    }
+
+    function create() {
+        // Dynamic finder — binds the value for you; never interpolate params into where=
+        user = model("User").findOneByEmail(LCase(Trim(params.email ?: "")));
+        if (IsObject(user) && user.authenticate(params.password ?: "")) {
+            service("sessionStrategy").login(principal={id: user.id, email: user.email});
+            redirectTo(route="posts", success="Welcome back.");
+        } else {
+            flashInsert(error="Invalid email or password");
+            redirectTo(route="login");
+        }
+    }
+
+    function delete() {
+        service("sessionStrategy").logout();
+        redirectTo(route="login", success="Logged out.");
+    }
+}
+```
+
+The principal struct is whatever shape you pick — `{id, email}` is a reasonable minimum; richer apps store `{id, email, roles, displayName}`. The strategy round-trips the struct verbatim.
+
+Protect controller actions with a filter that asks the authenticator:
+
+```cfm {test:compile} title="app/controllers/Posts.cfc"
+component extends="Controller" {
+    function config() {
+        filters(through="authenticate", except="index,show");
+    }
+
+    function index() {
+        posts = model("Post").findAll();
+    }
+
+    private function authenticate() {
+        var result = service("authenticator").authenticate(request);
+        if (!result.success) {
+            flashInsert(error="Please log in first");
+            redirectTo(route="login");
+        }
+    }
+
+    private function $currentUserId() {
+        var result = service("authenticator").authenticate(request);
+        return result.success ? (result.principal.id ?: 0) : 0;
+    }
+}
+```
+
+The filter must be `private`. A `public` filter becomes a routable action — Wheels will happily serve `/posts/authenticate` and run the filter body as an action. `$currentUserId()` uses the `$` prefix to mark it as internal by convention.
+
+## Password hashing
+
+Model-level hashing stays the same regardless of which strategy you use — the strategy doesn't touch passwords, it just round-trips a principal struct after you've already verified credentials.
+
+<Aside type="tip">
+  **Bcrypt ships with Wheels 4.1.** `bcryptHash()`, `bcryptVerify()`, and `bcryptNeedsRehash()` are global helpers — bundled jBCrypt on JVM engines with a pure-CFML fallback, no CFX tags or external libraries, byte-compatible with OpenBSD `$2b$` / jBCrypt hashes and verified against `$2$`, `$2a$`, `$2x$`, and `$2y$` inputs. Use them directly; there's no reason to hand-roll a salted hash anymore.
+</Aside>
+
+The pattern is a `beforeValidation` callback that hashes plaintext and clears it, plus an `authenticate(password)` instance method that verifies against the stored hash:
+
+```cfm {test:compile} title="app/models/User.cfc"
+component extends="Model" {
+    function config() {
+        validatesPresenceOf("email");
+        validatesUniquenessOf(property="email");
+        beforeValidation("normalizeEmail");
+        beforeValidation("hashPassword");
+    }
+
+    private function normalizeEmail() {
+        if (StructKeyExists(this, "email")) {
+            this.email = Trim(LCase(this.email));
+        }
+    }
+
+    private function hashPassword() {
+        if (StructKeyExists(this, "password") && Len(this.password)) {
+            this.passwordHash = bcryptHash(this.password);
+            StructDelete(this, "password");
+        }
+    }
+
+    public boolean function authenticate(required string password) {
+        if (!Len(this.passwordHash ?: "")) {
+            return false;
+        }
+        return bcryptVerify(arguments.password, this.passwordHash);
+    }
+}
+```
+
+`normalizeEmail` runs before validation so uniqueness sees a canonical address. `hashPassword` only fires when `this.password` is set (the caller just assigned a new one) and scrubs the plaintext before the save hits the database. One `passwordHash` column is all you need — the salt and cost are embedded in the bcrypt hash string, so there's no separate `passwordSalt` column to migrate.
+
+When you later raise the cost factor, `bcryptNeedsRehash()` flags stored hashes that predate it so you can rehash on login:
+
+```cfm {test:compile} title="transparent work-factor upgrade"
+if (bcryptNeedsRehash(user.passwordHash)) {
+    user.passwordHash = bcryptHash(params.password);
+    user.save();
+}
+```
+
+`bcryptHash(password, cost)` takes an optional cost (default `10`); `bcryptNeedsRehash(hash, cost)` compares the stored hash's cost against your target. `bcryptVerify()` compares in constant time, so the `authenticate()` above is safe as written. The `wheels generate auth` scaffold does all of this for you — this section is the hand-rolled equivalent.
+
+## Token auth with `TokenStrategy`
+
+`TokenStrategy` extracts a bearer token from `Authorization: Bearer <token>` (or, when explicitly enabled via `queryParam`, a query parameter) and validates it against either a **validator callback** — typical for database-backed API keys — or a **static token map** — useful for tests and seeded dev keys. Static tokens are matched case-sensitively and compared in constant time.
+
+### Validator callback (database-backed)
+
+```cfm {test:compile} title="config/app.cfm or equivalent init hook"
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
+    local.auth = service("authenticator");
+
+    if (!local.auth.hasStrategy("token")) {
+        // Hoist the closure into a variable first — an inline function literal as a
+        // constructor named argument crashes Adobe ColdFusion's compiler.
+        local.tokenValidator = function(token) {
+            // Dynamic finder binds the token value; the extra where= condition is
+            // merged in with AND.
+            var apiKey = model("ApiKey").findOneByToken(value=arguments.token, where="revokedAt IS NULL");
+            if (IsObject(apiKey)) {
+                return {id: apiKey.userId, role: apiKey.role, source: "api-key"};
+            }
+            return false;
+        };
+        local.tokenStrategy = new wheels.auth.TokenStrategy(validator=local.tokenValidator);
+        local.auth.registerStrategy(name="token", strategy=local.tokenStrategy);
+    }
+}
+```
+
+The callback receives the extracted token string and returns a principal struct on success or `false` on failure. Any lookup works — a database query, a Redis check, a remote HTTP call. Keep it fast: the callback runs on every authenticated request.
+
+### Static token map (tests, seeded keys)
+
+```cfm title="illustrative — static tokens"
+var tokenStrategy = new wheels.auth.TokenStrategy(tokens={
+    "dev-key-alice": {id: 1, role: "admin"},
+    "dev-key-bob":   {id: 2, role: "reader"}
+});
+```
+
+Static maps are fine for local dev and test fixtures. Don't commit production keys to source.
+
+### Consume from a controller
+
+With the strategy registered, controllers use the same authenticator call as session auth:
+
+```cfm {test:compile} title="app/controllers/Api.cfc"
+component extends="Controller" {
+    function config() {
+        filters(through="requireToken");
+        provides("json");
+    }
+
+    function index() {
+        var result = service("authenticator").authenticate(request);
+        renderWith({items: model("Item").findAllByUserId(result.principal.id)});
+    }
+
+    private function requireToken() {
+        var result = service("authenticator").authenticate(request);
+        if (!result.success) {
+            renderWith(data={error: result.error}, status=result.statusCode);
+        }
+    }
+}
+```
+
+## JWT auth with `JwtStrategy`
+
+JWTs are self-contained signed tokens — the client holds them, you verify the signature, and you never hit the database to look them up. `JwtStrategy` wraps `JwtService`, which does HMAC-SHA256 encode/decode.
+
+### Register the service and strategy
+
+```cfm {test:compile} title="config/app.cfm or equivalent init hook"
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
+    local.auth = service("authenticator");
+
+    if (!local.auth.hasStrategy("jwt")) {
+        local.jwtService = new wheels.auth.JwtService(
+            secretKey=env("JWT_SECRET"),
+            defaultExpiry=3600,
+            issuer="myapp"
+        );
+        local.jwtStrategy = new wheels.auth.JwtStrategy(jwtService=local.jwtService);
+        local.auth.registerStrategy(name="jwt", strategy=local.jwtStrategy);
+    }
+}
+```
+
+The secret lives in the environment (`env("JWT_SECRET")`) — never commit it, and make it at least 32 random bytes (`JwtService` throws at construction for empty or shorter secrets, per RFC 7518 §3.2). `defaultExpiry` is seconds; 3600 = one hour. `issuer` is stamped as the `iss` claim, and `decode()` rejects tokens whose `iss` is missing or doesn't match it.
+
+### Issue tokens on login
+
+```cfm {test:compile} title="app/controllers/ApiSessions.cfc"
+component extends="Controller" {
+    function config() {
+        provides("json");
+    }
+
+    function create() {
+        var user = model("User").findOneByEmail(params.email ?: "");
+        if (IsObject(user) && user.authenticate(params.password ?: "")) {
+            var jwtService = new wheels.auth.JwtService(secretKey=env("JWT_SECRET"));
+            var token = jwtService.encode({sub: user.id, email: user.email, role: user.role});
+            renderWith({token: token, expiresIn: 3600});
+        } else {
+            renderWith(data={error: "Invalid credentials"}, status=401);
+        }
+    }
+}
+```
+
+Clients send the token back on subsequent requests as `Authorization: Bearer <token>`. The JWT strategy extracts it, `JwtService.decode()` verifies the signature and expiry, and the decoded claims become the principal:
+
+```cfm {test:compile} title="app/controllers/Api.cfc — JWT-protected action"
+component extends="Controller" {
+    function config() {
+        filters(through="requireJwt");
+        provides("json");
+    }
+
+    function profile() {
+        var result = service("authenticator").authenticate(request);
+        renderWith({userId: result.principal.sub, email: result.principal.email});
+    }
+
+    private function requireJwt() {
+        var result = service("authenticator").authenticate(request);
+        if (!result.success) {
+            renderWith(data={error: result.error}, status=result.statusCode);
+        }
+    }
+}
+```
+
+On expired tokens `JwtStrategy` returns `error="JWT token has expired"` and `statusCode=401`; on bad signatures, `error="JWT signature verification failed"`. The controller doesn't need to distinguish — both fail the `result.success` check and return 401.
+
+## Combining strategies
+
+The registry pattern pays off when one app serves both HTML and JSON. Register session auth for browser routes, JWT for `/api/*`, and the authenticator picks the right one per request based on what the client sends.
+
+```cfm {test:compile} title="config/app.cfm — register both strategies"
+if (StructKeyExists(application, "wheelsdi") && application.wheelsdi.containsInstance("authenticator")) {
+    local.auth = service("authenticator");
+
+    if (!local.auth.hasStrategy("jwt")) {
+        local.jwtService = new wheels.auth.JwtService(secretKey=env("JWT_SECRET"));
+        local.auth.registerStrategy(name="jwt", strategy=new wheels.auth.JwtStrategy(jwtService=local.jwtService));
+    }
+    if (!local.auth.hasStrategy("session")) {
+        local.auth.registerStrategy(name="session", strategy=service("sessionStrategy"));
+    }
+}
+```
+
+Order matters. `JwtStrategy.supports(request)` returns true only when an `Authorization: Bearer` header is present; `SessionStrategy.supports(request)` returns true only when the session already has a principal. An API call carrying a bearer token is handled by JWT; a browser request carrying a session cookie is handled by session; neither matches, authentication fails with 401.
+
+A single `authenticate` filter in a base controller now protects both kinds of routes without branching:
+
+```cfm {test:compile} title="app/controllers/Controller.cfc — app-wide base"
+component extends="wheels.Controller" {
+    private function authenticate() {
+        var result = service("authenticator").authenticate(request);
+        if (!result.success) {
+            if ((request.format ?: "html") == "json") {
+                renderWith(data={error: result.error}, status=result.statusCode);
+            } else {
+                flashInsert(error="Please log in first");
+                redirectTo(route="login");
+            }
+        }
+    }
+}
+```
+
+## I don't want to use the DI container
+
+You don't have to. `Authenticator`, `SessionStrategy`, `TokenStrategy`, and `JwtStrategy` are plain CFCs — nothing about them requires `injector()`. Store the authenticator in `application` scope at init, instantiate the strategies with `new`, and call them directly. The DI container buys you testability (register a mock under the same name in `config/testing/services.cfm`) and a clean seam for environment-specific swaps. If your app is small and doesn't need either, skip it.
+
+## Security pitfalls
+
+- **Session fixation.** `SessionStrategy.login()` calls `sessionRotate()` automatically on engines that support it (Lucee). If you're on an engine without session rotation, issue a new session ID manually before storing the principal.
+- **Timing-safe comparison.** `bcryptVerify()` compares in constant time, so the `authenticate()` example above is safe as written. If you compare hashes yourself anywhere else, don't use `==` — under load an attacker can measure response times to recover the hash byte-by-byte.
+- **Secret rotation.** `JwtService` takes a single `secretKey`. Rotating it invalidates every outstanding token. For gradual rotation, validate against a list of current + previous secrets during the cutover window; the shipped `JwtService` doesn't do this natively, so you'll need to wrap it.
+- **JWT revocation.** JWTs are stateless by design — you cannot revoke an issued token before it expires unless you maintain a server-side deny-list and check it on every request. Keep token expiry short (minutes, not days) and use a refresh-token flow if you need long sessions.
+- **Token leakage in URLs.** Query-string tokens are disabled by default on both `TokenStrategy` and `JwtStrategy` (`queryParam=""`). Query strings show up in access logs, referer headers, and browser history — prefer the `Authorization` header, and only set `queryParam` if you must support URL-based keys.
+- **Weak JWT secrets.** `JwtService` refuses to construct with an empty secret (`Wheels.Auth.JWT.InvalidSecretKey`) or one shorter than 32 bytes (`Wheels.Auth.JWT.WeakSecretKey`), per RFC 7518 §3.2 — HMAC-SHA256 needs at least 256 bits of key material. Generate a random 32+ byte secret and load it from the environment.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Tutorial Part 6: Authentication" href="/v4-1-0/start-here/tutorial/06-authentication/" description="Walks the hand-rolled and built-in flows end-to-end for a blog." />
+  <LinkCard title="Authorization Policies" href="/v4-1-0/digging-deeper/authorization-policies/" description="The layer on top: authorize()/can()/policyScope() decide what the authenticated user may do." />
+  <LinkCard title="The Dependency Injection Container" href="/v4-1-0/core-concepts/dependency-injection/" description="Why services.cfm, what the three scopes do, and when plain new is still right." />
+  <LinkCard title="Controllers and Actions" href="/v4-1-0/basics/controllers-and-actions/" description="Filters, params, and the session scope that session auth builds on." />
+</CardGrid>

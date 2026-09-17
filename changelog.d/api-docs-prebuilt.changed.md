@@ -1,1 +1,0 @@
-- `/wheels/api` now serves the prebuilt Starlight API reference rather than rendering it from the installed framework's source comments, so what you read locally is identical to api.wheels.dev instead of a second rendering of it. `public/docs/core.cfm` is retained because `/wheels/ai` still derives its condensed API summary from it, but it no longer backs a browsable page

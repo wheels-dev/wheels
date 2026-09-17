@@ -1,1 +1,0 @@
-- `wheels start` no longer collides with another project on the shutdown port. When the shutdown port pinned in `lucee.json` is already in use, the next free port is used instead and reported; previously the clash surfaced as LuCLI's `port conflicts detected:` with an empty list. The HTTP port is never moved on its own, because users expect the port they configured

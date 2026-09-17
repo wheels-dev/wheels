@@ -1,0 +1,240 @@
+---
+title: Database and Multiple Datasources
+description: Configuring the default datasource, per-model overrides, transactions, and raw queries.
+type: howto
+sidebar:
+  order: 11
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Every Wheels model reads and writes through a named datasource. Most apps have exactly one, configured in `config/settings.cfm` and overridden per environment. Some apps need more — a legacy reporting database, a separate read replica, a tenant-per-database pattern. This page covers the knobs Wheels gives you for all of those cases, plus the transaction and raw-query escape hatches for the times the ORM isn't enough.
+
+**You'll learn:**
+
+- How to configure the default datasource for the whole app
+- How to override it per environment and per model
+- How to wrap a multi-statement unit of work in a transaction
+- How to fall through to raw SQL when the ORM can't express what you need
+- What Wheels 4.0 supports across database engines
+
+<Aside type="note">
+  You should already know how to define models. See [Models and the ORM](/v4-1-0/basics/models-and-the-orm/).
+</Aside>
+
+## The default datasource
+
+Wheels reads `dataSourceName` from `config/settings.cfm` at application start and stores it on `application.wheels.dataSourceName`. Every model uses this datasource unless it declares its own.
+
+```cfm {test:compile}
+set(dataSourceName = "myapp_dev");
+```
+
+The name you set here must match a datasource registered with your CFML engine — Wheels only cares that the name resolves to a working connection. The next section shows the registration shape for each setup. In development, a name that doesn't resolve surfaces as a `Wheels.DataSourceNotFound` error page naming the datasource (served with HTTP 404).
+
+`config/settings.cfm` is the shared file loaded in every environment; [per-environment overrides](#per-environment-datasource) shadow it.
+
+## Registering a datasource
+
+Where the registration lives depends on what serves your app:
+
+**With the wheels CLI** — datasources live in `lucee.json` at the app root. `wheels new` writes the SQLite pair for you; add more under `configuration.datasources` using the same shape:
+
+```json title="lucee.json (excerpt — the shape wheels new generates)"
+"configuration": {
+  "datasources": {
+    "myapp_dev": {
+      "class": "org.sqlite.JDBC",
+      "database": "myapp_dev",
+      "dbdriver": "Other",
+      "dsn": "jdbc:sqlite:{project}/db/development.sqlite",
+      "host": "", "username": "", "password": ""
+    }
+  }
+}
+```
+
+For MySQL/Postgres, swap `class`/`dsn` for the driver's JDBC form (e.g. `com.mysql.cj.jdbc.Driver` with `jdbc:mysql://localhost:3306/myapp`). Restart the server (`wheels stop && wheels start`) after editing.
+
+**With CommandBox** — the scaffolded `box.json` already includes `commandbox-cfconfig`; declare datasources in `server.json` and CFConfig applies them at server start:
+
+```json title="server.json (excerpt)"
+"cfconfig": {
+  "datasources": {
+    "myapp_dev": {
+      "dbdriver": "MySQL",
+      "host": "localhost", "port": 3306,
+      "database": "myapp",
+      "username": "wheels", "password": "${DB_PASSWORD}"
+    }
+  }
+}
+```
+
+**With your own server (manual installs)** — register the datasource in the engine's admin: Lucee's server or web admin, or the **ColdFusion Administrator** on Adobe (don't rely on runtime-defined datasources on ACF — admin-registered is the reliable path).
+
+<Aside type="caution" title="Adobe ColdFusion + MySQL 8">
+If the app connects but models and the migrator act as if your tables don't exist, add `nullCatalogMeansCurrent=true` to the datasource's Connection String in the CF Administrator — MySQL Connector/J 8 changed its metadata default and schema reads come back empty without it. Details in [IIS and Windows Deployment](/v4-1-0/deployment/iis-and-windows/#adobe-coldfusion--mysql-8).
+</Aside>
+
+## Per-environment datasource
+
+Development, test, and production usually point at different databases. Keep the shared default in `config/settings.cfm`, then shadow it from `config/<environment>/settings.cfm`:
+
+```cfm {test:compile}
+set(dataSourceName = "myapp_production");
+set(dataSourceUserName = env("DB_USER"));
+set(dataSourcePassword = env("DB_PASSWORD"));
+```
+
+Environment-specific settings are loaded after the shared ones, so whatever you set here wins. Read secrets from the environment with `env("VAR_NAME")` — never commit credentials into the repo. See [Environments and Configuration](/v4-1-0/core-concepts/environments-and-configuration/) for the full configuration loading order.
+
+## Per-model override
+
+Any model can point at a different datasource by calling `dataSource()` in `config()`. This is the standard pattern for reaching into a legacy database that lives alongside your primary schema.
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        dataSource("legacy_reporting");
+        table("vw_legacy_users");
+        setPrimaryKey("user_id");
+    }
+}
+```
+
+The typical legacy case is all three overrides at once: a non-default datasource, a non-convention table name (often a view), and a non-`id` primary key. The rest of the model still behaves like any other — associations, validations, finders, and the query builder all use the datasource you've declared.
+
+<Aside type="caution">
+  The table-name **setter** is `table()`. `tableName()` is a zero-argument getter — calling `tableName("vw_legacy_users")` silently ignores the argument, the model resolves the conventional table name instead, and the first query throws `Wheels.TableNotFound` ([#3079](https://github.com/wheels-dev/wheels/issues/3079)).
+</Aside>
+
+`dataSource()` also accepts `username` and `password` arguments for databases that need per-model credentials:
+
+```cfm {test:compile}
+component extends="Model" {
+    function config() {
+        dataSource(datasource="legacy_reporting", username="report_reader", password=env("REPORT_DB_PASSWORD"));
+    }
+}
+```
+
+## Read replicas
+
+Wheels 4.0 does not ship a built-in read-replica feature — there's no `readReplica="..."` argument on finders or a framework-level read/write split. If you want to send reads to a replica and writes to the primary, you build the pattern yourself with two datasources and per-model overrides.
+
+The simplest approach: register both databases, keep the primary as your default, and declare a thin read-only model that points at the replica.
+
+```cfm {test:compile}
+// config/settings.cfm
+set(dataSourceName = "myapp_primary");
+```
+
+```cfm {test:compile}
+// app/models/UserReadOnly.cfc
+component extends="Model" {
+    function config() {
+        dataSource("myapp_replica");
+        table("users");
+        setPrimaryKey("id");
+    }
+}
+```
+
+Queries against `model("UserReadOnly")` hit the replica; `model("User")` continues to hit the primary. You are responsible for making sure nothing mutates data through the read-only model, and for understanding replica lag — reading back a record you just wrote may return the pre-write version for a short window.
+
+A framework-level read/write split is under consideration for a future release. Until then, the pattern above is the supported path.
+
+## Transactions
+
+Wheels gives you three ways to wrap work in a transaction. Which one you pick depends on how many statements you're coordinating.
+
+**Single model method.** Every persistence method — `save`, `create`, `update`, `delete` — accepts a `transaction` argument. Pass `"rollback"` to run the statement inside a transaction and always roll it back (useful for dry-runs and tests) or `"commit"` (the default — persistence methods default their `transaction` argument to the `transactionMode` setting, whose framework default is `"commit"`) to commit normally.
+
+```cfm {test:compile}
+component extends="Controller" {
+    function preview() {
+        user = model("User").findByKey(params.key);
+        user.update(balance=user.balance - 100, transaction="rollback");
+        // changes are discarded; user.balance in memory reflects the attempted value
+    }
+}
+```
+
+**Multiple statements, one model.** Call `invokeWithTransaction(method="...")` to run a single model method inside an explicit transaction block.
+
+```cfm {test:compile}
+component extends="Controller" {
+    function settle() {
+        account = model("Account").findByKey(params.key);
+        account.invokeWithTransaction(method="settleOutstandingCharges");
+    }
+}
+```
+
+The invoked method must return a boolean — `invokeWithTransaction()` throws `Methods invoked using invokeWithTransaction must return a boolean value` otherwise. Returning `true` commits; returning `false` rolls the transaction back, even with `transaction="commit"`. Make sure `settleOutstandingCharges()` ends with `return true;` on its success path.
+
+**Multiple statements, multiple models.** Use a native CFML `transaction{}` block. Everything inside runs against the same connection and commits or rolls back as a unit. An uncaught exception inside rolls back automatically; an explicit rollback uses `transaction action="rollback"`.
+
+```cfm {test:compile}
+component extends="Controller" {
+    function transfer() {
+        transaction {
+            from = model("Account").findByKey(params.fromKey);
+            to = model("Account").findByKey(params.toKey);
+            from.update(balance=from.balance - params.amount);
+            to.update(balance=to.balance + params.amount);
+        }
+        redirectTo(route="accounts");
+    }
+}
+```
+
+Transactions commit when the block exits cleanly and roll back on any thrown exception. All statements in a transaction must run against the same datasource — cross-database transactions aren't a thing the engine can give you. Adobe ColdFusion enforces this with an error (`Datasource names for all the database tags within the cftransaction tag must be the same.`); Lucee 7 does not — it runs the statements against both datasources but provides no cross-database atomicity, so the failure mode is silent.
+
+## Raw queries
+
+For the rare query the ORM can't express cleanly — a reporting aggregate, a window function, a vendor-specific feature — drop through to native CFML `queryExecute()`. Point it at the app's configured datasource with the `datasource` option (don't hardcode an environment-specific name — that undoes the per-environment configuration above) and use positional parameters for any user input.
+
+```cfm {test:compile}
+component extends="Model" {
+    public query function topContributors(numeric limit=10) {
+        return queryExecute(
+            "SELECT userId, COUNT(*) AS postCount FROM posts GROUP BY userId ORDER BY postCount DESC LIMIT ?",
+            [arguments.limit],
+            {datasource: get("dataSourceName")}
+        );
+    }
+}
+```
+
+The `?` placeholder plus the `parameters` array gets you parameter binding through `cfqueryparam`. Never concatenate user input into the SQL string — that's the canonical SQL-injection gap. The rule is: if a value comes from `params`, `session`, or any request-scoped source, it goes through a placeholder, not through string interpolation.
+
+For model instances, use `findOne()`/`findByKey()` or `findAll(returnAs="objects")` — plain `findAll()` already returns a query result by default, so reach for raw `queryExecute()` only when neither the ORM nor the [query builder](/v4-1-0/basics/query-builder-and-scopes/) can express the SQL you need.
+
+## Connection pooling
+
+Each CFML engine keeps a connection pool per datasource. Lucee manages this through the datasource configuration in `lucee.json` (or the web admin); default pool sizing handles most workloads without tuning. If you run into connection-exhaustion errors under load, the usual culprits are long-running transactions, unclosed cursors in custom code, or pool-size settings that haven't been raised from the default. Consult your engine's documentation for the exact knobs — the tunables live below the Wheels layer.
+
+## Supported databases
+
+Wheels 4.0 has database adapters for:
+
+- **PostgreSQL** — recommended for new apps.
+- **MySQL / MariaDB** — fully supported, broad production use.
+- **Microsoft SQL Server** — fully supported, common in enterprise shops.
+- **SQLite** — great for development and testing, production-fine for small apps.
+- **H2** — embedded, great for tests that need a fresh database per run (Lucee-only in the CI matrix).
+- **CockroachDB** — distributed SQL, PostgreSQL wire-compatible, with its own adapter.
+- **Oracle** — supported with its own adapter (runs as a soft-fail leg in the CI matrix).
+
+The Wheels 4.0 core test suite runs on Lucee 7 + SQLite for day-to-day development; the full CI matrix covers additional engines and databases. SQLite is the reference — if something works there but not on your target database, that's a bug worth filing.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Models and the ORM" href="/v4-1-0/basics/models-and-the-orm/" description="Defining a model, finders, persistence, and the non-convention overrides this page extends." />
+  <LinkCard title="Query Builder and Scopes" href="/v4-1-0/basics/query-builder-and-scopes/" description="Chainable queries, reusable scopes, enums, and batch processing — the safe alternative to raw SQL." />
+  <LinkCard title="Migrations" href="/v4-1-0/basics/migrations/" description="Schema changes, column types, and indexes. The table structure your datasource exposes." />
+  <LinkCard title="Environments and Configuration" href="/v4-1-0/core-concepts/environments-and-configuration/" description="The configuration loading order. Datasource settings usually differ per environment." />
+</CardGrid>

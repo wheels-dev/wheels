@@ -1,0 +1,87 @@
+---
+title: How Routing Works
+description: URL to action, the algorithm — how .resources() expands, why order matters, and how route model binding loads records before your action runs.
+type: concept
+sidebar:
+  order: 7
+---
+
+Routing is the stage between a URL arriving and a controller method running. The algorithm is small enough to keep in your head, the expansion rules are fixed, and the precedence rules are mechanical — static paths first, then declaration order — which makes routing failures easy to reason about once you know the shape.
+
+**You'll learn:**
+
+- The match algorithm the router uses on every request
+- What `.resources("posts")` actually generates
+- The order rules that decide which route wins
+- How route model binding loads records before the action runs
+- Why named routes are the right way to build URLs
+
+## The match algorithm
+
+Routes are compiled at boot into an in-memory table, and the router resolves each request in two steps:
+
+1. **Static routes first.** Routes whose patterns contain no placeholders (`/posts/featured`, `/about`) live in an exact-path index and are checked with an O(1) lookup before anything else. A literal path always beats a placeholder route, no matter where either was declared. If two routes register the same static pattern, the first one declared wins.
+2. **Placeholder routes in declaration order.** Everything that isn't a static match falls through to an ordered top-to-bottom scan of the placeholder routes. The first route whose HTTP method and URL pattern both match wins — even if a more specific placeholder route appears later. There is no scoring, no backtracking, no "best fit."
+
+The static-first step means declaration order does **not** decide static-vs-placeholder conflicts — only placeholder-vs-placeholder ones and ties between identical static patterns. These are the intended semantics, settled in [#3073](https://github.com/wheels-dev/wheels/issues/3073) and pinned by the framework test suite: a literal path always routes to its literal route, so the classic bug where an earlier `/posts/[key]` steals `/posts/featured` cannot happen in Wheels.
+
+Resource and namespaced declarations are not matched as a unit. They expand at boot time into plain routes that sit in the same table as your hand-written `.get()` and `.post()` calls. A `.resources("posts")` registers an entry per REST action, in a fixed order. The wildcard route catches anything that falls through and maps `/controller/action` conventionally — a legacy pattern kept for upgrade paths. Named routes are the preferred way to wire URLs.
+
+## What `.resources("posts")` expands to
+
+One call generates the seven REST actions below. Each row is also registered with a `.[format]` twin (`/posts.json`, `/posts/[key].xml`, …) for content negotiation, so the actual table holds twice as many rows. The names in the right column are what you pass to `linkTo`, `redirectTo`, and `urlFor`.
+
+| HTTP method | Path | Controller#action | Named route |
+|-------------|------|-------------------|-------------|
+| GET | `/posts` | `posts#index` | `posts` |
+| GET | `/posts/new` | `posts#new` | `newPost` |
+| POST | `/posts` | `posts#create` | (same name `posts`) |
+| GET | `/posts/[key]` | `posts#show` | `post` |
+| GET | `/posts/[key]/edit` | `posts#edit` | `editPost` |
+| PATCH/PUT | `/posts/[key]` | `posts#update` | (same name `post`) |
+| DELETE | `/posts/[key]` | `posts#delete` | (same name `post`) |
+
+Two routes can share a named route because the helpers disambiguate by HTTP verb. `linkTo(route="post", key=post.id)` renders a GET link to `show`; `buttonTo(route="post", key=post.id, method="delete")` renders a DELETE button against the same name. You look up by name, the helper picks the verb.
+
+## Order rules
+
+Route order is almost always the cause when a URL matches the wrong action. Four rules cover every case:
+
+- A literal path beats a pattern with a placeholder — this is enforced by the router itself (the static-route index resolves first), not a convention you have to maintain by ordering.
+- `.resources(...)` declarations come before `.root(...)`, which comes before `.wildcard()`. The wildcard is always last.
+- A custom `.get(pattern="/posts/featured", to="posts##featured")` routes `/posts/featured` to `featured` whether it's declared before or after `.resources("posts")` — the static index wins over the placeholder `show` route in both orders. Declaring it first is still good style: it keeps the intent visible and matches the placeholder-vs-placeholder rule, where order genuinely decides.
+- Order within a named-route group doesn't matter for URL generation. Named routes are a keyed lookup — the name is the key, not the position.
+
+```cfm title="illustrative — config/routes.cfm"
+mapper()
+    .get(pattern="/posts/featured", to="posts##featured")
+    .resources("posts")
+    .root(to="home##index", method="get")
+    .wildcard()
+.end();
+```
+
+## Route model binding
+
+With `.resources(name="posts", binding=true)` — or globally via `set(routeModelBinding=true)` in `config/settings.cfm` — the router loads `params.post` from the database before your action runs. The convention is controller `posts` → model `Post` → `params.post`; override with `binding="BlogPost"` when the controller name doesn't singularize cleanly to the model. The helper runs after route dispatch but before `beforeAction` filters, so filters and actions both see the resolved instance.
+
+Member actions (`show`, `edit`, `update`, `delete`) see a pre-populated `params.post` ready to use. If the record doesn't exist, the dispatcher raises `Wheels.RecordNotFound` and renders a 404 — the controller action never runs. Without `binding=true`, `params.post` is undefined and you're expected to call `findByKey(params.key)` yourself; in development mode the framework logs a warning at dispatch time when a binding-eligible action is missing its binding.
+
+## Named routes everywhere
+
+Named routes are the one place URLs for a resource are defined, and every helper reads from that same table:
+
+- `linkTo(route="post", key=post.id, text="View")`
+- `redirectTo(route="posts")`
+- `urlFor(route="newPost")`
+- `buttonTo(route="post", key=post.id, method="delete")`
+- `startFormTag(route="post", key=post.id, method="put")`
+
+Rename the resource once in `config/routes.cfm` and every caller updates. That is the whole reason to route by name rather than by hand-written URL string.
+
+## See also
+
+- [The Request Lifecycle](/v4-1-0/core-concepts/request-lifecycle/) — routing is the first stage of dispatch
+- [Middleware Pipeline](/v4-1-0/core-concepts/middleware-pipeline/) — runs after the route is matched, before the controller
+- [Routing](/v4-1-0/basics/routing/) — hands-on how-to
+- [Controllers and Actions](/v4-1-0/basics/controllers-and-actions/) — where route params land

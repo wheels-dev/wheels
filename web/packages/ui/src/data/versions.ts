@@ -45,14 +45,16 @@ export interface VersionMeta {
 
 /** Wheels Guides — the narrative docs at guides.wheels.dev. */
 export const GUIDES_VERSIONS: VersionMeta[] = [
-	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-1-0', label: 'v4.1', sidebarLabel: 'v4.1 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0', collapsed: true, status: 'archived' },
 	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true, status: 'archived' },
 ];
 
 /** Wheels API Reference — function-level docs at api.wheels.dev. */
 export const API_VERSIONS: VersionMeta[] = [
-	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-1-0', label: 'v4.1', sidebarLabel: 'v4.1 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0', collapsed: true, status: 'archived' },
 	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-4-0', label: 'v2.4.0', collapsed: true, status: 'archived' },
