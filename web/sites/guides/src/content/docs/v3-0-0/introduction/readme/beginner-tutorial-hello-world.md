@@ -27,12 +27,10 @@ Let's create a controller from scratch to illustrate how easy it is to set up a 
 
 First, create a file called `Say.cfc` in the `/app/controllers` directory and add the code below to the file.
 
-{% code title="/app/controllers/Say.cfc" %}
-```javascript
+```javascript title="/app/controllers/Say.cfc"
 component extends="Controller"{
 }
 ```
-{% endcode %}
 
 Congratulations, you just created your first Wheels controller! What does this controller do, you might ask? Well, to be honest, not much. It has no methods defined, so it doesn't add any new functionality to our application. But because it extends the base `Controller` component, it inherits quite a bit of powerful functionality and is now tied into our Wheels application.
 
@@ -46,14 +44,12 @@ The error says "Could not find the view page for the 'index' action in the 'say'
 
 But let's jump ahead. Now that we have the controller created, let's add an action to it called `hello`. Change your `say` controller so it looks like the code block below:
 
-{% code title="/app/controllers/Say.cfc" %}
-```javascript
+```javascript title="/app/controllers/Say.cfc"
 component extends="Controller" {
     function hello() {
     }
 }
 ```
-{% endcode %}
 
 As you can see, we created an empty method named `hello`.
 
@@ -73,11 +69,9 @@ Find the `views` directory inside the `app` directory, located at `/` in your Wh
 
 Now inside the `say` directory, create a file called `hello.cfm`. In the `hello.cfm` file, add the following line of code:
 
-{% code title="/app/views/say/hello.cfm" %}
-```html
+```html title="/app/views/say/hello.cfm"
 <h1>Hello World!</h1>
 ```
-{% endcode %}
 
 Save your `hello.cfm` file, and let's call our `say/hello` action once again. You have your first working Wheels page if your browser looks like _Figure 3_ below.
 
@@ -93,15 +87,13 @@ We will add some simple dynamic content to our `hello` action and add a second a
 
 The first thing we are going to do is to add some dynamic content to our `say/hello` action. Modify your `say` controller so it looks like the code block below:
 
-{% code title="/app/controllers/Say.cfc" %}
-```javascript
+```javascript title="/app/controllers/Say.cfc"
 component extends="Controller" {
     function hello() {
         time = Now();
     }
 }
 ```
-{% endcode %}
 
 All we are doing here is creating a variable called `time` and setting its value to the current server time using the basic ColdFusion `Now()` function. When we do this, the variable becomes immediately available to our view code.
 
@@ -111,12 +103,10 @@ Why not just set up this value directly in the view? If you think about it, mayb
 
 Next, we will modify our `say/hello.cfm` view file so that it looks like the code block below. When we do this, the value will be displayed in the browser.
 
-{% code title="/app/views/say/hello.cfm" %}
-```html
+```html title="/app/views/say/hello.cfm"
 <h1>Hello World!</h1>
 <p>Current time: <cfoutput>#time#</cfoutput></p>
 ```
-{% endcode %}
 
 call your `say/hello` action again in your browser. Your browser should look like _Figure 4_ below.
 
@@ -130,8 +120,7 @@ Now we will expand the functionality of our application once again by adding a s
 
 First, modify the the `say` controller file so that it looks like the code block below.
 
-{% code title="/app/controllers/Say.cfc" %}
-```javascript
+```javascript title="/app/controllers/Say.cfc"
 component extends="Controller" {
     function hello() {
         time = Now();
@@ -141,17 +130,14 @@ component extends="Controller" {
     }
 }
 ```
-{% endcode %}
 
 Now go to the `/app/views/say` directory and create a `goodbye.cfm` page.
 
 Add the following code to the `goodbye.cfm` page and save it.
 
-{% code title="/app/views/say/goodbye.cfm" %}
-```
+```txt title="/app/views/say/goodbye.cfm"
 Goodbye World!
 ```
-{% endcode %}
 
 If we did everything right, we should be able to call the new `say/goodbye` action using the following URL:
 
@@ -169,13 +155,11 @@ Now let's link our two actions together. We will do this by adding a link to the
 
 Open the `say/hello.cfm` view file. We are going to add a line of code to the end of this file so our `say/hello.cfm` view file looks like the code block below:
 
-{% code title="/app/views/say/hello.cfm" %}
-```html
+```html title="/app/views/say/hello.cfm"
 <h1>Hello World!</h1>
 <p>Current time: <cfoutput>#time#</cfoutput></p>
 <p>Time to say <cfoutput>#linkTo(text="goodbye", action="goodbye")#?</cfoutput></p>
 ```
-{% endcode %}
 
 The [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function is a built-in Wheels function. In this case, we are passing 2 named parameters to it. The first parameter, `text`, is the text that will be displayed in the hyperlink. The second parameter, `action`, defines the action to point the link to. By using this built-in function, your application's main URL may change, and even controllers and actions may get shifted around, but you won't suffer from the dreaded dead link. Wheels will always create a valid link for you as long as you configure it correctly when you make infrastructure changes to your application.
 
@@ -191,12 +175,10 @@ Let's complete our little app and add a corresponding link to the bottom of our 
 
 Open your `say/goodbye.cfm` view page and modify it so it looks like the code block below.
 
-{% code title="/app/views/say/goodbye.cfm" %}
-```html
+```html title="/app/views/say/goodbye.cfm"
 <h1>Goodbye World!</h1>
 <p>Time to say <cfoutput>#linkTo(text="hello", action="hello")#?</cfoutput></p>
 ```
-{% endcode %}
 
 If you now call the `say/goodbye` action in your browser, your browser should look like _Figure 7_ below.
 

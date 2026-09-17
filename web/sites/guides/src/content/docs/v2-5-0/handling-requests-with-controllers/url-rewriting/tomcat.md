@@ -20,19 +20,16 @@ UrlRewriteFilter (commonly referred to as Tuckey) is a Java web filter for compl
 
 Servlet-Mapping markup
 
-{% code title="servlet-mapping" %}
-```xml
+```xml title="servlet-mapping"
 <servlet-mapping>
   <servlet-name>CFMLServlet</servlet-name>
     <url-pattern>/rewrite.cfm/*</url-pattern>
 </servlet-mapping>
 ```
-{% endcode %}
 
 Example markup with UrlRewriteFilter and Wheels pretty URLs for `WEB-INF/web.xml`.
 
-{% code title="web.xml" %}
-```xml
+```xml title="web.xml"
 <filter>
     <filter-name>UrlRewriteFilter</filter-name>
     <filter-class>org.tuckey.web.filters.urlrewrite.UrlRewriteFilter</filter-class>
@@ -48,12 +45,10 @@ Example markup with UrlRewriteFilter and Wheels pretty URLs for `WEB-INF/web.xml
     <url-pattern>/rewrite.cfm/*</url-pattern>
 </servlet-mapping>
 ```
-{% endcode %}
 
 Pretty URLs Rule markup
 
-{% code title="pretty urls rule" %}
-```xml
+```xml title="pretty urls rule"
 <rule enabled="true">
     <name>CFWheels pretty URLs</name>
     <condition type="request-uri" operator="notequal">^/(flex2gateway|jrunscripts|cfide|cf_scripts|cfformgateway|cffileservlet|lucee|files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots.txt|favicon.ico|sitemap.xml|rewrite.cfm)</condition>
@@ -61,12 +56,10 @@ Pretty URLs Rule markup
     <to type="passthrough">/rewrite.cfm/$1</to>
   </rule>
 ```
-{% endcode %}
 
 A complete barebones `WEB-INF/urlrewrite.xml` configuration example with pretty URLs.
 
-{% code title="urlrewrite.xml" %}
-```xml
+```xml title="urlrewrite.xml"
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE urlrewrite
     PUBLIC "-//tuckey.org//DTD UrlRewrite 4.0//EN"
@@ -81,4 +74,3 @@ A complete barebones `WEB-INF/urlrewrite.xml` configuration example with pretty 
   </rule>
 </urlrewrite>
 ```
-{% endcode %}

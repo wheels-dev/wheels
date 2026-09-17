@@ -22,6 +22,10 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 		// Storage for alias → component path mappings
 		variables.mappings = {};
 
+		// Storage for alias → factory closures (registered via toFactory()).
+		// Kept separate from mappings so getMappings() stays string-typed.
+		variables.factories = {};
+
 		// Singleton cache: mapping name → instance. Keyed by the same value
 		// as variables.singletonFlags so the flag and the cache can never
 		// disagree (previously the cache was keyed by component path, so a
@@ -72,6 +76,28 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	 * @name The alias name for this mapping (e.g. "global", "Plugins")
 	 */
 	public Injector function map(required string name) {
+		// S2: remapping an existing name starts a new lifecycle. Reset
+		// singleton / request flags here (not in to()) so
+		// map(b).asSingleton().to(...) can flag b after the reset.
+		// First bind of a new name is not a rebind — leave request cache
+		// and any unrelated flags alone.
+		if (structKeyExists(variables.factories, arguments.name)) {
+			// Re-mapping over a factory binding changes the construction
+			// source, so any cached instance must go too.
+			structDelete(variables.factories, arguments.name);
+			structDelete(variables.singletons, arguments.name);
+			structDelete(variables.singletonFlags, arguments.name);
+			structDelete(variables.requestScopedFlags, arguments.name);
+			structDelete(request, "$wheelsDICache");
+		} else if (structKeyExists(variables.mappings, arguments.name)) {
+			// Path re-map: keep the cached singleton AND its lifecycle flag
+			// (#3516). to() already invalidates the cached instance only on a
+			// path CHANGE (preserving it for the dev-reload same-path case), so
+			// dropping the flag here wrongly degrades a re-bound singleton to
+			// transient. Only clear the request-scoped instance cache; the
+			// singleton cache is invalidated by to() on a real path change.
+			structDelete(request, "$wheelsDICache");
+		}
 		variables.currentMapping = arguments.name;
 		return this;
 	}
@@ -94,6 +120,8 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 		if (!len(variables.currentMapping)) {
 			throw(type="Wheels.Injector", message="to() called without a preceding map() call.");
 		}
+		// A to() after toFactory() replaces the factory binding entirely.
+		structDelete(variables.factories, variables.currentMapping);
 		// Re-binding an alias to a DIFFERENT component path invalidates any
 		// cached singleton instance for that alias — the cache is keyed by
 		// alias, so without this the stale instance of the old component
@@ -113,24 +141,63 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	}
 
 	/**
-	 * Mark the most recently completed mapping as a singleton.
-	 * When getInstance() is called for a singleton, the instance is cached.
+	 * Complete a mapping with a factory closure. The closure receives the
+	 * container itself (so it can compose other services via
+	 * ctx.getInstance(...)) and its return value is the resolved instance.
+	 *
+	 * Scope interplay mirrors to(): transient factories run per resolve,
+	 * .asSingleton() runs the factory once under the singleton lock, and
+	 * .asRequestScoped() once per request. No auto-wiring or onDIcomplete()
+	 * runs on the result — the closure owns construction, and initArguments
+	 * passed to getInstance() are ignored for factory bindings.
+	 *
+	 * @factory Closure that builds the instance.
 	 */
-	public Injector function asSingleton() {
-		if (len(variables.lastMappedName)) {
-			variables.singletonFlags[variables.lastMappedName] = true;
+	public Injector function toFactory(required any factory) {
+		if (!len(variables.currentMapping)) {
+			throw(type="Wheels.Injector", message="toFactory() called without a preceding map() call.");
 		}
+		if (!IsClosure(arguments.factory) && !IsCustomFunction(arguments.factory)) {
+			throw(
+				type = "Wheels.Injector",
+				message = "toFactory() requires a closure or function reference."
+			);
+		}
+		// A toFactory() after to() replaces the path binding entirely.
+		structDelete(variables.mappings, variables.currentMapping);
+		structDelete(variables.singletons, variables.currentMapping);
+		variables.factories[variables.currentMapping] = arguments.factory;
+		variables.lastMappedName = variables.currentMapping;
+		variables.currentMapping = "";
 		return this;
 	}
 
 	/**
-	 * Mark the most recently completed mapping as request-scoped.
-	 * When getInstance() is called, the instance is cached per-request in request.$wheelsDICache.
+	 * Check whether a mapping is a factory binding.
+	 *
+	 * @name Alias name to check
+	 */
+	public boolean function isFactory(required string name) {
+		return structKeyExists(variables.factories, arguments.name);
+	}
+
+	/**
+	 * Mark the in-progress mapping (map then asSingleton then to) or the
+	 * most recently completed mapping as a singleton. Throws Wheels.Injector
+	 * when neither currentMapping nor lastMappedName is set.
+	 */
+	public Injector function asSingleton() {
+		variables.singletonFlags[$scopeTarget("asSingleton")] = true;
+		return this;
+	}
+
+	/**
+	 * Mark the in-progress mapping (map then asRequestScoped then to) or
+	 * the most recently completed mapping as request-scoped. Throws
+	 * Wheels.Injector when neither currentMapping nor lastMappedName is set.
 	 */
 	public Injector function asRequestScoped() {
-		if (len(variables.lastMappedName)) {
-			variables.requestScopedFlags[variables.lastMappedName] = true;
-		}
+		variables.requestScopedFlags[$scopeTarget("asRequestScoped")] = true;
 		return this;
 	}
 
@@ -157,6 +224,35 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	 * @initArguments Struct of arguments to pass to the init() method
 	 */
 	public any function getInstance(required string name, struct initArguments = {}) {
+		// Factory bindings bypass path resolution entirely.
+		if (structKeyExists(variables.factories, arguments.name)) {
+			// Singleton: the cache is keyed by the mapping name. A
+			// double-checked named lock ensures concurrent first resolutions
+			// run the factory exactly once.
+			if (structKeyExists(variables.singletonFlags, arguments.name)) {
+				if (!structKeyExists(variables.singletons, arguments.name)) {
+					lock name="#variables.lockNamePrefix##lCase(arguments.name)#" type="exclusive" timeout="30" {
+						if (!structKeyExists(variables.singletons, arguments.name)) {
+							variables.singletons[arguments.name] = $invokeFactory(arguments.name);
+						}
+					}
+				}
+				return variables.singletons[arguments.name];
+			}
+
+			// Request-scoped: cached per request in request.$wheelsDICache.
+			if (structKeyExists(variables.requestScopedFlags, arguments.name)) {
+				local.requestCache = $getRequestCache();
+				if (!structKeyExists(local.requestCache, arguments.name)) {
+					local.requestCache[arguments.name] = $invokeFactory(arguments.name);
+				}
+				return local.requestCache[arguments.name];
+			}
+
+			// Transient: the factory runs on every resolve.
+			return $invokeFactory(arguments.name);
+		}
+
 		// Resolve the component path
 		local.componentPath = resolveMapping(arguments.name);
 
@@ -261,6 +357,17 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	}
 
 	/**
+	 * Invoke a registered factory closure, passing the container so the
+	 * factory can compose other services. The closure is hoisted to a local
+	 * variable first — a bracket call `variables.factories[name](this)`
+	 * crashes the Adobe CF parser (Cross-Engine Invariant 4).
+	 */
+	private any function $invokeFactory(required string name) {
+		var fn = variables.factories[arguments.name];
+		return fn(this);
+	}
+
+	/**
 	 * Per-request resolving stack. Tracks which names are currently being
 	 * resolved in THIS thread/request, so the circular-dependency guard
 	 * doesn't see entries from concurrent requests.
@@ -280,14 +387,16 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 	 * @name Alias name to check
 	 */
 	public boolean function containsInstance(required string name) {
-		return structKeyExists(variables.mappings, arguments.name);
+		return structKeyExists(variables.mappings, arguments.name) || structKeyExists(variables.factories, arguments.name);
 	}
 
 	/**
 	 * Return all registered mappings (name → componentPath).
 	 */
 	public struct function getMappings() {
-		return variables.mappings;
+		// S7: callers get a Duplicate copy. Mutating the return value
+		// must not change later getMappings() or the live mappings table.
+		return Duplicate(variables.mappings);
 	}
 
 	/**
@@ -308,9 +417,60 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 		return structKeyExists(variables.singletonFlags, arguments.name);
 	}
 
+	/**
+	 * Snapshot of mapping tables so a failed ServiceProvider boot() can
+	 * unwind bindings written during register().
+	 */
+	public struct function $snapshotBindings() {
+		return {
+			mappings = Duplicate(variables.mappings),
+			factories = Duplicate(variables.factories),
+			singletonFlags = Duplicate(variables.singletonFlags),
+			requestScopedFlags = Duplicate(variables.requestScopedFlags)
+		};
+	}
+
+	/**
+	 * Restore mapping tables from $snapshotBindings() and drop singleton
+	 * cache entries that are no longer mapped.
+	 */
+	public void function $restoreBindings(required struct snapshot) {
+		variables.mappings = StructKeyExists(arguments.snapshot, "mappings")
+			? Duplicate(arguments.snapshot.mappings)
+			: {};
+		variables.factories = StructKeyExists(arguments.snapshot, "factories")
+			? Duplicate(arguments.snapshot.factories)
+			: {};
+		variables.singletonFlags = StructKeyExists(arguments.snapshot, "singletonFlags")
+			? Duplicate(arguments.snapshot.singletonFlags)
+			: {};
+		variables.requestScopedFlags = StructKeyExists(arguments.snapshot, "requestScopedFlags")
+			? Duplicate(arguments.snapshot.requestScopedFlags)
+			: {};
+		for (local.name in StructKeyArray(variables.singletons)) {
+			if (!StructKeyExists(variables.mappings, local.name) && !StructKeyExists(variables.factories, local.name)) {
+				StructDelete(variables.singletons, local.name);
+			}
+		}
+	}
+
 	// ---------------------------------------------------------------------------
 	// Private helpers
 	// ---------------------------------------------------------------------------
+
+	/**
+	 * Whether this name carries an explicit mapping or lifecycle flag in the
+	 * container — the #3213 model fast path in $createObjectFromRoot must fall
+	 * back to the full DI construction path when it does.
+	 */
+	public boolean function hasExplicitMapping(required string name) {
+		return (
+			StructKeyExists(variables.mappings, arguments.name)
+			|| StructKeyExists(variables.factories, arguments.name)
+			|| StructKeyExists(variables.singletonFlags, arguments.name)
+			|| StructKeyExists(variables.requestScopedFlags, arguments.name)
+		);
+	}
 
 	/**
 	 * Resolve an alias to its component path, or return the name as-is if no mapping exists.
@@ -320,6 +480,25 @@ component implements="wheels.interfaces.di.InjectorInterface" {
 			return variables.mappings[arguments.name];
 		}
 		return arguments.name;
+	}
+
+	/**
+	 * Name that asSingleton() / asRequestScoped() should flag.
+	 * Prefers the in-progress map() name so map(b).asSingleton().to(...)
+	 * binds b, not the previous lastMappedName. Empty both sides is
+	 * Wheels.Injector — same type as to() without map().
+	 */
+	private string function $scopeTarget(required string methodName) {
+		if (len(variables.currentMapping)) {
+			return variables.currentMapping;
+		}
+		if (len(variables.lastMappedName)) {
+			return variables.lastMappedName;
+		}
+		throw(
+			type = "Wheels.Injector",
+			message = "#arguments.methodName#() called without a preceding map() or to() call."
+		);
 	}
 
 	/**

@@ -1,0 +1,67 @@
+|DescriptionComment|/**
+ * Authorization policy for the {{modelName}} model — answers "may this user
+ * perform this action on this {{modelName}}?".
+ *
+ * Policies are DEFAULT-DENY: every method below denies until you change it.
+ * `variables.user` holds the current identity (empty string for guests) and
+ * `variables.record` holds the {{modelName}} being authorized.
+ *
+ * Enforce in a controller action:   authorize(post);
+ * Check without throwing (views):   can("update", post)
+ * Narrow an index collection:       policyScope(model("{{modelName}}")).findAll()
+ */
+component extends="Policy" {
+
+	public boolean function index() {
+		return false;
+	}
+
+	public boolean function show() {
+		return false;
+	}
+
+	public boolean function new() {
+		return false;
+	}
+
+	public boolean function create() {
+		return false;
+	}
+
+	public boolean function edit() {
+		return false;
+	}
+
+	public boolean function update() {
+		return false;
+	}
+
+	public boolean function delete() {
+		return false;
+	}
+
+	// Examples — adapt and replace the denials above:
+	//
+	// Grant to any signed-in user:
+	// public boolean function index() {
+	// 	return IsStruct(variables.user) && !StructIsEmpty(variables.user);
+	// }
+	//
+	// Grant to the record's owner:
+	// public boolean function update() {
+	// 	return IsStruct(variables.user)
+	// 		&& StructKeyExists(variables.user, "id")
+	// 		&& variables.user.id == variables.record.userId;
+	// }
+
+	/**
+	 * Narrows a collection to the records the user may see (used by
+	 * policyScope() for index actions). Inherits "no rows" from the base —
+	 * override to widen, e.g.:
+	 *
+	 * public any function scope(required any collection) {
+	 * 	return arguments.collection.where("userId", variables.user.id);
+	 * }
+	 */
+
+}

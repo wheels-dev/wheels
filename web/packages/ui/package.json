@@ -19,7 +19,9 @@
 		"./styles/tokens.css": "./src/styles/tokens.css",
 		"./styles/base.css": "./src/styles/base.css",
 		"./styles/starlight-theme.css": "./src/styles/starlight-theme.css",
-		"./assets/*": "./src/assets/*"
+		"./assets/*": "./src/assets/*",
+		"./markdown/rehype-base-prefix.mjs": "./src/markdown/rehype-base-prefix.mjs",
+		"./markdown/remark-base-prefix.mjs": "./src/markdown/remark-base-prefix.mjs"
 	},
 	"peerDependencies": {
 		"astro": "^5.0.0"

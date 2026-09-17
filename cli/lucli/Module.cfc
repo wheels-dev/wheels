@@ -107,8 +107,16 @@ component extends="modules.BaseModule" {
 	 * into a completely different invocation.
 	 */
 	private struct function structuredArgs(struct callerArgs = {}) {
+		// Command specs set `mod.__arguments = [...]` from OUTSIDE the
+		// component, which Lucee stores on the `this` scope; internal
+		// delegation assigns the unprefixed (variables) name. Consume either
+		// shape so both callers reach the same dispatch.
 		var raw = __arguments ?: [];
+		if (!arrayLen(raw) && structKeyExists(this, "__arguments")) {
+			raw = this.__arguments;
+		}
 		__arguments = [];
+		structDelete(this, "__arguments");
 		if (!structIsEmpty(arguments.callerArgs)) {
 			return arguments.callerArgs;
 		}
@@ -179,14 +187,24 @@ component extends="modules.BaseModule" {
 		var hidden = [
 			"main",     // bare `wheels` no-args dispatch target — not an MCP tool
 			"mcp",      // meta command — prints MCP setup instructions
+			// write .mcp.json / .opencode.json into the project. An assistant
+			// provisioning its own MCP config is a side-effecting setup step, not
+			// a query — the same reasoning as `docs` below.
+			"setup",
+			"map",      // deprecated forwarder for the same thing (snapshot 2499)
 			"d",        // alias for destroy
 			"g",        // alias for generate
 			"new",      // scaffolds a whole new Wheels project
 			"console",  // interactive CFML REPL — not usable over stdio
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
+			"engines",  // dev server lifecycle (stateful — RustCFML backend)
 			"browser",  // multi-step browser testing flow
 			"jobs",     // `jobs work` is a long-lived poll loop — no single-call MCP semantics (like start/stop)
+			"coverage", // instruments app/ on disk then runs the suite — stateful, not single-call MCP semantics
+			// downloads a ~30 MB bundle from GitHub and unpacks it into the CLI
+			// home — a side-effecting install step, not a query
+			"docs",
 			"mcpToolSpecs", // per-tool inputSchema registry read by LuCLI — not itself a tool
 			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
 			// unit-test them directly (the cli/CLAUDE.md "public for specs"
@@ -238,20 +256,44 @@ component extends="modules.BaseModule" {
 	 * the MCP advertisement cannot drift.
 	 *
 	 * Commands still on hand-rolled token parsing (generate, migrate, db,
-	 * deploy, routes, info, reload, validate, create — tracked by #2861)
+	 * deploy, info, reload, validate, create — tracked by #2861)
 	 * gain entries here as they migrate to ArgSpec.
 	 */
 	public struct function mcpToolSpecs() {
 		return {
 			"analyze" = analyzeArgSpec().toInputSchema(),
+			"create"  = createArgSpec().toInputSchema(),
 			"destroy" = destroyArgSpec().toInputSchema(),
 			"doctor"  = verboseFlagSpec().toInputSchema(),
+			"generate" = generateArgSpec().toInputSchema(),
+			"migrate" = migrateArgSpec().toInputSchema(),
 			"notes"   = notesArgSpec().toInputSchema(),
+			"routes"  = routesArgSpec().toInputSchema(),
 			"seed"    = seedArgSpec().toInputSchema(),
 			"stats"   = verboseFlagSpec().toInputSchema(),
 			"test"    = testArgSpec().toInputSchema(),
 			"upgrade" = upgradeArgSpec().toInputSchema()
 		};
+	}
+
+	/**
+	 * ArgSpec for `wheels migrate`. Positional action covers the whole
+	 * surface (latest/up/down/info/doctor/forget/pretend/
+	 * rename-system-tables/diff); the option set describes the diff action
+	 * so MCP clients can drive schema diffs declaratively.
+	 */
+	private any function migrateArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "action", default = "latest", description = "Migration action: latest, up, down, info, doctor, forget, pretend, rename-system-tables, diff")
+			.positional(name = "version", default = "", description = "Version for forget/pretend")
+			.flag(name = "yes", default = false, description = "Confirm forget/pretend")
+			.flag(name = "dry-run", default = false, description = "Preview rename-system-tables without writing")
+			.positional(name = "model", default = "", description = "Model to diff (diff action; omit for all models)")
+			.option(name = "rename", default = "", description = "Rename hint OLD:NEW (repeatable; Model.OLD:NEW for diffAll)")
+			.option(name = "hints", default = "", description = 'Rename hints JSON ({"renames":{"old":"new"}})')
+			.option(name = "threshold", default = "", description = "Heuristic rename threshold between 0 and 1")
+			.option(name = "name", default = "", description = "Migration name when writing a single-model diff")
+			.flag(name = "write", default = false, description = "Write migration file(s) instead of previewing");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -293,6 +335,20 @@ component extends="modules.BaseModule" {
 			.positional(name = "type", default = "", description = "What to remove: resource, model, controller, or view")
 			.positional(name = "name", default = "", description = "Name of the artifact to remove")
 			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
+	}
+
+	private any function generateArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "type", required = true, description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, auth, or app")
+			.positional(name = "name", description = "Artifact name (model/controller/resource name, or the app name for `generate app`)")
+			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text')")
+			.flag(name = "dry-run", default = false, description = "Print the would-be paths and write nothing");
+	}
+
+	private any function createArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "type", required = true, description = "What to create: app")
+			.positional(name = "name", required = true, description = "Application name");
 	}
 
 	private any function verboseFlagSpec() {
@@ -440,7 +496,7 @@ component extends="modules.BaseModule" {
 		help &= "  generate            Generate model, controller, scaffold, migration, etc." & nl;
 		help &= "  destroy (or d)      Remove generated files" & nl & nl;
 		help &= "Database:" & nl;
-		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)" & nl;
+		help &= "  migrate             Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables, diff)" & nl;
 		help &= "  seed                Run database seeds" & nl;
 		help &= "  db                  Database management (reset, status, version)" & nl & nl;
 		help &= "Background Jobs:" & nl;
@@ -461,7 +517,7 @@ component extends="modules.BaseModule" {
 		help &= "  upgrade             Upgrade the Wheels framework in your app (vendor/wheels/); `check` scans, `apply` swaps" & nl;
 		help &= "  deploy              Deploy your app (Kamal-compatible)" & nl & nl;
 		help &= "Other:" & nl;
-		help &= "  mcp                 Configure Wheels MCP server for AI assistants" & nl;
+		help &= "  setup               Configure this app for external tools (setup agents: AI assistants)" & nl;
 		help &= "  version             Show Wheels CLI version" & nl;
 		help &= "  help                Show this help" & nl & nl;
 		help &= "For command-specific help: wheels <command> --help" & nl & nl;
@@ -503,6 +559,26 @@ component extends="modules.BaseModule" {
 		return help;
 	}
 
+
+	/**
+	 * Dry-run-aware write for generator paths inside Module.cfc (the
+	 * migration builders and $writeGeneratedContent). Mirrors
+	 * Scaffold.cfc::$write — `wheels generate --dry-run` records the
+	 * would-be path and skips the write.
+	 */
+	private string function $generateWrite(required string path, required string content) {
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, arguments.path);
+			return arguments.path;
+		}
+		var dir = getDirectoryFromPath(arguments.path);
+		if (!directoryExists(dir)) {
+			directoryCreate(dir, true);
+		}
+		FileWrite(arguments.path, arguments.content);
+		return arguments.path;
+	}
+
 	// ─────────────────────────────────────────────────
 	//  generate — Code generation
 	// ─────────────────────────────────────────────────
@@ -514,95 +590,212 @@ component extends="modules.BaseModule" {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 
 		if (!arrayLen(args)) {
-			out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
-			out("");
-			out("Types:", "bold");
-			out("  app           Create a new Wheels application (alias for 'wheels new')");
-			out("  model         Generate a model CFC");
-			out("  controller    Generate a controller CFC");
-			out("  view          Generate a view template");
-			out("  migration     Generate a database migration");
-			out("  scaffold      Generate model + controller + views + migration + tests + routes");
-			out("  api-resource  Generate API-only model + controller + migration + tests + routes (no views)");
-			out("  route         Add a resource route to config/routes.cfm");
-			out("  test          Generate a test spec file");
-			out("  property      Generate an add-column migration for a model property");
-			out("  helper        Generate a helper file in app/helpers/");
-			out("  policy        Generate an authorization policy in app/policies/ (default-deny)");
-			out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
-			out("  admin         Generate admin CRUD interface for an existing model");
-			out("  auth          Generate a full authentication scaffold (session, token, or JWT)");
-			out("");
-			out("Examples:", "bold");
-			out("  wheels generate app myapp");
-			out("  wheels generate model User name email:string active:boolean");
-			out("  wheels generate controller Users index show create");
-			out("  wheels generate migration CreateUsers");
-			out("  wheels generate scaffold Post title body:text publishedAt:datetime");
-			out("  wheels generate api-resource Product name price:decimal sku:string");
-			out("  wheels generate route posts");
-			out("  wheels generate test model User");
-			out("  wheels generate property User email:string");
-			out("  wheels generate helper formatting");
-			out("  wheels generate policy Post");
-			out("  wheels generate snippets auth");
-			out("  wheels generate admin User");
-			out("  wheels generate auth");
-			out("  wheels generate auth --strategy=jwt");
+			$printGenerateUsage();
 			return "";
 		}
 
-		var type = args[1];
-		var remaining = args.len() > 1 ? args.slice(2) : [];
+		// --dry-run: print would-be paths and write nothing. Recognized
+		// anywhere in the argv (before or after the type/name).
+		var dryRun = false;
+		var cleaned = [];
+		for (var a in args) {
+			if (a == "--dry-run") {
+				dryRun = true;
+			} else {
+				arrayAppend(cleaned, a);
+			}
+		}
+		if (dryRun) {
+			request.$wheelsGenerateDryRun = true;
+			request.$wheelsDryRunPaths = [];
+			out("Dry run — nothing will be written.", "cyan");
+		}
 
-		switch (lCase(type)) {
+		// MCP named keys can arrive in any order. Normalize all three advertised
+		// parameters before choosing the dispatch type; an attributes option
+		// must never fall through as an ignored generator flag. Matching the
+		// literal prefix also avoids the old off-by-one length check.
+		var named = {};
+		var normalized = [];
+		for (var r in cleaned) {
+			if (reFindNoCase("^--type=", r)) {
+				named.type = valueAfterEquals(r);
+			} else if (reFindNoCase("^--name=", r)) {
+				named.name = valueAfterEquals(r);
+			} else if (reFindNoCase("^--attributes=", r)) {
+				for (var token in $splitGeneratorAttributes(valueAfterEquals(r))) {
+					arrayAppend(normalized, token);
+				}
+			} else {
+				arrayAppend(normalized, r);
+			}
+		}
+		var type = structKeyExists(named, "type") ? named.type : normalized[1];
+		var remaining = structKeyExists(named, "type") ? normalized : (arrayLen(normalized) > 1 ? normalized.slice(2) : []);
+		if (structKeyExists(named, "name")) arrayPrepend(remaining, named.name);
+
+		var result = $generateDispatch(type, remaining);
+
+		if (dryRun) {
+			var paths = request.$wheelsDryRunPaths ?: [];
+			if (arrayLen(paths)) {
+				out("");
+				// "write", not "create": the list legitimately contains paths that
+				// would be MODIFIED (a --belongsTo scaffold rewrites the parent
+				// model, controller and show view), and calling those "created"
+				// is wrong. Paths are shown relative to the project so the root
+				// isn't repeated on every line.
+				out("Would write:", "bold");
+				for (var p in paths) {
+					out("  #replace(p, variables.projectRoot & "/", "")#");
+				}
+			} else {
+				out("(no files would be written)", "yellow");
+			}
+			structDelete(request, "$wheelsGenerateDryRun");
+			structDelete(request, "$wheelsDryRunPaths");
+		}
+
+		return result;
+	}
+
+	/**
+	 * Split MCP's attribute string without splitting decimal{10,2} or enum
+	 * value lists. An enum followed by another bare property needs whitespace;
+	 * a comma followed by name:type starts a new property unambiguously.
+	 */
+	private array function $splitGeneratorAttributes(required string attributes) {
+		var tokens = [];
+		var token = "";
+		var braceDepth = 0;
+		for (var i = 1; i <= len(arguments.attributes); i++) {
+			var ch = mid(arguments.attributes, i, 1);
+			if (ch == "{") braceDepth++;
+			if (ch == "}") braceDepth--;
+			var separator = braceDepth == 0 && reFind("\s", ch) > 0;
+			if (ch == "," && braceDepth == 0) {
+				var enumValues = reFindNoCase("^[^:]+:enum:", token) > 0;
+				var nextProperty = reFind("^[A-Za-z_][A-Za-z0-9_]*:", trim(mid(arguments.attributes, i + 1, len(arguments.attributes)))) > 0;
+				separator = !enumValues || nextProperty;
+			}
+			if (separator) {
+				if (len(token)) arrayAppend(tokens, token);
+				token = "";
+			} else {
+				token &= ch;
+			}
+		}
+		if (len(token)) arrayAppend(tokens, token);
+		return tokens;
+	}
+
+	/**
+	 * Print the `wheels generate` usage/help banner.
+	 */
+	private void function $printGenerateUsage() {
+		out("Usage: wheels generate <type> <name> [attributes...]", "yellow");
+		out("");
+		out("Types:", "bold");
+		out("  app           Create a new Wheels application (alias for 'wheels new')");
+		out("  model         Generate a model CFC");
+		out("  controller    Generate a controller CFC");
+		out("  view          Generate a view template");
+		out("  migration     Generate a database migration");
+		out("  scaffold      Generate model + controller + views + migration + tests + routes");
+		out("  api-resource  Generate API-only model + controller + migration + tests + routes (no views)");
+		out("  route         Add a resource route to config/routes.cfm");
+		out("  test          Generate a test spec file");
+		out("  property      Generate an add-column migration for a model property");
+		out("  helper        Generate a helper file in app/helpers/");
+		out("  policy        Generate an authorization policy in app/policies/ (default-deny)");
+		out("  snippets      Generate common code pattern snippets (auth, soft-delete, api, etc.)");
+		out("  admin         Generate admin CRUD interface for an existing model");
+		out("  auth          Generate a full authentication scaffold (session, token, or JWT)");
+		out("");
+		out("Examples:", "bold");
+		out("  wheels generate app myapp");
+		out("  wheels generate model User name email:string active:boolean");
+		out("  wheels generate controller Users index show create");
+		out("  wheels generate migration CreateUsers");
+		out("  wheels generate scaffold Post title body:text publishedAt:datetime");
+		out("  wheels generate api-resource Product name price:decimal sku:string");
+		out("  wheels generate route posts");
+		out("  wheels generate test model User");
+		out("  wheels generate property User email:string");
+		out("  wheels generate helper formatting");
+		out("  wheels generate policy Post");
+		out("  wheels generate snippets auth");
+		out("  wheels generate admin User");
+		out("  wheels generate auth");
+		out("  wheels generate auth --strategy=jwt");
+	}
+
+	/**
+	 * Dispatch a generator type to its handler. The lCase mapping keeps
+	 * `wheels generate MODEL User` behaving identically to `model`.
+	 */
+	private any function $generateDispatch(required string type, required array remaining) {
+		var canonical = $canonicalGeneratorType(lCase(arguments.type));
+
+		switch (canonical) {
 			case "app":
-			case "a":
 				// Delegate to wheels new — pass remaining args as __arguments
-				__arguments = remaining;
+				__arguments = arguments.remaining;
 				return new();
 			case "model":
-			case "m":
-				return generateModel(remaining);
+				return generateModel(arguments.remaining);
 			case "controller":
-			case "c":
-				return generateController(remaining);
+				return generateController(arguments.remaining);
 			case "view":
-			case "v":
-				return generateView(remaining);
+				return generateView(arguments.remaining);
 			case "migration":
-			case "migrate":
-				return generateMigration(remaining);
+				return generateMigration(arguments.remaining);
 			case "scaffold":
-			case "s":
-				return generateScaffold(remaining);
+				return generateScaffold(arguments.remaining);
 			case "api-resource":
-			case "api":
-				return generateApiResource(remaining);
+				return generateApiResource(arguments.remaining);
 			case "route":
-			case "r":
-				return generateRoute(remaining);
+				return generateRoute(arguments.remaining);
 			case "test":
-				return generateTest(remaining);
+				return generateTest(arguments.remaining);
 			case "property":
-			case "prop":
-				return generateProperty(remaining);
+				return generateProperty(arguments.remaining);
 			case "helper":
-			case "h":
-				return generateHelper(remaining);
+				return generateHelper(arguments.remaining);
 			case "policy":
-				return generatePolicy(remaining);
+				return generatePolicy(arguments.remaining);
 			case "snippets":
-				return generateSnippets(remaining);
+				return generateSnippets(arguments.remaining);
 			case "admin":
-				return generateAdmin(remaining);
+				return generateAdmin(arguments.remaining);
 			case "auth":
-				return generateAuth(remaining);
+				return generateAuth(arguments.remaining);
 			default:
-				out("Unknown generator type: #type#", "red");
+				out("Unknown generator type: #arguments.type#", "red");
 				out("Run 'wheels generate' for available types.");
 				// throw maps to non-zero exit; return "" would silently succeed.
-				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #type#");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #arguments.type#");
+		}
+	}
+
+	/**
+	 * Normalize a generator type (or its single-letter alias) to its canonical
+	 * handler key so $generateDispatch can switch over the 15 real generators
+	 * instead of 25 type+alias labels.
+	 */
+	private string function $canonicalGeneratorType(required string type) {
+		switch (arguments.type) {
+			case "a": return "app";
+			case "m": return "model";
+			case "c": return "controller";
+			case "v": return "view";
+			case "migrate": return "migration";
+			case "s": return "scaffold";
+			case "api": return "api-resource";
+			case "r": return "route";
+			case "prop": return "property";
+			case "h": return "helper";
+			default: return arguments.type;
 		}
 	}
 
@@ -615,7 +808,16 @@ component extends="modules.BaseModule" {
 	 */
 	public string function migrate() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		// --offline is a documented no-op here: migrate never makes external
+		// network calls (the bridge is localhost). Consuming the flag keeps
+		// scripts portable and future-proofs any update check added later.
+		$consumeOfflineFlag(args);
 		var action = arrayLen(args) ? lCase(args[1]) : "latest";
+		// MCP and structured callers may pass action="diff" which re-emits as
+		// --action=diff — normalize to the positional form.
+		if (left(action, 9) == "--action=") {
+			action = lCase(mid(action, 10, 9999));
+		}
 
 		switch (action) {
 			case "latest":
@@ -654,9 +856,11 @@ component extends="modules.BaseModule" {
 					out("Rename failed: #e.message#", "red");
 					rethrow;
 				}
+			case "diff":
+				return runMigrationDiff(args);
 			default:
 				out("Unknown migration action: #action#", "red");
-				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables]");
+				out("Usage: wheels migrate [latest|up|down|info|doctor|forget|pretend|rename-system-tables|diff]");
 				throw(type = "Wheels.InvalidArguments", message = "Unknown migration action: #action#");
 		}
 	}
@@ -820,6 +1024,57 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Coverage: instrument app/ with function-level coverage counters, run the
+	 * app test suite against the running server, and report a CRAP ranking
+	 * (Change Risk Anti-Patterns: complexity^2 x (1 - coverage)^3 + complexity).
+	 * The instrumentation is reverted afterward (originals restored exactly).
+	 */
+	public string function coverage() {
+		var opts = parseCoverageArgs(structuredArgs(arguments));
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Coverage requires a running server bound to this project.",
+				"Start it with: wheels start"
+			],
+			requireProjectConfig = true
+		);
+		var appRoot = variables.projectRoot;
+		var svc = new services.coverage.CoverageService();
+		var instrumented = 0;
+		try {
+			instrumented = svc.$instrument(appRoot & "/app");
+			$purgeServerCfclasses();
+			var suite = svc.$runSuite(serverPort, opts.useTestDb);
+			var coverage = svc.$collect();
+			var rows = svc.$analyze(appRoot & "/app", coverage);
+			return svc.$report(rows, opts.top, instrumented, suite.status);
+		} catch (any e) {
+			throw(
+				type = "Wheels.CoverageFailed",
+				message = e.message,
+				detail = e.detail ?: ""
+			);
+		} finally {
+			svc.$revert(appRoot & "/app");
+		}
+	}
+
+	/**
+	 * Parse args for `wheels coverage`: --top N (report length) and
+	 * --no-test-db (test-db=false).
+	 */
+	private struct function parseCoverageArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.option(name = "top", default = "15")
+			.flag(name = "test-db", default = true)
+			.parse(arguments.coll);
+		return {
+			top = Val(parsed.top),
+			useTestDb = parsed["test-db"]
+		};
+	}
+
+	/**
 	 * Resolve the effective verbose flag for `wheels test`. The LuCLI picocli
 	 * root defines `-v`/`--verbose` as GLOBAL options and consumes them
 	 * wherever they appear on the command line — `wheels test --verbose`
@@ -873,6 +1128,249 @@ component extends="modules.BaseModule" {
 		}
 		return "tests.specs." & f;
 	}
+
+
+	// ─────────────────────────────────────────────────
+	//  docs — Local offline documentation bundle
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Fetch the local offline documentation bundle (so the guides and
+	 * API reference work with no internet connection)
+	 */
+	public string function docs() {
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		var action = arrayLen(args) ? lCase(args[1]) : "fetch";
+		// Resolve --force HERE, in the command that actually receives the parsed
+		// argv. docsFetch() takes no arguments, so a helper reading its
+		// `arguments` scope always saw an empty struct and the flag was
+		// silently ignored.
+		var force = false;
+		for (var a in args) {
+			if (lCase(a) == "--force") {
+				force = true;
+			}
+		}
+		switch (action) {
+			case "fetch":
+				return docsFetch(force = force);
+			case "status":
+				return docsStatus();
+			default:
+				out("Unknown docs action: #action#. Try: fetch, status", "red");
+				return "";
+		}
+	}
+
+	/**
+	 * Downloads wheels-docs-<version>.zip into <CLI home>/docs/<version>/,
+	 * which is where Public::$docsBundleRoot() looks for it. Skips the download
+	 * when that version is already unpacked, so this is safe to run repeatedly
+	 * (the Homebrew formula's wrapper does essentially the same thing on
+	 * install/upgrade).
+	 */
+	private string function docsFetch(boolean force = false) {
+		var version = $docsFrameworkVersion();
+		if (!len(version)) {
+			out("Could not determine the framework version — is this a Wheels project?", "red");
+			return "";
+		}
+		var home = $resolveLucliHome();
+		if (!len(home)) {
+			out("Could not resolve the Wheels CLI home directory.", "red");
+			return "";
+		}
+		var target = home & "/docs/" & version;
+
+		if (directoryExists(target) && !arguments.force) {
+			out("Documentation for #version# is already installed.", "green");
+			out("  #target#");
+			out("  Re-run with --force to replace it.");
+			return "";
+		}
+
+		// Not `url` — a variable named after a reserved CFML scope shadows it,
+		// and the download then receives the URL scope struct instead of the
+		// string ("Can't cast Complex Object Type [URL scope] to String").
+		var bundleUrl = $docsBundleUrl(version);
+		var tmp = getTempDirectory() & "wheels-docs-#version#.zip";
+		out("Fetching docs for #version#...");
+		out("  #bundleUrl#");
+
+		try {
+			new services.packages.HttpClient(timeoutSeconds = 300).download(bundleUrl, tmp);
+		} catch (any e) {
+			out("Download failed: #e.message#", "red");
+			out("  A release without a docs asset will 404 here — the bundle is built by");
+			out("  tools/build/scripts/build-docs.sh and attached to the release.");
+			return "";
+		}
+
+		try {
+			if (directoryExists(target)) {
+				directoryDelete(target, true);
+			}
+			directoryCreate(target, true);
+			// The bundle is zipped with its contents at the root (manifest.json,
+			// guides/, api/), so unpack straight into the version directory.
+			// Shell out to `unzip` rather than Lucee's extract(): `extract` is
+			// shadowed in this module's scope and resolves to a helper with a
+			// different arity. Same approach Installer::$extract() takes with
+			// `tar`, for the same reason.
+			var unzipResult = {};
+			cfexecute(
+				name = "unzip",
+				arguments = "-o -q #tmp# -d #target#",
+				timeout = 300,
+				variable = "local.unzipOut",
+				errorVariable = "local.unzipErr",
+				result = "unzipResult"
+			);
+			if (unzipResult.exitCode != 0) {
+				out("Could not unpack the bundle (unzip exit #unzipResult.exitCode#).", "red");
+				out("  #local.unzipErr#");
+				return "";
+			}
+		} catch (any e) {
+			out("Could not unpack the bundle: #e.message#", "red");
+			return "";
+		} finally {
+			if (fileExists(tmp)) {
+				fileDelete(tmp);
+			}
+		}
+
+		out("Installed documentation for #version#.", "green");
+		out("  #target#");
+		$docsMountIntoWebroot(target);
+		return "";
+	}
+
+	/**
+	 * Mirrors the unpacked bundle into the project's webroot as wheels-docs/.
+	 *
+	 * Required, not a convenience: the dev server's Lucee urlRewrite only
+	 * routes EXTENSION-LESS paths to the front controller, so the bundle's
+	 * /wheels-docs/.../_astro/*.css and pagefind assets have to be real files
+	 * under the webroot for the container to serve them. Pages still go through
+	 * the framework route.
+	 *
+	 * Hardlinks where possible so the shared cache is not duplicated per app;
+	 * falls back to a copy across filesystems.
+	 */
+	private void function $docsMountIntoWebroot(required string source) {
+		var webroot = variables.projectRoot & "/public";
+		if (!directoryExists(webroot)) {
+			out("  (no public/ webroot found — skipping the webroot mount)", "yellow");
+			return;
+		}
+		var mount = webroot & "/wheels-docs";
+		if (directoryExists(mount)) {
+			// directoryDelete rather than rm -rf so a partially-written mount
+			// from an interrupted run is cleared cleanly.
+			try {
+				directoryDelete(mount, true);
+			} catch (any e) {
+				out("  Could not clear the existing mount at #mount#.", "red");
+				return;
+			}
+		}
+		// -R -l hardlinks; -R alone copies. Try links first: same filesystem is
+		// the common case and costs no extra disk.
+		var linked = false;
+		try {
+			cfexecute(name = "cp", arguments = "-R -l #arguments.source# #mount#", timeout = 300, variable = "local.o1", errorVariable = "local.e1");
+			linked = directoryExists(mount);
+		} catch (any e) {
+			linked = false;
+		}
+		if (!linked) {
+			try {
+				cfexecute(name = "cp", arguments = "-R #arguments.source# #mount#", timeout = 600, variable = "local.o2", errorVariable = "local.e2");
+			} catch (any e) {
+				out("  Could not mount the docs into the webroot: #e.message#", "red");
+				return;
+			}
+		}
+		if (directoryExists(mount)) {
+			out("  Mounted at #mount#", "green");
+			out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
+			if (!linked) {
+				out("  (copied — the cache and webroot are on different filesystems)");
+			}
+		} else {
+			out("  Could not mount the docs into the webroot.", "red");
+		}
+	}
+
+	/**
+	 * Reports whether a docs bundle is installed for the current project.
+	 */
+	private string function docsStatus() {
+		var version = $docsFrameworkVersion();
+		var home = $resolveLucliHome();
+		if (!len(version) || !len(home)) {
+			out("Could not determine the framework version or the CLI home.", "red");
+			return "";
+		}
+		var target = home & "/docs/" & version;
+		if (!directoryExists(target)) {
+			out("No documentation installed for #version#.", "yellow");
+			out("  Run `wheels docs fetch` to download it.");
+			return "";
+		}
+		var manifestPath = target & "/manifest.json";
+		out("Documentation for #version# is installed.", "green");
+		out("  #target#");
+		if (fileExists(manifestPath)) {
+			try {
+				var manifest = deserializeJSON(fileRead(manifestPath));
+				if (structKeyExists(manifest, "docsVersion")) {
+					out("  docs version:  #manifest.docsVersion#");
+				}
+				if (structKeyExists(manifest, "builtAt")) {
+					out("  built:         #manifest.builtAt#");
+				}
+			} catch (any e) {
+				// A malformed manifest is not worth failing status over.
+			}
+		}
+		return "";
+	}
+
+	/**
+	 * The framework version the docs cache is keyed by — the same value
+	 * Public::$docsBundleRoot() appends to the docs path, read from the
+	 * project's vendor/wheels/wheels.json.
+	 */
+	private string function $docsFrameworkVersion() {
+		var manifestPath = variables.projectRoot & "/vendor/wheels/wheels.json";
+		if (!fileExists(manifestPath)) {
+			return "";
+		}
+		try {
+			var manifest = deserializeJSON(fileRead(manifestPath));
+			var version = manifest.version ?: "";
+			// An unstamped dev checkout reports a build token rather than a
+			// version; treat that as unknown rather than creating a bogus cache.
+			if (!len(version) || find("@", version)) {
+				return "";
+			}
+			return version;
+		} catch (any e) {
+			return "";
+		}
+	}
+
+	/**
+	 * Snapshots publish to the snapshots repo and releases to the main repo,
+	 * mirroring how the Homebrew formulae resolve their artifacts.
+	 */
+	private string function $docsBundleUrl(required string version) {
+		var repo = find("-snapshot", arguments.version) ? "wheels-snapshots" : "wheels";
+		return "https://github.com/wheels-dev/#repo#/releases/download/v#arguments.version#/wheels-docs-#arguments.version#.zip";
+	}
+
 
 	// ─────────────────────────────────────────────────
 	//  reload — Reload application
@@ -1022,11 +1520,51 @@ component extends="modules.BaseModule" {
 		// isn't on PATH after `brew install wheels` — the user gets an
 		// unactionable error from a fresh `wheels start`. Onboarding F1/F2.
 		var force = false;
+		var engine = "lucee";
+		var enginePort = 0;
 		var passThrough = [];
-		for (var a in args) {
-			if (a == "--force") { force = true; }
-			else { arrayAppend(passThrough, a); }
+		for (var i = 1; i <= arrayLen(args); i++) {
+			var a = args[i];
+			if (a == "--force") {
+				force = true;
+			} else if (a == "--engine") {
+				if (i < arrayLen(args)) { engine = lCase(args[i + 1]); i++; }
+			} else if (left(a, 9) == "--engine=") {
+				engine = lCase(mid(a, 10, len(a) - 9));
+			} else if (a == "--port") {
+				if (i < arrayLen(args)) { enginePort = val(args[i + 1]); i++; }
+			} else if (left(a, 7) == "--port=") {
+				enginePort = val(mid(a, 8, len(a) - 7));
+			} else {
+				arrayAppend(passThrough, a);
+			}
 		}
+
+		// Port resolution. Two projects whose defaults overlap clash on the
+		// SHUTDOWN port, and LuCLI reports that as "port conflicts detected:"
+		// followed by an empty list — an error that names nothing. So the
+		// shutdown port is always moved to a free one rather than left to
+		// collide, whether it came from --port or from lucee.json.
+		//
+		// The HTTP port is deliberately NOT moved on its own: users expect the
+		// port they configured, and silently relocating it would be worse than
+		// the warning emitted further down. `--port` used to be parsed and then
+		// dropped for Lucee projects — only the RustCFML branch consumed it — so
+		// `wheels start --port=8090` silently booted on the lucee.json port.
+		if (engine != "rustcfml") {
+			$resolveStartPorts(enginePort);
+		}
+
+		// RustCFML backend — separate lifecycle from LuCLI (no JDK/Lucee
+		// Express), so it never touches the server registry below.
+		if (engine == "rustcfml") {
+			var rustSvc = new services.rustcfml.RustCFMLEngine();
+			var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
+			out("RustCFML server started (pid " & rustState.pid & ") at http://localhost:" & rustState.port, "green");
+			out("Log: " & rustState.log, "cyan");
+			return "";
+		}
+
 		var registry = getService("serverRegistry");
 		var serverName = registry.serverNameFor(variables.projectRoot);
 		var reg = registry.inspect(serverName, variables.projectRoot);
@@ -1103,7 +1641,19 @@ component extends="modules.BaseModule" {
 		var cmdArgs = ["start"];
 		cmdArgs.append(passThrough, true);
 
-		executeCommand("server", cmdArgs, variables.projectRoot);
+		try {
+			executeCommand("server", cmdArgs, variables.projectRoot);
+		} catch (any startErr) {
+			// A failed LuCLI server start can leave a half-written
+			// registration in ~/.wheels/servers/<name>; the next start then
+			// refuses with "registered to a different project" and needs a
+			// manual --force. Wipe the dead registration so a retry starts
+			// clean.
+			try {
+				registry.clean(serverName);
+			} catch (any cleanupErr) {}
+			rethrow;
+		}
 
 		// Post-stage. If the express dir didn't exist at pre-stage time
 		// (very first LuCLI run on a fresh VM), the start command above just
@@ -1118,6 +1668,17 @@ component extends="modules.BaseModule" {
 	 * hint: Stop the running Wheels development server
 	 */
 	public string function stop() {
+		// RustCFML backend — if a recorded RustCFML server is alive, stop it
+		// before touching LuCLI's registry. Auto-detected, so `wheels stop`
+		// works regardless of which engine was started.
+		var rustSvc = new services.rustcfml.RustCFMLEngine();
+		var rustStatus = rustSvc.status(variables.projectRoot);
+		if (rustStatus.running) {
+			rustSvc.stop(variables.projectRoot);
+			out("RustCFML server stopped.", "cyan");
+			return "";
+		}
+
 		out("Stopping Wheels server...", "cyan");
 
 		// If LuCLI's stop won't find a registered server for this directory
@@ -1176,6 +1737,63 @@ component extends="modules.BaseModule" {
 		}
 
 		executeCommand("server", ["stop"], variables.projectRoot);
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  engines — manage the dev-server engine backend
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * `wheels engines rustcfml install|start|stop|status` — the RustCFML
+	 * (JVM-free CFML) engine backend. Deliberately separate from
+	 * `start`/`stop` (Lucee via LuCLI) so the two lifecycles never share a
+	 * registry. Hidden from MCP like the other stateful server commands.
+	 */
+	public string function engines() {
+		var coll = structuredArgs(arguments);
+		var opts = new services.ArgSpec()
+			.positional(name = "engine", default = "", description = "Engine name: rustcfml")
+			.positional(name = "action", default = "", description = "Action: install, start, stop, status")
+			.option(name = "port", default = "8513", description = "Port for `start` (default 8513)")
+			.parse(coll);
+
+		var engine = lCase(trim(opts.engine));
+		var action = lCase(trim(opts.action));
+
+		if (engine != "rustcfml") {
+			out("Unknown engine '#opts.engine#'. Supported: rustcfml", "yellow");
+			out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+			return "";
+		}
+
+		var svc = new services.rustcfml.RustCFMLEngine();
+		switch (action) {
+			case "install":
+				out("Installing RustCFML...", "cyan");
+				out("Installed: " & svc.install(), "green");
+				break;
+			case "start":
+				var st = svc.start(variables.projectRoot, val(opts.port));
+				out("RustCFML server started (pid " & st.pid & ") at http://localhost:" & st.port, "green");
+				out("Log: " & st.log, "cyan");
+				break;
+			case "stop":
+				out(svc.stop(variables.projectRoot)
+					? "RustCFML server stopped."
+					: "No RustCFML server recorded for this project.", "cyan");
+				break;
+			case "status":
+				var status = svc.status(variables.projectRoot);
+				if (status.running) {
+					out("RustCFML running (pid " & status.pid & ") at http://localhost:" & status.port, "green");
+				} else {
+					out("No RustCFML server running for this project.", "yellow");
+				}
+				break;
+			default:
+				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "yellow");
+		}
 		return "";
 	}
 
@@ -1296,6 +1914,23 @@ component extends="modules.BaseModule" {
 		var type = lCase(args[1]);
 		var remaining = args.len() > 1 ? args.slice(2) : [];
 
+		// Normalize the named --type=/--name= prefixes that MCP callers
+		// produce (toArgv re-emits {"type":"app","name":"myapp"} as
+		// --type=app --name=myapp) back to positional form.
+		if (left(type, 7) == "--type=") {
+			type = lCase(mid(type, 8, len(type)));
+		}
+		var normalizedRemaining = [];
+		for (var i = 1; i <= arrayLen(remaining); i++) {
+			var r = remaining[i];
+			if (left(r, 7) == "--name=") {
+				arrayAppend(normalizedRemaining, mid(r, 8, len(r)));
+			} else {
+				arrayAppend(normalizedRemaining, r);
+			}
+		}
+		remaining = normalizedRemaining;
+
 		switch (type) {
 			case "app":
 				__arguments = remaining;
@@ -1314,7 +1949,20 @@ component extends="modules.BaseModule" {
 	/**
 	 * hint: List all configured routes with method, path, and controller action
 	 */
+	private any function routesArgSpec() {
+		return new services.ArgSpec()
+			.option(name = "filter", default = "", description = "Show only routes whose name, pattern or controller##action contains this text (case-insensitive)")
+			.option(name = "format", default = "text", description = "Output format: text (aligned table) or json");
+	}
+
 	public string function routes() {
+		// Both flags were advertised in the wrapper's help for as long as the
+		// command has existed, and neither was ever read — the command fetched
+		// every route and printed the table unconditionally. Found while
+		// rehearsing `wheels routes --filter=posts` as a before/after for the
+		// scaffold beat: it returned all 57 routes, which on stage reads as a
+		// bug in front of the audience.
+		var opts = routesArgSpec().parse(structuredArgs(arguments));
 		var serverPort = $requireRunningServer();
 
 		try {
@@ -1322,7 +1970,7 @@ component extends="modules.BaseModule" {
 			// table as JSON. (The previous endpoint, /wheels/ai?context=routing,
 			// returns AI-documentation about routing patterns — not what users
 			// asking "what routes does my app have?" expect to see.)
-			var routesUrl = "http://localhost:#serverPort#/wheels/cli?command=routes&format=json";
+			var routesUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=routes&format=json";
 			var httpResult = makeHttpRequest(routesUrl);
 
 			var result = "";
@@ -1339,47 +1987,36 @@ component extends="modules.BaseModule" {
 				throw(type = "Wheels.RoutesFailed", message = "Failed to fetch routes: #result.message ?: 'unknown error'#");
 			}
 
-			if (!structKeyExists(result, "routes") || !arrayLen(result.routes)) {
-				out("No routes configured.", "yellow");
+			var routes = structKeyExists(result, "routes") ? result.routes : [];
+			if (len(opts.filter)) {
+				routes = $filterRoutes(routes, opts.filter);
+			}
+
+			if (lCase(opts.format) == "json") {
+				// Machine-readable: the filtered array and nothing else on stdout.
+				// Rebuild each route with quoted lower-case keys — a CFML struct
+				// serializes its keys UPPER-CASE, and `jq .pattern` on {"PATTERN":..}
+				// silently yields null. Field set matches the text table.
+				var shaped = [];
+				for (var route in routes) {
+					arrayAppend(shaped, {
+						"methods":    route.methods ?: "",
+						"pattern":    route.pattern ?: "",
+						"controller": route.controller ?: "",
+						"action":     route.action ?: "",
+						"name":       route.name ?: ""
+					});
+				}
+				out(serializeJSON(shaped), "");
 				return "";
 			}
 
-			// Normalise patterns so the leading "/" is shown exactly once. The
-			// framework stores routes with the leading slash already present,
-			// but defensively handle the case where it isn't.
-			var formatPattern = function(p) {
-				p = p ?: "";
-				return left(p, 1) == "/" ? p : "/" & p;
-			};
-
-			// Compute column widths from the data so the table aligns cleanly.
-			var maxMethod  = len("METHOD");
-			var maxPattern = len("PATTERN");
-			var maxAction  = len("CONTROLLER##ACTION");
-			for (var route in result.routes) {
-				var methodWidth  = len(uCase(route.methods ?: ""));
-				var patternWidth = len(formatPattern(route.pattern));
-				var actionWidth  = len((route.controller ?: "") & "##" & (route.action ?: ""));
-				if (methodWidth  > maxMethod)  maxMethod  = methodWidth;
-				if (patternWidth > maxPattern) maxPattern = patternWidth;
-				if (actionWidth  > maxAction)  maxAction  = actionWidth;
+			if (!arrayLen(routes)) {
+				out(len(opts.filter) ? "No routes match '#opts.filter#'." : "No routes configured.", "yellow");
+				return "";
 			}
 
-			out(lJustify("METHOD", maxMethod) & "  " & lJustify("PATTERN", maxPattern) & "  " & "CONTROLLER##ACTION", "bold");
-			out(repeatString("-", maxMethod + maxPattern + maxAction + 4));
-
-			for (var route in result.routes) {
-				var line = lJustify(uCase(route.methods ?: ""), maxMethod)
-					& "  " & lJustify(formatPattern(route.pattern), maxPattern)
-					& "  " & (route.controller ?: "") & "##" & (route.action ?: "");
-				if (structKeyExists(route, "name") && len(route.name)) {
-					line &= "  (" & route.name & ")";
-				}
-				out(line);
-			}
-
-			out("");
-			out("#arrayLen(result.routes)# route(s)", "cyan");
+			$printRoutesTable(routes);
 		} catch (any e) {
 			// Inner Wheels.RoutesFailed paths already printed a diagnostic; only HTTP/unexpected errors need one here.
 			if (e.type != "Wheels.RoutesFailed") {
@@ -1388,6 +2025,69 @@ component extends="modules.BaseModule" {
 			rethrow;
 		}
 		return "";
+	}
+
+	/**
+	 * Keep routes whose name, pattern, or controller##action contains the
+	 * filter text — the three fields the help text names. Case-insensitive
+	 * substring, not a regex: a presenter typing `--filter=posts` should not
+	 * have to think about escaping, and `[key]` in a pattern must be literal.
+	 */
+	private array function $filterRoutes(required array routes, required string filter) {
+		var needle = lCase(arguments.filter);
+		var kept = [];
+		for (var route in arguments.routes) {
+			var haystack = lCase(
+				(route.name ?: "") & " "
+				& (route.pattern ?: "") & " "
+				& (route.controller ?: "") & "##" & (route.action ?: "")
+			);
+			if (find(needle, haystack)) {
+				arrayAppend(kept, route);
+			}
+		}
+		return kept;
+	}
+
+	/**
+	 * Print the aligned route table. Patterns are normalised so the leading
+	 * "/" is shown exactly once (the framework stores them with it already,
+	 * but this defensively handles the case where it isn't).
+	 */
+	private void function $printRoutesTable(required array routes) {
+		var formatPattern = function(p) {
+			p = p ?: "";
+			return left(p, 1) == "/" ? p : "/" & p;
+		};
+
+		// Compute column widths from the data so the table aligns cleanly.
+		var maxMethod  = len("METHOD");
+		var maxPattern = len("PATTERN");
+		var maxAction  = len("CONTROLLER##ACTION");
+		for (var route in arguments.routes) {
+			var methodWidth  = len(uCase(route.methods ?: ""));
+			var patternWidth = len(formatPattern(route.pattern));
+			var actionWidth  = len((route.controller ?: "") & "##" & (route.action ?: ""));
+			if (methodWidth  > maxMethod)  maxMethod  = methodWidth;
+			if (patternWidth > maxPattern) maxPattern = patternWidth;
+			if (actionWidth  > maxAction)  maxAction  = actionWidth;
+		}
+
+		out(lJustify("METHOD", maxMethod) & "  " & lJustify("PATTERN", maxPattern) & "  " & "CONTROLLER##ACTION", "bold");
+		out(repeatString("-", maxMethod + maxPattern + maxAction + 4));
+
+		for (var route in arguments.routes) {
+			var line = lJustify(uCase(route.methods ?: ""), maxMethod)
+				& "  " & lJustify(formatPattern(route.pattern), maxPattern)
+				& "  " & (route.controller ?: "") & "##" & (route.action ?: "");
+			if (structKeyExists(route, "name") && len(route.name)) {
+				line &= "  (" & route.name & ")";
+			}
+			out(line);
+		}
+
+		out("");
+		out("#arrayLen(arguments.routes)# route(s)", "cyan");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1509,14 +2209,58 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Show MCP server configuration instructions
+	 * hint: `wheels setup agents` — write .mcp.json and .opencode.json for AI assistants
+	 *
+	 * `setup agents`, and the target is deliberately NOT spelled `mcp`: LuCLI
+	 * intercepts that literal token in ANY argument position — not just
+	 * argv[1] — so `wheels setup mcp` (and even `wheels info mcp`) is routed to
+	 * the runtime's module runner and answers "mcp: missing module name".
+	 * `ai` is reserved the same way. Verified live, both. `setup` and
+	 * `configure` are free top-level verbs (`init` is not — BaseModule has it).
 	 */
-	public string function mcp() {
+	/**
+	 * hint: Deprecated spelling — `wheels map setup` forwards to `setup agents`
+	 *
+	 * `map setup` shipped in snapshot 2499 before we learned that the literal
+	 * token `mcp` is intercepted by the runtime in any argv position. Kept as a
+	 * thin forwarder so that spelling keeps working.
+	 */
+	public string function map() {
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		if (!arrayLen(args) || lCase(args[1]) == "setup") {
+			return $setupMcp(args);
+		}
+		return setup();
+	}
+
+	public string function setup() {
+		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		var subcommand = arrayLen(args) ? lCase(args[1]) : "";
+
+		switch (subcommand) {
+			// NOT "mcp": LuCLI intercepts that literal token in ANY argument
+			// position, not just argv[1] — `wheels setup mcp` and even
+			// `wheels info mcp` are routed to the runtime's module runner
+			// ("mcp: missing module name"). `ai` is reserved the same way.
+			// Verified live. See $setupMcp() for the full constraint.
+			case "agents":
+				return $setupMcp(args);
+			case "":
+				break;
+			default:
+				out("Unknown setup target: #args[1]#", "red");
+				out("Usage: wheels setup [agents]");
+				out("  wheels setup            Show what can be set up");
+				out("  wheels setup agents     Write .mcp.json and .opencode.json here");
+				return "";
+		}
+
 		out("MCP is built into the Wheels CLI. Run:", "bold");
 		out("  wheels mcp wheels");
 		out("");
-		out("Configure in Claude Code (.mcp.json):", "bold");
-		out('  {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}');
+		out("Set it up:", "bold");
+		out("  wheels setup agents       Write .mcp.json and .opencode.json here");
+		out('  (or add by hand: {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}})');
 		out("");
 		out("For OpenCode, Cursor, and other AI IDEs, see:");
 		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
@@ -1527,6 +2271,177 @@ component extends="modules.BaseModule" {
 		out("Stateful/interactive commands (start, stop, new, console, ...) are hidden");
 		out("from MCP tools/list via mcpHiddenTools() — they remain CLI-only.");
 		return "";
+	}
+
+	/**
+	 * `wheels setup agents` — write the AI-client configs in the project root.
+	 *
+	 * Merges rather than overwrites: a project's .mcp.json usually lists other
+	 * servers too (a browser MCP, a database MCP), and clobbering those to add
+	 * one entry would be a hostile default. The `wheels` entry is added or
+	 * corrected, everything else is left byte-for-byte as the user wrote it.
+	 *
+	 * Fails closed on malformed JSON instead of rewriting it. A .mcp.json that
+	 * doesn't parse is either hand-edited mid-flight or has a syntax error the
+	 * user needs to see; silently replacing it would discard whatever they were
+	 * writing and hide the mistake.
+	 */
+	private string function $setupMcp(required array args) {
+		var force = false;
+		for (var a in arguments.args) {
+			if (a == "--force") force = true;
+		}
+
+		if (!$isWheelsProjectDir(variables.projectRoot)) {
+			out("Not in a Wheels project directory.", "yellow");
+			out("Run this from the root of a Wheels app (the directory holding config/settings.cfm).");
+			return "";
+		}
+
+		// Two clients, two shapes. Claude Code reads `.mcp.json` (mcpServers +
+		// separate command/args); OpenCode reads `.opencode.json` (an `mcp` key,
+		// `type: "local"`, and command+args as ONE array). Both are written —
+		// that is what the wrapper's own `wheels mcp` help has always promised.
+		var targets = [
+			{
+				file: ".mcp.json",
+				label: "Claude Code",
+				rootKey: "mcpServers",
+				entry: {command: "wheels", args: ["mcp", "wheels"]},
+				schema: ""
+			},
+			{
+				file: ".opencode.json",
+				label: "OpenCode",
+				rootKey: "mcp",
+				entry: {type: "local", command: ["wheels", "mcp", "wheels"], enabled: true},
+				schema: "https://opencode.ai/config.json"
+			}
+		];
+
+		// Load and validate everything BEFORE writing anything: a bad
+		// .opencode.json must not leave a half-applied setup with .mcp.json
+		// already rewritten.
+		var loaded = [];
+		for (var t in targets) {
+			arrayAppend(loaded, $loadMcpConfig(variables.projectRoot & "/" & t.file, t));
+		}
+
+		var changed = [];
+		for (var i = 1; i <= arrayLen(targets); i++) {
+			var t = targets[i];
+			var state = loaded[i];
+			var config = state.config;
+			if (!structKeyExists(config, t.rootKey) || !IsStruct(config[t.rootKey])) {
+				config[t.rootKey] = {};
+			}
+			if (len(t.schema) && !structKeyExists(config, "$schema")) {
+				config["$schema"] = t.schema;
+			}
+			var existing = config[t.rootKey].wheels ?: {};
+			var correct = $mcpEntryMatches(existing, t.entry);
+			if (!correct || force) {
+				config[t.rootKey].wheels = t.entry;
+				fileWrite(state.path, serializeJSON(config));
+				arrayAppend(changed, {
+					file: t.file,
+					path: state.path,
+					verb: !state.existed ? "Created" : (correct ? "Rewrote" : (structCount(existing) ? "Updated" : "Added")),
+					others: structCount(config[t.rootKey]) - 1
+				});
+			} else {
+				arrayAppend(changed, {file: t.file, path: state.path, verb: "", others: structCount(config[t.rootKey]) - 1});
+			}
+		}
+
+		var wrote = [];
+		for (var c in changed) {
+			if (len(c.verb)) arrayAppend(wrote, c);
+		}
+
+		if (!arrayLen(wrote) && !force) {
+			out("Already configured — both client configs list the wheels server.", "green");
+			for (var c in changed) {
+				out("  #c.path#");
+			}
+			return "";
+		}
+
+		for (var c in changed) {
+			if (len(c.verb)) {
+				out("#c.verb# #c.file#", "green");
+			} else {
+				out("Already configured: #c.file#", "");
+			}
+			out("  #c.path#");
+			if (c.others > 0) {
+				out("  #c.others# other server(s) preserved.", "");
+			}
+		}
+		out("");
+		out("Next:", "bold");
+		out("  Restart your AI assistant so it picks up the new server,");
+		out("  then ask it to run `wheels routes` to confirm the connection.");
+		return "";
+	}
+
+	/**
+	 * Read one client config for `setup agents`. Missing is fine (a fresh object is
+	 * returned). Malformed JSON is NOT: it fails closed rather than being
+	 * rewritten, because a file that doesn't parse is either mid-edit or has a
+	 * syntax error the user needs to see, and silently replacing it would
+	 * discard their work and hide the mistake.
+	 */
+	private struct function $loadMcpConfig(required string path, required struct target) {
+		var state = {path: arguments.path, existed: fileExists(arguments.path), config: {}};
+		if (!state.existed) return state;
+
+		var raw = fileRead(arguments.path);
+		if (!len(trim(raw))) return state;
+
+		try {
+			state.config = deserializeJSON(raw);
+		} catch (any e) {
+			out("#arguments.target.file# exists but is not valid JSON — leaving it untouched.", "red");
+			out("  #arguments.path#");
+			out("  Fix the syntax (or delete the file) and re-run `wheels setup agents`.");
+			throw(
+				type = "Wheels.McpSetup.InvalidJson",
+				message = "#arguments.target.file# is not valid JSON: #e.message#"
+			);
+		}
+		if (!IsStruct(state.config)) {
+			out("#arguments.target.file# does not contain a JSON object — leaving it untouched.", "red");
+			out("  #arguments.path#");
+			throw(
+				type = "Wheels.McpSetup.InvalidShape",
+				message = "#arguments.target.file# must be a JSON object."
+			);
+		}
+		return state;
+	}
+
+	/**
+	 * True when an existing entry already matches what setup would write. Only
+	 * the fields setup owns are compared, so a hand-added `env`, `disabled`, or
+	 * any other client-specific key does not make setup consider it wrong and
+	 * rewrite the file on every run.
+	 */
+	private boolean function $mcpEntryMatches(required any existing, required struct entry) {
+		if (!IsStruct(arguments.existing)) return false;
+		for (var key in arguments.entry) {
+			if (!structKeyExists(arguments.existing, key)) return false;
+			if (IsArray(arguments.entry[key])) {
+				if (!IsArray(arguments.existing[key])) return false;
+				if (arrayLen(arguments.existing[key]) != arrayLen(arguments.entry[key])) return false;
+				for (var i = 1; i <= arrayLen(arguments.entry[key]); i++) {
+					if (arguments.existing[key][i] != arguments.entry[key][i]) return false;
+				}
+			} else if (arguments.existing[key] != arguments.entry[key]) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1566,27 +2481,33 @@ component extends="modules.BaseModule" {
 			password = detectReloadPassword();
 		}
 
-		// Verify connectivity with a ping
-		var evalUrl = "http://localhost:#serverPort#/wheels/console/eval";
+		// Verify connectivity with a ping. Fail closed (##2229 / ##2941): a
+		// silent `return ""` here made `printf '...' | wheels console && ...`
+		// look successful when the eval endpoint was down or still restarting.
+		var evalUrl = "#$serverUrlBase(serverPort)#/wheels/console/eval";
 		try {
 			var pingResult = makeHttpPost(evalUrl, serializeJSON({expression: "__ping__", password: password}));
 			if (isJSON(pingResult)) {
 				var pingData = deserializeJSON(pingResult);
 				if (!pingData.success) {
-					out("Console connection failed: #pingData.error#", "red");
-					return "";
+					$consoleFail("Console connection failed: #pingData.error#");
 				}
 				var wheelsVersion = pingData.version ?: "unknown";
 				var wheelsEnv = pingData.environment ?: "unknown";
 			} else {
-				out("Server returned unexpected response. Is this a Wheels 3.x application?", "red");
-				return "";
+				$consoleFail("Server returned unexpected response. Is this a Wheels 3.x application?");
 			}
 		} catch (any e) {
+			if (e.type == "Wheels.ConsoleFailed") {
+				rethrow;
+			}
 			out("Cannot connect to console endpoint at #evalUrl#", "red");
 			out("Ensure your Wheels app is v3.1+ with console support.", "yellow");
 			out("Error: #e.message#", "yellow");
-			return "";
+			throw(
+				type = "Wheels.ConsoleFailed",
+				message = "Cannot connect to console endpoint at #evalUrl#: #e.message#"
+			);
 		}
 
 		// Banner
@@ -1596,25 +2517,32 @@ component extends="modules.BaseModule" {
 		out("Type expressions to evaluate in your app context. /help for commands.", "");
 		out("", "");
 
-		// Interactive REPL loop
+		// Interactive REPL loop. Piped sessions (EOF after one or more
+		// expressions) throw at EOF if any eval failed so shell `&&` gates
+		// and the tutorial e2e do not treat a printed `Error:` as success.
+		// Interactive `/exit` still returns 0 so a typo does not fail the
+		// whole session.
 		var System = createObject("java", "java.lang.System");
-		var reader = createObject("java", "java.io.BufferedReader").init(
-			createObject("java", "java.io.InputStreamReader").init(System.in)
-		);
+		var reader = $consoleReader(System);
 
 		var running = true;
+		var hadError = false;
 		while (running) {
-			// Print prompt
-			System.out.print("wheels> ");
-			System.out.flush();
+			// Read input. The reader owns the prompt: JLine has to draw it
+			// itself to redraw the line on left/right/history edits, and a
+			// separately printed prompt would be duplicated on every redraw.
+			var line = $consoleReadLine(reader, "wheels> ", System);
 
-			// Read input
-			var line = reader.readLine();
-
-			// Handle EOF (Ctrl+D)
+			// Handle EOF (Ctrl+D or end of a pipe)
 			if (isNull(line)) {
 				out("");
 				out("Bye!", "cyan");
+				if (hadError) {
+					throw(
+						type = "Wheels.ConsoleFailed",
+						message = "One or more console expressions failed"
+					);
+				}
 				break;
 			}
 
@@ -1623,79 +2551,245 @@ component extends="modules.BaseModule" {
 			// Skip empty lines
 			if (!len(line)) continue;
 
-			// Handle REPL commands
-			switch (lCase(line)) {
-				case "/exit":
-				case "/quit":
-				case "/q":
-					out("Bye!", "cyan");
-					running = false;
-					continue;
-
-				case "/help":
-				case "/h":
-					printConsoleHelp();
-					continue;
-
-				case "/env":
-					consoleExec(evalUrl, "__env__", password);
-					continue;
-
-				case "/reload":
-					out("Reloading application...", "cyan");
-					try {
-						// Same 302-vs-200 honesty contract as the reload
-						// command (#3059) — but interactive, so failures
-						// print red instead of throwing.
-						var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
-						var reloadVerdict = $evaluateReloadResponse(
-							makeHttpRequestWithStatus(reloadUrl, false).statusCode
-						);
-						if (reloadVerdict.success) {
-							out("Application reloaded.", "green");
-						} else {
-							out(reloadVerdict.message, "red");
-						}
-					} catch (any e) {
-						out("Reload failed: #e.message#", "red");
-					}
-					continue;
-
-				case "/clear":
-					// ANSI clear screen
-					System.out.print(chr(27) & "[2J" & chr(27) & "[H");
-					System.out.flush();
-					continue;
-
-				case "/models":
-					consoleExec(evalUrl, "structKeyArray(application.wheels.models).sort('textnocase')", password);
-					continue;
-
-				case "/routes":
-					consoleExec(evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", password);
-					continue;
-
-				case "/version":
-					consoleExec(evalUrl, "application.wheels.version", password);
-					continue;
-
-				case "/ds":
-				case "/datasource":
-					consoleExec(evalUrl, "application.wheels.dataSourceName", password);
-					continue;
+			// Handle REPL commands; unhandled input falls through to evaluation.
+			var verdict = $consoleHandleCommand(line, evalUrl, password, serverPort, System);
+			if (verdict == "exit") {
+				running = false;
+				continue;
+			}
+			if (verdict == "error") {
+				hadError = true;
+				continue;
+			}
+			if (verdict == "handled") {
+				continue;
 			}
 
 			// Evaluate expression
-			consoleExec(evalUrl, line, password);
+			if (!consoleExec(evalUrl, line, password)) {
+				hadError = true;
+			}
 		}
 
 		return "";
 	}
 
 	/**
-	 * Execute a single expression and display the result
+	 * Build the console's input reader.
+	 *
+	 * On a real terminal this is a JLine 3 LineReader — bundled in the LuCLI
+	 * runtime already — which is what turns arrow keys into cursor movement
+	 * and history recall. A plain BufferedReader over System.in receives the
+	 * raw escape bytes instead, so ← printed `^[[D` and ↑ printed `^[[A`.
+	 * History persists to ~/.wheels/console_history so ↑ also recalls
+	 * previous sessions.
+	 *
+	 * When stdin is NOT a terminal — `printf '...' | wheels console`, the
+	 * tutorial e2e, CI — System.console() is null and we keep the plain
+	 * reader. That path is byte-for-byte what shipped before: no prompt
+	 * redraw, no escape handling, and EOF still ends the session. JLine's
+	 * "dumb" terminal would work too, but there is nothing to gain from
+	 * running a line editor against a pipe and real risk in a different
+	 * EOF/interrupt contract for scripts that already pass.
+	 *
+	 * Returns a struct {jline: boolean, reader: any} so the read helper can
+	 * branch without re-detecting.
 	 */
-	private void function consoleExec(required string requestUrl, required string expression, string password = "") {
+	private struct function $consoleReader(required any javaSystem) {
+		// Plain reader, built once up front. NOT a closure: inside a closure
+		// `arguments` is the closure's own empty scope, so `arguments.javaSystem`
+		// there threw "key doesn't exist" — on the piped path, which is the
+		// one CI and the tutorial e2e exercise. (Cross-Engine Invariant 3.)
+		var plain = {
+			jline: false,
+			reader: createObject("java", "java.io.BufferedReader").init(
+				createObject("java", "java.io.InputStreamReader").init(arguments.javaSystem.in)
+			)
+		};
+		if (isNull(arguments.javaSystem.console())) {
+			return plain;
+		}
+		try {
+			var terminal = createObject("java", "org.jline.terminal.TerminalBuilder").builder()
+				.system(true)
+				.build();
+			var historyDir = $userHome() & "/.wheels";
+			if (!directoryExists(historyDir)) {
+				directoryCreate(historyDir, true);
+			}
+			var lineReader = createObject("java", "org.jline.reader.LineReaderBuilder").builder()
+				.terminal(terminal)
+				.variable("history-file", historyDir & "/console_history")
+				.variable("history-size", javaCast("int", 500))
+				.build();
+			$bindConsoleArrowKeys(lineReader);
+			return {jline: true, reader: lineReader};
+		} catch (any e) {
+			// An exotic terminal JLine cannot drive must not kill the REPL —
+			// degrade to the plain reader, which always works.
+			return plain;
+		}
+	}
+
+	/**
+	 * Read one line from the console reader. Returns the line, or null at
+	 * EOF — Ctrl+D interactively, end of input on a pipe — so the REPL loop's
+	 * existing isNull() check works unchanged on both paths.
+	 *
+	 * Ctrl+C on the JLine path abandons the current line rather than
+	 * exiting, matching every other shell; the loop just prompts again.
+	 */
+	private any function $consoleReadLine(required struct reader, required string prompt, required any javaSystem) {
+		if (!arguments.reader.jline) {
+			arguments.javaSystem.out.print(arguments.prompt);
+			arguments.javaSystem.out.flush();
+			return arguments.reader.reader.readLine();
+		}
+		try {
+			return arguments.reader.reader.readLine(arguments.prompt);
+		} catch (any e) {
+			// Match on the Java class name rather than a typed catch clause:
+			// a Java exception's CFML `type` is engine-dependent, and a miss
+			// here would turn Ctrl+D into a stack trace. `e.type` carries the
+			// FQN on Lucee; fall back to the message for the wrapped form.
+			var javaType = e.type ?: "";
+			if (findNoCase("EndOfFileException", javaType) || findNoCase("EndOfFileException", e.message ?: "")) {
+				return javaCast("null", "");
+			}
+			if (findNoCase("UserInterruptException", javaType) || findNoCase("UserInterruptException", e.message ?: "")) {
+				return "";
+			}
+			rethrow;
+		}
+	}
+
+	private string function $userHome() {
+		return createObject("java", "java.lang.System").getProperty("user.home");
+	}
+
+	/**
+	 * Bind the arrow keys explicitly, in BOTH terminal cursor modes.
+	 *
+	 * Terminals send arrows as `ESC [ D` (normal cursor mode) or `ESC O D`
+	 * (application mode, after the app sends terminfo's `smkx`). JLine binds
+	 * whichever form terminfo advertises — on this runtime that was only the
+	 * `ESC O` form, so the `ESC [ D` a real terminal actually sends arrived
+	 * with ESC consumed and `[D` left in the buffer as text: `1+2[D[D[D9`.
+	 * Introspected on the live reader: `emacs ESC[D -> UNBOUND` while
+	 * terminfo key_left = `\EOD`.
+	 *
+	 * Binding both forms costs nothing and removes the dependency on the
+	 * terminal honouring keypad-transmit mode. Applied to every keymap the
+	 * reader may select so the choice of emacs/vi mode does not matter.
+	 */
+	private void function $bindConsoleArrowKeys(required any lineReader) {
+		var esc = chr(27);
+		var bindings = [
+			{seqs: [esc & "[D", esc & "OD"], widget: "backward-char"},
+			{seqs: [esc & "[C", esc & "OC"], widget: "forward-char"},
+			{seqs: [esc & "[A", esc & "OA"], widget: "up-line-or-history"},
+			{seqs: [esc & "[B", esc & "OB"], widget: "down-line-or-history"},
+			{seqs: [esc & "[H", esc & "OH", esc & "[1~"], widget: "beginning-of-line"},
+			{seqs: [esc & "[F", esc & "OF", esc & "[4~"], widget: "end-of-line"}
+		];
+		var keyMaps = arguments.lineReader.getKeyMaps();
+		for (var name in ["main", "emacs", "viins"]) {
+			if (!keyMaps.containsKey(name)) continue;
+			var km = keyMaps.get(name);
+			for (var b in bindings) {
+				var ref = createObject("java", "org.jline.reader.Reference").init(b.widget);
+				for (var seq in b.seqs) {
+					km.bind(ref, seq);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Handle one REPL command line. Returns "exit" to end the loop, "handled"
+	 * when the line was a slash command, "error" when a slash command's eval
+	 * failed, or "" when it should be evaluated as an expression by the caller.
+	 */
+	private string function $consoleHandleCommand(required string line, required string evalUrl, required string password, required string serverPort, required any javaSystem) {
+		switch (lCase(arguments.line)) {
+			case "/exit":
+			case "/quit":
+			case "/q":
+				out("Bye!", "cyan");
+				return "exit";
+
+			case "/help":
+			case "/h":
+				printConsoleHelp();
+				return "handled";
+
+			case "/env":
+				if (!consoleExec(arguments.evalUrl, "__env__", arguments.password)) {
+					return "error";
+				}
+				return "handled";
+
+			case "/reload":
+				out("Reloading application...", "cyan");
+				try {
+					// Same 302-vs-200 honesty contract as the reload
+					// command (#3059) — but interactive, so failures
+					// print red instead of throwing.
+					var reloadUrl = "http://localhost:#arguments.serverPort#/?reload=true&password=#arguments.password#";
+					var reloadVerdict = $evaluateReloadResponse(
+						makeHttpRequestWithStatus(reloadUrl, false).statusCode
+					);
+					if (reloadVerdict.success) {
+						out("Application reloaded.", "green");
+					} else {
+						out(reloadVerdict.message, "red");
+					}
+				} catch (any e) {
+					out("Reload failed: #e.message#", "red");
+				}
+				return "handled";
+
+			case "/clear":
+				// ANSI clear screen
+				arguments.javaSystem.out.print(chr(27) & "[2J" & chr(27) & "[H");
+				arguments.javaSystem.out.flush();
+				return "handled";
+
+			case "/models":
+				if (!consoleExec(arguments.evalUrl, "structKeyArray(application.wheels.models).sort('textnocase')", arguments.password)) {
+					return "error";
+				}
+				return "handled";
+
+			case "/routes":
+				if (!consoleExec(arguments.evalUrl, "application.wheels.routes.map(function(r){ return r.pattern & ' -> ' & r.controller & '##' & r.action; })", arguments.password)) {
+					return "error";
+				}
+				return "handled";
+
+			case "/version":
+				if (!consoleExec(arguments.evalUrl, "application.wheels.version", arguments.password)) {
+					return "error";
+				}
+				return "handled";
+
+			case "/ds":
+			case "/datasource":
+				if (!consoleExec(arguments.evalUrl, "application.wheels.dataSourceName", arguments.password)) {
+					return "error";
+				}
+				return "handled";
+		}
+		return "";
+	}
+
+	/**
+	 * Execute a single expression and display the result. Returns false when
+	 * the HTTP call failed, the server reported success=false, or a model
+	 * result carries validation errors — the REPL records that and exits
+	 * non-zero on EOF so piped scripts cannot hide a failed create.
+	 */
+	private boolean function consoleExec(required string requestUrl, required string expression, string password = "") {
 		try {
 			var body = serializeJSON({expression: expression, password: password});
 			var httpResult = makeHttpPost(requestUrl, body);
@@ -1703,7 +2797,7 @@ component extends="modules.BaseModule" {
 			if (!isJSON(httpResult)) {
 				out("Server returned non-JSON response.", "red");
 				verbose(httpResult);
-				return;
+				return false;
 			}
 
 			var result = deserializeJSON(httpResult);
@@ -1715,7 +2809,7 @@ component extends="modules.BaseModule" {
 
 			if (!result.success) {
 				out("Error: #result.error#", "red");
-				return;
+				return false;
 			}
 
 			// Display result based on type
@@ -1724,7 +2818,7 @@ component extends="modules.BaseModule" {
 
 			if (resultType == "void" && !len(resultValue)) {
 				// No return value and no output — nothing to display
-				return;
+				return true;
 			}
 
 			switch (resultType) {
@@ -1734,6 +2828,9 @@ component extends="modules.BaseModule" {
 
 				case "model":
 					displayModelResult(resultValue);
+					if ($consoleModelHasErrors(resultValue)) {
+						return false;
+					}
 					break;
 
 				case "struct":
@@ -1757,9 +2854,38 @@ component extends="modules.BaseModule" {
 					}
 			}
 
+			return true;
+
 		} catch (any e) {
 			out("Request failed: #e.message#", "red");
+			return false;
 		}
+	}
+
+	/**
+	 * Print-then-throw for console startup failures so LuCLI surfaces a
+	 * non-zero exit (same contract as reload / routes, GH ##2229 / ##2941).
+	 */
+	private void function $consoleFail(required string message) {
+		out(arguments.message, "red");
+		throw(type = "Wheels.ConsoleFailed", message = arguments.message);
+	}
+
+	/**
+	 * True when a serialized model result includes validation errors.
+	 * `.create()` that fails validation still evaluates successfully and
+	 * returns the unsaved object — without this, piped console sessions
+	 * exited 0 after a no-op persist.
+	 */
+	public boolean function $consoleModelHasErrors(required string jsonResult) {
+		if (!isJSON(arguments.jsonResult)) {
+			return false;
+		}
+		var props = deserializeJSON(arguments.jsonResult);
+		if (!isStruct(props) || !structKeyExists(props, "_hasErrors")) {
+			return false;
+		}
+		return isBoolean(props._hasErrors) && props._hasErrors;
 	}
 
 	/**
@@ -1847,6 +2973,14 @@ component extends="modules.BaseModule" {
 			}
 			if (structKeyExists(props, "_isNew")) {
 				out("    _isNew: #props._isNew#", "cyan");
+			}
+			if (structKeyExists(props, "_hasErrors") && isBoolean(props._hasErrors) && props._hasErrors) {
+				out("    Validation failed:", "red");
+				if (structKeyExists(props, "_errors") && isArray(props._errors)) {
+					for (var errMsg in props._errors) {
+						out("    #errMsg#", "red");
+					}
+				}
 			}
 			out("  }", "green");
 		} catch (any e) {
@@ -2196,6 +3330,13 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * hint: Alias for migrate (historical CommandBox-style name)
+	 */
+	public string function dbmigrate() {
+		return migrate(argumentCollection = arguments);
+	}
+
+	/**
 	 * hint: Alias for generate
 	 */
 	public string function g() {
@@ -2331,264 +3472,346 @@ component extends="modules.BaseModule" {
 		var positional = $deployStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "deploy";
 
-		var dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
-			$deployBuildSshPool(opts.configPath)
-		);
+		// DeployMainCli is constructed lazily — only the deploy/main verb
+		// family needs the SSH pool, which eagerly loads config/deploy.yml.
+		// Building it up front broke the secrets verbs (fetch/extract/print),
+		// which are config-independent, whenever no deploy.yml existed.
+		var dmc = "";
 
-		switch (sub) {
+		// Dispatch by verb family. Each family mirrors the exact set of case
+		// labels the previous single switch handled; case-sensitive listFind
+		// preserves the same matching semantics (`wheels deploy DEPLOY` still
+		// falls through to the throw below).
+		if (listFind("deploy,redeploy,rollback,config,init,setup,version,audit,docs,details,remove", sub)) {
+			dmc = new modules.wheels.services.deploy.cli.DeployMainCli(
+				$deployBuildSshPool(opts.configPath)
+			);
+			return $deployMain(dmc, opts, positional, sub);
+		}
+		if (listFind("app,proxy,registry,build,accessory,prune,lock", sub)) {
+			return $deploySshVerb(opts, positional, sub);
+		}
+		if (listFind("bootstrap,exec,server", sub)) {
+			return $deployServerVerb(opts, positional, sub);
+		}
+		if (listFind("fetch-secrets,extract-secrets,print-secrets,secrets", sub)) {
+			return $deploySecretsVerb(opts, positional, sub);
+		}
+		throw(message = "Unknown deploy subcommand: #sub#");
+	}
+
+	/**
+	 * Dispatch the direct DeployMainCli verbs. Extracted from deploy() to keep
+	 * its dispatcher under the complexity gate.
+	 */
+	private any function $deployMain(required any dmc, required struct opts, required array positional, required string sub) {
+		switch (arguments.sub) {
 			case "deploy":
-				return dmc.deploy(opts);
+				return arguments.dmc.deploy(arguments.opts);
 			case "redeploy":
-				return dmc.redeploy(opts);
+				return arguments.dmc.redeploy(arguments.opts);
 			case "rollback":
-				if (arrayLen(positional) < 2) {
-					throw(message="rollback requires a version argument: wheels deploy rollback <version>");
+				if (arrayLen(arguments.positional) < 2) {
+					throw(message = "rollback requires a version argument: wheels deploy rollback <version>");
 				}
-				opts.version = positional[2];
-				return dmc.rollback(opts);
+				arguments.opts.version = arguments.positional[2];
+				return arguments.dmc.rollback(arguments.opts);
 			case "config":
-				return dmc.config(opts);
+				return arguments.dmc.config(arguments.opts);
 			case "init":
-				return dmc.init_stub(opts);
+				return arguments.dmc.init_stub(arguments.opts);
 			case "setup":
-				return dmc.setup(opts);
+				return arguments.dmc.setup(arguments.opts);
 			case "version":
-				return dmc.version();
+				return arguments.dmc.version();
 			case "audit":
-				return dmc.audit(opts);
+				return arguments.dmc.audit(arguments.opts);
 			case "docs":
 				// `docs [SECTION]` — section is the optional second positional.
-				opts.section = arrayLen(positional) >= 2 ? positional[2] : "";
-				return dmc.docs(opts);
+				arguments.opts.section = arrayLen(arguments.positional) >= 2 ? arguments.positional[2] : "";
+				return arguments.dmc.docs(arguments.opts);
 			case "details":
-				return dmc.details(opts);
+				return arguments.dmc.details(arguments.opts);
 			case "remove":
-				return dmc.remove(opts);
+				return arguments.dmc.remove(arguments.opts);
+		}
+	}
+
+	/**
+	 * Dispatch the nested SSH-pool verbs (app/proxy/registry/build/accessory/
+	 * prune/lock) to their per-verb helpers.
+	 */
+	private any function $deploySshVerb(required struct opts, required array positional, required string sub) {
+		switch (arguments.sub) {
 			case "app":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy app requires a verb");
-				}
-				var appVerb = positional[2];
-				var appCli = new modules.wheels.services.deploy.cli.DeployAppCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (appVerb) {
-					case "boot":
-					case "start":
-					case "stop":
-					case "details":
-					case "containers":
-					case "images":
-					case "logs":
-					case "live":
-					case "maintenance":
-					case "remove":
-						return invoke(appCli, appVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy app verb: #appVerb#");
-				}
+				return $deployApp(arguments.opts, arguments.positional);
 			case "proxy":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy proxy requires a verb");
-				}
-				var proxyVerb = positional[2];
-				var proxyCli = new modules.wheels.services.deploy.cli.DeployProxyCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (proxyVerb) {
-					case "boot":
-					case "reboot":
-					case "start":
-					case "stop":
-					case "restart":
-					case "details":
-					case "logs":
-					case "remove":
-						return invoke(proxyCli, proxyVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy proxy verb: #proxyVerb#");
-				}
+				return $deployProxy(arguments.opts, arguments.positional);
 			case "registry":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy registry requires a verb");
-				}
-				var registryVerb = positional[2];
-				var registryCli = new modules.wheels.services.deploy.cli.DeployRegistryCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (registryVerb) {
-					case "setup":
-					case "login":
-					case "logout":
-					case "remove":
-						return invoke(registryCli, registryVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy registry verb: #registryVerb#");
-				}
+				return $deployRegistry(arguments.opts, arguments.positional);
 			case "build":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy build requires a verb");
-				}
-				var buildVerb = positional[2];
-				var buildCli = new modules.wheels.services.deploy.cli.DeployBuildCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (buildVerb) {
-					case "deliver":
-					case "push":
-					case "pull":
-					case "create":
-					case "remove":
-					case "details":
-					case "dev":
-						return invoke(buildCli, buildVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy build verb: #buildVerb#");
-				}
+				return $deployBuild(arguments.opts, arguments.positional);
 			case "accessory":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy accessory requires a verb");
-				}
-				var accVerb = positional[2];
-				opts.name = arrayLen(positional) >= 3 ? positional[3] : "";
-				var accCli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				switch (accVerb) {
-					case "boot":
-					case "reboot":
-					case "start":
-					case "stop":
-					case "restart":
-					case "details":
-					case "logs":
-					case "remove":
-						return invoke(accCli, accVerb, [opts]);
-					default:
-						throw(message="Unknown wheels deploy accessory verb: #accVerb#");
-				}
+				return $deployAccessory(arguments.opts, arguments.positional);
 			case "prune":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy prune requires a verb (all/images/containers)");
-				}
-				var pruneVerb = positional[2];
-				if (!listFindNoCase("all,images,containers", pruneVerb)) {
-					throw(message="Unknown wheels deploy prune verb: " & pruneVerb);
-				}
-				var pruneCli = new modules.wheels.services.deploy.cli.DeployPruneCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				return invoke(pruneCli, pruneVerb, [opts]);
-			// `bootstrap` and `exec` are top-level aliases for `server bootstrap`
-			// and `server exec`. LuCLI's picocli root registers `server` as a
-			// top-level subcommand for Lucee instance management, so the nested
-			// `wheels deploy server <verb>` form gets shortcut into LuCLI's
-			// own server help before module dispatch — see #2677. These flat
-			// aliases sidestep the collision entirely. The original `server`
-			// branch below is retained for Kamal parity and direct callers
-			// (MCP, internal tests) that don't go through LuCLI's picocli root.
+				return $deployPrune(arguments.opts, arguments.positional);
+			case "lock":
+				return $deployLock(arguments.opts, arguments.positional);
+		}
+	}
+
+	private any function $deployApp(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy app requires a verb");
+		}
+		var appVerb = arguments.positional[2];
+		var appCli = new modules.wheels.services.deploy.cli.DeployAppCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (appVerb) {
+			case "boot":
+			case "start":
+			case "stop":
+			case "details":
+			case "containers":
+			case "images":
+			case "logs":
+			case "live":
+			case "maintenance":
+			case "remove":
+				return invoke(appCli, appVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy app verb: #appVerb#");
+		}
+	}
+
+	private any function $deployProxy(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy proxy requires a verb");
+		}
+		var proxyVerb = arguments.positional[2];
+		var proxyCli = new modules.wheels.services.deploy.cli.DeployProxyCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (proxyVerb) {
+			case "boot":
+			case "reboot":
+			case "start":
+			case "stop":
+			case "restart":
+			case "details":
+			case "logs":
+			case "remove":
+				return invoke(proxyCli, proxyVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy proxy verb: #proxyVerb#");
+		}
+	}
+
+	private any function $deployRegistry(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy registry requires a verb");
+		}
+		var registryVerb = arguments.positional[2];
+		var registryCli = new modules.wheels.services.deploy.cli.DeployRegistryCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (registryVerb) {
+			case "setup":
+			case "login":
+			case "logout":
+			case "remove":
+				return invoke(registryCli, registryVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy registry verb: #registryVerb#");
+		}
+	}
+
+	private any function $deployBuild(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy build requires a verb");
+		}
+		var buildVerb = arguments.positional[2];
+		var buildCli = new modules.wheels.services.deploy.cli.DeployBuildCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (buildVerb) {
+			case "deliver":
+			case "push":
+			case "pull":
+			case "create":
+			case "remove":
+			case "details":
+			case "dev":
+				return invoke(buildCli, buildVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy build verb: #buildVerb#");
+		}
+	}
+
+	private any function $deployAccessory(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy accessory requires a verb");
+		}
+		var accVerb = arguments.positional[2];
+		arguments.opts.name = arrayLen(arguments.positional) >= 3 ? arguments.positional[3] : "";
+		var accCli = new modules.wheels.services.deploy.cli.DeployAccessoryCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		switch (accVerb) {
+			case "boot":
+			case "reboot":
+			case "start":
+			case "stop":
+			case "restart":
+			case "details":
+			case "logs":
+			case "remove":
+				return invoke(accCli, accVerb, [arguments.opts]);
+			default:
+				throw(message = "Unknown wheels deploy accessory verb: #accVerb#");
+		}
+	}
+
+	private any function $deployPrune(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = "wheels deploy prune requires a verb (all/images/containers)");
+		}
+		var pruneVerb = arguments.positional[2];
+		if (!listFindNoCase("all,images,containers", pruneVerb)) {
+			throw(message = "Unknown wheels deploy prune verb: " & pruneVerb);
+		}
+		var pruneCli = new modules.wheels.services.deploy.cli.DeployPruneCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		return invoke(pruneCli, pruneVerb, [arguments.opts]);
+	}
+
+	private any function $deployLock(required struct opts, required array positional) {
+		if (arrayLen(arguments.positional) < 2) throw(message = "wheels deploy lock requires a verb (acquire/release/status)");
+		var lockVerb = arguments.positional[2];
+		if (!listFindNoCase("acquire,release,status", lockVerb)) {
+			throw(message = "Unknown wheels deploy lock verb: " & lockVerb);
+		}
+		var lockCli = new modules.wheels.services.deploy.cli.DeployLockCli(
+			$deployBuildSshPool(arguments.opts.configPath)
+		);
+		return invoke(lockCli, lockVerb, [arguments.opts]);
+	}
+
+	/**
+	 * Dispatch `bootstrap`/`exec` (flat aliases for `server bootstrap` /
+	 * `server exec`) and the nested `server` verb. LuCLI's picocli root
+	 * registers `server` as a top-level subcommand for Lucee instance
+	 * management, so the nested `wheels deploy server <verb>` form gets
+	 * shortcut into LuCLI's own server help before module dispatch — see
+	 * #2677. These flat aliases sidestep the collision entirely. The nested
+	 * `server` branch is retained for Kamal parity and direct callers
+	 * (MCP, internal tests) that don't go through LuCLI's picocli root.
+	 */
+	private any function $deployServerVerb(required struct opts, required array positional, required string sub) {
+		switch (arguments.sub) {
 			case "bootstrap":
 				// #2957 DEP-7: build the pool from deploy.yml's ssh: block like
 				// every other verb — a bare `new SshPool()` here meant the only
 				// CLI-reachable bootstrap form ignored ssh.user/port/keys.
 				var bootstrapCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					$deployBuildSshPool(opts.configPath)
+					$deployBuildSshPool(arguments.opts.configPath)
 				);
-				return bootstrapCli.bootstrap(opts);
+				return bootstrapCli.bootstrap(arguments.opts);
 			case "exec":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy exec requires a command");
+				if (arrayLen(arguments.positional) < 2) {
+					throw(message = "wheels deploy exec requires a command");
 				}
 				// Preserve multi-token commands: join all positional args after `exec`.
 				var execCmdParts = [];
-				for (var ei = 2; ei <= arrayLen(positional); ei++) {
-					arrayAppend(execCmdParts, positional[ei]);
+				for (var ei = 2; ei <= arrayLen(arguments.positional); ei++) {
+					arrayAppend(execCmdParts, arguments.positional[ei]);
 				}
-				opts.cmd = arrayToList(execCmdParts, " ");
+				arguments.opts.cmd = arrayToList(execCmdParts, " ");
 				// #2957 DEP-7: same ssh-config seeding as the nested `server` branch.
 				var execCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					$deployBuildSshPool(opts.configPath)
+					$deployBuildSshPool(arguments.opts.configPath)
 				);
-				return execCli.exec(opts);
+				return execCli.exec(arguments.opts);
 			case "server":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy server requires a verb (exec or bootstrap)");
+				if (arrayLen(arguments.positional) < 2) {
+					throw(message = "wheels deploy server requires a verb (exec or bootstrap)");
 				}
-				var serverVerb = positional[2];
+				var serverVerb = arguments.positional[2];
 				if (serverVerb == "exec") {
-					if (arrayLen(positional) < 3) {
-						throw(message="wheels deploy server exec requires a command");
+					if (arrayLen(arguments.positional) < 3) {
+						throw(message = "wheels deploy server exec requires a command");
 					}
 					// Preserve multi-token commands: join all positional args after the verb.
 					var cmdParts = [];
-					for (var ci = 3; ci <= arrayLen(positional); ci++) {
-						arrayAppend(cmdParts, positional[ci]);
+					for (var ci = 3; ci <= arrayLen(arguments.positional); ci++) {
+						arrayAppend(cmdParts, arguments.positional[ci]);
 					}
-					opts.cmd = arrayToList(cmdParts, " ");
+					arguments.opts.cmd = arrayToList(cmdParts, " ");
 				}
 				var serverCli = new modules.wheels.services.deploy.cli.DeployServerCli(
-					$deployBuildSshPool(opts.configPath)
+					$deployBuildSshPool(arguments.opts.configPath)
 				);
 				switch (serverVerb) {
 					case "exec":
-						return serverCli.exec(opts);
+						return serverCli.exec(arguments.opts);
 					case "bootstrap":
-						return serverCli.bootstrap(opts);
+						return serverCli.bootstrap(arguments.opts);
 					default:
-						throw(message="Unknown wheels deploy server verb: #serverVerb#");
+						throw(message = "Unknown wheels deploy server verb: #serverVerb#");
 				}
-			case "lock":
-				if (arrayLen(positional) < 2) throw(message="wheels deploy lock requires a verb (acquire/release/status)");
-				var lockVerb = positional[2];
-				if (!listFindNoCase("acquire,release,status", lockVerb)) {
-					throw(message="Unknown wheels deploy lock verb: " & lockVerb);
-				}
-				var lockCli = new modules.wheels.services.deploy.cli.DeployLockCli(
-					$deployBuildSshPool(opts.configPath)
-				);
-				return invoke(lockCli, lockVerb, [opts]);
-			// `fetch-secrets`, `extract-secrets`, and `print-secrets` are
-			// top-level aliases for `secrets fetch`/`extract`/`print`. LuCLI's
-			// picocli root registers `secrets` as a top-level subcommand for
-			// the local secrets store (init/set/list/rm/get/provider), so the
-			// nested `wheels deploy secrets <verb>` form gets shortcut into
-			// LuCLI's own secrets help before module dispatch — see #2697.
-			// These flat aliases sidestep the collision entirely, mirroring
-			// the `bootstrap`/`exec` pattern from #2677. The original
-			// `secrets` branch below is retained for Kamal parity and direct
-			// callers (MCP, internal tests) that don't go through LuCLI's
-			// picocli root.
+		}
+	}
+
+	/**
+	 * Dispatch the secrets verbs (`fetch-secrets`/`extract-secrets`/
+	 * `print-secrets` flat aliases + the nested `secrets` verb). LuCLI's
+	 * picocli root registers `secrets` as a top-level subcommand for the local
+	 * secrets store (init/set/list/rm/get/provider), so the nested
+	 * `wheels deploy secrets <verb>` form gets shortcut into LuCLI's own
+	 * secrets help before module dispatch — see #2697. These flat aliases
+	 * sidestep the collision entirely, mirroring the `bootstrap`/`exec`
+	 * pattern from #2677. The nested `secrets` branch is retained for Kamal
+	 * parity and direct callers (MCP, internal tests) that don't go through
+	 * LuCLI's picocli root.
+	 */
+	private any function $deploySecretsVerb(required struct opts, required array positional, required string sub) {
+		// Secrets resolution defaults to the module's cwd-derived project
+		// root — an explicit --projectRoot flag still wins. (Before this,
+		// the CLIs fell back to expandPath("./"), which resolves against the
+		// harness webroot rather than the user's project directory.)
+		arguments.opts.projectRoot = arguments.opts.projectRoot ?: variables.projectRoot;
+		switch (arguments.sub) {
 			case "fetch-secrets":
-				opts.keys = [];
-				for (var fsi = 2; fsi <= arrayLen(positional); fsi++) arrayAppend(opts.keys, positional[fsi]);
+				arguments.opts.keys = [];
+				for (var fsi = 2; fsi <= arrayLen(arguments.positional); fsi++) arrayAppend(arguments.opts.keys, arguments.positional[fsi]);
 				var fetchSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
-				return fetchSecretsCli.fetch(opts);
+				return fetchSecretsCli.fetch(arguments.opts);
 			case "extract-secrets":
-				opts.key = arrayLen(positional) >= 2 ? positional[2] : "";
+				arguments.opts.key = arrayLen(arguments.positional) >= 2 ? arguments.positional[2] : "";
 				var extractSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
-				return extractSecretsCli.extract(opts);
+				return extractSecretsCli.extract(arguments.opts);
 			case "print-secrets":
 				var printSecretsCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
-				return printSecretsCli.print(opts);
+				return printSecretsCli.print(arguments.opts);
 			case "secrets":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels deploy secrets requires a verb (fetch/extract/print)");
+				if (arrayLen(arguments.positional) < 2) {
+					throw(message = "wheels deploy secrets requires a verb (fetch/extract/print)");
 				}
-				var secVerb = positional[2];
+				var secVerb = arguments.positional[2];
 				if (!listFindNoCase("fetch,extract,print", secVerb)) {
-					throw(message="Unknown wheels deploy secrets verb: " & secVerb);
+					throw(message = "Unknown wheels deploy secrets verb: " & secVerb);
 				}
 				if (secVerb == "fetch") {
-					opts.keys = [];
-					for (var si = 3; si <= arrayLen(positional); si++) arrayAppend(opts.keys, positional[si]);
+					arguments.opts.keys = [];
+					for (var si = 3; si <= arrayLen(arguments.positional); si++) arrayAppend(arguments.opts.keys, arguments.positional[si]);
 				}
 				if (secVerb == "extract") {
-					opts.key = arrayLen(positional) >= 3 ? positional[3] : "";
+					arguments.opts.key = arrayLen(arguments.positional) >= 3 ? arguments.positional[3] : "";
 				}
 				var secCli = new modules.wheels.services.deploy.cli.DeploySecretsCli();
-				return invoke(secCli, secVerb, [opts]);
-			default:
-				throw(message="Unknown deploy subcommand: #sub#");
+				return invoke(secCli, secVerb, [arguments.opts]);
 		}
 	}
 
@@ -2636,6 +3859,7 @@ component extends="modules.BaseModule" {
 	 */
 	public string function packages() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		$consumeOfflineFlag(args);
 		var opts = $packagesArgsToOptions(args);
 		var positional = $packagesStripFlags(args);
 		var sub = arrayLen(positional) >= 1 ? positional[1] : "list";
@@ -2655,24 +3879,24 @@ component extends="modules.BaseModule" {
 			return $packagesHelp();
 		}
 
-		switch (sub) {
+		return $dispatchPackages(sub, positional, opts);
+	}
+
+	/**
+	 * Dispatch a `wheels packages` subcommand to the matching Packages CLI.
+	 * opts is mutated in place (by struct reference) so the caller's options
+	 * carry the resolved query/name/target before the CLI sees them.
+	 */
+	private any function $dispatchPackages(required string sub, required array positional, required struct opts) {
+		switch (arguments.sub) {
 			case "list":
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.list(opts);
+				return $packagesMainCli().list(arguments.opts);
 			case "search":
-				if (arrayLen(positional) < 2) {
-					throw(message="search requires a query: wheels packages search <query>");
-				}
-				opts.query = positional[2];
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.search(opts);
+				arguments.opts.query = $packagesRequireArg(arguments.positional, "search requires a query: wheels packages search <query>");
+				return $packagesMainCli().search(arguments.opts);
 			case "show":
-				if (arrayLen(positional) < 2) {
-					throw(message="show requires a name: wheels packages show <name>");
-				}
-				opts.name = positional[2];
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.show(opts);
+				arguments.opts.name = $packagesRequireArg(arguments.positional, "show requires a name: wheels packages show <name>");
+				return $packagesMainCli().show(arguments.opts);
 			case "install":
 				// LuCLI's built-in extension installer intercepts the
 				// literal verb `install` on the user-facing CLI surface
@@ -2688,36 +3912,51 @@ component extends="modules.BaseModule" {
 				// Fall through to the `add` branch (same validation,
 				// same error shape, same install behavior).
 			case "add":
-				if (arrayLen(positional) < 2) {
-					throw(message="add requires a name: wheels packages add <name>[@<version>]");
-				}
-				opts.target = positional[2];
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.add(opts);
+				arguments.opts.target = $packagesRequireArg(arguments.positional, "add requires a name: wheels packages add <name>[@<version>]");
+				return $packagesMainCli().add(arguments.opts);
 			case "update":
-				opts.target = arrayLen(positional) >= 2 ? positional[2] : "";
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.update(opts);
+				arguments.opts.target = arrayLen(arguments.positional) >= 2 ? arguments.positional[2] : "";
+				return $packagesMainCli().update(arguments.opts);
 			case "remove":
-				if (arrayLen(positional) < 2) {
-					throw(message="remove requires a name: wheels packages remove <name>");
-				}
-				opts.target = positional[2];
-				var mainCli = new modules.wheels.services.packages.PackagesMainCli();
-				return mainCli.remove(opts);
+				arguments.opts.target = $packagesRequireArg(arguments.positional, "remove requires a name: wheels packages remove <name>");
+				return $packagesMainCli().remove(arguments.opts);
 			case "registry":
-				if (arrayLen(positional) < 2) {
-					throw(message="wheels packages registry requires a verb (refresh or info)");
-				}
-				var regVerb = positional[2];
-				if (!listFindNoCase("refresh,info", regVerb)) {
-					throw(message="Unknown wheels packages registry verb: #regVerb#");
-				}
-				var regCli = new modules.wheels.services.packages.PackagesRegistryCli();
-				return invoke(regCli, regVerb, [opts]);
+				return $dispatchPackagesRegistry(arguments.positional, arguments.opts);
 			default:
-				throw(message="Unknown packages subcommand: #sub#. The install verb is `add` (not `install`): wheels packages add <name>");
+				throw(message="Unknown packages subcommand: #arguments.sub#. The install verb is `add` (not `install`): wheels packages add <name>");
 		}
+	}
+
+	/**
+	 * Return a fresh PackagesMainCli for a single subcommand dispatch.
+	 */
+	private any function $packagesMainCli() {
+		return new modules.wheels.services.packages.PackagesMainCli();
+	}
+
+	/**
+	 * Return positional[2] or throw the verb's missing-argument message.
+	 */
+	private string function $packagesRequireArg(required array positional, required string message) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message = arguments.message);
+		}
+		return arguments.positional[2];
+	}
+
+	/**
+	 * Dispatch the `registry` sub-verb (refresh|info) to PackagesRegistryCli.
+	 */
+	private any function $dispatchPackagesRegistry(required array positional, required struct opts) {
+		if (arrayLen(arguments.positional) < 2) {
+			throw(message="wheels packages registry requires a verb (refresh or info)");
+		}
+		var regVerb = arguments.positional[2];
+		if (!listFindNoCase("refresh,info", regVerb)) {
+			throw(message="Unknown wheels packages registry verb: #regVerb#");
+		}
+		var regCli = new modules.wheels.services.packages.PackagesRegistryCli();
+		return invoke(regCli, regVerb, [arguments.opts]);
 	}
 
 	// Hand-written help for `wheels packages`. Owned by the module rather than
@@ -2947,6 +4186,7 @@ component extends="modules.BaseModule" {
 	 */
 	public string function db() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		$consumeOfflineFlag(args);
 
 		if (!arrayLen(args)) {
 			out("Usage: wheels db <command>", "yellow");
@@ -3077,7 +4317,7 @@ component extends="modules.BaseModule" {
 			requireProjectConfig = true
 		);
 
-		var workUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsProcessNext&format=json";
+		var workUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=jobsProcessNext&format=json";
 		if (len(arguments.opts.queue)) {
 			workUrl &= "&queues=" & urlEncodedFormat(arguments.opts.queue);
 		}
@@ -3158,7 +4398,7 @@ component extends="modules.BaseModule" {
 			hints = ["Start one with: wheels start"]
 		);
 
-		var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=jobsStatus&format=json";
+		var statusUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=jobsStatus&format=json";
 		if (len(arguments.opts.queue)) {
 			statusUrl &= "&queue=" & urlEncodedFormat(arguments.opts.queue);
 		}
@@ -3675,7 +4915,7 @@ component extends="modules.BaseModule" {
 		// uncompilable file (literal extends="|DBMigrateExtends|"). The inline
 		// builder emits a correct extends="wheels.migrator.Migration" body and
 		// was already the path every dev-checkout install used. See CLI audit H4.
-		fileWrite(filePath, buildEmptyMigration(migrationName));
+		$generateWrite(filePath, buildEmptyMigration(migrationName));
 
 		printCreated("app/migrator/migrations/#fileName#");
 		return "";
@@ -3725,6 +4965,19 @@ component extends="modules.BaseModule" {
 				var relPath = listLast(item.path, "/\");
 				printCreated("#item.type#: #relPath#");
 			}
+			// A dry run writes nothing, so `modify` lines would be a lie. The
+			// would-be-modified paths still reach the caller's list (Scaffold.cfc
+			// records them through the same interception), so nothing is lost.
+			for (var item in ($isDryRun() ? [] : (results.modified ?: []))) {
+				var relPath = replace(item.path, variables.projectRoot & "/", "");
+				out("  modify  #item.type#: #relPath#", "green");
+			}
+			// config/routes.cfm is rewritten outside `generated`, so without this
+			// the real run silently edited it while --dry-run listed it — the dry
+			// run was more honest than the run.
+			for (var item in ($isDryRun() ? [] : (results.routes ?: []))) {
+				out("  modify  #item.type#: #replace(item.path, variables.projectRoot & "/", "")#", "green");
+			}
 			// Issue #2327: scaffold can succeed with skipped artifacts. Surface
 			// what was skipped so users know why their existing model wasn't
 			// touched and how to force a rewrite if they wanted one.
@@ -3732,10 +4985,14 @@ component extends="modules.BaseModule" {
 				out("  skip    #note#", "yellow");
 			}
 
-			out("");
-			out("Scaffold complete! Next steps:", "green");
-			out("  1. Run migrations: wheels migrate latest");
-			out("  2. Start server: wheels start");
+			// "Run migrations / start server" is nonsense after a dry run —
+			// nothing was written to migrate or serve.
+			if (!$isDryRun()) {
+				out("");
+				out("Scaffold complete! Next steps:", "green");
+				out("  1. Run migrations: wheels migrate latest");
+				out("  2. Start server: wheels start");
+			}
 		} else {
 			out("Scaffold failed:", "red");
 			for (var err in results.errors) {
@@ -3866,7 +5123,7 @@ component extends="modules.BaseModule" {
 
 		content &= '}' & nl;
 
-		fileWrite(migrationDir & "/" & fileName, content);
+		$generateWrite(migrationDir & "/" & fileName, content);
 		printCreated("app/migrator/migrations/#fileName#");
 		out("");
 		out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
@@ -4117,7 +5374,7 @@ component extends="modules.BaseModule" {
 		// Introspect the model via the server
 		out("Introspecting model: #modelName#...", "cyan");
 		try {
-			var introspectUrl = "http://localhost:#serverPort#/wheels/cli?command=introspect&model=#modelName#&format=json";
+			var introspectUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=introspect&model=#modelName#&format=json";
 			var response = makeHttpRequest(introspectUrl);
 			// parseCliResponse surfaces framework errors via thrown exceptions —
 			// issue #2315.
@@ -4217,14 +5474,14 @@ component extends="modules.BaseModule" {
 				out("  3. Protect actions with a filter that calls service(""authenticator"").authenticate(request).");
 				out("  4. Wire reset-link email delivery in app/controllers/Passwords.cfc (see the TODO in create()) —");
 				out("     until then no reset email is actually sent.");
-				out("  5. Rate-limit POST /login in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+				out("  5. Rate-limit POST /login in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			} else if (strategy == "jwt") {
 				out("  2. Set WHEELS_JWT_SECRET in .env (at least 32 random bytes) — startup fails loudly without it.");
 				out("  3. Restart, then POST credentials to /api/session to receive a JWT.");
-				out("  4. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+				out("  4. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			} else {
 				out("  2. Restart, then POST credentials to /api/session to receive a bearer token.");
-				out("  3. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a full PBKDF2 derivation.");
+				out("  3. Rate-limit POST /api/session in production (wheels.middleware.RateLimiter) — each attempt runs a bcrypt derivation.");
 			}
 			out("  Generated code is yours to edit — re-run with --force and review `git diff` to upgrade.");
 		} else {
@@ -4421,7 +5678,7 @@ component extends="modules.BaseModule" {
 		if (!directoryExists(dir)) {
 			directoryCreate(dir, true);
 		}
-		fileWrite(fullPath, arguments.content);
+		$generateWrite(fullPath, arguments.content);
 		return arguments.relativePath;
 	}
 
@@ -4545,46 +5802,13 @@ component extends="modules.BaseModule" {
 		// here didn't honor (#3080).
 		var mutatingAction = listFindNoCase("latest,up,down", arguments.action) > 0;
 
-		var serverPort = 0;
-		if (mutatingAction) {
-			serverPort = $requireRunningServer(
-				hints = [
-					"Migrations require a running server bound to this project.",
-					"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
-				],
-				requireProjectConfig = true
-			);
-		} else {
-			serverPort = $requireRunningServer(
-				hints = ["Start one with: wheels start"],
-				requireProjectConfig = false
-			);
-			// Transparency for the fallback attach: with no project-bound port
-			// we cannot prove the server on a common port belongs to this
-			// project — a sibling app's server would report the WRONG
-			// project's migration state. Say which port we attached to and
-			// how to pin it.
-			if (!detectServerPort(requireProjectConfig = true)) {
-				out(
-					"Attached to localhost:#serverPort# via the common-port fallback (no project-bound port in lucee.json / .env).",
-					"yellow"
-				);
-				out("If this is not this project's server, set 'port' in lucee.json (or PORT in .env) and re-run.", "yellow");
-			}
-		}
+		var serverPort = $resolveMigrationServerPort(mutatingAction);
 
 		out("Running migration: #action#...", "cyan");
 
-		var command = "";
-		switch (action) {
-			case "latest": command = "migrateToLatest"; break;
-			case "up":     command = "migrateUp"; break;
-			case "down":   command = "migrateDown"; break;
-			case "info":   command = "info"; break;
-			case "doctor": command = "doctor"; break;
-		}
+		var command = $migrationCommand(action);
 
-		var migrateUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
+		var migrateUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=#command#&format=json";
 
 		// latest/up/down change the schema — the framework's /wheels/cli
 		// bridge requires POST + the reload password for state-changing
@@ -4638,6 +5862,55 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
+	/**
+	 * Resolve the server to target for a migration run. Schema-mutating
+	 * actions (latest/up/down) require a server bound to this project's own
+	 * port; read-only actions (info/doctor) keep the common-port fallback.
+	 */
+	private numeric function $resolveMigrationServerPort(required boolean mutatingAction) {
+		if (arguments.mutatingAction) {
+			return $requireRunningServer(
+				hints = [
+					"Migrations require a running server bound to this project.",
+					"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+				],
+				requireProjectConfig = true
+			);
+		}
+
+		var serverPort = $requireRunningServer(
+			hints = ["Start one with: wheels start"],
+			requireProjectConfig = false
+		);
+		// Transparency for the fallback attach: with no project-bound port
+		// we cannot prove the server on a common port belongs to this
+		// project — a sibling app's server would report the WRONG
+		// project's migration state. Say which port we attached to and
+		// how to pin it.
+		if (!detectServerPort(requireProjectConfig = true)) {
+			out(
+				"Attached to localhost:#serverPort# via the common-port fallback (no project-bound port in lucee.json / .env).",
+				"yellow"
+			);
+			out("If this is not this project's server, set 'port' in lucee.json (or PORT in .env) and re-run.", "yellow");
+		}
+		return serverPort;
+	}
+
+	/**
+	 * Map a migration action to its /wheels/cli bridge command.
+	 */
+	private string function $migrationCommand(required string action) {
+		switch (arguments.action) {
+			case "latest": return "migrateToLatest";
+			case "up": return "migrateUp";
+			case "down": return "migrateDown";
+			case "info": return "info";
+			case "doctor": return "doctor";
+		}
+		return "";
+	}
+
 	private string function runForgetOrPretend(required string command, required array args) {
 		// `forget` and `pretend` require an explicit <version> arg plus
 		// `--yes` to confirm. Default behavior is to print what would
@@ -4683,7 +5956,7 @@ component extends="modules.BaseModule" {
 		// non-digits before SQL use (no injection path), but raw URL-special
 		// characters (&, =, %) in the CLI argument could still inject
 		// spurious query parameters before reaching that point.
-		var reconcileUrl = "http://localhost:#serverPort#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
+		var reconcileUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=#arguments.command#&version=#URLEncodedFormat(version)#&format=json";
 
 		// forget/pretend mutate the tracking table — POST + reload password.
 		var httpResult = "";
@@ -4730,7 +6003,7 @@ component extends="modules.BaseModule" {
 
 		out(arguments.dryRun ? "Previewing system-table rename..." : "Renaming legacy c_o_r_e_* system tables to wheels_*...", "cyan");
 
-		var renameUrl = "http://localhost:#serverPort#/wheels/cli?command=renameSystemTables&format=json"
+		var renameUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=renameSystemTables&format=json"
 			& (arguments.dryRun ? "&dryRun=true" : "");
 
 		// renameSystemTables alters tables — POST + reload password (the
@@ -4748,14 +6021,10 @@ component extends="modules.BaseModule" {
 
 		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {};
 		var success = parsed.success ?: false;
-		var message = parsed.message ?: "";
 		var renameResult = parsed.renameResult ?: {renamed: [], errors: [], sql: [], skipped: ""};
 
 		if (!success) {
-			out("Rename failed.", "red");
-			for (var err in (renameResult.errors ?: [])) {
-				out("  #err#", "red");
-			}
+			$printRenameFailures(renameResult);
 			return "";
 		}
 
@@ -4767,24 +6036,490 @@ component extends="modules.BaseModule" {
 
 		// Dry-run path: print SQL.
 		if (arguments.dryRun) {
-			if (ArrayLen(renameResult.sql ?: [])) {
-				out("Would execute:");
-				for (var sql in renameResult.sql) {
-					out("  " & sql, "cyan");
-				}
-			}
+			$printRenameDryRunSql(renameResult);
 			return "";
 		}
 
 		// Success path: print what was renamed.
+		$printRenameSuccess(renameResult);
+
+		return "";
+	}
+
+	/**
+	 * Print the rename failure summary (plus any per-table errors).
+	 */
+	private void function $printRenameFailures(required struct renameResult) {
+		out("Rename failed.", "red");
+		for (var err in (arguments.renameResult.errors ?: [])) {
+			out("  #err#", "red");
+		}
+	}
+
+	/**
+	 * Print the dry-run SQL preview.
+	 */
+	private void function $printRenameDryRunSql(required struct renameResult) {
+		if (ArrayLen(arguments.renameResult.sql ?: [])) {
+			out("Would execute:");
+			for (var sql in arguments.renameResult.sql) {
+				out("  " & sql, "cyan");
+			}
+		}
+	}
+
+	/**
+	 * Print the success summary (tables renamed + the cosmetic FK-name note).
+	 */
+	private void function $printRenameSuccess(required struct renameResult) {
 		out("Renamed:", "green");
-		for (var rename in (renameResult.renamed ?: [])) {
+		for (var rename in (arguments.renameResult.renamed ?: [])) {
 			out("  " & rename, "green");
 		}
 		out("");
 		out("Note: the foreign-key constraint name is still `fk_core_level`. Constraint names are scoped to their table and only rename via DROP/CREATE; this is cosmetic and will not affect functionality.", "yellow");
+	}
 
+	// ── migrate diff (AutoMigrator schema diff) ─────
+
+	/**
+	 * Detect and consume a global `--offline` flag (or WHEELS_OFFLINE=1
+	 * environment variable): the CLI must not phone home. migrate/db accept
+	 * the flag (a no-op for their localhost bridge); new() skips its update
+	 * check; packages fails fast with a clear message.
+	 */
+	public boolean function $consumeOfflineFlag(required array args) {
+		var found = false;
+		for (var a in arguments.args) {
+			if (a == "--offline") {
+				found = true;
+				break;
+			}
+		}
+		if (found) {
+			variables.offline = true;
+		}
+		if ($isOffline()) {
+			request.$wheelsOffline = true;
+		}
+		return found;
+	}
+
+	/**
+	 * True when offline mode is active: --offline flag seen, or
+	 * WHEELS_OFFLINE=1 / true in the environment.
+	 */
+	public boolean function $isOffline() {
+		if (structKeyExists(variables, "offline") && variables.offline) {
+			return true;
+		}
+		try {
+			var env = server.system.environment.WHEELS_OFFLINE ?: "";
+			return env == "1" || compareNoCase(env, "true") == 0;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * `wheels migrate diff [Model] [--rename OLD:NEW] [--hints JSON]
+	 * [--threshold 0-1] [--name migrationName] [--write]`
+	 *
+	 * Previews the schema diff between a model (or all models) and the
+	 * database via the AutoMigrator bridge. Read-only unless --write.
+	 */
+	private string function runMigrationDiff(required array args) {
+		var opts = $parseMigrateDiffArgs(args);
+
+		var serverPort = $requireRunningServer(
+			hints = [
+				"Diffing migrations requires a running server bound to this project.",
+				"Set 'port' in lucee.json (or PORT in .env), then start with: wheels start"
+			],
+			requireProjectConfig = true
+		);
+
+		out(opts.write ? "Writing migration diff..." : "Previewing migration diff...", "cyan");
+
+		var diffUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=diff&format=json" & $buildDiffBridgeUrl(opts);
+
+		var httpResult = "";
+		try {
+			httpResult = opts.write ? makeBridgePost(diffUrl) : makeHttpRequest(diffUrl);
+		} catch (any httpErr) {
+			throw(
+				type = "MigrationError",
+				message = "Diff failed (connection error): #httpErr.message#",
+				detail = httpErr.detail ?: ""
+			);
+		}
+
+		var parsed = isJSON(httpResult) ? deserializeJSON(httpResult) : {};
+		if (!(parsed.success ?: false)) {
+			out(parsed.message ?: "Diff failed.", "red");
+			return "";
+		}
+
+		$renderDiffResult(parsed, opts.write);
 		return "";
+	}
+
+	/**
+	 * Parse the `migrate diff` argv into a normalized opts struct.
+	 * Public for specs. Accepted forms:
+	 *   wheels migrate diff                          → diffAll preview
+	 *   wheels migrate diff User                     → single-model preview
+	 *   --rename OLD:NEW (repeatable)                → renames hint
+	 *   --rename User.OLD:NEW (diffAll form)         → per-model renames hint
+	 *   --hints '{"renames":{...}}'                  → raw hints JSON, merged
+	 *   --threshold 0.85 --name my_migration --write
+	 */
+	public struct function $parseMigrateDiffArgs(required array args) {
+		var rv = {
+			model = "",
+			hints = {},
+			threshold = "",
+			name = "",
+			write = false
+		};
+
+		// Positional: args[2] is the model when it isn't a flag.
+		var hasModel = false;
+		if (arrayLen(arguments.args) >= 2 && left(arguments.args[2], 2) != "--") {
+			rv.model = arguments.args[2];
+			hasModel = true;
+		}
+
+		// --rename is repeatable: --rename a b is one pair (space form) OR
+		// --rename=a:b (equals form). Collect raw tokens first.
+		var renames = [];
+		var i = hasModel ? 3 : 2;
+		while (i <= arrayLen(arguments.args)) {
+			var token = arguments.args[i];
+			if (token == "--rename" && i < arrayLen(arguments.args)) {
+				arrayAppend(renames, arguments.args[i + 1]);
+				i++;
+			} else if (left(token, 9) == "--rename=" && len(token) > 9) {
+				arrayAppend(renames, mid(token, 10, 9999));
+			} else if (left(token, 8) == "--hints=" && len(token) > 8) {
+				try {
+					var decoded = deserializeJSON(mid(token, 9, 9999));
+					if (isStruct(decoded)) {
+						structAppend(rv.hints, decoded, true);
+					}
+				} catch (any e) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "--hints must be valid JSON: #e.message#"
+					);
+				}
+			} else if (left(token, 12) == "--threshold=" && len(token) > 12) {
+				var threshold = mid(token, 13, 9999);
+				if (!isNumeric(threshold) || threshold < 0 || threshold > 1) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "--threshold must be a number between 0 and 1."
+					);
+				}
+				rv.threshold = threshold;
+			} else if (left(token, 7) == "--name=" && len(token) > 7) {
+				rv.name = mid(token, 8, 9999);
+			} else if (token == "--write") {
+				rv.write = true;
+			}
+			i++;
+		}
+
+		// Normalize the collected rename pairs into hints.renames.
+		if (arrayLen(renames)) {
+			var renamesOut = {};
+			for (var pair in renames) {
+				if (find(":", pair) == 0) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "Invalid --rename pair '#pair#' — expected OLD:NEW (or Model.OLD:NEW for diffAll)."
+					);
+				}
+				var oldName = trim(listFirst(pair, ":"));
+				var newName = trim(listLast(pair, ":"));
+				if (!len(oldName) || !len(newName)) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "Invalid --rename pair '#pair#' — expected OLD:NEW (or Model.OLD:NEW for diffAll)."
+					);
+				}
+				if (len(rv.model)) {
+					renamesOut[oldName] = newName;
+				} else if (find(".", oldName) > 0) {
+					// diffAll form: Model.OLD:NEW → hints.renames.Model.OLD = NEW
+					var modelName = trim(listFirst(oldName, "."));
+					var column = trim(listLast(oldName, "."));
+					if (!structKeyExists(renamesOut, modelName)) {
+						renamesOut[modelName] = {};
+					}
+					renamesOut[modelName][column] = newName;
+				} else {
+					renamesOut[oldName] = newName;
+				}
+			}
+			rv.hints.renames = structKeyExists(rv.hints, "renames") ? rv.hints.renames : {};
+			structAppend(rv.hints.renames, renamesOut, false);
+		}
+
+		return rv;
+	}
+
+	/**
+	 * Build the /wheels/cli query-string suffix for the diff command.
+	 * Pure string building — public for specs.
+	 */
+	public string function $buildDiffBridgeUrl(required struct opts) {
+		var query = "";
+		if (len(arguments.opts.model)) {
+			query &= "&modelName=#urlEncodedFormat(arguments.opts.model)#";
+		}
+		if (structCount(arguments.opts.hints)) {
+			query &= "&hints=#urlEncodedFormat(serializeJSON(arguments.opts.hints))#";
+		}
+		if (len(arguments.opts.threshold)) {
+			query &= "&threshold=#urlEncodedFormat(arguments.opts.threshold)#";
+		}
+		if (arguments.opts.write) {
+			query &= "&write=true";
+			if (len(arguments.opts.name)) {
+				query &= "&name=#urlEncodedFormat(arguments.opts.name)#";
+			}
+		}
+		return query;
+	}
+
+	/**
+	 * Coerce a diff-payload field to a printable string.
+	 *
+	 * AutoMigrator entries are structs (`{name, type, from, to, …}`).
+	 * Interpolating one (`"#col#"` / `"#suggestion.from#"` when `from` is
+	 * itself a struct) throws `Can't cast Complex Object Type [Struct] to
+	 * String` — the generate-auth User table hits this via nested
+	 * `changeColumns.from` / `.to`. Prefer scalar `name` / `from` / `to` /
+	 * `type` when present. Public for specs.
+	 */
+	public string function $stringifyDiffValue(required any value, fallback = "") {
+		if (isSimpleValue(arguments.value)) {
+			return toString(arguments.value);
+		}
+		if (isStruct(arguments.value)) {
+			var preferred = ["name", "from", "to", "type"];
+			for (var key in preferred) {
+				if (structKeyExists(arguments.value, key) && isSimpleValue(arguments.value[key])) {
+					return toString(arguments.value[key]);
+				}
+			}
+		}
+		return arguments.fallback;
+	}
+
+	/**
+	 * Read a changeColumn `from` / `to` node. AutoMigrator emits
+	 * `{type, size, scale, nullable}`; rename/suggest emit a bare name
+	 * string. Never interpolates the struct itself.
+	 */
+	public string function $diffTypeLabel(required any node, fallback = "?") {
+		if (isStruct(arguments.node) && structKeyExists(arguments.node, "type") && isSimpleValue(arguments.node.type)) {
+			return toString(arguments.node.type);
+		}
+		if (isSimpleValue(arguments.node) && len(toString(arguments.node))) {
+			return toString(arguments.node);
+		}
+		return arguments.fallback;
+	}
+
+	/**
+	 * Render a diff bridge response. Human-readable column listing per
+	 * model, with a trailer when previewing.
+	 *
+	 * Public for specs. Per-array printers keep this orchestrator under
+	 * the complexity gate; they still force every field through
+	 * `$stringifyDiffValue` / `$diffTypeLabel` so a struct cannot hit
+	 * the Struct-to-String cast.
+	 */
+	public void function $renderDiffResult(required struct parsed, required boolean write) {
+		var diffs = $diffResultModels(arguments.parsed);
+		var anyOutput = false;
+		for (var modelKey in diffs) {
+			var diff = diffs[modelKey];
+			if (!isStruct(diff)) {
+				continue;
+			}
+			$renderDiffModelHeading(diff, modelKey);
+			if ($renderDiffAddColumns(diff)) {
+				anyOutput = true;
+			}
+			if ($renderDiffRemoveColumns(diff)) {
+				anyOutput = true;
+			}
+			if ($renderDiffChangeColumns(diff)) {
+				anyOutput = true;
+			}
+			if ($renderDiffRenameColumns(diff)) {
+				anyOutput = true;
+			}
+			if ($renderDiffSuggestedRenames(diff)) {
+				anyOutput = true;
+			}
+		}
+		$renderDiffFooter(anyOutput, arguments.write);
+	}
+
+	/**
+	 * Single-model envelope is `parsed.model`; diffAll is `parsed.models`.
+	 */
+	public struct function $diffResultModels(required struct parsed) {
+		if (structKeyExists(arguments.parsed, "model")) {
+			return { "": arguments.parsed.model };
+		}
+		if (structKeyExists(arguments.parsed, "models") && isStruct(arguments.parsed.models)) {
+			return arguments.parsed.models;
+		}
+		return {};
+	}
+
+	public void function $renderDiffModelHeading(required struct diff, required any modelKey) {
+		var raw = arguments.modelKey;
+		if (structKeyExists(arguments.diff, "modelName")) {
+			raw = arguments.diff.modelName;
+		}
+		var fallback = "model";
+		if (isSimpleValue(arguments.modelKey)) {
+			fallback = toString(arguments.modelKey);
+		}
+		out("");
+		out("--- " & $stringifyDiffValue(raw, fallback) & " ---", "bold");
+	}
+
+	public boolean function $renderDiffAddColumns(required struct diff) {
+		var printed = false;
+		for (var col in $diffColumnArray(arguments.diff, "addColumns")) {
+			if (isStruct(col)) {
+				out(
+					"  + add    " & $diffStructField(col, "name")
+						& " (" & $diffStructField(col, "type") & ")",
+					"green"
+				);
+			} else {
+				out("  + add    " & $stringifyDiffValue(col), "green");
+			}
+			printed = true;
+		}
+		return printed;
+	}
+
+	public boolean function $renderDiffRemoveColumns(required struct diff) {
+		var printed = false;
+		for (var col in $diffColumnArray(arguments.diff, "removeColumns")) {
+			var removed = $diffStructField(col, "name");
+			out("  - remove " & removed, "red");
+			out("      (if this is a rename, use --rename " & removed & ":newName)", "yellow");
+			printed = true;
+		}
+		return printed;
+	}
+
+	public boolean function $renderDiffChangeColumns(required struct diff) {
+		var printed = false;
+		for (var col in $diffColumnArray(arguments.diff, "changeColumns")) {
+			// Nested from/to are structs — extract .type; never stringify from/to.
+			out(
+				"  ~ change " & $diffStructField(col, "name")
+					& " (" & $diffStructType(col, "from")
+					& " -> " & $diffStructType(col, "to") & ")",
+				"yellow"
+			);
+			printed = true;
+		}
+		return printed;
+	}
+
+	public boolean function $renderDiffRenameColumns(required struct diff) {
+		var printed = false;
+		for (var col in $diffColumnArray(arguments.diff, "renameColumns")) {
+			if (isStruct(col)) {
+				out(
+					"  ~ rename " & $diffStructField(col, "from", "?")
+						& " -> " & $diffStructField(col, "to", "?"),
+					"yellow"
+				);
+			} else {
+				out("  ~ rename " & $stringifyDiffValue(col) & " -> ?", "yellow");
+			}
+			printed = true;
+		}
+		return printed;
+	}
+
+	public boolean function $renderDiffSuggestedRenames(required struct diff) {
+		var printed = false;
+		for (var suggestion in $diffColumnArray(arguments.diff, "suggestedRenames")) {
+			// Elvis (`from ?: "?"`) returns a struct when `from` is nested.
+			if (isStruct(suggestion)) {
+				out(
+					"  ? suggest " & $diffStructField(suggestion, "from", "?")
+						& " -> " & $diffStructField(suggestion, "to", "?")
+						& " (" & $diffStructField(suggestion, "confidence") & ")",
+					"cyan"
+				);
+			} else {
+				out("  ? suggest " & $stringifyDiffValue(suggestion, "?") & " -> ? ()", "cyan");
+			}
+			printed = true;
+		}
+		return printed;
+	}
+
+	public void function $renderDiffFooter(required boolean anyOutput, required boolean write) {
+		if (!arguments.anyOutput) {
+			out("No differences found — models and database are in sync.", "green");
+		}
+		out("");
+		if (arguments.write) {
+			out("Migration file(s) written.", "green");
+		} else {
+			out("Preview only — pass --write to commit the migration file(s).", "yellow");
+		}
+	}
+
+	/**
+	 * Read a named field from a column struct, or stringify a bare value.
+	 * Avoids Elvis (`?:`) at the call site — `?` counts as a complexity
+	 * decision and is what pushed `$renderDiffResult` over the gate.
+	 */
+	public string function $diffStructField(required any col, required string field, fallback = "") {
+		if (!isStruct(arguments.col)) {
+			return $stringifyDiffValue(arguments.col, arguments.fallback);
+		}
+		if (!structKeyExists(arguments.col, arguments.field)) {
+			return arguments.fallback;
+		}
+		return $stringifyDiffValue(arguments.col[arguments.field], arguments.fallback);
+	}
+
+	public string function $diffStructType(required any col, required string field, fallback = "?") {
+		if (!isStruct(arguments.col)) {
+			return arguments.fallback;
+		}
+		if (!structKeyExists(arguments.col, arguments.field)) {
+			return arguments.fallback;
+		}
+		return $diffTypeLabel(arguments.col[arguments.field], arguments.fallback);
+	}
+
+	/**
+	 * Safe array read for a diff key. Missing / non-array keys become [].
+	 */
+	private array function $diffColumnArray(required struct diff, required string key) {
+		if (!structKeyExists(arguments.diff, arguments.key) || !isArray(arguments.diff[arguments.key])) {
+			return [];
+		}
+		return arguments.diff[arguments.key];
 	}
 
 	// ── Seed Execution ──────────────────────────────
@@ -4800,7 +6535,7 @@ component extends="modules.BaseModule" {
 
 		out("Running database seeds...", "cyan");
 
-		var seedUrl = "http://localhost:#serverPort#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
+		var seedUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
 		if (len(environment)) {
 			seedUrl &= "&environment=#environment#";
 		}
@@ -4887,7 +6622,7 @@ component extends="modules.BaseModule" {
 		var serverPort = $requireRunningServer();
 
 		try {
-			var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+			var statusUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=dbStatus&format=json";
 			var response = makeHttpRequest(statusUrl);
 			// Use parseCliResponse so a framework success:false surfaces with
 			// the canonical `messages` payload instead of leaving the user
@@ -4931,7 +6666,7 @@ component extends="modules.BaseModule" {
 		var serverPort = $requireRunningServer();
 
 		try {
-			var versionUrl = "http://localhost:#serverPort#/wheels/cli?command=dbVersion&format=json";
+			var versionUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=dbVersion&format=json";
 			var response = makeHttpRequest(versionUrl);
 			// Use parseCliResponse so framework errors surface — issue #2315.
 			var data = parseCliResponse(response, "Database version");
@@ -4940,7 +6675,7 @@ component extends="modules.BaseModule" {
 
 			if (detailed) {
 				// Also fetch status for extra detail
-				var statusUrl = "http://localhost:#serverPort#/wheels/cli?command=dbStatus&format=json";
+				var statusUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=dbStatus&format=json";
 				var statusResponse = makeHttpRequest(statusUrl);
 				var statusData = parseCliResponse(statusResponse, "Database status");
 
@@ -4990,35 +6725,12 @@ component extends="modules.BaseModule" {
 	 */
 	private string function runUpgradeCheck(string targetVersion = "", string format = "", boolean strict = false) {
 		var jsonMode = lCase(arguments.format) == "json";
-		// Detect current version. Prefer wheels.json (post-rename) and fall back
-		// to box.json so apps with pre-rename vendor/wheels/ committed in their
-		// repo still work. The fallback can be removed two releases after the
-		// wheels.json rename ships in stable.
-		var manifestPath = variables.projectRoot & "/vendor/wheels/wheels.json";
-		if (!fileExists(manifestPath)) {
-			manifestPath = variables.projectRoot & "/vendor/wheels/box.json";
-		}
-		var currentVersion = "unknown";
-		if (fileExists(manifestPath)) {
-			try {
-				var manifestData = deserializeJSON(fileRead(manifestPath));
-				currentVersion = manifestData.version ?: "unknown";
-			} catch (any e) {}
-		}
+		var currentVersion = $upgradeResolveCurrentVersion();
 
 		// Determine target version
-		var target = arguments.targetVersion;
+		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode);
 		if (!len(target)) {
-			try {
-				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
-				var response = makeHttpRequest(apiUrl);
-				var releaseData = deserializeJSON(response);
-				target = replace(releaseData.tag_name, "v", "");
-			} catch (any e) {
-				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
-				out(jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
-				return "";
-			}
+			return "";
 		}
 
 		if (!jsonMode) {
@@ -5038,20 +6750,128 @@ component extends="modules.BaseModule" {
 			out("");
 		}
 
-		// Check database. Each entry may set `severity` to either "breaking"
-		// (the default — flagged in red, gated by major-version-bump scenarios)
-		// or "advisory" (cyan, runs regardless of version-jump — for opt-in
-		// convention changes the user can adopt at their convenience).
+		var checks = $upgradeBuildChecks(currentMajor, targetMajor);
+
+		// Run checks. Matched checks land in `issues` (severity=breaking) or
+		// `advisories` (severity=advisory); unmatched land in `passed`.
+		var checkResults = $upgradeRunChecks(checks);
+		var issues = checkResults.issues;
+		var advisories = checkResults.advisories;
+		var passed = checkResults.passed;
+
+		// The version-appropriate guide + the soft-landing adapter, surfaced
+		// whenever breaking findings are reported (and always in JSON output).
+		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
+			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
+
+		// `success` must reflect every condition that produces a non-zero
+		// exit, otherwise `jq .success` and `$?` disagree when --strict is
+		// active with advisory-only findings (#2963 review round 1).
+		var strictAdvisoryFail = arguments.strict && arrayLen(advisories) > 0;
+
+		// JSON mode — one machine-readable document, no human report. The
+		// breaking-findings throw below still fires so pipelines can gate on
+		// the exit code without parsing stdout.
+		if (jsonMode) {
+			out(serializeJSON({
+				"currentVersion": currentVersion,
+				"targetVersion": target,
+				"success": arrayLen(issues) == 0 && !strictAdvisoryFail,
+				"strict": arguments.strict,
+				"breaking": issues,
+				"advisories": advisories,
+				"passed": passed,
+				"guide": guideUrl
+			}));
+		} else {
+			$upgradePrintReport(issues, advisories, passed, guideUrl, targetMajor);
+		}
+
+		// Throw after the full report flushes — breaking findings exit
+		// non-zero (CI gate), advisories and all-clear exit 0. Mirrors
+		// validate()'s Wheels.ValidationFailed convention.
+		if (arrayLen(issues)) {
+			throw(
+				type = "Wheels.UpgradeCheckFailed",
+				message = "Upgrade check found #arrayLen(issues)# breaking change(s) — see the report above."
+			);
+		}
+
+		// #2963: --strict escalates advisory findings to the same hard-fail
+		// path. Reuses Wheels.UpgradeCheckFailed so CI pipelines that already
+		// filter on the breaking-case type pick the strict case up too. The
+		// breaking branch above already returned, so this fires only when
+		// strict mode is on AND at least one advisory matched but no
+		// breaking finding did.
+		if (arguments.strict && arrayLen(advisories)) {
+			throw(
+				type = "Wheels.UpgradeCheckFailed",
+				message = "Upgrade check found #arrayLen(advisories)# advisory finding(s) and --strict is set — see the report above."
+			);
+		}
+
+		return "";
+	}
+
+	/**
+	 * Detect the app's current Wheels version. Prefer wheels.json (post-rename)
+	 * and fall back to box.json so apps with pre-rename vendor/wheels/ committed
+	 * in their repo still work. The fallback can be removed two releases after
+	 * the wheels.json rename ships in stable.
+	 */
+	private string function $upgradeResolveCurrentVersion() {
+		var manifestPath = variables.projectRoot & "/vendor/wheels/wheels.json";
+		if (!fileExists(manifestPath)) {
+			manifestPath = variables.projectRoot & "/vendor/wheels/box.json";
+		}
+		var currentVersion = "unknown";
+		if (fileExists(manifestPath)) {
+			try {
+				var manifestData = deserializeJSON(fileRead(manifestPath));
+				currentVersion = manifestData.version ?: "unknown";
+			} catch (any e) {}
+		}
+		return currentVersion;
+	}
+
+	/**
+	 * Determine the target version: the explicit --to= value when supplied,
+	 * otherwise the latest GitHub release. Returns "" (after printing the
+	 * error) when the release fetch fails so the caller can bail out early.
+	 */
+	private string function $upgradeResolveTargetVersion(required string targetVersion, required boolean jsonMode) {
+		var target = arguments.targetVersion;
+		if (!len(target)) {
+			try {
+				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
+				var response = makeHttpRequest(apiUrl);
+				var releaseData = deserializeJSON(response);
+				target = replace(releaseData.tag_name, "v", "");
+			} catch (any e) {
+				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
+				out(arguments.jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
+				return "";
+			}
+		}
+		return target;
+	}
+
+	/**
+	 * Build the upgrade-check definitions for the given current/target major
+	 * version pair. Each entry may set `severity` to "breaking" (default,
+	 * gated by major-version-bump scenarios) or "advisory" (runs regardless).
+	 */
+	private array function $upgradeBuildChecks(required numeric currentMajor, required numeric targetMajor) {
 		var checks = [];
 
 		// 2.x -> 3.x
-		if (currentMajor <= 2 && targetMajor >= 3) {
+		if (arguments.currentMajor <= 2 && arguments.targetMajor >= 3) {
 			// 2.x plugins lived at the webroot's /plugins (the previous
 			// `app/plugins` path never existed in any Wheels layout, so the
 			// check was dead). The 3.x -> 4.x block adds an identical root
 			// /plugins check, so skip this one on a 2.x -> 4.x jump to avoid
 			// reporting the same directory twice.
-			if (targetMajor < 4) {
+			if (arguments.targetMajor < 4) {
 				arrayAppend(checks, {
 					description: "Legacy plugin directory",
 					pattern: "",
@@ -5071,7 +6891,7 @@ component extends="modules.BaseModule" {
 		}
 
 		// 3.x -> 4.x
-		if (currentMajor <= 3 && targetMajor >= 4) {
+		if (arguments.currentMajor <= 3 && arguments.targetMajor >= 4) {
 			arrayAppend(checks, {
 				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
 				pattern: "",
@@ -5264,7 +7084,7 @@ component extends="modules.BaseModule" {
 		// reading only config/settings.cfm would miss it (#2808). Comment-
 		// strip each file first so a commented-out
 		// `// set(useUnderscoreReferenceColumns=true);` doesn't satisfy the
-		// guard (Anti-Pattern #14 — same shape as line 970).
+		// guard (Anti-Pattern #14).
 		var underscoreFlagAlreadySet = false;
 		var configDir = variables.projectRoot & "/config";
 		if (directoryExists(configDir)) {
@@ -5314,220 +7134,236 @@ component extends="modules.BaseModule" {
 			fix: "If migrations under app/migrator/migrations/ were applied before this flag was set, the database still has `<name>id` columns. New migrations will create `<name>_id`. For full consistency, write a data migration to rename old reference columns."
 		});
 
-		// Run checks. Matched checks land in `issues` (severity=breaking) or
-		// `advisories` (severity=advisory); unmatched land in `passed`.
-		var issues = [];
-		var advisories = [];
-		var passed = [];
+		// App template drift — compare public/Application.cfc and
+		// public/index.cfm against the CLI's bundled app template. Always-on
+		// (not major-gated): the current release's template changes must be
+		// visible to patch/minor upgraders too, not just 3.x → 4.x jumpers.
+		// Most recently the Adobe teardown guards (##3379). Advisory because
+		// customized apps legitimately drift — the point is to surface the
+		// diff, not to demand a byte-for-byte match.
+		arrayAppend(checks, {
+			description: "App template drift — public/Application.cfc or public/index.cfm differs from the bundled template",
+			checkType: "templateDiff",
+			severity: "advisory",
+			files: ["public/Application.cfc", "public/index.cfm"],
+			fix: "Diff these files against the CLI's bundled template and reconcile. The current release hardens public/Application.cfc's onError/onSessionEnd/onApplicationEnd against Adobe teardown crashes (##3379) — keep your local customizations (this.name, mappings, env loading) while adopting the framework changes."
+		});
 
-		for (var check in checks) {
-			var severity = structKeyExists(check, "severity") ? check.severity : "breaking";
-			var matched = false;
-			var matchEntry = {};
+		return checks;
+	}
 
-			if (check.checkType == "directory") {
-				var dirPath = variables.projectRoot & "/" & check.path;
-				if (directoryExists(dirPath)) {
-					var contents = directoryList(dirPath, false, "name");
-					if (arrayLen(contents)) {
-						matched = true;
-						matchEntry = {description: check.description, fix: check.fix, matches: [check.path & "/"]};
+	/**
+	 * Build the file set to scan for a single grep check. Checks may use
+	 * `scanDir` + `extensions` (recursive scan of one directory) and/or
+	 * `scanTargets` (mixed list of file paths and directory roots — needed
+	 * by the `wheels snippets` rename check).
+	 */
+	private array function $upgradeCollectScanFiles(required struct check) {
+		var filesToScan = [];
+
+		if (structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)) {
+			var scanPath = variables.projectRoot & "/" & arguments.check.scanDir;
+			if (directoryExists(scanPath)) {
+				for (var ext in listToArray(arguments.check.extensions)) {
+					var dirFiles = directoryList(scanPath, true, "path", "*." & ext);
+					for (var f in dirFiles) arrayAppend(filesToScan, f);
+				}
+			}
+		}
+
+		if (structKeyExists(arguments.check, "scanTargets") && isArray(arguments.check.scanTargets)) {
+			for (var scanTarget in arguments.check.scanTargets) {
+				var targetPath = variables.projectRoot & "/" & scanTarget.path;
+				if (fileExists(targetPath)) {
+					arrayAppend(filesToScan, targetPath);
+				} else if (directoryExists(targetPath)) {
+					var recurse = structKeyExists(scanTarget, "recurse") ? scanTarget.recurse : true;
+					// Avoid Elvis `?:` on `check.extensions` — Adobe CF
+					// throws when the key is absent. The `wheels snippets`
+					// check has no top-level `extensions`, so this branch
+					// is reached on every Adobe CF run when a target is a
+					// directory without its own `extensions` key.
+					var exts = structKeyExists(scanTarget, "extensions") ? scanTarget.extensions
+						: (structKeyExists(arguments.check, "extensions") ? arguments.check.extensions : "");
+					for (var ext in listToArray(exts)) {
+						var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
+						for (var f in dirFiles2) arrayAppend(filesToScan, f);
 					}
 				}
-			} else if (check.checkType == "grep") {
-				// Build the file set to scan. Checks may use `scanDir` +
-				// `extensions` (recursive scan of one directory) and/or
-				// `scanTargets` (mixed list of file paths and directory
-				// roots — needed by the `wheels snippets` rename check that
-				// has to look at Makefile, package.json, .github/workflows/,
-				// and top-level *.sh files in one shot).
-				var filesToScan = [];
+			}
+		}
 
-				if (structKeyExists(check, "scanDir") && len(check.scanDir)) {
-					var scanPath = variables.projectRoot & "/" & check.scanDir;
-					if (directoryExists(scanPath)) {
-						for (var ext in listToArray(check.extensions)) {
-							var dirFiles = directoryList(scanPath, true, "path", "*." & ext);
-							for (var f in dirFiles) arrayAppend(filesToScan, f);
-						}
-					}
+		return filesToScan;
+	}
+
+	/**
+	 * Execute a single upgrade check, returning its severity, matched flag,
+	 * and matchEntry (populated only when matched).
+	 */
+	private struct function $upgradeExecuteCheck(required struct check) {
+		var severity = structKeyExists(arguments.check, "severity") ? arguments.check.severity : "breaking";
+		var matched = false;
+		var matchEntry = {};
+
+		if (arguments.check.checkType == "directory") {
+			var dirPath = variables.projectRoot & "/" & arguments.check.path;
+			if (directoryExists(dirPath)) {
+				var contents = directoryList(dirPath, false, "name");
+				if (arrayLen(contents)) {
+					matched = true;
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [arguments.check.path & "/"]};
 				}
+			}
+		} else if (arguments.check.checkType == "grep") {
+			var filesToScan = $upgradeCollectScanFiles(arguments.check);
 
-				if (structKeyExists(check, "scanTargets") && isArray(check.scanTargets)) {
-					// `scanTarget`, not `target` — the function-level `target`
-					// above holds the target VERSION string and a same-named
-					// loop var would shadow (then clobber) it.
-					for (var scanTarget in check.scanTargets) {
-						var targetPath = variables.projectRoot & "/" & scanTarget.path;
-						if (fileExists(targetPath)) {
-							arrayAppend(filesToScan, targetPath);
-						} else if (directoryExists(targetPath)) {
-							var recurse = structKeyExists(scanTarget, "recurse") ? scanTarget.recurse : true;
-							// Avoid Elvis `?:` on `check.extensions` — Adobe CF
-							// throws when the key is absent. The `wheels snippets`
-							// check has no top-level `extensions`, so this branch
-							// is reached on every Adobe CF run when a target is a
-							// directory without its own `extensions` key.
-							var exts = structKeyExists(scanTarget, "extensions") ? scanTarget.extensions
-								: (structKeyExists(check, "extensions") ? check.extensions : "");
-							for (var ext in listToArray(exts)) {
-								var dirFiles2 = directoryList(targetPath, recurse, "path", "*." & ext);
-								for (var f in dirFiles2) arrayAppend(filesToScan, f);
-							}
-						}
-					}
-				}
-
-				var matches = [];
-				for (var filePath in filesToScan) {
-					// Strip CFML comments before grepping (Anti-Pattern #14):
-					// a commented-out `// t.references(...)` or
-					// `/* set(...) */` must not satisfy the pattern. Multi-line
-					// block comments collapse and may shift reported line
-					// numbers — same tradeoff `stripCfmlComments` callers at
-					// lines 970 and 5532 already accept.
-					var content = stripCfmlComments(fileRead(filePath));
-					var lines = listToArray(content, chr(10), true);
-					for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
-						if (reFindNoCase(check.pattern, lines[lineNum])) {
-							var relPath = replace(filePath, variables.projectRoot & "/", "");
-							arrayAppend(matches, "#relPath#:#lineNum#");
-						}
-					}
-				}
-
-				// `absent: true` inverts the check — warn when the pattern
-				// is NOT found anywhere in the scanned set. Used for "you
-				// should be setting csrfCookieEncryptionSecretKey somewhere" style
-				// checks. If nothing was scannable (e.g. config/ missing),
-				// treat as pass to avoid noisy false positives.
-				var isAbsent = structKeyExists(check, "absent") && check.absent;
-				if (isAbsent) {
-					if (arrayLen(filesToScan) && !arrayLen(matches)) {
-						matched = true;
-						var hint = structKeyExists(check, "scanDir") && len(check.scanDir)
-							? check.scanDir & "/ (no occurrences found)"
-							: "(no occurrences found)";
-						matchEntry = {description: check.description, fix: check.fix, matches: [hint]};
-					}
-				} else {
-					if (arrayLen(matches)) {
-						matched = true;
-						matchEntry = {description: check.description, fix: check.fix, matches: matches};
+			var matches = [];
+			for (var filePath in filesToScan) {
+				// Strip CFML comments before grepping (Anti-Pattern #14):
+				// a commented-out `// t.references(...)` or
+				// `/* set(...) */` must not satisfy the pattern. Multi-line
+				// block comments collapse and may shift reported line
+				// numbers — same tradeoff other `stripCfmlComments` callers
+				// accept.
+				var content = stripCfmlComments(fileRead(filePath));
+				var lines = listToArray(content, chr(10), true);
+				for (var lineNum = 1; lineNum <= arrayLen(lines); lineNum++) {
+					if (reFindNoCase(arguments.check.pattern, lines[lineNum])) {
+						var relPath = replace(filePath, variables.projectRoot & "/", "");
+						arrayAppend(matches, "#relPath#:#lineNum#");
 					}
 				}
 			}
 
+			// `absent: true` inverts the check — warn when the pattern
+			// is NOT found anywhere in the scanned set. Used for "you
+			// should be setting csrfCookieEncryptionSecretKey somewhere" style
+			// checks. If nothing was scannable (e.g. config/ missing),
+			// treat as pass to avoid noisy false positives.
+			var isAbsent = structKeyExists(arguments.check, "absent") && arguments.check.absent;
+			if (isAbsent) {
+				if (arrayLen(filesToScan) && !arrayLen(matches)) {
+					matched = true;
+					var hint = structKeyExists(arguments.check, "scanDir") && len(arguments.check.scanDir)
+						? arguments.check.scanDir & "/ (no occurrences found)"
+						: "(no occurrences found)";
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: [hint]};
+				}
+			} else {
+				if (arrayLen(matches)) {
+					matched = true;
+					matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: matches};
+				}
+			}
+		} else if (arguments.check.checkType == "templateDiff") {
+			// Compare app-owned template files against the CLI's bundled app
+			// template (the same source `wheels new` scaffolds from). Drift
+			// means the app may be missing framework-side hardening that
+			// shipped in the target release — most recently the Adobe
+			// teardown guards in public/Application.cfc (##3379). Advisory:
+			// customized apps legitimately drift; reconcile, never overwrite.
+			var driftFiles = [];
+			for (var relFile in arguments.check.files) {
+				var templatePath = variables.moduleRoot & "templates/app/" & relFile;
+				if (!fileExists(templatePath)) {
+					// Broken install — no reference to compare against.
+					continue;
+				}
+				var userPath = variables.projectRoot & "/" & relFile;
+				var differs = !fileExists(userPath);
+				if (!differs) {
+					differs = (compare(fileRead(userPath), fileRead(templatePath)) != 0);
+				}
+				if (differs) {
+					arrayAppend(driftFiles, relFile);
+				}
+			}
+			if (arrayLen(driftFiles)) {
+				matched = true;
+				matchEntry = {description: arguments.check.description, fix: arguments.check.fix, matches: driftFiles};
+			}
+		}
+
+		return {severity: severity, matched: matched, matchEntry: matchEntry};
+	}
+
+	/**
+	 * Run all checks, bucketing matched entries into issues (breaking) or
+	 * advisories (advisory) and unmatched descriptions into passed.
+	 */
+	private struct function $upgradeRunChecks(required array checks) {
+		var issues = [];
+		var advisories = [];
+		var passed = [];
+
+		for (var check in arguments.checks) {
+			var result = $upgradeExecuteCheck(check);
 			// Bucket the result by severity. Advisories surface as opt-in
 			// recommendations alongside (but distinct from) breaking changes.
-			if (matched) {
-				if (severity == "advisory") {
-					arrayAppend(advisories, matchEntry);
+			if (result.matched) {
+				if (result.severity == "advisory") {
+					arrayAppend(advisories, result.matchEntry);
 				} else {
-					arrayAppend(issues, matchEntry);
+					arrayAppend(issues, result.matchEntry);
 				}
 			} else {
 				arrayAppend(passed, check.description);
 			}
 		}
 
-		// The version-appropriate guide + the soft-landing adapter, surfaced
-		// whenever breaking findings are reported (and always in JSON output).
-		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
-			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
+		return {issues: issues, advisories: advisories, passed: passed};
+	}
 
-		// `success` must reflect every condition that produces a non-zero
-		// exit, otherwise `jq .success` and `$?` disagree when --strict is
-		// active with advisory-only findings (#2963 review round 1).
-		var strictAdvisoryFail = arguments.strict && arrayLen(advisories) > 0;
-
-		// JSON mode — one machine-readable document, no human report. The
-		// breaking-findings throw below still fires so pipelines can gate on
-		// the exit code without parsing stdout.
-		if (jsonMode) {
-			out(serializeJSON({
-				"currentVersion": currentVersion,
-				"targetVersion": target,
-				"success": arrayLen(issues) == 0 && !strictAdvisoryFail,
-				"strict": arguments.strict,
-				"breaking": issues,
-				"advisories": advisories,
-				"passed": passed,
-				"guide": guideUrl
-			}));
-		} else {
-			// Output — three sections in priority order: Breaking → Recommended → All Clear
-			if (arrayLen(issues)) {
-				out("Breaking Changes (#arrayLen(issues)# found):", "yellow");
-				for (var issue in issues) {
-					out("  ! #issue.description#", "yellow");
-					for (var match in issue.matches) {
-						out("    #match#");
-					}
-					out("    -> #issue.fix#", "cyan");
-					out("");
+	/**
+	 * Print the human-readable upgrade report (three sections in priority
+	 * order: Breaking → Recommended → All Clear), then the apply guidance.
+	 */
+	private void function $upgradePrintReport(required array issues, required array advisories, required array passed, required string guideUrl, required numeric targetMajor) {
+		if (arrayLen(arguments.issues)) {
+			out("Breaking Changes (#arrayLen(arguments.issues)# found):", "yellow");
+			for (var issue in arguments.issues) {
+				out("  ! #issue.description#", "yellow");
+				for (var match in issue.matches) {
+					out("    #match#");
 				}
-				out("Upgrade guide: #guideUrl#", "cyan");
-				if (targetMajor >= 4) {
-					out("Soft landing: wheels packages add wheels-legacy-adapter (shims renderPage()/renderPageToString() while you migrate)", "cyan");
-				}
+				out("    -> #issue.fix#", "cyan");
 				out("");
 			}
-
-			if (arrayLen(advisories)) {
-				out("Recommended Improvements (#arrayLen(advisories)# found):", "cyan");
-				for (var advisory in advisories) {
-					out("  ~ #advisory.description#", "cyan");
-					for (var match in advisory.matches) {
-						out("    #match#");
-					}
-					// Advisory fix lines are intentionally uncolored so the
-					// section header and description carry the cyan accent and
-					// opt-in items read lighter than breaking-change fixes
-					// (which use cyan on the fix line for stronger emphasis).
-					out("    -> #advisory.fix#");
-					out("");
-				}
+			out("Upgrade guide: #arguments.guideUrl#", "cyan");
+			if (arguments.targetMajor >= 4) {
+				out("Soft landing: wheels packages add wheels-legacy-adapter (shims renderPage()/renderPageToString() while you migrate)", "cyan");
 			}
-
-			if (arrayLen(passed)) {
-				out("All Clear (#arrayLen(passed)# checks):", "green");
-				for (var p in passed) {
-					out("  + #p#", "green");
-				}
-			}
-
 			out("");
-			// The framework swap is `wheels upgrade apply` (#3035) —
-			// `brew upgrade wheels` only updates the CLI binary, never the
-			// app's vendored framework copy.
-			out("Apply with: wheels upgrade apply");
 		}
 
-		// Throw after the full report flushes — breaking findings exit
-		// non-zero (CI gate), advisories and all-clear exit 0. Mirrors
-		// validate()'s Wheels.ValidationFailed convention.
-		if (arrayLen(issues)) {
-			throw(
-				type = "Wheels.UpgradeCheckFailed",
-				message = "Upgrade check found #arrayLen(issues)# breaking change(s) — see the report above."
-			);
+		if (arrayLen(arguments.advisories)) {
+			out("Recommended Improvements (#arrayLen(arguments.advisories)# found):", "cyan");
+			for (var advisory in arguments.advisories) {
+				out("  ~ #advisory.description#", "cyan");
+				for (var match in advisory.matches) {
+					out("    #match#");
+				}
+				// Advisory fix lines are intentionally uncolored so the
+				// section header and description carry the cyan accent and
+				// opt-in items read lighter than breaking-change fixes
+				// (which use cyan on the fix line for stronger emphasis).
+				out("    -> #advisory.fix#");
+				out("");
+			}
 		}
 
-		// #2963: --strict escalates advisory findings to the same hard-fail
-		// path. Reuses Wheels.UpgradeCheckFailed so CI pipelines that already
-		// filter on the breaking-case type pick the strict case up too. The
-		// breaking branch above already returned, so this fires only when
-		// strict mode is on AND at least one advisory matched but no
-		// breaking finding did.
-		if (arguments.strict && arrayLen(advisories)) {
-			throw(
-				type = "Wheels.UpgradeCheckFailed",
-				message = "Upgrade check found #arrayLen(advisories)# advisory finding(s) and --strict is set — see the report above."
-			);
+		if (arrayLen(arguments.passed)) {
+			out("All Clear (#arrayLen(arguments.passed)# checks):", "green");
+			for (var p in arguments.passed) {
+				out("  + #p#", "green");
+			}
 		}
 
-		return "";
+		out("");
+		// The framework swap is `wheels upgrade apply` (#3035) —
+		// `brew upgrade wheels` only updates the CLI binary, never the
+		// app's vendored framework copy.
+		out("Apply with: wheels upgrade apply");
 	}
 
 	// ── Upgrade Apply (bundled-source swap, #3035) ───
@@ -5740,6 +7576,93 @@ component extends="modules.BaseModule" {
 
 	// ── Test Execution ───────────────────────────────
 
+	/**
+	 * True when a `wheels test` JSON result should map to a non-zero CLI
+	 * exit via Wheels.TestsFailed. Aligns with tools/test-local.sh and
+	 * tools/ci/run-tests.sh: Fail/Error, a rejected directory= scope
+	 * (#3083), a vacuous 0-bundle discovery (#3083), or unloadable
+	 * *Spec.cfc files that displayTestResults already WARNs about.
+	 *
+	 * Public ONLY so the CLI specs can reach it (cli/CLAUDE.md "public
+	 * for specs" carve-out); hidden from MCP via the structural $-prefix
+	 * sweep. bundlesDiscovered is read with structKeyExists — Lucee's
+	 * Elvis treats 0 as empty, which would hide the exact 0-bundle case.
+	 */
+	public boolean function $cliTestResultFailed(required struct result, numeric specsFailedToLoad = 0) {
+		if (structKeyExists(arguments.result, "directoryRejected") && arguments.result.directoryRejected) {
+			return true;
+		}
+		if (structKeyExists(arguments.result, "bundlesDiscovered") && arguments.result.bundlesDiscovered == 0) {
+			return true;
+		}
+		if (arguments.specsFailedToLoad > 0) {
+			return true;
+		}
+		return ((arguments.result.totalFail ?: 0) + (arguments.result.totalError ?: 0)) > 0;
+	}
+
+	/**
+	 * True when a `wheels browser test` JSON result should map to a
+	 * non-zero CLI exit via Wheels.TestsFailed. Public for specs;
+	 * hidden from MCP via the structural sweep.
+	 */
+	public boolean function $browserTestResultFailed(required struct data) {
+		return ((arguments.data.totalFail ?: 0) + (arguments.data.totalError ?: 0)) > 0;
+	}
+
+	/**
+	 * Process-exit seam for `wheels test`. The only Wheels.TestsFailed
+	 * throw site on that path — runTests calls this after the report
+	 * flushes. Composes $cliTestResultFailed. Public for specs; hidden
+	 * from MCP via the structural $-prefix sweep.
+	 */
+	public void function $throwIfCliTestsFailed(required struct result, numeric specsFailedToLoad = 0) {
+		if (
+			$cliTestResultFailed(
+				result = arguments.result,
+				specsFailedToLoad = arguments.specsFailedToLoad
+			)
+		) {
+			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		}
+	}
+
+	/**
+	 * Process-exit seam for `wheels browser test`. The only
+	 * Wheels.TestsFailed throw site on that path. Composes
+	 * $browserTestResultFailed. Public for specs; hidden from MCP
+	 * via the structural sweep.
+	 */
+	public void function $throwIfBrowserTestsFailed(required struct data) {
+		if ($browserTestResultFailed(arguments.data)) {
+			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		}
+	}
+
+	/**
+	 * Disk-vs-loaded delta used by displayTestResults' unloadable WARN
+	 * and by runTests' exit decision, so a skipped *Spec.cfc cannot
+	 * warn-and-exit-0. Best-effort: probe failures return 0.
+	 */
+	private numeric function $countSpecsFailedToLoad(required any result, string testDirectory = "") {
+		if (!len(arguments.testDirectory) || !isStruct(arguments.result)) {
+			return 0;
+		}
+		try {
+			var runner = new services.TestRunner(projectRoot = variables.projectRoot);
+			var diskCount = runner.countSpecsOnDisk(arguments.testDirectory);
+			var loadedCount = (structKeyExists(arguments.result, "bundleStats") && isArray(arguments.result.bundleStats))
+				? arrayLen(arguments.result.bundleStats)
+				: 0;
+			if (diskCount > loadedCount) {
+				return diskCount - loadedCount;
+			}
+		} catch (any probeErr) {
+			verbose("Failed-to-load probe failed: #probeErr.message#");
+		}
+		return 0;
+	}
+
 	private string function runTests(
 		string filter = "",
 		string reporter = "simple",
@@ -5753,7 +7676,7 @@ component extends="modules.BaseModule" {
 		string basePath = "",
 		numeric timeoutSeconds = 900
 	) {
-		var serverPort = $requireRunningServer([
+		var serverPort = $requireOwnRunningServer([
 			"Start one with: wheels start",
 			"Or use: bash tools/test-local.sh (auto-manages server)"
 		]);
@@ -5801,14 +7724,28 @@ component extends="modules.BaseModule" {
 			out("Scope: #filter#", "cyan");
 		}
 
-		var testsFailed = false;
+		// Reload the isolated `_wheelsTest` application scope before an app
+		// test run (RETEST-2461 B): specs execute in a separate CFML
+		// application scope (suffix `_wheelsTest`, #3374) whose routes and
+		// model config are cached from its first boot. Anything scaffolded
+		// after that first run — e.g. `api-resource`'s `/api` routes and
+		// model config — stays invisible to the runner because `wheels reload`
+		// only restarts the live scope. Restart the test scope here so the
+		// suite reflects the code on disk. Core tests keep their own runner
+		// and reload semantics, so this is app-mode only.
+		if (!coreTests) {
+			$reloadTestApplication(serverPort, testPath);
+		}
+
 		// Struct (not a bare local) so the catch-block write persists on
 		// BoxLang — local assignments inside catch are discarded there
-		// (CLAUDE.md cross-engine invariant 11).
-		var runState = {crashed = false};
+		// (CLAUDE.md cross-engine invariant 11). result/specsFailedToLoad
+		// live here too so $throwIfCliTestsFailed can run AFTER the try
+		// (a throw inside would be swallowed as a crashed run).
+		var runState = {crashed = false, hasResult = false, result = {}, specsFailedToLoad = 0};
 
 		try {
-			var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#";
+			var testUrl = "#$serverUrlBase(serverPort)##testPath#?format=#format#&db=#db#";
 			// App tests default to running against the <appname>_test
 			// datasource so chapter-6-style manual signups in the dev DB
 			// don't bleed into chapter-7 specs. Core tests already pick
@@ -5845,10 +7782,14 @@ component extends="modules.BaseModule" {
 						displayTestResults(result, verboseOutput, resolvedDir, ciMode);
 				}
 
-				// Record failure so the command can exit non-zero AFTER the output
-				// is flushed. Throwing here would be swallowed by the catch below.
-				// testing.mdx documents a non-zero exit on failure. CLI audit H6.
-				testsFailed = ((result.totalFail ?: 0) + (result.totalError ?: 0)) > 0;
+				// Stash for the post-try throw seam. Throwing here would be
+				// swallowed by the catch below as a crashed run.
+				runState.hasResult = true;
+				runState.result = result;
+				runState.specsFailedToLoad = $countSpecsFailedToLoad(
+					result = result,
+					testDirectory = resolvedDir
+				);
 			} else {
 				// Could be an HTML error page. Either way no result document was
 				// produced — the run crashed, which must exit non-zero (#2963).
@@ -5880,11 +7821,15 @@ component extends="modules.BaseModule" {
 		// Exit non-zero when specs failed/errored so CI and shells can detect it.
 		// Previously runTests always returned "" → `wheels test` exited 0 even when
 		// tests failed, silently green-lighting broken builds. CLI audit H6.
-		if (testsFailed) {
-			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
+		// Sole Wheels.TestsFailed site for this path — do not throw beside it.
+		if (runState.hasResult) {
+			$throwIfCliTestsFailed(
+				result = runState.result,
+				specsFailedToLoad = runState.specsFailedToLoad
+			);
 		}
 		// A crash during the HTTP/parse phase printed red but exited 0 — the
-		// throw above only covers FAILING tests, not CRASHED runs (#2963).
+		// seam above only covers FAILING tests, not CRASHED runs (#2963).
 		if (runState.crashed) {
 			throw(type = "Wheels.TestRunFailed", message = "Test run crashed before producing results — see the output above.");
 		}
@@ -5913,42 +7858,9 @@ component extends="modules.BaseModule" {
 		// it by reference on Adobe CF (closures capture struct refs reliably
 		// but plain `var` captures can copy on Adobe — see CLAUDE.md).
 		var ctx = {tests: []};
-		var walkSuite = function(suite) {
-			for (var sp in (suite.specStats ?: [])) {
-				arrayAppend(ctx.tests, {
-					name: sp.name ?: "(unnamed)",
-					status: sp.status ?: "Failed",
-					failMessage: sp.failMessage ?: "",
-					// failOrigin can be an array of stack-frame structs, not a
-					// string. Coerce to a string here so the YAML emitter below
-					// (tapEscapeYaml) never receives an array and crashes the
-					// whole TAP run on the first failing spec. See CLI audit H6.
-					failOrigin: $tapOriginString(sp.failOrigin ?: ""),
-					skipped: (sp.status ?: "") == "Skipped"
-				});
-			}
-			// Suite-level errors (e.g. spec-file failed to compile, beforeAll
-			// threw) are reported on the suite itself with empty specStats —
-			// surface them as a synthetic test so they don't disappear.
-			if (
-				arrayIsEmpty(suite.specStats ?: [])
-				&& listFindNoCase("Failed,Error", suite.status ?: "")
-			) {
-				arrayAppend(ctx.tests, {
-					name: (suite.name ?: "(unnamed suite)") & " (suite-level)",
-					status: suite.status,
-					failMessage: suite.globalException ?: "",
-					failOrigin: "",
-					skipped: false
-				});
-			}
-			for (var inner in (suite.suiteStats ?: [])) {
-				walkSuite(inner);
-			}
-		};
 		for (var bundle in (arguments.result.bundleStats ?: [])) {
 			for (var suite in (bundle.suiteStats ?: [])) {
-				walkSuite(suite);
+				$tapWalkSuite(suite, ctx);
 			}
 		}
 
@@ -5969,6 +7881,46 @@ component extends="modules.BaseModule" {
 				}
 				out("  ...");
 			}
+		}
+	}
+
+	/**
+	 * Recursively flatten one suite (and its nested suites) into ctx.tests as
+	 * sequential TAP entries, including a synthetic entry for suite-level
+	 * errors. ctx is a struct so the shared list is visible by reference
+	 * across recursive calls on Adobe CF.
+	 */
+	private void function $tapWalkSuite(required any suite, required struct ctx) {
+		for (var sp in (arguments.suite.specStats ?: [])) {
+			arrayAppend(arguments.ctx.tests, {
+				name: sp.name ?: "(unnamed)",
+				status: sp.status ?: "Failed",
+				failMessage: sp.failMessage ?: "",
+				// failOrigin can be an array of stack-frame structs, not a
+				// string. Coerce to a string here so the YAML emitter below
+				// (tapEscapeYaml) never receives an array and crashes the
+				// whole TAP run on the first failing spec. See CLI audit H6.
+				failOrigin: $tapOriginString(sp.failOrigin ?: ""),
+				skipped: (sp.status ?: "") == "Skipped"
+			});
+		}
+		// Suite-level errors (e.g. spec-file failed to compile, beforeAll
+		// threw) are reported on the suite itself with empty specStats —
+		// surface them as a synthetic test so they don't disappear.
+		if (
+			arrayIsEmpty(arguments.suite.specStats ?: [])
+			&& listFindNoCase("Failed,Error", arguments.suite.status ?: "")
+		) {
+			arrayAppend(arguments.ctx.tests, {
+				name: (arguments.suite.name ?: "(unnamed suite)") & " (suite-level)",
+				status: arguments.suite.status,
+				failMessage: arguments.suite.globalException ?: "",
+				failOrigin: "",
+				skipped: false
+			});
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$tapWalkSuite(inner, arguments.ctx);
 		}
 	}
 
@@ -6038,21 +7990,55 @@ component extends="modules.BaseModule" {
 		// passed an empty run." We probe the disk and warn if the loaded
 		// bundle count is lower than the on-disk *Spec.cfc count. See
 		// finding #2 in the 2026-04-29 fresh-VM triage.
-		var specsFailedToLoad = 0;
+		var specsFailedToLoad = $countSpecsFailedToLoad(result, arguments.testDirectory);
+		var unloadedSpecPaths = $collectUnloadedSpecs(result, arguments.testDirectory, specsFailedToLoad);
+
+		if (specsFailedToLoad > 0) {
+			$printFailedToLoadWarning(specsFailedToLoad, unloadedSpecPaths, result);
+		} else {
+			$printTestResultDiagnostics(result);
+		}
+
+		// Display bundle/suite/spec tree if verbose and bundles exist
+		if (arguments.verboseOutput && structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
+			$printVerboseTree(result);
+		}
+
+		// Summary line
+		var duration = totalDuration > 0 ? " (#numberFormat(totalDuration / 1000, '0.00')#s)" : "";
+		$printTestSummaryAndDetails(result, arguments.verboseOutput, totalPass, totalFail, totalError, duration, specsFailedToLoad);
+
+		// CI mode (--ci): emit GitHub Actions-style error annotations so each
+		// failure/error surfaces inline in CI logs and PR-check annotations.
+		// testing.mdx documents --ci as tightening output for GitHub Actions
+		// and similar runners; before #3113 the flag was parsed and threaded
+		// through to here but never consumed — byte-identical to a plain run.
+		if (arguments.ciMode) {
+			for (var annotation in $buildCiAnnotations(arguments.result)) {
+				out(annotation);
+			}
+		}
+	}
+
+	/**
+	 * Probe the disk for specs that failed to load (returning their paths)
+	 * when the TestBox bundle count is lower than the on-disk *Spec.cfc count.
+	 * Best-effort — never lets a probe failure crash the test report.
+	 */
+	private array function $collectUnloadedSpecs(required any result, required string testDirectory, required numeric specsFailedToLoad) {
 		var unloadedSpecPaths = [];
-		if (len(arguments.testDirectory)) {
+		if (arguments.specsFailedToLoad > 0 && len(arguments.testDirectory)) {
 			try {
 				var runner = new services.TestRunner(projectRoot = variables.projectRoot);
 				var diskCount = runner.countSpecsOnDisk(arguments.testDirectory);
-				var loadedCount = (structKeyExists(result, "bundleStats") && isArray(result.bundleStats))
-					? arrayLen(result.bundleStats)
+				var loadedCount = (structKeyExists(arguments.result, "bundleStats") && isArray(arguments.result.bundleStats))
+					? arrayLen(arguments.result.bundleStats)
 					: 0;
 				if (diskCount > loadedCount) {
-					specsFailedToLoad = diskCount - loadedCount;
 					var diskSpecs = runner.listSpecsOnDisk(arguments.testDirectory);
 					var loadedNames = {};
 					if (loadedCount > 0) {
-						for (var b in result.bundleStats) {
+						for (var b in arguments.result.bundleStats) {
 							loadedNames[b.name ?: ""] = true;
 						}
 					}
@@ -6067,48 +8053,136 @@ component extends="modules.BaseModule" {
 				verbose("Failed-to-load probe failed: #probeErr.message#");
 			}
 		}
+		return unloadedSpecPaths;
+	}
 
-		if (specsFailedToLoad > 0) {
-			out("");
-			out("WARN  #specsFailedToLoad# spec file(s) failed to compile and were silently skipped:", "yellow");
-			for (var unloaded in unloadedSpecPaths) {
-				out("        #unloaded#", "yellow");
-			}
-			out("        Visit /wheels/app/tests in a browser for the parse-error details.", "yellow");
-			out("");
+	/**
+	 * Print the "specs failed to load" warning block plus any runner-payload
+	 * diagnostics (populate / TestBox constructor / 0-bundle / parse error).
+	 * Disk-vs-bundleStats is only a proxy — the same WARN used to fire for a
+	 * non-TestBox JSON body (e.g. tests/populate.cfm failed) with no compile
+	 * error at all.
+	 */
+	private void function $printFailedToLoadWarning(
+		required numeric specsFailedToLoad,
+		required array unloadedSpecPaths,
+		required any result
+	) {
+		out("");
+		out("WARN  #arguments.specsFailedToLoad# spec file(s) were on disk but not loaded (compile error, empty discovery, or runner error):", "yellow");
+		for (var unloaded in arguments.unloadedSpecPaths) {
+			out("        #unloaded#", "yellow");
 		}
+		out("        Visit /wheels/app/tests?format=json for runner diagnostics.", "yellow");
+		$printTestResultDiagnostics(arguments.result);
+		out("");
+	}
 
-		// Display bundle/suite/spec tree if verbose and bundles exist
-		if (arguments.verboseOutput && structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
-			for (var bundle in result.bundleStats) {
-				out("Bundle: #bundle.name ?: 'Unknown'#", "bold");
-				if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
-					for (var suite in bundle.suiteStats) {
-						displaySuite(suite, "  ");
-					}
+	/**
+	 * Human-readable lines from a runner JSON body that is missing bundleStats
+	 * or carries an explicit error (populate.cfm, TestBox constructor, 0-bundle
+	 * discovery). Public so CLI specs can lock the fields without a live server.
+	 */
+	public array function $testResultDiagnosticLines(required any result) {
+		var lines = [];
+		if (!isStruct(arguments.result)) {
+			return lines;
+		}
+		var interesting = false;
+		if (structKeyExists(arguments.result, "error") && isSimpleValue(arguments.result.error) && len(arguments.result.error)) {
+			arrayAppend(lines, "Runner error: #arguments.result.error#");
+			interesting = true;
+		}
+		if (structKeyExists(arguments.result, "message") && isSimpleValue(arguments.result.message) && len(arguments.result.message)) {
+			arrayAppend(lines, "Message: #arguments.result.message#");
+			interesting = true;
+		}
+		if (structKeyExists(arguments.result, "detail") && isSimpleValue(arguments.result.detail) && len(arguments.result.detail)) {
+			arrayAppend(lines, "Detail: #arguments.result.detail#");
+			interesting = true;
+		}
+		if (structKeyExists(arguments.result, "directoryRejected") && arguments.result.directoryRejected) {
+			arrayAppend(lines, "directoryRejected: true");
+			interesting = true;
+		}
+		if (structKeyExists(arguments.result, "bundlesDiscovered") && arguments.result.bundlesDiscovered == 0) {
+			arrayAppend(lines, "bundlesDiscovered: 0");
+			interesting = true;
+		}
+		if (structKeyExists(arguments.result, "testDirectoryExists") && !arguments.result.testDirectoryExists) {
+			arrayAppend(lines, "testDirectoryExists: false");
+			interesting = true;
+		}
+		if (structKeyExists(arguments.result, "warnings") && isArray(arguments.result.warnings) && arrayLen(arguments.result.warnings)) {
+			interesting = true;
+			for (var warning in arguments.result.warnings) {
+				if (isSimpleValue(warning) && len(warning)) {
+					arrayAppend(lines, "Warning: #warning#");
 				}
 			}
-			out("");
 		}
+		// Path / resolved-directory only when something above was wrong —
+		// a clean pass always carries bundlesDiscovered > 0 and must stay quiet.
+		if (interesting) {
+			if (structKeyExists(arguments.result, "directoryResolved") && isSimpleValue(arguments.result.directoryResolved) && len(arguments.result.directoryResolved)) {
+				arrayAppend(lines, "directoryResolved: #arguments.result.directoryResolved#");
+			}
+			if (structKeyExists(arguments.result, "testDirectoryPath") && isSimpleValue(arguments.result.testDirectoryPath) && len(arguments.result.testDirectoryPath)) {
+				arrayAppend(lines, "testDirectoryPath: #arguments.result.testDirectoryPath#");
+			}
+		}
+		return lines;
+	}
 
-		// Summary line
-		var duration = totalDuration > 0 ? " (#numberFormat(totalDuration / 1000, '0.00')#s)" : "";
+	private void function $printTestResultDiagnostics(required any result) {
+		for (var line in $testResultDiagnosticLines(arguments.result)) {
+			out("        #line#", "yellow");
+		}
+	}
 
-		if (totalFail == 0 && totalError == 0) {
-			if (specsFailedToLoad > 0) {
-				out("#totalPass# passed, #specsFailedToLoad# failed to load#duration#", "yellow");
+	/**
+	 * Print the bundle/suite/spec tree for a verbose run.
+	 */
+	private void function $printVerboseTree(required any result) {
+		for (var bundle in arguments.result.bundleStats) {
+			out("Bundle: #bundle.name ?: 'Unknown'#", "bold");
+			if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
+				for (var suite in bundle.suiteStats) {
+					displaySuite(suite, "  ");
+				}
+			}
+		}
+		out("");
+	}
+
+	/**
+	 * Print the summary line, then (on failure and outside verbose mode) the
+	 * per-suite failure details with the flat-failures fallback.
+	 */
+	private void function $printTestSummaryAndDetails(
+		required any result,
+		required boolean verboseOutput,
+		required numeric totalPass,
+		required numeric totalFail,
+		required numeric totalError,
+		required string duration,
+		required numeric specsFailedToLoad
+	) {
+		if (arguments.totalFail == 0 && arguments.totalError == 0) {
+			if (arguments.specsFailedToLoad > 0) {
+				out("#arguments.totalPass# passed, #arguments.specsFailedToLoad# failed to load#arguments.duration#", "yellow");
 			} else {
-				out("#totalPass# passed#duration#", "green");
+				out("#arguments.totalPass# passed#arguments.duration#", "green");
 			}
 		} else {
-			var failedToLoadStr = specsFailedToLoad > 0 ? ", #specsFailedToLoad# failed to load" : "";
-			out("#totalPass# passed, #totalFail# failed, #totalError# error(s)#failedToLoadStr##duration#", "red");
+			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
+			out("#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#", "red");
 			out("");
 
 			// Show failure details (skip if verbose already displayed them via displaySuite)
 			if (!arguments.verboseOutput) {
-				if (structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
-					for (var bundle in result.bundleStats) {
+				if (structKeyExists(arguments.result, "bundleStats") && isArray(arguments.result.bundleStats)) {
+					for (var bundle in arguments.result.bundleStats) {
 						if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
 							displayFailures(bundle.suiteStats);
 						}
@@ -6116,25 +8190,14 @@ component extends="modules.BaseModule" {
 				}
 
 				// Fallback: check for flat failures array
-				if (structKeyExists(result, "failures") && isArray(result.failures)) {
-					for (var failure in result.failures) {
+				if (structKeyExists(arguments.result, "failures") && isArray(arguments.result.failures)) {
+					for (var failure in arguments.result.failures) {
 						out("  FAIL: #failure.name ?: 'unknown'#", "red");
 						if (structKeyExists(failure, "message")) {
 							out("    #failure.message#", "yellow");
 						}
 					}
 				}
-			}
-		}
-
-		// CI mode (--ci): emit GitHub Actions-style error annotations so each
-		// failure/error surfaces inline in CI logs and PR-check annotations.
-		// testing.mdx documents --ci as tightening output for GitHub Actions
-		// and similar runners; before #3113 the flag was parsed and threaded
-		// through to here but never consumed — byte-identical to a plain run.
-		if (arguments.ciMode) {
-			for (var annotation in $buildCiAnnotations(arguments.result)) {
-				out(annotation);
 			}
 		}
 	}
@@ -6155,41 +8218,13 @@ component extends="modules.BaseModule" {
 			return annotations;
 		}
 
-		// Walk bundle → suite (recursively) → spec, collecting failures. Mirror
-		// the emitTapResults() walker: the closure references itself by name and
-		// appends to a parent struct field (not a bare array) so the mutation is
-		// seen by reference — the established pattern on the CLI's bundled Lucee.
+		// Walk bundle → suite (recursively) → spec, collecting failures into a
+		// shared ctx struct (not a bare array) so the mutation is seen by
+		// reference across recursive calls on the CLI's bundled Lucee.
 		var ctx = {failures: []};
-		var walkSuite = function(suite) {
-			for (var spec in (suite.specStats ?: [])) {
-				var status = spec.status ?: "";
-				if (status == "Failed" || status == "Error") {
-					var message = "";
-					if (status == "Failed") {
-						message = spec.failMessage ?: "";
-					} else if (structKeyExists(spec, "error") && isStruct(spec.error)) {
-						message = spec.error.message ?: "";
-					}
-					arrayAppend(ctx.failures, {name: (spec.name ?: "(unnamed spec)"), message: message});
-				}
-			}
-			// Suite-level failure with no specs (compile error, beforeAll threw).
-			if (
-				arrayIsEmpty(suite.specStats ?: [])
-				&& listFindNoCase("Failed,Error", suite.status ?: "")
-			) {
-				arrayAppend(ctx.failures, {
-					name: (suite.name ?: "(unnamed suite)") & " (suite-level)",
-					message: suite.globalException ?: ""
-				});
-			}
-			for (var inner in (suite.suiteStats ?: [])) {
-				walkSuite(inner);
-			}
-		};
 		for (var bundle in (arguments.result.bundleStats ?: [])) {
 			for (var suite in (bundle.suiteStats ?: [])) {
-				walkSuite(suite);
+				$ciWalkSuite(suite, ctx);
 			}
 		}
 
@@ -6201,6 +8236,39 @@ component extends="modules.BaseModule" {
 			);
 		}
 		return annotations;
+	}
+
+	/**
+	 * Recursively collect failed/errored specs (and suite-level failures) from
+	 * one suite into ctx.failures. ctx is a struct so the shared list is
+	 * visible by reference across recursive calls.
+	 */
+	private void function $ciWalkSuite(required any suite, required struct ctx) {
+		for (var spec in (arguments.suite.specStats ?: [])) {
+			var status = spec.status ?: "";
+			if (status == "Failed" || status == "Error") {
+				var message = "";
+				if (status == "Failed") {
+					message = spec.failMessage ?: "";
+				} else if (structKeyExists(spec, "error") && isStruct(spec.error)) {
+					message = spec.error.message ?: "";
+				}
+				arrayAppend(arguments.ctx.failures, {name: (spec.name ?: "(unnamed spec)"), message: message});
+			}
+		}
+		// Suite-level failure with no specs (compile error, beforeAll threw).
+		if (
+			arrayIsEmpty(arguments.suite.specStats ?: [])
+			&& listFindNoCase("Failed,Error", arguments.suite.status ?: "")
+		) {
+			arrayAppend(arguments.ctx.failures, {
+				name: (arguments.suite.name ?: "(unnamed suite)") & " (suite-level)",
+				message: arguments.suite.globalException ?: ""
+			});
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$ciWalkSuite(inner, arguments.ctx);
+		}
 	}
 
 	/**
@@ -6390,31 +8458,11 @@ component extends="modules.BaseModule" {
 		);
 		printCreated(appName & "/app/controllers/Main.cfc");
 
-		fileWrite(
-			targetDir & "/app/views/main/index.cfm",
-			(
-				'<!---' & nl &
-				tab & 'Starter home page: replace before production.' & nl &
-				tab & 'This development/first-run landing page surfaces environment' & nl &
-				tab & 'details (Wheels version, engine, database, environment) and CLI' & nl &
-				tab & 'commands. Deploy a real homepage so those are not exposed to' & nl &
-				tab & 'anonymous visitors.' & nl &
-				'--->' & nl &
-				'<cfoutput>' & nl &
-				'<h1>Welcome to ' & appName & '</h1>' & nl &
-				'<p>Your <strong>Wheels ##get("version")##</strong> application is running on ##application.wheels.serverName## with ##application.wheels.dataSourceName## (##get("environment")##).</p>' & nl &
-				nl &
-				'<h2>Next steps</h2>' & nl &
-				'<ul>' & nl &
-				tab & '<li><code>wheels g scaffold Post title content:text</code> &mdash; generate a model, controller, and views</li>' & nl &
-				tab & '<li><code>wheels migrate latest</code> &mdash; build the database schema</li>' & nl &
-				tab & '<li><code>wheels test</code> &mdash; run the test suite</li>' & nl &
-				'</ul>' & nl &
-				'<p><small>This page lives at <code>app/views/main/index.cfm</code>; routing is in <code>config/routes.cfm</code>.</small></p>' & nl &
-				'</cfoutput>' & nl
-			)
-		);
-		printCreated(appName & "/app/views/main/index.cfm");
+		// app/views/main/index.cfm is NOT written here — it ships as a real
+		// template file (cli/lucli/templates/app/app/views/main/index.cfm) and is
+		// copied above with {{appName}} substituted. Keeping the starter page as
+		// a reviewable file rather than an inline string means an edit to it
+		// cannot live only in a working tree and vanish without a trace.
 
 		out("");
 		out("Application created!", "green");
@@ -6440,14 +8488,17 @@ component extends="modules.BaseModule" {
 		// failed/slow network check. See services/UpdateChecker.cfc for the
 		// channel-aware logic + 24h cache. Wrapped in try/catch as a final
 		// belt for any failure mode the service itself doesn't already
-		// internalize (e.g., the createObject call throwing).
+		// internalize (e.g., the createObject call throwing). Skipped
+		// entirely in offline mode (--offline / WHEELS_OFFLINE=1).
 		try {
-			var checker = new services.UpdateChecker();
-			var updateResult = checker.check(currentVersion=super.version());
-			if (updateResult.hasUpdate) {
-				out("");
-				out("A newer wheels (#updateResult.channel#) is available: #updateResult.latest# (you have #updateResult.current#)", "yellow");
-				out("  Upgrade: #updateResult.upgradeCommand#", "yellow");
+			if (!$isOffline()) {
+				var checker = new services.UpdateChecker();
+				var updateResult = checker.check(currentVersion=super.version());
+				if (updateResult.hasUpdate) {
+					out("");
+					out("A newer wheels (#updateResult.channel#) is available: #updateResult.latest# (you have #updateResult.current#)", "yellow");
+					out("  Upgrade: #updateResult.upgradeCommand#", "yellow");
+				}
 			}
 		} catch (any e) {
 			// Silently swallow — never let an update check delay or break
@@ -6791,17 +8842,117 @@ component extends="modules.BaseModule" {
 	 * deterministic port to pre-check for a collision before delegating.
 	 */
 	private numeric function $readPinnedPort(required string projectRoot) {
+		return $readPinnedPorts(arguments.projectRoot).port;
+	}
+
+	/**
+	 * Both ports pinned in the project's lucee.json. Each is 0 when absent, so
+	 * callers can tell "not configured" from a real value.
+	 */
+	private struct function $readPinnedPorts(required string projectRoot) {
+		var ports = {port: 0, shutdownPort: 0};
 		var configFile = arguments.projectRoot & "/lucee.json";
-		if (!fileExists(configFile)) return 0;
+		if (!fileExists(configFile)) return ports;
 		try {
 			var config = deserializeJSON(fileRead(configFile));
-			if (isStruct(config) && structKeyExists(config, "port") && isNumeric(config.port)) {
-				return config.port;
+			if (isStruct(config)) {
+				if (structKeyExists(config, "port") && isNumeric(config.port)) {
+					ports.port = config.port;
+				}
+				if (structKeyExists(config, "shutdownPort") && isNumeric(config.shutdownPort)) {
+					ports.shutdownPort = config.shutdownPort;
+				}
 			}
 		} catch (any e) {
 			// Malformed lucee.json — let LuCLI surface its own parse error.
 		}
-		return 0;
+		return ports;
+	}
+
+	/**
+	 * First free TCP port at or above `from`. Used to place a project's shutdown
+	 * port next to its requested HTTP port without colliding with another
+	 * project's server. Bounded so a pathological environment cannot spin
+	 * forever; falls back to `from` and lets LuCLI report the conflict itself.
+	 */
+	private numeric function $nextFreePort(required numeric from) {
+		var probe = getService("portProbe");
+		for (var candidate = arguments.from; candidate < arguments.from + 100; candidate++) {
+			if (!probe.portInUse(candidate)) {
+				return candidate;
+			}
+		}
+		return arguments.from;
+	}
+
+	/**
+	 * Decide the HTTP and shutdown ports for a Lucee start, and persist the
+	 * shutdown port when it has to move.
+	 *
+	 * Two projects whose defaults overlap clash on the SHUTDOWN port, and LuCLI
+	 * reports that as "port conflicts detected:" followed by an empty list — an
+	 * error that names nothing. So the shutdown port is always moved to a free
+	 * one rather than left to collide, whether it came from --port or from
+	 * lucee.json.
+	 *
+	 * The HTTP port is deliberately NOT moved on its own: users expect the port
+	 * they configured, and silently relocating it would be worse than the
+	 * warning `start()` emits when it is taken. `--port` used to be parsed and
+	 * then dropped for Lucee projects — only the RustCFML branch consumed it —
+	 * so `wheels start --port=8090` silently booted on the lucee.json port.
+	 *
+	 * Extracted from start() rather than inlined: the branching here pushed that
+	 * function past the repository's complexity gate of 30.
+	 */
+	private void function $resolveStartPorts(required numeric enginePort) {
+		var pinned = $readPinnedPorts(variables.projectRoot);
+		var startupPort = arguments.enginePort > 0 ? arguments.enginePort : pinned.port;
+		var shutdownPort = 0;
+		var movedShutdown = false;
+
+		if (arguments.enginePort > 0) {
+			shutdownPort = $nextFreePort(arguments.enginePort + 1);
+		} else if (pinned.shutdownPort > 0 && getService("portProbe").portInUse(pinned.shutdownPort)) {
+			// Default path: keep the configured shutdown port only while it is
+			// actually free.
+			shutdownPort = $nextFreePort(pinned.shutdownPort + 1);
+			movedShutdown = true;
+		}
+
+		if (shutdownPort > 0 && (arguments.enginePort > 0 || movedShutdown)) {
+			if (movedShutdown) {
+				out("Shutdown port " & pinned.shutdownPort & " is in use; using " & shutdownPort & ".", "yellow");
+			}
+			$writePinnedPorts(variables.projectRoot, startupPort, shutdownPort);
+		}
+		if (arguments.enginePort > 0) {
+			out("Using port " & arguments.enginePort & " (shutdown " & shutdownPort & ").", "cyan");
+		}
+	}
+
+	/**
+	 * Persist the HTTP and shutdown ports into the project's lucee.json, which
+	 * is where LuCLI reads them from.
+	 *
+	 * Targeted substitution rather than a serializeJSON round-trip: rewriting
+	 * the whole file would collapse `wheels new`'s 2-space formatting onto a
+	 * single line and bury a two-number change in a wall of diff noise. The
+	 * file is parsed first so a malformed config is left untouched for LuCLI to
+	 * report. `"port"` cannot match inside `"shutdownPort"` because the pattern
+	 * requires a quote before the `p`.
+	 */
+	private void function $writePinnedPorts(required string projectRoot, required numeric port, required numeric shutdownPort) {
+		var configFile = arguments.projectRoot & "/lucee.json";
+		if (!fileExists(configFile)) return;
+		try {
+			if (!isStruct(deserializeJSON(fileRead(configFile)))) return;
+		} catch (any e) {
+			return;
+		}
+		var raw = fileRead(configFile);
+		raw = reReplace(raw, '"port"\s*:\s*\d+', '"port": ' & arguments.port, "one");
+		raw = reReplace(raw, '"shutdownPort"\s*:\s*\d+', '"shutdownPort": ' & arguments.shutdownPort, "one");
+		fileWrite(configFile, raw);
 	}
 
 	/**
@@ -7150,6 +9301,18 @@ component extends="modules.BaseModule" {
 					printCreated(relativePath);
 					continue;
 				}
+				// Binary assets are copied byte-for-byte. fileRead/fileWrite is a
+				// text round-trip — reading a PNG as a string and writing it back
+				// mangles the bytes, and processPlaceholders() would run replace()
+				// over binary data. The Wheels wordmark shipped with the starter
+				// page hits exactly this, so binary extensions skip the
+				// placeholder pass entirely. SVG is deliberately NOT listed: it is
+				// text, and templates may legitimately use placeholders in it.
+				if ($isBinaryTemplateFile(entry.name)) {
+					fileCopy(sourcePath, targetPath);
+					printCreated(relativePath);
+					continue;
+				}
 				// Read template, process placeholders, write to target
 				var content = fileRead(sourcePath);
 				content = processPlaceholders(content, arguments.context);
@@ -7157,6 +9320,18 @@ component extends="modules.BaseModule" {
 				printCreated(relativePath);
 			}
 		}
+	}
+
+	/**
+	 * Whether an app-template file must be copied byte-for-byte instead of being
+	 * read as text, placeholder-substituted, and written back.
+	 */
+	private boolean function $isBinaryTemplateFile(required string fileName) {
+		var ext = LCase(ListLast(arguments.fileName, "."));
+		return ListFindNoCase(
+			"png,jpg,jpeg,gif,webp,avif,ico,bmp,woff,woff2,ttf,otf,eot,pdf,zip,gz,jar,mp4,webm,mp3",
+			ext
+		) > 0;
 	}
 
 	/**
@@ -7197,6 +9372,15 @@ component extends="modules.BaseModule" {
 	/**
 	 * Parse generator arguments into properties and associations
 	 * E.g., ["name", "email:string", "--belongsTo=user", "active:boolean"]
+	 *
+	 * Unknown `--flags` are an ERROR, not a no-op. Every command-level flag
+	 * (--force, --dry-run) is stripped by the caller before this runs, so the
+	 * only `--` tokens that legitimately reach here are the three association
+	 * flags. Anything else is a typo — and a silently dropped typo is the
+	 * worst possible outcome for a generator: `--belogsTo=post` produced a
+	 * clean-looking scaffold with no association and no parent wiring, and
+	 * nothing in the output hinted why (live-demo rehearsal, 2026-09-13).
+	 * This is the second flag this loop has swallowed — see #2327 for --force.
 	 */
 	private struct function parseGeneratorArgs(required array args) {
 		var result = {
@@ -7205,6 +9389,7 @@ component extends="modules.BaseModule" {
 			hasMany: [],
 			hasOne: []
 		};
+		var known = ["--belongsTo", "--hasMany", "--hasOne"];
 
 		for (var arg in args) {
 			// Named association flags
@@ -7217,32 +9402,134 @@ component extends="modules.BaseModule" {
 			} else if (reFindNoCase("^--hasOne=", arg)) {
 				var rels = listToArray(valueAfterEquals(arg));
 				result.hasOne.append(rels, true);
-			} else if (!arg.startsWith("--")) {
-				// Property: name, name:type, or name:enum:value1,value2,...
-				// Split on the FIRST two colons only — any additional colons
-				// (e.g. inside the comma-separated value list) belong in the
-				// values segment.
-				var parts = listToArray(arg, ":");
-				var prop = {
-					name: parts[1],
-					type: arrayLen(parts) > 1 ? parts[2] : "string"
-				};
-				if (lCase(prop.type) == "enum" && arrayLen(parts) > 2) {
-					// Re-join everything after the second colon so values
-					// like "draft,published,archived" land in a single
-					// segment. Most cases are arrayLen==3 (no embedded
-					// colons), so this is just parts[3] — defensive against
-					// pathological inputs.
-					var valueSegments = [];
-					for (var i = 3; i <= arrayLen(parts); i++) {
-						arrayAppend(valueSegments, parts[i]);
-					}
-					prop.values = arrayToList(valueSegments, ":");
-				}
-				arrayAppend(result.properties, prop);
+			} else if (arg.startsWith("--")) {
+				var flagName = listFirst(arg, "=");
+				var hint = $closestFlag(flagName, known);
+				var message = "Unknown flag " & flagName & "."
+					& (len(hint) ? " Did you mean " & hint & "?" : "")
+					& " Association flags are --belongsTo=, --hasMany=, --hasOne=.";
+				// Print red AND throw: the red line is what the presenter reads,
+				// the throw is what makes `&&` chains and the exit code honest.
+				// Same contract as $consoleFail (##2229 / ##2941).
+				out(message, "red");
+				throw(type = "Wheels.CLI.UnknownFlag", message = message);
+			} else {
+				// Property: name, name:type, name:type{N}, name:type{P,S},
+				// or name:enum:value1,value2,...
+				arrayAppend(result.properties, $parsePropertyArg(arg));
 			}
 		}
 
+		return result;
+	}
+
+	/**
+	 * Nearest known flag for a "did you mean" hint. A typo is almost always
+	 * within two edits of what was intended (--belogsTo -> --belongsTo is
+	 * one); anything further is not a useful suggestion, so return "".
+	 */
+	private string function $closestFlag(required string typed, required array known) {
+		var best = "";
+		var bestDistance = 3;
+		for (var candidate in arguments.known) {
+			var d = $editDistance(lCase(arguments.typed), lCase(candidate));
+			if (d < bestDistance) {
+				bestDistance = d;
+				best = candidate;
+			}
+		}
+		return best;
+	}
+
+	/** Levenshtein distance — small inputs only (flag names), so O(n*m) is fine. */
+	private numeric function $editDistance(required string a, required string b) {
+		var la = len(arguments.a);
+		var lb = len(arguments.b);
+		if (!la) return lb;
+		if (!lb) return la;
+		var prev = [];
+		for (var j = 0; j <= lb; j++) arrayAppend(prev, j);
+		for (var i = 1; i <= la; i++) {
+			var cur = [i];
+			for (var j = 1; j <= lb; j++) {
+				var cost = mid(arguments.a, i, 1) == mid(arguments.b, j, 1) ? 0 : 1;
+				arrayAppend(cur, min(min(prev[j + 1] + 1, cur[j] + 1), prev[j] + cost));
+			}
+			prev = cur;
+		}
+		return prev[lb + 1];
+	}
+
+	/**
+	 * Parse one generator property token into a name/type struct, plus
+	 * optional Rails-style brace modifiers (`string{50}`, `decimal{10,2}`)
+	 * and colon-delimited enum values (`status:enum:draft,published`).
+	 *
+	 * Brace modifiers attach to the type token only, so they never steal
+	 * the value list from `name:enum:a,b`.
+	 */
+	private struct function $parsePropertyArg(required string arg) {
+		// Split on the FIRST two colons only — any additional colons
+		// (e.g. inside the comma-separated value list) belong in the
+		// values segment.
+		var parts = listToArray(arguments.arg, ":");
+		var typeToken = arrayLen(parts) > 1 ? parts[2] : "string";
+		var modifiers = $parseTypeModifiers(typeToken);
+		var prop = {
+			name: parts[1],
+			type: modifiers.type
+		};
+		if (structKeyExists(modifiers, "limit")) {
+			prop.limit = modifiers.limit;
+		}
+		if (structKeyExists(modifiers, "precision")) {
+			prop.precision = modifiers.precision;
+		}
+		if (structKeyExists(modifiers, "scale")) {
+			prop.scale = modifiers.scale;
+		}
+		if (lCase(prop.type) == "enum" && arrayLen(parts) > 2) {
+			// Re-join everything after the second colon so values
+			// like "draft,published,archived" land in a single
+			// segment. Most cases are arrayLen==3 (no embedded
+			// colons), so this is just parts[3] — defensive against
+			// pathological inputs.
+			var valueSegments = [];
+			for (var i = 3; i <= arrayLen(parts); i++) {
+				arrayAppend(valueSegments, parts[i]);
+			}
+			prop.values = arrayToList(valueSegments, ":");
+		}
+		return prop;
+	}
+
+	/**
+	 * Strip a trailing `{N}` or `{P,S}` modifier from a type token.
+	 * Single number → limit. Two comma-separated numbers → precision, scale.
+	 * Malformed or empty braces leave the type unchanged and add no fields.
+	 */
+	private struct function $parseTypeModifiers(required string typeToken) {
+		var result = {type: arguments.typeToken};
+		var openBrace = find("{", arguments.typeToken);
+		if (openBrace < 2) {
+			return result;
+		}
+		if (right(arguments.typeToken, 1) != "}") {
+			return result;
+		}
+		var inner = mid(arguments.typeToken, openBrace + 1, len(arguments.typeToken) - openBrace - 1);
+		if (!len(trim(inner))) {
+			return result;
+		}
+		// openBrace is at least 2, so this Left() length is at least 1
+		result.type = left(arguments.typeToken, openBrace - 1);
+		var bits = listToArray(inner);
+		if (arrayLen(bits) >= 2 && isNumeric(trim(bits[1])) && isNumeric(trim(bits[2]))) {
+			result.precision = trim(bits[1]);
+			result.scale = trim(bits[2]);
+		} else if (arrayLen(bits) == 1 && isNumeric(trim(bits[1]))) {
+			result.limit = trim(bits[1]);
+		}
 		return result;
 	}
 
@@ -7319,6 +9606,15 @@ component extends="modules.BaseModule" {
 		boolean requireProjectConfig = false,
 		array commonPorts = [8080, 60000, 3000, 8500]
 	) {
+		// 0. Check the RustCFML backend's recorded state first — a live
+		// RustCFML server serves its own port (default 8513), which never
+		// appears in lucee.json/.env/common ports.
+		var rustSvc = new services.rustcfml.RustCFMLEngine();
+		var rustStatus = rustSvc.status(variables.projectRoot);
+		if (rustStatus.running && structKeyExists(rustStatus, "port") && rustStatus.port > 0) {
+			return rustStatus.port;
+		}
+
 		// 1. Check lucee.json
 		var luceeJson = variables.projectRoot & "/lucee.json";
 		if (fileExists(luceeJson)) {
@@ -7360,6 +9656,21 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The origin prefix for an HTTP URL to the running server. On Lucee this is
+	 * the bare host:port; on RustCFML the path-info router needs an
+	 * `/index.cfm` entry point (RustCFML/RustCFML#194), so the base carries
+	 * that suffix. Callers interpolate `#$serverUrlBase(serverPort)#` in place
+	 * of the old `http://localhost:#serverPort#`.
+	 */
+	private string function $serverUrlBase(required numeric serverPort) {
+		var svc = new services.rustcfml.RustCFMLEngine();
+		if (svc.status(variables.projectRoot).running) {
+			return "http://localhost:#arguments.serverPort#/index.cfm";
+		}
+		return "http://localhost:#arguments.serverPort#";
+	}
+
+	/**
 	 * Guard for commands that require a live Wheels dev server. Returns the
 	 * detected port on success; prints a red diagnostic + any yellow hints
 	 * and throws `Wheels.ServerNotRunning` on failure, so LuCLI's Picocli
@@ -7395,6 +9706,38 @@ component extends="modules.BaseModule" {
 			message=arguments.requireProjectConfig
 				? "No running Wheels server detected for this project (set 'port' in lucee.json or PORT in .env, then start with: wheels start)"
 				: "No running Wheels server detected on any expected port (checked lucee.json, .env, 8080/60000/3000/8500)"
+		);
+	}
+
+	/**
+	 * Guard for commands that must target THIS project's server, not a
+	 * sibling app squatting a common port. `wheels test` is the canonical
+	 * caller: attaching to the wrong server yields misleading spec-load
+	 * failures (a foreign app reports a spec file that "failed to load" with
+	 * its own models on the stack). Unlike `$requireRunningServer()`, this
+	 * never falls back to a bare port probe — it only accepts a server whose
+	 * ownership is provable: the RustCFML backend (project-bound by
+	 * construction) or a Lucee registration in the server registry whose
+	 * `.project-path` matches this project (see ServerRegistry.ownServerPort).
+	 */
+	private numeric function $requireOwnRunningServer(required array hints) {
+		// RustCFML backend is project-bound by construction.
+		var rustSvc = new services.rustcfml.RustCFMLEngine();
+		var rustStatus = rustSvc.status(variables.projectRoot);
+		if (rustStatus.running && structKeyExists(rustStatus, "port") && rustStatus.port > 0) {
+			return rustStatus.port;
+		}
+
+		// Lucee: only the project's OWN registered, alive server qualifies.
+		var ownPort = getService("serverRegistry").ownServerPort(variables.projectRoot);
+		if (ownPort > 0) return ownPort;
+
+		for (var hint in arguments.hints) {
+			out(hint, "yellow");
+		}
+		throw(
+			type="Wheels.ServerNotRunning",
+			message="No running Wheels server detected for this project (start one with: wheels start)"
 		);
 	}
 
@@ -7558,6 +9901,43 @@ component extends="modules.BaseModule" {
 	public string function $buildTestRunnerPath(boolean coreTests = false, string basePath = "") {
 		var prefix = $normalizeBasePath(arguments.basePath);
 		return prefix & (arguments.coreTests ? "/wheels/core/tests" : "/wheels/app/tests");
+	}
+
+	/**
+	 * Restart the isolated `_wheelsTest` application scope before an app test
+	 * run. See runTests() for the why (RETEST-2461 B).
+	 *
+	 * Hitting the test-runner path with `?reload=true&password=...` routes the
+	 * request to the `_wheelsTest` scope (the path matches testcontext.cfm's
+	 * `/wheels/app/tests` haystack) and the framework's reload gate calls
+	 * applicationStop() there, then `location()`-redirects — so a successful
+	 * restart answers HTTP 302 and the next suite request boots the scope fresh.
+	 *
+	 * Best-effort: when no reload password is configured the gate fails closed
+	 * and the warm (possibly stale) scope is reused. We surface a note but never
+	 * block the run on a reload.
+	 *
+	 * Public ONLY so TestCommandSpec can unit-test the 302-vs-fallthrough
+	 * contract against a stub server (same carve-out as $evaluateReloadResponse).
+	 */
+	public boolean function $reloadTestApplication(required numeric serverPort, required string testPath) {
+		var password = detectReloadPassword();
+		if (!len(password)) {
+			return false;
+		}
+		var reloadUrl = "#$serverUrlBase(serverPort)##testPath#?reload=true&password=#urlEncodedFormat(password)#";
+		var reloadState = { statusCode = 0 };
+		try {
+			reloadState = makeHttpRequestWithStatus(reloadUrl, false);
+		} catch (any e) {
+			out("Note: could not reload the isolated test application (#e.message#).", "yellow");
+			return false;
+		}
+		if (reloadState.statusCode == 302) {
+			return true;
+		}
+		out("Note: the isolated test application was not reloaded (HTTP #reloadState.statusCode#); the run may use cached routes.", "yellow");
+		return false;
 	}
 
 	/**
@@ -7869,6 +10249,14 @@ component extends="modules.BaseModule" {
 	 * tracking session) emit unconditionally.
 	 */
 	private void function printCreated(required string path) {
+		// Dry run: the caller prints one authoritative "Would write" list after
+		// dispatch, so the per-file `create` lines here would duplicate it — and
+		// worse, they read as though the files were actually written. This is the
+		// single choke point for every generator, so gating here covers all 30
+		// call sites at once.
+		if ($isDryRun()) {
+			return;
+		}
 		if (structKeyExists(variables, "$createdPathTracker")) {
 			if (structKeyExists(variables.$createdPathTracker, arguments.path)) {
 				verbose("printCreated: duplicate emit suppressed for #arguments.path#");
@@ -7877,6 +10265,16 @@ component extends="modules.BaseModule" {
 			variables.$createdPathTracker[arguments.path] = true;
 		}
 		out("  create  #path#", "green");
+	}
+
+	/**
+	 * True while `wheels generate --dry-run` is suppressing writes. Writes are
+	 * intercepted in Templates.cfc / Scaffold.cfc and their destinations
+	 * collected on the request, so any output that implies a file already
+	 * exists must check this.
+	 */
+	private boolean function $isDryRun() {
+		return request.$wheelsGenerateDryRun ?: false;
 	}
 
 	/**
@@ -8003,19 +10401,98 @@ component extends="modules.BaseModule" {
 	}
 
 	private string function browserTest(array args = []) {
+		var opts = $browserParseArgs(arguments.args);
+		var format = opts.format;
+		var verboseOutput = opts.verboseOutput;
+		var basePath = opts.basePath;
+		var directory = opts.directory;
+
+		// Pre-flight: verify Playwright JARs
+		var manifestPath = variables.projectRoot & "/vendor/wheels/browser-manifest.json";
+		if (!$browserVerifyPlaywright(manifestPath)) {
+			return "";
+		}
+
+		out("Running browser tests...", "cyan");
+		out("Directory: #directory#");
+		out("");
+
+		var serverPort = $getServerPort();
+		// Hit the APP test runner (`/wheels/app/tests`), not the framework's
+		// core test runner (`/wheels/core/tests`). The latter only knows
+		// about specs under `vendor/wheels/tests/specs/`. Apps live under
+		// `tests/specs/`, mounted by the app runner. F11.
+		//
+		// Prefix the subfolder base path (#3026) so browser tests reach the
+		// runner on a subpath-mounted app the same way `wheels test` does.
+		var resolvedBasePath = $resolveTestBasePath(basePath);
+		var runnerPath = $buildTestRunnerPath(false, resolvedBasePath);
+		var testUrl = "#$serverUrlBase(serverPort)##runnerPath#?db=sqlite&format=json&directory=#directory#";
+
+		try {
+			// same long-running suite over the same 120s-default helper (issue #3352)
+			var httpResult = makeHttpRequest(testUrl, $resolveTestTimeout() * 1000);
+		} catch (any e) {
+			out("Failed to reach test runner at: #testUrl#", "red");
+			out("Is the server running? Try: wheels start", "yellow");
+			return "";
+		}
+
+		if (format == "json") {
+			out(httpResult);
+			if (isJSON(httpResult)) {
+				$throwIfBrowserTestsFailed(deserializeJSON(httpResult));
+			}
+			return "";
+		}
+
+		var parsed = {hasData = false, data = {}};
+		try {
+			var data = deserializeJSON(httpResult);
+			var totalPass = data.totalPass ?: 0;
+			var totalFail = data.totalFail ?: 0;
+			var totalError = data.totalError ?: 0;
+
+			out("Pass: #totalPass#  Fail: #totalFail#  Error: #totalError#");
+			out("");
+
+			var failureCount = $browserPrintFailures(data, verboseOutput);
+
+			$browserPrintSummary(totalFail, totalError, failureCount);
+
+			// Stash after the report flushes. Throwing inside this try
+			// would be swallowed by the parse-error catch as
+			// "Failed to parse test results".
+			parsed.hasData = true;
+			parsed.data = data;
+		} catch (any e) {
+			out("Failed to parse test results: #e.message#", "red");
+			if (verboseOutput) {
+				out(left(httpResult ?: "", 500));
+			}
+		}
+
+		// Sole Wheels.TestsFailed site for the text path.
+		if (parsed.hasData) {
+			$throwIfBrowserTestsFailed(parsed.data);
+		}
+
+		return "";
+	}
+
+	/**
+	 * Parse `wheels browser test` arguments. Defaults to the APP's browser
+	 * specs (tests/specs/browser/) — not the framework's internal browser
+	 * specs (Onboarding finding F11). Override with `--directory=...`.
+	 */
+	private struct function $browserParseArgs(required array args) {
 		var format = "text";
 		var verboseOutput = false;
 		var basePath = "";
-		// Default to the APP's browser specs (tests/specs/browser/) — not the
-		// framework's internal browser specs. Onboarding finding F11 reported
-		// `wheels browser test` running 0 tests because it pointed at
-		// `wheels.tests.specs.wheelstest`, the framework's own browser-DSL
-		// test directory, which contains no app code. Override with
-		// `--directory=...` for advanced use.
 		var directory = "tests.specs.browser";
 
-		for (var i = 2; i <= arrayLen(args); i++) {
-			var arg = args[i];
+		for (var i = 2; i <= arrayLen(arguments.args); i++) {
+			var arg = arguments.args[i];
 			if (arg == "--verbose" || arg == "-v") {
 				verboseOutput = true;
 			} else if (reFindNoCase("^--format=", arg)) {
@@ -8029,13 +10506,19 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		// Pre-flight: verify Playwright JARs
-		var manifestPath = variables.projectRoot & "/vendor/wheels/browser-manifest.json";
-		if (!fileExists(manifestPath)) {
-			out("browser-manifest.json not found at: #manifestPath#", "red");
-			return "";
+		return {format: format, verboseOutput: verboseOutput, basePath: basePath, directory: directory};
+	}
+
+	/**
+	 * Pre-flight: verify the Playwright JARs in browser-manifest.json are
+	 * present and SHA-matched. Prints guidance and returns false when not.
+	 */
+	private boolean function $browserVerifyPlaywright(required string manifestPath) {
+		if (!fileExists(arguments.manifestPath)) {
+			out("browser-manifest.json not found at: #arguments.manifestPath#", "red");
+			return false;
 		}
-		var manifest = deserializeJSON(fileRead(manifestPath));
+		var manifest = deserializeJSON(fileRead(arguments.manifestPath));
 		var installDir = $resolveBrowserInstallDir();
 
 		var allInstalled = true;
@@ -8062,133 +10545,118 @@ component extends="modules.BaseModule" {
 			}
 			out("");
 			out("Run: wheels browser setup");
-			return "";
+			return false;
 		}
+		return true;
+	}
 
-		out("Running browser tests...", "cyan");
-		out("Directory: #directory#");
-		out("");
-
-		var serverPort = $getServerPort();
-		// Hit the APP test runner (`/wheels/app/tests`), not the framework's
-		// core test runner (`/wheels/core/tests`). The latter only knows
-		// about specs under `vendor/wheels/tests/specs/`. Apps live under
-		// `tests/specs/`, mounted by the app runner. F11.
-		//
-		// Prefix the subfolder base path (#3026) so browser tests reach the
-		// runner on a subpath-mounted app the same way `wheels test` does.
-		var resolvedBasePath = $resolveTestBasePath(basePath);
-		var runnerPath = $buildTestRunnerPath(false, resolvedBasePath);
-		var testUrl = "http://localhost:#serverPort##runnerPath#?db=sqlite&format=json&directory=#directory#";
-
-		try {
-			// same long-running suite over the same 120s-default helper (issue #3352)
-			var httpResult = makeHttpRequest(testUrl, $resolveTestTimeout() * 1000);
-		} catch (any e) {
-			out("Failed to reach test runner at: #testUrl#", "red");
-			out("Is the server running? Try: wheels start", "yellow");
-			return "";
+	/**
+	 * Print per-spec/suite/bundle failures for a text-format browser run,
+	 * returning the total failure count. Recursive walk so nested suites and
+	 * suite-level failures (empty specStats but status Failed/Error) surface —
+	 * Onboarding F13.
+	 */
+	private numeric function $browserPrintFailures(required any data, required boolean verboseOutput) {
+		var ctx = {failureCount: 0, verbose: arguments.verboseOutput};
+		for (var bundle in (arguments.data.bundleStats ?: [])) {
+			for (var suite in (bundle.suiteStats ?: [])) {
+				$browserWalkSuite(suite, ctx);
+			}
+			// Bundle-level error (compile error in spec file).
+			if (len(bundle.globalException ?: "")) {
+				ctx.failureCount++;
+				out("  Bundle error: #bundle.name ?: '(unnamed)'#", "red");
+				var bg = bundle.globalException;
+				var shown = ctx.verbose ? bg : left(bg, 400);
+				out("    #shown#", "yellow");
+				if (!ctx.verbose && len(bg) > 400) {
+					out("    (truncated; pass --verbose for full output)", "yellow");
+				}
+			}
 		}
+		return ctx.failureCount;
+	}
 
-		if (format == "json") {
-			out(httpResult);
-			return "";
+	/**
+	 * Recursively print failures for one suite (and its nested suites),
+	 * incrementing the shared ctx.failureCount. ctx is a struct so the shared
+	 * counter is visible by reference across recursive calls on Adobe CF.
+	 */
+	private void function $browserWalkSuite(required any suite, required struct ctx) {
+		var specs = arguments.suite.specStats ?: [];
+		for (var sp in specs) {
+			if (listFindNoCase("Failed,Error", sp.status ?: "")) {
+				$browserPrintSpecFailure(sp, arguments.ctx);
+			}
 		}
+		// Suite-level errors (no spec ever ran — e.g. compile error,
+		// beforeAll threw, Playwright init blew up).
+		if (
+			arrayIsEmpty(specs)
+			&& listFindNoCase("Failed,Error", arguments.suite.status ?: "")
+		) {
+			$browserPrintSuiteFailure(arguments.suite, arguments.ctx);
+		}
+		for (var inner in (arguments.suite.suiteStats ?: [])) {
+			$browserWalkSuite(inner, arguments.ctx);
+		}
+	}
 
-		try {
-			var data = deserializeJSON(httpResult);
-			var totalPass = data.totalPass ?: 0;
-			var totalFail = data.totalFail ?: 0;
-			var totalError = data.totalError ?: 0;
+	/**
+	 * Print one failed/error spec and bump the shared failure counter.
+	 */
+	private void function $browserPrintSpecFailure(required any sp, required struct ctx) {
+		arguments.ctx.failureCount++;
+		out("  #arguments.sp.status ?: ''#: #arguments.sp.name ?: 'unknown'#", "red");
+		var msg = arguments.sp.failMessage ?: "";
+		if (len(msg)) {
+			$browserPrintFailureDetail(msg, arguments.ctx.verbose);
+		}
+		if (len(arguments.sp.failOrigin ?: "")) {
+			out("    at: #arguments.sp.failOrigin#", "yellow");
+		}
+	}
 
-			out("Pass: #totalPass#  Fail: #totalFail#  Error: #totalError#");
+	/**
+	 * Print a suite-level error (no spec ever ran) and bump the shared counter.
+	 */
+	private void function $browserPrintSuiteFailure(required any suite, required struct ctx) {
+		arguments.ctx.failureCount++;
+		out("  #arguments.suite.status#: #arguments.suite.name ?: '(unnamed suite)'# (suite-level)", "red");
+		var sg = arguments.suite.globalException ?: "";
+		if (len(sg)) {
+			$browserPrintFailureDetail(sg, arguments.ctx.verbose);
+		}
+	}
+
+	/**
+	 * Print a failure message, truncated to 400 chars unless verbose. Kept as a
+	 * helper because the spec-failure and suite-failure paths share this exact
+	 * truncate-and-annotate shape.
+	 */
+	private void function $browserPrintFailureDetail(required string message, required boolean verbose) {
+		// Print failMessage by default. Without --verbose truncate to 400
+		// chars (enough to see the assertion + selector context). With
+		// --verbose dump the whole thing.
+		var shown = arguments.verbose ? arguments.message : left(arguments.message, 400);
+		out("    #shown#", "yellow");
+		if (!arguments.verbose && len(arguments.message) > 400) {
+			out("    (truncated; pass --verbose for full output)", "yellow");
+		}
+	}
+
+	/**
+	 * Print the closing browser-test summary line(s).
+	 */
+	private void function $browserPrintSummary(required numeric totalFail, required numeric totalError, required numeric failureCount) {
+		if (arguments.totalFail == 0 && arguments.totalError == 0) {
+			out("All browser tests passed.", "green");
+		} else if (arguments.failureCount > 0 && (arguments.totalError + arguments.totalFail) > 0) {
 			out("");
-
-			// Recursive walk so we catch nested suites and surface failures
-			// at the suite level (empty specStats but status == Failed/Error)
-			// as well as per-spec failures. Playwright failures often error
-			// out before any `it` runs — the only artifact is on the suite,
-			// which the previous loop ignored. Onboarding F13.
-			// Mutable state on a parent struct so closures see it by reference
-			// on Adobe CF — see CLAUDE.md cross-engine notes.
-			var ctx = {failureCount: 0, verbose: verboseOutput};
-			var walkSuite = function(suite) {
-				var specs = suite.specStats ?: [];
-				for (var sp in specs) {
-					if (listFindNoCase("Failed,Error", sp.status ?: "")) {
-						ctx.failureCount++;
-						out("  #sp.status ?: ''#: #sp.name ?: 'unknown'#", "red");
-						var msg = sp.failMessage ?: "";
-						if (len(msg)) {
-							// Print failMessage by default. Without --verbose
-							// truncate to 400 chars (enough to see the
-							// assertion + selector context). With --verbose
-							// dump the whole thing.
-							var shown = ctx.verbose ? msg : left(msg, 400);
-							out("    #shown#", "yellow");
-							if (!ctx.verbose && len(msg) > 400) {
-								out("    (truncated; pass --verbose for full output)", "yellow");
-							}
-						}
-						if (len(sp.failOrigin ?: "")) {
-							out("    at: #sp.failOrigin#", "yellow");
-						}
-					}
-				}
-				// Suite-level errors (no spec ever ran — e.g. compile error,
-				// beforeAll threw, Playwright init blew up).
-				if (
-					arrayIsEmpty(specs)
-					&& listFindNoCase("Failed,Error", suite.status ?: "")
-				) {
-					ctx.failureCount++;
-					out("  #suite.status#: #suite.name ?: '(unnamed suite)'# (suite-level)", "red");
-					var sg = suite.globalException ?: "";
-					if (len(sg)) {
-						var shown = ctx.verbose ? sg : left(sg, 400);
-						out("    #shown#", "yellow");
-						if (!ctx.verbose && len(sg) > 400) {
-							out("    (truncated; pass --verbose for full output)", "yellow");
-						}
-					}
-				}
-				for (var inner in (suite.suiteStats ?: [])) {
-					walkSuite(inner);
-				}
-			};
-			for (var bundle in (data.bundleStats ?: [])) {
-				for (var suite in (bundle.suiteStats ?: [])) {
-					walkSuite(suite);
-				}
-				// Bundle-level error (compile error in spec file).
-				if (len(bundle.globalException ?: "")) {
-					ctx.failureCount++;
-					out("  Bundle error: #bundle.name ?: '(unnamed)'#", "red");
-					var bg = bundle.globalException;
-					var shown = ctx.verbose ? bg : left(bg, 400);
-					out("    #shown#", "yellow");
-					if (!ctx.verbose && len(bg) > 400) {
-						out("    (truncated; pass --verbose for full output)", "yellow");
-					}
-				}
-			}
-
-			if (totalFail == 0 && totalError == 0) {
-				out("All browser tests passed.", "green");
-			} else if (ctx.failureCount > 0 && (totalError + totalFail) > 0) {
-				out("");
-				out("If failure messages above don't show selector/Playwright detail,", "yellow");
-				out("the BrowserTest spec may need explicit try/catch around .click() /", "yellow");
-				out(".fill() to surface Playwright exceptions into failMessage.", "yellow");
-			}
-		} catch (any e) {
-			out("Failed to parse test results: #e.message#", "red");
-			if (verboseOutput) {
-				out(left(httpResult ?: "", 500));
-			}
+			out("If failure messages above don't show selector/Playwright detail,", "yellow");
+			out("the BrowserTest spec may need explicit try/catch around .click() /", "yellow");
+			out(".fill() to surface Playwright exceptions into failMessage.", "yellow");
 		}
-
-		return "";
 	}
 
 	private string function $resolveBrowserInstallDir() {

@@ -129,6 +129,43 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("$normalizeMigTypeForDiff (SQLite text affinity, issue 3565)", () => {
+
+				it("treats text vs string as equivalent", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "string")).toBe("string");
+				});
+
+				it("treats text vs text as a no-op", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "text")).toBe("text");
+				});
+
+				it("treats text vs datetime as equivalent", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "datetime")).toBe("datetime");
+				});
+
+				it("treats text vs date as equivalent", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "date")).toBe("date");
+				});
+
+				it("treats text vs time as equivalent", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "time")).toBe("time");
+				});
+
+				it("treats text vs boolean as equivalent", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "boolean")).toBe("boolean");
+				});
+
+				it("does NOT normalize text vs integer (not a text-affinity pair)", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "integer")).toBe("text");
+				});
+
+				it("does NOT normalize a non-text actual type", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("integer", "string")).toBe("integer");
+					expect(autoMigrator.$normalizeMigTypeForDiff("real", "float")).toBe("real");
+				});
+
+			});
+
 			describe("diff()", () => {
 
 				it("returns a struct with required keys", () => {

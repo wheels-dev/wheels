@@ -121,19 +121,22 @@ component extends="wheels.WheelsTest" {
 				it("findAll with order sorts correctly", () => {
 					var authors = g.model("author").findAll(order = "lastName ASC");
 					expect(authors).toBeQuery();
-					expect(authors.recordCount).toBeGT(0);
-					// Verify first record is alphabetically first
-					if (authors.recordCount > 1) {
-						expect(authors.lastName[1] LTE authors.lastName[2]).toBeTrue();
-					}
+					expect(authors.recordCount).toBeGT(1);
+					expect(authors.lastName[1]).toBeLTE(authors.lastName[2]);
+					expect(authors.lastName[authors.recordCount]).toBeGTE(authors.lastName[1]);
 				});
 
 				it("findAll with pagination returns correct page", () => {
 					var page1 = g.model("author").findAll(page = 1, perPage = 3, order = "lastName ASC");
 					var page2 = g.model("author").findAll(page = 2, perPage = 3, order = "lastName ASC");
 					expect(page1).toBeQuery();
+					expect(page1.recordCount).toBeGT(0);
 					expect(page1.recordCount).toBeLTE(3);
 					expect(page2).toBeQuery();
+					expect(page2.recordCount).toBeGT(0);
+					expect(page2.recordCount).toBeLTE(3);
+					expect(page1.lastName[1]).notToBe(page2.lastName[1]);
+					expect(page1.lastName[1]).toBeLTE(page2.lastName[1]);
 				});
 			});
 		});

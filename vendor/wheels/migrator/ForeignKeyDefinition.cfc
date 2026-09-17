@@ -21,8 +21,20 @@ component extends="Base" {
 				this[local.argumentName] = arguments[local.argumentName];
 			}
 		}
-		this.name = "FK_#objectCase(this.table)#_#objectCase(this.referenceTable)#";
+		this.name = $defaultForeignKeyName(this.table, this.referenceTable, this.column);
 		return this;
+	}
+
+	/**
+	 * Default constraint name. Includes the column so two FKs from the same
+	 * table to the same reference table do not collide.
+	 */
+	public string function $defaultForeignKeyName(
+		required string table,
+		required string referenceTable,
+		required string column
+	) {
+		return "FK_#objectCase(arguments.table)#_#objectCase(arguments.referenceTable)#_#objectCase(arguments.column)#";
 	}
 
 	public string function toSQL() {
@@ -38,7 +50,7 @@ component extends="Base" {
 	}
 
 	public string function toForeignKeySQL() {
-		local.sql = "CONSTRAINT " & this.name;
+		local.sql = "CONSTRAINT " & this.adapter.quoteTableName(this.name);
 		local.sql = addForeignKeyOptions(local.sql);
 		return local.sql;
 	}
@@ -55,6 +67,20 @@ component extends="Base" {
 			}
 		}
 		arguments.sql = this.adapter.addForeignKeyOptions(sql = arguments.sql, options = local.options);
+		// CREATE TABLE uses this path; ALTER ADD uses toSQL()/foreignKeySQL().
+		// Adapters historically dropped onUpdate/onDelete here.
+		return $appendReferentialActions(arguments.sql);
+	}
+
+	/**
+	 * Appends ON UPDATE / ON DELETE using the same mapping as Abstract.foreignKeySQL.
+	 */
+	public string function $appendReferentialActions(required string sql) {
+		for (local.item in ListToArray("onUpdate,onDelete")) {
+			if (StructKeyExists(this, local.item) && Len(this[local.item])) {
+				arguments.sql &= this.adapter.$referentialActionSQL(item = local.item, action = this[local.item]);
+			}
+		}
 		return arguments.sql;
 	}
 

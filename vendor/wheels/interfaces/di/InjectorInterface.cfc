@@ -47,6 +47,23 @@ interface {
 	public Injector function to(required string componentPath);
 
 	/**
+	 * Complete a mapping with a factory closure. The closure receives the
+	 * container and its return value is the resolved instance. Honors the
+	 * singleton / request-scoped flags like `to()`.
+	 *
+	 * @factory Closure or function reference that builds the instance.
+	 * @return The Injector (for chaining).
+	 */
+	public Injector function toFactory(required any factory);
+
+	/**
+	 * Whether the given name is bound to a factory (rather than a component path).
+	 *
+	 * @name The service name to check.
+	 */
+	public boolean function isFactory(required string name);
+
+	/**
 	 * Semantic alias for `map()`. Reads better for interface-to-implementation bindings:
 	 * `bind("INotifier").to("app.lib.SlackNotifier")`
 	 *
@@ -71,6 +88,12 @@ interface {
 	 * @return True if a mapping exists.
 	 */
 	public boolean function containsInstance(required string name);
+
+	/**
+	 * Whether this name carries an explicit mapping or lifecycle flag
+	 * (map().to(), toFactory(), asSingleton(), asRequestScoped()).
+	 */
+	public boolean function hasExplicitMapping(required string name);
 
 	/**
 	 * Mark the current mapping as a singleton (one instance per app lifecycle).

@@ -35,11 +35,29 @@ if (datasourceAvailable && structKeyExists(variables, "currentVersion") && curre
 	}
 }
 
+// Anti-CSRF token for the migrator command endpoint. Generated once per
+// application and echoed back by XHRs in the X-Wheels-Csrf-Token header, which
+// ../migrator/command.cfm requires before running any command. Hoisted above
+// the JSON branch so the debug bar's Migrator panel can fetch state and token
+// in a single request instead of having to load this page first.
+// Double-checked lock: two concurrent first-time requests must not each write
+// their own token, or whichever loaded first would 403 on every command until
+// reload.
+if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
+	cflock(scope="application", type="exclusive", timeout=5) {
+		if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
+			application.wheels.$migratorCsrfToken = LCase(Hash(GenerateSecretKey("AES") & CreateUUID(), "SHA-512"));
+		}
+	}
+}
+migratorCsrfToken = application.wheels.$migratorCsrfToken;
+
 // If JSON format is requested, return JSON response
 if (request.wheels.params.format == "json") {
 	local.migratorData = {
 		"version": application.wheels.version,
 		"timestamp": now(),
+		"csrfToken": application.wheels.$migratorCsrfToken,
 		"migrator": {
 			"datasourceAvailable": datasourceAvailable
 		}
@@ -77,20 +95,8 @@ if (request.wheels.params.format == "json") {
 	abort;
 }
 
-// Anti-CSRF token for the migrator command endpoint. Generated once per
-// application and echoed back by the page's XHRs in the X-Wheels-Csrf-Token
-// header, which ../migrator/command.cfm requires before running any command.
-// Double-checked lock: two concurrent first-time page loads must not each
-// write their own token, or whichever browser loaded first would 403 on every
-// command XHR until reload.
-if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
-	cflock(scope="application", type="exclusive", timeout=5) {
-		if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
-			application.wheels.$migratorCsrfToken = LCase(Hash(GenerateSecretKey("AES") & CreateUUID(), "SHA-512"));
-		}
-	}
-}
-migratorCsrfToken = application.wheels.$migratorCsrfToken;
+// Token already generated above (before the JSON branch) so both the HTML page
+// and the JSON response share one token.
 </cfscript>
 <cfinclude template="../layout/_header.cfm">
 <!--- cfformat-ignore-start --->

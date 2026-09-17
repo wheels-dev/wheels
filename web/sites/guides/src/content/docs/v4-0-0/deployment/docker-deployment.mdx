@@ -1,6 +1,6 @@
 ---
 title: Docker deployment
-description: Package a Wheels app as a container image and run it in production with Lucee 7 and Java 21.
+description: Package a Wheels app as a container image and run it in production with Lucee 7.1 and Java 25.
 type: howto
 sidebar:
   order: 3
@@ -12,7 +12,7 @@ This page shows you how to containerize a Wheels app for production. You'll writ
 
 **You'll learn:**
 
-- Why Lucee 7 + Java 21 is the recommended base
+- Why Lucee 7.1 + Java 25 is the recommended base
 - How to structure a multi-stage Dockerfile so the runtime layer stays small
 - What to exclude with `.dockerignore` and how to pass secrets through environment variables
 - How to add a health check endpoint to a Wheels app
@@ -26,9 +26,9 @@ This page shows you how to containerize a Wheels app for production. You'll writ
   You should already know how a Wheels app is laid out and how datasources are configured at boot. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/) if either of those is still fuzzy.
 </Aside>
 
-## Why Lucee 7 and Java 21
+## Why Lucee 7.1 and Java 25
 
-The framework's CI matrix pins Lucee 7 on Java 21 as the primary production target. Lucee 7 boots faster than Lucee 5 or 6, the JVM footprint on Java 21 is smaller, and the combination matches what the framework's own test suite runs against — if it passes CI, it runs on this stack. Adobe ColdFusion 2023 and BoxLang are also supported; the Dockerfile pattern is the same, only the base image and `CMD` change. See the callout at the bottom of this page for the swaps.
+The recommended base is the stable Lucee 7.1 Docker image, `lucee/lucee:7.1.0.204`, which runs on Java 25 (Temurin LTS). Lucee 7 boots faster than Lucee 5 or 6, and the combination matches what the framework's own test suite runs against — if it passes CI, it runs on this stack. Adobe ColdFusion 2023 and BoxLang are also supported; the Dockerfile pattern is the same, only the base image and `CMD` change. See the callout at the bottom of this page for the swaps.
 
 ## The Dockerfile
 
@@ -50,8 +50,9 @@ COPY . .
 RUN npm run build     # produces public/assets/ (Vite, Tailwind, etc.)
 
 # --- Stage 2: runtime ---------------------------------------------------------
-# Lucee 7 on Java 21. The lucee/lucee image ships a ready webroot at /var/www.
-FROM lucee/lucee:7-tomcat10-jre21
+# Lucee 7.1 (stable) on Java 25. The lucee/lucee image serves /var/www as its
+# webroot and listens on 8888 — both corrected below, plus a URL-rewrite valve.
+FROM lucee/lucee:7.1.0.204
 
 LABEL org.opencontainers.image.source="https://github.com/your-org/your-app"
 
@@ -63,20 +64,35 @@ ENV WHEELS_ENV=production \
 
 WORKDIR /var/www
 
+# Point Tomcat's ROOT context at Wheels' public/ webroot, add a URL-rewrite
+# valve for clean URLs, and make the connector follow $PORT (default 8888).
+RUN sed -i 's#<Context path="" docBase="/var/www/">#<Context path="" docBase="/var/www/public">\n  <Valve className="org.apache.catalina.valves.rewrite.RewriteValve" />#' /usr/local/tomcat/conf/server.xml \
+    && sed -i 's#port="8888"#port="${http.port}"#' /usr/local/tomcat/conf/server.xml \
+    && printf 'export CATALINA_OPTS="$CATALINA_OPTS -Dhttp.port=${PORT:-8888}"\n' > /usr/local/tomcat/bin/setenv.sh \
+    && mkdir -p /var/www/public/WEB-INF \
+    && printf '%s\n' \
+        'RewriteRule ^/?$ - [L]' \
+        'RewriteRule ^/index\.cfm($|/) - [L]' \
+        'RewriteRule ^/(cf_script|flex2gateway|jrunscripts|CFIDE|lucee|cfformgateway|cffileservlet|files|images|javascripts|miscellaneous|stylesheets|assets|wheels|uploads|robots\.txt|favicon\.ico|sitemap\.xml)(/.*)?$ - [L]' \
+        'RewriteRule ^/(.*)$ /index.cfm/$1 [L]' \
+        > /var/www/public/WEB-INF/rewrite.config
+
+# Install curl for the HEALTHCHECK probe.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy the app. Vendor code (framework + activated packages) ships inside the
 # image so production boot needs no network access.
 COPY --from=builder /build/app            ./app
 COPY --from=builder /build/config         ./config
 COPY --from=builder /build/public         ./public
 COPY --from=builder /build/vendor         ./vendor
-COPY --from=builder /build/Application.cfc ./Application.cfc
-COPY --from=builder /build/index.cfm       ./index.cfm
 
-# Tomcat listens on 8080 in the lucee/lucee image.
-EXPOSE 8080
+EXPOSE 8888
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8080/health || exit 1
+    CMD curl -fsS "http://127.0.0.1:${PORT:-8888}/up" || exit 1
 ```
 
 Why multi-stage:
@@ -86,7 +102,7 @@ Why multi-stage:
 3. **One image, any environment.** The runtime reads `WHEELS_ENV` at boot. The same artifact boots against development, staging, or production by swapping env vars — no rebuild.
 
 <Aside type="tip">
-  Use the JRE tag (`jre21`), not JDK. Production never needs `javac`. The JRE image is roughly 150 MB smaller.
+  The plain `7.1.0.204` tag is the JRE-based image (no `javac`) — production never needs the JDK. The JDK variants (e.g. `7.1.0.204-...-jdk25-temurin-noble`) are ~150 MB larger and only useful if you compile Java inside the container.
 </Aside>
 
 ## The .dockerignore
@@ -133,7 +149,7 @@ services:
     image: ghcr.io/your-org/your-app:latest
     restart: unless-stopped
     ports:
-      - "80:8080"
+      - "80:8888"
     environment:
       WHEELS_ENV: production
       WHEELS_DATASOURCE: app
@@ -148,7 +164,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8888/up"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -205,7 +221,7 @@ Keep secrets **out** of the image. `docker compose` reads them from your shell's
 
 ## Health check
 
-The Dockerfile and Compose file above both call `GET /health`. That route doesn't exist in Wheels out of the box — add it yourself. A health action is any controller action that responds quickly without touching external services.
+The Dockerfile and Compose file above both call `GET /up`. That route ships with every `wheels new` app (`app/controllers/Up.cfc`), so it works out of the box. For richer probes you can add your own controller. A health action is any controller action that responds quickly without touching external services.
 
 ```cfm {test:compile} title="app/controllers/Health.cfc"
 component extends="Controller" {
@@ -242,19 +258,19 @@ component {
 }
 ```
 
-Two endpoints, two purposes. `/health` is for the container runtime — fast and dumb, answers "is the process alive." `/ready` is for your load balancer — slower, answers "can this instance serve traffic." Point the `HEALTHCHECK` at `/health` and the Relianoid/ALB health probe at `/ready`.
+Two purposes, two probes. `/up` (built-in) and `/health` (below) answer "is the process alive" for the container runtime; `/ready` answers "can this instance serve traffic" for your load balancer. Point the `HEALTHCHECK` at `/up` (or `/health`) and the ALB/load-balancer probe at `/ready`.
 
 ## Image size
 
 A clean Wheels runtime image lands around 500–700 MB — most of that is Tomcat, Lucee, and the JRE. You can push it lower:
 
-- **JRE, not JDK.** The `lucee/lucee:7-tomcat10-jre21` tag is ~150 MB smaller than `jdk21`.
+- **JRE, not JDK.** The plain `lucee/lucee:7.1.0.204` tag is the JRE image — ~150 MB smaller than the `-jdk25` variant.
 - **Slim base.** If you really need sub-300 MB, build on a slim JRE + install Lucee manually. The prebuilt image is worth the extra MB on every host except the most constrained edge nodes.
 - **Drop test fixtures.** `.dockerignore` should always exclude `vendor/wheels/tests` and your own `tests/` directory.
 - **Layer cache.** `COPY package.json package-lock.json ./` **before** `COPY . .` so a docs-only change doesn't re-run `npm ci`.
 - **One `RUN` per concern.** Every `RUN` creates a layer. Combine `apt-get update && apt-get install && rm -rf /var/lib/apt/lists/*` into a single line.
 
-Alpine is tempting — the base image is tiny — but Lucee on Alpine has historically had glibc/musl issues with some JDBC drivers. The Debian-slim-based `lucee/lucee:7-tomcat10-jre21` is the path of least resistance for production.
+Alpine is tempting — the base image is tiny — but Lucee on Alpine has historically had glibc/musl issues with some JDBC drivers. The Debian-slim-based `lucee/lucee:7.1.0.204` is the path of least resistance for production.
 
 ## Multi-arch images with buildx
 

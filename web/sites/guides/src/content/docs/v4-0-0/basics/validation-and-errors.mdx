@@ -111,9 +111,9 @@ The argument is the view-scope variable name — `"post"` here matches `posts` i
 
 ## Per-field error display
 
-There is no dedicated per-field helper that matches the form-helper style, but two options cover every case.
+Object-bound form helpers can nest the first error for a property inside the field's error wrapper. Pass `includeErrorMessage=true` on the helper, or opt in globally with `set(includeFormErrorMessages=true)` (the `wheels new` template does this). The message is prefixed with `Error:` and marked `role="alert"` so it is not color-only.
 
-The short path is `errorMessageOn`, which returns the first error for a property (empty string when none):
+The short path is still `errorMessageOn`, which returns the first error for a property (empty string when none):
 
 ```cfm {test:compile}
 <cfoutput>

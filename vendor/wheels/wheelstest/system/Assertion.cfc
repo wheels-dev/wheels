@@ -1262,12 +1262,8 @@ component {
 
 	private boolean function equalize( any expected, any actual ){
 		// Null values
-		if ( isNull( arguments.expected ) && isNull( arguments.actual ) ) {
-			return true;
-		}
-
 		if ( isNull( arguments.expected ) || isNull( arguments.actual ) ) {
-			return false;
+			return isNull( arguments.expected ) && isNull( arguments.actual );
 		}
 
 		// Numerics
@@ -1279,14 +1275,7 @@ component {
 			return true;
 		}
 
-		// Simple values
-		if (
-			isSimpleValue( arguments.actual ) && isSimpleValue( arguments.expected ) && arguments.actual eq arguments.expected
-		) {
-			return true;
-		}
-
-		// Two simple values that did not match above are unequal, and saying so here
+		// Simple values that did not match above are unequal, and saying so here
 		// is what keeps them away from the `.equals()` fallback at the bottom of this
 		// function. That fallback is meant for objects; on BoxLang a simple value
 		// resolves `.equals()` to the DateTime member function and throws
@@ -1294,126 +1283,146 @@ component {
 		// reported as an ERROR carrying a cast message instead of a FAILURE reading
 		// "Expected [2] but received [0]" (#3302).
 		if ( isSimpleValue( arguments.actual ) && isSimpleValue( arguments.expected ) ) {
-			return false;
+			return $equalizeSimpleValues( arguments.expected, arguments.actual );
 		}
 
 		// Queries
 		if ( isQuery( arguments.actual ) && isQuery( arguments.expected ) ) {
-			// Check number of records
-			if ( arguments.actual.recordCount != arguments.expected.recordCount ) {
-				return false;
-			}
-
-			// Get both column lists and sort them the same
-			var actualColumnList   = listSort( arguments.actual.columnList, "textNoCase" );
-			var expectedColumnList = listSort( arguments.expected.columnList, "textNoCase" );
-
-			// Check column lists
-			if ( actualColumnList != expectedColumnList ) {
-				return false;
-			}
-
-			// Loop over each row
-			var i = 0;
-			while ( ++i <= arguments.actual.recordCount ) {
-				// Loop over each column
-				for ( var column in listToArray( actualColumnList ) ) {
-					// Compare each value
-					if ( arguments.actual[ column ][ i ] != arguments.expected[ column ][ i ] ) {
-						// At the first sign of trouble, bail!
-						return false;
-					}
-				}
-			}
-
-			// We made it here so nothing looked wrong
-			return true;
+			return $equalizeQueries( arguments.expected, arguments.actual );
 		}
 
 		// UDFs
-		if (
-			isCustomFunction( arguments.actual ) && isCustomFunction( arguments.expected ) &&
-			arguments.actual.toString() eq arguments.expected.toString()
-		) {
-			return true;
+		if ( isCustomFunction( arguments.actual ) && isCustomFunction( arguments.expected ) ) {
+			return $equalizeFunctions( arguments.expected, arguments.actual );
 		}
 
 		// XML
-		if (
-			isXMLDoc( arguments.actual ) && isXMLDoc( arguments.expected ) &&
-			toString( arguments.actual ) eq toString( arguments.expected )
-		) {
-			return true;
+		if ( isXMLDoc( arguments.actual ) && isXMLDoc( arguments.expected ) ) {
+			return $equalizeXml( arguments.expected, arguments.actual );
 		}
 
 		// Arrays
 		if ( isArray( arguments.actual ) && isArray( arguments.expected ) ) {
-			// Confirm both arrays are the same length
-			if ( arrayLen( arguments.actual ) neq arrayLen( arguments.expected ) ) {
-				return false;
-			}
-
-			for ( var i = 1; i lte arrayLen( arguments.actual ); i++ ) {
-				// check for both being defined
-				if ( arrayIsDefined( arguments.actual, i ) and arrayIsDefined( arguments.expected, i ) ) {
-					// check for both nulls
-					if ( isNull( arguments.actual[ i ] ) and isNull( arguments.expected[ i ] ) ) {
-						continue;
-					}
-					// check if one is null mismatch
-					if ( isNull( arguments.actual[ i ] ) OR isNull( arguments.expected[ i ] ) ) {
-						return false;
-					}
-					// And make sure they match
-					if ( !equalize( arguments.actual[ i ], arguments.expected[ i ] ) ) {
-						return false;
-					}
-					continue;
-				}
-				// check if both not defined, then continue to next element
-				if ( !arrayIsDefined( arguments.actual, i ) and !arrayIsDefined( arguments.expected, i ) ) {
-					continue;
-				} else {
-					return false;
-				}
-			}
-
-			// If we made it here, we couldn't find anything different
-			return true;
+			return $equalizeArrays( arguments.expected, arguments.actual );
 		}
 
 		// Structs / Object
 		if ( isStruct( arguments.actual ) && isStruct( arguments.expected ) ) {
-			var actualKeys   = listSort( structKeyList( arguments.actual ), "textNoCase" );
-			var expectedKeys = listSort( structKeyList( arguments.expected ), "textNoCase" );
-			var key          = "";
-
-			// Confirm both structs have the same keys
-			if ( actualKeys neq expectedKeys ) {
-				return false;
-			}
-
-			// Loop over each key
-			for ( key in arguments.actual ) {
-				// check for both nulls
-				if ( isNull( arguments.actual[ key ] ) and isNull( arguments.expected[ key ] ) ) {
-					continue;
-				}
-				// check if one is null mismatch
-				if ( isNull( arguments.actual[ key ] ) OR isNull( arguments.expected[ key ] ) ) {
-					return false;
-				}
-				// And make sure they match when actual values exist
-				if ( !equalize( arguments.actual[ key ], arguments.expected[ key ] ) ) {
-					return false;
-				}
-			}
-
-			// If we made it here, we couldn't find anything different
-			return true;
+			return $equalizeStructs( arguments.expected, arguments.actual );
 		}
 
 		return arguments.actual.equals( arguments.expected );
+	}
+
+	private boolean function $equalizeSimpleValues( any expected, any actual ){
+		// Both arguments are simple values (guaranteed by the caller) that did not
+		// match the numeric check above, so plain equality decides.
+		return arguments.actual eq arguments.expected;
+	}
+
+	private boolean function $equalizeQueries( any expected, any actual ){
+		// Check number of records
+		if ( arguments.actual.recordCount != arguments.expected.recordCount ) {
+			return false;
+		}
+
+		// Get both column lists and sort them the same
+		var actualColumnList   = listSort( arguments.actual.columnList, "textNoCase" );
+		var expectedColumnList = listSort( arguments.expected.columnList, "textNoCase" );
+
+		// Check column lists
+		if ( actualColumnList != expectedColumnList ) {
+			return false;
+		}
+
+		// Loop over each row
+		var i = 0;
+		while ( ++i <= arguments.actual.recordCount ) {
+			// Loop over each column
+			for ( var column in listToArray( actualColumnList ) ) {
+				// Compare each value
+				if ( arguments.actual[ column ][ i ] != arguments.expected[ column ][ i ] ) {
+					// At the first sign of trouble, bail!
+					return false;
+				}
+			}
+		}
+
+		// We made it here so nothing looked wrong
+		return true;
+	}
+
+	private boolean function $equalizeArrays( any expected, any actual ){
+		// Confirm both arrays are the same length
+		if ( arrayLen( arguments.actual ) neq arrayLen( arguments.expected ) ) {
+			return false;
+		}
+
+		for ( var i = 1; i lte arrayLen( arguments.actual ); i++ ) {
+			// check for both being defined
+			if ( arrayIsDefined( arguments.actual, i ) and arrayIsDefined( arguments.expected, i ) ) {
+				// check for both nulls
+				if ( isNull( arguments.actual[ i ] ) and isNull( arguments.expected[ i ] ) ) {
+					continue;
+				}
+				// check if one is null mismatch
+				if ( isNull( arguments.actual[ i ] ) OR isNull( arguments.expected[ i ] ) ) {
+					return false;
+				}
+				// And make sure they match
+				if ( !equalize( arguments.actual[ i ], arguments.expected[ i ] ) ) {
+					return false;
+				}
+				continue;
+			}
+			// check if both not defined, then continue to next element
+			if ( !arrayIsDefined( arguments.actual, i ) and !arrayIsDefined( arguments.expected, i ) ) {
+				continue;
+			} else {
+				return false;
+			}
+		}
+
+		// If we made it here, we couldn't find anything different
+		return true;
+	}
+
+	private boolean function $equalizeStructs( any expected, any actual ){
+		var actualKeys   = listSort( structKeyList( arguments.actual ), "textNoCase" );
+		var expectedKeys = listSort( structKeyList( arguments.expected ), "textNoCase" );
+		var key          = "";
+
+		// Confirm both structs have the same keys
+		if ( actualKeys neq expectedKeys ) {
+			return false;
+		}
+
+		// Loop over each key
+		for ( key in arguments.actual ) {
+			// check for both nulls
+			if ( isNull( arguments.actual[ key ] ) and isNull( arguments.expected[ key ] ) ) {
+				continue;
+			}
+			// check if one is null mismatch
+			if ( isNull( arguments.actual[ key ] ) OR isNull( arguments.expected[ key ] ) ) {
+				return false;
+			}
+			// And make sure they match when actual values exist
+			if ( !equalize( arguments.actual[ key ], arguments.expected[ key ] ) ) {
+				return false;
+			}
+		}
+
+		// If we made it here, we couldn't find anything different
+		return true;
+	}
+
+	private boolean function $equalizeFunctions( any expected, any actual ){
+		return arguments.actual.toString() eq arguments.expected.toString();
+	}
+
+	private boolean function $equalizeXml( any expected, any actual ){
+		return toString( arguments.actual ) eq toString( arguments.expected );
 	}
 
 	/**

@@ -788,7 +788,14 @@ component output="false" extends="wheels.Global"{
 		// Run the finder outside the try so query errors (DB connection failures, missing
 		// tables at query time, SQL errors) propagate instead of being masked as a missing
 		// model class.
-		local.instance = local.modelClass.findByKey(local.rv.key);
+		if (StructKeyExists(arguments.route, "bindBy") && Len(Trim(arguments.route.bindBy))) {
+			// bindBy="slug" looks the record up by a non-PK column via the
+			// parameterized dynamic finder. invoke() form (not a bracket call)
+			// per Cross-Engine Invariant 4.
+			local.instance = invoke(local.modelClass, "findOneBy" & arguments.route.bindBy, { 1 = local.rv.key });
+		} else {
+			local.instance = local.modelClass.findByKey(local.rv.key);
+		}
 
 		// If no record was found, throw a 404.
 		if (IsBoolean(local.instance) && !local.instance) {
@@ -972,14 +979,32 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Ensure that the controller and action params exist and are camelized.
+	 * A matched route that names a controller/action always wins over query,
+	 * form, or JSON body values. Mapper.$addRoute already deletes those keys
+	 * when the pattern contains [controller] / [action], so wildcard
+	 * path-derived names still come from $mergeRoutePattern. The pattern
+	 * check is a second gate for route structs built outside $addRoute.
 	 */
 	public struct function $ensureControllerAndAction(required struct params, required struct route) {
 		local.rv = arguments.params;
-		if (!StructKeyExists(local.rv, "controller")) {
+		local.pattern = StructKeyExists(arguments.route, "pattern") ? arguments.route.pattern : "";
+		if (
+			StructKeyExists(arguments.route, "controller")
+			&& Len(arguments.route.controller)
+			&& !FindNoCase("[controller]", local.pattern)
+		) {
 			local.rv.controller = arguments.route.controller;
+		} else if (!StructKeyExists(local.rv, "controller")) {
+			local.rv.controller = StructKeyExists(arguments.route, "controller") ? arguments.route.controller : "";
 		}
-		if (!StructKeyExists(local.rv, "action")) {
+		if (
+			StructKeyExists(arguments.route, "action")
+			&& Len(arguments.route.action)
+			&& !FindNoCase("[action]", local.pattern)
+		) {
 			local.rv.action = arguments.route.action;
+		} else if (!StructKeyExists(local.rv, "action")) {
+			local.rv.action = StructKeyExists(arguments.route, "action") ? arguments.route.action : "";
 		}
 
 		// We now need to have dot notation allowed in the controller hence the \.
@@ -1021,11 +1046,16 @@ component output="false" extends="wheels.Global"{
 
 	/**
 	 * Determine HTTP verb used in request.
+	 * `_method` is honored only on POST and only for PUT / PATCH / DELETE —
+	 * the verbs `startFormTag()` emits. GET/HEAD cannot become a
+	 * state-changing verb, and POST cannot become a CSRF-safe verb.
 	 */
 	public string function $getRequestMethod() {
-		// If request is a post, check for alternate verb.
 		if (request.cgi.request_method == "post" && StructKeyExists(form, "_method")) {
-			return form["_method"];
+			local.override = form["_method"];
+			if (ListFindNoCase("put,patch,delete", local.override)) {
+				return local.override;
+			}
 		}
 
 		return request.cgi.request_method;

@@ -5,7 +5,6 @@
 
 <h1>Create your account</h1>
 
-#flashMessages()#
 #errorMessagesFor("{{modelVar}}")#
 
 #startFormTag(route="registrations")#

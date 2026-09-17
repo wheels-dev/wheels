@@ -22,8 +22,8 @@ meta = $get("pluginMeta")[request.wheels.params.name];
 		</div>
 
 		<cfif StructCount(meta.boxjson)>
-			<cfif StructKeyExists(meta.boxjson, "homepage")>
-				<a class="ui button small teal" href="#meta.boxjson.homepage#" target="_blank">
+			<cfif StructKeyExists(meta.boxjson, "homepage") AND Len(meta.boxjson.homepage) AND REFindNoCase("^https?://", meta.boxjson.homepage)>
+				<a class="ui button small teal" href="#EncodeForHTML(meta.boxjson.homepage)#" target="_blank" rel="noopener">
 					<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24" style="vertical-align: middle;">
 						<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
 					</svg>
@@ -33,7 +33,7 @@ meta = $get("pluginMeta")[request.wheels.params.name];
 		</cfif>
 
 		<div class="ui segment">
-			<cfinclude template="/plugins/#LCase(request.wheels.params.name)#/index.cfm">
+			<p>Plugin-provided pages are not executed from this admin view.</p>
 		</div>
 	</div>
 </cfoutput>

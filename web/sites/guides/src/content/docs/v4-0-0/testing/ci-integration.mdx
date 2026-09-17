@@ -59,7 +59,7 @@ Treat this as the shape, not gospel — the step that varies per app is the data
 Two details worth knowing:
 
 - **`WHEELS_CI=true`** is a signal for the test harness — most visibly it gates browser specs (below). Set it on every CI job.
-- **`wheels test --ci`** exits non-zero on failure and emits one GitHub Actions `::error` annotation per failed or errored spec, so failures surface inline in the PR checks ([#3113](https://github.com/wheels-dev/wheels/issues/3113)).
+- **`wheels test --ci`** throws `Wheels.TestsFailed` (non-zero exit) on Fail/Error, on `directoryRejected` / `bundlesDiscovered=0`, and on compile-skipped specs, and emits one GitHub Actions `::error` annotation per failed or errored spec so failures surface inline in the PR checks ([#3113](https://github.com/wheels-dev/wheels/issues/3113), [#3083](https://github.com/wheels-dev/wheels/issues/3083)).
 
 ## Minimum viable — without the wheels CLI
 
@@ -93,7 +93,10 @@ jobs:
           import json
           d = json.load(open('results.json'))
           print(d.get('totalPass',0), 'pass', d.get('totalFail',0), 'fail', d.get('totalError',0), 'error')
-          raise SystemExit(0 if d.get('totalFail',0)==0 and d.get('totalError',0)==0 else 1)
+          rejected = d.get('directoryRejected')
+          vacuous = d.get('bundlesDiscovered', 1) == 0
+          failed = d.get('totalFail',0) or d.get('totalError',0)
+          raise SystemExit(0 if not (rejected or vacuous or failed) else 1)
           "
 ```
 
@@ -102,7 +105,7 @@ Adjust the port to whatever your `server.json` declares. Two constraints:
 - **The app must run as `development`** — the `/wheels/*` runner surfaces are development-only ([#2903](https://github.com/wheels-dev/wheels/pull/2903)). A CI job is exactly the place that's fine; just don't point this at a production-configured deployment.
 - **The runner uses the app's configured datasource** (no `<datasource>_test` auto-swap without the CLI) — configure the CI app's datasource to a throwaway database and let `tests/populate.cfm` build it.
 
-A filtered run that names a directory the runner doesn't recognize silently runs the **full** suite ([#3083](https://github.com/wheels-dev/wheels/issues/3083)) — when you filter in CI (`&directory=tests.specs.models`), also assert the run wasn't vacuous (a suspiciously low spec count or a zero-bundle warning in the payload).
+A filtered run that names a directory the runner doesn't recognize silently runs the **full** suite ([#3083](https://github.com/wheels-dev/wheels/issues/3083)) — the payload sets `directoryRejected: true`. When you filter in CI (`&directory=tests.specs.models`), fail the job on `directoryRejected` or `bundlesDiscovered=0` (the snippet above does). Prefer `wheels test --ci`, which throws `Wheels.TestsFailed` for those cases.
 
 ## Reporter output for CI
 

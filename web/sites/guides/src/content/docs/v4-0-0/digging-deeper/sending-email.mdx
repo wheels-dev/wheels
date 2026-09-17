@@ -260,8 +260,28 @@ set(functionName="sendEmail",
 Set the env var once in your deploy config; the same mailer code now routes mail correctly in every environment. See [Environments and Configuration](/v4-0-0/core-concepts/environments-and-configuration/) for the full per-environment settings pipeline.
 
 <Aside type="tip">
-  To see what an email would look like without delivering it, pass `deliver=false` to `sendEmail()`. Wheels renders the body, composes the arguments, and returns the struct — useful in tests and in dev when you just want to eyeball the HTML.
+  To see what an email would look like without delivering it, pass `deliver=false` to `sendEmail()`. Wheels renders the body, composes the arguments, and returns the struct — useful in tests and in dev when you just want to eyeball the HTML. Pair it with `writeToFile` to dump that rendered body to disk (see [Preview without sending](#preview-without-sending)).
 </Aside>
+
+## Preview without sending
+
+`deliver=false` skips `$mail()` / `cfmail`. `writeToFile` writes the **rendered body** (text and/or HTML) to the path you pass.
+
+That file is a debug dump, not an RFC 822 / MIME `.eml`. Wheels concatenates the text and HTML parts — a blank line between them when both exist — and writes the bytes with `$file`. It does **not** write `From`, `To`, `Subject`, `Date`, `MIME-Version`, or `Content-Type` headers. Live delivery still goes through `cfmail`, which builds a proper MIME message, so the inbox can look correct while a saved `.eml` opened in Outlook shows raw HTML tags.
+
+```cfm
+sendEmail(
+    template="/mailers/user/welcome",
+    from="no-reply@example.com",
+    to=user.email,
+    subject="Welcome!",
+    user=user,
+    deliver=false,
+    writeToFile=ExpandPath("./tmp/welcome-preview.html")
+);
+```
+
+Use a `.html` or `.txt` extension and open the file in a browser or editor. To preview a real message, send it (`deliver=true`) to yourself or point SMTP at a local capture tool (MailHog, Mailpit, Mailtrap) as in [Per-environment SMTP](#per-environment-smtp).
 
 ## Third-party services
 

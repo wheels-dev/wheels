@@ -1,0 +1,54 @@
+name: Blog — Publish Scheduled Posts
+
+# Every morning (06:00 UTC), moves blog posts whose publishedAt date is
+# today or earlier from web/content/blog/scheduled/ into
+# web/content/blog/posts/, commits as wheels-bot[bot] on a
+# docs/bot-blog-publish-<YYYYMMDD> branch, and opens a PR against develop.
+# develop's branch protection rejects direct pushes (GH013), so the publish
+# lands through a PR rather than a push to develop. Merging that PR triggers
+# the blog deploy (web-deploy.yml detects web/content/blog/posts/ changes) and
+# the announcement workflow (blog-announce-on-publish.yml), so the posts go
+# live and are announced once they are durable on develop.
+# Catch-up semantics: a missed day publishes on the next successful run.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: blog-publish-scheduled
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish posts scheduled for today
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      # App-token pushes trigger downstream workflows (GITHUB_TOKEN pushes
+      # do not), which is what makes the blog deploy and the announce
+      # workflow fire after the publish PR merges.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Publish due posts
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          chmod +x .github/scripts/blog-publish-scheduled.sh
+          bash .github/scripts/blog-publish-scheduled.sh

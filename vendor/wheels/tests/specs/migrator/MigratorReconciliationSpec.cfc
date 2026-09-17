@@ -41,7 +41,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns a clean health struct when DB and files match", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("003");
 				var report = migrator.doctor();
 				expect(report).toBeStruct();
@@ -53,7 +56,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("flags orphans as unhealthy", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				var report = migrator.doctor();
@@ -63,7 +69,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("flags pending local migrations", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				var report = migrator.doctor();
 				expect(report.healthy).toBeFalse();
@@ -71,7 +80,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("includes a human-readable summary message", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				var report = migrator.doctor();
@@ -100,7 +112,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("removes an orphan version from the tracking table", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				var result = migrator.forgetVersion("999");
@@ -110,7 +125,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("refuses to forget a version that has a local file", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("002");
 				var result = migrator.forgetVersion("002");
 				expect(result.success).toBeFalse();
@@ -118,14 +136,20 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("refuses to forget a version that is not in the tracking table", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var result = migrator.forgetVersion("999");
 				expect(result.success).toBeFalse();
 				expect(result.message).toInclude("not found");
 			});
 
 			it("returns a failure for invalid version input", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var result = migrator.forgetVersion("abc");
 				expect(result.success).toBeFalse();
 				expect(result.message).toInclude("Invalid version");
@@ -152,7 +176,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("records a version as applied without running its up()", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var result = migrator.pretendVersion("001");
 				expect(result.success).toBeTrue();
 				expect(result.recorded).toBe("001");
@@ -167,7 +194,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("refuses to pretend a version that is already applied", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				var result = migrator.pretendVersion("001");
 				expect(result.success).toBeFalse();
@@ -175,14 +205,20 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("refuses to pretend a version that has no local file", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var result = migrator.pretendVersion("999");
 				expect(result.success).toBeFalse();
 				expect(result.message).toInclude("no matching file");
 			});
 
 			it("returns a failure for invalid version input", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var result = migrator.pretendVersion("abc");
 				expect(result.success).toBeFalse();
 				expect(result.message).toInclude("Invalid version");

@@ -34,4 +34,11 @@ component {
 		return this;
 	}
 
+	public struct function $snapshotBindings() {
+		return {mappings = {}};
+	}
+
+	public void function $restoreBindings(required struct snapshot) {
+	}
+
 }

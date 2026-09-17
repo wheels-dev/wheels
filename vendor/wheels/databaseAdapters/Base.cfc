@@ -20,7 +20,6 @@ component output=false extends="wheels.Global"{
 		// Build query
 		cfquery(attributeCollection = args.queryAttributes) {
 			local.pos = 1;
-			local.prev = "";
 
 			for (; pos <= sqlLen; pos++) {
 				local.part = sqlArray[pos];
@@ -28,17 +27,18 @@ component output=false extends="wheels.Global"{
 				if (isStruct(part)) {
 					local.qp = $queryParams(part);
 
-					// Handle NULL for "IS NULL" or "IS NOT NULL"
-					if (
-						!isBinary(part.value) &&
-						part.value == "null" &&
-						pos > 1 &&
-						( right(prev, 2) == "IS" || right(prev, 6) == "IS NOT" )
-					) {
+					// A missing value (unquoted NULL keyword after IS / IS NOT,
+					// cfqueryparam null=true, or a CFML/Java null) renders as the
+					// inline SQL NULL literal — never as a bound parameter.
+					// PostgreSQL, CockroachDB, and SQL Server all reject a bound
+					// parameter in `IS $1` position ("syntax error at or near
+					// "$1""), and `= $1` with a NULL parameter silently matches
+					// nothing on most engines. The quoted literal 'null' is a
+					// different thing: it has qp.null=false and stays a bound
+					// string parameter in the normal branch below.
+					if (structKeyExists(qp, "null") && qp.null) {
 						writeOutput("NULL");
-					}
-					// Handle parameter lists "(?,?,?)"
-					else if (structKeyExists(qp, "list")) {
+					} else if (structKeyExists(qp, "list")) {
 						writeOutput("(");
 						if (args.parameterize) {
 							cfqueryParam(attributeCollection = qp);
@@ -66,7 +66,6 @@ component output=false extends="wheels.Global"{
 				}
 
 				writeOutput(newLine);
-				prev = part;
 			}
 
 			// LIMIT / OFFSET logic
@@ -536,7 +535,15 @@ component output=false extends="wheels.Global"{
 	 * Internal function.
 	 */
 	public struct function $queryParams(required struct settings) {
-		if (!StructKeyExists(arguments.settings, "value")) {
+		local.hasValue = StructKeyExists(arguments.settings, "value");
+		// Adobe CF's IsNull() misreports dotted-path arguments that hold the
+		// string "Null" as null (value-dependent quirk — the same string via a
+		// plain variable, bracket access, ToString, or Duplicate reads NO).
+		// Guard with IsSimpleValue() first: a real CFML/Java null is never a
+		// simple value, and the string "Null" always is, so the short-circuit
+		// keeps the check form- and engine-independent.
+		local.valueIsNull = local.hasValue && !IsSimpleValue(arguments.settings.value) && IsNull(arguments.settings.value);
+		if (!local.hasValue && !(StructKeyExists(arguments.settings, "null") && arguments.settings.null)) {
 			Throw(
 				type = "Wheels.QueryParamValue",
 				message = "The value for `cfqueryparam` cannot be determined for property `#arguments.settings.property#`.<br>This usually happens due to a syntax error in the WHERE clause (e.g., using unquoted strings or invalid values).",
@@ -545,9 +552,17 @@ component output=false extends="wheels.Global"{
 		}
 		local.rv = {};
 		local.rv.cfsqltype = arguments.settings.type;
-		local.rv.value = arguments.settings.value;
-		if (StructKeyExists(arguments.settings, "null")) {
-			local.rv.null = arguments.settings.null;
+		if (local.valueIsNull || (StructKeyExists(arguments.settings, "null") && arguments.settings.null)) {
+			// CFML/Java null and an explicit SQL-NULL flag bind as SQL NULL.
+			// Do not pass the strings "null" / "[NULL]" as the typed value —
+			// integer cfqueryparam cannot cast them.
+			local.rv.null = true;
+			local.rv.value = "";
+		} else {
+			local.rv.value = arguments.settings.value;
+			if (StructKeyExists(arguments.settings, "null")) {
+				local.rv.null = arguments.settings.null;
+			}
 		}
 		if (StructKeyExists(arguments.settings, "scale") && arguments.settings.scale > 0) {
 			local.rv.scale = arguments.settings.scale;
@@ -593,7 +608,11 @@ component output=false extends="wheels.Global"{
 		if (!StructKeyExists(arguments, "type")) {
 			arguments.type = $getValidationType(arguments.sqlType);
 		}
-		if (!ListFindNoCase("integer,float,boolean", arguments.type) || !Len(arguments.str)) {
+		if (
+			!ListFindNoCase("integer,float,boolean", arguments.type)
+			|| !Len(arguments.str)
+			|| (arguments.type == "boolean" && (CompareNoCase(arguments.str, "yes") == 0 || CompareNoCase(arguments.str, "no") == 0))
+		) {
 			local.rv = "'#Replace(arguments.str, "'", "''", "all")#'";
 		} else {
 			$validateValueShape(arguments.str, arguments.type);
@@ -630,6 +649,22 @@ component output=false extends="wheels.Global"{
 				}
 				break;
 		}
+	}
+
+	public void function $throwUnknownColumnType(required string typeName) {
+		Throw(
+			type = "Wheels.UnknownColumnType",
+			message = "The column type `#arguments.typeName#` is not mapped to a CFML SQL type.",
+			extendedInfo = "Add a case for `#arguments.typeName#` to `$getType()` on this database adapter."
+		);
+	}
+
+	public void function $throwIdentityNotFound() {
+		Throw(
+			type = "Wheels.IdentityNotFound",
+			message = "Could not retrieve the generated identity for this INSERT.",
+			extendedInfo = "The driver-supplied key and the sequence / SCOPE_IDENTITY path both missed. Last-resort MAX(ROWID) and @@IDENTITY have been removed."
+		);
 	}
 
 	public void function $throwInvalidValue(required string str, required string expectedType) {

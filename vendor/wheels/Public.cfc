@@ -4,26 +4,50 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 * Internal function.
 	 */
 	public struct function $init() {
-		include "/wheels/public/helpers.cfm";
-
-		// The include above declares its UDFs into `variables` only — they never
-		// reach `this` on Lucee 6, Adobe 2023 or Adobe 2025 (Lucee 7 and BoxLang
-		// do promote them, which is why the split stayed invisible). Every helper
-		// in helpers.cfm is declared `public`, and the framework's own views reach
-		// them through `variables`, so the divergence only bites an external
-		// caller — `CreateObject("component", "wheels.Public").$init().$$findMatchingRoutes(…)`
-		// threw "has no function with name" on three of five engines (##3302).
-		//
-		// Same problem, same fix as the `/app/global/functions.cfm` include in
-		// `Global.cfc`'s pseudo-constructor. Call the raw scan rather than
-		// `$promoteIncludedGlobalsToThis()`: that wrapper memoizes its promote
-		// list per class in application scope, and the entry for `wheels.Public`
-		// is written by the pseudo-constructor *before* this include runs — so the
-		// memoized path would replay a stale, pre-include key list and promote
-		// nothing. This is the dev-only GUI component, not a request hot path.
+		// The helpers include MUST live in its own method. 4.0.6 added
+		// `$scanAndPromoteIncludedGlobals()` immediately after a raw `include`
+		// in this same `$init` body (##3302 / 6bff054). That nests Adobe's
+		// include page-context with a parent-class method call (Global's
+		// promote scan). On the first request after a CommandBox cold start,
+		// Adobe CF 2023's `UDFMethod.invoke` cleanup then calls
+		// `NeoPageContext.popSuperScope` against an empty stack —
+		// EmptyStackException at onapplicationstart.cfc:409
+		// (`$createObjectFromRoot` → Public.$init). A later request succeeds
+		// because helpers.cfm is already compiled. 4.0.5 `$init` only
+		// included and returned, which is why discarding 4.0.6 files cleared
+		// it. Isolate the include so its page-context pops before the promote
+		// scan runs; keep the raw scan (not the memoized wrapper) so the
+		// ##3302 `this`-visibility contract stays.
+		$includePublicHelpers();
 		$scanAndPromoteIncludedGlobals();
 
 		return this;
+	}
+
+	/**
+	 * Includes `/wheels/public/helpers.cfm` in its own UDF frame so Adobe's
+	 * include page-context is popped before `$init` calls the parent-class
+	 * promote scan. Do not inline this `include` back into `$init` — that
+	 * nest is the 4.0.6 first-boot EmptyStackException on Adobe CF 2023.
+	 *
+	 * The include declares its UDFs into `variables` only — they never
+	 * reach `this` on Lucee 6, Adobe 2023 or Adobe 2025 (Lucee 7 and BoxLang
+	 * do promote them, which is why the split stayed invisible). Every helper
+	 * in helpers.cfm is declared `public`, and the framework's own views reach
+	 * them through `variables`, so the divergence only bites an external
+	 * caller — `CreateObject("component", "wheels.Public").$init().$$findMatchingRoutes(…)`
+	 * threw "has no function with name" on three of five engines (##3302).
+	 *
+	 * Same problem, same fix as the `/app/global/functions.cfm` include in
+	 * `Global.cfc`'s pseudo-constructor. `$init` calls the raw scan rather than
+	 * `$promoteIncludedGlobalsToThis()`: that wrapper memoizes its promote
+	 * list per class in application scope, and the entry for `wheels.Public`
+	 * is written by the pseudo-constructor *before* this include runs — so the
+	 * memoized path would replay a stale, pre-include key list and promote
+	 * nothing. This is the dev-only GUI component, not a request hot path.
+	 */
+	public void function $includePublicHelpers() {
+		include "/wheels/public/helpers.cfm";
 	}
 
 	/**
@@ -171,21 +195,27 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 		try {
 			local.canonicalRoot = CreateObject("java", "java.io.File").init(ExpandPath("/")).getCanonicalPath();
-			// Treat the requested path as web-root-relative. The old raw
-			// ExpandPath() resolved bare relative paths against the current
-			// template directory and let `../` climb out of the application
-			// entirely; java.io.File(parent, child) keeps absolute child
-			// paths contained too, and getCanonicalPath() collapses any
-			// remaining traversal before the confinement check below.
-			local.canonicalTarget = CreateObject("java", "java.io.File").init(local.canonicalRoot, arguments.output).getCanonicalPath();
+			local.separator = CreateObject("java", "java.io.File").separator;
+			// Join in CFML instead of the java.io.File(parent, child)
+			// constructor: RustCFML's java.io.File shim ignores the child
+			// argument, so the two-argument form resolves to the parent
+			// alone. Joining first keeps an absolute child contained the
+			// same way java.io.File(parent, child) does on JVM engines.
+			local.canonicalTarget = CreateObject("java", "java.io.File").init(local.canonicalRoot & local.separator & arguments.output).getCanonicalPath();
 		} catch (any e) {
 			return "";
 		}
-		local.separator = CreateObject("java", "java.io.File").separator;
-		if (Right(local.canonicalRoot, 1) != local.separator) {
-			local.canonicalRoot &= local.separator;
+		// Lexically collapse "." and ".." for the confinement check so the
+		// prefix comparison below also holds on engines whose java.io.File
+		// shim does not canonicalize traversal (RustCFML). Both sides are
+		// normalized the same way, so the check is equivalent on JVM engines
+		// (whose getCanonicalPath() already produced canonical paths).
+		local.normalizedTarget = $normalizeZipPath(Replace(local.canonicalTarget, "\", "/", "all"));
+		local.normalizedRoot = $normalizeZipPath(Replace(local.canonicalRoot, "\", "/", "all"));
+		if (Right(local.normalizedRoot, 1) != "/") {
+			local.normalizedRoot &= "/";
 		}
-		if (CompareNoCase(Left(local.canonicalTarget, Len(local.canonicalRoot)), local.canonicalRoot) != 0) {
+		if (CompareNoCase(Left(local.normalizedTarget, Len(local.normalizedRoot)), local.normalizedRoot) != 0) {
 			return "";
 		}
 		return local.canonicalTarget;
@@ -398,9 +428,33 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "views/routetesterprocess.cfm";
 		return "";
 	}
+	/**
+	 * API reference.
+	 *
+	 * The BROWSABLE page is served from the local docs bundle so it works
+	 * offline, replacing the CFML renderer that walked the installed framework's
+	 * source comments. The prebuilt Starlight site is the single source, so what
+	 * you read locally is identical to api.wheels.dev rather than a second
+	 * rendering of it.
+	 *
+	 * The non-HTML formats are NOT retired. `?format=json` is a published
+	 * interface, not a page: the Wheels Snapshots workflow fetches
+	 * /wheels/api?format=json&type=core to build the API snapshot the docs site
+	 * consumes, and /wheels/ai derives its condensed summary from the same data.
+	 * Those keep the CFML renderer.
+	 */
 	function api() {
 		$blockInProduction();
-		include "/wheels/public/views/api.cfm";
+		var format = StructKeyExists(request.wheels.params, "format") ? request.wheels.params.format : "html";
+		if (LCase(format) != "html") {
+			include "/wheels/public/views/api.cfm";
+			return "";
+		}
+		var path = StructKeyExists(request.wheels.params, "path") ? request.wheels.params.path : "";
+		if ($serveDocsFile("api", path)) {
+			return "";
+		}
+		$docsUnavailable("api");
 		return "";
 	}
 	function runner() {
@@ -596,8 +650,50 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return wheels();
 	}
 
+	/**
+	 * Serves the prebuilt docs bundle mounted under the app webroot.
+	 *
+	 * The bundle is served as /wheels-docs/guides/... and /wheels-docs/api/....
+	 * Assets under those prefixes are served by the container straight off
+	 * disk; only the extension-less page paths reach this handler, which maps
+	 * them onto the matching index.html.
+	 */
+	function docsBundle() {
+		$blockInProduction();
+		var path = StructKeyExists(request.wheels.params, "path") ? request.wheels.params.path : "";
+		var site = "guides";
+		if (Find("/", path)) {
+			site = LCase(ListFirst(path, "/"));
+			path = ListRest(path, "/");
+		} elseif (Len(path)) {
+			site = LCase(path);
+			path = "";
+		}
+		if (site != "guides" && site != "api") {
+			$docsUnavailable("guides");
+			return "";
+		}
+		if ($serveDocsFile(site, path)) {
+			return "";
+		}
+		$docsUnavailable(site);
+		return "";
+	}
+
+	/**
+	 * Guides. Served from the local docs bundle so they work offline.
+	 *
+	 * When no bundle is installed this falls back to views/guides.cfm, which
+	 * redirects HTML callers to guides.wheels.dev and returns a sidebar-derived
+	 * summary for AI/MCP callers hitting ?format=json — so an install without
+	 * the bundle keeps working exactly as it did before.
+	 */
 	function guides() {
 		$blockInProduction();
+		var path = StructKeyExists(request.wheels.params, "path") ? request.wheels.params.path : "";
+		if ($serveDocsFile("guides", path)) {
+			return "";
+		}
 		include "/wheels/public/views/guides.cfm";
 		return "";
 	}
@@ -745,7 +841,25 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			case "js":
 				return "application/javascript";
 			case "map":
+			case "json":
 				return "application/json";
+			// Added for the local docs bundle, which serves whole pages and the
+			// Pagefind search index rather than just dev-UI assets.
+			case "html":
+			case "htm":
+				return "text/html";
+			case "xml":
+				return "application/xml";
+			case "txt":
+				return "text/plain";
+			case "wasm":
+				return "application/wasm";
+			case "webp":
+				return "image/webp";
+			case "avif":
+				return "image/avif";
+			case "ico":
+				return "image/x-icon";
 			case "woff2":
 				return "font/woff2";
 			case "woff":
@@ -767,6 +881,165 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 				return "application/octet-stream";
 		}
 	}
+
+	/**
+	 * Absolute path to the unpacked local docs bundle, or "" when there isn't
+	 * one.
+	 *
+	 * The bundle is built by tools/build/scripts/build-docs.sh and unpacked
+	 * under the CLI home as docs/<frameworkVersion>/. `wheels docs fetch`
+	 * populates it, and the Homebrew formula stages it during install/upgrade.
+	 * `docsBundlePath` overrides the location (used by the spec suite, and by
+	 * anyone serving the bundle from somewhere else).
+	 */
+	public string function $docsBundleRoot() {
+		var override = $get("docsBundlePath");
+		if (IsSimpleValue(override) && Len(Trim(override))) {
+			var trimmed = REReplace(Trim(override), "[/\\]+$", "");
+			return DirectoryExists(trimmed) ? trimmed : "";
+		}
+		// Prefer a bundle mounted under the app's own webroot. It has to live
+		// there for ASSETS to work at all: the dev server's Lucee urlRewrite
+		// only routes extension-less paths to the front controller, so
+		// extension-bearing URLs under /wheels/ never reach Wheels. Files under
+		// the webroot are served by the container directly, and only the
+		// extension-less page paths come through here.
+		var webrootMount = ExpandPath("/wheels-docs");
+		if (DirectoryExists(webrootMount) && FileExists(webrootMount & "/manifest.json")) {
+			return webrootMount;
+		}
+		// Fall back to the shared cache that `wheels docs fetch` populates.
+		// Pages serve from here; assets cannot (see above).
+		var cliHome = env("LUCLI_HOME", "");
+		if (!IsSimpleValue(cliHome) || !Len(Trim(cliHome))) {
+			var userHome = env("HOME", "");
+			if (!IsSimpleValue(userHome) || !Len(Trim(userHome))) {
+				return "";
+			}
+			cliHome = userHome & "/.wheels";
+		}
+		var candidate = REReplace(Trim(cliHome), "[/\\]+$", "") & "/docs/" & application.wheels.version;
+		return DirectoryExists(candidate) ? candidate : "";
+	}
+
+	/**
+	 * Resolves a requested docs path to an absolute file inside the bundle.
+	 *
+	 * Mirrors $resolveDevAssetPath: reject traversal, backslashes, absolute
+	 * paths and anything outside a conservative charset before touching the
+	 * filesystem, then confirm with a canonical-prefix compare. Returns "" for
+	 * anything that escapes the bundle or does not exist.
+	 *
+	 * The extension allowlist is intentionally wider than the dev-asset one
+	 * because the bundle contains whole pages, the search index and fonts. It
+	 * still excludes anything that could be executed — no .cfc, .cfm, .cfml.
+	 */
+	public string function $resolveDocsPath(required string site, required string requested) {
+		if (arguments.site != "guides" && arguments.site != "api") {
+			return "";
+		}
+		if (!Len(Trim(arguments.requested))) {
+			return "";
+		}
+		if (
+			Find("..", arguments.requested)
+			|| Left(arguments.requested, 1) == "/"
+			|| ReFind("[^A-Za-z0-9_\-./]", arguments.requested)
+		) {
+			return "";
+		}
+		if (
+			!ListFindNoCase(
+				"html,htm,css,js,json,map,xml,txt,wasm,woff,woff2,ttf,eot,svg,png,jpg,jpeg,gif,webp,avif,ico",
+				ListLast(arguments.requested, ".")
+			)
+		) {
+			return "";
+		}
+		var root = $docsBundleRoot();
+		if (!Len(root)) {
+			return "";
+		}
+		var siteDir = root & "/" & arguments.site;
+		var target = siteDir & "/" & arguments.requested;
+		try {
+			var canonicalSite = CreateObject("java", "java.io.File").init(siteDir).getCanonicalPath();
+			var canonicalTarget = CreateObject("java", "java.io.File").init(target).getCanonicalPath();
+		} catch (any e) {
+			return "";
+		}
+		var separator = CreateObject("java", "java.io.File").separator;
+		if (Right(canonicalSite, 1) != separator) {
+			canonicalSite &= separator;
+		}
+		if (CompareNoCase(Left(canonicalTarget, Len(canonicalSite)), canonicalSite) != 0) {
+			return "";
+		}
+		return FileExists(canonicalTarget) ? canonicalTarget : "";
+	}
+
+	/**
+	 * Serves a file from the local docs bundle, or returns false when there is
+	 * no bundle / the path is not in it so the caller can fall back.
+	 *
+	 * Directory-style requests resolve to index.html, matching the static site
+	 * Astro builds.
+	 */
+	private boolean function $serveDocsFile(required string site, string path = "") {
+		var requested = Len(Trim(arguments.path)) ? Trim(arguments.path) : "index.html";
+		if (Right(requested, 1) == "/") {
+			requested &= "index.html";
+		}
+		// The app's urlrewrite.xml has a "Convert dot to format parameter" rule
+		// that maps /foo/bar.css to /foo/bar?format=css, so for any asset with an
+		// extension the filename arrives WITHOUT it and the extension shows up as
+		// the format param. Re-attach it, but only for extensions we serve — a
+		// genuine `?format=json` API call must not become a bogus filename.
+		if (!Find(".", ListLast(requested, "/"))) {
+			var fmt = StructKeyExists(request.wheels.params, "format") ? request.wheels.params.format : "";
+			if (
+				Len(fmt)
+				&& ListFindNoCase("css,js,json,map,xml,txt,wasm,woff,woff2,ttf,eot,svg,png,jpg,jpeg,gif,webp,avif,ico", fmt)
+			) {
+				requested &= "." & fmt;
+			}
+		}
+		var resolved = $resolveDocsPath(arguments.site, requested);
+		if (!Len(resolved)) {
+			return false;
+		}
+		var mime = $devAssetMimeType(resolved);
+		// The bundle is content-addressed by framework version, so a file only
+		// changes on upgrade — safe to cache hard, but not immutably, since the
+		// directory is replaced in place rather than renamed.
+		cfheader(name = "Cache-Control", value = "public, max-age=3600");
+		cfheader(name = "Content-Type", value = mime);
+		cffile(action = "readBinary", file = resolved, variable = "docsData");
+		cfcontent(type = mime, variable = docsData);
+		return true;
+	}
+
+	/**
+	 * Rendered when a docs route is hit but no local bundle is installed, so
+	 * the reader gets an actionable message instead of a bare 404. The bundle
+	 * arrives with the CLI (Homebrew stages it on install/upgrade); a source
+	 * checkout or a non-brew install needs `wheels docs fetch` once.
+	 */
+	private void function $docsUnavailable(required string site) {
+		cfheader(statusCode = 404);
+		// "API reference" is singular, "guides" is plural. The starter page links
+		// straight here, so this is now a page users actually land on.
+		var label = arguments.site == "api" ? "API reference" : "guides";
+		var verb = arguments.site == "api" ? "is" : "are";
+		WriteOutput(
+			"<h1>Wheels " & label & " " & verb & " not available offline yet</h1>"
+			& "<p>These pages are served from a local copy of the documentation so they work "
+			& "with no internet connection, and that copy is not installed.</p>"
+			& "<p>Run <code>wheels docs fetch</code> once to download it. Homebrew installs "
+			& "stage it automatically on <code>brew install</code> / <code>brew upgrade</code>.</p>"
+		);
+	}
+
 
 	/**
 	 * Builds a versioned URL for a bundled dev-UI asset, served by the

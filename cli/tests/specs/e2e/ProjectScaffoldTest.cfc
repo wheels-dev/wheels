@@ -214,16 +214,52 @@ component extends="testbox.system.BaseSpec" {
 
 					var content = fileRead(path);
 					expect(content).toInclude("Welcome to testapp");
-					// Runtime expressions must survive generation as single-hash
-					// CFML (## -> # in the fileWrite string), not be evaluated at
-					// scaffold time. Locks in the escaping shared with Module.cfc.
-					expect(content).toInclude('##get("version")##');
-					expect(content).toInclude('##application.wheels.serverName##');
+					// Runtime expressions reach disk as single-hash CFML. The view
+					// ships as a template file that is copied verbatim, so nothing
+					// is evaluated at scaffold time and no ## escaping is involved.
+					expect(content).toInclude('#get("version")#');
+					expect(content).toInclude("#application.wheels.serverName#");
 					expect(content).toInclude("<cfoutput>");
+					expect(content).toInclude("The details");
 					expect(content).toInclude("Next steps");
 					expect(content).toInclude("wheels g scaffold");
-					expect(content).toInclude("wheels migrate latest");
-					expect(content).toInclude("wheels test");
+					// Exactly two calls to action: the guides and the API
+					// reference. Both are documentation, so they open in a new
+					// tab (with rel=noopener) rather than navigating away from
+					// the app. The API card points at /wheels/api — the HTML
+					// reference — not /wheels/ai, which serves JSON.
+					expect(content).toInclude('href="/wheels/guides" target="_blank" rel="noopener"');
+					expect(content).toInclude('href="/wheels/api" target="_blank" rel="noopener"');
+					expect(content).notToInclude("/wheels/ai");
+					expect(
+						Len(content) - Len(Replace(content, 'class="wheels-starter-card"', "", "all"))
+					).toBe(Len('class="wheels-starter-card"') * 2);
+					// Brand mark comes from the copied image assets, not an inline
+					// SVG, and swaps to the inverse artwork on dark backgrounds.
+					expect(content).toInclude("/images/wheels-logo.png");
+					expect(content).toInclude("/images/wheels-logo-inverse.png");
+				});
+
+				it("copies binary template assets byte-for-byte", function() {
+					// The starter page ships the Wheels wordmark. The generic copy
+					// path is fileRead -> processPlaceholders -> fileWrite, which is
+					// a TEXT round-trip: it mangles binary data (and Adobe's
+					// FileWrite appends a trailing newline to simple values), so
+					// binary extensions must bypass it. A corrupted logo would still
+					// "exist", so assert real bytes, not just presence.
+					var names = ["wheels-logo.png", "wheels-logo-inverse.png"];
+					for (var name in names) {
+						var srcPath = variables.templateDir & "/public/images/" & name;
+						var dstPath = variables.targetDir & "/public/images/" & name;
+						expect(fileExists(srcPath)).toBeTrue("template asset missing: " & name);
+						expect(fileExists(dstPath)).toBeTrue("copied asset missing: " & name);
+
+						var srcBytes = fileReadBinary(srcPath);
+						var dstBytes = fileReadBinary(dstPath);
+						expect(arrayLen(dstBytes)).toBe(arrayLen(srcBytes));
+						// PNG magic number — only intact if the bytes were verbatim.
+						expect(binaryEncode(binaryMid(dstBytes, 1, 8), "hex")).toBe("89504e470d0a1a0a");
+					}
 				});
 
 				it("generates base Controller.cfc in app/controllers/", function() {
@@ -333,30 +369,9 @@ component extends="testbox.system.BaseSpec" {
 			'component extends="Controller" {' & nl & nl & tab & 'function index() {' & nl & tab & tab & '// Default action' & nl & tab & '}' & nl & nl & '}' & nl
 		);
 
-		fileWrite(
-			arguments.targetDir & "/app/views/main/index.cfm",
-			(
-				'<!---' & nl &
-				tab & 'Starter home page: replace before production.' & nl &
-				tab & 'This development/first-run landing page surfaces environment' & nl &
-				tab & 'details (Wheels version, engine, database, environment) and CLI' & nl &
-				tab & 'commands. Deploy a real homepage so those are not exposed to' & nl &
-				tab & 'anonymous visitors.' & nl &
-				'--->' & nl &
-				'<cfoutput>' & nl &
-				'<h1>Welcome to ' & arguments.appName & '</h1>' & nl &
-				'<p>Your <strong>Wheels ##get("version")##</strong> application is running on ##application.wheels.serverName## with ##application.wheels.dataSourceName## (##get("environment")##).</p>' & nl &
-				nl &
-				'<h2>Next steps</h2>' & nl &
-				'<ul>' & nl &
-				tab & '<li><code>wheels g scaffold Post title content:text</code> &mdash; generate a model, controller, and views</li>' & nl &
-				tab & '<li><code>wheels migrate latest</code> &mdash; build the database schema</li>' & nl &
-				tab & '<li><code>wheels test</code> &mdash; run the test suite</li>' & nl &
-				'</ul>' & nl &
-				'<p><small>This page lives at <code>app/views/main/index.cfm</code>; routing is in <code>config/routes.cfm</code>.</small></p>' & nl &
-				'</cfoutput>' & nl
-			)
-		);
+		// app/views/main/index.cfm comes from the template tree copied above
+		// (cli/lucli/templates/app/app/views/main/index.cfm) with {{appName}}
+		// substituted — same as Module.cfc. Do not re-create it here.
 	}
 
 	/**
@@ -393,6 +408,18 @@ component extends="testbox.system.BaseSpec" {
 			} else {
 				// Skip .gitkeep files
 				if (entry.name == ".gitkeep") continue;
+
+				// Binary assets (the starter page's logo PNGs) must be copied
+				// byte-for-byte — the fileRead/processPlaceholders/fileWrite
+				// path is a text round-trip and mangles them. Mirrors
+				// Module.cfc::$isBinaryTemplateFile.
+				if (ListFindNoCase(
+					"png,jpg,jpeg,gif,webp,avif,ico,bmp,woff,woff2,ttf,otf,eot,pdf,zip,gz,jar,mp4,webm,mp3",
+					LCase(ListLast(entry.name, "."))
+				)) {
+					fileCopy(sourcePath, targetPath);
+					continue;
+				}
 
 				var content = fileRead(sourcePath);
 				content = processPlaceholders(content, arguments.context);

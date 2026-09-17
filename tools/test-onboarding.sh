@@ -496,8 +496,8 @@ component extends="wheels.migrator.Migration" hint="Create posts table" {
         transaction {
             try {
                 t = createTable(name="posts");
-                t.string(columnNames="title", default="", allowNull=true, limit=255);
-                t.text(columnNames="body", default="", allowNull=true);
+                t.string(columnNames="title", allowNull=true, limit=255);
+                t.text(columnNames="body", allowNull=true);
                 t.string(columnNames="status", default="draft", allowNull=false, limit=20);
                 t.datetime(columnNames="publishedAt", allowNull=true);
                 t.timestamps();
@@ -570,6 +570,21 @@ CFML
         fi
     else
         skip "sqlite3 not on PATH — cannot verify schema"
+    fi
+
+    # Scaffold-then-migrate: the scaffold generator's migration output must apply
+    # cleanly. This is the seam the `default=''` vs migrator-hardener-S14
+    # regression slipped through — nothing previously ran the scaffold's output
+    # through the migrator. (Views are exercised separately; only the migration
+    # round-trip matters here.)
+    "$WHEELS_CMD" generate scaffold OnboardingPost title:string body:text > "$TMPDIR/scaffold-migrate.log" 2>&1 || true
+    if grep -Rq "default=''" "$APP_DIR/app/migrator/migrations/" 2>/dev/null; then
+        fail "scaffold migration emits default='' (migrator hardener S14 rejects it)"
+    elif "$WHEELS_CMD" migrate latest > "$TMPDIR/migrate-scaffold.log" 2>&1; then
+        pass "scaffold → migrate latest exited 0"
+    else
+        fail "scaffold → migrate latest failed"
+        tail -15 "$TMPDIR/migrate-scaffold.log" | sed 's/^/      /'
     fi
 fi
 

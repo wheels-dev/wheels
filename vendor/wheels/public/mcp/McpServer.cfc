@@ -366,91 +366,11 @@ component output="false" displayName="MCP Server" {
 		}
 
 		local.uri = arguments.params.uri;
-		local.content = "";
 
 		try {
-			switch (local.uri) {
-				// Documentation chunks
-				case "wheels://docs/manifest":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=manifest");
-					break;
-				case "wheels://docs/models":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=models");
-					break;
-				case "wheels://docs/controllers":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=controllers");
-					break;
-				case "wheels://docs/views":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=views");
-					break;
-				case "wheels://docs/migrations":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=migrations");
-					break;
-				case "wheels://docs/routing":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=routing");
-					break;
-				case "wheels://docs/testing":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=testing");
-					break;
-				case "wheels://docs/cli":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=cli");
-					break;
-				case "wheels://docs/patterns":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=patterns");
-					break;
-				// Project analysis
-				case "wheels://project/context":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=project");
-					break;
-				case "wheels://project/routes":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=routes");
-					break;
-				case "wheels://project/migrations":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=migrations");
-					break;
-				case "wheels://project/plugins":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=plugins");
-					break;
-				case "wheels://project/info":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=info");
-					break;
-				// Full documentation
-				case "wheels://api/full":
-					local.content = fetchFromAIEndpoint("/wheels/api?format=json");
-					break;
-				case "wheels://guides/all":
-					local.content = fetchFromAIEndpoint("/wheels/guides?format=json");
-					break;
-				// .ai folder documentation
-				case "wheels://.ai/overview":
-					local.content = readAIDocumentation("README.md");
-					break;
-				case "wheels://.ai/cfml/syntax":
-					local.content = aggregateAIDocumentation(".ai/cfml/syntax/");
-					break;
-				case "wheels://.ai/cfml/best-practices":
-					local.content = aggregateAIDocumentation(".ai/cfml/best-practices/");
-					break;
-				case "wheels://.ai/wheels/models":
-					local.content = aggregateAIDocumentation(".ai/wheels/database/");
-					break;
-				case "wheels://.ai/wheels/controllers":
-					local.content = aggregateAIDocumentation(".ai/wheels/controllers/");
-					break;
-				case "wheels://.ai/wheels/views":
-					local.content = aggregateAIDocumentation(".ai/wheels/views/");
-					break;
-				case "wheels://.ai/wheels/patterns":
-					local.content = aggregateAIDocumentation(".ai/wheels/patterns/");
-					break;
-				case "wheels://.ai/wheels/snippets":
-					local.content = aggregateAIDocumentation(".ai/wheels/snippets/");
-					break;
-				case "wheels://.ai/wheels/security":
-					local.content = aggregateAIDocumentation(".ai/wheels/security/");
-					break;
-				default:
-					return createErrorResponse({"id": arguments.id}, -32602, "Invalid params", "Unknown resource URI: #local.uri#");
+			local.content = $fetchResourceContent(local.uri);
+			if (isNull(local.content)) {
+				return createErrorResponse({"id": arguments.id}, -32602, "Invalid params", "Unknown resource URI: #local.uri#");
 			}
 
 			// Determine correct mime type based on URI
@@ -472,6 +392,67 @@ component output="false" displayName="MCP Server" {
 		} catch (any e) {
 			return createErrorResponse({"id": arguments.id}, -32603, "Internal error", "Failed to read resource: #e.message#");
 		}
+	}
+
+	/**
+	 * Resolve a `wheels://` resource URI to its content. Returns javaCast("null", "")
+	 * for an unknown URI so the caller can emit the -32602 "Unknown resource URI"
+	 * error without tripping the -32603 internal-error catch above.
+	 */
+	private any function $fetchResourceContent(required string uri) {
+		local.handlers = $resourceHandlers();
+		if (!structKeyExists(local.handlers, arguments.uri)) {
+			return javaCast("null", "");
+		}
+
+		local.handler = local.handlers[arguments.uri];
+		if (local.handler.kind == "fetch") {
+			return fetchFromAIEndpoint(local.handler.target);
+		}
+		if (local.handler.kind == "read") {
+			return readAIDocumentation(local.handler.target);
+		}
+		return aggregateAIDocumentation(local.handler.target);
+	}
+
+	/**
+	 * URI → {kind, target} dispatch table for resources/read. Data, not code:
+	 * kind selects the fetch helper (fetch = fetchFromAIEndpoint, read =
+	 * readAIDocumentation, aggregate = aggregateAIDocumentation) so the read
+	 * handler stays decision-light.
+	 */
+	private struct function $resourceHandlers() {
+		return {
+			// Documentation chunks
+			"wheels://docs/manifest": {kind: "fetch", target: "/wheels/ai?mode=manifest"},
+			"wheels://docs/models": {kind: "fetch", target: "/wheels/ai?mode=chunk&id=models"},
+			"wheels://docs/controllers": {kind: "fetch", target: "/wheels/ai?mode=chunk&id=controllers"},
+			"wheels://docs/views": {kind: "fetch", target: "/wheels/ai?mode=chunk&id=views"},
+			"wheels://docs/migrations": {kind: "fetch", target: "/wheels/ai?mode=chunk&id=migrations"},
+			"wheels://docs/routing": {kind: "fetch", target: "/wheels/ai?mode=chunk&id=routing"},
+			"wheels://docs/testing": {kind: "fetch", target: "/wheels/ai?mode=chunk&id=testing"},
+			"wheels://docs/cli": {kind: "fetch", target: "/wheels/ai?mode=chunk&id=cli"},
+			"wheels://docs/patterns": {kind: "fetch", target: "/wheels/ai?mode=chunk&id=patterns"},
+			// Project analysis
+			"wheels://project/context": {kind: "fetch", target: "/wheels/ai?mode=project"},
+			"wheels://project/routes": {kind: "fetch", target: "/wheels/ai?mode=routes"},
+			"wheels://project/migrations": {kind: "fetch", target: "/wheels/ai?mode=migrations"},
+			"wheels://project/plugins": {kind: "fetch", target: "/wheels/ai?mode=plugins"},
+			"wheels://project/info": {kind: "fetch", target: "/wheels/ai?mode=info"},
+			// Full documentation
+			"wheels://api/full": {kind: "fetch", target: "/wheels/api?format=json"},
+			"wheels://guides/all": {kind: "fetch", target: "/wheels/guides?format=json"},
+			// .ai folder documentation
+			"wheels://.ai/overview": {kind: "read", target: "README.md"},
+			"wheels://.ai/cfml/syntax": {kind: "aggregate", target: ".ai/cfml/syntax/"},
+			"wheels://.ai/cfml/best-practices": {kind: "aggregate", target: ".ai/cfml/best-practices/"},
+			"wheels://.ai/wheels/models": {kind: "aggregate", target: ".ai/wheels/database/"},
+			"wheels://.ai/wheels/controllers": {kind: "aggregate", target: ".ai/wheels/controllers/"},
+			"wheels://.ai/wheels/views": {kind: "aggregate", target: ".ai/wheels/views/"},
+			"wheels://.ai/wheels/patterns": {kind: "aggregate", target: ".ai/wheels/patterns/"},
+			"wheels://.ai/wheels/snippets": {kind: "aggregate", target: ".ai/wheels/snippets/"},
+			"wheels://.ai/wheels/security": {kind: "aggregate", target: ".ai/wheels/security/"}
+		};
 	}
 
 	private any function handleToolsList(required struct params, required string sessionId, required any id) {

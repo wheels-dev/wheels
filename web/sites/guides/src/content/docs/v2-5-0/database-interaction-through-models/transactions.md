@@ -18,8 +18,7 @@ For example, say you want to automatically create the first post when a new auth
 
 In your `Author` model, you would add the following code:
 
-{% code title="Author.cfc" %}
-```javascript
+```javascript title="Author.cfc"
 component extends="Model" {
   function config(){
     afterCreate("createFirstPost");
@@ -33,7 +32,6 @@ component extends="Model" {
   }
 }
 ```
-{% endcode %}
 
 In this example, if the post doesn't save (perhaps due to a validation problem), the author doesn't get created either. This helps to maintain database integrity.
 
@@ -47,11 +45,9 @@ model("author").create(name="John", transaction=false);
 
 Another option is to disable transactions across your entire application using the `transactionMode` configuration:
 
-{% code title="config/settings.cfm" %}
-```javascript
+```javascript title="config/settings.cfm"
 set(transactionMode=false);
 ```
-{% endcode %}
 
 See the chapter about [Configuration and Defaults](/2.5.0/guides/working-with-cfwheels/configuration-and-defaults) for more details.
 
@@ -65,11 +61,9 @@ model("author").create(name="John", transaction="rollback");
 
 Again, to configure your entire application to rollback _all_ transactions, you can set the `transactionMode` configuration to `rollback`.
 
-{% code title="config/settings.cfm" %}
-```javascript
+```javascript title="config/settings.cfm"
 set(transactionMode="rollback");
 ```
-{% endcode %}
 
 ### Nesting Transactions with invokeWithTransaction
 

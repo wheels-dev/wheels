@@ -88,7 +88,23 @@ component extends="wheels.WheelsTest" {
 				// When $include was compiled from vendor/wheels/global/tags.cfm,
 				// Lucee resolved /app/events/onabort.cfm under the webroot and
 				// every abort (including GET / and LuCLI) returned HTTP 500.
-				ctx.g.$include(template = "../../" & application.wheels.eventPath & "/onabort.cfm");
+				var eventPath = application.wheels.eventPath;
+				var relativeTemplate = "../../" & eventPath & "/onabort.cfm";
+				var resolved = ctx.g.$resolveGlobalIncludeTemplate(relativeTemplate);
+				expect(resolved).toBe("/app/events/onabort.cfm");
+				expect(FileExists(ExpandPath(resolved))).toBeTrue(
+					"onabort.cfm must exist on the /app mapping, not the webroot"
+				);
+				var src = FileRead(ExpandPath(resolved));
+				expect(FindNoCase("onAbort", src)).toBeGT(
+					0,
+					"resolved onabort.cfm must be the event hook, not an empty miss"
+				);
+				var output = ctx.g.$includeAndReturnOutput($template = relativeTemplate);
+				expect(IsSimpleValue(output)).toBeTrue();
+				expect(FindNoCase("Could not find", output)).toBe(0);
+				expect(FindNoCase("not found", output)).toBe(0);
+				ctx.g.$include(template = relativeTemplate);
 			});
 
 			it("collapses ../../##eventPath## event includes to the /app mapping", () => {
@@ -107,6 +123,14 @@ component extends="wheels.WheelsTest" {
 				);
 				expect(ctx.g.$resolveGlobalIncludeTemplate(eventPath & "/onabort.cfm")).toBe("/app/events/onabort.cfm");
 				expect(ctx.g.$resolveGlobalIncludeTemplate("/config/routes.cfm")).toBe("/config/routes.cfm");
+				expect(FileExists(ExpandPath("/app/events/onabort.cfm"))).toBeTrue();
+				expect(FileExists(ExpandPath("/app/events/onapplicationend.cfm"))).toBeTrue();
+				var abortOut = ctx.g.$includeAndReturnOutput($template = eventPath & "/onabort.cfm");
+				expect(IsSimpleValue(abortOut)).toBeTrue();
+				expect(FindNoCase("Could not find", abortOut)).toBe(0);
+				var endOut = ctx.g.$includeAndReturnOutput($template = eventPath & "/onapplicationend.cfm");
+				expect(IsSimpleValue(endOut)).toBeTrue();
+				expect(FindNoCase("Could not find", endOut)).toBe(0);
 				ctx.g.$include(template = eventPath & "/onabort.cfm");
 				ctx.g.$include(template = eventPath & "/onapplicationend.cfm");
 			});
@@ -156,12 +180,12 @@ component extends="wheels.WheelsTest" {
 				// 404'd (issue ##3241). ExpandPath("/wheels/Global.cfc") is
 				// the pre-split baseline.
 				var globalCfc = Replace(ExpandPath("/wheels/Global.cfc"), "\", "/", "all");
-				var frontController = Replace(
-					ExpandPath(GetDirectoryFromPath(globalCfc) & "../../public/index.cfm"),
-					"\",
-					"/",
-					"all"
-				);
+				// Derive the front controller from the resolved Global.cfc path
+				// instead of traversing "../../public/index.cfm": Adobe CF does
+				// not canonicalize ".." inside ExpandPath() (it mangles the
+				// result and FileExists turns false), while Lucee does — the
+				// string-replace form resolves identically on every engine.
+				var frontController = Replace(globalCfc, "vendor/wheels/Global.cfc", "public/index.cfm");
 				expect(FileExists(globalCfc)).toBeTrue();
 				expect(FileExists(frontController)).toBeTrue();
 				expect(ListLen(frontController, "/")).toBeLTE(

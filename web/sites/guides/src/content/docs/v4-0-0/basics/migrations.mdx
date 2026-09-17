@@ -258,6 +258,24 @@ component extends="wheels.migrator.Migration" hint="Seed admin role" {
 
 Quote string values inline; wrap each statement in `execute()` individually. For anything structural — building a compound object, branching on current rows — consider writing a one-off script under `app/lib/` and calling it from your deploy pipeline instead.
 
+For plain row updates and deletes, `updateRecord()` and `removeRecord()` save you the raw SQL — and fail closed on a full-table write. Both throw `Wheels.Migrator.MissingWhere` when `where` is empty unless you pass `all=true`:
+
+```cfm {test:compile}
+component extends="wheels.migrator.Migration" hint="Backfill and prune" {
+    function up() {
+        updateRecord(table="posts", where="status = 'legacy'", archived=true);
+        removeRecord(table="posts", where="deletedAt < CURRENT_TIMESTAMP");
+    }
+
+    function down() {
+        // An intentional full-table write still needs the explicit opt-in:
+        updateRecord(table="posts", all=true, archived=false);
+    }
+}
+```
+
+`updateRecord(table, where, ...columns)` sets the extra named arguments as column values (auto-typed: booleans, numbers, dates, and strings); `removeRecord(table, where)` deletes the matching rows. The `all=true` opt-in is the tripwire that keeps an accidentally-empty `where` from mutating every row.
+
 ## Reversible vs irreversible
 
 Every `up()` should have a matching `down()` so `wheels migrate down` can walk the history back. Most changes are trivially reversible: `createTable` pairs with `dropTable`, `addColumn` with `removeColumn`, `addIndex` with `removeIndex`.

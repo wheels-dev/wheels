@@ -15,7 +15,7 @@ component {
 	 * @file A list of the names of the files to attach to the email. This will reference files stored in the `files` folder (or a path relative to it). This argument is also aliased as `files`.
 	 * @detectMultipart When set to `true` and multiple values are provided for the `template` argument, Wheels will detect which of the templates is text and which one is HTML (by counting the `<` characters).
 	 * @deliver When set to `false`, the email will not be sent.
-	 * @writeToFile The file to which the email contents will be written
+	 * @writeToFile Path that receives the rendered text and/or HTML body. This is a debug dump of the body content, not a MIME `.eml` — no `From`/`To`/`Subject`/`Content-Type` headers are written. A `.eml` extension will not open as a rendered message in Outlook; use `.html`/`.txt` and open the file in a browser or editor.
 	 */
 	public any function sendEmail(
 		string template = "",
@@ -170,6 +170,9 @@ component {
 		StructDelete(local.rv, "tagContent");
 
 		// Write the email body to file (the text and html versions separated by a blank line when both exist).
+		// This is a rendered-body dump for inspection, not an RFC 822 / MIME `.eml`. Live delivery still goes
+		// through `$mail()`/`cfmail`, which builds the real MIME envelope — so an inbox render can look correct
+		// while a `writeToFile` path named `.eml` shows raw HTML tags in Outlook.
 		// Plain concatenation is used because CFML list functions treat each character of a multi-character delimiter as a separate delimiter.
 		if (Len(local.writeToFile)) {
 			if (Len(local.rv.text) && Len(local.rv.html)) {

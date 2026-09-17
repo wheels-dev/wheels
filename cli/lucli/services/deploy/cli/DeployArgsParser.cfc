@@ -19,111 +19,206 @@ component {
         var n = arrayLen(arguments.args);
         var i = 1;
         while (i <= n) {
-            var a = arguments.args[i];
-            if (a == "--dry-run") {
-                opts.dryRun = true;
-            } else if (left(a, 14) == "--destination=") {
-                opts.destination = mid(a, 15, 99999);
-            } else if (a == "--destination" && $nextIsValue(arguments.args, i, n)) {
-                opts.destination = arguments.args[i+1];
-                i++;
-            } else if (left(a, 10) == "--version=") {
-                // Documented Kamal-compatible form. picocli normally absorbs --version
-                // before the parser runs, so this arm is reachable only when a wrapper
-                // has rewritten --version -> --release first, or when arrays are
-                // constructed programmatically (tests).
-                opts.version = mid(a, 11, 99999);
-            } else if (a == "--version" && $nextIsValue(arguments.args, i, n)) {
-                opts.version = arguments.args[i+1];
-                i++;
-            } else if (left(a, 10) == "--release=") {
-                // picocli-safe alias for --version (issue #2674).
-                opts.version = mid(a, 11, 99999);
-            } else if (a == "--release" && $nextIsValue(arguments.args, i, n)) {
-                opts.version = arguments.args[i+1];
-                i++;
-            } else if (left(a, 13) == "--configPath=") {
-                opts.configPath = mid(a, 14, 99999);
-            } else if (a == "--configPath" && $nextIsValue(arguments.args, i, n)) {
-                opts.configPath = arguments.args[i+1];
-                i++;
-            } else if (left(a, 9) == "--config=") {
-                // Alias for --configPath — the deploy guides document --config. CLI audit H9.
-                opts.configPath = mid(a, 10, 99999);
-            } else if (a == "--config" && $nextIsValue(arguments.args, i, n)) {
-                opts.configPath = arguments.args[i+1];
-                i++;
-            } else if (a == "--force") {
-                opts.force = true;
-            } else if (left(a, 10) == "--service=") {
-                opts.service = mid(a, 11, 99999);
-            } else if (a == "--service" && $nextIsValue(arguments.args, i, n)) {
-                opts.service = arguments.args[i+1];
-                i++;
-            } else if (left(a, 8) == "--image=") {
-                opts.image = mid(a, 9, 99999);
-            } else if (a == "--image" && $nextIsValue(arguments.args, i, n)) {
-                opts.image = arguments.args[i+1];
-                i++;
-            } else if (left(a, 20) == "--registry-username=") {
-                opts.registryUsername = mid(a, 21, 99999);
-            } else if (a == "--registry-username" && $nextIsValue(arguments.args, i, n)) {
-                opts.registryUsername = arguments.args[i+1];
-                i++;
-            } else if (left(a, 7) == "--host=") {
-                opts.host = mid(a, 8, 99999);
-            } else if (a == "--host" && $nextIsValue(arguments.args, i, n)) {
-                opts.host = arguments.args[i+1];
-                i++;
-            } else if (left(a, 7) == "--keep=") {
-                opts.keep = mid(a, 8, 99999);
-            } else if (a == "--keep" && $nextIsValue(arguments.args, i, n)) {
-                opts.keep = arguments.args[i+1];
-                i++;
-            } else if (left(a, 10) == "--message=") {
-                opts.message = mid(a, 11, 99999);
-            } else if (a == "--message" && $nextIsValue(arguments.args, i, n)) {
-                opts.message = arguments.args[i+1];
-                i++;
-            } else if (left(a, 10) == "--adapter=") {
-                opts.adapter = mid(a, 11, 99999);
-            } else if (a == "--adapter" && $nextIsValue(arguments.args, i, n)) {
-                opts.adapter = arguments.args[i+1];
-                i++;
-            } else if (left(a, 10) == "--account=") {
-                opts.account = mid(a, 11, 99999);
-            } else if (a == "--account" && $nextIsValue(arguments.args, i, n)) {
-                opts.account = arguments.args[i+1];
-                i++;
-            } else if (left(a, 7) == "--from=") {
-                opts.from = mid(a, 8, 99999);
-            } else if (a == "--from" && $nextIsValue(arguments.args, i, n)) {
-                opts.from = arguments.args[i+1];
-                i++;
-            } else if (a == "--confirm") {
-                opts.confirm = true;
-            } else if (left(a, 7) == "--tail=") {
-                opts.tail = mid(a, 8, 99999);
-            } else if (a == "--tail" && $nextIsValue(arguments.args, i, n)) {
-                opts.tail = arguments.args[i+1];
-                i++;
-            } else if (left(a, 7) == "--role=") {
-                // `deploy app <verb>` role filter; DeployAppCli reads opts.role. CLI audit H9.
-                opts.role = mid(a, 8, 99999);
-            } else if (a == "--role" && $nextIsValue(arguments.args, i, n)) {
-                opts.role = arguments.args[i+1];
-                i++;
-            } else if (left(a, 12) == "--container=") {
-                opts.container = mid(a, 13, 99999);
-            } else if (a == "--container" && $nextIsValue(arguments.args, i, n)) {
-                opts.container = arguments.args[i+1];
-                i++;
-            } else if (a == "--follow") {
-                opts.follow = true;
-            }
-            i++;
+            i = $matchFlag(opts, arguments.args, i, n);
         }
         return opts;
+    }
+
+    /**
+     * Matches the token at position i against the grouped flag parsers and
+     * returns the index of the next token to inspect. A value-taking flag in
+     * its space-separated form consumes two tokens (returns i + 2); every other
+     * token — a matched single-token flag or an unrecognized token — returns
+     * i + 1, matching the original single-pass loop's unconditional `i++`.
+     */
+    private numeric function $matchFlag(required struct opts, required array args, required numeric i, required numeric n) {
+        var next = $parseDeployFlags(arguments.opts, arguments.args, arguments.i, arguments.n);
+        if (next) {
+            return next;
+        }
+        next = $parseConfigFlags(arguments.opts, arguments.args, arguments.i, arguments.n);
+        if (next) {
+            return next;
+        }
+        next = $parseBuildFlags(arguments.opts, arguments.args, arguments.i, arguments.n);
+        if (next) {
+            return next;
+        }
+        next = $parseRuntimeFlags(arguments.opts, arguments.args, arguments.i, arguments.n);
+        if (next) {
+            return next;
+        }
+        next = $parseAppFlags(arguments.opts, arguments.args, arguments.i, arguments.n);
+        if (next) {
+            return next;
+        }
+        return arguments.i + 1;
+    }
+
+    /**
+     * Parses --dry-run, --destination, --version, and --release.
+     */
+    private numeric function $parseDeployFlags(required struct opts, required array args, required numeric i, required numeric n) {
+        var a = arguments.args[arguments.i];
+        if (a == "--dry-run") {
+            arguments.opts.dryRun = true;
+            return arguments.i + 1;
+        } else if (left(a, 14) == "--destination=") {
+            arguments.opts.destination = mid(a, 15, 99999);
+            return arguments.i + 1;
+        } else if (a == "--destination" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.destination = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 10) == "--version=") {
+            // Documented Kamal-compatible form. picocli normally absorbs --version
+            // before the parser runs, so this arm is reachable only when a wrapper
+            // has rewritten --version -> --release first, or when arrays are
+            // constructed programmatically (tests).
+            arguments.opts.version = mid(a, 11, 99999);
+            return arguments.i + 1;
+        } else if (a == "--version" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.version = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 10) == "--release=") {
+            // picocli-safe alias for --version (issue #2674).
+            arguments.opts.version = mid(a, 11, 99999);
+            return arguments.i + 1;
+        } else if (a == "--release" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.version = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        }
+        return 0;
+    }
+
+    /**
+     * Parses --configPath, --config (alias), --force, and --service.
+     */
+    private numeric function $parseConfigFlags(required struct opts, required array args, required numeric i, required numeric n) {
+        var a = arguments.args[arguments.i];
+        if (left(a, 13) == "--configPath=") {
+            arguments.opts.configPath = mid(a, 14, 99999);
+            return arguments.i + 1;
+        } else if (a == "--configPath" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.configPath = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 9) == "--config=") {
+            // Alias for --configPath — the deploy guides document --config. CLI audit H9.
+            arguments.opts.configPath = mid(a, 10, 99999);
+            return arguments.i + 1;
+        } else if (a == "--config" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.configPath = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (a == "--force") {
+            arguments.opts.force = true;
+            return arguments.i + 1;
+        } else if (left(a, 10) == "--service=") {
+            arguments.opts.service = mid(a, 11, 99999);
+            return arguments.i + 1;
+        } else if (a == "--service" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.service = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        }
+        return 0;
+    }
+
+    /**
+     * Parses --image, --registry-username, --host, and --keep.
+     */
+    private numeric function $parseBuildFlags(required struct opts, required array args, required numeric i, required numeric n) {
+        var a = arguments.args[arguments.i];
+        if (left(a, 8) == "--image=") {
+            arguments.opts.image = mid(a, 9, 99999);
+            return arguments.i + 1;
+        } else if (a == "--image" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.image = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 20) == "--registry-username=") {
+            arguments.opts.registryUsername = mid(a, 21, 99999);
+            return arguments.i + 1;
+        } else if (a == "--registry-username" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.registryUsername = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 7) == "--host=") {
+            arguments.opts.host = mid(a, 8, 99999);
+            return arguments.i + 1;
+        } else if (a == "--host" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.host = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 7) == "--keep=") {
+            arguments.opts.keep = mid(a, 8, 99999);
+            return arguments.i + 1;
+        } else if (a == "--keep" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.keep = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        }
+        return 0;
+    }
+
+    /**
+     * Parses --message, --adapter, --account, and --from.
+     */
+    private numeric function $parseRuntimeFlags(required struct opts, required array args, required numeric i, required numeric n) {
+        var a = arguments.args[arguments.i];
+        if (left(a, 10) == "--message=") {
+            arguments.opts.message = mid(a, 11, 99999);
+            return arguments.i + 1;
+        } else if (a == "--message" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.message = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 10) == "--adapter=") {
+            arguments.opts.adapter = mid(a, 11, 99999);
+            return arguments.i + 1;
+        } else if (a == "--adapter" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.adapter = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 10) == "--account=") {
+            arguments.opts.account = mid(a, 11, 99999);
+            return arguments.i + 1;
+        } else if (a == "--account" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.account = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 7) == "--from=") {
+            arguments.opts.from = mid(a, 8, 99999);
+            return arguments.i + 1;
+        } else if (a == "--from" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.from = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        }
+        return 0;
+    }
+
+    /**
+     * Parses --confirm, --tail, --role, --container, and --follow.
+     */
+    private numeric function $parseAppFlags(required struct opts, required array args, required numeric i, required numeric n) {
+        var a = arguments.args[arguments.i];
+        if (a == "--confirm") {
+            arguments.opts.confirm = true;
+            return arguments.i + 1;
+        } else if (left(a, 7) == "--tail=") {
+            arguments.opts.tail = mid(a, 8, 99999);
+            return arguments.i + 1;
+        } else if (a == "--tail" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.tail = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 7) == "--role=") {
+            // `deploy app <verb>` role filter; DeployAppCli reads opts.role. CLI audit H9.
+            arguments.opts.role = mid(a, 8, 99999);
+            return arguments.i + 1;
+        } else if (a == "--role" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.role = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (left(a, 12) == "--container=") {
+            arguments.opts.container = mid(a, 13, 99999);
+            return arguments.i + 1;
+        } else if (a == "--container" && $nextIsValue(arguments.args, arguments.i, arguments.n)) {
+            arguments.opts.container = arguments.args[arguments.i + 1];
+            return arguments.i + 2;
+        } else if (a == "--follow") {
+            arguments.opts.follow = true;
+            return arguments.i + 1;
+        }
+        return 0;
     }
 
     /**

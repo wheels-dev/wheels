@@ -125,11 +125,12 @@
 
 		// fixes IIS issue that returns a blank cgi.path_info
 		if (!Len(local.rv.path_info) && Right(local.rv.script_name, 10) == "/index.cfm") {
-			if (Len(local.rv.http_x_rewrite_url)) {
-				// IIS6 1/ IIRF (Ionics Isapi Rewrite Filter)
+			if ($trustProxyHeaders() && Len(local.rv.http_x_rewrite_url)) {
+				// IIS6 1/ IIRF (Ionics Isapi Rewrite Filter). Client-supplied;
+				// only trusted when the app opted in via trustProxyHeaders.
 				local.rv.path_info = ListFirst(local.rv.http_x_rewrite_url, "?");
-			} else if (Len(local.rv.http_x_original_url)) {
-				// IIS7 rewrite default
+			} else if ($trustProxyHeaders() && Len(local.rv.http_x_original_url)) {
+				// IIS7 rewrite default. Same trust gate as X-Forwarded-*.
 				local.rv.path_info = ListFirst(local.rv.http_x_original_url, "?");
 			} else if (Len(local.rv.request_uri)) {
 				// Apache default
@@ -160,9 +161,11 @@
 
 
 	/**
-	 * Internal function. Returns whether the application has opted into trusting `X-Forwarded-*`
-	 * headers via `set(trustProxyHeaders=true)`. Guarded so it is safe to call on a cold start
-	 * before `application.wheels` exists (resolves to `false`, i.e. do not trust).
+	 * Internal function. Returns whether the application has opted into trusting
+	 * proxy-supplied headers via `set(trustProxyHeaders=true)`: `X-Forwarded-*`
+	 * plus the IIS rewrite headers `X-Rewrite-URL` / `X-Original-URL` used by
+	 * `$cgiScope()`. Guarded so it is safe to call on a cold start before
+	 * `application.wheels` exists (resolves to `false`, i.e. do not trust).
 	 */
 	public boolean function $trustProxyHeaders() {
 		return StructKeyExists(application, "wheels")
@@ -487,13 +490,15 @@
 	 * @returnAs Pass in `struct` to return all information about the request instead of just the final output (`body`).
 	 * @rollback Pass in `true` to roll back all database transactions made during the request.
 	 * @includeFilters Set to `before` to only execute "before" filters, `after` to only execute "after" filters or `false` to skip all filters.
+	 * @csrf CSRF handling for this request. Default `ignore` preserves the historic test helper. Pass `exception` or `abort` to enforce; this is opt-in and does not change the production `protectsFromForgery()` default.
 	 */
 	public any function processRequest(
 		required struct params,
 		string method,
 		string returnAs,
 		string rollback,
-		string includeFilters = true
+		string includeFilters = true,
+		string csrf = "ignore"
 	) {
 		$args(name = "processRequest", args = arguments);
 
@@ -525,8 +530,9 @@
 
 		local.controller = controller(name = arguments.params.controller, params = arguments.params);
 
-		// Set to ignore CSRF errors during testing.
-		local.controller.protectsFromForgery(with = "ignore");
+		// Historic test helper defaults to ignore. Opt in to exception/abort
+		// without flipping the production protectsFromForgery() default.
+		local.controller.protectsFromForgery(with = arguments.csrf);
 
 		local.controller.processAction(includeFilters = arguments.includeFilters);
 		local.response = local.controller.response();

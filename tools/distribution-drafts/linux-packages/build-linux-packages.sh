@@ -65,6 +65,19 @@ tar -xzf "${ARTIFACTS_DIR}/wheels-module-${WHEELS_VERSION}.tar.gz" -C "${BUILD_D
 # 2. Unzip the framework into build/framework/
 unzip -q "${ARTIFACTS_DIR}/wheels-core-${WHEELS_VERSION}.zip" -d "${BUILD_DIR}/build/framework/"
 
+# 2b. Stage the offline docs bundle. Shipped as the ZIP the release already
+#     publishes (~32 MB) rather than unpacked (~270 MB): the wrapper unpacks it
+#     into ~/.wheels/docs/<version>/ on first run, mirroring the Homebrew
+#     formula. The zip only exists for releases cut after the bundle started
+#     shipping, so an older artifact dir degrades to "no offline docs" rather
+#     than failing the whole package build.
+mkdir -p "${BUILD_DIR}/build/docs"
+if [ -f "${ARTIFACTS_DIR}/wheels-docs-${WHEELS_VERSION}.zip" ]; then
+  cp "${ARTIFACTS_DIR}/wheels-docs-${WHEELS_VERSION}.zip" "${BUILD_DIR}/build/docs/"
+else
+  echo "  WARNING: no wheels-docs-${WHEELS_VERSION}.zip in ${ARTIFACTS_DIR}; packaging without offline docs" >&2
+fi
+
 # 3. Download the portable LuCLI JAR as build/lucli.jar. The wrapper launches it
 #    with `java -Dlucli.binary.name=wheels -jar`, which both (a) routes to the
 #    bundled wheels module (the flag replaces the old basename(argv[0]) trick the
@@ -158,6 +171,31 @@ if [ "${USER_INSTALLED}" != "${INSTALLED_VERSION}" ]; then
   mkdir -p "${MODULE_DIR}"
   cp -r /opt/wheels/module/. "${MODULE_DIR}/"
   echo "${INSTALLED_VERSION}" > "${MODULE_VERSION_FILE}"
+fi
+
+# Offline docs bundle. Version-gated like the module/framework sync, so a
+# package upgrade refreshes the docs. /opt/wheels/docs holds the zip; the
+# unpacked tree is what the framework resolves from LUCLI_HOME + its own
+# version.
+DOCS_SRC="/opt/wheels/docs"
+DOCS_DST="${LUCLI_HOME}/docs/${INSTALLED_VERSION}"
+if [ -f "${DOCS_SRC}/wheels-docs-${INSTALLED_VERSION}.zip" ] && [ ! -f "${DOCS_DST}/manifest.json" ]; then
+  echo "Installing offline docs for ${INSTALLED_VERSION}..." >&2
+  rm -rf "${DOCS_DST}"
+  mkdir -p "${DOCS_DST}"
+  unzip -q -o "${DOCS_SRC}/wheels-docs-${INSTALLED_VERSION}.zip" -d "${DOCS_DST}" \
+    || echo "WARNING: could not unpack the offline docs bundle" >&2
+fi
+
+# Mirror the bundle into the current app's webroot when run from inside one.
+# Required, not a convenience: the dev server's Lucee urlRewrite only routes
+# extension-less paths to the front controller, so the bundle's
+# extension-bearing asset URLs must be real files under the webroot for the
+# container to serve them. Hardlinked so the shared cache is not duplicated.
+if [ -f "./vendor/wheels/wheels.json" ] && [ -d "./public" ] && [ -d "${DOCS_DST}" ]; then
+  rm -rf "./public/wheels-docs"
+  cp -R -l "${DOCS_DST}" "./public/wheels-docs" 2>/dev/null \
+    || cp -R "${DOCS_DST}" "./public/wheels-docs"
 fi
 
 # Stage SQLite JDBC into Lucee Express on first run.

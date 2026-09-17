@@ -1,0 +1,187 @@
+---
+title: Storage
+description: Local filesystem and S3 storage behind one interface — named disks, two drivers, and signed URLs.
+type: howto
+sidebar:
+  order: 6
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This page shows you how to read and write files through the `wheels.storage` abstraction instead of reaching for `FileWrite` / `cfhttp` directly. You configure one or more named *disks* — a local directory, an S3 bucket, or both — and resolve them through `StorageManager` for a single `put` / `get` / `exists` / `delete` / `url` / `signedUrl` surface that swaps backends with a config change.
+
+**You'll learn:**
+
+- How to declare disks in `config/settings.cfm` and resolve them by name
+- How `LocalDisk` stores objects on the filesystem and serves them through a URL prefix
+- How `S3Disk` talks to S3 over plain `cfhttp` with from-scratch SigV4 signing — no AWS SDK, no JARs
+- How signed (presigned) URLs work on both drivers
+- What the failure contract is (`Wheels.Storage.*` errors)
+
+<Aside type="note">
+  You should already know the DI container basics (see [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/)) and have multipart uploads working (see [File Uploads & Downloads](/v4-0-0/digging-deeper/file-uploads-and-downloads/)). This page covers where the uploaded bytes go.
+</Aside>
+
+## The model
+
+Storage mirrors the disk abstraction you already know from Laravel's Filesystem or Rails' ActiveStorage. Configuration *names* each disk and assigns it a `driver` — `"local"` or `"s3"`. Application code asks `StorageManager` for a disk by name and receives a `wheels.interfaces.StorageDiskInterface` back, regardless of which driver is behind it.
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(storage = {
+    default = "local",
+    disks = {
+        local = {
+            driver = "local",
+            root = ExpandPath("../storage/uploads"),
+            urlPrefix = "/uploads"
+        },
+        s3 = {
+            driver = "s3",
+            bucket = "my-bucket",
+            region = "us-east-1",
+            accessKeyId = env("S3_ACCESS_KEY_ID"),
+            secretAccessKey = env("S3_SECRET_ACCESS_KEY"),
+            visibility = "private"
+        }
+    }
+});
+</cfscript>
+```
+
+Register the manager as a singleton in `config/services.cfm`. Because its `init()` takes the storage config struct — which isn't a registered service — wrap construction in `toFactory()`:
+
+```cfm {test:compile} title="config/services.cfm"
+<cfscript>
+local.di = injector();
+local.di.map("storage").toFactory(function() {
+    return new wheels.storage.StorageManager(config = get("storage"));
+});
+</cfscript>
+```
+
+`StorageManager.disk()` returns the default disk when you pass no name, and throws `Wheels.Storage.UnknownDisk` for a name you didn't configure:
+
+```cfm {test:compile} title="resolving a disk"
+local.uploads = service("storage").disk();          // "local" (the default)
+local.assets  = service("storage").disk("s3");      // "s3"
+```
+
+If you aren't using the container, instantiate the manager directly — `new wheels.storage.StorageManager(config = get("storage"))` — and keep it in a scope you control.
+
+## Storing and reading objects
+
+Every disk exposes the same six methods. Keys are forward-slash-delimited path strings; `put()` creates intermediate directories for you.
+
+```cfm {test:compile} title="basic put/get/exists/delete"
+local.disk = service("storage").disk();
+
+local.disk.put("avatars/42.png", local.binary, contentType = "image/png", visibility = "public");
+// -> "avatars/42.png"
+
+local.content = local.disk.get("avatars/42.png");   // binary
+local.has     = local.disk.exists("avatars/42.png"); // true
+local.disk.delete("avatars/42.png");                // true
+```
+
+| Method | Returns | Notes |
+|---|---|---|
+| `put(key, content, contentType, visibility)` | the key | Binary or string content; `visibility` is `"public"` or `"private"`. |
+| `get(key)` | binary | Throws `Wheels.Storage.NotFound` when absent. |
+| `exists(key)` | boolean | `LocalDisk` checks the filesystem; `S3Disk` issues a `HEAD`. |
+| `delete(key)` | boolean | `false` when the object was already gone. |
+| `url(key)` | string | Public URL (local prefix, or the S3 object URL). |
+| `signedUrl(key, expiresIn, contentDisposition)` | string | Expiring URL; see below. |
+
+`get()` and `put()` round-trip bytes exactly — `LocalDisk.put()` writes binary, never a string, so a PNG comes back identical to what went in.
+
+## LocalDisk
+
+The local driver stores objects under a configured `root` and exposes them through `urlPrefix`, which is whatever path your app already serves statically. Its config:
+
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `root` | yes | — | Directory objects are written under. |
+| `urlPrefix` | no | `""` | Public URL path the app serves the files from. |
+| `signingKey` | no | `""` | HMAC secret for `signedUrl()`; required only if you call it. |
+
+```cfm {test:compile} title="config/settings.cfm — local disk"
+<cfscript>
+set(storage = {
+    default = "local",
+    disks = {
+        local = {
+            driver = "local",
+            root = ExpandPath("../storage/uploads"),
+            urlPrefix = "/uploads",
+            signingKey = env("STORAGE_SIGNING_KEY")
+        }
+    }
+});
+</cfscript>
+```
+
+`url("avatars/42.png")` produces `/uploads/avatars/42.png`. Because the filesystem has no native presigning, `signedUrl()` appends an HMAC `expires` / `signature` query string over the key and expiry — your download route is expected to verify it with `verifySignature()` before streaming. This is the same tradeoff Rails' `DiskController` and Laravel's `serve` make.
+
+## S3Disk
+
+The S3 driver speaks to S3 (and S3-compatible endpoints) over plain `cfhttp`, signing each request with a from-scratch SigV4 implementation in `wheels.storage.S3Signer` — no AWS SDK, no bundled JARs. Its config:
+
+| Key | Required | Default | Meaning |
+|---|---|---|---|
+| `bucket` | yes | — | Bucket name. |
+| `region` | yes | — | AWS region, e.g. `us-east-1`. |
+| `accessKeyId` | yes | — | AWS access key. |
+| `secretAccessKey` | yes | — | AWS secret key. |
+| `visibility` | no | `"private"` | Default ACL for `put()` (`public` → `public-read`). |
+| `endpoint` | no | `""` | S3-compatible endpoint (MinIO, R2, etc.). |
+| `usePathStyle` | no | `false` | Force path-style addressing for non-AWS endpoints. |
+| `timeout` | no | `60` | HTTP timeout in seconds. |
+
+```cfm {test:compile} title="putting an object to S3"
+service("storage").disk("s3").put(
+    key = "reports/q3.pdf",
+    content = local.pdfBytes,
+    contentType = "application/pdf",
+    visibility = "private"
+);
+```
+
+`url()` returns the object's public URL; `signedUrl()` returns a presigned, expiring GET URL computed locally by `S3Signer` — no round-trip to AWS required:
+
+```cfm {test:compile} title="presigned download URL"
+local.url = service("storage").disk("s3").signedUrl(
+    key = "reports/q3.pdf",
+    expiresIn = 900,
+    contentDisposition = "attachment; filename=q3.pdf"
+);
+```
+
+## Signed URLs on both drivers
+
+Both `signedUrl()` signatures match: `signedUrl(key, expiresIn = 300, contentDisposition = "")`. `expiresIn` must be within `1..604800` (one second to seven days) or the call throws `Wheels.Storage.InvalidExpiresIn`. On S3 the URL is a real AWS presigned GET; on local it's a URL with an HMAC token your app verifies. Object keys are RFC3986-encoded on both drivers, so spaces and reserved characters behave identically.
+
+## Failure contract
+
+Storage errors are typed so you can rescue them precisely:
+
+| Error | Raised when |
+|---|---|
+| `Wheels.Storage.UnknownDisk` | `disk("nope")` names a disk that isn't configured. |
+| `Wheels.Storage.UnknownDriver` | A disk's `driver` is neither `local` nor `s3`. |
+| `Wheels.Storage.InvalidConfiguration` | A disk omits a required config key (e.g. `root`, `bucket`). |
+| `Wheels.Storage.NotFound` | `get()` on a missing key. |
+| `Wheels.Storage.InvalidKey` | An empty or slash-only key on `LocalDisk`. |
+| `Wheels.Storage.InvalidExpiresIn` | `expiresIn` outside `1..604800`. |
+| `Wheels.Storage.MissingSigningKey` | `signedUrl()` on a local disk with no `signingKey`. |
+| `Wheels.Storage.RequestFailed` | An S3 request fails in a way that isn't "the object is absent". |
+
+`exists()` and `delete()` deliberately distinguish "object absent" (`false`) from "the backend didn't answer" (a thrown error) — a connection failure must not read as "no file here."
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="File Uploads & Downloads" href="/v4-0-0/digging-deeper/file-uploads-and-downloads/" description="Multipart uploads, validation, and serving downloads safely." />
+  <LinkCard title="The Dependency Injection Container" href="/v4-0-0/core-concepts/dependency-injection/" description="Why services.cfm, and how toFactory() fits construction with config." />
+  <LinkCard title="Deployment: Secrets" href="/v4-0-0/deployment/secrets/" description="Keep accessKeyId / secretAccessKey out of source." />
+</CardGrid>

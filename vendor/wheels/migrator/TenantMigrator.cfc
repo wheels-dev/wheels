@@ -111,7 +111,9 @@ component {
 						action = arguments.action,
 						dataSource = local.tenant.dataSource,
 						migratePath = arguments.migratePath,
-						sqlPath = arguments.sqlPath
+						sqlPath = arguments.sqlPath,
+						userName = StructKeyExists(local.tenant, "userName") ? local.tenant.userName : "",
+						password = StructKeyExists(local.tenant, "password") ? local.tenant.password : ""
 					);
 
 					ArrayAppend(local.results.success, {
@@ -142,28 +144,64 @@ component {
 
 	/**
 	 * Runs a single migration action against one tenant datasource.
-	 * Holds an exclusive named lock for the FULL run: the migrator reads
-	 * `application.wheels.dataSourceName` lazily at query time, so the
-	 * application-wide datasource is swapped to the tenant's for the whole
-	 * action and only restored once it completes. The lock prevents
-	 * concurrent tenant migrations from interleaving datasource swaps.
+	 * Isolates the tenant DS on the request (`request.wheels.migratorDataSource`)
+	 * instead of mutating `application.wheels.dataSourceName`. Concurrent
+	 * requests read the application key without this lock, so swapping it
+	 * would route their queries at the tenant. Per-datasource lock serializes
+	 * two runs against the same tenant without blocking other tenants.
 	 */
 	public any function $runForTenant(
 		required string action,
 		required string dataSource,
 		required string migratePath,
-		required string sqlPath
+		required string sqlPath,
+		string userName = "",
+		string password = ""
 	) {
-		local.appKey = "wheels";
+		if (!Len(Trim(arguments.dataSource))) {
+			Throw(
+				type = "Wheels.TenantMigrator.InvalidDataSource",
+				message = "Tenant migration requires a non-empty dataSource."
+			);
+		}
 
-		lock name="wheels_tenant_migrator" type="exclusive" timeout="300" {
-			local.originalDataSourceName = application[local.appKey].dataSourceName;
-			application[local.appKey].dataSourceName = arguments.dataSource;
-			try {
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		local.hadOverride = StructKeyExists(request.wheels, "migratorDataSource");
+		if (local.hadOverride) {
+			local.priorOverride = request.wheels.migratorDataSource;
+		}
+		request.wheels.migratorDataSource = arguments.dataSource;
+		local.hadUser = StructKeyExists(request.wheels, "migratorDataSourceUserName");
+		if (local.hadUser) {
+			local.priorUser = request.wheels.migratorDataSourceUserName;
+			local.priorPassword = StructKeyExists(request.wheels, "migratorDataSourcePassword")
+				? request.wheels.migratorDataSourcePassword
+				: "";
+		}
+		if (Len(Trim(arguments.userName))) {
+			request.wheels.migratorDataSourceUserName = arguments.userName;
+			request.wheels.migratorDataSourcePassword = arguments.password;
+		}
+
+		try {
+			lock name="wheels_tenant_migrator_#arguments.dataSource#" type="exclusive" timeout="300" {
 				local.migrator = $newMigrator(migratePath = arguments.migratePath, sqlPath = arguments.sqlPath);
 				return $executeAction(migrator = local.migrator, action = arguments.action);
-			} finally {
-				application[local.appKey].dataSourceName = local.originalDataSourceName;
+			}
+		} finally {
+			if (local.hadOverride) {
+				request.wheels.migratorDataSource = local.priorOverride;
+			} else {
+				StructDelete(request.wheels, "migratorDataSource");
+			}
+			if (local.hadUser) {
+				request.wheels.migratorDataSourceUserName = local.priorUser;
+				request.wheels.migratorDataSourcePassword = local.priorPassword;
+			} else {
+				StructDelete(request.wheels, "migratorDataSourceUserName");
+				StructDelete(request.wheels, "migratorDataSourcePassword");
 			}
 		}
 	}

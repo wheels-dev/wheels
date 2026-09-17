@@ -198,7 +198,8 @@ component output="false" {
 	/**
 	 * Kahn's algorithm with priority tiebreaker.
 	 * When multiple nodes have in-degree 0, lower priority runs first.
-	 * Falls back to priority-only sort if a cycle is detected.
+	 * Throws Wheels.Middleware.CircularDependency if a cycle is detected
+	 * (fail-closed — a cycle is a misconfiguration, not a recoverable order).
 	 */
 	private array function $topologicalSort(required array named, required struct graph) {
 		local.adjacency = arguments.graph.adjacency;
@@ -245,12 +246,11 @@ component output="false" {
 
 		// Cycle detection: not all nodes visited.
 		if (local.visited < ArrayLen(arguments.named)) {
-			WriteLog(
-				type = "warning",
-				text = "Wheels middleware ordering: circular dependency detected among plugin middleware. "
-					& "Falling back to priority-only ordering. Review before/after constraints."
+			throw(
+				type = "Wheels.Middleware.CircularDependency",
+				message = "Circular before/after constraint detected among plugin middleware. "
+					& "Review before/after constraints. Wheels will not guess an order."
 			);
-			return $fallbackPrioritySort(arguments.named);
 		}
 
 		return local.sorted;
@@ -274,21 +274,6 @@ component output="false" {
 		local.result = [];
 		for (local.pair in local.pairs) {
 			ArrayAppend(local.result, local.pair.key);
-		}
-		return local.result;
-	}
-
-	/**
-	 * Fallback: sort entries by priority only (ignoring constraints).
-	 */
-	private array function $fallbackPrioritySort(required array named) {
-		local.copy = Duplicate(arguments.named);
-		ArraySort(local.copy, function(a, b) {
-			return a.priority - b.priority;
-		});
-		local.result = [];
-		for (local.item in local.copy) {
-			ArrayAppend(local.result, local.item.entry);
 		}
 		return local.result;
 	}

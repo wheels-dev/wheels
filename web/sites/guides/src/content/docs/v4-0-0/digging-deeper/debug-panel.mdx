@@ -48,11 +48,11 @@ Do not put this override in `config/environment.cfm`. That file only selects the
 
 ## The debug bar
 
-When active, the bar appears as a slim strip pinned to the bottom of the browser window. Tabs are arranged from left to right: a Wheels logo (doubles as the Request tab toggle), then Request, Timing, Params, Environment, and optionally Tools. The right side shows the current git branch (when the web root — `public/` — contains a `.git` directory), the framework version, and a one-click reload link when no reload password is configured.
+When active, the bar appears as a slim strip pinned to the bottom of the browser window. While it is expanded, the page reserves the bar's height at the bottom (`--wdb-inset` on `html`, default 36px) so content and controls are not covered and remain reachable by scrolling. Collapsing the bar to the logo strip releases that reserved space — the corner logo stays fixed, but it does not leave a full-width dead zone. Tabs are arranged from left to right: a Wheels logo (doubles as the Request tab toggle), then Request, Timing, Params, Environment, and optionally Tools. The right side shows the current git branch (when the web root — `public/` — contains a `.git` directory), the framework version, and a one-click reload link when no reload password is configured.
 
-![The collapsed Wheels debug bar pinned to the bottom of a browser window: Wheels logo, Posts.index controller.action, timing badge, Params, Development environment, and Tools tabs, with Wheels 4.0.0-SNAPSHOT version on the right](/v4-0-0/digging-deeper/debug-panel-screenshots/01-collapsed-bar.png)
+![The Wheels debug bar pinned to the bottom of a browser window: Wheels logo, Posts.index controller.action, timing badge, Params, Development environment, and Tools tabs, with Wheels 4.0.0-SNAPSHOT version on the right](/v4-0-0/digging-deeper/debug-panel-screenshots/01-collapsed-bar.png)
 
-Clicking any tab opens a panel above the bar. Clicking the same tab again closes it. The minimize button (×) collapses the bar to a small "Debug" button in the corner, persisted via `sessionStorage` so it stays collapsed as you navigate.
+Clicking any tab opens a panel above the bar. Clicking the same tab again closes it. The close button (×) slides the bar left to a logo-sized black strip that shows only the stylized red W. Click the collapsed logo to expand the bar back across the bottom. The collapsed state is persisted via `sessionStorage` so it stays collapsed as you navigate.
 
 ## Request tab
 

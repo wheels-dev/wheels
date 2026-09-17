@@ -1,0 +1,16 @@
+<cfparam name="|ObjectNameSingular|" default="">
+<cfoutput>
+<h1>#|ObjectNameSingular|.|DisplayProperty|#</h1>
+<!--- CLI-Appends-Here --->
+<!--- All three actions carry simple.css's `.button` class so they read as one
+     row of buttons. `linkTo` takes extra HTML attributes directly; `buttonTo`
+     needs them prefixed with `input` because it wraps a nested <button>. --->
+<!--- A <div>, not a <p>: `buttonTo` renders a <form>, and a form inside a
+     paragraph is invalid HTML — the browser closes the <p> early and the row
+     falls apart. --->
+<div class="wheels-actions">
+	#linkTo(route="edit|ObjectNameSingularC|", key=|ObjectNameSingular|.id, text="Edit", class="button")#
+	#buttonTo(route="|ObjectNameSingular|", key=|ObjectNameSingular|.id, text="Delete", method="delete", inputClass="button")#
+	#linkTo(route="|ObjectNamePlural|", text="← all |ObjectNamePlural|", class="button")#
+</div>
+</cfoutput>

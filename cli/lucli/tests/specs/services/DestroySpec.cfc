@@ -185,6 +185,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result.success).toBeFalse();
 				});
 
+				it("S1 FIX: rejects ../x so the join cannot leave app/views/", () => {
+					var outside = tempRoot & "/app/S1Escape.cfm";
+					fileWrite(outside, "should-not-delete");
+					var result = destroy.destroyView("../S1Escape");
+					expect(result.success).toBeFalse();
+					expect(fileExists(outside)).toBeTrue();
+					expect(arrayToList(result.warnings)).toInclude("Invalid view path");
+					fileDelete(outside);
+				});
+
+				it("S1 FIX: rejects a .. segment in either half of controller/view", () => {
+					var result = destroy.destroyView("products/..");
+					expect(result.success).toBeFalse();
+					expect(arrayToList(result.warnings)).toInclude("Invalid view path");
+				});
+
 			});
 
 			describe("previewDestroy()", () => {
@@ -195,6 +211,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(arrayToList(preview)).toInclude("Product.cfc");
 					expect(arrayToList(preview)).toInclude("Products.cfc");
 					expect(arrayToList(preview)).toInclude("drop table");
+				});
+
+				it("S1 FIX: previewDestroy does not join ../x under app/views/", () => {
+					var preview = destroy.previewDestroy("../S1Escape", "view");
+					expect(arrayToList(preview)).notToInclude("app/views/../");
+					expect(arrayToList(preview)).toInclude("Invalid view path");
 				});
 
 				it("returns controller and spec only — views excluded (##2493)", () => {

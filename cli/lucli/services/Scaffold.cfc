@@ -17,11 +17,32 @@ component {
 		variables.codeGenService = arguments.codeGenService;
 		variables.helpers = arguments.helpers;
 		variables.projectRoot = arguments.projectRoot;
-		// Optional: only needed by generators that read bundled template
-		// directories directly (generateAuth). Ends with a trailing slash
-		// when provided (same convention as the Admin service).
-		variables.moduleRoot = arguments.moduleRoot;
+		// Direct service callers need the same bundled templates as Module.cfc.
+		variables.moduleRoot = Len(arguments.moduleRoot)
+			? arguments.moduleRoot & "/"
+			: GetDirectoryFromPath(GetCurrentTemplatePath()) & "../";
+		variables.parentSource = new ScaffoldSource();
 		return this;
+	}
+
+
+	/**
+	 * Dry-run-aware file writer. `wheels generate --dry-run` sets
+	 * request.$wheelsGenerateDryRun; writes are then recorded (for the
+	 * caller to print) and skipped. Creates the parent directory on the
+	 * real path.
+	 */
+	private string function $write(required string path, required string content) {
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, arguments.path);
+			return arguments.path;
+		}
+		var dir = getDirectoryFromPath(arguments.path);
+		if (!directoryExists(dir)) {
+			directoryCreate(dir, true);
+		}
+		FileWrite(arguments.path, arguments.content);
+		return arguments.path;
 	}
 
 	/**
@@ -37,24 +58,15 @@ component {
 		boolean tests = true,
 		boolean force = false
 	) {
-		var results = {success: true, generated: [], skipped: [], errors: [], rollback: []};
+		// `routes` is its own field, not part of `modified`: config/routes.cfm is a
+		// shared project file, not a per-model artifact, and the parent-wiring
+		// specs assert the exact contents of `modified`.
+		var results = {success: true, generated: [], modified: [], routes: [], skipped: [], errors: [], rollback: []};
 		var pluralName = variables.helpers.pluralize(arguments.name);
 
 		try {
 			// Add foreign key columns for belongsTo relationships
-			var props = duplicate(arguments.properties);
-			if (len(arguments.belongsTo)) {
-				for (var parent in listToArray(arguments.belongsTo)) {
-					var fkName = lCase(parent) & "Id";
-					var hasFK = false;
-					for (var p in props) {
-						if (p.name == fkName) { hasFK = true; break; }
-					}
-					if (!hasFK) {
-						arrayAppend(props, {name: fkName, type: "integer"});
-					}
-				}
-			}
+			var props = $addForeignKeyColumns(arguments.properties, arguments.belongsTo);
 
 			// 1. Generate Model. Issue #2327: existing model is no longer fatal —
 			// scaffold skips and continues so users can scaffold the controller +
@@ -145,13 +157,25 @@ component {
 
 			// 5. Generate Tests
 			if (arguments.tests) {
-				var modelTestResult = variables.codeGenService.generateTest(type = "model", name = arguments.name);
+				var modelTestResult = variables.codeGenService.generateTest(
+					type = "model",
+					name = arguments.name,
+					properties = props,
+					force = arguments.force
+				);
 				if (modelTestResult.success) {
 					arrayAppend(results.generated, {type: "test", path: modelTestResult.path});
 					arrayAppend(results.rollback, modelTestResult.path);
 				}
 
-				var ctrlTestResult = variables.codeGenService.generateTest(type = "controller", name = pluralName);
+				var ctrlTestResult = variables.codeGenService.generateTest(
+					type = "controller",
+					name = pluralName,
+					properties = props,
+					modelName = arguments.name,
+					belongsTo = arguments.belongsTo,
+					force = arguments.force
+				);
 				if (ctrlTestResult.success) {
 					arrayAppend(results.generated, {type: "test", path: ctrlTestResult.path});
 					arrayAppend(results.rollback, ctrlTestResult.path);
@@ -164,7 +188,18 @@ component {
 			// onboarding cliff (finding F4): scaffolding `Post` produced
 			// `.resources("post")`, which conflicted with hand-added plural routes
 			// and broke the controller convention.
-			updateRoutes(pluralName);
+			//
+			// updateRoutes() returns whether it actually changed the file, and
+			// that was discarded — so a real scaffold silently rewrote
+			// config/routes.cfm while --dry-run listed it. The dry run was more
+			// honest than the run. Report it like any other change.
+			if (updateRoutes(pluralName)) {
+				arrayAppend(results.routes, {type: "routes", path: variables.projectRoot & "/config/routes.cfm"});
+			}
+
+			// Parent files belong to the user, even under --force. Only make
+			// narrowly recognized edits; report everything else for manual wiring.
+			$wireParentSide(arguments.name, arguments.belongsTo, viewProps, arguments.api, results);
 
 		} catch (any e) {
 			results.success = false;
@@ -175,6 +210,161 @@ component {
 		}
 
 		return results;
+	}
+
+	/** Wire only conventional parent files; --force never owns parent code. */
+	private void function $wireParentSide(required string childName, required string belongsTo, required array viewProps, required boolean api, required struct results) {
+		var association = LCase(variables.helpers.pluralize(arguments.childName));
+		for (var parent in ListToArray(arguments.belongsTo)) {
+			parent = Trim(parent);
+			if (!ReFind("^[A-Za-z][A-Za-z0-9_]*$", parent) || !ReFind("^[A-Za-z][A-Za-z0-9_]*$", association)) {
+				ArrayAppend(arguments.results.skipped, "parent wiring: custom association name; wire manually");
+				continue;
+			}
+			var parentModel = variables.helpers.capitalize(parent);
+			var parentPlural = variables.helpers.pluralize(parentModel);
+			var modelPath = variables.projectRoot & "/app/models/" & parentModel & ".cfc";
+			if (!FileExists(modelPath)) {
+				ArrayAppend(arguments.results.skipped, "parent model: " & modelPath & " not found; add hasMany(name=""" & association & """) manually");
+				continue;
+			}
+			var original = FileRead(modelPath);
+			var modelEdit = variables.parentSource.inverse(original, association, arguments.childName);
+			if (!modelEdit.ready) {
+				ArrayAppend(arguments.results.skipped, "parent model: " & modelPath & " — " & modelEdit.reason & "; wire " & association & " manually");
+				continue;
+			}
+			$writeParentChange(modelPath, original, modelEdit.content, "model", arguments.results);
+			// API scaffolds must not change existing browser controllers/views.
+			if (arguments.api) continue;
+			var controllerPath = variables.projectRoot & "/app/controllers/" & parentPlural & ".cfc";
+			if (!FileExists(controllerPath)) {
+				ArrayAppend(arguments.results.skipped, "parent controller: " & controllerPath & " not found; add show include=""" & association & """ and related UI manually");
+				continue;
+			}
+			original = FileRead(controllerPath);
+			var controllerEdit = variables.parentSource.showInclude(original, LCase(parent), parentModel, association);
+			if (!controllerEdit.ready) {
+				ArrayAppend(arguments.results.skipped, "parent controller: " & controllerPath & " — " & controllerEdit.reason & "; add include=""" & association & """ and related UI manually");
+				continue;
+			}
+			$writeParentChange(controllerPath, original, controllerEdit.content, "controller", arguments.results);
+			$appendRelatedBlock(variables.projectRoot & "/app/views/" & LCase(parentPlural) & "/show.cfm", parent, association, arguments.viewProps, arguments.results);
+		}
+	}
+
+	private void function $writeParentChange(required string path, required string original, required string content, required string type, required struct results) {
+		if (Compare(arguments.original, arguments.content) == 0) return;
+		$write(arguments.path, arguments.content);
+		// Never put pre-existing parent files in the rollback deletion list.
+		for (var item in arguments.results.modified) {
+			if (item.path == arguments.path) return;
+		}
+		ArrayAppend(arguments.results.modified, {type: arguments.type, path: arguments.path});
+	}
+
+	/** Append once. A marked block is user-owned, including on --force reruns. */
+	private void function $appendRelatedBlock(required string viewPath, required string parent, required string association, required array viewProps, required struct results) {
+		if (!FileExists(arguments.viewPath)) {
+			ArrayAppend(arguments.results.skipped, "parent view: " & arguments.viewPath & " not found; add related UI manually");
+			return;
+		}
+		var content = FileRead(arguments.viewPath);
+		var marker = "CLI: related " & arguments.association;
+		if (FindNoCase(marker, content)) {
+			ArrayAppend(arguments.results.skipped, "parent view: " & arguments.viewPath & " — related " & arguments.association & " block already present; preserved (edit manually)");
+			return;
+		}
+		var anchor = variables.parentSource.viewAnchor(content, LCase(arguments.parent));
+		if (!anchor) {
+			ArrayAppend(arguments.results.skipped, "parent view: " & arguments.viewPath & " — custom or ambiguous show wrapper; add related UI manually");
+			return;
+		}
+		var templatePath = variables.moduleRoot & "templates/codegen/related-block.txt";
+		if (!FileExists(templatePath)) {
+			ArrayAppend(arguments.results.skipped, "parent view: related template not found: " & templatePath);
+			return;
+		}
+		// Same string/text/id priority as the child views, including columns
+		// merged from its existing migration. Never assume a body column.
+		var display = "id";
+		for (var kind in ["string", "text"]) {
+			for (var prop in arguments.viewProps) {
+				if ((prop.type ?: "string") == kind && !ReFindNoCase("(Id|_id)$", prop.name)) {
+					display = prop.name;
+					break;
+				}
+			}
+			if (display != "id") break;
+		}
+		var singular = LCase(variables.helpers.singularize(arguments.association));
+		var block = FileRead(templatePath);
+		var substitutions = {SingularCap: variables.helpers.capitalize(singular), Singular: singular, Association: arguments.association, ListCap: variables.helpers.capitalize(arguments.association), ParentVar: LCase(arguments.parent), DisplayProperty: display};
+		for (var key in substitutions) block = ReplaceNoCase(block, "|" & key & "|", substitutions[key], "all");
+		var nl = Find(Chr(13) & Chr(10), content) ? Chr(13) & Chr(10) : Chr(10);
+		block = Replace(RTrim(block), Chr(10), nl, "all") & nl;
+		// Insert takes a CHARACTER COUNT, not a one-based index.
+		$writeParentChange(arguments.viewPath, content, Insert(block, content, anchor - 1), "view", arguments.results);
+	}
+
+	/**
+	 * Append foreign-key columns for belongsTo relationships that aren't
+	 * already present in the properties list.
+	 */
+	private array function $addForeignKeyColumns(required array properties, required string belongsTo) {
+		var props = duplicate(arguments.properties);
+		if (len(arguments.belongsTo)) {
+			for (var parent in listToArray(arguments.belongsTo)) {
+				var fkName = $foreignKeyName(parent);
+				var hasFK = false;
+				for (var p in props) {
+					if (p.name == fkName) { hasFK = true; break; }
+				}
+				if (!hasFK) {
+					arrayAppend(props, {name: fkName, type: "integer"});
+				}
+			}
+		}
+		return props;
+	}
+
+	/**
+	 * Foreign-key column name for a belongsTo parent, honoring the
+	 * `useUnderscoreReferenceColumns` setting (framework default false, but
+	 * `wheels new` apps opt in): `user_id` when true, `userId` when false.
+	 * Mirrors the suffix `t.references()` emits (TableDefinition.cfc) so the
+	 * scaffold's FK column matches a hand-written migration's column.
+	 */
+	private string function $foreignKeyName(required string parent) {
+		return lCase(arguments.parent) & ($usesUnderscoreReferenceColumns() ? "_id" : "Id");
+	}
+
+	/**
+	 * Whether config/settings.cfm opts into `<name>_id` reference columns.
+	 * The framework reads the flag via `$get()` at migration time; the CLI
+	 * service reads the source file directly, comment-stripped first
+	 * (Anti-Pattern #14) so a commented-out
+	 * `// set(useUnderscoreReferenceColumns=true);` doesn't satisfy the check.
+	 */
+	private boolean function $usesUnderscoreReferenceColumns() {
+		var settingsPath = variables.projectRoot & "/config/settings.cfm";
+		if (!fileExists(settingsPath)) return false;
+		return reFindNoCase(
+			"useUnderscoreReferenceColumns\s*=\s*true",
+			$stripCfmlComments(fileRead(settingsPath))
+		) > 0;
+	}
+
+	/**
+	 * Strip tag / block / line comments so source-grep checks can't be fooled
+	 * by commented-out code (Anti-Pattern #14). Mirrors Analysis.cfc.
+	 */
+	private string function $stripCfmlComments(required string source) {
+		var result = arguments.source;
+		result = reReplace(result, "<!---[\s\S]*?--->", "", "all");
+		result = reReplace(result, "/\*[\s\S]*?\*/", "", "all");
+		result = reReplace(result, "//[^\r\n]*", "", "all");
+		return result;
 	}
 
 	/**
@@ -299,7 +489,7 @@ component {
 
 		var content = generateMigrationContent(className, tableName, arguments.properties, arguments.primaryKey);
 		var migrationPath = migrationDir & "/" & fileName;
-		fileWrite(migrationPath, content);
+		$write(migrationPath, content);
 
 		return migrationPath;
 	}
@@ -344,7 +534,7 @@ component {
 			var fullMarker = indent & markerPattern;
 			if (find(fullMarker, content)) {
 				content = replace(content, fullMarker, indent & resourceRoute & chr(10) & fullMarker, 'all');
-				fileWrite(routesPath, content);
+				$write(routesPath, content);
 				return true;
 			}
 
@@ -353,7 +543,7 @@ component {
 				var lastEnd = content.lastIndexOf('.end()');
 				if (lastEnd >= 0) {
 					content = mid(content, 1, lastEnd) & resourceRoute & chr(10) & chr(9) & mid(content, lastEnd + 1, len(content));
-					fileWrite(routesPath, content);
+					$write(routesPath, content);
 					return true;
 				}
 			}
@@ -388,7 +578,7 @@ component {
 			var props = duplicate(arguments.properties);
 			if (len(arguments.belongsTo)) {
 				for (var parent in listToArray(arguments.belongsTo)) {
-					var fkName = lCase(parent) & "Id";
+					var fkName = $foreignKeyName(parent);
 					var hasFK = false;
 					for (var p in props) {
 						if (p.name == fkName) { hasFK = true; break; }
@@ -438,13 +628,23 @@ component {
 
 			// 4. Generate API-specific tests
 			if (arguments.tests) {
-				var modelTestResult = variables.codeGenService.generateTest(type="model", name=arguments.name);
+				var modelTestResult = variables.codeGenService.generateTest(
+					type = "model",
+					name = arguments.name,
+					properties = props,
+					force = arguments.force
+				);
 				if (modelTestResult.success) {
 					arrayAppend(results.generated, {type: "test", path: modelTestResult.path});
 					arrayAppend(results.rollback, modelTestResult.path);
 				}
 
-				var apiTestResult = generateApiTest(pluralName, arguments.name);
+				var apiTestResult = generateApiTest(
+					controllerName = pluralName,
+					modelName = arguments.name,
+					properties = props,
+					force = arguments.force
+				);
 				if (apiTestResult.success) {
 					arrayAppend(results.generated, {type: "test", path: apiTestResult.path});
 					arrayAppend(results.rollback, apiTestResult.path);
@@ -508,7 +708,7 @@ component {
 					var before = mid(content, 1, insertPos);
 					var after = mid(content, insertPos + 1, len(content));
 					content = before & resourceLine & nl & after;
-					fileWrite(routesPath, content);
+					$write(routesPath, content);
 					return true;
 				}
 			}
@@ -532,7 +732,7 @@ component {
 
 			if (find(fullMarker, content)) {
 				content = replace(content, fullMarker, apiBlock & fullMarker, 'all');
-				fileWrite(routesPath, content);
+				$write(routesPath, content);
 				return true;
 			}
 
@@ -546,7 +746,7 @@ component {
 					content &= t & t & '.resources(name="#resourceName#", except="new,edit")' & nl;
 					content &= t & '.end()' & nl & t;
 					content &= after;
-					fileWrite(routesPath, content);
+					$write(routesPath, content);
 					return true;
 				}
 			}
@@ -557,66 +757,23 @@ component {
 	}
 
 	/**
-	 * Generate an API-specific controller test that verifies JSON responses
+	 * Generate an API-specific controller test that verifies JSON responses.
+	 * Delegates to CodeGen.generateTest(type="api") so the template stays
+	 * locked by CodeGenSpec / ScaffoldSpec the same way HTML CRUD specs are.
 	 */
-	public struct function generateApiTest(required string controllerName, required string modelName) {
-		var testName = "Api" & arguments.controllerName & "ControllerSpec";
-		var testDir = variables.projectRoot & "/tests/specs/controllers/";
-		var filePath = testDir & testName & ".cfc";
-
-		if (fileExists(filePath)) {
-			return {success: false, error: "Test already exists: #filePath#", path: filePath};
-		}
-
-		if (!directoryExists(testDir)) {
-			directoryCreate(testDir, true);
-		}
-
-		var singular = lCase(arguments.modelName);
-		var plural = lCase(arguments.controllerName);
-		var nl = chr(10);
-		var t = chr(9);
-
-		// processRequest() takes a params STRUCT (with the route NAME inside it,
-		// not a URL path) and needs returnAs="struct" for the result to expose
-		// `status`. Routes added by updateApiRoutes() live in .namespace("api"),
-		// which prefixes child route names: apiProducts / apiProduct.
-		var collectionRoute = "api" & variables.helpers.capitalize(plural);
-		var memberRoute = "api" & variables.helpers.capitalize(singular);
-
-		var c = 'component extends="wheels.WheelsTest" {' & nl & nl;
-		c &= t & 'function run() {' & nl;
-		c &= t & t & 'describe("API #arguments.controllerName# Controller", () => {' & nl & nl;
-		c &= t & t & t & 'beforeEach(() => {' & nl;
-		c &= t & t & t & t & '// Setup test data' & nl;
-		c &= t & t & t & '})' & nl & nl;
-		c &= t & t & t & 'it("GET /api/#plural# returns JSON list", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(params={route: "#collectionRoute#", format: "json"}, method="get", returnAs="struct");' & nl;
-		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
-		c &= t & t & t & t & 'expect(result.status).toBe(200);' & nl;
-		c &= t & t & t & '})' & nl & nl;
-		c &= t & t & t & 'it("GET /api/#plural#/:key returns JSON record", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(params={route: "#memberRoute#", key: 1, format: "json"}, method="get", returnAs="struct");' & nl;
-		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
-		c &= t & t & t & '})' & nl & nl;
-		c &= t & t & t & 'it("POST /api/#plural# creates record", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(params={route: "#collectionRoute#", format: "json", #singular#: {}}, method="post", returnAs="struct");' & nl;
-		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
-		c &= t & t & t & '})' & nl & nl;
-		c &= t & t & t & 'it("PUT /api/#plural#/:key updates record", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(params={route: "#memberRoute#", key: 1, format: "json", #singular#: {}}, method="put", returnAs="struct");' & nl;
-		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
-		c &= t & t & t & '})' & nl & nl;
-		c &= t & t & t & 'it("DELETE /api/#plural#/:key deletes record", () => {' & nl;
-		c &= t & t & t & t & 'result = processRequest(params={route: "#memberRoute#", key: 1, format: "json"}, method="delete", returnAs="struct");' & nl;
-		c &= t & t & t & t & 'expect(result).toHaveKey("status");' & nl;
-		c &= t & t & t & '})' & nl & nl;
-		c &= t & t & '})' & nl;
-		c &= t & '}' & nl;
-		c &= '}' & nl;
-
-		fileWrite(filePath, c);
-		return {success: true, path: filePath, message: "Generated API controller test"};
+	public struct function generateApiTest(
+		required string controllerName,
+		required string modelName,
+		array properties = [],
+		boolean force = false
+	) {
+		return variables.codeGenService.generateTest(
+			type = "api",
+			name = arguments.controllerName,
+			modelName = arguments.modelName,
+			properties = arguments.properties,
+			force = arguments.force
+		);
 	}
 
 	/**
@@ -700,7 +857,7 @@ component {
 				}
 				var migrationPath = migrationDir & "/" & variables.helpers.generateMigrationTimestamp()
 					& "_create_" & tableName & "_table.cfc";
-				fileWrite(migrationPath, $renderAuthTemplate("migration", ctx));
+				$write(migrationPath, $renderAuthTemplate("migration", ctx));
 				arrayAppend(results.generated, {type: "migration", path: migrationPath});
 				arrayAppend(results.rollback, migrationPath);
 			} else {
@@ -893,7 +1050,7 @@ component {
 		if (!directoryExists(dir)) {
 			directoryCreate(dir, true);
 		}
-		fileWrite(absPath, arguments.content);
+		$write(absPath, arguments.content);
 		arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 		if (!existed) {
 			arrayAppend(arguments.results.rollback, absPath);
@@ -934,7 +1091,7 @@ component {
 				if (!directoryExists(dir)) {
 					directoryCreate(dir, true);
 				}
-				fileWrite(absPath, scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl);
+				$write(absPath, scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl);
 				arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 				arrayAppend(arguments.results.rollback, absPath);
 				return;
@@ -966,7 +1123,7 @@ component {
 			content = left(content, regionStart - 1)
 				& $indentBlock(blockText, indent) & nl
 				& mid(content, regionEnd + 1, len(content));
-			fileWrite(absPath, content);
+			$write(absPath, content);
 			arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 			return;
 		}
@@ -995,7 +1152,7 @@ component {
 			content = left(content, insertLineStart - 1)
 				& $indentBlock(blockText, anchorIndent) & nl
 				& mid(content, insertLineStart, len(content));
-			fileWrite(absPath, content);
+			$write(absPath, content);
 			arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 			return;
 		}
@@ -1009,7 +1166,7 @@ component {
 		} else {
 			content = content & nl & scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl;
 		}
-		fileWrite(absPath, content);
+		$write(absPath, content);
 		arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 	}
 
@@ -1129,14 +1286,12 @@ component {
 
 			var cfType = mapToWheelsType(prop.type);
 			var params = "columnNames='#prop.name#'";
-			params &= ", default=''";
+			// No `default=''` — the migrator hardener (S14) rejects empty-string
+			// defaults on string/text/char columns, and for numeric/temporal
+			// types `default=''` just rendered DEFAULT NULL anyway. Omitting the
+			// default yields NULL for nullable columns, which is the same thing.
 			params &= ", allowNull=" & (structKeyExists(prop, "required") && prop.required ? "false" : "true");
-
-			switch (cfType) {
-				case "string": params &= ", limit='255'"; break;
-				case "decimal": params &= ", precision='10', scale='2'"; break;
-				case "integer": params &= ", limit='11'"; break;
-			}
+			params &= $columnSizeParams(prop, cfType);
 
 			c &= t & t & t & t & "t.#cfType#(#params#);" & nl;
 		}
@@ -1177,23 +1332,103 @@ component {
 	}
 
 	/**
+	 * Emit limit / precision / scale for a generated column.
+	 * Brace modifiers from the CLI (`string{50}`, `decimal{10,2}`) override
+	 * the defaults; types that do not take a default size only emit a limit
+	 * when the caller supplied one.
+	 */
+	private string function $columnSizeParams(required struct prop, required string cfType) {
+		switch (arguments.cfType) {
+			case "string":
+				return ", limit='" & $propOrDefault(arguments.prop, "limit", "255") & "'";
+			case "decimal":
+				return ", precision='" & $propOrDefault(arguments.prop, "precision", "10")
+					& "', scale='" & $propOrDefault(arguments.prop, "scale", "2") & "'";
+			case "integer":
+				return ", limit='" & $propOrDefault(arguments.prop, "limit", "11") & "'";
+			case "text":
+			case "binary":
+				if (structKeyExists(arguments.prop, "limit")) {
+					return ", limit='" & arguments.prop.limit & "'";
+				}
+				return "";
+			default:
+				return "";
+		}
+	}
+
+	/**
+	 * Read a numeric column-size override from a parsed property, or the
+	 * generator default when the caller omitted a brace modifier.
+	 */
+	private string function $propOrDefault(required struct prop, required string key, required string fallback) {
+		return structKeyExists(arguments.prop, arguments.key) ? arguments.prop[arguments.key] : arguments.fallback;
+	}
+
+	/**
 	 * Map property type to Wheels migration column type
 	 */
 	private string function mapToWheelsType(required string type) {
-		switch (lCase(arguments.type)) {
-			case "string": return "string";
-			case "text": return "text";
+		var t = lCase(arguments.type);
+
+		var numeric = $mapWheelsNumericType(t);
+		if (len(numeric)) return numeric;
+
+		var textual = $mapWheelsTextualType(t);
+		if (len(textual)) return textual;
+
+		var other = $mapWheelsOtherType(t);
+		if (len(other)) return other;
+
+		// Never silently map an unknown type to a VARCHAR — `references` and
+		// other unrecognised tokens must fail loudly instead of producing a
+		// plain string column with no foreign key.
+		throw(
+			type = "ScaffoldError",
+			message = "Unknown property type '#arguments.type#'. Valid types: string, text, integer, biginteger, float, decimal, boolean, date, datetime, time, binary, uuid, enum, email, url."
+		);
+	}
+
+	/**
+	 * Map numeric property types to their Wheels migration column type.
+	 */
+	private string function $mapWheelsNumericType(required string type) {
+		switch (arguments.type) {
 			case "integer": case "int": return "integer";
 			case "biginteger": case "bigint": return "biginteger";
 			case "float": case "double": return "float";
 			case "decimal": case "numeric": return "decimal";
+			default: return "";
+		}
+	}
+
+	/**
+	 * Map textual property types to their Wheels migration column type.
+	 */
+	private string function $mapWheelsTextualType(required string type) {
+		switch (arguments.type) {
+			case "string": case "varchar": return "string";
+			case "text": case "longtext": return "text";
+			default: return "";
+		}
+	}
+
+	/**
+	 * Map boolean/temporal/binary/uuid property types to their Wheels
+	 * migration column type. `email`/`url`/`enum` are stored as VARCHAR
+	 * columns (the model layer adds format/enum behaviour); anything else
+	 * returns "" so mapToWheelsType() rejects it instead of guessing "string".
+	 */
+	private string function $mapWheelsOtherType(required string type) {
+		switch (arguments.type) {
 			case "boolean": case "bool": return "boolean";
 			case "date": return "date";
 			case "datetime": case "timestamp": return "datetime";
 			case "time": return "time";
 			case "binary": case "blob": return "binary";
 			case "uuid": return "uniqueidentifier";
-			default: return "string";
+			case "email": case "url": case "enum": return "string";
+			default: return "";
 		}
 	}
 

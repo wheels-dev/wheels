@@ -27,7 +27,7 @@ component {
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.filter = {};
 			local.filter.through = local.throughKeysArray[local.i];
-			local.filter.type = arguments.type;
+			local.filter.type = LCase(arguments.type);
 			local.filter.only = arguments.only;
 			local.filter.except = arguments.except;
 			local.filter.arguments = {};
@@ -44,8 +44,12 @@ component {
 			}
 			if (arguments.placement == "append") {
 				ArrayAppend(variables.$class.filters, local.filter);
+			} else if (!ArrayLen(variables.$class.filters)) {
+				ArrayAppend(variables.$class.filters, local.filter);
 			} else {
-				ArrayPrepend(variables.$class.filters, local.filter);
+				// Prepend the through-list as a block so "a,b,c" stays a,b,c
+				// in front of the existing chain (not c,b,a).
+				ArrayInsertAt(variables.$class.filters, local.i, local.filter);
 			}
 		}
 	}
@@ -86,14 +90,15 @@ component {
 		}
 
 		// Set all filters to be returned, or loop over them and set only those that match the supplied type to be returned.
+		// Always return a copy so callers cannot mutate the live $class.filters chain.
 		if (arguments.type == "all") {
-			local.rv = variables.$class.filters;
+			local.rv = Duplicate(variables.$class.filters);
 		} else {
 			local.rv = [];
 			local.iEnd = ArrayLen(variables.$class.filters);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				if (variables.$class.filters[local.i].type == arguments.type) {
-					ArrayAppend(local.rv, variables.$class.filters[local.i]);
+				if (LCase(variables.$class.filters[local.i].type) == LCase(arguments.type)) {
+					ArrayAppend(local.rv, Duplicate(variables.$class.filters[local.i]));
 				}
 			}
 		}
@@ -103,8 +108,9 @@ component {
 
 	/**
 	 * Called twice when processing a request, first for "before" filters and then for "after" filters.
+	 * Returns false when a before filter returns false so processAction can skip the action.
 	 */
-	public void function $runFilters(required string type, required string action) {
+	public boolean function $runFilters(required string type, required string action) {
 		local.filters = filterChain(arguments.type);
 		local.iEnd = ArrayLen(local.filters);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -118,15 +124,20 @@ component {
 					);
 				}
 				local.result = $invoke(method = local.filter.through, invokeArgs = local.filter.arguments);
-				// If the filter returned false, we skip the remaining filters.
+				// If the filter returned false, skip remaining filters. A before
+				// filter also halts processAction (authz fail-closed).
 				if ((StructKeyExists(local, "result") && !IsNull(local.result) && !local.result)) {
+					if (LCase(arguments.type) == "before") {
+						return false;
+					}
 					break;
-				} else if (arguments.type == "before" && $performedRenderOrRedirect()) {
+				} else if (LCase(arguments.type) == "before" && $performedRenderOrRedirect()) {
 					break;
-				} else if (arguments.type == "after" && $performedRedirect()) {
+				} else if (LCase(arguments.type) == "after" && $performedRedirect()) {
 					break;
 				}
 			}
 		}
+		return true;
 	}
 }

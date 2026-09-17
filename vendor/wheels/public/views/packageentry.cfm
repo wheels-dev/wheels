@@ -28,8 +28,8 @@ local.manifest = local.meta.manifest;
 			</a>
 		</div>
 
-		<cfif StructKeyExists(local.manifest, "homepage") AND Len(local.manifest.homepage)>
-			<a class="ui button small teal" href="#local.manifest.homepage#" target="_blank">
+		<cfif StructKeyExists(local.manifest, "homepage") AND Len(local.manifest.homepage) AND REFindNoCase("^https?://", local.manifest.homepage)>
+			<a class="ui button small teal" href="#EncodeForHTML(local.manifest.homepage)#" target="_blank" rel="noopener">
 				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 24 24" style="vertical-align: middle;">
 					<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
 				</svg>
@@ -38,31 +38,31 @@ local.manifest = local.meta.manifest;
 		</cfif>
 
 		<div class="ui segment">
-			<h3 class="ui header">#local.meta.name#</h3>
+			<h3 class="ui header">#EncodeForHTML(local.meta.name)#</h3>
 			<cfif Len(local.meta.description)>
-				<p>#local.meta.description#</p>
+				<p>#EncodeForHTML(local.meta.description)#</p>
 			</cfif>
 
 			<table class="ui definition table">
 				<tbody>
 					<tr>
 						<td class="two wide">Version</td>
-						<td>#local.meta.version#</td>
+						<td>#EncodeForHTML(local.meta.version)#</td>
 					</tr>
 					<cfif Len(local.meta.author)>
 					<tr>
 						<td>Author</td>
-						<td>#local.meta.author#</td>
+						<td>#EncodeForHTML(local.meta.author)#</td>
 					</tr>
 					</cfif>
 					<tr>
 						<td>Directory</td>
-						<td><code>#local.meta.directory#</code></td>
+						<td><code>#EncodeForHTML(local.meta.directory)#</code></td>
 					</tr>
 					<cfif StructKeyExists(local.manifest, "wheelsVersion") AND Len(local.manifest.wheelsVersion)>
 					<tr>
 						<td>Wheels Version</td>
-						<td>#local.manifest.wheelsVersion#</td>
+						<td>#EncodeForHTML(local.manifest.wheelsVersion)#</td>
 					</tr>
 					</cfif>
 					<cfif StructKeyExists(local.manifest, "provides")>
@@ -71,7 +71,7 @@ local.manifest = local.meta.manifest;
 						<td>
 							<cfset local.provides = local.manifest.provides>
 							<cfif StructKeyExists(local.provides, "mixins") AND Len(local.provides.mixins)>
-								<span class="ui blue label">Mixins: #local.provides.mixins#</span>
+								<span class="ui blue label">Mixins: #EncodeForHTML(local.provides.mixins)#</span>
 							</cfif>
 							<cfif StructKeyExists(local.provides, "services") AND IsArray(local.provides.services) AND ArrayLen(local.provides.services)>
 								<span class="ui green label">Services: #ArrayToList(local.provides.services, ", ")#</span>
@@ -87,7 +87,7 @@ local.manifest = local.meta.manifest;
 						<td>Dependencies</td>
 						<td>
 							<cfloop collection="#local.manifest.dependencies#" item="local.depName">
-								<span class="ui label">#local.depName#: #local.manifest.dependencies[local.depName]#</span>
+								<span class="ui label">#EncodeForHTML(local.depName)#: #EncodeForHTML(local.manifest.dependencies[local.depName])#</span>
 							</cfloop>
 						</td>
 					</tr>
@@ -96,13 +96,9 @@ local.manifest = local.meta.manifest;
 			</table>
 		</div>
 
-		<!--- Include package-provided index if it exists --->
-		<cfset local.pkgIndexPath = "/vendor/#LCase(local.pkgName)#/index.cfm">
-		<cfif FileExists(expandPath(local.pkgIndexPath))>
-			<div class="ui segment">
-				<cfinclude template="#local.pkgIndexPath#">
-			</div>
-		</cfif>
+		<div class="ui segment">
+			<p>Package-provided pages are not executed from this admin view.</p>
+		</div>
 
 		<!--- Show test link if package has tests --->
 		<cfif DirectoryExists(expandPath("/vendor/#LCase(local.pkgName)#/tests"))>

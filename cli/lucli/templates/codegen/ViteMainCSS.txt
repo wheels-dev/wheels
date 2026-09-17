@@ -1,0 +1,24 @@
+/**
+ * Wheels Application Styles
+ *
+ * This is your main CSS file. Vite supports CSS nesting, @import, and
+ * PostCSS out of the box. Add preprocessor support (Sass, Less) by
+ * installing the corresponding package (e.g., `npm install -D sass`).
+ *
+ * In production, Vite extracts CSS into a separate fingerprinted file.
+ * In development, styles are injected via JavaScript for instant HMR.
+ */
+
+:root {
+  --color-primary: #1a73e8;
+  --color-text: #333;
+  --font-family: system-ui, -apple-system, sans-serif;
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--color-text);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}

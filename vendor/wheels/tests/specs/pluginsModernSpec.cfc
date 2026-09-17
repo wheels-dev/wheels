@@ -256,7 +256,7 @@ component extends="wheels.WheelsTest" {
 					// runs the failing plugin's hook first).
 					PluginObj = $pluginObj(config)
 
-					expect(PluginObj.getPlugins()).toHaveKey("TestLifecycleFailingA")
+					expect(PluginObj.getPlugins()).notToHaveKey("TestLifecycleFailingA")
 					expect(PluginObj.getPlugins()).toHaveKey("TestLifecycleWorkingB")
 					expect(ArrayFind(application.$wheelstestLifecycleLog, "B:onPluginLoad")).toBeGT(0)
 				} finally {
@@ -662,8 +662,9 @@ component extends="wheels.WheelsTest" {
 				PluginObj = $pluginObj(config)
 				var meta = PluginObj.getPluginMeta()
 
-				// Bad manifest should result in empty manifest struct
-				expect(StructIsEmpty(meta.TestBadManifestPlugin.manifest)).toBeTrue()
+				// Invalid plugin.json fails closed: the plugin is not loaded.
+				expect(PluginObj.getPlugins()).notToHaveKey("TestBadManifestPlugin")
+				expect(meta).notToHaveKey("TestBadManifestPlugin")
 
 				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})

@@ -45,7 +45,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("keeps the enriched name on the top version row after a missingMigFlag run", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("003");
 				// Simulate a "missing" gap migration: remove 002's tracking row
 				// and its table so the file counts as pending again.
@@ -72,7 +75,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not insert a bogus '0' row when run against an empty tracking table", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001", true);
 				var rows = queryExecute(
 					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '0'",
@@ -129,8 +135,17 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("sets request.$wheelsTransactionWrapper for the duration of up()", () => {
-				if (_isCockroachDB) return;
-				wrapperMigrator.redoMigration("001");
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var priorDown = application.wheels.allowMigrationDown;
+				application.wheels.allowMigrationDown = true;
+				try {
+					wrapperMigrator.redoMigration("001");
+				} finally {
+					application.wheels.allowMigrationDown = priorDown;
+				}
 				expect(request.$issue2789FlagDuringUp).toBeTrue(
 					"redoMigration() must set request.$wheelsTransactionWrapper while the "
 					& "migration runs (issue ##2789), like every other migration path."
@@ -138,8 +153,17 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rolls back DML written by up() when the redo fails", () => {
-				if (_isCockroachDB) return;
-				var output = errorPathMigrator.redoMigration("005");
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var priorDown = application.wheels.allowMigrationDown;
+				application.wheels.allowMigrationDown = true;
+				try {
+					var output = errorPathMigrator.redoMigration("005");
+				} finally {
+					application.wheels.allowMigrationDown = priorDown;
+				}
 				expect(output).toInclude("Error re-running 005");
 				expect(output).toInclude("synthetic failure after DML");
 				var found = queryExecute(
@@ -188,7 +212,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("doctor() reports state without bootstrapping the tracking table", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var report = migrator.doctor();
 				expect(report.healthy).toBeFalse();
 				expect(report.summary.pending).toBe(3);
@@ -204,7 +231,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("getCurrentMigrationVersion() reports 0 without bootstrapping", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				expect(migrator.getCurrentMigrationVersion()).toBe("0");
 				var info = application.wo.$dbinfo(
 					datasource = application.wheels.dataSourceName,
@@ -215,7 +245,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("migrateTo() still bootstraps the tables that reads left alone", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.doctor();
 				migrator.migrateTo("001");
 				var info = application.wo.$dbinfo(

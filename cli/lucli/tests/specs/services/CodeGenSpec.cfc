@@ -51,6 +51,117 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(find("SENTINEL", fileRead(path))).toBe(0);
 				});
 
+				it("S6 PROVE: missing-template fallback mints expect(true).toBeTrue()", () => {
+					var result = codegen.generateTest(
+						type = "noSuchTemplateType",
+						name = "S6FallbackMint",
+						force = true
+					);
+					expect(result.success).toBeTrue();
+					expect(result.message).toInclude("inline template");
+					var content = fileRead(tempRoot & "/tests/specs/unit/S6FallbackMintSpec.cfc");
+					expect(content).toInclude("expect(true).toBeTrue();");
+				});
+
+				it("controller spec covers the seven CRUD actions with processRequest", () => {
+					codegen.generateTest(type = "controller", name = "Posts", force = true);
+					var content = fileRead(tempRoot & "/tests/specs/controllers/PostsControllerSpec.cfc");
+					expect(content).toInclude('action = "index"');
+					expect(content).toInclude('action = "new"');
+					expect(content).toInclude('action = "create"');
+					expect(content).toInclude('action = "show"');
+					expect(content).toInclude('action = "edit"');
+					expect(content).toInclude('action = "update"');
+					expect(content).toInclude('action = "delete"');
+					expect(content).toInclude("processRequest(");
+					expect(content).toInclude("returnAs = ""struct""");
+					expect(content).notToInclude("// it(""creates a record""");
+					expect(content).notToInclude("{{targetName}}");
+					expect(content).notToInclude("{{modelName}}");
+				});
+
+				it("controller spec creates per-example data via model().create()", () => {
+					codegen.generateTest(
+						type = "controller",
+						name = "Posts",
+						modelName = "Post",
+						properties = [
+							{name: "title", type: "string"},
+							{name: "body", type: "text"},
+							{name: "publishedAt", type: "datetime"}
+						],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/tests/specs/controllers/PostsControllerSpec.cfc");
+					expect(content).toInclude('model("Post").create(properties = {"title": "MyString", "body": "MyText", "publishedAt": Now()})');
+					expect(content).notToInclude("{title = ");
+					expect(content).notToInclude('"title" = ');
+					expect(content).toInclude("beforeCount + 1");
+					expect(content).toInclude("beforeCount - 1");
+					expect(content).toInclude("expect(result.status).toBe(303)");
+					expect(content).toInclude("variables.post.id");
+				});
+
+				it("model spec stays thin without properties and adds presence examples when given them", () => {
+					codegen.generateTest(type = "model", name = "Bare", force = true);
+					var bare = fileRead(tempRoot & "/tests/specs/models/BareSpec.cfc");
+					expect(bare).toInclude('model("Bare").new()');
+					expect(bare).notToInclude("is invalid without required attributes");
+
+					codegen.generateTest(
+						type = "model",
+						name = "Post",
+						properties = [{name: "title", type: "string"}, {name: "body", type: "text"}],
+						force = true
+					);
+					var rich = fileRead(tempRoot & "/tests/specs/models/PostSpec.cfc");
+					expect(rich).toInclude("is invalid without required attributes");
+					expect(rich).toInclude("is valid with required attributes");
+					expect(rich).toInclude('new(properties = {"title": "MyString", "body": "MyText"})');
+				});
+
+				it("sample attributes cover enum, email, integer, and boolean types", () => {
+					codegen.generateTest(
+						type = "controller",
+						name = "Tickets",
+						modelName = "Ticket",
+						properties = [
+							{name: "status", type: "enum", values: "open,pending,closed"},
+							{name: "email", type: "email"},
+							{name: "count", type: "integer"},
+							{name: "active", type: "boolean"}
+						],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/tests/specs/controllers/TicketsControllerSpec.cfc");
+					expect(content).toInclude('"status": "open"');
+					expect(content).toInclude('"email": "user@example.com"');
+					expect(content).toInclude('"count": 1');
+					expect(content).toInclude('"active": true');
+					expect(content).notToInclude("{status = ");
+					expect(content).notToInclude('"status" = ');
+				});
+
+				it("api spec asserts 201/204 and count deltas with created record keys", () => {
+					var result = codegen.generateTest(
+						type = "api",
+						name = "Widgets",
+						modelName = "Widget",
+						properties = [{name: "value", type: "string"}],
+						force = true
+					);
+					expect(result.success).toBeTrue();
+					var content = fileRead(tempRoot & "/tests/specs/controllers/ApiWidgetsControllerSpec.cfc");
+					expect(content).toInclude('params={route: "apiWidgets", format: "json"}');
+					expect(content).toInclude('route: "apiWidget"');
+					expect(content).toInclude("returnAs=""struct""");
+					expect(content).toInclude("expect(result.status).toBe(201)");
+					expect(content).toInclude("expect(result.status).toBe(204)");
+					expect(content).toInclude("variables.widget.id");
+					expect(content).toInclude('"value": "MyString"');
+					expect(content).notToInclude("processRequest(route=");
+				});
+
 			});
 
 			describe("generateModel()", () => {
@@ -123,6 +234,77 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var content = fileRead(tempRoot & "/app/models/Empty.cfc");
 					expect(content).notToInclude("validatesPresenceOf");
 					expect(content).notToInclude("validatesFormatOf");
+					expect(content).notToInclude("validatesLengthOf");
+				});
+
+				it("emits validatesLengthOf for a string property with a brace limit", () => {
+					codegen.generateModel(
+						name = "SizedTitle",
+						properties = [{name: "title", type: "string", limit: "50"}],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/SizedTitle.cfc");
+					expect(content).toInclude('validatesPresenceOf("title")');
+					expect(content).toInclude('validatesLengthOf(property="title", maximum=50, allowBlank=true)');
+				});
+
+				it("does not invent a length validation for a bare string", () => {
+					codegen.generateModel(
+						name = "BareTitle",
+						properties = [{name: "title", type: "string"}],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/BareTitle.cfc");
+					expect(content).toInclude('validatesPresenceOf("title")');
+					expect(content).notToInclude("validatesLengthOf");
+				});
+
+				it("emits length validation for varchar / text / binary limits", () => {
+					codegen.generateModel(
+						name = "SizedMisc",
+						properties = [
+							{name: "sku", type: "varchar", limit: "80"},
+							{name: "body", type: "text", limit: "1000"},
+							{name: "blob", type: "binary", limit: "4096"}
+						],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/SizedMisc.cfc");
+					expect(content).toInclude('validatesPresenceOf("sku,body,blob")');
+					expect(content).toInclude('validatesLengthOf(property="sku", maximum=80, allowBlank=true)');
+					expect(content).toInclude('validatesLengthOf(property="body", maximum=1000, allowBlank=true)');
+					expect(content).toInclude('validatesLengthOf(property="blob", maximum=4096, allowBlank=true)');
+				});
+
+				it("skips length validation for integer limits and decimal precision", () => {
+					codegen.generateModel(
+						name = "NumericSized",
+						properties = [
+							{name: "count", type: "integer", limit: "8"},
+							{name: "price", type: "decimal", precision: "10", scale: "2"}
+						],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/NumericSized.cfc");
+					expect(content).toInclude('validatesPresenceOf("count,price")');
+					expect(content).notToInclude("validatesLengthOf");
+				});
+
+				it("keeps email format validation alongside a sibling string limit", () => {
+					codegen.generateModel(
+						name = "MixedValidations",
+						properties = [
+							{name: "title", type: "string", limit: "50"},
+							{name: "email", type: "email"}
+						],
+						force = true
+					);
+					var content = fileRead(tempRoot & "/app/models/MixedValidations.cfc");
+					expect(content).toInclude('validatesPresenceOf("title,email")');
+					expect(content).toInclude('validatesFormatOf(property="email", type="email")');
+					expect(content).toInclude('validatesLengthOf(property="title", maximum=50, allowBlank=true)');
+					expect(content).toInclude(chr(9) & chr(9) & "validatesLengthOf");
+					expect(content).notToInclude(chr(10) & "validatesLengthOf");
 				});
 
 				it("emits enum() for enum-typed properties (##M2)", () => {
@@ -265,6 +447,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result.actions).toBeEmpty();
 				});
 
+				it("S2 PROVE: packagePath from listFirst is unvalidated so ../X writes outside app/controllers/", () => {
+					// Current hole: listFirst("../S2Escape","/") is ".." and is
+					// joined as packagePath without validateName. Destination
+					// becomes app/controllers/../S2Escape.cfc → app/S2Escape.cfc.
+					var result = codegen.generateController(
+						name = "../S2Escape",
+						actions = [],
+						force = true
+					);
+					var escapedPath = tempRoot & "/app/S2Escape.cfc";
+					var controllersPath = tempRoot & "/app/controllers/S2Escape.cfc";
+					expect(result.success).toBeTrue();
+					expect(fileExists(escapedPath)).toBeTrue();
+					expect(fileExists(controllersPath)).toBeFalse();
+					if (fileExists(escapedPath)) {
+						fileDelete(escapedPath);
+					}
+				});
+
 			});
 
 			describe("generatePolicy()", () => {
@@ -331,6 +532,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("accepts valid PascalCase name", () => {
 					var result = codegen.validateName("UserProfile", "model");
 					expect(result.valid).toBeTrue();
+				});
+
+				it("S2 PROVE: validateName rejects ../X but generateController never consults it", () => {
+					var result = codegen.validateName("../X", "controller");
+					expect(result.valid).toBeFalse();
 				});
 
 			});

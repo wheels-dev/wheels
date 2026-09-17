@@ -108,12 +108,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(root & "/config/services.cfm")).toBeTrue();
 			});
 
-			it("emits a create-users migration with digest columns, unique email index, and no api token column", () => {
+			it("emits a create-users migration with a bcrypt hash column, unique email index, and no api token column", () => {
 				var files = directoryList(fixtures.session.root & "/app/migrator/migrations", false, "name", "*_create_users_table.cfc");
 				expect(arrayLen(files)).toBe(1);
 				var content = fileRead(fixtures.session.root & "/app/migrator/migrations/" & files[1]);
 				expect(content).toInclude('t.string(columnNames="email"');
-				expect(content).toInclude('t.string(columnNames="passwordDigest"');
+				expect(content).toInclude('t.string(columnNames="passwordHash"');
 				expect(content).toInclude('t.string(columnNames="resetTokenDigest"');
 				expect(content).toInclude('t.datetime(columnNames="resetTokenExpiresAt"');
 				expect(content).toInclude("t.timestamps();");
@@ -132,10 +132,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(find("wheels:generate-auth:routes:begin", content)).toBeLT(find(".wildcard()", content));
 			});
 
-			it("wires passwordHasher, authenticator, and sessionStrategy singletons in config/services.cfm", () => {
+			it("wires authenticator and sessionStrategy singletons (no hasher — bcrypt is a global helper) in config/services.cfm", () => {
 				var content = fileRead(fixtures.session.root & "/config/services.cfm");
 				expect(content).toInclude("wheels:generate-auth:services:begin");
-				expect(content).toInclude('map("passwordHasher").to("wheels.auth.PasswordHasher").asSingleton()');
+				expect(content).notToInclude("passwordHasher");
 				expect(content).toInclude('map("authenticator").to("wheels.auth.Authenticator").asSingleton()');
 				expect(content).toInclude('map("sessionStrategy").to("wheels.auth.SessionStrategy").asSingleton()');
 			});
@@ -156,25 +156,26 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 			});
 
-			it("hashes via the passwordHasher service and scrubs the transient password in the model", () => {
+			it("hashes via the bcryptHash global helper and scrubs the transient password in the model", () => {
 				var stripped = $strippedFile(fixtures.session.root & "/app/models/User.cfc");
 				expect(stripped).toInclude('beforeSave("hashPasswordProperty")');
-				expect(stripped).toInclude('service("passwordHasher")');
+				expect(stripped).toInclude("bcryptHash(");
+				expect(stripped).toInclude("bcryptVerify(");
+				expect(stripped).toInclude("bcryptNeedsRehash(");
 				expect(stripped).toInclude("function authenticate(");
-				expect(stripped).toInclude("needsRehash");
 				expect(stripped).toInclude('protectedProperties(');
 			});
 
-			it("disables the automatic NOT-NULL presence validation on passwordDigest", () => {
-				// passwordDigest is only populated by the beforeSave callback,
+			it("disables the automatic NOT-NULL presence validation on passwordHash", () => {
+				// passwordHash is only populated by the beforeSave callback,
 				// which runs AFTER validation — Wheels' automatic presence
 				// validation for the allowNull=false column would otherwise
-				// reject every new record ("Password Digest can't be empty").
+				// reject every new record ("Password Hash can't be empty").
 				// Verified live: seeding/registration failed until this line
 				// was added (runtime verification on PR ##3291).
 				for (var key in ["session", "token", "jwt"]) {
 					var stripped = $strippedFile(fixtures[key].root & "/app/models/User.cfc");
-					expect(stripped).toInclude('property(name="passwordDigest", automaticValidations=false)');
+					expect(stripped).toInclude('property(name="passwordHash", automaticValidations=false)');
 				}
 			});
 
@@ -225,7 +226,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("equalizes login timing with a dummy derivation when the email is unknown", () => {
 				var stripped = $strippedFile(fixtures.session.root & "/app/controllers/Sessions.cfc");
-				expect(stripped).toInclude('service("passwordHasher").hash(');
+				expect(stripped).toInclude('bcryptHash(');
 			});
 
 			it("emits a controller spec that calls processAction() with no positional action argument", () => {
@@ -327,7 +328,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("equalizes login timing with a dummy derivation when the email is unknown", () => {
 				var stripped = $strippedFile(fixtures.token.root & "/app/controllers/api/Sessions.cfc");
-				expect(stripped).toInclude('service("passwordHasher").hash(');
+				expect(stripped).toInclude('bcryptHash(');
 			});
 
 			it("hands the Authorization header to the authenticator explicitly on revoke", () => {
@@ -393,7 +394,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("equalizes login timing with a dummy derivation when the email is unknown", () => {
 				var stripped = $strippedFile(fixtures.jwt.root & "/app/controllers/api/Sessions.cfc");
-				expect(stripped).toInclude('service("passwordHasher").hash(');
+				expect(stripped).toInclude('bcryptHash(');
 			});
 
 			it("extends the app base controller by full mapping path (namespaced controller)", () => {

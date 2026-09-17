@@ -187,7 +187,12 @@ component {
 			}
 			if (inBlockComment) {
 				comments++;
-				if (findNoCase("--->", trimmed)) {
+				// A block comment may be CFML (<!--- … --->) or JS-style
+				// (/* … */). Close on either marker; previously only "--->" was
+				// checked, so a multi-line /** doc comment never reset the flag
+				// and every following line (the actual cfscript code) was
+				// counted as a comment.
+				if (findNoCase("--->", trimmed) || find("*/", trimmed)) {
 					inBlockComment = false;
 				}
 				continue;

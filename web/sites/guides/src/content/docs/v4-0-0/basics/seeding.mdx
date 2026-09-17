@@ -99,7 +99,11 @@ The commands you'll actually use day-to-day:
 
 There is no `wheels generate seed` command — it errors with `Unknown generator type: seed`. The snippets generator above is the scaffold path.
 
-You may also see references to `wheels seed --generate`, a legacy flag from before `seedOnce()` existed that bypasses your seed files and generates random fake records for every model. It's currently non-functional: every model errors internally, zero rows are created, and the command still reports success ([#3082](https://github.com/wheels-dev/wheels/issues/3082)). Don't use it — write explicit `seedOnce()` calls where you control the data.
+### Quick generated demo data
+
+`wheels seed --generate` bypasses your seed files and generates sample records from model property names and types. Free text now includes the **model, property, and row number**, with a deterministic sentence rotation. For example, `Post.body`, `Comment.body`, and `Post.description` receive different content instead of identical lorem ipsum. Titles and generic strings also include model context. Numeric, date, boolean, and special-purpose fields keep their type-specific generators; this is not a guarantee that every value is unique or that every model's validations can be satisfied.
+
+Generated seeding **adds** records—it does not update old rows or reset IDs. It is suitable for quick disposable demos, not repeatable relational fixtures: foreign-key values are still generated from row indexes rather than selected from actual parent records. After IDs advance, generated child rows can point at missing parents. For a rehearsable presentation or any important data, use explicit `seedOnce()` calls and look up the real parent keys, as shown below. Do not clear a database merely to make generated IDs line up.
 
 ## Running seeds without the wheels CLI
 

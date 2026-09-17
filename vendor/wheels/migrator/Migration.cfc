@@ -383,7 +383,13 @@ component extends="Base" {
 		// addReference for the same pattern.
 		$combineArguments(args = arguments, combine = "referenceName,columnName", required = false);
 		$combineArguments(args = arguments, combine = "referenceName,columnNames", required = true);
-		dropForeignKey(arguments.table, "FK_#arguments.table#_#pluralize(arguments.referenceName)#");
+		local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
+		local.column = arguments.referenceName & local.idSuffix;
+		local.refTable = pluralize(arguments.referenceName);
+		dropForeignKey(
+			arguments.table,
+			"FK_#objectCase(arguments.table)#_#objectCase(local.refTable)#_#objectCase(local.column)#"
+		);
 	}
 
 	/**
@@ -537,9 +543,16 @@ component extends="Base" {
 	 * [category: Migration Functions]
 	 *
 	 * @table The table name where the record is
-	 * @where The where clause, i.e admin = 1
+	 * @where The where clause, i.e admin = 1. Raw SQL — callers must supply a predicate or all=true.
+	 * @all When true, an empty where updates every row. Default false (fail-closed).
 	 */
-	public void function updateRecord(required string table, string where = "") {
+	public void function updateRecord(required string table, string where = "", boolean all = false) {
+		if (!Len(Trim(arguments.where)) && !arguments.all) {
+			Throw(
+				type = "Wheels.Migrator.MissingWhere",
+				message = "updateRecord() requires a where clause or all=true. An empty where would update every row."
+			);
+		}
 		local.appKey = $appKey();
 		local.setClauses = "";
 		local.params = [];
@@ -550,7 +563,7 @@ component extends="Base" {
 			arguments[application[local.appKey].timeStampOnUpdateProperty] = $timestamp();
 		}
 		for (local.key in arguments) {
-			if (local.key neq "table" && local.key neq "where") {
+			if (local.key neq "table" && local.key neq "where" && local.key neq "all") {
 				local.setClauses = ListAppend(local.setClauses, "#this.adapter.quoteColumnName(local.key)# = ?");
 				local.value = arguments[local.key];
 				// Strip wrapping single quotes if present (legacy convention)
@@ -588,9 +601,16 @@ component extends="Base" {
 	 * [category: Migration Functions]
 	 *
 	 * @table The table name to remove the record from
-	 * @where The where clause, i.e id = 123
+	 * @where The where clause, i.e id = 123. Raw SQL — callers must supply a predicate or all=true.
+	 * @all When true, an empty where deletes every row. Default false (fail-closed).
 	 */
-	public void function removeRecord(required string table, string where = "") {
+	public void function removeRecord(required string table, string where = "", boolean all = false) {
+		if (!Len(Trim(arguments.where)) && !arguments.all) {
+			Throw(
+				type = "Wheels.Migrator.MissingWhere",
+				message = "removeRecord() requires a where clause or all=true. An empty where would delete every row."
+			);
+		}
 		local.sql = 'DELETE FROM #this.adapter.quoteTableName(arguments.table)#';
 		local.message = 'Removed record(s) from table #arguments.table#';
 		if (arguments.where != '') {

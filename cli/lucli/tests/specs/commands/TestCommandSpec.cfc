@@ -342,6 +342,52 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("$reloadTestApplication (RETEST-2461 B)", () => {
+
+			it("is invoked by runTests for app-mode runs, never core", () => {
+				var moduleSource = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				// The call site is gated on !coreTests so core matrix runs keep
+				// their own runner/reload semantics.
+				expect(moduleSource).toInclude("if (!coreTests) {");
+				expect(moduleSource).toInclude("$reloadTestApplication(serverPort, testPath);");
+			});
+
+			it("returns true and treats the reload redirect (302) as a successful restart", () => {
+				var sandbox = $scaffold(envBody = "WHEELS_RELOAD_PASSWORD=secret");
+				var stubServer = new cli.lucli.tests.StubHttpServer(302);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				try {
+					expect(localMod.$reloadTestApplication(stubServer.getPort(), "/wheels/app/tests")).toBeTrue();
+				} finally {
+					stubServer.stop();
+					$tearDown(sandbox);
+				}
+			});
+
+			it("returns false when the reload gate falls through (200 = wrong/missing password)", () => {
+				var sandbox = $scaffold(envBody = "WHEELS_RELOAD_PASSWORD=secret");
+				var stubServer = new cli.lucli.tests.StubHttpServer(200);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				try {
+					expect(localMod.$reloadTestApplication(stubServer.getPort(), "/wheels/app/tests")).toBeFalse();
+				} finally {
+					stubServer.stop();
+					$tearDown(sandbox);
+				}
+			});
+
+			it("skips the reload and returns false when no reload password is configured", () => {
+				var sandbox = $scaffold();
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				try {
+					expect(localMod.$reloadTestApplication(1, "/wheels/app/tests")).toBeFalse();
+				} finally {
+					$tearDown(sandbox);
+				}
+			});
+
+		});
+
 		describe("$resolveTestBasePath (issue 3026)", () => {
 
 			it("returns empty when no flag, env, or subpath setting is present", () => {

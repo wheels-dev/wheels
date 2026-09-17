@@ -25,7 +25,7 @@ Every test type in Wheels — model, controller, view, integration, functional, 
 
 ## The populate lifecycle
 
-`tests/populate.cfm` runs **once per test run**, not once per spec. The runner includes it before TestBox boots, which means every `describe` and every `it` in the run starts with the same schema and the same seed rows. If your first spec writes a row and the tenth spec reads the table, the tenth spec sees the write.
+`tests/populate.cfm` runs **once per test run**, not once per spec. The runner includes it before the test suite boots, which means every `describe` and every `it` in the run starts with the same schema and the same seed rows. If your first spec writes a row and the tenth spec reads the table, the tenth spec sees the write.
 
 The trigger conditions live in `vendor/wheels/tests/runner.cfm`. The runner reads `url.populate` — defaulting to `true` when the param is missing — and also checks whether the core tables already exist. Populate runs when `url.populate` is truthy *or* when a sentinel table (`c_o_r_e_authors` in the framework's own suite) is missing from the database. In practice that means a fresh `wheels test` always populates; passing `?populate=false` in a URL invocation skips the drop-and-recreate but still runs if the schema is missing.
 

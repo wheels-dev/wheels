@@ -114,63 +114,14 @@ sudo dnf config-manager --add-repo https://yum.wheels.dev/wheels.repo
 sudo dnf install wheels
 ```
 
-### What you'll need to do for Phase 2 (when ready)
+### Phase 2 is live
 
-Bucket-repo templates are now drafted in:
-
-- [`tools/distribution-drafts/apt-repo/`](../apt-repo/) — receiver workflow,
-  `apt-ftparchive` regen + GPG sign script, `aptftparchive.conf`, landing
-  page HTML.
-- [`tools/distribution-drafts/yum-repo/`](../yum-repo/) — receiver workflow,
-  `createrepo_c` regen + GPG sign script, `.repo` files for both channels,
-  landing page HTML.
-
-The remaining work is operational:
-
-1. **Mint a GPG signing key** for the Wheels project (one key signs the apt
-   `Release`/`InRelease`, the yum `repomd.xml.asc`, AND each individual `.rpm`
-   via `rpm --addsign`). Store the private key + passphrase in 1Password under
-   `op://Wheels/wheels-linux-repo-signing/` (the Wheels project vault on the
-   personal `my.1password.com` tenant — NOT the PAI work `op://Infrastructure/`
-   vault). Commit the public half to the root of *each* bucket repo as
-   `wheels.gpg` (template placeholders live at
-   `<bucket>/templates/wheels.gpg.placeholder`).
-2. **Create the two bucket repos** under `wheels-dev`:
-   - `wheels-dev/apt-wheels` — copy contents of `apt-repo/` template
-   - `wheels-dev/yum-wheels` — copy contents of `yum-repo/` template
-3. **Create two Cloudflare R2 buckets** and attach apex domain bindings:
-   - bucket `wheels-apt` → custom domain `apt.wheels.dev`
-   - bucket `wheels-yum` → custom domain `yum.wheels.dev`
-
-   R2 has no per-object size limit (unlike Pages' 25 MiB) which is why we
-   serve from R2. End-user URLs are identical.
-4. **Add CI secrets** to `wheels-dev/wheels` (for the dispatch sender) and to
-   each bucket repo (for the signing receiver + R2 upload):
-   - On `wheels-dev/wheels`:
-     - `LINUX_REPO_DISPATCH_TOKEN` — fine-grained PAT with `actions: write`
-       on both bucket repos. The dispatch step in `release.yml` skips
-       silently when this secret is unset, so it's safe to land the wiring
-       before the bucket repos exist.
-   - On each bucket repo (`apt-wheels`, `yum-wheels`):
-     - `WHEELS_REPO_GPG_PRIVATE_KEY` — ASCII-armored private key
-     - `WHEELS_REPO_GPG_PASSPHRASE` — passphrase
-     - `CLOUDFLARE_API_TOKEN` — token with `Workers R2 Storage:Edit` on the
-       account that owns the bucket
-5. **Smoke-test** by running the bucket-repo workflows manually (each
-   supports `workflow_dispatch` for backfill). For the apt bucket:
-   ```
-   gh workflow run wheels-released.yml \
-     --repo wheels-dev/apt-wheels \
-     -f version=4.0.0 -f channel=stable
-   ```
-   then verify the published tree on a fresh Debian/Ubuntu host. Do the same
-   for the yum bucket on a Fedora host.
-6. **Update docs** — once `apt.wheels.dev` and `yum.wheels.dev` resolve,
-   replace the GitHub-Release download snippets in
-   `web/sites/guides/src/content/docs/v4-0-1-snapshot/start-here/installing.mdx`
-   and `command-line-tools/installation.mdx` with the sources.list /
-   `dnf config-manager` snippets, and remove the "native apt/yum repos coming"
-   `<Aside>` blocks.
+`apt.wheels.dev` and `yum.wheels.dev` are live, served from Cloudflare R2. The
+bucket repos — [`wheels-dev/apt-wheels`](https://github.com/wheels-dev/apt-wheels)
+and [`wheels-dev/yum-wheels`](https://github.com/wheels-dev/yum-wheels) — are
+the source of truth for the receiver workflow, regen/signing scripts, and
+landing page. Edit them directly; this directory only holds the nfpm build
+configs (`build-linux-packages.sh`) that produce the `.deb`/`.rpm` assets.
 
 ### Why split into two CF Pages sites instead of one
 

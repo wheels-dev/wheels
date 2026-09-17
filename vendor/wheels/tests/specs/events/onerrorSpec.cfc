@@ -21,13 +21,11 @@ component extends="wheels.WheelsTest" {
 			// Regression coverage for GH ##2319: Wheels-typed errors rendered
 			// in HTML format used to leave the status code at Lucee's default
 			// (200), misleading anything monitoring/alerting/retrying on
-			// status. The mapping (RouteNotFound/RecordNotFound → 404,
-			// everything else → 500) is mirrored from EventMethods.$runOnError;
-			// this spec freezes the contract so a rename there breaks the
-			// build immediately. Tested via a helper rather than a full
-			// onError invocation because $runOnError needs an active request
-			// scope and a real exception path that isn't easy to fake from
-			// inside a spec.
+			// status. The mapping below is the frozen contract. A helper that
+			// only reimplements the regex would stay green if the LIVE map
+			// flipped — EventsHardenerSpec S2 proves the same types against
+			// $runOnError and a source-scan of EventMethods.cfc. Do not flip
+			// the live status map.
 			it("maps Wheels.RouteNotFound to HTTP 404 (##2319)", () => {
 				expect($expectedStatusFor("Wheels.RouteNotFound")).toBe(404)
 			})

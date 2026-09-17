@@ -385,7 +385,7 @@ See [Packages](/v4-0-0/digging-deeper/packages/) for manifest fields, per-method
 
 **CHANGELOG:** `Deprecated: In-dev-server HTTP MCP endpoint at /wheels/mcp — superseded by the LuCLI stdio MCP server (wheels mcp wheels).`
 
-There is no `wheels mcp setup` command — migrate by adding the stdio server to your `.mcp.json` manually:
+Migrate by running `wheels setup agents` in your project — it writes `.mcp.json` for you — or add the stdio server by hand:
 
 ```json title=".mcp.json"
 {"mcpServers": {"wheels": {"command": "wheels", "args": ["mcp", "wheels"]}}}

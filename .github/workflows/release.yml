@@ -257,6 +257,33 @@ jobs:
           validate_package "build-wheels-core/wheels" "Wheels Core"
           validate_package "build-wheels-starterApp" "Wheels Starter App"
 
+          # Two-tier AI docs assertions:
+          #   1. source-tree check — consumer tier exists and the root
+          #      CLAUDE.md still points at it;
+          #   2. artifact check — every distributed package carries the
+          #      CONSUMER docs (CLAUDE.md + AGENTS.md) and must NOT leak
+          #      maintainer-only paths (.ai deep reference set beyond the
+          #      consumer README, .claude/, .github/).
+          echo ""
+          echo "=========================================="
+          echo "Validating two-tier AI docs"
+          echo "=========================================="
+          ./tools/build/scripts/ship-consumer-docs.sh check
+
+          for pkg in build-wheels-core/wheels build-wheels-starterApp; do
+            if [ ! -f "$pkg/CLAUDE.md" ] || [ ! -f "$pkg/AGENTS.md" ]; then
+              echo "ERROR: $pkg is missing the consumer AI docs (CLAUDE.md / AGENTS.md)"
+              exit 1
+            fi
+            for leaked in docs/superpowers docs/plans .claude .github CLAUDE.local.md; do
+              if [ -e "$pkg/$leaked" ]; then
+                echo "ERROR: $pkg leaks maintainer-only path: $leaked"
+                exit 1
+              fi
+            done
+          done
+          echo "  ✓ Two-tier AI docs validated"
+
           echo ""
           echo "=========================================="
           echo "All packages validated successfully!"
@@ -287,17 +314,35 @@ jobs:
           ./tools/build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
+      # The offline docs bundle: the prebuilt Astro/Starlight guides and API
+      # reference that `wheels docs fetch` downloads and the Homebrew formula
+      # stages. Built here so it lands on the SAME release tag as the core and
+      # module zips — that is what both consumers resolve against.
+      - name: Setup Node for Docs Bundle
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Build Docs Bundle
+        run: |
+          cd web && pnpm install --frozen-lockfile && cd ..
+          ./tools/build/scripts/build-docs.sh "${{ env.WHEELS_VERSION }}"
+          cd "artifacts/wheels/${{ env.WHEELS_VERSION }}"
+          md5sum wheels-docs-${{ env.WHEELS_VERSION }}.zip > wheels-docs-${{ env.WHEELS_VERSION }}.zip.md5 || md5 -r wheels-docs-${{ env.WHEELS_VERSION }}.zip > wheels-docs-${{ env.WHEELS_VERSION }}.zip.md5
+          sha512sum wheels-docs-${{ env.WHEELS_VERSION }}.zip > wheels-docs-${{ env.WHEELS_VERSION }}.zip.sha512 || shasum -a 512 wheels-docs-${{ env.WHEELS_VERSION }}.zip > wheels-docs-${{ env.WHEELS_VERSION }}.zip.sha512
+
       - name: Build Wheels Module Tarball
         env:
           MODULE_VERSION: ${{ env.WHEELS_VERSION }}
         run: |
           mkdir -p "artifacts/wheels/${MODULE_VERSION}"
-          # Bundle codegen templates into the module so Templates.cfc::resolveTemplateDir()
-          # finds them at moduleRoot/templates/codegen/ in installed distributions.
-          # Without this, every template-driven generator (model, controller, view,
-          # scaffold, helper, api-resource) fails or emits empty output. See #1944.
-          mkdir -p cli/lucli/templates/codegen
-          cp -R cli/src/templates/. cli/lucli/templates/codegen/
+          # Codegen/crud templates are committed at cli/lucli/templates/codegen/
+          # (single source of truth), so no build-time copy from cli/src/ is needed.
           # Substitute @build.version@ placeholders in the LuCLI module before
           # tarring. Without this, module.json ships with the literal placeholder
           # (or a stale hardcoded version), causing BaseModule.version() to return
@@ -475,6 +520,9 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-docs-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-docs-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-docs-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512
@@ -531,6 +579,9 @@ jobs:
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip.sha512
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-docs-*.zip
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-docs-*.zip.md5
+              artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-docs-*.zip.sha512
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.md5
               artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip.sha512
@@ -625,13 +676,13 @@ jobs:
       # yum.wheels.dev within minutes. See issue #2605.
       #
       # Requires LINUX_REPO_DISPATCH_TOKEN — a fine-grained PAT with
-      # `contents: write` on the two bucket repos. If the secret is unset
-      # (which it will be until the bucket repos are created), this step
-      # skips silently — releases continue to land on the GitHub Release
-      # artifact stream regardless.
+      # `contents: write` on the two bucket repos. If the secret is unset,
+      # this step skips silently — releases continue to land on the GitHub
+      # Release artifact stream regardless.
       #
-      # Templates for the bucket repos live in
-      # tools/distribution-drafts/apt-repo/ and tools/distribution-drafts/yum-repo/.
+      # The bucket repos (wheels-dev/apt-wheels and wheels-dev/yum-wheels)
+      # are live and authoritative; their receiver workflows regenerate and
+      # republish the apt/yum metadata from the R2 pools.
       #############################################
       - name: Dispatch Linux repo buckets
         if: steps.gh-release-final.outcome == 'success' || steps.gh-release-snapshot.outcome == 'success'

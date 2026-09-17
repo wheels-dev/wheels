@@ -105,17 +105,17 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("increments jobsProcessed counter on success", function() {
-				// Enqueue a job that will succeed (ProcessOrdersJob has a no-op perform)
 				local.testJob = new app.jobs.ProcessOrdersJob();
 				local.enqueued = local.testJob.enqueue(data = {batchSize: 1}, queue = "test_counter");
+				expect(local.enqueued.persisted).toBeTrue();
 
 				local.worker = new wheels.JobWorker();
 				expect(local.worker.jobsProcessed).toBe(0);
 				local.result = local.worker.processNext(queues = "test_counter");
 
-				if (local.result.success) {
-					expect(local.worker.jobsProcessed).toBe(1);
-				}
+				expect(local.result.success).toBeTrue();
+				expect(local.result.skipped).toBeFalse();
+				expect(local.worker.jobsProcessed).toBe(1);
 			});
 		});
 
@@ -128,37 +128,33 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("recovers stuck processing jobs", function() {
-				// Insert a job stuck in 'processing' with old updatedAt
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
 				local.id = CreateUUID();
 				local.oldTime = DateAdd("s", -600, Now());
-				try {
-					queryExecute(
-						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
-						VALUES (:id, 'wheels.Job', 'test_timeout', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
-						{
-							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-							runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-							createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
-							updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
-						},
-						{datasource = application.wheels.dataSourceName}
-					);
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'test_timeout', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
 
-					local.worker = new wheels.JobWorker();
-					local.recovered = local.worker.checkTimeouts(timeout = 300);
-					expect(local.recovered).toBeGTE(1);
+				local.worker = new wheels.JobWorker();
+				local.recovered = local.worker.checkTimeouts(timeout = 300);
+				expect(local.recovered).toBeGTE(1);
 
-					// Verify job was reset
-					local.job = queryExecute(
-						"SELECT status FROM wheels_jobs WHERE id = :id",
-						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
-						{datasource = application.wheels.dataSourceName}
-					);
-					// Should be either pending (retried) or failed (exhausted)
-					expect(ListFindNoCase("pending,failed", local.job.status)).toBeGT(0);
-				} catch (any e) {
-					// Table may not exist in clean test environments
-				}
+				local.job = queryExecute(
+					"SELECT status FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(ListFindNoCase("pending,failed", local.job.status)).toBeGT(0);
 			});
 		});
 
@@ -223,7 +219,11 @@ component extends="wheels.WheelsTest" {
 			it("accepts queue filter", function() {
 				local.worker = new wheels.JobWorker();
 				local.data = local.worker.getMonitorData(queue = "default");
-				expect(local.data).toBeStruct();
+				expect(local.data).toHaveKey("recentJobs");
+				expect(local.data).toHaveKey("oldestPending");
+				for (local.recent in local.data.recentJobs) {
+					expect(local.recent.queue).toBe("default");
+				}
 			});
 		});
 
@@ -248,35 +248,32 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("resets failed jobs to pending", function() {
-				// Insert a failed job
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
 				local.id = CreateUUID();
 				local.now = Now();
-				try {
-					queryExecute(
-						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, lastError, runAt, failedAt, createdAt, updatedAt)
-						VALUES (:id, 'wheels.Job', 'test_retry', '{}', 0, 'failed', 3, 3, 'Test error', :now, :now, :now, :now)",
-						{
-							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-							now = {value = local.now, cfsqltype = "cf_sql_timestamp"}
-						},
-						{datasource = application.wheels.dataSourceName}
-					);
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, lastError, runAt, failedAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'test_retry', '{}', 0, 'failed', 3, 3, 'Test error', :now, :now, :now, :now)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						now = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
 
-					local.worker = new wheels.JobWorker();
-					local.count = local.worker.retryFailed(queue = "test_retry");
-					expect(local.count).toBeGTE(1);
+				local.worker = new wheels.JobWorker();
+				local.count = local.worker.retryFailed(queue = "test_retry");
+				expect(local.count).toBeGTE(1);
 
-					// Verify job was reset
-					local.job = queryExecute(
-						"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
-						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
-						{datasource = application.wheels.dataSourceName}
-					);
-					expect(local.job.status).toBe("pending");
-					expect(local.job.attempts).toBe(0);
-				} catch (any e) {
-					// Table may not exist
-				}
+				local.job = queryExecute(
+					"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.job.status).toBe("pending");
+				expect(local.job.attempts).toBe(0);
 			});
 		});
 
@@ -308,34 +305,31 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("deletes old completed jobs", function() {
-				// Insert an old completed job
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
 				local.id = CreateUUID();
 				local.oldTime = DateAdd("d", -30, Now());
-				try {
-					queryExecute(
-						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, completedAt, createdAt, updatedAt)
-						VALUES (:id, 'wheels.Job', 'test_purge', '{}', 0, 'completed', 1, 3, :oldTime, :oldTime, :oldTime, :oldTime)",
-						{
-							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
-							oldTime = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
-						},
-						{datasource = application.wheels.dataSourceName}
-					);
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, completedAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'test_purge', '{}', 0, 'completed', 1, 3, :oldTime, :oldTime, :oldTime, :oldTime)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						oldTime = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
 
-					local.worker = new wheels.JobWorker();
-					local.count = local.worker.purge(status = "completed", days = 7, queue = "test_purge");
-					expect(local.count).toBeGTE(1);
+				local.worker = new wheels.JobWorker();
+				local.count = local.worker.purge(status = "completed", days = 7, queue = "test_purge");
+				expect(local.count).toBeGTE(1);
 
-					// Verify job was deleted
-					local.remaining = queryExecute(
-						"SELECT COUNT(*) as cnt FROM wheels_jobs WHERE id = :id",
-						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
-						{datasource = application.wheels.dataSourceName}
-					);
-					expect(local.remaining.cnt).toBe(0);
-				} catch (any e) {
-					// Table may not exist
-				}
+				local.remaining = queryExecute(
+					"SELECT COUNT(*) as cnt FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.remaining.cnt).toBe(0);
 			});
 		});
 

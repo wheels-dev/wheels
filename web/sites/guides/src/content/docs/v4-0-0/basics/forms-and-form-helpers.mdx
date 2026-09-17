@@ -39,7 +39,7 @@ Key behaviours:
 
 - Generates `<form action="..." method="post">` with CSRF token auto-included.
 - `route="..."` uses named routes — see [Routing](/v4-0-0/basics/routing/).
-- `method="put"` / `method="delete"` — Wheels emits a hidden `_method` field that gets translated server-side. Browsers only send GET and POST natively, so Wheels (like Rails, Laravel, and friends) uses the hidden field convention to expose the full set of REST verbs.
+- `method="put"` / `method="delete"` — Wheels emits a hidden `_method` field that gets translated server-side. Browsers only send GET and POST natively, so Wheels (like Rails, Laravel, and friends) uses the hidden field convention to expose the full set of REST verbs. The override is honored only on POST and only for `PUT` / `PATCH` / `DELETE`.
 
 ## Object-bound helpers — the core pattern
 
@@ -51,24 +51,15 @@ A field call like `textField(objectName="post", property="title")` generates:
 - `id="post-title"` — stable DOM id for labels and CSS
 - `data-auto-id="post_title"` — underscore variant for test selectors (see below)
 
-The canonical form pattern wraps inputs in labels, calls `errorMessagesFor` at the top, and ends with a submit button:
+The canonical form pattern calls `errorMessagesFor` at the top, lets each helper render its own label above the control (`labelPlacement="before"`), and ends with a submit button. New apps and scaffolds use this stacked layout by default so text inputs can span the full row.
 
 ```cfm {test:compile}
 <cfoutput>
     ##startFormTag(route="posts")##
         ##errorMessagesFor("post")##
-        <label>
-            Title
-            ##textField(objectName="post", property="title")##
-        </label>
-        <label>
-            Body
-            ##textArea(objectName="post", property="body", rows=6)##
-        </label>
-        <label>
-            Status
-            ##select(objectName="post", property="status", options="draft,published,archived")##
-        </label>
+        ##textField(objectName="post", property="title", labelPlacement="before")##
+        ##textArea(objectName="post", property="body", rows=6, labelPlacement="before")##
+        ##select(objectName="post", property="status", options="draft,published,archived", labelPlacement="before")##
         <button type="submit">Save</button>
     ##endFormTag()##
 </cfoutput>
@@ -97,7 +88,7 @@ The controller side is then just `model("Post").new(params.post)` — the `post[
 | `checkBox`        | `<input type="checkbox">` + hidden companion for the unchecked state | `checkedValue`, `uncheckedValue` |
 | `radioButton`     | `<input type="radio">`             | `tagValue` (the value this button submits) |
 
-Every helper also accepts the standard Wheels form options — `label`, `labelPlacement`, `prepend`, `append`, `prependToLabel`, `appendToLabel`, `errorElement`, `errorClass`, `encode` — plus any raw HTML attribute (`class`, `placeholder`, `required`, `autofocus`, and so on) which is passed through to the rendered tag.
+Every helper also accepts the standard Wheels form options — `label`, `labelPlacement`, `prepend`, `append`, `prependToLabel`, `appendToLabel`, `errorElement`, `errorClass`, `includeErrorMessage`, `encode` — plus any raw HTML attribute (`class`, `placeholder`, `required`, `autofocus`, and so on) which is passed through to the rendered tag.
 
 See `vendor/wheels/view/formsobject.cfc` for the full argument surface.
 
@@ -143,7 +134,9 @@ Opt out globally in `config/settings.cfm` with `set(formHelperDataAutoId=false)`
 
 ## Error messages
 
-`errorMessagesFor(objectName)` renders a summary block at the top of the form listing every validation error on the object. Pair it with per-field inline errors if you want — `errorMessageOn(objectName=..., property=...)` renders a single error for a single property, or use your own CSS to style fields based on the presence of validation errors.
+`errorMessagesFor(objectName)` renders a summary block at the top of the form listing every validation error on the object (`<ul class="error-messages" role="alert">`). Pair it with per-field inline errors — `errorMessageOn` renders a single error for a single property, and object-bound helpers can nest that message inside the field block when `includeErrorMessage=true` (or `set(includeFormErrorMessages=true)` in `config/settings.cfm`). New apps and scaffolds opt in so the error lives with the control.
+
+Default error markup uses `class="error-message"` / `class="error-messages"` and `role="alert"`. Fresh `wheels new` apps load `wheels.css`, which styles those classes in red and prefixes an icon so the cue is not color-only.
 
 ```cfm {test:compile}
 <cfoutput>
@@ -162,10 +155,9 @@ The summary block only renders when the object has errors — on a new-form rend
 
 Wheels does not ship a standalone `label()` helper. Labels are a first-class argument on every object-bound form helper via `label=` and `labelPlacement=`:
 
-- `textField(objectName="post", property="title", label="Post title")` — wraps the input in a `<label for="post-title">Post title</label>` with `labelPlacement` controlling whether the text comes `around` (default), `before`, or `after` the input.
+- `textField(objectName="post", property="title", label="Post title")` — renders a `<label for="post-title">Post title</label>` with `labelPlacement` controlling whether the text comes `around` (framework default), `before`, or `after` the input.
+- New apps generated by `wheels new` set `labelPlacement="before"` for text-like helpers so the label sits on its own line above a full-width field. Checkboxes and radios stay beside their labels.
 - `label=false` suppresses the auto-label — use this when you want to write the `<label>` tag by hand (for icons, extra classes, or explicit `for` attributes).
-
-The third and most common pattern is in the canonical example above: skip the `label` argument entirely and wrap the helper call inside a raw `<label>` element in your markup. The browser associates the label with the input via containment, no `for="..."` attribute needed.
 
 ## Form submission with Turbo Frames
 

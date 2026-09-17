@@ -2,8 +2,99 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 
 	function init(){
-		$integrateComponents("wheels.model");
+		// The model mixin surface is compile-time included below (#3213), so
+		// instances inherit it with no per-instance integration copy. Dynamic
+		// plugin/package mixins still apply at onDIcomplete() via
+		// $pluginObj().$initializeMixins(variables).
+		//
+		// init() is the one hook every creation path runs (model(), new(),
+		// finder rows), so the super<name> override aliases register here.
+		$registerModelSuperAliases();
 		return this;
+	}
+
+	/**
+	 * Preserves the `super<name>` override convention (#3325) under the
+	 * inheritance fast path (#3213): when an app model (or its Model.cfc base)
+	 * declares a method that shadows a model mixin, the framework original is
+	 * registered on the instance as `super<name>` so the override can delegate
+	 * to it. The mixin original lives in the instance's variables scope
+	 * (populated by this component's compile-time includes before the subclass
+	 * constructor runs), so aliasing is a reference copy.
+	 *
+	 * The declared-surface scan is cached per concrete class in the request
+	 * scope; the per-instance cost is one cache lookup plus one reference copy
+	 * per override (typically zero).
+	 *
+	 * The original ref is read from a shared wheels.Model prototype instance:
+	 * on the subclass instance `variables[name]` resolves to the app's own
+	 * override (declared methods shadow the parent's include-injected UDFs),
+	 * so the original is only unambiguously reachable on a wheels.Model
+	 * instance that carries no subclass surface.
+	 */
+	private void function $registerModelSuperAliases() {
+		if (!StructKeyExists(request, "wheelsModelOverrideCache")) {
+			request.wheelsModelOverrideCache = {};
+		}
+		local.className = getMetaData(this).fullname;
+		if (!StructKeyExists(request.wheelsModelOverrideCache, local.className)) {
+			local.names = [];
+			local.meta = getMetaData(this);
+			// Collect function names declared by the app's model classes —
+			// walking the extends chain up to (but not including) wheels.Model.
+			while (
+				StructKeyExists(local.meta, "extends")
+				&& StructKeyExists(local.meta.extends, "fullname")
+				&& local.meta.extends.fullname != "wheels.Model"
+			) {
+				local.fns = StructKeyExists(local.meta, "functions") ? local.meta.functions : [];
+				local.fEnd = ArrayLen(local.fns);
+				for (local.f = 1; local.f <= local.fEnd; local.f++) {
+					if (
+						StructKeyExists(variables, local.fns[local.f].name)
+						&& IsCustomFunction(variables[local.fns[local.f].name])
+					) {
+						ArrayAppend(local.names, local.fns[local.f].name);
+					}
+				}
+				local.meta = local.meta.extends;
+			}
+			request.wheelsModelOverrideCache[local.className] = local.names;
+		}
+		for (local.n in request.wheelsModelOverrideCache[local.className]) {
+			local.superName = "super" & local.n;
+			if (Left(local.n, 5) == "super" || StructKeyExists(this, local.superName)) {
+				continue;
+			}
+			local.originalRef = $modelSuperPrototype().$superOriginal(local.n);
+			if (IsCustomFunction(local.originalRef)) {
+				variables[local.superName] = local.originalRef;
+				this[local.superName] = local.originalRef;
+			}
+		}
+	}
+
+	/**
+	 * Shared wheels.Model instance whose include-injected variables carry the
+	 * unshadowed framework originals — used to register `super<name>` aliases
+	 * for app-level model overrides (#3213, #3325).
+	 */
+	private any function $modelSuperPrototype() {
+		if (!StructKeyExists(application.wheels, "modelSuperPrototype")) {
+			application.wheels.modelSuperPrototype = CreateObject("component", "wheels.Model");
+		}
+		return application.wheels.modelSuperPrototype;
+	}
+
+	/**
+	 * Returns the include-injected original for a mixin method name from this
+	 * instance's variables scope ("" when absent).
+	 */
+	public any function $superOriginal(required string name) {
+		if (StructKeyExists(variables, arguments.name) && IsCustomFunction(variables[arguments.name])) {
+			return variables[arguments.name];
+		}
+		return "";
 	}
 
 	/**
@@ -124,205 +215,11 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 			local.iEnd = local.columns.recordCount;
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				// set up properties and column mapping
-				// preserve the DB's reported column case; an unconditional lCase() here regressed non-Oracle engines in 3.0 (see $lowerCaseColumnNames)
-				local.columnName = local.columns["column_name"][local.i];
-				if (variables.wheels.class.adapter.$lowerCaseColumnNames()) {
-					local.columnName = lCase(local.columnName);
-				}
-
-				if (!StructKeyExists(local.processedColumns, local.columnName)) {
-					// default the column to map to a property with the same name
-					local.property = local.columnName;
-					for (local.key in variables.wheels.class.mapping) {
-						if (
-							StructKeyExists(variables.wheels.class.mapping[local.key], "type")
-							&& variables.wheels.class.mapping[local.key].type == "column"
-							&& variables.wheels.class.mapping[local.key].value == local.property
-						) {
-							// developer has chosen to map this column to a property with a different name so set that here
-							local.property = local.key;
-							break;
-						}
-					}
-
-					// Extract type and details, like if it's signed or not, from the "type_name"" information we got from cfdbinfo.
-					// It can be "int" or "int unsigned" for example (in which case we set type to "int" and details to "unsigned").
-					// Done below by treating the value as a space delimited list.
-					// We also ignore anything inside parentheses.
-					local.typeName = Trim(SpanExcluding(local.columns["type_name"][local.i], "("));
-					if (ListLen(local.typeName, " ") == 2) {
-						local.type = ListFirst(local.typeName, " ");
-						local.details = ListLast(local.typeName, " ");
-					} else {
-						local.type = local.typeName;
-						local.details = "";
-					}
-
-					// set the info we need for each property
-					variables.wheels.class.properties[local.property] = {};
-					variables.wheels.class.properties[local.property].dataType = local.type;
-					variables.wheels.class.properties[local.property].type = variables.wheels.class.adapter.$getType(
-						local.type,
-						local.columns["decimal_digits"][local.i],
-						local.details
-					);
-					variables.wheels.class.properties[local.property].column = local.columnName;
-					variables.wheels.class.properties[local.property].scale = local.columns["decimal_digits"][local.i];
-					// BoxLang compatibility - handle different column names from dbinfo
-					variables.wheels.class.properties[local.property].columnDefault = $getColumnDefaultValue(local.columns, local.i);
-
-					// get a boolean value for whether this column can be set to null or not
-					// if we don't get a boolean back we try to translate y/n to proper boolean values in cfml (yes/no)
-					variables.wheels.class.properties[local.property].nullable = Trim(local.columns["is_nullable"][local.i]);
-					if (!IsBoolean(variables.wheels.class.properties[local.property].nullable)) {
-						variables.wheels.class.properties[local.property].nullable = ReplaceList(
-							variables.wheels.class.properties[local.property].nullable,
-							"N,Y",
-							"No,Yes"
-						);
-					}
-
-					variables.wheels.class.properties[local.property].size = local.columns["column_size"][local.i];
-
-					// If property is id, then make it all-caps "ID."
-					if (local.property == "id") {
-						variables.wheels.class.properties[local.property].label = "ID";
-						// Otherwise, humanize it.
-					} else {
-						variables.wheels.class.properties[local.property].label = humanize(local.property);
-					}
-					// Detect datetime-like columns for SQLite, without changing the DB type
-					if (
-						variables.wheels.class.properties[local.property].datatype eq "TEXT"
-						&& variables.wheels.class.properties[local.property].type eq "cf_sql_varchar"
-						&& ReFindNoCase("\b(date|time|dob|birthday|birthTime|created|updated)\b", variables.wheels.class.properties[local.property].column)
-						&& get("adapterName") eq "SQLiteModel"
-					) {
-						// Override only validation type
-						variables.wheels.class.properties[local.property].validationtype = "datetime";
-					} else {
-						// Default logic
-						variables.wheels.class.properties[local.property].validationtype = variables.wheels.class.adapter.$getValidationType(
-							variables.wheels.class.properties[local.property].type
-						);
-					}
-
-					if (StructKeyExists(variables.wheels.class.mapping, local.property)) {
-						if (StructKeyExists(variables.wheels.class.mapping[local.property], "label")) {
-							variables.wheels.class.properties[local.property].label = variables.wheels.class.mapping[local.property].label;
-						}
-						if (StructKeyExists(variables.wheels.class.mapping[local.property], "defaultValue")) {
-							variables.wheels.class.properties[local.property].defaultValue = variables.wheels.class.mapping[
-								local.property
-							].defaultValue;
-						}
-					}
-					if (local.columns["is_primarykey"][local.i]) {
-						setPrimaryKey(local.property);
-					}
-					if (
-						variables.wheels.class.automaticValidations && !ListFindNoCase(
-							"#application.wheels.timeStampOnCreateProperty#,#application.wheels.timeStampOnUpdateProperty#,#application.wheels.softDeleteProperty#",
-							local.property
-						)
-					) {
-						// check if automatic validations have been turned off specifically for this property before proceeding
-						local.propertyAllowsAutomaticValidations = true;
-						if (
-							StructKeyExists(variables.wheels.class.mapping, local.property)
-							&& StructKeyExists(variables.wheels.class.mapping[local.property], "automaticValidations")
-							&& !variables.wheels.class.mapping[local.property].automaticValidations
-						) {
-							local.propertyAllowsAutomaticValidations = false;
-						}
-
-						if (local.propertyAllowsAutomaticValidations) {
-							local.defaultValidationsAllowBlank = variables.wheels.class.properties[local.property].nullable;
-
-							// primary keys should be allowed to be blank
-							if (ListFindNoCase(primaryKeys(), local.property)) {
-								local.defaultValidationsAllowBlank = true;
-							}
-							if (
-								!ListFindNoCase(primaryKeys(), local.property)
-								&& !variables.wheels.class.properties[local.property].nullable
-								&& !$validationExists(property = local.property, validation = "validatesPresenceOf")
-							) {
-								if (Len(variables.wheels.class.properties[local.property].columnDefault)) {
-									validatesPresenceOf(properties = local.property, when = "onUpdate");
-								} else {
-									validatesPresenceOf(properties = local.property);
-								}
-							}
-
-							// always allow blank if a database default or validatesPresenceOf() has been set
-							if (
-								Len(variables.wheels.class.properties[local.property].columnDefault)
-								|| $validationExists(property = local.property, validation = "validatesPresenceOf")
-							) {
-								local.defaultValidationsAllowBlank = true;
-							}
-
-							// set length validations if the developer has not
-							if (
-								variables.wheels.class.properties[local.property].validationtype == "string"
-								&& !$validationExists(property = local.property, validation = "validatesLengthOf")
-							) {
-								validatesLengthOf(
-									properties = local.property,
-									allowBlank = local.defaultValidationsAllowBlank,
-									maximum = variables.wheels.class.properties[local.property].size
-								);
-							}
-
-							// set numericality validations if the developer has not
-							if (
-								ListFindNoCase("integer,float", variables.wheels.class.properties[local.property].validationtype)
-								&& !$validationExists(property = local.property, validation = "validatesNumericalityOf")
-							) {
-								validatesNumericalityOf(
-									properties = local.property,
-									allowBlank = local.defaultValidationsAllowBlank,
-									onlyInteger = (variables.wheels.class.properties[local.property].validationtype == "integer")
-								);
-							}
-
-							// set date validations if the developer has not (checks both dates or times as per the IsDate() function)
-							if (
-								variables.wheels.class.properties[local.property].validationtype == "datetime"
-								&& !$validationExists(property = local.property, validation = "validatesFormatOf")
-							) {
-								validatesFormatOf(
-									properties = local.property,
-									allowBlank = local.defaultValidationsAllowBlank,
-									type = "date"
-								);
-							}
-						}
-					}
-
-					variables.wheels.class.propertyStruct[local.property] = true;
-					variables.wheels.class.columnStruct[variables.wheels.class.properties[local.property].column] = true;
-
-					variables.wheels.class.propertyList = ListAppend(variables.wheels.class.propertyList, local.property);
-
-					/*
-						To fix the issue below:
-						https://github.com/wheels-dev/wheels/issues/580
-
-						Added a new property called aliasedPropertyList in model class that will contain column names list that are prepended with the tablename.
-						For example, if there is a "user" table then the columns "id,createdat,updatedat,deletedat" will be added in the list with "user" prepended to it.
-
-						Then the list will contain, userid,usercreatedat,userupdatedat,userdeletedat.
-						*/
-					variables.wheels.class.aliasedPropertyList = ListAppend(variables.wheels.class.aliasedPropertyList, variables.wheels.class.modelname & local.property);
-					variables.wheels.class.columnList = ListAppend(
-						variables.wheels.class.columnList,
-						variables.wheels.class.properties[local.property].column
-					);
-					local.processedColumns[local.columnName] = true;
-				}
+				$initModelClassProcessColumn(
+					columns = local.columns,
+					i = local.i,
+					processedColumns = local.processedColumns
+				);
 			}
 
 			// Raise error when no primary key has been defined for the table.
@@ -365,6 +262,228 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			variables.wheels.class.timeStampingOnUpdate = false;
 		}
 		return this;
+	}
+
+	/**
+	 * Internal function.
+	 */
+	public void function $initModelClassProcessColumn(
+		required query columns,
+		required numeric i,
+		required struct processedColumns
+	) {
+		local.columns = arguments.columns;
+		local.i = arguments.i;
+		local.processedColumns = arguments.processedColumns;
+
+	// set up properties and column mapping
+	// preserve the DB's reported column case; an unconditional lCase() here regressed non-Oracle engines in 3.0 (see $lowerCaseColumnNames)
+	local.columnName = local.columns["column_name"][local.i];
+	if (variables.wheels.class.adapter.$lowerCaseColumnNames()) {
+		local.columnName = lCase(local.columnName);
+	}
+
+	if (!StructKeyExists(local.processedColumns, local.columnName)) {
+		// default the column to map to a property with the same name
+		local.property = local.columnName;
+		for (local.key in variables.wheels.class.mapping) {
+			if (
+				StructKeyExists(variables.wheels.class.mapping[local.key], "type")
+				&& variables.wheels.class.mapping[local.key].type == "column"
+				&& variables.wheels.class.mapping[local.key].value == local.property
+			) {
+				// developer has chosen to map this column to a property with a different name so set that here
+				local.property = local.key;
+				break;
+			}
+		}
+
+		// Extract type and details, like if it's signed or not, from the "type_name"" information we got from cfdbinfo.
+		// It can be "int" or "int unsigned" for example (in which case we set type to "int" and details to "unsigned").
+		// Done below by treating the value as a space delimited list.
+		// We also ignore anything inside parentheses.
+		local.typeName = Trim(SpanExcluding(local.columns["type_name"][local.i], "("));
+		if (ListLen(local.typeName, " ") == 2) {
+			local.type = ListFirst(local.typeName, " ");
+			local.details = ListLast(local.typeName, " ");
+		} else {
+			local.type = local.typeName;
+			local.details = "";
+		}
+
+		// set the info we need for each property
+		variables.wheels.class.properties[local.property] = {};
+		variables.wheels.class.properties[local.property].dataType = local.type;
+		variables.wheels.class.properties[local.property].type = variables.wheels.class.adapter.$getType(
+			local.type,
+			local.columns["decimal_digits"][local.i],
+			local.details
+		);
+		variables.wheels.class.properties[local.property].column = local.columnName;
+		variables.wheels.class.properties[local.property].scale = local.columns["decimal_digits"][local.i];
+		// BoxLang compatibility - handle different column names from dbinfo
+		variables.wheels.class.properties[local.property].columnDefault = $getColumnDefaultValue(local.columns, local.i);
+
+		// get a boolean value for whether this column can be set to null or not
+		// if we don't get a boolean back we try to translate y/n to proper boolean values in cfml (yes/no)
+		variables.wheels.class.properties[local.property].nullable = Trim(local.columns["is_nullable"][local.i]);
+		if (!IsBoolean(variables.wheels.class.properties[local.property].nullable)) {
+			variables.wheels.class.properties[local.property].nullable = ReplaceList(
+				variables.wheels.class.properties[local.property].nullable,
+				"N,Y",
+				"No,Yes"
+			);
+		}
+
+		variables.wheels.class.properties[local.property].size = local.columns["column_size"][local.i];
+
+		// If property is id, then make it all-caps "ID."
+		if (local.property == "id") {
+			variables.wheels.class.properties[local.property].label = "ID";
+			// Otherwise, humanize it.
+		} else {
+			variables.wheels.class.properties[local.property].label = humanize(local.property);
+		}
+		// Detect datetime-like columns for SQLite, without changing the DB type
+		if (
+			variables.wheels.class.properties[local.property].datatype eq "TEXT"
+			&& variables.wheels.class.properties[local.property].type eq "cf_sql_varchar"
+			&& ReFindNoCase("\b(date|time|dob|birthday|birthTime|created|updated)\b", variables.wheels.class.properties[local.property].column)
+			&& get("adapterName") eq "SQLiteModel"
+		) {
+			// Override only validation type
+			variables.wheels.class.properties[local.property].validationtype = "datetime";
+		} else {
+			// Default logic
+			variables.wheels.class.properties[local.property].validationtype = variables.wheels.class.adapter.$getValidationType(
+				variables.wheels.class.properties[local.property].type
+			);
+		}
+
+		if (StructKeyExists(variables.wheels.class.mapping, local.property)) {
+			if (StructKeyExists(variables.wheels.class.mapping[local.property], "label")) {
+				variables.wheels.class.properties[local.property].label = variables.wheels.class.mapping[local.property].label;
+			}
+			if (StructKeyExists(variables.wheels.class.mapping[local.property], "defaultValue")) {
+				variables.wheels.class.properties[local.property].defaultValue = variables.wheels.class.mapping[
+					local.property
+				].defaultValue;
+			}
+		}
+		if (local.columns["is_primarykey"][local.i]) {
+			setPrimaryKey(local.property);
+		}
+		$initModelClassApplyAutomaticValidations(property = local.property);
+
+		variables.wheels.class.propertyStruct[local.property] = true;
+		variables.wheels.class.columnStruct[variables.wheels.class.properties[local.property].column] = true;
+
+		variables.wheels.class.propertyList = ListAppend(variables.wheels.class.propertyList, local.property);
+
+		/*
+			To fix the issue below:
+			https://github.com/wheels-dev/wheels/issues/580
+
+			Added a new property called aliasedPropertyList in model class that will contain column names list that are prepended with the tablename.
+			For example, if there is a "user" table then the columns "id,createdat,updatedat,deletedat" will be added in the list with "user" prepended to it.
+
+			Then the list will contain, userid,usercreatedat,userupdatedat,userdeletedat.
+			*/
+		variables.wheels.class.aliasedPropertyList = ListAppend(variables.wheels.class.aliasedPropertyList, variables.wheels.class.modelname & local.property);
+		variables.wheels.class.columnList = ListAppend(
+			variables.wheels.class.columnList,
+			variables.wheels.class.properties[local.property].column
+		);
+		local.processedColumns[local.columnName] = true;
+	}
+}
+
+	/**
+	 * Internal function.
+	 */
+	public void function $initModelClassApplyAutomaticValidations(required string property) {
+		local.property = arguments.property;
+
+	if (
+		variables.wheels.class.automaticValidations && !ListFindNoCase(
+			"#application.wheels.timeStampOnCreateProperty#,#application.wheels.timeStampOnUpdateProperty#,#application.wheels.softDeleteProperty#",
+			local.property
+		)
+	) {
+		// check if automatic validations have been turned off specifically for this property before proceeding
+		local.propertyAllowsAutomaticValidations = true;
+		if (
+			StructKeyExists(variables.wheels.class.mapping, local.property)
+			&& StructKeyExists(variables.wheels.class.mapping[local.property], "automaticValidations")
+			&& !variables.wheels.class.mapping[local.property].automaticValidations
+		) {
+			local.propertyAllowsAutomaticValidations = false;
+		}
+
+		if (local.propertyAllowsAutomaticValidations) {
+			local.defaultValidationsAllowBlank = variables.wheels.class.properties[local.property].nullable;
+
+			// primary keys should be allowed to be blank
+			if (ListFindNoCase(primaryKeys(), local.property)) {
+				local.defaultValidationsAllowBlank = true;
+			}
+			if (
+				!ListFindNoCase(primaryKeys(), local.property)
+				&& !variables.wheels.class.properties[local.property].nullable
+				&& !$validationExists(property = local.property, validation = "validatesPresenceOf")
+			) {
+				if (Len(variables.wheels.class.properties[local.property].columnDefault)) {
+					validatesPresenceOf(properties = local.property, when = "onUpdate");
+				} else {
+					validatesPresenceOf(properties = local.property);
+				}
+			}
+
+			// always allow blank if a database default or validatesPresenceOf() has been set
+			if (
+				Len(variables.wheels.class.properties[local.property].columnDefault)
+				|| $validationExists(property = local.property, validation = "validatesPresenceOf")
+			) {
+				local.defaultValidationsAllowBlank = true;
+			}
+
+			// set length validations if the developer has not
+			if (
+				variables.wheels.class.properties[local.property].validationtype == "string"
+				&& !$validationExists(property = local.property, validation = "validatesLengthOf")
+			) {
+				validatesLengthOf(
+					properties = local.property,
+					allowBlank = local.defaultValidationsAllowBlank,
+					maximum = variables.wheels.class.properties[local.property].size
+				);
+			}
+
+			// set numericality validations if the developer has not
+			if (
+				ListFindNoCase("integer,float", variables.wheels.class.properties[local.property].validationtype)
+				&& !$validationExists(property = local.property, validation = "validatesNumericalityOf")
+			) {
+				validatesNumericalityOf(
+					properties = local.property,
+					allowBlank = local.defaultValidationsAllowBlank,
+					onlyInteger = (variables.wheels.class.properties[local.property].validationtype == "integer")
+				);
+			}
+
+			// set date validations if the developer has not (checks both dates or times as per the IsDate() function)
+			if (
+				variables.wheels.class.properties[local.property].validationtype == "datetime"
+				&& !$validationExists(property = local.property, validation = "validatesFormatOf")
+			) {
+				validatesFormatOf(
+					properties = local.property,
+					allowBlank = local.defaultValidationsAllowBlank,
+					type = "date"
+				);
+			}
+		}
+	}
 	}
 
 	/**
@@ -488,6 +607,12 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		boolean base = true,
 		boolean useFilterLists = true
 	) {
+		// Register super<name> override aliases here too: the #3213 instance
+		// fast path (CreateObject + $initModelObject) never calls init(), so
+		// this is the one hook every instance path runs. Idempotent — names
+		// already registered on `this` by the legacy init() path are skipped.
+		$registerModelSuperAliases();
+
 		variables.wheels = {};
 		variables.wheels.instance = {};
 		variables.wheels.errors = [];
@@ -518,16 +643,14 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 			// Attempt to grab the already‐loaded model object, or force‐load it
 			if ( structKeyExists( application.wheels.models, arguments.name ) ) {
-				// Fast path: model is already in the application cache
-				local.modelObj = application.wheels.models[ arguments.name ];
-
-				// At this point, local.modelObj is guaranteed to exist
-				variables.wheels.class = $simpleLock(
-					execute = "$classData",
-					name    = local.lockName,
-					object  = local.modelObj,
-					type    = "readOnly"
-				);
+				// Fast path: model is already in the application cache. The entry
+				// is only written after $createModelClass finishes building the
+				// class (config() + column processing), so a present entry is
+				// always a complete class — reading the class struct needs no
+				// lock (#3213: the per-instance $simpleLock was pure overhead on
+				// the hot path; concurrent first loads are handled by the slow
+				// path above).
+				variables.wheels.class = application.wheels.models[arguments.name].$classData();
 			}
 		}
 
@@ -653,6 +776,29 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		}
 	}
 	
+
+	// Model mixin surface, compile-time included so every model instance
+	// inherits it (same pattern as the global surface, issue ##3241).
+	// Alphabetical — this was the runtime integration plan's file order.
+	include "model/associations.cfm";
+	include "model/bulk.cfm";
+	include "model/calculations.cfm";
+	include "model/callbacks.cfm";
+	include "model/create.cfm";
+	include "model/delete.cfm";
+	include "model/errors.cfm";
+	include "model/locking.cfm";
+	include "model/miscellaneous.cfm";
+	include "model/nestedproperties.cfm";
+	include "model/onmissingmethod.cfm";
+	include "model/properties.cfm";
+	include "model/read.cfm";
+	include "model/serialize.cfm";
+	include "model/sql.cfm";
+	include "model/transactions.cfm";
+	include "model/update.cfm";
+	include "model/validations.cfm";
+
 	function onDIcomplete(){
 		$engineAdapter().prepareDIComplete(variables, this);
 		// Shared application-cached instance — constructing wheels.Plugins here

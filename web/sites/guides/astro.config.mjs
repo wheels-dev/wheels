@@ -1,11 +1,17 @@
 import { defineConfig } from 'astro/config';
+import remarkGfm from 'remark-gfm';
 import starlight from '@astrojs/starlight';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { GUIDES_VERSIONS } from '@wheels-dev/ui/data/versions';
+import { rehypeBasePrefix } from '@wheels-dev/ui/markdown/rehype-base-prefix.mjs';
+import { remarkBasePrefix } from '@wheels-dev/ui/markdown/remark-base-prefix.mjs';
+import cfmlGrammar from './languages/cfml.tmLanguage.json';
+import cfscriptGrammar from './languages/cfscript.tmLanguage.json';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
 
 function loadSidebar(version) {
 	const path = resolve(__dirname, 'src/sidebars', `${version}.json`);
@@ -64,8 +70,30 @@ function buildSidebarForVersion(version) {
 	};
 }
 
-export default defineConfig({
+const config = defineConfig({
 	site: 'https://guides.wheels.dev',
+	// The local docs bundle that ships with the framework is served from
+	// /wheels/guides/ rather than a domain root, and every asset URL Astro
+	// emits is absolute — so without a base the pages would request
+	// /_astro/*.css from the app root and 404. Set WHEELS_DOCS_BASE to build
+	// that variant; unset (the website build) leaves `base` at its default.
+	...(process.env.WHEELS_DOCS_BASE ? { base: process.env.WHEELS_DOCS_BASE } : {}),
+	// Astro 7 stopped applying GFM to MDX content pages by default, so tables
+	// in .mdx guides rendered as raw pipe text. Re-enable remark-gfm so it
+	// applies to both .md and .mdx (Starlight merges this with its defaults).
+	markdown: {
+		remarkPlugins: [
+			[remarkBasePrefix, { base: process.env.WHEELS_DOCS_BASE || '' }],
+			remarkGfm,
+		],
+		// Astro's `base` covers the URLs Astro generates, but NOT a link
+		// authored as `/v4-0-0/...` inside content. There are ~1000 of those in
+		// the guides, so the local docs bundle (served from /wheels/guides/)
+		// rewrites them at build time. No-op when base is unset.
+		rehypePlugins: [
+			[rehypeBasePrefix, { base: process.env.WHEELS_DOCS_BASE || '' }],
+		],
+	},
 	redirects: {
 		// v4.0.0 GA (2026-05-12) renamed the URL slug `v4-0-0-snapshot` to `v4-0-0`.
 		// Astro's static `redirects` map doesn't support [...spread] sources
@@ -139,6 +167,41 @@ export default defineConfig({
 				// every token color and the theme's own background. Starlight picks
 				// the first for `data-theme="dark"` and the second for light mode.
 				themes: ['github-dark-high-contrast', 'github-light'],
+				// Shiki ships no CFML grammar, so ```cfm blocks rendered as plain
+				// text. Load the TextMate grammars (atom-language-cfml, converted
+				// to JSON) vendored under ./languages/.
+				//
+				// `langs` is a Shiki *plugin* option, so it must be nested under
+				// `shiki` — a top-level `langs` key is ignored (the ExpressiveCode
+				// config type is `shiki?: PluginShikiOptions`).
+				//
+				// Shiki v4's LanguageRegistration extends the raw TextMate grammar:
+				// `scopeName`, `patterns`, `repository`, `injections` must sit at
+				// the TOP level, with `name` as the language id. Nesting the raw
+				// grammar under `{ id, grammar }` registers it under `undefined`
+				// keys and crashes the loader. Spread the raw JSON and override
+				// `name`/`aliases` instead.
+				shiki: {
+					langs: [
+						{ ...cfmlGrammar, name: 'cfm', aliases: ['cfml', 'coldfusion'] },
+						{ ...cfscriptGrammar },
+					],
+					// Resolve fence languages the guides actually use to a Shiki
+					// language id (bundled, or one of the vendored grammars above)
+					// so they highlight instead of falling back to plain text with
+					// a "language could not be found" warning.
+					langAlias: {
+						// CFML family → vendored grammars.
+						cfc: 'cfscript', // component extends="…" { … } — pure CFScript
+						boxlang: 'cfm', // BoxLang .bxm/.bx — tag-based CFML
+						markup: 'cfm', // fences hold CFML tags + HTML (cfml grammar is HTML-based)
+						warpscript: 'cfscript', // legacy typo in the beginner tutorial (CFML set() calls)
+						// Standard renames → bundled Shiki ids.
+						env: 'dotenv',
+						'shell-session': 'console',
+						gitignore: 'ini',
+					},
+				},
 			},
 			customCss: [
 				'@wheels-dev/ui/styles/tokens.css',
@@ -165,3 +228,19 @@ export default defineConfig({
 		}),
 	],
 });
+
+// Astro writes redirect DESTINATIONS verbatim, so in a sub-path build every
+// stub would bounce the reader to the app root. Prefix them here. The source
+// keys are left alone: Astro already emits the stub pages under the base.
+// No-op when WHEELS_DOCS_BASE is unset (the website build).
+const docsRedirectBase = (process.env.WHEELS_DOCS_BASE || '').replace(/\/+$/, '');
+if (docsRedirectBase && config.redirects) {
+	for (const [from, to] of Object.entries(config.redirects)) {
+		if (typeof to !== 'string') continue;
+		if (!to.startsWith('/') || to.startsWith('//')) continue;
+		if (to === docsRedirectBase || to.startsWith(docsRedirectBase + '/')) continue;
+		config.redirects[from] = docsRedirectBase + to;
+	}
+}
+
+export default config;

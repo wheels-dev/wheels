@@ -113,6 +113,30 @@ component extends="wheels.WheelsTest" {
 				expect(di.isSingleton("third")).toBeFalse();
 			});
 
+			it("re-mapping a singleton to a different path preserves the singleton lifecycle (##3516)", () => {
+				// Re-binding a singleton to a test double must stay a singleton —
+				// dropping the lifecycle flag on the path re-map degrades it to
+				// transient, so a counting spy/stub would be re-constructed on
+				// every resolve.
+				di.map("svc").to("wheels.tests._assets.di.SimpleService").asSingleton();
+				var first = di.getInstance("svc");
+				first.setMarker("original");
+				expect(first.getMarker()).toBe("original");
+
+				// Re-point to a different component path (test-double pattern).
+				di.map("svc").to("wheels.tests._assets.di.LifecycleHookService");
+
+				// The lifecycle flag must survive the re-map…
+				expect(di.isSingleton("svc")).toBeTrue();
+
+				// …and two resolves must return the same (new) instance, not a fresh
+				// transient on each call.
+				var second = di.getInstance("svc");
+				var third = di.getInstance("svc");
+				expect(second).toBe(third);
+				expect(second).notToBe(first);
+			});
+
 		});
 
 	}

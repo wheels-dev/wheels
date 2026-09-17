@@ -2,11 +2,11 @@
 # Run the Wheels core suite on the pinned RustCFML engine build and compare the
 # outcome against the checked-in known-failure baseline (tools/rustcfml/baseline.json).
 #
-# RustCFML is a JVM-free CFML engine under active development. This lane is
-# informational: it is never a merge gate. Pass criteria is "no NEW failures
-# versus the baseline", not zero failures — a set of known residual errors
-# (no-JVM limitations and open upstream engine issues) is expected and tracked
-# in the baseline file.
+# RustCFML is a supported JVM-free CFML engine. This script backs both the
+# required PR check (.github/workflows/rustcfml-ci.yml) and the release-matrix
+# leg (compat-matrix.yml). Pass criteria is "no NEW failures versus the
+# baseline", not zero failures — residual engine bugs are tracked in
+# tools/rustcfml/baseline.json with upstream issue links in the "_notes" key.
 #
 # Usage:
 #   bash tools/rustcfml/run-suite.sh                  # compare against baseline
@@ -23,7 +23,10 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$DIR/../.." && pwd)"
-VERSION="$(tr -d '[:space:]' < "$DIR/ENGINE_VERSION")"
+# RUSTCFML_VERSION overrides the pinned ENGINE_VERSION so the version-check
+# workflow can run the suite against a candidate release before committing a
+# bump (tools/rustcfml/check-version.sh).
+VERSION="${RUSTCFML_VERSION:-$(tr -d '[:space:]' < "$DIR/ENGINE_VERSION")}"
 BASELINE="$DIR/baseline.json"
 PORT="${RUSTCFML_PORT:-8513}"
 MODE="compare"
@@ -97,11 +100,16 @@ except Exception as exc:
 totals = {k: int(data.get(k, 0)) for k in
           ("totalSpecs", "totalPass", "totalFail", "totalError", "totalSkipped")}
 
-failing = set()
+failing = {}
 def walk(node, bundle, path):
     for spec in node.get("specStats", []):
         if spec.get("status") not in ("Passed", "Skipped"):
-            failing.add(f"{bundle} :: {path} :: {spec.get('name', '?')}")
+            key = f"{bundle} :: {path} :: {spec.get('name', '?')}"
+            failing[key] = {
+                "status": spec.get("status", "?"),
+                "message": str(spec.get("failMessage") or "").replace("\n", " | "),
+                "detail": str(spec.get("failDetail") or "").replace("\n", " | "),
+            }
     for nested in node.get("nestedSuiteStats", []) or []:
         walk(nested, bundle, f"{path} > {nested.get('name', '?')}")
 
@@ -109,7 +117,11 @@ for b in data.get("bundleStats", []):
     name = b.get("name", "?")
     ge = b.get("globalException") or {}
     if isinstance(ge, dict) and ge.get("message"):
-        failing.add(f"{name} :: (bundle-level exception)")
+        failing[f"{name} :: (bundle-level exception)"] = {
+            "status": "Exception",
+            "message": str(ge.get("message") or "").replace("\n", " | "),
+            "detail": str(ge.get("detail") or "").replace("\n", " | "),
+        }
     for su in b.get("suiteStats", []):
         walk(su, name, su.get("name", "?"))
 
@@ -127,8 +139,16 @@ if mode == "write":
     payload = {
         "engineVersion": version,
         "totals": totals,
-        "failing": sorted(failing),
+        "failing": sorted(failing.keys()),
     }
+    # Preserve the human-maintained "_notes" (upstream issue links) across
+    # regenerations.
+    try:
+        existing = json.load(open(baseline_path))
+        if isinstance(existing.get("_notes"), list):
+            payload["_notes"] = existing["_notes"]
+    except Exception:
+        pass
     with open(baseline_path, "w") as fh:
         json.dump(payload, fh, indent=2)
         fh.write("\n")
@@ -142,8 +162,8 @@ except Exception:
     sys.exit(1)
 
 known = set(baseline.get("failing", []))
-new = sorted(failing - known)
-fixed = sorted(known - failing)
+new = sorted(failing.keys() - known)
+fixed = sorted(known - failing.keys())
 
 # Coarse totals backstop: the failing[] walk only sees per-spec entries and
 # bundle-level exceptions, so a regression surfacing through a response shape
@@ -162,9 +182,26 @@ if fixed:
     summary_lines.append(f"NEWLY PASSING vs baseline ({len(fixed)}):")
     summary_lines += [f"  + {item}" for item in fixed]
     summary_lines.append("  (baseline can be refreshed with --write-baseline)")
+if failing:
+    known_now = sorted(failing.keys())
+    summary_lines.append(f"FAILING SPECS (all {len(known_now)}):")
+    for item in known_now:
+        summary_lines.append(f"  * {item}")
+        info = failing.get(item, {})
+        msg = info.get("message", "")
+        if msg:
+            summary_lines.append(f"      [{info.get('status', '?')}] {msg[:400]}")
 if new:
     summary_lines.append(f"NEW FAILURES vs baseline ({len(new)}):")
-    summary_lines += [f"  - {item}" for item in new]
+    for item in new:
+        summary_lines.append(f"  - {item}")
+        info = failing.get(item, {})
+        msg = info.get("message", "")
+        if msg:
+            summary_lines.append(f"      [{info.get('status', '?')}] {msg[:400]}")
+        detail = info.get("detail", "")
+        if detail and detail != msg:
+            summary_lines.append(f"      detail: {detail[:400]}")
 if totals_worse:
     summary_lines.append("TOTALS REGRESSION vs baseline (no named entry — check response shape):")
     summary_lines += [f"  - {item}" for item in totals_worse]

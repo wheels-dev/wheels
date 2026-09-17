@@ -14,6 +14,12 @@ component extends="wheels.WheelsTest" {
 				expect(_controller.response()).toInclude("variableForViewContent")
 			})
 
+			it("does not shadow a view variable named resolved (##3518)", () => {
+				c = application.wo.controller("test", {controller = "test", action = "testResolved"})
+				c.$callAction(action = "testResolved")
+				expect(c.response()).toInclude("RESOLVED-IS-STRUCT")
+			})
+
 			it("is implicitly calling render page", () => {
 				_controller.$callAction(action = "test")
 				expect(_controller.response()).toInclude("view template content")
@@ -212,7 +218,7 @@ component extends="wheels.WheelsTest" {
 				// https://github.com/wheels-dev/wheels/issues/3077 — an absolute `directory`
 				// outside the web root must be used verbatim, not re-resolved via ExpandPath
 				// (which web-root-prefixes the path on Adobe CF).
-				local.outsideDir = GetTempDirectory() & "dlprobe3077_outside"
+				local.outsideDir = $tempPath("dlprobe3077_outside")
 				if (!DirectoryExists(local.outsideDir)) {
 					// Adobe CF's DirectoryCreate accepts exactly one parameter (the extra
 					// createPath boolean is Lucee-only) and rejects extras at COMPILE time,
@@ -243,7 +249,7 @@ component extends="wheels.WheelsTest" {
 				// https://github.com/wheels-dev/wheels/issues/3077 — the `/wheels` mapping
 				// fallback substring-matched ANY absolute path containing "/wheels"
 				// (e.g. /var/www/wheels/uploads), silently rewriting it.
-				local.wheelsDir = GetTempDirectory() & "wheels3077-dl"
+				local.wheelsDir = $tempPath("wheels3077-dl")
 				if (!DirectoryExists(local.wheelsDir)) {
 					// Single-argument form only: the createPath boolean is Lucee-only and
 					// Adobe rejects it at compile time (crashes the whole bundle).
@@ -468,6 +474,26 @@ component extends="wheels.WheelsTest" {
 				result = _controller.sendEmail(argumentCollection = args)
 
 				expect(result.html).toBe("<p>another dummy html email body</p>")
+			})
+
+			it("writeToFile dumps a single html body without mime headers", () => {
+				// Reporter case for #3529: one HTML template + writeToFile + .eml path.
+				// sendEmail writes the rendered body only — no RFC 822 / MIME envelope —
+				// which is why Outlook shows raw HTML tags on the saved file while
+				// live cfmail delivery still renders. Pin that contract so a later
+				// MIME writer is an intentional change, not a silent one.
+				args.template = "HTMLEmailTemplate"
+				args.writeToFile = filePath
+				if (FileExists(filePath)) {
+					FileDelete(filePath)
+				}
+				_controller.sendEmail(argumentCollection = args)
+				fileContent = FileRead(filePath)
+				FileDelete(filePath)
+
+				expect(fileContent).toInclude(HTMLBody)
+				expect(FindNoCase("Content-Type:", fileContent)).toBe(0)
+				expect(FindNoCase("MIME-Version:", fileContent)).toBe(0)
 			})
 
 			it("sends mail with writetofile", () => {

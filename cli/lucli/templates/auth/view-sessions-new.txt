@@ -5,8 +5,6 @@
 
 <h1>Log in</h1>
 
-#flashMessages()#
-
 #startFormTag(route="session")#
 	<div>
 		#emailFieldTag(name="email", label="Email", value=params.email)#

@@ -101,7 +101,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             it("rejects allowlisted-but-unimplemented top-level keys", () => {
                 var v = new cli.lucli.services.deploy.config.Validator();
                 var deadKeys = [
-                    "boot", "healthcheck", "hooks", "volumes", "labels", "logging",
+                    "healthcheck", "hooks", "volumes", "labels", "logging",
                     "retain_containers", "minimum_version", "asset_path",
                     "require_destination", "allow_empty_roles", "run_directory",
                     "readiness_delay"
@@ -133,6 +133,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     env: {clear: {A: "1"}},
                     ssh: {user: "deploy"},
                     proxy: {host: "app.example.com"},
+                    boot: {limit: 10, wait: 5},
                     accessories: {db: {image: "postgres:16"}}
                 }, "test.yml");
                 expect(true).toBeTrue();
@@ -142,7 +143,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var v = new cli.lucli.services.deploy.config.Validator();
                 var state = {threw: false, message: ""};
                 try {
-                    v.validate({service: "demo", image: "a/b", servers: ["1.2.3.4"], boot: {limit: 1}}, "test.yml");
+                    v.validate({service: "demo", image: "a/b", servers: ["1.2.3.4"], healthcheck: {path: "/up"}}, "test.yml");
                 } catch (DeployConfigError e) {
                     state.threw = true;
                     state.message = e.message;
@@ -150,6 +151,54 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(state.threw).toBeTrue();
                 expect(state.message).toInclude("allowed keys:");
                 expect(state.message).toInclude("accessories");
+            });
+
+            it("accepts a boot block with numeric limit/wait", () => {
+                var v = new cli.lucli.services.deploy.config.Validator();
+                v.validate({
+                    service: "demo",
+                    image: "a/b",
+                    servers: ["1.2.3.4"],
+                    boot: {limit: 10, wait: 5}
+                }, "test.yml");
+                expect(true).toBeTrue();
+            });
+
+            it("accepts a boot block with a percentage limit", () => {
+                var v = new cli.lucli.services.deploy.config.Validator();
+                v.validate({
+                    service: "demo",
+                    image: "a/b",
+                    servers: ["1.2.3.4"],
+                    boot: {limit: "25%", wait: "5"}
+                }, "test.yml");
+                expect(true).toBeTrue();
+            });
+
+            it("rejects a boot block with a negative or non-numeric value", () => {
+                var v = new cli.lucli.services.deploy.config.Validator();
+                var bad = [
+                    {limit: -1},
+                    {wait: -2},
+                    {limit: "soon"},
+                    {wait: "soon"}
+                ];
+                for (var boot in bad) {
+                    var state = {threw: false, message: ""};
+                    try {
+                        v.validate({
+                            service: "demo",
+                            image: "a/b",
+                            servers: ["1.2.3.4"],
+                            boot: boot
+                        }, "test.yml");
+                    } catch (DeployConfigError e) {
+                        state.threw = true;
+                        state.message = e.message;
+                    }
+                    expect(state.threw).toBeTrue("expected boot block '#serializeJSON(boot)#' to be rejected");
+                    expect(state.message).toInclude("boot.");
+                }
             });
         });
     }

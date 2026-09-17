@@ -24,6 +24,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(templateRoot & "app/global/functions.cfm")).toBeTrue();
 			});
 
+			it("ships the consumer AI doc tier (CLAUDE.md / AGENTS.md / .ai/README.md)", () => {
+				// Two-tier AI docs: every `wheels new` scaffold ships the
+				// consumer application-developer docs (see
+				// docs/superpowers/plans/2026-08-30-ai-docs-two-tier.md and
+				// tools/build/scripts/ship-consumer-docs.sh).
+				expect(fileExists(templateRoot & "CLAUDE.md")).toBeTrue();
+				expect(fileExists(templateRoot & "AGENTS.md")).toBeTrue();
+				expect(fileExists(templateRoot & ".ai/README.md")).toBeTrue();
+			});
+
 			it("ships app/views/helpers.cfm (used by layout rendering)", () => {
 				expect(fileExists(templateRoot & "app/views/helpers.cfm")).toBeTrue();
 			});
@@ -80,6 +90,39 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(content).toInclude("PopulateCfm.MigrationFailed");
 			});
 
+			it("ships stacked form defaults, red validation errors, and boxed flash styles", () => {
+				expect(fileExists(templateRoot & "public/stylesheets/wheels.css")).toBeTrue();
+				var css = fileRead(templateRoot & "public/stylesheets/wheels.css");
+				expect(css).toInclude(".error-message");
+				expect(css).toInclude("width: 100%");
+				expect(css).toInclude("⚠");
+				// Boxed flash messages: success (green) and notice (blue) are
+				// styled like the error box so created/updated/deleted confirmations
+				// aren't bare text.
+				expect(css).toInclude(".success-message");
+				expect(css).toInclude(".notice-message");
+				expect(css).toInclude("--wheels-success");
+				expect(css).toInclude("--wheels-notice");
+				// Action rows: the scaffold gives every action simple.css's
+				// `.button` class, and this rule lays the row out. Without it
+				// the buttons sit flush against each other with no gap.
+				expect(css).toInclude(".wheels-actions");
+				expect(css).toInclude("display: flex");
+				// Top-aligned, and the button nested inside buttonTo's <form>
+				// loses simple.css's 8px bottom margin. With `center` and that
+				// margin intact, the form was 8px taller than the sibling links
+				// and Delete floated 4px above Edit and "all posts".
+				expect(css).toInclude("align-items: flex-start");
+				expect(css).toInclude(".wheels-actions > form > .button");
+
+				var layout = fileRead(templateRoot & "app/views/layout.cfm");
+				expect(layout).toInclude('styleSheetLinkTag(sources="simple,wheels")');
+
+				var settings = fileRead(templateRoot & "config/settings.cfm");
+				expect(settings).toInclude("includeFormErrorMessages=true");
+				expect(settings).toInclude('labelPlacement="before"');
+			});
+
 			it("ships .gitkeep files in tests/specs subfolders so empty dirs survive git", () => {
 				// Templates check — confirms the .gitkeep files exist on disk
 				// in the template tree. Their copying into the scaffolded app
@@ -90,6 +133,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(templateRoot & "tests/specs/controllers/.gitkeep")).toBeTrue();
 				expect(fileExists(templateRoot & "tests/specs/functional/.gitkeep")).toBeTrue();
 				expect(fileExists(templateRoot & "tests/specs/models/.gitkeep")).toBeTrue();
+			});
+
+			it("ships app/snippets/CRUDContent.txt identical to the bundled codegen template", () => {
+				// `wheels new` copies every codegen template into the app's
+				// app/snippets/, and Templates.cfc resolves THOSE first — they
+				// shadow the bundled copy. So a fix to templates/codegen/
+				// CRUDContent.txt is invisible to every freshly generated app
+				// unless the snippet copy moves with it. That is exactly how the
+				// 404 guard shipped in a release and then failed to appear in a
+				// stock `wheels new` app: the two files had silently diverged.
+				//
+				// Only this pair is pinned. Two other twins differ on purpose
+				// (the app copies read the reload password from .env), so a
+				// blanket "all snippets match codegen" rule would be wrong.
+				var bundled = fileRead(expandPath("/cli/lucli/templates/codegen/CRUDContent.txt"));
+				var shipped = fileRead(templateRoot & "app/snippets/CRUDContent.txt");
+				expect(compare(shipped, bundled)).toBe(0);
+				// And the shipped copy must actually carry the guard.
+				expect(shipped).toInclude('filters(through="requireRecord"');
 			});
 
 		});

@@ -1,28 +1,18 @@
 {
-  "engineVersion": "v0.429.0",
+  "engineVersion": "v0.637.0",
   "totals": {
-    "totalSpecs": 4711,
-    "totalPass": 4638,
-    "totalFail": 15,
-    "totalError": 40,
-    "totalSkipped": 18
+    "totalSpecs": 5375,
+    "totalPass": 5350,
+    "totalFail": 1,
+    "totalError": 2,
+    "totalSkipped": 22
   },
   "failing": [
-    "wheels.tests.specs.controller.verifiesSpec :: Tests that verifies :: checks that strings allow blank",
-    "wheels.tests.specs.controller.verifiesSpec :: Tests that verifies :: checks valid types",
-    "wheels.tests.specs.controller.verifiesSpec :: Tests that verifies :: is valid",
-    "wheels.tests.specs.controller.verifiesSpec :: Tests that verifies :: throws at declaration time when a types list length does not match its variable list",
-    "wheels.tests.specs.global.publicSpec :: Tests that processrequest :: processes request as GET",
-    "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns false when no files changed",
-    "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns true when a new cfm file appears",
-    "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns true when a tracked cfm file is modified",
-    "wheels.tests.specs.global.reloadGlobalsSpec :: Reload \u2014 global includes mtime tracking (issue #2792) :: $globalIncludesChanged returns true when a tracked cfm file is removed",
-    "wheels.tests.specs.migrator.migrationSpec :: Tests addIndex :: creates an index on multiple columns",
-    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $castForParam :: casts numeric to java.lang.Double for double param type",
-    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $castForParam :: casts numeric to java.lang.Integer for int param type",
-    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $castForParam :: passes Java objects through unchanged",
-    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $findSetter :: finds a one-arg setter by name on a JDK class",
-    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: $findSetter :: throws BrowserOptionError for nonexistent setter",
-    "wheels.tests.specs.wheelstest.BrowserLauncherSpec :: BrowserLauncher path discovery :: $findZeroArgMethod throws BrowserLauncherReflectionError when method missing"
+    "wheels.tests.specs.migrator.migrationSpec :: Tests addIndex :: creates an index on multiple columns"
+  ],
+  "_notes": [
+    "Known residual failures are upstream RustCFML engine bugs; each entry above maps to an open issue on https://github.com/RustCFML/RustCFML:",
+    "migrationSpec 'creates an index on multiple columns' -> https://github.com/RustCFML/RustCFML/issues/377 (query-of-query recordCount corruption after repeated QoQs).",
+    "Earlier tracked bugs now fixed framework-side or upstream were: #376 Hash(binary), #378 java.io.File two-arg constructor, #379 void-assignment key deletion, #380 GetTempDirectory separator, #381 new-operator name lowercasing."
   ]
 }

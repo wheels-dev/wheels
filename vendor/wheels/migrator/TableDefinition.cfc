@@ -51,6 +51,7 @@ component extends="Base" {
 		numeric precision,
 		numeric scale,
 		string references,
+		string referenceColumn = "id",
 		string onUpdate = "",
 		string onDelete = ""
 	) {
@@ -78,7 +79,7 @@ component extends="Base" {
 				table = this.name,
 				referenceTable = local.referenceTable,
 				column = arguments.name,
-				referenceColumn = "id",
+				referenceColumn = arguments.referenceColumn,
 				onUpdate = arguments.onUpdate,
 				onDelete = arguments.onDelete
 			);
@@ -334,6 +335,7 @@ component extends="Base" {
 	 * @foreignKey If true (default), registers a foreign key on the generated column. Ignored when `polymorphic=true`.
 	 * @onUpdate Foreign-key ON UPDATE clause. Engine-specific values; common: `"cascade"`, `"null"`, `"none"`.
 	 * @onDelete Foreign-key ON DELETE clause. Same value set as `onUpdate`.
+	 * @referenceColumn Referenced PK column. Default remains `"id"` (public API — do not flip).
 	 */
 	public any function references(
 		string referenceNames,
@@ -343,7 +345,8 @@ component extends="Base" {
 		boolean polymorphic = "false",
 		boolean foreignKey = "true",
 		string onUpdate = "",
-		string onDelete = ""
+		string onDelete = "",
+		string referenceColumn = "id"
 	) {
 		$combineArguments(args = arguments, combine = "referenceNames,columnNames", required = true);
 		local.idSuffix = $get("useUnderscoreReferenceColumns") ? "_id" : "id";
@@ -372,7 +375,7 @@ component extends="Base" {
 					table = this.name,
 					referenceTable = local.referenceTable,
 					column = "#local.referenceName##local.idSuffix#",
-					referenceColumn = "id",
+					referenceColumn = arguments.referenceColumn,
 					onUpdate = arguments.onUpdate,
 					onDelete = arguments.onDelete
 				);

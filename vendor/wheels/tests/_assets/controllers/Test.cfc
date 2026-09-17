@@ -9,6 +9,12 @@ component extends="Controller" {
 		variableForLayout = "variableForLayoutContent";
 	}
 
+	function testResolved() {
+		// Named `resolved` on purpose: $includeAndReturnOutput used to declare a
+		// bare `local.resolved`, which shadowed this variable in the view (#3518).
+		resolved = {foo = "bar"};
+	}
+
 	function testRedirect() {
 		redirectTo(action = "dummy");
 		request.setInActionAfterRedirect = true;

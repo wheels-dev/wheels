@@ -58,6 +58,13 @@ contents:
     dst: /opt/wheels/sqlite-jdbc.jar
     file_info:
       mode: 0644
+  # Offline docs bundle — the prebuilt guides + API reference, shipped as the
+  # release's wheels-docs-<v>.zip and unpacked into ~/.wheels/docs/<v>/ by the
+  # wrapper on first run. Zipped (~32 MB) rather than unpacked (~270 MB) to
+  # keep the package a sane download.
+  - src: ./build/docs/
+    dst: /opt/wheels/docs/
+    type: tree
   # Version + channel stamps. The wrapper reads both to render `wheels --version`.
   # Without them, `wheels --version` returns "unknown (stable)". See #2700.
   - src: ./build/.version
@@ -79,6 +86,10 @@ overrides:
     depends:
       - openjdk-21-jre-headless | openjdk-21-jre
       - tar
+      # Unpacks the offline docs bundle on first run.
+      - unzip
+      # Unpacks the offline docs bundle on first run.
+      - unzip
     recommends:
       - sqlite3   # not strictly required (driver bundled), but useful for the user
   rpm:
@@ -88,6 +99,8 @@ overrides:
       # unpacks /opt/wheels/module/ (or other tarball payloads) fails without
       # it. Declare it here so dnf pulls it in. See #2700.
       - tar
+      # Unpacks the offline docs bundle on first run.
+      - unzip
     recommends:
       - sqlite
 deb:

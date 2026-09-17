@@ -232,7 +232,7 @@ Where Wheels still trails 4.0 vs peers: ecosystem size, community size, bidirect
 - **Formalized** — capability had partial or undocumented precedent; became production-ready with tests + docs in 4.0.
 - **Hardened** — capability existed; security-tightened in 4.0.
 - **Fixed** — bug that made the 3.0 capability unreliable; resolved in 4.0.
-- **Breaking** — default behavior changed in a way that requires user action when upgrading (see the Upgrade Guide, forthcoming).
+- **Breaking** — default behavior changed in a way that requires user action when upgrading (see the [Upgrade Guide](https://guides.wheels.dev/v4-0-0/upgrading/manual-upgrades/)).
 - **Deprecated** — 3.0 surface retained but marked for removal.
 - **Removed** — 3.0 surface removed entirely.
 - **Renamed / Refactored / Refreshed / Streamlined / Changed** — shape-change without functional parity loss.

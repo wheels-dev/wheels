@@ -27,8 +27,9 @@ interface {
 	 *
 	 * @name Section name.
 	 * @defaultValue Fallback if no content was stored.
+	 * @encode Opt-in HTML encode of the stored section. Omitted by default.
 	 */
-	public string function includeContent(string name, string defaultValue);
+	public string function includeContent(string name, string defaultValue, any encode);
 
 	/**
 	 * Render a partial template, optionally looping over a query or array.

@@ -34,5 +34,19 @@
 	*/
 	set(useUnderscoreReferenceColumns=true);
 
+	/*
+		Stacked form layout (#3549) and in-field validation errors (#3550).
+		labelPlacement="before" puts the label on its own line; wheels.css
+		makes text inputs full width. includeFormErrorMessages nests the
+		per-field error inside the control's error wrapper. Existing apps
+		that already set(functionName=...) keep those options.
+		Checkboxes/radios stay beside their labels (around placement).
+	*/
+	set(includeFormErrorMessages=true);
+	set(
+		functionName="textField,textArea,passwordField,select,fileField,emailField,urlField,numberField,telField,dateField,searchField,colorField,rangeField",
+		labelPlacement="before"
+	);
+
 	// CLI-Appends-Here
 </cfscript>

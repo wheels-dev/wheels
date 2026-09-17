@@ -28,45 +28,48 @@ component output="false" {
 			local = arguments;
 		}
 		// Include the template and return the result.
-		// Variable is set to $wheels to limit chances of it being overwritten in the included template.
+		// Every local is $-prefixed so it cannot shadow a same-named variable in
+		// the included view (#3518): the include runs inside this function's
+		// scope, so a bare `resolved`/`captured`/`fallbacks` here would otherwise
+		// win over the controller variable passed to the view.
 		// Include stays in this function: `local = arguments` above must be
 		// visible to partials, and savecontent must wrap the include itself
 		// (a helper on this output=false CFC would capture nothing).
 		// cfformat-ignore-start
-		local.resolved = $resolveGlobalIncludeTemplate(arguments.$template);
-		var includeState = {done = false, output = ""};
-		var captured = "";
+		local.$resolved = $resolveGlobalIncludeTemplate(arguments.$template);
+		var $includeState = {done = false, output = ""};
+		var $captured = "";
 		try {
-			savecontent variable="captured" {
-				include "#local.resolved#"
+			savecontent variable="$captured" {
+				include "#local.$resolved#"
 			};
-			includeState.output = captured;
-			includeState.done = true;
+			$includeState.output = $captured;
+			$includeState.done = true;
 		} catch (any e) {
 			if (!$isMissingMappedInclude(e)) {
 				rethrow;
 			}
 		}
-		if (!includeState.done) {
-			var fallbacks = $mappedIncludeFallbacks(local.resolved);
-			var fbCount = ArrayLen(fallbacks);
-			for (var fbIndex = 1; fbIndex <= fbCount; fbIndex++) {
+		if (!$includeState.done) {
+			var $fallbacks = $mappedIncludeFallbacks(local.$resolved);
+			var $fbCount = ArrayLen($fallbacks);
+			for (var $fbIndex = 1; $fbIndex <= $fbCount; $fbIndex++) {
 				try {
-					savecontent variable="captured" {
-						include "#fallbacks[fbIndex]#"
+					savecontent variable="$captured" {
+						include "#$fallbacks[$fbIndex]#"
 					};
-					includeState.output = captured;
-					includeState.done = true;
+					$includeState.output = $captured;
+					$includeState.done = true;
 					break;
 				} catch (any e) {
-					if (fbIndex == fbCount || !$isMissingMappedInclude(e)) {
+					if ($fbIndex == $fbCount || !$isMissingMappedInclude(e)) {
 						rethrow;
 					}
 				}
 			}
 		}
 		// cfformat-ignore-end
-		return includeState.output;
+		return $includeState.output;
 	}
 
 	/**
@@ -99,39 +102,43 @@ component output="false" {
 	public void function $includeConfig(required string template) {
 		try {
 			// cfformat-ignore-start
-			local.resolved = $resolveGlobalIncludeTemplate(arguments.template);
-			var configIncludeState = {done = false, output = ""};
-			var configCaptured = "";
+			// Every local is $-prefixed so it cannot shadow a same-named variable in
+			// the included config template (#3526): the include runs inside this
+			// function's scope, so a bare `resolved`/`configCaptured` here would
+			// otherwise win over the app's own variable.
+			local.$resolved = $resolveGlobalIncludeTemplate(arguments.template);
+			var $configIncludeState = {done = false, output = ""};
+			var $configCaptured = "";
 			try {
-				savecontent variable="configCaptured" {
-					include "#local.resolved#"
+				savecontent variable="$configCaptured" {
+					include "#local.$resolved#"
 				};
-				configIncludeState.output = configCaptured;
-				configIncludeState.done = true;
+				$configIncludeState.output = $configCaptured;
+				$configIncludeState.done = true;
 			} catch (any e) {
 				if (!$isMissingMappedInclude(e)) {
 					rethrow;
 				}
 			}
-			if (!configIncludeState.done) {
-				var configFallbacks = $mappedIncludeFallbacks(local.resolved);
-				var configFbCount = ArrayLen(configFallbacks);
-				for (var configFbIndex = 1; configFbIndex <= configFbCount; configFbIndex++) {
+			if (!$configIncludeState.done) {
+				var $configFallbacks = $mappedIncludeFallbacks(local.$resolved);
+				var $configFbCount = ArrayLen($configFallbacks);
+				for (var $configFbIndex = 1; $configFbIndex <= $configFbCount; $configFbIndex++) {
 					try {
-						savecontent variable="configCaptured" {
-							include "#configFallbacks[configFbIndex]#"
+						savecontent variable="$configCaptured" {
+							include "#$configFallbacks[$configFbIndex]#"
 						};
-						configIncludeState.output = configCaptured;
-						configIncludeState.done = true;
+						$configIncludeState.output = $configCaptured;
+						$configIncludeState.done = true;
 						break;
 					} catch (any e) {
-						if (configFbIndex == configFbCount || !$isMissingMappedInclude(e)) {
+						if ($configFbIndex == $configFbCount || !$isMissingMappedInclude(e)) {
 							rethrow;
 						}
 					}
 				}
 			}
-			local.$wheelsConfigOutput = configIncludeState.output;
+			local.$wheelsConfigOutput = $configIncludeState.output;
 			// cfformat-ignore-end
 		} catch (any e) {
 			// Fail closed: a compile-time or runtime failure in a config template is a
@@ -528,6 +535,64 @@ component output="false" {
 				rethrow;
 			}
 			include "../vendor/wheels/global/lifecycle.cfm";
+		}
+	}
+
+	// Auth wiring facade (enableSession) — same mapping-absolute include
+	// ladder as the other global files above.
+	try {
+		include "/wheels/global/auth.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/auth.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/auth.cfm";
+		}
+	}
+
+	// bcrypt password helpers (bcryptHash / bcryptVerify + internals).
+	// RustCFML ships bcryptHash/bcryptVerify as NATIVE builtins — defining
+	// our own copies collides ("The name [bcryptHash] is already used by a
+	// built in Function") and breaks boot. Skip the include on engines that
+	// provide the builtins; their native implementations serve the same
+	// public API. bcryptNeedsRehash has no engine builtin, so it lives in
+	// the always-included security-extra.cfm below.
+	if (!StructKeyExists(getFunctionList(), "bcryptHash")) {
+		try {
+			include "/wheels/global/security.cfm";
+		} catch (any e) {
+			if (!$isMissingMappedInclude(e)) {
+				rethrow;
+			}
+			try {
+				include "global/security.cfm";
+			} catch (any e2) {
+				if (!$isMissingMappedInclude(e2)) {
+					rethrow;
+				}
+				include "../vendor/wheels/global/security.cfm";
+			}
+		}
+	}
+	try {
+		include "/wheels/global/security-extra.cfm";
+	} catch (any e) {
+		if (!$isMissingMappedInclude(e)) {
+			rethrow;
+		}
+		try {
+			include "global/security-extra.cfm";
+		} catch (any e2) {
+			if (!$isMissingMappedInclude(e2)) {
+				rethrow;
+			}
+			include "../vendor/wheels/global/security-extra.cfm";
 		}
 	}
 

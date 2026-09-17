@@ -98,9 +98,27 @@ component implements="wheels.auth.AuthStrategy" output="false" {
 				statusCode = 401,
 				strategy = getName()
 			);
+		} catch ("Wheels.Auth.JWT.InvalidAlgorithm" e) {
+			return variables.authResult.failure(
+				error = "Invalid JWT algorithm",
+				statusCode = 401,
+				strategy = getName()
+			);
+		} catch ("Wheels.Auth.JWT.InvalidIssuer" e) {
+			return variables.authResult.failure(
+				error = "JWT issuer validation failed",
+				statusCode = 401,
+				strategy = getName()
+			);
+		} catch ("Wheels.Auth.JWT.MissingExpiry" e) {
+			return variables.authResult.failure(
+				error = "JWT token is missing expiry",
+				statusCode = 401,
+				strategy = getName()
+			);
 		} catch (any e) {
 			return variables.authResult.failure(
-				error = "JWT authentication error: " & e.message,
+				error = "JWT authentication failed",
 				statusCode = 401,
 				strategy = getName()
 			);

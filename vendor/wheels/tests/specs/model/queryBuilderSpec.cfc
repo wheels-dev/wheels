@@ -17,7 +17,7 @@ component extends="wheels.WheelsTest" {
 					expect(result.recordcount).toBeGT(0);
 				})
 
-				it("passes through raw SQL strings (1-arg form)", () => {
+				it("passes through raw SQL strings (1-arg trusted-input form)", () => {
 					var result = model("author").where("lastName = 'Djurner'").get();
 					expect(result.recordcount).toBe(1);
 				})

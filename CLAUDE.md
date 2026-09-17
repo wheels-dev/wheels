@@ -46,7 +46,7 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
 7. **`private` mixin functions are not integrated.** `$integrateComponents()` only copies `public` methods into model/controller objects. ALL helpers in `vendor/wheels/model/*.cfc`, view helpers, etc. MUST use `public` access with `$` prefix for internal scope. BoxLang passes; Lucee/Adobe fail.
 8. **`Left(str, 0)` crashes Lucee 7.** Guard: `len > 0 ? Left(str, len) : ""`.
 9. **`toBeInstanceOf("component")` fails on BoxLang** — returns the FQN, not the literal `"component"`. Use `toBeWheelsModel()` for finder results.
-10. **Adobe CF 2023 and 2025 reject the `arguments` scope as `attributeCollection` on *any* built-in CFML tag.** Affects every `cfheader` / `cfcache` / `cfcontent` / `cfmail` / `cfdirectory` / `cffile` / `cflocation` / `cfhtmlhead` / `cfimage` / `cfdbinfo` / `cfinvoke` / `cfwddx` / `cfzip` wrapper. Covers both the string-interpolated (`attributeCollection = "#arguments#"`) and direct-struct (`attributeCollection = arguments`) forms. Adobe 2023/2025 throw — `cfheader`'s message is `"Failed to add HTML header"`; other tags surface their own — and `$header()` is catastrophic because it runs on every request. Copy to a plain struct first: `local.args = {}; for (local.key in arguments) { local.args[local.key] = arguments[local.key]; }`. Lucee 6/7, BoxLang, and Adobe 2018/2021 accept both forms; Adobe 2023/2025 require the plain struct. The 13 sites in `vendor/wheels/Global.cfc` were patched uniformly in [#2750](https://github.com/wheels-dev/wheels/pull/2750).
+10. **Adobe CF 2023 and 2025 reject the `arguments` scope as `attributeCollection` on *any* built-in CFML tag.** Affects every `cfheader` / `cfcache` / `cfcontent` / `cfmail` / `cfdirectory` / `cffile` / `cflocation` / `cfhtmlhead` / `cfimage` / `cfdbinfo` / `cfinvoke` / `cfwddx` / `cfzip` wrapper. Covers both the string-interpolated (`attributeCollection = "#arguments#"`) and direct-struct (`attributeCollection = arguments`) forms. Adobe 2023/2025 throw — `cfheader`'s message is `"Failed to add HTML header"`; other tags surface their own — and `$header()` is catastrophic because it runs on every request. Copy to a plain struct first: `local.args = {}; for (local.key in arguments) { local.args[local.key] = arguments[local.key]; }`. Lucee 6/7, BoxLang, and Adobe 2018/2021 accept both forms; Adobe 2023/2025 require the plain struct. The 13 tag wrappers in `vendor/wheels/global/tags.cfm` (mixed into `wheels.Global` at runtime) were patched uniformly in [#2750](https://github.com/wheels-dev/wheels/pull/2750).
 11. **Anything written through `local.` inside `catch` doesn't persist on BoxLang.** Catch body runs under a nested `local` that gets discarded on exit, so `expect(local.X)` after the catch reads the un-touched outer value. Use a struct field: `var state = {flag = false}; ... state.flag = true;`. Bare `var bareName` + unscoped `bareName = true` also works but the struct form mirrors `TenantResolverSpec` and is the prior-art pattern.
 
     **The struct form only works if you access it WITHOUT the `local.` prefix.** `local.state.flag = true` inside a catch fails exactly like a scalar `local.X = ...` — the nested `local` shadows `local.state`, so the write lands on a discarded copy rather than mutating the outer struct. The prefix is what breaks it, not the assignment shape:
@@ -82,6 +82,8 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
     - a non-`application` receiver, zero args, bare statement in a closure: `_controller.$clearCachableActions()` (`cachingSpec`), `strategy.logout()` (`SessionStrategySpec`), `local.c.$warnIfConfigSkipsSuper()` (`configSuperWarningSpec`)
 
     Two things make this expensive to diagnose. Adobe attributes the error to the **enclosing `describe(...)` line**, not the offending statement, so it reads like a broken test-block signature. And because the core suite compiles via `directory="wheels.tests.specs"`, one occurrence zeroes out **the entire engine leg** — adobe2025 reports `tests="0"` for every database while Lucee/BoxLang/Adobe 2023 stay green, and `compat-matrix.yml` does not run on PRs. In test code, ensure request state inline (`if (!StructKeyExists(request.wheels, "$pagination")) { request.wheels["$pagination"] = {} }`) rather than calling a void `$`-helper through `application.wo`; in framework code prefer helpers that **return** what they ensure, so callers write `local.store = $ensurePaginationStore();`. Hit by the #3339 pagination-namespace specs.
+
+    **16b-ext — a closure whose first two statements are a zero-arg `$`-member call then an argumented `$`-member call, Adobe 2025.** The same `MissingNameException` fires when a closure body *opens* with `_controller.$clearCachableActions()` followed by `g.$clearCache("action")` (any receivers — local, `g = application.wo`, or `application.wo` itself). Probe-verified boundaries: the pair compiles when it is **not** the first two statements (an assignment, an argumented call, or even another zero-arg call before it rescues it), when the first call has arguments, when the first call is not `$`-prefixed (`_controller.flashClear()` then `_controller.$setFlashStorage("x")` compiles), or when the second call is zero-arg. Fix by reordering (`g.$clearCache("action")` first) or hoisting a `var`/assignment ahead of the pair. Hit by `ControllerHardenerSpec` / `ControllerHardenerShouldSpec` `afterEach` blocks (the Aug 28 matrix dispatch showed the whole adobe2025 leg at `tests="0"`).
 
     Bisect this class of bug with a single probe against a running container instead of CI (~13s vs ~19min):
     ```bash
@@ -134,6 +136,10 @@ The framework must run on Lucee 5/6/7, Adobe CF 2018/2021/2023/2025, and BoxLang
     ```
 
     The CLI template (`wheels new`) and the demo app were fixed in #3380. **Existing apps must apply the same change to their `public/Application.cfc`.**
+
+    The same torn-down-scope rule applies to `onSessionEnd()`. Adobe's `SessionTracker.SessionCleanUpAgent` can call it after the live application scope is already reclaimed, so bare `application.wo.$simpleLock` throws the same `Element wo is undefined...` error. Route through `arguments.applicationScope.wo` and guard with `StructKeyExists(arguments.applicationScope, "wo")` only — this path uses `$simpleLock`, not `$include`, so do not add the `wheels` / `eventPath` checks used by `onApplicationEnd()`. Existing 4.0.x apps must paste the same edit into their own `public/Application.cfc`.
+
+20. **BoxLang's `DirectoryList()` returns a fixed-size array — `ArrayAppend` on it throws with NO message.** The exception surfaces as an `Error`-status spec with an empty `failMessage`/`failDetail`, and TestBox blames the closure's first line rather than the append. Copy into a fresh array before appending: `var files = []; for (var f in DirectoryList(...)) { ArrayAppend(files, f); }`. Iterating the result directly (`for (var f in DirectoryList(...))`) is fine. Hit by `BareCfabortGuardSpec` (Aug 29 matrix dispatch — BoxLang mysql+sqlite legs). Also note BoxLang's loose `==` coerces boolean-ish strings numerically — `"1" == "yes"` and `"0" == "no"` are TRUE, and `ListFindNoCase("yes,no", "1")` returns 1 / `("yes,no", "0")` returns 2 for the same reason. Use `CompareNoCase(a, b) == 0` (or `Compare`) for string equality decisions; hit by `QuoteValueSpec`.
 
 Verify Adobe CF fixes locally before pushing — don't iterate via CI:
 ```bash
@@ -354,266 +360,6 @@ Association foreign-key defaults resolve **either** convention: the default deri
 - **extends**: Models extend `"Model"`, controllers extend `"Controller"`, tests extend `"wheels.WheelsTest"`. (Legacy: `"wheels.Test"` was RocketUnit — never use for new tests.)
 - **Validation property param**: `property` (singular) for single, `properties` (plural) for list: `validatesPresenceOf(properties="name,email")`.
 
-## Model Quick Reference
-
-```cfm
-component extends="Model" {
-    function config() {
-        // Table/key (only if non-conventional)
-        table("tbl_users");        // setter is table(); tableName() is a getter — tableName("x") throws Wheels.InvalidArgument in dev/testing, no-op in production (#3079)
-        setPrimaryKey("userId");
-
-        // Associations — all named params when using options
-        hasMany(name="orders", dependent="delete");
-        belongsTo(name="role");
-
-        // Validations
-        validatesPresenceOf("firstName,lastName,email");
-        validatesUniquenessOf(property="email");
-        validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
-
-        // Callbacks
-        beforeSave("sanitizeInput");
-
-        // Calculated SQL properties — select=false keeps them off the default SELECT (hot path)
-        property(name="fullName", sql="firstName || ' ' || lastName", select=false);
-
-        // Query scopes — reusable, composable query fragments
-        scope(name="active", where="status = 'active'");
-        scope(name="recent", order="createdAt DESC");
-        scope(name="byRole", handler="scopeByRole");  // dynamic scope
-
-        // Enums — named values with auto-generated checkers and scopes
-        enum(property="status", values="draft,published,archived");
-        enum(property="priority", values={low: 0, medium: 1, high: 2});
-    }
-
-    private struct function scopeByRole(required string role) {
-        return {where: "role = '#arguments.role#'"};
-    }
-}
-```
-
-Finders: `model("User").findAll()`, `findOne(where="...")`, `findByKey(params.key)`.
-Create: `model("User").new(params.user).save()`, or `model("User").create(params.user)`.
-Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
-Opt a `select=false` calculated property into one call (additive): `findAll(includeCalculated="fullName")`. Unknown names throw `Wheels.CalculatedPropertyNotFound` in dev/testing.
-
-### Scopes / Enums / Builder / Batch
-
-```cfm
-// Scopes — chain composably
-model("User").active().recent().findAll();
-model("User").byRole("admin").findAll(page=1, perPage=25);
-
-// Enums — auto-generated checkers and scopes
-user.isDraft();                    // true/false
-model("User").draft().findAll();
-
-// Chainable query builder (injection-safe; values auto-quoted)
-model("User")
-    .where("status", "active")
-    .where("age", ">", 18)
-    .whereNotNull("emailVerifiedAt")
-    .orderBy("name", "ASC")
-    .limit(25)
-    .get();
-// Methods: where, orWhere, whereNull, whereNotNull, whereBetween, whereIn, whereNotIn, orderBy,
-// limit, offset, select, include, group, distinct, forUpdate, get
-// Any of these (not just where) can START the chain on the model, e.g. model("User").select("id,name").get()
-
-// Batch processing — memory-efficient
-model("User").findEach(batchSize=1000, callback=function(user) {
-    user.sendReminderEmail();
-});
-model("User").findInBatches(batchSize=500, callback=function(users) {
-    processUserBatch(users);
-});
-```
-
-## Routing Quick Reference
-
-```cfm
-mapper()
-    .resources("users")
-    .resources("products", except="delete")
-    .resources(name="posts", callback=function(map) {
-        map.resources("comments");
-    })
-    .get(name="login", to="sessions##new")
-    .post(name="authenticate", to="sessions##create")
-    .root(to="home##index", method="get")
-    .wildcard()                                       // keep last!
-.end();
-```
-
-Helpers: `linkTo(route="user", key=user.id)`, `urlFor(route="users")`, `redirectTo(route="user", key=user.id)`, `startFormTag(route="user", method="put", key=user.id)`.
-
-### Route Model Binding
-
-Resolves `params.key` into a model instance before the action runs. Lands in `params.<singularModelName>`. Throws `Wheels.RecordNotFound` (404) if missing; silently skips if the model class doesn't exist.
-
-```cfm
-.resources(name="users", binding=true)                // params.user
-.resources(name="posts", binding="BlogPost")          // params.blogPost
-.scope(path="/api", binding=true, callback=function(map) {  // all nested resources bound
-    map.resources("users");
-})
-set(routeModelBinding=true);                          // global, in config/settings.cfm
-```
-
-## Pagination View Helpers
-
-Requires a paginated query: `findAll(page=params.page, perPage=25)`. Recommended all-in-one helper: `paginationNav()`.
-
-```cfm
-// All-in-one nav
-#paginationNav()#
-#paginationNav(showInfo=true, showFirst="never", showLast="never", navClass="my-pagination")#
-#paginationNav(windowSize=3)#
-
-// Declarative presets — Bootstrap 4/5 and Tailwind
-#paginationNav(viewStyle="bootstrap5")#
-#paginationNav(viewStyle="bootstrap4")#
-#paginationNav(viewStyle="tailwind")#
-
-// Manual composition (like-for-like swap for legacy paginationLinks)
-#paginationNav(
-    navClass="",
-    prepend='<ul class="pagination">',
-    append="</ul>",
-    prependToPage='<li class="page-item">',
-    appendToPage="</li>",
-    class="page-link",
-    classForCurrent="active",
-    addActiveClassToPrependedParent=true
-)#
-
-// Individual helpers
-#paginationInfo()#       #firstPageLink()#       #previousPageLink()#
-#pageNumberLinks()#      #nextPageLink()#        #lastPageLink()#
-```
-
-`showFirst` / `showLast` / `showPrevious` / `showNext` accept `"auto"` (default), `"always"`, or `"never"`. Under `"auto"` the first/last anchors are hidden when the window already reaches the boundary; previous/next render disabled `<span>` at boundaries to preserve position. Booleans coerce (`true`→`"always"`, `false`→`"never"`).
-
-`viewStyle` accepts `"plain"` (default), `"bootstrap5"`, `"bootstrap4"`, `"tailwind"`. Bootstrap presets emit `<li class="page-item active" aria-current="page"><span class="page-link">N</span></li>`. Non-plain presets ignore manual-composition args.
-
-In development, `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` for unknown sub-helper args. `windowSize` is consumed by `paginationNav` itself (not forwarded). Accepted pass-through: `format, text, name, class, disabledClass, showDisabled, pageNumberAsParam, classForCurrent, linkToCurrentPage, prependToPage, appendToPage, addActiveClassToPrependedParent, route, controller, action, key, anchor, onlyPath, host, protocol, port, params`. Named route segment variables are auto-exempted from the check.
-
-## Middleware Quick Reference
-
-Middleware runs at the dispatch level, before controller instantiation. Each implements `handle(request, next)`.
-
-```cfm
-// config/settings.cfm — global middleware
-set(middleware = [
-    new wheels.middleware.RequestId(),
-    new wheels.middleware.SecurityHeaders(),
-    new wheels.middleware.Cors(allowOrigins="https://myapp.com")
-]);
-
-// config/routes.cfm — route-scoped
-mapper()
-    .scope(path="/api", middleware=["app.middleware.ApiAuth"], callback=function(map) {
-        map.resources("users");
-    })
-.end();
-```
-
-Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`. Custom: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
-
-**Singleton lifecycle contract**: both global and route-scoped middleware (including string-path entries) are resolved once and cached for the application lifetime. The same instance handles every matching request — stateful middleware (e.g. in-memory `RateLimiter` on a `.scope()`) accumulates state across requests as intended. Implication: every middleware component must be safe to share across concurrent requests (use CFML locks for any mutable state).
-
-### Rate Limiting
-
-```cfm
-new wheels.middleware.RateLimiter()                                            // fixed window, 60 req / 60s
-new wheels.middleware.RateLimiter(maxRequests=100, windowSeconds=120, strategy="slidingWindow")
-new wheels.middleware.RateLimiter(maxRequests=50, windowSeconds=60, strategy="tokenBucket")
-new wheels.middleware.RateLimiter(storage="database")                          // auto-creates wheels_rate_limits
-// rate-limit per API key — hoist the closure first: an inline function literal
-// as a constructor named arg crashes Adobe CF (Cross-Engine Invariant 5)
-var apiKeyFn = function(req) {
-    var apiKey = req.cgi.http_x_api_key ?: "";
-    return Len(apiKey) ? apiKey : "anonymous";
-};
-new wheels.middleware.RateLimiter(keyFunction=apiKeyFn)
-```
-
-The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method, cgi}`. The `cgi` member is the sanitized `request.cgi` copy overlaid on every inbound HTTP header under its CGI-style `http_*` name (built by `Dispatch.$buildMiddlewareCgiScope()`), so arbitrary headers like `X-Api-Key` resolve per client ([#3074](https://github.com/wheels-dev/wheels/issues/3074) — before 4.0.4 the context had **no `cgi` key** and `req.cgi.*` silently collapsed every client into one bucket). Keep the `Len()` guard: an empty-valued header reads as empty string, and on pre-fix versions a missing header does too.
-
-Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` or `database`. Emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. Returns `429` with `Retry-After` when exceeded.
-
-`windowSeconds` must be > 0; `maxRequests` must be >= 0. Invalid values throw `Wheels.RateLimiter.InvalidConfiguration` at construction. `maxRequests = 0` is a valid kill-switch.
-
-## DI Container Quick Reference
-
-Register services in `config/services.cfm` (loaded at app start; environment overrides supported):
-
-```cfm
-local.di = injector();
-local.di.map("emailService").to("app.lib.EmailService").asSingleton();
-local.di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
-local.di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
-```
-
-Resolve with `service("emailService")` anywhere, or `inject("emailService, currentUser")` in controller `config()`. Scopes: transient (default), `.asSingleton()`, `.asRequestScoped()`. Auto-wiring: `init()` params matching registered names are auto-resolved when no `initArguments` passed.
-
-## Package System
-
-Optional first-party modules distributed as standalone repos and installed into `vendor/<name>/`. Auto-discovered from `vendor/*/package.json` on startup via `PackageLoader.cfc` with per-package error isolation.
-
-```
-vendor/                # Runtime: framework core + installed packages
-  wheels/              #   Framework core (excluded from package discovery)
-  wheels-sentry/       #   Installed package
-plugins/               # DEPRECATED: legacy plugins still work with warning
-```
-
-First-party packages live in standalone repos under `wheels-dev/`, indexed by `wheels-dev/wheels-packages`:
-- `wheels-sentry` — error tracking
-- `wheels-hotwire` — Turbo/Stimulus
-- `wheels-basecoat` — UI components
-- `wheels-legacy-adapter` — 3.x → 4.x compatibility shims
-- `wheels-i18n` — internationalization
-- `wheels-seo-suite` — SEO tooling
-
-### package.json Manifest
-
-```json
-{
-    "name": "wheels-sentry",
-    "version": "1.0.0",
-    "wheelsVersion": ">=3.0",
-    "mappings": {"plugins.sentry": "."},
-    "provides": {"mixins": "controller", "services": [], "middleware": []},
-    "requires": {}, "replaces": {}, "suggests": {}
-}
-```
-
-- **`mapping`** (singular): CFML-identifier-safe alias registered as a CFML mapping. Defaults to lower-camel-case of `name`. Lets package CFCs use `new wheelsSentry.SentryClient()`.
-- **`mappings`** (plural): struct of dotted aliases beyond the singular. Use for legacy compatibility paths (e.g., `plugins.sentry` keeps old call sites resolving). See [#2705](https://github.com/wheels-dev/wheels/pull/2705).
-- **`provides.mixins`**: comma-delimited from `application,dispatch,controller,mapper,model,base,sqlserver,mysql,postgresql,h2,test`, plus `global` or `none`. Default `none`. View helpers belong in `controller` mixins (views execute in controller's `variables` scope).
-- **`requires` / `replaces` / `suggests`**: package name → semver constraint. Loader uses these, NOT legacy `dependencies`.
-
-### CLI
-
-```bash
-wheels packages list                  # browse registry
-wheels packages search <query>
-wheels packages show <name>
-wheels packages add <name>            # latest compat version (canonical verb)
-wheels packages add <name>@<ver>      # pin
-wheels packages add <name> --force    # overwrite existing
-wheels packages update <name> --yes
-wheels packages update --all --yes
-wheels packages remove <name>
-wheels packages registry info         # registry source + cache age
-wheels packages registry refresh      # bust 24h cache
-```
-
-Override registry with `WHEELS_PACKAGES_REGISTRY=<org>/<repo>` (default `wheels-dev/wheels-packages`). Restart or `wheels reload` after install. Each package loads in its own try/catch — a broken one is logged and skipped.
-
 ## Testing Quick Reference
 
 **All new tests use WheelsTest BDD syntax.** RocketUnit (`test_` prefix, `assert()`) is legacy only.
@@ -675,124 +421,22 @@ Java 21 + Wheels CLI 4.0.0+ required for `tools/test-local.sh`. Docker required 
 
 ### Onboarding harness
 
-`tools/test-onboarding.sh` simulates a brand-new-user fresh-install flow without touching your daily wheels install. Use when fixing CLI/framework/template code that affects `wheels new` → `wheels start` → `wheels migrate latest`. Validates cliff fixes BEFORE asking for a fresh-VM tutorial run. ~90s end-to-end across 7 phases. Deep reference: [.ai/wheels/testing/onboarding-harness.md](.ai/wheels/testing/onboarding-harness.md).
+`tools/test-onboarding.sh` simulates a brand-new-user fresh-install flow without touching your daily wheels install. Use when fixing CLI/framework/template code that affects `wheels new` → `wheels start` → `wheels migrate latest`. Validates cliff fixes BEFORE asking for a fresh-VM tutorial run. ~90s end-to-end across 15 phases. Deep reference: [.ai/wheels/testing/onboarding-harness.md](.ai/wheels/testing/onboarding-harness.md).
 
 ### Browser tests
 
 Specs extend `wheels.wheelstest.BrowserTest`. Install Playwright once: `wheels browser setup` (~370MB). Then `bash tools/test-local.sh` includes them. Deep reference: [.ai/wheels/testing/browser-testing.md](.ai/wheels/testing/browser-testing.md).
 
-## Migrations & Seeding
+## Framework Usage Quick Reference (application developers)
 
-### Shared Dev DB Reconciliation
-
-`wheels_migrator_versions` can drift from on-disk files when several developers share a single dev database (peer applied a migration whose file isn't yet in your branch). Detected and surfaced automatically; reconciliation is explicit:
-
-- `wheels migrate latest` — when a peer's tracked version sits above your latest local file, it now applies pending local migrations with a warning instead of silently no-op'ing on a "down" branch.
-- `wheels migrate info` — orphan rows render as `[?] <version> <name> (applied <timestamp>)` when the enriched `wheels_migrator_versions.name` / `.applied_at` columns are populated, or `[?] <version> ********** NO FILE **********` (Rails-style) for legacy rows.
-- `wheels migrate doctor` — single-command health report. Lists orphans + pending; pure read.
-- `wheels migrate forget <version> --yes` — delete a stale tracking row (refuses if a matching local file exists, refuses if version not in table).
-- `wheels migrate pretend <version> --yes` — record a version as applied without running `up()` (refuses if already applied or no matching file).
-
-Tracking-table schema: `wheels_migrator_versions(version, core_level, name, applied_at)`. The `name` and `applied_at` columns are additive (NULL for legacy rows) and added automatically via `$ensureTrackingColumns()` on first migrator call after upgrade. Both columns are populated by `$setVersionAsMigrated(version, migrationName)` going forward; existing rows stay NULL and display version-only.
-
-Both `forget` and `pretend` are dry-run by default; `--yes` is required to mutate. Helpers live on `Migrator.cfc`: `$getOrphanVersions()`, `$getOrphanVersionsWithMeta()`, `doctor()`, `forgetVersion()`, `pretendVersion()`, `$buildInfoOutput()`, `$ensureTrackingColumns()`. Deep reference: [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md). User-facing guide: `web/sites/guides/src/content/docs/v4-0-0/basics/shared-development-databases.mdx`. Shipped across #2798, #2799, and the schema enrichment PR.
-
-### Auto-Migration
-
-Generate migrations from model/DB schema diffs. Rename detection via explicit hints (authoritative) + heuristic suggestions (normalized-token + Levenshtein).
-
-```cfm
-var am = CreateObject("component", "wheels.migrator.AutoMigrator");
-var d = am.diff("User");
-var d = am.diff("User", {renames: {"full_name": "fullName"}});
-var d = am.diff("User", {heuristicThreshold: 0.85});
-var all = am.diffAll({hints: {"User": {renames: {"full_name": "fullName"}}}, heuristicThreshold: 0.7});
-am.writeMigration(d, "rename_name_field");
-```
-
-_Auto-migration is currently CFC-only (`wheels.migrator.AutoMigrator`, shown above). There is no `wheels dbmigrate diff` CLI command — invoking it errors._
-
-Result struct: `{modelName, tableName, addColumns, removeColumns, changeColumns, renameColumns, suggestedRenames}`. Limits: PK renames not detected; rename + type change requires separate migrations; calculated properties excluded.
-
-### Seeding
-
-Convention-based, idempotent, CLI-supported.
-
-```cfm
-// app/db/seeds.cfm — shared (all environments)
-seedOnce(modelName="Role", uniqueProperties="name", properties={
-    name: "admin", description: "Administrator"
-});
-
-// app/db/seeds/development.cfm — dev-only (runs after seeds.cfm)
-seedOnce(modelName="User", uniqueProperties="email", properties={
-    firstName: "Dev", lastName: "User", email: "dev@example.com"
-});
-```
-
-```bash
-wheels seed                            # auto-detect env (canonical)
-wheels seed --environment=production
-wheels seed --generate                 # legacy: random test data
-```
-
-To scaffold seed templates, use: `wheels generate snippets seed-data` (writes `app/snippets/seeds*.cfm` — copy or move to `app/db/` to activate them). There is no `wheels generate seed` generator.
-
-`seedOnce()`: idempotent — checks `uniqueProperties` via `findOne()`, creates only if not found. Execution: `seeds.cfm` → `seeds/<environment>.cfm`, wrapped in a transaction. Programmatic: `application.wheels.seeder.runSeeds()`. (Note: `wheels db:seed` is NOT a valid command — it errors. Use `wheels seed`.)
-
-## Background Jobs Quick Reference
-
-```cfm
-// app/jobs/SendWelcomeEmailJob.cfc
-component extends="wheels.Job" {
-    function config() {
-        super.config();
-        this.queue = "mailers";
-        this.maxRetries = 5;
-    }
-    public void function perform(struct data = {}) {
-        sendEmail(to=data.email, subject="Welcome!", from="app@example.com");
-    }
-}
-
-// Enqueue
-job = new app.jobs.SendWelcomeEmailJob();
-job.enqueue(data={email: user.email});
-job.enqueueIn(seconds=300, data={email: "..."});
-job.enqueueAt(runAt=scheduledDate, data={});
-
-// Process
-result = (new wheels.Job()).processQueue(queue="mailers", limit=10);
-stats = (new wheels.Job()).queueStats();
-```
-
-Worker CLI (`cli/lucli/Module.cfc::jobs()` — thin wrapper over the `jobsProcessNext`/`jobsStatus` bridge commands in `vendor/wheels/public/views/cli.cfm`; requires a running server):
-```bash
-wheels jobs work --queue=mailers --interval=3   # long-lived worker loop; --max-jobs=N for one-shot batches, --quiet
-wheels jobs status [--queue=mailers] [--format=json]
-```
-The `retry`/`purge`/`monitor` verbs are tracked follow-ups ([#3090](https://github.com/wheels-dev/wheels/issues/3090)) — invoking one errors with the programmatic equivalent (`(new wheels.Job()).retryFailed()` / `.purgeCompleted()`).
-
-Backoff: `this.baseDelay = 2`, `this.maxDelay = 3600` in `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`. The `wheels_jobs` table is auto-created on first enqueue/processing — no migration needed.
-
-## Server-Sent Events (SSE)
-
-```cfm
-function notifications() {
-    var data = model("Notification").findAll(where="userId=#params.userId#");
-    renderSSE(data=SerializeJSON(data), event="notifications", id=params.lastId);
-}
-
-function stream() {
-    var writer = initSSEStream();
-    for (var item in items) sendSSEEvent(writer=writer, data=SerializeJSON(item), event="update");
-    closeSSEStream(writer=writer);
-}
-
-if (isSSERequest()) { renderSSE(data="..."); }
-```
-
-Client: `const es = new EventSource('/controller/notifications');`
+The user-facing quick references — Model, Routing, Pagination helpers,
+Middleware, DI container, Package system + CLI, Migrations & Seeding,
+Background Jobs, SSE, and app testing — live in
+`docs/consumer-ai/CLAUDE.md`, which ships in every distributed artifact
+(ForgeBox core, starter app, `wheels new` scaffolds) and is what AI tools
+inside USER apps auto-load. Keep both files in sync: when a quick
+reference changes here, update the consumer copy (or run
+`tools/build/scripts/ship-consumer-docs.sh --check` in CI).
 
 ## Commit Message Conventions
 
@@ -826,7 +470,8 @@ User-facing `fix`/`feat` PRs add a **fragment file**, never a direct `CHANGELOG.
 {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
 ```
 
-There is no `wheels mcp setup` command — copy the JSON above into `.mcp.json` manually (see the MCP integration guide for OpenCode/Cursor variants).
+Run `wheels setup agents` to write `.mcp.json` and `.opencode.json` in the current project (it merges, preserving any other servers you already list). It is `setup agents`, not `setup mcp`: LuCLI intercepts the literal token `mcp` in **any** argument position
+(`wheels info mcp` is intercepted too), so no argument may be spelled `mcp`. `setup agents` avoids the token entirely — see the MCP integration guide for OpenCode/Cursor variants.
 
 Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (live-verified on the released 4.0.3 CLI): `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (18 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only tools (`main`, `mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`, `jobs`) are hidden via `mcpHiddenTools()`.
 
@@ -852,20 +497,17 @@ Prefer MCP tools when the Wheels MCP server is available. Fall back to CLI other
 
 ## Reference Docs (verified to exist)
 
-Search `.ai/` for deeper documentation:
+Search `.ai/` for deeper documentation. The tree is deliberately small —
+the code is the source of truth, and the CFML-language / generic-pattern
+reference tiers were removed (they drifted and modern models no longer
+need them). What remains is maintainer-only runbook knowledge that is not
+recoverable from reading the code:
 
 - [.ai/wheels/cross-engine-compatibility.md](.ai/wheels/cross-engine-compatibility.md) — Start here for Lucee/Adobe gotchas
 - [.ai/wheels/deploy.md](.ai/wheels/deploy.md) — `wheels deploy` Kamal port (extracted from CLAUDE.md)
 - [.ai/wheels/wheels-bot.md](.ai/wheels/wheels-bot.md) — Bot architecture (extracted from CLAUDE.md)
 - [.ai/wheels/testing/browser-testing.md](.ai/wheels/testing/browser-testing.md) — Browser DSL (extracted from CLAUDE.md)
 - [.ai/wheels/testing/onboarding-harness.md](.ai/wheels/testing/onboarding-harness.md) — Fresh-install simulation
-- [.ai/wheels/controllers/api.md](.ai/wheels/controllers/api.md) — API controller patterns
-- [.ai/wheels/views/query-association-patterns.md](.ai/wheels/views/query-association-patterns.md) — Loop / include patterns
-- [.ai/wheels/security/https-detection.md](.ai/wheels/security/https-detection.md)
-- [.ai/wheels/channels/channels.md](.ai/wheels/channels/channels.md)
-- [.ai/wheels/snippets/model-snippets.md](.ai/wheels/snippets/model-snippets.md), [controller-snippets.md](.ai/wheels/snippets/controller-snippets.md)
-- [.ai/wheels/troubleshooting/common-errors.md](.ai/wheels/troubleshooting/common-errors.md), [form-helper-errors.md](.ai/wheels/troubleshooting/form-helper-errors.md)
 - [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md) — Orphan-version handling + `migrate doctor` / `forget` / `pretend` reconciliation commands (#2780)
-- [.ai/cfml/](.ai/cfml/) — CFML language reference (syntax, components, control flow)
 
 **External:** user-facing guides at `web/sites/guides/src/content/docs/v4-0-0/` (deployment, command-line-tools/mcp-integration, etc.) — these ship to guides.wheels.dev. Use when you need the version Wheels users read.

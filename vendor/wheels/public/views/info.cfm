@@ -220,12 +220,18 @@ if (request.wheels.params.format == "json") {
 	// Get database info
 	try {
 		local.db = $$getAllDatabaseInformation();
+		// Keys mirror the HTML branch below. $$getAllDatabaseInformation()
+		// returns {info, adapterName} — there is no `datasource` key, so the
+		// previous local.db.datasource.* reads threw and this payload always
+		// came back as {"error": "key [DATASOURCE] doesn't exist"}.
 		local.infoData.database = {
-			"datasourceName": local.db.datasource.name,
-			"database": local.db.datasource.database_productname,
-			"version": local.db.datasource.database_version,
-			"driver": local.db.datasource.driver_name,
-			"driverVersion": local.db.datasource.driver_version
+			"datasourceName": get("dataSourceName"),
+			"adapterName": local.db.adapterName,
+			"productName": local.db.info.database_productname,
+			"version": local.db.info.database_version,
+			"driver": local.db.info.driver_name,
+			"driverVersion": local.db.info.driver_version,
+			"jdbcVersion": local.db.info.jdbc_major_version & "." & local.db.info.jdbc_minor_version
 		};
 	} catch (any e) {
 		local.infoData.database = {"error": e.message};

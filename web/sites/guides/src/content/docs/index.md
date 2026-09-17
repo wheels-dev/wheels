@@ -8,7 +8,8 @@ or use the search bar (top right) to find a topic across all versions.
 
 ## Available versions
 
-- **[v4.0 (current release)](/v4-0-0/)** — stable guides for the Wheels 4.0 line
+- **[v4.1 (current release)](/v4-1-0/)** — stable guides for the Wheels 4.1 line
+- [v4.0](/v4-0-0/) — archived guides for the Wheels 4.0 release
 - [v3.0.0](/v3-0-0/) — archived guides for the Wheels 3.0 release
 - [v2.5.0](/v2-5-0/) — frozen snapshot for the 2.5 release
 

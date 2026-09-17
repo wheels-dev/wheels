@@ -157,7 +157,7 @@
 			case "PostgreSQL":
 				return "NUMERIC";
 			case "SQLite":
-				return "REAL";
+				return "NUMERIC";
 			default:
 				return "`adddecimal()` not supported for " & migration.adapter.adapterName();
 		}

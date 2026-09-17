@@ -19,9 +19,7 @@
 # commands Ruby Kamal would? — requires either:
 #   (a) Kamal upstream adding a real `--dry-run` flag, or
 #   (b) a mock SSH layer that captures Kamal's SSHKit emissions.
-# See tools/deploy-dry-run-diff.sh (stub) for the aspirational harness
-# and docs/superpowers/plans/2026-04-21-phase1-retrospective.md for
-# the honest write-up.
+# See tools/deploy-dry-run-diff.sh (stub) for the aspirational harness.
 #
 # Prerequisites:
 #   - Ruby + Kamal 2.x on PATH (tested with 2.8.2).

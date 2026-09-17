@@ -5,7 +5,7 @@ component extends="wheels.WheelsTest" {
 
 			// Regression for #2614: Adobe CF rejects directoryCreate(path, true); routes through File.mkdirs() instead.
 			it("creates deeply nested artifact directories whose parents do not yet exist (regression ##2614)", () => {
-				var nestedRoot = GetTempDirectory() & "wheels-browser-2614-" & CreateUUID() & "/level-a/level-b/level-c";
+				var nestedRoot = $tempPath("wheels-browser-2614-" & CreateUUID() & "/level-a/level-b/level-c");
 				try {
 					var browserTest = new wheels.wheelstest.BrowserTest();
 					browserTest.$ensureArtifactDir(nestedRoot);
@@ -13,8 +13,8 @@ component extends="wheels.WheelsTest" {
 						"expected $ensureArtifactDir to create the nested artifact root"
 					);
 				} finally {
-					var unique = ListFirst(Replace(nestedRoot, GetTempDirectory(), ""), "/");
-					var sweep = GetTempDirectory() & unique;
+					var unique = ListFirst(Replace(nestedRoot, $tempPath(""), ""), "/");
+					var sweep = $tempPath(unique);
 					if (DirectoryExists(sweep)) {
 						DirectoryDelete(sweep, true);
 					}
@@ -22,7 +22,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("is a no-op when the artifact directory already exists", () => {
-				var existingDir = GetTempDirectory() & "wheels-browser-2614-" & CreateUUID();
+				var existingDir = $tempPath("wheels-browser-2614-" & CreateUUID());
 				DirectoryCreate(existingDir);
 				try {
 					var browserTest = new wheels.wheelstest.BrowserTest();

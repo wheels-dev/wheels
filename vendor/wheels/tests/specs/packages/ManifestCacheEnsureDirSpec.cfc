@@ -13,7 +13,7 @@ component extends="wheels.WheelsTest" {
 			// multi-level parent case the BIF createPath flag was
 			// meant to cover.
 			it("creates deeply nested cache directories whose parents do not yet exist", () => {
-				var nestedRoot = GetTempDirectory() & "wheels-cache-2567-" & CreateUUID() & "/level-a/level-b/level-c/";
+				var nestedRoot = $tempPath("wheels-cache-2567-" & CreateUUID() & "/level-a/level-b/level-c/");
 				try {
 					var cache = new wheels.services.packages.ManifestCache(root = nestedRoot);
 					cache.writeIndex(["wheels-sentry"]);
@@ -23,8 +23,8 @@ component extends="wheels.WheelsTest" {
 				} finally {
 					// Walk up to the unique parent we control, so we
 					// remove only this test's tree.
-					var unique = ListFirst(Replace(nestedRoot, GetTempDirectory(), ""), "/");
-					var sweep = GetTempDirectory() & unique;
+					var unique = ListFirst(Replace(nestedRoot, $tempPath(""), ""), "/");
+					var sweep = $tempPath(unique);
 					if (DirectoryExists(sweep)) {
 						DirectoryDelete(sweep, true);
 					}
@@ -32,7 +32,7 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("creates the manifests subdirectory when only the root exists", () => {
-				var root = GetTempDirectory() & "wheels-cache-2567-" & CreateUUID() & "/";
+				var root = $tempPath("wheels-cache-2567-" & CreateUUID() & "/");
 				try {
 					var cache = new wheels.services.packages.ManifestCache(root = root);
 					cache.writeManifest("wheels-sentry", {name: "wheels-sentry", versions: [{version: "1.0.0"}]});

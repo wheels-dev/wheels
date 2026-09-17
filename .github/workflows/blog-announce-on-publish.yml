@@ -1,0 +1,69 @@
+name: Blog — Announce on Publish
+
+# After a publish PR merges to develop (or on manual dispatch), post each
+# newly-published post's `announcement` frontmatter to the GitHub Discussions
+# board. The `discussionUrl` writeback is committed on a
+# docs/bot-blog-announce-<shortsha> branch and opened as a tiny PR against
+# develop — never pushed to develop directly.
+#
+# Why this runs here and not in the publish workflow: the publisher used to
+# announce then push to develop. When the push failed (GH013 required checks),
+# the Discussion already existed but the publish never landed, so the next
+# day's run re-announced and duplicated the thread. Announcing only on
+# push-to-develop means a post is durable before any announcement is made,
+# and the dedupe in web/scripts/blog-announce-discussion.mjs (exact title /
+# blog-URL search before create) is a second line of defence.
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'web/content/blog/posts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: blog-announce-on-publish
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    name: Announce published posts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WHEELS_BOT_APP_ID }}
+          private-key: ${{ secrets.WHEELS_BOT_PRIVATE_KEY }}
+
+      # Full history so the push path can diff event.before..event.after to
+      # identify exactly which posts this push added or modified.
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      # Node for the discussion-announcement helper (web/scripts/...mjs).
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Announce and write back discussion URLs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          chmod +x .github/scripts/blog-announce-on-publish.sh
+          bash .github/scripts/blog-announce-on-publish.sh

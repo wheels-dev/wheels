@@ -38,14 +38,14 @@ component extends="wheels.WheelsTest" {
 				expect(account.valid()).toBeFalse();
 			});
 
-			it("hashes the password into passwordDigest and authenticates round-trip", () => {
+			it("hashes the password into passwordHash and authenticates round-trip", () => {
 				var account = model("{{modelName}}").create({
 					email: "auth-spec-roundtrip@example.com",
 					password: "a-long-password-123",
 					passwordConfirmation: "a-long-password-123"
 				});
 				expect(account.hasErrors()).toBeFalse();
-				expect(Len(account.passwordDigest ?: "")).toBeGT(0);
+				expect(Len(account.passwordHash ?: "")).toBeGT(0);
 				expect(StructKeyExists(account, "password")).toBeFalse();
 				expect(account.authenticate("a-long-password-123")).toBeTrue();
 				expect(account.authenticate("not-the-password-1")).toBeFalse();

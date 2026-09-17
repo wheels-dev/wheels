@@ -10,8 +10,9 @@
  *
  * Fixtures live in /wheels/tests/_assets/packages_lazy_sp:
  * - lazysvc:  lazy + provides.services hint — must join the lifecycle at boot.
- * - lazylate: lazy, no services hint — stays lazy through boot; register()/
- *             boot() must run when getPackage() instantiates it afterwards.
+ * - lazylate: lazy, no services hint, but implements ServiceProviderInterface
+ *             — pulled into register()/boot() at lifecycle time (same as a
+ *             solo unhinted provider).
  */
 component extends="wheels.WheelsTest" {
 
@@ -59,7 +60,7 @@ component extends="wheels.WheelsTest" {
 				expect(pkgs.lazysvc.bootCalled).toBeTrue();
 			});
 
-			it("leaves a lazy provider without a services hint un-instantiated through boot", () => {
+			it("invokes register() and boot() on an unhinted lazy ServiceProvider", () => {
 				var loader = new wheels.PackageLoader(
 					vendorPath = lazyFixturesPath,
 					componentPrefix = lazyFixturesPrefix
@@ -72,9 +73,10 @@ component extends="wheels.WheelsTest" {
 				loader.$invokeServiceProviderRegister(fakeContainer);
 				loader.$invokeServiceProviderBoot({});
 
-				// Unhinted lazy packages keep their laziness.
-				expect(loader.getPackages()).notToHaveKey("lazylate");
-				expect(loader.isPackageLoaded("lazylate")).toBeTrue();
+				var pkgs = loader.getPackages();
+				expect(pkgs).toHaveKey("lazylate");
+				expect(pkgs.lazylate.registerCalled).toBeTrue();
+				expect(pkgs.lazylate.bootCalled).toBeTrue();
 			});
 
 			it("invokes register()/boot() when an unhinted lazy provider is instantiated after boot", () => {

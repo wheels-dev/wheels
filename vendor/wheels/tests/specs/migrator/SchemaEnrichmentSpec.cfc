@@ -41,7 +41,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("adds name and applied_at columns to the tracking table on first call", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				// Force tracking table to be created via migrateTo
 				migrator.migrateTo("001");
 				// First call should add the columns (the migrator may have already
@@ -55,7 +58,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("is idempotent — second call adds nothing", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				migrator.$ensureTrackingColumns();
 				var result = migrator.$ensureTrackingColumns();
@@ -65,7 +71,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("populates the name column for newly applied migrations", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				// The name column should now contain "create_bunyips_table" for version 001
 				var rows = queryExecute(
@@ -82,7 +91,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("populates applied_at for newly applied migrations", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				// applied_at is the column-DEFAULT CURRENT_TIMESTAMP on most
 				// engines; SQLite gets an explicit CFML-side Now() because it
@@ -98,7 +110,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("re-runs ALTER when the tracking table is dropped+recreated (regression)", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				// First run: applies a migration, schema gets enriched,
 				// and both app-scope caches are set.
 				migrator.migrateTo("001");
@@ -131,7 +146,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("populates applied_at across app restarts (regression for round-2 C2)", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				// First "app run": migrate 001, which adds the enriched
 				// columns and caches $migratorDbType + $trackingColumnsEnsured.
 				migrator.migrateTo("001");

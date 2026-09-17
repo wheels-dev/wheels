@@ -88,6 +88,24 @@
 		local.argumentCollection = arguments;
 		if (local.method EQ 'init') {
 			local.rv = application.wheelsdi.getInstance(name = "#local.component#", initArguments = local.argumentCollection);
+		} else if (local.method EQ '$initModelObject' && !application.wheelsdi.hasExplicitMapping("#local.component#")) {
+			// Model-instance fast path (#3213): direct CreateObject + structured
+			// call skips the DI resolve/auto-wire and the reflective Invoke on
+			// the hottest path in the framework (every new() and finder row).
+			// onDIcomplete still runs so plugin/package mixins keep applying;
+			// models explicitly mapped in the container take the legacy path.
+			local.instance = CreateObject("component", local.component);
+			local.rv = local.instance.$initModelObject(
+				name = local.argumentCollection.name,
+				properties = local.argumentCollection.properties,
+				persisted = local.argumentCollection.persisted,
+				row = local.argumentCollection.row ?: 1,
+				base = local.argumentCollection.base ?: true,
+				useFilterLists = local.argumentCollection.useFilterLists ?: true
+			);
+			if (StructKeyExists(local.instance, "onDIcomplete")) {
+				local.instance.onDIcomplete();
+			}
 		} else {
 			local.instance = application.wheelsdi.getInstance(name = "#local.component#");
 			local.rv = Invoke(local.instance, local.method, local.argumentCollection);
@@ -126,6 +144,16 @@
 		if (!StructKeyExists(application, "wheels")) {
 			return $buildComponentIntegrationPlan(arguments.path);
 		}
+		// Request-scoped cache: the plan is stable within a request (the only
+		// invalidation — the rebuild-on-poison validation below — replaces both
+		// copies), and the application scope is synchronized on access. Serving
+		// the plan from the request scope turns ~6 application-scope reads per
+		// materialized object into one request-scope read (issue #3213): on
+		// Lucee 7 that cut the plan lookup from ~61µs to ~1µs per model
+		// instantiation in the benchmark rig.
+		if (StructKeyExists(request, "wheelsIntegrationPlans") && StructKeyExists(request.wheelsIntegrationPlans, arguments.path)) {
+			return request.wheelsIntegrationPlans[arguments.path];
+		}
 		if (!StructKeyExists(application.wheels, "integrationPlans")) {
 			lock name="wheels.integrationPlans.#application.applicationName#" type="exclusive" timeout="10" {
 				if (!StructKeyExists(application.wheels, "integrationPlans")) {
@@ -139,7 +167,73 @@
 				application.wheels.integrationPlans[arguments.path] = local.plan;
 			}
 		}
-		return application.wheels.integrationPlans[arguments.path];
+		local.plan = application.wheels.integrationPlans[arguments.path];
+
+		// Once per request (per path), validate the cached plan. On Lucee 7 a
+		// cached function reference can come back as Java null (#3457) — e.g.
+		// when the plan was first built while the engine was still compiling
+		// the mixin component. A null ref is then written into every
+		// materialized instance's variables/this scope, and Lucee throws a
+		// bare NullPointerException when it later enumerates the component.
+		// Rebuild the plan in place when that happens.
+		//
+		// The flag lives in a request-scope struct rather than a dotted
+		// request-scope key: RustCFML resolves dots in request-scope keys as
+		// paths (nested writes, missed deletes), so a flat dotted key never
+		// round-trips there.
+		if (!StructKeyExists(request, "wheelsIntegrationPlanChecks")) {
+			request.wheelsIntegrationPlanChecks = {};
+		}
+		local.planKey = LCase(arguments.path);
+		if (!StructKeyExists(request.wheelsIntegrationPlanChecks, local.planKey)) {
+			request.wheelsIntegrationPlanChecks[local.planKey] = true;
+			if ($integrationPlanHasNullRefs(local.plan)) {
+				local.plan = $buildComponentIntegrationPlan(arguments.path);
+				lock name="wheels.integrationPlans.#application.applicationName#" type="exclusive" timeout="10" {
+					application.wheels.integrationPlans[arguments.path] = local.plan;
+				}
+				$warnNullIntegrationPlanRefs(arguments.path);
+			}
+		}
+		if (!StructKeyExists(request, "wheelsIntegrationPlans")) {
+			request.wheelsIntegrationPlans = {};
+		}
+		request.wheelsIntegrationPlans[arguments.path] = local.plan;
+		return local.plan;
+	}
+
+	/**
+	 * Internal. Whether any entry in an integration plan carries a null (or
+	 * missing) function reference — a plan in that state would write null
+	 * members into every materialized instance (#3457).
+	 */
+	public boolean function $integrationPlanHasNullRefs(required array plan) {
+		for (local.comp in arguments.plan) {
+			for (local.pm in local.comp.publicMethods) {
+				if (!StructKeyExists(local.pm, "ref") || IsNull(local.pm.ref)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Internal. One-time warning when a cached integration plan had to be
+	 * rebuilt because it contained null function references (#3457).
+	 */
+	public void function $warnNullIntegrationPlanRefs(required string path) {
+		try {
+			if (StructKeyExists(getFunctionList(), "writeLog")) {
+				writeLog(
+					file = "wheels",
+					type = "warning",
+					text = "Wheels rebuilt a cached component integration plan for '#arguments.path#' because it contained null function references (see issue ##3457). If this repeats on every request, the engine's class cache may be stale — restart the server."
+				);
+			}
+		} catch (any e) {
+			// Logging must never fail the request.
+		}
 	}
 
 
@@ -169,10 +263,19 @@
 			local.fEnd = ArrayLen(local.fns);
 			for (local.f = 1; local.f <= local.fEnd; local.f++) {
 				if (local.fns[local.f].access == "public") {
-					ArrayAppend(local.publicMethods, {
-						name = local.fns[local.f].name,
-						ref = local.instance[local.fns[local.f].name]
-					});
+					local.ref = local.instance[local.fns[local.f].name];
+					// Guard against engines returning a null function reference
+					// while the mixin component is still compiling (#3457) —
+					// caching a null ref would write a null member into every
+					// materialized instance.
+					if (!IsNull(local.ref)) {
+						ArrayAppend(local.publicMethods, {
+							name = local.fns[local.f].name,
+							ref = local.ref
+						});
+					} else {
+						$warnNullIntegrationPlanRefs("#arguments.path#.#local.componentName# (build)");
+					}
 				}
 			}
 			ArrayAppend(local.rv, {
@@ -243,13 +346,21 @@
 		// break up the full path string in the path name only and the file name only
 		local.path = GetDirectoryFromPath(arguments.absolutePath);
 		local.file = Replace(arguments.absolutePath, local.path, "");
-		// get all existing files in the directory and place them in a list in application scope
-		local.pathHash = Hash(local.path);
-		if (!StructKeyExists(application[local.appKey].directoryFiles, local.pathHash)) {
+		// Skip the directoryFiles memo when cacheFileChecking is off so a
+		// new file on disk is visible on the next check.
+		local.cacheChecks = StructKeyExists(application[local.appKey], "cacheFileChecking")
+		&& application[local.appKey].cacheFileChecking;
+		if (local.cacheChecks) {
+			local.pathHash = Hash(local.path);
+			if (!StructKeyExists(application[local.appKey].directoryFiles, local.pathHash)) {
+				local.dirInfo = $directory(directory = local.path);
+				application[local.appKey].directoryFiles[local.pathHash] = ValueList(local.dirInfo.name);
+			}
+			local.fileList = application[local.appKey].directoryFiles[local.pathHash];
+		} else {
 			local.dirInfo = $directory(directory = local.path);
-			application[local.appKey].directoryFiles[local.pathHash] = ValueList(local.dirInfo.name);
+			local.fileList = ValueList(local.dirInfo.name);
 		}
-		local.fileList = application[local.appKey].directoryFiles[local.pathHash];
 		// loop through the file list and return the file name if exists regardless of case (the == operator is case insensitive)
 		local.fileArray = ListToArray(local.fileList);
 		local.iEnd = ArrayLen(local.fileArray);

@@ -4,25 +4,27 @@
 
     `wheels test` runs against the `<appname>_test` datasource (a
     separate SQLite file from your dev DB) so chapter-6-style manual
-    signups in development don't bleed into chapter-7 specs. The first
-    time the test DB is empty (no migrator-versions table), the
-    framework includes this file from app-runner.cfm to apply your
-    migrations.
+    signups in development don't bleed into chapter-7 specs. The framework
+    includes this file from app-runner.cfm before every test run to apply
+    your pending migrations (migrateToLatest() is a no-op when already
+    current).
 
     Customise this file when you need test-specific seed data — model
     fixtures, baseline users, anything that should exist before EVERY
     test run. Keep it minimal; most specs should set up their own state
-    via beforeEach/it blocks rather than relying on global fixtures.
+    via beforeEach/it blocks rather than relying on global fixtures. Any
+    seed data you add here runs on every test run, so it must be
+    idempotent.
 
     The framework only includes this file when:
     - the request was made with ?useTestDB=true (set automatically by
       `wheels test`; opt out with --no-test-db)
     - a `<dataSourceName>_test` datasource is registered (created
       automatically by `wheels new` when you accept the SQLite default)
-    - the test DB has no migrator-versions table
 
-    On second and subsequent runs the test DB schema persists, so this
-    file is skipped. Delete `db/test.sqlite` to force a fresh schema.
+    To force a fresh schema, stop the server first (`wheels stop`) and then
+    delete `db/test.sqlite` — deleting it while the server is running causes
+    SQLITE_READONLY_DBMOVED on every query.
 --->
 <cfscript>
     // Run all pending migrations against the active datasource —
@@ -35,10 +37,9 @@
         // UDFs), so surface it loudly through app-runner's populate-500 path.
         local.migrateResult = application.wheels.migrator.migrateToLatest();
         if (FindNoCase("Error migrating", local.migrateResult ?: "")) {
-            // Drop the versions table so the NEXT run re-enters populate and
-            // fails loudly again (app-runner only includes populate.cfm when the
-            // table is absent) — otherwise one failure leaves a silently
-            // half-migrated schema. Fix the migration, then just re-run.
+            // Drop the versions table so the NEXT run re-attempts the failing
+            // migration and fails loudly again — otherwise one failure leaves a
+            // silently half-migrated schema. Fix the migration, then just re-run.
             // Note: `DROP TABLE IF EXISTS` is unsupported on Oracle < 23c, so
             // the self-healing re-entry loop only latches for one run there;
             // the loud-failure Throw below still fires on the first failure.

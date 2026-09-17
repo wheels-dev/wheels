@@ -69,6 +69,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			case "rowid":
 				local.rv = "cf_sql_varchar";
 				break;
+			default:
+				$throwUnknownColumnType(arguments.type);
+				break;
 		}
 		return local.rv;
 	}
@@ -160,7 +163,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				local.seq = local.q.sequence_name;
 			}
 		} catch (any e) {
-			// Catalog view absent (pre-12c) — fall through to the legacy lookup.
+			// Catalog view absent (pre-12c) — leave seq empty so $lastIdLookup throws.
 			// Deliberately no local assignments in here (BoxLang catch-scope invariant).
 		}
 		if (Len(local.seq) && !REFind("^[A-Za-z][A-Za-z0-9_$##]*$", local.seq)) {
@@ -201,9 +204,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			// Standard extended ROWID: 18 base-64 chars. The value originates from
 			// the JDBC driver — not user input — but $query has no parameter
 			// binding, so gate strictly before interpolating; UROWIDs and anything
-			// unexpected fall through to the fallbacks below. This exact-row
+			// unexpected fall through to CURRVAL, then throw. This exact-row
 			// lookup targets OUR insert, so it is race-free under concurrent
-			// inserts (unlike MAX(ROWID)).
+			// inserts.
 			if (REFind("^[A-Za-z0-9/+]{18}$", local.generated) == 1) {
 				local.query = $query(
 					sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# WHERE ROWID = CHARTOROWID('#local.generated#')",
@@ -216,8 +219,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		}
 
 		// No usable driver key (e.g. current BoxLang): read CURRVAL on the identity
-		// column's backing sequence. CURRVAL is session-scoped, so unlike MAX(ROWID)
-		// it cannot return another session's key under concurrent inserts.
+		// column's backing sequence. CURRVAL is session-scoped and cannot return
+		// another session's key under concurrent inserts.
 		local.seq = $identitySequenceName(
 			tableName = local.tbl,
 			columnName = ListFirst(arguments.primaryKey),
@@ -233,15 +236,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			}
 		}
 
-		// Legacy heuristic, kept only for pre-12c schemas with no discoverable
-		// identity sequence. ROWID is physical location, not insertion order, so
-		// MAX(ROWID) races under concurrent inserts and can return another
-		// session's row.
-		local.query = $query(
-			sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# WHERE ROWID = (SELECT MAX(ROWID) FROM #local.tbl#)",
-			argumentCollection = arguments.queryAttributes
-		);
-		return local.query.lastId;
+		$throwIdentityNotFound();
 	}
 
 	/**

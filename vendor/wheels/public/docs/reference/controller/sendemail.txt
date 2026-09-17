@@ -28,3 +28,16 @@ sendEmail(
 	file="invoice_2024.pdf",
 	deliver=false
 );
+
+// 4. Write the rendered body to a file without sending.
+// writeToFile dumps the text/HTML body only — it is not a MIME .eml.
+// Open the file in a text editor (or a browser for HTML). A .eml
+// extension will show raw HTML tags in Outlook.
+sendEmail(
+	from="dev@example.com",
+	to="dev@example.com",
+	subject="Preview",
+	template="welcomeEmail",
+	deliver=false,
+	writeToFile=ExpandPath("./tmp/welcome-preview.html")
+);

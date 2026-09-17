@@ -6,6 +6,14 @@
     // wheels.controller.flash::$inTestHarness().
     request.$wheelsTestRun = true;
 
+    // Coverage mode (tools/code-quality/cfml-coverage.py): reset the
+    // function-level counter map so the end-of-request dump reflects only
+    // THIS run. Mirrors the app runner (app-runner.cfm) so `wheels coverage`
+    // style workflows can target the core suite as well.
+    if (StructKeyExists(url, "coverage") && url.coverage) {
+        server.__wheels_cov = {};
+    }
+
     // Pre-size the response buffer so the servlet response stays uncommitted
     // through the entire test suite. Adobe CF's 8KB default flushes early
     // under heavy test output, and once committed the end-of-suite status
@@ -361,6 +369,15 @@
             if (local.runnerOwnsSwap && StructKeyExists(application, "$$$wheels")) {
                 application.wheels = application.$$$wheels;
                 structDelete(application, "$$$wheels");
+            }
+            // Coverage mode: dump the function-level counter map to an
+            // absolute path the coverage tooling reads. Best-effort — a
+            // failed dump must never break the test response.
+            if (StructKeyExists(url, "coverage") && url.coverage) {
+                try {
+                    FileWrite("/tmp/wheels-core-coverage.json", SerializeJSON(server.__wheels_cov));
+                } catch (any e) {
+                }
             }
         }
     }

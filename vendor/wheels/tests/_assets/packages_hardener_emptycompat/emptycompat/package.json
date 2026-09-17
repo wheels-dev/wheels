@@ -1,0 +1,9 @@
+{
+	"name": "wheels-emptycompat",
+	"version": "1.0.0",
+	"description": "Hardener B2 fixture: empty wheelsVersion string must fail closed",
+	"wheelsVersion": "",
+	"provides": {
+		"mixins": "none"
+	}
+}

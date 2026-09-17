@@ -16,7 +16,7 @@ component extends="[extends]" hint="[description]" {
 		var state = {};
 		transaction {
 			try {
-				updateRecord(table = 'tableName', where = '');
+				updateRecord(table = 'tableName', where = 'id = 1');
 			} catch (any e) {
 				state.exception = e;
 			}
@@ -34,7 +34,7 @@ component extends="[extends]" hint="[description]" {
 		var state = {};
 		transaction {
 			try {
-				updateRecord(table = 'tableName', where = '');
+				updateRecord(table = 'tableName', where = 'id = 1');
 			} catch (any e) {
 				state.exception = e;
 			}

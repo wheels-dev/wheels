@@ -150,6 +150,18 @@ component extends="Controller" {
 
 For an entire JSON API under `/api`, inherit from a controller that calls `protectsFromForgery(with="ignore")` instead of the default exception-throwing base.
 
+## Mass assignment
+
+`params.user` flows straight into `new()` and `update()` on a scaffolded form, which means a request that adds an `isAdmin=1` field can set columns you didn't intend. The default is open for backward compatibility; opt in to fail-closed with:
+
+```cfm {test:compile} title="config/settings.cfm"
+<cfscript>
+set(massAssignmentStrict=true);
+</cfscript>
+```
+
+With it on, any model that defines neither `accessibleProperties()` nor `protectedProperties()` fails closed on mass assignment instead of accepting every posted property. Define one of those two lists per model to state the intended surface explicitly — see [Models and the ORM](/v4-0-0/basics/models-and-the-orm/) for the property-list API.
+
 ## Reload password
 
 `reloadPassword` gates `?reload=true` and environment switches via URL (`?reload=production`). If it's empty, **both are disabled**: the reload gate in `public/Application.cfc` fails closed and requires a non-empty configured password plus a matching `password` parameter before it will restart anything, mirroring the environment-switch leg in `vendor/wheels/events/onapplicationstart.cfc`. The security warning Wheels logs on boot when the password is blank states exactly that. (Before [#3062](https://github.com/wheels-dev/wheels/issues/3062) a blank password left plain `?reload=true` open to any anonymous client — an internet-reachable restart-DoS — so still set a real password anywhere reload should work.)
@@ -211,11 +223,12 @@ Wheels does **not** trust `X-Forwarded-*` headers by default. They are ordinary 
 
 ### `trustProxyHeaders` — framework-wide header trust
 
-`set(trustProxyHeaders=true)` (default `false`) governs the framework's own use of forwarded headers across three surfaces:
+`set(trustProxyHeaders=true)` (default `false`) governs the framework's own use of forwarded and rewrite headers:
 
 - **`isSecure()`.** With trust off, only the engine's `server_port_secure` flag counts — a client-supplied `X-Forwarded-Proto: https` is ignored, so a direct-HTTP client can't spoof secure-cookie, CSRF, or HTTPS-redirect decisions. With trust on, `X-Forwarded-Proto: https` from your TLS-terminating proxy makes `isSecure()` return `true`.
 - **Maintenance-mode IP exceptions.** `set(ipExceptions="...")` is matched against the socket address by default, or against the rightmost `X-Forwarded-For` hop when trust is on. The exception list comes from config only — the legacy `?except=` URL parameter has been removed (it let any anonymous client rewrite the exception list for everyone).
 - **Reload rate-limit keying.** Failed `?reload=` password attempts are counted per trusted client IP, so with trust on, clients behind a shared proxy no longer share one lockout bucket.
+- **IIS rewrite path recovery.** When `cgi.path_info` is blank, `$cgiScope()` reads `X-Rewrite-URL` / `X-Original-URL` only if trust is on. Those are ordinary request headers; any client can send them. With trust off, recovery falls through to `request_uri` / `redirect_url`.
 
 ```cfm {test:compile} title="config/production/settings.cfm — app behind a TLS-terminating reverse proxy"
 <cfscript>

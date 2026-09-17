@@ -7,7 +7,13 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['boolean'] = { name = 'INTEGER' }; // SQLite has no real BOOLEAN type
 	variables.sqlTypes['date'] = { name = 'TEXT' };
 	variables.sqlTypes['datetime'] = { name = 'TEXT' };
-	variables.sqlTypes['decimal'] = { name = 'REAL' };
+	// NUMERIC keeps the declared type distinct from REAL so the model layer binds
+	// decimal values via cf_sql_decimal (BigDecimal) instead of cf_sql_float.
+	// REAL is SQLite's 8-byte floating point storage: Lucee binds it as a 32-bit
+	// float and 149.99 round-trips as 149.990005493164. NUMERIC affinity still
+	// stores non-integer values as a double internally, but the JDBC driver reads
+	// it back as an exact BigDecimal, so `price:decimal` round-trips 149.99.
+	variables.sqlTypes['decimal'] = { name = 'NUMERIC' };
 	variables.sqlTypes['float'] = { name = 'REAL' };
 	variables.sqlTypes['integer'] = { name = 'INTEGER' };
 	variables.sqlTypes['string'] = { name = 'TEXT', limit = 255 };
@@ -29,9 +35,9 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * SQLite supports inline foreign key definitions
 	 */
 	public string function addForeignKeyOptions(required string sql, struct options = {}) {
-		arguments.sql &= " REFERENCES " & arguments.options.referenceTable;
+		arguments.sql &= " REFERENCES " & quoteTableName(arguments.options.referenceTable);
 		if (StructKeyExists(arguments.options, "referenceColumn")) {
-			arguments.sql &= " (" & arguments.options.referenceColumn & ")";
+			arguments.sql &= " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
 		}
 		// Add ON DELETE / ON UPDATE if provided
 		if (StructKeyExists(arguments.options, "onDelete")) {

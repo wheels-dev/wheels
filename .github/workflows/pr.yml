@@ -196,3 +196,28 @@ jobs:
             kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
           fi
           lucli server stop 2>/dev/null || true
+
+  tutorial-e2e:
+    name: "Tutorial E2E (new → scaffold → migrate → routes → .json → test)"
+    if: github.event.action != 'edited'
+    runs-on: ubuntu-latest
+    env:
+      LUCLI_VERSION: "0.6.1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install LuCLI
+        run: |
+          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
+            -o /usr/local/bin/lucli
+          chmod +x /usr/local/bin/lucli
+          lucli --version
+
+      - name: Run tutorial e2e
+        run: bash tools/test-tutorial-e2e.sh

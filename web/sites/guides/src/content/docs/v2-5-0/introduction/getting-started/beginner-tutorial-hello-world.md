@@ -31,12 +31,10 @@ controller and plug it into the CFWheels framework.
 First, create a file called `Say.cfc` in the `controllers` directory and add the\
 code below to the file.
 
-{% code title="controllers/Say.cfc" %}
-```javascript
+```javascript title="controllers/Say.cfc"
 component extends="Controller"{
 }
 ```
-{% endcode %}
 
 Congratulations, you just created your first CFWheels controller! What does this\
 controller do, you might ask? Well, to be honest, not much. It has no methods\
@@ -66,14 +64,12 @@ But let's jump ahead. Now that we have the controller created, let's add an\
 action to it called `hello`. Change your `say` controller so it looks like the\
 code block below:
 
-{% code title="controllers/Say.cfc" %}
-```javascript
+```javascript title="controllers/Say.cfc"
 component extends="Controller" {
     function hello() {
     }
 }
 ```
-{% endcode %}
 
 As you can see, we created an empty method named `hello`.
 
@@ -107,11 +103,9 @@ controller that we created above.
 Now inside the `say` directory, create a file called `hello.cfm`. In the\
 `hello.cfm` file, add the following line of code:
 
-{% code title="views/say/hello.cfm" %}
-```html
+```html title="views/say/hello.cfm"
 <h1>Hello World!</h>
 ```
-{% endcode %}
 
 Save your `hello.cfm` file, and let's call our `say/hello` action once again.\
 You have your first working CFWheels page if your browser looks like _Figure 3_\
@@ -136,15 +130,13 @@ The first thing we are going to do is to add some dynamic content to our\
 `say/hello` action. Modify your `say` controller so it looks like the code block\
 below:
 
-{% code title="controllers/Say.cfc" %}
-```javascript
+```javascript title="controllers/Say.cfc"
 component extends="Controller" {
     function hello() {
         time = Now();
     }
 }
 ```
-{% endcode %}
 
 All we are doing here is creating a variable called `time` and setting its value\
 to the current server time using the basic ColdFusion `Now()` function. When we\
@@ -161,12 +153,10 @@ is supposed to coordinate all of the data and business logic, not the view.
 Next, we will modify our `say/hello.cfm` view file so that it looks like the\
 code block bellow. When we do this, the value will be displayed in the browser.
 
-{% code title="views/say/hello.cfm" %}
-```html
+```html title="views/say/hello.cfm"
 <h1>Hello World!</h1>
 <p>Current time: <cfoutput>#time#</cfoutput></p>
 ```
-{% endcode %}
 
 call your `say/hello` action again in your browser. Your browser should look\
 like _Figure 4_ below.
@@ -189,8 +179,7 @@ not feeling that adventurous, we'll quickly go step by step.
 First, modify the the `say` controller file so that it looks like the code block\
 below.
 
-{% code title="controllers/Say.cfc" %}
-```javascript
+```javascript title="controllers/Say.cfc"
 component extends="Controller" {
     function hello() {
         time = Now();
@@ -200,17 +189,14 @@ component extends="Controller" {
     }
 }
 ```
-{% endcode %}
 
 Now go to the `views/say` directory and create a `goodbye.cfm` page.
 
 Add the following code to the `goodbye.cfm` page and save it.
 
-{% code title="views/say/goodbye.cfm" %}
-```
+```txt title="views/say/goodbye.cfm"
 Goodbye World!
 ```
-{% endcode %}
 
 If we did everything right, we should be able to call the new `say/goodbye`\
 action using the following URL:
@@ -232,13 +218,11 @@ Open the `say/hello.cfm` view file. We are going to add a line of code to the\
 end of this file so our `say/hello.cfm` view file looks like the code block\
 below:
 
-{% code title="views/say/hello.cfm" %}
-```html
+```html title="views/say/hello.cfm"
 <h1>Hello World!</h1>
 <p>Current time: <cfoutput>#time#</cfoutput></p>
 <p>Time to say <cfoutput>#linkTo(text="goodbye", action="goodbye")#?</cfoutput></p>
 ```
-{% endcode %}
 
 The [linkTo()](https://wheels.dev/api/v2.5.0/controller.linkto.html) function is a built-in CFWheels function. In this case, we are passing 2 named parameters to it. The first parameter, `text`, is the text\
 that will be displayed in the hyperlink. The second parameter, `action`, defines the action to point the link to. By using this built-in function, your application's main URL may change, and even controllers and actions may get shifted around, but you won't suffer from the dreaded dead link. CFWheels will\
@@ -263,12 +247,10 @@ block below.
 
 CFML: views/say/goodbye.cfm
 
-{% code title="views/say/goodbye.cfm" %}
-```html
+```html title="views/say/goodbye.cfm"
 <h1>Goodbye World!</h1>
 <p>Time to say <cfoutput>#linkTo(text="hello", action="hello")#?</cfoutput></p>
 ```
-{% endcode %}
 
 If you now call the `say/goodbye` action in your browser, your browser should\
 look like _Figure 7_ below.

@@ -34,8 +34,10 @@ RUN if [ -f package.json ] && node -e "process.exit(require('./package.json').sc
     fi
 
 # --- Stage 2: runtime ---------------------------------------------------------
-# Lucee 7 on Java 21. The lucee/lucee image ships a ready webroot at /var/www.
-FROM lucee/lucee:7-tomcat10-jre21
+# Lucee 7.1 (stable). The lucee/lucee image serves /var/www as its webroot,
+# listens on 8888, and ships no URL-rewrite filter; all three are corrected
+# below (a Tomcat RewriteValve handles clean URLs so /up works).
+FROM lucee/lucee:7.1.0.204
 
 LABEL org.opencontainers.image.title="{{service_name}}"
 
@@ -52,6 +54,20 @@ ENV WHEELS_ENV=production \
 
 WORKDIR /var/www
 
+# Point Tomcat's ROOT context at Wheels' public/ webroot, add a URL-rewrite
+# valve, and make the HTTP connector follow $PORT (default 8888) so PaaS
+# platforms and kamal-proxy can both route to it.
+RUN sed -i 's#<Context path="" docBase="/var/www/">#<Context path="" docBase="/var/www/public">\n  <Valve className="org.apache.catalina.valves.rewrite.RewriteValve" />#' /usr/local/tomcat/conf/server.xml \
+    && sed -i 's#port="8888"#port="${http.port}"#' /usr/local/tomcat/conf/server.xml \
+    && printf 'export CATALINA_OPTS="$CATALINA_OPTS -Dhttp.port=${PORT:-8888}"\n' > /usr/local/tomcat/bin/setenv.sh \
+    && mkdir -p /var/www/public/WEB-INF \
+    && printf '%s\n' \
+        'RewriteRule ^/?$ - [L]' \
+        'RewriteRule ^/index\.cfm($|/) - [L]' \
+        'RewriteRule ^/(cf_script|flex2gateway|jrunscripts|CFIDE|lucee|cfformgateway|cffileservlet|files|images|javascripts|miscellaneous|stylesheets|assets|wheels|uploads|robots\.txt|favicon\.ico|sitemap\.xml)(/.*)?$ - [L]' \
+        'RewriteRule ^/(.*)$ /index.cfm/$1 [L]' \
+        > /var/www/public/WEB-INF/rewrite.config
+
 # Install curl for the HEALTHCHECK probe.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
@@ -65,9 +81,7 @@ COPY --from=builder /build/config         ./config
 COPY --from=builder /build/public         ./public
 COPY --from=builder /build/vendor         ./vendor
 
-# Tomcat listens on 8080 in the lucee/lucee image — matches the default
-# proxy.app_port in config/deploy.yml.
-EXPOSE 8080
+EXPOSE 8888
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8080/up || exit 1
+    CMD curl -fsS "http://127.0.0.1:${PORT:-8888}/up" || exit 1

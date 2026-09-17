@@ -4,9 +4,11 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { API_VERSIONS } from '@wheels-dev/ui/data/versions';
+import { rehypeBasePrefix } from '@wheels-dev/ui/markdown/rehype-base-prefix.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const contentRoot = resolve(__dirname, 'src/content/docs');
+
 
 // Snapshot content is generated in CI from the running Wheels server and is
 // NOT committed. Filter it out of the sidebar when the directory doesn't
@@ -21,6 +23,16 @@ const versions = API_VERSIONS.filter(
 
 export default defineConfig({
 	site: 'https://api.wheels.dev',
+	// See the guides config: the local docs bundle is served from /wheels/api/,
+	// and Astro's absolute asset URLs need the prefix baked in at build time.
+	...(process.env.WHEELS_DOCS_BASE ? { base: process.env.WHEELS_DOCS_BASE } : {}),
+	// See the guides config: content links authored as `/v4-0-0/...` are not
+	// rewritten by Astro's `base`, so the local bundle prefixes them here.
+	markdown: {
+		rehypePlugins: [
+			[rehypeBasePrefix, { base: process.env.WHEELS_DOCS_BASE || '' }],
+		],
+	},
 	integrations: [
 		starlight({
 			title: 'Wheels API Reference',

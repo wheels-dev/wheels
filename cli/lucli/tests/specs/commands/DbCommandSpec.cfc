@@ -11,6 +11,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// Create vendor/wheels stub
 		directoryCreate(tempRoot & "/vendor/wheels", true, true);
 
+		// Pin the project port to a closed port so the server-dependent db
+		// subcommands deterministically throw Wheels.ServerNotRunning in
+		// every environment (a local dev server on 8080 would otherwise
+		// answer the common-port fallback and flip these assertions).
+		fileWrite(tempRoot & "/.env", "PORT=1" & chr(10));
+
 		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 	}
 
@@ -35,39 +41,45 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("accepts status subcommand", () => {
 				mod.__arguments = ["status"];
-				// Will fail gracefully since no server, but should not throw
-				mod.db();
-				expect(true).toBeTrue();
+				// Dispatch is proven by the server-dependent error: the
+				// subcommand was accepted and routed (no server in CI).
+				expect(() => mod.db()).toThrow(type = "Wheels.ServerNotRunning");
 			});
 
 			it("accepts version subcommand", () => {
 				mod.__arguments = ["version"];
-				mod.db();
-				expect(true).toBeTrue();
+				expect(() => mod.db()).toThrow(type = "Wheels.ServerNotRunning");
 			});
 
 			it("accepts reset subcommand", () => {
 				mod.__arguments = ["reset"];
-				mod.db();
-				expect(true).toBeTrue();
+				// reset short-circuits before the server gate in some
+				// environments — tolerate either the graceful run or the
+				// server-not-running error, but nothing else.
+				try {
+					mod.db();
+				} catch (any e) {
+					expect(e.type).toBe("Wheels.ServerNotRunning");
+				}
 			});
 
 			it("status accepts --pending flag", () => {
 				mod.__arguments = ["status", "--pending"];
-				mod.db();
-				expect(true).toBeTrue();
+				expect(() => mod.db()).toThrow(type = "Wheels.ServerNotRunning");
 			});
 
 			it("version accepts --detailed flag", () => {
 				mod.__arguments = ["version", "--detailed"];
-				mod.db();
-				expect(true).toBeTrue();
+				expect(() => mod.db()).toThrow(type = "Wheels.ServerNotRunning");
 			});
 
 			it("reset accepts --skip-seed flag", () => {
 				mod.__arguments = ["reset", "--skip-seed"];
-				mod.db();
-				expect(true).toBeTrue();
+				try {
+					mod.db();
+				} catch (any e) {
+					expect(e.type).toBe("Wheels.ServerNotRunning");
+				}
 			});
 
 		});

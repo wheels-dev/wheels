@@ -16,5 +16,5 @@ validatesUniquenessOf(property="slug", when="onCreate");
 // 6. Run the check only when a condition is true
 validatesUniquenessOf(property="referralCode", condition="this.isAffiliate()");
 
-// 7. Exclude soft-deleted records from the uniqueness check so a previously-deleted value can be reused
-validatesUniquenessOf(property="username", includeSoftDeletes=false);
+// 7. Include soft-deleted records in the uniqueness check so a previously-deleted value stays reserved
+validatesUniquenessOf(property="username", includeSoftDeletes=true);

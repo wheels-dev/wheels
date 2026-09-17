@@ -1,11 +1,53 @@
 #wheels-debugbar *{box-sizing:border-box;margin:0;padding:0;}
-#wheels-debugbar{position:fixed;bottom:0;left:0;right:0;z-index:99999;font-size:13px;line-height:1.4;}
-#wheels-debugbar .wdb-bar{display:flex;align-items:center;background:#1e1e2e;color:#cdd6f4;height:36px;padding:0 8px;gap:2px;border-top:1px solid #45475a;user-select:none;}
+/* `width:100%`, deliberately, for two separate reasons:
+   1. NOT 100vw — that includes the vertical scrollbar, so on a browser with
+      classic scrollbars it is wider than the content area and can force an
+      unwanted horizontal scrollbar. Under overlay scrollbars (the Safari and
+      Chrome default) the two are indistinguishable; the few px at the right
+      edge under a classic scrollbar are that scrollbar's own space.
+   2. NOT `width:auto` with `left:0;right:0` — the collapse animation must
+      interpolate an explicit width against the collapsed `width:40px`, and CSS
+      cannot transition to or from `auto`, so the slide silently stops
+      animating (pinned by DebugBarCollapseSpec).
+   The `!important` is required to beat the root's inline `all:initial`. */
+/* NOTE: the root element carries an inline `all:initial`, which resets every
+   property and — being an inline style — beats any stylesheet rule that is not
+   !important. That is why nearly every declaration in this file is !important,
+   and why a plain `border-top-right-radius` here silently did nothing. */
+#wheels-debugbar{display:block !important;position:fixed;bottom:0;left:0;width:100% !important;min-width:0;overflow:hidden;z-index:99999;font-size:13px;line-height:1.4;background:#1e1e2e !important;transition:width .35s cubic-bezier(.4,0,.2,1) !important;}
+/* Square when stretched so the bar runs edge to edge and disappears into the
+   window sides; only the collapsed stub gets a rounded top-right corner, where
+   it reads as a floating button rather than a full-width strip. */
+#wheels-debugbar.wdb-collapsed{width:40px !important;border-top-right-radius:8px !important;}
+#wheels-debugbar.wdb-no-transition{transition:none !important;}
+@media (prefers-reduced-motion:reduce){#wheels-debugbar{transition:none !important;}}
+#wheels-debugbar.wdb-collapsed>:not(.wdb-bar):not(style):not(script){display:none !important;}
+#wheels-debugbar.wdb-collapsed .wdb-bar>:not(.wdb-logo){display:none !important;}
+#wheels-debugbar .wdb-logo{flex-shrink:0;}
+#wheels-debugbar.wdb-collapsed .wdb-bar{padding:0;background:#1e1e2e;}
+#wheels-debugbar.wdb-collapsed .wdb-logo{width:40px;padding:0;justify-content:center;}
+#wheels-debugbar .wdb-bar{display:flex;align-items:center;background:#1e1e2e;color:#cdd6f4;height:36px;padding:0 8px;gap:2px;border-top:1px solid #45475a;user-select:none;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;scrollbar-width:none;}
+/* The bar carries nine tabs now, which overflows a narrow window. It used to
+   clip silently, pushing the reload and close buttons off the right edge
+   entirely — so allow scrolling, and hide the scrollbar chrome. */
+#wheels-debugbar .wdb-bar::-webkit-scrollbar{height:0;display:none;}
+#wheels-debugbar .wdb-version{flex:0 0 auto;}
+@media (max-width:1280px){#wheels-debugbar .wdb-version{display:none;}}
 #wheels-debugbar .wdb-bar a,#wheels-debugbar .wdb-bar span{color:#cdd6f4;text-decoration:none;}
 #wheels-debugbar .wdb-tab{display:flex;align-items:center;gap:5px;padding:0 10px;height:36px;cursor:pointer;border:none;background:none;color:#cdd6f4;font-size:12px;font-family:inherit;white-space:nowrap;transition:background .15s;}
 #wheels-debugbar .wdb-tab:hover{background:#313244;}
 #wheels-debugbar .wdb-tab.active{background:#313244;color:#89b4fa;border-top:2px solid #89b4fa;padding-top:2px;}
 #wheels-debugbar .wdb-tab svg{width:14px;height:14px;fill:currentColor;flex-shrink:0;}
+/* Dock-style fallback: when the labels no longer fit, the bar drops to icons
+   and each tab reveals its name through the title attribute on hover. The
+   badge stays — it carries live state, not decoration. */
+#wheels-debugbar.wdb-icons .wdb-tab-label{display:none !important;}
+#wheels-debugbar.wdb-icons .wdb-tab{padding:0 8px;}
+/* ── Tab hover tooltip ─────────────────────────────────────────────────── */
+/* Drawn above the tab because the bar is pinned to the window bottom. Fixed
+   rather than absolute so the bar's overflow-x/y cannot clip it. */
+#wheels-debugbar .wdb-tip{position:fixed;z-index:100000;pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .12s ease,transform .12s ease;background:#313244 !important;color:#cdd6f4 !important;border:1px solid #45475a;border-radius:5px;padding:4px 9px;font-size:11px;font-weight:600;line-height:1.3;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.45);}
+#wheels-debugbar .wdb-tip.wdb-tip-on{opacity:1;transform:translateY(0);}
 #wheels-debugbar .wdb-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;line-height:1;}
 #wheels-debugbar .wdb-badge-green{background:#28a74533;color:#a6e3a1;}
 #wheels-debugbar .wdb-badge-yellow{background:#ffc10733;color:#f9e2af;}
@@ -19,7 +61,20 @@
 #wheels-debugbar .wdb-panel-header h3{font-size:14px;font-weight:600;color:#cdd6f4;}
 #wheels-debugbar .wdb-panel-body{padding:12px 16px;}
 #wheels-debugbar .wdb-table{width:100%;border-collapse:collapse;}
-#wheels-debugbar .wdb-table th{text-align:left;padding:6px 12px;font-size:11px;font-weight:600;color:#a6adc8;text-transform:uppercase;letter-spacing:.5px;background:#181825;border-bottom:1px solid #313244;}
+/* The host page's stylesheet zebra-stripes `tr:nth-child(2n)` and `th` with its
+   own --accent-bg — a light #f5f7ff in a stock app — which lands inside the bar
+   as white bands with grey text. This file only ever set backgrounds on th/td,
+   so the host's row background showed straight through.
+   Scoped to `table`, NOT `.wdb-table`: the complexity panel builds its table
+   with inline styles and carries no class, so a class-scoped fix misses it. */
+#wheels-debugbar table tr{background-color:transparent !important;}
+#wheels-debugbar table tr:nth-child(2n){background-color:rgba(255,255,255,.022) !important;}
+#wheels-debugbar table th{background-color:#181825 !important;}
+#wheels-debugbar .wdb-table th{text-align:left;padding:6px 12px;font-size:11px;font-weight:600;color:#a6adc8;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #313244;}
+/* simple.css colours every `code` with its own --code (a dark rose, #d81b60),
+   which is unreadable on the bar's dark surface. */
+#wheels-debugbar code{color:#cdd6f4 !important;background-color:#313244 !important;border:0 !important;}
+#wheels-debugbar pre code{background-color:transparent !important;}
 #wheels-debugbar .wdb-table td{padding:6px 12px;border-bottom:1px solid #313244;font-size:12px;vertical-align:top;}
 #wheels-debugbar .wdb-table tr:hover td{background:#31324433;}
 #wheels-debugbar .wdb-kv{display:grid;grid-template-columns:180px 1fr;gap:0;}
@@ -36,6 +91,82 @@
 #wheels-debugbar .wdb-link-card{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#313244;border-radius:6px;color:#cdd6f4;text-decoration:none;font-size:12px;font-weight:500;transition:background .15s;}
 #wheels-debugbar .wdb-link-card:hover{background:#45475a;}
 #wheels-debugbar .wdb-link-card svg{width:16px;height:16px;fill:#89b4fa;flex-shrink:0;}
+#wheels-debugbar .wdb-card-note{margin-left:auto;color:#6c7086;font-size:10px;font-weight:400;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
 #wheels-debugbar .wdb-env-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
 #wheels-debugbar .wdb-section{margin-bottom:16px;}
 #wheels-debugbar .wdb-section-title{font-size:11px;font-weight:700;color:#89b4fa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #313244;}
+html:has(#wheels-debugbar),html.wdb-has-debugbar{--wdb-inset:36px;padding-bottom:var(--wdb-inset);scroll-padding-bottom:var(--wdb-inset);}
+html:has(#wheels-debugbar.wdb-collapsed),html.wdb-debugbar-collapsed{--wdb-inset:0px;}
+
+/* ── Migrator panel ────────────────────────────────────────────────────── */
+#wheels-debugbar .wdb-panel-note{margin-left:8px;color:#6c7086;font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;}
+#wheels-debugbar .wdb-muted{color:#6c7086;font-size:12px;}
+#wheels-debugbar .wdb-mig-actions{text-align:right;white-space:nowrap;}
+#wheels-debugbar .wdb-mig-btn{background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;padding:4px 10px;font:inherit;font-size:11px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s;}
+#wheels-debugbar .wdb-mig-btn:hover{background:#45475a;}
+#wheels-debugbar .wdb-mig-btn-primary{background:#89b4fa;border-color:#89b4fa;color:#1e1e2e;}
+#wheels-debugbar .wdb-mig-btn-primary:hover{background:#74c7ec;border-color:#74c7ec;}
+#wheels-debugbar .wdb-mig-btn-danger{color:#f38ba8;border-color:#f38ba855;}
+#wheels-debugbar .wdb-mig-btn-danger:hover{background:#f38ba822;border-color:#f38ba8;}
+#wheels-debugbar .wdb-mig-toolbar{display:flex;gap:8px;margin-top:12px;align-items:center;}
+
+/* ── Warning notices (reload refused, config/plugin warnings) ──────────── */
+/* Lays the message and its Copy button on one row. The button reuses the
+   migration button styles so every copy affordance in the bar looks alike. */
+#wheels-debugbar .wdb-notice-warn{display:flex;align-items:flex-start;gap:12px;background:#45475a;color:#f9e2af;padding:8px 14px;font-size:12px;line-height:1.6;border-top:2px solid #f9e2af;}
+#wheels-debugbar .wdb-notice-body{flex:1;min-width:0;}
+#wheels-debugbar .wdb-notice-body code{color:#f9e2af !important;background:rgba(0,0,0,.25) !important;}
+/* Section title with its Copy button on the same row. */
+#wheels-debugbar .wdb-section-head{display:flex;align-items:center;gap:10px;}
+#wheels-debugbar .wdb-section-head .wdb-section-title{flex:1;}
+
+/* ── Tests panel ───────────────────────────────────────────────────────── */
+#wheels-debugbar .wdb-tests-bad td{color:#f38ba8;}
+#wheels-debugbar .wdb-tests-filter{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:#a6adc8;}
+#wheels-debugbar .wdb-tests-filter code{background:#313244 !important;color:#cdd6f4 !important;padding:1px 5px;border-radius:3px;}
+
+/* ── Packages panel ────────────────────────────────────────────────────── */
+#wheels-debugbar .wdb-pkg-desc{color:#a6adc8;}
+
+/* ── Hold-to-confirm ───────────────────────────────────────────────────── */
+/* Destructive migration actions need a sustained press rather than a click,
+   so an accidental tap cannot drop tables. The fill shows the progress. */
+#wheels-debugbar .wdb-hold{position:relative;overflow:hidden;background:#313244;color:#cdd6f4;border:1px solid #45475a;border-radius:4px;padding:4px 12px;font:inherit;font-size:11px;font-weight:600;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;min-width:140px;text-align:center;}
+#wheels-debugbar .wdb-hold:hover{border-color:#f38ba8;color:#fff;}
+#wheels-debugbar .wdb-hold.holding{border-color:#f38ba8;color:#fff;}
+#wheels-debugbar .wdb-hold .wdb-hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:#dc3545;pointer-events:none;}
+#wheels-debugbar .wdb-hold .wdb-hold-label{position:relative;z-index:1;}
+#wheels-debugbar .wdb-hold-hint{color:#f38ba8 !important;font-size:11px;margin-top:-2px;}
+#wheels-debugbar .wdb-mig-confirm{margin-top:12px;padding:10px 12px;background:#313244;border:1px solid #f9e2af55;border-radius:6px;font-size:12px;}
+#wheels-debugbar .wdb-mig-confirm p{color:#f9e2af;margin-bottom:2px;}
+#wheels-debugbar .wdb-mig-result{margin-top:12px;border:1px solid #45475a;border-radius:6px;padding:10px 12px;background:#181825 !important;font-size:12px;max-height:22vh;overflow:auto;}
+/* A failed migration used to render in the same green block as a successful
+   one, so a failure read as a win. Errors get their own treatment. */
+#wheels-debugbar .wdb-mig-result-failed{border-color:#f38ba8 !important;background:#2a1218 !important;}
+#wheels-debugbar .wdb-result-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+#wheels-debugbar .wdb-result-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#f38ba8;background:#f38ba822;border:1px solid #f38ba855;border-radius:999px;padding:2px 8px;}
+#wheels-debugbar .wdb-result-badge-ok{color:#a6e3a1;background:#a6e3a122;border-color:#a6e3a155;}
+#wheels-debugbar .wdb-copy-btn{margin-left:auto;}
+#wheels-debugbar .wdb-copy-btn.wdb-copied{background:#a6e3a1;border-color:#a6e3a1;color:#1e1e2e;}
+/* Needs the extra class for specificity: the generic `.wdb-mig-result pre`
+   rule further down also carries !important and would otherwise win on order. */
+#wheels-debugbar .wdb-mig-result.wdb-mig-result-failed pre,
+#wheels-debugbar .wdb-mig-result.wdb-mig-result-failed pre code{color:#f38ba8 !important;}
+/* The host stylesheet (simple.css) paints bare `pre` with a light --accent-bg
+   and dark --preformatted text, so the migration output rendered as green on
+   white. Panels own the backgrounds and colours of everything inside them. */
+#wheels-debugbar pre{background:transparent !important;border:0 !important;}
+#wheels-debugbar .wdb-mig-result pre{white-space:pre-wrap;margin:0;color:#a6e3a1 !important;}
+#wheels-debugbar .wdb-mig-result pre code{background:transparent !important;border:0 !important;color:inherit !important;font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;}
+
+/* ── Collapsible sections (System information) ─────────────────────────── */
+/* The host page's own stylesheet (simple.css in a stock app) styles
+   `details`/`summary` with a light background, borders and negative margins,
+   which bleed straight through into the bar. Reset them explicitly — same
+   reason the rest of this file uses !important. */
+#wheels-debugbar .wdb-details{margin:4px 0 0 !important;padding:8px 0 0 !important;background:transparent !important;border:0 !important;border-top:1px solid #313244 !important;border-radius:0 !important;}
+#wheels-debugbar .wdb-details summary{cursor:pointer;font-size:11px;font-weight:700;color:#89b4fa;text-transform:uppercase;letter-spacing:.5px;list-style:none;margin:0 !important;padding:0 !important;background:transparent !important;border:0 !important;display:block;}
+#wheels-debugbar .wdb-details summary::-webkit-details-marker{display:none;}
+#wheels-debugbar .wdb-details summary::before{content:'\25B8';display:inline-block;width:12px;color:#6c7086;}
+#wheels-debugbar .wdb-details[open] summary::before{content:'\25BE';}
+#wheels-debugbar .wdb-details > div{margin-top:10px;background:transparent !important;}

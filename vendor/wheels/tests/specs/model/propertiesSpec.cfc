@@ -351,7 +351,9 @@ component extends="wheels.WheelsTest" {
 
 				_properties = author.properties()
 				actual = ListSort(StructKeyList(_properties), "text")
-				expected = "allowExplicitTimestamps,firstName,lastName"
+				// allowExplicitTimestamps is a write-path control flag stored in the
+				// private variables scope — it must not surface as a property.
+				expected = "firstName,lastName"
 
 				expect(actual).toBe(expected)
 				expect(author.firstName).toBe("Foo")
@@ -383,7 +385,9 @@ component extends="wheels.WheelsTest" {
 
 				_properties = author.properties(returnIncluded = false)
 				actual = ListSort(StructKeyList(_properties), "text")
-				expected = "allowExplicitTimestamps,firstName,lastName"
+				// allowExplicitTimestamps is a write-path control flag stored in the
+				// private variables scope — it must not surface as a property.
+				expected = "firstName,lastName"
 
 				expect(actual).toBe(expected)
 			})

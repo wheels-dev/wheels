@@ -965,6 +965,34 @@ component extends="wheels.WheelsTest" {
 				expect(e).toBe(r)
 			})
 
+			it("resolves put/patch/delete resource member routes instead of throwing RouteNotFound (##3517)", () => {
+				// Resource member routes carry get/patch/put/delete — never post —
+				// so the route must be resolved with the ORIGINAL verb, then the
+				// HTML verb restored before rendering.
+				$clearRoutes()
+				g.mapper().resources(name = "customers").end()
+				g.$setNamedRoutePositions()
+
+				StructDelete(args, "controller")
+				args.route = "customer"
+				args.key = "1"
+
+				args.method = "delete"
+				r = _controller.startFormTag(argumentcollection = args)
+				expect(r).toInclude('method="post"')
+				expect(r).toInclude('name="_method" type="hidden" value="delete"')
+
+				args.method = "put"
+				r = _controller.startFormTag(argumentcollection = args)
+				expect(r).toInclude('method="post"')
+				expect(r).toInclude('name="_method" type="hidden" value="put"')
+
+				args.method = "patch"
+				r = _controller.startFormTag(argumentcollection = args)
+				expect(r).toInclude('method="post"')
+				expect(r).toInclude('name="_method" type="hidden" value="patch"')
+			})
+
 			it("works with multipart", () => {
 				args.multipart = "true"
 				argsction = _controller.urlfor(argumentCollection = args)
@@ -1289,6 +1317,48 @@ component extends="wheels.WheelsTest" {
 				r = '<select data-auto-id="user_birthday_year" id="user-birthday-year" name="user[birthday]($year)"><option value="1990">1990</option><option value="1989">1989</option><option value="1988">1988</option><option value="1987">1987</option><option value="1986">1986</option><option value="1985">1985</option><option value="1984">1984</option><option value="1983">1983</option><option value="1982">1982</option><option value="1981">1981</option><option value="1980">1980</option></select>'
 
 				expect(e).toBe(r)
+			})
+		})
+
+		describe("Tests that includeErrorMessage nests the message in the field block", () => {
+
+			beforeEach(() => {
+				_controller = g.controller(name = "ControllerWithModelErrors")
+			})
+
+			it("does not emit a per-field error message by default", () => {
+				result = _controller.textField(objectName = "user", property = "firstname", label = false)
+
+				expect(result).toInclude("field-with-errors")
+				expect(result).notToInclude("error-message")
+			})
+
+			it("nests errorMessageOn inside the error wrapper when includeErrorMessage is true", () => {
+				result = _controller.textField(
+					objectName = "user",
+					property = "firstname",
+					labelPlacement = "before",
+					includeErrorMessage = true
+				)
+
+				expect(result).toInclude("field-with-errors")
+				expect(result).toInclude('class="error-message"')
+				expect(result).toInclude('role="alert"')
+				// encode=true turns the colon into a hex entity (S18 / encodeHtmlTags).
+				expect(result).toInclude("Error&##x3a;")
+				expect(result).toInclude("firstname error1")
+				expect(FindNoCase('type="text"', result)).toBeLT(FindNoCase("error-message", result))
+				expect(result).notToInclude("includeErrorMessage")
+			})
+
+			it("honours includeFormErrorMessages when the per-call flag is omitted", () => {
+				g.set(includeFormErrorMessages = true)
+				try {
+					result = _controller.textField(objectName = "user", property = "firstname", label = false)
+					expect(result).toInclude("error-message")
+				} finally {
+					g.set(includeFormErrorMessages = false)
+				}
 			})
 		})
 	}

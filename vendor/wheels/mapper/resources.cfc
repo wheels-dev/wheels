@@ -34,6 +34,7 @@ component {
 		struct constraints,
 		any callback,
 		any binding,
+		any bindBy,
 		string $call = "resource",
 		boolean $plural = false,
 		boolean mapFormat = variables.mapFormat
@@ -179,6 +180,11 @@ component {
 			local.args.binding = arguments.binding;
 		}
 
+		// Pass along bindBy preference.
+		if (StructKeyExists(arguments, "bindBy")) {
+			local.args.bindBy = arguments.bindBy;
+		}
+
 		// Scope the resource.
 		scope($call = arguments.$call, argumentCollection = local.args);
 
@@ -230,6 +236,7 @@ component {
 		struct constraints,
 		any callback,
 		any binding,
+		any bindBy,
 		boolean mapFormat = variables.mapFormat
 	) {
 		return resource(argumentCollection = arguments, $plural = true, $call = "resources");

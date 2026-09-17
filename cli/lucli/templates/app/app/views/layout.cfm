@@ -12,13 +12,14 @@
 			<meta name="viewport" content="width=device-width, initial-scale=1">
 			<title>{{appName}}</title>
 			<cfoutput>#csrfMetaTags()#</cfoutput>
-			<!--- Default styling: simple.css (https://simplecss.org/) — a classless
-			      stylesheet that gives plain semantic HTML a clean, modern look without
-			      any markup changes. Form helpers like #textField()# already emit the
-			      right tags, so scaffolded views render polished out of the box.
-			      Remove this line if you're bringing your own CSS, or swap for a richer
-			      component kit — e.g. `wheels packages add wheels-basecoat`. --->
-			<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+			<!--- Default styling: simple.css (https://simplecss.org/) plus
+			      wheels.css (stacked form fields + red validation errors).
+			      Both live in public/stylesheets/ so the app renders polished
+			      offline. simple.css is classless; wheels.css only adds form
+			      layout and error styles. Delete these lines (and the files)
+			      to bring your own CSS, or swap for a richer kit — e.g.
+			      `wheels packages add wheels-basecoat`. --->
+			<cfoutput>#styleSheetLinkTag(sources="simple,wheels")#</cfoutput>
 		</head>
 
 		<body>

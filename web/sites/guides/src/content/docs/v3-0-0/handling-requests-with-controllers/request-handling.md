@@ -61,8 +61,7 @@ First, it will create an instance of the `shop` controller (`/app/controllers/Sh
 
 Let's show how the code for the `products` function could look to make it more clear what goes on:
 
-{% code title="Shop.cfc" %}
-```javascript
+```javascript title="Shop.cfc"
 component extends="Controller" {
 
     function products() {
@@ -71,7 +70,6 @@ component extends="Controller" {
 
 }
 ```
-{% endcode %}
 
 The only thing this does is specify the view page to render using the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function.
 
@@ -91,8 +89,7 @@ The first thing Wheels assumes is that if you call [renderView()](https://wheels
 
 Therefore, the code above can be changed to:
 
-{% code title="Shop.cfc" %}
-```javascript
+```javascript title="Shop.cfc"
 component extends="Controller" {
 
     function products() {
@@ -101,7 +98,6 @@ component extends="Controller" {
 
 }
 ```
-{% endcode %}
 
 … and it will still work just fine.
 
@@ -109,8 +105,7 @@ Does Wheels assume anything else? Sure it does. You can actually remove the enti
 
 That leaves you with this code:
 
-{% code title="Shop.cfc" %}
-```javascript
+```javascript title="Shop.cfc"
 component extends="Controller" {
 
     function products() { 
@@ -118,17 +113,14 @@ component extends="Controller" {
 
 }
 ```
-{% endcode %}
 
 That looks rather silly, a `products` function with no code whatsoever. What do you think will happen if you just remove that entire function, leaving you with this code?
 
-{% code title="Shop.cfc" %}
-```javascript
+```javascript title="Shop.cfc"
 component extends="Controller" { 
 
 }
 ```
-{% endcode %}
 
 …If you guessed that Wheels will just assume you don't need any code for the `products` action and just want the view rendered directly, then you are correct.
 

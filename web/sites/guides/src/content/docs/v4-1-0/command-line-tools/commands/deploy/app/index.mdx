@@ -1,0 +1,44 @@
+---
+title: "wheels deploy app"
+description: App container lifecycle verbs — boot, start, stop, logs, containers, images, live, maintenance, remove.
+type: reference
+sidebar:
+  label: "app"
+  order: 20
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+App container lifecycle. Every verb targets containers labelled with the current service, optionally filtered by `--role`.
+
+## Verbs
+
+| Verb | Purpose |
+|------|---------|
+| [`boot`](/v4-1-0/command-line-tools/commands/deploy/app/boot/) | `docker run` new containers for the given version. |
+| [`start`](/v4-1-0/command-line-tools/commands/deploy/app/start/) | `docker start` existing stopped containers. |
+| [`stop`](/v4-1-0/command-line-tools/commands/deploy/app/stop/) | `docker stop` running containers. |
+| [`details`](/v4-1-0/command-line-tools/commands/deploy/app/details/) | `docker inspect` for the given version's containers. |
+| [`containers`](/v4-1-0/command-line-tools/commands/deploy/app/containers/) | `docker ps` filtered by service label. |
+| [`images`](/v4-1-0/command-line-tools/commands/deploy/app/images/) | `docker images` for the app image. |
+| [`logs`](/v4-1-0/command-line-tools/commands/deploy/app/logs/) | `docker logs` across every host. |
+| [`live`](/v4-1-0/command-line-tools/commands/deploy/app/live/) | Clear the maintenance marker file. |
+| [`maintenance`](/v4-1-0/command-line-tools/commands/deploy/app/maintenance/) | Write the maintenance marker file. |
+| [`remove`](/v4-1-0/command-line-tools/commands/deploy/app/remove/) | Stop + remove containers for the given version. |
+
+## Common flags
+
+| Flag | Description |
+|------|-------------|
+| `--release=<v>` | Required for boot/start/stop/details/live/maintenance/remove. |
+| `--role=<name>` | Limit to one role. Default: all roles. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+<Aside type="note" title="--release, not --version">
+The version always travels as `--release=`. A literal `--version=` flag never reaches deploy dispatch — the CLI's picocli root intercepts it first and fails with `Invalid value for option '--version'` ([#2674](https://github.com/wheels-dev/wheels/issues/2674)).
+</Aside>
+
+<Aside type="caution" title="Purely numeric release values">
+A purely numeric release value (e.g. `--release=1`) currently hangs for ~75 seconds with `Operation timed out`, even under `--dry-run` ([#3111](https://github.com/wheels-dev/wheels/issues/3111)). Use a non-numeric label — a git short sha or a `v`-prefixed tag like `v1.2.3` — until that's fixed.
+</Aside>

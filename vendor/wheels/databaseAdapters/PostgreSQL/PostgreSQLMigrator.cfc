@@ -1,7 +1,9 @@
 component extends="wheels.databaseAdapters.Abstract" {
 
 	variables.sqlTypes = {};
+	variables.sqlTypes['biginteger'] = {name = 'BIGINT'};
 	variables.sqlTypes['binary'] = {name = 'BYTEA'};
+	variables.sqlTypes['char'] = {name = 'CHAR', limit = 1};
 	variables.sqlTypes['boolean'] = {name = 'BOOLEAN'};
 	variables.sqlTypes['date'] = {name = 'DATE'};
 	variables.sqlTypes['datetime'] = {name = 'TIMESTAMP'};
@@ -27,12 +29,12 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * or scaffold `--belongsTo=` on PostgreSQL throws at migrate time. See #2876.
 	 */
 	public string function addForeignKeyOptions(required string sql, struct options = {}) {
-		arguments.sql = arguments.sql & " FOREIGN KEY (" & arguments.options.column & ")";
+		arguments.sql = arguments.sql & " FOREIGN KEY (" & quoteColumnName(arguments.options.column) & ")";
 		if (StructKeyExists(arguments.options, "referenceTable")) {
 			if (StructKeyExists(arguments.options, "referenceColumn")) {
 				arguments.sql = arguments.sql & " REFERENCES ";
-				arguments.sql = arguments.sql & arguments.options.referenceTable;
-				arguments.sql = arguments.sql & " (" & arguments.options.referenceColumn & ")";
+				arguments.sql = arguments.sql & quoteTableName(arguments.options.referenceTable);
+				arguments.sql = arguments.sql & " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
 			}
 		}
 		return arguments.sql;
@@ -59,6 +61,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	) {
 		if (StructKeyExists(arguments.options, 'type') && arguments.options.type != 'primaryKey') {
 			if (StructKeyExists(arguments.options, 'default') && optionsIncludeDefault(argumentCollection = arguments.options)) {
+				$rejectEmptyStringDefault(arguments.options);
 				if (arguments.alter) {
 					arguments.sql = arguments.sql & " SET";
 				}
@@ -72,11 +75,6 @@ component extends="wheels.databaseAdapters.Abstract" {
 					arguments.sql = arguments.sql & " DEFAULT NULL";
 				} else if (arguments.options.type == 'boolean') {
 					arguments.sql = arguments.sql & " DEFAULT #IIf(arguments.options.default, true, false)#";
-				} else if (arguments.options.type == 'string' && arguments.options.default eq "") {
-					// Leading space required: when called with alter=true the upstream
-					// concatenates " SET" first, and without this space the resulting
-					// "SETDEFAULT ''" is invalid SQL (PG rejects the merged token).
-					arguments.sql = arguments.sql & " DEFAULT ''";
 				} else {
 					arguments.sql = arguments.sql & " DEFAULT #quote(value = arguments.options.default, options = arguments.options)#";
 				}
@@ -94,7 +92,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 			}
 		}
 		if (StructKeyExists(arguments.options, "afterColumn") && Len(Trim(arguments.options.afterColumn)) GT 0) {
-			arguments.sql = arguments.sql & " AFTER #arguments.options.afterColumn#";
+			arguments.sql = arguments.sql & " AFTER " & quoteColumnName(arguments.options.afterColumn);
 		}
 		return arguments.sql;
 	}
@@ -126,20 +124,18 @@ component extends="wheels.databaseAdapters.Abstract" {
 	 * Rails adaptor appears to be applying default/nulls in separate queries
 	 */
 	public string function changeColumnInTable(required string name, required any column) {
+		local.sql = "ALTER TABLE #quoteTableName(objectCase(arguments.name))# ALTER COLUMN #quoteColumnName(arguments.column.name)# TYPE #arguments.column.sqlType()#";
 		for (local.i in ["default", "allowNull", "afterColumn"]) {
 			if (StructKeyExists(arguments.column, local.i)) {
 				local.opts = {};
 				local.opts.type = arguments.column.type;
 				local.opts[local.i] = arguments.column[local.i];
 				local.columnSQL = addColumnOptions(
-					sql = " ALTER COLUMN #arguments.column.name#",
+					sql = " ALTER COLUMN #quoteColumnName(arguments.column.name)#",
 					options = local.opts,
 					alter = true
 				);
-				if (!StructKeyExists(local, "sql")) {
-					local.sql = "ALTER TABLE #quoteTableName(objectCase(arguments.name))# ALTER COLUMN #objectCase(arguments.column.name)# TYPE #arguments.column.sqlType()#";
-				}
-				if (Len(arguments.column[local.i])) {
+				if (local.i == "allowNull" || Len(ToString(arguments.column[local.i]))) {
 					local.sql = ListAppend(local.sql, local.columnSQL, ",#Chr(13)##Chr(10)#");
 				}
 			}

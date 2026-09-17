@@ -39,8 +39,50 @@ component {
 		return this;
 	}
 
-	public string function version() {
-		return isDev() ? "0.0.0-dev" : variables.info.version;
+	public string function version(string manifestPath = "") {
+		if (!isDev()) return variables.info.version;
+		// Some release-install paths (Homebrew formula, module tarball) ship
+		// this file unstamped, but the sibling manifest IS stamped on every
+		// path. When we're structurally a dev build, fall back to the manifest
+		// version so released installs don't self-report "0.0.0-dev".
+		if (!len(arguments.manifestPath)) {
+			arguments.manifestPath = $defaultManifestPath();
+		}
+		var manifestVersion = $manifestVersion(arguments.manifestPath);
+		return len(manifestVersion) ? manifestVersion : "0.0.0-dev";
+	}
+
+	/**
+	 * Resolve the sibling manifest next to this component: wheels.json first,
+	 * falling back to the legacy box.json (rename transition — see
+	 * FrameworkInstaller.cfc::$resolveManifest for the same order).
+	 */
+	private string function $defaultManifestPath() {
+		var dir = getDirectoryFromPath(getCurrentTemplatePath());
+		if (fileExists(dir & "wheels.json")) return dir & "wheels.json";
+		if (fileExists(dir & "box.json")) return dir & "box.json";
+		return "";
+	}
+
+	/**
+	 * Read a manifest's `version` key, returning "" when the file is absent/
+	 * unparseable, the key is missing/empty, or the value is still an
+	 * unresolved placeholder. Returns the concrete version otherwise.
+	 */
+	private string function $manifestVersion(required string manifestPath) {
+		if (!len(arguments.manifestPath) || !fileExists(arguments.manifestPath)) return "";
+		var manifest = {};
+		try {
+			manifest = deserializeJSON(fileRead(arguments.manifestPath));
+		} catch (any e) {
+			return "";
+		}
+		if (!isStruct(manifest) || !structKeyExists(manifest, "version")) return "";
+		var v = manifest.version;
+		if (!isSimpleValue(v)) return "";
+		v = trim(v);
+		if (!len(v)) return "";
+		return $blankIfPlaceholder(v);
 	}
 
 	public boolean function isDev() {

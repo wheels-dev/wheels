@@ -319,13 +319,12 @@ component extends="wheels.WheelsTest" {
 
 			it("defaults maxStoreSize to 100000", function() {
 				var limiter = new wheels.middleware.RateLimiter();
-				// Should construct without error.
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				expect(limiter.$maxStoreSize()).toBe(100000);
 			});
 
 			it("accepts custom maxStoreSize", function() {
 				var limiter = new wheels.middleware.RateLimiter(maxStoreSize = 500);
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				expect(limiter.$maxStoreSize()).toBe(500);
 			});
 
 			it("evicts entries when store exceeds maxStoreSize", function() {
@@ -342,12 +341,13 @@ component extends="wheels.WheelsTest" {
 				for (var i = 1; i <= 10; i++) {
 					var req = {remoteAddr: "client-evict-#i#"};
 					limiter.handle(request = req, next = nextFn);
+					expect(limiter.$storeSize()).toBeLTE(5);
 				}
 
-				// The limiter should still function correctly (not error out).
 				var finalReq = {remoteAddr: "client-evict-final"};
 				var result = limiter.handle(request = finalReq, next = nextFn);
 				expect(result).toBe("ok");
+				expect(limiter.$storeSize()).toBeLTE(5);
 			});
 
 			// NOTE: Testing that rate limiting still works after eviction is inherently
@@ -364,7 +364,7 @@ component extends="wheels.WheelsTest" {
 					maxRequests = 10,
 					strategy = "slidingWindow"
 				);
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				expect(limiter.$maxTimestampsPerKey()).toBe(30);
 			});
 
 			it("accepts custom maxTimestampsPerKey", function() {
@@ -373,7 +373,7 @@ component extends="wheels.WheelsTest" {
 					strategy = "slidingWindow",
 					maxTimestampsPerKey = 50
 				);
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				expect(limiter.$maxTimestampsPerKey()).toBe(50);
 			});
 
 			it("caps sliding window timestamps per key", function() {
@@ -393,7 +393,10 @@ component extends="wheels.WheelsTest" {
 					limiter.handle(request = req, next = nextFn);
 				}
 
-				// The limiter should still function correctly after capping.
+				// Truncate-then-append can leave at most cap+1 timestamps.
+				expect(limiter.$slidingWindowSize("flood-client")).toBeLTE(6);
+				expect(limiter.$slidingWindowSize("flood-client")).toBeGT(0);
+
 				var finalReq = {remoteAddr: "flood-client"};
 				var result = limiter.handle(request = finalReq, next = nextFn);
 				expect(result).toBe("ok");
@@ -450,13 +453,21 @@ component extends="wheels.WheelsTest" {
 		describe("RateLimiter maxKeyLength", function() {
 
 			it("defaults maxKeyLength to 128", function() {
-				var limiter = new wheels.middleware.RateLimiter();
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				var limiter = new wheels.middleware.RateLimiter(maxRequests = 1, windowSeconds = 60);
+				expect(limiter.$maxKeyLength()).toBe(128);
+
+				var nextFn = function(req) { return "ok"; };
+				var longKey = RepeatString("K", 129);
+				var hashed = Hash(longKey, "SHA-256");
+				expect(limiter.handle(request = {remoteAddr: longKey}, next = nextFn)).toBe("ok");
+				expect(limiter.handle(request = {remoteAddr: hashed}, next = nextFn)).toInclude(
+					"Rate limit exceeded"
+				);
 			});
 
 			it("accepts custom maxKeyLength", function() {
 				var limiter = new wheels.middleware.RateLimiter(maxKeyLength = 64);
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				expect(limiter.$maxKeyLength()).toBe(64);
 			});
 
 			it("hashes keys longer than maxKeyLength", function() {
@@ -562,18 +573,20 @@ component extends="wheels.WheelsTest" {
 		describe("RateLimiter failOpen parameter", function() {
 
 			it("defaults failOpen to false (fail-closed)", function() {
-				var limiter = new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60);
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				var limiter = new wheels.middleware.RateLimiter();
+				var outcome = limiter.$handleError("spec-default", "failopen-lock");
+				expect(outcome.allowed).toBeFalse();
+				expect(outcome.remaining).toBe(0);
 			});
 
 			it("accepts failOpen=true", function() {
 				var limiter = new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60, failOpen = true);
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				expect(limiter.$handleError("spec-open", "failopen-true").allowed).toBeTrue();
 			});
 
 			it("accepts failOpen=false", function() {
 				var limiter = new wheels.middleware.RateLimiter(maxRequests = 5, windowSeconds = 60, failOpen = false);
-				expect(limiter).toBeInstanceOf("wheels.middleware.RateLimiter");
+				expect(limiter.$handleError("spec-closed", "failopen-false").allowed).toBeFalse();
 			});
 
 			it("blocks requests by default when fail-closed with fixed window", function() {

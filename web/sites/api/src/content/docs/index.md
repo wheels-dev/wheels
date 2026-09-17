@@ -10,7 +10,8 @@ from the framework's inline documentation annotations.
 
 | Version                | Functions | Status          |
 | ---------------------- | --------- | --------------- |
-| **[v4.0.0](/v4-0-0/)** | 378       | current release |
+| **[v4.1.0](/v4-1-0/)** | 388       | current release |
+| [v4.0.0](/v4-0-0/)     | 378       |                 |
 | [v3.0.0](/v3-0-0/)     | 309       |                 |
 | [v2.5.0](/v2-5-0/)     | 309       |                 |
 | [v2.4.0](/v2-4-0/)     | 298       |                 |

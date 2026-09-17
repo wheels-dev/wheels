@@ -55,6 +55,23 @@ component output="false" {
 		}
 	}
 
+	// Framework Java resources — the bundled jBCrypt jar used by the global
+	// bcryptHash()/bcryptVerify() helpers. LoadPaths are read at app init, so
+	// the jar must be present under vendor/wheels/resources/java before the
+	// first request; on JVM engines this makes bcrypt run in native Java
+	// instead of the slow pure-CFML Blowfish fallback.
+	if (DirectoryExists(this.wheelsDir & "resources/java")) {
+		if (!StructKeyExists(this, "javaSettings")) {
+			this.javaSettings = {};
+		}
+		if (!StructKeyExists(this.javaSettings, "LoadPaths")) {
+			this.javaSettings.LoadPaths = [];
+		}
+		if (!ArrayFind(this.javaSettings.LoadPaths, this.wheelsDir & "resources/java")) {
+			ArrayAppend(this.javaSettings.LoadPaths, this.wheelsDir & "resources/java");
+		}
+	}
+
 	// Put environment vars into env struct
 	if ( !structKeyExists(this,"env") ) {
 		this.env = {};
@@ -208,23 +225,24 @@ component output="false" {
 		local.lockName = "reloadLock" & this.name;
 
 		arguments.componentReference = "wheels.events.EventMethods";
-		application.wo.$simpleLock(
-			name = local.lockName,
-			execute = "$runOnSessionEnd",
-			executeArgs = arguments,
-			type = "readOnly",
-			timeout = 180
-		);
+		// Adobe SessionTracker.SessionCleanUpAgent calls onSessionEnd after the
+		// live application scope can already be torn down (same class of failure
+		// as onApplicationEnd, issue #3379). Route through the passed-in
+		// arguments.applicationScope and guard so a reclaimed scope is a no-op.
+		if (StructKeyExists(arguments.applicationScope, "wo")) {
+			arguments.applicationScope.wo.$simpleLock(
+				name = local.lockName,
+				execute = "$runOnSessionEnd",
+				executeArgs = arguments,
+				type = "readOnly",
+				timeout = 180
+			);
+		}
 	}
 
 	public boolean function onRequestStart( string targetPage ) {
 
-		if(structKeyExists(url, "format") && listFindNoCase("junit,json,txt", url.format))
-		{
-			application.contentOnly = true;
-		}else{
-			application.contentOnly = false;
-		}
+		this.$setContentOnlyForFormat();
 
 		local.lockName = "reloadLock" & this.name;
 
@@ -239,6 +257,39 @@ component output="false" {
 		// Need to setup the wheels struct up here since it's used to store debugging info below if this is a reload request.
 		application.wo.$initializeRequestScope();
 
+		this.$applyDebugIpAccessOverrides();
+
+		local.environmentSwitchAlreadyApplied = this.$isEnvironmentSwitchAlreadyApplied();
+
+		local.reloadAuthorized = this.$authorizeReload(local.environmentSwitchAlreadyApplied);
+		if (local.reloadAuthorized) {
+			this.$restartAppRequest(local.lockName);
+			return false;
+		}
+
+		// Run the rest of the request start code.
+		arguments.componentReference = "wheels.events.EventMethods";
+		application.wo.$simpleLock(
+			name = local.lockName,
+			execute = "$runOnRequestStart",
+			executeArgs = arguments,
+			type = "readOnly",
+			timeout = 180
+		);
+
+		return true;
+	}
+
+	public void function $setContentOnlyForFormat() {
+		if(structKeyExists(url, "format") && listFindNoCase("junit,json,txt", url.format))
+		{
+			application.contentOnly = true;
+		}else{
+			application.contentOnly = false;
+		}
+	}
+
+	public void function $applyDebugIpAccessOverrides() {
 		// IP-based access to public Component/debug GUI (only if allowed in settings)
 		if (!structKeyExists(application.wheels, "debugIPAccess")) {
 			application.wheels.debugIPAccess.originalEnablePublicComponent = application.wheels.enablePublicComponent;
@@ -280,7 +331,9 @@ component output="false" {
 				application.wheels.showErrorInformation = application.wheels.debugIPAccess.originalShowErrorInformation;
 			}
 		}
+	}
 
+	public boolean function $isEnvironmentSwitchAlreadyApplied() {
 		// Loop-break for URL environment switches (issue #3030): $buildRedirectUrl()
 		// keeps ?reload=<environment>&password=... on the post-restart redirect so the
 		// framework's switch code (vendor/wheels/events/onapplicationstart.cfc) can see
@@ -290,12 +343,55 @@ component output="false" {
 		// already active, skip the restart and serve the request normally.
 		// Trade-off: ?reload=<current-environment> is a no-op — use ?reload=true for a
 		// same-environment restart.
-		local.environmentSwitchAlreadyApplied = StructKeyExists(url, "reload")
+		return StructKeyExists(url, "reload")
 			&& !IsBoolean(url.reload)
 			&& StructKeyExists(application, "wheels")
 			&& StructKeyExists(application.wheels, "environment")
 			&& application.wheels.environment == url.reload;
+	}
 
+	public boolean function $reloadRateLimited(required string clientIp) {
+		// Same per-IP store and window as wheels/events/onapplicationstart.cfc, so
+		// warm-path and cold-start attempts count against one shared bucket.
+		if (!StructKeyExists(application, "$reloadRateLimit")) {
+			application.$reloadRateLimit = {};
+		}
+		local.reloadRateLimited = false;
+		if (StructKeyExists(application.$reloadRateLimit, arguments.clientIp)) {
+			local.reloadRateLimitEntry = application.$reloadRateLimit[arguments.clientIp];
+			if (local.reloadRateLimitEntry.count >= 5 && DateDiff("n", local.reloadRateLimitEntry.firstAttempt, Now()) < 5) {
+				local.reloadRateLimited = true;
+			}
+			if (DateDiff("n", local.reloadRateLimitEntry.firstAttempt, Now()) >= 5) {
+				StructDelete(application.$reloadRateLimit, arguments.clientIp);
+			}
+		}
+		return local.reloadRateLimited;
+	}
+
+	public void function $recordReloadRefusalReason(required boolean reloadAuthorized) {
+		// Record WHY a requested reload did not fire so the framework's debug
+		// bar can render a development-only notice instead of a silent no-op
+		// (issue #3311). Recording is environment-agnostic — a request-scope
+		// flag, no output; the message text and the development-environment
+		// gate live framework-side in vendor/wheels/events/onrequestend/debug.cfm
+		// so wording can improve without template drift. Wrong-password and
+		// rate-limited attempts deliberately collapse into one generic reason
+		// so the notice adds no oracle on top of $secureCompare().
+		if (!arguments.reloadAuthorized && StructKeyExists(request, "wheels")) {
+			local.reloadPasswordConfigured = StructKeyExists(application.wheels, "reloadPassword")
+				&& Len(application.wheels.reloadPassword);
+			if (!local.reloadPasswordConfigured) {
+				request.wheels.reloadRefusedReason = "emptyPassword";
+			} else if (!StructKeyExists(url, "password")) {
+				request.wheels.reloadRefusedReason = "missingPasswordParam";
+			} else {
+				request.wheels.reloadRefusedReason = "refused";
+			}
+		}
+	}
+
+	public boolean function $authorizeReload(required boolean environmentSwitchAlreadyApplied) {
 		// Reload application properly using applicationStop() if requested.
 		// SECURITY (issue #3062): the gate FAILS CLOSED. A URL-based reload requires a
 		// non-empty configured reloadPassword AND a matching password parameter — an
@@ -305,25 +401,11 @@ component output="false" {
 		// attempts are logged to wheels_security.log with the trusted client IP and
 		// feed the same per-IP rate limit as the cold-start path (5 failed attempts
 		// within 5 minutes locks the source out).
-		local.reloadRequested = StructKeyExists(url, "reload") && !local.environmentSwitchAlreadyApplied;
+		local.reloadRequested = StructKeyExists(url, "reload") && !arguments.environmentSwitchAlreadyApplied;
 		local.reloadAuthorized = false;
 		if (local.reloadRequested && StructKeyExists(application, "wheels") && StructKeyExists(application, "wo")) {
-			// Same per-IP store and window as wheels/events/onapplicationstart.cfc, so
-			// warm-path and cold-start attempts count against one shared bucket.
 			local.reloadClientIp = application.wo.$trustedClientIp();
-			if (!StructKeyExists(application, "$reloadRateLimit")) {
-				application.$reloadRateLimit = {};
-			}
-			local.reloadRateLimited = false;
-			if (StructKeyExists(application.$reloadRateLimit, local.reloadClientIp)) {
-				local.reloadRateLimitEntry = application.$reloadRateLimit[local.reloadClientIp];
-				if (local.reloadRateLimitEntry.count >= 5 && DateDiff("n", local.reloadRateLimitEntry.firstAttempt, Now()) < 5) {
-					local.reloadRateLimited = true;
-				}
-				if (DateDiff("n", local.reloadRateLimitEntry.firstAttempt, Now()) >= 5) {
-					StructDelete(application.$reloadRateLimit, local.reloadClientIp);
-				}
-			}
+			local.reloadRateLimited = this.$reloadRateLimited(local.reloadClientIp);
 			if (
 				!local.reloadRateLimited
 				&& StructKeyExists(application.wheels, "reloadPassword")
@@ -353,51 +435,22 @@ component output="false" {
 					// Fail silently if logging fails
 				}
 			}
-			// Record WHY a requested reload did not fire so the framework's debug
-			// bar can render a development-only notice instead of a silent no-op
-			// (issue #3311). Recording is environment-agnostic — a request-scope
-			// flag, no output; the message text and the development-environment
-			// gate live framework-side in vendor/wheels/events/onrequestend/debug.cfm
-			// so wording can improve without template drift. Wrong-password and
-			// rate-limited attempts deliberately collapse into one generic reason
-			// so the notice adds no oracle on top of $secureCompare().
-			if (!local.reloadAuthorized && StructKeyExists(request, "wheels")) {
-				local.reloadPasswordConfigured = StructKeyExists(application.wheels, "reloadPassword")
-					&& Len(application.wheels.reloadPassword);
-				if (!local.reloadPasswordConfigured) {
-					request.wheels.reloadRefusedReason = "emptyPassword";
-				} else if (!StructKeyExists(url, "password")) {
-					request.wheels.reloadRefusedReason = "missingPasswordParam";
-				} else {
-					request.wheels.reloadRefusedReason = "refused";
-				}
-			}
+			this.$recordReloadRefusalReason(local.reloadAuthorized);
 		}
-		if (local.reloadAuthorized) {
-			application.wo.$debugPoint("total,reload");
-			if (StructKeyExists(url, "lock") && !url.lock) {
-				this.$handleRestartAppRequest();
-			} else {
-				// Case-exact "Application" — see the matching comment in onSessionStart().
-				// A lowercase reference turns every authorized reload into an HTTP 500 on
-				// Adobe CF + case-sensitive filesystems (issue #3053 follow-up).
-				local.executeArgs = {"componentReference" = "Application"};
-				application.wo.$simpleLock(name = local.lockName, execute = "$handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
-			}
-			return false;
+		return local.reloadAuthorized;
+	}
+
+	public void function $restartAppRequest(required string lockName) {
+		application.wo.$debugPoint("total,reload");
+		if (StructKeyExists(url, "lock") && !url.lock) {
+			this.$handleRestartAppRequest();
+		} else {
+			// Case-exact "Application" — see the matching comment in onSessionStart().
+			// A lowercase reference turns every authorized reload into an HTTP 500 on
+			// Adobe CF + case-sensitive filesystems (issue #3053 follow-up).
+			local.executeArgs = {"componentReference" = "Application"};
+			application.wo.$simpleLock(name = arguments.lockName, execute = "$handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 		}
-
-		// Run the rest of the request start code.
-		arguments.componentReference = "wheels.events.EventMethods";
-		application.wo.$simpleLock(
-			name = local.lockName,
-			execute = "$runOnRequestStart",
-			executeArgs = arguments,
-			type = "readOnly",
-			timeout = 180
-		);
-
-		return true;
 	}
 
 	public boolean function onRequest( string targetPage ) {
@@ -471,47 +524,69 @@ component output="false" {
 		// already lost — fall back to a minimal HTML response rather than
 		// cascading into "The key [WO] does not exist." (issue ##2773).
 		if (!StructKeyExists(application, "wo")) {
-			setting requestTimeout=30;
-			// Surface a real 5xx so monitoring tools and CDNs don't cache this
-			// failure as a successful response. Use a plain struct for
-			// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
-			// scope on built-in tags (CLAUDE.md cross-engine invariant ##10).
-			try {
-				local.statusArgs = {statusCode: 500, statusText: "Internal Server Error"};
-				cfheader(attributeCollection=local.statusArgs);
-			} catch (any headerErr) {
-				// Header may already have been written; the body still renders.
-			}
-			WriteOutput("<h1>Application Error</h1>");
-			WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
-			try {
-				if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
-					WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
-				}
-			} catch (any fallbackErr) {
-				// Last-ditch render must never throw.
-			}
+			$renderMinimalError(arguments.Exception);
 			return;
 		}
 
-		local.requestTimeout = application.wo.$getRequestTimeout() + 30;
-		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "onErrorRequestTimeout")) {
-			local.requestTimeout = application.wheels.onErrorRequestTimeout;
+		try {
+			// In case the error was caused by a timeout we have to add extra time for error handling.
+			// We have to check if onErrorRequestTimeout exists since errors can be triggered before the application.wheels struct has been created.
+			local.requestTimeout = application.wo.$getRequestTimeout() + 30;
+			if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "onErrorRequestTimeout")) {
+				local.requestTimeout = application.wheels.onErrorRequestTimeout;
+			}
+			setting requestTimeout=local.requestTimeout;
+
+			application.wo.$initializeRequestScope();
+			arguments.componentReference = "wheels.events.EventMethods";
+
+			local.lockName = "reloadLock" & this.name;
+			local.rv = application.wo.$simpleLock(
+				name = local.lockName,
+				execute = "$runOnError",
+				executeArgs = arguments,
+				type = "readOnly",
+				timeout = 180
+			);
+			WriteOutput(local.rv);
+		} catch (any e) {
+			// Adobe CF can tear down the application scope mid-onError during
+			// applicationStop() (issue ##3379): application.wo resolves to a
+			// Java String[] and every dereference throws "Element wo is
+			// undefined in a Java object of type class [Ljava.lang.String".
+			// The StructKeyExists guard above can pass and the scope still be
+			// reclaimed before the dereferences below run, so degrade to the
+			// minimal fallback rather than cascade the torn-down-scope error
+			// over the real one.
+			$renderMinimalError(arguments.Exception);
 		}
-		setting requestTimeout=local.requestTimeout;
+	}
 
-		application.wo.$initializeRequestScope();
-		arguments.componentReference = "wheels.events.EventMethods";
-
-		local.lockName = "reloadLock" & this.name;
-		local.rv = application.wo.$simpleLock(
-			name = local.lockName,
-			execute = "$runOnError",
-			executeArgs = arguments,
-			type = "readOnly",
-			timeout = 180
-		);
-		WriteOutput(local.rv);
+	// Shared minimal error response for the two onError failure modes: the
+	// Wheels global never came up (issue ##2773), and the application scope
+	// being torn down mid-onError (issue ##3379). Kept in one place so both
+	// paths render identically.
+	private void function $renderMinimalError( required any Exception ) {
+		setting requestTimeout=30;
+		// Surface a real 5xx so monitoring tools and CDNs don't cache this
+		// failure as a successful response. Use a plain struct for
+		// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
+		// scope on built-in tags (CLAUDE.md cross-engine invariant ##10).
+		try {
+			local.statusArgs = {statusCode: 500, statusText: "Internal Server Error"};
+			cfheader(attributeCollection=local.statusArgs);
+		} catch (any headerErr) {
+			// Header may already have been written; the body still renders.
+		}
+		WriteOutput("<h1>Application Error</h1>");
+		WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
+		try {
+			if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
+				WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
+			}
+		} catch (any fallbackErr) {
+			// Last-ditch render must never throw.
+		}
 	}
 
 	public boolean function onMissingTemplate( string targetPage ) {

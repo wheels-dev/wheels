@@ -17,8 +17,7 @@ We recommend using CFWheels ability to set global defaults for [sendEmail()](htt
 
 This setting should be done in the `config/settings.cfm` file and can look something like this:
 
-{% code title="Example" %}
-```javascript
+```javascript title="Example"
 set(
     functionName="sendEmail",
     server="yourServer",
@@ -26,7 +25,6 @@ set(
     password="yourPassword"
 );
 ```
-{% endcode %}
 
 By specifying these values here, these arguments can be omitted from all [sendEmail()](https://wheels.dev/api/v2.5.0/controller.sendemail.html) function calls, thus providing cleaner, less cluttered code.
 
@@ -34,8 +32,7 @@ But you are not limited to setting only these 3 variables. In fact, you can set 
 
 Alternatively, most modern CFML engines allow setting SMTP information directly within the application configuration. So you can actually add this in `/config/app.cfm`: here's an example configuration:
 
-{% code title="config/app.cfm" %}
-```javascript
+```javascript title="config/app.cfm"
 // Lucee:
 this.tag.mail.server="smtp.mydomain.com";
 this.tag.mail.username="mySMTPUsername";
@@ -50,7 +47,6 @@ this.smtpServersettings = {
     'password' : 'xxxxxxx'
 };
 ```
-{% endcode %}
 
 ### Create an Email Template
 
@@ -71,8 +67,7 @@ The content of the template is simple: simply output the content and any expecte
 
 Here's an example for `myemailtemplate.cfm`, which will contain HTML content.
 
-{% code title="Example" %}
-```html
+```html title="Example"
 <cfoutput>
 <p>Hi #recipientName#,</p>
 <p>
@@ -85,7 +80,6 @@ Here's an example for `myemailtemplate.cfm`, which will contain HTML content.
 </p>
 </cfoutput>
 ```
-{% endcode %}
 
 ### Sending the Email
 
@@ -93,8 +87,7 @@ As we've said before, [sendEmail()](https://wheels.dev/api/v2.5.0/controller.sen
 
 Consider the following example:
 
-{% code title="Example" %}
-```javascript
+```javascript title="Example"
 member = model("member").findByKey(newMember.id);
 sendEmail(
     from="service@yourwebsite.com",
@@ -105,7 +98,6 @@ sendEmail(
     startDate=member.startDate
 );
 ```
-{% endcode %}
 
 Here we are sending an email by including the `myemailtemplate` template and passing values for `recipientName`and `startDate` to it.
 
@@ -138,8 +130,7 @@ sendEmail(
 
 Alternatively you can pass in mail parameters directly if you require more control (such as sending a dynamically generated PDF which isn't written to disk):
 
-{% code title="Mail Example" %}
-```javascript
+```javascript title="Mail Example"
 // Create PDF
 cfdocument(name="PDFContent", format="pdf"){ 
   writeOutput("<h1>Cats are better than dogz!</h1>"); 
@@ -158,7 +149,6 @@ sendEmail(
     mailParams=mailParams
 );
 ```
-{% endcode %}
 
 ### Using Email Layouts
 
@@ -174,8 +164,7 @@ Best practice is that variables (such as `recipientName` and `startDate`, in the
 
 In this case, the two calls to [sendEmail()](https://wheels.dev/api/v2.5.0/controller.sendemail.html) would be nearly identical, with the exception of the `layout` argument.
 
-{% code title="Example" %}
-```javascript
+```javascript title="Example"
 // Get new member.
 member = model("member").findByKey(params.key);
 
@@ -201,7 +190,6 @@ sendEmail(
     startDate=member.startDate
 );
 ```
-{% endcode %}
 
 ### Multipart Email Layouts
 
@@ -209,8 +197,7 @@ CFWheels also lets you set up layouts for the HTML and plain text parts in a mul
 
 If we set up generic email layouts at `views/plainemaillayout.cfm` and `views/htmlemaillayout.cfm`, we would call [sendEmail()](https://wheels.dev/api/v2.5.0/controller.sendemail.html) like so:
 
-{% code title="Example" %}
-```javascript
+```javascript title="Example"
 // Multipart customer email.
 sendEmail(
     from="service@yourwebsite.com",
@@ -222,7 +209,6 @@ sendEmail(
     startDate=member.startDate
 );
 ```
-{% endcode %}
 
 For both the `templates` and `layouts` arguments (again, notice the plurals), we provide a list of view files to use. CFWheels will figure out which of the templates and layouts are the HTML versions and separate out the MIME parts for you automatically.
 

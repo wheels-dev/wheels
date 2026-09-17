@@ -1,3 +1,7 @@
+// Mass assignment is open by default: with neither accessibleProperties() nor
+// protectedProperties(), every property can be set via new() / create() / update().
+// set(massAssignmentStrict=true) fail-closes that case (opt-in; not the default).
+
 // 1. Allow only `isActive` to be set through mass assignment (e.g. `updateAll()`, `new()`, `update()`).
 config() {
 	accessibleProperties("isActive");

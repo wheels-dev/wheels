@@ -20,6 +20,8 @@ component extends="wheels.WheelsTest" {
 				_savedStaticRoutes = StructKeyExists(application.wheels, "staticRoutes")
 					? Duplicate(application.wheels.staticRoutes) : {};
 				_savedCgiMethod = request.cgi.request_method;
+				_hadCgiOrigin = StructKeyExists(request.cgi, "http_origin");
+				_savedCgiOrigin = _hadCgiOrigin ? request.cgi.http_origin : "";
 				application.wheels.routes = [];
 				application.wheels.staticRoutes = {};
 			});
@@ -29,6 +31,11 @@ component extends="wheels.WheelsTest" {
 				application.wheels.routes = _savedRoutes;
 				application.wheels.staticRoutes = _savedStaticRoutes;
 				request.cgi["request_method"] = _savedCgiMethod;
+				if (_hadCgiOrigin) {
+					request.cgi["http_origin"] = _savedCgiOrigin;
+				} else {
+					StructDelete(request.cgi, "http_origin");
+				}
 			});
 
 			it("does not 404 on OPTIONS preflight when CORS middleware is registered", () => {
@@ -44,6 +51,9 @@ component extends="wheels.WheelsTest" {
 					new wheels.middleware.Cors(allowOrigins = "https://portal.pai.com")
 				];
 				request.cgi["request_method"] = "OPTIONS";
+				// Preflight short-circuit requires ACAO. Inject the matching Origin
+				// so Cors emits the allow header instead of passing through to 404.
+				request.cgi["http_origin"] = "https://portal.pai.com";
 
 				var d = application.wo.$createObjectFromRoot(
 					path = "wheels", fileName = "Dispatch", method = "$init"

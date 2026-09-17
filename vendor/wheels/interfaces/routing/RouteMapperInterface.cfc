@@ -69,7 +69,8 @@ interface {
 		string shallowName,
 		struct constraints,
 		any callback,
-		any binding
+		any binding,
+		any bindBy
 	);
 
 	/**
@@ -195,7 +196,8 @@ interface {
 		string shallowName,
 		struct constraints,
 		any middleware,
-		any binding
+		any binding,
+		any bindBy
 	);
 
 	/**

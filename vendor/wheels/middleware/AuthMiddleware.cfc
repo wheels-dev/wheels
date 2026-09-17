@@ -42,16 +42,21 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @allowAnonymous When true, failed authentication does not short-circuit the pipeline.
 	 *                 Instead, request.auth is set to the failure result and the next middleware runs.
 	 *                 Useful for routes that behave differently for authenticated vs anonymous users.
+	 * @genericErrors When true, the default JSON 401 body uses a generic "Unauthorized" message
+	 *                instead of authResult.error. Defaults to false so existing API clients keep
+	 *                the current response contract.
 	 */
 	public AuthMiddleware function init(
 		any authenticator = "",
 		any strategies = "",
 		any onFailure = "",
-		boolean allowAnonymous = false
+		boolean allowAnonymous = false,
+		boolean genericErrors = false
 	) {
 		variables.authenticator = arguments.authenticator;
 		variables.allowAnonymous = arguments.allowAnonymous;
 		variables.onFailure = arguments.onFailure;
+		variables.genericErrors = arguments.genericErrors;
 
 		// Normalize strategies to an array
 		if (IsArray(arguments.strategies)) {
@@ -148,8 +153,13 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			}
 		}
 
+		local.errorMessage = arguments.authResult.error;
+		if (variables.genericErrors) {
+			local.errorMessage = "Unauthorized";
+		}
+
 		return SerializeJSON({
-			error = arguments.authResult.error,
+			error = local.errorMessage,
 			status = arguments.authResult.statusCode
 		});
 	}

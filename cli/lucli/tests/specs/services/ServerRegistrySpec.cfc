@@ -195,6 +195,58 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("ServerRegistry.ownServerPort", () => {
+
+			it("returns the port when the project's own server is registered and alive", () => {
+				// Use this JVM's own pid so $isProcessAlive() reports true.
+				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
+				var name = variables.registry.serverNameFor(variables.canonicalProject);
+				makeRegistration(name = name, projectPath = variables.canonicalProject, pidContent = selfPid & ":8094");
+				try {
+					expect(variables.registry.ownServerPort(variables.canonicalProject)).toBe(8094);
+				} finally {
+					dropRegistration(name);
+				}
+			});
+
+			it("returns 0 when the registration belongs to a different project", () => {
+				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
+				var name = variables.registry.serverNameFor(variables.canonicalProject);
+				makeRegistration(name = name, projectPath = "/some/other/project", pidContent = selfPid & ":8094");
+				try {
+					expect(variables.registry.ownServerPort(variables.canonicalProject)).toBe(0);
+				} finally {
+					dropRegistration(name);
+				}
+			});
+
+			it("returns 0 when the recorded pid is not alive", () => {
+				var name = variables.registry.serverNameFor(variables.canonicalProject);
+				makeRegistration(name = name, projectPath = variables.canonicalProject, pidContent = "99999999:8094");
+				try {
+					expect(variables.registry.ownServerPort(variables.canonicalProject)).toBe(0);
+				} finally {
+					dropRegistration(name);
+				}
+			});
+
+			it("returns 0 when server.pid has no port segment", () => {
+				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
+				var name = variables.registry.serverNameFor(variables.canonicalProject);
+				makeRegistration(name = name, projectPath = variables.canonicalProject, pidContent = selfPid);
+				try {
+					expect(variables.registry.ownServerPort(variables.canonicalProject)).toBe(0);
+				} finally {
+					dropRegistration(name);
+				}
+			});
+
+			it("returns 0 when no registration exists", () => {
+				expect(variables.registry.ownServerPort(variables.canonicalProject)).toBe(0);
+			});
+
+		});
+
 		describe("ServerRegistry constructed without a lucliHome", () => {
 
 			it("inspect() returns exists=false instead of crashing", () => {
@@ -206,6 +258,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("clean() is a no-op instead of crashing", () => {
 				var orphanRegistry = new cli.lucli.services.ServerRegistry(lucliHome = "");
 				orphanRegistry.clean("anything");  // should not throw
+			});
+
+			it("ownServerPort() returns 0 instead of crashing", () => {
+				var orphanRegistry = new cli.lucli.services.ServerRegistry(lucliHome = "");
+				expect(orphanRegistry.ownServerPort(variables.canonicalProject)).toBe(0);
 			});
 
 		});

@@ -23,7 +23,7 @@ Your app's specs live under `tests/specs/` and run through the framework's built
 
 ## With the wheels CLI
 
-`wheels test` detects your running dev server, reloads the app, hits the test runner, and prints pass/fail counts. No ceremony:
+`wheels test` detects your running dev server, reloads the app, hits the test runner, and prints pass/fail counts. A failing, errored, rejected, vacuous, or compile-skipped run throws `Wheels.TestsFailed` (non-zero exit) — do not treat a quiet `0 passed` as success. No ceremony:
 
 ```bash title="your shell — in your app root"
 # Run the full suite
@@ -67,7 +67,7 @@ Keep the dev loop as: change a spec, refresh the URL. Two things to know:
 - **The datasource is whatever the app is using.** The `<datasource>_test` auto-swap is a CLI convenience; the raw runner exercises the datasource your app is currently configured with. If you drive tests by URL routinely, point your development datasource at a database you're happy to have `tests/populate.cfm` rebuild — or keep populate idempotent (it should be anyway; see [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/)).
 - **Isolated application scope.** With the stock `Application.cfc` snippet (`include` of `vendor/wheels/events/testcontext.cfm` after `config/app.cfm`), `/wheels/app/tests` and `/wheels/core/tests` bind a separate CFML application name. Concurrent browsing of the same server keeps live config. See [Fixtures & Test Data](/v4-0-0/testing/fixtures-and-test-data/).
 
-An unrecognized `directory=` value is ignored and the **full** suite runs instead ([#3083](https://github.com/wheels-dev/wheels/issues/3083)) — if a filtered run looks suspiciously slow or broad, check the value against your `tests/specs/` layout.
+An unrecognized `directory=` value is ignored and the **full** suite runs instead ([#3083](https://github.com/wheels-dev/wheels/issues/3083)) — the JSON flags this with `directoryRejected: true`. A `directory=` that names a single spec file (or a folder with no `*Spec.cfc` files) yields `bundlesDiscovered: 0`. `wheels test` throws `Wheels.TestsFailed` in both cases. If you curl the runner yourself, check those fields; if a filtered run looks suspiciously slow or broad, check the value against your `tests/specs/` layout.
 
 ## Filtering
 

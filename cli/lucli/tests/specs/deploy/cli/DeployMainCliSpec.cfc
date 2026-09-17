@@ -231,8 +231,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 localCli.init_stub({cwd: tmpCwd, service: "myapp", image: "acme/myapp"});
 
                 var df = fileRead(tmpCwd & "/Dockerfile");
-                expect(df).toInclude("FROM lucee/lucee:7-tomcat10-jre21");
-                expect(df).toInclude("EXPOSE 8080");
+                expect(df).toInclude("FROM lucee/lucee:7.1.0.204");
+                expect(df).toInclude("EXPOSE 8888");
                 expect(df).toInclude("HEALTHCHECK");
                 expect(df).toInclude("myapp");
 
@@ -823,7 +823,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
             // Regression suite for #3089 — deploy()/rollback() hardcoded the
             // kamal-proxy target to <container>:3000, ignoring proxy.app_port
-            // (code default 80; `wheels deploy init` scaffolds 8080).
+            // (code default 80; `wheels deploy init` scaffolds 8888).
 
             it("deploy --dry-run builds the kamal-proxy target from proxy.app_port (##3089)", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();

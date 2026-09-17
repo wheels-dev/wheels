@@ -12,6 +12,20 @@
 
 export type VersionStatus = 'current' | 'snapshot' | 'archived';
 
+/**
+ * Astro's configured `base` (defaults to '/'). The docs sites are built twice:
+ * once for their own domain with no base, and once with
+ * WHEELS_DOCS_BASE=/wheels/guides/ (or /wheels/api/) for the local bundle the
+ * framework serves out of the user's cache. Astro rewrites the URLs it
+ * generates, but not ones built by hand — so anything constructing an absolute
+ * path here has to apply the base itself.
+ */
+const BASE = (import.meta.env?.BASE_URL ?? '/').replace(/\/+$/, '');
+
+function withBase(path: string): string {
+	return `${BASE}${path}`;
+}
+
 export interface VersionMeta {
 	/** URL-safe slug (no dots — e.g. 'v3-0-0'). */
 	slug: string;
@@ -31,14 +45,16 @@ export interface VersionMeta {
 
 /** Wheels Guides — the narrative docs at guides.wheels.dev. */
 export const GUIDES_VERSIONS: VersionMeta[] = [
-	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-1-0', label: 'v4.1', sidebarLabel: 'v4.1 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0', collapsed: true, status: 'archived' },
 	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true, status: 'archived' },
 ];
 
 /** Wheels API Reference — function-level docs at api.wheels.dev. */
 export const API_VERSIONS: VersionMeta[] = [
-	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-1-0', label: 'v4.1', sidebarLabel: 'v4.1 (current)', collapsed: false, status: 'current' },
+	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0', collapsed: true, status: 'archived' },
 	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-5-0', label: 'v2.5.0', collapsed: true, status: 'archived' },
 	{ slug: 'v2-4-0', label: 'v2.4.0', collapsed: true, status: 'archived' },
@@ -159,7 +175,14 @@ export function computeVersionOptions(
 		const equivalent = isCurrent
 			? currentRelativePath
 			: (findEquivalentPath(currentRelativePath, targetEntries) ?? null);
-		const url = equivalent ? `/${v.slug}/${equivalent}/` : `/${v.slug}/`;
+		// These URLs are built by hand, and Astro only rewrites URLs Astro
+		// generates itself — so a sub-path build (`base: '/wheels/guides/'`,
+		// used by the local docs bundle the framework serves) has to prefix
+		// them here, or every version-switcher link lands on the app root.
+		// BASE_URL is Astro's configured base and defaults to '/'.
+		const url = equivalent
+			? withBase(`/${v.slug}/${equivalent}/`)
+			: withBase(`/${v.slug}/`);
 		return { ...v, url, isCurrent };
 	});
 

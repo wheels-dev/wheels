@@ -48,4 +48,10 @@ application.$wheels.restoreTestRunnerApplicationScope = true;
 // (e.g. `post_title`) favored by Rails/Laravel-style browser test selectors. Only emitted
 // when the id is auto-derived from objectName + property; a user-supplied `id` suppresses it.
 application.$wheels.formHelperDataAutoId = true;
+
+// When true, object-bound form helpers nest errorMessageOn() inside the field's
+// error wrapper (label + control + message). Framework default is false so
+// existing apps keep their current markup; `wheels new` opts in via settings.cfm
+// and scaffolds pass includeErrorMessage=true per field (#3549, #3550).
+application.$wheels.includeFormErrorMessages = false;
 </cfscript>

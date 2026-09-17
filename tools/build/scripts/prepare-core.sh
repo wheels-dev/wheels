@@ -37,9 +37,7 @@ cp NOTICE "${BUILD_DIR}/wheels/"
 # Ship ONLY the user-facing reference docs. The repo's docs/ tree also holds
 # internal working artifacts that must never reach a `box install` consumer:
 #
-#   docs/superpowers/   — AI planning specs/plans/patches (75+ files)
-#   docs/plans/         — internal implementation plans
-#   docs/releases/      — unpublished blog drafts, skeletons, social posts, audits
+#   docs/releases/      — roadmaps, backlog, unpublished drafts, audits
 #   docs/contributing/  — wheels-bot CI/automation architecture (internal)
 #
 # Use an explicit ALLOWLIST rather than `cp -r docs/*` + excludes so that any
@@ -51,7 +49,6 @@ mkdir -p "${BUILD_DIR}/wheels/docs"
 # User-facing reference subtrees/files (extend this list deliberately).
 DOCS_ALLOWLIST=(
     "api"                      # versioned API reference JSON
-    "AI_INTEGRATION_GUIDE.md"  # consumer-facing AI integration guide
     "wheels-vs-frameworks.md"  # consumer-facing framework comparison
 )
 for item in "${DOCS_ALLOWLIST[@]}"; do
@@ -61,6 +58,14 @@ for item in "${DOCS_ALLOWLIST[@]}"; do
         echo "  WARNING: allowlisted docs entry not found: docs/${item}" >&2
     fi
 done
+
+# Ship the CONSUMER AI doc tier (CLAUDE.md + AGENTS.md + .ai/) into the
+# artifact root and defensively strip any maintainer-only doc paths that a
+# future `cp -r vendor/wheels/*` change might drag in. Maintainer docs
+# (root CLAUDE.md invariants, .ai/) must never reach a `box install`
+# consumer.
+echo "Shipping consumer AI docs..."
+./tools/build/scripts/ship-consumer-docs.sh ship "${BUILD_DIR}/wheels"
 
 # Copy template files. The package now ships TWO manifests:
 #

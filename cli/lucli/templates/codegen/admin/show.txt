@@ -1,0 +1,34 @@
+<!--- Admin: |ObjectNameSingularC| Detail --->
+<cfparam name="|ObjectNameSingular|" default="">
+<cfoutput>
+<div class="container-fluid py-4">
+
+	<div class="d-flex justify-content-between align-items-center mb-4">
+		<h1>|ObjectNameSingularC| Detail</h1>
+		<div>
+			#linkTo(route="|ObjectNamePluralC|", text="Back to List", class="btn btn-outline-secondary")#
+			#linkTo(route="edit|ObjectNameSingularC|", key=|ObjectNameSingular|.key(), text="Edit", class="btn btn-primary")#
+		</div>
+	</div>
+
+	<div class="card mb-4">
+		<div class="card-header">
+			<h5 class="mb-0">|ObjectNameSingularC| Information</h5>
+		</div>
+		<div class="table-responsive">
+			<table class="table table-sm mb-0">
+				<tbody>
+					{{AdminShowFields}}
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+	{{AdminAssociationSections}}
+
+	<div class="mt-4">
+		#buttonTo(route="|ObjectNameSingularC|", method="delete", key=|ObjectNameSingular|.key(), text="Delete |ObjectNameSingularC|", confirm="Are you sure you want to delete this |ObjectNameSingularC|?", inputClass="btn btn-outline-danger")#
+	</div>
+
+</div>
+</cfoutput>

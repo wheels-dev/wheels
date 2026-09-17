@@ -17,10 +17,10 @@
 #   wheels db status       — surfaced by audit (same pattern)
 #   wheels db version      — surfaced by audit (same pattern)
 #
-# `wheels console` is excluded — its success path reads from stdin, so driving
-# it from a non-interactive shell test without a server is already covered by
-# type-parity with the other throws. (Same rationale as the TemplateNotFound
-# case in test-new-exit-codes.sh.)
+# `wheels console` is excluded here — its success path reads from stdin.
+# Connection/eval failures now throw `Wheels.ConsoleFailed` (same print-then-
+# throw contract as reload). Covered by ConsoleCommandSpec source + helper
+# tests, not this no-server smoke.
 #
 # Prerequisites:
 #   - wheels binary on PATH

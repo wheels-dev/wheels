@@ -9,15 +9,13 @@ description: URL rewriting instructions for Apache
 
 First in your web.xml add the following servlet mapping above the default servlet mapping:
 
-{% code title="web.xml" %}
-```
+```xml title="web.xml"
  <!-- The mapping for rewriting -->
     <servlet-mapping>
         <servlet-name>CFMLServlet</servlet-name>
         <url-pattern>/rewrite.cfm/*</url-pattern>
     </servlet-mapping>
 ```
-{% endcode %}
 
 For this you can use the global web.xml that for instance can be found at: /opt/lucee/tomcat/conf/web.xml.
 Or, if you are on shared hosting, use a local web.xml that for instance can be found at: yourwebroot/WEB-INF/web.xml.
@@ -35,8 +33,7 @@ If you have an older version of Apache and you're trying to run your Wheels site
 
 * Change the last line of the `.htaccess` file to the following: `RewriteRule ^(.*)$ /sub_folder_name_goes_here/rewrite.cfm/$1 [L]`. Don't forget to change `sub_folder_name_goes_here` to the actual folder name first of course.
 
-{% code title=".htaccess" %}
-```
+```apache title=".htaccess"
 Options +FollowSymLinks
 RewriteEngine On
 RewriteCond %{REQUEST_URI} ^.*/index.cfm/(.*)$ [NC]
@@ -44,6 +41,5 @@ RewriteRule ^.*/index.cfm/(.*)$ ./rewrite.cfm/$1 [NS,L]
 RewriteCond %{REQUEST_URI} !^.*/(flex2gateway|jrunscripts|cfide|cf_scripts|cfformgateway|cffileservlet|lucee|files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots.txt|favicon.ico|sitemap.xml|rewrite.cfm)($|/.*$) [NC]
 RewriteRule ^(.*)$ ./rewrite.cfm/$1 [NS,L]
 ```
-{% endcode %}
 
 Note that it's often considered better practice to include this URL rewriting configuration at the `<virtualhost>` block level, but get it working with a `.htaccess` file first.

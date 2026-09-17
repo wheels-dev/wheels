@@ -91,6 +91,37 @@ component {
 	}
 
 	/**
+	 * Port of the project's OWN running Lucee server, resolved from the
+	 * registry (`.project-path` matches this project AND the recorded pid is
+	 * alive). Returns 0 when no such server is registered or alive.
+	 *
+	 * This is the authoritative "is MY server running" answer — unlike a
+	 * bare port probe, it proves ownership via the `.project-path` marker,
+	 * so callers that must not attach to a sibling app (e.g. `wheels test`)
+	 * can refuse when it returns 0 instead of falling back to a heuristic
+	 * port that may belong to a different project.
+	 */
+	public numeric function ownServerPort(required string projectRoot) {
+		var name = serverNameFor(arguments.projectRoot);
+		if (!len(name)) return 0;
+		var reg = inspect(name, arguments.projectRoot);
+		if (!reg.alive || !reg.ours) return 0;
+
+		var pidFile = variables.lucliHome & "/servers/" & name & "/server.pid";
+		if (!fileExists(pidFile)) return 0;
+		try {
+			var raw = trim(fileRead(pidFile));
+			// LuCLI writes "<pid>:<port>" into server.pid. Split off the
+			// port; a pid-only file (older format) has no usable port.
+			if (listLen(raw, ":") > 1) {
+				var port = listGetAt(raw, 2, ":");
+				if (isNumeric(port) && val(port) > 0) return val(port);
+			}
+		} catch (any e) {}
+		return 0;
+	}
+
+	/**
 	 * Wipe a stale `<lucliHome>/servers/<name>/` registration directory so
 	 * the next `wheels start` boots cleanly. Best-effort — silently ignores
 	 * lock-induced delete failures (rare, but possible on Windows when a

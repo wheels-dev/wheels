@@ -132,6 +132,58 @@ component {
     }
 
     /**
+     * Best-effort: set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 in the JVM process
+     * environment before Playwright's driver ever spawns. Playwright Java's
+     * Driver.ensureDriverInstalled() runs `node driver/cli.js install` (a full
+     * browser download/check) on first create() UNLESS this env var is set.
+     * On machines where that subprocess stalls (broken node driver, network
+     * hang), the install step blocks with no timeout and wedges the entire
+     * test run — every later test request then queues on the test-runner lock
+     * indefinitely. Browsers are preinstalled by `wheels browser setup`, so
+     * skipping the install step is always correct here.
+     *
+     * Injection is reflective because System.getenv() returns an unmodifiable
+     * map. When the JVM forbids it (JPMS), the call is a silent no-op — the
+     * watchdog timeout in $launchBrowserGuarded() remains as the backstop.
+     */
+    public void function $ensurePlaywrightSkipBrowserDownload() {
+        if (structKeyExists(variables, "$skipEnvEnsured")) {
+            return;
+        }
+        variables.$skipEnvEnsured = true;
+        try {
+            var sys = createObject("java", "java.lang.System");
+            var current = sys.getenv("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD");
+            if (!isNull(current) && len(current)) {
+                return;
+            }
+            // Properties are harmless even if nothing reads them.
+            sys.setProperty("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1");
+            // Env map: JDK's Collections$UnmodifiableMap hides a mutable `m`
+            // field; the same shape sits under ProcessEnvironment's
+            // theUnmodifiableEnvironment. Walk declared fields so the lookup
+            // survives field-name changes across JDK versions.
+            var envMap = sys.getenv();
+            var mapFields = envMap.getClass().getDeclaredFields();
+            for (var mapField in mapFields) {
+                if (mapField.getName() != "m") {
+                    continue;
+                }
+                mapField.setAccessible(true);
+                var innerMap = mapField.get(envMap);
+                if (isObject(innerMap)) {
+                    innerMap.put("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1");
+                }
+                break;
+            }
+        } catch (any e) {
+            // JPMS blocks setAccessible on java.lang internals (Java 17+), a
+            // SecurityManager may deny access, or the field moved. The
+            // watchdog timeout still bounds any launch.
+        }
+    }
+
+    /**
      * Dynamically loads the Playwright runtime JARs into a URLClassLoader so
      * classloader lookups (`loadClass(...)`) can resolve Playwright classes.
      * The servlet's default classpath doesn't include them.
@@ -180,6 +232,10 @@ component {
 
         variables.$classLoader = classLoader;
         variables.$state = "ready";
+
+        // Must run before the first Playwright.create(): the driver's
+        // ensureDriverInstalled() consults the env var at spawn time.
+        $ensurePlaywrightSkipBrowserDownload();
     }
 
     /**
@@ -195,15 +251,17 @@ component {
      * into Playwright's runtime code.
      */
     private any function $pushTCCL() {
-        var thread = createObject("java", "java.lang.Thread").currentThread();
-        var previous = thread.getContextClassLoader();
-        thread.setContextClassLoader(variables.$classLoader);
+        // Named `currentThread` deliberately — `thread` collides with the
+        // CFML thread scope when this runs inside the launch watchdog thread.
+        var currentThread = createObject("java", "java.lang.Thread").currentThread();
+        var previous = currentThread.getContextClassLoader();
+        currentThread.setContextClassLoader(variables.$classLoader);
         return previous;
     }
 
     private void function $popTCCL(required any previousLoader) {
-        createObject("java", "java.lang.Thread").currentThread()
-            .setContextClassLoader(arguments.previousLoader);
+        var currentThread = createObject("java", "java.lang.Thread").currentThread();
+        currentThread.setContextClassLoader(arguments.previousLoader);
     }
 
     /**
@@ -214,9 +272,18 @@ component {
      * first calls can't both run Playwright.create()/launch() and orphan
      * an instance.
      *
-     * @engine One of: chromium, firefox, webkit
+     * The launch itself runs in $launchBrowserGuarded(), which bounds it with
+     * a watchdog: a Playwright driver that stalls forever (broken node
+     * runtime, network hang during the implicit browser-install step) used to
+     * wedge the entire test suite indefinitely. The watchdog converts that
+     * into a typed timeout exception after launchTimeoutMs.
+     *
+     * @engine           One of: chromium, firefox, webkit
+     * @launchTimeoutMs  Watchdog bound for a fresh launch (cached hits return
+     *                    immediately). Generous on purpose — normal launches
+     *                    finish in seconds, the bound only trips on stalls.
      */
-    public any function acquireBrowser(string engine = "chromium") {
+    public any function acquireBrowser(string engine = "chromium", numeric launchTimeoutMs = 60000) {
         if (variables.$state != "ready") {
             throw(
                 type="Wheels.BrowserLauncherNotReady",
@@ -229,15 +296,93 @@ component {
             return cached;
         }
 
-        lock name="wheelsBrowserLauncherAcquire" type="exclusive" timeout="60" {
-            // Re-check inside the lock — another thread may have launched
-            // while we were waiting.
-            cached = $liveCachedBrowser(engine=arguments.engine);
-            if (isObject(cached)) {
-                return cached;
-            }
-            return $launchBrowser(engine=arguments.engine);
+        // A previous launch already blew its watchdog — fail fast instead of
+        // paying the full timeout again on every subsequent spec. This stays
+        // self-healing: if the stalled worker thread DID eventually finish and
+        // cached a live browser, the cache check above short-circuits first.
+        if (variables.$launchFailed ?: false) {
+            throw(
+                type="Wheels.BrowserLaunchTimedOut",
+                message="A previous browser launch for this launcher timed out; skipping further launches."
+            );
         }
+
+        return $launchBrowserGuarded(
+            engine=arguments.engine,
+            timeoutMs=arguments.launchTimeoutMs
+        );
+    }
+
+    /**
+     * Runs $launchBrowser() inside a watchdog CFML thread and joins with a
+     * timeout. On success the worker returns the Browser through its thread
+     * scope. On timeout the main thread throws Wheels.BrowserLaunchTimedOut
+     * and records the failure on the launcher (fast-fail for later specs);
+     * the worker thread, if it eventually finishes, may still cache a live
+     * browser, which the acquireBrowser() cache check then honors.
+     *
+     * The double-checked wheelsBrowserLauncherAcquire lock moves inside the
+     * worker so a stalled launch cannot pin the lock on the request thread.
+     */
+    public any function $launchBrowserGuarded(
+        required string engine,
+        numeric timeoutMs = 60000
+    ) {
+        var ticket = "wheelsBrowserLaunch_" & replace(createUUID(), "-", "", "all");
+        thread
+            action="run"
+            name="#ticket#"
+            engine="#arguments.engine#"
+        {
+            try {
+                lock name="wheelsBrowserLauncherAcquire" type="exclusive" timeout="120" {
+                    var live = $liveCachedBrowser(engine=attributes.engine);
+                    if (!isObject(live)) {
+                        live = $launchBrowser(engine=attributes.engine);
+                    }
+                    thread.launchResult = live;
+                }
+            } catch (any e) {
+                // Copy the typed failure into a plain struct (exception
+                // objects don't round-trip thread scope on every engine) so
+                // the main thread can rethrow it with its original type.
+                thread.launchError = {
+                    type: e.type,
+                    message: e.message,
+                    detail: e.detail ?: "",
+                    stack: e.stackTrace ?: "",
+                    tag: serializeJSON(e.tagContext ?: [])
+                };
+            }
+        }
+
+        thread action="join" name="#ticket#" timeout="#arguments.timeoutMs#";
+
+        var finished = cfthread[ticket];
+        if (structKeyExists(finished, "status") && finished.status == "COMPLETED") {
+            if (structKeyExists(finished, "launchError")) {
+                // Preserve the original typed failure (BrowserEngineInvalid,
+                // BrowserLaunchFailed, lock timeout, ...) so callers' catch
+                // semantics hold — a failed-but-bounded launch is NOT a stall.
+                var launchError = finished.launchError;
+                throw(
+                    type=launchError.type,
+                    message="[MARKER9] " & launchError.message,
+                    detail=(len(launchError.stack) ? launchError.stack : (len(launchError.tag) ? launchError.tag : launchError.detail))
+                );
+            }
+            if (structKeyExists(finished, "launchResult")) {
+                return finished.launchResult;
+            }
+        }
+
+        variables.$launchFailed = true;
+        throw(
+            type="Wheels.BrowserLaunchTimedOut",
+            message="Browser launch for '" & arguments.engine & "' did not complete within "
+                & arguments.timeoutMs & "ms. The Playwright node driver is likely stalled; "
+                & "run `wheels browser setup` and retry."
+        );
     }
 
     /**

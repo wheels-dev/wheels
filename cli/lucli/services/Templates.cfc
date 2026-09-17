@@ -49,6 +49,13 @@ component {
 
 		var destinationPath = variables.projectRoot & "/" & arguments.destination;
 
+		// Dry run (request.$wheelsGenerateDryRun set by `wheels generate
+		// --dry-run`): record the would-be path, write nothing.
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, destinationPath);
+			return {success: true, path: destinationPath, message: "Dry run — not written", dryRun: true};
+		}
+
 		// Ensure destination directory exists
 		var destinationDir = getDirectoryFromPath(destinationPath);
 		if (!directoryExists(destinationDir)) {
@@ -66,122 +73,13 @@ component {
 	public string function processTemplate(required string content, required struct context) {
 		var processed = arguments.content;
 
-		// Replace {{variable}} with context values (skip special keys)
-		var skipKeys = ["belongsTo", "hasMany", "hasOne", "belongsToRelationships", "hasManyRelationships", "properties", "actions"];
-		for (var key in arguments.context) {
-			if (arrayFindNoCase(skipKeys, key)) continue;
-			var value = arguments.context[key];
-			if (isSimpleValue(value)) {
-				processed = reReplace(processed, "\{\{#key#\}\}", toString(value), "all");
-			}
-		}
-
-		// Handle name variations
-		if (structKeyExists(arguments.context, "name")) {
-			var name = arguments.context.name;
-			processed = reReplace(processed, "\{\{nameSingular\}\}", name, "all");
-			processed = reReplace(processed, "\{\{namePlural\}\}", variables.helpers.pluralize(name), "all");
-			processed = reReplace(processed, "\{\{nameSingularLower\}\}", lCase(name), "all");
-			processed = reReplace(processed, "\{\{namePluralLower\}\}", lCase(variables.helpers.pluralize(name)), "all");
-			processed = reReplace(processed, "\{\{nameSingularUpper\}\}", uCase(name), "all");
-			processed = reReplace(processed, "\{\{namePluralUpper\}\}", uCase(variables.helpers.pluralize(name)), "all");
-		}
-
-		// Process relationship placeholders
+		processed = $processTemplateVariables(processed, arguments.context);
 		processed = processRelationships(processed, arguments.context);
-
-		// Process {{validations}} placeholder. Prefer the pre-built `validations`
-		// code string from context (populated by CodeGen.generateModel); fall back
-		// to deriving from the legacy `attributes` string shape for callers that
-		// still use it.
-		var validationCode = "";
-		if (structKeyExists(arguments.context, "validations") && isSimpleValue(arguments.context.validations)) {
-			validationCode = arguments.context.validations;
-		} else if (structKeyExists(arguments.context, "attributes") && len(arguments.context.attributes)) {
-			var attributesStruct = parseAttributes(arguments.context.attributes);
-			validationCode = generateValidationCode(attributesStruct);
-		}
-		processed = reReplace(processed, "\{\{validations\}\}", validationCode, "all");
-
-		// Process {{enums}} placeholder. Mirrors {{validations}}: CodeGen.generateModel
-		// pre-builds an `enums` code string of enum(property=..., values=...) lines for
-		// any name:enum:a,b,c properties. Explicit (not just the generic {{key}} loop)
-		// so it's substituted even when empty. CLI audit M2.
-		var enumCode = (structKeyExists(arguments.context, "enums") && isSimpleValue(arguments.context.enums)) ? arguments.context.enums : "";
-		processed = reReplace(processed, "\{\{enums\}\}", enumCode, "all");
-
-		// Process actions for controllers
-		if (structKeyExists(arguments.context, "actions") && isArray(arguments.context.actions)) {
-			var actionsCode = generateActionsCode(arguments.context.actions);
-			processed = replace(processed, "|Actions|", actionsCode, "all");
-		} else {
-			processed = replace(processed, "|Actions|", "", "all");
-		}
-
-		// Process helper functions
-		if (structKeyExists(arguments.context, "functions") && isArray(arguments.context.functions)) {
-			var helperFunctionsCode = generateHelperFunctionsCode(arguments.context.functions, arguments.context);
-			processed = replace(processed, "|HelperFunctions|", helperFunctionsCode, "all");
-		} else {
-			processed = replace(processed, "|HelperFunctions|", "", "all");
-		}
-
-		// Process description comment
-		if (structKeyExists(arguments.context, "description") && len(trim(arguments.context.description))) {
-			var descComment = "/**" & chr(10) & " * " & arguments.context.description & chr(10) & " */" & chr(10);
-			processed = replace(processed, "|DescriptionComment|", descComment, "all");
-		} else {
-			processed = replace(processed, "|DescriptionComment|", "", "all");
-		}
-
-		// Process custom table name
-		if (structKeyExists(arguments.context, "tableName") && len(trim(arguments.context.tableName))) {
-			var tableNameCall = 'table("' & arguments.context.tableName & '");' & chr(10) & chr(9) & chr(9);
-			processed = replace(processed, "|TableName|", tableNameCall, "all");
-		} else {
-			processed = replace(processed, "|TableName|", "", "all");
-		}
-
-		// Process form fields
-		if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties) && structKeyExists(arguments.context, "modelName")) {
-			var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
-			var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName, belongsToList);
-			processed = replace(processed, "|FormFields|", formFieldsCode, "all");
-		} else {
-			processed = replace(processed, "|FormFields|", "", "all");
-		}
-
-		// Process |DisplayProperty| — the column name used for human-readable
-		// scaffold headings/links. Defaults to `id` (matches legacy behavior),
-		// but if the properties list contains a string column we use that
-		// instead so scaffolded show.cfm/index.cfm don't lead with a numeric
-		// primary key. Onboarding F4.
-		processed = replace(
-			processed,
-			"|DisplayProperty|",
-			pickDisplayProperty(arguments.context.properties ?: []),
-			"all"
-		);
-
-		// Process controller includes for associations
-		if (structKeyExists(arguments.context, "belongsTo") && len(arguments.context.belongsTo)) {
-			processed = addControllerIncludes(processed, arguments.context.belongsTo);
-		}
-
-		// Process CLI-Appends markers for index/show views
-		if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties)) {
-			var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
-			processed = processViewMarkers(processed, arguments.context, belongsToList);
-		}
-
-		// Process pipe-delimited object name placeholders (must be last)
-		if (structKeyExists(arguments.context, "modelName")) {
-			var modelName = listLast(arguments.context.modelName, "/");
-			processed = replace(processed, "|ObjectNameSingular|", lCase(modelName), "all");
-			processed = replace(processed, "|ObjectNamePlural|", lCase(variables.helpers.pluralize(modelName)), "all");
-			processed = replace(processed, "|ObjectNameSingularC|", modelName, "all");
-			processed = replace(processed, "|ObjectNamePluralC|", variables.helpers.pluralize(modelName), "all");
-		}
+		processed = $processCodegenPlaceholders(processed, arguments.context);
+		processed = $processControllerPlaceholders(processed, arguments.context);
+		processed = $processFormPlaceholders(processed, arguments.context);
+		processed = $processAssociationPlaceholders(processed, arguments.context);
+		processed = $processObjectNamePlaceholders(processed, arguments.context);
 
 		// Final cleanup: remove orphan whitespace-only lines left behind by
 		// empty placeholders (e.g. `\t\t{{hasManyRelationships}}` when no
@@ -191,6 +89,161 @@ component {
 		processed = collapseEmptyLines(processed);
 
 		return processed;
+	}
+
+	/**
+	 * Replace {{variable}} with context values (skip special keys) and expand
+	 * the name-variation placeholders ({{nameSingular}}, {{namePlural}}, ...).
+	 */
+	private string function $processTemplateVariables(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		var skipKeys = ["belongsTo", "hasMany", "hasOne", "belongsToRelationships", "hasManyRelationships", "properties", "actions"];
+		for (var key in arguments.context) {
+			if (arrayFindNoCase(skipKeys, key)) continue;
+			var value = arguments.context[key];
+			if (isSimpleValue(value)) {
+				result = reReplace(result, "\{\{#key#\}\}", toString(value), "all");
+			}
+		}
+
+		// Handle name variations
+		if (structKeyExists(arguments.context, "name")) {
+			var name = arguments.context.name;
+			result = reReplace(result, "\{\{nameSingular\}\}", name, "all");
+			result = reReplace(result, "\{\{namePlural\}\}", variables.helpers.pluralize(name), "all");
+			result = reReplace(result, "\{\{nameSingularLower\}\}", lCase(name), "all");
+			result = reReplace(result, "\{\{namePluralLower\}\}", lCase(variables.helpers.pluralize(name)), "all");
+			result = reReplace(result, "\{\{nameSingularUpper\}\}", uCase(name), "all");
+			result = reReplace(result, "\{\{namePluralUpper\}\}", uCase(variables.helpers.pluralize(name)), "all");
+		}
+
+		return result;
+	}
+
+	/**
+	 * Process {{validations}} and {{enums}} placeholders. Both prefer the
+	 * pre-built code string from context (populated by CodeGen.generateModel);
+	 * {{validations}} falls back to deriving from the legacy `attributes`
+	 * string shape for callers that still use it. CLI audit M2.
+	 */
+	private string function $processCodegenPlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		var validationCode = "";
+		if (structKeyExists(arguments.context, "validations") && isSimpleValue(arguments.context.validations)) {
+			validationCode = arguments.context.validations;
+		} else if (structKeyExists(arguments.context, "attributes") && len(arguments.context.attributes)) {
+			var attributesStruct = parseAttributes(arguments.context.attributes);
+			validationCode = generateValidationCode(attributesStruct);
+		}
+		result = reReplace(result, "\{\{validations\}\}", validationCode, "all");
+
+		var enumCode = (structKeyExists(arguments.context, "enums") && isSimpleValue(arguments.context.enums)) ? arguments.context.enums : "";
+		result = reReplace(result, "\{\{enums\}\}", enumCode, "all");
+
+		return result;
+	}
+
+	/**
+	 * Process |Actions|, |HelperFunctions| and |DescriptionComment| placeholders.
+	 */
+	private string function $processControllerPlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		if (structKeyExists(arguments.context, "actions") && isArray(arguments.context.actions)) {
+			var actionsCode = generateActionsCode(arguments.context.actions);
+			result = replace(result, "|Actions|", actionsCode, "all");
+		} else {
+			result = replace(result, "|Actions|", "", "all");
+		}
+
+		if (structKeyExists(arguments.context, "functions") && isArray(arguments.context.functions)) {
+			var helperFunctionsCode = generateHelperFunctionsCode(arguments.context.functions, arguments.context);
+			result = replace(result, "|HelperFunctions|", helperFunctionsCode, "all");
+		} else {
+			result = replace(result, "|HelperFunctions|", "", "all");
+		}
+
+		if (structKeyExists(arguments.context, "description") && len(trim(arguments.context.description))) {
+			var descComment = "/**" & chr(10) & " * " & arguments.context.description & chr(10) & " */" & chr(10);
+			result = replace(result, "|DescriptionComment|", descComment, "all");
+		} else {
+			result = replace(result, "|DescriptionComment|", "", "all");
+		}
+
+		return result;
+	}
+
+	/**
+	 * Process |TableName|, |FormFields| and |DisplayProperty| placeholders.
+	 */
+	private string function $processFormPlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		if (structKeyExists(arguments.context, "tableName") && len(trim(arguments.context.tableName))) {
+			var tableNameCall = 'table("' & arguments.context.tableName & '");' & chr(10) & chr(9) & chr(9);
+			result = replace(result, "|TableName|", tableNameCall, "all");
+		} else {
+			result = replace(result, "|TableName|", "", "all");
+		}
+
+		if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties) && structKeyExists(arguments.context, "modelName")) {
+			var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
+			var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName, belongsToList);
+			result = replace(result, "|FormFields|", formFieldsCode, "all");
+		} else {
+			result = replace(result, "|FormFields|", "", "all");
+		}
+
+		// |DisplayProperty| is the column name used for human-readable scaffold
+		// headings/links. Defaults to `id` (matches legacy behavior), but if the
+		// properties list contains a string column we use that instead so
+		// scaffolded show.cfm/index.cfm don't lead with a numeric primary key.
+		result = replace(
+			result,
+			"|DisplayProperty|",
+			pickDisplayProperty(arguments.context.properties ?: []),
+			"all"
+		);
+
+		return result;
+	}
+
+	/**
+	 * Process controller includes and CLI-Appends view markers, both driven by
+	 * the association context (belongsTo / properties).
+	 */
+	private string function $processAssociationPlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		if (structKeyExists(arguments.context, "belongsTo") && len(arguments.context.belongsTo)) {
+			result = addControllerIncludes(result, arguments.context.belongsTo);
+		}
+
+		if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties)) {
+			var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
+			result = processViewMarkers(result, arguments.context, belongsToList);
+		}
+
+		return result;
+	}
+
+	/**
+	 * Process pipe-delimited object name placeholders (must be last).
+	 */
+	private string function $processObjectNamePlaceholders(required string processed, required struct context) {
+		var result = arguments.processed;
+
+		if (structKeyExists(arguments.context, "modelName")) {
+			var modelName = listLast(arguments.context.modelName, "/");
+			result = replace(result, "|ObjectNameSingular|", lCase(modelName), "all");
+			result = replace(result, "|ObjectNamePlural|", lCase(variables.helpers.pluralize(modelName)), "all");
+			result = replace(result, "|ObjectNameSingularC|", modelName, "all");
+			result = replace(result, "|ObjectNamePluralC|", variables.helpers.pluralize(modelName), "all");
+		}
+
+		return result;
 	}
 
 	/**
@@ -430,7 +483,8 @@ component {
 		for (var prop in arguments.properties) {
 			var t = lCase(prop.type ?: "string");
 			var n = prop.name ?: "";
-			if (t == "string" && right(n, 2) != "Id" && n != "id") {
+			// Skip foreign keys in BOTH conventions — post_id as well as postId.
+			if (t == "string" && right(n, 2) != "Id" && right(n, 3) != "_id" && n != "id") {
 				return n;
 			}
 		}
@@ -458,25 +512,55 @@ component {
 			var fieldCode = "";
 
 			if (arrayFindNoCase(foreignKeys, fieldName)) {
-				var associationName = left(fieldName, len(fieldName) - 2);
-				var associationModel = variables.helpers.capitalize(associationName);
-				fieldCode = '##select(objectName="|ObjectNameSingular|", property="#fieldName#", options=model("#associationModel#").findAll(), textField="name", valueField="id", includeBlank="Select #associationModel#", label="#fieldLabel#")##';
+				var fk = $foreignKeyParts(fieldName);
+				// Label the parent picker with the parent's own display column
+				// rather than a hardcoded "name" — a scaffolded Post has a
+				// title, so a "name" textField rendered a dropdown of blanks.
+				var labelField = $resolveParentDisplayField(fk.model);
+				fieldCode = $scaffoldFieldCall(
+					helperName = "select",
+					fieldName = fieldName,
+					fieldLabel = variables.helpers.capitalize(fk.association),
+					extraArgs = 'options=model("#fk.model#").findAll(), textField="#labelField#", valueField="id", includeBlank="Select #fk.model#"'
+				);
 			} else {
 				switch (lCase(fieldType)) {
 					case "boolean":
-						fieldCode = '##checkBox(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+						// Checkboxes stay beside their label (around placement).
+						fieldCode = $scaffoldFieldCall(
+							helperName = "checkBox",
+							fieldName = fieldName,
+							fieldLabel = fieldLabel,
+							stacked = false
+						);
 						break;
 					case "text": case "longtext":
-						fieldCode = '##textArea(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+						fieldCode = $scaffoldFieldCall(
+							helperName = "textArea",
+							fieldName = fieldName,
+							fieldLabel = fieldLabel
+						);
 						break;
 					case "date":
-						fieldCode = '##dateSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+						fieldCode = $scaffoldDateFieldCall(
+							helperName = "dateSelect",
+							fieldName = fieldName,
+							fieldLabel = fieldLabel
+						);
 						break;
 					case "datetime": case "timestamp":
-						fieldCode = '##dateTimeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+						fieldCode = $scaffoldDateFieldCall(
+							helperName = "dateTimeSelect",
+							fieldName = fieldName,
+							fieldLabel = fieldLabel
+						);
 						break;
 					case "time":
-						fieldCode = '##timeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+						fieldCode = $scaffoldDateFieldCall(
+							helperName = "timeSelect",
+							fieldName = fieldName,
+							fieldLabel = fieldLabel
+						);
 						break;
 					case "enum":
 						// Render a <select> with the enum's values. The
@@ -489,20 +573,77 @@ component {
 							enumValues = $resolveEnumValuesFromModel(arguments.modelName, fieldName);
 						}
 						if (len(enumValues)) {
-							fieldCode = '##select(objectName="|ObjectNameSingular|", property="#fieldName#", options="#enumValues#", label="#fieldLabel#")##';
+							fieldCode = $scaffoldFieldCall(
+								helperName = "select",
+								fieldName = fieldName,
+								fieldLabel = fieldLabel,
+								extraArgs = 'options="#enumValues#"'
+							);
 						} else {
 							// Fall back to a textField if we couldn't find
 							// the values — better than crashing the scaffold.
-							fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+							fieldCode = $scaffoldFieldCall(
+								helperName = "textField",
+								fieldName = fieldName,
+								fieldLabel = fieldLabel
+							);
 						}
 						break;
 					default:
-						fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+						fieldCode = $scaffoldFieldCall(
+							helperName = "textField",
+							fieldName = fieldName,
+							fieldLabel = fieldLabel
+						);
 				}
 			}
 			arrayAppend(fields, fieldCode);
 		}
 		return arrayToList(fields, chr(10));
+	}
+
+	/**
+	 * One scaffolded field: `.field` wrapper, label above the control
+	 * (except checkboxes), and includeErrorMessage so validation text
+	 * lives in the field block (#3549, #3550).
+	 */
+	private string function $scaffoldFieldCall(
+		required string helperName,
+		required string fieldName,
+		required string fieldLabel,
+		boolean stacked = true,
+		string extraArgs = ""
+	) {
+		var call = '##' & arguments.helperName & '(objectName="|ObjectNameSingular|", property="#arguments.fieldName#", label="#arguments.fieldLabel#"';
+		if (arguments.stacked) {
+			call &= ', labelPlacement="before"';
+		}
+		call &= ', includeErrorMessage=true';
+		if (len(arguments.extraArgs)) {
+			call &= ', ' & arguments.extraArgs;
+		}
+		call &= ')##';
+		return '<div class="field">' & chr(10) & call & chr(10) & '</div>';
+	}
+
+	/**
+	 * One scaffolded date/time field: a single <label> above the composite
+	 * control, WITHOUT labelPlacement/includeErrorMessage on the helper. The
+	 * dateSelect/dateTimeSelect/timeSelect helpers render a sub-select per
+	 * component (3 for date, 6 for datetime), so passing label/error through
+	 * them repeated the label and validation message once per sub-select
+	 * (#3553). The top-level errorMessagesFor() still shows the error once.
+	 */
+	private string function $scaffoldDateFieldCall(
+		required string helperName,
+		required string fieldName,
+		required string fieldLabel
+	) {
+		var call = '##' & arguments.helperName & '(objectName="|ObjectNameSingular|", property="' & arguments.fieldName & '")##';
+		return '<div class="field">' & chr(10)
+			& '<label>' & arguments.fieldLabel & '</label>' & chr(10)
+			& call & chr(10)
+			& '</div>';
 	}
 
 	/**
@@ -543,14 +684,21 @@ component {
 	private string function generateIndexArticleBody(required array properties, string belongsTo = "") {
 		var blocks = [];
 		var foreignKeys = buildForeignKeyList(arguments.belongsTo);
+		// The display property already appears in the article's <h2> link, and
+		// framework-managed columns are noise in a list — don't repeat them.
+		var displayProperty = pickDisplayProperty(arguments.properties);
+		var skipped = ["id", "createdAt", "updatedAt", "deletedAt"];
 
 		for (var prop in arguments.properties) {
+			if (prop.name == displayProperty || arrayFindNoCase(skipped, prop.name)) {
+				continue;
+			}
 			var label = variables.helpers.capitalize(prop.name);
 			if (arrayFindNoCase(foreignKeys, prop.name)) {
 				// findAll() returns a flat query — association objects are not
 				// reachable inside a query-driven cfloop, so posts.author.name throws.
 				// Keep the friendly label but render the raw FK column value.
-				label = variables.helpers.capitalize(left(prop.name, len(prop.name) - 2));
+				label = variables.helpers.capitalize($foreignKeyParts(prop.name).association);
 			}
 			arrayAppend(blocks, '<p>' & label & ': ##|ObjectNamePlural|.' & prop.name & '##</p>');
 		}
@@ -567,7 +715,7 @@ component {
 		for (var prop in arguments.properties) {
 			var headerName = variables.helpers.capitalize(prop.name);
 			if (arrayFindNoCase(foreignKeys, prop.name)) {
-				headerName = variables.helpers.capitalize(left(prop.name, len(prop.name) - 2));
+				headerName = variables.helpers.capitalize($foreignKeyParts(prop.name).association);
 			}
 			arrayAppend(headers, '<th>#headerName#</th>');
 		}
@@ -598,12 +746,22 @@ component {
 	private string function generateShowViewProperties(required array properties, required string modelName, string belongsTo = "") {
 		var displayCode = [];
 		var foreignKeys = buildForeignKeyList(arguments.belongsTo);
+		// The display property already appears in the <h1>, and framework-managed
+		// columns are noise — don't repeat them in the detail list.
+		var displayProperty = pickDisplayProperty(arguments.properties);
+		var skipped = ["id", "createdAt", "updatedAt", "deletedAt"];
 
 		for (var prop in arguments.properties) {
+			if (prop.name == displayProperty || arrayFindNoCase(skipped, prop.name)) {
+				continue;
+			}
 			var propDisplay = '<p>' & chr(10);
 			if (arrayFindNoCase(foreignKeys, prop.name)) {
-				var assocName = left(prop.name, len(prop.name) - 2);
-				propDisplay &= chr(9) & '<strong>#variables.helpers.capitalize(assocName)#:</strong> ##encodeForHTML(|ObjectNameSingular|.' & assocName & '.name)##' & chr(10);
+				var fk = $foreignKeyParts(prop.name);
+				// Link to the parent record and show its label, so the detail
+				// page shows the relationship instead of a raw foreign key.
+				var labelField2 = $resolveParentDisplayField(fk.model);
+				propDisplay &= chr(9) & '<strong>#variables.helpers.capitalize(fk.association)#:</strong> ##linkTo(route="' & fk.association & '", key=|ObjectNameSingular|.' & fk.association & '.id, text=|ObjectNameSingular|.' & fk.association & '.' & labelField2 & ')##' & chr(10);
 			} else {
 				propDisplay &= chr(9) & '<strong>#variables.helpers.capitalize(prop.name)#:</strong> ##encodeForHTML(|ObjectNameSingular|.#prop.name#)##' & chr(10);
 			}
@@ -653,10 +811,74 @@ component {
 		var foreignKeys = [];
 		if (len(arguments.belongsTo)) {
 			for (var parent in listToArray(arguments.belongsTo)) {
-				arrayAppend(foreignKeys, lCase(trim(parent)) & "Id");
+				var name = lCase(trim(parent));
+				// BOTH conventions. The camelCase form (postId) is the framework
+				// default, but `wheels new` scaffolds apps with
+				// useUnderscoreReferenceColumns=true, so the column the migrator
+				// actually creates is post_id. Recognising only camelCase meant
+				// every belongsTo field in a freshly scaffolded app silently
+				// degraded to a raw id text input instead of a parent picker.
+				arrayAppend(foreignKeys, name & "Id");
+				arrayAppend(foreignKeys, name & "_id");
 			}
 		}
 		return foreignKeys;
+	}
+
+	/**
+	 * Split a foreign-key column name into its association name and parent
+	 * model, for either convention: postId / post_id -> post / Post.
+	 */
+	private struct function $foreignKeyParts(required string fieldName) {
+		var n = arguments.fieldName;
+		if (right(n, 3) == "_id") {
+			n = left(n, len(n) - 3);
+		} else if (right(n, 2) == "Id") {
+			n = left(n, len(n) - 2);
+		}
+		return { association = n, model = variables.helpers.capitalize(n) };
+	}
+
+	/**
+	 * Best human-readable column to label a parent record with, resolved from
+	 * the parent's own create-table migration. Falls back to "name" so the
+	 * generated code is still valid when the parent was not scaffolded here.
+	 */
+	private string function $resolveParentDisplayField(required string parentModel) {
+		var fallback = "name";
+		var migrationsDir = variables.projectRoot & "/app/migrator/migrations";
+		if (!directoryExists(migrationsDir)) {
+			return fallback;
+		}
+		var tableName = lCase(variables.helpers.pluralize(arguments.parentModel));
+		for (var f in directoryList(migrationsDir, false, "name", "*create_*_table.cfc")) {
+			var src = fileRead(migrationsDir & "/" & f);
+			// Generated migrations use single quotes and the `createTable`
+			// helper (createTable(name='posts', ...)); hand-written ones may use
+			// double quotes, the `table` alias, or the singular columnName.
+			if (!reFindNoCase("(?:createTable|table)\(\s*name\s*=\s*['""]#tableName#['""]", src)) {
+				continue;
+			}
+			var cols = [];
+			for (var decl in reMatchNoCase("(?:columnNames|columnName)\s*=\s*['""][^'""]+['""]", src)) {
+				for (var one in listToArray(reReplaceNoCase(decl, ".*['""]([^'""]+)['""].*", "\1"))) {
+					arrayAppend(cols, trim(one));
+				}
+			}
+			for (var candidate in ["title", "name", "label", "subject", "heading", "username", "email"]) {
+				if (arrayFindNoCase(cols, candidate)) {
+					return candidate;
+				}
+			}
+			for (var c in cols) {
+				var lc = lCase(c);
+				if (lc == "id" || right(lc, 3) == "_id" || listFindNoCase("createdat,updatedat,deletedat", lc)) {
+					continue;
+				}
+				return c;
+			}
+		}
+		return fallback;
 	}
 
 	/**

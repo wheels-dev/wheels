@@ -10,11 +10,12 @@ component extends="wheels.Global"{
 	public function announce(required string message) {
 		param name="request.$wheelsMigrationOutput" default="";
 		request.$wheelsMigrationOutput = request.$wheelsMigrationOutput & arguments.message & Chr(13) & Chr(10);
+		request.$wheelsMigrationDidAnnounce = true;
 	}
 
 	public string function $getDBType(string dataSource = "") {
 		local.appKey = $appKey();
-		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : $migratorDataSource();
 
 		// Memoize the resolved adapter name per datasource: engine identity is
 		// stable for the life of the application, and discovery paths (e.g.
@@ -28,11 +29,12 @@ component extends="wheels.Global"{
 			return application[local.appKey].$migratorAdapterNames[local.dsName];
 		}
 
+		local.creds = $migratorDataSourceCredentials();
 		local.info = $dbinfo(
 			type = "version",
 			datasource = local.dsName,
-			username = application[local.appKey].dataSourceUserName,
-			password = application[local.appKey].dataSourcePassword
+			username = local.creds.username,
+			password = local.creds.password
 		);
 		local.adapterName = "";
 		if (
@@ -121,23 +123,42 @@ component extends="wheels.Global"{
 		local.quotedTable = this.adapter.quoteTableName(arguments.table);
 		try {
 			$query(
-				datasource = application[local.appKey].dataSourceName,
+				datasource = $migratorDataSource(),
 				sql = "SELECT 1 FROM #local.quotedTable# WHERE 1=0"
 			);
 		} catch (any e) {
 			local.state.tableExists = false;
 		}
 		if (local.state.tableExists) {
+			local.creds = $migratorDataSourceCredentials();
 			local.foreignKeys = $dbinfo(
 				type = "foreignkeys",
 				table = arguments.table,
-				datasource = application[local.appKey].dataSourceName,
-				username = application[local.appKey].dataSourceUserName,
-				password = application[local.appKey].dataSourcePassword
+				datasource = $migratorDataSource(),
+				username = local.creds.username,
+				password = local.creds.password
 			);
-			local.foreignKeyList = ValueList(local.foreignKeys.FKCOLUMN_NAME);
+			// S2: FKCOLUMN_NAME is the local column, not the constraint name.
+			// Adobe dropTable() fed that list to dropForeignKey(keyname=).
+			local.foreignKeyList = $foreignKeyConstraintNames(local.foreignKeys);
 		}
 		return local.foreignKeyList;
+	}
+
+	/**
+	 * Constraint names from a cfdbinfo(type="foreignkeys") query.
+	 * Prefers FK_NAME. Never falls back to FKCOLUMN_NAME — that is the
+	 * referencing column, and using it as a constraint name breaks DROP
+	 * on Adobe / non-SQLite.
+	 */
+	public string function $foreignKeyConstraintNames(required query foreignKeys) {
+		if (
+			IsQuery(arguments.foreignKeys)
+			&& ListFindNoCase(arguments.foreignKeys.columnList, "FK_NAME")
+		) {
+			return ValueList(arguments.foreignKeys.FK_NAME);
+		}
+		return "";
 	}
 
 	private void function $execute(required any sql, string dataSource = "") {
@@ -152,7 +173,7 @@ component extends="wheels.Global"{
 			return;
 		}
 		local.appKey = $appKey();
-		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : $migratorDataSource();
 		// Executed statements may change the schema — drop the request-scoped
 		// column cache so the next $getColumns() re-probes.
 		StructDelete(request, "$wheelsMigratorColumns");
@@ -167,7 +188,7 @@ component extends="wheels.Global"{
 	 */
 	private void function $executeWithParams(required string sql, required array params, string dataSource = "") {
 		local.appKey = $appKey();
-		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : $migratorDataSource();
 		local.prepared = $prepareMigrationSql(sql = arguments.sql, dsName = local.dsName);
 		if (!local.prepared.captured) {
 			queryExecute(local.prepared.sql, arguments.params, {datasource: local.dsName});
@@ -205,6 +226,8 @@ component extends="wheels.Global"{
 			}
 			ArrayAppend(request.$wheelsDebugSQLResult, local.sql);
 		}
+		// Any real SQL (including debug capture) means this step is not announce-only.
+		request.$wheelsMigrationDidExecute = true;
 		return {sql: local.sql, captured: local.captured};
 	}
 
@@ -218,17 +241,18 @@ component extends="wheels.Global"{
 		// Key on the VERBATIM table name: the $dbinfo probe below uses original
 		// case, so case-folding the key would let `Authors` and `authors` share
 		// one slot on case-sensitive databases (#2937 review, #2977).
-		local.cacheKey = application[local.appKey].dataSourceName & "|" & arguments.tableName;
+		local.cacheKey = $migratorDataSource() & "|" & arguments.tableName;
 		if (
 			StructKeyExists(request, "$wheelsMigratorColumns")
 			&& StructKeyExists(request.$wheelsMigratorColumns, local.cacheKey)
 		) {
 			return request.$wheelsMigratorColumns[local.cacheKey];
 		}
+		local.creds = $migratorDataSourceCredentials();
 		local.columns = $dbinfo(
-			datasource = application[local.appKey].dataSourceName,
-			username = application[local.appKey].dataSourceUserName,
-			password = application[local.appKey].dataSourcePassword,
+			datasource = $migratorDataSource(),
+			username = local.creds.username,
+			password = local.creds.password,
 			type = "columns",
 			table = arguments.tableName
 		);
@@ -280,10 +304,11 @@ component extends="wheels.Global"{
 
 	private string function $getColumnDefinition(required string tableName, required string columnName) {
 		local.appKey = $appKey();
+		local.creds = $migratorDataSourceCredentials();
 		local.columns = $dbinfo(
-			datasource = application[local.appKey].dataSourceName,
-			username = application[local.appKey].dataSourceUserName,
-			password = application[local.appKey].dataSourcePassword,
+			datasource = $migratorDataSource(),
+			username = local.creds.username,
+			password = local.creds.password,
 			type = "columns",
 			table = arguments.tableName
 		);

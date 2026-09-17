@@ -70,6 +70,13 @@ component {
 		return new Ssh(s);
 	}
 
+	public any function boot() {
+		var b = (structKeyExists(variables.raw, "boot") && isStruct(variables.raw.boot))
+			? variables.raw.boot
+			: {};
+		return new Boot(b);
+	}
+
 	public array function roles() {
 		var servers = variables.raw.servers;
 

@@ -1,13 +1,14 @@
 /**
  * Test double for the Oracle database adapter. Captures every SQL string
  * passed to $query() and serves mock resultsets from a FIFO queue instead of
- * hitting a database, so adapter-unit specs can exercise the CURRVAL /
- * MAX(ROWID) identity fallbacks without a live Oracle connection.
+ * hitting a database, so adapter-unit specs can exercise the CURRVAL
+ * identity path and the IdentityNotFound miss without a live Oracle connection.
  */
 component extends="wheels.databaseAdapters.Oracle.OracleModel" output=false {
 
 	this.boxlangMode = false;
 	this.capturedSql = [];
+	this.throwOnQuery = false;
 	// FIFO queue of mock query objects served by $query().
 	this.queryResults = [];
 
@@ -17,6 +18,9 @@ component extends="wheels.databaseAdapters.Oracle.OracleModel" output=false {
 
 	public any function $query(required string sql) {
 		ArrayAppend(this.capturedSql, arguments.sql);
+		if (this.throwOnQuery) {
+			Throw(type = "Database.CatalogMissing", message = "user_tab_identity_cols missing");
+		}
 		if (ArrayLen(this.queryResults)) {
 			local.queued = this.queryResults[1];
 			ArrayDeleteAt(this.queryResults, 1);

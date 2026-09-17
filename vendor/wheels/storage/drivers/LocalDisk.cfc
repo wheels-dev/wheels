@@ -73,6 +73,7 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	}
 
 	public string function signedUrl(required string key, numeric expiresIn = 300, string contentDisposition = "") {
+		$assertExpiresIn(arguments.expiresIn);
 		if (!Len(variables.signingKey)) {
 			throw(
 				type = "Wheels.Storage.MissingSigningKey",
@@ -148,13 +149,21 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		return local.diff == 0;
 	}
 
-	private string function $resolve(required string key) {
+	public string function $resolve(required string key) {
 		// Reject traversal — a key must stay inside root.
 		local.clean = Replace(arguments.key, "\", "/", "all");
 		if (Find("..", local.clean)) {
 			throw(
 				type = "Wheels.Storage.InvalidKey",
 				message = "Storage key [#arguments.key#] must not contain '..'."
+			);
+		}
+		// Empty or slash-only keys resolve to root itself. Throw rather than
+		// let put() write the disk root or get() treat the directory as NotFound.
+		if (!Len(REReplace(local.clean, "/", "", "all"))) {
+			throw(
+				type = "Wheels.Storage.InvalidKey",
+				message = "Storage key [#arguments.key#] must not be empty or slash-only."
 			);
 		}
 		return variables.root & "/" & local.clean;
@@ -178,12 +187,49 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	private string function $joinUrl(required string prefix, required string key) {
 		local.p = REReplace(arguments.prefix, "/+$", "");
 		local.k = REReplace(arguments.key, "^/+", "");
-		return local.p & "/" & local.k;
+		return local.p & "/" & $uriEncodePath(local.k);
 	}
 
 	private string function $uriEncode(required string value) {
-		local.encoded = CreateObject("java", "java.net.URLEncoder").encode(arguments.value, "UTF-8");
-		return Replace(local.encoded, "+", "%20", "all");
+		// RFC3986 percent-encoding over UTF-8 bytes. Built on BinaryEncode/hex
+		// instead of java.net.URLEncoder so it is byte-identical on engines
+		// without a JVM (RustCFML): unreserved bytes (A-Z a-z 0-9 - _ . ~)
+		// pass through, everything else becomes %XX with uppercase hex —
+		// the canonical form AWS SigV4 and the public-url specs expect.
+		// Byte extraction via base64 round-trip: CharsetEncode() returns a
+		// Java byte[] (not a CFML binary) on some Lucee 7.0.0.x builds, which
+		// BinaryEncode cannot consume. ToBase64 + BinaryDecode produces a
+		// proper binary on every engine for the same UTF-8 bytes.
+		local.bin = BinaryDecode(ToBase64(ToString(arguments.value), "utf-8"), "base64");
+		local.hex = UCase(BinaryEncode(local.bin, "hex"));
+		local.out = "";
+		for (local.i = 1; local.i < Len(local.hex); local.i += 2) {
+			local.byteVal = InputBaseN(Mid(local.hex, local.i, 2), 16);
+			if (
+				(local.byteVal >= 48 && local.byteVal <= 57)
+				|| (local.byteVal >= 65 && local.byteVal <= 90)
+				|| (local.byteVal >= 97 && local.byteVal <= 122)
+				|| local.byteVal == 45 || local.byteVal == 46 || local.byteVal == 95 || local.byteVal == 126
+			) {
+				local.out &= Chr(local.byteVal);
+			} else {
+				local.out &= "%" & Mid(local.hex, local.i, 2);
+			}
+		}
+		return local.out;
+	}
+
+	private string function $uriEncodePath(required string key) {
+		return Replace($uriEncode(arguments.key), "%2F", "/", "all");
+	}
+
+	private void function $assertExpiresIn(required numeric expiresIn) {
+		if (arguments.expiresIn < 1 || arguments.expiresIn > 604800) {
+			throw(
+				type = "Wheels.Storage.InvalidExpiresIn",
+				message = "signedUrl expiresIn must be between 1 and 604800 seconds (got #arguments.expiresIn#)."
+			);
+		}
 	}
 
 	private numeric function $epochSeconds() {

@@ -129,7 +129,7 @@ component extends="wheels.WheelsTest" {
 					expect(captured.strategy).toBe("alwaysPass");
 				});
 
-				it("skips unregistered strategies gracefully", function() {
+				it("fails closed when the restriction list mixes a typo with a known name", function() {
 					var auth = new wheels.auth.Authenticator();
 					auth.registerStrategy(name = "pass", strategy = new wheels.tests._assets.auth.AlwaysPassStrategy());
 
@@ -137,10 +137,13 @@ component extends="wheels.WheelsTest" {
 					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var result = pipeline.run(request = {}, coreHandler = function(required struct request) {
-						return "OK";
+						return "should not reach";
 					});
 
-					expect(result).toBe("OK");
+					var parsed = DeserializeJSON(result);
+					expect(parsed.status).toBe(401);
+					expect(parsed.error).toInclude("nonexistent");
+					expect(parsed.error).toInclude("unregistered strategy");
 				});
 
 				it("surfaces a wiring error when restricted to only unregistered strategies", function() {

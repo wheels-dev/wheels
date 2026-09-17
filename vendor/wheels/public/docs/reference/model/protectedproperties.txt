@@ -1,3 +1,6 @@
+// Without accessibleProperties() or protectedProperties(), mass assignment is open.
+// set(massAssignmentStrict=true) fail-closes that case (opt-in; not the default).
+
 // 1. Protect a comma-delimited list of properties from mass assignment in `models/User.cfc`.
 // `firstName` and `lastName` cannot be changed via `updateAll()`, `new()`, `update()`, etc.
 function config() {

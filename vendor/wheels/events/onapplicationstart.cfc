@@ -275,6 +275,13 @@ component {
 			application.$wheels.enablePublicComponent = true;
 		}
 
+		// Where the unpacked local docs bundle lives. Empty means auto-resolve
+		// to <CLI home>/docs/<frameworkVersion>/ — see Public::$docsBundleRoot().
+		// Set explicitly only when serving the bundle from elsewhere.
+		if (!StructKeyExists(application.$wheels, "docsBundlePath")) {
+			application.$wheels.docsBundlePath = "";
+		}
+
 		// Create migrations object and set default settings.
 		application.$wheels.autoMigrateDatabase = false;
 		// New default names (F15 Phase 1). The migrator's $detectSystemTables()

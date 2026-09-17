@@ -274,88 +274,8 @@ component {
 				}
 				switch (local.contentType) {
 					case "json":
-						// Build the coercion-directive set from the function's own parameter
-						// metadata (see redirectTo() in redirection.cfc for prior art) so newly
-						// declared parameters can never leak in as type directives. The previous
-						// hardcoded 8-name list went stale when the `status` parameter was added.
-						// The declared-name list is built only when the arity guard indicates
-						// extra named args are present, so the common directive-free render path
-						// pays only for GetMetadata + ArrayLen.
-						local.functionInfo = GetMetadata(variables.renderWith);
-						local.namedArgs = {};
-						if (StructCount(arguments) > ArrayLen(local.functionInfo.parameters)) {
-							local.declaredParams = "";
-							local.iEnd = ArrayLen(local.functionInfo.parameters);
-							for (local.i = 1; local.i <= local.iEnd; local.i++) {
-								local.declaredParams = ListAppend(local.declaredParams, local.functionInfo.parameters[local.i].name);
-							}
-							local.namedArgs = $namedArguments(argumentCollection = arguments, $defined = local.declaredParams);
-						}
-						local.markersInserted = false;
-						for (local.key in local.namedArgs) {
-							if (!IsSimpleValue(local.namedArgs[local.key])) {
-								continue;
-							}
-							if (local.namedArgs[local.key] == "string") {
-								// Force to string by wrapping in a non-printable marker (BEL) that we
-								// strip again after serialization. This is a deliberate cross-engine
-								// SerializeJSON workaround: a plain pre-serialization cast is not
-								// reliably type-preserving on all engines. Rows that don't contain
-								// the key are skipped (the previous code threw on them).
-								if (IsArray(arguments.data)) {
-									local.iEnd = ArrayLen(arguments.data);
-									for (local.i = 1; local.i <= local.iEnd; local.i++) {
-										if (IsStruct(arguments.data[local.i]) && StructKeyExists(arguments.data[local.i], local.key)) {
-											arguments.data[local.i][local.key] = Chr(7) & arguments.data[local.i][local.key] & Chr(7);
-											local.markersInserted = true;
-										}
-									}
-								} else if (IsStruct(arguments.data) && StructKeyExists(arguments.data, local.key)) {
-									arguments.data[local.key] = Chr(7) & arguments.data[local.key] & Chr(7);
-									local.markersInserted = true;
-								}
-							} else if (local.namedArgs[local.key] == "integer") {
-								// Force to integer pre-serialization: integral numeric values are cast
-								// to a Java long, which serializes without a ".0" suffix on every
-								// engine. This replaces the old post-serialization regex pass, which
-								// rewrote nested same-named keys anywhere in the document and
-								// re-scanned the whole payload once per directive key.
-								if (IsArray(arguments.data)) {
-									local.iEnd = ArrayLen(arguments.data);
-									for (local.i = 1; local.i <= local.iEnd; local.i++) {
-										if (
-											IsStruct(arguments.data[local.i])
-											&& StructKeyExists(arguments.data[local.i], local.key)
-											&& IsNumeric(arguments.data[local.i][local.key])
-											&& arguments.data[local.i][local.key] == Int(arguments.data[local.i][local.key])
-										) {
-											arguments.data[local.i][local.key] = JavaCast("long", arguments.data[local.i][local.key]);
-										}
-									}
-								} else if (
-									IsStruct(arguments.data)
-									&& StructKeyExists(arguments.data, local.key)
-									&& IsNumeric(arguments.data[local.key])
-									&& arguments.data[local.key] == Int(arguments.data[local.key])
-								) {
-									arguments.data[local.key] = JavaCast("long", arguments.data[local.key]);
-								}
-							}
-						}
-						local.content = SerializeJSON(arguments.data);
-						if (local.markersInserted) {
-							// Strip only the quote-adjacent marker bytes we inserted above, in both
-							// the raw form and the JSON-escaped form (Lucee 7 escapes control
-							// characters as \u0007 when serializing). Unlike the previous global
-							// Replace(content, Chr(7), "", "all") this leaves legitimate BEL bytes
-							// inside data values intact. Residual edge: a legitimate BEL (or literal
-							// "\u0007" text) as the very first/last character of a string value is
-							// still stripped, but only in renders that requested string coercion.
-							local.content = Replace(local.content, '"' & Chr(7), '"', "all");
-							local.content = Replace(local.content, Chr(7) & '"', '"', "all");
-							local.content = Replace(local.content, '"\u0007', '"', "all");
-							local.content = Replace(local.content, '\u0007"', '"', "all");
-						}
+						local.namedArgs = $renderWithNamedArgs(arguments);
+						local.content = $renderWithJsonContent(arguments.data, local.namedArgs);
 						break;
 					case "xml":
 						local.content = $toXml(arguments.data);
@@ -373,6 +293,100 @@ component {
 		if (StructKeyExists(local, "rv")) {
 			return local.rv;
 		}
+	}
+
+	/**
+	 * Internal function. Extra named arguments passed to renderWith beyond its
+	 * declared parameters, keyed by data key with a "string" or "integer"
+	 * coercion directive as the value. Built from the function's own parameter
+	 * metadata so newly declared parameters can never leak in as directives.
+	 */
+	public struct function $renderWithNamedArgs(required struct args) {
+		local.functionInfo = GetMetadata(variables.renderWith);
+		local.namedArgs = {};
+		if (StructCount(arguments.args) > ArrayLen(local.functionInfo.parameters)) {
+			local.declaredParams = "";
+			local.iEnd = ArrayLen(local.functionInfo.parameters);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				local.declaredParams = ListAppend(local.declaredParams, local.functionInfo.parameters[local.i].name);
+			}
+			local.namedArgs = $namedArguments(argumentCollection = arguments.args, $defined = local.declaredParams);
+		}
+		return local.namedArgs;
+	}
+
+	/**
+	 * Internal function. Serialize data to JSON applying the "string" /
+	 * "integer" coercion directives from $renderWithNamedArgs. Mutates the
+	 * passed data in place (CFML arrays/structs are passed by reference).
+	 */
+	public string function $renderWithJsonContent(required any data, required struct namedArgs) {
+		local.markersInserted = false;
+		for (local.key in arguments.namedArgs) {
+			if (!IsSimpleValue(arguments.namedArgs[local.key])) {
+				continue;
+			}
+			if (arguments.namedArgs[local.key] == "string") {
+				// Force to string by wrapping in a non-printable marker (BEL) that we
+				// strip again after serialization. This is a deliberate cross-engine
+				// SerializeJSON workaround: a plain pre-serialization cast is not
+				// reliably type-preserving on all engines. Rows that don't contain
+				// the key are skipped (the previous code threw on them).
+				if (IsArray(arguments.data)) {
+					local.iEnd = ArrayLen(arguments.data);
+					for (local.i = 1; local.i <= local.iEnd; local.i++) {
+						if (IsStruct(arguments.data[local.i]) && StructKeyExists(arguments.data[local.i], local.key)) {
+							arguments.data[local.i][local.key] = Chr(7) & arguments.data[local.i][local.key] & Chr(7);
+							local.markersInserted = true;
+						}
+					}
+				} else if (IsStruct(arguments.data) && StructKeyExists(arguments.data, local.key)) {
+					arguments.data[local.key] = Chr(7) & arguments.data[local.key] & Chr(7);
+					local.markersInserted = true;
+				}
+			} else if (arguments.namedArgs[local.key] == "integer") {
+				// Force to integer pre-serialization: integral numeric values are cast
+				// to a Java long, which serializes without a ".0" suffix on every
+				// engine. This replaces the old post-serialization regex pass, which
+				// rewrote nested same-named keys anywhere in the document and
+				// re-scanned the whole payload once per directive key.
+				if (IsArray(arguments.data)) {
+					local.iEnd = ArrayLen(arguments.data);
+					for (local.i = 1; local.i <= local.iEnd; local.i++) {
+						if (
+							IsStruct(arguments.data[local.i])
+							&& StructKeyExists(arguments.data[local.i], local.key)
+							&& IsNumeric(arguments.data[local.i][local.key])
+							&& arguments.data[local.i][local.key] == Int(arguments.data[local.i][local.key])
+						) {
+							arguments.data[local.i][local.key] = JavaCast("long", arguments.data[local.i][local.key]);
+						}
+					}
+				} else if (
+					IsStruct(arguments.data)
+					&& StructKeyExists(arguments.data, local.key)
+					&& IsNumeric(arguments.data[local.key])
+					&& arguments.data[local.key] == Int(arguments.data[local.key])
+				) {
+					arguments.data[local.key] = JavaCast("long", arguments.data[local.key]);
+				}
+			}
+		}
+		local.content = SerializeJSON(arguments.data);
+		if (local.markersInserted) {
+			// Strip only the quote-adjacent marker bytes we inserted above, in both
+			// the raw form and the JSON-escaped form (Lucee 7 escapes control
+			// characters as \u0007 when serializing). Unlike the previous global
+			// Replace(content, Chr(7), "", "all") this leaves legitimate BEL bytes
+			// inside data values intact. Residual edge: a legitimate BEL (or literal
+			// "\u0007" text) as the very first/last character of a string value is
+			// still stripped, but only in renders that requested string coercion.
+			local.content = Replace(local.content, '"' & Chr(7), '"', "all");
+			local.content = Replace(local.content, Chr(7) & '"', '"', "all");
+			local.content = Replace(local.content, '"\u0007', '"', "all");
+			local.content = Replace(local.content, '\u0007"', '"', "all");
+		}
+		return local.content;
 	}
 
 
@@ -656,94 +670,15 @@ component {
 			if (StructKeyExists(arguments, "query") && IsQuery(arguments.query)) {
 				local.query = arguments.query;
 				StructDelete(arguments, "query");
-				local.rv = "";
 				local.iEnd = local.query.recordCount;
 				// The column list is constant for the whole query, so tokenize it once
 				// instead of on every row of the per-row loops below.
 				local.columnArray = ListToArray(local.query.columnList);
 				local.columnCount = ArrayLen(local.columnArray);
 				if (Len(arguments.$group)) {
-					// We want to group based on a column so loop through the rows until we find, this will break if the query is not ordered by the grouped column.
-					local.tempSpacer = "}|{";
-					local.groupValue = "";
-					local.groupQueryCount = 1;
-					arguments.group = QueryNew(local.query.columnList);
-					if ($get("showErrorInformation") && !ListFindNoCase(local.query.columnList, arguments.$group)) {
-						Throw(
-							type = "Wheels.GroupColumnNotFound",
-							message = "Wheels couldn't find a query column with the name of `#arguments.$group#`.",
-							extendedInfo = "Make sure your finder method has the column `#arguments.$group#` specified in the `select` argument. If the column does not exist, create it."
-						);
-					}
-					for (local.i = 1; local.i <= local.iEnd; local.i++) {
-						if (local.i == 1) {
-							local.groupValue = local.query[arguments.$group][local.i];
-						} else if (local.groupValue != local.query[arguments.$group][local.i]) {
-							// We have a different group for this row so output what we have.
-							local.rv &= $includeAndReturnOutput(argumentCollection = arguments);
-							if (StructKeyExists(arguments, "$spacer")) {
-								local.rv &= local.tempSpacer;
-							}
-							local.groupValue = local.query[arguments.$group][local.i];
-							arguments.group = QueryNew(local.query.columnList);
-							local.groupQueryCount = 1;
-						}
-						QueryAddRow(arguments.group);
-						for (local.j = 1; local.j <= local.columnCount; local.j++) {
-							local.property = local.columnArray[local.j];
-							arguments[local.property] = local.query[local.property][local.i];
-							QuerySetCell(arguments.group, local.property, local.query[local.property][local.i], local.groupQueryCount);
-						}
-						arguments.current = local.i + 1 - arguments.group.recordCount;
-						local.groupQueryCount++;
-					}
-
-					// If we have anything left at the end we need to render it too.
-					if (arguments.group.recordCount) {
-						local.rv &= $includeAndReturnOutput(argumentCollection = arguments);
-						if (StructKeyExists(arguments, "$spacer") && local.i < local.iEnd) {
-							local.rv &= local.tempSpacer;
-						}
-					}
-
-					// Now remove the last temp spacer and replace the tempSpacer with $spacer.
-					if (Right(local.rv, 3) == local.tempSpacer) {
-						local.rv = Left(local.rv, Len(local.rv) - 3);
-					}
-					local.rv = Replace(local.rv, local.tempSpacer, arguments.$spacer, "all");
+					local.rv = $includeFileRenderQueryGrouped(arguments, local.query, local.iEnd, local.columnArray, local.columnCount);
 				} else {
-					local.unreadableColumns = {};
-					for (local.i = 1; local.i <= local.iEnd; local.i++) {
-						arguments.current = local.i;
-						arguments.totalCount = local.iEnd;
-						for (local.j = 1; local.j <= local.columnCount; local.j++) {
-							local.property = local.columnArray[local.j];
-							try {
-								arguments[local.property] = local.query[local.property][local.i];
-							} catch (any e) {
-								// A column value that cannot be read (e.g. an unsupported / binary
-								// type) defaults to an empty string. Log once per column so the
-								// failure is surfaced instead of silently swallowed.
-								if (!StructKeyExists(local.unreadableColumns, local.property)) {
-									local.unreadableColumns[local.property] = true;
-									try {
-										WriteLog(
-											type = "warning",
-											text = "[Wheels] Could not read query column `#local.property#` while rendering partial `#arguments.$name#` (first failing row: #local.i#): #e.message#. Defaulting the column to an empty string.",
-											file = "wheels"
-										);
-									} catch (any logError) {
-										// Logging is best-effort; never let it break rendering.
-									}
-								}
-								arguments[local.property] = "";
-							}
-						}
-						local.rv &= $includeAndReturnOutput(argumentCollection = arguments);
-						if (StructKeyExists(arguments, "$spacer") && local.i < local.iEnd) {
-							local.rv &= arguments.$spacer;
-						}
-					}
+					local.rv = $includeFileRenderQueryPlain(arguments, local.query, local.iEnd, local.columnArray, local.columnCount);
 				}
 			} else if (StructKeyExists(arguments, "object") && IsObject(arguments.object)) {
 				local.modelName = arguments.object.$classData().modelName;
@@ -753,27 +688,149 @@ component {
 			} else if (StructKeyExists(arguments, "objects") && IsArray(arguments.objects)) {
 				local.array = arguments.objects;
 				StructDelete(arguments, "objects");
-				local.originalArguments = Duplicate(arguments);
-				local.modelName = local.array[1].$classData().modelName;
-				local.rv = "";
-				local.iEnd = ArrayLen(local.array);
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					StructClear(arguments);
-					StructAppend(arguments, local.originalArguments);
-					arguments.current = local.i;
-					arguments.totalCount = local.iEnd;
-					arguments[local.modelName] = local.array[local.i];
-					local.properties = local.array[local.i].properties();
-					StructAppend(arguments, local.properties, true);
-					local.rv &= $includeAndReturnOutput(argumentCollection = arguments);
-					if (StructKeyExists(arguments, "$spacer") && local.i < local.iEnd) {
-						local.rv &= arguments.$spacer;
-					}
-				}
+				local.rv = $includeFileRenderObjects(arguments, local.array);
 			}
 		}
 		if (!StructKeyExists(local, "rv")) {
 			local.rv = $includeAndReturnOutput(argumentCollection = arguments);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Renders a query-backed partial grouped by $group.
+	 * Mutates the passed args struct by reference (group/current/spacer
+	 * semantics preserved). Extracted from $includeFile.
+	 */
+	public string function $includeFileRenderQueryGrouped(
+		required any args,
+		required any query,
+		required numeric iEnd,
+		required array columnArray,
+		required numeric columnCount
+	) {
+		local.rv = "";
+		// We want to group based on a column so loop through the rows until we find, this will break if the query is not ordered by the grouped column.
+		local.tempSpacer = "}|{";
+		local.groupValue = "";
+		local.groupQueryCount = 1;
+		arguments.args.group = QueryNew(arguments.query.columnList);
+		if ($get("showErrorInformation") && !ListFindNoCase(arguments.query.columnList, arguments.args.$group)) {
+			Throw(
+				type = "Wheels.GroupColumnNotFound",
+				message = "Wheels couldn't find a query column with the name of `#arguments.args.$group#`.",
+				extendedInfo = "Make sure your finder method has the column `#arguments.args.$group#` specified in the `select` argument. If the column does not exist, create it."
+			);
+		}
+		for (local.i = 1; local.i <= arguments.iEnd; local.i++) {
+			if (local.i == 1) {
+				local.groupValue = arguments.query[arguments.args.$group][local.i];
+			} else if (local.groupValue != arguments.query[arguments.args.$group][local.i]) {
+				// We have a different group for this row so output what we have.
+				local.rv &= $includeAndReturnOutput(argumentCollection = arguments.args);
+				if (StructKeyExists(arguments.args, "$spacer")) {
+					local.rv &= local.tempSpacer;
+				}
+				local.groupValue = arguments.query[arguments.args.$group][local.i];
+				arguments.args.group = QueryNew(arguments.query.columnList);
+				local.groupQueryCount = 1;
+			}
+			QueryAddRow(arguments.args.group);
+			for (local.j = 1; local.j <= arguments.columnCount; local.j++) {
+				local.property = arguments.columnArray[local.j];
+				arguments.args[local.property] = arguments.query[local.property][local.i];
+				QuerySetCell(arguments.args.group, local.property, arguments.query[local.property][local.i], local.groupQueryCount);
+			}
+			arguments.args.current = local.i + 1 - arguments.args.group.recordCount;
+			local.groupQueryCount++;
+		}
+
+		// If we have anything left at the end we need to render it too.
+		if (arguments.args.group.recordCount) {
+			local.rv &= $includeAndReturnOutput(argumentCollection = arguments.args);
+			if (StructKeyExists(arguments.args, "$spacer") && local.i < arguments.iEnd) {
+				local.rv &= local.tempSpacer;
+			}
+		}
+
+		// Now remove the last temp spacer and replace the tempSpacer with $spacer.
+		if (Right(local.rv, 3) == local.tempSpacer) {
+			local.rv = Left(local.rv, Len(local.rv) - 3);
+		}
+		local.rv = Replace(local.rv, local.tempSpacer, arguments.args.$spacer, "all");
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Renders a query-backed partial row by row.
+	 * Mutates the passed args struct by reference (current/totalCount and the
+	 * last row's column values remain set, as before). Extracted from $includeFile.
+	 */
+	public string function $includeFileRenderQueryPlain(
+		required any args,
+		required any query,
+		required numeric iEnd,
+		required array columnArray,
+		required numeric columnCount
+	) {
+		local.rv = "";
+		local.unreadableColumns = {};
+		for (local.i = 1; local.i <= arguments.iEnd; local.i++) {
+			arguments.args.current = local.i;
+			arguments.args.totalCount = arguments.iEnd;
+			for (local.j = 1; local.j <= arguments.columnCount; local.j++) {
+				local.property = arguments.columnArray[local.j];
+				try {
+					arguments.args[local.property] = arguments.query[local.property][local.i];
+				} catch (any e) {
+					// A column value that cannot be read (e.g. an unsupported / binary
+					// type) defaults to an empty string. Log once per column so the
+					// failure is surfaced instead of silently swallowed.
+					if (!StructKeyExists(local.unreadableColumns, local.property)) {
+						local.unreadableColumns[local.property] = true;
+						try {
+							WriteLog(
+								type = "warning",
+								text = "[Wheels] Could not read query column `#local.property#` while rendering partial `#arguments.args.$name#` (first failing row: #local.i#): #e.message#. Defaulting the column to an empty string.",
+								file = "wheels"
+							);
+						} catch (any logError) {
+							// Logging is best-effort; never let it break rendering.
+						}
+					}
+					arguments.args[local.property] = "";
+				}
+			}
+			local.rv &= $includeAndReturnOutput(argumentCollection = arguments.args);
+			if (StructKeyExists(arguments.args, "$spacer") && local.i < arguments.iEnd) {
+				local.rv &= arguments.args.$spacer;
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. Renders an objects-backed partial, one object per
+	 * iteration. Mutates the passed args struct by reference. Extracted from
+	 * $includeFile.
+	 */
+	public string function $includeFileRenderObjects(required any args, required array array) {
+		local.originalArguments = Duplicate(arguments.args);
+		local.modelName = arguments.array[1].$classData().modelName;
+		local.rv = "";
+		local.iEnd = ArrayLen(arguments.array);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			StructClear(arguments.args);
+			StructAppend(arguments.args, local.originalArguments);
+			arguments.args.current = local.i;
+			arguments.args.totalCount = local.iEnd;
+			arguments.args[local.modelName] = arguments.array[local.i];
+			local.properties = arguments.array[local.i].properties();
+			StructAppend(arguments.args, local.properties, true);
+			local.rv &= $includeAndReturnOutput(argumentCollection = arguments.args);
+			if (StructKeyExists(arguments.args, "$spacer") && local.i < local.iEnd) {
+				local.rv &= arguments.args.$spacer;
+			}
 		}
 		return local.rv;
 	}

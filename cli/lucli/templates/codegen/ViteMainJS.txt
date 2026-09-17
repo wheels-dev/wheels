@@ -1,0 +1,14 @@
+/**
+ * Wheels Application Entry Point
+ *
+ * This is your main JavaScript file. Import CSS and other modules here.
+ * Vite will handle bundling, tree-shaking, and code splitting automatically.
+ *
+ * In your Wheels layout (app/views/layout.cfm), include this entry point:
+ *   #viteScriptTag("src/main.js")#
+ */
+
+// Import your styles — Vite injects them via HMR in development
+import './main.css';
+
+console.log('Wheels + Vite is ready!');

@@ -21,9 +21,9 @@ component extends="wheels.WheelsTest" {
 				args.content = "this is a test to see if textarea renders"
 
 				e = _controller.$element(argumentcollection = args)
-				r = '<textare cols="40" name="textareatest" rows="10">this is a test to see if textare renders</textarea>'
+				r = '<textarea cols="40" name="textareatest" rows="10">this is a test to see if textarea renders</textarea>'
 
-				expect(r).toBe(r)
+				expect(e).toBe(r)
 			})
 		})
 

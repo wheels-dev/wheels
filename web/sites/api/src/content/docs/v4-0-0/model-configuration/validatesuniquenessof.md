@@ -35,7 +35,7 @@ When the record is updated, the same check is made but disregarding the record i
 | `scope` | `string` | no | — | One or more properties by which to limit the scope of the uniqueness constraint. |
 | `condition` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `true` validation will run). |
 | `unless` | `string` | no | — | String expression to be evaluated that decides if validation will be run (if the expression returns `false` validation will run). |
-| `includeSoftDeletes` | `boolean` | no | `true` | Set to `true` to include soft-deleted records in the queries that this method runs. |
+| `includeSoftDeletes` | `boolean` | no | `false` | Set to `true` to include soft-deleted records in the uniqueness check. The default excludes them so a previously deleted value can be reused. |
 
 </div>
 

@@ -46,7 +46,12 @@ component extends="wheels.WheelsTest" {
 
 				var selfName = "BareCfabortGuardSpec.cfc";
 				var root = ExpandPath("/wheels");
-				var files = DirectoryList(root, true, "path", "*.cfc");
+				// Copy into a fresh array: BoxLang returns a fixed-size array from
+				// DirectoryList() and ArrayAppend on it throws with no message.
+				var files = [];
+				for (var listedFile in DirectoryList(root, true, "path", "*.cfc")) {
+					ArrayAppend(files, listedFile);
+				}
 				// Script-context includes compiled into Global.cfc (issue ##3241)
 				// are not `.cfc` files but must obey the same bare-cfabort ban.
 				var globalIncludes = DirectoryList(root & "/global", false, "path", "*.cfm");

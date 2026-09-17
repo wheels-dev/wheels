@@ -29,8 +29,7 @@ Object callbacks to the rescue! By using object callbacks to implement this sort
 
 Part of the `Order.cfc` model file:
 
-{% code title="Order.cfc" %}
-```javascript
+```javascript title="Order.cfc"
 component extends="Model" {
 
     public function config() {
@@ -50,7 +49,6 @@ component extends="Model" {
 
 }
 ```
-{% endcode %}
 
 The above code registers 2 methods to be run at specific points in the life cycle of all objects in your application.
 

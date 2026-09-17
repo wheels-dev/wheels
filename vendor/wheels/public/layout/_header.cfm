@@ -101,7 +101,13 @@ if (StructKeyExists(url, "refresh")) {
 <cfparam name="request.isFluid" default="false">
 <cfoutput>
 	<!--- cfformat-ignore-start --->
-	<DOCTYPE html>
+	<!--- Missing the exclamation mark, this read `<DOCTYPE html>`, which the
+		parser treats as an unknown ELEMENT rather than a doctype — putting every
+		/wheels/* page into QUIRKS MODE (document.compatMode === "BackCompat").
+		Quirks mode changes the box model and viewport metrics:
+		documentElement.clientHeight reports the full content height instead of
+		the viewport height, which breaks any bottom-anchored layout. --->
+	<!DOCTYPE html>
 	<html>
 	<head>
 		<title>#request.internalPageTitle#</title>

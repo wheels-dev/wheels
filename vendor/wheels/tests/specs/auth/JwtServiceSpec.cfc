@@ -196,6 +196,32 @@ component extends="wheels.WheelsTest" {
 					}).toThrow("Wheels.Auth.JWT.InvalidSignature");
 				});
 
+				it("throws MissingExpiry for a signed token with no exp by default", function() {
+					var token = _signHs256(
+						"test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						"{""alg"":""HS256"",""typ"":""JWT""}",
+						"{""sub"":1,""iat"":1000}"
+					);
+					expect(function() {
+						jwt.decode(token);
+					}).toThrow("Wheels.Auth.JWT.MissingExpiry");
+				});
+
+				it("accepts a signed token with no exp when requireExpiry is false", function() {
+					var openJwt = new wheels.auth.JwtService(
+						secretKey = "test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						requireExpiry = false
+					);
+					var token = _signHs256(
+						"test-secret-key-for-jwt-specs-padded-to-32-bytes",
+						"{""alg"":""HS256"",""typ"":""JWT""}",
+						"{""sub"":1,""iat"":1000}"
+					);
+					var claims = openJwt.decode(token);
+					expect(claims.sub).toBe(1);
+					expect(StructKeyExists(claims, "exp")).toBeFalse();
+				});
+
 			});
 
 			describe("issuer validation", function() {
@@ -484,6 +510,22 @@ component extends="wheels.WheelsTest" {
 		b64 = Replace(b64, "/", "_", "all");
 		b64 = REReplace(b64, "=+$", "");
 		return b64;
+	}
+
+	/**
+	 * Craft a valid HS256 JWT from JSON strings (used to omit exp).
+	 */
+	private string function _signHs256(required string secret, required string headerJson, required string payloadJson) {
+		var headerB64 = _base64UrlEncode(arguments.headerJson);
+		var payloadB64 = _base64UrlEncode(arguments.payloadJson);
+		var input = headerB64 & "." & payloadB64;
+		var hmacHex = HMac(input, arguments.secret, "HMACSHA256", "UTF-8");
+		var hmacBinary = BinaryDecode(hmacHex, "hex");
+		var b64 = BinaryEncode(hmacBinary, "base64");
+		b64 = Replace(b64, "+", "-", "all");
+		b64 = Replace(b64, "/", "_", "all");
+		b64 = REReplace(b64, "=+$", "");
+		return input & "." & b64;
 	}
 
 }

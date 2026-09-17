@@ -16,8 +16,7 @@ CFWheels is here to take you to greener pastures with its form helper functions.
 
 Here is a simple form for editing a user profile. Normally, you would code your web form similarly to this:
 
-{% code title="views/profiles/edit.cfm" %}
-```html
+```html title="views/profiles/edit.cfm"
 <cfoutput>
 
 <form action="/profile" method="post">
@@ -52,7 +51,6 @@ Here is a simple form for editing a user profile. Normally, you would code your 
 
 </cfoutput>
 ```
-{% endcode %}
 
 Then you would write a script for the form that validates the data submitted, handles interactions with the data source(s), and displays the form with errors that may happen as a result of user input. (And most of that code isn't even included in this example.)
 
@@ -66,8 +64,7 @@ The good news is that CFWheels simplifies this quite a bit for you. At first, it
 
 Let's rewrite and then explain.
 
-{% code title="views/profiles/edit.cfm" %}
-```html
+```html title="views/profiles/edit.cfm"
 <cfoutput>
 
 #startFormTag(route="profile", method="patch")#
@@ -106,7 +103,6 @@ Let's rewrite and then explain.
 
 </cfoutput>
 ```
-{% endcode %}
 
 I know what you are thinking. 9 lines of code can't replace all that work, right? In fact, they do. The HTML output will be very nearly the same as the previous example. By using CFWheels conventions, you are saving yourself a lot of key strokes and a great deal of time.
 
@@ -130,13 +126,11 @@ CFWheels's default wildcard `controller/action`-based URLs will not accept form 
 
 Most of the time, you'll probably be working with a resource. Your `config/routes.cfm` may look something like this:
 
-{% code title="config/routes.cfm" %}
-```javascript
+```javascript title="config/routes.cfm"
 mapper()
     .resources("users")
 .end();
 ```
-{% endcode %}
 
 If you click the **View Routes** link in the debug footer, you'll be most interested in these types of routes for your forms:
 
@@ -151,13 +145,11 @@ Once you get to this list of routes, it really doesn't matter how you authored t
 
 If you are creating a record, your route is likely setup to accept a `POST` method. That happens to be the default for [startFormTag()](https://wheels.dev/api/v2.5.0/v2.2/controller.startFormTag.html), so you don't even need to include the `method` argument. You can then pass the `users` route name to the `route` argument:
 
-{% code title="views/users/new.cfm" %}
-```html
+```html title="views/users/new.cfm"
 <!--- `method` argument defaults to `post`, so we don't need to pass it in. --->
 #startFormTag(route="users")#
 #endFormTag()
 ```
-{% endcode %}
 
 If you need to send the form via another HTTP method, you can pass that in for the `method` argument as listed in your routes:
 
@@ -241,8 +233,7 @@ By setting up global defaults (as explained in the [Configuration and Defaults](
 
 Here are the settings that you would apply in `config/settings.cfm`:
 
-{% code title="config/settings.cfm" %}
-```javascript
+```javascript title="config/settings.cfm"
 set(
     functionName="textField",
     prependToLabel="<div>",
@@ -257,12 +248,10 @@ set(
     labelPlacement="before"
 );
 ```
-{% endcode %}
 
 And here's how our example code can be simplified as a result:
 
-{% code title="views/profiles/edit.cfm" %}
-```html
+```html title="views/profiles/edit.cfm"
 <cfoutput>
 
 #startFormTag(route="profile", method="patch")#
@@ -283,7 +272,6 @@ And here's how our example code can be simplified as a result:
 
 </cfoutput>
 ```
-{% endcode %}
 
 All that the controller needs to provide at this point is a model object instance named `profile` that contains `firstName`, `lastName`, and `departmentId` properties and a query object named `departments` that contains identifier and text values. Note that the instance variable is named `profile`, though the model itself doesn't necessarily need to be named `profile`.
 
@@ -295,8 +283,7 @@ If you look at the previous examples, there is one other bit of configuration th
 
 Because we've named `firstName`, `lastName`, and `departmentId` in conventional ways (camel case), CFWheels will generate the labels for us automatically:
 
-{% code title="views/profiles/edit.cfm" %}
-```html
+```html title="views/profiles/edit.cfm"
 <cfoutput>
 
 #startFormTag(route="profile", method="patch")#
@@ -316,21 +303,18 @@ Because we've named `firstName`, `lastName`, and `departmentId` in conventional 
 
 </cfoutput>
 ```
-{% endcode %}
 
 You'll notice that CFWheels is even smart enough to translate the `departmentId` property to `Department`.
 
 If you ever need to override a label, you can do so in the model's initializer using the `label` argument of the [property()](https://wheels.dev/api/v2.5.0/v2.2/model.property.html)method:
 
-{% code title="models/User.cfc" %}
-```javascript
+```javascript title="models/User.cfc"
 component extends="Model" {
     function init() {
         property(name="lastName", label="Surname");
     }
 }
 ```
-{% endcode %}
 
 ### Form Error Messages
 
@@ -346,8 +330,7 @@ In the controller, let's say that this just happened. Your model includes valida
 
 The `update` action may look something like this:
 
-{% code title="controllers/Profiles.cfc" %}
-```javascript
+```javascript title="controllers/Profiles.cfc"
 function update() {
     // In this example, we're loading an existing object based on the user's
     // session.
@@ -365,14 +348,12 @@ function update() {
     }
 }
 ```
-{% endcode %}
 
 Notice that the view for the `edit` action is rendered if the `profile` object's [update()](https://wheels.dev/api/v2.5.0/v2.2/model.update.html) returns `false`.
 
 Let's take the previous form example and add some visual indication to the user about what he did wrong and where, by simply adding the following code on your form page.
 
-{% code title="views/profiles/edit.cfm" %}
-```html
+```html title="views/profiles/edit.cfm"
 <cfoutput>
 
 #errorMessagesFor("profile")#
@@ -394,7 +375,6 @@ Let's take the previous form example and add some visual indication to the user 
 
 </cfoutput>
 ```
-{% endcode %}
 
 How about that? With just that line of code (and the required validations on your object model), CFWheels will do the following:
 
@@ -410,8 +390,7 @@ Let's say that would rather display the error messages just below the failed fie
 
 Let's add some error message handlers for the `firstName`, `lastName`, and `departmentId` fields:
 
-{% code title="views/profiles/edit.cfm" %}
-```html
+```html title="views/profiles/edit.cfm"
 <cfoutput>
 
 #startFormTag(route="profile", method="patch")#
@@ -435,7 +414,6 @@ Let's add some error message handlers for the `firstName`, `lastName`, and `depa
 
 </cfoutput>
 ```
-{% endcode %}
 
 Notice the call to the [errorMessageOn()](https://wheels.dev/api/v2.5.0/controller.errormessageon.html) function below the `firstName`, `lastName`, and `departmentId` fields. That's all it takes to display the corresponding error messages of each form control on your form.
 
@@ -648,22 +626,19 @@ In order for your form to pass the correct `enctype`, you can pass `multipart=tr
 
 Looking at this form code, it isn't 100% evident how to set an initial value for the fields:
 
-{% code title="views/accounts/new.cfm" %}
-```html
+```html title="views/accounts/new.cfm"
 #startFormTag(route="accounts")#
     #textField(objectName="account", property="title")#
     #select(objectName="account", property="accountTypeId")#
     #checkBox(objectName="account", property="subscribedToNewsletter")#
 #endFormTag()#
 ```
-{% endcode %}
 
 What if we want a random title pre-filled, a certain account type pre-selected, and the check box automatically checked when the form first loads?
 
 The answer lies in the `account` object that the fields are bound to. Let's say that you always wanted this behavior to happen when the form for a new account loads. You can do something like this in the controller:
 
-{% code title="controllers/Accounts.cfc" %}
-```javascript
+```javascript title="controllers/Accounts.cfc"
 component extends="controllers.Controller" {
     function new() {
         local.defaultAccountType = model("accountType").findOne(
@@ -678,7 +653,6 @@ component extends="controllers.Controller" {
     }
 }
 ```
-{% endcode %}
 
 Now the initial state of the form will reflect the default values setup on the object in the controller.
 

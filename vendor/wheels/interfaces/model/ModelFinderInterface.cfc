@@ -1,7 +1,7 @@
 /**
  * Contract for model read operations (finders, counting, existence checks).
  *
- * The default implementation lives in `wheels.model.read` and is mixed into
+ * The default implementation lives in `wheels.Model` (the model mixin surface is compile-time included there, #3213).
  * Model instances at runtime via `$integrateComponents()`. Because of this
  * mixin pattern, concrete models cannot use `implements=` at compile time.
  * Compliance is verified by runtime reflection tests instead.

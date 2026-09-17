@@ -18,22 +18,18 @@ Generally speaking, if you try and add Unicode characters such as umlauts into t
 
 ### Using cfprocessingdirective
 
-{% code title="/views/main/example.cfm" %}
-```html
+```html title="/views/main/example.cfm"
 <h1>Über uns</h1>
 ```
-{% endcode %}
 
 ![Incorrect encoding example](https://files.readme.io/b18b015-umlaut\_1.png)![Incorrect encoding example](https://files.readme.io/b18b015-umlaut\_1.png)
 
 Incorrect encoding example
 
-{% code title="/views/main/example.cfm" %}
-```html
+```html title="/views/main/example.cfm"
 <cfprocessingdirective pageEncoding="utf-8">
 <h1>Über uns</h1>
 ```
-{% endcode %}
 
 ![Correct encoding](https://files.readme.io/605ed49-umlaut\_2.png)![Correct encoding](https://files.readme.io/605ed49-umlaut\_2.png)
 
@@ -41,8 +37,7 @@ Correct encoding
 
 Likewise, umlauts in routes would need for the `config/routes.cfm` file to have the correct encoding:
 
-{% code title="config/routes.cfm" %}
-```html
+```html title="config/routes.cfm"
 <cfprocessingdirective pageEncoding="utf-8">
 <cfscript>
     mapper()
@@ -51,7 +46,6 @@ Likewise, umlauts in routes would need for the `config/routes.cfm` file to have 
     .end();
 </cfscript>
 ```
-{% endcode %}
 
 ### Using file encoding
 

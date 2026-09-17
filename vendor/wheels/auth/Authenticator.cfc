@@ -103,11 +103,9 @@ component implements="wheels.auth.AuthenticatorInterface" output="false" {
 		// Determine which strategies to try and in what order
 		if (ArrayLen(local.filter)) {
 			// Restricted: try only the named strategies, in the caller's order.
-			// Unknown names are skipped so a list mixing a typo with a valid
-			// name still authenticates — but when the restriction leaves
-			// nothing to try AND unknown names were given, surface the wiring
-			// bug (misspelled name or registerStrategy() never ran) instead of
-			// a generic 401.
+			// Unknown names fail closed even when other listed names are
+			// registered — a typo in "token,jwtt" must not silently degrade
+			// to token-only.
 			local.toTry = [];
 			local.unknown = [];
 			for (local.name in local.filter) {
@@ -122,7 +120,7 @@ component implements="wheels.auth.AuthenticatorInterface" output="false" {
 				}
 			}
 
-			if (ArrayLen(local.toTry) == 0 && ArrayLen(local.unknown)) {
+			if (ArrayLen(local.unknown)) {
 				local.unknownList = ArrayToList(local.unknown, ", ");
 				local.registeredList = ArrayToList(getStrategyNames(), ", ");
 				return $authResult(

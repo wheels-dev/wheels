@@ -66,30 +66,53 @@ component {
 	/**
 	 * Build validation code lines for a model's config() from typed properties.
 	 * Emits a single combined validatesPresenceOf("a,b,c") for all properties,
-	 * plus per-property validatesFormatOf for email and URL types.
+	 * plus per-property validatesFormatOf for email and URL types, and
+	 * validatesLengthOf when a string-like property carries a brace `{N}` limit.
 	 */
 	private string function buildModelValidations(required array properties) {
 		if (!arrayLen(arguments.properties)) return "";
 
 		var presenceProps = [];
-		var formatLines = [];
+		var extraLines = [];
 
 		for (var prop in arguments.properties) {
 			arrayAppend(presenceProps, prop.name);
 			var propType = structKeyExists(prop, "type") ? lCase(prop.type) : "string";
 			if (propType == "email") {
-				arrayAppend(formatLines, "validatesFormatOf(property=""#prop.name#"", type=""email"");");
+				arrayAppend(extraLines, "validatesFormatOf(property=""#prop.name#"", type=""email"");");
 			} else if (propType == "url") {
-				arrayAppend(formatLines, "validatesFormatOf(property=""#prop.name#"", type=""URL"");");
+				arrayAppend(extraLines, "validatesFormatOf(property=""#prop.name#"", type=""URL"");");
+			}
+			if (isStringLikeLengthLimit(prop, propType)) {
+				// allowBlank=true so an empty value only surfaces the
+				// validatesPresenceOf "can't be empty" error instead of also
+				// triggering a confusing "is the wrong length" duplicate.
+				arrayAppend(extraLines, "validatesLengthOf(property=""#prop.name#"", maximum=#prop.limit#, allowBlank=true);");
 			}
 		}
 
 		var lines = ["validatesPresenceOf(""#arrayToList(presenceProps)#"");"];
-		lines.append(formatLines, true);
+		lines.append(extraLines, true);
 		// Join with newline + 2 tabs so subsequent lines align with the template's
 		// `\t\t{{validations}}` placeholder indent. The first line gets its indent
 		// from the placeholder's leading whitespace at fill time.
 		return arrayToList(lines, chr(10) & chr(9) & chr(9));
+	}
+
+	/**
+	 * True when the property is string-like and carries a numeric `{N}` limit
+	 * from the generator parser. Integer `{N}` is a column display width, not
+	 * a string length, so it is excluded. Decimal `{p,s}` uses precision/scale
+	 * and never sets limit.
+	 */
+	private boolean function isStringLikeLengthLimit(required struct prop, required string propType) {
+		if (listFindNoCase("string,varchar,text,binary", arguments.propType) == 0) {
+			return false;
+		}
+		if (!structKeyExists(arguments.prop, "limit")) {
+			return false;
+		}
+		return isNumeric(arguments.prop.limit) && val(arguments.prop.limit) > 0;
 	}
 
 	/**
@@ -269,35 +292,23 @@ component {
 	}
 
 	/**
-	 * Generate a test file
+	 * Generate a test file.
+	 *
+	 * `properties` (scaffold / api-resource) drive sample attribute literals so
+	 * create/update/destroy assertions have valid data. `modelName` overrides
+	 * the singular derived from `name` (api-resource already knows both).
 	 */
 	public struct function generateTest(
 		required string type,
 		required string name,
+		array properties = [],
+		string modelName = "",
+		string belongsTo = "",
 		boolean force = false
 	) {
-		var testName = arguments.name;
-		var testDir = "tests/specs/";
-		var suffix = "";
-
-		switch (arguments.type) {
-			case "model":
-				testDir &= "models/";
-				suffix = "Spec";
-				break;
-			case "controller":
-				testDir &= "controllers/";
-				suffix = "ControllerSpec";
-				break;
-			default:
-				testDir &= "unit/";
-				suffix = "Spec";
-		}
-
-		// Remove existing suffixes before adding the correct one
-		testName = reReplaceNoCase(testName, "(Test|Spec|ControllerSpec|ViewSpec|IntegrationSpec)$", "");
-		testName &= suffix;
-
+		var meta = $testFileMeta(arguments.type, arguments.name);
+		var testName = meta.testName;
+		var testDir = meta.testDir;
 		var fileName = testName & ".cfc";
 		// Refuse to clobber an existing spec unless --force (mirrors generateHelper).
 		// Previously generateTest silently overwrote and still printed "create".
@@ -311,12 +322,14 @@ component {
 		}
 
 		var template = "tests/#arguments.type#.txt";
-		var context = {
-			testName: testName,
-			targetName: reReplaceNoCase(testName, "(Spec|Test|ControllerSpec)$", ""),
-			type: arguments.type,
-			timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
-		};
+		var context = $buildTestContext(
+			type = arguments.type,
+			testName = testName,
+			targetName = meta.targetName,
+			modelName = arguments.modelName,
+			properties = arguments.properties,
+			belongsTo = arguments.belongsTo
+		);
 
 		var result = variables.templateService.generateFromTemplate(
 			template = template,
@@ -342,11 +355,240 @@ component {
 			content &= t & t & '})' & nl;
 			content &= t & '}' & nl;
 			content &= '}' & nl;
-			fileWrite(filePath, content);
-			result = {success: true, path: filePath, message: "Generated from inline template"};
+			if (request.$wheelsGenerateDryRun ?: false) {
+				arrayAppend(request.$wheelsDryRunPaths, filePath);
+				result = {success: true, path: filePath, message: "Dry run — not written", dryRun: true};
+			} else {
+				fileWrite(filePath, content);
+				result = {success: true, path: filePath, message: "Generated from inline template"};
+			}
 		}
 
 		return result;
+	}
+
+	/**
+	 * Resolve dest directory, file stem, and the unsuffixed target name for a
+	 * generated spec. `api` writes Api<Name>ControllerSpec under controllers/.
+	 */
+	private struct function $testFileMeta(required string type, required string name) {
+		var testName = arguments.name;
+		var testDir = "tests/specs/";
+		var suffix = "Spec";
+
+		switch (arguments.type) {
+			case "model":
+				testDir &= "models/";
+				break;
+			case "controller":
+				testDir &= "controllers/";
+				suffix = "ControllerSpec";
+				break;
+			case "api":
+				testDir &= "controllers/";
+				suffix = "ControllerSpec";
+				if (!reFindNoCase("^Api", testName)) {
+					testName = "Api" & testName;
+				}
+				break;
+			default:
+				testDir &= "unit/";
+		}
+
+		testName = reReplaceNoCase(testName, "(Test|Spec|ControllerSpec|ViewSpec|IntegrationSpec)$", "");
+		testName &= suffix;
+		return {
+			testDir: testDir,
+			testName: testName,
+			targetName: reReplaceNoCase(testName, "(Spec|Test|ControllerSpec)$", "")
+		};
+	}
+
+	/**
+	 * Template context for model / controller / API specs, including Rails-style
+	 * sample attributes derived from scaffold properties.
+	 */
+	private struct function $buildTestContext(
+		required string type,
+		required string testName,
+		required string targetName,
+		string modelName = "",
+		array properties = [],
+		string belongsTo = ""
+	) {
+		var resolvedModel = len(arguments.modelName) ? arguments.modelName : arguments.targetName;
+		var controllerName = arguments.targetName;
+		if (arguments.type == "api") {
+			controllerName = reReplaceNoCase(arguments.targetName, "^Api", "");
+			if (!len(arguments.modelName)) {
+				resolvedModel = variables.helpers.singularize(controllerName);
+			}
+		} else if (arguments.type == "controller" && !len(arguments.modelName)) {
+			resolvedModel = variables.helpers.singularize(arguments.targetName);
+		} else if (arguments.type == "model") {
+			controllerName = variables.helpers.pluralize(resolvedModel);
+		}
+		resolvedModel = variables.helpers.capitalize(resolvedModel);
+		var modelNameLower = lCase(resolvedModel);
+		var pluralLower = lCase(controllerName);
+		// Bracket-assign keys so they stay camelCase. CFML struct literals
+		// uppercase keys, and processTemplate matches {{key}} case-sensitively
+		// (TemplatesSpec: "CodeGen builds context with lowercase keys via
+		// explicit struct assignment").
+		var context = {};
+		context["testName"] = arguments.testName;
+		context["targetName"] = arguments.targetName;
+		context["type"] = arguments.type;
+		context["name"] = resolvedModel;
+		context["modelName"] = resolvedModel;
+		context["modelNameLower"] = modelNameLower;
+		context["controllerName"] = controllerName;
+		context["pluralLower"] = pluralLower;
+		context["collectionRoute"] = "api" & variables.helpers.capitalize(pluralLower);
+		context["memberRoute"] = "api" & variables.helpers.capitalize(modelNameLower);
+
+		// belongsTo-aware: the child's FK must reference a real parent, but the
+		// generated spec hard-coded `<name>_id: 1`. The controller eager-loads the
+		// parent via findByKey(include="<name>"), which inner-joins — so a child
+		// with no parent yet came back false and the first `wheels test` run
+		// failed the show/edit/update/delete specs. Create each parent in
+		// beforeEach (validation skipped: the generator can't know the parent's
+		// required fields) and reference its id for the FK.
+		var belongsToInfo = $belongsToInfo(arguments.belongsTo, arguments.properties);
+		context["belongsToSetup"] = $belongsToSetupLines(belongsToInfo);
+		context["validAttributes"] = $buildValidAttributesLiteral(arguments.properties, belongsToInfo);
+		context["validationExamples"] = $buildValidationExamples(resolvedModel, arguments.properties);
+		context["timestamp"] = dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss");
+		return context;
+	}
+
+	/**
+	 * CFML struct literal used as model().create(properties=...) / params.<model>.
+	 * Use quoted keys + colon (`{"title": "MyString"}`). Unquoted `{title = ...}`
+	 * uppercases the key to TITLE. Quoted keys with equals (`{"title" = ...}`)
+	 * are a boolean equality expression, not a keyed entry — create() then
+	 * receives a boolean and Wheels looks up TITLE on it.
+	 */
+	private string function $buildValidAttributesLiteral(required array properties, array belongsToInfo = []) {
+		if (!arrayLen(arguments.properties)) {
+			return "{}";
+		}
+		var parts = [];
+		for (var prop in arguments.properties) {
+			var literal = $samplePropertyLiteral(prop);
+			// Replace a belongsTo FK sample value with the created parent's id.
+			for (var info in arguments.belongsToInfo) {
+				if (prop.name == info.fkColumn) {
+					literal = "variables." & info.parentVar & ".id";
+					break;
+				}
+			}
+			arrayAppend(parts, '"' & prop.name & '": ' & literal);
+		}
+		return "{" & arrayToList(parts, ", ") & "}";
+	}
+
+	/**
+	 * Map each belongsTo parent to its parent model, variable name, and the
+	 * foreign-key column in the child's properties (matching either `_id` or
+	 * `Id` convention). Empty when there are no belongsTo associations.
+	 */
+	private array function $belongsToInfo(required string belongsTo, required array properties) {
+		var result = [];
+		if (!len(arguments.belongsTo)) {
+			return result;
+		}
+		for (var parent in listToArray(arguments.belongsTo)) {
+			var parentVar = lCase(trim(parent));
+			var parentModel = variables.helpers.capitalize(parentVar);
+			var fkColumn = "";
+			for (var prop in arguments.properties) {
+				var propName = lCase(prop.name);
+				if (propName == parentVar & "_id" || propName == parentVar & "id") {
+					fkColumn = prop.name;
+					break;
+				}
+			}
+			if (len(fkColumn)) {
+				arrayAppend(result, {parentVar = parentVar, parentModel = parentModel, fkColumn = fkColumn});
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * beforeEach lines that persist each belongsTo parent with validation
+	 * skipped (the generator can't know the parent's required fields). Joined
+	 * with a newline + 4 tabs so the template's `{{belongsToSetup}}` placeholder
+	 * (already indented under beforeEach) lines up with the sibling statements.
+	 */
+	private string function $belongsToSetupLines(required array belongsToInfo) {
+		if (!arrayLen(arguments.belongsToInfo)) {
+			return "";
+		}
+		var lines = [];
+		for (var info in arguments.belongsToInfo) {
+			arrayAppend(lines, 'variables.' & info.parentVar & ' = model("' & info.parentModel & '").new();');
+			arrayAppend(lines, 'variables.' & info.parentVar & '.save(validate = false);');
+		}
+		return arrayToList(lines, chr(10) & chr(9) & chr(9) & chr(9) & chr(9));
+	}
+
+	/**
+	 * One CFML literal matching the property type (Rails fixture spirit).
+	 */
+	private string function $samplePropertyLiteral(required struct prop) {
+		var propType = structKeyExists(prop, "type") ? lCase(prop.type) : "string";
+		var propName = structKeyExists(prop, "name") ? lCase(prop.name) : "";
+
+		if (propType == "enum" && structKeyExists(prop, "values") && len(prop.values)) {
+			return '"' & listFirst(prop.values) & '"';
+		}
+		if (propType == "email" || propName == "email") {
+			return '"user@example.com"';
+		}
+		if (propType == "url" || listFindNoCase("url,website", propName)) {
+			return '"https://example.com"';
+		}
+		if (listFindNoCase("integer,int,biginteger,bigint", propType)) {
+			return "1";
+		}
+		if (listFindNoCase("decimal,float,numeric", propType)) {
+			return "9.99";
+		}
+		if (listFindNoCase("boolean,bool", propType)) {
+			return "true";
+		}
+		if (listFindNoCase("datetime,timestamp,date,time", propType)) {
+			return "Now()";
+		}
+		if (listFindNoCase("text,longtext", propType)) {
+			return '"MyText"';
+		}
+		return '"MyString"';
+	}
+
+	/**
+	 * Optional presence/valid-attributes examples when the scaffold emitted
+	 * validatesPresenceOf from properties. Empty string when there are none.
+	 */
+	private string function $buildValidationExamples(required string modelName, required array properties) {
+		if (!arrayLen(arguments.properties)) {
+			return "";
+		}
+		var nl = chr(10);
+		var t3 = chr(9) & chr(9) & chr(9);
+		var t4 = t3 & chr(9);
+		var block = "";
+		block &= nl & t3 & 'it("is invalid without required attributes", () => {' & nl;
+		block &= t4 & 'var record = model("#arguments.modelName#").new();' & nl;
+		block &= t4 & "expect(record.valid()).toBeFalse();" & nl;
+		block &= t3 & "});" & nl & nl;
+		block &= t3 & 'it("is valid with required attributes", () => {' & nl;
+		block &= t4 & 'var record = model("#arguments.modelName#").new(properties = ' & $buildValidAttributesLiteral(arguments.properties) & ');' & nl;
+		block &= t4 & "expect(record.valid()).toBeTrue();" & nl;
+		block &= t3 & "});";
+		return block;
 	}
 
 	/**

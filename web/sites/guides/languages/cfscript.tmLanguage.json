@@ -1,0 +1,1059 @@
+{
+  "scopeName": "source.cfscript",
+  "name": "cfscript",
+  "fileTypes": [
+    "cfc"
+  ],
+  "patterns": [
+    {
+      "include": "#labels"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#for"
+    },
+    {
+      "include": "#switch"
+    },
+    {
+      "include": "#expression"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "brackets": {
+      "patterns": [
+        {
+          "include": "#round-brackets"
+        },
+        {
+          "include": "#square-brackets"
+        },
+        {
+          "include": "#curly-brackets"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "begin": "/\\*\\*(?!/)",
+          "captures": {
+            "0": {
+              "name": "punctuation.definition.comment.cfml"
+            }
+          },
+          "end": "\\*/",
+          "name": "comment.block.documentation.cfml"
+        },
+        {
+          "begin": "/\\*",
+          "captures": {
+            "0": {
+              "name": "punctuation.definition.comment.cfml"
+            }
+          },
+          "end": "\\*/",
+          "name": "comment.block.cfml"
+        },
+        {
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.comment.cfml"
+            }
+          },
+          "match": "(//).*$\\n?",
+          "name": "comment.line.double-slash.cfml"
+        },
+        {
+          "include": "source.cfml#comments"
+        }
+      ]
+    },
+    "component": {
+      "patterns": [
+        {
+          "begin": "(?i)^\\s*(component)(?=(\\s+|{))",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.class.cfml"
+            }
+          },
+          "end": "(?={)",
+          "name": "meta.class.cfml",
+          "patterns": [
+            {
+              "include": "#component-attributes"
+            }
+          ]
+        },
+        {
+          "begin": "(?i)^\\s*(interface)(?=(\\s+|{))",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.interface.cfml"
+            }
+          },
+          "end": "(?={)",
+          "name": "meta.interface.cfml",
+          "patterns": [
+            {
+              "include": "#component-attributes"
+            }
+          ]
+        }
+      ]
+    },
+    "component-attributes": {
+      "patterns": [
+        {
+          "include": "#tag-generic-attribute-script"
+        }
+      ]
+    },
+    "constructor": {
+      "patterns": [
+        {
+          "begin": "(new)\\s+(?=[_$a-zA-Z][$\\w.]*)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.operator.new.cfml"
+            }
+          },
+          "end": "(?![_$a-zA-Z][$\\w.]*)",
+          "name": "meta.instance.constructor",
+          "patterns": [
+            {
+              "include": "#support"
+            },
+            {
+              "match": "([_$a-zA-Z][$\\w.]*\\.)?([_$a-zA-Z][$\\w]*)",
+              "captures": {
+                "2": {
+                  "name": "entity.name.class.cfml"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "curly-brackets": {
+      "patterns": [
+        {
+          "begin": "\\{",
+          "beginCaptures": {
+            "0": {
+              "name": "meta.brace.curly.cfml"
+            }
+          },
+          "end": "\\}",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.curly.cfml"
+            }
+          },
+          "name": "meta.group.braces.curly",
+          "patterns": [
+            {
+              "include": "$self"
+            }
+          ]
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        {
+          "include": "#support"
+        },
+        {
+          "include": "#function"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#string"
+        },
+        {
+          "include": "#language-constant"
+        },
+        {
+          "include": "#language-variable"
+        },
+        {
+          "include": "#constructor"
+        },
+        {
+          "include": "#component"
+        },
+        {
+          "include": "#method-call"
+        },
+        {
+          "include": "#function-call"
+        },
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#brackets"
+        },
+        {
+          "include": "#operators"
+        },
+        {
+          "include": "#tag-in-script"
+        },
+        {
+          "include": "#variable"
+        }
+      ]
+    },
+    "for": {
+      "patterns": [
+        {
+          "begin": "(?<!\\.)\\b(for)\\b",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.loop.cfml"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.round.cfml"
+            }
+          },
+          "name": "meta.for.cfml",
+          "patterns": [
+            {
+              "begin": "\\(",
+              "beginCaptures": {
+                "0": {
+                  "name": "meta.brace.round.cfml"
+                }
+              },
+              "end": "(?=\\))",
+              "patterns": [
+                {
+                  "include": "#keyword-storage"
+                },
+                {
+                  "include": "#expression"
+                },
+                {
+                  "include": "#punctuation"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "function": {
+      "patterns": [
+        {
+          "begin": "(?:(?:(?i:\\b(private|package|public|remote)\\s+)?(?i:\\b(void)\\s+|(any|array|binary|boolean|component|date|guid|numeric|query|string|struct|xml|uuid)\\s+|([A-Za-z0-9_\\.$]+)\\s+)?))(?i:(function))\\s+(?:(init)|([_$a-zA-Z][$\\w]*))\\b",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.modifier.cfml"
+            },
+            "2": {
+              "name": "storage.type.return-type.void.cfml"
+            },
+            "3": {
+              "name": "storage.type.return-type.primitive.cfml"
+            },
+            "4": {
+              "name": "storage.type.return-type.object.cfml"
+            },
+            "5": {
+              "name": "storage.type.function.cfml"
+            },
+            "6": {
+              "name": "entity.name.function.constructor.cfml"
+            },
+            "7": {
+              "name": "entity.name.function.cfml"
+            }
+          },
+          "end": "(?={|;)",
+          "name": "meta.function.cfml",
+          "patterns": [
+            {
+              "include": "#function-declaration-parameters"
+            },
+            {
+              "include": "#function-properties"
+            }
+          ]
+        },
+        {
+          "begin": "(\\b[_$a-zA-Z][$\\w]*)\\s*=\\s*(function)(?:(?=\\s|[(]))\\s*([_$a-zA-Z][$\\w]*)?\\s*",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.function.cfml"
+            },
+            "2": {
+              "name": "storage.type.cfml"
+            },
+            "3": {
+              "name": "storage.type.function.cfml"
+            }
+          },
+          "end": "(?={|;)",
+          "name": "meta.function.cfml",
+          "patterns": [
+            {
+              "include": "#function-declaration-parameters"
+            },
+            {
+              "include": "#function-properties"
+            }
+          ]
+        }
+      ]
+    },
+    "function-call": {
+      "begin": "([_$a-zA-Z][$\\w]*)\\s*(?=\\()",
+      "beginCaptures": {
+        "1": {
+          "name": "variable.function.cfml"
+        }
+      },
+      "end": "(?<=\\))",
+      "name": "meta.function-call.cfml",
+      "patterns": [
+        {
+          "begin": "\\(",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.arguments.begin.cfml"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.arguments.end.cfml"
+            }
+          },
+          "name": "meta.function-call.arguments.cfml",
+          "patterns": [
+            {
+              "match": ",",
+              "name": "punctuation.definition.separator.arguments.cfml"
+            },
+            {
+              "match": "(?i:(\\w+)\\s*(?=\\=[^\\=]))",
+              "name": "entity.other.function-parameter.cfml"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "function-declaration-parameters": {
+      "patterns": [
+        {
+          "begin": "\\(",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.parameters.begin.cfml"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.parameters.end.cfml"
+            }
+          },
+          "patterns": [
+            {
+              "match": "(?i:required)",
+              "name": "keyword.other.required.argument.cfml"
+            },
+            {
+              "include": "#storage-types"
+            },
+            {
+              "match": "[_$a-zA-Z][$\\w]*",
+              "name": "variable.parameter.function.cfml"
+            },
+            {
+              "match": ",",
+              "name": "punctuation.separator.parameter.function.cfml"
+            },
+            {
+              "begin": "=",
+              "beginCaptures": {
+                "0": {
+                  "name": "keyword.operator.assignment.cfml"
+                }
+              },
+              "end": "(?=[,)])",
+              "name": "meta.parameter.optional.cfml",
+              "patterns": [
+                {
+                  "include": "#expression"
+                }
+              ]
+            },
+            {
+              "include": "#comments"
+            }
+          ]
+        }
+      ]
+    },
+    "function-properties": {
+      "patterns": [
+        {
+          "include": "source.cfml#tag-generic-attribute"
+        }
+      ]
+    },
+    "keyword-storage": {
+      "patterns": [
+        {
+          "match": "\\b(var)\\b",
+          "name": "storage.modifier.cfml"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "include": "#keyword-storage"
+        },
+        {
+          "match": "\\b(return)\\b",
+          "name": "keyword.control.flow.cfml"
+        },
+        {
+          "match": "\\b(if|else)\\b",
+          "name": "keyword.control.conditional.cfml"
+        },
+        {
+          "match": "\\b(catch|finally|rethrow|throw|try)\\b",
+          "name": "keyword.control.trycatch.cfml"
+        },
+        {
+          "match": "\\b(break|continue|do|while)\\b",
+          "name": "keyword.control.loop.cfml"
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "begin": "(?x)\n  (?<!\\?)(?<!\\?\\s)(?=(\n    ((')((?:[^']|\\\\')*)('))|\n    ((\")((?:[^\"]|\\\\\")*)(\"))\n  )\\s*:)",
+          "end": ":",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.separator.key-value.cfml"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#string"
+            }
+          ]
+        },
+        {
+          "match": "(?<!\\.|\\?|\\?\\s)([_$a-zA-Z][$\\w]*)\\s*(:)",
+          "name": "constant.other.object.key.cfml",
+          "captures": {
+            "1": {
+              "name": "string.unquoted.label.cfml"
+            },
+            "2": {
+              "name": "punctuation.separator.key-value.cfml"
+            }
+          }
+        }
+      ]
+    },
+    "language-constant": {
+      "patterns": [
+        {
+          "match": "(?<!\\.)\\b(?i:true)\\b",
+          "name": "constant.language.boolean.true.cfml"
+        },
+        {
+          "match": "(?<!\\.)\\b(?i:false)\\b",
+          "name": "constant.language.boolean.false.cfml"
+        },
+        {
+          "match": "(?<!\\.)\\b(?i:null)\\b",
+          "name": "constant.language.null.cfml"
+        }
+      ]
+    },
+    "language-variable": {
+      "patterns": [
+        {
+          "match": "(?<!\\.)\\b(?i:super)\\b",
+          "name": "variable.language.super.cfml"
+        },
+        {
+          "match": "(?<!\\.)\\b(?i:this)\\b",
+          "name": "variable.language.this.cfml"
+        },
+        {
+          "match": "(?<!\\.)\\b(?i:(application|arguments|attributes|caller|cgi|client|cookie|flash|form|local|request|server|session|thistag|thread|thread local|url|variables|self|argumentcollection))\\b",
+          "name": "variable.language.scope.cfml"
+        }
+      ]
+    },
+    "method-call": {
+      "begin": "(?<=\\.)([_$a-zA-Z][$\\w]*)\\s*(?=\\()",
+      "end": "(?<=\\))",
+      "name": "meta.function-call.method.cfml",
+      "patterns": [
+        {
+          "begin": "\\(",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.arguments.begin.cfml"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.arguments.end.cfml"
+            }
+          },
+          "name": "meta.function-call.method.arguments.cfml",
+          "patterns": [
+            {
+              "match": ",",
+              "name": "punctuation.definition.separator.arguments.cfml"
+            },
+            {
+              "match": "(?i:(\\w+)\\s*(?=\\=[^\\=]))",
+              "name": "entity.other.method-parameter.cfml"
+            },
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "number": {
+      "match": "((\\b[0-9]+)|(\\.[0-9]+[0-9\\.]*)|(0(x|X)[0-9a-fA-F]+)|(\\.[0-9]+)((e|E)(\\+|-)?[0-9]+)?([LlFfUuDd]|UL|ul)?)\\b",
+      "name": "constant.numeric.cfml"
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "(?<!\\.)\\b(in|new|void)\\b",
+          "name": "keyword.operator.cfml"
+        },
+        {
+          "match": "!(?!=)|&&|\\|\\|",
+          "name": "keyword.operator.logical.cfml"
+        },
+        {
+          "match": "\\b(?i:(not|and|or|xor|eqv|imp))\\b",
+          "name": "keyword.operator.logical.cfml"
+        },
+        {
+          "match": "\\b(?i:(greater|less|than|equal\\s+to|does|contains|equal|eq|neq|lt|lte|le|gt|gte|ge|and|is))\\b",
+          "name": "keyword.operator.decision.cfml"
+        },
+        {
+          "match": "=(?!=)",
+          "name": "keyword.operator.assignment.cfml"
+        },
+        {
+          "match": "%=|&=|\\*=|\\+=|-=|/=",
+          "name": "keyword.operator.assignment.augmented.cfml"
+        },
+        {
+          "match": "&",
+          "name": "keyword.operator.concat.cfml"
+        },
+        {
+          "match": "<=|>=|<|>",
+          "name": "keyword.operator.relational.cfml"
+        },
+        {
+          "match": "==|!=",
+          "name": "keyword.operator.comparison.cfml"
+        },
+        {
+          "match": "--|\\+\\+|/|%|\\*|\\+|-",
+          "name": "keyword.operator.arithmetic.cfml"
+        },
+        {
+          "match": "\\?|:",
+          "name": "keyword.operator.ternary.cfml"
+        },
+        {
+          "match": "\\.",
+          "name": "keyword.operator.accessor.cfml"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": ";",
+          "name": "punctuation.terminator.statement.cfml"
+        },
+        {
+          "match": ",",
+          "name": "meta.delimiter.comma.cfml"
+        }
+      ]
+    },
+    "round-brackets": {
+      "patterns": [
+        {
+          "begin": "\\(",
+          "beginCaptures": {
+            "0": {
+              "name": "meta.brace.round.cfml"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.round.cfml"
+            }
+          },
+          "name": "meta.group.braces.round",
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "match": "\\)",
+          "name": "invalid.illegal.stray.brace.round.cfml"
+        }
+      ]
+    },
+    "square-brackets": {
+      "patterns": [
+        {
+          "begin": "\\[",
+          "beginCaptures": {
+            "0": {
+              "name": "meta.brace.square.cfml"
+            }
+          },
+          "end": "\\]",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.square.cfml"
+            }
+          },
+          "name": "meta.group.braces.square",
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "storage-types": {
+      "match": "\\b(?i:(function|string|date|struct|array|void|binary|numeric|boolean|query|xml|uuid|any))\\b",
+      "name": "storage.type.primitive.cfml"
+    },
+    "string": {
+      "patterns": [
+        {
+          "include": "#string-quoted-single"
+        },
+        {
+          "include": "#string-quoted-double"
+        }
+      ]
+    },
+    "string-quoted-single": {
+      "begin": "'",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.begin.cfml"
+        }
+      },
+      "end": "'(?!')",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.end.cfml"
+        }
+      },
+      "name": "string.quoted.single.cfml",
+      "patterns": [
+        {
+          "match": "''",
+          "name": "constant.character.escape.quote.cfml"
+        },
+        {
+          "include": "source.cfml#hash-delimiters"
+        }
+      ]
+    },
+    "string-quoted-double": {
+      "begin": "(\")",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.begin.cfml"
+        }
+      },
+      "end": "(\")(?!\")",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.end.cfml"
+        }
+      },
+      "name": "string.quoted.double.cfml",
+      "patterns": [
+        {
+          "match": "\"\"",
+          "name": "constant.character.escape.quote.cfml"
+        },
+        {
+          "include": "source.cfml#hash-delimiters"
+        }
+      ]
+    },
+    "support": {
+      "patterns": [
+        {
+          "begin": "(?x)\n(?<!\\.)\\b\n(?i:\n    (abs|acos|addsoaprequestheader|addsoapresponseheader|ajaxlink|ajaxonload|applicationstarttime\n    |applicationstop|array|arrayappend|arrayavg|arrayclear|arraycontains|arraycontainsnocase\n    |arraydelete|arraydeleteat|arrayeach|arrayevery|arrayfilter|arrayfind|arrayfindall|arrayfindallnocase\n    |arrayfindnocase|arrayfirst|arrayindexexists|arrayinsertat|arrayisdefined|arrayisempty\n    |arraylast|arraylen|arraymap|arraymax|arraymedian|arraymerge|arraymid|arraymin|arraynew|arrayprepend\n    |arrayreduce|arrayresize|arrayreverse|arrayset|arrayslice|arraysome|arraysort|arraysum|arrayswap\n    |arraytolist|arraytostruct|asc|asin|atn|beat|binarydecode|binaryencode|bitand|bitmaskclear|bitmaskread\n    |bitmaskset|bitnot|bitor|bitshln|bitshrn|bitxor|cacheclear|cachecount|cachedelete|cacheget|cachegetall\n    |cachegetallids|cachegetdefaultcachename|cachegetmetadata|cachegetproperties|cacheidexists|cachekeyexists\n    |cacheput|cacheremove|cacheremoveall|cachesetproperties|callstackdump|callstackget|canonicalize|ceiling\n    |cfusion_decrypt|cfusion_encrypt|charsetdecode|charsetencode|chr|cjustify|collectioneach|collectionevery\n    |collectionfilter|collectionmap|collectionreduce|collectionsome|compare|comparenocase|componentcacheclear\n    |componentcachelist|componentinfo|compress|contractpath|cos|createdate|createdatetime|createdynamicproxy\n    |createguid|createobject|createodbcdate|createodbcdatetime|createodbctime|createtime|createtimespan\n    |createuniqueid|createuuid|csrfgeneratetoken|csrfverifytoken|ctcacheclear|ctcachelist\n    |datasourceflushmetacache|dateadd|datecompare|dateconvert|datediff|dateformat|datepart|datetimeformat|day\n    |dayofweek|dayofweekasstring|dayofweekshortasstring|dayofyear|daysinmonth|daysinyear|de|decimalformat\n    |decodefromurl|decrementvalue|decrypt|decryptbinary|deleteclientvariable|deserializejson|directorycopy\n    |directorycreate|directorydelete|directoryexists|directorylist|directoryrename|dollarformat|dump|duplicate\n    |each|echo|empty|encodeforcss|encodefordn|encodeforhtml|encodeforhtmlattribute|encodeforjavascript\n    |encodeforldap|encodeforurl|encodeforxml|encodeforxmlattribute|encodeforxpath|encrypt|encryptbinary|entitydelete\n    |entityload|entityloadbyexample|entityloadbypk|entitymerge|entitynamearray|entitynamelist|entitynew|entityreload\n    |entitysave|entitytoquery|esapidecode|esapiencode|evaluate|exp|expandpath|extract|fileappend|fileclose|filecopy\n    |filedelete|fileexists|filegetmimetype|fileiseof|filemove|fileopen|fileread|filereadbinary|filereadline|fileseek\n    |filesetaccessmode|filesetattribute|filesetlastmodified|fileskipbytes|fileupload|fileuploadall|filewrite\n    |filewriteline|find|findnocase|findoneof|firstdayofmonth|fix|formatbasen|generatesecretkey|getapplicationmetadata\n    |getapplicationsettings|getauthuser|getbasetagdata|getbasetaglist|getbasetemplatepath|getbuiltinfunction\n    |getcanonicalpath|getclasspath|getclientvariableslist|getcomponentmetadata|getcontextroot|getcpuusage\n    |getcurrentcontext|getcurrenttemplatepath|getdirectoryfrompath|getencoding|getfilefrompath|getfileinfo|getfreespace\n    |getfunctioncalledname|getfunctiondata|getfunctionkeywords|getfunctionlist|gethttprequestdata|gethttptimestring\n    |getk2serverdoccount|getk2serverdoccountlimit|getlocale|getlocaledisplayname|getlocalhostip|getluceeid\n    |getmemoryusage|getmetadata|getmetricdata|getnumericdate|getpagecontext|getprinterlist|getprofilesections\n    |getprofilestring|getreadableimageformats|getsoaprequest|getsoaprequestheader|getsoapresponse|getsoapresponseheader\n    |getsystemfreememory|getsystemtotalmemory|gettagdata|gettaglist|gettempdirectory|gettempfile|gettemplatepath\n    |gettickcount|gettimezone|gettimezoneinfo|gettoken|gettotalspace|getuserroles|getvariable|getvfsmetadata\n    |getwriteableimageformats|hash|hash40|hmac|hour|htmlcodeformat|htmleditformat|htmlparse|iif|imageaddborder\n    |imageblur|imageclearrect|imagecopy|imagecrop|imagedrawarc|imagedrawbeveledrect|imagedrawcubiccurve|imagedrawimage\n    |imagedrawline|imagedrawlines|imagedrawoval|imagedrawpoint|imagedrawquadraticcurve|imagedrawrect|imagedrawroundrect\n    |imagedrawtext|imagefilter|imagefiltercolormap|imagefiltercurves|imagefilterkernel|imagefilterwarpgrid|imageflip\n    |imagefonts|imageformats|imagegetblob|imagegetbufferedimage|imagegetexifmetadata|imagegetexiftag|imagegetheight\n    |imagegetiptctag|imagegetwidth|imagegrayscale|imageinfo|imagenegative|imagenew|imageoverlay|imagepaste|imageread\n    |imagereadbase64|imageresize|imagerotate|imagerotatedrawingaxis|imagescaletofit|imagesetantialiasing\n    |imagesetbackgroundcolor|imagesetdrawingalpha|imagesetdrawingcolor|imagesetdrawingstroke|imagesetdrawingtransparency\n    |imagesharpen|imageshear|imagesheardrawingaxis|imagetranslate|imagetranslatedrawingaxis|imagewrite|imagewritebase64\n    |imagexordrawingmode|incrementvalue|inputbasen|insert|int|invoke|isarray|isbinary|isboolean|isclosure\n    |iscustomfunction|isdate|isdebugmode|isdefined|isempty|isimage|isimagefile|isinstanceof|isipinrange|isipv6\n    |isjson|isleapyear|islocalhost|isnotmap|isnull|isnumeric|isnumericdate|isobject|ispdfobject|isquery|issimplevalue\n    |issoaprequest|isstruct|isuserinanyrole|isuserinrole|isuserloggedin|isvalid|isvideofile|iswddx|isxml|isxmlattribute\n    |isxmldoc|isxmlelem|isxmlnode|isxmlroot|iszipfile|javacast|jsstringformat|lcase|left|len|listappend|listavg\n    |listchangedelims|listcompact|listcontains|listcontainsnocase|listdeleteat|listeach|listevery|listfilter|listfind\n    |listfindnocase|listfirst|listgetat|listindexexists|listinsertat|listitemtrim|listlast|listlen|listmap|listprepend\n    |listqualify|listreduce|listremoveduplicates|listrest|listsetat|listsome|listsort|listtoarray|listtrim\n    |listvaluecount|listvaluecountnocase|ljustify|location|log|log10|lscurrencyformat|lsdateformat|lsdatetimeformat\n    |lsdayofweek|lseurocurrencyformat|lsiscurrency|lsisdate|lsisnumeric|lsnumberformat|lsparsecurrency|lsparsedatetime\n    |lsparseeurocurrency|lsparsenumber|lstimeformat|lsweek|ltrim|max|metaphone|mid|millisecond|min|minute|month\n    |monthasstring|monthshortasstring|newline|now|nowserver|nullvalue|numberformat|objectequals|objectload|objectsave\n    |ormclearsession|ormcloseallsessions|ormclosesession|ormevictcollection|ormevictentity|ormevictqueries\n    |ormexecutequery|ormflush|ormgetsession|ormgetsessionfactory|ormreload|pagepoolclear|pagepoollist|paragraphformat\n    |parameterexists|parsedatetime|parsenumber|pi|precisionevaluate|preservesinglequotes|quarter|query|queryaddcolumn\n    |queryaddrow|querycolumnarray|querycolumncount|querycolumndata|querycolumnexists|querycolumnlist|queryconvertforgrid\n    |querycurrentrow|querydeletecolumn|querydeleterow|queryeach|queryevery|queryexecute|queryfilter|querygetcell\n    |querygetrow|querymap|querynew|queryrecordcount|queryreduce|queryrowdata|querysetcell|queryslice|querysome\n    |querysort|quotedvaluelist|rand|randomize|randrange|refind|refindnocase|releasecomobject|rematch|rematchnocase\n    |removechars|repeatstring|replace|replacelist|replacenocase|rereplace|rereplacenocase|restdeleteapplication\n    |restinitapplication|restsetresponse|reverse|right|rjustify|round|rtrim|second|sendgatewaymessage|serialize\n    |serializejson|sessioninvalidate|sessionrotate|sessionstarttime|setencoding|setlocale|setprofilestring|settimezone\n    |setvariable|sgn|sin|sizeof|sleep|soundex|spanexcluding|spanincluding|spreadsheetnew|spreadsheetsetcellvalue\n    |spreadsheetwrite|sqr|sslcertificateinstall|sslcertificatelist|storeaddacl|storegetacl|storesetacl|stringlen|stripcr\n    |structappend|structclear|structcopy|structcount|structdelete|structeach|structevery|structfilter|structfind\n    |structfindkey|structfindvalue|structget|structinsert|structisempty|structkeyarray|structkeyexists|structkeylist\n    |structkeytranslate|structmap|structnew|structreduce|structsome|structsort|structupdate|systemcacheclear|systemoutput\n    |tan|threadjoin|threadterminate|throw|timeformat|tobase64|tobinary|tonumeric|toscript|tostring|trace|transactioncommit\n    |transactionrollback|transactionsetsavepoint|trim|truefalseformat|ucase|ucfirst|unserializejava|urldecode|urlencode\n    |urlencodedformat|urlsessionformat|val|valuearray|valuelist|verifyclient|week|wrap|writedump|writelog|writeoutput\n    |xmlchildpos|xmlelemnew|xmlformat|xmlgetnodetype|xmlnew|xmlparse|xmlsearch|xmltransform|xmlvalidate|year|yesnoformat)\n  )(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "support.function.cfml"
+            },
+            "2": {
+              "name": "meta.support.function-call.arguments.cfml punctuation.definition.arguments.begin.cfml"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "1": {
+              "name": "meta.support.function-call.arguments.cfml punctuation.definition.arguments.end.cfml"
+            }
+          },
+          "name": "meta.support.function-call.cfml",
+          "contentName": "meta.support.function-call.arguments.cfml",
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "begin": "(?x)\n  (\\.)\n  (?i:\n    (add|addcolumn|addrow|append|avg|blur|cjustify|clear|clearrect|columnarray|columncount|columndata|columnexists\n    |columnlist|compare|comparenocase|contains|containsnocase|copy|count|crop|currentrow|dateformat|day|dayofweek\n    |dayofyear|daysinmonth|daysinyear|delete|deleteat|deletecolumn|deleterow|diff|drawarc|drawcubiccurve|drawline\n    |drawlines|drawoval|drawpoint|drawquadraticcurve|drawrect|drawroundrect|each|every|filter|find|findall\n    |findallnocase|findkey|findnocase|findoneof|findvalue|first|firstdayofmonth|flip|get|getbufferedimage|getcell\n    |getheight|getrow|gettoken|getwidth|grayscale|hour|indexexists|info|insert|insertat|isdefined|isempty|keyarray\n    |keyexists|keylist|keytranslate|last|lcase|left|len|listappend|listavg|listchangedelims|listcompact|listcontains\n    |listcontainsnocase|listdeleteat|listeach|listevery|listfilter|listfind|listfindnocase|listfirst|listgetat\n    |listindexexists|listinsertat|listitemtrim|listlast|listlen|listmap|listprepend|listqualify|listreduce\n    |listremoveduplicates|listrest|listsetat|listsome|listsort|listtoarray|listvaluecount|listvaluecountnocase\n    |ljustify|lsdateformat|lsdayofweek|ltrim|map|max|median|merge|mid|min|minute|month|overlay|part|paste|prepend\n    |quarter|recordcount|reduce|refind|refindnocase|rematch|rematchnocase|removechars|repeatstring|replace|replacenocase\n    |rereplace|rereplacenocase|resize|reverse|right|rowdata|rtrim|scaletofit|second|set|setantialiasing|setcell\n    |setdrawingstroke|sharpen|slice|some|sort|spanexcluding|spanincluding|stripcr|sum|swap|tolist|tostruct|translate\n    |trim|ucase|update|week|wrap|writebase64|year)\n  )(\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.operator.accessor.cfml"
+            },
+            "2": {
+              "name": "support.function.member.cfml"
+            },
+            "3": {
+              "name": "meta.support.function-call.member.arguments.cfml punctuation.definition.arguments.begin.cfml"
+            }
+          },
+          "end": "\\)",
+          "endCaptures": {
+            "1": {
+              "name": "meta.support.function-call.member.arguments.cfml punctuation.definition.arguments.end.cfml"
+            }
+          },
+          "name": "meta.support.function-call.member.cfml",
+          "contentName": "meta.support.function-call.member.arguments.cfml",
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "switch": {
+      "patterns": [
+        {
+          "begin": "(?<!\\.)\\b(switch)\\b",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.switch.cfml"
+            }
+          },
+          "end": "\\}",
+          "endCaptures": {
+            "0": {
+              "name": "meta.brace.curly.cfml"
+            }
+          },
+          "name": "meta.switch.cfml",
+          "patterns": [
+            {
+              "include": "#round-brackets"
+            },
+            {
+              "begin": "\\{",
+              "beginCaptures": {
+                "0": {
+                  "name": "meta.brace.curly.cfml"
+                }
+              },
+              "end": "(?=})",
+              "patterns": [
+                {
+                  "begin": "(?<!\\.)\\b(case|default)\\b",
+                  "beginCaptures": {
+                    "1": {
+                      "name": "keyword.control.switch.cfml"
+                    }
+                  },
+                  "end": "(?=:)",
+                  "patterns": [
+                    {
+                      "include": "#expression"
+                    }
+                  ]
+                },
+                {
+                  "include": "$self"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "tag-generic-attribute-script": {
+      "patterns": [
+        {
+          "match": "\\b([a-zA-Z0-9:-]+)\\b",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.cfml"
+            }
+          }
+        },
+        {
+          "begin": "=",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.separator.key-value.cfml"
+            }
+          },
+          "end": "(?<=[^\\s=])|(?=[;{])",
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "tag-in-script": {
+      "patterns": [
+        {
+          "begin": "(?i)(?<!\\.)\\b(property)(?!\\s+in\\b)(\\s+(any|array|binary|boolean|component|date|guid|numeric|query|string|struct|xml|uuid|[_$a-zA-Z][$\\w]*))?\\s+([_$a-zA-Z][$\\w]*\\b)(?!\\s*=)",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.tag.script.cfml"
+            },
+            "3": {
+              "name": "storage.type.cfml"
+            },
+            "4": {
+              "name": "string.unquoted.cfml"
+            }
+          },
+          "end": "(?=(;|{))",
+          "name": "meta.tag.script.cfml",
+          "patterns": [
+            {
+              "include": "source.cfml#tag-generic-attribute"
+            }
+          ]
+        },
+        {
+          "begin": "(?i)(?<!\\.)\\b(property)(?!\\s+in\\b)(?=(\\s+[a-zA-Z]|\\s*$|\\s*[{;]))",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.tag.script.cfml"
+            }
+          },
+          "end": "(?=(;|{))",
+          "name": "meta.tag.script.cfml",
+          "patterns": [
+            {
+              "include": "source.cfml#tag-generic-attribute"
+            }
+          ]
+        },
+        {
+          "begin": "(?i)(?<!\\.)\\b(param)(?!\\s+in\\b)(?=\\s+(name|default|max|maxLength|min|pattern|type)\\s*=)",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.tag.script.cfml"
+            }
+          },
+          "end": "(?=[;{])",
+          "name": "meta.tag.script.cfml",
+          "patterns": [
+            {
+              "include": "#tag-generic-attribute-script"
+            }
+          ]
+        },
+        {
+          "begin": "(?i)(?<!\\.)\\b(param)(?!\\s+in\\b)\\s+([_$a-zA-Z][$\\w\\.]*)(?=\\s+(name|default|max|maxLength|min|pattern|type))",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.tag.script.cfml"
+            },
+            "2": {
+              "name": "string.unquoted.cfml"
+            }
+          },
+          "end": "(?=[;{])",
+          "name": "meta.tag.script.cfml",
+          "patterns": [
+            {
+              "include": "#tag-generic-attribute-script"
+            }
+          ]
+        },
+        {
+          "begin": "(?i)(?<!\\.)\\b(param)(?!\\s+in\\b)(?=(\\s+[a-zA-Z]|\\s*[{;]|\\s*$))",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.tag.script.cfml"
+            },
+            "3": {
+              "name": "storage.type.cfml"
+            },
+            "4": {
+              "name": "string.unquoted.cfml"
+            }
+          },
+          "end": "(?=[;{])",
+          "name": "meta.tag.script.cfml",
+          "patterns": [
+            {
+              "include": "#tag-generic-attribute-script"
+            }
+          ]
+        },
+        {
+          "begin": "(?i)(?<!\\.)\\b(param)(?!\\s+in\\b)(?=(\\s+[a-zA-Z]|\\s*[{;]|\\s*$))",
+          "beginCaptures": {
+            "1": {
+              "name": "entity.name.tag.script.cfml"
+            }
+          },
+          "end": "(?=[;{])",
+          "name": "meta.tag.script.cfml",
+          "patterns": [
+            {
+              "include": "#tag-generic-attribute-script"
+            }
+          ]
+        },
+        {
+          "begin": "(?<!.)(\b)(?i:(abort))(?!s+in\b)(?=(s+[a-zA-Z]|s*;|s*$))",
+          "beginCaptures": {
+            "2": {
+              "name": "entity.name.tag.script.cfml"
+            }
+          },
+          "end": "(?=[;{])",
+          "name": "meta.tag.script.cfml",
+          "patterns": [
+            {
+              "include": "#tag-generic-attribute-script"
+            }
+          ]
+        },
+        {
+          "begin": "(?x)\n    (?<!.)(\b)\n    (?i:\n      (ajaximport|ajaxproxy|applet|application|argument|associate|authenticate|break|cache|chart|chartdata\n      |chartseries|col|collection|content|cookie|dbinfo|directory|div|document|documentitem\n      |documentsection|dump|error|execute|exit|feed|file|flush|form|forward|ftp|graph|graphdata\n      |header|htmlbody|htmlhead|http|httpparam|image|imap|import|include|index|input|insert|invoke|invokeargument\n      |layout|layoutarea|ldap|location|lock|log|login|loginuser|logout|loop|mail|mailparam|mailpart|map|mapitem|mediaplayer\n      |module|object|objectcache|output|pageencoding|pdf|pdfparam|pop|processingdirective|procparam|procresult\n      |query|queryparam|registry|rethrow|retry|savecontent|schedule|search|select|servlet|servletparam\n      |setting|silent|sleep|slider|stopwatch|storedproc|table|textinput|thread|throw|timer|trace|transaction\n      |update|video|videoplayer|videoplayerparam|wddx|window|xml|zip|zipparam)\n    )(?!s+in\b)(?=(s+[a-zA-Z]|s*[{]|s*$))",
+          "beginCaptures": {
+            "2": {
+              "name": "entity.name.tag.script.cfml"
+            }
+          },
+          "end": "(?=[;{])",
+          "name": "meta.tag.script.cfml",
+          "patterns": [
+            {
+              "include": "#tag-generic-attribute-script"
+            }
+          ]
+        }
+      ]
+    },
+    "variable": {
+      "patterns": [
+        {
+          "match": "\\b[A-Z][_\\$\\dA-Z]*\\b",
+          "name": "variable.other.constant.cfml"
+        },
+        {
+          "match": "(?:[^A-Za-z0-9_])(\\$)",
+          "captures": {
+            "1": {
+              "name": "variable.other.dollar.cfml"
+            }
+          }
+        },
+        {
+          "begin": "\\b([A-Z][\\$\\w]*)(?=(\\.))",
+          "end": "(?=[^\\w\\$\\.])",
+          "beginCaptures": {
+            "1": {
+              "name": "variable.object.class.cfml"
+            }
+          },
+          "patterns": [
+            {
+              "match": "(\\.)([\\$\\w]+(?=[^\\$\\w])(?![\\(]))",
+              "captures": {
+                "1": {
+                  "name": "keyword.operator.accessor.cfml"
+                },
+                "2": {
+                  "name": "variable.object.property.cfml"
+                }
+              }
+            },
+            {
+              "match": "(\\.)([\\$\\w]+(?=\\())",
+              "captures": {
+                "1": {
+                  "name": "keyword.operator.accessor.cfml"
+                },
+                "2": {
+                  "name": "entity.function.method.cfml"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "match": "([\\$\\w]+(?=[^\\$\\w])(?![\\(]))",
+          "name": "variable.other.cfml"
+        }
+      ]
+    }
+  }
+}

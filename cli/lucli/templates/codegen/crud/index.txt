@@ -1,0 +1,15 @@
+<cfparam name="|ObjectNamePlural|" default="">
+<cfoutput>
+<h1>|ObjectNamePluralC|</h1>
+<!--- A <div>, not a <p>: `buttonTo` renders a <form>, and a form inside a
+     paragraph is invalid HTML — the browser closes the <p> early and the row
+     falls apart. --->
+<div class="wheels-actions">#linkTo(route="new|ObjectNameSingularC|", text="New |ObjectNameSingular|", class="button")#
+</div>
+<cfloop query="|ObjectNamePlural|">
+	<article>
+		<h2>#linkTo(route="|ObjectNameSingular|", key=|ObjectNamePlural|.id, text=|ObjectNamePlural|.|DisplayProperty|)#</h2>
+		<!--- CLI-Appends-Here --->
+	</article>
+</cfloop>
+</cfoutput>

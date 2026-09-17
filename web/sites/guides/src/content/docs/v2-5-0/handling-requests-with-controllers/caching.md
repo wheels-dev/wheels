@@ -113,8 +113,7 @@ In CFWheels, you can cache data in 4 different ways:
 
 This code specifies that you want to cache the `browseByUser` and `browseByTitle` actions for 30 minutes:
 
-{% code title="Caches Example" %}
-```javascript
+```javascript title="Caches Example"
 component extends="Controller" {
   
    function config(){
@@ -128,7 +127,6 @@ component extends="Controller" {
      }
 }
 ```
-{% endcode %}
 
 As you can see, the `caches()` function call goes inside the `config()` function at the top of your controller file and accepts a list of action names and the number of minutes the actions should be cached for.
 
@@ -148,12 +146,10 @@ One way to use this feature is to submit your forms to the same page to have it 
 
 Here is some code that shows this technique with using the Flash to expire the cache. (Imagine that the `showArticle`page is cached and a user is adding a new comment to it.)
 
-{% code title="Expire with Flash" %}
-```javascript
+```javascript title="Expire with Flash"
 flashInsert(message="Your comment was added");
 redirectTo(action="showArticle", key=params.key);
 ```
-{% endcode %}
 
 Note that by default, any filters set for the action are being run as normal. This means that if you do authentication in the filter (which is a common technique for sites with content where you have to login first to see it), you can still cache those pages safely using the [caches()](https://wheels.dev/api/v2.5.0/controller.caches.html) function.
 
@@ -163,8 +159,7 @@ However, to achieve the fastest possible cache, you can override this default an
 
 This code specifies that you want to cache the view page for the `browseByUser` action for 1 hour:
 
-{% code title="browseByUser caches" %}
-```javascript
+```javascript title="browseByUser caches"
 component extends="Controller" {
    
    function browseByUser(){
@@ -175,7 +170,6 @@ component extends="Controller" {
      }
 }
 ```
-{% endcode %}
 
 The difference between action caching and page caching is that page caching will run the action and then only cache the view page itself. Action caching, as explained above, does not run the action code at all (but it does run filters and verifications).
 
@@ -191,11 +185,9 @@ So, for example, if you have an e-commerce site that lists products with a shopp
 
 Example code:
 
-{% code title="IncludePartial" %}
-```javascript
+```javascript title="IncludePartial"
 #includePartial(partial="listing", cache=true)#
 ```
-{% endcode %}
 
 Behind the scenes CFWheels creates the cache key based on the name of the partial plus all of the arguments passed in to it. This means that if you pass in a `userId` variable for example, they will be cached separately.
 

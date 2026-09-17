@@ -52,13 +52,13 @@ component extends="wheels.databaseAdapters.Abstract" {
         } else {
             // Add all primary key columns normally
             for (local.col in arguments.primaryKeys) {
-                arrayAppend(local.lines, col.toSQL());
+                arrayAppend(local.lines, local.col.toSQL());
             }
         }
 
         // 2. Add normal columns
         for (local.col in arguments.columns) {
-            arrayAppend(local.lines, col.toSQL());
+            arrayAppend(local.lines, local.col.toSQL());
         }
 
         // 3. Add composite primary key constraint if needed
@@ -68,7 +68,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 
         // 4. Add foreign keys
         for (local.fk in arguments.foreignKeys) {
-            arrayAppend(local.lines, fk.toForeignKeySQL());
+            arrayAppend(local.lines, local.fk.toForeignKeySQL());
         }
 
         // 5. Join all lines and wrap in CREATE TABLE
@@ -221,12 +221,12 @@ component extends="wheels.databaseAdapters.Abstract" {
         required string sql,
         struct options = {}
     ) {
-        arguments.sql &= " FOREIGN KEY (" & arguments.options.column & ")";
+        arguments.sql &= " FOREIGN KEY (" & quoteColumnName(arguments.options.column) & ")";
 
         if (StructKeyExists(arguments.options, "referenceTable")) {
             if (StructKeyExists(arguments.options, "referenceColumn")) {
-                arguments.sql &= " REFERENCES " & arguments.options.referenceTable;
-                arguments.sql &= " (" & arguments.options.referenceColumn & ")";
+                arguments.sql &= " REFERENCES " & quoteTableName(arguments.options.referenceTable);
+                arguments.sql &= " (" & quoteColumnName(arguments.options.referenceColumn) & ")";
             }
         }
 

@@ -13,8 +13,7 @@ The only other requirement to make a plugin work is that `MyPlugin.cfc` must con
 
 Here's an example:
 
-{% code title="ExamplePlugin.cfc" %}
-```javascript
+```javascript title="ExamplePlugin.cfc"
 component {
   function init(){
     this.version="1.4.5,2.0";
@@ -22,7 +21,6 @@ component {
   }
 }
 ```
-{% endcode %}
 
 {% hint style="info" %}
 #### Init() not config()
@@ -46,13 +44,11 @@ It is also important to note that although you can overwrite functions, they are
 
 Let's say that we wanted Wheels's built-in function [timeAgoInWords()](https://wheels.dev/api/v3.0.0/controller.timeAgoInWords.html) to return the time followed by the string " (approximately)":
 
-{% code title="timeAgoInWords.cfc" %}
-```javascript
+```javascript title="timeAgoInWords.cfc"
 public string function timeAgoInWords(){
   return core.timeAgoInWords(argumentCollection=arguments) & " (approximately)";
 }
 ```
-{% endcode %}
 
 ### Plugin Attributes
 
@@ -90,11 +86,9 @@ This is convenient when you're deploying plugins but can be annoying when you're
 
 To force Wheels to skip the unzipping process, set the `overwritePlugins` setting to `false` in the development environment.
 
-{% code title="/config/development/settings.cfm" %}
-```javascript
+```javascript title="/config/development/settings.cfm"
 set(overwritePlugins=false);
 ```
-{% endcode %}
 
 With this setting, you'll be able to reload your application without worrying about your file being overwritten by the contents of the corresponding zip file.
 
@@ -102,11 +96,9 @@ With this setting, you'll be able to reload your application without worrying ab
 
 To force Wheels to skip the folder deletion process, set the `deletePluginDirectories` setting to `false` for your `development` environment.
 
-{% code title="/config/development/settings.cfm" %}
-```javascript
+```javascript title="/config/development/settings.cfm"
 set(deletePluginDirectories=false);
 ```
-{% endcode %}
 
 With this setting, you can now develop new plugins in your application without worrying about having a corresponding zip file in place.
 
@@ -126,8 +118,7 @@ With Wheels 2.x we can take advantage of the inbuilt documentation generator. Tr
 
 Here's an example from the wheels ical4J plugin:
 
-{% code title="ical4J" %}
-```java
+```java title="ical4J"
 /**
  * Given a iCal style repeat rule, a seed date and a from-to range, get all recurring dates which satisfy those conditions
  *
@@ -149,7 +140,6 @@ public array function getRecurringDates(
     return local.recur.getDates($ical_createDate(arguments.seed), $ical_createDate(arguments.from), $ical_createDate(arguments.to), $ical_createValue("DATE"));
 }
 ```
-{% endcode %}
 
 The javaDoc style comments will automatically show this function under Plugins > Calendaring, rather than in the "Uncategorized" functions. The `@parameter` lines give a helpful hint to the user
 
@@ -177,8 +167,7 @@ This means you can distribute plugins with Java libs and they'll work properly w
 
 One of the nicest things about `2.x` is the tighter integration with command-line tools such as CommandBox. We can take advantage of the new testing suite JSON return type and the new Wheels CLI in CommandBox 2.x to easily build a Travis CI test. It's perhaps easiest to just show the `.travis.yml` file - this goes in the root of your gitHub plugin repository, and once you've turned on testing under Travis.org, will run your test suite on every commit.
 
-{% code title=".travis.yml" %}
-```yaml
+```yaml title=".travis.yml"
 language: java
 sudo: required
 jdk:
@@ -209,7 +198,6 @@ script: >
 notifications:
     email: true
 ```
-{% endcode %}
 
 In sum, this:
 

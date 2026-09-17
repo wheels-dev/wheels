@@ -62,7 +62,7 @@ for (local.key in packageMeta) {
 		<div class="ui error message">
 			<div class="header">Package Loading Errors</div>
 			<cfloop array="#failedPackages#" index="local.fp">
-				<p><strong>#local.fp.name#</strong>: #local.fp.error#<cfif Len(local.fp.detail)> &mdash; #local.fp.detail#</cfif></p>
+				<p><strong>#EncodeForHTML(local.fp.name)#</strong>: #EncodeForHTML(local.fp.error)#<cfif Len(local.fp.detail)> &mdash; #EncodeForHTML(local.fp.detail)#</cfif></p>
 			</cfloop>
 		</div>
 	</cfif>
@@ -83,11 +83,11 @@ for (local.key in packageMeta) {
 					<cfset local.pkg = packageMeta[local.pkgKey]>
 					<tr>
 						<td>
-							<a href="#urlFor(route="wheelsPackageEntry", name=local.pkgKey)#">#local.pkg.name#</a>
+							<a href="#urlFor(route="wheelsPackageEntry", name=local.pkgKey)#">#EncodeForHTML(local.pkg.name)#</a>
 						</td>
-						<td>#local.pkg.version#</td>
-						<td>#local.pkg.author#</td>
-						<td>#local.pkg.description#</td>
+						<td>#EncodeForHTML(local.pkg.version)#</td>
+						<td>#EncodeForHTML(local.pkg.author)#</td>
+						<td>#EncodeForHTML(local.pkg.description)#</td>
 						<td>
 							<a class="ui button tiny teal" href="#urlFor(route='wheelsPackageEntry', name=local.pkgKey)#">
 								<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="8 6 8 12" fill="white" style="vertical-align: middle; margin-right: 4px;">
@@ -127,7 +127,7 @@ for (local.key in packageMeta) {
 	<cfif Len(registryError)>
 		<div class="ui warning message">
 			<div class="header">Registry unavailable</div>
-			<p>#HTMLEditFormat(registryError)#</p>
+			<p>#EncodeForHTML(registryError)#</p>
 		</div>
 	<cfelseif ArrayLen(registryPackages) EQ 0>
 		<div class="ui message">
@@ -149,13 +149,13 @@ for (local.key in packageMeta) {
 					<cfset local.isInstalled = StructKeyExists(installedKeys, local.rpKey)>
 					<tr>
 						<td>
-							<strong>#HTMLEditFormat(local.rp.name)#</strong>
+							<strong>#EncodeForHTML(local.rp.name)#</strong>
 							<cfif Len(local.rp.homepage) AND REFindNoCase("^https?://", local.rp.homepage)>
-								<br><a href="#HTMLEditFormat(local.rp.homepage)#" target="_blank" rel="noopener" class="ui small grey text">homepage</a>
+								<br><a href="#EncodeForHTML(local.rp.homepage)#" target="_blank" rel="noopener" class="ui small grey text">homepage</a>
 							</cfif>
 						</td>
-						<td>#HTMLEditFormat(local.rp.description)#</td>
-						<td>#HTMLEditFormat(local.rp.latestVersion)#</td>
+						<td>#EncodeForHTML(local.rp.description)#</td>
+						<td>#EncodeForHTML(local.rp.latestVersion)#</td>
 						<td>
 							<cfif local.isInstalled>
 								<span class="ui label"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 512 512" fill="currentColor" style="vertical-align: middle; margin-right: 4px;"><path d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"/></svg>Installed</span>
@@ -165,10 +165,10 @@ for (local.key in packageMeta) {
 								      `add` (not `install`) is the canonical verb — LuCLI's built-in extension
 								      installer intercepts the literal subcommand `install`, so `wheels packages
 								      install <name>` never reaches Module.cfc. See PR #2374 / cli/lucli/services/packages/PackagesMainCli.cfc. --->
-								<code id="install-#HTMLEditFormat(local.rpKey)#">wheels packages add #HTMLEditFormat(local.rp.name)#</code>
+								<code id="install-#EncodeForHTML(local.rpKey)#">wheels packages add #EncodeForHTML(local.rp.name)#</code>
 								<button type="button"
 									class="ui tiny button"
-									aria-label="Copy install command for #HTMLEditFormat(local.rp.name)#"
+									aria-label="Copy install command for #EncodeForHTML(local.rp.name)#"
 									onclick="navigator.clipboard.writeText(document.getElementById('install-#JSStringFormat(local.rpKey)#').innerText)">
 									Copy
 								</button>

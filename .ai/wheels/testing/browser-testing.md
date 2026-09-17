@@ -5,7 +5,7 @@ Shipped in v4.0 across PRs #2113, #2115, #2116. Specs extend `wheels.wheelstest.
 ## Example
 
 ```cfm
-// vendor/wheels/tests/specs/browser/LoginBrowserSpec.cfc
+// vendor/wheels/tests/specs/wheelstest/BrowserLoginSpec.cfc
 component extends="wheels.wheelstest.BrowserTest" {
 
     this.browserEngine = "chromium";   // chromium only in PR 1

@@ -25,13 +25,11 @@ Use the [get()](https://wheels.dev/api/v2.5.0/controller.gset.html) function to 
 
 
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 if (get("environment") == "production") {
     // Do something for production environment
 }
 ```
-{% endcode %}
 
 ### Setting CFML Application Configurations
 
@@ -39,8 +37,7 @@ In CFML's standard `Application.cfc`, you can normally set values for your appli
 
 Here is an example of what can go in `config/app.cfm`:
 
-{% code title="config/app.cfm" %}
-```javascript
+```javascript title="config/app.cfm"
 this.name = "TheNextSiteToBeatTwitter";
 this.sessionManagement = false;
 
@@ -49,7 +46,6 @@ this.customTagPaths = ListAppend(
   ExpandPath("../customtags")
 );
 ```
-{% endcode %}
 
 ### Types of Configurations Available
 
@@ -78,11 +74,9 @@ Not only are the environments useful for separating your production settings fro
 
 The setting for the current environment can be found in `config/environment.cfm` and should look something like this:
 
-{% code title="config/environment.cfm" %}
-```javascript
+```javascript title="config/environment.cfm"
 set(environment="development");
 ```
-{% endcode %}
 
 **Full Listing of Environment Settings**
 
@@ -98,11 +92,9 @@ set(environment="development");
 
 Sometimes it is useful for our applications to "force" URL rewriting. By default, CFWheels will try to determinate what type of URL rewriting to perform and set it up for you. But you can force in or out this setting by using the example below:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(urlRewriting="Off");
 ```
-{% endcode %}
 
 The code above will tell CFWheels to skip its automatic detection of the URL Rewriting capabilities and just set it as `"Off"`.
 
@@ -116,13 +108,11 @@ Probably the most important configuration of them all. What is an application wi
 
 The data source configuration is what tells CFWheels which database to use for all of its models. (This can be overridden on a per-model basis, but that will be covered later.) To set this up in CFWheels, it's just as easy as the previous example:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(dataSourceName="yourDataSourceName");
 set(dataSourceUserName="yourDataSourceUsername");
 set(dataSourcePassword="yourDataSourcePassword");
 ```
-{% endcode %}
 
 ### Function Settings
 
@@ -130,11 +120,9 @@ OK, here it's where the fun begins! CFWheels includes a lot of functions to make
 
 Let's look at a little of example:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(functionName="findAll", perPage=20);
 ```
-{% endcode %}
 
 That little line of code will make all calls to the [findAll()](https://wheels.dev/api/v2.5.0/model.findall.html) method in CFWheels return a maximum number of 20 record per page (if pagination is enabled for that [findAll()](https://wheels.dev/api/v2.5.0/model.findall.html) call). How great is that? You don't need to set the `perPage` value for every single call to [findAll()](https://wheels.dev/api/v2.5.0/model.findall.html) if you have a different requirement than the CFWheels default of 10 records.
 
@@ -144,12 +132,10 @@ You'll generally want to configure how CFWheels handles errors and debugging inf
 
 For example, let's say that we want to enable debugging information in our "development" environment temporarily:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 // /config/development/settings.cfm
 set(showDebugInformation=false);
 ```
-{% endcode %}
 
 **Full Listing of Debugging and Error Settings**
 
@@ -171,11 +157,9 @@ CFWheels does a pretty good job at caching the framework and its output to speed
 
 Let's say your application generates dynamic routes and you need it to check the routes on each request. This task will be as simple as this line of code:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(cacheRoutes=false);
 ```
-{% endcode %}
 
 **Full Listing of Caching Settings**
 
@@ -205,11 +189,9 @@ The CFWheels ORM provides many sensible conventions and defaults, but sometimes 
 
 For example, if we wanted to prefix all of the database table names in our application with `blog_` but didn't want to include that at the beginning of model names, we would do this:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(tableNamePrefix="blog_");
 ```
-{% endcode %}
 
 Now your `post` model will map to the `blog_posts` table, `comment` model will map to the `blog_comments` table, etc.
 
@@ -234,11 +216,9 @@ There are several settings that make plugin development more convenient. We reco
 
 If you want to keep what's stored in a plugin's zip file from overwriting changes that you made in its expanded folder, set this in `config/development/settings.cfm`:
 
-{% code title="CFScript" %}
-```javascript
+```javascript title="CFScript"
 set(overwritePlugins=false);
 ```
-{% endcode %}
 
 See the chapter on [Installing and Using Plugins](/2.5.0/guides/plugins/installing-and-using-plugins) for more information.
 

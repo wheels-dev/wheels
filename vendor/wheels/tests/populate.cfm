@@ -25,6 +25,7 @@
 <cfset local.textColumnType = "text">
 <cfset local.intColumnType = "int">
 <cfset local.floatColumnType = "float">
+<cfset local.decimalColumnType = "decimal(10,2)">
 <cfset local.identityColumnType = "">
 <cfset local.bitColumnType = "bit">
 <cfset local.bitColumnDefault = 0>
@@ -62,6 +63,7 @@
 	<cfset local.bitColumnType      = "NUMBER(1)">
 	<cfset local.bitColumnDefault   = "0">
 	<cfset local.intColumnType = "NUMBER(10)">
+	<cfset local.decimalColumnType = "NUMBER(10,2)">
 	<cfset local.textColumnType = "VARCHAR2(255)">
 	<cfset local.dateTimeDefault = "TIMESTAMP '2000-01-01 18:26:08.490'">
 	<cfset local.charType = "VARCHAR2(9)">
@@ -73,6 +75,7 @@
 	<cfset local.textColumnType = "TEXT">
 	<cfset local.intColumnType = "INTEGER">
 	<cfset local.floatColumnType = "REAL">
+	<cfset local.decimalColumnType = "NUMERIC(10,2)">
 	<cfset local.bitColumnType = "INTEGER">
 	<cfset local.bitColumnDefault = 0>
 	<cfset local.charType = "TEXT">
@@ -316,6 +319,7 @@ CREATE TABLE c_o_r_e_sqltypes
 	,binaryType #local.binaryColumnType# NULL
 	,dateTimeType #local.datetimeColumnType# DEFAULT #PreserveSingleQuotes(local.dateTimeDefault)# NOT NULL
 	,floatType #local.floatColumnType# DEFAULT 1.25 NULL
+	,decimalType #local.decimalColumnType# DEFAULT 1.25 NULL
 	,intType #local.intColumnType# DEFAULT 1 NOT NULL
 	,stringType char(4) DEFAULT 'blah' NOT NULL
 	,stringVariableType varchar(80) NOT NULL
@@ -702,7 +706,7 @@ FROM c_o_r_e_users u INNER JOIN c_o_r_e_galleries g ON u.id = g.userid
 </cfloop>
 
 <!--- sqltype --->
-<cfset model("sqltype").create(stringVariableType = "tony", textType = "blah blah blah blah")>
+<cfset model("sqltype").create(stringVariableType = "tony", textType = "blah blah blah blah", decimalType = 149.99)>
 
 <!--- assign posts for multiple join test --->
 <cfset local.andy.update(favouritePostId = 1, leastFavouritePostId = 2)>

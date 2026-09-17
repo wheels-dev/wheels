@@ -101,11 +101,11 @@ component extends="wheels.WheelsTest" {
 				StructDelete(author, "firstName")
 				result = author.hasChanged()
 
-				expect(result).toBeFalse()
+				expect(result).toBeTrue()
 
 				result = author.hasChanged("firstName")
 
-				expect(result).toBeFalse()
+				expect(result).toBeTrue()
 
 				result = author.hasChanged("somethingThatDoesNotExist")
 

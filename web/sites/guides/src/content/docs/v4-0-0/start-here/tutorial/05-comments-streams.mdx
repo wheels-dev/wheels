@@ -123,7 +123,7 @@ On the post show page, a form at the bottom posts to a nested route, `/posts/:po
                try {
                    t = createTable(name="comments");
                    t.integer(columnNames="postId", allowNull=false);
-                   t.string(columnNames="author", default="", allowNull=false, limit=80);
+                   t.string(columnNames="author", allowNull=false, limit=80);
                    t.text(columnNames="body", allowNull=false);
                    t.timestamps();
                    t.create();

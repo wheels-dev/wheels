@@ -1,10 +1,37 @@
 <cfoutput>
 	<!--- cfformat-ignore-start --->
+	<cfset local.copyJson = "">
+	<cfset local.copyReady = false>
+	<cftry>
+		<cfset local.copyBuilder = CreateObject("component", "wheels.events.onerror.ErrorCopyPayload")>
+		<cfset local.copyJson = local.copyBuilder.toJson(wheelsError = arguments.wheelsError)>
+		<cfset local.copyReady = Len(local.copyJson) GT 0>
+		<cfcatch>
+			<cftry>
+				<cfset local.copyFallback = {}>
+				<cfif StructKeyExists(arguments.wheelsError, "type")>
+					<cfset local.copyFallback["type"] = arguments.wheelsError.type>
+				</cfif>
+				<cfif StructKeyExists(arguments.wheelsError, "message")>
+					<cfset local.copyFallback["message"] = arguments.wheelsError.message>
+				</cfif>
+				<cfset local.copyJson = SerializeJSON(local.copyFallback)>
+				<cfset local.copyReady = Len(local.copyJson) GT 0>
+				<cfcatch></cfcatch>
+			</cftry>
+		</cfcatch>
+	</cftry>
 	<div class="ui container" style="padding-bottom:2em;">
-		<!--- Error Type Badge --->
-		<div style="margin-bottom:1.5em;">
+		<!--- Error Type Badge + Copy control --->
+		<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:1.5em;flex-wrap:wrap;">
 			<span style="display:inline-block;background:rgba(243,139,168,.15);color:##f38ba8;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;">#EncodeForHTML(arguments.wheelsError.type)#</span>
+			<cfif local.copyReady>
+				<button type="button" id="wheels-copy-error" data-label="Copy" onclick="wheelsCopyErrorPayload()" aria-label="Copy error details as JSON" style="font-size:11px;padding:4px 12px;border-radius:4px;border:1px solid ##89b4fa;background:rgba(137,180,250,.15);color:##89b4fa;cursor:pointer;font-weight:600;">Copy</button>
+			</cfif>
 		</div>
+		<cfif local.copyReady>
+			<script type="application/json" id="wheels-error-copy-payload">#EncodeForHTML(local.copyJson)#</script>
+		</cfif>
 
 		<!--- Error Message --->
 		<h1 style="font-size:1.8em;margin-bottom:.5em;line-height:1.3;">
@@ -187,6 +214,55 @@
 			wheelsFilterTrace('app');
 		}
 	})();
+
+	function wheelsCopyErrorPayload() {
+		var el = document.getElementById('wheels-error-copy-payload');
+		var text = el ? (el.textContent || el.innerText || '') : '';
+		var btn = document.getElementById('wheels-copy-error');
+		var done = function() {
+			if (!btn) return;
+			var orig = btn.getAttribute('data-label') || 'Copy';
+			btn.textContent = 'Copied';
+			btn.style.borderColor = '#a6e3a1';
+			btn.style.background = 'rgba(166,227,161,.15)';
+			btn.style.color = '#a6e3a1';
+			setTimeout(function() {
+				btn.textContent = orig;
+				btn.style.borderColor = '#89b4fa';
+				btn.style.background = 'rgba(137,180,250,.15)';
+				btn.style.color = '#89b4fa';
+			}, 1500);
+		};
+		var fail = function() {
+			if (!btn) return;
+			btn.textContent = 'Copy failed';
+		};
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(text).then(done).catch(function() {
+				if (wheelsCopyErrorFallback(text)) { done(); } else { fail(); }
+			});
+		} else if (wheelsCopyErrorFallback(text)) {
+			done();
+		} else {
+			fail();
+		}
+	}
+
+	function wheelsCopyErrorFallback(text) {
+		var ta = document.createElement('textarea');
+		ta.value = text;
+		ta.setAttribute('readonly', '');
+		ta.style.position = 'fixed';
+		ta.style.left = '-9999px';
+		document.body.appendChild(ta);
+		ta.focus();
+		ta.select();
+		ta.setSelectionRange(0, text.length);
+		var ok = false;
+		try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+		document.body.removeChild(ta);
+		return ok;
+	}
 
 	function wheelsFilterTrace(filter) {
 		var frames = document.querySelectorAll('[data-frame-type]');

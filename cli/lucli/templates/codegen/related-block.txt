@@ -1,0 +1,22 @@
+<!--- CLI: related |Association| (generated) --->
+<h2>|ListCap|</h2>
+<cfif StructKeyExists(|ParentVar|, "|Association|") and ArrayLen(|ParentVar|.|Association|)>
+	<!--- Multiple eager-loaded collections can repeat a child across joined rows. --->
+	<cfset wheelsRelated|ListCap|Seen = {}>
+	<cfloop array="#|ParentVar|.|Association|#" index="|Singular|">
+		<cfif not StructKeyExists(wheelsRelated|ListCap|Seen, |Singular|.id)>
+			<cfset wheelsRelated|ListCap|Seen[|Singular|.id] = true>
+			<article>
+				<p>#linkTo(route="|Singular|", key=|Singular|.id, text=|Singular|.|DisplayProperty|)#</p>
+			</article>
+		</cfif>
+	</cfloop>
+<cfelse>
+	<p>No |Association| yet.</p>
+</cfif>
+<!--- A <div>, not a <p>: `buttonTo` renders a <form>, and a form inside a
+     paragraph is invalid HTML — the browser closes the <p> early and the row
+     falls apart. --->
+<div class="wheels-actions">#linkTo(route="new|SingularCap|", text="Add a |Singular|", class="button")#
+</div>
+<!--- /CLI: related |Association| --->

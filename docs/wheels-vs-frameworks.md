@@ -279,5 +279,5 @@ The following gaps were closed in v4.0:
 - **Auto-migrations from models** ([#2102](https://github.com/wheels-dev/wheels/pull/2102))
 - **HTTP test client** ([#2099](https://github.com/wheels-dev/wheels/pull/2099))
 - **Parallel test execution** ([#2100](https://github.com/wheels-dev/wheels/pull/2100))
-- **Auto-migration rename detection** — explicit hints + heuristic suggestions via `AutoMigrator`, new `wheels dbmigrate diff` CLI command, MCP `wheels_migrate(action="diff")`
+- **Auto-migration rename detection** — explicit hints + heuristic suggestions via `AutoMigrator` and the MCP `migrate` tool (`action="diff"`). (Note: the `wheels dbmigrate diff` CLI was never shipped — see the [4.x backlog](releases/wheels-4.x-backlog.md).)
 - **Browser testing** ([#2113](https://github.com/wheels-dev/wheels/pull/2113), [#2115](https://github.com/wheels-dev/wheels/pull/2115), [#2116](https://github.com/wheels-dev/wheels/pull/2116), [#2121](https://github.com/wheels-dev/wheels/pull/2121)) — native CFML browser testing via Playwright Java. Specs extend `wheels.wheelstest.BrowserTest` and drive a real Chromium through a fluent DSL (~60 methods: navigation, interaction, assertions, waiting, scoping, cookies, loginAs/logout, dialogs, viewport, screenshots). `wheels browser setup` / `wheels browser:test` CLI commands, Playwright cache + install in CI.

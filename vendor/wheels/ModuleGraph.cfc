@@ -35,16 +35,25 @@ component output="false" {
 			errors = []
 		};
 
-		// Build lookup: package name -> directory name (for resolving requires by name)
-		local.nameToDir = {};
-		for (local.dirName in arguments.manifests) {
-			local.m = arguments.manifests[local.dirName];
-			local.pkgName = StructKeyExists(local.m, "name") ? local.m.name : local.dirName;
-			local.nameToDir[local.pkgName] = local.dirName;
+		// Build lookup: package name -> directory name (for resolving requires by name).
+		// Duplicate manifest names fail closed — last-wins would silently bind
+		// requires/replaces/suggests to whichever directory happened to iterate last.
+		local.nameIndex = $collectNameIndex(arguments.manifests);
+		local.nameToDir = local.nameIndex.nameToDir;
+		local.excluded = {};
+		for (local.collision in local.nameIndex.collisions) {
+			local.dirList = ArrayToList(local.collision.dirs, ", ");
+			for (local.collidingDir in local.collision.dirs) {
+				ArrayAppend(local.result.errors, {
+					package = local.collidingDir,
+					message = "Duplicate package name '#local.collision.name#' declared by #local.dirList#"
+				});
+				local.excluded[local.collidingDir] = "Duplicate package name '#local.collision.name#'";
+			}
 		}
 
-		// Phase 1: Process replacements
-		local.excluded = $processReplacements(arguments.manifests, local.nameToDir);
+		// Phase 1: Process replacements (colliding names are already excluded)
+		local.excluded = $processReplacements(arguments.manifests, local.nameToDir, local.excluded);
 		StructAppend(local.result.excluded, local.excluded);
 
 		// Phase 2: Build the active package set (excluding replaced packages)
@@ -98,14 +107,54 @@ component output="false" {
 	}
 
 	/**
+	 * Indexes manifests by package name. Duplicate names are reported as
+	 * collisions and omitted from nameToDir so requires/replaces/suggests
+	 * cannot silently bind the last directory.
+	 *
+	 * @return  Struct with: nameToDir (struct), collisions (array of {name, dirs})
+	 */
+	private struct function $collectNameIndex(required struct manifests) {
+		local.byName = {};
+		for (local.dirName in arguments.manifests) {
+			local.m = arguments.manifests[local.dirName];
+			local.pkgName = StructKeyExists(local.m, "name") && Len(Trim(local.m.name))
+				? Trim(local.m.name)
+				: local.dirName;
+			if (!StructKeyExists(local.byName, local.pkgName)) {
+				local.byName[local.pkgName] = [];
+			}
+			local.dirs = local.byName[local.pkgName];
+			ArrayAppend(local.dirs, local.dirName);
+			local.byName[local.pkgName] = local.dirs;
+		}
+
+		local.nameToDir = {};
+		local.collisions = [];
+		for (local.pkgName in local.byName) {
+			local.dirs = local.byName[local.pkgName];
+			if (ArrayLen(local.dirs) > 1) {
+				ArrayAppend(local.collisions, {name = local.pkgName, dirs = local.dirs});
+			} else {
+				local.nameToDir[local.pkgName] = local.dirs[1];
+			}
+		}
+
+		return {nameToDir = local.nameToDir, collisions = local.collisions};
+	}
+
+	/**
 	 * Processes `replaces` declarations across all manifests.
 	 * If package A declares replaces: {"pkg-B": "*"}, and pkg-B is present,
 	 * then pkg-B is excluded from loading.
 	 *
 	 * @return  Struct of excluded dirName => reason string
 	 */
-	private struct function $processReplacements(required struct manifests, required struct nameToDir) {
-		local.excluded = {};
+	private struct function $processReplacements(
+		required struct manifests,
+		required struct nameToDir,
+		struct excluded = {}
+	) {
+		local.excluded = Duplicate(arguments.excluded);
 
 		// Process packages in sorted directory-name order so the outcome is
 		// deterministic regardless of struct iteration order, and skip the

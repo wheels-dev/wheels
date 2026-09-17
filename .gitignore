@@ -94,3 +94,20 @@ web/tests/visual-diffs/
 public/testbox/system/stubs/
 /rewrite.config
 /box.json
+
+# Office lock files
+~\$*.pptx
+~\$*.docx
+~\$*.xlsx
+
+# Build outputs (docs bundle etc.)
+artifacts/
+
+# Linux package build staging (tools/distribution-drafts/linux-packages)
+.linux-pkg-build/
+
+# Offline docs bundle the CLI mirrors into the webroot of any app it runs in
+public/wheels-docs/
+
+# Test-server JVM pid recorded by tools/test-cli-local.sh
+.wheels-test-server.pid

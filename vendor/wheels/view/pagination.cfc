@@ -583,7 +583,7 @@ component {
 			name = "nav",
 			content = local.content,
 			class = arguments.navClass,
-			encode = false
+			encode = $coerceEncode(arguments.encode, "attributes")
 		);
 	}
 
@@ -669,7 +669,12 @@ component {
 		local.rv = $decodeHtmlEntities(arguments.input);
 		local.rv = reReplaceNoCase(local.rv, '\s+on\w+\s*=\s*([''"])[^''"]*\1', '', 'all');
 		local.rv = reReplaceNoCase(local.rv, '\s+on\w+\s*=\s*[^\s>]+', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+style\s*=\s*([''"])[^''"]*(expression|javascript)\s*\(?[^''"]*\1', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+style\s*=\s*[^\s>]*(expression|javascript)\s*\(?[^\s>]*', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+(href|src|action|formaction|xlink:href)\s*=\s*([''"])\s*data\s*:[^''"]*\2', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, '\s+(href|src|action|formaction|xlink:href)\s*=\s*data\s*:[^\s>]+', '', 'all');
 		local.rv = reReplaceNoCase(local.rv, 'javascript\s*:', '', 'all');
+		local.rv = reReplaceNoCase(local.rv, 'data\s*:', '', 'all');
 		return local.rv;
 	}
 
@@ -734,10 +739,15 @@ component {
 			local.linkArgs[arguments.name] = arguments.page;
 		} else {
 			local.linkArgs.params = arguments.name & "=" & arguments.page;
-			if (StructKeyExists(arguments.args, "params") && Len(arguments.args.params)) {
+			if (StructKeyExists(arguments.args, "params")) {
 				if (IsStruct(arguments.args.params)) {
-					local.linkArgs.params &= "&" & $paramsToQueryString(arguments.args.params);
-				} else {
+					// Adobe's Len() only accepts simple values — struct params
+					// must be stringified (and StructCount'd) before any Len().
+					local.paramsString = $paramsToQueryString(arguments.args.params, false);
+					if (Len(local.paramsString)) {
+						local.linkArgs.params &= "&" & local.paramsString;
+					}
+				} else if (Len(arguments.args.params)) {
 					local.linkArgs.params &= "&" & arguments.args.params;
 				}
 			}

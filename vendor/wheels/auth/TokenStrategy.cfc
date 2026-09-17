@@ -16,12 +16,14 @@
  *   {"my-api-key": {id: 1, role: "admin"}, "other-key": {id: 2, role: "reader"}}
  *
  * Usage:
- *   // With a validator callback
- *   var strategy = new wheels.auth.TokenStrategy(validator=function(token) {
- *       var key = model("ApiKey").findOne(where="token='#token#' AND active=1");
+ *   // With a validator callback — hoist the closure (Adobe invariant 5)
+ *   // and bind the token via the 2-arg query builder (never interpolate).
+ *   var tokenValidator = function(token) {
+ *       var key = model("ApiKey").where("token", arguments.token).where("active", 1).findOne();
  *       if (isObject(key)) return {id: key.userId, role: key.role};
  *       return false;
- *   });
+ *   };
+ *   var strategy = new wheels.auth.TokenStrategy(validator=tokenValidator);
  *
  *   // With a static token map
  *   var strategy = new wheels.auth.TokenStrategy(tokens={"abc-123": {id: 1, role: "admin"}});

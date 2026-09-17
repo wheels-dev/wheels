@@ -44,11 +44,16 @@ component extends="wheels.WheelsTest" {
 				expect(datecompare(r, e)).toBe(0)
 			})
 
-			it("defaults year to 1899", () => {
-				args.formScope["obj[published]($year)"] = 1899
+			it("S1 HOLD: omits year when $year is absent and defaults to 1899", () => {
+				// HOLD: do not flip the default year. The existing "defaults year
+				// to 1899" case was a tautology ($year=1899, expect 1899). This
+				// one omits $year and still expects 1899, matching
+				// $translateDatePartSubmissions.
+				args.formScope["obj[published]($month)"] = 3
+				args.formScope["obj[published]($day)"] = 15
 				_params = dispatch.$createParams(argumentCollection = args)
 				e = _params.obj.published
-				r = CreateDateTime(1899, 1, 1, 0, 0, 0)
+				r = CreateDateTime(1899, 3, 15, 0, 0, 0)
 
 				expect(datecompare(r, e)).toBe(0)
 			})
@@ -102,17 +107,17 @@ component extends="wheels.WheelsTest" {
 			it("does not overwrite FORM scope", () => {
 				args.formScope["obj[published]($month)"] = 2
 				_params = dispatch.$createParams(argumentCollection = args)
-				exists = StructKeyExists(args.formScope, "obj[published]($month)")
 
-				expect(exists).toBeTrue()
+				expect(args.formScope).toHaveKey("obj[published]($month)")
+				expect(args.formScope["obj[published]($month)"]).toBe(2)
 			})
 
 			it("does not overwrite URL scope", () => {
 				StructInsert(args.urlScope, "user[email]", "tpetruzzi@gmail.com", true)
 				_params = dispatch.$createParams(argumentCollection = args)
-				exists = StructKeyExists(args.urlScope, "user[email]")
 
-				expect(exists).toBeTrue()
+				expect(args.urlScope).toHaveKey("user[email]")
+				expect(args.urlScope["user[email]"]).toBe("tpetruzzi@gmail.com")
 			})
 
 			it("creates multiple objects with checkbox", () => {
@@ -153,6 +158,11 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("sets controller in upper camel case", () => {
+				// Wildcard-style route: no fixed controller, so the incoming
+				// name is the value that gets camelized (B1: a routed
+				// controller name is no longer overridable from the form).
+				args.route.pattern = "/[controller]"
+				StructDelete(args.route, "controller")
 				args.formScope["controller"] = "wheels-test"
 				_params = dispatch.$createParams(argumentCollection = args)
 
@@ -165,6 +175,9 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("sanitizes controller and action params", () => {
+				args.route.pattern = "/[controller]/[action]"
+				StructDelete(args.route, "controller")
+				StructDelete(args.route, "action")
 				args.formScope["controller"] = "../../../wheels%00"
 				args.formScope["action"] = "../../../test*^&%()%00"
 				_params = dispatch.$createParams(argumentCollection = args)

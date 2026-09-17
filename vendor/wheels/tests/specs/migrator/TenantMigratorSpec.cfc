@@ -39,7 +39,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("action=latest migrates the tenant datasource to the latest fixture version", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var results = tenantMigrator.migrateAll(
 					action = "latest",
 					tenants = [{id = "t1", dataSource = application.wheels.dataSourceName}],
@@ -53,7 +56,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("action=up applies exactly one pending migration", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var results = tenantMigrator.migrateAll(
 					action = "up",
 					tenants = [{id = "t1", dataSource = application.wheels.dataSourceName}],
@@ -66,7 +72,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("action=down rolls back one version", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("002");
 				var results = tenantMigrator.migrateAll(
 					action = "down",
@@ -80,7 +89,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("action=info returns output without mutating the version", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				var results = tenantMigrator.migrateAll(
 					action = "info",
@@ -95,7 +107,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("restores the application datasource and a pre-existing request tenant context", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var originalDataSourceName = application.wheels.dataSourceName;
 				if (!StructKeyExists(request, "wheels")) {
 					request.wheels = {};
@@ -114,7 +129,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("records the failure and continues when stopOnError=false", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var results = tenantMigrator.migrateAll(
 					action = "info",
 					tenants = [
@@ -133,7 +151,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("stops after the first failure when stopOnError=true", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var results = tenantMigrator.migrateAll(
 					action = "info",
 					tenants = [
@@ -162,7 +183,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("resolves tenants from a tenantProvider closure", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				// Hoisted before the named-arg call (Adobe CF chokes on inline
 				// closures passed as named arguments). Reads the application
 				// scope directly rather than capturing an outer local var.

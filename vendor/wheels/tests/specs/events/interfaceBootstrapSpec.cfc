@@ -7,7 +7,19 @@ component extends="wheels.WheelsTest" {
 		describe("Dev-Mode Interface Contract Verification", () => {
 
 			it("$verifyInterfaceContracts does not throw in a healthy app", () => {
-				g.$verifyInterfaceContracts();
+				// S1: a call with no expect() is a silent no-op. completed=true
+				// only after the live function returns; a throw, or deleting the
+				// call and leaving this expect, fails the spec.
+				var state = {completed = false, type = ""};
+				try {
+					g.$verifyInterfaceContracts();
+					state.completed = true;
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.completed).toBeTrue(
+					"$verifyInterfaceContracts must complete without throwing (got #state.type#)"
+				);
 			});
 
 			it("$verifyInterfaceContracts checks that model has finder methods", () => {

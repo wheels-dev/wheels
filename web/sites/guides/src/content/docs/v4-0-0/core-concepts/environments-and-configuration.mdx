@@ -29,6 +29,8 @@ A fourth value, `maintenance`, is supported for planned downtime. Most apps neve
 
 These are the defaults the framework itself flips per environment. Operational concerns like log rotation and HTTPS enforcement are not framework settings — handle those in your web server, or use the `SecurityHeaders` middleware for transport-security headers.
 
+In development, the framework error page (`showErrorInformation=true`) includes a **Copy** button that puts a JSON dump of the exception — type, message, suggested action, file and line, a source snippet, and stack frames tagged as app vs framework — on the clipboard so you can paste it into a coding agent.
+
 ## Where settings live
 
 Configuration loads from a small set of files in `config/`. The framework reads them in order at application start and on every reload (`?reload=true&password=...`):

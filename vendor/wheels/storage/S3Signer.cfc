@@ -71,6 +71,7 @@ component output="false" {
 		string contentDisposition = "",
 		string amzDate = ""
 	) {
+		$assertExpiresIn(arguments.expiresIn);
 		local.amzDate = Len(arguments.amzDate) ? arguments.amzDate : $amzNow();
 		local.dateStamp = Left(local.amzDate, 8);
 		local.credentialScope = local.dateStamp & "/" & variables.region & "/" & variables.service & "/aws4_request";
@@ -119,13 +120,17 @@ component output="false" {
 	 * @key Object key.
 	 * @payload Request body (binary or string); empty for GET/DELETE/HEAD.
 	 * @amzDate Optional deterministic timestamp override.
+	 * @range Optional Range header value (e.g. "bytes=0-9"). Empty keeps the current signed header set.
+	 * @acl Optional x-amz-acl value. Empty keeps the current signed header set (S8 vector).
 	 * @return Struct of header name => value to attach to the request.
 	 */
 	public struct function signedHeaders(
 		required string method,
 		required string key,
 		any payload = "",
-		string amzDate = ""
+		string amzDate = "",
+		string range = "",
+		string acl = ""
 	) {
 		local.amzDate = Len(arguments.amzDate) ? arguments.amzDate : $amzNow();
 		local.dateStamp = Left(local.amzDate, 8);
@@ -137,11 +142,21 @@ component output="false" {
 			? "/" & $uriEncodePath(variables.bucket & "/" & arguments.key)
 			: "/" & $uriEncodePath(arguments.key);
 
-		// Headers signed for header-auth: host, x-amz-content-sha256, x-amz-date (sorted).
-		local.canonicalHeaders = "host:" & variables.host & Chr(10)
-			& "x-amz-content-sha256:" & local.payloadHash & Chr(10)
+		// Optional range / acl insert in code-point order so the S8 no-acl vector
+		// stays byte-identical when both are empty.
+		local.canonicalHeaders = "host:" & variables.host & Chr(10);
+		local.signedHeaderList = "host";
+		if (Len(arguments.range)) {
+			local.canonicalHeaders &= "range:" & arguments.range & Chr(10);
+			local.signedHeaderList &= ";range";
+		}
+		if (Len(arguments.acl)) {
+			local.canonicalHeaders &= "x-amz-acl:" & arguments.acl & Chr(10);
+			local.signedHeaderList &= ";x-amz-acl";
+		}
+		local.canonicalHeaders &= "x-amz-content-sha256:" & local.payloadHash & Chr(10)
 			& "x-amz-date:" & local.amzDate & Chr(10);
-		local.signedHeaderList = "host;x-amz-content-sha256;x-amz-date";
+		local.signedHeaderList &= ";x-amz-content-sha256;x-amz-date";
 
 		local.canonicalRequest = UCase(arguments.method) & Chr(10)
 			& local.canonicalUri & Chr(10)
@@ -157,12 +172,19 @@ component output="false" {
 			& "SignedHeaders=" & local.signedHeaderList & ", "
 			& "Signature=" & local.signature;
 
-		return {
+		local.headers = {
 			"Authorization" = local.authorization,
 			"x-amz-content-sha256" = local.payloadHash,
 			"x-amz-date" = local.amzDate,
 			"Host" = variables.host
 		};
+		if (Len(arguments.range)) {
+			local.headers["Range"] = arguments.range;
+		}
+		if (Len(arguments.acl)) {
+			local.headers["x-amz-acl"] = arguments.acl;
+		}
+		return local.headers;
 	}
 
 	/**
@@ -217,15 +239,32 @@ component output="false" {
 	}
 
 	/**
-	 * HMAC-SHA256 with a binary key, returning raw bytes. Uses javax.crypto.Mac
-	 * directly so successive rounds can key off the previous round's binary
-	 * output — the built-in HMac() takes only string keys.
+	 * HMAC-SHA256 with a binary key, returning raw bytes. Prefers
+	 * javax.crypto.Mac so successive rounds can key off the previous round's
+	 * binary output (the built-in Hmac() takes only string keys on JVM
+	 * engines). Falls back to the engine's native hmac(), which hashes binary
+	 * keys verbatim, when the Mac shim cannot produce binary output
+	 * (RustCFML's shim returns signed-byte arrays). The IsBinary check keeps
+	 * the fallback decision inside the function body: the binary return-type
+	 * coercion runs outside the body on every engine, so returning the
+	 * array directly would throw an uncatchable cast error on RustCFML.
 	 */
 	private binary function $hmac(required binary key, required string message) {
-		local.mac = CreateObject("java", "javax.crypto.Mac").getInstance("HmacSHA256");
-		local.keySpec = CreateObject("java", "javax.crypto.spec.SecretKeySpec").init(arguments.key, "HmacSHA256");
-		local.mac.init(local.keySpec);
-		return local.mac.doFinal(CharsetDecode(arguments.message, "UTF-8"));
+		try {
+			local.mac = CreateObject("java", "javax.crypto.Mac").getInstance("HmacSHA256");
+			local.keySpec = CreateObject("java", "javax.crypto.spec.SecretKeySpec").init(arguments.key, "HmacSHA256");
+			local.mac.init(local.keySpec);
+			local.raw = local.mac.doFinal(CharsetDecode(arguments.message, "UTF-8"));
+		} catch (any e) {
+			local.raw = "not-binary";
+		}
+		if (IsBinary(local.raw)) {
+			return local.raw;
+		}
+		// JVM-free engine (RustCFML): native hmac() takes the binary key
+		// verbatim and returns uppercase hex.
+		local.hex = Hmac(arguments.message, arguments.key, "HMACSHA256");
+		return BinaryDecode(local.hex, "hex");
 	}
 
 	/**
@@ -255,16 +294,33 @@ component output="false" {
 
 	/**
 	 * RFC3986 encode a single value (slashes ARE encoded). Built on
-	 * java.net.URLEncoder with the AWS-required fix-ups so it is byte-identical
-	 * across engines.
+	 * BinaryEncode/hex instead of java.net.URLEncoder so it is byte-identical
+	 * across engines, including JVM-free RustCFML: unreserved bytes
+	 * (A-Z a-z 0-9 - _ . ~) pass through, everything else becomes %XX with
+	 * uppercase hex — the canonical form AWS SigV4 requires.
 	 */
 	private string function $uriEncodeSegment(required any value) {
-		local.encoder = CreateObject("java", "java.net.URLEncoder");
-		local.encoded = local.encoder.encode(ToString(arguments.value), "UTF-8");
-		local.encoded = Replace(local.encoded, "+", "%20", "all");
-		local.encoded = Replace(local.encoded, "*", "%2A", "all");
-		local.encoded = Replace(local.encoded, "%7E", "~", "all");
-		return local.encoded;
+		// Byte extraction via base64 round-trip: CharsetEncode() returns a
+		// Java byte[] (not a CFML binary) on some Lucee 7.0.0.x builds, which
+		// BinaryEncode cannot consume. ToBase64 + BinaryDecode produces a
+		// proper binary on every engine for the same UTF-8 bytes.
+		local.bin = BinaryDecode(ToBase64(ToString(arguments.value), "utf-8"), "base64");
+		local.hex = UCase(BinaryEncode(local.bin, "hex"));
+		local.out = "";
+		for (local.i = 1; local.i < Len(local.hex); local.i += 2) {
+			local.byteVal = InputBaseN(Mid(local.hex, local.i, 2), 16);
+			if (
+				(local.byteVal >= 48 && local.byteVal <= 57)
+				|| (local.byteVal >= 65 && local.byteVal <= 90)
+				|| (local.byteVal >= 97 && local.byteVal <= 122)
+				|| local.byteVal == 45 || local.byteVal == 46 || local.byteVal == 95 || local.byteVal == 126
+			) {
+				local.out &= Chr(local.byteVal);
+			} else {
+				local.out &= "%" & Mid(local.hex, local.i, 2);
+			}
+		}
+		return local.out;
 	}
 
 	/**
@@ -272,6 +328,15 @@ component output="false" {
 	 */
 	private string function $uriEncodePath(required string key) {
 		return Replace($uriEncodeSegment(arguments.key), "%2F", "/", "all");
+	}
+
+	private void function $assertExpiresIn(required numeric expiresIn) {
+		if (arguments.expiresIn < 1 || arguments.expiresIn > 604800) {
+			throw(
+				type = "Wheels.Storage.InvalidExpiresIn",
+				message = "signedUrl expiresIn must be between 1 and 604800 seconds (got #arguments.expiresIn#)."
+			);
+		}
 	}
 
 	/**

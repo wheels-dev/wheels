@@ -41,7 +41,7 @@ component extends="Controller" {
 }
 ```
 
-The two-argument form of `where` means equality. The three-argument form takes an operator in the middle — `>`, `<`, `>=`, `<=`, `!=`, `LIKE`, and so on. Stack multiple `.where(...)` calls and they AND together.
+The two-argument form of `where` means equality. The three-argument form takes an operator in the middle — `>`, `<`, `>=`, `<=`, `!=`, `LIKE`, and so on. Stack multiple `.where(...)` calls and they AND together. A single-argument `where("status = 'published'")` is a raw-SQL passthrough for trusted clauses only — it is not quoted or parameterized. Use the 2- or 3-argument forms for values that came from the request.
 
 ### Builder methods
 

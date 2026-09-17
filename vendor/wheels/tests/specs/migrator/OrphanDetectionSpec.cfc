@@ -41,7 +41,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns empty array when DB and files match", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				var orphans = migrator.$getOrphanVersions();
 				expect(orphans).toBeArray();
@@ -49,7 +52,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns the orphan when DB has a version with no matching file", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				var orphans = migrator.$getOrphanVersions();
@@ -58,7 +64,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("returns multiple orphans sorted ascending", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				insertOrphan("998");
@@ -69,7 +78,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("ignores the sentinel '0' returned by empty tracking table", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				var orphans = migrator.$getOrphanVersions();
 				expect(ArrayLen(orphans)).toBe(0);
 			});
@@ -95,7 +107,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("does not take the down branch when only orphans separate current from target", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				var output = migrator.migrateTo("003");
@@ -103,7 +118,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("applies pending local migrations when only orphans separate current from target", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				migrator.migrateTo("003");
@@ -114,7 +132,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("emits a warning naming the orphan version(s)", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("001");
 				insertOrphan("999");
 				var output = migrator.migrateTo("003");
@@ -123,7 +144,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("prints a clear nothing-to-do message when no pending local migrations exist", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("003");
 				insertOrphan("999");
 				var output = migrator.migrateToLatest();
@@ -133,7 +157,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("still allows legitimate down-migration when down target has a local file", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("002");
 				var output = migrator.migrateTo("001");
 				expect(output).toInclude("down to 001");
@@ -142,7 +169,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("warns about orphans and still runs the down branch when both are present above target", () => {
-				if (_isCockroachDB) return;
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
 				migrator.migrateTo("002");
 				insertOrphan("999");
 				var output = migrator.migrateTo("001");

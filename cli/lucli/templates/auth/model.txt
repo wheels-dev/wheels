@@ -5,24 +5,24 @@
  * later, re-run `wheels generate auth --force` on a clean branch and review
  * the changes with `git diff`.
  *
- * Passwords are hashed with PBKDF2-HMAC-SHA256 via the framework's
- * `passwordHasher` service (registered in config/services.cfm). The plaintext
- * `password` property is transient: it is validated, hashed into
- * `passwordDigest` by the beforeSave callback, then scrubbed.
+ * Passwords are hashed with bcrypt via the framework's bcryptHash() /
+ * bcryptVerify() helpers (bundled jBCrypt on JVM engines, native builtins on
+ * RustCFML). The plaintext `password` property is transient: it is validated,
+ * hashed into `passwordHash` by the beforeSave callback, then scrubbed.
  */
 component extends="Model" {
 
 	function config() {
 		// Never allow these to be set by mass assignment (params structs).
-		protectedProperties("passwordDigest,resetTokenDigest,resetTokenExpiresAt{{protectedApiToken}}");
+		protectedProperties("passwordHash,resetTokenDigest,resetTokenExpiresAt{{protectedApiToken}}");
 
-		// passwordDigest is populated by the beforeSave callback AFTER validation
+		// passwordHash is populated by the beforeSave callback AFTER validation
 		// runs, so Wheels' automatic NOT-NULL presence validation (added for
 		// allowNull=false columns) would reject every new record before the hash
 		// exists. Presence stays guaranteed: validatesPresenceOf(password) on
 		// create feeds the hashing callback, and the database NOT NULL
 		// constraint is the backstop.
-		property(name="passwordDigest", automaticValidations=false);
+		property(name="passwordHash", automaticValidations=false);
 
 		// Validations. The transient `password` property is only validated when
 		// present, so updates that don't touch the password pass untouched.
@@ -39,20 +39,19 @@ component extends="Model" {
 	}
 
 	/**
-	 * Verify a plaintext password against the stored PBKDF2 digest.
+	 * Verify a plaintext password against the stored bcrypt hash.
 	 * Transparently re-hashes after a successful verify when the stored
-	 * work factor is below the hasher's current configuration.
+	 * work factor is below the current cost (10).
 	 */
 	public boolean function authenticate(required string password) {
-		if (!Len(this.passwordDigest ?: "")) {
+		if (!Len(this.passwordHash ?: "")) {
 			return false;
 		}
-		var hasher = service("passwordHasher");
-		if (!hasher.verify(password=arguments.password, hash=this.passwordDigest)) {
+		if (!bcryptVerify(password=arguments.password, hash=this.passwordHash)) {
 			return false;
 		}
-		if (hasher.needsRehash(this.passwordDigest)) {
-			this.passwordDigest = hasher.hash(arguments.password);
+		if (bcryptNeedsRehash(hash=this.passwordHash, cost=10)) {
+			this.passwordHash = bcryptHash(password=arguments.password);
 			this.save(validate=false, callbacks=false);
 		}
 		return true;
@@ -81,7 +80,7 @@ component extends="Model" {
 
 	private function hashPasswordProperty() {
 		if (StructKeyExists(this, "password") && Len(this.password)) {
-			this.passwordDigest = service("passwordHasher").hash(this.password);
+			this.passwordHash = bcryptHash(this.password);
 			// Scrub the plaintext so it never persists or leaks in dumps.
 			StructDelete(this, "password");
 			StructDelete(this, "passwordConfirmation");

@@ -3,7 +3,7 @@ component extends="wheels.WheelsTest" {
 	function run() {
 		describe("Registry.fetchManifest validation", () => {
 			var $freshCache = () => {
-				var root = GetTempDirectory() & "wheels-registry-" & CreateUUID() & "/";
+				var root = $tempPath("wheels-registry-" & CreateUUID() & "/");
 				return new wheels.services.packages.ManifestCache(root = root);
 			};
 

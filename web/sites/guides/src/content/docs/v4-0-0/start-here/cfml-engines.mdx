@@ -1,6 +1,6 @@
 ---
 title: CFML Engines
-description: Run Wheels on Lucee, Adobe ColdFusion, or BoxLang. The wheels CLI ships with Lucee; the framework runs on all three.
+description: Run Wheels on Lucee, Adobe ColdFusion, BoxLang, or the JVM-free RustCFML interpreter. The wheels CLI ships with Lucee; the framework runs on all four.
 type: explanation
 sidebar:
   order: 6
@@ -8,7 +8,7 @@ sidebar:
 
 import { Aside, Tabs, TabItem, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-Wheels is the framework. **The framework runs on three CFML engines:** Lucee, Adobe ColdFusion, and BoxLang. The `wheels` CLI is a separate thing — it's a developer convenience that bundles a Lucee runtime so newcomers can `brew install wheels` and have a working dev server in one step. If you need Adobe CF or BoxLang for development or production, you don't use the `wheels` CLI's bundled runtime; you use a CommandBox-managed server (or a manual install) and the framework handles the rest.
+Wheels is the framework. **The framework runs on four CFML engines:** Lucee, Adobe ColdFusion, BoxLang, and RustCFML. The `wheels` CLI is a separate thing — it's a developer convenience that bundles a Lucee runtime so newcomers can `brew install wheels` and have a working dev server in one step. If you need Adobe CF, BoxLang, or RustCFML for development or production, you don't use the `wheels` CLI's bundled runtime; you use a CommandBox-managed server (or a manual install) and the framework handles the rest.
 
 ## TL;DR
 
@@ -17,8 +17,11 @@ Wheels is the framework. **The framework runs on three CFML engines:** Lucee, Ad
 | Lucee 6 / 7 | Yes — bundled, recommended | Yes | Yes |
 | Adobe ColdFusion 2023 / 2025 | No — install manually | Yes — recommended | Yes |
 | BoxLang | No | Yes | Yes |
+| RustCFML | No | No — ships its own launcher | Yes¹ |
 
-The framework's CI matrix (`.github/workflows/compat-matrix.yml`) runs every release against Lucee 6, Lucee 7, Adobe CF 2023, Adobe CF 2025, and BoxLang on each release. Engine support is hard-gated.
+¹ RustCFML is a JVM-free interpreter, so app code that calls `java.*` classes through `CreateObject("java")` does not work on it. The core suite runs green against a pinned RustCFML build with one tracked upstream bug (a query-of-query `recordCount` issue) — see [Running Wheels on RustCFML](#running-wheels-on-rustcfml).
+
+The framework's CI matrix (`.github/workflows/compat-matrix.yml`) runs every release against Lucee 6, Lucee 7, Adobe CF 2023, Adobe CF 2025, BoxLang, and RustCFML, and a dedicated RustCFML leg (`.github/workflows/rustcfml-ci.yml`) runs on every pull request to `develop`. Engine support is hard-gated.
 
 ## Why the `wheels` CLI is Lucee-only
 
@@ -87,11 +90,24 @@ The `wheels start`, `wheels stop`, `wheels reload`, and `wheels test` commands a
 
 Wheels' BoxLang compatibility is verified per release in the same CI matrix as Lucee and Adobe CF. Cross-engine gotchas worth knowing about live in [`.ai/wheels/cross-engine-compatibility.md`](https://github.com/wheels-dev/wheels/blob/develop/.ai/wheels/cross-engine-compatibility.md) — most are about minor differences in struct/array semantics under closures.
 
+## Running Wheels on RustCFML
+
+[RustCFML](https://github.com/RustCFML/RustCFML) is a JVM-free CFML interpreter written in Rust. It ships its own launcher instead of a CommandBox module: download the binary for your platform from the [releases](https://github.com/RustCFML/RustCFML/releases) page and point it at your Wheels app's `public/` directory:
+
+```bash
+rustcfml --serve public --port 8080
+```
+
+Wheels treats RustCFML as a first-class engine. The framework's core test suite (all 5,300+ specs) runs against a pinned RustCFML build on every pull request to `develop` via `.github/workflows/rustcfml-ci.yml` and on every release in the compatibility matrix. The suite is green except for one tracked upstream engine bug — a query-of-query `recordCount` edge case ([RustCFML/RustCFML#377](https://github.com/RustCFML/RustCFML/issues/377)) recorded in `tools/rustcfml/baseline.json`, which the CI leg compares against so *new* failures block a merge while the known one does not.
+
+Because there is no JVM, RustCFML cannot run `CreateObject("java", …)` — any app code (or third-party package) that reaches into `java.*` classes will not work on it. The Wheels framework core has been made engine-agnostic, so framework features (routing, ORM, migrations, storage signing, channels, auth hashing) run without the JVM.
+
 ## Pick an engine
 
 - **You're new to Wheels and want the easiest path:** Lucee, with the bundled `wheels` CLI. Skip the rest of this page.
 - **Your team standardised on Adobe CF:** CommandBox + Adobe CF. Skip the bundled CLI's `start`/`stop` commands; use `box server` instead.
 - **You want a modern, performant CFML runtime and don't have legacy Adobe scripts to support:** BoxLang via CommandBox.
+- **You want a small, JVM-free runtime (edge/serverless, WASM-targetable) and no app code needs `java.*`:** RustCFML, serving `public/` directly.
 - **You're shipping to a production server you don't control:** the framework runs on whatever engine that server uses; the `wheels` CLI doesn't ship to production.
 
 ## Related

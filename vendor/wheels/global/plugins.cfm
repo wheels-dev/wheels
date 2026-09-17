@@ -115,22 +115,114 @@
 	}
 
 
-	public string function $checkMinimumVersion(required string engine, required string version) {
-		local.rv = "";
+	/**
+	 * Internal function. Splits a dotted engine version into numeric major,
+	 * minor, patch, and build parts; trailing parts default to 0.
+	 */
+	public any function $parseVersionParts(required string version) {
 		local.version = Replace(arguments.version, ".", ",", "all");
-		local.major = Val(ListGetAt(local.version, 1));
-		local.minor = 0;
-		local.patch = 0;
-		local.build = 0;
+		local.parts = {
+			major = Val(ListGetAt(local.version, 1)),
+			minor = 0,
+			patch = 0,
+			build = 0
+		};
 		if (ListLen(local.version) > 1) {
-			local.minor = Val(ListGetAt(local.version, 2));
+			local.parts.minor = Val(ListGetAt(local.version, 2));
 		}
 		if (ListLen(local.version) > 2) {
-			local.patch = Val(ListGetAt(local.version, 3));
+			local.parts.patch = Val(ListGetAt(local.version, 3));
 		}
 		if (ListLen(local.version) > 3) {
-			local.build = Val(ListGetAt(local.version, 4));
+			local.parts.build = Val(ListGetAt(local.version, 4));
 		}
+		return local.parts;
+	}
+
+
+	/**
+	 * Internal function. Builds the BoxLang version warning for versions below
+	 * the minimum or above the maximum; returns an empty string when the version
+	 * is within the supported range.
+	 */
+	public string function $boxLangVersionMessage(
+		required any major,
+		required any minor,
+		required any patch,
+		required any minimumMajor,
+		required any minimumMinor,
+		required any minimumPatch,
+		required any maximumMajor,
+		required any maximumMinor,
+		required any maximumPatch,
+		required string version
+	) {
+		local.rv = "";
+		// Check minimum version
+		if (
+			arguments.major < arguments.minimumMajor
+			|| (arguments.major == arguments.minimumMajor && arguments.minor < arguments.minimumMinor)
+			|| (arguments.major == arguments.minimumMajor && arguments.minor == arguments.minimumMinor && arguments.patch < arguments.minimumPatch)
+		) {
+			local.rv = "The Wheels framework requires BoxLang version #arguments.minimumMajor#.#arguments.minimumMinor#.#arguments.minimumPatch# or higher. You are currently running version #arguments.version#.";
+		}
+		// Check maximum version (optional - for major version compatibility)
+		if (
+			arguments.major > arguments.maximumMajor
+			|| (arguments.major == arguments.maximumMajor && arguments.minor > arguments.maximumMinor)
+			|| (arguments.major == arguments.maximumMajor && arguments.minor == arguments.maximumMinor && arguments.patch > arguments.maximumPatch)
+		) {
+			local.rv = "The Wheels framework has been tested up to BoxLang version #arguments.maximumMajor#.#arguments.maximumMinor#.#arguments.maximumPatch#. You are currently running version #arguments.version#. Please check for framework updates or compatibility issues.";
+		}
+		return local.rv;
+	}
+
+
+	/**
+	 * Internal function. Applies the shared minimum-version floor and any
+	 * per-major-release floor to the given result. Reads every value from the
+	 * passed state struct so optional fields (minimumBuild, floor) keep their
+	 * existing lazy-resolution semantics.
+	 */
+	public any function $checkMinimumVersionFloor(required any rv, required struct state) {
+		local.rv = arguments.rv;
+		if (
+			arguments.state.major < arguments.state.minimumMajor
+			|| (arguments.state.major == arguments.state.minimumMajor && arguments.state.minor < arguments.state.minimumMinor)
+			|| (arguments.state.major == arguments.state.minimumMajor && arguments.state.minor == arguments.state.minimumMinor && arguments.state.patch < arguments.state.minimumPatch)
+			|| (
+				arguments.state.major == arguments.state.minimumMajor
+				&& arguments.state.minor == arguments.state.minimumMinor
+				&& arguments.state.patch == arguments.state.minimumPatch
+				&& Len(arguments.state.minimumBuild)
+				&& arguments.state.build < arguments.state.minimumBuild
+			)
+		) {
+			local.rv = arguments.state.minimumMajor & "." & arguments.state.minimumMinor & "." & arguments.state.minimumPatch;
+			if (Len(arguments.state.minimumBuild)) {
+				local.rv &= "." & arguments.state.minimumBuild;
+			}
+		}
+		if (StructKeyExists(arguments.state, "floor")) {
+			// special requirements for having a specific minor or patch version within a major release exists
+			if (
+				arguments.state.minor < arguments.state.floor.minimumMinor
+				|| (arguments.state.minor == arguments.state.floor.minimumMinor && arguments.state.patch < arguments.state.floor.minimumPatch)
+			) {
+				local.rv = arguments.state.major & "." & arguments.state.floor.minimumMinor & "." & arguments.state.floor.minimumPatch;
+			}
+		}
+		return local.rv;
+	}
+
+
+	public string function $checkMinimumVersion(required string engine, required string version) {
+		local.rv = "";
+		local.parts = $parseVersionParts(arguments.version);
+		local.major = local.parts.major;
+		local.minor = local.parts.minor;
+		local.patch = local.parts.patch;
+		local.build = local.parts.build;
 		if (arguments.engine == "BoxLang") {
 			local.minimumMajor = "1";
 			local.minimumMinor = "0";
@@ -138,24 +230,18 @@
 			local.maximumMajor = "1";
 			local.maximumMinor = "15";
 			local.maximumPatch = "999";
-
-			// Check minimum version
-			if (
-				local.major < local.minimumMajor
-				|| (local.major == local.minimumMajor && local.minor < local.minimumMinor)
-				|| (local.major == local.minimumMajor && local.minor == local.minimumMinor && local.patch < local.minimumPatch)
-			) {
-				local.rv = "The Wheels framework requires BoxLang version #local.minimumMajor#.#local.minimumMinor#.#local.minimumPatch# or higher. You are currently running version #arguments.version#.";
-			}
-
-			// Check maximum version (optional - for major version compatibility)
-			if (
-				local.major > local.maximumMajor
-				|| (local.major == local.maximumMajor && local.minor > local.maximumMinor)
-				|| (local.major == local.maximumMajor && local.minor == local.maximumMinor && local.patch > local.maximumPatch)
-			) {
-				local.rv = "The Wheels framework has been tested up to BoxLang version #local.maximumMajor#.#local.maximumMinor#.#local.maximumPatch#. You are currently running version #arguments.version#. Please check for framework updates or compatibility issues.";
-			}
+			local.rv = $boxLangVersionMessage(
+				major = local.major,
+				minor = local.minor,
+				patch = local.patch,
+				minimumMajor = local.minimumMajor,
+				minimumMinor = local.minimumMinor,
+				minimumPatch = local.minimumPatch,
+				maximumMajor = local.maximumMajor,
+				maximumMinor = local.maximumMinor,
+				maximumPatch = local.maximumPatch,
+				version = arguments.version
+			);
 		} else if (arguments.engine == "Lucee") {
 			local.minimumMajor = "5";
 			local.minimumMinor = "3";
@@ -181,32 +267,22 @@
 			local.rv = false;
 		}
 		if (StructKeyExists(local, "minimumMajor")) {
-			if (
-				local.major < local.minimumMajor
-				|| (local.major == local.minimumMajor && local.minor < local.minimumMinor)
-				|| (local.major == local.minimumMajor && local.minor == local.minimumMinor && local.patch < local.minimumPatch)
-				|| (
-					local.major == local.minimumMajor
-					&& local.minor == local.minimumMinor
-					&& local.patch == local.minimumPatch
-					&& Len(local.minimumBuild)
-					&& local.build < local.minimumBuild
-				)
-			) {
-				local.rv = local.minimumMajor & "." & local.minimumMinor & "." & local.minimumPatch;
-				if (Len(local.minimumBuild)) {
-					local.rv &= "." & local.minimumBuild;
-				}
+			local.state = {
+				major = local.major,
+				minor = local.minor,
+				patch = local.patch,
+				build = local.build,
+				minimumMajor = local.minimumMajor,
+				minimumMinor = local.minimumMinor,
+				minimumPatch = local.minimumPatch
+			};
+			if (StructKeyExists(local, "minimumBuild")) {
+				local.state.minimumBuild = local.minimumBuild;
 			}
 			if (StructKeyExists(local, local.major)) {
-				// special requirements for having a specific minor or patch version within a major release exists
-				if (
-					local.minor < local[local.major].minimumMinor
-					|| (local.minor == local[local.major].minimumMinor && local.patch < local[local.major].minimumPatch)
-				) {
-					local.rv = local.major & "." & local[local.major].minimumMinor & "." & local[local.major].minimumPatch;
-				}
+				local.state.floor = local[local.major];
 			}
+			local.rv = $checkMinimumVersionFloor(rv = local.rv, state = local.state);
 		}
 		return local.rv;
 	}

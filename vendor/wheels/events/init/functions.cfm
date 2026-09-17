@@ -156,13 +156,15 @@
 			appendText = "",
 			wrapperElement = "span",
 			class = "error-message",
+			role = "alert",
 			encode = true
 		};
 		application.$wheels.functions.errorMessagesFor = {
 			class = "error-messages",
 			showDuplicates = true,
 			encode = true,
-			includeAssociations = true
+			includeAssociations = true,
+			role = "alert"
 		};
 		application.$wheels.functions.excerpt = {radius = 100, excerptString = "..."};
 		application.$wheels.functions.exists = {reload = false, parameterize = true};
@@ -224,7 +226,14 @@
 		application.$wheels.functions.imageTag = {onlyPath = true, host = "", protocol = "", port = 0, encode = true};
 		application.$wheels.functions.includePartial = {layout = "", spacer = "", dataFunction = true};
 		application.$wheels.functions.javaScriptIncludeTag = {type = "text/javascript", head = false, encode = true};
-		application.$wheels.functions.linkTo = {onlyPath = true, host = "", protocol = "", port = 0, encode = true};
+		application.$wheels.functions.linkTo = {
+			onlyPath = true,
+			host = "",
+			protocol = "",
+			port = 0,
+			encode = true,
+			sanitizeHref = false
+		};
 		application.$wheels.functions.mailTo = {encode = true};
 		application.$wheels.functions.maximum = {parameterize = true, ifNull = ""};
 		application.$wheels.functions.minimum = {parameterize = true, ifNull = ""};
@@ -531,7 +540,7 @@
 			appendToLabel = "",
 			encode = true
 		};
-		application.$wheels.functions.processRequest = {method = "get", returnAs = "", rollback = false};
+		application.$wheels.functions.processRequest = {method = "get", returnAs = "", rollback = false, csrf = "ignore"};
 		application.$wheels.functions.protectsFromForgery = {with = "exception", only = "", except = ""};
 		application.$wheels.functions.radioButton = {
 			label = "useDefaultLabel",
@@ -749,7 +758,8 @@
 		application.$wheels.functions.validatesPresenceOf = {message = "[property] can't be empty"};
 		application.$wheels.functions.validatesUniquenessOf = {
 			message = "[property] has already been taken",
-			allowBlank = false
+			allowBlank = false,
+			includeSoftDeletes = false
 		};
 		application.$wheels.functions.verifies = {handler = ""};
 		application.$wheels.functions.wordTruncate = {length = 5, truncateString = "..."};

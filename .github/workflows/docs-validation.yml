@@ -101,10 +101,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Set up Linuxbrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@2026.09.07.1
 
       - name: Install Wheels CLI
         run: |
+          # Trust BEFORE tap. Homebrew now validates every formula in a tap while
+          # cloning it, and on Linuxbrew refuses untrusted ones at that moment —
+          # the clone itself fails with "Invalid formula ... Refusing to load formula
+          # from untrusted tap", so a trust command placed after the tap runs too
+          # late. `brew trust` accepts a tap that is not installed yet (no-op on
+          # older brew that lacks the command).
+          brew trust wheels-dev/wheels || true
           brew tap wheels-dev/wheels || true
           brew install wheels
 

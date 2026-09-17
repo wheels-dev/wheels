@@ -1,3 +1,10 @@
+/**
+ * Seeder suite plus hardener proofs for desk IDs S1–S10. Desk IDs stay locked.
+ *
+ * S4 and S5 are flipped (no longer HOLDs). S1–S3 / S6–S10 stay as proven on develop.
+ *
+ * This is the only seeder spec file. Do not invent wheels.tests.specs.seeder.
+ */
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
@@ -12,8 +19,10 @@ component extends="wheels.WheelsTest" {
 
 			describe("init()", () => {
 
-				it("initializes with default seed path", () => {
+				it("S9: default seedPath is ExpandPath of /app/db/", () => {
 					local.s = CreateObject("component", "wheels.Seeder").init();
+					expect(local.s.seedMappingPath).toBe("/app/db/");
+					expect(local.s.seedPath).toBe(ExpandPath("/app/db/"));
 					expect(local.s.seedPath).toInclude("app");
 				});
 
@@ -39,6 +48,21 @@ component extends="wheels.WheelsTest" {
 					expect(local.s.hasSeedFiles()).toBeFalse();
 				});
 
+				it("S3: hasSeedFiles is true for a stray seeds/*.cfm that runSeeds will not include", () => {
+					// hasSeedFiles() returns true if ANY seeds/*.cfm exists.
+					// runSeeds() only includes seeds.cfm + seeds/<environment>.cfm.
+					local.s = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/stray/"
+					);
+					expect(local.s.hasSeedFiles()).toBeTrue();
+
+					$deleteAuthorByFirstName("SeederStrayOrphan99");
+					local.result = local.s.runSeeds(environment = "testing");
+					expect(local.result.success).toBeFalse();
+					expect(local.result.message).toInclude("No seed files found");
+					expect(IsObject(model("author").findOne(where = "firstName = 'SeederStrayOrphan99'"))).toBeFalse();
+				});
+
 			});
 
 			describe("runSeeds()", () => {
@@ -52,21 +76,60 @@ component extends="wheels.WheelsTest" {
 					expect(local.result.message).toInclude("No seed files found");
 				});
 
-				it("runs main seeds.cfm file", () => {
+				it("S1: runs main seeds.cfm and creates the fixture record", () => {
+					$deleteAuthorByFirstName("SeederMainOK99");
+
 					local.s = CreateObject("component", "wheels.Seeder").init(
 						seedPath = "/wheels/tests/_assets/seeder/"
 					);
 					local.result = local.s.runSeeds(environment = "testing");
+
 					expect(local.result.success).toBeTrue();
-					expect(local.result.totalCreated).toBeGTE(0);
+					expect(local.result.totalCreated).toBe(1);
+					expect(local.result.totalSkipped).toBe(0);
+					local.created = model("author").findOne(where = "firstName = 'SeederMainOK99'");
+					expect(IsObject(local.created)).toBeTrue();
+					expect(local.created.lastName).toBe("MainSeed");
+					local.created.delete();
 				});
 
-				it("includes environment-specific seeds when available", () => {
+				it("S2: includes environment-specific seeds when available", () => {
+					$deleteAuthorByFirstName("SeederEnvMain99");
+					$deleteAuthorByFirstName("SeederEnvTest99");
+
 					local.s = CreateObject("component", "wheels.Seeder").init(
 						seedPath = "/wheels/tests/_assets/seeder/withenv/"
 					);
 					local.result = local.s.runSeeds(environment = "testing");
+
 					expect(local.result.success).toBeTrue();
+					expect(local.result.totalCreated).toBe(2);
+					expect(local.result.environment).toBe("testing");
+					local.mainRow = model("author").findOne(where = "firstName = 'SeederEnvMain99'");
+					local.envRow = model("author").findOne(where = "firstName = 'SeederEnvTest99'");
+					expect(IsObject(local.mainRow)).toBeTrue();
+					expect(IsObject(local.envRow)).toBeTrue();
+					expect(local.mainRow.lastName).toBe("EnvMain");
+					expect(local.envRow.lastName).toBe("EnvTest");
+					local.mainRow.delete();
+					local.envRow.delete();
+				});
+
+				it("S2: an environment without a matching file does not include seeds/testing.cfm", () => {
+					$deleteAuthorByFirstName("SeederEnvMain99");
+					$deleteAuthorByFirstName("SeederEnvTest99");
+
+					local.s = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/withenv/"
+					);
+					local.result = local.s.runSeeds(environment = "development");
+
+					expect(local.result.success).toBeTrue();
+					expect(local.result.totalCreated).toBe(1);
+					expect(local.result.environment).toBe("development");
+					expect(IsObject(model("author").findOne(where = "firstName = 'SeederEnvMain99'"))).toBeTrue();
+					expect(IsObject(model("author").findOne(where = "firstName = 'SeederEnvTest99'"))).toBeFalse();
+					$deleteAuthorByFirstName("SeederEnvMain99");
 				});
 
 				it("returns failure and rolls back when a seedOnce entry fails validation", () => {
@@ -91,6 +154,75 @@ component extends="wheels.WheelsTest" {
 					// not look like fully-applied ones).
 					local.leaked = model("user").findOne(where = "username = 'SeederPartialOK99'");
 					expect(IsObject(local.leaked)).toBeFalse();
+				});
+
+				it("S7: include-throw is caught, reported, and rolled back", () => {
+					$deleteAuthorByFirstName("SeederThrowOK99");
+
+					local.s = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/includethrow/"
+					);
+					local.result = local.s.runSeeds(environment = "testing");
+
+					expect(local.result.success).toBeFalse();
+					expect(local.result.message).toInclude("Seed failed:");
+					expect(local.result.message).toInclude("intentional include throw");
+					expect(StructKeyExists(local.result, "detail")).toBeTrue();
+					expect(IsObject(model("author").findOne(where = "firstName = 'SeederThrowOK99'"))).toBeFalse();
+				});
+
+				it("S8: request.$wheelsSeeder is left set after a successful run", () => {
+					$deleteAuthorByFirstName("SeederMainOK99");
+					StructDelete(request, "$wheelsSeeder");
+
+					local.s = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/"
+					);
+					local.result = local.s.runSeeds(environment = "testing");
+
+					expect(local.result.success).toBeTrue();
+					expect(StructKeyExists(request, "$wheelsSeeder")).toBeTrue();
+					expect(request.$wheelsSeeder.seedMappingPath).toBe("/wheels/tests/_assets/seeder/");
+					$deleteAuthorByFirstName("SeederMainOK99");
+				});
+
+				it("S8: a later run still sees request.$wheelsSeeder", () => {
+					$deleteAuthorByFirstName("SeederMainOK99");
+					$deleteAuthorByFirstName("SeederEnvMain99");
+					$deleteAuthorByFirstName("SeederEnvTest99");
+					StructDelete(request, "$wheelsSeeder");
+
+					local.first = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/"
+					);
+					local.first.runSeeds(environment = "testing");
+					expect(StructKeyExists(request, "$wheelsSeeder")).toBeTrue();
+
+					local.second = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/withenv/"
+					);
+					local.second.runSeeds(environment = "testing");
+
+					// Never cleared — a later run overwrites the leftover, it does not delete it.
+					expect(StructKeyExists(request, "$wheelsSeeder")).toBeTrue();
+					expect(request.$wheelsSeeder.seedMappingPath).toBe("/wheels/tests/_assets/seeder/withenv/");
+					$deleteAuthorByFirstName("SeederMainOK99");
+					$deleteAuthorByFirstName("SeederEnvMain99");
+					$deleteAuthorByFirstName("SeederEnvTest99");
+				});
+
+				it("S8: the include-throw catch path also leaves request.$wheelsSeeder set", () => {
+					$deleteAuthorByFirstName("SeederThrowOK99");
+					StructDelete(request, "$wheelsSeeder");
+
+					local.s = CreateObject("component", "wheels.Seeder").init(
+						seedPath = "/wheels/tests/_assets/seeder/includethrow/"
+					);
+					local.result = local.s.runSeeds(environment = "testing");
+
+					expect(local.result.success).toBeFalse();
+					expect(StructKeyExists(request, "$wheelsSeeder")).toBeTrue();
+					expect(request.$wheelsSeeder.seedMappingPath).toBe("/wheels/tests/_assets/seeder/includethrow/");
 				});
 
 				it("throws when the environment name contains path traversal characters", () => {
@@ -171,6 +303,56 @@ component extends="wheels.WheelsTest" {
 
 					// Clean up
 					local.author.delete();
+				});
+
+				it("S4: seedOnce binds unique values so an apostrophe unique key skips on the second call", () => {
+					// Kill-case: quote-escape interpolation (`Replace(val, "'", "''")`
+					// into findOne(where=)) left doubled apostrophes in the bound
+					// value, so the second seedOnce missed the stored O'Brien row
+					// and created again. Placeholders + findOne(parameterize=true)
+					// must skip (action="skipped") and leave a single row.
+					local.uniqueFirst = "O'Brien_#Replace(CreateUUID(), '-', '', 'all')#";
+
+					local.first = seeder.seedOnce(
+						modelName = "author",
+						uniqueProperties = "firstName",
+						properties = {firstName: local.uniqueFirst, lastName: "QuoteEscape"}
+					);
+					expect(local.first.action).toBe("created");
+					expect(StructKeyExists(local.first, "key")).toBeTrue();
+
+					local.second = seeder.seedOnce(
+						modelName = "author",
+						uniqueProperties = "firstName",
+						properties = {firstName: local.uniqueFirst, lastName: "QuoteEscape"}
+					);
+					expect(local.second.action).toBe("skipped");
+					expect(StructKeyExists(local.second, "key")).toBeFalse();
+
+					// Count matches in CFML — a findOne(where=) assertion would
+					// re-introduce the same apostrophe extraction bug.
+					local.allAuthors = model("author").findAll(select = "id,firstName");
+					local.matchCount = 0;
+					for (local.i = 1; local.i <= local.allAuthors.recordCount; local.i++) {
+						if (local.allAuthors.firstName[local.i] == local.uniqueFirst) {
+							local.matchCount++;
+						}
+					}
+					expect(local.matchCount).toBe(1);
+
+					local.firstRow = model("author").findByKey(local.first.key);
+					if (IsObject(local.firstRow)) {
+						local.firstRow.delete();
+					}
+					local.leftoverQuery = model("author").findAll(select = "id,firstName");
+					for (local.i = 1; local.i <= local.leftoverQuery.recordCount; local.i++) {
+						if (local.leftoverQuery.firstName[local.i] == local.uniqueFirst) {
+							local.leftover = model("author").findByKey(local.leftoverQuery.id[local.i]);
+							if (IsObject(local.leftover)) {
+								local.leftover.delete();
+							}
+						}
+					}
 				});
 
 				it("counts failed entries and reports them in the result", () => {
@@ -264,6 +446,23 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it("persists numeric values for float-validated decimal and floating point columns", () => {
+					local.beforeQuery = model("SeederNumericProduct").findAll(select = "id");
+					local.beforeIds = ValueList(local.beforeQuery.id);
+					try {
+						local.result = seeder.generateSeeds(models = "SeederNumericProduct", count = 2);
+						expect(local.result.success).toBeTrue();
+						expect(local.result.totalCreated).toBe(2);
+						expect(local.result.totalSkipped).toBe(0);
+						local.rows = model("SeederNumericProduct").findAll(where = "id NOT IN (#local.beforeIds#)", order = "id");
+						// The shared fixture is FLOAT, whose JDBC round-trip can lose precision.
+						expect(Round(local.rows.price[1] * 100) / 100).toBe(10.99);
+						expect(Round(local.rows.price[2] * 100) / 100).toBe(20.99);
+					} finally {
+						model("SeederNumericProduct").deleteAll(where = "id NOT IN (#local.beforeIds#)", instantiate = false, softDelete = false);
+					}
+				});
+
 				it("reports overall failure when a model cannot be seeded", () => {
 					local.gen = CreateObject("component", "wheels.Seeder").init();
 					local.result = local.gen.generateSeeds(
@@ -281,6 +480,80 @@ component extends="wheels.WheelsTest" {
 					expect(ArrayLen(local.result.seeded)).toBe(1);
 					expect(local.result.seeded[1].success).toBeFalse();
 					expect(StructKeyExists(local.result.seeded[1], "error")).toBeTrue();
+				});
+
+				it("S5: generateSeeds write is transactional — a mixed list leaves no rows", () => {
+					// Mixed list still reports honesty (success=false, totalFailed=1).
+					// totalCreated stays the in-transaction count after rollback,
+					// same as runSeeds (it reports totals even though rows were
+					// rolled back). After the call, no new Author rows remain vs
+					// the before-ids snapshot.
+					local.beforeQuery = model("Author").findAll(select = "id");
+					local.beforeIds = ValueList(local.beforeQuery.id);
+
+					local.gen = CreateObject("component", "wheels.Seeder").init();
+					local.result = local.gen.generateSeeds(
+						models = "Author,NoSuchModel_SeederS5",
+						count = 1
+					);
+
+					expect(local.result.success).toBeFalse();
+					expect(local.result.totalCreated).toBe(1);
+					expect(local.result.totalFailed).toBe(1);
+					expect(ArrayLen(local.result.seeded)).toBe(2);
+					expect(local.result.seeded[1].model).toBe("Author");
+					expect(local.result.seeded[1].success).toBeTrue();
+					expect(local.result.seeded[2].success).toBeFalse();
+
+					local.afterQuery = model("Author").findAll(select = "id");
+					local.afterIds = ValueList(local.afterQuery.id);
+					expect(local.afterIds).toBe(local.beforeIds);
+
+					if (Len(local.beforeIds)) {
+						model("Author").deleteAll(where = "id NOT IN (#local.beforeIds#)", instantiate = false);
+					} else {
+						model("Author").deleteAll(instantiate = false);
+					}
+				});
+
+				it("S6: count=0 reports overall failure even when the per-model entry succeeds", () => {
+					// success requires totalCreated>0. The per-model loop does not
+					// run (1 <= 0), so seededCount==count and the entry is success=true.
+					local.beforeQuery = model("Author").findAll(select = "id");
+					local.beforeIds = ValueList(local.beforeQuery.id);
+
+					local.gen = CreateObject("component", "wheels.Seeder").init();
+					local.result = local.gen.generateSeeds(models = "Author", count = 0);
+
+					expect(local.result.success).toBeFalse();
+					expect(local.result.totalCreated).toBe(0);
+					expect(local.result.totalFailed).toBe(0);
+					expect(ArrayLen(local.result.seeded)).toBe(1);
+					expect(local.result.seeded[1].count).toBe(0);
+					expect(local.result.seeded[1].success).toBeTrue();
+
+					local.afterQuery = model("Author").findAll(select = "id");
+					expect(ValueList(local.afterQuery.id)).toBe(local.beforeIds);
+				});
+
+				it("S6: a negative count creates no rows and marks the model failed", () => {
+					// The for-loop does not run. seededCount (0) != count (-1), so
+					// the entry is success=false and totalFailed increments.
+					local.beforeQuery = model("Author").findAll(select = "id");
+					local.beforeIds = ValueList(local.beforeQuery.id);
+
+					local.gen = CreateObject("component", "wheels.Seeder").init();
+					local.result = local.gen.generateSeeds(models = "Author", count = -1);
+
+					expect(local.result.success).toBeFalse();
+					expect(local.result.totalCreated).toBe(0);
+					expect(local.result.totalFailed).toBe(1);
+					expect(ArrayLen(local.result.seeded)).toBe(1);
+					expect(local.result.seeded[1].count).toBe(0);
+					expect(local.result.seeded[1].success).toBeFalse();
+
+					local.afterQuery = model("Author").findAll(select = "id");
+					expect(ValueList(local.afterQuery.id)).toBe(local.beforeIds);
 				});
 
 				it("reports failure (not silent success) when an explicit list resolves to no models", () => {
@@ -318,8 +591,389 @@ component extends="wheels.WheelsTest" {
 
 			});
 
+			describe("generated belongsTo references", () => {
+
+				beforeEach(() => {
+					model("RefChild").deleteAll(instantiate = false);
+					model("RefParent").deleteAll(instantiate = false);
+				});
+
+				afterEach(() => {
+					model("RefChild").deleteAll(instantiate = false);
+					model("RefParent").deleteAll(instantiate = false);
+				});
+
+				it("generates selected parents before children even when the child is listed first", () => {
+					local.result = seeder.generateSeeds(models = "RefChild,RefParent", count = 3);
+					expect(local.result.success).toBeTrue();
+					expect(local.result.totalCreated).toBe(6);
+					expect(local.result.seeded[1].model).toBe("RefParent");
+					local.children = model("RefChild").findAll(include = "refParent");
+					expect(local.children.recordCount).toBe(3);
+				});
+
+				it("cycles actual noncontiguous underscore foreign keys rather than row indices", () => {
+					$createSeederParents();
+					local.result = seeder.generateSeeds(models = "RefChild", count = 5);
+					expect(local.result.success).toBeTrue();
+					local.children = model("RefChild").findAll(order = "id");
+					expect(ValueList(local.children.refparent_id)).toBe("41,97,41,97,41");
+					expect(model("RefParent").count()).toBe(2);
+				});
+
+				it("honors modelName, mapped custom foreignKey and a non-primary joinKey", () => {
+					$createSeederParents();
+					local.result = seeder.generateSeeds(models = "SeederJoinChild", count = 3);
+					expect(local.result.success).toBeTrue();
+					local.children = model("SeederJoinChild").findAll(order = "id");
+					expect(ValueList(local.children.ownerCode)).toBe("41,97,41");
+				});
+
+				it("fails missing parents without creating orphans and rolls back other models", () => {
+					local.beforeCount = model("Author").count();
+					local.result = seeder.generateSeeds(models = "Author,RefChild", count = 2);
+					expect(local.result.success).toBeFalse();
+					expect(local.result.totalFailed).toBe(1);
+					expect(local.result.message).toInclude("refParent");
+					expect(local.result.message).toInclude("rolled back");
+					expect(model("RefChild").count()).toBe(0);
+					expect(model("Author").count()).toBe(local.beforeCount);
+				});
+
+				it("keeps zero-save auth-style validation failures skipped", () => {
+					local.result = seeder.generateSeeds(models = "SeederRejectedParent,RefParent", count = 2);
+					expect(local.result.success).toBeTrue();
+					expect(local.result.totalSkipped).toBe(1);
+					expect(local.result.totalFailed).toBe(0);
+					expect(model("RefParent").count()).toBe(2);
+				});
+
+				it("durably commits valid models before skipped auth models with normal transaction defaults", () => {
+					// Core tests normally disable model transactions, hiding a failed save's
+					// nested rollback of the seeder's already-created records.
+					local.transactionMode = application.wheels.transactionMode;
+					application.wheels.transactionMode = "commit";
+					try {
+						local.result = seeder.generateSeeds(models = "RefParent,SeederRejectedParent", count = 2);
+						expect(local.result.success).toBeTrue();
+						expect(local.result.totalCreated).toBe(2);
+						expect(local.result.totalSkipped).toBe(1);
+						expect(model("RefParent").count()).toBe(2);
+					} finally {
+						application.wheels.transactionMode = local.transactionMode;
+					}
+				});
+
+				it("discards skipped model callback writes without discarding valid models", () => {
+					local.result = seeder.generateSeeds(models = "RefParent,SeederCallbackParent", count = 2);
+					expect(local.result.success).toBeTrue();
+					expect(local.result.totalCreated).toBe(2);
+					expect(local.result.totalSkipped).toBe(1);
+					expect(model("RefParent").count()).toBe(2);
+					expect(model("RefParent").count(where = "name = 'SeederCallbackSideEffect'")).toBe(0);
+				});
+
+				it("restores the outer transaction signal on success and failure", () => {
+					local.previous = {exists = StructKeyExists(request, "$wheelsTransactionWrapper")};
+					if (local.previous.exists) {
+						local.previous.value = request.$wheelsTransactionWrapper;
+					}
+					try {
+						StructDelete(request, "$wheelsTransactionWrapper");
+						seeder.generateSeeds(models = "RefParent", count = 1);
+						expect(StructKeyExists(request, "$wheelsTransactionWrapper")).toBeFalse();
+						seeder.generateSeeds(models = "NoSuchModel_SeederSignal", count = 1);
+						expect(StructKeyExists(request, "$wheelsTransactionWrapper")).toBeFalse();
+						request.$wheelsTransactionWrapper = false;
+						seeder.generateSeeds(models = "RefParent", count = 1);
+						expect(request.$wheelsTransactionWrapper).toBeFalse();
+						request.$wheelsTransactionWrapper = true;
+						seeder.generateSeeds(models = "NoSuchModel_SeederSignal", count = 1);
+						expect(request.$wheelsTransactionWrapper).toBeTrue();
+					} finally {
+						if (local.previous.exists) {
+							request.$wheelsTransactionWrapper = local.previous.value;
+						} else {
+							StructDelete(request, "$wheelsTransactionWrapper");
+						}
+					}
+				});
+
+				it("rolls back partially saved models rather than treating them as skipped", () => {
+					local.result = seeder.generateSeeds(models = "SeederPartialParent", count = 2);
+					expect(local.result.success).toBeFalse();
+					expect(local.result.totalCreated).toBe(1);
+					expect(local.result.totalFailed).toBe(1);
+					expect(local.result.totalSkipped).toBe(0);
+					expect(model("RefParent").count()).toBe(0);
+				});
+
+				it("bounds self references and refuses to invent a missing parent", () => {
+					local.result = seeder.generateSeeds(models = "SeederSelfChild", count = 2);
+					expect(local.result.success).toBeFalse();
+					expect(local.result.message).toInclude("No usable");
+					expect(model("RefChild").count()).toBe(0);
+				});
+
+				it("refuses polymorphic references instead of generating an arbitrary type and id", () => {
+					local.result = seeder.generateSeeds(models = "PolyComment", count = 2);
+					expect(local.result.success).toBeFalse();
+					expect(local.result.totalFailed).toBe(1);
+					expect(local.result.message).toInclude("polymorphic");
+				});
+
+				it("resolves a string primary key that is not named id", () => {
+					local.beforeQuery = model("Truck").findAll(select = "id");
+					local.beforeIds = ValueList(local.beforeQuery.id);
+					try {
+						local.result = seeder.generateSeeds(models = "Truck", count = 3);
+						expect(local.result.success).toBeTrue();
+						local.children = model("Truck").findAll(where = "id NOT IN (#local.beforeIds#)", include = "shop");
+						expect(local.children.recordCount).toBe(3);
+					} finally {
+						model("Truck").deleteAll(where = "id NOT IN (#local.beforeIds#)", instantiate = false);
+					}
+				});
+
+				it("uses existing camelCase parent keys and excludes soft-deleted parents", () => {
+					local.beforeQuery = model("Comment").findAll(select = "id");
+					local.beforeIds = ValueList(local.beforeQuery.id);
+					local.deleted = model("Post").findOne(order = "id");
+					local.deleted.delete();
+					try {
+						local.parents = model("Post").findAll(select = "id", order = "id");
+						local.parentIds = ValueList(local.parents.id);
+						local.result = seeder.generateSeeds(models = "Comment", count = 7);
+						expect(local.result.success).toBeTrue();
+						local.children = model("Comment").findAll(where = "id NOT IN (#local.beforeIds#)");
+						expect(local.children.recordCount).toBe(7);
+						for (local.row = 1; local.row <= local.children.recordCount; local.row++) {
+							expect(ListFind(local.parentIds, local.children.postid[local.row]) > 0).toBeTrue();
+						}
+					} finally {
+						model("Comment").deleteAll(where = "id NOT IN (#local.beforeIds#)", instantiate = false);
+						local.deleted.update(deletedAt = "", includeSoftDeletes = true);
+					}
+				});
+
+			});
+
+			describe("$generateTestData()", () => {
+
+				it("S10: email names return an example.com address", () => {
+					expect(seeder.$generateTestData(propertyName = "email", propertyType = "string", index = 1)).toBe("test1@example.com");
+					expect(seeder.$generateTestData(propertyName = "userEmail", propertyType = "integer", index = 4)).toBe("test4@example.com");
+				});
+
+				it("S10: firstname / fname cycle the first-name list", () => {
+					expect(seeder.$generateTestData(propertyName = "firstName", propertyType = "string", index = 1)).toBe("John");
+					expect(seeder.$generateTestData(propertyName = "fname", propertyType = "string", index = 2)).toBe("Jane");
+					expect(seeder.$generateTestData(propertyName = "firstName", propertyType = "string", index = 11)).toBe("John");
+				});
+
+				it("S10: lastname / lname cycle the last-name list", () => {
+					expect(seeder.$generateTestData(propertyName = "lastName", propertyType = "string", index = 1)).toBe("Smith");
+					expect(seeder.$generateTestData(propertyName = "lname", propertyType = "string", index = 2)).toBe("Johnson");
+				});
+
+				it("S10: exact name and username return TestUserN", () => {
+					expect(seeder.$generateTestData(propertyName = "name", propertyType = "string", index = 3)).toBe("TestUser3");
+					expect(seeder.$generateTestData(propertyName = "userName", propertyType = "string", index = 3)).toBe("TestUser3");
+					expect(seeder.$generateTestData(propertyName = "displayName", propertyType = "string", index = 3)).toBe("displayName Test 3");
+				});
+
+				it("S10: phone / mobile, address / street, and geo names", () => {
+					expect(seeder.$generateTestData(propertyName = "phone", propertyType = "string", index = 1)).toBe("555-1001");
+					expect(seeder.$generateTestData(propertyName = "mobile", propertyType = "string", index = 2)).toBe("555-1002");
+					expect(seeder.$generateTestData(propertyName = "address", propertyType = "string", index = 4)).toBe("4 Test Street");
+					expect(seeder.$generateTestData(propertyName = "street", propertyType = "string", index = 4)).toBe("4 Test Street");
+					expect(seeder.$generateTestData(propertyName = "city", propertyType = "string", index = 1)).toBe("New York");
+					expect(seeder.$generateTestData(propertyName = "city", propertyType = "string", index = 2)).toBe("Los Angeles");
+					expect(seeder.$generateTestData(propertyName = "state", propertyType = "string", index = 1)).toBe("CA");
+					expect(seeder.$generateTestData(propertyName = "province", propertyType = "string", index = 2)).toBe("TX");
+					expect(seeder.$generateTestData(propertyName = "zip", propertyType = "string", index = 1)).toBe("10001");
+					expect(seeder.$generateTestData(propertyName = "postal", propertyType = "string", index = 2)).toBe("10002");
+				});
+
+				it("S10: url / website and password names", () => {
+					expect(seeder.$generateTestData(propertyName = "url", propertyType = "string", index = 5)).toBe("https://example5.com");
+					expect(seeder.$generateTestData(propertyName = "website", propertyType = "string", index = 5)).toBe("https://example5.com");
+					// Password values are >= 12 chars so they pass the auth scaffold's
+					// validatesLengthOf(password, minimum=12).
+					expect(seeder.$generateTestData(propertyName = "password", propertyType = "string", index = 5)).toBe("TestPassword5!");
+				});
+
+				it("S10: boolean type and active / enabled / published names", () => {
+					expect(seeder.$generateTestData(propertyName = "flag", propertyType = "boolean", index = 1)).toBeTrue();
+					expect(seeder.$generateTestData(propertyName = "flag", propertyType = "boolean", index = 2)).toBeFalse();
+					expect(seeder.$generateTestData(propertyName = "isActive", propertyType = "string", index = 1)).toBeTrue();
+					expect(seeder.$generateTestData(propertyName = "enabled", propertyType = "string", index = 2)).toBeFalse();
+					// bare "published" is boolean; "publishedAt" is date-like. The
+					// type-first reorder stops the "published" substring from
+					// swallowing "publishedAt" into a boolean (#3552).
+					expect(seeder.$generateTestData(propertyName = "published", propertyType = "string", index = 1)).toBeTrue();
+					expect(IsDate(seeder.$generateTestData(propertyName = "publishedAt", propertyType = "string", index = 1))).toBeTrue();
+				});
+
+				it("S10: integer / numeric type — age, price, quantity, and default", () => {
+					expect(seeder.$generateTestData(propertyName = "age", propertyType = "integer", index = 1)).toBe(21);
+					expect(seeder.$generateTestData(propertyName = "price", propertyType = "numeric", index = 1)).toBe(10.99);
+					expect(seeder.$generateTestData(propertyName = "price", propertyType = "float", index = 1, modelName = "Product")).toBe(10.99);
+					expect(seeder.$generateTestData(propertyName = "rating", propertyType = "float", index = 3)).toBe(3);
+					expect(seeder.$generateTestData(propertyName = "cost", propertyType = "integer", index = 2)).toBe(20.99);
+					expect(seeder.$generateTestData(propertyName = "amount", propertyType = "integer", index = 3)).toBe(30.99);
+					expect(seeder.$generateTestData(propertyName = "quantity", propertyType = "integer", index = 2)).toBe(10);
+					expect(seeder.$generateTestData(propertyName = "count", propertyType = "integer", index = 3)).toBe(15);
+					expect(seeder.$generateTestData(propertyName = "views", propertyType = "integer", index = 7)).toBe(7);
+				});
+
+				it("S10: date type and date / birthday / dob names", () => {
+					local.typed = seeder.$generateTestData(propertyName = "foo", propertyType = "date", index = 3);
+					expect(IsDate(local.typed)).toBeTrue();
+					expect(DateDiff("d", local.typed, Now())).toBe(3);
+
+					local.named = seeder.$generateTestData(propertyName = "startDate", propertyType = "string", index = 2);
+					expect(IsDate(local.named)).toBeTrue();
+					expect(DateDiff("d", local.named, Now())).toBe(2);
+
+					local.birthday = seeder.$generateTestData(propertyName = "birthday", propertyType = "string", index = 1);
+					expect(IsDate(local.birthday)).toBeTrue();
+					local.dob = seeder.$generateTestData(propertyName = "dob", propertyType = "datetime", index = 4);
+					expect(IsDate(local.dob)).toBeTrue();
+					expect(DateDiff("d", local.dob, Now())).toBe(4);
+				});
+
+				it("S10: text type and description / content / body / title / status without a model", () => {
+					expect(seeder.$generateTestData(propertyName = "foo", propertyType = "text", index = 1)).toStartWith("This is foo 1.");
+					expect(seeder.$generateTestData(propertyName = "description", propertyType = "string", index = 1)).toStartWith("This is description 1.");
+					expect(seeder.$generateTestData(propertyName = "content", propertyType = "string", index = 1)).toStartWith("This is content 1.");
+					expect(seeder.$generateTestData(propertyName = "body", propertyType = "string", index = 1)).toStartWith("This is body 1.");
+					expect(seeder.$generateTestData(propertyName = "title", propertyType = "string", index = 8)).toBe("Test Title 8");
+					expect(seeder.$generateTestData(propertyName = "subject", propertyType = "string", index = 8)).toBe("Test Title 8");
+					expect(seeder.$generateTestData(propertyName = "status", propertyType = "string", index = 1)).toBe("pending");
+					expect(seeder.$generateTestData(propertyName = "status", propertyType = "string", index = 2)).toBe("active");
+					expect(seeder.$generateTestData(propertyName = "status", propertyType = "string", index = 5)).toBe("pending");
+				});
+
+				it("varies the same free-text column across models", () => {
+					// Both explicit text types and name-inferred string bodies must
+					// distinguish comments from the post they appear beneath.
+					for (local.propertyType in ["text", "string"]) {
+						local.postBody = seeder.$generateTestData(propertyName = "body", propertyType = local.propertyType, index = 1, modelName = "Post");
+						local.commentBody = seeder.$generateTestData(propertyName = "body", propertyType = local.propertyType, index = 1, modelName = "Comment");
+						local.pageBody = seeder.$generateTestData(propertyName = "body", propertyType = local.propertyType, index = 1, modelName = "Page");
+						expect(local.postBody).notToBe(local.commentBody);
+						// Equal-length model labels can share a sentence, not a value.
+						expect(local.postBody).notToBe(local.pageBody);
+						expect(local.postBody).toStartWith("This is post body 1.");
+						expect(local.commentBody).toStartWith("This is comment body 1.");
+					}
+				});
+
+				it("varies free-text columns within the same model", () => {
+					for (local.propertyType in ["text", "string"]) {
+						local.body = seeder.$generateTestData(propertyName = "body", propertyType = local.propertyType, index = 1, modelName = "Post");
+						local.description = seeder.$generateTestData(propertyName = "description", propertyType = local.propertyType, index = 1, modelName = "Post");
+						local.content = seeder.$generateTestData(propertyName = "content", propertyType = local.propertyType, index = 1, modelName = "Post");
+						expect(local.body).notToBe(local.description);
+						expect(local.body).notToBe(local.content);
+						expect(local.description).notToBe(local.content);
+						expect(local.description).toStartWith("This is post description 1.");
+					}
+				});
+
+				it("varies titles by model and property while preserving legacy no-model titles", () => {
+					expect(seeder.$generateTestData(propertyName = "title", index = 8, modelName = "Post")).toBe("Post Title 8");
+					expect(seeder.$generateTestData(propertyName = "subject", index = 8, modelName = "Post")).toBe("Post Subject 8");
+					expect(seeder.$generateTestData(propertyName = "subtitle", index = 8, modelName = "Post")).toBe("Post Subtitle 8");
+					expect(seeder.$generateTestData(propertyName = "title", index = 8, modelName = "Comment")).toBe("Comment Title 8");
+					expect(seeder.$generateTestData(propertyName = "title", index = 8, modelName = "   ")).toBe("Test Title 8");
+				});
+
+				it("keeps generated text deterministic and rows distinct beyond the sentence pool", () => {
+					local.otherSeeder = CreateObject("component", "wheels.Seeder").init();
+					for (local.propertyType in ["text", "string"]) {
+						for (local.propertyName in ["body", "description", "title", "notes"]) {
+							local.seen = {};
+							for (local.i = 1; local.i <= 6; local.i++) {
+								local.value = seeder.$generateTestData(propertyName = local.propertyName, propertyType = local.propertyType, index = local.i, modelName = "Post");
+								expect(StructKeyExists(local.seen, local.value)).toBeFalse();
+								local.seen[local.value] = true;
+								expect(local.otherSeeder.$generateTestData(propertyName = local.propertyName, propertyType = local.propertyType, index = local.i, modelName = "Post")).toBe(local.value);
+							}
+						}
+					}
+				});
+
+				it("uses property and row context without a model and treats blank models as absent", () => {
+					local.body = seeder.$generateTestData(propertyName = "body", propertyType = "text", index = 1);
+					local.description = seeder.$generateTestData(propertyName = "description", propertyType = "text", index = 1);
+					expect(local.body).notToBe(local.description);
+					expect(seeder.$generateTestData(propertyName = "body", propertyType = "text", index = 5)).notToBe(local.body);
+					expect(seeder.$generateTestData(propertyName = "body", propertyType = "text", index = 1)).toBe(local.body);
+					expect(seeder.$generateTestData(propertyName = "body", propertyType = "text", index = 1, modelName = "   ")).toBe(local.body);
+				});
+
+				it("trims context and retains readable camelCase model and property labels", () => {
+					expect(seeder.$generateTestData(propertyName = " mainBody ", propertyType = "text", index = 2, modelName = " BlogPost ")).toStartWith("This is blog post main body 2.");
+					expect(seeder.$generateTestData(propertyName = " metaTitle ", index = 2, modelName = " BlogPost ")).toBe("Blog Post Meta Title 2");
+					expect(seeder.$generateTestData(propertyName = " mainBody ", propertyType = "text", index = 2, modelName = " BlogPost ")).toBe(seeder.$generateTestData(propertyName = "mainBody", propertyType = "text", index = 2, modelName = "BlogPost"));
+				});
+
+				it("supports single-character model names on Adobe as well as other engines", () => {
+					// The old title path used two-argument Mid(), which Adobe cannot
+					// compile. A one-character model must also need no remainder.
+					expect(seeder.$generateTestData(propertyName = "title", index = 1, modelName = "x")).toBe("X Title 1");
+					expect(seeder.$generateTestData(propertyName = "subject", index = 1, modelName = " X ")).toBe("X Subject 1");
+					expect(seeder.$generateTestData(propertyName = "body", propertyType = "text", index = 1, modelName = "x")).toStartWith("This is x body 1.");
+				});
+
+				it("preserves numeric, foreign-key, boolean and date values with model context", () => {
+					expect(seeder.$generateTestData(propertyName = "body", propertyType = "integer", index = 3, modelName = "Post")).toBe(3);
+					expect(seeder.$generateTestData(propertyName = "title", propertyType = "numeric", index = 3, modelName = "Post")).toBe(3);
+					expect(seeder.$generateTestData(propertyName = "postId", propertyType = "integer", index = 3, modelName = "Comment")).toBe(3);
+					expect(seeder.$generateTestData(propertyName = "post_id", propertyType = "integer", index = 3, modelName = "Comment")).toBe(3);
+					expect(seeder.$generateTestData(propertyName = "price", propertyType = "numeric", index = 3, modelName = "Product")).toBe(30.99);
+					expect(seeder.$generateTestData(propertyName = "body", propertyType = "boolean", index = 2, modelName = "Post")).toBeFalse();
+					expect(seeder.$generateTestData(propertyName = "published", propertyType = "boolean", index = 3, modelName = "Post")).toBeTrue();
+					local.typedDate = seeder.$generateTestData(propertyName = "body", propertyType = "date", index = 3, modelName = "Post");
+					local.publishedAt = seeder.$generateTestData(propertyName = "publishedAt", propertyType = "datetime", index = 3, modelName = "Post");
+					expect(IsDate(local.typedDate)).toBeTrue();
+					expect(IsDate(local.publishedAt)).toBeTrue();
+					expect(DateDiff("d", local.publishedAt, Now())).toBe(3);
+					// Model context does not alter bounded/special-purpose pools.
+					expect(seeder.$generateTestData(propertyName = "status", index = 5, modelName = "Post")).toBe("pending");
+					expect(seeder.$generateTestData(propertyName = "email", index = 3, modelName = "User")).toBe("test3@example.com");
+				});
+
+				it("S10: unmatched names fall through to the default string", () => {
+					expect(seeder.$generateTestData(propertyName = "zzz", propertyType = "string", index = 9)).toBe("zzz Test 9");
+					expect(seeder.$generateTestData(propertyName = "notes", index = 1)).toBe("notes Test 1");
+				});
+
+				it("includes model and property context in otherwise unmatched string fields", () => {
+					expect(seeder.$generateTestData(propertyName = "notes", index = 1, modelName = "Post")).toBe("Post Notes Test 1");
+					expect(seeder.$generateTestData(propertyName = "notes", index = 1, modelName = "Comment")).toBe("Comment Notes Test 1");
+					expect(seeder.$generateTestData(propertyName = "displayName", index = 1, modelName = "Post")).toBe("Post Display Name Test 1");
+				});
+
+			});
+
 		});
 
+	}
+
+	public void function $createSeederParents() {
+		model("RefParent").create(id = 41, name = "Parent forty one");
+		model("RefParent").create(id = 97, name = "Parent ninety seven");
+	}
+
+	public void function $deleteAuthorByFirstName(required string firstName) {
+		local.escaped = Replace(arguments.firstName, "'", "''", "all");
+		local.record = model("author").findOne(where = "firstName = '#local.escaped#'");
+		if (IsObject(local.record)) {
+			local.record.delete();
+		}
 	}
 
 }

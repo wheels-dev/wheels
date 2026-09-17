@@ -18,6 +18,7 @@ component extends="wheels.WheelsTest" {
 				expect(local.job.queue).toBe("default");
 				expect(local.job.priority).toBe(0);
 				expect(local.job.maxRetries).toBe(3);
+				expect(local.job.retryBackoff).toBe("exponential");
 				expect(local.job.timeout).toBe(300);
 				expect(local.job.baseDelay).toBe(2);
 				expect(local.job.maxDelay).toBe(3600);
@@ -268,9 +269,16 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("perform executes without error", function() {
+				var performed = {ok = true, error = ""};
 				local.job = new app.jobs.ProcessOrdersJob();
-				// Should not throw
-				local.job.perform(data = {batchSize: 5});
+				try {
+					local.job.perform(data = {batchSize: 5});
+				} catch (any e) {
+					performed.ok = false;
+					performed.error = e.message;
+				}
+				expect(performed.ok).toBeTrue();
+				expect(performed.error).toBe("");
 			});
 
 			it("can be enqueued", function() {

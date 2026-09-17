@@ -26,6 +26,94 @@ component extends="wheels.WheelsTest" {
 					expect(bi.version()).toBe("0.0.0-dev");
 				});
 
+				it("falls back to the sibling wheels.json version when unstamped (dev mode)", () => {
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
+					var manifestPath = dir & "/wheels.json";
+					fileWrite(manifestPath, '{"version": "4.1.2"}');
+					try {
+						var bi = new wheels.BuildInfo();
+						expect(bi.version(manifestPath = manifestPath)).toBe("4.1.2");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
+				it("falls back to the sibling box.json when wheels.json is absent", () => {
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
+					var manifestPath = dir & "/box.json";
+					fileWrite(manifestPath, '{"version": "3.5.0"}');
+					try {
+						var bi = new wheels.BuildInfo();
+						expect(bi.version(manifestPath = manifestPath)).toBe("3.5.0");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
+				it("returns 0.0.0-dev when no manifest exists", () => {
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
+					try {
+						var bi = new wheels.BuildInfo();
+						expect(bi.version(manifestPath = dir & "/wheels.json")).toBe("0.0.0-dev");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
+				it("returns 0.0.0-dev when the manifest version is still a placeholder", () => {
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
+					var manifestPath = dir & "/wheels.json";
+					fileWrite(manifestPath, '{"version": "@build.version@"}');
+					try {
+						var bi = new wheels.BuildInfo();
+						expect(bi.version(manifestPath = manifestPath)).toBe("0.0.0-dev");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
+				it("stamped BuildInfo version wins over the manifest", () => {
+					// Webroot-relative temp dir: RustCFML's Linux build cannot write to
+					// getTempDirectory() (permission-denied), while the webroot is always
+					// writable in CI. Deleted in the finally block below.
+					var dir = expandPath("/") & "wheels-buildinfo-" & createUUID();
+					// Adobe CF's directoryCreate validates to a single parameter —
+					// the dir is webroot-relative and single-level, so no createPath.
+					directoryCreate(dir);
+					var manifestPath = dir & "/wheels.json";
+					fileWrite(manifestPath, '{"version": "9.9.9"}');
+					try {
+						var bi = new wheels.BuildInfo({version: "4.0.0"});
+						expect(bi.version(manifestPath = manifestPath)).toBe("4.0.0");
+					} finally {
+						directoryDelete(dir, true);
+					}
+				});
+
 			});
 
 			describe("isDev() / isSnapshot()", () => {

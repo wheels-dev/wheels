@@ -91,6 +91,49 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that buttonTo resolves spoofed REST member routes", () => {
+
+			beforeEach(() => {
+				_controller = g.controller(name = "dummy")
+				oldURLRewriting = application.wheels.URLRewriting
+				application.wheels.URLRewriting = "On"
+				oldScriptName = request.cgi.script_name
+				request.cgi.script_name = "/index.cfm"
+				g.set(functionName = "buttonTo", encode = false)
+				_originalRoutes = Duplicate(application.wheels.routes)
+				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
+				_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+				application.wheels.routes = []
+				application.wheels.staticRoutes = {}
+				application.wheels.namedRoutePositions = {}
+				g.mapper().resources("posts").end()
+				g.$setNamedRoutePositions()
+			})
+
+			afterEach(() => {
+				application.wheels.routes = _originalRoutes
+				application.wheels.staticRoutes = _originalStaticRoutes
+				application.wheels.namedRoutePositions = _originalNamedRoutePositions
+				application.wheels.URLRewriting = oldURLRewriting
+				request.cgi.script_name = oldScriptName
+				g.set(functionName = "buttonTo", encode = true)
+			})
+
+			it("builds a delete form targeting the singular member route (issue 3551)", () => {
+				actual = _controller.buttonTo(route = "post", key = 123, text = "Delete", method = "delete")
+				expect(actual).toInclude("posts/123")
+				expect(actual).toInclude('method="post"')
+				expect(actual).toInclude('name="_method" type="hidden" value="delete"')
+			})
+
+			it("builds a put form targeting the singular member route", () => {
+				actual = _controller.buttonTo(route = "post", key = 123, text = "Update", method = "put")
+				expect(actual).toInclude("posts/123")
+				expect(actual).toInclude('method="post"')
+				expect(actual).toInclude('name="_method" type="hidden" value="put"')
+			})
+		})
+
 		describe("Tests that linkTo", () => {
 
 			beforeEach(() => {

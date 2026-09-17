@@ -1,0 +1,9 @@
+{
+	"name": "wheels-zeroversion",
+	"version": "1.0.0",
+	"description": "Hardener S3: wheelsVersion 0.0.0 is not a declared compat list",
+	"wheelsVersion": "0.0.0",
+	"provides": {
+		"mixins": "none"
+	}
+}

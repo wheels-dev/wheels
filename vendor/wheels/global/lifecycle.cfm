@@ -149,9 +149,15 @@
 		if (!DirectoryExists(arguments.directory)) {
 			return snapshot;
 		}
-		var files = DirectoryList(arguments.directory, true, "query", "*.cfm");
-		for (var row in files) {
-			snapshot[row.directory & "/" & row.name] = row.dateLastModified;
+		var files = DirectoryList(arguments.directory, true, "path", "*.cfm");
+		for (var filePath in files) {
+			// Per-file GetFileInfo(): RustCFML's DirectoryList query leaves
+			// dateLastModified empty, but GetFileInfo() returns a parseable
+			// "YYYY-MM-DD HH:MM:SS" string there and a date object on
+			// Lucee/Adobe. CFML struct keys are case-insensitive, so the
+			// Lucee "lastmodified" and RustCFML "lastModified" keys both match.
+			local.info = GetFileInfo(filePath);
+			snapshot[filePath] = StructKeyExists(local.info, "lastmodified") ? local.info.lastmodified : "";
 		}
 		return snapshot;
 	}
@@ -174,7 +180,13 @@
 			if (!StructKeyExists(arguments.snapshot, key)) {
 				return true;
 			}
-			if (DateCompare(arguments.snapshot[key], current[key]) != 0) {
+			// Date-aware when both engines return dates; string comparison when
+			// either side is a formatted string (RustCFML's GetFileInfo mtime).
+			if (IsDate(arguments.snapshot[key]) && IsDate(current[key])) {
+				if (DateCompare(arguments.snapshot[key], current[key]) != 0) {
+					return true;
+				}
+			} else if (Compare(ToString(arguments.snapshot[key]), ToString(current[key])) != 0) {
 				return true;
 			}
 		}

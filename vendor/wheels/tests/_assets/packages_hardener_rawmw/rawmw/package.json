@@ -1,0 +1,11 @@
+{
+	"name": "wheels-rawmw",
+	"version": "1.0.0",
+	"description": "Hardener S5: middleware component outside the package tree",
+	"provides": {
+		"mixins": "none",
+		"middleware": [
+			{"component": "wheels.Dispatch"}
+		]
+	}
+}

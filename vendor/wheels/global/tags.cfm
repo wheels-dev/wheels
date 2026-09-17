@@ -267,6 +267,15 @@
 		if (StructKeyExists(arguments, "password") && !Len(arguments.password)) {
 			StructDelete(arguments, "password");
 		}
+		if (StructKeyExists(arguments, "table") && Len(arguments.table)) {
+			if (!ReFindNoCase("^[A-Za-z_][A-Za-z0-9_]*$", arguments.table)) {
+				Throw(
+					type = "Wheels.InvalidArgument",
+					message = "$dbinfo table name must be a SQL identifier"
+				);
+			}
+			local.tableName = arguments.table;
+		}
 
 		// BoxLang specific fix for index queries (MSSQL/Oracle)
 		if (
@@ -300,12 +309,16 @@
 					INNER JOIN sys.objects t ON i.object_id = t.object_id
 					INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
 					INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
-					WHERE t.name = '#arguments.table#'
+					WHERE t.name = ?
 						AND t.type = 'U'
 						AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
 					ORDER BY i.name, ic.key_ordinal
 				";
-				local.rv = $query(sql = local.sql, datasource = arguments.datasource);
+				local.rv = QueryExecute(
+					PreserveSingleQuotes(local.sql),
+					[local.tableName],
+					{datasource = arguments.datasource}
+				);
 				return local.rv;
 			}
 
@@ -327,11 +340,15 @@
 						'' AS FILTER_CONDITION
 					FROM ALL_INDEXES ai
 					JOIN ALL_IND_COLUMNS ac ON ai.INDEX_NAME = ac.INDEX_NAME AND ai.OWNER = ac.INDEX_OWNER
-					WHERE ai.TABLE_NAME = UPPER('#arguments.table#')
+					WHERE ai.TABLE_NAME = UPPER(?)
 						AND ai.INDEX_TYPE != 'LOB'
 					ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
 				";
-				local.rv = $query(sql = local.sql, datasource = arguments.datasource);
+				local.rv = QueryExecute(
+					PreserveSingleQuotes(local.sql),
+					[local.tableName],
+					{datasource = arguments.datasource}
+				);
 				return local.rv;
 			}
 		}
@@ -339,13 +356,14 @@
 		if (
 			StructKeyExists(arguments, "type") &&
 			arguments.type eq "index" &&
-			$get("adapterName") eq "SQLiteModel"
+			$get("adapterName") eq "SQLiteModel" &&
+			StructKeyExists(local, "tableName")
 		) {
 			local.sql = "
 				SELECT
 					NULL AS TABLE_CAT,
 					NULL AS TABLE_SCHEM,
-					'#arguments.table#' AS TABLE_NAME,
+					'#local.tableName#' AS TABLE_NAME,
 					CASE WHEN il.""unique"" = 0 THEN 1 ELSE 0 END AS NON_UNIQUE,
 					NULL AS INDEX_QUALIFIER,
 					il.name AS INDEX_NAME,
@@ -356,7 +374,7 @@
 					0 AS CARDINALITY,
 					0 AS PAGES,
 					'' AS FILTER_CONDITION
-				FROM pragma_index_list('#arguments.table#') il
+				FROM pragma_index_list('#local.tableName#') il
 				JOIN pragma_index_info(il.name) ii
 
 				UNION ALL
@@ -364,7 +382,7 @@
 				SELECT
 					NULL AS TABLE_CAT,
 					NULL AS TABLE_SCHEM,
-					'#arguments.table#' AS TABLE_NAME,
+					'#local.tableName#' AS TABLE_NAME,
 					0 AS NON_UNIQUE,
 					NULL AS INDEX_QUALIFIER,
 					'PRIMARY' AS INDEX_NAME,
@@ -375,7 +393,7 @@
 					0 AS CARDINALITY,
 					0 AS PAGES,
 					'' AS FILTER_CONDITION
-				FROM pragma_table_info('#arguments.table#')
+				FROM pragma_table_info('#local.tableName#')
 				WHERE pk > 0
 
 				ORDER BY INDEX_NAME, ORDINAL_POSITION;
@@ -493,11 +511,144 @@
 
 	public any function $zip() {
 		$engineAdapter().prepareZipArgs(arguments);
+		local.action = StructKeyExists(arguments, "action") ? LCase(arguments.action) : "";
+		if (
+			local.action == "unzip"
+			&& StructKeyExists(arguments, "file")
+			&& StructKeyExists(arguments, "destination")
+		) {
+			$assertZipEntriesContained(arguments.file, arguments.destination);
+		}
 		local.args = {};
 		for (local.key in arguments) {
 			local.args[local.key] = arguments[local.key];
 		}
 		cfzip(attributeCollection = "#local.args#");
+	}
+
+	/**
+	 * Returns true when a zip entry would extract outside destination.
+	 * Rejects empty names, absolute paths, `..` segments, and any entry
+	 * whose canonical path is not contained by the destination directory.
+	 */
+	public boolean function $zipEntryEscapesDestination(required string destination, required string entryName) {
+		local.entry = Replace(arguments.entryName, "\", "/", "all");
+		if (!Len(Trim(local.entry))) {
+			return true;
+		}
+		if (Left(local.entry, 1) == "/" || REFind("^[A-Za-z]:", local.entry)) {
+			return true;
+		}
+		local.segments = ListToArray(local.entry, "/");
+		for (local.seg in local.segments) {
+			if (local.seg == "..") {
+				return true;
+			}
+		}
+		if ($engineAdapter().isRustCFML()) {
+			// JVM-free engine: java.io.File shims are unreliable for canonical
+			// paths. Lexical containment is the correct check there — `..`
+			// segments and absolute paths were already rejected above, so a
+			// normalized join that stays under the normalized destination is
+			// contained (RustCFML has no symlink resolution to bypass).
+			local.normDestination = $normalizeZipPath(arguments.destination);
+			local.normJoined = $normalizeZipPath(arguments.destination & "/" & local.entry);
+			if (Len(local.normJoined) == Len(local.normDestination)) {
+				return false;
+			}
+			return CompareNoCase(Left(local.normJoined, Len(local.normDestination)), local.normDestination) != 0;
+		}
+		try {
+			local.destFile = CreateObject("java", "java.io.File").init(arguments.destination);
+			local.destCanon = local.destFile.getCanonicalPath();
+			local.sep = CreateObject("java", "java.io.File").separator;
+			local.destPrefix = local.destCanon;
+			if (Right(local.destPrefix, 1) != local.sep) {
+				local.destPrefix = local.destPrefix & local.sep;
+			}
+			local.target = CreateObject("java", "java.io.File").init(local.destFile, local.entry);
+			local.targetCanon = local.target.getCanonicalPath();
+			if (local.targetCanon == local.destCanon) {
+				return false;
+			}
+			return CompareNoCase(Left(local.targetCanon, Len(local.destPrefix)), local.destPrefix) != 0;
+		} catch (any e) {
+			// Canonical resolution failing means "cannot verify" — fail closed.
+			return true;
+		}
+	}
+
+	/**
+	 * Lexically normalize a filesystem path: collapse `.` and `..` segments
+	 * and duplicate separators. Used by the RustCFML fallback in
+	 * $zipEntryEscapesDestination (the JVM engines resolve canonical paths
+	 * instead).
+	 */
+	public string function $normalizeZipPath(required string path) {
+		local.norm = Replace(Replace(arguments.path, "\", "/", "all"), "//", "/", "all");
+		local.parts = [];
+		for (local.part in ListToArray(local.norm, "/")) {
+			if (local.part == ".." && ArrayLen(local.parts)) {
+				ArrayDeleteAt(local.parts, ArrayLen(local.parts));
+			} else if (local.part != "." && Len(local.part)) {
+				ArrayAppend(local.parts, local.part);
+			}
+		}
+		return "/" & ArrayToList(local.parts, "/");
+	}
+
+	/**
+	 * Lists entry names in a zip via the native cfzip tag so every engine
+	 * (including JVM-free RustCFML) sees the same names before cfzip writes
+	 * anything.
+	 */
+	public array function $zipEntryNames(required string zipFile) {
+		local.names = [];
+		if ($engineAdapter().isRustCFML()) {
+			// JVM-free engine: no java.util.zip — use the native cfzip list
+			// action (script-callable there). Normalize the name-variable and
+			// direct-return variants the same way the engine-agnostic paths do.
+			local.listResult = cfzip(action = "list", file = arguments.zipFile, name = "local.zipListResult");
+			if (!IsQuery(local.listResult) && IsDefined("local.zipListResult") && IsQuery(local.zipListResult)) {
+				local.listResult = local.zipListResult;
+			}
+			if (!IsQuery(local.listResult)) {
+				return local.names;
+			}
+			for (local.row in local.listResult) {
+				ArrayAppend(local.names, local.row.name);
+			}
+			return local.names;
+		}
+		// JVM engines (Lucee/Adobe/BoxLang): java.util.zip.ZipFile is
+		// uniform and does not depend on how each engine exposes the cfzip
+		// tag from script (Lucee has no script-callable cfzip at all).
+		local.zf = CreateObject("java", "java.util.zip.ZipFile").init(arguments.zipFile);
+		try {
+			local.entries = local.zf.entries();
+			while (local.entries.hasMoreElements()) {
+				local.entry = local.entries.nextElement();
+				ArrayAppend(local.names, local.entry.getName());
+			}
+		} finally {
+			local.zf.close();
+		}
+		return local.names;
+	}
+
+	/**
+	 * Throws Wheels.UnsafeZipEntry when any entry would escape destination.
+	 */
+	public void function $assertZipEntriesContained(required string zipFile, required string destination) {
+		local.names = $zipEntryNames(arguments.zipFile);
+		for (local.entry in local.names) {
+			if ($zipEntryEscapesDestination(arguments.destination, local.entry)) {
+				Throw(
+					type = "Wheels.UnsafeZipEntry",
+					message = "Zip entry '#local.entry#' escapes destination '#arguments.destination#'"
+				);
+			}
+		}
 	}
 
 

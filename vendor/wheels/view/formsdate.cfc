@@ -104,7 +104,6 @@ component {
 	) {
 		local.combine = arguments.combine;
 		StructDelete(arguments, "combine");
-		local.name = $tagName(arguments.objectName, arguments.property);
 		arguments.$id = $tagId(arguments.objectName, arguments.property);
 		// Mirror $applyAutoId's object-bound check here: the child helpers (year/month/etc.)
 		// receive the derived ids like `user-birthday-month`; only emit companion data-auto-id
@@ -120,7 +119,17 @@ component {
 			arguments.order = ListAppend(arguments.order, "ampm");
 		}
 
-		local.value = $formValue(argumentCollection = arguments);
+		local.value = $dateOrTimeSelectNormalizeValue($formValue(argumentCollection = arguments));
+		return $dateOrTimeSelectRender(attrs = arguments, value = local.value, combine = local.combine);
+	}
+
+	/**
+	 * Internal function. Normalize a bound date/time value for
+	 * $dateOrTimeSelect: unwrap java.time.LocalDateTime and Oracle TIMESTAMP
+	 * objects, and repair BoxLang's string date parsing quirks.
+	 */
+	public any function $dateOrTimeSelectNormalizeValue(required any value) {
+		local.value = arguments.value;
 		// Added this section for Adobe Coldfusion as it returns a "java.time.LocalDateTime" object for datetime data
 		if(isInstanceOf(local.value,"java.time.LocalDateTime")){
 			local.value = createDateTime(local.value.getYear(),local.value.getMonthValue(),local.value.getDayOfMonth(),local.value.getHour(),local.value.getMinute(),local.value.getSecond());
@@ -176,46 +185,54 @@ component {
 				}
 			}
 		}
+		return local.value;
+	}
+
+	/**
+	 * Internal function. Render the order segments of $dateOrTimeSelect,
+	 * dispatching each segment to its child select-tag helper.
+	 */
+	public string function $dateOrTimeSelectRender(required struct attrs, required any value, required boolean combine) {
 		local.rv = "";
 		local.firstDone = false;
-		local.orderArray = ListToArray(arguments.order);
+		local.functionMap = {
+			year: "$yearSelectTag",
+			month: "$monthSelectTag",
+			day: "$daySelectTag",
+			hour: "$hourSelectTag",
+			minute: "$minuteSelectTag",
+			second: "$secondSelectTag",
+			yearMonthHourMinuteSecond: "$yearMonthHourMinuteSecondSelectTag",
+			ampm: "$ampmSelectTag"
+		};
+		local.name = $tagName(arguments.attrs.objectName, arguments.attrs.property);
+		local.orderArray = ListToArray(arguments.attrs.order);
 		local.iEnd = ArrayLen(local.orderArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.item = local.orderArray[local.i];
 			local.marker = "($" & local.item & ")";
-			if (!local.combine) {
-				local.name = $tagName(arguments.objectName, "#arguments.property#-#local.item#");
+			if (!arguments.combine) {
+				local.name = $tagName(arguments.attrs.objectName, "#arguments.attrs.property#-#local.item#");
 				local.marker = "";
 			}
-			arguments.name = local.name & local.marker;
-			arguments.value = local.value;
-			if (IsDate(local.value)) {
-				if (arguments.twelveHour && ListFind("hour,ampm", local.item)) {
+			arguments.attrs.name = local.name & local.marker;
+			arguments.attrs.value = arguments.value;
+			if (IsDate(arguments.value)) {
+				if (arguments.attrs.twelveHour && ListFind("hour,ampm", local.item)) {
 					if (local.item == "hour") {
-						arguments.value = TimeFormat(local.value, 'h');
+						arguments.attrs.value = TimeFormat(arguments.value, 'h');
 					} else if (local.item == "ampm") {
-						arguments.value = TimeFormat(local.value, 'tt');
+						arguments.attrs.value = TimeFormat(arguments.value, 'tt');
 					}
 				} else {
-					arguments.value = $resolveDateTime(local.item, local.value);
+					arguments.attrs.value = $resolveDateTime(local.item, arguments.value);
 				}
 			}
 			if (local.firstDone) {
-				local.rv &= arguments.separator;
+				local.rv &= arguments.attrs.separator;
 			}
-			local.functionMap = {
-				year: "$yearSelectTag",
-				month: "$monthSelectTag",
-				day: "$daySelectTag",
-				hour: "$hourSelectTag",
-				minute: "$minuteSelectTag",
-				second: "$secondSelectTag",
-				yearMonthHourMinuteSecond: "$yearMonthHourMinuteSecondSelectTag",
-				ampm: "$ampmSelectTag"
-			};
-
-			if (structKeyExists(functionMap, local.item)) {
-				local.rv &= invoke(this, local.functionMap[local.item], arguments);
+			if (structKeyExists(local.functionMap, local.item)) {
+				local.rv &= invoke(this, local.functionMap[local.item], arguments.attrs);
 			} else {
 				throw("Invalid item value: " & local.item);
 			}
@@ -319,7 +336,9 @@ component {
 				local.content &= $yearMonthHourMinuteSecondSelectTagContent(argumentCollection = local.args);
 			}
 		}
-		local.encode = IsBoolean(arguments.encode) && arguments.encode ? "attributes" : false;
+		// Match select(): encode="attributes" (non-boolean) must still encode
+		// attribute values. `IsBoolean && encode` coerced that string to false.
+		local.encode = $coerceEncode(arguments.encode, "attributes");
 		return local.before & $element(
 			name = "select",
 			skip = "objectName,property,label,labelPlacement,prepend,append,prependToLabel,appendToLabel,errorElement,errorClass,value,includeBlank,order,separator,startYear,endYear,monthDisplay,monthNames,monthAbbreviations,dateSeparator,dateOrder,timeSeparator,timeOrder,minuteStep,secondStep,association,position,twelveHour,encode",
@@ -333,7 +352,7 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public string function $yearMonthHourMinuteSecondSelectTagContent() {
+	public string function $yearMonthHourMinuteSecondSelectTagContent(any encode = false) {
 		local.args = {};
 		local.args.value = arguments.counter;
 		if (arguments.value == arguments.counter) {
@@ -347,7 +366,9 @@ component {
 		if (arguments.$type == "minute" || arguments.$type == "second") {
 			arguments.optionContent = NumberFormat(arguments.optionContent, "09");
 		}
-		return $element(name = "option", content = arguments.optionContent, attributes = local.args, encode = false);
+		// Default false keeps the existing unit tests (they omit encode).
+		// monthSelectTag etc. pass encode through argumentCollection (S1).
+		return $element(name = "option", content = arguments.optionContent, attributes = local.args, encode = arguments.encode);
 	}
 
 	/**

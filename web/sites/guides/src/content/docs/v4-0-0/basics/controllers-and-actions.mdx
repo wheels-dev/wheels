@@ -92,7 +92,7 @@ component extends="Controller" {
 
 `config()` runs once per controller instantiation — it's where you register filters, verify rules, and any other per-controller setup. Don't put action logic here; it runs before any action is known.
 
-`filters(through="methodName")` binds a private method to run before every action in this controller. Use `only="..."` to restrict it to specific actions or `except="..."` to skip them. Pass `type="after"` to run after the action instead of before.
+`filters(through="methodName")` binds a private method to run before every action in this controller. Use `only="..."` to restrict it to specific actions or `except="..."` to skip them. Pass `type="after"` to run after the action instead of before. `type` is case-insensitive (`Before` and `before` both run as before filters). A before filter that returns `false` skips the action and any remaining filters; `redirectTo()` and `renderText()` still short-circuit the same way.
 
 ```cfm {test:compile} title="app/controllers/Posts.cfc"
 component extends="Controller" {
@@ -118,6 +118,8 @@ The `params` struct is built by the framework on every request. It merges three 
 - **URL segments** — `:key` from `/posts/:key` lands in `params.key`.
 - **Query string** — `?page=2` lands in `params.page`.
 - **Form fields** — `<input name="post[title]">` lands in `params.post.title`.
+
+`params.controller` and `params.action` come from the matched route. A query string, form field, or JSON body cannot retarget them. Wildcard `[controller]` / `[action]` routes still take those names from the path.
 
 ```cfm {test:compile} title="app/controllers/Posts.cfc"
 component extends="Controller" {

@@ -386,7 +386,10 @@ component {
 		}
 
 		// Remove 'methods' argument if settings disable it.
+		// Keep the drawn verb for the static index so restful=false get()
+		// cannot register POST:/ (S4). Ordered matching still sees no methods.
 		if (!variables.methods && StructKeyExists(arguments, "methods")) {
+			arguments.$staticIndexMethods = arguments.methods;
 			StructDelete(arguments, "methods");
 		}
 
@@ -414,6 +417,11 @@ component {
 		// Inherit binding from scope stack.
 		if (!StructKeyExists(arguments, "binding") && StructKeyExists(variables.scopeStack[1], "binding")) {
 			arguments.binding = variables.scopeStack[1].binding;
+		}
+
+		// Inherit bindBy from scope stack.
+		if (!StructKeyExists(arguments, "bindBy") && StructKeyExists(variables.scopeStack[1], "bindBy")) {
+			arguments.bindBy = variables.scopeStack[1].bindBy;
 		}
 
 		// Add shallow path to pattern.

@@ -47,6 +47,29 @@ component extends="cli.lucli.Module" {
 		return parseSeedArgs(arguments.coll);
 	}
 
+	/**
+	 * Point the probe at a different project root. resolveProjectRoot() runs in
+	 * the constructor, so a spec that needs `wheels setup agents` to write into a
+	 * temp project sets it here rather than touching variables directly.
+	 */
+	public void function $setProjectRoot(required string path) {
+		variables.projectRoot = arguments.path;
+	}
+
+	// NOTE the `Probe` suffix — a shim named exactly after the private helper
+	// resolves to ITSELF (public wins) and recurses until the stack blows.
+	public string function $setupMcpProbe(required array args) {
+		return $setupMcp(arguments.args);
+	}
+
+	public array function $filterRoutesProbe(required array routes, required string filter) {
+		return $filterRoutes(arguments.routes, arguments.filter);
+	}
+
+	public struct function $parseRoutesArgs(required struct coll) {
+		return routesArgSpec().parse(arguments.coll);
+	}
+
 	public struct function $parseNotesArgs(required struct coll) {
 		return parseNotesArgs(arguments.coll);
 	}
@@ -73,6 +96,10 @@ component extends="cli.lucli.Module" {
 
 	public struct function $parseTestArgs(required struct coll) {
 		return parseTestArgs(arguments.coll);
+	}
+
+	public struct function $parseGeneratorArgs(required array args) {
+		return parseGeneratorArgs(arguments.args);
 	}
 
 }

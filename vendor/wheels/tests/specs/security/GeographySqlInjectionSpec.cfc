@@ -5,7 +5,7 @@ component extends="wheels.WheelsTest" {
 		describe("Geography/WKT SQL injection prevention", () => {
 
 			beforeEach(() => {
-				misc = new wheels.model.miscellaneous();
+				misc = new wheels.Model();
 			});
 
 			describe("$sanitizeWktValue", () => {

@@ -106,22 +106,27 @@ component extends="wheels.WheelsTest" {
 				expect(thrown.message).toInclude("abc-123")
 			})
 
-			it("throws Wheels.InvalidJobClass when the path resolves to something that is not a job", () => {
-				// NOT `local.`-scoped, deliberately. Cross-engine invariant 11: a catch body
-				// runs under a nested `local` on BoxLang, so `thrown.type = e.type`
-				// inside the catch writes to a struct that is discarded on exit and the
-				// assertion below reads the untouched outer value. The blessed form is a
-				// `var`-declared struct accessed WITHOUT the `local.` prefix. Scoping this
-				// one for consistency cost two BoxLang failures on every database
-				// (`Expected [Wheels.JobClassNotFound] but received []`) — caught by the
-				// compat matrix, invisible on Lucee.
+			it("throws Wheels.JobClassNotAllowed for an off-path component even if it exists", () => {
 				var thrown = {type: ""}
 
 				local.bridge = new wheels.Job()
 
 				try {
-					// a real component with no perform()
 					local.bridge.$instantiateJobClass(jobClass = "wheels.tests._assets.models.Post")
+				} catch (any e) {
+					thrown.type = e.type
+				}
+
+				expect(thrown.type).toBe("Wheels.JobClassNotAllowed")
+			})
+
+			it("throws Wheels.InvalidJobClass when an allowlisted path is not a job", () => {
+				var thrown = {type: ""}
+
+				local.bridge = new wheels.Job()
+
+				try {
+					local.bridge.$instantiateJobClass(jobClass = "wheels.tests._assets.jobs.NoPerformStub")
 				} catch (any e) {
 					thrown.type = e.type
 				}

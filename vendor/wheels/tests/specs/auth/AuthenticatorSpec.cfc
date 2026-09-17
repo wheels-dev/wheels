@@ -170,11 +170,14 @@ component extends="wheels.WheelsTest" {
 					expect(result.strategy).toBe("alwaysPass");
 				});
 
-				it("skips unknown names when a registered strategy can still authenticate", function() {
+				it("fails closed when the restriction list includes an unknown name", function() {
 					auth.registerStrategy(name = "pass", strategy = new wheels.tests._assets.auth.AlwaysPassStrategy());
 
 					var result = auth.authenticateWith(request = {}, strategies = "ghost,pass");
-					expect(result.success).toBeTrue();
+					expect(result.success).toBeFalse();
+					expect(result.statusCode).toBe(401);
+					expect(result.error).toInclude("ghost");
+					expect(result.error).toInclude("unregistered strategy");
 				});
 
 				it("surfaces a wiring diagnostic when restricted to only unregistered names", function() {

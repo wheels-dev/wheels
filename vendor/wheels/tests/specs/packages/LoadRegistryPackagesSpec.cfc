@@ -2,8 +2,12 @@ component extends="wheels.WheelsTest" {
 
 	function run() {
 		describe("Public.$loadRegistryPackages", () => {
+			// createObject (not `new`) — RustCFML's `new` operator lowercases
+			// the component name before the file lookup, which misses
+			// Public.cfc on case-sensitive filesystems (Linux); the
+			// createObject form resolves with the exact case on every engine.
 			var $newPublic = () => {
-				return new wheels.Public();
+				return createObject("component", "wheels.Public");
 			};
 
 			// Minimal fake registry that returns canned data or throws.

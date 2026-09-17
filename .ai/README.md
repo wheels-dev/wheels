@@ -1,35 +1,33 @@
 # Wheels Framework Reference Docs
 
-Searchable reference for CFML language and Wheels framework patterns.
+Maintainer-only deep reference. Claude Code searches this tree on demand —
+see the root `CLAUDE.md` for the always-loaded invariants and the
+"Reference Docs" index at its end.
 
-## CFML Language (`cfml/`)
+The tree is deliberately small. The code is the source of truth, and the
+former CFML-language reference (`.ai/cfml/`) plus generic pattern /
+troubleshooting pages were removed — they drifted and modern models no
+longer need them. What remains is runbook knowledge that is NOT
+recoverable from reading the code.
 
-- `syntax/` — CFScript basics, tags vs script, comments, hash escaping
-- `data-types/` — Variables, scopes, arrays, strings, structures, numbers
-- `control-flow/` — Conditionals, loops, exception handling
-- `components/` — CFC basics, functions, properties
-- `database/` — Query fundamentals
-- `advanced/` — Closures, advanced features
-- `best-practices/` — Modern CFML patterns
+> The APPLICATION-developer doc tier (shipped in every distribution) lives
+> in `docs/consumer-ai/` — keep the two tiers separate.
 
-## Wheels Framework (`wheels/`)
+## Files
 
-- `models/` — ORM architecture, associations, validations, performance
-- `controllers/` — Actions, filters, rendering, security, parameters
-- `views/` — Layouts, partials, form helpers, link helpers, assets
-- `database/` — Migrations, associations, queries, validations
-- `configuration/` — Routing, environments, settings
-- `core-concepts/` — MVC architecture, ORM mapping, routing conventions
-- `cli/` — Generators, server management
-- `communication/` — Email sending
-- `files/` — File uploads and downloads
-- `jobs/` — Background job processing
-- `mcp/` — AI agent integration via LuCLI stdio MCP
-- `middleware/` — Request pipeline (rate limiting, tenant resolver, pipeline structure)
-- `packages/` — First-party packages (sentry, hotwire, basecoat) and activation model
-- `security/` — CSRF, authentication, authorization
-- `patterns/` — Common development patterns, validation templates
-- `snippets/` — Code examples for all component types
-- `integration/` — Frontend stack (Tailwind, Alpine, HTMX)
-- `testing/` — Testing strategies and patterns
-- `troubleshooting/` — Common errors and debugging
+- `wheels/cross-engine-compatibility.md` — engine gotchas (Lucee/Adobe/BoxLang differences), the deep version of CLAUDE.md's Cross-Engine Invariants
+- `wheels/deploy.md` — `wheels deploy` Kamal port architecture
+- `wheels/wheels-bot.md` — wheels-bot GitHub App architecture
+- `wheels/testing/browser-testing.md` — Playwright browser-test DSL
+- `wheels/testing/onboarding-harness.md` — fresh-install simulation harness (`tools/test-onboarding.sh`)
+- `wheels/troubleshooting/shared-dev-databases.md` — orphan-version handling and `migrate doctor` / `forget` / `pretend` reconciliation (#2780)
+
+## Conventions
+
+- Every file is a focused runbook page; add links from `CLAUDE.md`'s
+  "Reference Docs" section when you add one.
+- Do not re-add generic CFML/framework reference material — the code and
+  `docs/consumer-ai/` cover that. Add a file here only when it captures
+  knowledge that cannot be recovered by reading the code.
+- Don't duplicate the auto-loaded `CLAUDE.md` invariants here — link them
+  instead (`cross-engine-compatibility.md` is the deep version).

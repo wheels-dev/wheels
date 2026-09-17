@@ -47,6 +47,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// reload() is already public. Expose generateAdmin so the
 		// call-site gating tests below can drive it directly.
 		makePublic(variables.mod, "generateAdmin");
+		makePublic(variables.mod, "$requireOwnRunningServer");
 	}
 
 	function afterAll() {
@@ -83,6 +84,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		var log = m.$callLog()["$requireRunningServer"];
 		expect(arrayLen(log)).toBeGTE(1, "migrate #arguments.action# never reached $requireRunningServer()");
 		return log[1].requireProjectConfig;
+	}
+
+	/**
+	 * Fresh Module whose getService("serverRegistry") returns the supplied
+	 * registry, with `$requireOwnRunningServer` exposed for direct calls.
+	 * Each test gets its own instance so the getService mock never leaks
+	 * into the shared `variables.mod`.
+	 */
+	private any function moduleWithRegistry(required any registry) {
+		createObject("java", "java.io.File").init(expandPath("/testbox/system/stubs")).mkdirs();
+		var m = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(m);
+		makePublic(m, "$requireOwnRunningServer");
+		m.$(method = "getService", returns = arguments.registry);
+		return m;
 	}
 
 	function run() {
@@ -212,6 +228,55 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("wheels test server ownership — $requireOwnRunningServer", () => {
+
+			// `wheels test` must hit THIS project's server. Attaching to a
+			// sibling app squatting a common port (e.g. 8080) yields bogus
+			// "spec failed to load" output from a different codebase. These
+			// specs drive the ownership guard directly, with getService
+			// mocked to a hermetic temp registry, so no live server is needed.
+
+			it("returns the port of the project's own registered server", () => {
+				var canonical = createObject("java", "java.io.File")
+					.init(variables.tempRoot).getCanonicalPath();
+				var registry = registryWithRegistration(canonical, "8094");
+				var m = moduleWithRegistry(registry);
+				expect(m.$requireOwnRunningServer(["hint"])).toBe(8094);
+			});
+
+			it("throws when the registration belongs to a different project", () => {
+				var registry = registryWithRegistration("/some/other/project", "8094");
+				var m = moduleWithRegistry(registry);
+				expect(() => m.$requireOwnRunningServer(["hint"])).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+			it("throws when no registration exists for this project", () => {
+				var registry = registryWithRegistration("/some/other/project", "8094");
+				// Wipe the registration so ownServerPort() resolves nothing.
+				registry.clean(registry.serverNameFor(variables.tempRoot));
+				var m = moduleWithRegistry(registry);
+				expect(() => m.$requireOwnRunningServer(["hint"])).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+		});
+
+	}
+
+	/**
+	 * Build a hermetic ServerRegistry whose registration for THIS temp
+	 * project's server name records the given `.project-path` and a live pid
+	 * (the JVM's own, so inspect() reports alive=true).
+	 */
+	private any function registryWithRegistration(required string projectPath, required string port) {
+		var home = getTempDirectory() & "wheels-own-server-" & createUUID();
+		directoryCreate(home & "/servers", true);
+		var registry = new cli.lucli.services.ServerRegistry(lucliHome = home);
+		var serverName = registry.serverNameFor(variables.tempRoot);
+		directoryCreate(home & "/servers/" & serverName, true);
+		fileWrite(home & "/servers/" & serverName & "/.project-path", arguments.projectPath);
+		var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
+		fileWrite(home & "/servers/" & serverName & "/server.pid", selfPid & ":" & arguments.port);
+		return registry;
 	}
 
 }

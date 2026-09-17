@@ -45,13 +45,11 @@ authorCount = model("author").count(include="profile(country)", where="name='USA
 
 In the background, these functions all perform SQL that looks like this:
 
-{% code title="MySQL" %}
-```sql
+```sql title="MySQL"
 SELECT COUNT(*)
 FROM authors
 WHERE ...
 ```
-{% endcode %}
 
 However, if you include a `hasMany` association, CFWheels will be smart enough to add the `DISTINCT` keyword to the SQL. This makes sure that you're only counting unique rows.
 
@@ -63,13 +61,11 @@ authorCount = model("author").count(include="books", where="title LIKE 'Wheels%'
 
 Will execute this SQL (presuming `id` is the primary key of the `authors` table and the correct associations have been setup):
 
-{% code title="MySQL" %}
-```sql
+```sql title="MySQL"
 SELECT COUNT(DISTINCT authors.id)
 FROM authors LEFT OUTER JOIN books ON authors.id = books.authorid
 WHERE ..
 ```
-{% endcode %}
 
 OK, so now we've covered the [count()](https://wheels.dev/api/v2.5.0/model.count.html) function, but there are a few other functions you can use as well to get column statistics.
 

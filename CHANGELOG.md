@@ -26,6 +26,257 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ---
 
+# [4.1.0](https://github.com/wheels-dev/wheels/releases/tag/v4.1.0) => 2026-09-17
+
+### Added
+
+- `wheels upgrade check` now diffs app-owned template files (`public/Application.cfc`, `public/index.cfm`) against the CLI's bundled app template and reports any drift as an advisory — surfacing framework-side hardening (such as the Adobe teardown guards in `onError`/`onSessionEnd`) that a `vendor/wheels/`-only swap never delivers to existing apps (#3379)
+- Added `enableSession()` — one-line session-auth wiring for `config/services.cfm`.
+- Added `wheels migrate diff` (alias `dbmigrate diff`) — preview or `--write` AutoMigrator schema diffs with rename hints.
+- Added `wheels generate --dry-run` — print would-be generated files without writing anything.
+- Added offline mode (`--offline` / `WHEELS_OFFLINE=1`) — skips the CLI update check and fails fast on registry network calls.
+- Added `boot` deploy config section (Kamal-compatible `limit`/`wait`).
+- Added `wheels doctor` checks for legacy `wheels.Test` specs, legacy `plugins/`, and raw `params.` mass assignment.
+- Fixed the debug bar showing `0.0.0-dev` on installs where `BuildInfo.cfc` ships unstamped (now falls back to the sibling manifest version).
+- Added `Injector.toFactory()` — bind a name to a closure that builds the instance (receives the container, honors singleton/request-scoped flags).
+- Added route `bindBy=` — bind a resource route's `:key` segment to a non-primary-key column via the parameterized dynamic finder (e.g. `bindBy="slug"`).
+- Added `bcryptHash()`, `bcryptVerify()`, and `bcryptNeedsRehash()` global helpers — pure-CFML, OpenBSD/htpasswd/jBCrypt-compatible bcrypt password hashing with no Java objects, CFX, or external libraries. RustCFML, which ships `bcryptHash()`/`bcryptVerify()` as native builtins, uses those for the same API.
+- Added a "Code Complexity" panel to the development debug bar that shows cyclomatic complexity per file in `app/` — computed statically (1 + decision points) and cached for the application lifetime, so it costs one scan per reload. Complements the maintainer-side complexity gate (`tools/code-quality/cfml-complexity.py` + `.github/workflows/code-quality.yml`) and the function-coverage tool (`tools/code-quality/cfml-coverage.py`); test coverage for CRAP scoring is a separate `wheels coverage` run.
+- `set(massAssignmentStrict=true)` fail-closes mass assignment when a model has neither `accessibleProperties()` nor `protectedProperties()`; the default remains open for compatibility
+- `linkTo(sanitizeHref=true)` blanks caller-supplied `javascript:` / `data:` hrefs. Default remains `false` (no public-behavior change)
+- Added a `wheels coverage` command that instruments `app/` with function-level coverage counters, runs the app test suite against the running server, and reports a CRAP ranking (cyclomatic complexity × test coverage) of your most change-risky files. The instrumentation is reverted automatically afterward. Pairs with the debug bar's Complexity panel: complexity is static and always visible; `wheels coverage` adds the test-coverage half of the CRAP score on demand.
+- Development error page now includes a Copy button that copies a JSON dump of the exception (type, message, suggested action, file and line, source snippet, and app/framework stack frames) to the clipboard for pasting into a coding agent (#3552)
+- CLI generators (`model`, `scaffold`, `api-resource`) accept Rails-style column size modifiers (`title:string{50}`, `price:decimal{10,2}`) and emit the custom `limit` / `precision` / `scale` in the generated migration
+- CLI generators emit `validatesLengthOf(property=..., maximum=N)` on the generated model when a string-like property (`string`, `varchar`, `text`, `binary`) uses a `{N}` size modifier
+- `wheels console` now has real line editing: ← → move the cursor, ↑ ↓ recall history (persisted across sessions in `~/.wheels/console_history`), Home/End jump to the line ends. Previously arrow keys printed raw escape sequences. Piped sessions (`printf ... | wheels console`) are unchanged
+- Debug bar: Copy buttons on the message blocks worth pasting into a coding agent — the reload-refused notice, configuration warnings, deprecations, the Warnings section, failing migration output and failing test output. Each copies plain text behind a short header rather than raw markup
+- Debug bar: tab labels collapse to icons below the width where they stop fitting, with the tab name shown in a hover tooltip, instead of clipping the close button off-screen
+- Debug bar: new Routes, Migrate, Tests and Packages tabs. Routes lists the app's route table, Migrate shows migration state with hold-to-confirm rollback/redo/reset, Tests runs the app suite and can re-run a single bundle, and Packages lists installed packages plus any that failed to load. Each is lazy-loaded on open, and the Migrator/Tests/Packages cards were removed from the Tools tab since the tabs supersede them
+- The Linux `.deb` / `.rpm` packages now ship the offline documentation bundle and unpack it into `~/.wheels/docs/<version>/` on first run, so the guides and API reference work without an internet connection. The bundle is also mirrored into an app's `public/wheels-docs/` when `wheels` is run from inside a project, since the dev server's URL rewriting only routes extension-less paths to the front controller
+- The guides and API reference are now served from a local copy of the documentation instead of guides.wheels.dev / api.wheels.dev, so they stay readable with no internet connection. The bundle is fetched once — `wheels docs fetch`, or automatically by the Homebrew formula on install/upgrade — and served at `/wheels-docs/guides/` and `/wheels-docs/api/`, with matching Guides and API tabs in the debug bar
+- Added a RustCFML engine backend to the CLI: `wheels engines rustcfml install|start|stop|status` downloads the pinned JVM-free RustCFML binary and runs a Wheels app's `public/` directory on it. This is a separate lifecycle from the Lucee `wheels start`/`stop` path; the framework itself has run on RustCFML since 4.0, and this adds the CLI-side dev-server convenience (caveats apply — no JVM, so `CreateObject("java", …)` and any `java.*` app code won't run)
+- `wheels generate scaffold <Child> --belongsTo=<parent>` now wires conventional existing parent scaffolds: it adds the inverse `hasMany`, merges children into the parent `show()` finder's static `include` list, and adds related-record links using the child's display field plus an Add link. Parent writes respect `--dry-run` and are reported as modifications, not newly created files. Existing custom associations and edited related blocks are preserved, including on `--force`; missing files or ambiguous custom code are reported for manual wiring rather than rewritten. API scaffolds never modify parent HTML controllers or views.
+- `wheels setup agents` writes `.mcp.json` (Claude Code) and `.opencode.json` (OpenCode) so AI assistants can query the app through the Wheels MCP server. It merges rather than overwrites — other servers you already list are preserved, an existing `wheels` entry is corrected, hand-added keys on it are left alone, and every file is validated before any is written. Malformed JSON is left untouched and reported instead of replaced
+
+### Changed
+
+- Guides for `wheels test` now state the CLI throws `Wheels.TestsFailed` on `directoryRejected`, `bundlesDiscovered=0`, and compile-skipped specs — not only Fail/Error — so a vacuous or rejected scope is not documented as exit 0 (#3083)
+- Legacy CommandBox `wheels test` / `browser:test` refuse with a deprecation `error()` then `return` and no longer invoke TestBox (`testbox run`). Unrouted `vendor/wheels/controllers/Tests.cfc` is removed; `/wheels/core/tests` and `/wheels/app/tests` stay on `Public.cfc` (#3083)
+- `JwtService.decode()` now requires an `exp` claim by default (`requireExpiry=true`). Pass `requireExpiry=false` to accept signed tokens with no expiry. `maxRefreshAge` stays `0` (unbounded refresh) unless a positive window is set
+- Channel `publish()` throws `Wheels.Channel.PublishFailed` when the database INSERT fails instead of returning `persisted:false`
+- `$getChannelEngine()` throws `Wheels.Channel.UnknownAdapter` for a name that is not `memory` or `database`
+- The memory channel engine replays retained events after `lastEventId` on subscribe
+- `channelSSETag(events=)` registers `addEventListener` for each named event so they are not dropped by `onmessage`
+- Empty and whitespace-only channel names throw `Wheels.Channel.InvalidName`
+- `processAction()` returns `false` when a verification aborts or a before filter returns `false` (the halt signal was previously always `true`)
+- `processRequest()` accepts opt-in `csrf="exception"` / `csrf="abort"`; the historic test-helper default remains `ignore` and production `protectsFromForgery()` is unchanged
+- Database adapters no longer coerce the bound string `"null"` after `IS` / `IS NOT` to SQL NULL, drop MySQL TEXT/float `DEFAULT`, leave boolean `yes`/`no` unquoted, advertise fake SQLite advisory locks, default unknown foreign-key actions to `CASCADE`, emit asymmetric empty-string defaults, map unknown column types silently, or fall back to Oracle `MAX(ROWID)` / SQL Server `@@IDENTITY`
+- The unquoted SQL keyword `NULL` and a CFML/Java null still bind as SQL NULL (so an absent uniqueness-scope property does not send the string `[NULL]` to an integer `cfqueryparam`)
+- Injector rebind of an existing name resets singleton and request-scoped flags and drops `request.$wheelsDICache`
+- `asSingleton()` / `asRequestScoped()` throw `Wheels.Injector` when no mapping is in progress. `map(b).asSingleton().to(...)` flags `b`, not the previous key
+- `getMappings()` returns a `Duplicate` copy. Mutating the return value does not change later `getMappings()` or the live mappings table
+- `AuthMiddleware` accepts `genericErrors=true` to emit a generic `Unauthorized` JSON body; the default 401 still includes `authResult.error`
+- `TenantResolver` accepts `failClosed=true` to 403 unmatched tenants; unmatched requests still proceed on the default datasource unless opted in
+- `updateRecord()` / `removeRecord()` accept `all=true` for an intentional full-table write; empty `where` now throws
+- `AutoMigrator.diff()` accepts `allowColumnRemoval=false` and reports leftover columns on `unmappedColumns` instead of scheduling drops
+- `t.references()` accepts `referenceColumn` (default remains `"id"`)
+- Tenant structs may pass `userName` / `password` for per-tenant migrator credentials
+- `validatesUniquenessOf` now defaults `includeSoftDeletes` to `false`, so a soft-deleted value can be reused unless the caller opts in (`includeSoftDeletes=true`)
+- Query builder docs now state that single-argument `where()` / `orWhere()` is a raw-SQL passthrough; the 2- and 3-argument forms remain the parameterized contract
+- `authorize()` / `can()` throw `Wheels.Policy.UnknownAction` when the policy has no method for the action, instead of treating a typo as a deny
+- `$currentUserForPolicy()` no longer swallows a throwing DI `currentUser` into the authenticator user, or a throwing authenticator into guest `""`
+- `seedOnce()` binds unique-property values in the uniqueness WHERE so an apostrophe (`O'Brien`) no longer creates a duplicate row on the second call
+- `generateSeeds()` wraps the write in a transaction and rolls back on any model failure, so a mixed list cannot leave rows
+- LocalDisk `$resolve` throws `Wheels.Storage.InvalidKey` for empty and slash-only keys instead of concatenating onto `root`
+- LocalDisk `url()` and `signedUrl()` RFC3986-encode object keys the same way S3 does (spaces and reserved characters)
+- `S3Disk.delete()` HEADs first and returns false when the object is missing. An existing object still deletes and returns true
+- `S3Disk.put()` sends a signed `x-amz-acl` (`public` maps to `public-read`; default and `private` send `private`)
+- `signedUrl()` / `presignGetUrl()` throw `Wheels.Storage.InvalidExpiresIn` when `expiresIn` is outside `1..604800`
+- `S3Signer.signedHeaders()` accepts an optional `range` argument so the official AWS GET Object header-auth vector can be pinned. The no-range canonical request is unchanged
+- LocalDisk `$resolve` and S3Disk `$request` are public so tests can call and override them. `S3Disk.delete()` still returns true after any 2xx
+- `hasManyRadioButton()` now forwards extra HTML attributes (`class`, `rel`, …) the same way `hasManyCheckBox()` does, matching its documented passthrough
+- `buttonTo(encode="attributes")` now encodes attribute values the same way `select()` does (`encode=false` still leaves them raw)
+- Documented that `sendEmail(writeToFile=)` writes the rendered text/HTML body only — not a MIME `.eml` — so Outlook shows raw HTML tags on a `.eml` path while live `cfmail` delivery still renders. Restored v4 `sendEmail` examples and replaced the v3 `.eml` sample with `.html` (#3529)
+- Debug bar: clicking the X now slides the bar left to a logo-sized black strip with the stylized red W, instead of a floating "Debug" button. Clicking the collapsed logo expands the bar back across the bottom of the page (#3547)
+- `/wheels/api` now serves the prebuilt Starlight API reference rather than rendering it from the installed framework's source comments, so what you read locally is identical to api.wheels.dev instead of a second rendering of it. `public/docs/core.cfm` is retained because `/wheels/ai` still derives its condensed API summary from it, but it no longer backs a browsable page
+- `wheels new` apps now style flash messages as colored boxes instead of bare text: `success` (created/updated/deleted) renders in a green box, `notice` in a blue box, and `warning` in an amber box — matching the existing red validation-error box, with icon prefixes and dark-mode variants
+- `wheels generate auth` now hashes passwords with bcrypt via the framework's `bcryptHash()` / `bcryptVerify()` / `bcryptNeedsRehash()` helpers (bundled jBCrypt on JVM engines, native builtins on RustCFML) instead of the PBKDF2-based `passwordHasher` service. The generated `User` model stores a `passwordHash` column (renamed from `passwordDigest`), no longer registers a `passwordHasher` service, and equalizes login timing with a bcrypt derivation. Existing generated apps keep their own code (generated files are code-you-own); the `wheels.auth.PasswordHasher` service remains available for apps that prefer PBKDF2.
+- Scaffolded views now render every action as a button. `Edit`, `New <model>` and `← all <models>` were plain links sitting beside a `Delete` button; they all carry simple.css's `.button` class now, so links and form buttons are visually identical. The action row is a `<div>` rather than a `<p>` because `buttonTo` emits a `<form>`, which a paragraph cannot legally contain
+- `wheels generate scaffold` now emits full CRUD controller specs (`index`, `new`, `create`, `show`, `edit`, `update`, `delete`) with `processRequest` assertions and `model().create()` test data, matching the spirit of Rails scaffold controller tests. Sample attribute structs use quoted colon keys (`{"title": "MyString"}`) so CFML keeps the real property names. The app-test runner now delays `redirectTo()` (same as the core runner) so create/update/delete specs cannot `cflocation`-abort `wheels test` — that leak rendered `show.cfm` with `findByKey()=false` and crashed with `there is no property with name [TITLE] found in [boolean]`. Mutating actions assert HTTP 303. Re-generate existing apps with `--force` to pick up the richer specs.
+- Scaffolded CRUD controllers now set a success flash message on create, update, and delete (e.g. "Post was created successfully."), which the default layout renders via `flashMessages()`. This matches the feedback Rails/Laravel scaffolds provide out of the box.
+- Scaffolded (and new-app) forms now stack labels above full-width inputs and nest validation errors in the field block, styled in red with an icon and `Error:` prefix so the cue is not color-only (#3549, #3550)
+- Scaffolded apps now bundle simple.css locally in `public/stylesheets/simple.css` (MIT, ~10 KB) instead of loading it from a CDN, so fresh apps and demos render with the default styling offline. It remains a classless stylesheet — remove the `<link>` in `app/views/layout.cfm` (and the file) to use your own CSS, with no markup cleanup needed.
+- The scaffolded starter page now offers two calls to action instead of six — the guides and the API reference — and both open in a new tab so following the docs doesn't navigate away from the app. The API card points at `/wheels/api` (the browsable reference) rather than `/wheels/ai`, which serves JSON
+- `wheels start --port=<n>` now actually starts on that port for Lucee apps; the flag was previously parsed and then discarded, so the server silently booted on the port pinned in `lucee.json`. The shutdown port is now derived from the requested port (the next free one), so two projects can no longer collide on it — that collision surfaced as LuCLI's `port conflicts detected:` with an empty list
+- `wheels new` now scaffolds a richer starter page at `/`: the Wheels mark, a **Welcome to \<app\>** heading, the runtime details (Wheels version, engine, datasource, environment), and cards linking to the guides, routes, migrator, tests, system info, and API reference. It replaces the short prose line and three-item list, and is deliberately styled to be replaced before deployment
+- The scaffolded starter page now uses the official Wheels wordmark instead of an inline SVG mark with a text label. It ships in two files — the default for light backgrounds and a white-lettering inverse for dark ones — swapped automatically via `prefers-color-scheme`, so the logo stays legible in either theme
+
+### Deprecated
+
+- `wheels.Test` (RocketUnit) now emits a one-time deprecation warning; removal is planned for Wheels 5.0.
+
+### Performance
+
+- Model instances are now created with a direct constructor call instead of the DI container's resolve/auto-wire path plus a reflective invoke, and the per-instance class-struct read no longer takes a named lock — roughly 1.5x faster model materialization on top of the previous #3213 work (#3462).
+- Model instances now inherit the full model API from compile-time includes instead of copying ~270 method references into each instance at runtime — roughly 2x faster model object materialization (#3213).
+- Reduced per-instance model/controller materialization overhead by serving the cached component-integration plan from the request scope after its first use in a request, instead of re-reading the synchronized application scope on every instantiation (#3213).
+
+### Fixed
+
+- `wheels test` now exits non-zero when the runner reports `directoryRejected`, `bundlesDiscovered=0`, or unloadable specs (same honesty as `tools/test-local.sh` / `tools/ci/run-tests.sh`); `wheels browser test` exits non-zero on Fail/Error instead of always returning success (#3083)
+- The Packages admin page (`/wheels/packages`) no longer calls `HTMLEditFormat`, which is missing on Adobe ColdFusion 2025 and caused HTTP 500. Registry names, descriptions, versions, errors, and homepage links are encoded with `EncodeForHTML` instead, matching the rest of the `/wheels` admin surface (#3378)
+- Adobe CF can reclaim the application scope mid-`onError` during `applicationStop()`, so the `StructKeyExists(application, "wo")` guard could pass and the following `application.wo.*` dereferences still throw "Element wo is undefined in a Java object of type class [Ljava.lang.String" — masking the original error. Shipped `Application.cfc` copies now wrap the post-guard handling in its own `try`/`catch` and degrade to a shared `$renderMinimalError()` fallback; the two example apps (`starter-app`, `tweet`) were also brought up to the same guarded shape. Existing apps upgrading from 4.0.x must apply the same change to their own `public/Application.cfc` — the `vendor/wheels/` swap alone does not update app-owned files (#3379)
+- Adobe's session reaper (`SessionTracker.SessionCleanUpAgent`) can call `onSessionEnd` after the live application scope is already torn down; shipped `Application.cfc` copies now route `$simpleLock` through `arguments.applicationScope.wo` (guarded with `StructKeyExists`) so a reclaimed scope is a no-op instead of "Element wo is undefined...". Existing apps upgrading from 4.0.x must apply the same change to their own `public/Application.cfc` (#3379)
+- `Public.$init` no longer nests the `/wheels/public/helpers.cfm` include in the same method as `$scanAndPromoteIncludedGlobals()`. That nest threw `EmptyStackException` from Adobe `popSuperScope` on the first request after a CommandBox cold start on Adobe CF 2023; the 4.0.6 helper-promote onto `this` is unchanged (#3379)
+- The built-in app-test runner (`vendor/wheels/tests/app-runner.cfm`) swapped `application.wheels.dataSourceName` to `<name>_test` without a lock, so two overlapping `wheels test` runs could capture the already-swapped value as their "original" and strand the shared application scope on the test datasource (or silently run specs against the live database mid-run). The capture → swap → run → restore window is now serialized under the same exclusive named lock as the core runner (`wheelsTestRunner_<applicationName>`), the original datasource is captured inside the lock, and a re-entrancy marker lets nested requests skip the swap and the shared lock instead of deadlocking (#3427)
+- Fixed Adobe CF 2023/2025 failures from the compatibility matrix: the dev-mode debug bar and CFML error page no longer throw "routine declared twice" when their templates are included more than once per request, `create()`/`save()` no longer bind SQL NULL for string values such as `"Null"`, nested `hasMany` properties no longer stamp stale GetTickCount-style keys as child primary keys, and pagination helpers accept struct `params` again.
+- Fixed the pure-CFML bcrypt helpers throwing (or producing wrong hashes) on Adobe CF 2023: 32-bit words are normalized to the signed range and bytes are extracted arithmetically so values above 2^31-1 never reach Adobe's int-converting bit operations, and the EksBlowfish key schedule no longer relies on arrays being passed by reference (Adobe passes them by value), so hashes now match OpenBSD/jBCrypt vectors on every engine.
+- `$cacheSettingsForAction` first-matches like `processAction` and keeps `appendToKey`
+- `caches()` with no action throws `Wheels.InvalidArgument` instead of silently becoming `*`
+- `cacheActions` / `cachePages` / `cachePartials` / `cacheImages` / `cacheQueries` stay off in development and testing
+- Action cache keys include session/user identity so params-only pages do not leak across sessions
+- `clearCachableActions` drops this controller's action bodies, not metadata only
+- `$clearCache()` clears each category in place and no longer `StructClear`s the parent bucket
+- `caches("Foo")` matches action `foo`
+- `$getFromCache` returns a stored `false` (or other falsey payload) as a hit. A miss is only absent, expired, or culled. `$isCacheMiss()` reads the last lookup, not the value
+- `$addToCache` / `$getFromCache` / `$clearCache` take a named exclusive `wheelsCacheStore` lock
+- Memory channel drain no longer `clear()`s the live buffer, so events published during the drain loop are not dropped
+- `$callAction()` no longer remaps layout or render exceptions to `Wheels.ViewNotFound` just because `action.cfm` is missing; only genuine missing-view includes become typed `Wheels.ViewNotFound`. `$callAction()` now always Throws that type (it no longer include+aborts via `$throwErrorOrShow404Page`). `processAction()` still presents the production 404 page for ViewNotFound, so HTTP 404 for apps is unchanged.
+- `$useLayout()` keeps a chosen `usesLayout` match when a later declaration does not apply, instead of resetting to `useDefault` (layout bypass)
+- Action cache no longer stores a redirect-only empty body
+- `filterChain()` returns a copy so callers cannot mutate the live filter chain
+- `$findRoute()` throws `Wheels.RouteNotFound` when no same-named candidate matches, instead of returning the last declaration
+- `filters(placement="prepend")` keeps multi-`through` order (`a,b,c` stays `a,b,c` in front of the existing chain)
+- `redirectTo(url=)` encodes `params` the same way `back=true` does
+- A blank string returned from a layout function uses the default layout, matching the documented contract
+- `addColumnOptions` quotes `AFTER` through `quoteColumnName` so a hostile column name cannot be interpolated raw
+- Microsoft SQL Server `quoteTableName` quotes `schema.table` as `[schema].[table]` instead of mixing MySQL backticks inside brackets
+- Oracle `createTable` scopes `col` and `fk` so the composite-key and foreign-key loops resolve on Adobe CF
+- Unevaluable validation `condition` / `unless` expressions now throw `Wheels.InvalidValidationCondition` even when `showErrorInformation` is false, instead of silently skipping the validation (#3398)
+- `$fullCgiDomainString()` honors `set(trustProxyHeaders=true)` before reading `X-Forwarded-Proto` (default stays false)
+- `$dbinfo()` rejects non-identifier table names and no longer interpolates `arguments.table` into SQL
+- `$fileExistsNoCase()` lists the directory live when `cacheFileChecking` is false (default stays true)
+- Fixed a flaky bare `NullPointerException` during model instantiation on Lucee 7 by validating the cached component-integration plan once per request and rebuilding it in place when it contains null function references — a null ref was previously copied into every materialized model/controller instance.
+- Job complete/retry/fail UPDATEs now require `status = 'processing'`, so a stolen job's original worker cannot overwrite `completed` or `failed`
+- Persist-fail `enqueue()` returns `persisted=false` and `error` instead of lying with `status=pending`
+- `JobWorker.getMonitorData(queue=)` filters `recentJobs` and `oldestPending` as well as throughput
+- Job `timeout` (default 300) is persisted on enqueue and honored by `processNext` / `$processJob`; a hung `perform()` is cut off instead of running until it returns
+- Unknown-database pending SELECTs are bounded with `LIMIT 25` (`candidateLimit`) instead of scanning the whole backlog
+- Enqueue no longer writes `tenant.config` into `wheels_jobs.data`; `$restoreTenantContext` applies `dataSource` only when it is a known app datasource
+- `CreateObject(jobClass)` is allowlisted to `app/jobs` (plus configured `jobClassPrefixes`); a `perform()` method on an off-path class is not enough
+- JobWorker claim persist errors throw `Wheels.JobClaimFailed` and are contained as a failed drain result — they are no longer swallowed as `return false` / idle `skipped`
+- The job-class allowlist treats `app.jobs` (and configured `jobClassPrefixes`) as first-class; `wheels.tests._assets.jobs` is an extra testing prefix only
+- `maxRetries` (default still 3) is retries after the first failure, so a job gets 4 tries before the dead letter
+- `retryFailed` / `purgeCompleted` / `JobWorker.purge` return the real DML count, including `0` when nothing matched
+- `$mapper(restful=false)` plus a static `get()` no longer indexes `POST:/` in `staticRoutes`. The stored route still omits `methods`, so ordered matching is unchanged. `mapper(restful=true)` is unchanged.
+- Fixed the remaining compatibility-matrix failures: `IS NULL` / `IS NOT NULL` and null parameters now render as inline SQL NULL on every engine (PostgreSQL, CockroachDB, and SQL Server rejected the bound-parameter form), Adobe CF no longer binds SQL NULL for `"Null"`-valued string properties, and BoxLang legs no longer fail on boolean quoting, `DirectoryList` array appends, apostrophe values in `seedOnce`, or channel event ordering (microsecond `createdAt` precision).
+- `JobWorker.getMonitorData().oldestPending` now always returns a CFML date, including on Adobe CF + SQLite where the driver returns epoch-millis longs.
+- The onboarding harness and the tutorial docs no longer use `default=""` on string columns, matching the empty-string-default hardening.
+- Announce-only migrations (default `up()`/`down()` stubs and the announce template) no longer mark or unmark versions in `wheels_migrator_versions`. `announce()` plus ORM persist (`model().create()` / `save()` / `delete()` with no `$execute`) still marks or unmarks the version
+- `redoMigration()` fails closed when `allowMigrationDown` is false instead of skipping `down()` and re-running `up()` (the `allowMigrationDown` default is unchanged)
+- CREATE TABLE foreign keys now emit `ON UPDATE` / `ON DELETE`; default FK names include the column so two FKs to the same table do not collide
+- `TenantMigrator` no longer mutates `application.wheels.dataSourceName`; tenant runs use a request-scoped datasource
+- `AutoMigrator.generateMigrationCFC()` honors `suggestedRenames` as `renameColumn` instead of destructive remove+add
+- Migrator down no longer reports a successful rollback when `allowMigrationDown` is false; the default stays `false`
+- Adobe `dropTable()` now drops foreign keys by `FK_NAME` instead of `FKCOLUMN_NAME`
+- New `wheels_migrator_versions` tables use a PRIMARY KEY on `version`; existing tables get a best-effort unique index
+- `updateRecord()` / `removeRecord()` require a `where` clause or explicit `all=true` instead of touching every row
+- Migrations that fail to load are not run; MySQL/Oracle failures warn that DDL is not rolled back
+- AutoMigrator rejects unsafe identifiers, restores typed dropped columns in `down()`, and can opt out of destructive unmapped-column drops via `allowColumnRemoval=false`
+- `create()` no longer mass-assigns properties onto the shared class model before instantiating the record
+- Nested `hasMany` collection keys no longer use a `GetTickCount` window heuristic to decide "new" vs existing; form identities use a `new-` prefix (or `_new`), and a failed `findByKey` no longer stamps the key as the child primary key
+- `hasChanged()` now treats `StructDelete` of a persisted property as a change
+- `findAll(returnAs="struct")` invokes `afterFind` against each row struct instead of the shared class model, so callbacks that read persisted columns no longer depend on `create()` leaking onto the class
+- Plugin compatibility with an empty / undeclared version no longer loads, even when `loadIncompatiblePlugins` is `true`. Declared mismatches still honor that setting (default remains `true`)
+- Package manifests with a present-but-empty `wheelsVersion` are rejected; omitting the field is unchanged
+- `ModuleGraph` fails duplicate package.json `name` values instead of last-wins binding `requires` / `replaces` / `suggests`
+- A lazy ServiceProvider that does not hint `provides.services` is still detected (comment-stripped CFC `implements`) and joins register/boot, including when it is the only package
+- Package mixin collisions still last-wins; `provides.overrides` only silences the warning. Lazy `getPackage()` instantiates once under a named lock. Failed ServiceProvider `boot()` restores DI bindings written in `register()`
+- `wheelsVersion` of `*`, `0.0.0`, or an unstamped placeholder fails closed on packages and plugins even when `loadIncompatiblePlugins` is `true`. Omitting the field on packages is unchanged. The three public plugin defaults stay `true`
+- Invalid `plugin.json` skips the plugin; `init()` / `onPluginLoad` failures are isolated and the throwing plugin is not left loaded. `onPluginLoad` receives a sandbox (no live `application` copy/sync). `$pluginDelete()` deletes orphan unzip folders again under `deletePluginDirectories=true`, skipping symlinks and git checkouts
+- PackageLoader and Plugins getters return copies so callers cannot mutate the live mixin/package/plugin registries. Implicit plugin mixin target `global` is detected and logged; the default is not flipped
+- `onPluginActivate` receives the same sandbox as `onPluginLoad` (no live `application`, no StructCopy sync-back)
+- `Policy.scope()` fail-closes with a no-rows chain when the resolved id list is empty, instead of calling `whereIn("id", [])`
+- `policyScope()` in production returns that empty chain after `InvalidCollection` and does not call `whereIn` on the unresolved collection
+- `authorize()` / `can()` deny reserved `init` and `scope` actions instead of Invoking those Policy methods
+- Fixed the legacy RocketUnit runner crashing the whole suite (HTTP 500, "variable [MESSAGE] doesn't exist" on Lucee 7) whenever a single test threw — test errors are recorded per-test again instead of aborting the run.
+- Made the in-memory channel engine, S3 SigV4 URL signing, query-string URL encoding, named-lock dispatch, and the CLI dump-path resolver engine-agnostic (no JVM-only classes), so the framework's core test suite runs clean on the JVM-free RustCFML engine.
+- Debug bar: collapsing via the X now animates a stylesheet-driven width slide to a logo-only black strip (stylized red W). The root container no longer pins `width:100%` inline next to `all:initial`, which blocked the transition and left a hovering-button look (#3547)
+- Fixed the debug bar's Code Complexity panel leaking raw CFML identifiers (e.g. `#local.codeComplexity.summary.files#`) instead of evaluated values on engines that do not inherit the `cfoutput` context across a `cfinclude` boundary. The panel now wraps its own `<cfoutput>` so summary metrics and per-file rows always render real numbers and paths. Per-file paths use `HtmlEditFormat` instead of `EncodeForHTML` so RustCFML does not turn `/` into `&#x2f;` (#3548)
+- Fixed `buttonTo()` so delete/update buttons that target a singular resource member route (e.g. `buttonTo(route="post", key=post.id, method="delete")`) no longer throw `Wheels.RouteNotFound`. The generated form still submits via `POST` with a hidden `_method` field, but the route is now resolved using the original verb (`delete`/`put`/`patch`) instead of the spoofed `post` (#3551)
+- Scaffolded action rows are top-aligned and the Delete button sits flush with its siblings. `buttonTo` wraps its button in a `<form>`, and simple.css's bottom margin on that nested button made the form taller than the neighbouring links — under `align-items: center` Delete floated 4px above Edit and "← all"
+- `model(...).new()`, `.create()`, and `.update()` no longer leak the internal `allowExplicitTimestamps` write-path control flag into `properties()` and `SerializeJSON` output — the flag is now stored in the private `variables` scope and only consulted when stamping `createdAt`/`updatedAt`, so API payloads no longer include an `allowExplicitTimestamps` key
+- Fixed `/wheels/api?format=json` returning 404 after the API reference moved to the prebuilt documentation bundle. `?format=json` is a published interface rather than a page — the Wheels Snapshots workflow fetches it to build the API snapshot the docs site consumes, and `/wheels/ai` reads the same data — so the non-HTML formats keep the CFML renderer and only the browsable page serves the bundle
+- Blog announcement publisher no longer creates a second GitHub Discussion when one already exists for the same title or post URL
+- `wheels test` now resolves the current project's own running server via the server registry (the `.project-path` registration) instead of falling back to a bare port probe on 8080/60000/3000/8500. When the project's server is not running, `wheels test` errors clearly rather than silently attaching to a sibling app squatting a common port (which previously produced misleading "spec failed to load" output from a different codebase)
+- `wheels console` now exits non-zero when a piped/EOF session had an evaluation error, a connection/ping failure, or a returned model with validation errors (previously always exited 0, which hid failed `create()` calls from scripts and the tutorial e2e)
+- Fixed `/wheels/info?format=json` always returning `{"error": "key [DATASOURCE] doesn't exist"}`: the JSON branch read a non-existent `db.datasource.*` key instead of the `db.info.*` struct the helper actually returns, and the payload now also carries `adapterName` and `jdbcVersion`
+- Fixed `/wheels/migrator?format=json` omitting the anti-CSRF token: the token is now generated above the JSON branch so a single request returns both the migrator state and the token, and the HTML page shares the same token
+- Debug bar: the expanded bar now reserves its height at the bottom of the page (`--wdb-inset` / `padding-bottom` on `html`) so content and controls are not covered and remain reachable by scrolling. Collapsing to the logo strip releases that space
+- Fixed debug bar tables rendering with the host page's light `tr:nth-child(2n)` / `th` styling bleeding through on dark themes, which banded the Warnings, Code Complexity and Migrator tables white-on-dark. The tables now carry `class="wdb-table"` instead of inline styles, and the host-bleed resets are scoped to any table inside the bar rather than a single class
+- `wheels start` no longer collides with another project on the shutdown port. When the shutdown port pinned in `lucee.json` is already in use, the next free port is used instead and reported; previously the clash surfaced as LuCLI's `port conflicts detected:` with an empty list. The HTTP port is never moved on its own, because users expect the port they configured
+- Fixed the dev-tool layout (`/wheels/*` pages) declaring `<DOCTYPE html>` without the exclamation mark, which the parser treats as an unknown element rather than a doctype and so put every dev-tool page into quirks mode. Quirks mode changes the box model and viewport metrics — `documentElement.clientHeight` reported the full content height instead of the viewport height — which broke bottom-anchored layout such as the debug bar
+- Fixed the local docs bundle advertising URLs that do not exist: building with a mount `base` made Astro emit `https://guides.wheels.dev/wheels-docs/guides/v4-0-0/` as the canonical link, `og:url` and sitemap entry, because it concatenates `site` with the local base. The bundle build now strips the mount prefix from those absolute URLs so they describe the real page
+- Fixed `wheels docs fetch` failing with `Can't cast Complex Object Type [URL scope] to String`: the download URL was held in a variable named `url`, which shadows CFML's reserved URL scope, so the HTTP client received the scope struct instead of the string
+- Fixed `wheels docs fetch --force` being silently ignored — the flag was read from a helper that inspected `docsFetch()`'s own (empty) arguments scope rather than the parsed argv
+- Fixed the offline docs bundle never being published: `wheels docs fetch` and the Homebrew formula both resolve `wheels-docs-<version>.zip` from the release tag, but no workflow built it, so the download always 404'd. `release.yml` now builds the bundle and attaches it alongside the core and module zips
+- `wheels generate --dry-run` prints one honest list. It used to print the normal `create`/`modify` lines and a "Scaffold complete! Next steps: Run migrations" block *as well as* the would-be-written list, so a dry run looked like it had written files and suggested migrating them. The list is now headed `Would write:` (it includes files that would be *modified*, e.g. a `--belongsTo` scaffold's parent), paths are project-relative, and the real run reports its `config/routes.cfm` edit instead of making it silently
+- `wheels generate` now rejects a misspelled association flag instead of silently ignoring it. `--belogsTo=post` used to produce a clean-looking scaffold with no association and no parent wiring; it now fails with `Unknown flag --belogsTo. Did you mean --belongsTo?` and writes nothing
+- Generated seeds now create selected `belongsTo` parents first and reuse real parent keys (including underscore/custom foreign keys and `joinKey`) instead of assuming IDs start at 1. Soft-deleted parents are excluded; missing parents and unsupported polymorphic associations report an actionable failure and roll back the run rather than creating orphan references. Models whose generated rows all fail validation still retain their existing skipped behavior.
+- Generated seeds now recognize the `float` validation type used by decimal and floating-point database columns, so numeric fields such as a scaffolded Product's `price` receive numbers instead of strings that cause every generated row to be skipped.
+- Generated seeding now retains successfully saved records when a later auth or otherwise invalid model is skipped. The seeder explicitly owns the outer transaction, preventing a failed model save from silently rolling back earlier inserts while reporting success; skipped models roll back to a savepoint so their callback writes do not leak. Partial saves and errors still roll back the whole run.
+- Fix the CLI/MCP `generate` tool dropping named `attributes` and depending on named-argument order. Model and scaffold generation now preserve the requested fields, including string limits, decimal precision/scale and enum values, while retaining positional CLI behavior.
+- `wheels migrate diff` no longer crashes with `Can't cast Complex Object Type [Struct] to String` when rendering a generate-auth User table — nested `changeColumns.from`/`to` structs and other non-scalar diff fields are printed by name/type instead of interpolated wholesale
+- Fixed `.[format]` URL routing (e.g. `/api/products.json`, `/posts.xml`): the shipped URL rewrite config passed `.json`/`.xml` URLs to the static servlet before the CFML router could see them, so every format-suffixed route returned 404. `.json` and `.xml` are now excluded from the static passthrough list; root-level `manifest.json`/`sitemap.xml` are still served by the explicit root-file rule.
+- `wheels routes --filter=<text>` and `--format=json` now work. Both were advertised in the command's help for as long as it existed and neither was ever read — the command printed every route unconditionally. `--filter` matches name, pattern or `controller#action` (case-insensitive, literal); `--format=json` emits the filtered array with lower-case keys so `jq .pattern` works
+- Fixed the RustCFML server URL base: `routes`, `migrate`, `db`, `seed`, `test`, `console`, and `jobs` referenced the private `$serverUrlBase` helper without its `$` prefix, so any live-server fetch threw `No matching function [serverUrlBase] found`. Call sites now interpolate `#$serverUrlBase(serverPort)#` so the `/index.cfm` path-info prefix is actually applied on RustCFML (and the bare origin on Lucee).
+- Scaffolded controllers now return **404** for a key that matches no record, including a soft-deleted one. Previously `show`, `edit`, `update` and `delete` called `findByKey` bare, and a missing row made the action operate on an empty value — the view threw and the user saw a 500. A `requireRecord` before-filter now throws `Wheels.RecordNotFound`, which the framework maps to 404
+- Fixed `wheels generate scaffold --belongsTo` emitting a raw foreign-key text input instead of a parent picker in every `wheels new` app. Scaffolding already produced the underscore `<name>_id` column (#3567), but the generator's field lookups still only recognised the camelCase `<name>Id` spelling, so the belongsTo branch never fired. Both conventions are now recognised, the parent `<select>` is labelled by the parent's own display column rather than a hardcoded `name` (a scaffolded Post has a `title`, so the dropdown listed blank labels), and the generated `show` view renders a link to the parent record instead of the bare key
+- `wheels generate scaffold` and `wheels generate api-resource` now honour `useUnderscoreReferenceColumns` when adding the `belongsTo` foreign-key column: with the flag set (the `wheels new` default) the generated migration emits `<name>_id` (e.g. `user_id`) instead of a hard-coded camelCase `userId`, matching what `t.references()` produces (#3337)
+- Fixed `wheels generate scaffold` / `wheels generate api-resource` emitting `default=''` on generated columns, which the migrator hardener (S14) rejects on string/text/char columns with `An empty string default is not allowed for string columns.` Scaffold migrations now omit the default entirely, so `wheels generate scaffold Post title:string … && wheels migrate latest` works again.
+- `wheels generate scaffold` and `wheels generate api-resource` now reject unknown property types (e.g. `user:references`) with a clear error instead of silently emitting a plain `string`/VARCHAR column with no foreign key
+- `wheels seed --generate` now includes both model and property context plus the row index in generated free text, so `posts.body`, `comments.body`, and `posts.description` no longer receive identical filler. Model-aware titles and generic string values also distinguish their fields. Text remains deterministic and offline; numeric, foreign-key, date, boolean, and special-purpose generators retain their existing behavior. Existing database records are not rewritten.
+- SQLite `decimal` columns now use `NUMERIC` instead of `REAL` storage, so a generated `price:decimal` column binds through `cf_sql_decimal` (BigDecimal) and round-trips values exactly — `149.99` reads back as `149.99` rather than `149.990005493164` (32-bit float noise)
+- `wheels test` now prints runner `error` / `message` / `bundlesDiscovered` / mapping-path diagnostics when on-disk specs are not loaded, instead of only warning that they "failed to compile" (a populate failure or empty TestBox discovery produced the same WARN)
+- `wheels test` now reloads the isolated `_wheelsTest` application before an app-test run, so resources scaffolded after the first test run — e.g. `wheels generate api-resource` adding an `/api` namespace, a model, and its routes — are visible to the specs instead of erroring with "Could not find the `apiProducts` route" against a stale cached route table (RETEST-2461 B)
+
+### Security
+
+- `SessionStrategy.login()` / `logout()` rotate or invalidate the session ID and no longer swallow rotate failures in a catch-all
+- `authenticateWith()` fails closed when the restriction list includes any unregistered strategy name, instead of silently skipping typos
+- `TokenStrategy` usage sample binds the token through the 2-arg query builder instead of interpolating it into `where=`
+- `JwtStrategy` catch-all returns a generic 401 and no longer concatenates `e.message` into the response
+- `JwtService.decode()` fails closed on a missing `exp` claim by default (`requireExpiry=true`; opt out with `requireExpiry=false`)
+- `wheels destroy view` now rejects path-join escapes such as `../x` so deletes stay under `app/views/`
+- Routed `controller` / `action` can no longer be retargeted by query string, form fields, or JSON body (`$ensureControllerAndAction`). Wildcard `[controller]` / `[action]` path names are unchanged
+- `$cgiScope()` no longer trusts client-supplied `X-Rewrite-URL` / `X-Original-URL` unless `set(trustProxyHeaders=true)` (same opt-in as `X-Forwarded-*`)
+- `form._method` is honored only on POST and only for `PUT` / `PATCH` / `DELETE`, so GET/HEAD cannot become a state-changing verb and POST cannot become a CSRF-safe verb
+- A before filter that returns `false` now skips the action and remaining filters (authz fail-closed). `redirectTo()` / `renderText()` still halt as before
+- `caches(appendToKey=)` walks the full dotted path and throws `Wheels.KeyNotFound` when a segment is missing, instead of silently omitting it and sharing one cache key
+- Filter `type` is case-insensitive (`Before` / `before`, `After` / `after`)
+- `$wildcardDomainMatch()` compares every host label, so `https://*.example.com` no longer matches `https://evil.com`
+- `$get()` refuses per-tenant overrides of live CSRF cookie, proxy, CORS, `showErrorInformation`, and `dataSourceName` keys
+- `Pipeline.getMiddleware()` returns a shallow copy so callers cannot mutate the live stack
+- `RateLimiter.$getClientIp()` honors `trustProxy` / `X-Forwarded-For` before a client-supplied `request.remoteAddr`
+- `MiddlewareOrderResolver` throws `Wheels.Middleware.CircularDependency` on a cycle instead of falling back to priority-only order
+- `Cors` no longer short-circuits OPTIONS or emits `Access-Control-Max-Age` when no `Access-Control-Allow-Origin` is set
+- `TenantResolver` usage sample binds the subdomain through the 2-arg query builder instead of interpolating it into `where=`
+- RateLimiter default-lock specs now observe fail-closed (`$handleError` on a default constructor) and the store-size / key-length / timestamp-per-key caps when those caps are hit, instead of `toBeInstanceOf`
+- Plugin zip extraction (`$pluginsExtract` / `$zip` unzip) now rejects zip-slip entries (absolute paths, `..` segments, or a canonical path outside the destination) before writing files. `overwritePlugins` stays `true`.
+- Package and plugin admin pages no longer `cfinclude` on-disk `index.cfm` files, and homepage links only render `http(s)` URLs encoded with `EncodeForHTML` (javascript: and unescaped list fields were still live after #3378)
+- PackageLoader refuses dotted/traversed directory names, foreign middleware `CreateObject` paths, and plural `mappings` values that realpath outside the package (including symlink escapes)
+- `authorize()` / `can()` grant only when a policy method returns boolean `true`. The CFML strings `"yes"` and `"true"` no longer authorize
+- LocalDisk refuses empty and slash-only keys so `put()` cannot write the disk root
+- S3 `put()` honours visibility by sending a signed `x-amz-acl` header
+- `labelPlacement="aroundRight"` now encodes the label under the existing `encode=true` default (`$formAfterElement` no longer raw-concats)
+- Date `<select>` helpers honor `encode="attributes"` the same way `select()` does (attribute values stay encoded)
+- `paginationLinks()` sanitizes `prependToPage` on first/last `alwaysShowAnchors` the same way as numbered pages
+- View helpers now reject breakout HTML attribute names, restrict `errorElement` / `wrapperElement` to safe tag names, honor `encode` on date `<option>` bodies and `csrfMetaTags`, and skip the CSRF field on `startFormTag` when `action` is an absolute external URL
+- `paginationNav()` encodes outer `nav` attributes, `$paginationSanitizeWrapper` also strips `style` expressions and `data:` URIs, and pagination params are no longer double-encoded
+- Vite script/style/preload tags encode interpolated paths; `imageTag` / asset helpers collapse `..` on local sources; `stripTags` removes comments and newline-split tags; `h()` / `hAttr()` canonicalize first; `errorMessageOn` prepend/append encode once
+- `includeContent(encode=true)` is opt-in (default still returns stored HTML). `linkTo` / `URLFor` external hrefs and `formHelperDataAutoId=true` are unchanged (escalated; no public default flip)
+---
+
 # [4.0.6](https://github.com/wheels-dev/wheels/releases/tag/v4.0.6) => 2026-08-20
 
 ### Added
