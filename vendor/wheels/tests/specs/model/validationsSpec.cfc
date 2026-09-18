@@ -301,6 +301,76 @@ component extends="wheels.WheelsTest" {
 				assert_test(user, false)
 			})
 
+			// Compound boolean conditions (##3634): the evaluator used to hand
+			// `$evaluateLogicalExpression` the whole `a && b` string, which
+			// read tokens[2] as the operator and threw. Splitting on `&&`/`||`
+			// and evaluating each side is the fix; genuinely unsupported
+			// clauses still throw (see the fail-closed test below).
+			it("evaluates a compound && condition (##3634)", () => {
+				user.requestFor = "Engine Part"
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'requestFor') && this.requestFor == 'Engine Part'")).toBeTrue()
+			})
+
+			it("evaluates compound && and || conditions", () => {
+				expect(user.$evaluateConditionString("1 eq 1 && 2 eq 2")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 1 && 2 eq 3")).toBeFalse()
+				expect(user.$evaluateConditionString("1 eq 0 || 2 eq 2")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 0 || 2 eq 3")).toBeFalse()
+			})
+
+			it("gives && higher precedence than ||", () => {
+				expect(user.$evaluateConditionString("1 eq 0 && 1 eq 1 || 1 eq 1")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 1 || 1 eq 0 && 1 eq 0")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 0 || 1 eq 1 && 1 eq 0")).toBeFalse()
+			})
+
+			it("does not split on && or || inside a quoted value", () => {
+				user.requestFor = "a && b || c"
+				expect(user.$evaluateConditionString("this.requestFor eq 'a && b || c'")).toBeTrue()
+			})
+
+			it("evaluates a bare StructKeyExists() clause", () => {
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'username')")).toBeTrue()
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'nonexistent')")).toBeFalse()
+			})
+
+			it("combines a whitelisted Len() call with a comparison", () => {
+				expect(user.$evaluateConditionString("Len(this.username) gt 3")).toBeTrue()
+				expect(user.$evaluateConditionString("Len(this.username) lt 3")).toBeFalse()
+			})
+
+			it("still fails closed for an unrecognised function call", () => {
+				args.condition = "unknownConditionFunc(this.username)"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
+			it("runs a validation whose compound condition is true (##3634)", () => {
+				user.requestFor = "Engine Part"
+				args.condition = "StructKeyExists(this, 'requestFor') && this.requestFor eq 'Engine Part'"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("skips a validation whose compound condition is false (##3634)", () => {
+				user.requestFor = "Bolt"
+				args.condition = "StructKeyExists(this, 'requestFor') && this.requestFor eq 'Engine Part'"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, true)
+			})
+
+			it("still fails closed for a genuinely unsupported compound clause", () => {
+				args.condition = "1 eq 1 && noSuchMethod()"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
 			it("throws in development when a condition cannot be evaluated", () => {
 				args.condition = "noSuchMethod()"
 				user.validatesLengthOf(argumentCollection = args)

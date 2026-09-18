@@ -586,7 +586,7 @@
 					Throw(
 						type = "Wheels.InvalidValidationCondition",
 						message = "The `#local.item#` expression `#arguments[local.item]#` could not be evaluated: #e.message#",
-						extendedInfo = "Supported forms: `this.property`, `this.method()` (with named `key='val'` or positional `'val'` arguments), bare `method()` (optionally negated with `!`), and binary comparisons using eq/neq/lt/lte/gt/gte or ==/!=/</<=/>/>=."
+						extendedInfo = "Supported forms: `this.property`, `this.method()` (with named `key='val'` or positional `'val'` arguments), bare `method()` (optionally negated with `!`), binary comparisons using eq/neq/lt/lte/gt/gte or ==/!=/</<=/>/>=, compound `&&`/`||` combinations of those, and whitelisted functions such as `StructKeyExists(this, 'property')` and `Len(this.property)`."
 					);
 				}
 			}
@@ -834,10 +834,50 @@
 	 * Evaluate a condition string without using Evaluate().
 	 * Dispatches to typed sub-handlers based on the expression shape.
 	 *
+	 * Compound boolean expressions are split on the lowest-precedence
+	 * operator first (`||`, then `&&`) and each side is evaluated
+	 * recursively. Splitting is quote- and paren-aware, so `&&`/`||` inside
+	 * a quoted literal or an argument list is left alone, and `&&` binds
+	 * tighter than `||` because `||` is split at the outer level first.
+	 *
+	 * This widens the grammar this evaluator understands; it does not
+	 * re-introduce silent skipping. A clause outside the supported grammar
+	 * still propagates to the fail-closed catch in `$evaluateCondition()`
+	 * and throws `Wheels.InvalidValidationCondition`. That keeps broken
+	 * conditions loud, but it also means a legacy condition that was never
+	 * supported (and was silently skipped before the 4.1.0 fail-closed
+	 * change) will still surface as a 500 until it is rewritten — see
+	 * wheels-dev/wheels#3634 for the upgrade-safety discussion.
+	 *
 	 * @condition The condition to resolve
 	 */
 	public any function $evaluateConditionString(required string condition) {
 		local.normalized = $normalizeConditionOperators(arguments.condition);
+
+		// Compound OR — lowest precedence, so it is split first. One `true`
+		// side is enough to short-circuit the whole expression.
+		local.orParts = $splitTopLevelCondition(local.normalized, "||");
+		if (ArrayLen(local.orParts) > 1) {
+			for (local.part in local.orParts) {
+				if ($evaluateConditionString(local.part)) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		// Compound AND — binds tighter than `||`, so it is split second. One
+		// `false` side is enough to short-circuit the whole expression.
+		local.andParts = $splitTopLevelCondition(local.normalized, "&&");
+		if (ArrayLen(local.andParts) > 1) {
+			for (local.part in local.andParts) {
+				if (!$evaluateConditionString(local.part)) {
+					return false;
+				}
+			}
+			return true;
+		}
+
 		local.split = $splitConditionOnOperator(local.normalized);
 
 		// this.method() or this.property references
@@ -852,6 +892,15 @@
 		// Bare function calls: isActive() or !isActive()
 		if (Right(local.normalized, 2) == "()") {
 			return $evaluateBareCall(local.normalized);
+		}
+
+		// Whitelisted function calls with arguments, e.g. StructKeyExists(this, 'x')
+		if ($isConditionFunctionCall(local.split.expression)) {
+			local.callResult = $evaluateFunctionCall(local.split.expression);
+			if (StructKeyExists(local.split, "operator")) {
+				return $resolveOperator(local.callResult, $unquoteConditionValue(local.split.rightOperand), local.split.operator);
+			}
+			return local.callResult;
 		}
 
 		// Space-separated logical expressions: a op b
@@ -887,6 +936,48 @@
 			local.rv.operator = LCase(Mid(local.padded, local.match.pos[2], local.match.len[2]));
 			local.rv.rightOperand = Trim(Mid(local.padded, local.match.pos[2] + local.match.len[2], Len(local.padded)));
 		}
+		return local.rv;
+	}
+
+	/**
+	 * Splits a condition on a top-level delimiter (`||`, `&&` or `,`) that
+	 * appears outside single/double quotes and outside parentheses. Returns
+	 * an array with a single element when the delimiter never appears at the
+	 * top level, so callers can test `ArrayLen(...) > 1`.
+	 *
+	 * This is what keeps `this.status eq 'a && b'` and
+	 * `StructKeyExists(this, 'a,b')` from being torn apart.
+	 */
+	public array function $splitTopLevelCondition(required string condition, required string delimiter) {
+		local.rv = [];
+		local.length = Len(arguments.condition);
+		local.delimiterLength = Len(arguments.delimiter);
+		local.start = 1;
+		local.depth = 0;
+		local.quote = "";
+		local.i = 1;
+		while (local.i <= local.length) {
+			local.char = Mid(arguments.condition, local.i, 1);
+			if (Len(local.quote)) {
+				// Inside a literal — only the matching quote ends it.
+				if (local.char == local.quote) {
+					local.quote = "";
+				}
+			} else if (local.char == "'" || local.char == '"') {
+				local.quote = local.char;
+			} else if (local.char == "(") {
+				local.depth++;
+			} else if (local.char == ")") {
+				local.depth--;
+			} else if (local.depth == 0 && Mid(arguments.condition, local.i, local.delimiterLength) == arguments.delimiter) {
+				ArrayAppend(local.rv, Trim(Mid(arguments.condition, local.start, local.i - local.start)));
+				local.i += local.delimiterLength;
+				local.start = local.i;
+				continue;
+			}
+			local.i++;
+		}
+		ArrayAppend(local.rv, Trim(Mid(arguments.condition, local.start, local.length - local.start + 1)));
 		return local.rv;
 	}
 
@@ -1000,6 +1091,123 @@
 		local.methodName = Replace(local.methodName, "()", "");
 		local.result = invoke(this, local.methodName);
 		return local.negate ? !local.result : local.result;
+	}
+
+	/**
+	 * True when the expression is a `name(...)` function call with a
+	 * non-empty argument list. Zero-argument calls (`isnew()`) are handled by
+	 * `$evaluateBareCall()` and deliberately do not match here.
+	 */
+	public boolean function $isConditionFunctionCall(required string expression) {
+		return REFindNoCase("^[A-Za-z_][A-Za-z0-9_]*\s*\(.+\)$", Trim(arguments.expression)) > 0;
+	}
+
+	/**
+	 * Evaluates a whitelisted, side-effect-free function call such as
+	 * `StructKeyExists(this, 'requestFor')` or `Len(this.name)`.
+	 *
+	 * Only the functions named in the switch below are supported. This
+	 * evaluator intentionally never falls back to Evaluate(), so an
+	 * unrecognised call fails closed (throws) instead of executing arbitrary
+	 * code. The supported set is deliberately limited to read-only
+	 * predicates/length checks.
+	 */
+	public any function $evaluateFunctionCall(required string expression) {
+		local.expression = Trim(arguments.expression);
+		local.match = REFindNoCase("^([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)$", local.expression, 1, true);
+		if (local.match.pos[1] == 0) {
+			throw("Unsupported function call in condition: " & local.expression);
+		}
+		local.functionName = LCase(Mid(local.expression, local.match.pos[2], local.match.len[2]));
+		local.argsRaw = Mid(local.expression, local.match.pos[3], local.match.len[3]);
+		local.args = [];
+		for (local.argument in $splitTopLevelCondition(local.argsRaw, ",")) {
+			if (Len(local.argument)) {
+				ArrayAppend(local.args, $resolveConditionArgument(local.argument));
+			}
+		}
+
+		switch (local.functionName) {
+			case "structkeyexists":
+				if (ArrayLen(local.args) == 2) {
+					return StructKeyExists(local.args[1], local.args[2]);
+				}
+				break;
+			case "isnull":
+				if (ArrayLen(local.args) == 1) {
+					return IsNull(local.args[1]);
+				}
+				break;
+			case "isnumeric":
+				if (ArrayLen(local.args) == 1) {
+					return IsNumeric(local.args[1]);
+				}
+				break;
+			case "issimplevalue":
+				if (ArrayLen(local.args) == 1) {
+					return IsSimpleValue(local.args[1]);
+				}
+				break;
+			case "isstruct":
+				if (ArrayLen(local.args) == 1) {
+					return IsStruct(local.args[1]);
+				}
+				break;
+			case "isarray":
+				if (ArrayLen(local.args) == 1) {
+					return IsArray(local.args[1]);
+				}
+				break;
+			case "isboolean":
+				if (ArrayLen(local.args) == 1) {
+					return IsBoolean(local.args[1]);
+				}
+				break;
+			case "isdate":
+				if (ArrayLen(local.args) == 1) {
+					return IsDate(local.args[1]);
+				}
+				break;
+			case "len":
+				if (ArrayLen(local.args) == 1) {
+					return Len(local.args[1]);
+				}
+				break;
+		}
+		throw("Unsupported function in condition: " & local.functionName & "().");
+	}
+
+	/**
+	 * Resolves a single positional argument of a whitelisted condition
+	 * function call. Supports `this`, `this.property`/`this.method()` refs,
+	 * quoted strings, booleans and numbers. Anything else throws, so an
+	 * unrecognised token can never be silently treated as a literal.
+	 */
+	public any function $resolveConditionArgument(required string argument) {
+		local.argument = Trim(arguments.argument);
+		if (local.argument == "this") {
+			return this;
+		}
+		if (Left(local.argument, 5) == "this.") {
+			local.resolved = $resolveThisReference(Mid(local.argument, 6, Len(local.argument)));
+			if (StructKeyExists(local.resolved, "value")) {
+				return local.resolved.value;
+			}
+			throw("Could not resolve `" & local.argument & "` in a condition function argument.");
+		}
+		if (LCase(local.argument) == "true") {
+			return true;
+		}
+		if (LCase(local.argument) == "false") {
+			return false;
+		}
+		if (REFind("^'.*'$|^"".*""$", local.argument)) {
+			return $unquoteConditionValue(local.argument);
+		}
+		if (IsNumeric(local.argument)) {
+			return local.argument;
+		}
+		throw("Unsupported argument `" & local.argument & "` in a condition function call.");
 	}
 
 	/**
