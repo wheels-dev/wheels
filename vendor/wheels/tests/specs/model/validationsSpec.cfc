@@ -339,6 +339,45 @@ component extends="wheels.WheelsTest" {
 				expect(user.$evaluateConditionString("Len(this.username) lt 3")).toBeFalse()
 			})
 
+			// List membership predicates are a shape legacy conditions really
+			// use (e.g. ListFind('24,32,63', this.countryId)). They match
+			// $isConditionFunctionCall, so without an explicit case the
+			// fail-closed evaluator would newly throw where 4.1.0 silently
+			// skipped — the exact upgrade regression #3634 is about.
+			it("evaluates the whitelisted list predicates", () => {
+				expect(user.$evaluateConditionString("ListFind('a,b,c', 'b')")).toBeTrue()
+				expect(user.$evaluateConditionString("ListFind('a,b,c', 'z')")).toBeFalse()
+				expect(user.$evaluateConditionString("ListFindNoCase('a,b,c', 'B')")).toBeTrue()
+				expect(user.$evaluateConditionString("ListFindNoCase('a,b,c', 'z')")).toBeFalse()
+				expect(user.$evaluateConditionString("ListContains('a,b,c', 'b')")).toBeTrue()
+				expect(user.$evaluateConditionString("ListContains('a,b,c', 'z')")).toBeFalse()
+				expect(user.$evaluateConditionString("ListContainsNoCase('a,b,c', 'B')")).toBeTrue()
+				expect(user.$evaluateConditionString("ListContainsNoCase('a,b,c', 'z')")).toBeFalse()
+			})
+
+			it("evaluates a ListFind condition against a property (##3634)", () => {
+				user.countryId = "63"
+				expect(user.$evaluateConditionString("ListFind('24,32,63,67,117,167,191', this.countryId)")).toBeTrue()
+				user.countryId = "99"
+				expect(user.$evaluateConditionString("ListFind('24,32,63,67,117,167,191', this.countryId)")).toBeFalse()
+			})
+
+			it("runs a validation whose ListFind condition is true (##3634)", () => {
+				user.countryId = "63"
+				args.condition = "ListFind('24,32,63,67,117,167,191', this.countryId)"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("still fails closed for a non-whitelisted function such as ListSort()", () => {
+				args.condition = "ListSort('c,a,b')"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
 			it("still fails closed for an unrecognised function call", () => {
 				args.condition = "unknownConditionFunc(this.username)"
 				user.validatesLengthOf(argumentCollection = args)
