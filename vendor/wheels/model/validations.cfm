@@ -1110,7 +1110,11 @@
 	 * evaluator intentionally never falls back to Evaluate(), so an
 	 * unrecognised call fails closed (throws) instead of executing arbitrary
 	 * code. The supported set is deliberately limited to read-only
-	 * predicates/length checks.
+	 * predicates/length checks — including the list predicates ListFind,
+	 * ListFindNoCase, ListContains and ListContainsNoCase.
+	 *
+	 * Note the upgrade hazard documented at the throw below: a call outside
+	 * this whitelist used to return false in 4.1.0 and now throws.
 	 */
 	public any function $evaluateFunctionCall(required string expression) {
 		local.expression = Trim(arguments.expression);
@@ -1173,7 +1177,42 @@
 					return Len(local.args[1]);
 				}
 				break;
+			// Common read-only list predicates. Legacy conditions frequently
+			// test membership with e.g. ListFind('a,b,c', this.typeId). In
+			// 4.1.0 these silently evaluated to false (validation skipped);
+			// whitelisting them keeps that upgrade working under the
+			// fail-closed evaluator rather than turning it into a 500.
+			case "listfind":
+				if (ArrayLen(local.args) == 2) {
+					return ListFind(local.args[1], local.args[2]);
+				}
+				break;
+			case "listfindnocase":
+				if (ArrayLen(local.args) == 2) {
+					return ListFindNoCase(local.args[1], local.args[2]);
+				}
+				break;
+			case "listcontains":
+				if (ArrayLen(local.args) == 2) {
+					return ListContains(local.args[1], local.args[2]);
+				}
+				break;
+			case "listcontainsnocase":
+				if (ArrayLen(local.args) == 2) {
+					return ListContainsNoCase(local.args[1], local.args[2]);
+				}
+				break;
 		}
+		// ── UPGRADE HAZARD ────────────────────────────────────────────────
+		// The whitelist above covers common read-only predicates, but ANY
+		// function-call condition outside it fails the upgrade in the
+		// opposite direction from 4.1.0: 4.1.0 silently returned false here
+		// (the validation was skipped), whereas this evaluator fails closed
+		// and throws Wheels.InvalidValidationCondition — a 500 on every save.
+		// That tradeoff is intentional for now and is called out in the PR
+		// description. The maintainer-owned alternative for legacy
+		// conditions — direction (b) in #3634, log-and-skip instead of
+		// throwing — is deliberately NOT implemented here.
 		throw("Unsupported function in condition: " & local.functionName & "().");
 	}
 
