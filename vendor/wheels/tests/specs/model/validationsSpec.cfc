@@ -410,6 +410,60 @@ component extends="wheels.WheelsTest" {
 				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
 			})
 
+			// A leading `!` negates the whole clause. Before this was handled,
+			// `$splitConditionOnOperator()` tore a negated call with arguments
+			// into `!StructKeyExists(this,` / `'x')`, and the clause fell through
+			// to the three-token parser — a 500 for the negation of a form the
+			// evaluator otherwise supports.
+			it("negates a whitelisted function call (##3634)", () => {
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'username')")).toBeFalse()
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'nonexistent')")).toBeTrue()
+			})
+
+			it("negates a list predicate (##3634)", () => {
+				expect(user.$evaluateConditionString("!ListFind('a,b,c', 'b')")).toBeFalse()
+				expect(user.$evaluateConditionString("!ListFind('a,b,c', 'z')")).toBeTrue()
+			})
+
+			it("negates a whitelisted call inside a compound clause (##3634)", () => {
+				expect(user.$evaluateConditionString("1 eq 1 && !StructKeyExists(this, 'nonexistent')")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 0 || !ListFind('a,b,c', 'z')")).toBeTrue()
+			})
+
+			// An argument that is not present on the instance resolves to an
+			// empty value rather than throwing, so `||` short-circuits the way
+			// it reads. Property absence is normal on a model instance, and the
+			// either/or shape below is exactly what the compound support is for.
+			it("short-circuits || when a property argument is absent (##3634)", () => {
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'absentProp') || StructKeyExists(this, 'username')")).toBeTrue()
+				expect(user.$evaluateConditionString("IsNumeric(this.absentProp)")).toBeFalse()
+				expect(user.$evaluateConditionString("!IsNumeric(this.absentProp)")).toBeTrue()
+			})
+
+			it("evaluates a parenthesised group (##3634)", () => {
+				expect(user.$evaluateConditionString("(1 eq 0 || 1 eq 1) && 2 eq 2")).toBeTrue()
+				expect(user.$evaluateConditionString("(1 eq 1 && 1 eq 0) || 3 eq 3")).toBeTrue()
+			})
+
+			it("evaluates symbolic operators inside a compound clause (##3634)", () => {
+				expect(user.$evaluateConditionString("1 == 1 && 2 != 3")).toBeTrue()
+			})
+
+			// A bare call also ends in ")", but it is not a parenthesised group;
+			// unwrapping it would strip the call and change the result.
+			it("does not mistake a bare call for a parenthesised group (##3634)", () => {
+				expect(user.$evaluateConditionString("isnew() || 1 eq 0")).toBeTrue()
+			})
+
+			it("fails closed when a whitelisted function gets the wrong argument count (##3634)", () => {
+				args.condition = "Len('a', 'b')"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
 			it("throws in development when a condition cannot be evaluated", () => {
 				args.condition = "noSuchMethod()"
 				user.validatesLengthOf(argumentCollection = args)
