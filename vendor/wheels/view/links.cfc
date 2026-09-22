@@ -99,6 +99,47 @@ component {
 	}
 
 	/**
+	 * Internal function. Reports whether the ambient route name from
+	 * `request.wheels.params` can safely be adopted as paginationLinks()'s own
+	 * `route` (#3638).
+	 *
+	 * Two things have to hold. The name must resolve to exactly one configured
+	 * route: a multi-candidate name such as `wildcard` (one candidate per method x
+	 * pattern) cannot be disambiguated by `$findRoute()` without an HTTP method or
+	 * path variables, and paginationLinks() supplies neither, so the adoption used
+	 * to throw `Wheels.RouteNotFound` — a whole-page 404 in production, where the
+	 * route error path aborts. And every path variable the chosen route requires
+	 * must already be present in `args`, because `URLFor()` throws
+	 * `Wheels.IncorrectRoutingArguments` for an adopted route with an unsupplied
+	 * variable. When either check fails, the caller leaves `route` unset and
+	 * `URLFor()` builds the controller/action URL instead.
+	 */
+	public boolean function $canAdoptAmbientRoute(required string route, required struct args) {
+		if (!Len(arguments.route) || !StructKeyExists(application.wheels, "namedRoutePositions")) {
+			return false;
+		}
+		if (!StructKeyExists(application.wheels.namedRoutePositions, arguments.route)) {
+			return false;
+		}
+		local.positions = application.wheels.namedRoutePositions[arguments.route];
+		if (Find(",", local.positions)) {
+			return false;
+		}
+		local.route = application.wheels.routes[ListGetAt(local.positions, 1)];
+		if (!StructKeyExists(local.route, "foundvariables")) {
+			return true;
+		}
+		local.iEnd = ListLen(local.route.foundvariables);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.variable = ListGetAt(local.route.foundvariables, local.i);
+			if (!StructKeyExists(arguments.args, local.variable) || !Len(arguments.args[local.variable])) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
 	 * Creates a form containing a single button that submits to the URL. Note: Pass any additional arguments by prefixing them with "input" like inputClass, inputRel, and inputId, and the generated tag will also include those values as HTML attributes.
 	 * The URL is built the same way as the `linkTo` function.
 	 *
@@ -278,11 +319,19 @@ component {
 			https://github.com/wheels-dev/wheels/issues/942
 
 			The paginationLinks() function does not set the correct URL on the anchor tag if route is not passed in. Added condition to default the route, if it is not passed in, to the route defined in the request.wheels.params, if the action is index.
+
+			The ambient name is only adopted when it can actually be resolved from
+			here (#3638): paginationLinks() passes neither an HTTP method nor the
+			current request's route variables, so an ambiguous name (the six
+			`wildcard` candidates) or a route with unsupplied path variables would
+			throw instead of rendering the pagination.
 		*/
 		if (!StructKeyExists(arguments, "route")) {
 			if(structKeyExists(request.wheels, 'params') AND structKeyExists(request.wheels.params, 'route')) {
 				if(request.wheels.params.action EQ "index"){
-					arguments.route = request.wheels.params.route;
+					if ($canAdoptAmbientRoute(route = request.wheels.params.route, args = arguments)) {
+						arguments.route = request.wheels.params.route;
+					}
 				}
 			}
 		}
@@ -303,7 +352,7 @@ component {
 		local.start = "";
 		local.middle = "";
 		local.end = "";
-		if (StructKeyExists(arguments, "route")) {
+		if (StructKeyExists(arguments, "route") && Len(arguments.route)) {
 			// when a route name is specified and the name argument is part
 			// of the route variables specified, we need to force the
 			// arguments.pageNumberAsParam to be false
