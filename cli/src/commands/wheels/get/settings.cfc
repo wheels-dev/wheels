@@ -227,9 +227,10 @@ component extends="../base" {
 					local.value = REReplace(local.value, "^['""]|['""]$", "", "all");
 					
 					// Try to parse boolean/numeric values
-					if (local.value == "true") {
+					// STRING comparison: `==` compares "1.0" and "true" NUMERICALLY in Lucee.
+					if (Compare(LCase(local.value), "true") == 0) {
 						local.value = true;
-					} else if (local.value == "false") {
+					} else if (Compare(LCase(local.value), "false") == 0) {
 						local.value = false;
 					} else if (IsNumeric(local.value)) {
 						local.value = Val(local.value);
