@@ -1,0 +1,8 @@
+{
+	"name": "wheels-naming-rules",
+	"version": "1.0.0",
+	"description": "Test fixture: entry point derived from the package NAME (wheels-naming-rules -> NamingRules.cfc), with a helper CFC alongside it",
+	"provides": {
+		"mixins": "none"
+	}
+}
