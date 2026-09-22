@@ -305,7 +305,13 @@ CREATE TABLE c_o_r_e_uuidrecords
 CREATE TABLE c_o_r_e_trucks
 (
 	id #local.identityColumnType#
-	,shopid char(9) NOT NULL
+	<!--- Must match c_o_r_e_shops.shopid's per-engine type: with `char(9)` here
+		and `VARCHAR2(9)` there, Oracle compares the join non-blank-padded, so
+		`trucks.shopid` ('SHOP1    ') never equals `shops.shopid` ('SHOP1') and
+		any include="shop" query silently returns no rows (#3649). Every other
+		engine's CHAR comparison ignores the padding, which is why only the
+		adobe2023 + oracle leg failed. --->
+	,shopid #local.charType# NOT NULL
 	,registration varchar(80) NULL
 	,PRIMARY KEY(id)
 ) #local.storageEngine#
