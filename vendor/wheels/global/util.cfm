@@ -261,6 +261,130 @@
 
 	/**
 	 * Internal function.
+	 * Normalize a timestamp value read back from a database into a CFML date,
+	 * or return "" when the value is not a recognized timestamp shape.
+	 *
+	 * Most engines hand datetime columns back as a CFML date or a datetime
+	 * string, but two shapes need bridging (#3649):
+	 *
+	 * - Oracle's JDBC driver returns TIMESTAMP columns as `oracle.sql.TIMESTAMP`,
+	 *   which is NOT a `java.util.Date` and which Adobe CF's `IsDate()` answers
+	 *   with the string "NO". Its `timestampValue()` method bridges to a
+	 *   `java.sql.Timestamp`.
+	 * - Some drivers append fractional seconds ("2026-09-22 20:24:54.205"),
+	 *   which `IsDate()` also rejects; the whole-second prefix is enough for
+	 *   every caller here.
+	 * - Adobe + sqlite-jdbc returns raw epoch milliseconds, which the old
+	 *   SQLite-only inline conversion in `JobWorker` special-cased.
+	 *
+	 * A `java.util.Date` is converted through `java.util.Calendar`, so the
+	 * resulting CFML date is the instant in the JVM's timezone — the same
+	 * reading `DateDiff()` against `Now()` expects.
+	 */
+	public any function $normalizeDbTimestamp(required any value) {
+		if (IsDate(arguments.value)) {
+			return arguments.value;
+		}
+		// Epoch milliseconds — a plain number, or a boxed java.lang.Number
+		// (Adobe + sqlite-jdbc hands the column back as java.lang.Long). Both
+		// are numeric on every engine, so this is the hot path for SQLite.
+		if (IsNumeric(arguments.value)) {
+			return $javaCalendarToDate($epochMillisCalendar(JavaCast("long", arguments.value)));
+		}
+		// Datetime strings, including the fractional-second form
+		// ("2026-09-22 20:24:54.205") that IsDate() rejects.
+		if (IsSimpleValue(arguments.value)) {
+			if (Len(arguments.value) >= 19) {
+				try {
+					local.parsed = ParseDateTime(Left(arguments.value, 19));
+					if (IsDate(local.parsed)) {
+						return local.parsed;
+					}
+				} catch (any e) {
+					// Not a parseable datetime string.
+				}
+			}
+			return "";
+		}
+		// Driver objects. Deliberately NOT gated on IsObject(): Lucee reports
+		// java.util.Date and other boxed Java values as simple values, and the
+		// java.sql.Timestamp that the Oracle bridge returns is one of those —
+		// so IsObject() is false for the very objects this branch exists for.
+		try {
+			if (IsInstanceOf(arguments.value, "java.lang.Number")) {
+				return $javaCalendarToDate($epochMillisCalendar(arguments.value.longValue()));
+			}
+		} catch (any e) {
+			// Not a boxed number.
+		}
+		try {
+			if (IsInstanceOf(arguments.value, "java.util.Date")) {
+				return $javaDateToCfml(arguments.value);
+			}
+		} catch (any e) {
+			// Not a java.util.Date — try the Oracle bridge below.
+		}
+		try {
+			// oracle.sql.TIMESTAMP is not a java.util.Date, but bridges to one.
+			local.bridged = arguments.value.timestampValue();
+			if (IsInstanceOf(local.bridged, "java.util.Date")) {
+				return $javaDateToCfml(local.bridged);
+			}
+		} catch (any e) {
+			// Not an oracle.sql.TIMESTAMP either.
+		}
+		return "";
+	}
+
+
+	/**
+	 * Internal function for `$normalizeDbTimestamp()`. Converts a
+	 * `java.util.Date` into a CFML date through `java.util.Calendar`, so the
+	 * result is the instant in the JVM's default timezone — the same reading
+	 * `DateDiff()` against `Now()` expects.
+	 */
+	private date function $javaDateToCfml(required any javaDate) {
+		local.cal = CreateObject("java", "java.util.Calendar").getInstance();
+		local.cal.setTime(arguments.javaDate);
+		return $javaCalendarToDate(local.cal);
+	}
+
+
+	/**
+	 * Internal function for `$normalizeDbTimestamp()`. A Calendar for an epoch
+	 * millisecond count, in the JVM's default timezone.
+	 */
+	private any function $epochMillisCalendar(required any millis) {
+		local.cal = CreateObject("java", "java.util.Calendar").getInstance();
+		if (IsInstanceOf(arguments.millis, "java.lang.Number")) {
+			// Already a Java number (e.g. java.lang.Long) — no cast needed.
+			local.cal.setTimeInMillis(arguments.millis.longValue());
+		} else {
+			local.cal.setTimeInMillis(JavaCast("long", arguments.millis));
+		}
+		return local.cal;
+	}
+
+
+	/**
+	 * Internal function for `$normalizeDbTimestamp()`. Reads the calendar fields
+	 * with the numeric `java.util.Calendar` constants: YEAR=1, MONTH=2 (zero
+	 * based), DAY_OF_MONTH=5, HOUR_OF_DAY=11, MINUTE=12, SECOND=13.
+	 */
+	private date function $javaCalendarToDate(required any calendar) {
+		return CreateDateTime(
+			year = arguments.calendar.get(1),
+			month = arguments.calendar.get(2) + 1,
+			day = arguments.calendar.get(5),
+			hour = arguments.calendar.get(11),
+			minute = arguments.calendar.get(12),
+			second = arguments.calendar.get(13)
+		);
+	}
+
+
+	/**
+	 * Internal function.
 	 * HTML-escape text for the debug bar (complexity panel), the development
 	 * error page, the docs viewer, and legacy test output.
 	 *

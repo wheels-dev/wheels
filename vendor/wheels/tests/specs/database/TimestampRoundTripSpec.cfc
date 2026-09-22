@@ -56,36 +56,40 @@ component extends="wheels.WheelsTest" {
 				expect(row.recordCount).toBe(1);
 
 				var readBack = row.createdat;
-				var shape = IsDate(readBack) ? "date" : (IsNumeric(readBack) ? "numeric" : "neither");
+				// Raw queryExecute: the shape is entirely up to the engine and
+				// driver. Route it through the same normalizer the framework's
+				// date readers use, then assert the *value* — that is the real
+				// contract (#3649).
+				var normalized = application.wo.$normalizeDbTimestamp(readBack);
+				var shape = IsDate(normalized) ? "date" : "neither";
+				var valueClass = IsObject(readBack) ? readBack.getClass().getName() : "not-an-object";
 
-				// Report the value, not just the verdict. "Expected [NO] to be true"
-				// is what the five downstream failures already say, and it names
-				// nothing at all.
+				// Report the value and its Java class, not just the verdict.
+				// "Expected [NO] to be true" is what the downstream failures say,
+				// and it names nothing at all.
 				expect(shape).notToBe(
 					"neither",
 					"A cf_sql_timestamp round-tripped as something $secondsSince() cannot "
 					& "read: wrote [" & DateTimeFormat(written, "yyyy-mm-dd HH:nn:ss")
-					& "], read back [" & readBack & "]. Every framework path that stores a "
-					& "timestamp and later measures elapsed time against it — RateLimiter's "
-					& "token bucket, the migrator's applied_at — is unreliable here."
+					& "], read back [" & readBack & "] of class [" & valueClass & "]. Every "
+					& "framework path that stores a timestamp and later measures elapsed time "
+					& "against it — RateLimiter's token bucket, the migrator's applied_at — is "
+					& "unreliable here."
 				);
 
-				// Whichever shape it is, it has to still mean the time that was
-				// written. Reproduce $secondsSince()'s own computation rather than
-				// reconstructing a date from the epoch value: both branches yield
-				// "seconds since the stored moment", which is timezone-free, so the
-				// comparison holds wherever the suite runs.
-				var elapsed = IsDate(readBack)
-					? DateDiff("s", readBack, Now())
-					: Int((GetTickCount() - readBack) / 1000);
+				// Whichever shape it arrived in, it has to still mean the time that
+				// was written. Compare the normalized instant against the write, the
+				// same way $secondsSince() does.
+				var elapsed = DateDiff("s", normalized, Now());
 				var expected = DateDiff("s", written, Now());
 
 				expect(Abs(elapsed - expected)).toBeLT(
 					120,
 					"The stored timestamp came back as a #shape# that does not resolve to "
 					& "the time written: wrote [" & DateTimeFormat(written, "yyyy-mm-dd HH:nn:ss")
-					& "], read back [" & readBack & "]. $secondsSince() would report "
-					& elapsed & "s elapsed where " & expected & "s is correct."
+					& "], read back [" & readBack & "] of class [" & valueClass & "]. "
+					& "$secondsSince() would report " & elapsed & "s elapsed where "
+					& expected & "s is correct."
 				);
 
 				queryExecute(
