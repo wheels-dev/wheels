@@ -1,0 +1,1 @@
+- Honor case-insensitive spec names as well as IDs in testSpecs filters; name filters no longer silently skip every spec.
