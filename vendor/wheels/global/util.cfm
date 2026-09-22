@@ -289,7 +289,12 @@
 		// (Adobe + sqlite-jdbc hands the column back as java.lang.Long). Both
 		// are numeric on every engine, so this is the hot path for SQLite.
 		if (IsNumeric(arguments.value)) {
-			return $javaCalendarToDate($epochMillisCalendar(JavaCast("long", arguments.value)));
+			try {
+				return $javaCalendarToDate($epochMillisCalendar(JavaCast("long", arguments.value)));
+			} catch (any e) {
+				// JVM-free engine (RustCFML) — plain epoch arithmetic instead.
+				return DateAdd("s", Int(arguments.value / 1000), CreateDate(1970, 1, 1));
+			}
 		}
 		// Datetime strings, including the fractional-second form
 		// ("2026-09-22 20:24:54.205") that IsDate() rejects.
@@ -343,7 +348,7 @@
 	 * result is the instant in the JVM's default timezone — the same reading
 	 * `DateDiff()` against `Now()` expects.
 	 */
-	private date function $javaDateToCfml(required any javaDate) {
+	public date function $javaDateToCfml(required any javaDate) {
 		local.cal = CreateObject("java", "java.util.Calendar").getInstance();
 		local.cal.setTime(arguments.javaDate);
 		return $javaCalendarToDate(local.cal);
@@ -354,7 +359,7 @@
 	 * Internal function for `$normalizeDbTimestamp()`. A Calendar for an epoch
 	 * millisecond count, in the JVM's default timezone.
 	 */
-	private any function $epochMillisCalendar(required any millis) {
+	public any function $epochMillisCalendar(required any millis) {
 		local.cal = CreateObject("java", "java.util.Calendar").getInstance();
 		if (IsInstanceOf(arguments.millis, "java.lang.Number")) {
 			// Already a Java number (e.g. java.lang.Long) — no cast needed.
@@ -371,7 +376,7 @@
 	 * with the numeric `java.util.Calendar` constants: YEAR=1, MONTH=2 (zero
 	 * based), DAY_OF_MONTH=5, HOUR_OF_DAY=11, MINUTE=12, SECOND=13.
 	 */
-	private date function $javaCalendarToDate(required any calendar) {
+	public date function $javaCalendarToDate(required any calendar) {
 		return CreateDateTime(
 			year = arguments.calendar.get(1),
 			month = arguments.calendar.get(2) + 1,
