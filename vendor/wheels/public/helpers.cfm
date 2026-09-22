@@ -551,7 +551,7 @@ struct function $getExtendedCodeExamples(pathToExtended, slug) {
 	local.rv["hasExtended"] = FileExists(local.rv.path) ? true : false;
 	local.rv["docs"] = "";
 	if (local.rv.hasExtended) {
-		local.rv["docs"] = "<pre><code class='javascript'>" & HtmlEditFormat(FileRead(local.rv.path)) & "</code></pre>";
+		local.rv["docs"] = "<pre><code class='javascript'>" & $encodeForDisplayText(FileRead(local.rv.path)) & "</code></pre>";
 		local.rv["docs"] = Trim(local.rv["docs"]);
 	}
 	StructDelete(local.rv, "path");
