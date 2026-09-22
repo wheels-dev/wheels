@@ -722,9 +722,10 @@ component extends="wheels.WheelsTest" {
 	}
 
 	public void function $resetDir(required string path) {
-		if (DirectoryExists(arguments.path)) {
-			DirectoryDelete(arguments.path, true);
-		}
+		// $removeTree() unlinks symlinks before deleting: this fixture root holds
+		// the mappings-escape symlink, which Adobe CF 2023's recursive
+		// DirectoryDelete leaves behind ("cannot be deleted ... not empty").
+		$removeTree(arguments.path);
 		DirectoryCreate(arguments.path);
 	}
 
