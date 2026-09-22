@@ -749,8 +749,12 @@ component output="false" {
 						local.value = mid(local.value, 2, len(local.value) - 2);
 					}
 
-					if (local.value == "true" || local.value == "false") {
-						local.value = (local.value == "true");
+					// Type casting for boolean and numeric values. STRING comparison,
+					// never `==`: Lucee compares `"1.0" == "true"` NUMERICALLY (1 == 1,
+					// so true), which turned every .env value of numeric 1 into the BOOLEAN
+					// true and made numeric settings silently take their defaults instead.
+					if (Compare(lCase(local.value), "true") == 0 || Compare(lCase(local.value), "false") == 0) {
+						local.value = (Compare(lCase(local.value), "true") == 0);
 					} else if (isNumeric(local.value) && !find(".", local.value)) {
 						local.value = val(local.value);
 					}

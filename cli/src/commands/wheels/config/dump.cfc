@@ -217,8 +217,10 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 				}
 				
 				// Try to parse boolean and numeric values
-				if (local.value == "true" || local.value == "false") {
-					local.value = (local.value == "true");
+				if (Compare(LCase(local.value), "true") == 0 || Compare(LCase(local.value), "false") == 0) {
+					// STRING comparison: `==` compares "1.0" and "true" NUMERICALLY in
+					// Lucee, which turned a numeric value of 1 into the boolean true.
+					local.value = (Compare(LCase(local.value), "true") == 0);
 				} else if (IsNumeric(local.value)) {
 					local.value = Val(local.value);
 				}
