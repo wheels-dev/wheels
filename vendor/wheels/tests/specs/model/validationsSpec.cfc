@@ -301,6 +301,169 @@ component extends="wheels.WheelsTest" {
 				assert_test(user, false)
 			})
 
+			// Compound boolean conditions (##3634): the evaluator used to hand
+			// `$evaluateLogicalExpression` the whole `a && b` string, which
+			// read tokens[2] as the operator and threw. Splitting on `&&`/`||`
+			// and evaluating each side is the fix; genuinely unsupported
+			// clauses still throw (see the fail-closed test below).
+			it("evaluates a compound && condition (##3634)", () => {
+				user.requestFor = "Engine Part"
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'requestFor') && this.requestFor == 'Engine Part'")).toBeTrue()
+			})
+
+			it("evaluates compound && and || conditions", () => {
+				expect(user.$evaluateConditionString("1 eq 1 && 2 eq 2")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 1 && 2 eq 3")).toBeFalse()
+				expect(user.$evaluateConditionString("1 eq 0 || 2 eq 2")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 0 || 2 eq 3")).toBeFalse()
+			})
+
+			it("gives && higher precedence than ||", () => {
+				expect(user.$evaluateConditionString("1 eq 0 && 1 eq 1 || 1 eq 1")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 1 || 1 eq 0 && 1 eq 0")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 0 || 1 eq 1 && 1 eq 0")).toBeFalse()
+			})
+
+			it("does not split on && or || inside a quoted value", () => {
+				user.requestFor = "a && b || c"
+				expect(user.$evaluateConditionString("this.requestFor eq 'a && b || c'")).toBeTrue()
+			})
+
+			it("evaluates a bare StructKeyExists() clause", () => {
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'username')")).toBeTrue()
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'nonexistent')")).toBeFalse()
+			})
+
+			it("combines a whitelisted Len() call with a comparison", () => {
+				expect(user.$evaluateConditionString("Len(this.username) gt 3")).toBeTrue()
+				expect(user.$evaluateConditionString("Len(this.username) lt 3")).toBeFalse()
+			})
+
+			// List membership predicates are a shape legacy conditions really
+			// use (e.g. ListFind('24,32,63', this.countryId)). They match
+			// $isConditionFunctionCall, so without an explicit case the
+			// fail-closed evaluator would newly throw where 4.1.0 silently
+			// skipped — the exact upgrade regression #3634 is about.
+			it("evaluates the whitelisted list predicates", () => {
+				expect(user.$evaluateConditionString("ListFind('a,b,c', 'b')")).toBeTrue()
+				expect(user.$evaluateConditionString("ListFind('a,b,c', 'z')")).toBeFalse()
+				expect(user.$evaluateConditionString("ListFindNoCase('a,b,c', 'B')")).toBeTrue()
+				expect(user.$evaluateConditionString("ListFindNoCase('a,b,c', 'z')")).toBeFalse()
+				expect(user.$evaluateConditionString("ListContains('a,b,c', 'b')")).toBeTrue()
+				expect(user.$evaluateConditionString("ListContains('a,b,c', 'z')")).toBeFalse()
+				expect(user.$evaluateConditionString("ListContainsNoCase('a,b,c', 'B')")).toBeTrue()
+				expect(user.$evaluateConditionString("ListContainsNoCase('a,b,c', 'z')")).toBeFalse()
+			})
+
+			it("evaluates a ListFind condition against a property (##3634)", () => {
+				user.countryId = "63"
+				expect(user.$evaluateConditionString("ListFind('24,32,63,67,117,167,191', this.countryId)")).toBeTrue()
+				user.countryId = "99"
+				expect(user.$evaluateConditionString("ListFind('24,32,63,67,117,167,191', this.countryId)")).toBeFalse()
+			})
+
+			it("runs a validation whose ListFind condition is true (##3634)", () => {
+				user.countryId = "63"
+				args.condition = "ListFind('24,32,63,67,117,167,191', this.countryId)"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("still fails closed for a non-whitelisted function such as ListSort()", () => {
+				args.condition = "ListSort('c,a,b')"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
+			it("still fails closed for an unrecognised function call", () => {
+				args.condition = "unknownConditionFunc(this.username)"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
+			it("runs a validation whose compound condition is true (##3634)", () => {
+				user.requestFor = "Engine Part"
+				args.condition = "StructKeyExists(this, 'requestFor') && this.requestFor eq 'Engine Part'"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, false)
+			})
+
+			it("skips a validation whose compound condition is false (##3634)", () => {
+				user.requestFor = "Bolt"
+				args.condition = "StructKeyExists(this, 'requestFor') && this.requestFor eq 'Engine Part'"
+				user.validatesLengthOf(argumentCollection = args)
+				assert_test(user, true)
+			})
+
+			it("still fails closed for a genuinely unsupported compound clause", () => {
+				args.condition = "1 eq 1 && noSuchMethod()"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
+			// A leading `!` negates the whole clause. Before this was handled,
+			// `$splitConditionOnOperator()` tore a negated call with arguments
+			// into `!StructKeyExists(this,` / `'x')`, and the clause fell through
+			// to the three-token parser — a 500 for the negation of a form the
+			// evaluator otherwise supports.
+			it("negates a whitelisted function call (##3634)", () => {
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'username')")).toBeFalse()
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'nonexistent')")).toBeTrue()
+			})
+
+			it("negates a list predicate (##3634)", () => {
+				expect(user.$evaluateConditionString("!ListFind('a,b,c', 'b')")).toBeFalse()
+				expect(user.$evaluateConditionString("!ListFind('a,b,c', 'z')")).toBeTrue()
+			})
+
+			it("negates a whitelisted call inside a compound clause (##3634)", () => {
+				expect(user.$evaluateConditionString("1 eq 1 && !StructKeyExists(this, 'nonexistent')")).toBeTrue()
+				expect(user.$evaluateConditionString("1 eq 0 || !ListFind('a,b,c', 'z')")).toBeTrue()
+			})
+
+			// An argument that is not present on the instance resolves to an
+			// empty value rather than throwing, so `||` short-circuits the way
+			// it reads. Property absence is normal on a model instance, and the
+			// either/or shape below is exactly what the compound support is for.
+			it("short-circuits || when a property argument is absent (##3634)", () => {
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'absentProp') || StructKeyExists(this, 'username')")).toBeTrue()
+				expect(user.$evaluateConditionString("IsNumeric(this.absentProp)")).toBeFalse()
+				expect(user.$evaluateConditionString("!IsNumeric(this.absentProp)")).toBeTrue()
+			})
+
+			it("evaluates a parenthesised group (##3634)", () => {
+				expect(user.$evaluateConditionString("(1 eq 0 || 1 eq 1) && 2 eq 2")).toBeTrue()
+				expect(user.$evaluateConditionString("(1 eq 1 && 1 eq 0) || 3 eq 3")).toBeTrue()
+			})
+
+			it("evaluates symbolic operators inside a compound clause (##3634)", () => {
+				expect(user.$evaluateConditionString("1 == 1 && 2 != 3")).toBeTrue()
+			})
+
+			// A bare call also ends in ")", but it is not a parenthesised group;
+			// unwrapping it would strip the call and change the result.
+			it("does not mistake a bare call for a parenthesised group (##3634)", () => {
+				expect(user.$evaluateConditionString("isnew() || 1 eq 0")).toBeTrue()
+			})
+
+			it("fails closed when a whitelisted function gets the wrong argument count (##3634)", () => {
+				args.condition = "Len('a', 'b')"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
 			it("throws in development when a condition cannot be evaluated", () => {
 				args.condition = "noSuchMethod()"
 				user.validatesLengthOf(argumentCollection = args)
