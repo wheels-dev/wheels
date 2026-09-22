@@ -13,6 +13,8 @@ component extends="wheels.WheelsTest" {
 				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
 				_originalNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
 				_originalRewrite = application.wheels.URLRewriting
+				_originalRequestParams = StructKeyExists(request.wheels, "params") ? Duplicate(request.wheels.params) : {}
+				_originalRequestParamsExisted = StructKeyExists(request.wheels, "params")
 				$clearRoutes()
 				g.mapper().$match(name = "pagination", pattern = "pag/ina/tion/[special]", to = "pagi##nation").end()
 				g.$setNamedRoutePositions()
@@ -26,6 +28,12 @@ component extends="wheels.WheelsTest" {
 				application.wheels.staticRoutes = _originalStaticRoutes
 				application.wheels.namedRoutePositions = _originalNamedRoutePositions
 				application.wheels.URLRewriting = _originalRewrite
+				if (StructKeyExists(request.wheels, "params")) {
+					StructDelete(request.wheels, "params")
+				}
+				if (_originalRequestParamsExisted) {
+					request.wheels.params = _originalRequestParams
+				}
 				g.set(functionName = "linkTo", encode = true)
 				g.set(functionName = "paginationLinks", encode = true)
 			})
@@ -78,6 +86,63 @@ component extends="wheels.WheelsTest" {
 
 				expect(result).toInclude(link)
 				expect(result).toInclude("?page=")
+			})
+
+			it("does not adopt an ambiguous ambient route name (##3638)", () => {
+				// `wildcard()` registers six candidates under the single name
+				// `wildcard` (2 methods x 3 patterns). paginationLinks() passes
+				// neither a method nor the route's path variables, so adopting the
+				// ambient name made $findRoute() throw Wheels.RouteNotFound — a
+				// whole-page 404 in production, where the throw aborts.
+				$clearRoutes()
+				g.mapper().wildcard(methods = "get,post", mapKey = true).root(to = "home##index", method = "get").end()
+				g.$setNamedRoutePositions()
+				application.wheels.URLRewriting = "On"
+				request.wheels.params = {controller = "dummy", action = "index", route = "wildcard"}
+				_controller = g.controller("dummy", request.wheels.params)
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+
+				result = _controller.paginationLinks(linkToCurrentPage = true)
+
+				expect(result).toInclude("?page=1")
+				expect(result).toInclude("?page=3")
+			})
+
+			it("still adopts an unambiguous ambient route name (##942)", () => {
+				$clearRoutes()
+				g.mapper().$match(name = "pagelist", pattern = "pagelist", to = "pagi##nation").end()
+				g.$setNamedRoutePositions()
+				request.wheels.params = {controller = "dummy", action = "index", route = "pagelist"}
+				_controller = g.controller("dummy", request.wheels.params)
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+
+				result = _controller.paginationLinks(linkToCurrentPage = true)
+
+				expect(result).toInclude("/pagelist")
+				expect(result).toInclude("?page=1")
+			})
+
+			it("does not adopt an ambient route whose path variables are missing (##3638)", () => {
+				// A unique route is not enough: adopting `pagination` (which requires
+				// `special`) without it throws Wheels.IncorrectRoutingArguments from
+				// URLFor, so the adoption must be skipped and the controller/action
+				// URL used instead.
+				request.wheels.params = {controller = "dummy", action = "index", route = "pagination"}
+				_controller = g.controller("dummy", request.wheels.params)
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+
+				result = _controller.paginationLinks(linkToCurrentPage = true)
+
+				expect(result).toInclude("?page=1")
+				expect(result).notToInclude("/pag/ina/tion")
+			})
+
+			it("treats an explicit empty route as an opt-out (##3638)", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+
+				result = _controller.paginationLinks(route = "")
+
+				expect(result).toInclude("?page=1")
 			})
 
 			it("works with page as route param with route not containing page parameter in variables", () => {
