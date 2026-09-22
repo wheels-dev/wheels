@@ -1,0 +1,8 @@
+{
+	"name": "wheels-solocfc",
+	"version": "1.0.0",
+	"description": "Test fixture: exactly one root CFC, named nothing like the package — unambiguous, so it keeps working",
+	"provides": {
+		"mixins": "none"
+	}
+}

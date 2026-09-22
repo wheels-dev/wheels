@@ -1,0 +1,9 @@
+{
+	"name": "wheels-maindeclared",
+	"version": "1.0.0",
+	"description": "Test fixture: two root CFCs, entry point declared with `main` — the wheels-sentry shape",
+	"main": "Entry",
+	"provides": {
+		"mixins": "none"
+	}
+}

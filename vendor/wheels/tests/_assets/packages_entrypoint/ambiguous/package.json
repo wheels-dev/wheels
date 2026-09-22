@@ -1,0 +1,8 @@
+{
+	"name": "wheels-ambiguous",
+	"version": "1.0.0",
+	"description": "Test fixture: two root CFCs, no `main`, no name match — the loader must REFUSE to guess",
+	"provides": {
+		"mixins": "none"
+	}
+}

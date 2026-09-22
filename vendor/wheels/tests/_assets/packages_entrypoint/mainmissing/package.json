@@ -1,0 +1,9 @@
+{
+	"name": "wheels-mainmissing",
+	"version": "1.0.0",
+	"description": "Test fixture: `main` names a CFC that does not exist — a declared entry point must never fall back to guessing",
+	"main": "Ghost",
+	"provides": {
+		"mixins": "none"
+	}
+}
