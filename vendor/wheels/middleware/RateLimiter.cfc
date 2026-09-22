@@ -1162,6 +1162,19 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		if (IsDate(arguments.storedTime)) {
 			return DateDiff("s", arguments.storedTime, Now());
 		}
+		// Oracle hands TIMESTAMP columns back as driver objects
+		// (oracle.sql.TIMESTAMP is not a java.util.Date), and some drivers append
+		// fractional seconds; both defeat IsDate(). The shared normalizer covers
+		// those shapes plus the SQLite epoch-milliseconds form (#3649).
+		try {
+			local.normalized = application.wo.$normalizeDbTimestamp(arguments.storedTime);
+			if (IsDate(local.normalized)) {
+				return DateDiff("s", local.normalized, Now());
+			}
+		} catch (any e) {
+			// No application scope (or an older framework) — fall through to the
+			// numeric epoch-milliseconds branch.
+		}
 		return Int((GetTickCount() - arguments.storedTime) / 1000);
 	}
 
