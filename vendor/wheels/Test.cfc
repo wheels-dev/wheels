@@ -189,7 +189,7 @@ component output="false" displayName="Test" extends="wheels.Global"{
 			run() interprets exception with this errorcode as a "Failure".
 			All other errorcodes cause are interpreted as an "Error".
 		*/
-		Throw(errorcode = "__FAIL__", message = "#HtmlEditFormat(message)#");
+		Throw(errorcode = "__FAIL__", message = "#$encodeForDisplayText(message)#");
 	}
 
 	/**

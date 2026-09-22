@@ -261,6 +261,47 @@
 
 	/**
 	 * Internal function.
+	 * HTML-escape text for the debug bar (complexity panel), the development
+	 * error page, the docs viewer, and legacy test output.
+	 *
+	 * `HtmlEditFormat` is preferred where the engine provides it — it preserves
+	 * "/", so file paths in the complexity panel stay readable (#3548). Adobe CF
+	 * 2025 removed the BIF entirely — `Variable HTMLEDITFORMAT is undefined` —
+	 * which 500s every surface that used it (#3645). Probe for it once per
+	 * application and fall back to a local escaper with the same character set,
+	 * so the debug bar reports problems instead of becoming one.
+	 *
+	 * The fallback is deliberately NOT `EncodeForHTML`: that encodes "/" as
+	 * "&#x2f;" on some engines, which breaks the complexity panel's path
+	 * assertions and the panel regression (#3548).
+	 *
+	 * Call sites must go through this helper rather than the BIF directly;
+	 * `HtmlEditFormatGuardSpec` enforces that.
+	 */
+	public string function $encodeForDisplayText(required string value) {
+		if (!StructKeyExists(application.wheels, "$displayTextEncoder")) {
+			try {
+				HtmlEditFormat("");
+				application.wheels.$displayTextEncoder = "HtmlEditFormat";
+			} catch (any e) {
+				application.wheels.$displayTextEncoder = "local";
+			}
+		}
+		if (application.wheels.$displayTextEncoder == "HtmlEditFormat") {
+			return HtmlEditFormat(arguments.value);
+		}
+		// Ampersand first, then the markup characters: ReplaceList() re-scans
+		// what it just inserted on Lucee, so escaping "<" before "&" turns the
+		// generated "&lt;" into "&amp;lt;".
+		local.rv = Replace(arguments.value, "&", "&amp;", "all");
+		local.rv = Replace(local.rv, "<", "&lt;", "all");
+		local.rv = Replace(local.rv, ">", "&gt;", "all");
+		return Replace(local.rv, """", "&quot;", "all");
+	}
+
+
+	/**
+	 * Internal function.
 	 * Disambiguates a D1/D2/YYYY slash date: a component greater than 12 cannot
 	 * be a month so the format is unambiguous; otherwise the engine adapter's
 	 * locale preference decides (MM/DD/YYYY on Lucee / Adobe, DD/MM/YYYY on
