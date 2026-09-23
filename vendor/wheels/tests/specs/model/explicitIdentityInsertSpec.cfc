@@ -62,7 +62,9 @@ component extends="wheels.WheelsTest" {
 					try {
 						g.model("RefParent").create(id = 943, name = "Duplicate key 943", parameterize = false);
 					} catch (any e) {
-						state.error = e.message;
+						// Adobe puts the driver's text in detail; message is the generic
+						// "Error Executing Database Query."
+						state.error = e.message & " " & e.detail;
 					}
 					// The trailing OFF has to run even though the INSERT failed; if it
 					// did not, this insert on the same connection would fail.
