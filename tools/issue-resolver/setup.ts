@@ -193,7 +193,7 @@ async function main() {
       SUBMIT_REVIEW_TOOL,
     ],
     description:
-      "Reviews Wheels PRs for issue resolution, anti-pattern compliance, and cross-engine compatibility. Outputs structured JSON verdict.",
+      "Reviews Wheels PRs for issue resolution, anti-pattern compliance, and cross-engine compatibility. Reports its verdict through the submit_review tool.",
   });
   console.log(`  ${reviewer.id} (version ${reviewer.version})`);
 
