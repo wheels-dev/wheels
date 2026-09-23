@@ -84,6 +84,14 @@ component output=false extends="wheels.Global"{
 			wheels.rv.query = local[args.debugName];
 		}
 
+		// No `result` attribute was requested ($performQuery's $captureResult=false,
+		// the bulk paths): there is no result metadata to return and no generated
+		// key to look up.
+		if (!structKeyExists(wheels, "result")) {
+			wheels.rv.result = {};
+			return wheels.rv;
+		}
+
 		// Manual identity retrieval for Lucee / ACF
 		// Pass the query result (if any) as returningIdentity — needed by adapters
 		// that use RETURNING clauses (e.g. CockroachDB) to retrieve generated keys.
@@ -846,6 +854,10 @@ component output=false extends="wheels.Global"{
 
 	/**
 	 * Internal function.
+	 *
+	 * @$captureResult Pass `false` when the caller reads neither the cfquery result
+	 * struct nor a generated key (the bulk paths). The `result` attribute is then
+	 * omitted, which is what stops Lucee asking the driver for generated keys.
 	 */
 	public struct function $performQuery(
 		required array sql,
@@ -854,7 +866,8 @@ component output=false extends="wheels.Global"{
 		numeric offset = 0,
 		string dataSource = variables.dataSource,
 		string $primaryKey = "",
-		string $debugName = "query"
+		string $debugName = "query",
+		boolean $captureResult = true
 	) {
 		// Multi-tenant datasource override: if a tenant is active and this model
 		// is not shared, route the query to the tenant's datasource.
@@ -873,7 +886,15 @@ component output=false extends="wheels.Global"{
 		local.queryAttributes.dataSource = arguments.dataSource;
 		local.queryAttributes.username = variables.username;
 		local.queryAttributes.password = variables.password;
-		local.queryAttributes.result = "local.wheels.result";
+		// A `result` attribute is not free: Lucee requests generated keys
+		// (Statement.RETURN_GENERATED_KEYS) for any cfquery that has one, and the
+		// Oracle driver implements that by appending `RETURNING ROWID INTO ?` to every
+		// INSERT. Oracle rejects that after `INSERT ... SELECT`, so insertAll() failed
+		// with ORA-03048 on Lucee (#3653). Callers that read neither the result nor a
+		// key opt out with $captureResult=false.
+		if (arguments.$captureResult) {
+			local.queryAttributes.result = "local.wheels.result";
+		}
 		local.queryAttributes.name = "local." & arguments.$debugName;
 		if (StructKeyExists(local.queryAttributes, "username") && !Len(local.queryAttributes.username)) {
 			StructDelete(local.queryAttributes, "username");
@@ -897,7 +918,7 @@ component output=false extends="wheels.Global"{
 		// Copy only the non-excluded keys by reference — Duplicate(arguments) would
 		// deep-clone the entire SQL fragment array (including param structs) per query.
 		for (local.key in arguments) {
-			if (!ListFindNoCase("sql,parameterize,$debugName,limit,offset,$primaryKey", local.key)) {
+			if (!ListFindNoCase("sql,parameterize,$debugName,limit,offset,$primaryKey,$captureResult", local.key)) {
 				local.queryAttributes[local.key] = arguments[local.key];
 			}
 		}
@@ -917,9 +938,7 @@ component output=false extends="wheels.Global"{
 	 * Generates a multi-row INSERT statement as an array compatible with `$querySetup()`.
 	 * Default shape is `INSERT INTO ... VALUES (?,?), (?,?), ...` (SQL standard table value
 	 * constructor) — used by every adapter except Oracle, which overrides this method to
-	 * emit `INSERT ALL ... SELECT 1 FROM dual` because Oracle 23 rejects multi-row VALUES
-	 * combined with the JDBC driver's implicit RETURNING (RETURN_GENERATED_KEYS) handling
-	 * with `ORA: returning clause is not allowed with INSERT and Table Value Constructor`.
+	 * emit `INSERT INTO ... SELECT ... FROM dual UNION ALL ...` (see OracleModel).
 	 */
 	public array function $bulkInsertSQL(
 		required string tableName,
