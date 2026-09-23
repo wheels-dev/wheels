@@ -70,6 +70,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(body).toInclude("""mcp""");
 			});
 
+			it("hides the command aliases so each command is advertised once", () => {
+				// `d`, `g` and `dbmigrate` forward to destroy / generate / migrate.
+				// Advertised, an alias is a second copy of the tool with an empty
+				// inputSchema (it has no mcpToolSpecs() entry), so an MCP client sees
+				// `dbmigrate` as a no-argument twin of `migrate`.
+				var startIdx = reFindNoCase("(?m)^[ \t]*public\s+array\s+function\s+mcpHiddenTools\s*\(", variables.moduleSource);
+				expect(startIdx).toBeGT(0);
+				var body = mid(variables.moduleSource, startIdx, 2500);
+				expect(body).toInclude("""d""");
+				expect(body).toInclude("""g""");
+				expect(body).toInclude("""dbmigrate""");
+			});
+
 			it("returns an array (the LuCLI mcpHiddenTools() contract)", () => {
 				// LuCLI calls mcpHiddenTools() and expects an array of
 				// string names. Source-level: the return type is `array`
