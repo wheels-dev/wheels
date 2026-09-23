@@ -1,6 +1,7 @@
 component extends="Controller" {
 
 	function config() {
+		super.config();
 		provides("html");
 		filters(through="requireAuth");
 	}

@@ -6,7 +6,7 @@ Agent-driven docs validation. Two modes:
   validates each public function: reads CFC source, refreshes/authors
   reference example at `vendor/wheels/public/docs/reference/<scope>/<name>.txt`,
   fixes docblock drift in the CFC.
-- **`--mode=guide`** — walks `web/sites/guides/src/content/docs/v4-0-0-snapshot/`
+- **`--mode=guide`** — walks the newest versioned guides directory, `web/sites/guides/src/content/docs/v<major>-<minor>-<patch>/` (override with `WHEELS_DOCS_GUIDES_VERSION`)
   and validates each page: enumerates code blocks, adds `{test:*}`
   annotations to anything tag-able, marks illustrative blocks with
   `title="..."`, fixes prose drift, validates via the existing
@@ -18,7 +18,7 @@ Agent-driven docs validation. Two modes:
   function bodies when behavior contradicts the contract
 - `vendor/wheels/public/docs/reference/<scope>/<name>.txt` — API
   examples (api mode)
-- `web/sites/guides/src/content/docs/v4-0-0-snapshot/**/*.mdx?` —
+- `web/sites/guides/src/content/docs/<newest version>/**/*.mdx?` —
   guide page edits (guide mode)
 - Nothing else. Anything else trips the `needs_human` flag.
 

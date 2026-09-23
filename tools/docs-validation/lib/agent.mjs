@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { TOOLS, makeExecutor } from './tools.mjs';
 import { locateFunction } from './source-map.mjs';
 import { readReferenceAnyScope } from './reference-store.mjs';
-import { loadGuidePage, summarizeBlocks } from './guides.mjs';
+import { GUIDES_DIR, GUIDES_VERSION, loadGuidePage, summarizeBlocks } from './guides.mjs';
 
 const PROMPT_PATH_API = resolve(new URL('../agent/prompt.md', import.meta.url).pathname);
 const PROMPT_PATH_GUIDE = resolve(new URL('../agent/prompt-guide.md', import.meta.url).pathname);
@@ -15,7 +15,7 @@ const MAX_TOKENS = Number(process.env.WHEELS_DOCS_MAX_TOKENS ?? 8192);
 
 const PROMPT_CACHE = {};
 async function getPrompt(path) {
-  PROMPT_CACHE[path] ??= await readFile(path, 'utf8');
+  PROMPT_CACHE[path] ??= (await readFile(path, 'utf8')).replaceAll('{{GUIDES_DIR}}', GUIDES_DIR).replaceAll('{{GUIDES_VERSION}}', GUIDES_VERSION);
   return PROMPT_CACHE[path];
 }
 
@@ -155,7 +155,7 @@ async function runAgentLoop({ client, system, outcome, runState, exec, messages,
       tools: TOOLS.map((t, i) =>
         i === TOOLS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t,
       ),
-      messages,
+      messages: withTailBreakpoint(messages),
     });
 
     for (const k of Object.keys(usage)) usage[k] += resp.usage?.[k] ?? 0;
@@ -221,6 +221,15 @@ async function runAgentLoop({ client, system, outcome, runState, exec, messages,
   }
 
   return { outcome: outcome.value, usage, turns: turn };
+}
+
+// Cache the growing conversation: mark only the newest block, on a copy of the
+// request, so the breakpoint moves forward each turn (tools + system + tail = 3 of 4).
+function withTailBreakpoint(messages) {
+  const last = messages[messages.length - 1];
+  const blocks = typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : [...last.content];
+  blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral' } };
+  return [...messages.slice(0, -1), { ...last, content: blocks }];
 }
 
 function truncate(s, n) {

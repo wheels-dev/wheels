@@ -76,4 +76,4 @@ jobs:
           claude_args: |
             --model claude-opus-4-8
             --max-turns 400
-            --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git show:*),Bash(git grep:*),WebFetch,WebSearch,Read,Grep,Glob"
+            --allowedTools "Bash(gh:*),Bash(git log:*),Bash(git show:*),Bash(git grep:*),WebFetch,WebSearch,Read,Grep,Glob,Agent,Task"

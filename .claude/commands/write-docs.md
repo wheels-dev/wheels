@@ -14,7 +14,8 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
   caller workflow has created `docs/bot-<issue>-<slug>` for you and you
   are checked out on it).
 - **Filesystem writes are scoped to doc paths only**:
-  `web/sites/guides/**`, `.ai/wheels/**`, `CLAUDE.md`, `CHANGELOG.md`.
+  `web/sites/guides/**`, `.ai/wheels/**`, `CLAUDE.md`, `changelog.d/**`
+  (never `CHANGELOG.md` directly — see `changelog.d/README.md`).
   **Do NOT modify any file under `vendor/wheels/**`, `app/**`,
   `tests/**`, `vendor/wheels/tests/**`, `.github/**`, `cli/**`, or
   `config/**`** — this is a docs-only stage. The TDD gate skips this
@@ -44,10 +45,10 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
    was found.
 
 3. **Read the supporting context.**
-   - `CLAUDE.md` § "Commit Message Conventions" — type `docs`, allowed
-     scopes (`docs`, `web/guides`, `web/landing`, `web/blog`, etc.).
-   - `web/sites/guides/src/content/docs/v4-0-0-snapshot/` — browse the
-     existing structure to find the right place for the new content.
+   - `CLAUDE.md` § "Commit Message Conventions" — type `docs`; scope is
+     optional (`docs`, `web/guides`, `web/blog`, … are conventional).
+   - The newest `web/sites/guides/src/content/docs/v*/` directory — browse
+     the existing structure to find the right place for the new content.
    - One or two existing pages in the same area for style/depth
      reference. Match existing tone (no emoji unless the surrounding
      pages use them).
@@ -79,13 +80,13 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
 5. **Decide what to write.** Based on the triage scope and the issue body,
    pick targets:
 
-   - **MDX guide page(s)** under
-     `web/sites/guides/src/content/docs/v4-0-0-snapshot/`. If the issue
+   - **MDX guide page(s)** under the newest
+     `web/sites/guides/src/content/docs/v*/` directory. If the issue
      is about a feature or subsystem, look for the right `<area>/`
      (e.g. `working-with-wheels/`, `digging-deeper/`,
      `command-line-tools/`). Add to an existing page where possible;
      create a new page only when no existing page covers the area.
-   - **`.ai/wheels/<layer>/`** — only if the docs change documents a
+   - **`.ai/wheels/`** — only if the docs change documents a
      pattern or convention an AI agent should know about. Most user-
      facing docs do NOT need a corresponding `.ai/` update.
    - **`CLAUDE.md`** — only if the change is about a top-level convention
@@ -107,16 +108,18 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
      The bot cannot capture screenshots itself (no headless browser
      available in the runner). The PR description (step 8) will list
      these placeholders so a human can capture and replace them.
-   - Add a `CHANGELOG.md` `[Unreleased]` entry. One line, present
-     tense, no PR number.
+   - Add a changelog fragment `changelog.d/<slug>.<type>.md` (usually
+     type `changed` or `added`) with one bullet line, present tense.
+     Never edit `CHANGELOG.md` directly — fragments are assembled at
+     release time.
 
 7. **Stage and commit.**
 
-   Conventional commit. Type `docs`. Scope from the allowlist:
+   Conventional commit. Type `docs`. Scope is optional; by convention:
    - `web/guides` for changes under `web/sites/guides/src/content/docs/`
    - `docs` for `.ai/wheels/` changes
    - no scope for `CLAUDE.md` or mixed paths
-   Subject ≤ 100 chars, sentence-case.
+   Whole header ≤ 100 chars, sentence-case.
 
    Examples:
    - `docs(web/guides): add Debug Panel guide outlining each feature`
@@ -156,7 +159,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
 
 9. **Self-check before opening.** Do NOT open the PR if any check fails:
    - [ ] No files changed outside doc paths (`web/sites/guides/`,
-     `.ai/wheels/`, `CLAUDE.md`, `CHANGELOG.md`)
+     `.ai/wheels/`, `CLAUDE.md`, `changelog.d/`)
    - [ ] At least one doc file changed (don't open empty PRs)
    - [ ] Commit message is conventional and ≤ 100 chars
    - [ ] PR body includes `Fixes #<issue-number>`

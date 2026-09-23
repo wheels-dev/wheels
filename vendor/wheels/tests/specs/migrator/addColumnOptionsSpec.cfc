@@ -16,7 +16,7 @@ component extends="wheels.WheelsTest" {
 		variables.isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
 	}
 
-	private string function buildOptions(string type, string default = "", boolean allowNull = true) {
+	private string function buildOptions(string type, default = "", boolean allowNull = true) {
 		var opts = {
 			type: arguments.type,
 			default: arguments.default,
