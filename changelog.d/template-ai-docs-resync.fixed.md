@@ -1,0 +1,1 @@
+- `wheels new` scaffolds ship an up-to-date `CLAUDE.md`: the template copy had drifted about 74 lines behind `docs/consumer-ai/CLAUDE.md` (missing auth, storage, DI and seeding guidance) and wrongly said `wheels dbmigrate diff` does not exist; `ship-consumer-docs.sh check` now fails when the two copies differ

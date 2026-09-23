@@ -19,6 +19,17 @@ ships to consumers.
 - **Validation property param**: `property` (singular) for single, `properties` (plural) for list: `validatesPresenceOf(properties="name,email")`.
 - **Mass assignment**: open by default for compatibility. `set(massAssignmentStrict=true)` fail-closes it — a model with neither `accessibleProperties()` nor `protectedProperties()` then rejects unlisted posted properties. Define one of the two lists per model.
 
+## Common Mistakes
+
+- **Don't mix positional and named arguments** in one framework call: `hasMany("comments")` or `hasMany(name="comments", dependent="delete")`, never `hasMany("comments", dependent="delete")`.
+- **Finders return queries, not arrays** — loop with `<cfloop query="users">`.
+- **Nested resources use `callback=`**: `.resources(name="posts", callback=function(map) { map.resources("comments"); })`. `scope()`, `namespace()`, `package()` and `controller()` take `callback=` too.
+- **Routes match first to last** — resources, then custom named routes, then root, then the wildcard last. Placeholder-free patterns (`/posts/featured`) win over `/posts/[key]` regardless of order.
+- **Controller filters are `private`** — a public method is a routable action. Action names can't reuse framework helper names (`redirectTo`, `linkTo`, …).
+- **`cfparam` every variable a view reads.**
+- **Never name a parameter or local variable after a CFML scope** (`url`, `form`, `request`, `session`, `application`, …) — the scope can win over the argument.
+- **`timestamps()` adds `createdAt`, `updatedAt` and `deletedAt`**; migration seed data goes through `execute("…SQL…")` (no `parameters` argument), with `CURRENT_TIMESTAMP` rather than `NOW()`, which fails on SQLite and SQL Server.
+
 ## Model Quick Reference
 
 ```cfm
@@ -202,7 +213,7 @@ new wheels.middleware.RateLimiter(maxRequests=100, windowSeconds=120, strategy="
 new wheels.middleware.RateLimiter(maxRequests=50, windowSeconds=60, strategy="tokenBucket")
 new wheels.middleware.RateLimiter(storage="database")                          // auto-creates wheels_rate_limits
 // rate-limit per API key — hoist the closure first: an inline function literal
-// as a constructor named arg crashes Adobe CF (Cross-Engine Invariant 5)
+// as a constructor named arg crashes Adobe CF's compiler
 var apiKeyFn = function(req) {
     var apiKey = req.cgi.http_x_api_key ?: "";
     return Len(apiKey) ? apiKey : "anonymous";
@@ -210,7 +221,7 @@ var apiKeyFn = function(req) {
 new wheels.middleware.RateLimiter(keyFunction=apiKeyFn)
 ```
 
-The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method, cgi}`. The `cgi` member is the sanitized `request.cgi` copy overlaid on every inbound HTTP header under its CGI-style `http_*` name (built by `Dispatch.$buildMiddlewareCgiScope()`), so arbitrary headers like `X-Api-Key` resolve per client ([#3074](https://github.com/wheels-dev/wheels/issues/3074) — before 4.0.4 the context had **no `cgi` key** and `req.cgi.*` silently collapsed every client into one bucket). Keep the `Len()` guard: an empty-valued header reads as empty string, and on pre-fix versions a missing header does too.
+The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method, cgi}`. The `cgi` member is the sanitized `request.cgi` copy overlaid on every inbound HTTP header under its CGI-style `http_*` name (built by `Dispatch.$buildMiddlewareCgiScope()`), so arbitrary headers like `X-Api-Key` resolve per client. Keep the `Len()` guard: a missing or empty-valued header reads as an empty string, and returning it would put every such client in one bucket.
 
 Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` or `database`. Emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. Returns `429` with `Retry-After` when exceeded.
 
@@ -348,7 +359,7 @@ Override registry with `WHEELS_PACKAGES_REGISTRY=<org>/<repo>` (default `wheels-
 
 `wheels_migrator_versions` can drift from on-disk files when several developers share a single dev database (peer applied a migration whose file isn't yet in your branch). Detected and surfaced automatically; reconciliation is explicit:
 
-- `wheels migrate latest` — when a peer's tracked version sits above your latest local file, it now applies pending local migrations with a warning instead of silently no-op'ing on a "down" branch.
+- `wheels migrate latest` — when a peer's tracked version sits above your latest local file, it applies pending local migrations and prints a warning.
 - `wheels migrate info` — orphan rows render as `[?] <version> <name> (applied <timestamp>)` when the enriched `wheels_migrator_versions.name` / `.applied_at` columns are populated, or `[?] <version> ********** NO FILE **********` (Rails-style) for legacy rows.
 - `wheels migrate doctor` — single-command health report. Lists orphans + pending; pure read.
 - `wheels migrate forget <version> --yes` — delete a stale tracking row (refuses if a matching local file exists, refuses if version not in table).
@@ -356,7 +367,7 @@ Override registry with `WHEELS_PACKAGES_REGISTRY=<org>/<repo>` (default `wheels-
 
 Tracking-table schema: `wheels_migrator_versions(version, core_level, name, applied_at)`. The `name` and `applied_at` columns are additive (NULL for legacy rows) and added automatically via `$ensureTrackingColumns()` on first migrator call after upgrade. Both columns are populated by `$setVersionAsMigrated(version, migrationName)` going forward; existing rows stay NULL and display version-only.
 
-Both `forget` and `pretend` are dry-run by default; `--yes` is required to mutate. Helpers live on `Migrator.cfc`: `$getOrphanVersions()`, `$getOrphanVersionsWithMeta()`, `doctor()`, `forgetVersion()`, `pretendVersion()`, `$buildInfoOutput()`, `$ensureTrackingColumns()`. Deep reference: [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md). User-facing guide: `web/sites/guides/src/content/docs/v4-0-0/basics/shared-development-databases.mdx`. Shipped across #2798, #2799, and the schema enrichment PR.
+Both `forget` and `pretend` are dry-run by default; `--yes` is required to mutate. Helpers live on `Migrator.cfc`: `$getOrphanVersions()`, `$getOrphanVersionsWithMeta()`, `doctor()`, `forgetVersion()`, `pretendVersion()`, `$buildInfoOutput()`, `$ensureTrackingColumns()`. Guide: https://guides.wheels.dev (Basics → Shared Development Databases).
 
 ### Auto-Migration
 
@@ -484,15 +495,16 @@ component extends="wheels.WheelsTest" {
 - **App tests**: `/wheels/app/tests` — project-specific, in `tests/specs/`. Uses `tests/populate.cfm` and `tests/TestRunner.cfc`.
 - **Core tests**: `/wheels/core/tests` — framework, in `vendor/wheels/tests/specs/`. Uses `vendor/wheels/tests/populate.cfm`. **This is what CI runs across all engines × DBs.**
 
-**Isolated test application (#3374):** `Application.cfc` includes `vendor/wheels/events/testcontext.cfm` after `config/app.cfm` so runner URLs (and TestClient/browser requests that send `X-Wheels-Test-Context`) bind `<this.name>_wheelsTest` — a separate CFML application scope. The live `application.wheels` is not swapped. `$testClient(testContext=false)` addresses the live app. A request-scoped overlay cannot replace this (blockers B1–B9 on #3025). Existing apps without the include still use the #3373 named-lock swap on the live scope.
+**Isolated test application:** `public/Application.cfc` includes `vendor/wheels/events/testcontext.cfm` after `config/app.cfm`, so runner URLs (and TestClient/browser requests that send `X-Wheels-Test-Context`) bind `<this.name>_wheelsTest` — a separate CFML application scope; the live `application.wheels` is untouched. `$testClient(testContext=false)` addresses the live app. Apps whose `Application.cfc` lacks the include run tests against the live application scope under a named lock.
 
-**Critical**: core tests use `directory="wheels.tests.specs"` which compiles EVERY CFC in the directory. One compilation error in any spec file crashes the entire suite for that engine. The "inline closure as constructor named arg" anti-pattern (#5 in Cross-Engine Invariants) is the classic example.
+The runner compiles every CFC under the spec directory, so one compilation error in any spec file fails the entire run, not just that file. The usual cause on Adobe CF is an inline closure passed as a constructor named argument — assign the closure to a variable first.
 
 ### Test-specific gotchas
 
 - **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
-- **`$clearRoutes()` in test specs**: NOT inherited from `wheels.WheelsTest`. Copy from `linksSpec.cfc` if your spec manipulates routes.
+- **`$clearRoutes()` in test specs**: not inherited from `wheels.WheelsTest`. A spec that manipulates routes defines its own:
+  `public void function $clearRoutes() { application.wheels.routes = []; application.wheels.staticRoutes = {}; application.wheels.namedRoutePositions = {}; }`
 
 ### Running tests locally
 

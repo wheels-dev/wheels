@@ -68,6 +68,16 @@ check() {
         failures=$((failures + 1))
     fi
 
+    # `wheels new` scaffolds ship a committed copy of the consumer tier;
+    # it must stay byte-identical to the source.
+    local tpl="$REPO_ROOT/cli/lucli/templates/app"
+    for f in CLAUDE.md AGENTS.md .ai/README.md; do
+        if ! cmp -s "$CONSUMER_DIR/$f" "$tpl/$f"; then
+            echo "ERROR: cli/lucli/templates/app/$f differs from docs/consumer-ai/$f (cp to resync)" >&2
+            failures=$((failures + 1))
+        fi
+    done
+
     # The consumer tier must not accidentally grow maintainer content.
     if grep -Rq "test-local.sh\|compat-matrix.yml\|onboarding-harness" "$CONSUMER_DIR" 2>/dev/null; then
         echo "ERROR: maintainer-only content detected under docs/consumer-ai/" >&2

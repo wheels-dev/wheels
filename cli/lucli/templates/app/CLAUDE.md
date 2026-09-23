@@ -17,6 +17,18 @@ ships to consumers.
 - **Parameters**: `params.key` for URL key, `params.user` for form struct, `params.user.firstName` for nested.
 - **extends**: Models extend `"Model"`, controllers extend `"Controller"`, tests extend `"wheels.WheelsTest"`. (Legacy: `"wheels.Test"` was RocketUnit — never use for new tests.)
 - **Validation property param**: `property` (singular) for single, `properties` (plural) for list: `validatesPresenceOf(properties="name,email")`.
+- **Mass assignment**: open by default for compatibility. `set(massAssignmentStrict=true)` fail-closes it — a model with neither `accessibleProperties()` nor `protectedProperties()` then rejects unlisted posted properties. Define one of the two lists per model.
+
+## Common Mistakes
+
+- **Don't mix positional and named arguments** in one framework call: `hasMany("comments")` or `hasMany(name="comments", dependent="delete")`, never `hasMany("comments", dependent="delete")`.
+- **Finders return queries, not arrays** — loop with `<cfloop query="users">`.
+- **Nested resources use `callback=`**: `.resources(name="posts", callback=function(map) { map.resources("comments"); })`. `scope()`, `namespace()`, `package()` and `controller()` take `callback=` too.
+- **Routes match first to last** — resources, then custom named routes, then root, then the wildcard last. Placeholder-free patterns (`/posts/featured`) win over `/posts/[key]` regardless of order.
+- **Controller filters are `private`** — a public method is a routable action. Action names can't reuse framework helper names (`redirectTo`, `linkTo`, …).
+- **`cfparam` every variable a view reads.**
+- **Never name a parameter or local variable after a CFML scope** (`url`, `form`, `request`, `session`, `application`, …) — the scope can win over the argument.
+- **`timestamps()` adds `createdAt`, `updatedAt` and `deletedAt`**; migration seed data goes through `execute("…SQL…")` (no `parameters` argument), with `CURRENT_TIMESTAMP` rather than `NOW()`, which fails on SQLite and SQL Server.
 
 ## Model Quick Reference
 
@@ -122,11 +134,14 @@ Resolves `params.key` into a model instance before the action runs. Lands in `pa
 ```cfm
 .resources(name="users", binding=true)                // params.user
 .resources(name="posts", binding="BlogPost")          // params.blogPost
+.resources(name="posts", binding=true, bindBy="slug") // params.post via findOneBySlug(value=key)
 .scope(path="/api", binding=true, callback=function(map) {  // all nested resources bound
     map.resources("users");
 })
 set(routeModelBinding=true);                          // global, in config/settings.cfm
 ```
+
+`bindBy="slug"` resolves the `:key` segment through the parameterized dynamic finder (`findOneBySlug(value=key)`) instead of `findByKey()`, so URLs can carry slugs or usernames rather than primary keys. It's ignored unless binding is enabled.
 
 ## Pagination View Helpers
 
@@ -186,7 +201,7 @@ mapper()
 .end();
 ```
 
-Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`. Custom: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
+Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`, `wheels.middleware.AuthMiddleware` (authenticate + attach the result; `genericErrors=true` emits a generic `Unauthorized` JSON body instead of `authResult.error`), `wheels.middleware.TenantResolver` (resolve the active tenant; `failClosed=true` 403s unmatched tenants instead of proceeding on the default datasource). Custom: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
 
 **Singleton lifecycle contract**: both global and route-scoped middleware (including string-path entries) are resolved once and cached for the application lifetime. The same instance handles every matching request — stateful middleware (e.g. in-memory `RateLimiter` on a `.scope()`) accumulates state across requests as intended. Implication: every middleware component must be safe to share across concurrent requests (use CFML locks for any mutable state).
 
@@ -198,7 +213,7 @@ new wheels.middleware.RateLimiter(maxRequests=100, windowSeconds=120, strategy="
 new wheels.middleware.RateLimiter(maxRequests=50, windowSeconds=60, strategy="tokenBucket")
 new wheels.middleware.RateLimiter(storage="database")                          // auto-creates wheels_rate_limits
 // rate-limit per API key — hoist the closure first: an inline function literal
-// as a constructor named arg crashes Adobe CF (Cross-Engine Invariant 5)
+// as a constructor named arg crashes Adobe CF's compiler
 var apiKeyFn = function(req) {
     var apiKey = req.cgi.http_x_api_key ?: "";
     return Len(apiKey) ? apiKey : "anonymous";
@@ -206,7 +221,7 @@ var apiKeyFn = function(req) {
 new wheels.middleware.RateLimiter(keyFunction=apiKeyFn)
 ```
 
-The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method, cgi}`. The `cgi` member is the sanitized `request.cgi` copy overlaid on every inbound HTTP header under its CGI-style `http_*` name (built by `Dispatch.$buildMiddlewareCgiScope()`), so arbitrary headers like `X-Api-Key` resolve per client ([#3074](https://github.com/wheels-dev/wheels/issues/3074) — before 4.0.4 the context had **no `cgi` key** and `req.cgi.*` silently collapsed every client into one bucket). Keep the `Len()` guard: an empty-valued header reads as empty string, and on pre-fix versions a missing header does too.
+The `keyFunction` receives the dispatch middleware context `{params, route, pathInfo, method, cgi}`. The `cgi` member is the sanitized `request.cgi` copy overlaid on every inbound HTTP header under its CGI-style `http_*` name (built by `Dispatch.$buildMiddlewareCgiScope()`), so arbitrary headers like `X-Api-Key` resolve per client. Keep the `Len()` guard: a missing or empty-valued header reads as an empty string, and returning it would put every such client in one bucket.
 
 Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` or `database`. Emits `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. Returns `429` with `Retry-After` when exceeded.
 
@@ -224,6 +239,64 @@ local.di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
 ```
 
 Resolve with `service("emailService")` anywhere, or `inject("emailService, currentUser")` in controller `config()`. Scopes: transient (default), `.asSingleton()`, `.asRequestScoped()`. Auto-wiring: `init()` params matching registered names are auto-resolved when no `initArguments` passed.
+
+Construction that needs logic uses `.toFactory()` — bind a name to a closure that builds the instance (receives the `Injector`) and honors the chained lifecycle flag:
+
+```cfm
+local.di.map("jwtStrategy").toFactory(function(container) {
+    return new wheels.auth.JwtStrategy(jwtService = new wheels.auth.JwtService(secretKey = env("JWT_SECRET")));
+}).asSingleton();
+// service("jwtStrategy") returns the factory's result — no .build() indirection
+```
+
+## Authentication & Authorization
+
+One-command scaffold (4.0.6+): `wheels generate auth` emits a `User` model (PBKDF2 hashing via the `passwordHasher` service), `Sessions`/`Passwords`/`Registrations` controllers + views, a create-users migration, and wiring. Flags: `--model=<Name>` (default `User`), `--strategy=session|token|jwt`, `--registration`/`--no-registration`, `--force`.
+
+Built-in strategies under `wheels.auth.*`: `Authenticator` (registry that tries strategies in order), `SessionStrategy`, `TokenStrategy`, `JwtStrategy`. Wire by hand in `config/services.cfm`, or collapse session wiring to one line:
+
+```cfm
+// config/services.cfm — registers + wires SessionStrategy (idempotent)
+enableSession(sessionKey = "wheels.auth");
+```
+
+Password hashing: `wheels.auth.PasswordHasher` (PBKDF2-SHA256, 600k iterations; `hash()` / `verify()` / `needsRehash()`), and global pure-CFML bcrypt helpers (OpenBSD/jBCrypt-compatible):
+
+```cfm
+hash = bcryptHash(plaintext);                // cost defaults to 10
+ok = bcryptVerify(plaintext, hash);          // constant-time
+if (bcryptNeedsRehash(hash)) { /* rehash + save */ }
+```
+
+Authorization policies (4.0.6+): `wheels.Policy` base class + `app/policies/<Model>Policy.cfc`, generated with `wheels generate policy <Model>`. Helpers: `authorize(model)` (throws `Wheels.NotAuthorized` → 403 on deny, returns the record on allow), `can("action", model)` (boolean), `policyScope(model("Post"))` (no-rows scope on deny). Default-deny: every action denies unless the policy defines it.
+
+## Storage
+
+Named disks behind one interface — `put` / `get` / `exists` / `delete` / `url` / `signedUrl` — resolved through `wheels.storage.StorageManager`. Drivers: `local` (filesystem + URL prefix) and `s3` (from-scratch SigV4 over `cfhttp`, no AWS SDK).
+
+```cfm
+// config/settings.cfm
+set(storage = {
+    default = "local",
+    disks = {
+        local = { driver="local", root=ExpandPath("../storage/uploads"), urlPrefix="/uploads", signingKey=env("STORAGE_SIGNING_KEY") },
+        s3 = { driver="s3", bucket="my-bucket", region="us-east-1", accessKeyId=env("S3_KEY"), secretAccessKey=env("S3_SECRET") }
+    }
+});
+
+// config/services.cfm
+local.di.map("storage").toFactory(function() {
+    return new wheels.storage.StorageManager(config = get("storage"));
+});
+```
+
+```cfm
+service("storage").disk().put("avatars/42.png", bytes, contentType="image/png", visibility="public");
+bytes = service("storage").disk().get("avatars/42.png");
+url = service("storage").disk("s3").signedUrl(key="reports/q3.pdf", expiresIn=900);
+```
+
+`disk()` returns the default disk; `disk("name")` a named one. `get()` returns binary; `put()` round-trips bytes exactly. Errors: `Wheels.Storage.NotFound`, `.UnknownDisk`, `.UnknownDriver`, `.InvalidKey`, `.InvalidExpiresIn` (`expiresIn` must be `1..604800`), `.MissingSigningKey` (local `signedUrl()` without a `signingKey`).
 
 ## Package System
 
@@ -286,7 +359,7 @@ Override registry with `WHEELS_PACKAGES_REGISTRY=<org>/<repo>` (default `wheels-
 
 `wheels_migrator_versions` can drift from on-disk files when several developers share a single dev database (peer applied a migration whose file isn't yet in your branch). Detected and surfaced automatically; reconciliation is explicit:
 
-- `wheels migrate latest` — when a peer's tracked version sits above your latest local file, it now applies pending local migrations with a warning instead of silently no-op'ing on a "down" branch.
+- `wheels migrate latest` — when a peer's tracked version sits above your latest local file, it applies pending local migrations and prints a warning.
 - `wheels migrate info` — orphan rows render as `[?] <version> <name> (applied <timestamp>)` when the enriched `wheels_migrator_versions.name` / `.applied_at` columns are populated, or `[?] <version> ********** NO FILE **********` (Rails-style) for legacy rows.
 - `wheels migrate doctor` — single-command health report. Lists orphans + pending; pure read.
 - `wheels migrate forget <version> --yes` — delete a stale tracking row (refuses if a matching local file exists, refuses if version not in table).
@@ -294,7 +367,7 @@ Override registry with `WHEELS_PACKAGES_REGISTRY=<org>/<repo>` (default `wheels-
 
 Tracking-table schema: `wheels_migrator_versions(version, core_level, name, applied_at)`. The `name` and `applied_at` columns are additive (NULL for legacy rows) and added automatically via `$ensureTrackingColumns()` on first migrator call after upgrade. Both columns are populated by `$setVersionAsMigrated(version, migrationName)` going forward; existing rows stay NULL and display version-only.
 
-Both `forget` and `pretend` are dry-run by default; `--yes` is required to mutate. Helpers live on `Migrator.cfc`: `$getOrphanVersions()`, `$getOrphanVersionsWithMeta()`, `doctor()`, `forgetVersion()`, `pretendVersion()`, `$buildInfoOutput()`, `$ensureTrackingColumns()`. Deep reference: [.ai/wheels/troubleshooting/shared-dev-databases.md](.ai/wheels/troubleshooting/shared-dev-databases.md). User-facing guide: `web/sites/guides/src/content/docs/v4-0-0/basics/shared-development-databases.mdx`. Shipped across #2798, #2799, and the schema enrichment PR.
+Both `forget` and `pretend` are dry-run by default; `--yes` is required to mutate. Helpers live on `Migrator.cfc`: `$getOrphanVersions()`, `$getOrphanVersionsWithMeta()`, `doctor()`, `forgetVersion()`, `pretendVersion()`, `$buildInfoOutput()`, `$ensureTrackingColumns()`. Guide: https://guides.wheels.dev (Basics → Shared Development Databases).
 
 ### Auto-Migration
 
@@ -309,7 +382,7 @@ var all = am.diffAll({hints: {"User": {renames: {"full_name": "fullName"}}}, heu
 am.writeMigration(d, "rename_name_field");
 ```
 
-_Auto-migration is currently CFC-only (`wheels.migrator.AutoMigrator`, shown above). There is no `wheels dbmigrate diff` CLI command — invoking it errors._
+A CLI wrapper exists too: `wheels migrate diff` (alias `dbmigrate diff`) previews the same AutoMigrator diffs and, with `--write`, emits migration files. `--rename OLD:NEW` (repeatable; `Model.OLD:NEW` when diffing all models) supplies rename hints, `--hints` takes JSON, `--model` limits the diff to one model, and `--name` names the written migration.
 
 Result struct: `{modelName, tableName, addColumns, removeColumns, changeColumns, renameColumns, suggestedRenames}`. Limits: PK renames not detected; rename + type change requires separate migrations; calculated properties excluded. `writeMigration()` / `generateMigrationCFC()` honor `suggestedRenames` as `renameColumn` instead of destructive remove+add.
 
@@ -334,12 +407,16 @@ seedOnce(modelName="User", uniqueProperties="email", properties={
 ```bash
 wheels seed                            # auto-detect env (canonical)
 wheels seed --environment=production
-wheels seed --generate                 # legacy: random test data
+wheels seed --generate                 # generated sample data
 ```
 
 To scaffold seed templates, use: `wheels generate snippets seed-data` (writes `app/snippets/seeds*.cfm` — copy or move to `app/db/` to activate them). There is no `wheels generate seed` generator.
 
 `seedOnce()`: idempotent — checks `uniqueProperties` via `findOne()`, creates only if not found. Execution: `seeds.cfm` → `seeds/<environment>.cfm`, wrapped in a transaction. Programmatic: `application.wheels.seeder.runSeeds()`. (Note: `wheels db:seed` is NOT a valid command — it errors. Use `wheels seed`.)
+
+Generated seeds resolve `belongsTo` references from real, non-soft-deleted parent rows, honoring conventional and custom foreign keys and `joinKey`. When both models are selected, the parent is generated first; a child-only run reuses existing parents without creating any. Programmatic selection: `application.wheels.seeder.generateSeeds(models="Comment,Post", count=10)`.
+
+If an association has no usable parent, generation fails and rolls back the entire run instead of guessing IDs. Seed that parent first (including auth models that require hand-written seeds). Polymorphic associations and cycles without existing parents require `app/db/seeds.cfm`. Models whose generated records all fail validation are still skipped; partial saves or errors still roll back the run.
 
 ## Background Jobs Quick Reference
 
@@ -418,15 +495,16 @@ component extends="wheels.WheelsTest" {
 - **App tests**: `/wheels/app/tests` — project-specific, in `tests/specs/`. Uses `tests/populate.cfm` and `tests/TestRunner.cfc`.
 - **Core tests**: `/wheels/core/tests` — framework, in `vendor/wheels/tests/specs/`. Uses `vendor/wheels/tests/populate.cfm`. **This is what CI runs across all engines × DBs.**
 
-**Isolated test application (#3374):** `Application.cfc` includes `vendor/wheels/events/testcontext.cfm` after `config/app.cfm` so runner URLs (and TestClient/browser requests that send `X-Wheels-Test-Context`) bind `<this.name>_wheelsTest` — a separate CFML application scope. The live `application.wheels` is not swapped. `$testClient(testContext=false)` addresses the live app. A request-scoped overlay cannot replace this (blockers B1–B9 on #3025). Existing apps without the include still use the #3373 named-lock swap on the live scope.
+**Isolated test application:** `public/Application.cfc` includes `vendor/wheels/events/testcontext.cfm` after `config/app.cfm`, so runner URLs (and TestClient/browser requests that send `X-Wheels-Test-Context`) bind `<this.name>_wheelsTest` — a separate CFML application scope; the live `application.wheels` is untouched. `$testClient(testContext=false)` addresses the live app. Apps whose `Application.cfc` lacks the include run tests against the live application scope under a named lock.
 
-**Critical**: core tests use `directory="wheels.tests.specs"` which compiles EVERY CFC in the directory. One compilation error in any spec file crashes the entire suite for that engine. The "inline closure as constructor named arg" anti-pattern (#5 in Cross-Engine Invariants) is the classic example.
+The runner compiles every CFC under the spec directory, so one compilation error in any spec file fails the entire run, not just that file. The usual cause on Adobe CF is an inline closure passed as a constructor named argument — assign the closure to a variable first.
 
 ### Test-specific gotchas
 
 - **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
-- **`$clearRoutes()` in test specs**: NOT inherited from `wheels.WheelsTest`. Copy from `linksSpec.cfc` if your spec manipulates routes.
+- **`$clearRoutes()` in test specs**: not inherited from `wheels.WheelsTest`. A spec that manipulates routes defines its own:
+  `public void function $clearRoutes() { application.wheels.routes = []; application.wheels.staticRoutes = {}; application.wheels.namedRoutePositions = {}; }`
 
 ### Running tests locally
 
@@ -438,6 +516,14 @@ wheels test tests/specs/models   # a subdirectory of specs
 The CLI boots the app on an isolated port and runs the suite over HTTP,
 mirroring CI. Browser-driven specs need Playwright installed once:
 `wheels browser setup`.
+
+## Development Error Page
+
+When `showErrorInformation` is on (the development default), the framework
+error page includes a **Copy** button. One click copies a JSON payload
+(exception type and message, suggested action, file + line, source snippet,
+and stack frames tagged app vs framework) to the clipboard for pasting into
+a coding agent.
 
 ## Where to go deeper
 
