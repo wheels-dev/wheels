@@ -80,14 +80,16 @@ component extends="wheels.WheelsTest" {
 
 				var state = {threw = false};
 				try {
-					// findByKey() without its required key throws inside the invoked
-					// method, after the marker has been set.
-					tag.invokeWithTransaction(method = "findByKey", transaction = "none");
+					// An unknown select column makes findAll() throw Wheels.ColumnNotFound
+					// inside the invoked method, after the marker has been set, before any
+					// query runs. A Wheels Throw() rather than a missing required argument,
+					// which RustCFML does not enforce through cfinvoke.
+					tag.invokeWithTransaction(method = "findAll", transaction = "none", select = "wheelsNoSuchColumn");
 				} catch (any e) {
 					state.threw = true;
 				}
 
-				expect(state.threw).toBeTrue("findByKey() without a key should have thrown.");
+				expect(state.threw).toBeTrue("findAll() with an unknown select column should have thrown.");
 				expect(request.wheels.transactions[connectionArgs]).toBeFalse(
 					"A throwing transaction='none' call must clear the marker it set, otherwise every "
 					& "later model call in this request silently skips its own transaction."
@@ -108,7 +110,7 @@ component extends="wheels.WheelsTest" {
 
 				var state = {threw = false};
 				try {
-					tag.invokeWithTransaction(method = "findByKey", transaction = "commit");
+					tag.invokeWithTransaction(method = "findAll", transaction = "commit", select = "wheelsNoSuchColumn");
 				} catch (any e) {
 					state.threw = true;
 				}
@@ -116,7 +118,7 @@ component extends="wheels.WheelsTest" {
 				// Restore before asserting, so a failure here cannot leak into later bundles.
 				request.wheels.transactions[connectionArgs] = false;
 
-				expect(state.threw).toBeTrue("findByKey() without a key should have thrown.");
+				expect(state.threw).toBeTrue("findAll() with an unknown select column should have thrown.");
 				expect(stillOpen).toBeTrue(
 					"A nested ('alreadyopen') call does not own the marker; the outer owner clears it."
 				);
