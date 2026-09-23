@@ -19,88 +19,11 @@ Activate automatically during:
 - Code review and refactoring
 - Any Wheels code modification
 
-## 🚨 Production-Tested Critical Detections
+## Anti-Patterns
 
-### 1. CLI Generator String Boolean Values (CRITICAL)
+### 1. Property Access Without structKeyExists() Check
 
-**🔴 CRITICAL:** The CLI `wheels g migration` command generates migrations with string boolean values that silently fail.
-
-**Detection Pattern:**
-```regex
-createTable\s*\([^)]*force\s*=\s*['"][^'"]*['"]
-createTable\s*\([^)]*id\s*=\s*['"][^'"]*['"]
-```
-
-**Examples to Detect:**
-```cfm
-❌ t = createTable(name='users', force='false', id='true', primaryKey='id');
-❌ t = createTable(name='posts', force='false');
-❌ t = createTable(name='comments', id='true');
-```
-
-**Auto-Fix:**
-```cfm
-✅ t = createTable(name='users');
-✅ t = createTable(name='posts');
-✅ t = createTable(name='comments');
-```
-
-**Error Message:**
-```
-⚠️  CRITICAL: CLI-generated string boolean values detected
-Line: 5
-Found: createTable(name='users', force='false', id='true', primaryKey='id')
-Fix:   createTable(name='users')
-
-CLI generators create STRING booleans ('false', 'true') that don't work.
-Remove force/id/primaryKey parameters and use Wheels defaults instead.
-This will cause "NoPrimaryKey" errors if not fixed!
-```
-
-### 2. Missing setPrimaryKey() in Models (CRITICAL)
-
-**🔴 CRITICAL:** Models must explicitly call `setPrimaryKey("id")` in config(), even when migrations are correct.
-
-**Detection Pattern:**
-```regex
-component\s+extends\s*=\s*["']Model["'][\s\S]*?function\s+config\s*\(\s*\)\s*\{(?![\s\S]*?setPrimaryKey)
-```
-
-**Examples to Detect:**
-```cfm
-❌ component extends="Model" {
-    function config() {
-        table("users");
-        hasMany(name="posts");  // Missing setPrimaryKey!
-    }
-}
-```
-
-**Auto-Fix:**
-```cfm
-✅ component extends="Model" {
-    function config() {
-        table("users");
-        setPrimaryKey("id");  // Added!
-        hasMany(name="posts");
-    }
-}
-```
-
-**Error Message:**
-```
-⚠️  CRITICAL: Missing setPrimaryKey() in model config()
-Line: 3
-Found: config() without setPrimaryKey() declaration
-Fix:   Add setPrimaryKey("id") as first line after table() declaration
-
-Even with correct migrations, Wheels ORM requires explicit primary key declaration.
-This will cause "Wheels.NoPrimaryKey" errors if not added!
-```
-
-### 3. Property Access Without structKeyExists() Check (CRITICAL)
-
-**🔴 CRITICAL:** Accessing properties in beforeCreate/beforeValidation callbacks without existence check causes errors.
+Properties that weren't passed to `new()` don't exist on the object yet, so reading them in a `beforeCreate` / `beforeValidation` callback throws unless you check first.
 
 **Detection Pattern:**
 ```regex
@@ -133,46 +56,10 @@ Found: if (!len(this.followersCount)) in beforeCreate callback
 Fix:   if (!structKeyExists(this, "followersCount") || !len(this.followersCount))
 
 In beforeCreate/beforeValidation callbacks, properties may not exist yet.
-This will cause "no accessible Member" errors if not checked!
+Without the check this throws a "no accessible Member" error.
 ```
 
-### 4. Wrong Validation Parameter Names (CRITICAL)
-
-**🔴 CRITICAL:** Validation functions use "properties" (plural) not "property" (singular).
-
-**Detection Pattern:**
-```regex
-validates\w+Of\s*\(\s*property\s*=
-```
-
-**Examples to Detect:**
-```cfm
-❌ validatesPresenceOf(property="username,email")
-❌ validatesUniquenessOf(property="email")
-❌ validatesFormatOf(property="email", regEx="...")
-```
-
-**Auto-Fix:**
-```cfm
-✅ validatesPresenceOf(properties="username,email")
-✅ validatesUniquenessOf(properties="email")
-✅ validatesFormatOf(properties="email", regEx="...")
-```
-
-**Error Message:**
-```
-⚠️  CRITICAL: Wrong validation parameter name
-Line: 8
-Found: validatesPresenceOf(property="username")
-Fix:   validatesPresenceOf(properties="username")
-
-Wheels validation functions use "properties" (PLURAL), not "property".
-This validation will be silently ignored if not fixed!
-```
-
-## Critical Anti-Patterns
-
-### 5. Mixed Argument Styles
+### 2. Mixed Argument Styles
 
 **Detection Pattern:**
 ```regex
@@ -208,7 +95,7 @@ Wheels requires consistent parameter syntax - either ALL positional OR ALL named
 When using options like 'dependent', you MUST use named arguments for ALL parameters.
 ```
 
-### 2. Query/Array Confusion
+### 3. Query/Array Confusion
 
 **Detection Pattern:**
 ```regex
@@ -239,7 +126,7 @@ Fix:   post.comments().recordCount
 Wheels associations return QUERIES, not arrays. Use .recordCount for count.
 ```
 
-### 3. Association Access Inside Query Loops
+### 4. Association Access Inside Query Loops
 
 **Detection Pattern:**
 ```regex
@@ -272,109 +159,45 @@ Cannot access associations directly on query objects inside loops.
 Must reload the model object first.
 ```
 
-### 4. Non-Existent Form Helpers
+### 5. Use the HTML5 Form Helpers
 
-**Detection Pattern:**
-```regex
-(emailField|passwordField|numberField|dateField|timeField|urlField|telField)\s*\(
-```
+`emailField`, `passwordField`, `numberField`, `urlField`, `telField`, `dateField`, `colorField`, `rangeField` and `searchField` all exist (object and `*Tag` forms). Prefer them over `textField(type="...")`, which loses the helper's type-specific attributes.
 
-**Examples:**
 ```cfm
-❌ #emailField(objectName="user", property="email")#
-❌ #passwordField(objectName="user", property="password")#
-❌ #numberField(objectName="product", property="price")#
-❌ #urlField(objectName="company", property="website")#
+✅ #emailField(objectName="user", property="email")#
+✅ #numberField(objectName="product", property="price", min="0")#
 ```
 
-**Auto-Fix:**
+### 6. Nested Routes Use callback=
+
+Wheels nests resources with a `callback=` function (or `nested=true` plus `.end()`), not Rails-style inline blocks.
+
 ```cfm
-✅ #textField(objectName="user", property="email", type="email")#
-✅ #textField(objectName="user", property="password", type="password")#
-✅ #textField(objectName="product", property="price", type="number")#
-✅ #textField(objectName="company", property="website", type="url")#
+❌ .resources("posts", function(r) { r.resources("comments"); })
+
+✅ .resources(name="posts", callback=function(map) {
+       map.resources("comments");
+   })
 ```
 
-**Error Message:**
-```
-⚠️  ANTI-PATTERN DETECTED: Non-existent form helper
-Line: 23
-Found: emailField(objectName="user", property="email")
-Fix:   textField(objectName="user", property="email", type="email")
-
-Wheels doesn't have specialized field helpers like emailField().
-Use textField() with the 'type' attribute instead.
-```
-
-### 5. Rails-Style Nested Routing
-
-**Detection Pattern:**
-```regex
-resources\s*\([^)]+,\s*(nested|namespace)\s*=
-```
-
-**Examples:**
-```cfm
-❌ resources("posts", nested=resources("comments"))
-❌ resources("users", namespace="admin")
-```
-
-**Auto-Fix:**
-```cfm
-✅ resources("posts")
-✅ resources("comments")
-// Define separately, not nested
-```
-
-**Error Message:**
-```
-⚠️  ANTI-PATTERN DETECTED: Rails-style nested routing
-Line: 8
-Found: resources("posts", nested=resources("comments"))
-Fix:   resources("posts") and resources("comments") as separate declarations
-
-Wheels doesn't support Rails-style nested resources.
-Define resources separately and handle nesting in controllers.
-```
-
-### 6. Database-Specific SQL Functions
+### 7. Database-Specific SQL Functions
 
 **Detection Pattern:**
 ```regex
 (DATE_SUB|DATE_ADD|NOW|CURDATE|CURTIME|DATEDIFF|INTERVAL)\s*\(
 ```
 
-**Examples:**
+`NOW()`, `CURDATE()` and `DATE_SUB(... INTERVAL ...)` are MySQL-specific; `NOW()` fails on SQLite (the `wheels new` default) and SQL Server. In raw SQL use `CURRENT_TIMESTAMP`. For relative dates in application code, compute the value in CFML and pass it through the model layer, which binds it as a parameter.
+
 ```cfm
-❌ execute("INSERT INTO posts (publishedAt) VALUES (DATE_SUB(NOW(), INTERVAL 1 DAY))")
-❌ execute("SELECT * FROM posts WHERE createdAt > CURDATE()")
 ❌ execute("UPDATE posts SET modifiedAt = NOW()")
+✅ execute("UPDATE posts SET modifiedAt = CURRENT_TIMESTAMP")
+
+❌ model("Post").findAll(where="createdAt > DATE_SUB(NOW(), INTERVAL 1 DAY)")
+✅ model("Post").findAll(where="createdAt > '#DateFormat(DateAdd("d", -1, Now()), "yyyy-mm-dd")#'")
 ```
 
-**Auto-Fix:**
-```cfm
-✅ var pastDate = DateAdd("d", -1, Now());
-   execute("INSERT INTO posts (publishedAt) VALUES (TIMESTAMP '#DateFormat(pastDate, "yyyy-mm-dd")# #TimeFormat(pastDate, "HH:mm:ss")#')")
-
-✅ var today = Now();
-   execute("SELECT * FROM posts WHERE createdAt > TIMESTAMP '#DateFormat(today, "yyyy-mm-dd")# 00:00:00'")
-
-✅ var now = Now();
-   execute("UPDATE posts SET modifiedAt = TIMESTAMP '#DateFormat(now, "yyyy-mm-dd")# #TimeFormat(now, "HH:mm:ss")#'")
-```
-
-**Error Message:**
-```
-⚠️  ANTI-PATTERN DETECTED: Database-specific SQL function
-Line: 34
-Found: DATE_SUB(NOW(), INTERVAL 1 DAY)
-Fix:   Use CFML DateAdd() + TIMESTAMP formatting
-
-MySQL-specific date functions won't work across all databases.
-Use CFML date functions (DateAdd, DateFormat, TimeFormat) for compatibility.
-```
-
-### 7. Missing CSRF Protection Check
+### 8. Missing CSRF Protection Check
 
 **Detection Pattern:**
 ```regex
@@ -391,7 +214,7 @@ Use CFML date functions (DateAdd, DateFormat, TimeFormat) for compatibility.
 **Auto-Fix:**
 ```cfm
 ✅ #startFormTag(action="create", method="post")#
-    <!--- CSRF token automatically included --->
+    <!--- token added automatically when the controller calls protectsFromForgery() --->
 #endFormTag()#
 ```
 
@@ -402,175 +225,11 @@ Line: 45
 Found: <form method="post"> without CSRF token
 Fix:   Use #startFormTag()# which includes CSRF automatically
 
-Wheels provides built-in CSRF protection.
-Use startFormTag() instead of raw <form> tags.
+startFormTag() adds the authenticity token for non-GET forms when the
+controller (usually app/controllers/Controller.cfc) calls protectsFromForgery().
 ```
-
-### 8. Inconsistent Property Style in config()
-
-**Detection Pattern:**
-Check for mixing positional and named arguments within same config() function
-
-**Examples:**
-```cfm
-❌ function config() {
-    hasMany("comments");  // Positional
-    belongsTo(name="user");  // Named
-}
-```
-
-**Auto-Fix:**
-```cfm
-✅ function config() {
-    hasMany(name="comments");  // All named
-    belongsTo(name="user");    // All named
-}
-```
-
-**Error Message:**
-```
-⚠️  ANTI-PATTERN DETECTED: Inconsistent parameter style in config()
-Lines: 5-6
-Found: Mixed positional and named arguments
-Fix:   Use SAME style for ALL association/validation declarations
-
-config() function should use consistent argument style throughout.
-Either ALL positional OR ALL named - never mix them.
-```
-
-## Validation Workflow
-
-### Before Writing Any File
-
-1. **Scan Generated Code:** Run all anti-pattern regex checks
-2. **If Pattern Detected:**
-   - Display warning message
-   - Show before/after comparison
-   - Auto-fix the code
-   - Log the fix for user awareness
-3. **Validate Fix:** Ensure fix doesn't introduce new issues
-4. **Write Corrected File:** Save the validated code
-
-### Example Validation Output
-
-```
-🔍 Validating generated code...
-
-⚠️  3 anti-patterns detected and auto-fixed:
-
-1. [Line 8] Mixed argument styles
-   Before: hasMany("comments", dependent="delete")
-   After:  hasMany(name="comments", dependent="delete")
-
-2. [Line 15] Query/Array confusion
-   Before: ArrayLen(post.comments())
-   After:  post.comments().recordCount
-
-3. [Line 23] Non-existent helper
-   Before: emailField(objectName="user", property="email")
-   After:  textField(objectName="user", property="email", type="email")
-
-✅ All anti-patterns fixed. Writing file...
-```
-
-## Integration Points
-
-### Auto-Activation During:
-
-1. **Model Generation** (wheels-model-generator)
-   - Check association argument styles
-   - Check validation argument styles
-   - Check callback definitions
-
-2. **Controller Generation** (wheels-controller-generator)
-   - Check findByKey/findAll argument styles
-   - Check renderPage/redirectTo calls
-   - Check parameter verification
-
-3. **View Generation** (wheels-view-generator)
-   - Check query handling
-   - Check form helper usage
-   - Check association access in loops
-   - Check CSRF protection
-
-4. **Migration Generation** (wheels-migration-generator)
-   - Check for database-specific SQL
-   - Check date/time handling
-   - Check transaction structure
-
-## Testing Anti-Pattern Detection
-
-### Test Cases
-
-```cfm
-// Test Case 1: Should detect mixed arguments
-Input:  hasMany("comments", dependent="delete")
-Detect: ✅ YES
-Fix:    hasMany(name="comments", dependent="delete")
-
-// Test Case 2: Should allow consistent named arguments
-Input:  hasMany(name="comments", dependent="delete")
-Detect: ❌ NO (Correct pattern)
-
-// Test Case 3: Should allow consistent positional (no options)
-Input:  hasMany("comments")
-Detect: ❌ NO (Correct pattern)
-
-// Test Case 4: Should detect ArrayLen on association
-Input:  ArrayLen(post.comments())
-Detect: ✅ YES
-Fix:    post.comments().recordCount
-
-// Test Case 5: Should detect non-existent helper
-Input:  emailField(objectName="user", property="email")
-Detect: ✅ YES
-Fix:    textField(objectName="user", property="email", type="email")
-
-// Test Case 6: Should detect database-specific SQL
-Input:  "INSERT INTO posts (date) VALUES (NOW())"
-Detect: ✅ YES
-Fix:    Use CFML Now() with formatting
-
-// Test Case 7: Should detect inconsistent config styles
-Input:  hasMany("comments") + belongsTo(name="user")
-Detect: ✅ YES
-Fix:    Both use named arguments
-```
-
-## Configuration
-
-### Enable/Disable Checks
-
-```json
-// .claude/anti-pattern-config.json
-{
-  "checks": {
-    "mixedArguments": true,
-    "queryArrayConfusion": true,
-    "nonExistentHelpers": true,
-    "railsRouting": true,
-    "databaseSpecificSQL": true,
-    "csrfProtection": true,
-    "inconsistentConfig": true
-  },
-  "autoFix": true,
-  "reportLevel": "warning"
-}
-```
-
-## Success Metrics
-
-- **Detection Rate:** 100% of known anti-patterns caught
-- **False Positives:** <5%
-- **Auto-Fix Success:** >95%
-- **User Awareness:** Clear before/after shown for all fixes
 
 ## Related Skills
 
 All Wheels generator skills depend on this skill for validation.
 
----
-
-**Generated by:** Wheels Anti-Pattern Detector Skill v1.0
-**Framework:** CFWheels 3.0+
-**Last Updated:** 2025-10-20

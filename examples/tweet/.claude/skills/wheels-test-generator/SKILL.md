@@ -1,6 +1,6 @@
 ---
 name: Wheels Test Generator
-description: Generate TestBox BDD test specs for Wheels models, controllers, and integration tests. Use when creating tests for models (validations, associations), controllers (actions, filters), or integration workflows. Ensures comprehensive test coverage with proper setup/teardown and Wheels testing conventions.
+description: Generate WheelsTest BDD specs for Wheels models, controllers, and integration tests. Use when creating tests for models (validations, associations), controllers (actions, filters), or integration workflows. Ensures comprehensive test coverage with proper setup/teardown and Wheels testing conventions.
 ---
 
 # Wheels Test Generator
@@ -10,102 +10,49 @@ description: Generate TestBox BDD test specs for Wheels models, controllers, and
 Activate automatically when:
 - User requests to create tests/specs
 - User wants to test a model, controller, or workflow
-- User mentions: test, spec, TestBox, BDD, describe, it, expect
+- User mentions: test, spec, WheelsTest, BDD, describe, it, expect
 - After generating models/controllers (proactive testing)
 
-## Model Test Template
+## Model Spec Template
+
+Specs live in `tests/specs/` and extend `wheels.WheelsTest`.
 
 ```cfm
-component extends="wheels.Test" {
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Post", () => {
+            it("requires a title", () => {
+                var post = model("Post").new(title = "");
+                expect(post.valid()).toBeFalse();
+                expect(post.hasErrors("title")).toBeTrue();
+            });
 
-    function setup() {
-        // Runs before each test
-        super.setup();
-        model = model("Post").new();
-    }
-
-    function teardown() {
-        // Runs after each test
-        if (isObject(model) && model.isPersisted()) {
-            model.delete();
-        }
-        super.teardown();
-    }
-
-    function testValidatesPresenceOfTitle() {
-        model.title = "";
-        assert("!model.valid()");
-        assert("model.hasErrors('title')");
-    }
-
-    function testHasManyComments() {
-        model = model("Post").create(title="Test", content="Content");
-        comment = model("Comment").create(postId=model.id, content="Comment");
-
-        assert("model.comments().recordCount == 1");
-
-        model.delete(); // Cascade should delete comment
-        assert("!isObject(model('Comment').findByKey(comment.id))");
+            it("deletes its comments with it", () => {
+                var post = model("Post").create(title = "Test", content = "Content");
+                var comment = model("Comment").create(postId = post.id, content = "Comment");
+                expect(post.comments().recordCount).toBe(1);
+                post.delete();
+                expect(IsObject(model("Comment").findByKey(comment.id))).toBeFalse();
+            });
+        });
     }
 }
 ```
 
-## Controller Test Template
+Assign finder results to a local (`var post`), never to a variable named `model` - that shadows the `model()` function for the rest of the spec.
+
+## Request Spec Template
+
+Exercise controllers through a request, not by instantiating them:
 
 ```cfm
-component extends="wheels.Test" {
-
-    function setup() {
-        super.setup();
-        params = {controller="posts", action="index"};
-    }
-
-    function testIndexLoadsAllPosts() {
-        controller = controller("Posts", params);
-        controller.processAction("index");
-
-        assert("isQuery(controller.posts)");
-    }
-
-    function testShowRequiresKey() {
-        params.action = "show";
-        controller = controller("Posts", params);
-        // Should redirect due to missing key
-    }
-
-    function testCreateWithValidData() {
-        params.action = "create";
-        params.post = {title="Test", content="Content"};
-
-        controller = controller("Posts", params);
-        controller.processAction("create");
-
-        assert("flashKeyExists('success')");
-    }
-}
-```
-
-## Integration Test Template
-
-```cfm
-component extends="wheels.Test" {
-
-    function testCompletePostLifecycle() {
-        // Create
-        post = model("Post").create(title="Test", content="Content");
-        assert("isObject(post) && post.isPersisted()");
-
-        // Update
-        post.update(title="Updated");
-        assert("post.title == 'Updated'");
-
-        // Add comment
-        comment = model("Comment").create(postId=post.id, content="Comment");
-        assert("post.comments().recordCount == 1");
-
-        // Delete (cascade)
-        post.delete();
-        assert("!isObject(model('Comment').findByKey(comment.id))");
+component extends="wheels.WheelsTest" {
+    function run() {
+        describe("Posts", () => {
+            it("lists posts", () => {
+                $testClient().get("/posts").assertOk();
+            });
+        });
     }
 }
 ```
@@ -115,6 +62,3 @@ component extends="wheels.Test" {
 - **wheels-model-generator**: Creates models to test
 - **wheels-controller-generator**: Creates controllers to test
 
----
-
-**Generated by:** Wheels Test Generator Skill v1.0

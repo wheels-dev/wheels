@@ -33,6 +33,7 @@
 								</a>
 							<cfelse>
 								<form action="#urlFor(route='followUser', userId=user.id)#" method="post" class="inline">
+									#authenticityTokenField()#
 									<button type="submit"
 											class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-full font-medium">
 										Follow
@@ -105,6 +106,7 @@
 						<!-- Delete button (only for own tweets) -->
 						<cfif structKeyExists(session, "userId") AND tweets.userId EQ session.userId>
 							<form action="#urlFor(controller='tweets', action='delete', key=tweets.id)#" method="post" onsubmit="return confirm('Are you sure you want to delete this tweet?');">
+								#authenticityTokenField()#
 								<button type="submit" class="text-red-500 hover:text-red-700 text-sm">
 									Delete
 								</button>

@@ -93,6 +93,7 @@
 							<!-- Delete button (only for own tweets) -->
 							<cfif structKeyExists(session, "userId") AND tweets.userId EQ session.userId>
 								<form action="#urlFor(controller='tweets', action='delete', key=tweets.id)#" method="post" onsubmit="return confirm('Are you sure you want to delete this tweet?');">
+									#authenticityTokenField()#
 									<button type="submit" class="text-red-500 hover:text-red-700 text-sm">
 										Delete
 									</button>
@@ -119,6 +120,7 @@
 									</a>
 								<cfelse>
 									<form action="#urlFor(route='likeTweet', tweetId=tweets.id)#" method="post" class="inline">
+										#authenticityTokenField()#
 										<button type="submit" class="flex items-center space-x-1 hover:text-red-500">
 											<span>🤍</span>
 											<span class="text-sm font-medium">#tweets.likesCount#</span>

@@ -1,6 +1,7 @@
 component extends="Controller" {
 
 	function config() {
+		super.config();
 		provides("html");
 		filters(through="requireAuth", except="new,create");
 		filters(through="findUser", only="show,edit,update");
