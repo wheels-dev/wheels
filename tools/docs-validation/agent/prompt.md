@@ -33,9 +33,9 @@ You're invoked once per function. The user message contains:
 - The existing reference example body, if any
 - The documented hint and parameters from the snapshot
 
-Aim for this turn budget:
+Work in this order:
 
-1. **(1 turn)** Read the function source at the candidate path. The user
+1. Read the function source at the candidate path. The user
    message gives you the line; jump there. If the function spans the
    docblock + a few hundred lines, that's one `read_file`.
 
@@ -62,12 +62,12 @@ Aim for this turn budget:
    structs (most string/util functions, `count()`, `findAll()` returning
    a query, etc.) — the function source is enough.
 
-2. **(0–1 turns)** If you've never seen a Wheels reference example, read
+2. If you've never seen a Wheels reference example, read
    ONE for format reference (e.g. `reference/model/findall.txt`). Don't
    read more than one.
-3. **(0 turns)** Skim the docblock vs. the snapshot's `hint`/`parameters`
+3. Skim the docblock vs. the snapshot's `hint`/`parameters`
    for drift — you have both in context already, no tool call needed.
-4. **(0–2 turns)** If drift exists, decide direction:
+4. If drift exists, decide direction:
    - **Doc wrong, code right** (most common): `edit_file` on the CFC,
      touching only the docblock comment lines or `@param` hints. Never
      the signature.
@@ -78,38 +78,30 @@ Aim for this turn budget:
    - **Unclear / intentional / non-trivial**: skip the edit; make the
      example pragmatic and mark `status="needs_human"` in your final
      report if a doc/code conflict remains.
-5. **(1 turn)** Draft 1–3 examples. Format: numbered comment headings
+5. Draft 1–3 examples. Format: numbered comment headings
    (`// 1. Basic usage`), one CFML fragment per heading. Mimic the tone
    of existing references — short, idiomatic, no `<cfcomponent>`
    wrappers unless the example IS a component definition.
-6. **(0–1 turns, OPTIONAL)** If you're unsure about CFML syntax (not
+6. Optionally, if you're unsure about CFML syntax (not
    framework calls), `wheels cfml '<expr>'` once to sanity-check. Skip
    this entirely if the example is straightforward.
-7. **(1 turn)** `write_file` the reference. Path:
+7. `write_file` the reference. Path:
    `vendor/wheels/public/docs/reference/<scope>/<funcname-lowercased>.txt`.
    Pick the scope from the function's `availableIn` (most specific
    first; if `availableIn` includes both `controller` and `model`, prefer
    `controller`).
-8. **(1 turn)** `report_outcome` with `status="done"`. **DO THIS
-   IMMEDIATELY AFTER `write_file`. Do not validate further. Do not
-   re-read the file you just wrote.**
+8. `report_outcome` with `status="done"`, right after `write_file` —
+   the example doesn't need further validation.
 
-## Termination is the most important thing
+## Finishing
 
-You have a hard turn budget. If you don't call `report_outcome`, your
-work is recorded as `failed` even when the file you wrote is good.
-
-**Mandatory pattern at the end of every run:**
-
-```
-write_file(...)        // step 7
-report_outcome(...)    // step 8 — IMMEDIATELY after write_file
-```
-
-If you find yourself at turn ≥10 and you haven't written the file yet,
-**simplify**: write the smallest plausible idiomatic example you can
-defend and report `status="done"`. Don't pursue perfection at the cost
-of termination.
+The run has a fixed turn budget. A run that ends without
+`report_outcome` is recorded as auto-finalized and needs extra human
+review even when the file you wrote is good, so end every run with
+`write_file` followed by `report_outcome`. If you're past turn 10
+without a written file, write the smallest idiomatic example you can
+defend and report `done` — a defensible example that lands beats a
+perfect one that doesn't.
 
 If you find yourself wanting to re-read a file you've already read,
 **don't**. Trust your context. If you genuinely forgot specific content,
@@ -180,12 +172,12 @@ Use this instead of reading CLAUDE.md.
   controller-context expressions.
 
 **Migrations**
-- Use `NOW()` for cross-database date defaults (works on MySQL,
-  Postgres, SQL Server, H2, SQLite).
+- Use `CURRENT_TIMESTAMP` for cross-database date defaults. `NOW()`
+  fails on SQLite and SQL Server.
 - `t.timestamps()` adds three columns: `createdAt`, `updatedAt`,
   `deletedAt`. Don't add separate datetime columns for those.
 - Bulk seed data: use literal SQL, not parameterized
-  (`execute("INSERT INTO ... VALUES ('admin', NOW(), NOW())")`).
+  (`execute("INSERT INTO ... VALUES ('admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")`).
 
 **Routes**
 - Order: MCP → resources → custom named → root → wildcard (last).
@@ -194,8 +186,8 @@ Use this instead of reading CLAUDE.md.
 
 **Test framework**
 - Tests use WheelsTest BDD (`describe(...)`, `it(...)`). Tests extend
-  `wheels.WheelsTest`. The legacy RocketUnit (`assert()`,
-  `function test_...`) is gone.
+  `wheels.WheelsTest`. RocketUnit (`assert()`, `function test_...`) is
+  legacy; don't use it in new examples.
 
 **Soft deletes**
 - Models with a `deletedAt` column are soft-deleted by default;

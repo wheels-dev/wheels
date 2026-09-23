@@ -22,6 +22,14 @@ interface ReviewerVerdict {
 
 const client = new Anthropic({ apiKey: config.anthropicApiKey });
 
+// Every session this run creates, so the summary can report what the run cost.
+const sessionIds: string[] = [];
+async function trackSession<T extends { id: string }>(p: Promise<T>): Promise<T> {
+  const s = await p;
+  sessionIds.push(s.id);
+  return s;
+}
+
 async function main(): Promise<void> {
   const filterArg = process.argv[2];
   const filter = filterArg ? new Set(filterArg.split(",").map(Number)) : null;
@@ -71,11 +79,21 @@ async function main(): Promise<void> {
   for (const row of summary) {
     console.log(`  #${row.issue}: ${row.result}`);
   }
+
+  // usage.list_cost.amount is an integer string in cents.
+  let cents = 0;
+  for (const id of sessionIds) {
+    const s = (await client.beta.sessions.retrieve(id)) as {
+      usage?: { list_cost?: { amount?: string } };
+    };
+    cents += Number(s.usage?.list_cost?.amount ?? 0);
+  }
+  console.log(`  List cost across ${sessionIds.length} session(s): $${(cents / 100).toFixed(2)}`);
 }
 
 async function processIssue(issue: Issue, branch: string): Promise<string> {
   // 1. Create fixer session with develop checked out, memory attached.
-  const fixerSession = await client.beta.sessions.create({
+  const fixerSession = await trackSession(client.beta.sessions.create({
     agent: config.fixerAgentId,
     environment_id: config.environmentId,
     title: `Fix issue #${issue.number}`,
@@ -94,7 +112,7 @@ async function processIssue(issue: Issue, branch: string): Promise<string> {
           "Cross-issue knowledge. Read /conventions.md and /gotchas.md before starting. After completing the fix, append to /issues-completed.md (issue, branch, files, learning). If you discover anything tricky, add it to /gotchas.md.",
       },
     ],
-  });
+  }));
   console.log(`  fixer session: ${fixerSession.id}`);
 
   // 2. Initial fix turn.
@@ -238,7 +256,7 @@ async function reviewPr(
   branch: string,
 ): Promise<ReviewerVerdict> {
   // Fresh reviewer session, scoped to this PR.
-  const reviewSession = await client.beta.sessions.create({
+  const reviewSession = await trackSession(client.beta.sessions.create({
     agent: config.reviewerAgentId,
     environment_id: config.environmentId,
     title: `Review PR #${pr.number}`,
@@ -257,7 +275,7 @@ async function reviewPr(
           "Cross-PR review knowledge. Read /review-patterns.md and /gotchas.md before reviewing. Append any new patterns you notice to /review-patterns.md.",
       },
     ],
-  });
+  }));
 
   const reviewMsg = `Review PR #${pr.number} (branch ${branch}, base ${pr.base.ref}).
 
@@ -265,26 +283,40 @@ The branch is checked out at /workspace/wheels.
 
 Run \`git diff ${pr.base.ref}...HEAD\` to see the changes. Read affected files in full for context.
 
-Apply the review checklist from your system prompt. End your response with the JSON verdict block as specified.`;
+Apply the review checklist from your system prompt, then call submit_review.`;
 
-  const result = await runTurn(client, reviewSession.id, reviewMsg, {
+  const captured: { verdict: ReviewerVerdict | null } = { verdict: null };
+  await runTurn(client, reviewSession.id, reviewMsg, {
     onText: (t) => process.stdout.write(t),
+    customTools: {
+      submit_review: async (input) => {
+        const v = input as Partial<ReviewerVerdict>;
+        if (
+          (v.verdict !== "approve" && v.verdict !== "request_changes") ||
+          !Array.isArray(v.comments) ||
+          typeof v.general_feedback !== "string"
+        ) {
+          return {
+            text: "Invalid submit_review input; call it again with verdict, comments[], and general_feedback.",
+            isError: true,
+          };
+        }
+        captured.verdict = v as ReviewerVerdict;
+        return { text: "Review recorded." };
+      },
+    },
   });
   process.stdout.write("\n");
 
-  const verdict = extractVerdict(result.finalText);
-  if (!verdict) {
-    console.warn(
-      `  ⚠ reviewer output had no parseable JSON verdict — treating as request_changes.`,
-    );
+  if (!captured.verdict) {
+    console.warn(`  ⚠ reviewer ended without calling submit_review — treating as request_changes.`);
     return {
       verdict: "request_changes",
       comments: [],
-      general_feedback:
-        "Reviewer output had no parseable JSON verdict block. Please fix the JSON output format.",
+      general_feedback: "The automated reviewer did not submit a verdict; this PR needs a human look.",
     };
   }
-  return verdict;
+  return captured.verdict;
 }
 
 async function waitForCiAndFix(
@@ -326,7 +358,7 @@ Please:
 3. Commit and push to the same branch.
 4. Output a summary of what you fixed.
 
-If the failure is a flake (transient, infrastructure), say "FLAKE:" in your response and the orchestrator will retry without changes.`;
+If the failure is transient infrastructure rather than code, make no changes and say so in your summary.`;
 
     const fixTurn = await runTurn(client, fixerSessionId, ciMsg, {
       onText: (t) => process.stdout.write(t),
@@ -377,27 +409,6 @@ async function pollCiUntilDone(sha: string): Promise<ReturnType<typeof summarize
     await new Promise((r) => setTimeout(r, config.ciPollIntervalSec * 1000));
   }
   return { state: "failure", failed: [], inProgress: [] };
-}
-
-function extractVerdict(text: string): ReviewerVerdict | null {
-  const fenced = text.match(/```json\s*\n([\s\S]*?)\n```/);
-  if (fenced) {
-    try {
-      return JSON.parse(fenced[1]) as ReviewerVerdict;
-    } catch {
-      // fall through
-    }
-  }
-  // Fallback: look for the last { ... "verdict" ... } object in the text.
-  const lastObj = text.match(/\{[\s\S]*"verdict"[\s\S]*\}/);
-  if (lastObj) {
-    try {
-      return JSON.parse(lastObj[0]) as ReviewerVerdict;
-    } catch {
-      // fall through
-    }
-  }
-  return null;
 }
 
 function buildPrBody(issue: Issue, fixerSummary: string): string {

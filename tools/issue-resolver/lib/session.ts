@@ -28,6 +28,11 @@ export async function runTurn(
   options: {
     onText?: (delta: string) => void;
     onEvent?: (event: AnyEvent) => void;
+    /** Handlers for the agent's custom tools, keyed by tool name. */
+    customTools?: Record<
+      string,
+      (input: unknown) => Promise<{ text: string; isError?: boolean }>
+    >;
   } = {},
 ): Promise<RunTurnResult> {
   const events: AnyEvent[] = [];
@@ -47,6 +52,7 @@ export async function runTurn(
   let status: "idle" | "terminated" = "idle";
   let stopReason: string | undefined;
   const turnTextParts: string[] = [];
+  let answeredCustomTool = false;
 
   for await (const event of stream as unknown as AsyncIterable<AnyEvent>) {
     events.push(event);
@@ -65,6 +71,29 @@ export async function runTurn(
       }
     }
 
+    if (event.type === "agent.custom_tool_use") {
+      const name = (event as { name?: string }).name ?? "";
+      const handler = options.customTools?.[name];
+      if (!handler) {
+        throw new Error(
+          `Session ${sessionId} called custom tool "${name}" with no handler.`,
+        );
+      }
+      const out = await handler((event as { input?: unknown }).input);
+      await client.beta.sessions.events.send(sessionId, {
+        events: [
+          {
+            type: "user.custom_tool_result",
+            custom_tool_use_id: event.id,
+            content: [{ type: "text", text: out.text }],
+            is_error: out.isError ?? false,
+          },
+        ],
+      });
+      answeredCustomTool = true;
+      continue;
+    }
+
     if (event.type === "session.status_terminated") {
       status = "terminated";
       break;
@@ -77,11 +106,12 @@ export async function runTurn(
         stopReason = reason;
         break;
       }
-      // requires_action — agent is waiting on a client-side response
-      // (tool confirmation or custom tool result). We don't wire those up,
-      // so this is a configuration bug; surface it.
+      // requires_action — transient while a custom tool result we already
+      // sent is processed. Tool confirmations aren't wired up, so any other
+      // requires_action is a configuration bug; surface it.
+      if (answeredCustomTool) continue;
       throw new Error(
-        `Session ${sessionId} idle with requires_action — neither tool confirmations nor custom tools are wired up in this orchestrator.`,
+        `Session ${sessionId} idle with requires_action and no custom tool call to answer — tool confirmations are not wired up in this orchestrator.`,
       );
     }
   }

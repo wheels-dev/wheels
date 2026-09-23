@@ -10,10 +10,10 @@ const ENV_FILE = join(__dirname, ".env.local");
 const FIXER_MODEL = process.env.FIXER_MODEL || "claude-opus-4-7";
 const REVIEWER_MODEL = process.env.REVIEWER_MODEL || "claude-sonnet-4-6";
 
-const FIXER_SYSTEM = `You are a Wheels framework engineer resolving GitHub issues. The repo is mounted at /workspace/wheels with a feature branch already checked out.
+const FIXER_SYSTEM = `You are a Wheels framework engineer resolving GitHub issues. The repo is mounted at /workspace/wheels with the base branch checked out; each task message names the branch to create.
 
-ALWAYS read /workspace/wheels/CLAUDE.md first. It contains anti-patterns and conventions you must follow strictly. Pay particular attention to:
-- The Top-10 Anti-Patterns (mixed positional/named args, query vs array in views, etc.)
+Read /workspace/wheels/CLAUDE.md before changing code: it holds the framework's anti-patterns and conventions, and changes that violate them fail review. In particular:
+- The Anti-Patterns section (mixed positional/named args, query vs array in views, etc.)
 - Cross-engine compatibility notes (.ai/wheels/cross-engine-compatibility.md) — Lucee/Adobe CF differences are common bug sources
 - Commit message format (commitlint rules in CLAUDE.md)
 
@@ -21,7 +21,7 @@ Workflow:
 1. Read the issue body and any referenced files. Use grep/glob to find related code.
 2. Make the smallest change that resolves the issue. No refactoring of surrounding code, no scope creep, no speculative abstractions.
 3. If a quick relevant test exists, run it (e.g. bash tools/test-local.sh model). Skip heavy matrix tests — CI handles those.
-4. Commit using the conventional format \`type(scope): subject\` from CLAUDE.md. The branch is already \`claude/issue-<NUMBER>\`.
+4. Create the branch named in the task message, then commit using the conventional format \`type(scope): subject\` from CLAUDE.md.
 5. Push the branch with \`git push -u origin <branch>\`.
 6. Output a final message stating: branch name, commit SHA(s), files changed, brief summary.
 
@@ -43,15 +43,41 @@ Read /workspace/wheels/CLAUDE.md for the anti-patterns list. Then review the dif
 
 Read affected files in full for context, not just the diff.
 
-End your response with a JSON block (the orchestrator parses this — no other JSON in your response):
-
-\`\`\`json
-{"verdict": "approve" | "request_changes", "comments": [{"path": "<file>", "line": <number>, "body": "<actionable feedback>"}], "general_feedback": "<one paragraph summary>"}
-\`\`\`
-
-If verdict is "approve", \`comments\` may be empty. If "request_changes", every comment must be actionable and specific. Don't nitpick style if commitlint and tests pass — focus on correctness, framework conventions, and cross-engine concerns.
+Finish by calling \`submit_review\` once with your verdict. If you request changes, every comment must be actionable and specific. Don't nitpick style if commitlint and tests pass — focus on correctness, framework conventions, and cross-engine concerns.
 
 A memory store is attached. Read /review-patterns.md for accumulated reviewer notes from prior PRs.`;
+
+const SUBMIT_REVIEW_TOOL = {
+  type: "custom" as const,
+  name: "submit_review",
+  description:
+    "Record the final review verdict for this PR. The orchestrator posts it to GitHub as a PR review (one inline comment per entry in comments) and, on request_changes, forwards the comments to the fixer agent. Call exactly once, after you have finished reviewing. Returns a short acknowledgement, or an error message if the input is malformed (call again with corrected input).",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      verdict: {
+        type: "string",
+        enum: ["approve", "request_changes"],
+        description: "approve: mergeable as-is. request_changes: at least one comment must be addressed.",
+      },
+      comments: {
+        type: "array",
+        description: "Inline comments; may be empty on approve.",
+        items: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Repo-relative path of a file in the diff" },
+            line: { type: "integer", description: "Line number in the new version of the file" },
+            body: { type: "string", description: "Actionable, specific feedback" },
+          },
+          required: ["path", "line", "body"],
+        },
+      },
+      general_feedback: { type: "string", description: "One-paragraph summary, posted as the review body." },
+    },
+    required: ["verdict", "comments", "general_feedback"],
+  },
+};
 
 const SEED_CONVENTIONS = `# Wheels Conventions Cheat Sheet
 
@@ -60,7 +86,7 @@ This file accumulates framework-specific conventions discovered while resolving 
 - Models extend "Model"; controllers extend "Controller"; new tests extend "wheels.WheelsTest" (BDD).
 - All associations/validations/callbacks go in the model's config() function.
 - Function-call rule: NEVER mix positional and named arguments in Wheels framework calls. Use all named when passing options.
-- Migrations: use NOW() for timestamps (database-agnostic), use direct SQL for seed inserts (parameter binding is unreliable in execute()).
+- Migrations: use CURRENT_TIMESTAMP for timestamps (NOW() fails on SQLite and SQL Server); seed inserts are inline SQL strings, because execute() takes only a SQL string and has no parameters argument.
 - View variables must be cfparam'd at the top of every view file.
 - Filter functions in controllers must be declared private.
 - timestamps() in migrations adds createdAt, updatedAt, AND deletedAt (three columns, not two).
@@ -97,7 +123,7 @@ Notes accumulated across PR reviews — recurring issues, false positives, frame
 - Always check \`vendor/wheels/\` changes for cross-engine compatibility (Lucee 6/7, Adobe 2023/2025, BoxLang).
 - New CFC files: confirm \`extends="..."\` is correct and matches the CLAUDE.md convention.
 - Routes: order matters; resources before custom-named before root before wildcard.
-- Migrations: use \`NOW()\` not database-specific timestamp functions.
+- Migrations: use \`CURRENT_TIMESTAMP\`; \`NOW()\` fails on SQLite and SQL Server.
 `;
 
 async function main() {
@@ -164,6 +190,7 @@ async function main() {
     system: REVIEWER_SYSTEM,
     tools: [
       { type: "agent_toolset_20260401", default_config: { enabled: true } },
+      SUBMIT_REVIEW_TOOL,
     ],
     description:
       "Reviews Wheels PRs for issue resolution, anti-pattern compliance, and cross-engine compatibility. Outputs structured JSON verdict.",

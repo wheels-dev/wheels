@@ -223,7 +223,7 @@ jobs:
 
           - Mode: `${{ inputs.mode }}`
           - Edit scope (api mode): `vendor/wheels/**/*.cfc` (docblocks + narrow body fixes) and `vendor/wheels/public/docs/reference/{scope}/{name}.txt`
-          - Edit scope (guide mode): `web/sites/guides/src/content/docs/v4-0-0-snapshot/**/*.mdx?` and `vendor/wheels/**/*.cfc` (docblock prose only)
+          - Edit scope (guide mode): `web/sites/guides/src/content/docs/<newest version>/**/*.mdx?` and `vendor/wheels/**/*.cfc` (docblock prose only)
           - Per-item status tracked in `tools/docs-validation/state.json`
 
           ## Review checklist
