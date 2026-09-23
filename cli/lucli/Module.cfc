@@ -194,6 +194,7 @@ component extends="modules.BaseModule" {
 			"map",      // deprecated forwarder for the same thing (snapshot 2499)
 			"d",        // alias for destroy
 			"g",        // alias for generate
+			"dbmigrate", // alias for migrate — a duplicate tool with no inputSchema otherwise
 			"new",      // scaffolds a whole new Wheels project
 			"console",  // interactive CFML REPL — not usable over stdio
 			"start",    // dev server lifecycle (stateful)
@@ -255,9 +256,11 @@ component extends="modules.BaseModule" {
 	 * builder the command's parse helper uses, so the CLI parse surface and
 	 * the MCP advertisement cannot drift.
 	 *
-	 * Commands still on hand-rolled token parsing (generate, migrate, db,
-	 * deploy, info, reload, validate, create — tracked by #2861)
-	 * gain entries here as they migrate to ArgSpec.
+	 * Verified over stdio on the pinned LuCLI runtime (0.6.1): every entry
+	 * below is advertised as its tool's inputSchema. `info` and `validate`
+	 * take no arguments, so their empty schema is accurate. The commands that
+	 * still parse their own argv (db, deploy, packages, reload) advertise an
+	 * empty schema until they move to ArgSpec and gain an entry here.
 	 */
 	public struct function mcpToolSpecs() {
 		return {

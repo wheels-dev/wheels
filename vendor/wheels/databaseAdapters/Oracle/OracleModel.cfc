@@ -300,6 +300,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * default is evaluated per row. It is also the shape `$upsertSQL` below already
 	 * uses for its MERGE source, including the alias-the-first-branch-only detail.
 	 *
+	 * Oracle rejects RETURNING after `INSERT ... SELECT` too (ORA-03048), so this
+	 * statement must also reach the driver without a generated-key request. insertAll()
+	 * runs it with `$captureResult=false`, which drops the cfquery `result` attribute —
+	 * the thing that makes Lucee request generated keys (#3653).
+	 *
 	 * Uses parameterized values via `$buildBulkParam` — never interpolates user data
 	 * into SQL.
 	 */

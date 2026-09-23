@@ -532,13 +532,27 @@ if (isMySQLFamily) {
 
 CockroachDB is a full (non-soft-fail) leg of the compat matrix — each engine × cockroachdb combination runs as its own parallel job in `.github/workflows/compat-matrix.yml`. The only remaining soft-fail database is Oracle (`SOFT_FAIL_DBS="oracle"` in the same workflow, tracked in #2663).
 
-### Oracle — Multi-Row INSERT and RETURNING Incompatibility
+### Oracle — Bulk INSERT, RETURNING and Generated Keys
 
-Oracle 23 rejects `INSERT INTO t (cols) VALUES (?,?), (?,?), ...` (the SQL-standard table value constructor) when the JDBC driver also requests `RETURN_GENERATED_KEYS`. The Oracle JDBC driver translates `RETURN_GENERATED_KEYS` into a `RETURNING ROWID INTO` clause, and Oracle 23 does not permit `RETURNING` combined with multi-row VALUES.
+The Oracle JDBC driver implements `Statement.RETURN_GENERATED_KEYS` by appending `RETURNING ROWID INTO ?` to every INSERT it is handed, and Oracle rejects that clause after two bulk shapes:
 
-`OracleModel` overrides `$bulkInsertSQL()` to emit `INSERT ALL INTO t (cols) VALUES (...) INTO t (cols) VALUES (...) SELECT 1 FROM dual` — Oracle's idiomatic multi-row form, which avoids both the table value constructor and the RETURNING expansion. This is transparent to framework users; `insertAll()` works the same on Oracle as on other databases.
+- a multi-row `VALUES (?,?), (?,?)` table value constructor — `returning clause is not allowed with INSERT and Table Value Constructor` on Oracle 23 (#2745);
+- `INSERT INTO t (cols) SELECT ... FROM dual UNION ALL ...` — `ORA-03048: SQL reserved word 'ROWID' is not syntactically valid following '... FROM dual RETURNING'` (#3653).
 
-If you write code that generates raw bulk-insert SQL for Oracle (or adds a new adapter), use `INSERT ALL ... SELECT 1 FROM dual` rather than multi-row VALUES. The canonical implementation is `vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc::$bulkInsertSQL`.
+Lucee requests generated keys for any `cfquery` that carries a `result` attribute. Probed on Lucee 7 + ojdbc11, the same `INSERT ... SELECT` succeeds once `result` is dropped, and a leading `/* comment */` does not help because the driver skips comments when it classifies the statement.
+
+How the framework handles it:
+
+- `OracleModel::$bulkInsertSQL` emits `INSERT INTO t (cols) SELECT ... FROM dual UNION ALL SELECT ... FROM dual`: one driving row per record, so identity defaults are evaluated per row. The older `INSERT ALL ... SELECT 1 FROM dual` form had a single driving row and handed every record the same generated key (#3302), so don't reintroduce it.
+- `insertAll()` and `upsertAll()` run their statements with `$performQuery(..., $captureResult = false)`, which omits the `result` attribute, so no RETURNING clause is appended. Anything else that runs a multi-row INSERT through `$performQuery` and does not read the result or a key should opt out the same way.
+- Don't dodge the rewrite with a PL/SQL block (`BEGIN INSERT ...; END;`). It works, but it halves the bind capacity: 1,000 rows × 40 columns fails with `ORA-16951` where the plain statement passes. It was also several times slower in the same probe.
+
+### SQL Server — Explicit Identity Values and Multi-Statement Batches
+
+`create()` with an explicit primary key needs `SET IDENTITY_INSERT <table> ON` when that key is an IDENTITY column (#3647). `MicrosoftSQLServerModel::$identityInsertSQL` sends the ON, the INSERT and the OFF as one batch, guarded by a `sys.identity_columns` lookup. Two engine facts shaped it, both probed on Lucee 7 + SQL Server:
+
+- **Lucee drops an error raised after a batch's first result.** Wrapping the INSERT in `BEGIN TRY ... END TRY BEGIN CATCH ... THROW; END CATCH` made a duplicate-key insert report success: the failed statement's result came back first, and Lucee never surfaced the re-raised error that followed it. Don't use CATCH + THROW (or `RAISERROR` after other output) to report failures from a multi-statement batch.
+- **A `SET` in a statement with inlined values outlives the batch** and stays on the pooled connection. With `parameterize = false`, a leftover `IDENTITY_INSERT ON` made the connection's next plain insert fail ("Explicit value must be specified for identity column"). So the OFF must run even when the INSERT fails. A constraint violation only ends its own statement, so a trailing OFF in the same batch still runs.
 
 ### Oracle — DDL Auto-Commit and Transaction Wrapper
 

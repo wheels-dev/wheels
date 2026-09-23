@@ -969,44 +969,12 @@ component extends="wheels.WheelsTest" {
 	 * The assertions name the parents' actual keys (41 and 97) and depend on them
 	 * being noncontiguous — that is what proves the seeder cycles real column
 	 * values rather than row indices — so the rows must carry explicit ids.
-	 * SQL Server rejects an explicit value for an IDENTITY column unless
-	 * IDENTITY_INSERT is ON, and that setting is session-scoped, so the creates
-	 * run inside one transaction with the prefix/suffix around them.
+	 * On SQL Server that needs IDENTITY_INSERT, which the adapter now turns on
+	 * for an INSERT that supplies its own identity value (#3647).
 	 */
 	public void function $createSeederParents() {
-		if (!$isSqlServer()) {
-			model("RefParent").create(id = 41, name = "Parent forty one");
-			model("RefParent").create(id = 97, name = "Parent ninety seven");
-			return;
-		}
-		transaction {
-			queryExecute(
-				"SET IDENTITY_INSERT c_o_r_e_refparents ON",
-				[],
-				{datasource = application.wheels.dataSourceName}
-			);
-			model("RefParent").create(id = 41, name = "Parent forty one");
-			model("RefParent").create(id = 97, name = "Parent ninety seven");
-			queryExecute(
-				"SET IDENTITY_INSERT c_o_r_e_refparents OFF",
-				[],
-				{datasource = application.wheels.dataSourceName}
-			);
-		}
-	}
-
-	/**
-	 * True when the core-test datasource is Microsoft SQL Server, the one engine
-	 * that needs IDENTITY_INSERT for an explicit identity value
-	 * (see `$createSeederParents`).
-	 */
-	public boolean function $isSqlServer() {
-		local.info = application.wo.$dbinfo(
-			datasource = application.wheels.dataSourceName,
-			type = "version"
-		);
-		return FindNoCase("SQL Server", local.info.database_productname)
-			|| FindNoCase("SQLServer", local.info.driver_name);
+		model("RefParent").create(id = 41, name = "Parent forty one");
+		model("RefParent").create(id = 97, name = "Parent ninety seven");
 	}
 
 	public void function $deleteAuthorByFirstName(required string firstName) {

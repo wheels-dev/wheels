@@ -52,9 +52,13 @@
 				propertyInfo = variables.wheels.class.properties
 			);
 
+			// Nothing here reads the result or a generated key, so don't request one:
+			// on Lucee that asks the driver for generated keys, and the Oracle driver
+			// then appends a RETURNING clause Oracle rejects (#3653).
 			variables.wheels.class.adapter.$querySetup(
 				parameterize = arguments.parameterize,
-				sql = local.sql
+				sql = local.sql,
+				$captureResult = false
 			);
 
 			local.totalInserted += (local.batchEnd - local.batchStart + 1);
@@ -143,9 +147,11 @@
 				propertyInfo = variables.wheels.class.properties
 			);
 
+			// Same as insertAll(): no result or generated key is read (#3653).
 			variables.wheels.class.adapter.$querySetup(
 				parameterize = arguments.parameterize,
-				sql = local.sql
+				sql = local.sql,
+				$captureResult = false
 			);
 
 			local.totalUpserted += (local.batchEnd - local.batchStart + 1);
