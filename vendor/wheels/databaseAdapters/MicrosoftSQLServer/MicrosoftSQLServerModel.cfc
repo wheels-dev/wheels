@@ -57,6 +57,18 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		required boolean parameterize,
 		string $primaryKey = ""
 	) {
+		// An INSERT that supplies its own primary-key value may need IDENTITY_INSERT
+		// (#3647). This runs before the BoxLang branch below on purpose: a wrapped
+		// statement no longer starts with INSERT INTO, so no SCOPE_IDENTITY() is
+		// appended — correctly, since the caller already has the key.
+		if (
+			Len(Trim(arguments.$primaryKey))
+			&& IsSimpleValue(arguments.sql[1])
+			&& Left(arguments.sql[1], 11) == "INSERT INTO"
+		) {
+			arguments.sql = $identityInsertSQL(sql = arguments.sql, primaryKey = arguments.$primaryKey);
+		}
+
 		// Same-batch identity retrieval for engines whose query result carries no
 		// driver-supplied generated key (currently BoxLang). SCOPE_IDENTITY() is
 		// batch-scoped, so it must ride in the INSERT's own batch; Base.$executeQuery
@@ -194,6 +206,67 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 		$moveAggregateToHaving(args = arguments);
 		return $performQuery(argumentCollection = arguments);
+	}
+
+	/**
+	 * SQL Server rejects an explicit value for an IDENTITY column unless
+	 * IDENTITY_INSERT is ON for the table, so `create(id = 41, ...)` failed here while
+	 * every other supported database accepts it (#3647). This wraps an INSERT whose
+	 * column list includes a primary-key column (the caller supplied that value) in the
+	 * ON/OFF pair. Three rules shape the wrapper:
+	 *
+	 * - One batch. IDENTITY_INSERT is session-scoped, so the ON, the INSERT and the OFF
+	 *   must share a connection; a single statement guarantees that whether or not the
+	 *   caller opened a transaction.
+	 * - Guarded by the catalog. The ON/OFF only runs when one of those key columns is
+	 *   in sys.identity_columns. A natural or UUID key has no identity property, and
+	 *   SET IDENTITY_INSERT on such a table is an error.
+	 * - No TRY/CATCH. The OFF must run even when the INSERT fails: with inlined values
+	 *   (parameterize=false) the batch runs as-is and the setting outlives it, so the
+	 *   pooled connection's next insert into the table would fail. A constraint
+	 *   violation only ends its own statement, so the trailing OFF still runs.
+	 *   Re-raising from a CATCH block (THROW) does not work: Lucee drops an error raised
+	 *   after a batch's first result, so a duplicate key came back as success.
+	 *
+	 * Returns the SQL array unchanged when no primary-key column is supplied.
+	 *
+	 * @sql The INSERT statement as a `$querySetup()` SQL array.
+	 * @primaryKey The table's primary-key column name(s).
+	 */
+	public array function $identityInsertSQL(required array sql, required string primaryKey) {
+		// Parse the INSERT's column list from the fragment strings only (the values are
+		// param structs), the same parse $identitySelect uses.
+		local.text = "";
+		for (local.part in arguments.sql) {
+			if (IsSimpleValue(local.part)) {
+				local.text &= local.part;
+			}
+		}
+		local.insertColumns = $parseInsertColumnList(local.text);
+
+		local.names = "";
+		for (local.key in ListToArray(arguments.primaryKey)) {
+			local.column = $stripIdentifierQuotes(Trim(local.key));
+			if (ListFindNoCase(local.insertColumns, local.column)) {
+				local.names = ListAppend(local.names, "N'" & Replace(local.column, "'", "''", "all") & "'");
+			}
+		}
+		if (!Len(local.names)) {
+			return arguments.sql;
+		}
+
+		// "INSERT INTO [table] (" -> "[table]"
+		local.table = Trim(SpanExcluding(Mid(arguments.sql[1], 12, Len(arguments.sql[1])), "("));
+		local.tableLiteral = Replace(local.table, "'", "''", "all");
+
+		ArrayPrepend(
+			arguments.sql,
+			"DECLARE @wheelsIdentityInsert bit = CASE WHEN EXISTS (SELECT 1 FROM sys.identity_columns"
+			& " WHERE object_id = OBJECT_ID(N'" & local.tableLiteral & "') AND name IN (" & local.names & "))"
+			& " THEN 1 ELSE 0 END; IF @wheelsIdentityInsert = 1 SET IDENTITY_INSERT " & local.table & " ON;"
+		);
+		ArrayAppend(arguments.sql, "; IF @wheelsIdentityInsert = 1 SET IDENTITY_INSERT " & local.table & " OFF;");
+		return arguments.sql;
 	}
 
 	/**
