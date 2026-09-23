@@ -1,7 +1,7 @@
 # /update-docs
 
 Read a PR's implementation diff and add follow-up doc commits (MDX user
-guides, `.ai/wheels/<layer>/`, `CLAUDE.md`) to the PR branch. The bot's
+guides, `.ai/wheels/`, `CLAUDE.md`) to the PR branch. The bot's
 implementation is already in the PR; your job is documentation only.
 
 ## Rails
@@ -11,7 +11,8 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
 - Use `gh` for GitHub state. Use `git add` and `git commit` to land doc
   commits on the PR branch (the caller workflow handles the actual push).
 - **Filesystem writes are scoped to doc paths only**:
-  `web/sites/guides/**`, `.ai/wheels/**`, `CLAUDE.md`, `CHANGELOG.md`.
+  `web/sites/guides/**`, `.ai/wheels/**`, `CLAUDE.md`, `changelog.d/**`
+  (never `CHANGELOG.md` directly — see `changelog.d/README.md`).
   **Do NOT modify any file under `vendor/wheels/**`, `app/**`, `tests/**`,
   `vendor/wheels/tests/**`, `.github/**`, `cli/**`, or `config/**`** —
   the implementation is already in the PR; touching it would create a
@@ -45,15 +46,15 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
    - **MDX user guide?** If user-visible behavior changed (UI, framework
      feature surface, CLI command, public API, error message text), find
      the relevant page under
-     `web/sites/guides/src/content/docs/v4-0-0-snapshot/<area>/`. If no
+     `web/sites/guides/src/content/docs/<newest v* dir>/<area>/`. If no
      obvious page exists, **skip** — note in step 6 that a new doc page
      may be warranted as a follow-up. Do not create new pages.
-   - **`.ai/wheels/<layer>/`?** Update only if a documented pattern, a
-     conventions table, or a canonical example actually changed in the
-     PR diff. Do not edit prose unrelated to the change.
+   - **`.ai/wheels/`?** Update only if a documented pattern, a
+     conventions table, or a canonical example there actually changed in
+     the PR diff. Do not edit prose unrelated to the change.
    - **`CLAUDE.md`?** Update only if model/controller/view conventions
-     changed (the "Critical Anti-Patterns" or "Wheels Conventions"
-     sections in `CLAUDE.md`), or if a new top-level subsystem surfaced.
+     changed (the "Cross-Engine Invariants", "Anti-Patterns", or "Wheels
+     Conventions" sections in `CLAUDE.md`), or if a new top-level subsystem surfaced.
 
    **If none of the above apply** (purely internal refactor, test-only
    change, or doc-only PR already shipping the docs), skip to step 6
@@ -71,10 +72,10 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
 
 5. **Stage and commit (only if there are doc changes).**
 
-   Conventional commit. Type `docs`. Scope from the allowlist if the file
-   path matches: `docs` for `.ai/wheels/` updates, `web/guides` for MDX
-   under `web/sites/guides/`, no scope for `CLAUDE.md`. Subject ≤ 100
-   chars, sentence-case.
+   Conventional commit. Type `docs`. Scope is optional; by convention `docs`
+   for `.ai/wheels/` updates, `web/guides` for MDX under
+   `web/sites/guides/`, none for `CLAUDE.md`. Whole header ≤ 100 chars,
+   sentence-case.
 
    Examples:
    - `docs(web/guides): note registry-package list in debug-panel guide`
@@ -121,7 +122,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
 
 7. **Self-check before posting.**
    - [ ] No files changed outside doc paths (`web/sites/guides/`,
-     `.ai/wheels/`, `CLAUDE.md`, `CHANGELOG.md`)
+     `.ai/wheels/`, `CLAUDE.md`, `changelog.d/`)
    - [ ] If a commit was made, message is conventional and ≤ 100 chars
    - [ ] PR comment with `wheels-bot:update-docs:<pr-number>` marker is
      posted

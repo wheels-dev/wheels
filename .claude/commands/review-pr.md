@@ -3,7 +3,7 @@
 The Reviewer. Review the given pull request as a senior Wheels maintainer
 would. This is the pipeline's single quality gate: there is no second
 reviewer critiquing this review afterwards, so the adversarial self-review
-in step 4 is load-bearing — it replaces the retired Reviewer B pass.
+in step 4 is load-bearing.
 
 ## Rails
 
@@ -31,8 +31,7 @@ below. Highlights for this command:
    `gh pr view <pr-number> --json reviews --jq '.'`. If any review body
    contains the marker `<!-- wheels-bot:review-a:<pr>:<head-sha> -->` for the
    `<head-sha>` you were passed, exit silently — there is nothing to do.
-   Always take the marker SHA from the `<head-sha>` argument; don't compute
-   it yourself (issue #2848). (The marker keeps the legacy `review-a` name
+   (The marker keeps the legacy `review-a` name
    for continuity with reviews posted before the single-reviewer
    consolidation — the skip-check gate and the workflow guard both grep for
    it.)
@@ -52,11 +51,11 @@ below. Highlights for this command:
    - `gh pr view <pr-number> --json files` — file list
    - `git log --oneline origin/develop..<head-sha>` — commit list (for
      commit-message review)
-   - `CLAUDE.md` § "Critical Anti-Patterns" + § "Wheels Conventions" + §
-     "Commit Message Conventions"
+   - `CLAUDE.md` § "Cross-Engine Invariants" + § "Anti-Patterns" + §
+     "Wheels Conventions" + § "Commit Message Conventions"
    - `.ai/wheels/cross-engine-compatibility.md` — Lucee/Adobe/BoxLang gotchas
-   - For any layer touched, the corresponding `.ai/wheels/<layer>/` doc
-     (e.g. if `app/models/**` is touched, read `.ai/wheels/models/`)
+   - For any layer touched, the layer's own source and specs are the
+     reference (`vendor/wheels/<layer>/`, `vendor/wheels/tests/specs/<layer>/`)
 
 3. **Review the diff.** Score the change against this checklist. For each
    issue you find, prepare a line comment with file path + line number +
@@ -75,19 +74,14 @@ below. Highlights for this command:
    - Migration seed data uses inline SQL (not parameter binding)
    - Route order: MCP → resources → custom → root → wildcard last
    - `t.timestamps()` includes deletedAt — no separate datetime columns
-   - Database-agnostic dates (`NOW()`, not `CURRENT_TIMESTAMP`)
+   - Database-agnostic dates (`CURRENT_TIMESTAMP`, not `NOW()` — `NOW()` fails
+     on SQLite and SQL Server)
    - Controller filters declared `private`
    - View variables `cfparam`-ed at top of view file
 
-   **Cross-engine compatibility** (.ai/wheels/cross-engine-compatibility.md)
-   - `struct.map()` member functions on CFC objects (Lucee/Adobe collide)
-   - `application` scope function members (Adobe-broken)
-   - `client` reserved scope inside closures (Lucee throws)
-   - `obj["key"]()` bracket-notation calls (Adobe parser crash)
-   - Array by-value in struct literals (Adobe copies)
-   - `private` mixin functions in `vendor/wheels/model/*.cfc` etc. — must use
-     `public` access with `$` prefix
-   - `Left(str, 0)` on Lucee 7
+   **Cross-engine compatibility** — check the diff against every numbered
+   invariant in `CLAUDE.md` § "Cross-Engine Invariants" (the list there is
+   authoritative and grows; don't review from memory of a subset).
 
    **Test coverage**
    - Are there tests under `tests/specs/` or `vendor/wheels/tests/specs/`?
@@ -97,9 +91,8 @@ below. Highlights for this command:
 
    **Docs & metadata**
    - PR template feature-completeness checklist filled honestly
-   - `.ai/wheels/<layer>/` updated if behavior changed
-   - `web/sites/guides/src/content/docs/v4-0-0-snapshot/` page updated for
-     user-facing features
+   - `web/sites/guides/src/content/docs/<current-version>/` page updated for
+     user-facing features (the newest `v*` directory there)
    - Changelog fragment under `changelog.d/` (`<slug>.<type>.md`; a direct
      `CHANGELOG.md` `[Unreleased]` edit is a finding — it recreates the
      merge-conflict anchor the fragment system removes)
@@ -107,7 +100,7 @@ below. Highlights for this command:
 
    **Commits**
    - Each commit conforms to `commitlint.config.js` (type from allowlist,
-     scope from allowlist or empty, subject ≤ 100 chars, not ALL-CAPS)
+     scope optional and unrestricted, header ≤ 100 chars, not ALL-CAPS)
    - Commit messages reflect the "why," not the "what"
 
    **Security**
@@ -118,9 +111,8 @@ below. Highlights for this command:
 
 4. **Adversarial self-review.** Before writing the review body, switch
    sides: treat your own draft findings the way a hostile second reviewer
-   would. This step inherits the retired Reviewer B's anti-sycophancy and
-   false-positive mandate — there is no downstream critique pass to catch
-   what you let through here.
+   would — there is no downstream critique pass to catch what you let
+   through here.
 
    For **each** finding from step 3, actively attempt to refute it against
    the actual code:
@@ -128,8 +120,8 @@ below. Highlights for this command:
      just the diff hunk). Is the claim accurate as written? E.g. "this
      could SQL inject" is refuted if the code uses parameter binding or the
      query builder.
-   - Is the flagged idiom actually a documented pattern in `.ai/wheels/` or
-     `CLAUDE.md`? If so, the finding is a false positive — drop it.
+   - Is the flagged idiom actually a documented pattern in `CLAUDE.md` or
+     `.ai/wheels/cross-engine-compatibility.md`? If so, the finding is a false positive — drop it.
    - Does the convention you're insisting on actually exist in this repo?
      `git grep` for prior art. If you can't find it, drop the finding.
    - Can you cite concrete evidence (a quoted line, a doc path) for the
@@ -170,9 +162,7 @@ below. Highlights for this command:
      `### Security` — omit empty sections
    - For each finding, cite the file + line, quote the offending snippet,
      and propose a concrete fix
-   - End with the marker `<!-- wheels-bot:review-a:<pr>:<head-sha> -->` where
-     `<head-sha>` is the SHA passed to this command — never a value re-derived
-     from `gh pr view` during the session (issue #2848)
+   - End with the marker `<!-- wheels-bot:review-a:<pr>:<head-sha> -->`
 
    Submit verdict:
    - `--request-changes` if any **Correctness**, **Cross-engine**, or
