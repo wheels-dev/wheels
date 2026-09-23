@@ -38,9 +38,12 @@ component extends="wheels.WheelsTest" {
 				// INSERT without the identity column fails ("Explicit value must be
 				// specified for identity column"). parameterize=false because inlined
 				// values run as a plain batch, where the setting outlives the statement;
-				// a prepared statement's setting does not survive its execution.
+				// a prepared statement's setting does not survive its execution. No string
+				// value in the inlined insert: BoxLang escapes an inlined string literal's
+				// quotes a second time, which would fail the statement before it tests
+				// anything.
 				transaction action="begin" {
-					g.model("RefParent").create(id = 942, name = "Explicit key 942", parameterize = false);
+					g.model("RefParent").create(id = 942, parameterize = false);
 					var generated = g.model("RefParent").create(name = "Generated after explicit");
 					expect(Val(generated.id)).toBeGT(0);
 					expect(Val(generated.id)).notToBe(942);
@@ -60,7 +63,8 @@ component extends="wheels.WheelsTest" {
 				transaction action="begin" {
 					g.model("RefParent").create(id = 943, name = "Explicit key 943");
 					try {
-						g.model("RefParent").create(id = 943, name = "Duplicate key 943", parameterize = false);
+						// Inlined, with no string value, for the same reasons as above.
+						g.model("RefParent").create(id = 943, parameterize = false);
 					} catch (any e) {
 						// Adobe puts the driver's text in detail; message is the generic
 						// "Error Executing Database Query."
