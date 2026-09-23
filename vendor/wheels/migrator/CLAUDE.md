@@ -9,7 +9,7 @@ Every column-adding helper in `TableDefinition.cfc` follows the same shape — m
 **Column name arguments use `$combineArguments` to accept both plural and singular forms.** The plural is canonical; the singular is the alias.
 
 ```cfm
-public any function string(string columnNames, any limit, string default, boolean allowNull) {
+public any function string(string columnNames, any limit, default, boolean allowNull) {
     $combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
     // ... iterate over the list internally
 }
@@ -50,7 +50,7 @@ New code should pass `columnNames`. Both keep working.
 
 The framework default is `false` so existing apps with applied migrations keep matching their database schemas. The `wheels new` template at `cli/lucli/templates/app/config/settings.cfm` opts new apps into `true`.
 
-**The model side does not read this flag, and must not.** Association foreign-key defaults resolve against the columns that actually exist — `vendor/wheels/model/sql.cfc::$deriveAssociationForeignKey()` tries the legacy `<modelName><key>` shape first and falls back to `<modelName>_<key>` — so both conventions work, including a schema holding a mix of the two. Making it flag-driven instead would break: this function's result is memoized for the application lifetime (`expandedMetadataFilled`), whereas `references()` re-reads `$get()` on every call, so a runtime flip would change migrations without changing models. Before [#3337](https://github.com/wheels-dev/wheels/issues/3337) the model layer derived `<modelName><key>` unconditionally, which meant a stock `wheels new` app had a migrator and a model layer that could never agree.
+**The model side does not read this flag, and must not.** Association foreign-key defaults resolve against the columns that actually exist — `vendor/wheels/model/sql.cfm::$deriveAssociationForeignKey()` tries the legacy `<modelName><key>` shape first and falls back to `<modelName>_<key>` — so both conventions work, including a schema holding a mix of the two. Making it flag-driven instead would break: this function's result is memoized for the application lifetime (`expandedMetadataFilled`), whereas `references()` re-reads `$get()` on every call, so a runtime flip would change migrations without changing models. Before [#3337](https://github.com/wheels-dev/wheels/issues/3337) the model layer derived `<modelName><key>` unconditionally, which meant a stock `wheels new` app had a migrator and a model layer that could never agree.
 
 The exception is **polymorphic** associations, which pin their foreign key to `<name>id` at registration time — see the note in the root `CLAUDE.md`. Those still need an explicit `foreignKey=` under the underscore convention.
 

@@ -156,7 +156,7 @@ curl -s "http://localhost:62025/wheels/core/tests?db=sqlite&directory=wheels.tes
 
 Deep reference: [.ai/wheels/cross-engine-compatibility.md](.ai/wheels/cross-engine-compatibility.md).
 
-## Anti-Patterns (Top 14)
+## Anti-Patterns
 
 These are the most common mistakes when generating or modifying Wheels code. Check every time.
 
@@ -251,7 +251,7 @@ function authenticate() { ... }
 private function authenticate() { ... }
 ```
 
-Conversely, public **framework helpers** mixed onto every controller (`env`, `model`, `redirectTo`, `linkTo`, the `is*` request predicates, the flash helpers, …) are auto-excluded from the routable surface. At app start `application.wheels.protectedControllerMethods` is built from the `wheels.Global` + `wheels.controller.*` + `wheels.view.*` mixin surface (the same `getMetaData().functions` set `$integrateComponents` mixes in), and `$callAction()` throws `Wheels.ActionNotAllowed` for any action whose name matches one — intended to fall through to the 404 path, but it currently surfaces as HTTP 500 in every environment ([#3075](https://github.com/wheels-dev/wheels/issues/3075)). So a helper can't be invoked as an action — but you also **can't name a user action after a framework helper** (it errors instead of dispatching). The standard REST action names (`index`, `show`, `new`, `edit`, `create`, `update`, `delete`) are not helpers, so they're unaffected ([#2845](https://github.com/wheels-dev/wheels/pull/2845)).
+Conversely, public **framework helpers** mixed onto every controller (`env`, `model`, `redirectTo`, `linkTo`, the `is*` request predicates, the flash helpers, …) are auto-excluded from the routable surface. At app start `application.wheels.protectedControllerMethods` is built from the `wheels.Global` + `wheels.controller.*` + `wheels.view.*` mixin surface (the same `getMetaData().functions` set `$integrateComponents` mixes in), and `$callAction()` treats any action whose name matches one (or starts with `$`) as a missing action: it routes through `$throwErrorOrShow404Page(type="Wheels.ActionNotAllowed")`, so production renders the 404 page and development shows the `Wheels.ActionNotAllowed` error at status 404 ([#3075](https://github.com/wheels-dev/wheels/issues/3075)). So a helper can't be invoked as an action — but you also **can't name a user action after a framework helper** (it 404s instead of dispatching). The standard REST action names (`index`, `show`, `new`, `edit`, `create`, `update`, `delete`) are not helpers, so they're unaffected ([#2845](https://github.com/wheels-dev/wheels/pull/2845)).
 
 ### 9. Always cfparam View Variables
 Every variable passed from controller to view needs a cfparam at the top of the view file.
@@ -330,7 +330,7 @@ Any validator, analyzer, scanner, or upgrade-check that does substring-matching 
 - `cli/lucli/services/Doctor.cfc::$stripCfmlBlockComments()`
 
 ### 15. Migrator helpers accept singular AND plural column names — prefer the plural
-**Source:** [#2781](https://github.com/wheels-dev/wheels/issues/2781) (`t.references()`) + [#2803](https://github.com/wheels-dev/wheels/issues/2803) (`t.primaryKey()`) — these two helpers were the last outliers in `TableDefinition.cfc`. Every sibling helper accepted `columnNames` / `columnName` via `$combineArguments`, but `references` required `referenceNames` and `primaryKey` required `name`. AI agents and humans both kept reaching for the consistent form and hitting "argument required" errors. Now resolved: both accept `columnNames` as an alias, and that's the preferred form going forward.
+**Source:** [#2781](https://github.com/wheels-dev/wheels/issues/2781) (`t.references()`) + [#2803](https://github.com/wheels-dev/wheels/issues/2803) (`t.primaryKey()`). Every column helper in `TableDefinition.cfc` accepts `columnNames` / `columnName` via `$combineArguments`; `references` and `primaryKey` also keep their legacy names (`referenceNames`, `name`) as aliases. Use `columnNames`.
 
 ```cfm
 // RIGHT — modern, matches every other column helper
@@ -350,7 +350,7 @@ For new migrator helpers or anywhere you accept a column-name argument: declare 
 
 Association foreign-key defaults resolve **either** convention: the default derivation checks which column actually exists on whichever side owns the foreign key, rather than reading the setting ([#3337](https://github.com/wheels-dev/wheels/issues/3337) — before that fix the model layer derived `<modelName><key>` unconditionally and a stock `wheels new` app threw `key [<name>id] doesn't exist` on any `include=`). It is schema-driven on purpose: the migrator reads the flag per call, but the model-side default is memoized for the application lifetime, so honouring the flag there would let a runtime flip change migrations without changing models. Apps holding a mix of both shapes work for the same reason.
 
-**Polymorphic associations are not covered.** `belongsTo(polymorphic=true)` and `hasMany`/`hasOne` with `as=` fix their foreign key to `<name>id` at *registration* time (`vendor/wheels/model/associations.cfc:30`, `:81`, `:134`), before the schema is available, so the join-time resolution never sees a blank to fill. Against an underscore-shaped schema those still need an explicit `foreignKey="<name>_id"`.
+**Polymorphic associations are not covered.** `belongsTo(polymorphic=true)` and `hasMany`/`hasOne` with `as=` fix their foreign key to `<name>id` at *registration* time (`vendor/wheels/model/associations.cfm:30`, `:81`, `:134`), before the schema is available, so the join-time resolution never sees a blank to fill. Against an underscore-shaped schema those still need an explicit `foreignKey="<name>_id"`.
 
 ## Wheels Conventions
 
@@ -436,7 +436,7 @@ Background Jobs, SSE, and app testing — live in
 (ForgeBox core, starter app, `wheels new` scaffolds) and is what AI tools
 inside USER apps auto-load. Keep both files in sync: when a quick
 reference changes here, update the consumer copy (or run
-`tools/build/scripts/ship-consumer-docs.sh --check` in CI).
+`tools/build/scripts/ship-consumer-docs.sh check`, which `release.yml` enforces).
 
 ## Commit Message Conventions
 
@@ -473,7 +473,7 @@ User-facing `fix`/`feat` PRs add a **fragment file**, never a direct `CHANGELOG.
 Run `wheels setup agents` to write `.mcp.json` and `.opencode.json` in the current project (it merges, preserving any other servers you already list). It is `setup agents`, not `setup mcp`: LuCLI intercepts the literal token `mcp` in **any** argument position
 (`wheels info mcp` is intercepted too), so no argument may be spelled `mcp`. `setup agents` avoids the token entirely — see the MCP integration guide for OpenCode/Cursor variants.
 
-Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (live-verified on the released 4.0.3 CLI): `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (18 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only tools (`main`, `mcp`, `d`, `g`, `new`, `console`, `start`, `stop`, `browser`, `jobs`) are hidden via `mcpHiddenTools()`.
+Tools are auto-discovered from `cli/lucli/Module.cfc` public functions. Names in `tools/list` are the bare function names — NOT `wheels_*`-prefixed (live-verified on the released 4.0.3 CLI): `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate` (18 tools; the `wheels` server entry in `.mcp.json` namespaces them per client). CLI-only, stateful, and side-effecting commands (`main`, `mcp`, `setup`, `d`, `g`, `new`, `console`, `start`, `stop`, `engines`, `browser`, `jobs`, `coverage`, `docs`, …) are hidden via `mcpHiddenTools()`, which also auto-hides every public `$`-prefixed helper — read that function for the current list.
 
 **Deprecated:** the in-dev-server HTTP endpoint at `/wheels/mcp`. Emits a deprecation notice on first request. Migrate to the stdio surface.
 

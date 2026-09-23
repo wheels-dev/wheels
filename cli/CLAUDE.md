@@ -19,10 +19,10 @@ sibling distribution repos) — **not** `box install`.
 ```
 cli/lucli/
   Module.cfc          The CLI itself. Each PUBLIC function is a subcommand
-                      (generate, g, migrate, seed, test, reload, start, stop, new,
-                      create, routes, info, mcp, console, analyze, validate, destroy, d,
-                      doctor, deploy, packages, stats, notes, db, upgrade, browser,
-                      version, showHelp). Private functions are internal helpers.
+                      (generate/g, migrate, test, new, start/stop, deploy, …; grep
+                      `public .* function` for the current set). `mcp` is a LuCLI
+                      runtime verb, not a Module.cfc function. Private functions
+                      are internal helpers.
   module.json         Module manifest (name=wheels, main=Module.cfc).
   ARCHITECTURE.md     Deep architectural reference — read this first.
   services/           Service objects the subcommands delegate to:
@@ -45,8 +45,7 @@ cli/lucli/
 
 Subcommands parse args via the **ArgSpec service** (`services/ArgSpec.cfc`) — a typed,
 declarative spec builder (`.option()`, `.flag()`, `.parse()`). Build the command's ArgSpec
-to enumerate its real flags/options/defaults. (Historical note: the legacy `getArgs()`
-argv round-trip was removed in the #2861/#2875 ArgSpec migration.)
+to enumerate its real flags/options/defaults.
 
 LuCLI reserves some tokens before the module sees them: `--help`/`-h`, bare `help`,
 `--verbose`/`-v`, `--version`, and verbs like `run`/`install`/`mcp` and nested `server`/`secrets`.
