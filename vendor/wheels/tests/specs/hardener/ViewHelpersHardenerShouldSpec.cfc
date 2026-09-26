@@ -150,6 +150,19 @@ component extends="wheels.WheelsTest" {
 				expect(result).notToInclude("authenticityToken")
 			})
 
+			it("omits authenticityToken when an absolute action hides an external host behind same-host userinfo", () => {
+				// Browsers read "<server_name>:x" as userinfo and post to evil.example.
+				result = _controller.startFormTag(action = "https://" & request.cgi.server_name & ":x@evil.example/steal", method = "post")
+
+				expect(result).notToInclude("authenticityToken")
+			})
+
+			it("still emits authenticityToken for an absolute same-host action with a port", () => {
+				result = _controller.startFormTag(action = "https://" & request.cgi.server_name & ":8443/posts", method = "post")
+
+				expect(result).toInclude("authenticityToken")
+			})
+
 			it("still emits authenticityToken for a same-app post form", () => {
 				result = _controller.startFormTag(controller = "dummy", action = "index", method = "post")
 

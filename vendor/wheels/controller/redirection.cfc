@@ -203,9 +203,10 @@ component {
 		// Protocol-relative URL (//hostname/path): only safe when the hostname matches the current
 		// server name exactly.
 		if (Left(arguments.url, 2) == "//") {
-			local.afterScheme = Mid(arguments.url, 3, Len(arguments.url) - 2);
-			local.refererHost = ListFirst(local.afterScheme, ":/?##");
-			return CompareNoCase(local.refererHost, arguments.serverName) == 0;
+			return $isSameHostAuthority(
+				afterScheme = Mid(arguments.url, 3, Len(arguments.url) - 2),
+				serverName = arguments.serverName
+			);
 		}
 
 		// Relative URLs (starting with a single "/") are always safe.
@@ -226,10 +227,33 @@ component {
 		if (local.schemeEnd == 0) {
 			return false;
 		}
-		local.afterScheme = Mid(arguments.url, local.schemeEnd + 3, Len(arguments.url) - local.schemeEnd - 2);
+		return $isSameHostAuthority(
+			afterScheme = Mid(arguments.url, local.schemeEnd + 3, Len(arguments.url) - local.schemeEnd - 2),
+			serverName = arguments.serverName
+		);
+	}
 
-		// Extract hostname before any port, path, query, or fragment delimiter.
-		local.refererHost = ListFirst(local.afterScheme, ":/?##");
+	/**
+	 * Internal helper for `$isSafeRedirectUrl()`. Receives everything after the "//" of an absolute or
+	 * protocol-relative URL and returns true only when its host matches `serverName`.
+	 *
+	 * The authority ends at the first "/", "?" or "#". An authority containing "@" carries userinfo
+	 * ("user:pass@host"), and browsers navigate to the host AFTER the "@", so
+	 * "https://mysite.com:1@evil.com/" goes to evil.com. Splitting on ":" before isolating the authority
+	 * read that URL's host as "mysite.com". Legitimate same-site redirects never embed credentials, so
+	 * any userinfo is rejected outright rather than parsed.
+	 *
+	 * [section: Controller]
+	 * [category: Miscellaneous Functions]
+	 */
+	public boolean function $isSameHostAuthority(required string afterScheme, required string serverName) {
+		local.authority = ListFirst(arguments.afterScheme, "/?##");
+		if (Find("@", local.authority)) {
+			return false;
+		}
+
+		// Extract hostname before any port.
+		local.refererHost = ListFirst(local.authority, ":");
 
 		return CompareNoCase(local.refererHost, arguments.serverName) == 0;
 	}
