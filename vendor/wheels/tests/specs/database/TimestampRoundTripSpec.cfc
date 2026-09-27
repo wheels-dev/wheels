@@ -62,16 +62,17 @@ component extends="wheels.WheelsTest" {
 				// contract (#3649).
 				var normalized = application.wo.$normalizeDbTimestamp(readBack);
 				var shape = IsDate(normalized) ? "date" : "neither";
-				var valueClass = IsObject(readBack) ? readBack.getClass().getName() : "not-an-object";
-
 				// Report the value and its Java class, not just the verdict.
 				// "Expected [NO] to be true" is what the downstream failures say,
-				// and it names nothing at all.
+				// and it names nothing at all. The message is built on every run,
+				// pass or fail, so it must never cast the raw driver object: on
+				// BoxLang, concatenating an oracle.sql.TIMESTAMP throws (#3714).
+				var described = application.wo.$describeDbValue(readBack);
 				expect(shape).notToBe(
 					"neither",
 					"A cf_sql_timestamp round-tripped as something $secondsSince() cannot "
 					& "read: wrote [" & DateTimeFormat(written, "yyyy-mm-dd HH:nn:ss")
-					& "], read back [" & readBack & "] of class [" & valueClass & "]. Every "
+					& "], read back " & described & ". Every "
 					& "framework path that stores a timestamp and later measures elapsed time "
 					& "against it — RateLimiter's token bucket, the migrator's applied_at — is "
 					& "unreliable here."
@@ -87,7 +88,7 @@ component extends="wheels.WheelsTest" {
 					120,
 					"The stored timestamp came back as a #shape# that does not resolve to "
 					& "the time written: wrote [" & DateTimeFormat(written, "yyyy-mm-dd HH:nn:ss")
-					& "], read back [" & readBack & "] of class [" & valueClass & "]. "
+					& "], read back " & described & ". "
 					& "$secondsSince() would report " & elapsed & "s elapsed where "
 					& expected & "s is correct."
 				);

@@ -343,6 +343,46 @@
 
 
 	/**
+	 * Internal function.
+	 * A printable description of any value read back from a database, for
+	 * diagnostics. Never casts a driver object to a string: BoxLang throws
+	 * "Can't cast oracle.sql.TIMESTAMP to a string" on concatenation, which
+	 * turned a failure message into the failure (#3714).
+	 */
+	public string function $describeDbValue(required any value) {
+		if (IsSimpleValue(arguments.value)) {
+			try {
+				return "" & arguments.value;
+			} catch (any e) {
+				// Reported as simple but not castable; describe it by type below.
+			}
+		}
+		if (IsStruct(arguments.value) && !IsObject(arguments.value)) {
+			return "[struct]";
+		}
+		if (IsArray(arguments.value)) {
+			return "[array]";
+		}
+		if (IsQuery(arguments.value)) {
+			return "[query]";
+		}
+		try {
+			local.meta = GetMetadata(arguments.value);
+			if (IsStruct(local.meta) && StructKeyExists(local.meta, "fullname")) {
+				return "[component " & local.meta.fullname & "]";
+			}
+		} catch (any e) {
+			// Not a component.
+		}
+		try {
+			return "[object " & arguments.value.getClass().getName() & "]";
+		} catch (any e) {
+			return "[unprintable value]";
+		}
+	}
+
+
+	/**
 	 * Internal function for `$normalizeDbTimestamp()`. Converts a
 	 * `java.util.Date` into a CFML date through `java.util.Calendar`, so the
 	 * result is the instant in the JVM's default timezone — the same reading

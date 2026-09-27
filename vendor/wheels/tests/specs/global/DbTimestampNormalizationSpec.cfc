@@ -59,6 +59,34 @@ component extends="wheels.WheelsTest" {
 				expect(DateDiff("s", normalized, g.$normalizeDbTimestamp(millis))).toBe(0);
 			});
 
+			it("normalizes a real oracle.sql.TIMESTAMP when the Oracle driver is loaded (##3714)", () => {
+				// The stub above pins the timestampValue() bridge; this pins the real
+				// driver class, which BoxLang hands back for a cf_sql_timestamp column.
+				var state = {value = ""};
+				try {
+					state.value = CreateObject("java", "oracle.sql.TIMESTAMP").init(
+						CreateObject("java", "java.sql.Timestamp").init(JavaCast("long", millis))
+					);
+				} catch (any e) {
+					state.value = "";
+				}
+				if (IsSimpleValue(state.value)) {
+					skip("oracle.sql.TIMESTAMP is not on this engine's classpath (runs on the Oracle legs).");
+					return;
+				}
+				var normalized = g.$normalizeDbTimestamp(state.value);
+				expect(IsDate(normalized)).toBeTrue();
+				expect(DateDiff("s", normalized, g.$normalizeDbTimestamp(millis))).toBe(0);
+				// Concatenating the raw object throws on BoxLang; the describer must not.
+				expect(g.$describeDbValue(state.value)).toInclude("oracle.sql.TIMESTAMP");
+			});
+
+			it("describes any value for a diagnostic without casting it (##3714)", () => {
+				expect(g.$describeDbValue("2026-07-25 10:20:00")).toBe("2026-07-25 10:20:00");
+				expect(g.$describeDbValue(new wheels.tests._assets.db.OracleTimestampStub(millis))).toInclude("OracleTimestampStub");
+				expect(g.$describeDbValue({a = 1})).toBe("[struct]");
+			});
+
 			it("accepts fractional-second datetime strings", () => {
 				var normalized = g.$normalizeDbTimestamp("2026-07-25 10:20:00.205");
 				expect(IsDate(normalized)).toBeTrue();
