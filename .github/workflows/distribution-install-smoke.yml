@@ -239,6 +239,14 @@ jobs:
       - name: Ensure Homebrew is on PATH (Linuxbrew)
         if: runner.os == 'Linux'
         run: echo "/home/linuxbrew/.linuxbrew/bin" >> "$GITHUB_PATH"
+      # With HOMEBREW_NO_INSTALL_FROM_API, core formulae resolve only from a
+      # local homebrew/core tap, which the ubuntu runner does not ship. Since
+      # runner image ubuntu24/20260920 (Homebrew 7.0.4), `brew install` resolves
+      # dependencies before auto-tapping core, so `depends_on "openjdk@21"`
+      # fails with "No available formula" (#3691). Tap core first.
+      - name: Tap homebrew/core (Linuxbrew)
+        if: runner.os == 'Linux'
+        run: brew tap homebrew/core
       - name: brew tap + install (the documented path)
         run: |
           set -euo pipefail
