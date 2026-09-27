@@ -443,6 +443,49 @@ component extends="wheels.WheelsTest" {
 				expect("wiki/a:b").notToMatch(local.route.regex)
 			})
 
+			it("constrains every optional-segment variant of an unnamed route", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(pattern="other/[year]", to="other##index")
+					.get(pattern="archive(/[year])", to="archive##index")
+						.whereNumber("year")
+					.end()
+
+				// Optional segments register longest-first, so the unnamed call adds
+				// /archive/[year] then /archive after the unrelated /other/[year].
+				local.routes = local.mapper.getRoutes()
+				expect(ArrayLen(local.routes)).toBe(3)
+				expect(local.routes[2].pattern).toBe("/archive/[year]")
+				expect(local.routes[2].constraints.year).toBe("\d+")
+				expect("archive/2024").toMatch(local.routes[2].regex)
+				expect("archive/abc").notToMatch(local.routes[2].regex)
+				expect("archive").toMatch(local.routes[3].regex)
+
+				// The constraint must not bleed into the preceding, separate route.
+				expect(StructKeyExists(local.routes[1].constraints, "year")).toBeFalse()
+				expect("other/abc").toMatch(local.routes[1].regex)
+			})
+
+			it("constrains the variable in each unnamed variant that declares it", function() {
+				local.mapper = $mapper()
+					.$draw()
+					.get(pattern="posts/[id](.[format])", to="posts##show")
+						.whereNumber("id")
+					.end()
+
+				local.routes = local.mapper.getRoutes()
+				expect(ArrayLen(local.routes)).toBe(2)
+				expect(local.routes[1].constraints.id).toBe("\d+")
+				expect(local.routes[2].constraints.id).toBe("\d+")
+				expect("posts/1.json").toMatch(local.routes[1].regex)
+				expect("posts/abc.json").notToMatch(local.routes[1].regex)
+				expect("posts/abc").notToMatch(local.routes[2].regex)
+
+				// The grouping index lives on the mapper, never on the route structs
+				// (which the routes page serializes to JSON).
+				expect(StructKeyExists(local.routes[1], "lastMatchFirstRouteIndex")).toBeFalse()
+			})
+
 			it("throws error when no routes exist", function() {
 				mapper = $mapper().$draw()
 
