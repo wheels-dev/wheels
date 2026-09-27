@@ -14,9 +14,10 @@
 #   - Java 21 via actions/setup-java@v5.
 #
 # Gating model:
-#   1. cli-tests              - runs `tools/test-cli-local.sh`; tools/ci/testbox_results.py
-#      walks the full result tree, gates deploy-bundle failures (every failure
-#      under WHEELS_CLI_TEST_STRICT=1), and fails when counts don't reconcile.
+#   1. cli-tests              - runs `tools/test-cli-local.sh` with
+#      WHEELS_CLI_TEST_STRICT=1: tools/ci/testbox_results.py walks the full
+#      result tree and fails on ANY failure or error, or on counts that don't
+#      reconcile. (Locally the default still gates only deploy bundles.)
 #      The raw result JSON is uploaded as the `cli-test-results` artifact.
 #   2. deploy-config-diff     - informational (`continue-on-error: true`).
 #      The script expects Ruby Kamal on PATH *and* a routable `wheels deploy`.
@@ -107,6 +108,10 @@ jobs:
       - name: Run CLI test suite
         env:
           WHEELS_CLI_TEST_RESULT_FILE: ${{ runner.temp }}/cli-test-results.json
+          # Every CLI failure gates, not just deploy bundles. Safe now that the
+          # walker sees the whole result tree and reconciles counts (#3694)
+          # and the routing specs no longer reach a live server (#3693).
+          WHEELS_CLI_TEST_STRICT: "1"
         run: bash tools/test-cli-local.sh
 
       - name: Upload raw CLI test results
