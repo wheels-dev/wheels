@@ -24,7 +24,7 @@ wheels upgrade check [--to=<version>] [--format=json] [--strict]
 wheels upgrade apply [--to=<version>] [--nobackup]
 ```
 
-Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0. Any other subcommand — a typo like `wheels upgrade chekc` — prints the usage and then hard-errors with a non-zero exit, so a misspelled verb in a script fails loudly instead of looking like a successful run.
+Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0. Any other subcommand — a typo like `wheels upgrade chekc` — prints an error naming the valid verbs (`check`, `apply`, `help`) and the usage, then exits non-zero, so a misspelled verb in a script fails loudly instead of looking like a successful run.
 
 ### What it does
 

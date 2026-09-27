@@ -257,6 +257,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(o.sawTo).toBeTrue();
 			});
 
+			it("treats explicit false/empty values as not passed (MCP sends schema defaults, ##2963)", () => {
+				// sawX used key presence, so apply {strict: false} was refused
+				// as "--strict is not supported by the apply verb".
+				var o = probe.$parseUpgradeArgs({arg1: "apply", strict: false, "dry-run": "false", format: "", to: ""});
+				expect(o.sawStrict).toBeFalse();
+				expect(o.sawDryRun).toBeFalse();
+				expect(o.sawFormat).toBeFalse();
+				expect(o.sawTo).toBeFalse();
+			});
+
 			it("reads --format=json for machine-readable CI output", () => {
 				var o = probe.$parseUpgradeArgs({arg1: "check", format: "json"});
 				expect(o.format).toBe("json");

@@ -97,6 +97,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(schema.properties.password.type).toBe("string");
 			});
 
+			it("never advertises a `help` or `h` property (LuCLI intercepts the key)", () => {
+				// LuCLI's MCP server treats ANY `help` key as a help request and
+				// prints the global CLI help instead of running the tool. MCP
+				// clients send schema defaults, so an advertised help=false
+				// silently disabled `packages` (##2963).
+				var specs = probe.mcpToolSpecs();
+				for (var toolName in specs) {
+					expect(specs[toolName].properties).notToHaveKey("help", "#toolName# advertises `help`");
+					expect(specs[toolName].properties).notToHaveKey("h", "#toolName# advertises `h`");
+				}
+			});
+
 			it("leaves the argument-free tools out of the registry", () => {
 				// info and validate read no arguments, so the runtime's empty
 				// schema is accurate for them.

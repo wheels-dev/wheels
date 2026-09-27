@@ -448,7 +448,7 @@ component extends="modules.BaseModule" {
 			.option(name = "filter",    default = "", description = "Spec directory to run, as a dotted path (e.g. tests.specs.models). Directories only — a single spec file's path discovers no bundles (##3083)")
 			.option(name = "directory", default = "", description = "Documented alias for --filter")
 			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format: simple, json, or tap")
-			.option(name = "db",        default = "sqlite", description = "Database the suite runs against")
+			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
 			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT.")
 			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
@@ -531,7 +531,6 @@ component extends="modules.BaseModule" {
 			.flag(name = "all", default = false, description = "update only: update every installed package")
 			.flag(name = "yes", default = false, description = "update only: confirm the update (required)")
 			.flag(name = "force", default = false, description = "add only: overwrite vendor/<name>/ if it already exists")
-			.flag(name = "help", default = false, description = "Print usage instead of running a verb")
 			.flag(name = "offline", default = false, description = "Refuse registry network access (cached registry data still works). Also set by WHEELS_OFFLINE=1");
 	}
 
@@ -4036,8 +4035,14 @@ component extends="modules.BaseModule" {
 	 *   wheels packages registry info
 	 */
 	public string function packages() {
-		var shortHelp = $takeShortHelp(structuredArgs(arguments));
+		var coll = structuredArgs(arguments);
+		var shortHelp = $takeShortHelp(coll);
 		var parsed = packagesArgSpec().parse(shortHelp.coll);
+		// `--help` is deliberately NOT in packagesArgSpec(): LuCLI's MCP server
+		// intercepts ANY `help` key (even help=false, which clients send as the
+		// schema default) and prints the global CLI help instead of running the
+		// tool (#2963). Honour it here for in-process callers that pass it.
+		var helpFlag = structKeyExists(coll, "help") && isSimpleValue(coll.help) && compareNoCase(toString(coll.help), "true") == 0;
 		$consumeOfflineFlag(parsed.offline ? ["--offline"] : []);
 		var sub = len(trim(parsed.subcommand)) ? trim(parsed.subcommand) : "list";
 		var target = trim(parsed.target);
@@ -4061,7 +4066,7 @@ component extends="modules.BaseModule" {
 		// `wheels packages -h` all reach $packagesHelp().
 		//
 		// `-h` (as the verb or after it) is taken out by $takeShortHelp().
-		if (parsed.help || shortHelp.help || sub == "help") {
+		if (helpFlag || shortHelp.help || sub == "help") {
 			return $packagesHelp();
 		}
 
@@ -4351,11 +4356,9 @@ component extends="modules.BaseModule" {
 				return dbStatus(opts);
 			case "version":
 				return dbVersion(opts);
-			default:
-				out("Unknown db command: #subcommand#", "red");
-				out("Valid commands: reset, status, version");
-				throw(type = "Wheels.InvalidArguments", message = "Unknown db command: #subcommand#");
 		}
+		// Unreachable: dbArgSpec()'s choices reject any other subcommand in parse().
+		return "";
 	}
 
 	// ─────────────────────────────────────────────────
@@ -4673,10 +4676,13 @@ component extends="modules.BaseModule" {
 			// --fail-level WARNING / Mix --warnings-as-errors.
 			strict = parsed.strict,
 			doBackup = doBackup,
-			sawTo = structKeyExists(arguments.coll, "to"),
-			sawDryRun = structKeyExists(arguments.coll, "dry-run"),
-			sawStrict = structKeyExists(arguments.coll, "strict"),
-			sawFormat = structKeyExists(arguments.coll, "format")
+			// "Passed" means a real value, not key presence: MCP clients send
+			// schema defaults, so apply {strict: false} was refused as
+			// "--strict is not supported by the apply verb" (#2963).
+			sawTo = len(trim(parsed.to)) > 0,
+			sawDryRun = structKeyExists(arguments.coll, "dry-run") && isSimpleValue(arguments.coll["dry-run"]) && compareNoCase(toString(arguments.coll["dry-run"]), "true") == 0,
+			sawStrict = parsed.strict,
+			sawFormat = len(trim(parsed.format)) > 0
 		};
 	}
 
@@ -4716,7 +4722,18 @@ component extends="modules.BaseModule" {
 	 */
 	public string function upgrade() {
 		var coll = structuredArgs(arguments);
-		var opts = parseUpgradeArgs(coll);
+		var opts = {};
+		try {
+			opts = parseUpgradeArgs(coll);
+		} catch (Wheels.InvalidArguments e) {
+			// upgradeArgSpec()'s choices reject a typo'd verb before the
+			// branch below that prints the usage and steers to apply/check —
+			// keep that documented behaviour (guides: "prints the usage and
+			// then hard-errors") and still exit non-zero.
+			out(e.message, "red");
+			$printUpgradeHelp();
+			rethrow;
+		}
 
 		if (opts.wantsHelp) {
 			return $printUpgradeHelp();
@@ -4738,18 +4755,6 @@ component extends="modules.BaseModule" {
 
 		// ── Apply verb. Every refusal below fires before any file mutation.
 
-		// A positional that isn't check/apply/help is a typo'd subcommand.
-		// A typo'd verb must hard-stop rather than exit 0 looking like it
-		// did something (`wheels upgrade chekc` in a script should fail
-		// loudly, not print usage and report success).
-		if (!opts.isApply) {
-			out("Unknown upgrade subcommand: #opts.subcommand#", "red");
-			$printUpgradeHelp();
-			throw(
-				type = "Wheels.InvalidArguments",
-				message = "Unknown upgrade subcommand '#opts.subcommand#' — use `wheels upgrade apply` (swap the framework) or `wheels upgrade check` (read-only scan)."
-			);
-		}
 
 		// Check-only flags on the apply verb almost always mean the user
 		// wanted the scan — nudge toward it instead of mutating

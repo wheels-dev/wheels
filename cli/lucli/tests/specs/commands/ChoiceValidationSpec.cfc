@@ -49,6 +49,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(arrayLen(prop.enum)).toBeGT(0);
 				}
 				expect(specs.upgrade.properties.format).toHaveKey("enum");
+				// test db: the core runner only recognizes these (runner.cfm);
+				// anything else silently fell back to the default datasource.
+				expect(specs.test.properties.db.enum).toBe(["sqlite", "h2", "mysql", "postgres", "sqlserver", "sqlserver_cicd", "oracle", "cockroachdb"]);
 			});
 
 			it("lists only generator types that generate actually dispatches (no drift)", () => {
@@ -74,6 +77,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("test rejects an unknown reporter instead of using simple", () => {
 				expect(() => mod.test(reporter = "bogus")).toThrow(type = "Wheels.InvalidArguments");
+			});
+
+			it("test rejects a core db the runner does not recognize instead of using the default", () => {
+				expect(() => mod.test(core = true, db = "qa-sentinel")).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 			it("analyze rejects an unknown target, by token or by name", () => {
@@ -117,6 +124,27 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("upgrade -h does not throw an invalid-verb error", () => {
 				expect(() => mod.upgrade(arg1 = "-h")).notToThrow();
+			});
+
+		});
+
+		describe("an explicit false boolean behaves like an omitted one (##2963)", () => {
+
+			it("upgrade apply with strict=false is not refused as a check-only flag", () => {
+				// The temp project's vendor/wheels is an empty stub, so apply
+				// stops at the framework sniff — the point is it gets past the
+				// flag refusal.
+				var state = {message: ""};
+				try {
+					mod.upgrade(subcommand = "apply", strict = false);
+				} catch (any e) {
+					state.message = e.message;
+				}
+				expect(state.message).notToInclude("--strict");
+			});
+
+			it("packages with help=false runs the verb (in-process callers)", () => {
+				expect(() => mod.packages(subcommand = "registry", target = "bogus", help = false)).toThrow(regex = "Unknown wheels packages registry verb");
 			});
 
 		});
