@@ -113,7 +113,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		$addColumnsToSelectAndGroupBy(args = arguments);
 		$moveAggregateToHaving(args = arguments);
 		local.rv = $performQuery(argumentCollection = arguments);
-		if ($isBoxLangEngine() && StructKeyExists(local.rv, "query")) {
+		// Every engine: BoxLang and Adobe 2023 both hand Oracle TIMESTAMP columns
+		// back as raw driver objects (#3719). Engines that already return dates
+		// pay one class-name check per column.
+		if (StructKeyExists(local.rv, "query")) {
 			local.rv.query = $normalizeOracleTemporalResult(local.rv.query);
 		}
 		return local.rv;
@@ -172,7 +175,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * date, to the millisecond. Converted from the driver's own
 	 * java.sql.Timestamp (the instant in the JVM's timezone, like the other
 	 * framework readers) with its sub-second part carried over, so a finder
-	 * on BoxLang returns the same value Lucee and Adobe do. Returns "" when
+	 * returns the same value on every engine. Returns "" when
 	 * the object cannot be bridged without a connection (TIMESTAMP WITH TIME
 	 * ZONE); callers then leave the value as it was.
 	 */
@@ -194,9 +197,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * BoxLang's Oracle driver hands DATE/TIMESTAMP columns back as raw
-	 * `oracle.sql.*` driver objects, where Lucee and Adobe hand back CFML
-	 * dates. App code then cannot format, compare, output or JSON-render them
+	 * On some engines (BoxLang, Adobe 2023) the Oracle driver's DATE/TIMESTAMP
+	 * columns reach query results as raw `oracle.sql.*` driver objects instead
+	 * of CFML dates. App code then cannot format, compare, output or JSON-render them
 	 * (#3719). Convert, in place, every column whose first non-empty value is
 	 * an Oracle TIMESTAMP/TIMESTAMPTZ/TIMESTAMPLTZ/DATE object into CFML dates,
 	 * to the millisecond, through `$oracleTemporalToDate()`.

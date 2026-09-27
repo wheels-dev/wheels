@@ -1,9 +1,9 @@
 /**
  * Finder results hand app code CFML dates for datetime columns, on every
- * engine and database (#3719). BoxLang's Oracle driver used to return raw
+ * engine and database (#3719). On Oracle, BoxLang and Adobe 2023 used to return raw
  * oracle.sql.TIMESTAMP objects, which DateFormat(), DateCompare(), output,
  * concatenation and SerializeJSON() all choke on. The finder specs below run
- * everywhere; on BoxLang + Oracle they exercise the conversion in
+ * everywhere; on the Oracle legs they exercise the conversion in
  * OracleModel.$normalizeOracleTemporalColumns(). The unit specs call that
  * function directly with a real oracle.sql.TIMESTAMP wherever the Oracle
  * driver is on the classpath.
