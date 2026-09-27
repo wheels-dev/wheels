@@ -218,10 +218,11 @@ for line in summary_lines:
 rejected = bool(new or totals_worse)
 result_path = os.environ.get("RUSTCFML_RESULT_JSON")
 if result_path:
-    # The fingerprint identifies "this candidate, failing this way", so a
-    # daily re-check of an already-rejected candidate can stay quiet (#3687).
+    # The fingerprint identifies "this candidate, failing these specs", so a
+    # daily re-check of an already-rejected candidate stays quiet (#3687). It
+    # is built from names only, never counts: a flaky total must not re-notify.
     fingerprint = hashlib.sha256(
-        (version + "\n" + "\n".join(new) + "\n" + "\n".join(totals_worse)).encode("utf-8")
+        (version + "\n" + "\n".join(sorted(new))).encode("utf-8")
     ).hexdigest()[:16]
     with open(result_path, "w") as fh:
         json.dump({

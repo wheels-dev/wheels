@@ -110,6 +110,14 @@ class RunSuiteParserTest(unittest.TestCase):
         self.assertEqual(first["fingerprint"], again["fingerprint"])
         self.assertNotEqual(first["fingerprint"], other["fingerprint"])
 
+    def test_fingerprint_ignores_counts(self):
+        # Same named failures, a different (flaky) fail total: no re-notify.
+        _, _, base = self.run_parser(_result())
+        _, _, noisy = self.run_parser(_result(fail=7))
+        self.assertEqual(base["new"], noisy["new"])
+        self.assertNotEqual(base["totals"], noisy["totals"])
+        self.assertEqual(base["fingerprint"], noisy["fingerprint"])
+
     def test_unparseable_response_is_an_evaluation_error(self):
         code, out, verdict = self.run_parser(None, raw="<html>500</html>")
         self.assertEqual(code, 1, out)
