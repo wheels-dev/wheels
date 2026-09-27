@@ -107,6 +107,93 @@ component extends="wheels.WheelsTest" {
 				});
 			});
 
+			describe("non-simple driver keys (##3708)", () => {
+
+				// BoxLang surfaces Oracle's generated key as an oracle.sql.ROWID OBJECT, and
+				// Len()/ListFirst() on it threw "Cannot determine length of object of type
+				// oracle.sql.ROWID", aborting fixture population for the whole leg.
+
+				it("reads a numeric key from an object's stringValue()", () => {
+					var key = new wheels.tests._assets.adapters.GeneratedKeyStringValueStub("42");
+					var rv = adapter.$identitySelect(
+						queryAttributes = {},
+						result = {sql = "INSERT INTO users (firstname) VALUES ('test')", generatedKey = key},
+						primaryKey = "id",
+						returningIdentity = ""
+					);
+					expect(rv).toBeStruct();
+					expect(rv.lastId).toBe("42");
+				});
+
+				it("reads a numeric key from an object's toString() (java.sql.RowId contract, ACF rowid surface)", () => {
+					var key = new wheels.tests._assets.adapters.GeneratedKeyToStringStub("42");
+					var rv = adapter.$identitySelect(
+						queryAttributes = {},
+						result = {sql = "INSERT INTO users (firstname) VALUES ('test')", rowid = key},
+						primaryKey = "id",
+						returningIdentity = ""
+					);
+					expect(rv).toBeStruct();
+					expect(rv.lastId).toBe("42");
+				});
+
+				it("resolves a ROWID object through the exact-row CHARTOROWID lookup", () => {
+					var probe = CreateObject("component", "wheels.tests._assets.adapters.OracleProbe");
+					ArrayAppend(probe.queryResults, QueryNew("lastId", "integer", [{lastId: 7}]));
+					var key = new wheels.tests._assets.adapters.GeneratedKeyStringValueStub("AAAR3sAAEAAAACXAAA");
+					var rv = probe.$identitySelect(
+						queryAttributes = {},
+						result = {sql = "INSERT INTO users (firstname) VALUES ('x')", generatedKey = key},
+						primaryKey = "id",
+						returningIdentity = ""
+					);
+					expect(rv).toBeStruct();
+					expect(rv.lastId).toBe(7);
+					expect(probe.capturedSql[1]).toInclude("CHARTOROWID('AAAR3sAAEAAAACXAAA')");
+				});
+
+				it("treats an unreadable key object as no key and falls back to CURRVAL", () => {
+					var probe = CreateObject("component", "wheels.tests._assets.adapters.OracleProbe");
+					ArrayAppend(probe.queryResults, QueryNew("sequence_name", "varchar", [{sequence_name: "ISEQ$$_12345"}]));
+					ArrayAppend(probe.queryResults, QueryNew("lastId", "integer", [{lastId: 9}]));
+					var key = new wheels.tests._assets.adapters.GeneratedKeyOpaqueStub();
+					var rv = probe.$identitySelect(
+						queryAttributes = {},
+						result = {sql = "INSERT INTO users (firstname) VALUES ('x')", generatedKey = key},
+						primaryKey = "id",
+						returningIdentity = ""
+					);
+					expect(rv).toBeStruct();
+					expect(rv.lastId).toBe(9);
+					expect(ArrayToList(probe.capturedSql, " ")).toInclude("ISEQ$$_12345.CURRVAL");
+					expect(ArrayToList(probe.capturedSql, " ")).notToInclude("CHARTOROWID");
+				});
+
+				it("reads a real oracle.sql.ROWID when the Oracle driver is on the classpath", () => {
+					var rowidText = "AAAR3sAAEAAAACXAAA";
+					var state = {rowid = ""};
+					try {
+						state.rowid = CreateObject("java", "oracle.sql.ROWID").init(CharsetDecode(rowidText, "us-ascii"));
+					} catch (any e) {
+						state.rowid = "";
+					}
+					if (IsSimpleValue(state.rowid)) {
+						skip("oracle.sql.ROWID is not on this engine's classpath (runs on the Oracle legs).");
+						return;
+					}
+					var probe = CreateObject("component", "wheels.tests._assets.adapters.OracleProbe");
+					ArrayAppend(probe.queryResults, QueryNew("lastId", "integer", [{lastId: 11}]));
+					var rv = probe.$identitySelect(
+						queryAttributes = {},
+						result = {sql = "INSERT INTO users (firstname) VALUES ('x')", generatedKey = state.rowid},
+						primaryKey = "id",
+						returningIdentity = ""
+					);
+					expect(rv.lastId).toBe(11);
+					expect(probe.capturedSql[1]).toInclude("CHARTOROWID('#rowidText#')");
+				});
+			});
+
 			describe("$randomOrder", () => {
 
 				it("returns DBMS_RANDOM.VALUE", () => {
