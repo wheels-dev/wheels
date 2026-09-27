@@ -109,6 +109,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 			});
 
+			it("keeps timeout, not the terminal-only --test-timeout, in the test schema (##3678)", () => {
+				var props = probe.mcpToolSpecs().test.properties;
+				expect(props).toHaveKey("timeout");
+				expect(props).notToHaveKey("test-timeout");
+			});
+
 			it("leaves the argument-free tools out of the registry", () => {
 				// info and validate read no arguments, so the runtime's empty
 				// schema is accurate for them.

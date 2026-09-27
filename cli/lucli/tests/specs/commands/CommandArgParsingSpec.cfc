@@ -386,6 +386,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("parseTestArgs", () => {
 
+			it("reads --test-timeout, the terminal spelling LuCLI's global --timeout can't take (##3678)", () => {
+				expect(probe.$parseTestArgs({"test-timeout": "45"}).timeout).toBe(45);
+				expect(probe.$parseTestArgs({"test-timeout": "45"}).timeoutWarning).toBe("");
+			});
+
+			it("prefers --test-timeout over timeout when both are given", () => {
+				expect(probe.$parseTestArgs({"test-timeout": "45", "timeout": "60"}).timeout).toBe(45);
+			});
+
+			it("warns and falls back for a junk --test-timeout, like timeout", () => {
+				var o = probe.$parseTestArgs({"test-timeout": "soon"});
+				expect(o.timeout).toBe(900);
+				expect(o.timeoutWarning).toInclude('"soon"');
+			});
+
 			it("carries a warning for a non-numeric timeout instead of dropping it silently", () => {
 				var o = probe.$parseTestArgs({timeout: "soon"});
 				expect(o.timeout).toBe(900);

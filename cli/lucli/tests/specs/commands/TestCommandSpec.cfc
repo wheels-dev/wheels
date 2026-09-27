@@ -140,6 +140,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(mod.$testTimeoutWarning("-30", 1200)).toInclude("using 1200s");
 			});
 
+			it("points the timed-out hint at --test-timeout, not the --timeout LuCLI swallows (##3678)", () => {
+				var source = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				expect(source).toInclude("wheels test --test-timeout=");
+				expect(source).notToInclude("On the terminal, --timeout is taken by LuCLI");
+			});
+
 			it("warns about nothing when the timeout is valid or absent", () => {
 				expect(mod.$testTimeoutWarning("", 900)).toBe("");
 				expect(mod.$testTimeoutWarning("   ", 900)).toBe("");

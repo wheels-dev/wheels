@@ -470,11 +470,16 @@ component extends="modules.BaseModule" {
 			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format: simple, json, or tap")
 			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
-			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT.")
+			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT. On the terminal, use --test-timeout=<seconds>: LuCLI's own global --timeout takes the plain flag")
 			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
 			.flag(name = "ci",      default = false, description = "CI mode output")
 			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
-			.flag(name = "test-db", default = true, description = "Swap to the dedicated test datasource for the run (disable with --no-test-db)");
+			.flag(name = "test-db", default = true, description = "Swap to the dedicated test datasource for the run (disable with --no-test-db)")
+			// Terminal spelling of `timeout`. LuCLI's picocli root owns a global
+			// `--timeout=<seconds>` int option and swallows `wheels test
+			// --timeout` before dispatch (#3678), so the terminal needs a name it
+			// doesn't claim. Accepted, not advertised: MCP passes `timeout`.
+			.accept("test-timeout");
 	}
 
 	private any function analyzeArgSpec() {
@@ -1146,7 +1151,13 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		var resolvedTimeout = $resolveTestTimeout(parsed.timeout);
+		// --test-timeout (terminal) wins over timeout (MCP / in-process);
+		// then WHEELS_TEST_TIMEOUT, then 900 — see $resolveTestTimeout().
+		var rawTimeout = parsed.timeout;
+		if (structKeyExists(arguments.coll, "test-timeout") && len(trim(toString(arguments.coll["test-timeout"])))) {
+			rawTimeout = toString(arguments.coll["test-timeout"]);
+		}
+		var resolvedTimeout = $resolveTestTimeout(rawTimeout);
 
 		return {
 			filter = filter,
@@ -1162,13 +1173,14 @@ component extends="modules.BaseModule" {
 			useTestDB = parsed["test-db"],
 			basePath = parsed["base-path"],
 			timeout = resolvedTimeout,
-			timeoutWarning = $testTimeoutWarning(parsed.timeout, resolvedTimeout)
+			timeoutWarning = $testTimeoutWarning(rawTimeout, resolvedTimeout)
 		};
 	}
 
 	/**
-	 * Seconds to wait for the test-runner response. `--timeout` wins, then
-	 * WHEELS_TEST_TIMEOUT, then 900.
+	 * Seconds to wait for the test-runner response. An explicit value wins
+	 * (`--test-timeout` on the terminal, `timeout` over MCP — LuCLI swallows a
+	 * terminal `--timeout`, #3678), then WHEELS_TEST_TIMEOUT, then 900.
 	 *
 	 * The shared HTTP helper reads for 120 seconds, which is right for the
 	 * request/response bridge commands but is a hard ceiling on how big a suite
@@ -1183,7 +1195,7 @@ component extends="modules.BaseModule" {
 	 * throwing: a mistyped timeout should not be the thing that stops a test run.
 	 */
 	/**
-	 * The one-line warning for a --timeout that $resolveTestTimeout() had to
+	 * The one-line warning for a timeout (--test-timeout / timeout) that $resolveTestTimeout() had to
 	 * ignore, or "" when it was valid or absent. A mistyped timeout still must
 	 * not stop the run, but the fallback may not be silent (maintainer
 	 * decision on #2963). Public for specs; hidden from MCP by the $-prefix.
@@ -8070,10 +8082,10 @@ component extends="modules.BaseModule" {
 			if (reFindNoCase("(read timed out|SocketTimeout)", e.message)) {
 				out("Test run timed out after #arguments.timeoutSeconds#s waiting for the suite to finish.", "red");
 				out("The specs may have passed — the CLI stopped waiting, the runner did not stop running.", "yellow");
-				// Lead with the env var: on the terminal LuCLI's own global
-				// --timeout option swallows `wheels test --timeout` (#3678).
-				out("Give it longer:  WHEELS_TEST_TIMEOUT=#arguments.timeoutSeconds * 2# wheels test", "yellow");
-				out("(MCP clients: pass timeout=#arguments.timeoutSeconds * 2#. On the terminal, --timeout is taken by LuCLI — see ##3678.)", "yellow");
+				// --test-timeout, not --timeout: LuCLI's own global --timeout
+				// option swallows the plain flag on the terminal (#3678).
+				out("Give it longer:  wheels test --test-timeout=#arguments.timeoutSeconds * 2#", "yellow");
+				out("Or set WHEELS_TEST_TIMEOUT=<seconds> for the whole environment (MCP clients: pass timeout).", "yellow");
 				out("Or scope the run:  wheels test --filter=<subdirectory>", "yellow");
 			} else {
 				out("Test execution failed: #e.message#", "red");
