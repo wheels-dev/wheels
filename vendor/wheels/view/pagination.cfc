@@ -735,21 +735,28 @@ component {
 			}
 		}
 
+		// Caller-supplied params are forwarded in both modes; with pageNumberAsParam=false
+		// the page number goes into the route segment but the query string must survive.
+		local.paramsString = "";
+		if (StructKeyExists(arguments.args, "params")) {
+			if (IsStruct(arguments.args.params)) {
+				// Adobe's Len() only accepts simple values — struct params
+				// must be stringified (and StructCount'd) before any Len().
+				local.paramsString = $paramsToQueryString(arguments.args.params, false);
+			} else {
+				local.paramsString = arguments.args.params;
+			}
+		}
+
 		if (!arguments.pageNumberAsParam) {
 			local.linkArgs[arguments.name] = arguments.page;
+			if (Len(local.paramsString)) {
+				local.linkArgs.params = local.paramsString;
+			}
 		} else {
 			local.linkArgs.params = arguments.name & "=" & arguments.page;
-			if (StructKeyExists(arguments.args, "params")) {
-				if (IsStruct(arguments.args.params)) {
-					// Adobe's Len() only accepts simple values — struct params
-					// must be stringified (and StructCount'd) before any Len().
-					local.paramsString = $paramsToQueryString(arguments.args.params, false);
-					if (Len(local.paramsString)) {
-						local.linkArgs.params &= "&" & local.paramsString;
-					}
-				} else if (Len(arguments.args.params)) {
-					local.linkArgs.params &= "&" & arguments.args.params;
-				}
+			if (Len(local.paramsString)) {
+				local.linkArgs.params &= "&" & local.paramsString;
 			}
 		}
 
