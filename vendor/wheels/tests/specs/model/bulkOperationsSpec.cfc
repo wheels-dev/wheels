@@ -57,9 +57,11 @@ component extends="wheels.WheelsTest" {
 
 					var found = g.model("bulkItem").findAll(where="code LIKE 'BULK-TS-%'", order="code");
 					expect(found.recordCount).toBe(2);
-					// createdAt should have been auto-populated.
-					expect(Len(found.createdAt[1])).toBeGT(0);
-					expect(Len(found.updatedAt[1])).toBeGT(0);
+					// createdAt should have been auto-populated. Read it through the
+					// framework normalizer: BoxLang + Oracle hands the column back as a
+					// raw oracle.sql.TIMESTAMP, which Len() cannot measure (#3715).
+					expect(IsDate(g.$normalizeDbTimestamp(found.createdAt[1]))).toBeTrue();
+					expect(IsDate(g.$normalizeDbTimestamp(found.updatedAt[1]))).toBeTrue();
 
 					transaction action="rollback";
 				}

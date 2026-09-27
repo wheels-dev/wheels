@@ -137,6 +137,36 @@ component extends="wheels.WheelsTest" {
 				expect(text).notToInclude("Anderson");
 			});
 
+			it("wraps the INSERT ... SELECT in an anonymous PL/SQL block (##3715)", () => {
+				// BoxLang asks the driver for generated keys on every INSERT, and
+				// Oracle's driver cannot return them for INSERT ... SELECT: the
+				// statement fails with ORA-17009 (Closed statement), which inside a
+				// transaction surfaces only as "Connection is closed". A statement
+				// that starts with BEGIN is not an INSERT to the engine, so no key
+				// request is made; nothing here reads a generated key anyway.
+				var sql = oracle.$bulkInsertSQL(
+					tableName       = """AUTHORS""",
+					columns         = ["firstName", "lastName"],
+					validProperties = ["firstName", "lastName"],
+					records         = records,
+					batchStart      = 1,
+					batchEnd        = 3,
+					propertyInfo    = propertyInfo
+				);
+
+				var text = "";
+				for (var part in sql) {
+					if (IsSimpleValue(part)) {
+						text &= part;
+					}
+				}
+				var collapsed = Trim(ReReplace(text, "[[:space:]]+", " ", "all"));
+
+				expect(collapsed).toMatch("^BEGIN INSERT INTO ""AUTHORS""");
+				expect(collapsed).toMatch("FROM dual; END;$");
+				expect(ArrayLen(ReMatch("(?i)\bBEGIN\b", text))).toBe(1);
+			});
+
 			it("handles a single-row batch without falling back to multi-row VALUES", () => {
 				var sql = oracle.$bulkInsertSQL(
 					tableName       = """AUTHORS""",

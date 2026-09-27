@@ -336,6 +336,13 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * runs it with `$captureResult=false`, which drops the cfquery `result` attribute —
 	 * the thing that makes Lucee request generated keys (#3653).
 	 *
+	 * BoxLang requests generated keys on every INSERT regardless of `result`, and
+	 * for `INSERT ... SELECT` the Oracle driver then fails with ORA-17009 (Closed
+	 * statement), which inside a transaction surfaces only as "Connection is closed"
+	 * (#3715). The statement is therefore wrapped in an anonymous PL/SQL block:
+	 * `BEGIN INSERT ... SELECT ...; END;` is not an INSERT to the engine, so no
+	 * engine asks for keys, and bind parameters work inside the block.
+	 *
 	 * Uses parameterized values via `$buildBulkParam` — never interpolates user data
 	 * into SQL.
 	 */
@@ -358,7 +365,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.colList &= $quoteIdentifier(local.col);
 		}
 
-		ArrayAppend(local.sql, "INSERT INTO #arguments.tableName# (#local.colList#) ");
+		ArrayAppend(local.sql, "BEGIN INSERT INTO #arguments.tableName# (#local.colList#) ");
 
 		local.propCount = ArrayLen(arguments.validProperties);
 		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
@@ -385,6 +392,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			}
 			ArrayAppend(local.sql, " FROM dual");
 		}
+		ArrayAppend(local.sql, "; END;");
 
 		return local.sql;
 	}
