@@ -124,7 +124,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * `oracle.sql.*` driver objects, where Lucee and Adobe hand back CFML
 	 * dates. App code then cannot format, compare, output or JSON-render them
 	 * (#3719). Convert, in place, every column whose first non-empty value is
-	 * such an object into CFML dates through `$normalizeDbTimestamp()`, the
+	 * an Oracle TIMESTAMP/TIMESTAMPTZ/TIMESTAMPLTZ/DATE object into CFML dates through `$normalizeDbTimestamp()`, the
 	 * same conversion the framework's own timestamp readers use (#3649).
 	 *
 	 * One value per column is inspected to decide, so columns of simple values
@@ -159,7 +159,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Internal function for `$normalizeOracleTemporalColumns()`: is the first
-	 * non-empty value in `column` an `oracle.sql.*` driver object? Decided by
+	 * non-empty value in `column` an Oracle temporal driver object? Decided by
 	 * the Java class name alone: the driver objects throw on Len(), string
 	 * casts and date functions, so nothing else is called on them.
 	 */
@@ -182,9 +182,17 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return false;
 	}
 
-	/** Internal function: is `value` an `oracle.sql.*` driver object? */
+	/**
+	 * Internal function: is `value` one of the Oracle driver's temporal
+	 * objects? Exactly these classes, not every `oracle.sql.*`: the
+	 * conversion treats numbers as epoch milliseconds, so a raw
+	 * oracle.sql.NUMBER must never reach it.
+	 */
 	public boolean function $isOracleDriverValue(required any value) {
-		return Left($javaClassName(arguments.value), 11) == "oracle.sql.";
+		return ListFind(
+			"oracle.sql.TIMESTAMP,oracle.sql.TIMESTAMPTZ,oracle.sql.TIMESTAMPLTZ,oracle.sql.DATE",
+			$javaClassName(arguments.value)
+		) > 0;
 	}
 
 	/** Internal function: the Java class name of `value`, or "" when unknown. */

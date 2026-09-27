@@ -94,6 +94,27 @@ component extends="wheels.WheelsTest" {
 				expect(DateTimeFormat(normalized.happened[2], "yyyy-mm-dd HH:nn:ss")).toBe("2026-07-25 17:20:00");
 			});
 
+			it("leaves a non-temporal oracle.sql value (NUMBER) untouched", () => {
+				// The conversion reads numbers as epoch milliseconds, so a raw
+				// oracle.sql.NUMBER must never be treated as a timestamp.
+				var probe = {num = ""};
+				try {
+					probe.num = CreateObject("java", "oracle.sql.NUMBER").init(JavaCast("int", 42));
+				} catch (any e) {
+					probe.num = "";
+				}
+				if (IsSimpleValue(probe.num)) {
+					return;
+				}
+				var adapter = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
+				expect(adapter.$isOracleDriverValue(probe.num)).toBeFalse();
+				var q = QueryNew("amount");
+				QueryAddRow(q);
+				QuerySetCell(q, "amount", probe.num, 1);
+				var normalized = adapter.$normalizeOracleTemporalColumns(q);
+				expect(IsDate(normalized.amount[1])).toBeFalse("the NUMBER cell was rewritten as a date");
+			});
+
 		});
 
 	}
