@@ -463,6 +463,7 @@ The canonical rules live in `commitlint.config.js` — if this section and the c
 Notes:
 - `ci` is a TYPE, not a scope — never write `refactor(ci):`.
 - DCO sign-off email must match `git config user.email` — prefer `git commit -s` over manual trailer.
+- Never put a closing verb (`close`, `fixes`, `resolves`, …) right before `#N` in a PR body or commit message unless you mean it — **GitHub ignores negation**. "It does **not** close #3709" linked #3709 as a closing issue and the merge auto-closed it. For a non-closing link write `Refs #N`, and confirm with `gh pr view <n> --json closingIssuesReferences` before merge.
 
 ### Changelog entries
 

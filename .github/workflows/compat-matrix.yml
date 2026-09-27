@@ -231,12 +231,18 @@ jobs:
         run: |
           MAX_RETRIES=3
           RETRY_COUNT=0
+          PACKAGES="image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle"
+          # Adobe 2025 raises "The graphqlclient package is not installed." while
+          # loading an app's datasources at startup when this package is absent.
+          if [ "${{ matrix.cfengine }}" = "adobe2025" ]; then
+            PACKAGES="${PACKAGES},graphqlclient"
+          fi
 
           while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
             RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "Attempt $RETRY_COUNT of $MAX_RETRIES: Installing CFPM packages..."
+            echo "Attempt $RETRY_COUNT of $MAX_RETRIES: Installing CFPM packages (${PACKAGES})..."
 
-            if docker exec wheels-${{ matrix.cfengine }}-1 box cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle; then
+            if docker exec wheels-${{ matrix.cfengine }}-1 box cfpm install "${PACKAGES}"; then
               echo "CFPM packages installed successfully"
               exit 0
             else
