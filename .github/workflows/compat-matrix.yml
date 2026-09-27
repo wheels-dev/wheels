@@ -109,7 +109,14 @@ jobs:
           # Tracks the last HTTP status code so timeout diagnostics can
           # distinguish "no response" (engine didn't bind) from "5xx"
           # (engine bound but app returning errors — e.g. issue #2646).
-          MAX_WAIT=60
+          #
+          # Ceiling: measured over four matrix runs (2026-09-27), the Adobe
+          # engines answered on attempt 42-57 (2023) and 48-60 (2025) of the old
+          # 60; Lucee and BoxLang on 1-12. 120 leaves ~2x the observed worst
+          # case. Each attempt is ~5-10s, so a dead engine now fails after
+          # ~10-20 min instead of ~5-10. A ready-after-3/4 warning (below)
+          # makes future drift visible before it turns red.
+          MAX_WAIT=120
           WAIT_COUNT=0
           RESTARTS=0
           MAX_RESTARTS=3
@@ -143,7 +150,10 @@ jobs:
             LAST_HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" 2>/dev/null || true)
             LAST_HTTP_CODE=${LAST_HTTP_CODE:-000}
             if echo "$LAST_HTTP_CODE" | grep -qE "^(200|302|404)$"; then
-              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT)"
+              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT/$MAX_WAIT)"
+              if [ $((WAIT_COUNT * 4)) -gt $((MAX_WAIT * 3)) ]; then
+                echo "::warning::${CFENGINE} became ready at attempt $WAIT_COUNT/$MAX_WAIT (past 3/4 of the ceiling); readiness headroom is shrinking."
+              fi
               READY=true
               break
             fi
@@ -186,19 +196,35 @@ jobs:
             "echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/cfusion/lib/serialfilter.txt"
           docker restart wheels-${{ matrix.cfengine }}-1
 
-          # Wait for engine to come back up after restart
+          # Wait for engine to come back up after restart. This used to fall
+          # through silently when the engine never came back, so the suite ran
+          # against a dead engine; fail loudly instead. A full Adobe restart has
+          # the same cold-start profile as the readiness wait above, so it gets
+          # the same ceiling (the old 30 was never measured: it could not fail).
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
-          MAX_WAIT=30
+          CONTAINER="wheels-${{ matrix.cfengine }}-1"
+          MAX_WAIT=120
           WAIT_COUNT=0
+          READY=false
           while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
             WAIT_COUNT=$((WAIT_COUNT + 1))
             if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
-              echo "CF engine back up after restart"
+              echo "CF engine back up after restart (attempt $WAIT_COUNT/$MAX_WAIT)"
+              READY=true
               break
             fi
-            sleep 5
+            if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
+              sleep 5
+            fi
           done
+          if [ "$READY" != "true" ]; then
+            echo "::error::CF engine did not come back after the serialfilter restart (${MAX_WAIT} attempts)"
+            echo "=== Container logs (raw, last 200 lines) ==="
+            docker logs "$CONTAINER" 2>&1 | tail -200
+            echo "=== /end raw logs ==="
+            exit 1
+          fi
 
       - name: Install CFPM packages (Adobe 2023/2025)
         if: matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025'

@@ -98,7 +98,11 @@ jobs:
           CONTAINER="wheels-${CFENGINE}-1"
           echo "Waiting for ${CFENGINE} on port ${PORT}..."
 
-          MAX_WAIT=60
+          # Ceiling: Adobe 2023 answered on attempt 42-57 of the old 60 across
+          # four compat-matrix runs (2026-09-27); BoxLang on 7-12. 120 leaves ~2x
+          # the observed worst case; a dead engine fails after ~10-20 min, inside
+          # this job's 45-minute timeout. See compat-matrix.yml for the details.
+          MAX_WAIT=120
           WAIT_COUNT=0
           RESTARTS=0
           MAX_RESTARTS=3
@@ -128,7 +132,10 @@ jobs:
             LAST_HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" 2>/dev/null || true)
             LAST_HTTP_CODE=${LAST_HTTP_CODE:-000}
             if echo "$LAST_HTTP_CODE" | grep -qE "^(200|302|404)$"; then
-              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT)"
+              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT/$MAX_WAIT)"
+              if [ $((WAIT_COUNT * 4)) -gt $((MAX_WAIT * 3)) ]; then
+                echo "::warning::${CFENGINE} became ready at attempt $WAIT_COUNT/$MAX_WAIT (past 3/4 of the ceiling); readiness headroom is shrinking."
+              fi
               READY=true
               break
             fi
