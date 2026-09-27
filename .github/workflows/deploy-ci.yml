@@ -61,7 +61,19 @@ jobs:
         run: |
           set -euo pipefail
           # Anything that can change what the CLI suite tests or how it is judged.
-          PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$)'
+          # The suite runs INSIDE the booted demo app (tools/test-cli-local.sh
+          # serves ./public via lucee.json and calls /wheels/cli/tests), so besides
+          # the CLI and its tooling this lists what that request path loads:
+          #   lucee.json, public/                     server config, webroot, Application.cfc
+          #   config/                                 datasources, reloadPassword, routes
+          #   app/events/, app/global/, app/migrator/ demo boot hooks + migrations (db specs)
+          #   vendor/wheels/public/, Public.cfc       /wheels/cli bridge, routes, clitests view
+          #   vendor/wheels/events/                   app start + test context
+          #   vendor/wheels/wheelstest/               the TestBox runner the view uses
+          #   vendor/wheels/migrator/, Seeder.cfc, JobWorker.cfc  what CliBridge calls
+          # Wider framework boot breakage is caught by the core suite, which is
+          # required on its own.
+          PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$|lucee\.json$|public/|config/|app/(events|global|migrator)/|vendor/wheels/(public/|Public\.cfc$|events/|wheelstest/|migrator/|Seeder\.cfc$|JobWorker\.cfc$))'
           if [ "$EVENT_NAME" = "pull_request" ]; then
             git fetch --no-tags --depth=1 origin "$BASE_REF"
             CHANGED="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
