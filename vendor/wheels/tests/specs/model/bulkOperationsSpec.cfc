@@ -149,6 +149,57 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("keeps the original createdAt of an existing row on conflict", () => {
+				// H2's MERGE INTO ... KEY form rewrites every listed column on a match, so the
+				// update column list cannot keep createdAt out of it there.
+				if (g.model("bulkItem").$dialectName() == "H2") {
+					return;
+				}
+				transaction action="begin" {
+					// Seed the row with a createdAt far in the past so the assertion is independent
+					// of the database's timestamp precision and the time the test runs.
+					var records = [
+						{code: "UPSERT-CA-1", name: "Original", quantity: 1, createdAt: CreateDateTime(2001, 6, 15, 12, 0, 0)}
+					];
+					g.model("bulkItem").upsertAll(records=records, uniqueBy="code");
+
+					// Conflicting upsert without createdAt: the framework stamps one for the insert
+					// branch, but it must not overwrite the existing row's value.
+					var records2 = [
+						{code: "UPSERT-CA-1", name: "Changed", quantity: 42}
+					];
+					g.model("bulkItem").upsertAll(records=records2, uniqueBy="code");
+
+					var found = g.model("bulkItem").findOne(where="code = 'UPSERT-CA-1'");
+					expect(found.name).toBe("Changed");
+					expect(found.quantity).toBe(42);
+					expect(Year(found.createdAt)).toBe(2001, "createdAt of the existing row was overwritten");
+					expect(Len(found.updatedAt)).toBeGT(0);
+
+					transaction action="rollback";
+				}
+			});
+
+			it("writes a createdAt the caller supplies in the records on conflict", () => {
+				transaction action="begin" {
+					var records = [
+						{code: "UPSERT-CA-2", name: "Original", quantity: 1}
+					];
+					g.model("bulkItem").upsertAll(records=records, uniqueBy="code");
+
+					var records2 = [
+						{code: "UPSERT-CA-2", name: "Changed", quantity: 7, createdAt: CreateDateTime(2001, 6, 15, 12, 0, 0)}
+					];
+					g.model("bulkItem").upsertAll(records=records2, uniqueBy="code");
+
+					var found = g.model("bulkItem").findOne(where="code = 'UPSERT-CA-2'");
+					expect(found.name).toBe("Changed");
+					expect(Year(found.createdAt)).toBe(2001);
+
+					transaction action="rollback";
+				}
+			});
+
 			it("returns zero count for empty records array", () => {
 				var result = g.model("bulkItem").upsertAll(records=[], uniqueBy="code");
 				expect(result.upsertedCount).toBe(0);
