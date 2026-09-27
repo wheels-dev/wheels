@@ -77,11 +77,70 @@ def validate(result):
             problems.append(f"{key} is missing or not a whole number ({value!r})")
         elif value < 0:
             problems.append(f"{key} is negative ({value})")
+    if isinstance(bundles, list):
+        problems.extend(_tree_problems(bundles))
     if not problems:
         executed = sum(int(_get(result, k)) for k in ("totalPass", "totalFail", "totalError"))
         if not bundles or executed == 0:
             problems.append("empty result: no bundles ran and no specs executed")
     return problems
+
+
+def _tree_problems(bundles):
+    """Structural check of the tree: every bundle an object with a suiteStats
+    list, every suite and spec an object. A null or {} node is not evidence
+    that anything ran (#3695 review)."""
+    problems = []
+
+    def check_suite(suite, where):
+        if not isinstance(suite, dict):
+            problems.append(f"{where}: suite is {type(suite).__name__}, not an object")
+            return
+        specs = _get(suite, "specStats", [])
+        if not isinstance(specs, list):
+            problems.append(f"{where}: specStats is not a list")
+        else:
+            for i, spec in enumerate(specs):
+                if not isinstance(spec, dict):
+                    problems.append(f"{where}: specStats[{i}] is {type(spec).__name__}, not an object")
+        for key in ("suiteStats", "nestedSuiteStats"):
+            children = _get(suite, key, [])
+            if not isinstance(children, list):
+                problems.append(f"{where}: {key} is not a list")
+                continue
+            for i, child in enumerate(children):
+                check_suite(child, f"{where} > {key}[{i}]")
+
+    for i, bundle in enumerate(bundles):
+        where = f"bundleStats[{i}]"
+        if not isinstance(bundle, dict):
+            problems.append(f"{where} is {type(bundle).__name__}, not an object")
+            continue
+        suites = _get(bundle, "suiteStats")
+        if not isinstance(suites, list):
+            problems.append(f"{where} has no suiteStats list")
+            continue
+        for j, suite in enumerate(suites):
+            check_suite(suite, f"{where}.suiteStats[{j}]")
+    return problems
+
+
+def leaf_counts(result):
+    """Count every spec leaf in the tree by status."""
+    counts = {}
+
+    def visit(suite):
+        for spec in _get(suite, "specStats", []) or []:
+            status = str(_get(spec, "status", "") or "")
+            counts[status] = counts.get(status, 0) + 1
+        for key in ("suiteStats", "nestedSuiteStats"):
+            for child in _get(suite, key, []) or []:
+                visit(child)
+
+    for bundle in _get(result, "bundleStats", []) or []:
+        for suite in _get(bundle, "suiteStats", []) or []:
+            visit(suite)
+    return counts
 
 
 def walk(result):
@@ -164,6 +223,11 @@ def reconcile(result, failures):
         problems.append(f"totalFail is {t['fail']} but {failed} failing spec(s) were found in the tree")
     if errored != t["error"]:
         problems.append(f"totalError is {t['error']} but {errored} error(s) were found in the tree")
+    # Passes must be evidenced too: a totalPass with no Passed leaves behind
+    # it (e.g. bundleStats:[{}]) is not a result that ran (#3695 review).
+    passed = leaf_counts(result).get("Passed", 0)
+    if passed != t["pass"]:
+        problems.append(f"totalPass is {t['pass']} but {passed} passing spec(s) were found in the tree")
     return problems
 
 

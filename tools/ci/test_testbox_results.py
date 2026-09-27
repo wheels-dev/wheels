@@ -118,6 +118,18 @@ class EnvelopeValidationTests(unittest.TestCase):
         self.assertEqual(code, 1)  # the one real failure gates
         self.assertNotIn("NOT A TESTBOX RESULT", out)
 
+    def test_rejects_an_empty_bundle_object(self):
+        # rev1-r2 follow-up: {} as a bundle has no tree to walk.
+        self.assert_rejected("bundle-empty-object.json")
+
+    def test_rejects_a_null_bundle(self):
+        self.assert_rejected("bundle-null.json")
+
+    def test_passes_claimed_without_passed_leaves_do_not_reconcile(self):
+        code, out = run("pass-mismatch.json", "--strict")
+        self.assertEqual(code, 3)
+        self.assertIn("totalPass is 5 but 1", out)
+
     def test_rejects_an_empty_run(self):
         # No bundles, nothing executed: a vacuous run cannot certify a pass.
         self.assert_rejected("empty-valid.json")
