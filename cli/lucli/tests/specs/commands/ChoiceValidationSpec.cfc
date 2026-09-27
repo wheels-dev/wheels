@@ -168,6 +168,42 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("every command rejects an unknown key (additionalProperties:false, ##2963)", () => {
+
+			it("throws naming the unknown key, for every MCP tool plus info and validate", () => {
+				var tools = structKeyArray(mod.mcpToolSpecs());
+				arrayAppend(tools, ["info", "validate"], true);
+				for (var tool in tools) {
+					var callArgs = {"bogus_key": "y"};
+					// create and generate need a valid call shape so the unknown key
+					// is the only thing wrong with it.
+					if (tool == "create") callArgs = {"type": "app", "name": "specapp", "bogus_key": "y"};
+					if (tool == "generate") callArgs = {"type": "model", "name": "SpecWidget", "bogus_key": "y"};
+					if (tool == "destroy") callArgs = {"type": "model", "name": "SpecWidget", "bogus_key": "y"};
+					var state = {message: "", threw: false};
+					try {
+						invoke(mod, tool, callArgs);
+					} catch (any e) {
+						state.threw = true;
+						state.message = e.message;
+					}
+					expect(state.threw).toBeTrue("#tool# accepted an unknown key");
+					expect(state.message).toInclude("bogus_key", "#tool# failed for another reason: #state.message#");
+				}
+				expect(fileExists(variables.tempRoot & "/app/models/SpecWidget.cfc")).toBeFalse();
+				expect(directoryExists(variables.tempRoot & "/specapp")).toBeFalse();
+			});
+
+			it("accepts the documented global --offline on a command that does not declare it", () => {
+				// `wheels generate model User --offline` is the guide's example; the
+				// generator used to reject it as an unknown flag.
+				mod.generate(arg1 = "model", arg2 = "OfflineWidget", offline = true);
+				expect(fileExists(variables.tempRoot & "/app/models/OfflineWidget.cfc")).toBeTrue();
+				mod.$consumeOfflineFlag([]);
+			});
+
+		});
+
 		describe("$throwIfBridgeRefused — migrate refusals exit non-zero", () => {
 
 			it("throws MigrationError when the bridge answered success:false", () => {

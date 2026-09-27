@@ -301,7 +301,8 @@ component extends="modules.BaseModule" {
 			.option(name = "hints", default = "", description = 'Rename hints JSON ({"renames":{"old":"new"}})')
 			.option(name = "threshold", default = "", description = "Heuristic rename threshold between 0 and 1")
 			.option(name = "name", default = "", description = "Migration name when writing a single-model diff")
-			.flag(name = "write", default = false, description = "Write migration file(s) instead of previewing");
+			.flag(name = "write", default = false, description = "Write migration file(s) instead of previewing")
+			.flag(name = "offline", default = false, description = "Accepted for script portability; migrate only talks to the local server, so it has no effect");
 	}
 
 	/**
@@ -353,10 +354,12 @@ component extends="modules.BaseModule" {
 	 * still reaches new()'s own handling. Public for specs.
 	 */
 	public struct function $createArgs(required struct coll) {
+		// Non-strict on purpose: create forwards every other key to new(), whose
+		// own parse is strict, so an unknown key still fails there (#2963).
 		var parsed = new services.ArgSpec()
 			.positional(name = "type")
 			.positional(name = "name")
-			.parse(arguments.coll);
+			.parse(arguments.coll, false);
 
 		var tokens = $positionalTokens(arguments.coll);
 		var remaining = [];
@@ -391,12 +394,28 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Throw for any key present with a NULL value. The stdio MCP transport
+	 * turns an empty JSON string into null, and copying a null into a CFML
+	 * struct drops the key — so a helper that copies the collection before
+	 * parse() would silently turn "no value" into "omitted" (#2963: upgrade
+	 * {dry-run: ""} reached apply). Call it before any such copy.
+	 */
+	private void function $rejectNullKeys(required struct coll) {
+		for (var key in arguments.coll) {
+			if (isNull(arguments.coll[key])) {
+				throw(type = "Wheels.InvalidArguments", message = "--#key# has no value.");
+			}
+		}
+	}
+
+	/**
 	 * Take a `-h` token out of the collection. `-h` is not a LuCLI flag shape
 	 * (single dash), so it arrives as a positional token, and a choice-checked
 	 * positional would reject it. Returns the remaining collection and
 	 * whether help was asked for.
 	 */
 	private struct function $takeShortHelp(required struct coll) {
+		$rejectNullKeys(arguments.coll);
 		var rest = {};
 		var help = false;
 		for (var key in arguments.coll) {
@@ -501,7 +520,15 @@ component extends="modules.BaseModule" {
 			.option(name = "to", default = "", description = "Target Wheels version. check: version to scan against (default: latest). apply: must match the CLI's bundled framework version")
 			.option(name = "format", default = "", choices = "text,json", description = "check only: text (default) or json for machine-readable output")
 			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
-			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework");
+			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework")
+			// CLI-only spellings read by parseUpgradeArgs, deliberately NOT
+			// advertised: `--no-backup` (LuCLI normalizes it to backup=false),
+			// `--help`/`-h`, and `--dry-run`, which neither verb supports and is
+			// accepted only so it can be refused with a nudge toward `check`.
+			.accept("backup")
+			.accept("help")
+			.accept("h")
+			.accept("dry-run");
 	}
 
 	private any function jobsArgSpec() {
@@ -532,7 +559,10 @@ component extends="modules.BaseModule" {
 			.flag(name = "all", default = false, description = "update only: update every installed package")
 			.flag(name = "yes", default = false, description = "update only: confirm the update (required)")
 			.flag(name = "force", default = false, description = "add only: overwrite vendor/<name>/ if it already exists")
-			.flag(name = "offline", default = false, description = "Refuse registry network access (cached registry data still works). Also set by WHEELS_OFFLINE=1");
+			.flag(name = "offline", default = false, description = "Refuse registry network access (cached registry data still works). Also set by WHEELS_OFFLINE=1")
+			// `help` is honoured from in-process callers but never advertised:
+			// LuCLI's MCP server intercepts any `help` key (see packages()).
+			.accept("help");
 	}
 
 	/**
@@ -773,6 +803,11 @@ component extends="modules.BaseModule" {
 				dryRun = true;
 			} else if (a == "--no-dry-run") {
 				dryRun = false;
+			} else if (a == "--offline" || a == "--no-offline") {
+				// Documented global flag (`wheels generate model User --offline`);
+				// generate makes no network calls, so it only reaches the offline
+				// state. Passed on, the generator rejected it as an unknown flag.
+				$consumeOfflineFlag(a == "--offline" ? [a] : []);
 			} else {
 				arrayAppend(cleaned, a);
 			}
@@ -1555,6 +1590,10 @@ component extends="modules.BaseModule" {
 	 * issue #2477 and `deployment/security-hardening.mdx`.
 	 */
 	public string function reload() {
+		// Validate arguments before touching the server (#2963): an unknown or
+		// valueless key must fail on its own, not behind "no server running".
+		var reloadOpts = parseConsoleArgs(structuredArgs(arguments));
+
 		// Write-side guard: reload mutates the running app's state, so it must
 		// target the server bound to THIS project — never a sibling app squatting
 		// a common port. Without lucee.json/.env port config we refuse the
@@ -1570,7 +1609,6 @@ component extends="modules.BaseModule" {
 		// Auto-detect the reload password from .env / config, but let an explicit
 		// `--password=<value>` override it (parity with `wheels console`). The
 		// auto-detect default is unchanged when no flag is given.
-		var reloadOpts = parseConsoleArgs(structuredArgs(arguments));
 		var password = len(reloadOpts.password) ? reloadOpts.password : detectReloadPassword();
 
 		// F5 fix: physically wipe the Lucee compiled-class cache before
@@ -2006,7 +2044,13 @@ component extends="modules.BaseModule" {
 	 * hint: Scaffold a new Wheels project directory
 	 */
 	public string function new() {
-		var opts = parseNewArgs(structuredArgs(arguments));
+		var newColl = structuredArgs(arguments);
+		var opts = parseNewArgs(newColl);
+		// --offline is a documented global flag: new() skips its update check.
+		// It was accepted but never consumed here, so only WHEELS_OFFLINE worked.
+		$consumeOfflineFlag(
+			structKeyExists(newColl, "offline") && compareNoCase(toString(newColl.offline), "true") == 0 ? ["--offline"] : []
+		);
 
 		if (opts.isEmpty) {
 			out("Usage: wheels new <appname> [options]", "yellow");
@@ -2249,6 +2293,8 @@ component extends="modules.BaseModule" {
 	 * hint: Show framework version, environment, and configuration
 	 */
 	public string function info() {
+		// Takes no arguments; enforce the schema's additionalProperties:false (#2963).
+		new services.ArgSpec().parse(structuredArgs(arguments));
 		out("Wheels CLI v#super.version()#", "bold");
 		out("");
 
@@ -3284,6 +3330,8 @@ component extends="modules.BaseModule" {
 	 * hint: Validate Wheels application code for common errors and anti-patterns
 	 */
 	public string function validate() {
+		// Takes no arguments; enforce the schema's additionalProperties:false (#2963).
+		new services.ArgSpec().parse(structuredArgs(arguments));
 		if (!directoryExists(variables.projectRoot & "/app")) {
 			out("No app/ directory found. Are you in a Wheels project?", "red");
 			// throw maps to non-zero exit; return "" would silently succeed.
@@ -3348,6 +3396,7 @@ component extends="modules.BaseModule" {
 		// reorder below (`destroy User` puts the NAME first), so binding them
 		// to <type> here would reject valid CLI forms. Named values (the MCP
 		// shape) are validated against the type choices by parse().
+		$rejectNullKeys(arguments.coll);
 		var namedOnly = {};
 		for (var key in arguments.coll) {
 			if (!reFindNoCase("^arg\d+$", key)) {

@@ -257,6 +257,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(o.sawTo).toBeTrue();
 			});
 
+			it("rejects any key present with a NULL value before deciding anything (##2963)", () => {
+				// The stdio transport turns {"dry-run": ""} into dry-run=null.
+				// dry-run is undeclared and structKeyExists() is false for a
+				// null value, so it counted as "not passed" and apply ran.
+				for (var key in ["dry-run", "backup", "help", "strict"]) {
+					var coll = createObject("java", "java.util.HashMap").init();
+					coll.put("subcommand", "apply");
+					coll.put(key, javaCast("null", ""));
+					expect(() => probe.$parseUpgradeArgs(coll)).toThrow(type = "Wheels.InvalidArguments", regex = key);
+				}
+			});
+
 			it("treats explicit false/empty values as not passed (MCP sends schema defaults, ##2963)", () => {
 				// sawX used key presence, so apply {strict: false} was refused
 				// as "--strict is not supported by the apply verb".

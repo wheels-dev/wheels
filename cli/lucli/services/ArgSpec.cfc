@@ -35,6 +35,21 @@ component {
 	public any function init() {
 		variables.positionals = [];
 		variables.named = {};
+		// Keys parse() accepts without declaring or advertising them. `offline`
+		// is the one documented GLOBAL flag ("applies to every command",
+		// command-line-tools guide); commands that act on it read it through
+		// $consumeOfflineFlag or declare it.
+		variables.accepted = ["offline"];
+		return this;
+	}
+
+	/**
+	 * Accept a named key that parse() must not reject but the MCP schema must
+	 * not advertise — a CLI-only spelling the command reads itself (e.g.
+	 * upgrade's `--no-backup`, which LuCLI normalizes to backup=false).
+	 */
+	public any function accept(required string name) {
+		arrayAppend(variables.accepted, arguments.name);
 		return this;
 	}
 
@@ -124,7 +139,14 @@ component {
 		}
 	}
 
-	public struct function parse(required struct coll) {
+	/**
+	 * `strict` (default) enforces the schema's additionalProperties:false: a
+	 * named key that is not declared, not a positional's name, and not
+	 * accept()ed throws Wheels.InvalidArguments naming it (#2963). Pass
+	 * strict=false only for a partial spec whose caller forwards the rest to
+	 * a parser that is itself strict (create -> new).
+	 */
+	public struct function parse(required struct coll, boolean strict = true) {
 		var result = {};
 
 		// 1. Seed named defaults so every declared option is present in the result.
@@ -160,9 +182,26 @@ component {
 				throw(type = "Wheels.InvalidArguments", message = "<" & p.name & "> has no value.");
 			}
 		}
+		// ...declared or not: an undeclared null key is still input the
+		// command might read raw (upgrade's dry-run did, and applied).
 		for (var nk in nullKeys) {
-			if (structKeyExists(variables.named, nk)) {
-				throw(type = "Wheels.InvalidArguments", message = "--" & nk & " has no value.");
+			throw(type = "Wheels.InvalidArguments", message = "--" & nk & " has no value.");
+		}
+
+		if (arguments.strict) {
+			for (var key in arguments.coll) {
+				if (
+					reFindNoCase("^arg\d+$", key)
+					|| structKeyExists(variables.named, key)
+					|| arrayFindNoCase(variables.accepted, key)
+					|| $isPositionalName(key)
+				) {
+					continue;
+				}
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "Unknown argument '--#key#'. Accepted: #arrayLen($acceptedNames()) ? arrayToList($acceptedNames(), ', ') : 'none (this command takes no arguments)'#."
+				);
 			}
 		}
 
@@ -274,6 +313,11 @@ component {
 			if (reFindNoCase("^arg\d+$", key)) {
 				continue;
 			}
+			if (isNull(arguments.coll[key])) {
+				// The MCP transport turns "" into null; forwarding it as a flag
+				// would change meaning downstream (#2963).
+				throw(type = "Wheels.InvalidArguments", message = "--" & key & " has no value.");
+			}
 			var value = arguments.coll[key];
 			if (!isSimpleValue(value)) {
 				continue;
@@ -382,6 +426,30 @@ component {
 	 * arg<N> key — so consumers must never assume the indices are contiguous
 	 * or start at 1.
 	 */
+	private boolean function $isPositionalName(required string name) {
+		for (var p in variables.positionals) {
+			if (p.name == arguments.name) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Every name parse() accepts, for the unknown-argument message.
+	 */
+	private array function $acceptedNames() {
+		var names = [];
+		for (var p in variables.positionals) {
+			arrayAppend(names, p.name);
+		}
+		for (var n in variables.named) {
+			arrayAppend(names, n);
+		}
+		arraySort(names, "textnocase");
+		return names;
+	}
+
 	private array function $positionalIndices(required struct coll) {
 		var indices = [];
 		for (var key in arguments.coll) {

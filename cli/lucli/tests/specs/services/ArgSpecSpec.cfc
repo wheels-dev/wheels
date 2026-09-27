@@ -63,7 +63,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("binds multiple gap-numbered positionals in numeric index order", () => {
 					var spec = new cli.lucli.services.ArgSpec()
 						.positional(name = "first")
-						.positional(name = "second");
+						.positional(name = "second")
+						.flag(name = "force");
 					var out = spec.parse({"arg2": "a", "arg5": "b", "force": "true"});
 					expect(out.first).toBe("a");
 					expect(out.second).toBe("b");
@@ -208,10 +209,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			describe("parse() — unknown keys", () => {
 
-				it("ignores keys in coll that the spec did not declare", () => {
+				it("ignores undeclared keys only when the caller opts out of strict parsing", () => {
+					// Strict (the default) rejects them; see "strict parse" below (##2963).
 					var spec = new cli.lucli.services.ArgSpec()
 						.flag(name = "sqlite", default = true);
-					var out = spec.parse({sqlite: "false", mystery: "value"});
+					var out = spec.parse({sqlite: "false", mystery: "value"}, false);
 					expect(out.sqlite).toBeFalse();
 					expect(structKeyExists(out, "mystery")).toBeFalse();
 				});
@@ -465,6 +467,49 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(() => spec.parse({"to": "true"})).toThrow(type = "Wheels.InvalidArguments");
 					expect(() => spec.parse({"to": true})).toThrow(type = "Wheels.InvalidArguments");
 					expect(spec.parse({"to": "4.1.0"}).to).toBe("4.1.0");
+				});
+
+			});
+
+			describe("strict parse — the schema's additionalProperties:false is enforced (##2963)", () => {
+
+				it("rejects an undeclared named key, naming it", () => {
+					var spec = new cli.lucli.services.ArgSpec().option(name = "format", default = "text");
+					expect(() => spec.parse({"formt": "json"})).toThrow(type = "Wheels.InvalidArguments", regex = "formt");
+				});
+
+				it("accepts tokens, declared keys, positional names, accept()ed keys and the global offline", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "")
+						.option(name = "format", default = "text")
+						.accept("backup");
+					var out = spec.parse({"arg1": "x", "format": "json", "backup": "false", "offline": "true"});
+					expect(out.target).toBe("x");
+					expect(out.format).toBe("json");
+					expect(spec.parse({"target": "y"}).target).toBe("y");
+				});
+
+				it("does not advertise accept()ed keys in the schema", () => {
+					var schema = new cli.lucli.services.ArgSpec().option(name = "format").accept("backup").toInputSchema();
+					expect(schema.properties).notToHaveKey("backup");
+					expect(schema.properties).notToHaveKey("offline");
+				});
+
+				it("allows unknown keys only when a caller opts out with strict=false", () => {
+					var spec = new cli.lucli.services.ArgSpec().positional(name = "type");
+					expect(spec.parse({"type": "app", "port": "3000"}, false).type).toBe("app");
+				});
+
+				it("rejects a NULL value for an undeclared key too", () => {
+					// upgrade read the undeclared dry-run raw; {dry-run: null} from the
+					// MCP transport counted as absent and apply ran.
+					var spec = new cli.lucli.services.ArgSpec().accept("dry-run");
+					var coll = createObject("java", "java.util.HashMap").init();
+					coll.put("dry-run", javaCast("null", ""));
+					expect(() => spec.parse(coll)).toThrow(type = "Wheels.InvalidArguments", regex = "dry-run");
+					var lenientColl = createObject("java", "java.util.HashMap").init();
+					lenientColl.put("anything", javaCast("null", ""));
+					expect(() => spec.parse(lenientColl, false)).toThrow(type = "Wheels.InvalidArguments");
 				});
 
 			});
