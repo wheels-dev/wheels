@@ -15,7 +15,7 @@
 	},
 	"app":{
 			"cfengine":"lucee@7.0.1+100",
-			"libDirs":"tools/docker/lucee7/lib"
+			"libDirs":"/opt/wheels-lib"
 	},
 	"cfconfigFile":"CFConfig.json"
 }

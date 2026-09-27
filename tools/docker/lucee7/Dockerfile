@@ -2,14 +2,19 @@ FROM ortussolutions/commandbox:latest@sha256:1f180edf899d1db7fc906835e20c12ed18a
 
 LABEL maintainer "Wheels Core Team"
 
-# Install Lucee extensions (H2, Oracle) and SQLite JDBC driver in a single layer
+# Install Lucee extensions (H2, Oracle) and SQLite JDBC driver in a single layer.
+#
+# The SQLite driver goes in /opt/wheels-lib, which server.json names as
+# app.libDirs. Lucee 7 does not load jars from lucee-server/context/lib (the
+# Lucee 6 image's location), and a libDirs path under /wheels-test-suite would
+# be hidden by the compose source bind mount, so it must live outside it (#3688).
 RUN mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy \
  && wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex \
       https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex \
  && wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
       https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex \
- && mkdir -p /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib \
- && wget -q -O /usr/local/lib/serverHome/WEB-INF/lucee-server/context/lib/sqlite-jdbc.jar \
+ && mkdir -p /opt/wheels-lib \
+ && wget -q -O /opt/wheels-lib/sqlite-jdbc-3.50.3.0.jar \
       https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar
 
 # Install SQLite and create test database
