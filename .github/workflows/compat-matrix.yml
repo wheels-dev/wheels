@@ -29,7 +29,7 @@ jobs:
         # DIAGNOSTIC BRANCH for #3709 (never merged): adobe2025 + oracle, with
         # adobe2023 + oracle as the passing control.
         cfengine:
-          ["adobe2025", "adobe2023"]
+          ["adobe2025", "lucee7"]
         database:
           ["oracle"]
         exclude:
@@ -345,8 +345,42 @@ jobs:
           nohup bash /tmp/histo.sh "$C" > /tmp/histo-samples.txt 2>&1 &
           echo "sampler started"
 
+      # DIAG (#3709, option C): one suspect per request, live Oracle statement
+      # counts (after a full GC) before and after each. Class names/counts only.
+      - name: "DIAG: statement-leak probe"
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+        run: |
+          PORT_VAR="PORT_${CFENGINE}"; PORT="${!PORT_VAR}"
+          C="wheels-${CFENGINE}-1"
+          B="http://localhost:${PORT}/wheels/core/tests?db=oracle&format=json&directory=wheels.tests.specs.zzleakprobe"
+          live() {
+            docker exec "$C" sh -c 'PID=$(pgrep -f "java.*runwar" | head -1); [ -n "$PID" ] || PID=$(pgrep -f "java" | tail -1); JH=$(dirname "$(dirname "$(readlink -f /proc/$PID/exe)")"); [ -x "$JH/bin/jcmd" ] || { echo "jcmd-unavailable"; exit 0; }; "$JH/bin/jcmd" "$PID" GC.class_histogram' \
+              | grep -E 'jcmd-unavailable|T4CPreparedStatement$|T4CStatement$|T4CCallableStatement$|OracleSql$|T4CConnection$' \
+              | awk '{ if ($1=="jcmd-unavailable") { printf "jcmd-unavailable"; next } n=$4; sub(/.*\./,"",n); printf "%s=%s ", n, $2 }'
+          }
+          hit() {
+            local out=/tmp/probe.json code
+            code=$(curl -s -o "$out" --max-time 600 -w "%{http_code}" "$B&leakphase=$1&leakn=$2" || true)
+            echo -n "http=$code $(python3 -c "import json;d=json.load(open('$out'));print('pass',d.get('totalPass'),'err',d.get('totalError'),'fail',d.get('totalFail'))" 2>/dev/null || echo 'non-json')"
+          }
+          curl -s -o /dev/null --max-time 120 "http://localhost:${PORT}/" || true
+          echo "warm-up #1: $(hit none 0)"   # first test-app init fails on Adobe 2025 (#3726)
+          echo "warm-up #2: $(hit none 0)"
+          echo "baseline: $(live)"
+          for round in 1 2; do
+            for phase in dbinfo_columns dbinfo_index query_plain query_param finder; do
+              BEFORE="$(live)"; R="$(hit $phase 200)"; AFTER="$(live)"
+              echo "round $round | $phase x200 | $R"
+              echo "    before: $BEFORE"
+              echo "    after:  $AFTER"
+            done
+          done
+
       - name: Run test suite for ${{ matrix.database }}
         id: run-tests
+        # DIAG: the probe above is the experiment; skip the full suite (it OOMs).
+        if: false
         run: |
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
