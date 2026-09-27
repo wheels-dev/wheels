@@ -56,7 +56,9 @@ WORKDIR /var/www
 
 # Point Tomcat's ROOT context at Wheels' public/ webroot, add a URL-rewrite
 # valve, and make the HTTP connector follow $PORT (default 8888) so PaaS
-# platforms and kamal-proxy can both route to it.
+# platforms and kamal-proxy can both route to it. The Upgrade-gated /ws/ rule
+# lets WebSocket upgrades reach lucee/extension-websocket's /ws/<name>
+# endpoints (see cli/lucli/templates/app/rewrite.config for why it is gated).
 RUN sed -i 's#<Context path="" docBase="/var/www/">#<Context path="" docBase="/var/www/public">\n  <Valve className="org.apache.catalina.valves.rewrite.RewriteValve" />#' /usr/local/tomcat/conf/server.xml \
     && sed -i 's#port="8888"#port="${http.port}"#' /usr/local/tomcat/conf/server.xml \
     && printf 'export CATALINA_OPTS="$CATALINA_OPTS -Dhttp.port=${PORT:-8888}"\n' > /usr/local/tomcat/bin/setenv.sh \
@@ -65,6 +67,8 @@ RUN sed -i 's#<Context path="" docBase="/var/www/">#<Context path="" docBase="/v
         'RewriteRule ^/?$ - [L]' \
         'RewriteRule ^/index\.cfm($|/) - [L]' \
         'RewriteRule ^/(cf_script|flex2gateway|jrunscripts|CFIDE|lucee|cfformgateway|cffileservlet|files|images|javascripts|miscellaneous|stylesheets|assets|wheels|uploads|robots\.txt|favicon\.ico|sitemap\.xml)(/.*)?$ - [L]' \
+        'RewriteCond %{HTTP:Upgrade} ^websocket$ [NC]' \
+        'RewriteRule ^/ws/.*$ - [L]' \
         'RewriteRule ^/(.*)$ /index.cfm/$1 [L]' \
         > /var/www/public/WEB-INF/rewrite.config
 
