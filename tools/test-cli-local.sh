@@ -6,12 +6,17 @@
 # suite at /cli/lucli/tests/runner.cfm.
 #
 # Prerequisites:
-#   - LuCLI 0.3.3+ on PATH
+#   - Wheels CLI installed (brew install wheels, choco, or a GitHub release).
+#     Wheels is built on the LuCLI runtime and ships it under the `wheels`
+#     brand, so a normal install has no separate `lucli` binary. A raw
+#     `lucli` (0.3.3+) also works — CI installs one — and is preferred when
+#     both are on PATH.
 #   - Java 21+
 #
 # Usage:
 #   bash tools/test-cli-local.sh              # run all CLI specs
 #   PORT=9090 bash tools/test-cli-local.sh    # custom port
+#   LUCLI_BIN=/path/to/lucli bash tools/test-cli-local.sh   # pick the runtime
 #
 set -euo pipefail
 
@@ -24,7 +29,35 @@ RESULT_FILE="/tmp/wheels-cli-test-results.json"
 
 cd "$PROJECT_ROOT"
 
-# Ensure JAVA_HOME is set (lucli server run needs it explicitly on some macOS setups).
+# ── Runtime binary ──────────────────────────────────
+# Resolve once and use everywhere: $LUCLI_BIN if set, else a raw `lucli` on
+# PATH (what CI installs), else the `wheels` binary a normal install ships —
+# it IS the LuCLI runtime and takes the same `server run/stop` flags.
+if [ -n "${LUCLI_BIN:-}" ]; then
+  if [ ! -x "$LUCLI_BIN" ] && ! command -v "$LUCLI_BIN" >/dev/null 2>&1; then
+    echo "::error::LUCLI_BIN=${LUCLI_BIN} is not an executable." >&2
+    exit 2
+  fi
+  CLI_BIN="$LUCLI_BIN"
+elif command -v lucli >/dev/null 2>&1; then
+  CLI_BIN="lucli"
+elif command -v wheels >/dev/null 2>&1; then
+  CLI_BIN="wheels"
+else
+  echo "::error::Neither 'lucli' nor 'wheels' is on PATH. Install the Wheels CLI or set LUCLI_BIN." >&2
+  exit 2
+fi
+# Where the runtime may extract Lucee Express — only a fallback: the running
+# JVM's -Dcatalina.home (below) is authoritative. The binary's name does not
+# tell us the home: the brew `wheels` wrapper sets LUCLI_HOME=~/.wheels and
+# execs a raw binary that is also named `wheels`.
+EXPRESS_HOMES=("$HOME/.wheels/express" "$HOME/.lucli/express")
+if [ -n "${LUCLI_HOME:-}" ]; then
+  EXPRESS_HOMES=("$LUCLI_HOME/express" "${EXPRESS_HOMES[@]}")
+fi
+echo "Using runtime: ${CLI_BIN} ($(command -v "$CLI_BIN" 2>/dev/null || echo "$CLI_BIN"))"
+
+# Ensure JAVA_HOME is set (`server run` needs it explicitly on some macOS setups).
 if [ -z "${JAVA_HOME:-}" ]; then
   if command -v /usr/libexec/java_home >/dev/null 2>&1; then
     export JAVA_HOME="$(/usr/libexec/java_home -v 21 2>/dev/null || /usr/libexec/java_home 2>/dev/null || true)"
@@ -65,7 +98,7 @@ cleanup() {
   fi
   if [ "${STARTED_SERVER:-false}" = "true" ]; then
     echo "Stopping test server..."
-    ( cd "$PROJECT_ROOT" && lucli server stop >/dev/null 2>&1 ) || true
+    ( cd "$PROJECT_ROOT" && "$CLI_BIN" server stop >/dev/null 2>&1 ) || true
     # `kill $SERVER_PID` only kills the launcher: the JVM survives it and keeps
     # holding the port, so whichever project wants that port next silently gets
     # THIS app's responses. Kill the JVM the registry recorded, then wait for
@@ -107,7 +140,7 @@ if [ -n "$EXISTING_PID" ]; then
   fi
   echo "Using existing server on port ${PORT} (PID ${EXISTING_PID}, this project)"
 else
-  echo "Starting LuCLI server on port ${PORT}..."
+  echo "Starting ${CLI_BIN} server on port ${PORT}..."
 
   # lucee.json pins BOTH ports (8080 + shutdown 8081). `--port` moves only the
   # HTTP port, so `PORT=8180` still tried to bind shutdown 8081 and died with
@@ -140,7 +173,7 @@ else
   fi
 
   start_lucli() {
-    nohup lucli server run --port="$PORT" --force > /tmp/wheels-cli-test-server.log 2>&1 &
+    nohup "$CLI_BIN" server run --port="$PORT" --force > /tmp/wheels-cli-test-server.log 2>&1 &
     SERVER_PID=$!
     STARTED_SERVER=true
   }
@@ -167,36 +200,66 @@ else
   echo "Waiting for server..."
   wait_for_server
 
-  # Ensure SQLite JDBC is installed in LuCLI's lib/ext/ — the CLI test
+  # Ensure SQLite JDBC is installed in the runtime's lib/ext/ — the CLI test
   # suite includes specs (e.g. TestRunnerSpec) that bring up ephemeral
   # Lucee servers against SQLite and need the driver in lib/ext/.
   #
-  # lib/ext/ only exists after LuCLI fully extracts Lucee, which is
-  # complete by the time the server is ready above. If the JAR is missing,
-  # install it AND restart LuCLI so the classloader picks it up.
+  # lib/ext/ only exists after the runtime fully extracts Lucee, which is
+  # complete by the time the server is ready above. The JVM holding the port
+  # names the exact Lucee Express it runs from (-Dcatalina.home); fall back to
+  # the first lib/ext under the candidate homes when lsof/ps can't tell us.
+  # If the JAR is missing, install it AND restart so the classloader sees it.
+  SERVER_JVM="$(listener_pid "$PORT" || true)"
   LUCEE_LIB=""
-  if [ -d "$HOME/.lucli/express" ]; then
-    LUCEE_LIB="$(find "$HOME/.lucli/express" -path "*/lib/ext" -type d 2>/dev/null | head -1 || true)"
+  if [ -n "$SERVER_JVM" ]; then
+    CATALINA_HOME_DIR="$(ps -ww -p "$SERVER_JVM" -o command= 2>/dev/null | tr ' ' '\n' \
+      | sed -n 's/^-Dcatalina\.home=//p' | head -1 || true)"
+    if [ -n "$CATALINA_HOME_DIR" ] && [ -d "$CATALINA_HOME_DIR/lib/ext" ]; then
+      LUCEE_LIB="$CATALINA_HOME_DIR/lib/ext"
+    fi
+  fi
+  if [ -z "$LUCEE_LIB" ]; then
+    for express_home in "${EXPRESS_HOMES[@]}"; do
+      [ -d "$express_home" ] || continue
+      LUCEE_LIB="$(find "$express_home" -path "*/lib/ext" -type d 2>/dev/null | head -1 || true)"
+      [ -n "$LUCEE_LIB" ] && break
+    done
   fi
   if [ -n "$LUCEE_LIB" ] && ! ls "$LUCEE_LIB"/sqlite-jdbc*.jar 1>/dev/null 2>&1; then
     echo "Downloading SQLite JDBC driver to $LUCEE_LIB..."
     curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.49.1.0/sqlite-jdbc-3.49.1.0.jar" \
       -o "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar"
-    echo "Restarting LuCLI to pick up new JAR..."
+    echo "Restarting ${CLI_BIN} server to pick up new JAR..."
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
-    lucli server stop 2>/dev/null || true
-    sleep 3  # give the port a moment to release
+    "$CLI_BIN" server stop 2>/dev/null || true
+    # The JVM can outlive both the launcher and `server stop`; while it still
+    # answers, wait_for_server below would "succeed" against the old process
+    # and the new one would be left running unrecorded after cleanup.
+    if [ -n "$SERVER_JVM" ]; then
+      kill "$SERVER_JVM" 2>/dev/null || true
+    fi
+    for _ in $(seq 1 30); do
+      [ -z "$(listener_pid "$PORT" || true)" ] && break
+      sleep 1
+    done
     start_lucli
     echo "Waiting for server after JDBC install..."
     wait_for_server
   fi
 
   # Record the JVM (not the launcher) so cleanup can stop what actually holds
-  # the port. The registry writes "<pid>:<port>" once the server is up.
-  OWN_DIR="$(project_server_dir || true)"
-  if [ -n "$OWN_DIR" ] && [ -f "$OWN_DIR/server.pid" ]; then
-    cp "$OWN_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
+  # the port. Prefer the live listener — the port was free when we started, so
+  # it is ours — over the registry's "<pid>:<port>", which can still name the
+  # pre-restart JVM right after a restart.
+  SERVER_JVM="$(listener_pid "$PORT" || true)"
+  if [ -n "$SERVER_JVM" ]; then
+    printf '%s:%s\n' "$SERVER_JVM" "$PORT" > "$PROJECT_ROOT/.wheels-test-server.pid"
+  else
+    OWN_DIR="$(project_server_dir || true)"
+    if [ -n "$OWN_DIR" ] && [ -f "$OWN_DIR/server.pid" ]; then
+      cp "$OWN_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
+    fi
   fi
 fi
 
