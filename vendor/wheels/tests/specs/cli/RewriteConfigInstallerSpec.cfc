@@ -150,7 +150,7 @@ component extends="wheels.WheelsTest" {
 				var projectRoot = $tempPath("wheels-rewriteinstaller-#createUUID()#");
 				directoryCreate(projectRoot);
 				try {
-					var missing = getTempDirectory() & "wheels-no-such-template-#createUUID()#.config";
+					var missing = $tempPath("wheels-no-such-template-#createUUID()#.config");
 
 					var result = installer.install(projectRoot=projectRoot, sourceTemplate=missing);
 

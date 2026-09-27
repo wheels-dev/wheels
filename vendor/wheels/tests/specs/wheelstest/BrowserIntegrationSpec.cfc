@@ -574,7 +574,7 @@ component extends="wheels.WheelsTest" {
             it("screenshot(path) writes a valid PNG (magic bytes verified)", () => {
                 if (variables.skipBrowserTests) return;
                 variables.bc.visitUrl("data:text/html,<h1>Snap</h1>");
-                var tmpPath = getTempDirectory() & "wheels-bc-" & createUUID() & ".png";
+                var tmpPath = $tempPath("wheels-bc-" & createUUID() & ".png");
                 try {
                     variables.bc.screenshot(tmpPath);
                     expect(fileExists(tmpPath)).toBeTrue();
@@ -595,7 +595,7 @@ component extends="wheels.WheelsTest" {
             it("screenshot with fullPage option writes a PNG file", () => {
                 if (variables.skipBrowserTests) return;
                 variables.bc.visitUrl("data:text/html,<div style='height:2000px'>Tall page</div>");
-                var tmpPath = getTempDirectory() & "wheels-bc-fullpage-" & createUUID() & ".png";
+                var tmpPath = $tempPath("wheels-bc-fullpage-" & createUUID() & ".png");
                 try {
                     variables.bc.screenshot(path=tmpPath, fullPage=true);
                     expect(fileExists(tmpPath)).toBeTrue();

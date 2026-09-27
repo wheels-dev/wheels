@@ -1,19 +1,16 @@
 {
   "engineVersion": "v0.637.0",
   "totals": {
-    "totalSpecs": 5815,
-    "totalPass": 5791,
+    "totalSpecs": 5816,
+    "totalPass": 5794,
     "totalFail": 0,
-    "totalError": 2,
+    "totalError": 0,
     "totalSkipped": 22
   },
-  "failing": [
-    "wheels.tests.specs.storage.StorageSpec :: Storage disk abstraction > LocalDisk :: follows a symlink under root to a file outside (Find('..') does not see the hop)",
-    "wheels.tests.specs.storage.StorageSpec :: Storage disk abstraction > LocalDisk :: stores, reports existence, reads back, and deletes an object"
-  ],
+  "failing": [],
   "_notes": [
     "Known residual failures are upstream RustCFML engine bugs; each entry in failing[] should map to an open issue on https://github.com/RustCFML/RustCFML. There are none at v0.637.0.",
-    "failing[] and totals are the Linux CI result (rustcfml-ci.yml on #3700, job 108660711166): 5791 pass / 0 fail / 2 error. The 2 errors are StorageSpec LocalDisk specs that fail only on the Linux runner (directoryCreate: Permission denied, os error 13; fileWrite: No such file or directory, os error 2); macOS passes them. Not yet classified as an engine bug vs a Wheels spec assumption. Regenerate this file on Linux, as the rustcfml-ci.yml header says.",
+    "totals are the Linux CI result (rustcfml-ci.yml on #3705, job 108668327586): 5794 pass / 0 fail / 0 error. The two StorageSpec LocalDisk entries that used to fail only on Linux were RustCFML/RustCFML#380 (GetTempDirectory() returns /tmp without a trailing separator when TMPDIR is unset, fixed by v0.691.0); the spec now uses WheelsTest.$tempPath(). Regenerate this file on Linux, as the rustcfml-ci.yml header says.",
     "migrationSpec 'creates an index on multiple columns' was previously listed here against RustCFML/RustCFML#377 (QoQ recordCount corruption). That attribution was wrong: #377 was closed unable-to-reproduce, and the failure was a Wheels assertion that assumed one comma-delimited cfdbinfo row on RustCFML, which returns one row per column. Fixed in the spec (wheels-dev/wheels#3686).",
     "Earlier tracked bugs now fixed framework-side or upstream were: #376 Hash(binary), #378 java.io.File two-arg constructor, #379 void-assignment key deletion, #380 GetTempDirectory separator, #381 new-operator name lowercasing."
   ]
