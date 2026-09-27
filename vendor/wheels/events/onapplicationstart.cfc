@@ -8,6 +8,14 @@ component {
 
 	public void function $init(struct keys = {}) {
 
+		// Create one Global subclass here, outside any Global mixin call and
+		// before the first `application.wo` call. On Adobe CF this initializes
+		// the engine's super-scope state for every Global mixin. Without it, the
+		// first request after a cold start fails with EmptyStackException when
+		// `$createObjectFromRoot` creates wheels.Public below (##3730). See
+		// wheels.events.SuperScopePrimer. Keep this the first statement.
+		CreateObject("component", "wheels.events.SuperScopePrimer");
+
 		// Embedding values from `Application.cfc`'s `this` scope into the current component's `this` scope.
 		for (key in keys) {
 			application[key] = keys[key];

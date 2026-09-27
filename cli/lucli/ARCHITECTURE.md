@@ -14,7 +14,7 @@ How `wheels <command>` reaches our code, and where we can intercept.
                       └──────────────┬───────────────────────┘
                                      │  exec
                       ┌──────────────▼───────────────────────┐
-                      │  2.  LuCLI binary  (upstream)        │
+                      │  2.  LuCLI runtime (Wheels fork)     │
                       │      installed under our name as     │
                       │      `libexec/wheels`. picocli       │
                       │      parses args, then routes to     │
@@ -32,18 +32,20 @@ How `wheels <command>` reaches our code, and where we can intercept.
 
 ## Layer 1 — the wrapper (ours)
 
-The Homebrew formula in [`wheels-dev/homebrew-wheels`](https://github.com/wheels-dev/homebrew-wheels) and the Chocolatey package in [`wheels-dev/chocolatey-wheels`](https://github.com/wheels-dev/chocolatey-wheels) each generate a small wrapper that:
+Homebrew, Scoop, and the apt/yum packages each generate a small wrapper that:
 
 1. Stages the wheels module (`cli/lucli/`) into `~/.wheels/modules/wheels/` if `.module-version` has changed since last run.
 2. Stages the framework source (`vendor/wheels/`) into `~/.wheels/modules/wheels/vendor/wheels/`.
 3. Drops the SQLite JDBC driver into `~/.wheels/express/<version>/lib/ext/` (fresh-VM cliff fix; see commit `da9058f42`).
 4. Sets `JAVA_HOME` and `LUCLI_HOME=$HOME/.wheels`.
 5. **Intercepts arguments that picocli would short-circuit on** (see "Why intercept here" below).
-6. `exec`s `libexec/wheels` (the renamed LuCLI native binary).
+6. Launches the packaged LuCLI runtime (a JAR with a Unix launcher, or Java directly on Windows/Linux packages).
 
-## Layer 2 — LuCLI binary (upstream)
+## Layer 2 — LuCLI runtime (Wheels fork)
 
-The brew formula downloads `lucli-<version>-<os>` from [`cybersonic/LuCLI`](https://github.com/cybersonic/LuCLI/releases) and installs it as `libexec/wheels`. **We do not patch this binary.** It is upstream LuCLI, byte-for-byte, just renamed.
+The runtime repo and version are selected once in [`tools/lucli.json`](../../tools/lucli.json). CI and Linux packaging read that file; Homebrew and Scoop update workflows consume the same pin to generate their URLs and checksums. The Homebrew formula installs the Unix launcher as `libexec/wheels`.
+
+[`wheels-dev/LuCLI`](https://github.com/wheels-dev/LuCLI) carries a reviewed queue of upstream bug fixes on an upstream release tag. Every behavioral patch has an upstream PR; drop it when rebasing onto an upstream release that contains it. See the fork's `FORK.md` for provenance and release checks. Fork-only product features do not belong in this queue.
 
 LuCLI's startup flow when invoked as `wheels`:
 
@@ -70,14 +72,14 @@ So `wheels new myapp` becomes `modules.new("myapp")`. Each public function in [`
 | Layer | Use it for | Cannot reach |
 |-------|------------|--------------|
 | **Wrapper** | Anything picocli would short-circuit on (`--version`, `--help`), or anything that needs to skip JVM startup for speed | n/a — wrapper sees raw args before LuCLI does |
-| **LuCLI binary** | Untouchable per project policy (we don't patch upstream) | n/a |
+| **LuCLI binary** | Upstream bug fixes through the reviewed fork queue | n/a |
 | **`Module.cfc`** | Any subcommand that reaches `routeCommand` → module dispatch: `new`, `start`, `migrate`, `test`, `generate`, … Includes `wheels --help` (rewritten by `preprocessModuleHelp` to module dispatch) | picocli's root-level absorbed flags: `--version`, `--lucee-version`, `--verbose`, `--debug`, `--timing` |
 
 ### Why intercept in the wrapper
 
 picocli treats `@Option(versionHelp = true)` and `@Option(usageHelp = true)` flags specially: it processes them **during argument parsing**, before the `call()` method runs. So `wheels --version` never reaches our module dispatch — picocli prints LuCLI's banner and exits. The same is true for `--help` if it appears alone (no positional first arg to trigger `preprocessModuleHelp`'s rewrite).
 
-The wrapper is the only place upstream of picocli that we own. A short pattern-match on `$@` lets us emit our own banner / help and `exit 0` before `exec`ing LuCLI.
+The wrapper handles Wheels-specific presentation before picocli. A short pattern-match on `$@` lets us emit our own banner / help and `exit 0` before `exec`ing LuCLI.
 
 ### Why duplicate `--help` and `--version` in `Module.cfc` too
 

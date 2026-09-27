@@ -4,20 +4,17 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 * Internal function.
 	 */
 	public struct function $init() {
-		// The helpers include MUST live in its own method. 4.0.6 added
-		// `$scanAndPromoteIncludedGlobals()` immediately after a raw `include`
-		// in this same `$init` body (##3302 / 6bff054). That nests Adobe's
-		// include page-context with a parent-class method call (Global's
-		// promote scan). On the first request after a CommandBox cold start,
-		// Adobe CF 2023's `UDFMethod.invoke` cleanup then calls
-		// `NeoPageContext.popSuperScope` against an empty stack —
-		// EmptyStackException at onapplicationstart.cfc:409
-		// (`$createObjectFromRoot` → Public.$init). A later request succeeds
-		// because helpers.cfm is already compiled. 4.0.5 `$init` only
-		// included and returned, which is why discarding 4.0.6 files cleared
-		// it. Isolate the include so its page-context pops before the promote
-		// scan runs; keep the raw scan (not the memoized wrapper) so the
-		// ##3302 `this`-visibility contract stays.
+		// Promote the helpers onto `this` after including them. Keep the raw
+		// scan (not the memoized wrapper) so the ##3302 `this`-visibility
+		// contract stays; see $includePublicHelpers().
+		//
+		// The Adobe first-request EmptyStackException at the
+		// `$createObjectFromRoot(... "Public" ...)` call in onapplicationstart
+		// does NOT come from this method. 51edf9dce blamed this include; the
+		// real cause is the engine's super-scope bug when Global's
+		// pseudo-constructor copies the running `$createObjectFromRoot` mixin
+		// onto this new object. onapplicationstart.$init() avoids it by
+		// creating wheels.events.SuperScopePrimer first (##3730).
 		$includePublicHelpers();
 		$scanAndPromoteIncludedGlobals();
 
@@ -25,10 +22,11 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	/**
-	 * Includes `/wheels/public/helpers.cfm` in its own UDF frame so Adobe's
-	 * include page-context is popped before `$init` calls the parent-class
-	 * promote scan. Do not inline this `include` back into `$init` — that
-	 * nest is the 4.0.6 first-boot EmptyStackException on Adobe CF 2023.
+	 * Includes `/wheels/public/helpers.cfm` in its own UDF frame. The split was
+	 * made (51edf9dce) as a fix for the Adobe first-boot EmptyStackException,
+	 * but it was not the cause and does not prevent it (##3730, see
+	 * wheels.events.SuperScopePrimer). It is kept because it is harmless and
+	 * keeps the include's page context out of `$init`.
 	 *
 	 * The include declares its UDFs into `variables` only — they never
 	 * reach `this` on Lucee 6, Adobe 2023 or Adobe 2025 (Lucee 7 and BoxLang

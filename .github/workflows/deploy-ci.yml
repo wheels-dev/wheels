@@ -10,7 +10,7 @@
 # matrix, and deploy-subsystem edits pick up an extra gate.
 #
 # Prerequisites (already present in this repo's CI):
-#   - LuCLI install recipe mirrors .github/workflows/pr.yml (cybersonic/LuCLI release).
+#   - LuCLI install recipe mirrors .github/workflows/pr.yml (tools/lucli.json pin).
 #   - Java 21 via actions/setup-java@v5.
 #
 # Gating model:
@@ -73,7 +73,7 @@ jobs:
           #   vendor/wheels/migrator/, Seeder.cfc, JobWorker.cfc  what CliBridge calls
           # Wider framework boot breakage is caught by the core suite, which is
           # required on its own.
-          PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$|lucee\.json$|public/|config/|app/(events|global|migrator)/|vendor/wheels/(public/|Public\.cfc$|events/|wheelstest/|migrator/|Seeder\.cfc$|JobWorker\.cfc$))'
+          PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$|\.github/actions/setup-lucli/|tools/lucli\.json$|lucee\.json$|public/|config/|app/(events|global|migrator)/|vendor/wheels/(public/|Public\.cfc$|events/|wheelstest/|migrator/|Seeder\.cfc$|JobWorker\.cfc$))'
           if [ "$EVENT_NAME" = "pull_request" ]; then
             git fetch --no-tags --depth=1 origin "$BASE_REF"
             CHANGED="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
@@ -100,7 +100,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      LUCLI_VERSION: "0.6.1"
       WHEELS_CI: "true"
       PORT: "8080"
     steps:
@@ -113,11 +112,7 @@ jobs:
           java-version: '21'
 
       - name: Install LuCLI
-        run: |
-          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
-            -o /usr/local/bin/lucli
-          chmod +x /usr/local/bin/lucli
-          lucli --version
+        uses: ./.github/actions/setup-lucli
 
       - name: Create test databases
         run: |

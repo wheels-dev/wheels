@@ -30,7 +30,6 @@ jobs:
     if: github.event.action != 'edited'
     runs-on: ubuntu-latest
     env:
-      LUCLI_VERSION: "0.6.1"
       WHEELS_CI: "true"
       WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
       WHEELS_BROWSER_CI_ENABLE: "true"
@@ -44,11 +43,7 @@ jobs:
           java-version: '21'
 
       - name: Install LuCLI
-        run: |
-          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
-            -o /usr/local/bin/lucli
-          chmod +x /usr/local/bin/lucli
-          lucli --version
+        uses: ./.github/actions/setup-lucli
 
       - name: Create test databases
         run: |
@@ -201,8 +196,6 @@ jobs:
     name: "Tutorial E2E (new → scaffold → migrate → routes → .json → test)"
     if: github.event.action != 'edited'
     runs-on: ubuntu-latest
-    env:
-      LUCLI_VERSION: "0.6.1"
     steps:
       - uses: actions/checkout@v5
 
@@ -213,11 +206,7 @@ jobs:
           java-version: '21'
 
       - name: Install LuCLI
-        run: |
-          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
-            -o /usr/local/bin/lucli
-          chmod +x /usr/local/bin/lucli
-          lucli --version
+        uses: ./.github/actions/setup-lucli
 
       - name: Run tutorial e2e
         run: bash tools/test-tutorial-e2e.sh

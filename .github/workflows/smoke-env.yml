@@ -30,6 +30,8 @@ on:
       - '.github/workflows/smoke-env.yml'
       - 'tools/ci/lucee.ci.json'
       - '.github/actions/setup-wheels-test-env/**'
+      - '.github/actions/setup-lucli/**'
+      - 'tools/lucli.json'
       - 'compose.yml'
       - 'tools/docker/adobe2023/**'
 

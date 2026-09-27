@@ -112,7 +112,173 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		$removeColumnAliasesInOrderClause(args = arguments);
 		$addColumnsToSelectAndGroupBy(args = arguments);
 		$moveAggregateToHaving(args = arguments);
-		return $performQuery(argumentCollection = arguments);
+		local.rv = $performQuery(argumentCollection = arguments);
+		// Every engine: BoxLang and Adobe 2023 both hand Oracle TIMESTAMP columns
+		// back as raw driver objects (#3719). Engines that already return dates
+		// pay one class-name check per column.
+		if (StructKeyExists(local.rv, "query")) {
+			local.rv.query = $normalizeOracleTemporalResult(local.rv.query);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Normalize whatever shape the finder returned: a query, or the native
+	 * `returnType="array"` (an array of row structs) / `returnType="struct"`
+	 * (a struct of row structs) results that finders can ask cfquery for.
+	 */
+	public any function $normalizeOracleTemporalResult(required any result) {
+		if (IsQuery(arguments.result)) {
+			return $normalizeOracleTemporalColumns(arguments.result);
+		}
+		if (IsArray(arguments.result)) {
+			for (local.i = 1; local.i <= ArrayLen(arguments.result); local.i++) {
+				if (IsStruct(arguments.result[local.i])) {
+					$normalizeOracleTemporalRow(arguments.result[local.i]);
+				}
+			}
+			return arguments.result;
+		}
+		if (IsStruct(arguments.result)) {
+			for (local.key in arguments.result) {
+				if (IsNull(arguments.result[local.key])) {
+					continue;
+				}
+				if (IsStruct(arguments.result[local.key])) {
+					$normalizeOracleTemporalRow(arguments.result[local.key]);
+				} else if ($isOracleDriverValue(arguments.result[local.key])) {
+					local.converted = $oracleTemporalToDate(arguments.result[local.key]);
+					if (IsDate(local.converted)) {
+						arguments.result[local.key] = local.converted;
+					}
+				}
+			}
+		}
+		return arguments.result;
+	}
+
+	/** Internal function: convert the Oracle temporal values in one row struct. */
+	public void function $normalizeOracleTemporalRow(required struct row) {
+		for (local.key in arguments.row) {
+			if (IsNull(arguments.row[local.key]) || !$isOracleDriverValue(arguments.row[local.key])) {
+				continue;
+			}
+			local.converted = $oracleTemporalToDate(arguments.row[local.key]);
+			if (IsDate(local.converted)) {
+				arguments.row[local.key] = local.converted;
+			}
+		}
+	}
+
+	/**
+	 * Internal function: an Oracle TIMESTAMP/DATE driver object as a CFML
+	 * date, to the millisecond. Converted from the driver's own
+	 * java.sql.Timestamp (the instant in the JVM's timezone, like the other
+	 * framework readers) with its sub-second part carried over, so a finder
+	 * returns the same value on every engine. Returns "" when
+	 * the object cannot be bridged without a connection (TIMESTAMP WITH TIME
+	 * ZONE); callers then leave the value as it was.
+	 */
+	public any function $oracleTemporalToDate(required any value) {
+		try {
+			local.stamp = arguments.value.timestampValue();
+		} catch (any e) {
+			return "";
+		}
+		if (IsNull(local.stamp)) {
+			return "";
+		}
+		local.date = $javaDateToCfml(local.stamp);
+		local.millis = Int(local.stamp.getNanos() / 1000000);
+		if (local.millis > 0) {
+			local.date = DateAdd("l", local.millis, local.date);
+		}
+		return local.date;
+	}
+
+	/**
+	 * On some engines (BoxLang, Adobe 2023) the Oracle driver's DATE/TIMESTAMP
+	 * columns reach query results as raw `oracle.sql.*` driver objects instead
+	 * of CFML dates. App code then cannot format, compare, output or JSON-render them
+	 * (#3719). Convert, in place, every column whose first non-empty value is
+	 * an Oracle TIMESTAMP/TIMESTAMPTZ/TIMESTAMPLTZ/DATE object into CFML dates,
+	 * to the millisecond, through `$oracleTemporalToDate()`.
+	 *
+	 * One value per column is inspected to decide, so columns of simple values
+	 * or real dates cost a single check. A cell is only replaced when the
+	 * conversion yields a date; anything it cannot convert (for example a
+	 * TIMESTAMP WITH TIME ZONE that needs a live connection) is left as it was
+	 * rather than blanked.
+	 */
+	public query function $normalizeOracleTemporalColumns(required query query) {
+		local.rowCount = arguments.query.recordCount;
+		if (!local.rowCount) {
+			return arguments.query;
+		}
+		local.columns = ListToArray(arguments.query.columnList);
+		for (local.column in local.columns) {
+			if (!$isOracleTemporalColumn(arguments.query, local.column, local.rowCount)) {
+				continue;
+			}
+			for (local.row = 1; local.row <= local.rowCount; local.row++) {
+				local.cell = arguments.query[local.column][local.row];
+				if (IsNull(local.cell) || !$isOracleDriverValue(local.cell)) {
+					continue;
+				}
+				local.converted = $oracleTemporalToDate(local.cell);
+				if (IsDate(local.converted)) {
+					QuerySetCell(arguments.query, local.column, local.converted, local.row);
+				}
+			}
+		}
+		return arguments.query;
+	}
+
+	/**
+	 * Internal function for `$normalizeOracleTemporalColumns()`: is the first
+	 * non-empty value in `column` an Oracle temporal driver object? Decided by
+	 * the Java class name alone: the driver objects throw on Len(), string
+	 * casts and date functions, so nothing else is called on them.
+	 */
+	public boolean function $isOracleTemporalColumn(required query query, required string column, required numeric rowCount) {
+		for (local.row = 1; local.row <= arguments.rowCount; local.row++) {
+			local.cell = arguments.query[arguments.column][local.row];
+			if (IsNull(local.cell)) {
+				continue;
+			}
+			if ($isOracleDriverValue(local.cell)) {
+				return true;
+			}
+			// An empty string is a NULL column value: keep looking. Any other
+			// value (text, number, CFML date) means this is not such a column.
+			if ($javaClassName(local.cell) == "java.lang.String" && !Len(local.cell)) {
+				continue;
+			}
+			return false;
+		}
+		return false;
+	}
+
+	/**
+	 * Internal function: is `value` one of the Oracle driver's temporal
+	 * objects? Exactly these classes, not every `oracle.sql.*`: the
+	 * conversion treats numbers as epoch milliseconds, so a raw
+	 * oracle.sql.NUMBER must never reach it.
+	 */
+	public boolean function $isOracleDriverValue(required any value) {
+		return ListFind(
+			"oracle.sql.TIMESTAMP,oracle.sql.TIMESTAMPTZ,oracle.sql.TIMESTAMPLTZ,oracle.sql.DATE",
+			$javaClassName(arguments.value)
+		) > 0;
+	}
+
+	/** Internal function: the Java class name of `value`, or "" when unknown. */
+	public string function $javaClassName(required any value) {
+		try {
+			return arguments.value.getClass().getName();
+		} catch (any e) {
+			return "";
+		}
 	}
 
 	/**
