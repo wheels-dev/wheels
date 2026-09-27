@@ -1154,8 +1154,13 @@ component extends="modules.BaseModule" {
 		// --test-timeout (terminal) wins over timeout (MCP / in-process);
 		// then WHEELS_TEST_TIMEOUT, then 900 — see $resolveTestTimeout().
 		var rawTimeout = parsed.timeout;
-		if (structKeyExists(arguments.coll, "test-timeout") && len(trim(toString(arguments.coll["test-timeout"])))) {
-			rawTimeout = toString(arguments.coll["test-timeout"]);
+		if (structKeyExists(arguments.coll, "test-timeout")) {
+			if (!isSimpleValue(arguments.coll["test-timeout"])) {
+				// Not a value at all: warn and fall back like any junk timeout.
+				rawTimeout = "(not a simple value)";
+			} else if (len(trim(toString(arguments.coll["test-timeout"])))) {
+				rawTimeout = toString(arguments.coll["test-timeout"]);
+			}
 		}
 		var resolvedTimeout = $resolveTestTimeout(rawTimeout);
 

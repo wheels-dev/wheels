@@ -395,6 +395,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(probe.$parseTestArgs({"test-timeout": "45", "timeout": "60"}).timeout).toBe(45);
 			});
 
+			it("warns instead of throwing a cast error for a non-simple --test-timeout", () => {
+				var o = probe.$parseTestArgs({"test-timeout": {nested: 1}});
+				expect(o.timeout).toBe(900);
+				expect(len(o.timeoutWarning)).toBeGT(0);
+			});
+
 			it("warns and falls back for a junk --test-timeout, like timeout", () => {
 				var o = probe.$parseTestArgs({"test-timeout": "soon"});
 				expect(o.timeout).toBe(900);
