@@ -201,6 +201,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(o.hasTarget).toBeTrue();
 			});
 
+			it("reads target by name, the MCP call shape (##2963)", () => {
+				// LuCLI's MCP server passes {target: "..."} as a named key; the
+				// target used to be ignored and `all` analyzed instead.
+				var o = probe.$parseAnalyzeArgs({target: "Models"});
+				expect(o.target).toBe("models");
+				expect(o.hasTarget).toBeTrue();
+			});
+
 		});
 
 		describe("parseVerboseFlag (doctor / stats — named-only fix + -v preserved)", () => {
@@ -283,6 +291,40 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(o.type).toBe("model");
 				expect(o.name).toBe("User");
 				expect(o.force).toBeTrue();
+			});
+
+			it("reads type and name by name, the MCP call shape (##2963)", () => {
+				// {type: "model", name: "User"} arrives as named keys over MCP;
+				// both were ignored and destroy printed its usage instead.
+				var o = probe.$parseDestroyArgs({type: "model", name: "User"});
+				expect(o.type).toBe("model");
+				expect(o.name).toBe("User");
+				expect(o.positionalCount).toBe(2);
+			});
+
+			it("defaults a named-only name to type resource, like the one-token CLI form", () => {
+				var o = probe.$parseDestroyArgs({name: "User"});
+				expect(o.type).toBe("resource");
+				expect(o.name).toBe("User");
+				expect(o.positionalCount).toBe(1);
+			});
+
+			it("treats a named type without a name as no target (shows usage)", () => {
+				// Never let {type: "model"} become a resource NAMED "model".
+				expect(probe.$parseDestroyArgs({type: "model"}).positionalCount).toBe(0);
+			});
+
+			it("keeps named values in place instead of running the legacy reorder", () => {
+				// The reorder guesses which token is the type; named keys say so.
+				var o = probe.$parseDestroyArgs({type: "bogus", name: "User"});
+				expect(o.name).toBe("User");
+				expect(o.type).toBe("bogus");
+			});
+
+			it("prefers typed positional tokens over named keys", () => {
+				var o = probe.$parseDestroyArgs({arg1: "controller", arg2: "Posts", type: "model", name: "User"});
+				expect(o.type).toBe("controller");
+				expect(o.name).toBe("Posts");
 			});
 
 		});

@@ -26,6 +26,40 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// showing help. Dead (masked by the old -1 error sentinel) until
 		// Module.cfc became instantiable here; xdescribe keeps them visible and
 		// green until the audit makes them runnable. See #2829 / PR #2831.
+		// Paths that fail before any registry or network call, so they run
+		// in every environment (##2963: packages now parses via ArgSpec).
+		describe("wheels packages — argument parsing", () => {
+
+			it("rejects a bare --tag instead of filtering on the literal `true`", () => {
+				// LuCLI delivers `--tag foo` as tag=true plus a positional, so a
+				// bare --tag must fail loudly rather than list nothing.
+				expect(() => mod.packages(arg1 = "list", tag = true)).toThrow(type = "Wheels.InvalidArguments");
+			});
+
+			it("reports a missing name for add from a named subcommand", () => {
+				var state = {message: ""};
+				try {
+					mod.packages(subcommand = "add");
+				} catch (any e) {
+					state.message = e.message;
+				}
+				expect(state.message).toInclude("add requires a name");
+			});
+
+			it("binds a named target the same as a positional one", () => {
+				// `registry` validates its verb before touching the network.
+				expect(() => mod.packages(subcommand = "registry", target = "bogus")).toThrow();
+				var state = {message: ""};
+				try {
+					mod.packages(subcommand = "registry", target = "bogus");
+				} catch (any e) {
+					state.message = e.message;
+				}
+				expect(state.message).toInclude("Unknown wheels packages registry verb: bogus");
+			});
+
+		});
+
 		xdescribe("wheels packages help", () => {
 
 			it("treats `help` positional as a help request (no network call)", () => {

@@ -197,6 +197,7 @@ component extends="modules.BaseModule" {
 			"dbmigrate", // alias for migrate — a duplicate tool with no inputSchema otherwise
 			"new",      // scaffolds a whole new Wheels project
 			"console",  // interactive CFML REPL — not usable over stdio
+			"deploy",   // SSH/pushes/restarts on remote hosts — side effects off-machine (#2963)
 			"start",    // dev server lifecycle (stateful)
 			"stop",     // dev server lifecycle (stateful)
 			"engines",  // dev server lifecycle (stateful — RustCFML backend)
@@ -257,20 +258,24 @@ component extends="modules.BaseModule" {
 	 * the MCP advertisement cannot drift.
 	 *
 	 * Verified over stdio on the pinned LuCLI runtime (0.6.1): every entry
-	 * below is advertised as its tool's inputSchema. `info` and `validate`
-	 * take no arguments, so their empty schema is accurate. The commands that
-	 * still parse their own argv (db, deploy, packages, reload) advertise an
-	 * empty schema until they move to ArgSpec and gain an entry here.
+	 * below is advertised as its tool's inputSchema. LuCLI passes tools/call
+	 * arguments as NAMED keys, positionals included, which ArgSpec.parse()
+	 * binds by name when no positional token is present. `info` and
+	 * `validate` read no arguments, so their empty schema is accurate;
+	 * `deploy` is hidden from MCP (see mcpHiddenTools()).
 	 */
 	public struct function mcpToolSpecs() {
 		return {
 			"analyze" = analyzeArgSpec().toInputSchema(),
 			"create"  = createArgSpec().toInputSchema(),
+			"db"      = dbArgSpec().toInputSchema(),
 			"destroy" = destroyArgSpec().toInputSchema(),
 			"doctor"  = verboseFlagSpec().toInputSchema(),
 			"generate" = generateArgSpec().toInputSchema(),
 			"migrate" = migrateArgSpec().toInputSchema(),
 			"notes"   = notesArgSpec().toInputSchema(),
+			"packages" = packagesArgSpec().toInputSchema(),
+			"reload"  = reloadPasswordSpec().toInputSchema(),
 			"routes"  = routesArgSpec().toInputSchema(),
 			"seed"    = seedArgSpec().toInputSchema(),
 			"stats"   = verboseFlagSpec().toInputSchema(),
@@ -382,6 +387,37 @@ component extends="modules.BaseModule" {
 			.option(name = "max-jobs", default = 0, type = "numeric", description = "work only: stop after this many jobs (successes + failures count). 0 = run until stopped")
 			.flag(name = "quiet", default = false, description = "work only: suppress per-job completion output, only print failures")
 			.option(name = "format", default = "table", description = "status only: output format, table or json");
+	}
+
+	private any function dbArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "subcommand", default = "", description = "Database command: reset (run pending migrations, then reseed), status (applied vs pending migrations), or version (current schema version). Omitted prints usage")
+			.flag(name = "force", default = false, description = "reset only: confirm the reset. Without it, reset prints a warning and changes nothing")
+			.flag(name = "skip-seed", default = false, description = "reset only: run migrations but skip reseeding")
+			.flag(name = "pending", default = false, description = "status only: list pending migrations only")
+			.flag(name = "detailed", default = false, description = "version only: also show the last applied migration, totals, and the next pending migration")
+			.flag(name = "offline", default = false, description = "Accepted for script portability; db only talks to the local server, so it has no effect");
+	}
+
+	private any function packagesArgSpec() {
+		return new services.ArgSpec()
+			.positional(name = "subcommand", default = "list", description = "Package verb: list (default), search, show, add (install a package; `install` is an alias), update, remove, registry, or help")
+			.positional(name = "target", default = "", description = "search: the query. show/remove: the package name. add: name or name@version. update: the package name (omit with --all). registry: refresh or info")
+			.option(name = "tag", default = "", description = "list only: show only packages carrying this tag (pass as --tag=<tag>)")
+			.flag(name = "all", default = false, description = "update only: update every installed package")
+			.flag(name = "yes", default = false, description = "update only: confirm the update (required)")
+			.flag(name = "force", default = false, description = "add only: overwrite vendor/<name>/ if it already exists")
+			.flag(name = "help", default = false, description = "Print usage instead of running a verb")
+			.flag(name = "offline", default = false, description = "Refuse registry network access (cached registry data still works). Also set by WHEELS_OFFLINE=1");
+	}
+
+	/**
+	 * `--password=<value>` for reload and console: overrides the reload
+	 * password the CLI auto-detects from .env / config/settings.cfm.
+	 */
+	private any function reloadPasswordSpec() {
+		return new services.ArgSpec()
+			.option(name = "password", default = "", description = "Reload password. Overrides the one auto-detected from .env or config/settings.cfm");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2461,9 +2497,7 @@ component extends="modules.BaseModule" {
 	 * value (#2861).
 	 */
 	private struct function parseConsoleArgs(required struct coll) {
-		var parsed = new services.ArgSpec()
-			.option(name = "password", default = "")
-			.parse(arguments.coll);
+		var parsed = reloadPasswordSpec().parse(arguments.coll);
 		return { password = parsed.password };
 	}
 
@@ -3051,7 +3085,8 @@ component extends="modules.BaseModule" {
 		var parsed = analyzeArgSpec().parse(arguments.coll);
 		return {
 			target = lCase(parsed.target),
-			hasTarget = structKeyExists(arguments.coll, "arg1")
+			// arg1 from the CLI, or target=... by name from an MCP tool call
+			hasTarget = structKeyExists(arguments.coll, "arg1") || structKeyExists(arguments.coll, "target")
 		};
 	}
 
@@ -3192,8 +3227,8 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseDestroyArgs(required struct coll) {
 		// The builder also declares the <type>/<name> positionals (for the MCP
-		// schema); the smart legacy-order reorder below still reads them from
-		// the raw collection, so only parsed.force is consumed here.
+		// schema). The smart legacy-order reorder below reads typed tokens from
+		// the raw collection; parsed.type / parsed.name cover the by-name path.
 		var parsed = destroyArgSpec().parse(arguments.coll);
 
 		// Collect positionals from every arg<n> value in numeric order. LuCLI
@@ -3211,6 +3246,21 @@ component extends="modules.BaseModule" {
 		for (var idx in indices) {
 			var token = trim(arguments.coll["arg" & idx]);
 			if (len(token)) arrayAppend(positional, token);
+		}
+
+		// MCP tool calls send <type>/<name> as named keys (#2963), which the
+		// ArgSpec by-name fallback binds into parsed.type / parsed.name. They
+		// apply only when no token was typed, and skip the legacy reorder
+		// because named values are unambiguous. A type with no name is not a
+		// target: it shows usage rather than destroying a resource named "model".
+		if (!arrayLen(positional) && len(trim(parsed.name))) {
+			var namedType = trim(parsed.type);
+			return {
+				name = trim(parsed.name),
+				type = len(namedType) ? lCase(namedType) : "resource",
+				force = parsed.force,
+				positionalCount = len(namedType) ? 2 : 1
+			};
 		}
 
 		var validTypes = "resource,model,controller,view";
@@ -3861,11 +3911,21 @@ component extends="modules.BaseModule" {
 	 *   wheels packages registry info
 	 */
 	public string function packages() {
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
-		$consumeOfflineFlag(args);
-		var opts = $packagesArgsToOptions(args);
-		var positional = $packagesStripFlags(args);
-		var sub = arrayLen(positional) >= 1 ? positional[1] : "list";
+		var parsed = packagesArgSpec().parse(structuredArgs(arguments));
+		$consumeOfflineFlag(parsed.offline ? ["--offline"] : []);
+		var sub = len(trim(parsed.subcommand)) ? trim(parsed.subcommand) : "list";
+		var target = trim(parsed.target);
+		// LuCLI delivers `--tag foo` (space form) as tag=true plus a
+		// positional, so a bare --tag reaches us as the string "true".
+		// Filtering on it would silently list nothing — fail loudly instead.
+		if (compare(parsed.tag, "true") == 0) {
+			throw(type = "Wheels.InvalidArguments", message = "--tag needs a value: wheels packages list --tag=<tag>");
+		}
+		var opts = {tag = parsed.tag, all = parsed.all, yes = parsed.yes, force = parsed.force};
+		var positional = [sub];
+		if (len(target)) {
+			arrayAppend(positional, target);
+		}
 
 		// `--help` / `-h` short-circuits to a deterministic help string the
 		// module owns directly. LuCLI's auto-introspected help previously
@@ -3874,11 +3934,10 @@ component extends="modules.BaseModule" {
 		// guarantees `wheels packages help`, `wheels packages --help`, and
 		// `wheels packages -h` all reach $packagesHelp().
 		//
-		// Note: `-h` is consumed by $packagesArgsToOptions (sets opts.help =
-		// true) and stripped from positionals by $packagesStripFlags before
-		// `sub` is read, so it arrives here as opts.help — never as a
-		// positional. No `sub == "-h"` clause is needed.
-		if ((opts.help ?: false) || sub == "help") {
+		// `-h` is not a LuCLI flag shape (single dash), so it arrives as a
+		// positional token — as the verb (`packages -h`) or after it
+		// (`packages list -h`).
+		if (parsed.help || sub == "help" || sub == "-h" || target == "-h") {
 			return $packagesHelp();
 		}
 
@@ -3997,55 +4056,6 @@ component extends="modules.BaseModule" {
 		help &= "  wheels packages update --all --yes" & nl;
 		help &= "  wheels packages remove wheels-basecoat" & nl;
 		return help;
-	}
-
-	private struct function $packagesArgsToOptions(required array args) {
-		var opts = {};
-		var n = arrayLen(arguments.args);
-		var i = 1;
-		while (i <= n) {
-			var a = arguments.args[i];
-			if (a == "--all") {
-				opts.all = true;
-			} else if (a == "--yes") {
-				opts.yes = true;
-			} else if (a == "--force") {
-				opts.force = true;
-			} else if (a == "--help" || a == "-h") {
-				opts.help = true;
-			} else if (left(a, 6) == "--tag=") {
-				opts.tag = mid(a, 7, 99999);
-			} else if (a == "--tag" && i < n) {
-				opts.tag = arguments.args[i+1];
-				i++;
-			}
-			i++;
-		}
-		return opts;
-	}
-
-	private array function $packagesStripFlags(required array args) {
-		var out = [];
-		var n = arrayLen(arguments.args);
-		var i = 1;
-		while (i <= n) {
-			var a = arguments.args[i];
-			if (left(a, 2) == "--") {
-				var booleans = "--all,--yes,--force,--help";
-				if (!find("=", a) && !listFindNoCase(booleans, a) && i < n && left(arguments.args[i+1], 2) != "--") {
-					i++;
-				}
-				i++;
-				continue;
-			}
-			if (a == "-h") {
-				i++;
-				continue;
-			}
-			arrayAppend(out, a);
-			i++;
-		}
-		return out;
 	}
 
 	private array function $deployStripFlags(required array args) {
@@ -4188,10 +4198,10 @@ component extends="modules.BaseModule" {
 	 * hint: Database management commands (reset, status, version)
 	 */
 	public string function db() {
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
-		$consumeOfflineFlag(args);
+		var opts = dbArgSpec().parse(structuredArgs(arguments));
+		$consumeOfflineFlag(opts.offline ? ["--offline"] : []);
 
-		if (!arrayLen(args)) {
+		if (!len(trim(opts.subcommand))) {
 			out("Usage: wheels db <command>", "yellow");
 			out("");
 			out("Commands:", "bold");
@@ -4208,15 +4218,15 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var subcommand = lCase(args[1]);
+		var subcommand = lCase(trim(opts.subcommand));
 
 		switch (subcommand) {
 			case "reset":
-				return dbReset(args);
+				return dbReset(opts);
 			case "status":
-				return dbStatus(args);
+				return dbStatus(opts);
 			case "version":
-				return dbVersion(args);
+				return dbVersion(opts);
 			default:
 				out("Unknown db command: #subcommand#", "red");
 				out("Valid commands: reset, status, version");
@@ -6574,13 +6584,9 @@ component extends="modules.BaseModule" {
 	/**
 	 * Reset database: run pending migrations and reseed
 	 */
-	private string function dbReset(array args = []) {
-		var force = false;
-		var skipSeed = false;
-		for (var arg in arguments.args) {
-			if (arg == "--force") force = true;
-			if (arg == "--skip-seed") skipSeed = true;
-		}
+	private string function dbReset(required struct opts) {
+		var force = arguments.opts.force;
+		var skipSeed = arguments.opts["skip-seed"];
 
 		if (!force) {
 			out("This will run pending migrations and reseed the database.", "yellow");
@@ -6616,11 +6622,8 @@ component extends="modules.BaseModule" {
 	/**
 	 * Show migration status
 	 */
-	private string function dbStatus(array args = []) {
-		var pendingOnly = false;
-		for (var arg in arguments.args) {
-			if (arg == "--pending") pendingOnly = true;
-		}
+	private string function dbStatus(required struct opts) {
+		var pendingOnly = arguments.opts.pending;
 
 		var serverPort = $requireRunningServer();
 
@@ -6660,11 +6663,8 @@ component extends="modules.BaseModule" {
 	/**
 	 * Show current database schema version
 	 */
-	private string function dbVersion(array args = []) {
-		var detailed = false;
-		for (var arg in arguments.args) {
-			if (arg == "--detailed") detailed = true;
-		}
+	private string function dbVersion(required struct opts) {
+		var detailed = arguments.opts.detailed;
 
 		var serverPort = $requireRunningServer();
 

@@ -12,7 +12,7 @@
  * `ArgSpec` consumes LuCLI's structured map directly. Each command either
  * declares its positionals, flags, and options up front and calls
  * `.parse(arguments)` for a typed result struct, or — when it forwards to its
- * own downstream argv parser (generate, deploy, packages, ...) — calls
+ * own downstream argv parser (generate, deploy, migrate, ...) — calls
  * `.toArgv(arguments)` for a non-lossy collection->argv reconstruction. Either
  * way: no per-command flatten, no re-parse, no lossy `false` round trip. The
  * Module.cfc getArgs()/argsFromCollection() shim this replaced has been removed
@@ -103,6 +103,14 @@ component {
 			var pSpec = variables.positionals[i];
 			if (i <= arrayLen(positionalIndices)) {
 				result[pSpec.name] = $coerce(arguments.coll["arg" & positionalIndices[i]], pSpec.type);
+			} else if (structKeyExists(arguments.coll, pSpec.name) && isSimpleValue(arguments.coll[pSpec.name])) {
+				// By-name fallback (#2963). LuCLI's MCP server delivers
+				// tools/call arguments as named keys — toInputSchema()
+				// advertises positionals as named properties, so
+				// {type: "model"} arrives as type=model, never arg1. A typed
+				// positional token still wins; the name only fills a slot the
+				// tokens left unbound.
+				result[pSpec.name] = $coerce(arguments.coll[pSpec.name], pSpec.type);
 			} else if (pSpec.required) {
 				throw(
 					type = "Wheels.CLI.MissingArgument",
@@ -134,8 +142,8 @@ component {
 	 * The inverse of LuCLI's parse: positionals (arg1, arg2, ...) emit first
 	 * in index order, then named keys emit as `--key` (true), `--no-key`
 	 * (false), or `--key=value`. This is the non-lossy passthrough that
-	 * commands with their own downstream argv parsers (generate, create, db,
-	 * browser, deploy, packages, migrate, start) use to forward LuCLI's
+	 * commands with their own downstream argv parsers (generate, create,
+	 * browser, deploy, migrate, start) use to forward LuCLI's
 	 * structured handoff to a flat-array parser — replacing the Module.cfc
 	 * getArgs()/argsFromCollection() round trip (#2855, #2861).
 	 *

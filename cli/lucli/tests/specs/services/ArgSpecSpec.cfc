@@ -78,6 +78,63 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("parse() — positionals passed by name (the MCP call shape, ##2963)", () => {
+
+				// LuCLI's MCP server hands tools/call arguments to the module as
+				// NAMED keys — {subcommand: "status"} arrives as subcommand=status,
+				// never arg1 — because toInputSchema() advertises positionals as
+				// named properties. Without a by-name fallback every advertised
+				// positional was silently ignored over MCP.
+
+				it("binds a positional from its named key when no arg<N> is present", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "type", default = "resource")
+						.positional(name = "name", default = "");
+					var out = spec.parse({"type": "model", "name": "Post"});
+					expect(out.type).toBe("model");
+					expect(out.name).toBe("Post");
+				});
+
+				it("satisfies a required positional from its named key", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "appName", required = true);
+					var out = spec.parse({"appName": "blog"});
+					expect(out.appName).toBe("blog");
+				});
+
+				it("prefers a typed positional token over a same-named key", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all");
+					var out = spec.parse({"arg1": "models", "target": "views"});
+					expect(out.target).toBe("models");
+				});
+
+				it("fills only the positionals the tokens left unbound", () => {
+					// arg1 binds the first positional; the second comes by name.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "subcommand", default = "list")
+						.positional(name = "target", default = "");
+					var out = spec.parse({"arg1": "show", "target": "wheels-auth"});
+					expect(out.subcommand).toBe("show");
+					expect(out.target).toBe("wheels-auth");
+				});
+
+				it("coerces a named positional to its declared type", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "count", default = 0, type = "numeric");
+					var out = spec.parse({"count": "7"});
+					expect(out.count).toBe(7);
+				});
+
+				it("ignores a non-simple named value and keeps the default", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all");
+					var out = spec.parse({"target": {nested: true}});
+					expect(out.target).toBe("all");
+				});
+
+			});
+
 			describe("parse() — flags (the --no-X regression surface)", () => {
 
 				it("applies the declared default when the key is absent", () => {

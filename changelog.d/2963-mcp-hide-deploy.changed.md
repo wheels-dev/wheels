@@ -1,0 +1,1 @@
+- `deploy` is no longer exposed as an MCP tool: it runs SSH, image pushes, and container restarts on remote hosts, so it stays CLI-only like `new`, `start`, and `setup` (#2963)

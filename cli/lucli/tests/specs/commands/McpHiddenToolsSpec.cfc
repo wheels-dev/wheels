@@ -83,6 +83,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(body).toInclude("""dbmigrate""");
 			});
 
+			it("hides deploy, which reaches remote hosts with side effects", () => {
+				// Maintainer decision on ##2963: `deploy` drives SSH, registry
+				// pushes and container restarts on remote machines — outside the
+				// project, like new/start/setup — so it is CLI-only.
+				var startIdx = reFindNoCase("(?m)^[ \t]*public\s+array\s+function\s+mcpHiddenTools\s*\(", variables.moduleSource);
+				expect(startIdx).toBeGT(0);
+				var body = mid(variables.moduleSource, startIdx, 2500);
+				expect(body).toInclude("""deploy""");
+			});
+
 			it("returns an array (the LuCLI mcpHiddenTools() contract)", () => {
 				// LuCLI calls mcpHiddenTools() and expects an array of
 				// string names. Source-level: the return type is `array`

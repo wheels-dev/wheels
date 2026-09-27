@@ -651,7 +651,7 @@ The Wheels CLI ships a stdio MCP server. Run `wheels setup agents` to write `.mc
 {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}
 ```
 
-Its tools use bare names: `analyze`, `create`, `db`, `deploy`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate`. Clients prefix them with the server name (`mcp__wheels__generate` in Claude Code). Starting and stopping the server is CLI-only (`wheels start` / `wheels stop`). The older HTTP endpoint at `/wheels/mcp` is deprecated.
+Its tools use bare names: `analyze`, `create`, `db`, `destroy`, `doctor`, `generate`, `info`, `migrate`, `notes`, `packages`, `reload`, `routes`, `seed`, `stats`, `test`, `upgrade`, `validate`. Clients prefix them with the server name (`mcp__wheels__generate` in Claude Code). Starting and stopping the server is CLI-only (`wheels start` / `wheels stop`). The older HTTP endpoint at `/wheels/mcp` is deprecated.
 
 ## Common Patterns
 

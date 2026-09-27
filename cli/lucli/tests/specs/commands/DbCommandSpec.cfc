@@ -84,6 +84,26 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("wheels db — named arguments (the MCP call shape, ##2963)", () => {
+
+			it("routes a named subcommand with a native boolean flag", () => {
+				expect(() => mod.db(arg1 = "status", pending = true)).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+			it("reads a named subcommand when no positional is present", () => {
+				// An MCP client sends every schema property by name, so the
+				// subcommand can arrive as `subcommand=` rather than arg1.
+				expect(() => mod.db(subcommand = "version", detailed = true)).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+			it("does not reset without force, even when other flags are passed", () => {
+				// reset without --force must print its warning and change
+				// nothing — it returns before the migration/server step.
+				expect(mod.db(arg1 = "reset", force = false, "skip-seed" = true)).toBe("");
+			});
+
+		});
+
 	}
 
 }
