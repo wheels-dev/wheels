@@ -5,10 +5,15 @@
  * Adobe ColdFusion 2025 without its optional graphqlclient package reports
  * "The graphqlclient package is not installed." while it applies an
  * application's datasource declarations (ApplicationSettings.loadAppDatasources
- * calls ServiceFactory.getGraphQLClientService). It invokes onError() with
- * that notice and then carries on starting the application and serving the
- * request, so rendering it as an error page turns a working first request
- * into an HTTP 500.
+ * calls ServiceFactory.getGraphQLClientService). It calls onError() with that
+ * notice, with no event name, before onApplicationStart, and then continues
+ * the same request: onApplicationStart and onRequest still run. Rendering the
+ * notice makes that request an HTTP 500; returning lets it complete.
+ *
+ * Measured on cold Adobe 2025 starts (healthcheck off, one first request):
+ * returning here gives a first 200 only together with the Adobe super-scope
+ * primer (wheels.events.SuperScopePrimer, ##3730). Without the primer, the
+ * continued request fails in onApplicationStart instead.
  *
  * isBenign() matches that exact signature and nothing else: an empty event
  * name (before the application starts), type "Application", the exact English
@@ -59,7 +64,7 @@ component output=false {
 			WriteLog(
 				file = "wheels",
 				type = "information",
-				text = "Adobe ColdFusion reported '#variables.message#' while applying the application's datasources. It is an optional engine package and does not affect Wheels; the request continues. Install it with the ColdFusion package manager (cfpm install graphqlclient) to silence this notice (##3726)."
+				text = "Adobe ColdFusion reported '#variables.message#' while applying the application's datasources, before the application started. Wheels does not use that optional package, so the notice was logged instead of rendered as an error. Install it with the ColdFusion package manager (cfpm install graphqlclient) to silence this notice (##3726)."
 			);
 		} catch (any e) {
 			// Logging must never break error handling.
