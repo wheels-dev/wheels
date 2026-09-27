@@ -18,10 +18,13 @@ component extends="wheels.WheelsTest" {
 
 			it("fills in every key when onError has already created request.wheels", () => {
 				var saved = request.wheels;
+				// Hoisted: a bare zero-arg call through application.wo in a closure
+				// fails to compile on Adobe 2025 (CLAUDE.md invariant 16b).
+				var wo = application.wo;
 				try {
 					request.wheels = {exception = {message = "engine startup notice"}, eventName = "onApplicationStart"};
 
-					application.wo.$initializeRequestScope();
+					wo.$initializeRequestScope();
 
 					expect(request.wheels).toHaveKey("httpRequestData");
 					expect(request.wheels.httpRequestData).toHaveKey("headers");
@@ -40,10 +43,13 @@ component extends="wheels.WheelsTest" {
 
 			it("fills in the keys when a helper created an empty request.wheels", () => {
 				var saved = request.wheels;
+				// Hoisted: a bare zero-arg call through application.wo in a closure
+				// fails to compile on Adobe 2025 (CLAUDE.md invariant 16b).
+				var wo = application.wo;
 				try {
 					request.wheels = {};
 
-					application.wo.$initializeRequestScope();
+					wo.$initializeRequestScope();
 
 					expect(request.wheels).toHaveKey("httpRequestData");
 					expect(request.wheels).toHaveKey("params");
@@ -55,13 +61,16 @@ component extends="wheels.WheelsTest" {
 
 			it("keeps keys that are already initialized", () => {
 				var saved = request.wheels;
+				// Hoisted: a bare zero-arg call through application.wo in a closure
+				// fails to compile on Adobe 2025 (CLAUDE.md invariant 16b).
+				var wo = application.wo;
 				try {
 					request.wheels = {
 						params = {sentinel = "kept"},
 						httpRequestData = {headers = {"X-Sentinel" = "kept"}, content = "", method = "GET", protocol = "HTTP/1.1"}
 					};
 
-					application.wo.$initializeRequestScope();
+					wo.$initializeRequestScope();
 
 					expect(request.wheels.params.sentinel).toBe("kept");
 					expect(request.wheels.httpRequestData.headers["X-Sentinel"]).toBe("kept");
@@ -73,10 +82,13 @@ component extends="wheels.WheelsTest" {
 
 			it("creates request.wheels when it is absent", () => {
 				var saved = request.wheels;
+				// Hoisted: a bare zero-arg call through application.wo in a closure
+				// fails to compile on Adobe 2025 (CLAUDE.md invariant 16b).
+				var wo = application.wo;
 				try {
 					StructDelete(request, "wheels");
 
-					application.wo.$initializeRequestScope();
+					wo.$initializeRequestScope();
 
 					expect(request).toHaveKey("wheels");
 					expect(request.wheels).toHaveKey("httpRequestData");
