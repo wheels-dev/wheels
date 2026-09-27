@@ -78,6 +78,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(() => mod.migrate(action = "info", "dry-run" = false)).toThrow(type = "Wheels.ServerNotRunning");
 			});
 
+			it("rejects action=true instead of falling back to latest and running migrations", () => {
+				// Must fail on the arguments, before any server step: reaching
+				// Wheels.ServerNotRunning means it would have migrated.
+				expect(() => mod.migrate(action = "true")).toThrow(type = "Wheels.InvalidArguments");
+				expect(() => mod.migrate(action = true)).toThrow(type = "Wheels.InvalidArguments");
+			});
+
 			it("rejects an unknown named action instead of running latest", () => {
 				expect(() => mod.migrate(action = "bogus")).toThrow(type = "Wheels.InvalidArguments");
 			});

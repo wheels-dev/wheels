@@ -126,13 +126,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(out.count).toBe(7);
 				});
 
-				it("does not bind a bare CLI flag (name=true) to a string positional", () => {
-					// `wheels destroy --name` arrives as name=true; binding the
-					// literal "true" as the artifact name would be wrong.
+				it("rejects a bare flag (name=true) for a string positional instead of using the default", () => {
+					// `wheels destroy --name` arrives as name=true. Falling back to
+					// the default is dangerous: MCP migrate {action: "true"} became
+					// the default action `latest` and would run migrations.
 					var spec = new cli.lucli.services.ArgSpec()
-						.positional(name = "name", default = "");
-					expect(spec.parse({"name": "true"}).name).toBe("");
-					expect(spec.parse({"name": true}).name).toBe("");
+						.positional(name = "action", default = "latest");
+					expect(() => spec.parse({"action": "true"})).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => spec.parse({"action": true})).toThrow(type = "Wheels.InvalidArguments");
 				});
 
 				it("ignores a non-simple named value and keeps the default", () => {
