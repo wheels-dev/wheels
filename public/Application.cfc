@@ -800,3 +800,5 @@ component output="false" {
 	}
 
 }
+
+// probe for #3711: DO NOT MERGE
