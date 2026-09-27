@@ -182,6 +182,55 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 
+			it("encodes a custom route variable exactly once when URL rewriting is off", () => {
+				mapper = $mapper()
+				mapper
+					.$draw()
+					.get(name = "encodeOnceBlog", pattern = "blogs/[slug]", to = "blogs##show")
+					.end()
+				g.$setNamedRoutePositions()
+				application.wheels.URLRewriting = "Off"
+
+				// The route pattern is replaced by the `?controller=...` query string, so `slug` is appended
+				// as a query parameter. A space must become `+`, not the double-encoded `%2B`.
+				r1 = g.urlFor(route = "encodeOnceBlog", slug = "a b")
+				r2 = g.urlFor(route = "encodeOnceBlog", slug = "first&second")
+				r3 = g.urlFor(route = "encodeOnceBlog", slug = "x=y")
+
+				expect(r1).toBe("/index.cfm?controller=blogs&action=show&slug=a+b")
+				expect(r2).toBe("/index.cfm?controller=blogs&action=show&slug=first%26second")
+				expect(r3).toBe("/index.cfm?controller=blogs&action=show&slug=x%3Dy")
+			})
+
+			it("HTML-encodes a custom route variable exactly once when URL rewriting is off", () => {
+				mapper = $mapper()
+				mapper
+					.$draw()
+					.get(name = "encodeOnceBlog", pattern = "blogs/[slug]", to = "blogs##show")
+					.end()
+				g.$setNamedRoutePositions()
+				application.wheels.URLRewriting = "Off"
+
+				r = g.urlFor(route = "encodeOnceBlog", slug = "a b", $encodeForHtmlAttribute = true)
+
+				expect(r).toBe("/index.cfm?controller=blogs&action=show&slug=" & EncodeForHTMLAttribute("a+b"))
+			})
+
+			it("encodes a custom route variable once when URL rewriting is partial", () => {
+				mapper = $mapper()
+				mapper
+					.$draw()
+					.get(name = "encodeOnceBlog", pattern = "blogs/[slug]", to = "blogs##show")
+					.end()
+				g.$setNamedRoutePositions()
+				application.wheels.URLRewriting = "Partial"
+
+				r = g.urlFor(route = "encodeOnceBlog", slug = "a b")
+
+				expect(r).toInclude("/blogs/a+b")
+				expect(r).notToInclude("%2B")
+			})
+
 			describe("controller/action route lookup cache (issue 2955)", () => {
 
 				beforeEach(() => {

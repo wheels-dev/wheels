@@ -422,6 +422,9 @@
 				local.value = local.value.key();
 			}
 
+			// Keep the unencoded value for the query-string branch below.
+			local.rawValue = local.value;
+
 			// Any value we find from above, URL encode it here.
 			if (arguments.args.encode && $get("encodeURLs")) {
 				local.value = $encodeUrlParam(local.value);
@@ -431,9 +434,15 @@
 			}
 
 			// If property is not in pattern, store it in the params argument.
+			// `$constructParams` encodes params itself, so append the raw value (escaping only the
+			// `&` / `=` delimiters it splits on, as the `params` argument documents) to avoid
+			// double-encoding, e.g. a space becoming `%2B` when URL rewriting is off.
 			if (!ReFind(local.reg, local.rv)) {
 				if (!ListFindNoCase(arguments.coreVariables, local.property)) {
-					arguments.args.params = ListAppend(arguments.args.params, "#local.property#=#local.value#", "&");
+					if (arguments.args.encode && $get("encodeURLs")) {
+						local.rawValue = Replace(Replace(local.rawValue, "&", "%26", "all"), "=", "%3D", "all");
+					}
+					arguments.args.params = ListAppend(arguments.args.params, "#local.property#=#local.rawValue#", "&");
 				}
 				continue;
 			}
