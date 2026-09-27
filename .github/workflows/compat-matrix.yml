@@ -114,6 +114,10 @@ jobs:
           RESTARTS=0
           MAX_RESTARTS=3
           LAST_HTTP_CODE="000"
+          # Track readiness explicitly: success on the final attempt leaves
+          # WAIT_COUNT == MAX_WAIT, so the count alone can't tell success from
+          # exhaustion (#3685).
+          READY=false
           while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
             WAIT_COUNT=$((WAIT_COUNT + 1))
 
@@ -140,6 +144,7 @@ jobs:
             LAST_HTTP_CODE=${LAST_HTTP_CODE:-000}
             if echo "$LAST_HTTP_CODE" | grep -qE "^(200|302|404)$"; then
               echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT)"
+              READY=true
               break
             fi
 
@@ -154,7 +159,7 @@ jobs:
             fi
           done
 
-          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+          if [ "$READY" != "true" ]; then
             echo "::error::CF engine not ready after ${MAX_WAIT} attempts (last HTTP code: $LAST_HTTP_CODE)"
             if [ "$LAST_HTTP_CODE" = "000" ]; then
               echo "::notice::No HTTP response received — engine likely never bound to port $PORT."
@@ -253,16 +258,19 @@ jobs:
               echo "Waiting for Oracle to accept connections..."
               MAX_WAIT=60
               WAIT_COUNT=0
+              ORACLE_READY=false
               while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
                 WAIT_COUNT=$((WAIT_COUNT + 1))
                 if docker exec wheels-oracle-1 sqlplus -S wheelstestdb/wheelstestdb@localhost:1521/wheelstestdb <<< "SELECT 1 FROM DUAL; EXIT;" > /dev/null 2>&1; then
                   echo "Oracle is ready! (attempt ${WAIT_COUNT})"
+                  ORACLE_READY=true
                   break
                 fi
                 echo "Oracle not ready yet (attempt ${WAIT_COUNT}/${MAX_WAIT})..."
                 sleep 5
               done
-              if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+              # Same final-attempt boundary as the CF readiness loop (#3685).
+              if [ "$ORACLE_READY" != "true" ]; then
                 echo "::warning::Oracle may not be fully ready after ${MAX_WAIT} attempts"
               fi
               ;;
