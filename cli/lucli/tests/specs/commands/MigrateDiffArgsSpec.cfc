@@ -123,8 +123,23 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(mod.$isOffline()).toBeTrue();
 				expect(request.$wheelsOffline).toBeTrue();
 				// tidy up so later specs in this bundle aren't affected
+				mod.$consumeOfflineFlag([]);
 				structDelete(request, "$wheelsOffline");
 				mod.__arguments = [];
+			});
+
+			it("does not stay offline for a later call without the flag (##2963)", () => {
+				// The stdio MCP server reuses one Module across tool calls, so
+				// offline=true on one call must not leak into the next.
+				if (len(server.system.environment.WHEELS_OFFLINE ?: "")) {
+					return; // offline forced by the environment for this run
+				}
+				mod.$consumeOfflineFlag(["--offline"]);
+				expect(mod.$isOffline()).toBeTrue();
+				mod.$consumeOfflineFlag([]);
+				expect(mod.$isOffline()).toBeFalse();
+				expect(request.$wheelsOffline).toBeFalse();
+				structDelete(request, "$wheelsOffline");
 			});
 
 		});

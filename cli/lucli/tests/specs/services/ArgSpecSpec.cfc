@@ -126,6 +126,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(out.count).toBe(7);
 				});
 
+				it("does not bind a bare CLI flag (name=true) to a string positional", () => {
+					// `wheels destroy --name` arrives as name=true; binding the
+					// literal "true" as the artifact name would be wrong.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "name", default = "");
+					expect(spec.parse({"name": "true"}).name).toBe("");
+					expect(spec.parse({"name": true}).name).toBe("");
+				});
+
 				it("ignores a non-simple named value and keeps the default", () => {
 					var spec = new cli.lucli.services.ArgSpec()
 						.positional(name = "target", default = "all");

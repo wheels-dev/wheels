@@ -103,13 +103,19 @@ component {
 			var pSpec = variables.positionals[i];
 			if (i <= arrayLen(positionalIndices)) {
 				result[pSpec.name] = $coerce(arguments.coll["arg" & positionalIndices[i]], pSpec.type);
-			} else if (structKeyExists(arguments.coll, pSpec.name) && isSimpleValue(arguments.coll[pSpec.name])) {
+			} else if (
+				structKeyExists(arguments.coll, pSpec.name)
+				&& isSimpleValue(arguments.coll[pSpec.name])
+				&& !(pSpec.type == "string" && compareNoCase(toString(arguments.coll[pSpec.name]), "true") == 0)
+			) {
 				// By-name fallback (#2963). LuCLI's MCP server delivers
 				// tools/call arguments as named keys — toInputSchema()
 				// advertises positionals as named properties, so
 				// {type: "model"} arrives as type=model, never arg1. A typed
 				// positional token still wins; the name only fills a slot the
-				// tokens left unbound.
+				// tokens left unbound. A bare CLI `--name` arrives as
+				// name=true — a flag, not a value — so it never binds a string
+				// positional.
 				result[pSpec.name] = $coerce(arguments.coll[pSpec.name], pSpec.type);
 			} else if (pSpec.required) {
 				throw(

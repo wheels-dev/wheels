@@ -304,6 +304,98 @@ component extends="modules.BaseModule" {
 			.flag(name = "write", default = false, description = "Write migration file(s) instead of previewing");
 	}
 
+	/**
+	 * Rebuild `wheels migrate`'s argv with the positionals first. The action
+	 * and its second slot (<version> for forget/pretend, <model> for diff)
+	 * come from a typed token when there is one, else from the named key an
+	 * MCP tools/call sends (#2963); the remaining named keys follow as flags.
+	 * ArgSpec.toArgv() alone emitted named keys in struct order, so
+	 * {action: "info", "dry-run": false} could put --no-dry-run where the
+	 * action belongs. argv[1] is always the lower-cased action (default
+	 * latest). Public for specs; the $-prefix keeps it off the MCP surface.
+	 */
+	public array function $migrateArgv(required struct coll) {
+		var parsed = migrateArgSpec().parse(arguments.coll);
+		var action = lCase(trim(parsed.action));
+		var argv = [len(action) ? action : "latest"];
+
+		var tokens = $positionalTokens(arguments.coll);
+		if (arrayLen(tokens) >= 2) {
+			for (var i = 2; i <= arrayLen(tokens); i++) {
+				arrayAppend(argv, tokens[i]);
+			}
+		} else {
+			// migrateArgSpec() declares <version> and <model> as separate
+			// positionals for the schema; on the CLI both occupy slot 2.
+			var slot = argv[1] == "diff" ? trim(parsed.model) : (listFind("forget,pretend", argv[1]) ? trim(parsed.version) : "");
+			if (len(slot)) {
+				arrayAppend(argv, slot);
+			}
+		}
+
+		var flags = {};
+		for (var key in arguments.coll) {
+			if (!reFindNoCase("^arg\d+$", key) && !listFindNoCase("action,version,model", key)) {
+				flags[key] = arguments.coll[key];
+			}
+		}
+		arrayAppend(argv, new services.ArgSpec().toArgv(flags), true);
+		return argv;
+	}
+
+	/**
+	 * Bind `wheels create`'s <type> and <name> the way ArgSpec.parse() does (a
+	 * typed token, else the named key an MCP tools/call sends, #2963) and
+	 * collect what to forward to new(): the name, any further tokens, then the
+	 * remaining named keys as flags. createArgSpec() marks both positionals
+	 * required for the MCP schema; this binding stays lenient so an unknown
+	 * type still reports "Unknown create type" and `create app` with no name
+	 * still reaches new()'s own handling. Public for specs.
+	 */
+	public struct function $createArgs(required struct coll) {
+		var parsed = new services.ArgSpec()
+			.positional(name = "type")
+			.positional(name = "name")
+			.parse(arguments.coll);
+
+		var tokens = $positionalTokens(arguments.coll);
+		var remaining = [];
+		if (len(trim(parsed.name))) {
+			arrayAppend(remaining, trim(parsed.name));
+		}
+		for (var i = 3; i <= arrayLen(tokens); i++) {
+			arrayAppend(remaining, tokens[i]);
+		}
+
+		var flags = {};
+		for (var key in arguments.coll) {
+			if (!reFindNoCase("^arg\d+$", key) && !listFindNoCase("type,name", key)) {
+				flags[key] = arguments.coll[key];
+			}
+		}
+		arrayAppend(remaining, new services.ArgSpec().toArgv(flags), true);
+		return {type = lCase(trim(parsed.type)), remaining = remaining};
+	}
+
+	/**
+	 * The collection's positional token values (arg<N>) in numeric order.
+	 * LuCLI numbers them by global token index, so gaps are normal.
+	 */
+	private array function $positionalTokens(required struct coll) {
+		var indices = [];
+		for (var key in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				arrayAppend(indices, val(mid(key, 4, len(key))));
+			}
+		}
+		arraySort(indices, "numeric");
+		var tokens = [];
+		for (var idx in indices) {
+			arrayAppend(tokens, arguments.coll["arg" & idx]);
+		}
+		return tokens;
+	}
+
 	// ─────────────────────────────────────────────────
 	//  ArgSpec builders — one per command, shared by the
 	//  command's parse helper and mcpToolSpecs() so the
@@ -846,17 +938,12 @@ component extends="modules.BaseModule" {
 	 * hint: Run database migrations (latest, up, down, info, doctor, forget, pretend, rename-system-tables)
 	 */
 	public string function migrate() {
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		var args = $migrateArgv(structuredArgs(arguments));
 		// --offline is a documented no-op here: migrate never makes external
 		// network calls (the bridge is localhost). Consuming the flag keeps
 		// scripts portable and future-proofs any update check added later.
 		$consumeOfflineFlag(args);
-		var action = arrayLen(args) ? lCase(args[1]) : "latest";
-		// MCP and structured callers may pass action="diff" which re-emits as
-		// --action=diff — normalize to the positional form.
-		if (left(action, 9) == "--action=") {
-			action = lCase(mid(action, 10, 9999));
-		}
+		var action = args[1];
 
 		switch (action) {
 			case "latest":
@@ -1936,9 +2023,11 @@ component extends="modules.BaseModule" {
 	 * hint: Create application components (wheels create app <name> [options])
 	 */
 	public string function create() {
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		var createArgs = $createArgs(structuredArgs(arguments));
+		var type = createArgs.type;
+		var remaining = createArgs.remaining;
 
-		if (!arrayLen(args)) {
+		if (!len(type)) {
 			out("Usage: wheels create <type> <name> [options]", "yellow");
 			out("");
 			out("Types:", "bold");
@@ -1949,26 +2038,6 @@ component extends="modules.BaseModule" {
 			out("  wheels create app myapp --port=3000 --setup-h2");
 			return "";
 		}
-
-		var type = lCase(args[1]);
-		var remaining = args.len() > 1 ? args.slice(2) : [];
-
-		// Normalize the named --type=/--name= prefixes that MCP callers
-		// produce (toArgv re-emits {"type":"app","name":"myapp"} as
-		// --type=app --name=myapp) back to positional form.
-		if (left(type, 7) == "--type=") {
-			type = lCase(mid(type, 8, len(type)));
-		}
-		var normalizedRemaining = [];
-		for (var i = 1; i <= arrayLen(remaining); i++) {
-			var r = remaining[i];
-			if (left(r, 7) == "--name=") {
-				arrayAppend(normalizedRemaining, mid(r, 8, len(r)));
-			} else {
-				arrayAppend(normalizedRemaining, r);
-			}
-		}
-		remaining = normalizedRemaining;
 
 		switch (type) {
 			case "app":
@@ -6109,12 +6178,11 @@ component extends="modules.BaseModule" {
 				break;
 			}
 		}
-		if (found) {
-			variables.offline = true;
-		}
-		if ($isOffline()) {
-			request.$wheelsOffline = true;
-		}
+		// Assign both ways, never only set: the stdio MCP server reuses one
+		// Module instance (and request) across tool calls, so a single
+		// offline=true call must not stick for every call after it.
+		variables.offline = found;
+		request.$wheelsOffline = $isOffline();
 		return found;
 	}
 
