@@ -479,10 +479,15 @@ jobs:
           BAD=0
           for C in "wheels-${CFENGINE}-1" "wheels-${DB}-1"; do
             STATE=$(docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} oomkilled={{.State.OOMKilled}} restarts={{.RestartCount}}' "$C" 2>/dev/null || echo "missing")
+            # OOMKilled only reflects PID 1 (the CommandBox launcher); the server
+            # JVM is its child, so a kernel kill of the JVM can leave the container
+            # "running, oomkilled=false". The cgroup's oom_kill counter sees it.
+            KILLS=$(docker exec "$C" sh -c 'cat /sys/fs/cgroup/memory.events 2>/dev/null || cat /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null' 2>/dev/null | awk '$1=="oom_kill"{print $2}')
+            STATE="$STATE cgroup_oom_kill=${KILLS:-n/a}"
             echo "$C: $STATE"
             echo "- \`$C\`: $STATE" >> "$GITHUB_STEP_SUMMARY"
             case "$STATE" in
-              *oomkilled=true*) echo "::error::$C was OOM-killed by the kernel (cgroup memory limit): $STATE"; BAD=1 ;;
+              *oomkilled=true*|*cgroup_oom_kill=[1-9]*) echo "::error::$C had a process OOM-killed by the kernel (cgroup memory limit): $STATE"; BAD=1 ;;
               exited*|dead*) echo "::error::$C is not running after the suite: $STATE"; BAD=1 ;;
             esac
           done
