@@ -196,6 +196,25 @@ component extends="wheels.WheelsTest" {
 		
 				expect(e).toBe(r)
 			})
+
+			it("adds rel=nofollow for delete method links", () => {
+				r = _controller.linkTo(href = "/posts/1", text = "Delete", method = "delete")
+
+				expect(r).toInclude('rel="nofollow"')
+				expect(r).notToInclude("no-follow")
+			})
+
+			it("preserves a caller-supplied rel alongside nofollow for delete method links", () => {
+				r = _controller.linkTo(href = "/posts/1", text = "Delete", method = "delete", rel = "external")
+
+				expect(r).toInclude('rel="external nofollow"')
+			})
+
+			it("does not add nofollow for non-delete method links", () => {
+				r = _controller.linkTo(href = "/posts/1", text = "Edit", method = "put")
+
+				expect(r).notToInclude("nofollow")
+			})
 		})
 
 		describe("Tests that mailTo", () => {

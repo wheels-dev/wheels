@@ -1,0 +1,1 @@
+- `linkTo(method="delete")` now adds `rel="nofollow"` instead of the misspelled `rel="no-follow"`, which crawlers do not recognise as a link type — so delete links were never actually marked as not-to-be-followed. A caller-supplied `rel` is still preserved (e.g. `rel="external nofollow"`)

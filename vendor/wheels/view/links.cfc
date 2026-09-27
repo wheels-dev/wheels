@@ -47,7 +47,7 @@ component {
 				if (!StructKeyExists(arguments, "rel")) {
 					arguments.rel = "";
 				}
-				arguments.rel = ListAppend(arguments.rel, "no-follow", " ");
+				arguments.rel = ListAppend(arguments.rel, "nofollow", " ");
 			}
 		}
 
