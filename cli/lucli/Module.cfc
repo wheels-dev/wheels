@@ -1146,6 +1146,8 @@ component extends="modules.BaseModule" {
 			}
 		}
 
+		var resolvedTimeout = $resolveTestTimeout(parsed.timeout);
+
 		return {
 			filter = filter,
 			reporter = parsed.reporter,
@@ -1159,8 +1161,8 @@ component extends="modules.BaseModule" {
 			dbExplicit = structKeyExists(arguments.coll, "db"),
 			useTestDB = parsed["test-db"],
 			basePath = parsed["base-path"],
-			timeout = $resolveTestTimeout(parsed.timeout),
-			timeoutWarning = $testTimeoutWarning(parsed.timeout, $resolveTestTimeout(parsed.timeout))
+			timeout = resolvedTimeout,
+			timeoutWarning = $testTimeoutWarning(parsed.timeout, resolvedTimeout)
 		};
 	}
 
@@ -8068,8 +8070,10 @@ component extends="modules.BaseModule" {
 			if (reFindNoCase("(read timed out|SocketTimeout)", e.message)) {
 				out("Test run timed out after #arguments.timeoutSeconds#s waiting for the suite to finish.", "red");
 				out("The specs may have passed — the CLI stopped waiting, the runner did not stop running.", "yellow");
-				out("Give it longer:  wheels test --timeout=#arguments.timeoutSeconds * 2#", "yellow");
-				out("Or set WHEELS_TEST_TIMEOUT=<seconds> for the whole environment.", "yellow");
+				// Lead with the env var: on the terminal LuCLI's own global
+				// --timeout option swallows `wheels test --timeout` (#3678).
+				out("Give it longer:  WHEELS_TEST_TIMEOUT=#arguments.timeoutSeconds * 2# wheels test", "yellow");
+				out("(MCP clients: pass timeout=#arguments.timeoutSeconds * 2#. On the terminal, --timeout is taken by LuCLI — see ##3678.)", "yellow");
 				out("Or scope the run:  wheels test --filter=<subdirectory>", "yellow");
 			} else {
 				out("Test execution failed: #e.message#", "red");
