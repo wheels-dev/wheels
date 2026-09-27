@@ -149,6 +149,30 @@ component extends="wheels.WheelsTest" {
 
 				expect(r.path_info).toBe(urlDecode(e.path_info))
 			})
+
+			it("strips a leading index.cfm segment recovered from request_uri", () => {
+				cgi_scope.path_info = ""
+				cgi_scope.http_x_rewrite_url = ""
+				cgi_scope.http_x_original_url = ""
+				cgi_scope.request_uri = "/index.cfm/users/list?page=2"
+				_cgi = g.$cgiScope(scope = cgi_scope)
+
+				expect(_cgi.path_info).toBe("/users/list")
+			})
+
+			it("strips a leading index.cfm segment reported in path_info", () => {
+				cgi_scope.path_info = "/index.cfm/users/list"
+				_cgi = g.$cgiScope(scope = cgi_scope)
+
+				expect(_cgi.path_info).toBe("/users/list")
+			})
+
+			it("leaves index.cfm that is not the leading segment untouched", () => {
+				cgi_scope.path_info = "/docs/myindex.cfm/users"
+				_cgi = g.$cgiScope(scope = cgi_scope)
+
+				expect(_cgi.path_info).toBe("/docs/myindex.cfm/users")
+			})
 		})
 
 		describe("Tests that $checkMinimumVersion", () => {

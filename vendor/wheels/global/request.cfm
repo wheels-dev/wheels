@@ -152,9 +152,11 @@
 			}
 		}
 
-		// some web servers incorrectly place index.cfm in the path_info but since that should never be there we can safely remove it
-		if (Find("index.cfm/", local.rv.path_info)) {
-			Replace(local.rv.path_info, "index.cfm/", "");
+		// some web servers incorrectly place index.cfm in the path_info (e.g. the IIS fallbacks above copy
+		// request_uri "/index.cfm/users/list" verbatim) but since that should never be there we can safely
+		// remove it. Anchored to the start so a later segment such as "/docs/myindex.cfm/x" is left alone.
+		if (ReFindNoCase("^/index\.cfm/", local.rv.path_info)) {
+			local.rv.path_info = ReReplaceNoCase(local.rv.path_info, "^/index\.cfm/", "/");
 		}
 		return local.rv;
 	}
