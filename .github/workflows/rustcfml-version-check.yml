@@ -3,8 +3,14 @@ name: RustCFML — version check
 # Daily: check github.com/RustCFML/RustCFML for a newer release than the pinned
 # tools/rustcfml/ENGINE_VERSION. When one exists, run the full core suite
 # against it (compare mode vs the pinned baseline). If GREEN, bump the pin and
-# regenerate baseline.json via a PR; if the suite has new failures, the run
-# stays red and the pin is left unchanged for a human to investigate.
+# regenerate baseline.json via a PR. If the suite has new failures, the
+# candidate is REJECTED: the pin stays, the run finishes with a warning and a
+# named diff in the job summary, and one issue is opened per candidate +
+# failure fingerprint (repeat runs stay quiet). The run goes red only when the
+# candidate could not be evaluated (lookup, download, boot, response) (#3687).
+#
+# A workflow_dispatch from another branch tests that branch's scripts but
+# never opens a bump PR or an issue (the notifier runs in dry-run mode).
 
 on:
   schedule:
@@ -14,16 +20,17 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write   # notify-rejection.sh: one issue per rejected candidate
 
 jobs:
   check:
     name: Check for newer RustCFML
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout develop
+      - name: Checkout develop (or the dispatched ref)
         uses: actions/checkout@v6
         with:
-          ref: develop
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || 'develop' }}
           fetch-depth: 1
 
       - name: Check for a newer release and run the suite
@@ -31,8 +38,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash tools/rustcfml/check-version.sh
 
+      - name: Notify once for a rejected candidate
+        if: env.RUSTCFML_REJECTED != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Only develop notifies for real; a branch dispatch prints the decision.
+          NOTIFY_DRY_RUN: ${{ github.ref != 'refs/heads/develop' && '1' || '' }}
+        run: bash tools/rustcfml/notify-rejection.sh "$RUSTCFML_RESULT_JSON"
+
       - name: Open bump PR
-        if: env.RUSTCFML_LATEST != ''
+        # Only from develop: a branch dispatch that happens to go green must not
+        # open a bump PR built on a feature branch.
+        if: env.RUSTCFML_LATEST != '' && github.ref == 'refs/heads/develop'
         uses: peter-evans/create-pull-request@v6
         with:
           branch: "auto-bump/rustcfml-${{ env.RUSTCFML_LATEST }}"

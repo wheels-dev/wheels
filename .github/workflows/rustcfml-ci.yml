@@ -34,6 +34,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
+      # Engine-free: pins run-suite.sh's result parsing, keys and exit codes
+      # (0 accepted / 3 rejected / 1 not evaluable) against fixtures (#3687).
+      - name: Test the result comparison (no engine)
+        run: python3 tools/rustcfml/test_run_suite.py
+
       - name: Read pinned engine version
         id: engine
         run: echo "version=$(tr -d '[:space:]' < tools/rustcfml/ENGINE_VERSION)" >> $GITHUB_OUTPUT
