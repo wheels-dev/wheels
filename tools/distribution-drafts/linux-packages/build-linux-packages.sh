@@ -6,7 +6,7 @@
 #   CHANNEL          — "stable" or "bleeding-edge" (default: stable)
 #   ARTIFACTS_DIR    — directory holding wheels-module-<v>.tar.gz and wheels-core-<v>.zip
 #                       (default: artifacts/wheels/${WHEELS_VERSION})
-#   LUCLI_LINUX_URL  — URL for the Linux LuCLI binary (default: cybersonic upstream)
+#   LUCLI_JAR_URL    — explicit local-test override; releases use tools/lucli.json
 #   OUT_DIR          — where to write the .deb / .rpm (default: dist/)
 #
 # Outputs (in OUT_DIR) — architecture-independent (Java jar payload):
@@ -21,14 +21,17 @@ set -euo pipefail
 WHEELS_VERSION="${WHEELS_VERSION:?WHEELS_VERSION must be set}"
 CHANNEL="${CHANNEL:-stable}"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-artifacts/wheels/${WHEELS_VERSION}}"
-LUCLI_VERSION="${LUCLI_VERSION:-0.3.17}"
+# The runtime pin shared with CI and the Homebrew/Scoop updaters.
+LUCLI_PIN="$(cd "$(dirname "$0")/../.." && pwd)/lucli.json"
+LUCLI_REPO=$(jq -er '.LUCLI_REPO | select(test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))' "$LUCLI_PIN")
+LUCLI_VERSION=$(jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))' "$LUCLI_PIN")
 # Portable JAR launcher (runs on any arch with Java 21) instead of the amd64-only
 # native `lucli-linux` binary. This is what makes the .deb/.rpm architecture-
 # independent (all/noarch) so they install on arm64 too — and it matches how the
 # Scoop manifest already launches LuCLI. Routing to the bundled `wheels` module
 # is done via -Dlucli.binary.name=wheels in the wrapper (the native binary did it
 # via basename(argv[0])).
-LUCLI_JAR_URL="${LUCLI_JAR_URL:-https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}.jar}"
+LUCLI_JAR_URL="${LUCLI_JAR_URL:-https://github.com/${LUCLI_REPO}/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}.jar}"
 SQLITE_JDBC_VERSION="3.49.1.0"
 SQLITE_JDBC_URL="https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/${SQLITE_JDBC_VERSION}/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
 OUT_DIR="${OUT_DIR:-dist}"

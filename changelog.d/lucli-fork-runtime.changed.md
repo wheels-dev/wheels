@@ -1,0 +1,1 @@
+- Test and package the Wheels CLI with the same LuCLI fork runtime, selected in `tools/lucli.json`, including fixes for module argument forwarding and MCP failure reports. Terminal `wheels test --timeout=<seconds>` now reaches the test command; `--test-timeout` remains a compatibility alias.

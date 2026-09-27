@@ -1,0 +1,30 @@
+name: Install the Wheels LuCLI runtime
+description: Install the runtime selected by tools/lucli.json, shared with distribution packaging.
+runs:
+  using: composite
+  steps:
+    - name: Read the runtime pin
+      shell: bash
+      run: |
+        set -euo pipefail
+        repo=$(jq -er '.LUCLI_REPO | select(test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))' tools/lucli.json)
+        version=$(jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))' tools/lucli.json)
+        echo "LUCLI_REPO=$repo" >> "$GITHUB_ENV"
+        echo "LUCLI_VERSION=$version" >> "$GITHUB_ENV"
+    - name: Install LuCLI
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "$RUNNER_OS" in
+          Linux) suffix=linux ;;
+          macOS) suffix=macos ;;
+          *) echo "Unsupported runner: $RUNNER_OS" >&2; exit 1 ;;
+        esac
+        install_dir="$RUNNER_TEMP/wheels-lucli-bin"
+        mkdir -p "$install_dir"
+        curl --fail --location --retry 3 \
+          "https://github.com/${LUCLI_REPO}/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-${suffix}" \
+          --output "$install_dir/lucli"
+        chmod +x "$install_dir/lucli"
+        "$install_dir/lucli" --version
+        echo "$install_dir" >> "$GITHUB_PATH"

@@ -386,7 +386,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("parseTestArgs", () => {
 
-			it("reads --test-timeout, the terminal spelling LuCLI's global --timeout can't take (##3678)", () => {
+			it("reads the --test-timeout compatibility alias (##3678)", () => {
 				expect(probe.$parseTestArgs({"test-timeout": "45"}).timeout).toBe(45);
 				expect(probe.$parseTestArgs({"test-timeout": "45"}).timeoutWarning).toBe("");
 			});
