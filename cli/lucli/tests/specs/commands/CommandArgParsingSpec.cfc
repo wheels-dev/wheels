@@ -386,6 +386,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("parseTestArgs", () => {
 
+			it("carries a warning for a non-numeric timeout instead of dropping it silently", () => {
+				var o = probe.$parseTestArgs({timeout: "soon"});
+				expect(o.timeout).toBe(900);
+				expect(o.timeoutWarning).toInclude('"soon"');
+				expect(probe.$parseTestArgs({timeout: "60"}).timeoutWarning).toBe("");
+			});
+
 			it("lower-cases --db, since the core runner matches its dialect list case-sensitively", () => {
 				// `--db=MySQL` passed the case-insensitive choice check but the
 				// runner's listFind() missed it and used the default datasource.

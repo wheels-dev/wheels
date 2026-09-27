@@ -797,6 +797,7 @@ component extends="modules.BaseModule" {
 		// anywhere in the argv (before or after the type/name). --no-dry-run
 		// is what toArgv() emits for an MCP call sending dry-run=false.
 		var dryRun = false;
+		var offlineFound = false;
 		var cleaned = [];
 		for (var a in args) {
 			if (a == "--dry-run") {
@@ -804,14 +805,18 @@ component extends="modules.BaseModule" {
 			} else if (a == "--no-dry-run") {
 				dryRun = false;
 			} else if (a == "--offline" || a == "--no-offline") {
-				// Documented global flag (`wheels generate model User --offline`);
-				// generate makes no network calls, so it only reaches the offline
-				// state. Passed on, the generator rejected it as an unknown flag.
-				$consumeOfflineFlag(a == "--offline" ? [a] : []);
+				// Documented global flag (`wheels generate model User --offline`).
+				// Kept out of the generator's argv, where it failed as an unknown
+				// flag; consumed once below and forwarded to `generate app`.
+				offlineFound = a == "--offline";
 			} else {
 				arrayAppend(cleaned, a);
 			}
 		}
+		// Assign the offline state for THIS call (resets a stale value left by an
+		// earlier MCP call on the reused Module).
+		$consumeOfflineFlag(offlineFound ? ["--offline"] : []);
+
 		if (dryRun) {
 			request.$wheelsGenerateDryRun = true;
 			request.$wheelsDryRunPaths = [];
@@ -946,8 +951,14 @@ component extends="modules.BaseModule" {
 
 		switch (canonical) {
 			case "app":
-				// Delegate to wheels new — pass remaining args as __arguments
-				__arguments = arguments.remaining;
+				// Delegate to wheels new — pass remaining args as __arguments.
+				// new() assigns the offline state from ITS arguments, so forward
+				// --offline or it resets what generate consumed (#2963).
+				var newArgs = duplicate(arguments.remaining);
+				if ($isOffline() && !arrayFindNoCase(newArgs, "--offline")) {
+					arrayAppend(newArgs, "--offline");
+				}
+				__arguments = newArgs;
 				return new();
 			case "model":
 				return generateModel(arguments.remaining);
@@ -1148,7 +1159,8 @@ component extends="modules.BaseModule" {
 			dbExplicit = structKeyExists(arguments.coll, "db"),
 			useTestDB = parsed["test-db"],
 			basePath = parsed["base-path"],
-			timeout = $resolveTestTimeout(parsed.timeout)
+			timeout = $resolveTestTimeout(parsed.timeout),
+			timeoutWarning = $testTimeoutWarning(parsed.timeout, $resolveTestTimeout(parsed.timeout))
 		};
 	}
 
@@ -1168,6 +1180,20 @@ component extends="modules.BaseModule" {
 	 * Non-numeric or non-positive input falls back to the default rather than
 	 * throwing: a mistyped timeout should not be the thing that stops a test run.
 	 */
+	/**
+	 * The one-line warning for a --timeout that $resolveTestTimeout() had to
+	 * ignore, or "" when it was valid or absent. A mistyped timeout still must
+	 * not stop the run, but the fallback may not be silent (maintainer
+	 * decision on #2963). Public for specs; hidden from MCP by the $-prefix.
+	 */
+	public string function $testTimeoutWarning(string parsedTimeout = "", required numeric resolvedSeconds) {
+		var raw = trim(arguments.parsedTimeout);
+		if (!len(raw) || (isNumeric(raw) && val(raw) > 0)) {
+			return "";
+		}
+		return 'Warning: ignoring invalid timeout "#raw#"; using #arguments.resolvedSeconds#s';
+	}
+
 	public numeric function $resolveTestTimeout(string parsedTimeout = "") {
 		if (
 			len(trim(arguments.parsedTimeout))
@@ -1192,6 +1218,9 @@ component extends="modules.BaseModule" {
 	 */
 	public string function test() {
 		var opts = parseTestArgs(structuredArgs(arguments));
+		if (len(opts.timeoutWarning)) {
+			out(opts.timeoutWarning, "yellow");
+		}
 		var filter = opts.filter;
 		var reporter = opts.reporter;
 		var format = opts.format;
