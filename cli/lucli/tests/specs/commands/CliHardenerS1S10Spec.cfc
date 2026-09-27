@@ -175,7 +175,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	private string function $nongatingFailJson() {
-		return '{"totalPass":10,"totalFail":1,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.services.FooSpec","suiteStats":[{"specStats":[{"name":"fails on purpose","status":"Failed","failMessage":"boom"}]}]}]}';
+		return '{"totalPass":0,"totalFail":1,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.services.FooSpec","suiteStats":[{"specStats":[{"name":"fails on purpose","status":"Failed","failMessage":"boom"}]}]}]}';
 	}
 
 	private string function $nestedFailJson() {
@@ -183,7 +183,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	private string function $deployFailJson() {
-		return '{"totalPass":10,"totalFail":1,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.deploy.cli.DeployMainCliSpec","suiteStats":[{"specStats":[{"name":"deploy fail","status":"Failed","failMessage":"boom"}]}]}]}';
+		return '{"totalPass":0,"totalFail":1,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.deploy.cli.DeployMainCliSpec","suiteStats":[{"specStats":[{"name":"deploy fail","status":"Failed","failMessage":"boom"}]}]}]}';
 	}
 
 	/**
