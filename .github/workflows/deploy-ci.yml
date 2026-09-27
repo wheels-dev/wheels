@@ -14,7 +14,10 @@
 #   - Java 21 via actions/setup-java@v5.
 #
 # Gating model:
-#   1. cli-tests              - runs `tools/test-cli-local.sh`, must be 365+/0/0.
+#   1. cli-tests              - runs `tools/test-cli-local.sh`; tools/ci/testbox_results.py
+#      walks the full result tree, gates deploy-bundle failures (every failure
+#      under WHEELS_CLI_TEST_STRICT=1), and fails when counts don't reconcile.
+#      The raw result JSON is uploaded as the `cli-test-results` artifact.
 #   2. deploy-config-diff     - informational (`continue-on-error: true`).
 #      The script expects Ruby Kamal on PATH *and* a routable `wheels deploy`.
 #      Neither is wired in CI yet, so this step's exit 1 is expected and
@@ -40,6 +43,9 @@ on:
       - 'tools/deploy-*.sh'
       - 'tools/deploy-dry-run-normalize.py'
       - 'tools/test-cli-local.sh'
+      - 'tools/ci/testbox_results.py'
+      - 'tools/ci/test_testbox_results.py'
+      - 'tools/ci/fixtures/testbox/**'
       - '.github/workflows/deploy-ci.yml'
   pull_request:
     paths:
@@ -53,6 +59,9 @@ on:
       - 'tools/deploy-*.sh'
       - 'tools/deploy-dry-run-normalize.py'
       - 'tools/test-cli-local.sh'
+      - 'tools/ci/testbox_results.py'
+      - 'tools/ci/test_testbox_results.py'
+      - 'tools/ci/fixtures/testbox/**'
       - '.github/workflows/deploy-ci.yml'
 
 permissions:
@@ -89,8 +98,27 @@ jobs:
           sqlite3 wheelstestdb.db "SELECT 1;"
           sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
 
+      - name: Test the TestBox result walker
+        # tools/ci/testbox_results.py decides pass/fail for the suite below;
+        # its fixtures cover nested failures and bundle-level exceptions,
+        # which the old inline parser let through as a pass (#3694).
+        run: python3 tools/ci/test_testbox_results.py
+
       - name: Run CLI test suite
+        env:
+          WHEELS_CLI_TEST_RESULT_FILE: ${{ runner.temp }}/cli-test-results.json
         run: bash tools/test-cli-local.sh
+
+      - name: Upload raw CLI test results
+        # Keep the raw TestBox JSON on every run, pass or fail, so every
+        # failure in an aggregate can be identified afterwards (#3694: a
+        # run reported 9 failures but only 8 could be named).
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-test-results
+          path: ${{ runner.temp }}/cli-test-results.json
+          if-no-files-found: warn
 
       - name: Run deploy-config-diff (informational)
         continue-on-error: true

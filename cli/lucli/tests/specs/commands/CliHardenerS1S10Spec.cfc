@@ -93,9 +93,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("pins WHEELS_CLI_TEST_STRICT default 0 and does not flip it to 1", () => {
 				var sh = fileRead(cliLocalScript);
-				expect(sh).toInclude('WHEELS_CLI_TEST_STRICT="${WHEELS_CLI_TEST_STRICT:-0}"');
-				expect(find('WHEELS_CLI_TEST_STRICT="${WHEELS_CLI_TEST_STRICT:-1}"', sh)).toBe(0);
-				expect(sh).toInclude("os.environ.get('WHEELS_CLI_TEST_STRICT', '0') == '1'");
+				expect(sh).toInclude('"${WHEELS_CLI_TEST_STRICT:-0}" = "1"');
+				expect(find("WHEELS_CLI_TEST_STRICT:-1", sh)).toBe(0);
+				// The verdict comes from the shared full-tree walker (##3694).
+				expect(sh).toInclude("tools/ci/testbox_results.py");
 			});
 
 			it("CI tools/ci/run-tests.sh fail-closes on any CLI Fail/Error", () => {
@@ -116,6 +117,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 				expect(loose).toBe(0);
 				expect(tight).toBe(1);
+			});
+
+			it("STRICT=1 gates a failure nested below the first suite level (##3694)", () => {
+				var mockPath = getTempDirectory() & "cli-strict-nested-" & createUUID() & ".json";
+				fileWrite(mockPath, $nestedFailJson());
+				var code = $evalCliLocalStrict(mockJsonPath = mockPath, strictFlag = "1");
+				if (fileExists(mockPath)) {
+					fileDelete(mockPath);
+				}
+				expect(code).toBe(1);
 			});
 
 			it("STRICT=0 still gates a deploy-bundle fail (default is not 'always 0')", () => {
@@ -167,42 +178,37 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return '{"totalPass":10,"totalFail":1,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.services.FooSpec","suiteStats":[{"specStats":[{"name":"fails on purpose","status":"Failed","failMessage":"boom"}]}]}]}';
 	}
 
+	private string function $nestedFailJson() {
+		return '{"totalPass":1,"totalFail":1,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.services.FooSpec","suiteStats":[{"name":"outer","specStats":[{"name":"ok","status":"Passed"}],"suiteStats":[{"name":"inner","specStats":[{"name":"nested fail","status":"Failed","failMessage":"boom"}]}]}]}]}';
+	}
+
 	private string function $deployFailJson() {
 		return '{"totalPass":10,"totalFail":1,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.deploy.cli.DeployMainCliSpec","suiteStats":[{"specStats":[{"name":"deploy fail","status":"Failed","failMessage":"boom"}]}]}]}';
 	}
 
+	/**
+	 * Run the gate test-cli-local.sh delegates to (tools/ci/testbox_results.py,
+	 * ##3694) with the same --strict mapping the script applies, and return its
+	 * exit code.
+	 */
 	private numeric function $evalCliLocalStrict(required string mockJsonPath, required string strictFlag) {
-		var shSrc = fileRead(variables.cliLocalScript);
-		var importAt = find("import json, os, sys", shSrc);
-		var exitNeedle = "sys.exit(0 if gating_failures == 0 else 1)";
-		var exitAt = find(exitNeedle, shSrc);
-		expect(importAt).toBeGT(0);
-		expect(exitAt).toBeGT(0);
-		var inner = mid(shSrc, importAt, exitAt + len(exitNeedle) - importAt);
-
-		var bs = chr(92);
-		var q = chr(34);
-		inner = replace(inner, "$RESULT_FILE", arguments.mockJsonPath, "all");
-		inner = replace(inner, bs & q, q, "all");
-		inner = replace(inner, bs & bs & "n", bs & "n", "all");
-
-		var pyPath = getTempDirectory() & "cli-strict-eval-" & createUUID() & ".py";
-		fileWrite(pyPath, inner);
+		var helper = getDirectoryFromPath(variables.cliLocalScript) & "ci/testbox_results.py";
+		expect(fileExists(helper)).toBeTrue();
 
 		var cmd = createObject("java", "java.util.ArrayList").init();
 		cmd.add("/usr/bin/python3");
-		cmd.add(pyPath);
+		cmd.add(helper);
+		cmd.add(arguments.mockJsonPath);
+		if (arguments.strictFlag == "1") {
+			cmd.add("--strict");
+		}
 		var pb = createObject("java", "java.lang.ProcessBuilder").init(cmd);
 		pb.redirectErrorStream(true);
 		pb.environment().put("WHEELS_CLI_TEST_STRICT", arguments.strictFlag);
 		var proc = pb.start();
 		proc.getInputStream().readAllBytes();
 		proc.waitFor();
-		var code = proc.exitValue();
-		if (fileExists(pyPath)) {
-			fileDelete(pyPath);
-		}
-		return code;
+		return proc.exitValue();
 	}
 
 }

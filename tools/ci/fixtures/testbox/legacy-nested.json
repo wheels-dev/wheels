@@ -1,0 +1,1 @@
+{"totalPass":0,"totalFail":1,"totalError":0,"bundleStats":[{"name":"x.Spec","suiteStats":[{"name":"a","specStats":[],"nestedSuiteStats":[{"name":"b","specStats":[{"status":"Failed","name":"legacy","failMessage":"y"}]}]}]}]}

@@ -25,7 +25,10 @@ PORT="${PORT:-8080}"
 # Must match set(reloadPassword=...) in config/settings.cfm — a mismatch never
 # reloads and, since #3062, counts against the per-IP reload rate limit.
 PASSWORD="wheels-dev"
-RESULT_FILE="/tmp/wheels-cli-test-results.json"
+# Per-checkout results file (same scheme as tools/test-local.sh, #3352): a
+# fixed /tmp path let concurrent checkouts overwrite each other's results.
+# CI sets WHEELS_CLI_TEST_RESULT_FILE and uploads it as an artifact (#3694).
+RESULT_FILE="${WHEELS_CLI_TEST_RESULT_FILE:-/tmp/wheels-cli-test-results-$(echo "$PROJECT_ROOT" | shasum | cut -c1-12).json}"
 
 cd "$PROJECT_ROOT"
 
@@ -282,52 +285,22 @@ HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
 
 # ── Parse and display results ───────────────────────
 #
-# Strict-mode scoping: by default, only failures in specs under
-# cli.lucli.tests.specs.deploy.* gate the exit code. Pre-existing failures
-# in unrelated specs (notably TestRunnerSpec, which depends on SQLite JDBC
-# being wired into LuCLI's lib/ext/ — fragile in fresh CI runners) are
-# reported but don't block the deploy subsystem CI.
+# tools/ci/testbox_results.py walks the WHOLE TestBox tree (nested suiteStats,
+# bundle-level globalException) and refuses a result whose counts don't match
+# totalFail/totalError (#3694: the old inline walker read one suite level, so
+# a nested failure or a bundle that threw could exit 0 even with STRICT=1).
 #
-# Set WHEELS_CLI_TEST_STRICT=1 to fail on any failure across all specs.
+# Gating policy: failures in cli.lucli.tests.specs.deploy.* always gate;
+# WHEELS_CLI_TEST_STRICT=1 makes every failure gate. Counts that don't
+# reconcile, and unrecognised statuses, always fail.
+echo "Raw result: ${RESULT_FILE}"
 if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; then
-  WHEELS_CLI_TEST_STRICT="${WHEELS_CLI_TEST_STRICT:-0}" \
-  python3 -c "
-import json, os, sys
-try:
-    d = json.load(open('$RESULT_FILE'))
-except Exception as e:
-    print(f'Failed to parse results: {e}')
-    sys.exit(2)
-# TestBox's totalError is unreliable in this repo (sometimes negative when
-# skipped/pending specs exist). Trust totalFail + explicit Error statuses.
-strict = os.environ.get('WHEELS_CLI_TEST_STRICT', '0') == '1'
-passes = d.get('totalPass', 0)
-fails = d.get('totalFail', 0)
-err = max(0, d.get('totalError', 0))
-print(f\"{passes} pass, {fails} fail, {err} error\")
-
-gating_failures = 0
-nongating_failures = 0
-for b in d.get('bundleStats', []):
-    bundle_name = b.get('name', '') or ''
-    is_deploy = 'cli.lucli.tests.specs.deploy' in bundle_name
-    for s in b.get('suiteStats', []):
-        for sp in s.get('specStats', []):
-            if sp.get('status') in ('Failed', 'Error'):
-                msg = (sp.get('failMessage') or '')[:180]
-                prefix = '' if (is_deploy or strict) else '  [non-gating] '
-                print(f\"{prefix}  {sp['status']}: {bundle_name}: {sp['name']}: {msg}\")
-                if is_deploy or strict:
-                    gating_failures += 1
-                else:
-                    nongating_failures += 1
-
-if nongating_failures and not strict:
-    print(f\"\\n{nongating_failures} non-gating failure(s) in non-deploy specs — reported but not blocking.\")
-    print('Run with WHEELS_CLI_TEST_STRICT=1 to gate on them too.')
-
-sys.exit(0 if gating_failures == 0 else 1)
-"
+  STRICT_FLAG=""
+  if [ "${WHEELS_CLI_TEST_STRICT:-0}" = "1" ]; then
+    STRICT_FLAG="--strict"
+  fi
+  python3 "$PROJECT_ROOT/tools/ci/testbox_results.py" "$RESULT_FILE" $STRICT_FLAG
+  exit $?
 else
   echo "Test runner returned HTTP ${HTTP_CODE}"
   cat "$RESULT_FILE" | head -30
