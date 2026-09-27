@@ -1,0 +1,1 @@
+- `WHEELS_SERVER_FALLBACK=false`, in the environment or the project's `.env`, stops read-side CLI commands (`wheels db status`, `db version`, `migrate info`, …) from falling back to whatever server answers on a common port (8080, 60000, 3000, 8500) when this project's own port isn't serving. Without it, such a command can silently read a different app's server (#3693)

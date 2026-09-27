@@ -120,6 +120,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 			});
 
+			it("skips the commonPorts fallback when the project opts out (WHEELS_SERVER_FALLBACK=false, ##3693)", () => {
+				// A real "no server" mode: specs (and users) that must never
+				// attach to a sibling app on a common port can say so, instead
+				// of hoping a closed PORT=1 stops the scan (it does not).
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var siblingPort = siblingSocket.getLocalPort();
+					fileWrite(tempRoot & "/.env", "WHEELS_SERVER_FALLBACK=false" & chr(10));
+					expect(mod.detectServerPort(commonPorts = [siblingPort])).toBeFalse();
+				} finally {
+					siblingSocket.close();
+					if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				}
+			});
+
 			it("refuses commonPorts fallback when requireProjectConfig is true", () => {
 				// Same simulated sibling on an open port. Write-side
 				// commands MUST refuse to attach — the #2878 root cause.

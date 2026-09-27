@@ -9853,6 +9853,10 @@ component extends="modules.BaseModule" {
 	 * target the server bound to this project's own config, never a
 	 * sibling app squatting 8080 (issue #2878).
 	 *
+	 * Setting WHEELS_SERVER_FALLBACK=false (process environment or the
+	 * project's `.env`) also skips the common-port probe for read-side
+	 * callers (#3693).
+	 *
 	 * `commonPorts` is a test seam — the spec injects a known port to
 	 * simulate a sibling app deterministically. Production callers always
 	 * get the historical fallback list.
@@ -9864,6 +9868,29 @@ component extends="modules.BaseModule" {
 	 * spec reaches it through TestBox `makePublic()` — see
 	 * cli/lucli/tests/specs/services/ServerDetectionSpec.cfc (#2878 review).
 	 */
+	/**
+	 * True when WHEELS_SERVER_FALLBACK is set to false (false/0/no) in the
+	 * process environment or in the project's `.env`.
+	 */
+	private boolean function $serverFallbackDisabled() {
+		var raw = "";
+		try {
+			raw = server.system.environment.WHEELS_SERVER_FALLBACK ?: "";
+		} catch (any e) {
+		}
+		if (!len(trim(raw))) {
+			var envFile = variables.projectRoot & "/.env";
+			if (fileExists(envFile)) {
+				// Anchor on start-of-file or a newline (portable across regex engines).
+				var hit = reFindNoCase("(^|[\r\n])[ \t]*WHEELS_SERVER_FALLBACK[ \t]*=[ \t]*[""']?([A-Za-z0-9]+)", fileRead(envFile), 1, true);
+				if (arrayLen(hit.match) > 2) {
+					raw = hit.match[3];
+				}
+			}
+		}
+		return listFindNoCase("false,0,no", trim(raw)) > 0;
+	}
+
 	private any function detectServerPort(
 		boolean requireProjectConfig = false,
 		array commonPorts = [8080, 60000, 3000, 8500]
@@ -9906,6 +9933,14 @@ component extends="modules.BaseModule" {
 		//    the server on 8080 belongs to this project, and silently
 		//    attaching can run a migration against the wrong database.
 		if (arguments.requireProjectConfig) {
+			return false;
+		}
+
+		// 3b. An explicit opt-out (#3693): WHEELS_SERVER_FALLBACK=false in the
+		//     environment or the project's .env means "only this project's own
+		//     port counts" — the real "no server" mode. A closed PORT=1 does
+		//     not stop the scan below, so specs must not rely on it.
+		if ($serverFallbackDisabled()) {
 			return false;
 		}
 

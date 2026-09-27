@@ -17,7 +17,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		directoryCreate(tempRoot & "/vendor/wheels", true, true);
 		// A closed port, so server-dependent actions deterministically throw
 		// Wheels.ServerNotRunning — proof the action was dispatched.
-		fileWrite(tempRoot & "/.env", "PORT=1" & chr(10));
+		// PORT=1 alone is not "no server": read-side discovery still scans the
+		// common ports and finds a live server on 8080 (CI). Opt out (##3693).
+		fileWrite(tempRoot & "/.env", "PORT=1" & chr(10) & "WHEELS_SERVER_FALLBACK=false" & chr(10));
 		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 	}
 
