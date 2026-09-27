@@ -120,16 +120,19 @@ echo "\nWaiting for service to be ready..."
 max_wait_iterations=30
 wait_seconds=5
 iterations=0
+# Success on the final attempt leaves iterations == max, so track it (#3685).
+service_ready=false
 
 while [ "$iterations" -lt "$max_wait_iterations" ]; do
     iterations=$((iterations + 1))
     echo -n "Checking service (attempt ${iterations}/${max_wait_iterations})... "
-    
+
     # Quick health check
     health_code=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://${host}:${port}/" || echo "000")
-    
+
     if [ "$health_code" = "200" ] || [ "$health_code" = "404" ] || [ "$health_code" = "302" ]; then
         echo "Service responding with ${health_code}"
+        service_ready=true
         break
     else
         echo "Not ready (${health_code})"
@@ -139,7 +142,7 @@ while [ "$iterations" -lt "$max_wait_iterations" ]; do
     fi
 done
 
-if [ "$iterations" -ge "$max_wait_iterations" ]; then
+if [ "$service_ready" != "true" ]; then
     echo "Service failed to become ready after ${max_wait_iterations} attempts"
 fi
 

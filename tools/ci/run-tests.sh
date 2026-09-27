@@ -18,11 +18,16 @@ CLI_OK=true
 # --- Wait for server to be ready ---
 echo "Waiting for Lucee on port ${PORT}..."
 WAIT_COUNT=0
+# Track readiness explicitly: a response on the final attempt leaves
+# WAIT_COUNT == MAX_WAIT, so the count alone can't tell success from
+# exhaustion (#3685).
+READY=false
 while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
   WAIT_COUNT=$((WAIT_COUNT + 1))
   HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "${BASE_URL}/" 2>/dev/null || echo "000")
   if echo "$HTTP_CODE" | grep -qE "^(200|302|404|500)$"; then
     echo "Lucee is responding (HTTP ${HTTP_CODE})"
+    READY=true
     break
   fi
   if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
@@ -30,7 +35,7 @@ while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
   fi
 done
 
-if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+if [ "$READY" != "true" ]; then
   echo "::error::Lucee not ready after ${MAX_WAIT} attempts"
   exit 1
 fi
