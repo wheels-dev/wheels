@@ -30,6 +30,23 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("$cliTestResultFailed — wheels test fail-closed (##3083)", () => {
 
+			it("flags the runner's failure envelope, which carries no test counts (##2963)", () => {
+				// app-runner.cfm answers a failed test-db populate with
+				// {success: false, error, message, detail} and no totals, so a
+				// count-only check read it as a clean run and exited 0.
+				expect(
+					mod.$cliTestResultFailed({
+						"SUCCESS": false,
+						"ERROR": "tests/populate.cfm failed",
+						"MESSAGE": "Test-db migration did not complete cleanly."
+					})
+				).toBeTrue();
+			});
+
+			it("does not flag a normal result document, which has no success key", () => {
+				expect(mod.$cliTestResultFailed({totalPass: 3, totalFail: 0, totalError: 0, bundlesDiscovered: 2})).toBeFalse();
+			});
+
 			it("flags directoryRejected: true even when totalFail/Error are 0", () => {
 				expect(
 					mod.$cliTestResultFailed({

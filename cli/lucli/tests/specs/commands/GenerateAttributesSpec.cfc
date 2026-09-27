@@ -85,6 +85,23 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayLen(directoryList(variables.tempRoot & "/app/migrator/migrations", false, "name"))).toBe(0);
 				expect(fileRead(variables.tempRoot & "/config/routes.cfm")).toBe('mapper().wildcard().end();');
 			});
+
+			it("treats an explicit dry-run=false as a real run (MCP sends schema defaults, ##2963)", () => {
+				// toArgv() re-emits dry-run=false as --no-dry-run, which the
+				// generator's flag parser rejected as `Unknown flag`.
+				mod.generate(type = "model", name = "Tag", attributes = "name:string{30} slug:string", "dry-run" = false);
+				expect($source("app/models/Tag.cfc")).toInclude('validatesPresenceOf("name,slug")');
+			});
+
+			it("does not inherit a stale dry-run left on the request by an earlier call", () => {
+				// The stdio MCP server reuses the request across tool calls; a
+				// dry run that threw before its cleanup must not make the next
+				// generate write nothing.
+				request.$wheelsGenerateDryRun = true;
+				request.$wheelsDryRunPaths = [];
+				mod.generate(type = "model", name = "Tag", attributes = "name:string{30} slug:string");
+				expect(fileExists(variables.tempRoot & "/app/models/Tag.cfc")).toBeTrue();
+			});
 		});
 	}
 

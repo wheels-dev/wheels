@@ -201,6 +201,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(o.hasTarget).toBeTrue();
 			});
 
+			it("rejects an unknown target instead of silently analyzing everything (##2963)", () => {
+				expect(() => probe.$parseAnalyzeArgs({target: "bogus"})).toThrow(type = "Wheels.InvalidArguments");
+				expect(() => probe.$parseAnalyzeArgs({arg1: "Bogus"})).toThrow(type = "Wheels.InvalidArguments");
+			});
+
 			it("reads target by name, the MCP call shape (##2963)", () => {
 				// LuCLI's MCP server passes {target: "..."} as a named key; the
 				// target used to be ignored and `all` analyzed instead.

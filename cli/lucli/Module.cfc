@@ -427,7 +427,7 @@ component extends="modules.BaseModule" {
 
 	private any function analyzeArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "target", default = "all", description = "Analysis target (default: all)");
+			.positional(name = "target", default = "all", description = "What to analyze: all (default), models, controllers, or views");
 	}
 
 	private any function destroyArgSpec() {
@@ -725,13 +725,22 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		// Reset dry-run state first: the stdio MCP server reuses the request
+		// across tool calls, and a dry run that threw before its cleanup below
+		// would otherwise make every later generate write nothing (#2963).
+		structDelete(request, "$wheelsGenerateDryRun");
+		structDelete(request, "$wheelsDryRunPaths");
+
 		// --dry-run: print would-be paths and write nothing. Recognized
-		// anywhere in the argv (before or after the type/name).
+		// anywhere in the argv (before or after the type/name). --no-dry-run
+		// is what toArgv() emits for an MCP call sending dry-run=false.
 		var dryRun = false;
 		var cleaned = [];
 		for (var a in args) {
 			if (a == "--dry-run") {
 				dryRun = true;
+			} else if (a == "--no-dry-run") {
+				dryRun = false;
 			} else {
 				arrayAppend(cleaned, a);
 			}
@@ -3152,8 +3161,17 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseAnalyzeArgs(required struct coll) {
 		var parsed = analyzeArgSpec().parse(arguments.coll);
+		var target = lCase(trim(parsed.target));
+		// Analysis.analyze() treats any unknown target as `all`, so a typo
+		// (or an MCP client guessing a value) silently analyzed everything.
+		if (!listFind("all,models,controllers,views", target)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Unknown analyze target '#parsed.target#'. Valid targets: all, models, controllers, views."
+			);
+		}
 		return {
-			target = lCase(parsed.target),
+			target = target,
 			// arg1 from the CLI, or target=... by name from an MCP tool call
 			hasTarget = structKeyExists(arguments.coll, "arg1") || structKeyExists(arguments.coll, "target")
 		};
@@ -7660,6 +7678,16 @@ component extends="modules.BaseModule" {
 	 * Elvis treats 0 as empty, which would hide the exact 0-bundle case.
 	 */
 	public boolean function $cliTestResultFailed(required struct result, numeric specsFailedToLoad = 0) {
+		// The runner's failure envelope (app-runner.cfm: a failed test-db
+		// populate, a missing runner) is {success: false, error, message} with
+		// no test counts at all. A result document never carries `success`.
+		if (
+			structKeyExists(arguments.result, "success")
+			&& isBoolean(arguments.result.success)
+			&& !arguments.result.success
+		) {
+			return true;
+		}
 		if (structKeyExists(arguments.result, "directoryRejected") && arguments.result.directoryRejected) {
 			return true;
 		}
@@ -7841,16 +7869,26 @@ component extends="modules.BaseModule" {
 				// the CI-friendly modes; `simple` (default) keeps the colorful
 				// human-readable rollup. Without this branch the reporter flag
 				// was parsed and passed in but never used (onboarding F12).
-				switch (lCase(arguments.reporter)) {
-					case "json":
-						out(httpResult);
-						break;
-					case "tap":
-						emitTapResults(result);
-						break;
-					case "simple":
-					default:
-						displayTestResults(result, verboseOutput, resolvedDir, ciMode);
+				var isFailureEnvelope = structKeyExists(result, "success") && isBoolean(result.success) && !result.success;
+				if (isFailureEnvelope && lCase(arguments.reporter) != "json") {
+					// The runner refused before running anything (e.g. the
+					// test-db populate failed). There are no counts to render,
+					// so print its own explanation; the exit seam below fails.
+					out("Test run failed before any spec ran: #result.error ?: 'runner error'#", "red");
+					if (len(result.message ?: "")) out(result.message, "yellow");
+					if (len(result.detail ?: "")) out(result.detail);
+				} else {
+					switch (lCase(arguments.reporter)) {
+						case "json":
+							out(httpResult);
+							break;
+						case "tap":
+							emitTapResults(result);
+							break;
+						case "simple":
+						default:
+							displayTestResults(result, verboseOutput, resolvedDir, ciMode);
+					}
 				}
 
 				// Stash for the post-try throw seam. Throwing here would be
