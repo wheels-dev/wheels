@@ -112,7 +112,88 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		$removeColumnAliasesInOrderClause(args = arguments);
 		$addColumnsToSelectAndGroupBy(args = arguments);
 		$moveAggregateToHaving(args = arguments);
-		return $performQuery(argumentCollection = arguments);
+		local.rv = $performQuery(argumentCollection = arguments);
+		if ($isBoxLangEngine() && StructKeyExists(local.rv, "query") && IsQuery(local.rv.query)) {
+			local.rv.query = $normalizeOracleTemporalColumns(local.rv.query);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * BoxLang's Oracle driver hands DATE/TIMESTAMP columns back as raw
+	 * `oracle.sql.*` driver objects, where Lucee and Adobe hand back CFML
+	 * dates. App code then cannot format, compare, output or JSON-render them
+	 * (#3719). Convert, in place, every column whose first non-empty value is
+	 * such an object into CFML dates through `$normalizeDbTimestamp()`, the
+	 * same conversion the framework's own timestamp readers use (#3649).
+	 *
+	 * One value per column is inspected to decide, so columns of simple values
+	 * or real dates cost a single check. A cell is only replaced when the
+	 * conversion yields a date; anything it cannot convert (for example a
+	 * TIMESTAMP WITH TIME ZONE that needs a live connection) is left as it was
+	 * rather than blanked.
+	 */
+	public query function $normalizeOracleTemporalColumns(required query query) {
+		local.rowCount = arguments.query.recordCount;
+		if (!local.rowCount) {
+			return arguments.query;
+		}
+		local.columns = ListToArray(arguments.query.columnList);
+		for (local.column in local.columns) {
+			if (!$isOracleTemporalColumn(arguments.query, local.column, local.rowCount)) {
+				continue;
+			}
+			for (local.row = 1; local.row <= local.rowCount; local.row++) {
+				local.cell = arguments.query[local.column][local.row];
+				if (IsNull(local.cell) || !$isOracleDriverValue(local.cell)) {
+					continue;
+				}
+				local.converted = $normalizeDbTimestamp(local.cell);
+				if (IsDate(local.converted)) {
+					QuerySetCell(arguments.query, local.column, local.converted, local.row);
+				}
+			}
+		}
+		return arguments.query;
+	}
+
+	/**
+	 * Internal function for `$normalizeOracleTemporalColumns()`: is the first
+	 * non-empty value in `column` an `oracle.sql.*` driver object? Decided by
+	 * the Java class name alone: the driver objects throw on Len(), string
+	 * casts and date functions, so nothing else is called on them.
+	 */
+	public boolean function $isOracleTemporalColumn(required query query, required string column, required numeric rowCount) {
+		for (local.row = 1; local.row <= arguments.rowCount; local.row++) {
+			local.cell = arguments.query[arguments.column][local.row];
+			if (IsNull(local.cell)) {
+				continue;
+			}
+			if ($isOracleDriverValue(local.cell)) {
+				return true;
+			}
+			// An empty string is a NULL column value: keep looking. Any other
+			// value (text, number, CFML date) means this is not such a column.
+			if ($javaClassName(local.cell) == "java.lang.String" && !Len(local.cell)) {
+				continue;
+			}
+			return false;
+		}
+		return false;
+	}
+
+	/** Internal function: is `value` an `oracle.sql.*` driver object? */
+	public boolean function $isOracleDriverValue(required any value) {
+		return Left($javaClassName(arguments.value), 11) == "oracle.sql.";
+	}
+
+	/** Internal function: the Java class name of `value`, or "" when unknown. */
+	public string function $javaClassName(required any value) {
+		try {
+			return arguments.value.getClass().getName();
+		} catch (any e) {
+			return "";
+		}
 	}
 
 	/**

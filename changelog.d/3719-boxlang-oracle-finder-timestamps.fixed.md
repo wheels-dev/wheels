@@ -1,0 +1,1 @@
+- On BoxLang with Oracle, model finders returned datetime columns as raw `oracle.sql.TIMESTAMP` driver objects, which `DateFormat()`, `DateCompare()`, output, concatenation and `SerializeJSON()` could not handle. They are now CFML dates, as on every other engine (#3719)
