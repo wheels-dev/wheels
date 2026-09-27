@@ -173,6 +173,34 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * The text form of a driver-supplied generated key. Simple values pass through
+	 * unchanged. A key OBJECT (BoxLang returns oracle.sql.ROWID as-is, #3708) is read
+	 * via stringValue() (oracle.sql.ROWID) or, failing that, toString() (the
+	 * java.sql.RowId contract). Anything without a readable text form is "" (no
+	 * usable key), so the caller falls back to CURRVAL. The result is still gated by
+	 * the numeric / extended-ROWID checks before it reaches any SQL.
+	 */
+	public string function $generatedKeyText(required any value) {
+		if (IsSimpleValue(arguments.value)) {
+			return arguments.value;
+		}
+		var state = {text = ""};
+		try {
+			state.text = arguments.value.stringValue();
+		} catch (any e) {
+			state.text = "";
+		}
+		if (!IsSimpleValue(state.text) || !Len(state.text)) {
+			try {
+				state.text = arguments.value.toString();
+			} catch (any e) {
+				state.text = "";
+			}
+		}
+		return IsSimpleValue(state.text) ? state.text : "";
+	}
+
+	/**
 	 * Override Base adapter's $identitySelect hook.
 	 */
 	public any function $lastIdLookup(
@@ -189,12 +217,15 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		// Oracle JDBC driver returns the inserted row's ROWID. Lucee surfaces it
 		// as result.generatedKey (StructKeyExists is case-insensitive so the
 		// lowercase `generatedkey` key matches); ACF surfaces it as result.rowid.
-		// ListFirst because multi-row inserts can return a list.
+		// ListFirst because multi-row inserts can return a list. BoxLang hands back
+		// the driver's key as an oracle.sql.ROWID OBJECT rather than a string, so read
+		// its text form before any Len()/ListFirst() (#3708).
 		local.generated = "";
-		if (StructKeyExists(arguments.result, "generatedKey") && Len(arguments.result.generatedKey)) {
-			local.generated = ListFirst(arguments.result.generatedKey);
-		} else if (StructKeyExists(arguments.result, "rowid") && Len(arguments.result.rowid)) {
-			local.generated = arguments.result.rowid;
+		if (StructKeyExists(arguments.result, "generatedKey")) {
+			local.generated = ListFirst($generatedKeyText(arguments.result.generatedKey));
+		}
+		if (!Len(local.generated) && StructKeyExists(arguments.result, "rowid")) {
+			local.generated = $generatedKeyText(arguments.result.rowid);
 		}
 		if (Len(local.generated)) {
 			// Some driver/engine combos return the identity value itself.
