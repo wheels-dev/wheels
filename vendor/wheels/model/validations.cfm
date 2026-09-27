@@ -854,17 +854,28 @@
 	public any function $evaluateConditionString(required string condition) {
 		local.normalized = $normalizeConditionOperators(arguments.condition);
 
-		// A leading `!` negates the whole clause (matching CFML's reading of
-		// `!x`). It cannot be handled further down: `$splitConditionOnOperator()`
+		// A leading `!` negates the single clause (or parenthesised group) it
+		// prefixes. It cannot be handled further down: `$splitConditionOnOperator()`
 		// splits on whitespace, so a negated call with arguments would be torn
 		// into `!StructKeyExists(this,` / `'x')`. Strip it here, evaluate the rest
 		// as a unit, and invert the result.
 		//
+		// `!` binds tighter than `&&`/`||`, so when the rest still has a top-level
+		// `||` or `&&` (`!a || b`) the `!` belongs to the first operand only: fall
+		// through and let the compound split run first — each side recurses back
+		// here and negates just its own clause. `!(a || b)` has no top-level
+		// operator after the `!`, so the whole group is still negated.
+		//
 		// `!=` is already rewritten to ` neq ` by the normalizer above, so any
 		// `!` reaching this point is negation.
-		local.negate = (Left(local.normalized, 1) == "!");
-		if (local.negate) {
-			local.normalized = Trim(Mid(local.normalized, 2, Len(local.normalized)));
+		if (Left(local.normalized, 1) == "!") {
+			local.rest = Trim(Mid(local.normalized, 2, Len(local.normalized)));
+			if (
+				ArrayLen($splitTopLevelCondition(local.rest, "||")) == 1
+				&& ArrayLen($splitTopLevelCondition(local.rest, "&&")) == 1
+			) {
+				return !$evaluateConditionString(local.rest);
+			}
 		}
 
 		// Parenthesised group, e.g. `(a || b) && c`. Unwrap only when the parens
@@ -877,14 +888,13 @@
 			}
 		}
 
-		local.result = $evaluateSingleConditionString(local.normalized);
-		return local.negate ? !local.result : local.result;
+		return $evaluateSingleConditionString(local.normalized);
 	}
 
 	/**
-	 * Evaluates one clause — no leading negation, no surrounding group. Split out
-	 * of `$evaluateConditionString()` so the negation wrapper above can invert the
-	 * finished result instead of the first operand.
+	 * Evaluates one clause or compound expression — no negated single clause, no
+	 * surrounding group. Split out of `$evaluateConditionString()` so the negation
+	 * wrapper above can invert a finished clause instead of its first token.
 	 */
 	public any function $evaluateSingleConditionString(required string condition) {
 		local.normalized = arguments.condition;

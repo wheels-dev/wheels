@@ -430,6 +430,32 @@ component extends="wheels.WheelsTest" {
 				expect(user.$evaluateConditionString("1 eq 0 || !ListFind('a,b,c', 'z')")).toBeTrue()
 			})
 
+			// `!` binds tighter than `&&`/`||`: a leading `!` negates only the first
+			// operand, not the whole compound. It used to invert the entire
+			// expression, so `!a || b` was evaluated as `!(a || b)`.
+			it("applies a leading ! only to the first operand of an || compound", () => {
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'username') || 1 eq 1")).toBeTrue()
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'nonexistent') || 1 eq 0")).toBeTrue()
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'username') || 1 eq 0")).toBeFalse()
+			})
+
+			it("applies a leading ! only to the first operand of an && compound", () => {
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'nonexistent') && 1 eq 0")).toBeFalse()
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'username') && 1 eq 0")).toBeFalse()
+				expect(user.$evaluateConditionString("!StructKeyExists(this, 'nonexistent') && 1 eq 1")).toBeTrue()
+			})
+
+			it("negates a whole parenthesised group", () => {
+				expect(user.$evaluateConditionString("!(StructKeyExists(this, 'username') || 1 eq 0)")).toBeFalse()
+				expect(user.$evaluateConditionString("!(StructKeyExists(this, 'nonexistent') || 1 eq 0)")).toBeTrue()
+				expect(user.$evaluateConditionString("!(1 eq 1) || (1 eq 1)")).toBeTrue()
+			})
+
+			it("negates a mid-expression operand only", () => {
+				expect(user.$evaluateConditionString("1 eq 1 && !StructKeyExists(this, 'username')")).toBeFalse()
+				expect(user.$evaluateConditionString("StructKeyExists(this, 'username') && !ListFind('a,b,c', 'z')")).toBeTrue()
+			})
+
 			// An argument that is not present on the instance resolves to an
 			// empty value rather than throwing, so `||` short-circuits the way
 			// it reads. Property absence is normal on a model instance, and the
