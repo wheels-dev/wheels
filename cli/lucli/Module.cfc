@@ -627,7 +627,31 @@ component extends="modules.BaseModule" {
 		} catch (any e) {
 			// fall through
 		}
-		return "";
+		// The runtime sets neither of those; its jar carries the version in
+		// lucli/version.properties on the launcher's classpath. This is what
+		// lets `wheels version` (and the distribution smoke) name the LuCLI
+		// runtime a channel actually installed.
+		return $readLucliVersionResource();
+	}
+
+	private string function $readLucliVersionResource() {
+		try {
+			var loader = createObject("java", "java.lang.ClassLoader").getSystemClassLoader();
+			var stream = loader.getResourceAsStream("lucli/version.properties");
+			if (isNull(stream)) {
+				return "";
+			}
+			var props = createObject("java", "java.util.Properties").init();
+			try {
+				props.load(stream);
+			} finally {
+				stream.close();
+			}
+			var v = props.getProperty("lucli.version");
+			return isNull(v) ? "" : trim(v);
+		} catch (any e) {
+			return "";
+		}
 	}
 
 	private string function $detectJavaVersion() {
