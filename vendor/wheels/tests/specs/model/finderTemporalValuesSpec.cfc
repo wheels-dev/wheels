@@ -78,9 +78,7 @@ component extends="wheels.WheelsTest" {
 					probe.ts = "";
 				}
 				if (IsSimpleValue(probe.ts)) {
-					// The Oracle driver is not on this engine's classpath: only the
-					// finder specs above (and the other legs) can run here.
-					return;
+					skip("oracle.sql.TIMESTAMP is not on this engine's classpath (runs on the Oracle legs).");
 				}
 				var adapter = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
 				var q = QueryNew("happened");
@@ -104,7 +102,7 @@ component extends="wheels.WheelsTest" {
 					probe.num = "";
 				}
 				if (IsSimpleValue(probe.num)) {
-					return;
+					skip("oracle.sql.NUMBER is not on this engine's classpath (runs on the Oracle legs).");
 				}
 				var adapter = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
 				expect(adapter.$isOracleDriverValue(probe.num)).toBeFalse();
