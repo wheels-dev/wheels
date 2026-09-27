@@ -43,14 +43,16 @@ component {
 		boolean required = false,
 		any default = "",
 		string type = "string",
-		string description = ""
+		string description = "",
+		string choices = ""
 	) {
 		arrayAppend(variables.positionals, {
 			"name" = arguments.name,
 			"required" = arguments.required,
 			"default" = arguments.default,
 			"type" = arguments.type,
-			"description" = arguments.description
+			"description" = arguments.description,
+			"choices" = listToArray(arguments.choices)
 		});
 		return this;
 	}
@@ -63,23 +65,63 @@ component {
 		variables.named[arguments.name] = {
 			"default" = arguments.default,
 			"type" = "boolean",
-			"description" = arguments.description
+			"description" = arguments.description,
+			"choices" = []
 		};
 		return this;
 	}
 
+	/**
+	 * `choices` (comma-delimited) fixes the accepted values: parse() rejects
+	 * anything else and toInputSchema() advertises them as a JSON Schema
+	 * `enum`, so the parser and the MCP schema share one declaration (#2963).
+	 * Positionals take the same argument.
+	 */
 	public any function option(
 		required string name,
 		any default = "",
 		string type = "string",
-		string description = ""
+		string description = "",
+		string choices = ""
 	) {
 		variables.named[arguments.name] = {
 			"default" = arguments.default,
 			"type" = arguments.type,
-			"description" = arguments.description
+			"description" = arguments.description,
+			"choices" = listToArray(arguments.choices)
 		};
 		return this;
+	}
+
+	/**
+	 * The declared choices for a positional or option (empty array when it
+	 * has none). For commands that bind a value outside parse() — destroy's
+	 * legacy <name> <type> reorder — and must validate it the same way.
+	 */
+	public array function choicesFor(required string name) {
+		for (var p in variables.positionals) {
+			if (p.name == arguments.name) {
+				return p.choices;
+			}
+		}
+		return structKeyExists(variables.named, arguments.name) ? variables.named[arguments.name].choices : [];
+	}
+
+	/**
+	 * Throw Wheels.InvalidArguments when a supplied value is not one of the
+	 * declared choices. Empty values are not validated: they mean "not
+	 * given" (db's subcommand defaults to "" to print usage).
+	 */
+	private void function $assertChoice(required string name, required any value, required array choices) {
+		if (!arrayLen(arguments.choices) || !isSimpleValue(arguments.value) || !len(trim(arguments.value))) {
+			return;
+		}
+		if (!arrayFindNoCase(arguments.choices, trim(arguments.value))) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Invalid value '#arguments.value#' for #arguments.name#. Valid values: #arrayToList(arguments.choices, ', ')#."
+			);
+		}
 	}
 
 	public struct function parse(required struct coll) {
@@ -103,6 +145,7 @@ component {
 			var pSpec = variables.positionals[i];
 			if (i <= arrayLen(positionalIndices)) {
 				result[pSpec.name] = $coerce(arguments.coll["arg" & positionalIndices[i]], pSpec.type);
+				$assertChoice(pSpec.name, result[pSpec.name], pSpec.choices);
 			} else if (structKeyExists(arguments.coll, pSpec.name) && isSimpleValue(arguments.coll[pSpec.name])) {
 				// By-name fallback (#2963). LuCLI's MCP server delivers
 				// tools/call arguments as named keys — toInputSchema()
@@ -122,6 +165,7 @@ component {
 					);
 				}
 				result[pSpec.name] = $coerce(arguments.coll[pSpec.name], pSpec.type);
+				$assertChoice(pSpec.name, result[pSpec.name], pSpec.choices);
 			} else if (pSpec.required) {
 				throw(
 					type = "Wheels.CLI.MissingArgument",
@@ -141,6 +185,7 @@ component {
 			}
 			if (structKeyExists(variables.named, key)) {
 				result[key] = $coerce(arguments.coll[key], variables.named[key].type);
+				$assertChoice(key, result[key], variables.named[key].choices);
 			}
 		}
 
@@ -240,7 +285,7 @@ component {
 		var required = [];
 
 		for (var p in variables.positionals) {
-			properties[p.name] = $toSchemaProperty(p.type, p["default"], p.description);
+			properties[p.name] = $toSchemaProperty(p.type, p["default"], p.description, p.choices);
 			if (p.required) {
 				arrayAppend(required, p.name);
 			}
@@ -248,7 +293,7 @@ component {
 
 		for (var optName in variables.named) {
 			var spec = variables.named[optName];
-			properties[optName] = $toSchemaProperty(spec.type, spec["default"], spec.description);
+			properties[optName] = $toSchemaProperty(spec.type, spec["default"], spec.description, spec.choices);
 		}
 
 		return {
@@ -262,12 +307,18 @@ component {
 	private struct function $toSchemaProperty(
 		required string type,
 		required any default,
-		string description = ""
+		string description = "",
+		array choices = []
 	) {
-		var prop = {
-			"type" = $toJsonSchemaType(arguments.type),
-			"default" = arguments.default
-		};
+		var prop = {"type" = $toJsonSchemaType(arguments.type)};
+		if (arrayLen(arguments.choices)) {
+			prop["enum"] = arguments.choices;
+		}
+		// A default outside the enum (db's "" = print usage) would contradict
+		// the schema, so it is left out; the command still applies it.
+		if (!arrayLen(arguments.choices) || arrayFindNoCase(arguments.choices, toString(arguments.default))) {
+			prop["default"] = arguments.default;
+		}
 		if (len(arguments.description)) {
 			prop["description"] = arguments.description;
 		}

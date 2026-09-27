@@ -43,6 +43,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				).toBeTrue();
 			});
 
+			it("flags a response with no test counts, such as an error document with only message/detail", () => {
+				// `wheels test --core` against a missing datasource printed the
+				// runner's message/detail, then "0 passed", and exited 0.
+				expect(
+					mod.$cliTestResultFailed({
+						"message": "Datasource [public] doesn't exist",
+						"detail": "available datasource names are [qaapp,qaapp_test]"
+					})
+				).toBeTrue();
+			});
+
 			it("does not flag a normal result document, which has no success key", () => {
 				expect(mod.$cliTestResultFailed({totalPass: 3, totalFail: 0, totalError: 0, bundlesDiscovered: 2})).toBeFalse();
 			});

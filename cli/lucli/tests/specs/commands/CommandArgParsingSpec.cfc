@@ -162,7 +162,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("reads --mode", () => {
-				expect(probe.$parseSeedArgs({mode: "development"}).mode).toBe("development");
+				expect(probe.$parseSeedArgs({mode: "convention"}).mode).toBe("convention");
+			});
+
+			it("rejects a --mode outside auto/convention/generate (##2963)", () => {
+				// An unknown mode fell through to auto and generated rows.
+				expect(() => probe.$parseSeedArgs({mode: "development"})).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 			it("maps --generate to mode=generate", () => {
@@ -247,7 +252,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("detects the --dry-run and --to misfires for the nudge", () => {
-				var o = probe.$parseUpgradeArgs({arg1: "oops", "dry-run": "true", to: "4.0.0"});
+				var o = probe.$parseUpgradeArgs({arg1: "apply", "dry-run": "true", to: "4.0.0"});
 				expect(o.sawDryRun).toBeTrue();
 				expect(o.sawTo).toBeTrue();
 			});
@@ -321,9 +326,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("keeps named values in place instead of running the legacy reorder", () => {
 				// The reorder guesses which token is the type; named keys say so.
-				var o = probe.$parseDestroyArgs({type: "bogus", name: "User"});
-				expect(o.name).toBe("User");
-				expect(o.type).toBe("bogus");
+				var o = probe.$parseDestroyArgs({type: "view", name: "model"});
+				expect(o.name).toBe("model");
+				expect(o.type).toBe("view");
+			});
+
+			it("rejects a named type outside the choices (##2963)", () => {
+				expect(() => probe.$parseDestroyArgs({type: "bogus", name: "User"})).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 			it("prefers typed positional tokens over named keys", () => {

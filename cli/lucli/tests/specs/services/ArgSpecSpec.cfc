@@ -421,6 +421,76 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("choices — one declaration drives parser rejection and schema enum (##2963)", () => {
+
+				// An invalid value for a fixed-choice parameter used to fall
+				// back silently: routes format=bogus printed the text table,
+				// seed mode=bogus generated rows.
+
+				it("accepts a positional token that is one of the choices, case-insensitively", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all", choices = "all,models,views");
+					expect(spec.parse({"arg1": "Models"}).target).toBe("Models");
+				});
+
+				it("rejects a positional token outside the choices", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all", choices = "all,models,views");
+					expect(() => spec.parse({"arg1": "bogus"})).toThrow(type = "Wheels.InvalidArguments", regex = "all, models, views");
+				});
+
+				it("rejects a positional passed by name outside the choices", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all", choices = "all,models,views");
+					expect(() => spec.parse({"target": "bogus"})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("rejects an option value outside the choices", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.option(name = "format", default = "text", choices = "text,json");
+					expect(spec.parse({"format": "json"}).format).toBe("json");
+					expect(() => spec.parse({"format": "bogus"})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("rejects a bare flag given to a choice option (format=true)", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.option(name = "format", default = "text", choices = "text,json");
+					expect(() => spec.parse({"format": "true"})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("does not validate defaults or an explicit empty value", () => {
+					// db's subcommand defaults to "" (print usage), which is not a choice.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "subcommand", default = "", choices = "reset,status,version");
+					expect(spec.parse({}).subcommand).toBe("");
+					expect(spec.parse({"subcommand": ""}).subcommand).toBe("");
+				});
+
+				it("emits the choices as a JSON Schema enum", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.option(name = "format", default = "text", choices = "text,json")
+						.toInputSchema();
+					expect(schema.properties.format.enum).toBe(["text", "json"]);
+					expect(schema.properties.format["default"]).toBe("text");
+				});
+
+				it("omits a default that is not one of the choices", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.positional(name = "subcommand", default = "", choices = "reset,status,version")
+						.toInputSchema();
+					expect(schema.properties.subcommand.enum).toBe(["reset", "status", "version"]);
+					expect(schema.properties.subcommand).notToHaveKey("default");
+				});
+
+				it("exposes the declared choices so a caller can validate a value it binds itself", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "type", choices = "resource,model");
+					expect(spec.choicesFor("type")).toBe(["resource", "model"]);
+					expect(spec.choicesFor("undeclared")).toBe([]);
+				});
+
+			});
+
 		});
 
 	}
