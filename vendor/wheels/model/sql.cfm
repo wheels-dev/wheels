@@ -265,13 +265,13 @@
 						);
 					} else if (Find(".", local.iItem)) {
 						// Prevent SQL injection via dot-notation — only allow table.column identifiers
-						if (REFind("^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?$", local.iItem)) {
+						if (REFind("^[a-zA-Z_][a-zA-Z0-9_$]*\.[a-zA-Z_][a-zA-Z0-9_$]*(\s+(ASC|DESC))?$", local.iItem)) {
 							local.rv = ListAppend(local.rv, local.iItem);
 						} else {
 							Throw(
 								type = "Wheels.InvalidOrderClause",
 								message = "Invalid dot-notation in ORDER BY clause: `#local.iItem#`.",
-								extendedInfo = "Dot-notation order items must follow the `tablename.columnname` pattern using only alphanumeric characters and underscores."
+								extendedInfo = "Dot-notation order items must follow the `tablename.columnname` pattern using only alphanumeric characters, underscores, and `$` (not as the first character)."
 							);
 						}
 					} else {
@@ -373,7 +373,7 @@
 						extendedInfo = "The GROUP BY item '#EncodeForHTML(local.gItem)#' contains invalid characters."
 					);
 				}
-				if (Find(".", local.gItem) && !REFind("^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$", local.gItem)) {
+				if (Find(".", local.gItem) && !REFind("^[a-zA-Z_][a-zA-Z0-9_$]*\.[a-zA-Z_][a-zA-Z0-9_$]*$", local.gItem)) {
 					Throw(
 						type = "Wheels.InvalidGroupByClause",
 						message = "Invalid GROUP BY clause.",
@@ -1062,7 +1062,7 @@
 				}
 				local.elementDataPart = Trim(ReReplace(local.elementDataPart, "^(AND|OR)", ""));
 				local.temp = ReFind(
-					"^([a-zA-Z0-9-_\.]*) ?#variables.wheels.class.RESQLOperators#",
+					"^([a-zA-Z0-9-_\.$]*) ?#variables.wheels.class.RESQLOperators#",
 					local.elementDataPart,
 					1,
 					true
@@ -1120,7 +1120,7 @@
 						}
 					}
 					local.temp = ReFind(
-						"^[a-zA-Z0-9-_\.]* ?#variables.wheels.class.RESQLOperators#",
+						"^[a-zA-Z0-9-_\.$]* ?#variables.wheels.class.RESQLOperators#",
 						local.elementDataPart,
 						1,
 						true

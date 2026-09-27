@@ -469,10 +469,10 @@ component extends="wheels.migrator.Base" {
 	 * cannot close a string and inject tags.
 	 */
 	public string function $escapeCfcIdentifier(required string name) {
-		if (!ReFindNoCase("^[A-Za-z_][A-Za-z0-9_]*$", arguments.name)) {
+		if (!ReFindNoCase("^[A-Za-z_][A-Za-z0-9_$]*$", arguments.name)) {
 			Throw(
 				type = "Wheels.Migrator.InvalidIdentifier",
-				message = "Unsafe identifier for generated migration CFC: `#arguments.name#`. Use letters, digits, and underscore only."
+				message = "Unsafe identifier for generated migration CFC: `#arguments.name#`. Use letters, digits, underscore, and $ (not as the first character) only."
 			);
 		}
 		return arguments.name;

@@ -538,17 +538,17 @@ component output="false" {
 
 	/**
 	 * Validate that a property name is safe to interpolate into SQL.
-	 * Allows alphanumeric identifiers with underscores, and optional table.column dot notation.
+	 * Allows alphanumeric identifiers with underscores and `$` (never first), and optional table.column dot notation.
 	 * Throws Wheels.InvalidPropertyName if the name contains unsafe characters.
 	 *
 	 * @property The property name to validate.
 	 */
 	private void function $validatePropertyName(required string property) {
-		if (!Len(arguments.property) || !ReFind("^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$", arguments.property)) {
+		if (!Len(arguments.property) || !ReFind("^[a-zA-Z_][a-zA-Z0-9_$]*(\.[a-zA-Z_][a-zA-Z0-9_$]*)?$", arguments.property)) {
 			Throw(
 				type = "Wheels.InvalidPropertyName",
 				message = "The property name `#EncodeForHTML(arguments.property)#` contains invalid characters.",
-				extendedInfo = "Property names may only contain letters, numbers, and underscores, with an optional table prefix using dot notation (e.g., `users.id`)."
+				extendedInfo = "Property names may only contain letters, numbers, underscores, and `$` (not as the first character), with an optional table prefix using dot notation (e.g., `users.id`)."
 			);
 		}
 	}
