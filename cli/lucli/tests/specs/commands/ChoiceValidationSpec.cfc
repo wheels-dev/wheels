@@ -95,6 +95,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(() => mod.migrate(action = "bogus")).toThrow(type = "Wheels.InvalidArguments");
 			});
 
+			it("an empty positional token does not shadow an invalid named value", () => {
+				// {arg1: "", action: "bogus"} bound action="" (then latest) and
+				// reached the migration step.
+				expect(() => mod.migrate(arg1 = "", action = "bogus")).toThrow(type = "Wheels.InvalidArguments");
+				expect(() => mod.db(arg1 = "", subcommand = "bogus", force = true)).toThrow(type = "Wheels.InvalidArguments");
+				expect(() => mod.upgrade(arg1 = "", subcommand = "bogus")).toThrow(type = "Wheels.InvalidArguments");
+			});
+
 			it("still accepts a valid verb (it proceeds to the server step)", () => {
 				expect(() => mod.db(subcommand = "STATUS")).toThrow(type = "Wheels.ServerNotRunning");
 			});
@@ -141,6 +149,17 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					state.message = e.message;
 				}
 				expect(state.message).notToInclude("--strict");
+			});
+
+			it("destroy with a malformed force value throws and deletes nothing", () => {
+				// force=1 used to coerce loosely and ran the destroy (QA deleted a
+				// scratch Guard.cfc this way).
+				var guard = variables.tempRoot & "/app/models/Guard.cfc";
+				directoryCreate(getDirectoryFromPath(guard), true, true);
+				fileWrite(guard, 'component extends="Model" {}');
+				expect(() => mod.destroy(arg1 = "model", arg2 = "Guard", force = "1")).toThrow(type = "Wheels.InvalidArguments");
+				expect(() => mod.destroy(type = "model", name = "Guard", force = "yes")).toThrow(type = "Wheels.InvalidArguments");
+				expect(fileExists(guard)).toBeTrue();
 			});
 
 			it("packages with help=false runs the verb (in-process callers)", () => {

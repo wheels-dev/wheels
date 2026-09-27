@@ -374,6 +374,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("parseTestArgs", () => {
 
+			it("lower-cases --db, since the core runner matches its dialect list case-sensitively", () => {
+				// `--db=MySQL` passed the case-insensitive choice check but the
+				// runner's listFind() missed it and used the default datasource.
+				expect(probe.$parseTestArgs({db: "MySQL"}).db).toBeWithCase("mysql");
+			});
+
 			it("defaults reporter=simple, db=sqlite, format=json, flags off, useTestDB on", () => {
 				var o = probe.$parseTestArgs({});
 				expect(o.filter).toBe("");

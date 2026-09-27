@@ -65,6 +65,50 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				testHelper.cleanupTempProject(variables.tempRoot);
 			});
 
+			describe("apply is never reached for invalid input (##2963)", () => {
+
+				// apply swaps vendor/wheels/. For a destructive verb anything
+				// unrecognized must throw, never fall through to the swap.
+				// Each case seeds a framework that a real apply WOULD swap (see
+				// "swaps vendor/wheels/ with the bundled framework" below), then
+				// asserts the call threw and the framework is untouched.
+				it("throws and leaves vendor/wheels/ untouched for every invalid combination", () => {
+					var cases = [
+						{subcommand: "apply", strict: "bogus"},
+						{subcommand: "apply", strict: "1"},
+						{subcommand: "apply", nobackup: "bogus"},
+						{subcommand: "apply", "dry-run": "1"},
+						{subcommand: "apply", "dry-run": "bogus"},
+						{subcommand: "apply", "dry-run": true},
+						{subcommand: "apply", strict: true},
+						{subcommand: "apply", format: "json"},
+						{subcommand: "apply", format: "bogus"},
+						{subcommand: "apply", to: true},
+						{arg1: "", subcommand: "bogus"},
+						{subcommand: "bogus"},
+						{arg1: "bogus"},
+						{subcommand: "true"},
+						{subcommand: true}
+					];
+					for (var args in cases) {
+						seedVendorWheels(version = "0.0.1-spec-fixture");
+						fileWrite(variables.tempRoot & "/vendor/wheels/marker.txt", "old-framework");
+						var state = {threw: false};
+						try {
+							mod.upgrade(argumentCollection = args);
+						} catch (any e) {
+							state.threw = true;
+						}
+						var label = serializeJSON(args);
+						expect(state.threw).toBeTrue("expected #label# to throw");
+						expect(seededVersion()).toBe("0.0.1-spec-fixture", "#label# reached the framework swap");
+						expect(fileExists(variables.tempRoot & "/vendor/wheels/marker.txt")).toBeTrue("#label# replaced vendor/wheels/");
+						expect(arrayLen(listBackups())).toBe(0, "#label# made a backup");
+					}
+				});
+
+			});
+
 			describe("wheels upgrade help", () => {
 
 				it("returns help text when invoked with --help", () => {

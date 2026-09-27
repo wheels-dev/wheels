@@ -139,12 +139,39 @@ component {
 		//    arg<N> key and sort numerically instead of probing literal
 		//    arg1..argN; fixed-index probing made gap-following positionals
 		//    silently bind nothing (the appName above was ignored).
+		// A key that is present with a NULL value (the stdio MCP transport
+		// turns an empty JSON string into null) is "no value", never
+		// "omitted": `migrate {action: null}` must not fall back to the default
+		// action `latest`. structKeyExists() is false for a null value, so scan
+		// the keys directly.
+		var nullKeys = [];
+		for (var nk in arguments.coll) {
+			if (isNull(arguments.coll[nk])) {
+				arrayAppend(nullKeys, nk);
+			}
+		}
+		for (var nk in nullKeys) {
+			if (reFindNoCase("^arg\d+$", nk)) {
+				throw(type = "Wheels.InvalidArguments", message = "Positional argument #mid(nk, 4, len(nk))# has no value.");
+			}
+		}
+		for (var p in variables.positionals) {
+			if (arrayFindNoCase(nullKeys, p.name)) {
+				throw(type = "Wheels.InvalidArguments", message = "<" & p.name & "> has no value.");
+			}
+		}
+		for (var nk in nullKeys) {
+			if (structKeyExists(variables.named, nk)) {
+				throw(type = "Wheels.InvalidArguments", message = "--" & nk & " has no value.");
+			}
+		}
+
 		var positionalIndices = $positionalIndices(arguments.coll);
 		var positionalCount = arrayLen(variables.positionals);
 		for (var i = 1; i <= positionalCount; i++) {
 			var pSpec = variables.positionals[i];
 			if (i <= arrayLen(positionalIndices)) {
-				result[pSpec.name] = $coerce(arguments.coll["arg" & positionalIndices[i]], pSpec.type);
+				result[pSpec.name] = $coerce(arguments.coll["arg" & positionalIndices[i]], pSpec.type, pSpec.name);
 				$assertChoice(pSpec.name, result[pSpec.name], pSpec.choices);
 			} else if (structKeyExists(arguments.coll, pSpec.name) && isSimpleValue(arguments.coll[pSpec.name])) {
 				// By-name fallback (#2963). LuCLI's MCP server delivers
@@ -164,7 +191,7 @@ component {
 						message = "<" & pSpec.name & "> needs a value, e.g. --" & pSpec.name & "=<value> (a bare --" & pSpec.name & " is a flag)."
 					);
 				}
-				result[pSpec.name] = $coerce(arguments.coll[pSpec.name], pSpec.type);
+				result[pSpec.name] = $coerce(arguments.coll[pSpec.name], pSpec.type, pSpec.name);
 				$assertChoice(pSpec.name, result[pSpec.name], pSpec.choices);
 			} else if (pSpec.required) {
 				throw(
@@ -180,11 +207,23 @@ component {
 		//    so we just consume the structured handoff. Unknown keys are
 		//    ignored so a stray LuCLI flag never lands in the result.
 		for (var key in arguments.coll) {
-			if (reFindNoCase("^arg\d+$", key)) {
+			if (reFindNoCase("^arg\d+$", key) || arrayFindNoCase(nullKeys, key)) {
 				continue;
 			}
 			if (structKeyExists(variables.named, key)) {
-				result[key] = $coerce(arguments.coll[key], variables.named[key].type);
+				// A bare `--to` arrives as to=true: a flag, not a value. For a
+				// string option that must ERROR, never bind the literal "true".
+				if (
+					variables.named[key].type == "string"
+					&& isSimpleValue(arguments.coll[key])
+					&& compareNoCase(trim(toString(arguments.coll[key])), "true") == 0
+				) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "--#key# needs a value, e.g. --#key#=<value> (a bare --#key# is a flag)."
+					);
+				}
+				result[key] = $coerce(arguments.coll[key], variables.named[key].type, key);
 				$assertChoice(key, result[key], variables.named[key].choices);
 			}
 		}
@@ -346,7 +385,13 @@ component {
 	private array function $positionalIndices(required struct coll) {
 		var indices = [];
 		for (var key in arguments.coll) {
-			if (reFindNoCase("^arg\d+$", key)) {
+			// An empty token is not a token (#2963): it must not bind a slot
+			// and shadow the named key, or {arg1: "", action: "bogus"} would
+			// bind action="" and fall back to the default action.
+			if (
+				reFindNoCase("^arg\d+$", key)
+				&& !(isSimpleValue(arguments.coll[key]) && !len(trim(toString(arguments.coll[key]))))
+			) {
 				arrayAppend(indices, val(mid(key, 4, len(key))));
 			}
 		}
@@ -354,20 +399,39 @@ component {
 		return indices;
 	}
 
-	private any function $coerce(required any v, required string type) {
+	/**
+	 * Coerce a supplied value to its declared type, rejecting anything that is
+	 * not a real value of that type (#2963). A value that cannot be read must
+	 * never become a silent default: `strict=bogus` used to read as false and
+	 * `--interval` (bare) as 0. Destructive verbs like `upgrade apply` depend
+	 * on this to throw before acting.
+	 */
+	private any function $coerce(required any v, required string type, string name = "") {
+		var label = len(arguments.name) ? "--" & arguments.name : "value";
+		var text = trim(toString(arguments.v));
 		switch (arguments.type) {
 			case "boolean":
-				// Normalize to a strict CFML boolean regardless of whether the
-				// runtime handed us a literal true/false or the string "true"/
-				// "false". `isBoolean("false")` is true on every supported
-				// engine, but the *value* is still a string; the ternary forces
-				// the conversion so downstream `if (out.flag)` is unambiguous.
-				if (isBoolean(arguments.v)) {
-					return arguments.v ? true : false;
+				// LuCLI normalizes flags to the strings "true"/"false"; MCP
+				// clients send native booleans (toString gives "true"/"false").
+				// Nothing else is a boolean here — not yes/no/1/0, not "".
+				if (compareNoCase(text, "true") == 0) {
+					return true;
 				}
-				return lCase(trim(toString(arguments.v))) == "true";
+				if (compareNoCase(text, "false") == 0) {
+					return false;
+				}
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "#label# expects true or false, got '#text#'."
+				);
 			case "numeric":
-				return val(arguments.v);
+				if (!isNumeric(text)) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "#label# expects a number, got '#text#'."
+					);
+				}
+				return val(text);
 			default:
 				return toString(arguments.v);
 		}

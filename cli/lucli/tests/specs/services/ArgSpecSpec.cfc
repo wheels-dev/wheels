@@ -421,6 +421,54 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("booleans and bare flags must be real values, never a silent default (##2963)", () => {
+
+				it("accepts true/false in every shape LuCLI and MCP deliver", () => {
+					var spec = new cli.lucli.services.ArgSpec().flag(name = "strict", default = false);
+					expect(spec.parse({"strict": true}).strict).toBeTrue();
+					expect(spec.parse({"strict": "true"}).strict).toBeTrue();
+					expect(spec.parse({"strict": false}).strict).toBeFalse();
+					expect(spec.parse({"strict": "false"}).strict).toBeFalse();
+					expect(spec.parse({"strict": "FALSE"}).strict).toBeFalse();
+				});
+
+				it("rejects a non-boolean value for a flag instead of reading it as false", () => {
+					// upgrade apply {strict: "bogus"} coerced to false and reached
+					// the framework swap.
+					var spec = new cli.lucli.services.ArgSpec().flag(name = "strict", default = false);
+					expect(() => spec.parse({"strict": "bogus"})).toThrow(type = "Wheels.InvalidArguments", regex = "strict");
+					expect(() => spec.parse({"strict": "1"})).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => spec.parse({"strict": ""})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("treats a key present with a NULL value as no value, never as omitted", () => {
+					// The stdio MCP transport turns "" into null. structKeyExists()
+					// is false for a null value, so migrate {action: null} fell back
+					// to the default action `latest`.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "action", default = "latest")
+						.flag(name = "force", default = false);
+					var withNullPositional = createObject("java", "java.util.HashMap").init();
+					withNullPositional.put("action", javaCast("null", ""));
+					expect(() => spec.parse(withNullPositional)).toThrow(type = "Wheels.InvalidArguments", regex = "action");
+					var withNullFlag = createObject("java", "java.util.HashMap").init();
+					withNullFlag.put("force", javaCast("null", ""));
+					expect(() => spec.parse(withNullFlag)).toThrow(type = "Wheels.InvalidArguments", regex = "force");
+					var withNullToken = createObject("java", "java.util.HashMap").init();
+					withNullToken.put("arg1", javaCast("null", ""));
+					expect(() => spec.parse(withNullToken)).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("rejects a bare flag (key=true) given to a string option", () => {
+					// `--to` with no value arrives as to=true.
+					var spec = new cli.lucli.services.ArgSpec().option(name = "to", default = "");
+					expect(() => spec.parse({"to": "true"})).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => spec.parse({"to": true})).toThrow(type = "Wheels.InvalidArguments");
+					expect(spec.parse({"to": "4.1.0"}).to).toBe("4.1.0");
+				});
+
+			});
+
 			describe("choices — one declaration drives parser rejection and schema enum (##2963)", () => {
 
 				// An invalid value for a fixed-choice parameter used to fall

@@ -416,7 +416,8 @@ component extends="modules.BaseModule" {
 	private array function $positionalTokens(required struct coll) {
 		var indices = [];
 		for (var key in arguments.coll) {
-			if (reFindNoCase("^arg\d+$", key)) {
+			// Empty tokens are skipped, matching ArgSpec's positional binding.
+			if (reFindNoCase("^arg\d+$", key) && len(trim(toString(arguments.coll[key])))) {
 				arrayAppend(indices, val(mid(key, 4, len(key))));
 			}
 		}
@@ -1106,7 +1107,9 @@ component extends="modules.BaseModule" {
 			verbose = verbose,
 			ci = parsed.ci,
 			core = parsed.core,
-			db = parsed.db,
+			// The core runner matches its dialect list case-sensitively
+			// (runner.cfm), so `--db=MySQL` silently used the default datasource.
+			db = lCase(trim(parsed.db)),
 			dbExplicit = structKeyExists(arguments.coll, "db"),
 			useTestDB = parsed["test-db"],
 			basePath = parsed["base-path"],
@@ -4648,16 +4651,20 @@ component extends="modules.BaseModule" {
 		var shortHelp = $takeShortHelp(arguments.coll);
 		var parsed = upgradeArgSpec().parse(shortHelp.coll);
 
-		var sub = parsed.subcommand;
-		if (!len(sub) && structKeyExists(arguments.coll, "subcommand") && isSimpleValue(arguments.coll.subcommand)) {
-			sub = arguments.coll.subcommand;
+		// The verb comes ONLY from parse(), which validated it against the
+		// choices. The old by-name fallback re-read coll.subcommand after
+		// validation, so {arg1: "", subcommand: "bogus"} reached apply (#2963).
+		// ArgSpec binds a named subcommand itself now; re-check the value that
+		// is actually dispatched anyway, since apply swaps vendor/wheels/.
+		var sub = lCase(trim(parsed.subcommand));
+		if (len(sub) && !arrayFindNoCase(upgradeArgSpec().choicesFor("subcommand"), sub)) {
+			throw(type = "Wheels.InvalidArguments", message = "Invalid value '#sub#' for subcommand. Valid values: check, apply, help.");
 		}
-		sub = lCase(trim(sub));
 
 		// --nobackup is the documented spelling, but LuCLI normalizes the
 		// conventional negation `--no-backup` to backup=false — honor both.
 		var doBackup = !parsed.nobackup;
-		if (structKeyExists(arguments.coll, "backup") && isSimpleValue(arguments.coll.backup) && arguments.coll.backup == "false") {
+		if (structKeyExists(arguments.coll, "backup") && isSimpleValue(arguments.coll.backup) && compareNoCase(toString(arguments.coll.backup), "false") == 0) {
 			doBackup = false;
 		}
 
@@ -4680,7 +4687,11 @@ component extends="modules.BaseModule" {
 			// schema defaults, so apply {strict: false} was refused as
 			// "--strict is not supported by the apply verb" (#2963).
 			sawTo = len(trim(parsed.to)) > 0,
-			sawDryRun = structKeyExists(arguments.coll, "dry-run") && isSimpleValue(arguments.coll["dry-run"]) && compareNoCase(toString(arguments.coll["dry-run"]), "true") == 0,
+			// --dry-run is not declared (neither verb supports it), so ANY value
+			// except an explicit false counts as passed and is refused on apply:
+			// `--dry-run=1` read as "not passed" reached the swap.
+			sawDryRun = structKeyExists(arguments.coll, "dry-run")
+				&& !(isSimpleValue(arguments.coll["dry-run"]) && compareNoCase(trim(toString(arguments.coll["dry-run"])), "false") == 0),
 			sawStrict = parsed.strict,
 			sawFormat = len(trim(parsed.format)) > 0
 		};
@@ -4789,6 +4800,11 @@ component extends="modules.BaseModule" {
 			);
 		}
 
+		// Explicit guard for the destructive path: only a validated `apply`
+		// may reach the framework swap, whatever changes above (#2963).
+		if (!opts.isApply) {
+			throw(type = "Wheels.InvalidArguments", message = "Refusing to run upgrade apply for subcommand '#opts.subcommand#'.");
+		}
 		return runUpgradeApply(opts.targetVersion, opts.doBackup);
 	}
 
