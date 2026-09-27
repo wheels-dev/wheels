@@ -10,10 +10,16 @@
 #     recent Wheels CLI releases)
 #
 # Usage:
-#   bash tools/test-local.sh              # run all core tests
-#   bash tools/test-local.sh model        # run model tests only
-#   bash tools/test-local.sh security     # run security tests only
-#   PORT=9090 bash tools/test-local.sh    # use custom port
+#   bash tools/test-local.sh                          # run all core tests
+#   bash tools/test-local.sh model                    # one area: any directory under
+#                                                     # vendor/wheels/tests/specs/ (models/
+#                                                     # controllers/views also accepted)
+#   bash tools/test-local.sh model/associations       # a nested directory
+#   bash tools/test-local.sh wheels.tests.specs.model # the dotted TestBox form
+#   PORT=9090 bash tools/test-local.sh                # use custom port
+#
+# An area that is not a directory under vendor/wheels/tests/specs/ exits 2
+# with the list of valid areas; it never falls back to the full suite.
 #
 # Browser-test behavior:
 #   Browser specs (BrowserDialog/Login/Route) run against the local
@@ -52,6 +58,38 @@ export WHEELS_BROWSER_TEST_BASE_URL="${WHEELS_BROWSER_TEST_BASE_URL:-http://loca
 export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD="${PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD:-1}"
 
 cd "$PROJECT_ROOT"
+
+# ── Resolve the area filter before anything starts ──
+#
+# Derived from the filesystem, not a hand list: the old list covered nine
+# areas, and any other name (e.g. `database`) went to the server raw, was
+# rejected by its directory allowlist, and ran the FULL suite before failing.
+SPECS_DIR="vendor/wheels/tests/specs"
+list_areas() {
+  find "$SPECS_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | tr '\n' ' '
+}
+if [ -n "$FILTER" ]; then
+  REL="$FILTER"
+  case "$REL" in
+    wheels.tests.specs) REL="" ;;
+    wheels.tests.specs.*) REL="${REL#wheels.tests.specs.}"; REL="${REL//./\/}"; [ -n "$REL" ] || REL="." ;;
+    *) REL="${REL%/}" ;;
+  esac
+  # Plural aliases for the three areas that have always accepted them.
+  case "$REL" in
+    models|controllers|views) [ -d "$SPECS_DIR/$REL" ] || REL="${REL%s}" ;;
+  esac
+  if [ -z "$REL" ]; then
+    FILTER=""
+  elif [[ "$REL" =~ ^[A-Za-z0-9_]+(/[A-Za-z0-9_]+)*$ ]] && [ -d "$SPECS_DIR/$REL" ]; then
+    FILTER="wheels.tests.specs.${REL//\//.}"
+  else
+    echo "ERROR: unknown test area '${1}'." >&2
+    echo "  Valid areas (directories under $SPECS_DIR/): $(list_areas)" >&2
+    echo "  Also accepted: a nested path (model/associations) or the dotted form (wheels.tests.specs.model)." >&2
+    exit 2
+  fi
+fi
 
 # ── Ensure SQLite test databases exist ──────────────
 sqlite3 wheelstestdb.db "SELECT 1;" 2>/dev/null || true
@@ -207,18 +245,7 @@ sleep 2
 # ── Run tests ───────────────────────────────────────
 TEST_URL="http://localhost:${PORT}/wheels/core/tests?db=${DB}&format=json"
 if [ -n "$FILTER" ]; then
-  # Map short names to directories
-  case "$FILTER" in
-    model|models) FILTER="wheels.tests.specs.model" ;;
-    controller|controllers) FILTER="wheels.tests.specs.controller" ;;
-    view|views) FILTER="wheels.tests.specs.view" ;;
-    security) FILTER="wheels.tests.specs.security" ;;
-    middleware) FILTER="wheels.tests.specs.middleware" ;;
-    dispatch) FILTER="wheels.tests.specs.dispatch" ;;
-    migrator) FILTER="wheels.tests.specs.migrator" ;;
-    internal) FILTER="wheels.tests.specs.internal" ;;
-    interfaces) FILTER="wheels.tests.specs.interfaces" ;;
-  esac
+  # Already resolved and validated above.
   TEST_URL="${TEST_URL}&directory=${FILTER}"
 fi
 

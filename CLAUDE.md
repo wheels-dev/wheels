@@ -404,6 +404,10 @@ bash tools/test-local.sh security             # …/security/
 bash tools/test-local.sh middleware           # …/middleware/
 bash tools/test-local.sh dispatch             # …/dispatch/
 bash tools/test-local.sh migrator             # …/migrator/
+bash tools/test-local.sh database             # any directory under vendor/wheels/tests/specs/ works
+bash tools/test-local.sh model/hardener       # nested directory (or wheels.tests.specs.model.hardener)
+PORT=8191 bash tools/test-local.sh model      # use another port when 8080 is taken
+# An unknown area exits 2 with the list of valid areas — it never runs the full suite.
 
 # Cross-engine via Docker (mirrors compat-matrix.yml exactly)
 tools/test-matrix.sh                          # Lucee 7 + SQLite (fastest)
