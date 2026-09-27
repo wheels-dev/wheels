@@ -48,6 +48,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * The nested TOP queries in $querySetup() return the last `limit` rows rather than the requested
+	 * window when limit + offset exceeds the matching rows, so callers must clamp the limit first.
+	 */
+	public boolean function $offsetNeedsRowCount() {
+		return true;
+	}
+
+	/**
 	 * Call functions to make adapter specific changes to arguments before executing query.
 	 */
 	public struct function $querySetup(

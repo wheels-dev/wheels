@@ -762,6 +762,14 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Whether this adapter's OFFSET emulation needs the limit clamped to the rows remaining after the
+	 * offset (the query builder runs a COUNT first when it does). Native LIMIT/OFFSET dialects do not.
+	 */
+	public boolean function $offsetNeedsRowCount() {
+		return false;
+	}
+
+	/**
 	 * Remove the maxRows argument and add a limit argument instead.
 	 * The args argument is the original arguments passed in by reference so we just modify it without passing it back.
 	 */

@@ -371,7 +371,8 @@
 				case "query":
 					local.rv = local.findAll.query;
 					// execute callbacks unless we're currently running the count or primary key pagination queries (we only want the callback to run when we have the actual data)
-					if (local.rv.columnList != "wheelsqueryresult" && !arguments.$limit && !arguments.$offset) {
+					// both of those pass callbacks=false, so a query builder offset() call ($limit / $offset) still gets its callbacks
+					if (local.rv.columnList != "wheelsqueryresult") {
 						$callback("afterFind", arguments.callbacks, local.rv);
 					}
 					break;

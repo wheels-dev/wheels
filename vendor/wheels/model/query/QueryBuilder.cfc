@@ -341,6 +341,14 @@ component output="false" {
 			return QueryNew(variables.modelReference.$classData().columnList);
 		}
 		local.args = $buildFinderArgs(arguments);
+		// A caller-supplied `page` owns the row window, so offset() only applies without it.
+		if (variables.offsetValue > 0 && !StructKeyExists(local.args, "page")) {
+			if (!$applyOffset(args = local.args, limit = variables.limitValue)) {
+				return $emptyResult(
+					StructKeyExists(local.args, "returnAs") ? local.args.returnAs : variables.modelReference.$get(name = "returnAs", functionName = "findAll")
+				);
+			}
+		}
 		return variables.modelReference.findAll(argumentCollection = local.args);
 	}
 
@@ -360,6 +368,23 @@ component output="false" {
 			return false;
 		}
 		local.args = $buildFinderArgs(arguments);
+		if (variables.offsetValue > 0) {
+			// Model findOne() windows rows with maxRows (or pagination for hasMany includes), neither
+			// of which can skip rows, so run the offset query through findAll() and unwrap the first
+			// row the same way findOne() does.
+			if (!StructKeyExists(local.args, "returnAs")) {
+				local.args.returnAs = variables.modelReference.$get(name = "returnAs", functionName = "findOne");
+			}
+			if ($applyOffset(args = local.args, limit = 1)) {
+				local.rv = variables.modelReference.findAll(argumentCollection = local.args);
+			} else {
+				local.rv = $emptyResult(local.args.returnAs);
+			}
+			if (IsArray(local.rv) && local.args.returnAs != "array") {
+				local.rv = ArrayLen(local.rv) ? local.rv[1] : false;
+			}
+			return local.rv;
+		}
 		return variables.modelReference.findOne(argumentCollection = local.args);
 	}
 
@@ -455,6 +480,58 @@ component output="false" {
 			message = "The method `#arguments.missingMethodName#` was not found on the query builder for `#variables.modelReference.$classData().modelName#`.",
 			extendedInfo = "Available methods: where, orWhere, whereNull, whereNotNull, whereBetween, whereIn, whereNotIn, orderBy, limit, offset, select, include, group, distinct, forUpdate, get, first, findAll, findOne, count, exists, updateAll, deleteAll, findEach, findInBatches."
 		);
+	}
+
+	/**
+	 * Translate the builder's offset() into findAll()'s SQL-level `$limit` / `$offset` arguments.
+	 * Returns false when the adapter reports the offset lies past the last matching row.
+	 *
+	 * @args The finder arguments built by $buildFinderArgs(); modified in place.
+	 * @limit Rows to return after the offset; 0 or less means "all remaining rows".
+	 */
+	public boolean function $applyOffset(required struct args, required numeric limit) {
+		StructDelete(arguments.args, "maxRows");
+		arguments.args.$offset = variables.offsetValue;
+		// OFFSET needs a row limit on every dialect, so "no limit" becomes the largest 32-bit value.
+		arguments.args.$limit = arguments.limit > 0 ? arguments.limit : 2147483647;
+		// Skipping rows is only deterministic with an ORDER BY (and SQL Server's windowing requires one),
+		// so default to the primary key like findAll() pagination does.
+		if (
+			(!StructKeyExists(arguments.args, "order") || !Len(arguments.args.order))
+			&& (!StructKeyExists(arguments.args, "group") || !Len(arguments.args.group))
+		) {
+			arguments.args.order = variables.modelReference.primaryKey();
+		}
+		// SQL Server emulates OFFSET with nested TOP queries, which return the trailing rows instead of
+		// the requested window when limit + offset runs past the end, so clamp the limit to what is left.
+		if (variables.modelReference.$classData().adapter.$offsetNeedsRowCount()) {
+			local.countArgs = {};
+			for (local.key in ["where", "include", "parameterize", "includeSoftDeletes", "group", "reload", "dataSource"]) {
+				if (StructKeyExists(arguments.args, local.key)) {
+					local.countArgs[local.key] = arguments.args[local.key];
+				}
+			}
+			local.total = variables.modelReference.count(argumentCollection = local.countArgs);
+			if (IsQuery(local.total)) {
+				local.total = local.total.recordCount;
+			}
+			local.remaining = local.total - variables.offsetValue;
+			if (local.remaining < 1) {
+				return false;
+			}
+			arguments.args.$limit = Min(arguments.args.$limit, local.remaining);
+		}
+		return true;
+	}
+
+	/**
+	 * An empty result shaped for the requested `returnAs` (query columns mirror the $alwaysEmpty path).
+	 */
+	public any function $emptyResult(required string returnAs) {
+		if (arguments.returnAs == "query") {
+			return QueryNew(variables.modelReference.$classData().columnList);
+		}
+		return [];
 	}
 
 	// ----- Private Helpers -----
