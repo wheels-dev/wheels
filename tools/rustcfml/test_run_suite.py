@@ -22,7 +22,8 @@ NESTED = "b.Nested :: Outer > Inner :: nested failure"
 
 
 def _parser_source():
-    text = open(os.path.join(HERE, "run-suite.sh"), encoding="utf-8").read()
+    with open(os.path.join(HERE, "run-suite.sh"), encoding="utf-8") as fh:
+        text = fh.read()
     start = text.index("<<'PY'\n") + len("<<'PY'\n")
     return text[start:text.index("\nPY\n", start)] + "\n"
 
@@ -44,10 +45,13 @@ def _result(nested_failure=True, bundle_exception=False, fail=None, error=0):
     ]
     if bundle_exception:
         bundles.append({"name": "b.Broken", "globalException": {"Message": "boom"}, "suiteStats": []})
+    # Totals agree with the tree unless a test overrides them on purpose: the
+    # shared walker reconciles pass/fail/error counts against the specs it finds.
+    passed = 1 + (0 if nested_failure else 1)
     if fail is None:
         fail = 1 + (1 if nested_failure else 0)
-    return {"totalSpecs": 4, "totalPass": 2, "totalFail": fail, "totalError": error,
-            "totalSkipped": 0, "bundleStats": bundles}
+    return {"totalSpecs": passed + fail + error, "totalPass": passed, "totalFail": fail,
+            "totalError": error, "totalSkipped": 0, "bundleStats": bundles}
 
 
 BASELINE = {"engineVersion": "v0.637.0",
@@ -117,6 +121,13 @@ class RunSuiteParserTest(unittest.TestCase):
         self.assertEqual(base["new"], noisy["new"])
         self.assertNotEqual(base["totals"], noisy["totals"])
         self.assertEqual(base["fingerprint"], noisy["fingerprint"])
+
+    def test_runner_error_envelope_is_an_evaluation_error(self):
+        # Parseable JSON that is not a TestBox result must never read as a verdict.
+        code, out, verdict = self.run_parser(None, raw=json.dumps({"success": False, "error": "boot failed"}))
+        self.assertEqual(code, 1, out)
+        self.assertIsNone(verdict)
+        self.assertIn("not a usable TestBox result", out)
 
     def test_unparseable_response_is_an_evaluation_error(self):
         code, out, verdict = self.run_parser(None, raw="<html>500</html>")

@@ -108,6 +108,16 @@ except Exception as exc:
     print(raw[:400])
     sys.exit(1)
 
+# Not a usable TestBox result (error envelope, no bundle tree, bad totals, empty
+# run): the engine could not be evaluated, so this is exit 1, never a verdict.
+unusable = tbr.validate(data)
+if unusable:
+    print("BOOT BREAK: the suite response is not a usable TestBox result:")
+    for reason in unusable:
+        print(f"  - {reason}")
+    print(raw[:400])
+    sys.exit(1)
+
 totals = {k: int(data.get(k, 0)) for k in
           ("totalSpecs", "totalPass", "totalFail", "totalError", "totalSkipped")}
 
