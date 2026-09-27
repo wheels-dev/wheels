@@ -412,11 +412,22 @@ component {
 		}
 		if (Len(local.middle)) {
 			if (Len(arguments.prependToPage) && !arguments.prependOnFirst) {
-				local.middle = Mid(
-					local.middle,
-					Len(arguments.prependToPage) + 1,
-					Len(local.middle) - Len(arguments.prependToPage)
+				// Strip exactly the prefix emitted for the first page in the window. That is the
+				// sanitized (and possibly entity-decoded) string, or its "active " variant when the
+				// first page is the current page, so its length can differ from the raw argument.
+				local.firstPrefix = $paginationPrependForPage(
+					args = arguments,
+					sanitizedPrepend = local.sanitizedPrepend,
+					isCurrentPage = (Max(1, local.currentPage - arguments.windowSize) == local.currentPage)
 				);
+				local.firstPrefixLen = Len(local.firstPrefix);
+				if (
+					local.firstPrefixLen > 0
+					&& Len(local.middle) >= local.firstPrefixLen
+					&& Compare(Left(local.middle, local.firstPrefixLen), local.firstPrefix) == 0
+				) {
+					local.middle = Mid(local.middle, local.firstPrefixLen + 1, Len(local.middle) - local.firstPrefixLen);
+				}
 			}
 			if (Len(local.sanitizedAppend) && !arguments.appendOnLast) {
 				local.middle = Mid(local.middle, 1, Len(local.middle) - Len(local.sanitizedAppend));
@@ -518,27 +529,11 @@ component {
 						The changes made here set the active class to the immediate parent of the current page element in case nested elements are passed in.
 					 */
 
-					if (arguments.currentPage == local.i && arguments.args.addActiveClassToPrependedParent && findNoCase('class', arguments.sanitizedPrepend)) {
-						// Inject "active " into the class attribute value via regex
-						if (reFindNoCase('class\s*=\s*[''"]', arguments.sanitizedPrepend)) {
-							local.activePrependToPage = reReplaceNoCase(
-								arguments.sanitizedPrepend,
-								'(class\s*=\s*[''"])',
-								'\1active ',
-								'one'
-							);
-						} else {
-							local.activePrependToPage = reReplaceNoCase(
-								arguments.sanitizedPrepend,
-								'(class\s*=\s*)',
-								'\1active ',
-								'one'
-							);
-						}
-						local.middle &= local.activePrependToPage;
-					} else {
-						local.middle &= arguments.sanitizedPrepend;
-					}
+					local.middle &= $paginationPrependForPage(
+						args = arguments.args,
+						sanitizedPrepend = arguments.sanitizedPrepend,
+						isCurrentPage = (arguments.currentPage == local.i)
+					);
 				}
 				if (arguments.currentPage != local.i || arguments.args.linkToCurrentPage) {
 					local.middle &= linkTo(argumentCollection = local.lta);
@@ -560,6 +555,30 @@ component {
 			}
 		}
 		return local.middle;
+	}
+
+	/**
+	 * Internal: returns the `prependToPage` string `paginationLinks()` emits before a page link,
+	 * injecting "active " into the parent's class attribute for the current page when
+	 * `addActiveClassToPrependedParent` is set.
+	 */
+	public string function $paginationPrependForPage(
+		required struct args,
+		required string sanitizedPrepend,
+		required boolean isCurrentPage
+	) {
+		if (
+			arguments.isCurrentPage
+			&& arguments.args.addActiveClassToPrependedParent
+			&& findNoCase('class', arguments.sanitizedPrepend)
+		) {
+			// Inject "active " into the class attribute value via regex
+			if (reFindNoCase('class\s*=\s*[''"]', arguments.sanitizedPrepend)) {
+				return reReplaceNoCase(arguments.sanitizedPrepend, '(class\s*=\s*[''"])', '\1active ', 'one');
+			}
+			return reReplaceNoCase(arguments.sanitizedPrepend, '(class\s*=\s*)', '\1active ', 'one');
+		}
+		return arguments.sanitizedPrepend;
 	}
 
 	/**

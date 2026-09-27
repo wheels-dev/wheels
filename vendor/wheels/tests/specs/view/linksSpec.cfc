@@ -268,6 +268,48 @@ component extends="wheels.WheelsTest" {
 				expect(result).notToInclude("alert(1)")
 				expect(result).toInclude("<span")
 			})
+
+			it("strips the active-class prefix from the current first page when prependOnFirst is false", () => {
+				authors = g.model("author").findAll(page = 1, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					prependToPage                   = '<li class="page-item">',
+					appendToPage                    = "</li>",
+					addActiveClassToPrependedParent = true,
+					prependOnFirst                  = false,
+					encode                          = false
+				)
+
+				expect(Left(result, 6)).toBe("1</li>")
+				expect(result).notToInclude('-item">1')
+				expect(result).notToInclude("active page-item")
+				expect(result).toInclude('<li class="page-item">')
+			})
+
+			it("strips the sanitized prefix from the first page when prependOnFirst is false", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					prependToPage  = '<li onclick="x()">',
+					appendToPage   = "</li>",
+					prependOnFirst = false,
+					encode         = false
+				)
+
+				expect(result).notToInclude("onclick")
+				expect(Left(result, 3)).toBe("<a ")
+				expect(result).toInclude("</li><li>2</li>")
+			})
+
+			it("strips the entity-decoded prefix from the first page when prependOnFirst is false and encode is true", () => {
+				authors = g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				result = _controller.paginationLinks(
+					prependToPage  = "<li class='page-item'>",
+					appendToPage   = "</li>",
+					prependOnFirst = false,
+					encode         = true
+				)
+
+				expect(Left(result, 3)).toBe("<a ")
+			})
 		})
 	}
 
