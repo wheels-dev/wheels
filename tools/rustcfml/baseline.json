@@ -1,17 +1,19 @@
 {
-  "engineVersion": "v0.637.0",
+  "engineVersion": "v0.691.0",
   "totals": {
     "totalSpecs": 5816,
-    "totalPass": 5794,
-    "totalFail": 0,
+    "totalPass": 5793,
+    "totalFail": 1,
     "totalError": 0,
     "totalSkipped": 22
   },
-  "failing": [],
+  "failing": [
+    "wheels.tests.specs.internal.testClientSpec :: TestClient > assertions :: assertNotFound() passes on 404 response"
+  ],
   "_notes": [
-    "Known residual failures are upstream RustCFML engine bugs; each entry in failing[] should map to an open issue on https://github.com/RustCFML/RustCFML. There are none at v0.637.0.",
-    "totals are the Linux CI result (rustcfml-ci.yml on #3705, job 108668327586): 5794 pass / 0 fail / 0 error. The two StorageSpec LocalDisk entries that used to fail only on Linux were RustCFML/RustCFML#380 (GetTempDirectory() returns /tmp without a trailing separator when TMPDIR is unset, fixed by v0.691.0); the spec now uses WheelsTest.$tempPath(). Regenerate this file on Linux, as the rustcfml-ci.yml header says.",
-    "migrationSpec 'creates an index on multiple columns' was previously listed here against RustCFML/RustCFML#377 (QoQ recordCount corruption). That attribution was wrong: #377 was closed unable-to-reproduce, and the failure was a Wheels assertion that assumed one comma-delimited cfdbinfo row on RustCFML, which returns one row per column. Fixed in the spec (wheels-dev/wheels#3686).",
-    "Earlier tracked bugs now fixed framework-side or upstream were: #376 Hash(binary), #378 java.io.File two-arg constructor, #379 void-assignment key deletion, #380 GetTempDirectory separator, #381 new-operator name lowercasing."
+    "Linux baseline from this PR run: https://github.com/wheels-dev/wheels/actions/runs/36338113712/job/108672765311 (cc2c26537, v0.691.0): 5793 pass / 1 fail / 0 error / 22 skipped. totalSpecs is the sum of those reported categories.",
+    "The sole known failure is TestClient assertNotFound(): a missing-view response is 500 instead of 404 because RustCFML loses custom exception type/detail across include. Standalone rustcfml -c reproduction: https://github.com/RustCFML/RustCFML/issues/431 . Keep the strict 404 assertion active; remove this baseline entry once the engine preserves the exception. The include defect also reproduces on v0.637.0; this note does not claim it began in v0.691.0.",
+    "The previous migrationSpec multi-column index failure was a Wheels metadata-shape assumption, fixed in wheels-dev/wheels#3697, not the closed RustCFML#377. Both previously baselined Linux StorageSpec errors pass on this v0.691.0 run and are removed.",
+    "SystemUtilSpec retains missing-property default/error assertions on every engine; java.version is required only when EngineCapabilities confirms real JVM class loading. RustCFML is JVM-free, so a null Java-version placeholder is not an engine defect."
   ]
 }
