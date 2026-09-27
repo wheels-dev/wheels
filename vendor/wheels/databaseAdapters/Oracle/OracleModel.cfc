@@ -113,10 +113,84 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		$addColumnsToSelectAndGroupBy(args = arguments);
 		$moveAggregateToHaving(args = arguments);
 		local.rv = $performQuery(argumentCollection = arguments);
-		if ($isBoxLangEngine() && StructKeyExists(local.rv, "query") && IsQuery(local.rv.query)) {
-			local.rv.query = $normalizeOracleTemporalColumns(local.rv.query);
+		if ($isBoxLangEngine() && StructKeyExists(local.rv, "query")) {
+			local.rv.query = $normalizeOracleTemporalResult(local.rv.query);
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Normalize whatever shape the finder returned: a query, or the native
+	 * `returnType="array"` (an array of row structs) / `returnType="struct"`
+	 * (a struct of row structs) results that finders can ask cfquery for.
+	 */
+	public any function $normalizeOracleTemporalResult(required any result) {
+		if (IsQuery(arguments.result)) {
+			return $normalizeOracleTemporalColumns(arguments.result);
+		}
+		if (IsArray(arguments.result)) {
+			for (local.i = 1; local.i <= ArrayLen(arguments.result); local.i++) {
+				if (IsStruct(arguments.result[local.i])) {
+					$normalizeOracleTemporalRow(arguments.result[local.i]);
+				}
+			}
+			return arguments.result;
+		}
+		if (IsStruct(arguments.result)) {
+			for (local.key in arguments.result) {
+				if (IsNull(arguments.result[local.key])) {
+					continue;
+				}
+				if (IsStruct(arguments.result[local.key])) {
+					$normalizeOracleTemporalRow(arguments.result[local.key]);
+				} else if ($isOracleDriverValue(arguments.result[local.key])) {
+					local.converted = $oracleTemporalToDate(arguments.result[local.key]);
+					if (IsDate(local.converted)) {
+						arguments.result[local.key] = local.converted;
+					}
+				}
+			}
+		}
+		return arguments.result;
+	}
+
+	/** Internal function: convert the Oracle temporal values in one row struct. */
+	public void function $normalizeOracleTemporalRow(required struct row) {
+		for (local.key in arguments.row) {
+			if (IsNull(arguments.row[local.key]) || !$isOracleDriverValue(arguments.row[local.key])) {
+				continue;
+			}
+			local.converted = $oracleTemporalToDate(arguments.row[local.key]);
+			if (IsDate(local.converted)) {
+				arguments.row[local.key] = local.converted;
+			}
+		}
+	}
+
+	/**
+	 * Internal function: an Oracle TIMESTAMP/DATE driver object as a CFML
+	 * date, to the millisecond. Converted from the driver's own
+	 * java.sql.Timestamp (the instant in the JVM's timezone, like the other
+	 * framework readers) with its sub-second part carried over, so a finder
+	 * on BoxLang returns the same value Lucee and Adobe do. Returns "" when
+	 * the object cannot be bridged without a connection (TIMESTAMP WITH TIME
+	 * ZONE); callers then leave the value as it was.
+	 */
+	public any function $oracleTemporalToDate(required any value) {
+		try {
+			local.stamp = arguments.value.timestampValue();
+		} catch (any e) {
+			return "";
+		}
+		if (IsNull(local.stamp)) {
+			return "";
+		}
+		local.date = $javaDateToCfml(local.stamp);
+		local.millis = Int(local.stamp.getNanos() / 1000000);
+		if (local.millis > 0) {
+			local.date = DateAdd("l", local.millis, local.date);
+		}
+		return local.date;
 	}
 
 	/**
@@ -124,8 +198,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * `oracle.sql.*` driver objects, where Lucee and Adobe hand back CFML
 	 * dates. App code then cannot format, compare, output or JSON-render them
 	 * (#3719). Convert, in place, every column whose first non-empty value is
-	 * an Oracle TIMESTAMP/TIMESTAMPTZ/TIMESTAMPLTZ/DATE object into CFML dates through `$normalizeDbTimestamp()`, the
-	 * same conversion the framework's own timestamp readers use (#3649).
+	 * an Oracle TIMESTAMP/TIMESTAMPTZ/TIMESTAMPLTZ/DATE object into CFML dates,
+	 * to the millisecond, through `$oracleTemporalToDate()`.
 	 *
 	 * One value per column is inspected to decide, so columns of simple values
 	 * or real dates cost a single check. A cell is only replaced when the
@@ -148,7 +222,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				if (IsNull(local.cell) || !$isOracleDriverValue(local.cell)) {
 					continue;
 				}
-				local.converted = $normalizeDbTimestamp(local.cell);
+				local.converted = $oracleTemporalToDate(local.cell);
 				if (IsDate(local.converted)) {
 					QuerySetCell(arguments.query, local.column, local.converted, local.row);
 				}

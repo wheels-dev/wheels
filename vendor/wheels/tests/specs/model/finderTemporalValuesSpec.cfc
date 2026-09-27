@@ -47,6 +47,35 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("finder datetime values keep their milliseconds on Oracle (##3719)", () => {
+
+			it("findByKey and findAll(returnType=array) read back a fractional TIMESTAMP exactly", () => {
+				var isOracle = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "Oracle";
+				if (!isOracle) {
+					skip("Oracle TIMESTAMP literal; the fractional round-trip is specific to the Oracle legs.");
+				}
+				var first = g.model("Post").findOne(order = "id");
+				var state = {byKey = "", rows = []};
+				transaction action="begin" {
+					QueryExecute(
+						"UPDATE c_o_r_e_posts SET createdat = TIMESTAMP '2026-07-25 17:20:00.789' WHERE id = :id",
+						{id = {value = first.id, cfsqltype = "cf_sql_integer"}},
+						{datasource = application.wheels.dataSourceName}
+					);
+					state.byKey = g.model("Post").findByKey(key = first.id, reload = true).createdAt;
+					state.rows = g.model("Post").findAll(where = "id = #first.id#", returnType = "array", reload = true);
+					transaction action="rollback";
+				}
+				expect(IsDate(state.byKey)).toBeTrue();
+				expect(DateTimeFormat(state.byKey, "yyyy-mm-dd HH:nn:ss")).toBe("2026-07-25 17:20:00");
+				expect(DatePart("l", state.byKey)).toBe(789);
+				expect(ArrayLen(state.rows)).toBe(1);
+				expect(IsDate(state.rows[1].createdAt)).toBeTrue();
+				expect(DatePart("l", state.rows[1].createdAt)).toBe(789);
+			});
+
+		});
+
 		describe("OracleModel.$normalizeOracleTemporalColumns (##3719)", () => {
 
 			it("leaves text, numbers, dates and empty values alone", () => {
@@ -72,7 +101,7 @@ component extends="wheels.WheelsTest" {
 				var probe = {ts = ""};
 				try {
 					probe.ts = CreateObject("java", "oracle.sql.TIMESTAMP").init(
-						CreateObject("java", "java.sql.Timestamp").valueOf("2026-07-25 17:20:00")
+						CreateObject("java", "java.sql.Timestamp").valueOf("2026-07-25 17:20:00.789")
 					);
 				} catch (any e) {
 					probe.ts = "";
@@ -90,6 +119,29 @@ component extends="wheels.WheelsTest" {
 				expect(normalized.happened[1]).toBe("");
 				expect(IsDate(normalized.happened[2])).toBeTrue();
 				expect(DateTimeFormat(normalized.happened[2], "yyyy-mm-dd HH:nn:ss")).toBe("2026-07-25 17:20:00");
+				// Full precision: the milliseconds survive (rev1-r2, #3725).
+				expect(DatePart("l", normalized.happened[2])).toBe(789);
+			});
+
+			it("converts driver values in returnType array and struct results too", () => {
+				var probe = {ts = ""};
+				try {
+					probe.ts = CreateObject("java", "oracle.sql.TIMESTAMP").init(
+						CreateObject("java", "java.sql.Timestamp").valueOf("2026-07-25 17:20:00.789")
+					);
+				} catch (any e) {
+					probe.ts = "";
+				}
+				if (IsSimpleValue(probe.ts)) {
+					skip("oracle.sql.TIMESTAMP is not on this engine's classpath (runs on the Oracle legs).");
+				}
+				var adapter = CreateObject("component", "wheels.databaseAdapters.Oracle.OracleModel");
+				var asArray = adapter.$normalizeOracleTemporalResult([{id = 1, happened = probe.ts, label = "x"}]);
+				expect(IsDate(asArray[1].happened)).toBeTrue();
+				expect(DatePart("l", asArray[1].happened)).toBe(789);
+				expect(asArray[1].label).toBe("x");
+				var asStruct = adapter.$normalizeOracleTemporalResult({"1" = {id = 1, happened = probe.ts}});
+				expect(IsDate(asStruct["1"].happened)).toBeTrue();
 			});
 
 			it("leaves a non-temporal oracle.sql value (NUMBER) untouched", () => {
