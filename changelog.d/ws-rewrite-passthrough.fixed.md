@@ -3,4 +3,4 @@
   RewriteCond %{HTTP:Upgrade} ^websocket$ [NC]
   RewriteRule ^/ws/.*$ - [L]
   ```
-  CommandBox/Undertow (`urlrewrite.xml`) is unchanged: on Undertow the extension accepts the upgrade but never runs the listener, so there is no working WebSocket path there yet (wheels-dev/wheels-websockets#1)
+  CommandBox/Undertow (`urlrewrite.xml`) is unchanged: on Undertow the extension accepts the upgrade but never runs the listener, so there is no working WebSocket path there yet (#3676, wheels-dev/wheels-websockets#1)
