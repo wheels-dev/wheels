@@ -30,47 +30,61 @@
 
 name: Deploy Subsystem CI
 
+# No workflow-level `paths:` filter: the "CLI suite" job below is meant to be a
+# REQUIRED check, and a path-filtered required check leaves every unrelated PR
+# stuck at "Expected" (the failure mode documented in rustcfml-ci.yml). The
+# `changes` job decides relevance instead, and "CLI suite" always reports.
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'cli/lucli/services/deploy/**'
-      - 'cli/lucli/lib/deploy/**'
-      - 'cli/lucli/templates/deploy/**'
-      - 'cli/lucli/tests/_fixtures/deploy/**'
-      - 'cli/lucli/tests/specs/deploy/**'
-      - 'cli/lucli/tests/_helpers/DeployShellHelper.cfc'
-      - 'cli/lucli/Module.cfc'
-      - 'tools/deploy-*.sh'
-      - 'tools/deploy-dry-run-normalize.py'
-      - 'tools/test-cli-local.sh'
-      - 'tools/ci/testbox_results.py'
-      - 'tools/ci/test_testbox_results.py'
-      - 'tools/ci/fixtures/testbox/**'
-      - '.github/workflows/deploy-ci.yml'
   pull_request:
-    paths:
-      - 'cli/lucli/services/deploy/**'
-      - 'cli/lucli/lib/deploy/**'
-      - 'cli/lucli/templates/deploy/**'
-      - 'cli/lucli/tests/_fixtures/deploy/**'
-      - 'cli/lucli/tests/specs/deploy/**'
-      - 'cli/lucli/tests/_helpers/DeployShellHelper.cfc'
-      - 'cli/lucli/Module.cfc'
-      - 'tools/deploy-*.sh'
-      - 'tools/deploy-dry-run-normalize.py'
-      - 'tools/test-cli-local.sh'
-      - 'tools/ci/testbox_results.py'
-      - 'tools/ci/test_testbox_results.py'
-      - 'tools/ci/fixtures/testbox/**'
-      - '.github/workflows/deploy-ci.yml'
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: "Detect CLI changes"
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.diff.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Diff against the base
+        id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # Anything that can change what the CLI suite tests or how it is judged.
+          PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$)'
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_REF"
+            CHANGED="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+          elif [ -n "${BEFORE:-}" ] && ! echo "$BEFORE" | grep -qE '^0+$' && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            CHANGED="$(git diff --name-only "$BEFORE" HEAD)"
+          else
+            echo "No usable base commit (new branch or force push): treating as relevant."
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          MATCHES="$(printf '%s\n' "$CHANGED" | grep -E "$PATTERN" || true)"
+          if [ -n "$MATCHES" ]; then
+            echo "CLI-relevant changes:"; printf '%s\n' "$MATCHES" | sed 's/^/  /'
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No CLI-relevant changes."
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
   deploy-gate:
     name: "Deploy CLI tests + verb smoke"
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -138,3 +152,35 @@ jobs:
         if: failure()
         run: |
           cat /tmp/wheels-cli-test-server.log 2>/dev/null || true
+
+  # The stable-named check to require in branch protection. It ALWAYS reports:
+  # quick success when nothing CLI-relevant changed, otherwise the verdict of the
+  # real suite above. A skipped job counts as success for branch protection, so
+  # the suite job itself must not be the required check.
+  cli-suite:
+    name: "CLI suite"
+    needs: [changes, deploy-gate]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the CLI suite verdict
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          RELEVANT: ${{ needs.changes.outputs.relevant }}
+          SUITE_RESULT: ${{ needs.deploy-gate.result }}
+        run: |
+          set -euo pipefail
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::Could not determine whether this change touches the CLI (changes job: ${CHANGES_RESULT}); failing closed."
+            exit 1
+          fi
+          if [ "$RELEVANT" != "true" ]; then
+            echo "No CLI changes: the CLI suite is not needed for this change."
+            exit 0
+          fi
+          if [ "$SUITE_RESULT" = "success" ]; then
+            echo "CLI suite passed."
+            exit 0
+          fi
+          echo "::error::CLI suite did not pass (Deploy CLI tests + verb smoke: ${SUITE_RESULT})."
+          exit 1
