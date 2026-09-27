@@ -26,10 +26,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # DIAGNOSTIC BRANCH for #3726 (never merged): does installing the
+        # graphqlclient cfpm package remove Adobe 2025's startup error?
         cfengine:
-          ["lucee6", "lucee7", "adobe2023", "adobe2025", "boxlang"]
+          ["adobe2025"]
         database:
-          ["mysql", "postgres", "sqlserver", "h2", "cockroachdb", "oracle", "sqlite"]
+          ["sqlite", "mysql"]
         exclude:
           # h2 is a Lucee-only datasource
           - cfengine: adobe2023
