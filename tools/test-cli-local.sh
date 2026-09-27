@@ -28,7 +28,9 @@ PASSWORD="wheels-dev"
 # Per-checkout results file (same scheme as tools/test-local.sh, #3352): a
 # fixed /tmp path let concurrent checkouts overwrite each other's results.
 # CI sets WHEELS_CLI_TEST_RESULT_FILE and uploads it as an artifact (#3694).
-RESULT_FILE="${WHEELS_CLI_TEST_RESULT_FILE:-/tmp/wheels-cli-test-results-$(echo "$PROJECT_ROOT" | shasum | cut -c1-12).json}"
+# shasum is not on every system; fall back rather than die under `set -e`.
+CHECKOUT_KEY="$(echo "$PROJECT_ROOT" | { shasum 2>/dev/null || sha1sum 2>/dev/null || cksum; } | cut -c1-12 | tr -d ' ')"
+RESULT_FILE="${WHEELS_CLI_TEST_RESULT_FILE:-/tmp/wheels-cli-test-results-${CHECKOUT_KEY}.json}"
 
 cd "$PROJECT_ROOT"
 

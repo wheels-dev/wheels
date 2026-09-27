@@ -86,5 +86,42 @@ class ExitCodeTests(unittest.TestCase):
         self.assertEqual(run("does-not-exist.json")[0], 2)
 
 
+class EnvelopeValidationTests(unittest.TestCase):
+    """rev1-r2 MUST-FIX on #3695: anything that is not a real TestBox result
+    must FAIL, never read as zero failures."""
+
+    def assert_rejected(self, name):
+        code, out = run(name, "--strict")
+        self.assertEqual(code, 2, f"{name} should be rejected, got exit {code}: {out}")
+        self.assertIn("NOT A TESTBOX RESULT", out)
+        return out
+
+    def test_rejects_a_json_array(self):
+        self.assert_rejected("not-an-object.json")
+
+    def test_rejects_an_empty_object(self):
+        self.assert_rejected("empty-object.json")
+
+    def test_rejects_a_runner_error_envelope(self):
+        out = self.assert_rejected("error-envelope.json")
+        self.assertIn("runner failed", out)
+
+    def test_rejects_totals_without_a_bundle_tree(self):
+        self.assert_rejected("totals-only.json")
+
+    def test_rejects_a_negative_total(self):
+        self.assert_rejected("negative-total.json")
+
+    def test_accepts_whole_number_float_totals_from_adobe(self):
+        # Adobe CF serialises totals as floats (5792.0); that is still valid.
+        code, out = run("adobe-float-totals.json", "--strict")
+        self.assertEqual(code, 1)  # the one real failure gates
+        self.assertNotIn("NOT A TESTBOX RESULT", out)
+
+    def test_rejects_an_empty_run(self):
+        # No bundles, nothing executed: a vacuous run cannot certify a pass.
+        self.assert_rejected("empty-valid.json")
+
+
 if __name__ == "__main__":
     unittest.main()

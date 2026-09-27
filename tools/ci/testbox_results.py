@@ -17,7 +17,8 @@ Used as a module (tools/rustcfml, tests) or from the command line:
     testbox_results.py RESULT.json [--policy cli] [--strict]
 
 Exit codes: 0 = no gating failures and the counts reconcile,
-1 = gating failures, 2 = unreadable result, 3 = counts do not reconcile.
+1 = gating failures, 2 = unreadable or not a usable TestBox result (see
+validate()), 3 = counts do not reconcile.
 """
 
 import argparse
@@ -44,6 +45,43 @@ def _exception_text(exc):
     if isinstance(exc, dict):
         return str(_get(exc, "message") or _get(exc, "detail") or exc)
     return str(exc)
+
+
+def validate(result):
+    """Return a list of reasons this is not a usable TestBox result (empty = OK).
+
+    A gate that fails closed must not read an unrecognised document as "no
+    failures": a JSON array, {}, a runner error envelope ({success: false}),
+    totals with no bundle tree, a negative or missing total, and an empty run
+    (no bundles, nothing executed) are all rejected (#3695 review).
+    """
+    if not isinstance(result, dict):
+        return [f"expected a JSON object, got {type(result).__name__}"]
+    problems = []
+    if _get(result, "success") is False:
+        detail = _get(result, "error") or _get(result, "message") or "no detail"
+        problems.append(f"the runner reported failure (success: false): {detail}")
+    bundles = _get(result, "bundleStats")
+    if not isinstance(bundles, list):
+        problems.append("missing bundleStats list")
+    for key in ("totalPass", "totalFail", "totalError"):
+        value = _get(result, key)
+        # Adobe CF serialises the totals as floats (5792.0), so accept any
+        # whole number; reject bools, fractions, strings and absence.
+        whole = (
+            not isinstance(value, bool)
+            and isinstance(value, (int, float))
+            and float(value).is_integer()
+        )
+        if not whole:
+            problems.append(f"{key} is missing or not a whole number ({value!r})")
+        elif value < 0:
+            problems.append(f"{key} is negative ({value})")
+    if not problems:
+        executed = sum(int(_get(result, k)) for k in ("totalPass", "totalFail", "totalError"))
+        if not bundles or executed == 0:
+            problems.append("empty result: no bundles ran and no specs executed")
+    return problems
 
 
 def walk(result):
@@ -77,12 +115,12 @@ def walk(result):
                 "message": str(_get(spec, "failMessage") or ""),
                 "detail": str(_get(spec, "failDetail") or ""),
             })
-        seen = set()
+        # Both keys are read (older reporters used nestedSuiteStats). A
+        # reporter that emitted the same children under both would be
+        # counted twice; reconcile() then reports the mismatch (exit 3), so
+        # a double emission fails closed rather than passing.
         for key in ("suiteStats", "nestedSuiteStats"):
             for child in _get(suite, key, []) or []:
-                if id(child) in seen:
-                    continue
-                seen.add(id(child))
                 visit_suite(child, bundle, path)
 
     for bundle in _get(result, "bundleStats", []) or []:
@@ -147,6 +185,14 @@ def main(argv=None):
             result = json.load(fh)
     except Exception as exc:  # noqa: BLE001 - any unreadable result is fatal
         print(f"Failed to parse results: {exc}")
+        return 2
+
+    invalid = validate(result)
+    if invalid:
+        print("NOT A TESTBOX RESULT — refusing to certify this run:")
+        for p in invalid:
+            print(f"  {p}")
+        print(f"Raw result: {args.result}")
         return 2
 
     failures = walk(result)

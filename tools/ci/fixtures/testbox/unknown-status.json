@@ -1,1 +1,1 @@
-{"totalPass":0,"totalFail":0,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.commands.SomeSpec","suiteStats":[{"name":"a","specStats":[{"status":"Pending","name":"odd"}]}]}]}
+{"totalPass":1,"totalFail":0,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.commands.SomeSpec","suiteStats":[{"name":"a","specStats":[{"status":"Passed","name":"ok"},{"status":"Pending","name":"odd"}]}]}]}
