@@ -213,6 +213,15 @@ component extends="wheels.WheelsTest" {
 					expect(result.firstname[3]).toBe(everyone.firstname[everyone.recordcount]);
 				})
 
+				it("keeps the sort order when an explicit limit() plus offset() passes the 32-bit maximum (##3684)", () => {
+					// H2 1.3.172 mis-sorts once LIMIT + OFFSET exceeds 2147483647.
+					var everyone = model("author").orderBy("firstName", "ASC").get();
+					var result = model("author").orderBy("firstName", "ASC").limit(2147483647).offset(everyone.recordcount - 3).get();
+					expect(result.recordcount).toBe(3);
+					expect(result.firstname[1]).toBe(everyone.firstname[everyone.recordcount - 2]);
+					expect(result.firstname[3]).toBe(everyone.firstname[everyone.recordcount]);
+				})
+
 				it("returns only the rows that are left when limit() runs past the end", () => {
 					var everyone = model("author").orderBy("firstName", "ASC").get();
 					var result = model("author").orderBy("firstName", "ASC").limit(5).offset(everyone.recordcount - 2).get();
