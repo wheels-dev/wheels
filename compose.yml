@@ -199,7 +199,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          # 4G = the 2 GB pinned heap plus Adobe's ~0.5-1 GB of non-heap
+          # (metaspace, code cache, threads), with headroom so the kernel
+          # never OOM-kills the JVM silently (exit 137, no Java error).
+          memory: 4G
         reservations:
           memory: 1G
     networks:
@@ -237,7 +240,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          # 4G = the 2 GB pinned heap plus Adobe's ~0.5-1 GB of non-heap
+          # (metaspace, code cache, threads), with headroom so the kernel
+          # never OOM-kills the JVM silently (exit 137, no Java error).
+          memory: 4G
         reservations:
           memory: 1G
     networks:

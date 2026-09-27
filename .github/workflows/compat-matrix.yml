@@ -467,6 +467,29 @@ jobs:
             fi
           fi
 
+      - name: Report container exit state
+        # A cgroup OOM-kill ends the JVM with exit 137 and NO Java error, so
+        # a leg could otherwise fail (or pass on stale results) silently.
+        if: always()
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+          DB: ${{ matrix.database }}
+        run: |
+          SOFT_FAIL_DBS="oracle"
+          BAD=0
+          for C in "wheels-${CFENGINE}-1" "wheels-${DB}-1"; do
+            STATE=$(docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} oomkilled={{.State.OOMKilled}} restarts={{.RestartCount}}' "$C" 2>/dev/null || echo "missing")
+            echo "$C: $STATE"
+            echo "- \`$C\`: $STATE" >> "$GITHUB_STEP_SUMMARY"
+            case "$STATE" in
+              *oomkilled=true*) echo "::error::$C was OOM-killed by the kernel (cgroup memory limit): $STATE"; BAD=1 ;;
+              exited*|dead*) echo "::error::$C is not running after the suite: $STATE"; BAD=1 ;;
+            esac
+          done
+          if [ "$BAD" = 1 ] && ! echo ",${SOFT_FAIL_DBS}," | grep -q ",${DB},"; then
+            exit 1
+          fi
+
       - name: Generate per-leg summary
         if: always()
         run: |

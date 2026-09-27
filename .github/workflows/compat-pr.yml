@@ -261,3 +261,22 @@ jobs:
             docker logs "wheels-${{ matrix.cfengine }}-1" 2>&1 | tail -100
             exit 1
           fi
+
+      - name: Report container exit state
+        # A cgroup OOM-kill ends the JVM with exit 137 and NO Java error; name it.
+        if: always() && steps.changes.outputs.framework_changed == 'true'
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+          DB: ${{ matrix.database }}
+        run: |
+          BAD=0
+          for C in "wheels-${CFENGINE}-1" "wheels-${DB}-1"; do
+            STATE=$(docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} oomkilled={{.State.OOMKilled}} restarts={{.RestartCount}}' "$C" 2>/dev/null || echo "missing")
+            echo "$C: $STATE"
+            case "$STATE" in
+              missing) ;;  # sqlite/h2 legs have no database container
+              *oomkilled=true*) echo "::error::$C was OOM-killed by the kernel (cgroup memory limit): $STATE"; BAD=1 ;;
+              exited*|dead*) echo "::error::$C is not running after the suite: $STATE"; BAD=1 ;;
+            esac
+          done
+          exit "$BAD"
