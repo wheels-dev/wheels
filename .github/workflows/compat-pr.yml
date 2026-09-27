@@ -8,6 +8,12 @@
 # manual (compat-matrix.yml); SQLite is sufficient to catch engine-specific
 # breakage, which is independent of the database.
 #
+# One database-specific leg rides along: Lucee 7 + H2. H2 is embedded (no
+# external container) and its SQL dialect diverges enough to break on its own:
+# an H2-only query-builder regression (#3684) went unseen until the weekly
+# matrix. The two sqlite legs keep their check names, which branch protection
+# requires; the H2 leg is not required unless maintainers add it.
+#
 # The workflow triggers on EVERY PR (no path filter) and reports a success
 # no-op when the PR doesn't touch framework/CLI code. This is required
 # because the two legs are registered as required branch-protection checks,
@@ -34,16 +40,21 @@ env:
 
 jobs:
   compat:
-    name: "${{ matrix.cfengine }} + sqlite"
+    name: "${{ matrix.cfengine }} + ${{ matrix.database }}"
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         cfengine: [boxlang, adobe2023]
+        database: [sqlite]
+        include:
+          - cfengine: lucee7
+            database: h2
     env:
       PORT_boxlang: 60001
       PORT_adobe2023: 62023
+      PORT_lucee7: 60007
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -179,14 +190,15 @@ jobs:
           echo "Failed to install CFPM packages after $MAX_RETRIES attempts"
           exit 1
 
-      - name: Run test suite for sqlite
+      - name: Run test suite for ${{ matrix.database }}
         if: steps.changes.outputs.framework_changed == 'true'
+        env:
+          DB: ${{ matrix.database }}
         run: |
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
           BASE_URL="http://localhost:${PORT}/wheels/core/tests"
-          DB="sqlite"
-          RESULT_FILE="/tmp/${{ matrix.cfengine }}-sqlite-result.txt"
+          RESULT_FILE="/tmp/${{ matrix.cfengine }}-${DB}-result.txt"
 
           echo "Warming up Wheels application before first test run..."
           curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/" || true
