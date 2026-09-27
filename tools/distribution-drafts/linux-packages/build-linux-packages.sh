@@ -6,7 +6,8 @@
 #   CHANNEL          — "stable" or "bleeding-edge" (default: stable)
 #   ARTIFACTS_DIR    — directory holding wheels-module-<v>.tar.gz and wheels-core-<v>.zip
 #                       (default: artifacts/wheels/${WHEELS_VERSION})
-#   LUCLI_JAR_URL    — explicit local-test override; releases use tools/lucli.json
+#   LUCLI_JAR_URL    — explicit local-test override; releases use tools/lucli.json.
+#                       An override must come with LUCLI_JAR_SHA256.
 #   OUT_DIR          — where to write the .deb / .rpm (default: dist/)
 #
 # Outputs (in OUT_DIR) — architecture-independent (Java jar payload):
@@ -31,7 +32,14 @@ LUCLI_VERSION=$(jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(
 # Scoop manifest already launches LuCLI. Routing to the bundled `wheels` module
 # is done via -Dlucli.binary.name=wheels in the wrapper (the native binary did it
 # via basename(argv[0])).
-LUCLI_JAR_URL="${LUCLI_JAR_URL:-https://github.com/${LUCLI_REPO}/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}.jar}"
+if [ -n "${LUCLI_JAR_URL:-}" ]; then
+  # A local override is only trusted with its own checksum.
+  LUCLI_JAR_SHA256="${LUCLI_JAR_SHA256:?LUCLI_JAR_SHA256 must be set when LUCLI_JAR_URL is overridden}"
+  LUCLI_JAR_URL_OVERRIDDEN=1
+else
+  LUCLI_JAR_URL="https://github.com/${LUCLI_REPO}/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}.jar"
+  LUCLI_JAR_SHA256=$(jq -er '.LUCLI_SHA256.jar | select(test("^[0-9a-f]{64}$"))' "$LUCLI_PIN")
+fi
 SQLITE_JDBC_VERSION="3.49.1.0"
 SQLITE_JDBC_URL="https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/${SQLITE_JDBC_VERSION}/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
 OUT_DIR="${OUT_DIR:-dist}"
@@ -88,6 +96,21 @@ fi
 #    installs on amd64 AND arm64. See issue #2700 (routing) and the arch-independent
 #    refactor.
 curl -fsSL -o "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_URL}"
+# Fail closed: the package never ships a runtime that is not the pinned one.
+if command -v sha256sum >/dev/null 2>&1; then
+  LUCLI_JAR_ACTUAL=$(sha256sum "${BUILD_DIR}/build/lucli.jar" | cut -d' ' -f1)
+else
+  LUCLI_JAR_ACTUAL=$(shasum -a 256 "${BUILD_DIR}/build/lucli.jar" | cut -d' ' -f1)
+fi
+if [ "${LUCLI_JAR_ACTUAL}" != "${LUCLI_JAR_SHA256}" ]; then
+  echo "LuCLI jar checksum mismatch: expected ${LUCLI_JAR_SHA256}, got ${LUCLI_JAR_ACTUAL}" >&2
+  exit 1
+fi
+LUCLI_JAR_REPORTED=$(unzip -p "${BUILD_DIR}/build/lucli.jar" lucli/version.properties | sed -n 's/^lucli\.version=//p' | tr -d '\r')
+if [ -z "${LUCLI_JAR_URL_OVERRIDDEN:-}" ] && [ "${LUCLI_JAR_REPORTED}" != "${LUCLI_VERSION}" ]; then
+  echo "LuCLI jar reports version '${LUCLI_JAR_REPORTED}', expected '${LUCLI_VERSION}'" >&2
+  exit 1
+fi
 
 # 4. Download SQLite JDBC
 curl -fsSL -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"

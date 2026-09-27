@@ -20,11 +20,34 @@ runs:
           macOS) suffix=macos ;;
           *) echo "Unsupported runner: $RUNNER_OS" >&2; exit 1 ;;
         esac
+        # The pinned checksum for this asset. A missing or malformed value
+        # fails the step: the runtime is never installed unverified.
+        expected=$(jq -er --arg k "$suffix" '.LUCLI_SHA256[$k] | select(test("^[0-9a-f]{64}$"))' tools/lucli.json) || {
+          echo "::error::tools/lucli.json has no valid LUCLI_SHA256.${suffix} (64 lowercase hex characters)." >&2
+          exit 1
+        }
         install_dir="$RUNNER_TEMP/wheels-lucli-bin"
         mkdir -p "$install_dir"
+        # Installed as plain `lucli`: a versioned file name would be taken
+        # for a module alias.
         curl --fail --location --retry 3 \
           "https://github.com/${LUCLI_REPO}/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-${suffix}" \
           --output "$install_dir/lucli"
+        if command -v sha256sum >/dev/null 2>&1; then
+          actual=$(sha256sum "$install_dir/lucli" | cut -d' ' -f1)
+        else
+          actual=$(shasum -a 256 "$install_dir/lucli" | cut -d' ' -f1)
+        fi
+        if [ "$actual" != "$expected" ]; then
+          echo "::error::LuCLI ${LUCLI_VERSION} (${suffix}) checksum mismatch: expected ${expected}, got ${actual}. Refusing to use it." >&2
+          rm -f "$install_dir/lucli"
+          exit 1
+        fi
         chmod +x "$install_dir/lucli"
-        "$install_dir/lucli" --version
+        reported=$("$install_dir/lucli" --version 2>&1 | head -1)
+        if [ "$reported" != "LuCLI Version: ${LUCLI_VERSION}" ]; then
+          echo "::error::The installed LuCLI reports '${reported}', expected 'LuCLI Version: ${LUCLI_VERSION}'." >&2
+          exit 1
+        fi
+        echo "$reported (sha256 ${actual})"
         echo "$install_dir" >> "$GITHUB_PATH"

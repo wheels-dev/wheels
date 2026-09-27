@@ -470,14 +470,16 @@ component extends="modules.BaseModule" {
 			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format: simple, json, or tap")
 			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
-			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT; --test-timeout is a compatibility alias")
+			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT. On the terminal use --test-timeout=<seconds>: it works on every LuCLI runtime, while a plain --timeout only reaches this command on LuCLI builds that include the module-timeout fix (LuCLI ##130)")
 			.flag(name = "verbose", default = false, description = "Print per-spec detail instead of the summary rollup")
 			.flag(name = "ci",      default = false, description = "CI mode output")
 			.flag(name = "core",    default = false, description = "Run the framework core suite (vendor/wheels/tests) instead of the app suite")
 			.flag(name = "test-db", default = true, description = "Swap to the dedicated test datasource for the run (disable with --no-test-db)")
-			// Compatibility alias for LuCLI versions predating module timeout
-			// forwarding. Current runtimes accept --timeout after the module name.
-			// Accepted, not advertised: MCP passes `timeout`.
+			// Terminal spelling of `timeout` that works on every LuCLI runtime.
+			// LuCLI's picocli root owns a global `--timeout=<seconds>` option and
+			// swallows `wheels test --timeout` before dispatch (#3678) unless the
+			// runtime includes the module-timeout fix (LuCLI #130). MCP passes
+			// `timeout`.
 			.accept("test-timeout");
 	}
 
@@ -1150,7 +1152,7 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		// The --test-timeout compatibility alias wins over timeout;
+		// --test-timeout (terminal) wins over timeout (MCP / fixed runtimes);
 		// then WHEELS_TEST_TIMEOUT, then 900 — see $resolveTestTimeout().
 		var rawTimeout = parsed.timeout;
 		if (structKeyExists(arguments.coll, "test-timeout")) {
@@ -1183,8 +1185,9 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Seconds to wait for the test-runner response. An explicit value wins
-	 * (`--timeout` or the compatibility alias `--test-timeout` on the terminal,
-	 * `timeout` over MCP), then WHEELS_TEST_TIMEOUT, then 900.
+	 * (`--test-timeout` on the terminal, or `--timeout` on LuCLI builds with
+	 * the module-timeout fix (LuCLI #130); `timeout` over MCP), then
+	 * WHEELS_TEST_TIMEOUT, then 900.
 	 *
 	 * The shared HTTP helper reads for 120 seconds, which is right for the
 	 * request/response bridge commands but is a hard ceiling on how big a suite
@@ -8086,8 +8089,9 @@ component extends="modules.BaseModule" {
 			if (reFindNoCase("(read timed out|SocketTimeout)", e.message)) {
 				out("Test run timed out after #arguments.timeoutSeconds#s waiting for the suite to finish.", "red");
 				out("The specs may have passed — the CLI stopped waiting, the runner did not stop running.", "yellow");
-				// The compatibility alias also works on older LuCLI runtimes.
-				out("Give it longer:  wheels test --timeout=#arguments.timeoutSeconds * 2#", "yellow");
+				// --test-timeout works on every LuCLI runtime; a plain --timeout
+				// only reaches the module on builds with the LuCLI #130 fix.
+				out("Give it longer:  wheels test --test-timeout=#arguments.timeoutSeconds * 2#", "yellow");
 				out("Or set WHEELS_TEST_TIMEOUT=<seconds> for the whole environment (MCP clients: pass timeout).", "yellow");
 				out("Or scope the run:  wheels test --filter=<subdirectory>", "yellow");
 			} else {

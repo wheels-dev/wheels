@@ -1,4 +1,9 @@
 {
   "LUCLI_REPO": "cybersonic/LuCLI",
-  "LUCLI_VERSION": "0.6.1"
+  "LUCLI_VERSION": "0.6.1",
+  "LUCLI_SHA256": {
+    "linux": "5c53b100f420fa33c68459b38155d056b7d6ed98ff16ada59c910fe90fb3d5ec",
+    "macos": "5c53b100f420fa33c68459b38155d056b7d6ed98ff16ada59c910fe90fb3d5ec",
+    "jar": "8a224cf4324eb6eb3042c71122eeb8cf1ebfb248da1d46a30d3beef1c52782a2"
+  }
 }
