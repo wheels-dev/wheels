@@ -855,13 +855,18 @@ component extends="wheels.WheelsTest" {
 
 				actual = g.$query(query = info, dbtype = "query", sql = sql)
 
-				// Added the ListLen check here for CF2018 because its cfdbinfo behaves a little differently.
-				// It returns the index for multiple columns in one record where as Lucee or Boxlang returns multiple.
-				if((isLucee || isBoxLang) || (isSQLite && isACF)) {
-					expect(actual.recordCount).toBe(2)
-				} else {
-					expect(ListLen(actual['column_name'][1])).toBe(2)
+				// cfdbinfo's index shape varies by engine: Lucee, BoxLang and RustCFML return one
+				// row per indexed column, while Adobe (non-SQLite) returns a single row with a
+				// comma-delimited column_name. Collect the columns across every row either way,
+				// then assert on the actual set rather than on the row count (#3686).
+				indexedColumns = []
+				for (row = 1; row <= actual.recordCount; row++) {
+					for (indexedColumn in ListToArray(actual["column_name"][row])) {
+						ArrayAppend(indexedColumns, LCase(Trim(indexedColumn)))
+					}
 				}
+				ArraySort(indexedColumns, "text")
+				expect(ArrayToList(indexedColumns)).toBe("datecolumn,integercolumn")
 
 				expect(actual.non_unique).toBeTrue()
 			})
