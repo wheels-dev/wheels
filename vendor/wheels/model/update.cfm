@@ -63,6 +63,7 @@
 					local.objects[local.i].update(
 						properties = arguments.properties,
 						parameterize = arguments.parameterize,
+						validate = arguments.validate,
 						transaction = arguments.transaction,
 						callbacks = arguments.callbacks
 					)

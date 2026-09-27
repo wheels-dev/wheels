@@ -1,0 +1,1 @@
+- Model: `updateAll(instantiate=true, validate=false)` now skips validations as documented. The instantiate path called each object's `update()` without forwarding `validate`, so validations always ran and records failing them were silently left unchanged (and excluded from the returned count).

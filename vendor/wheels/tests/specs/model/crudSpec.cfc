@@ -1965,6 +1965,36 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(loc.query2.recordcount).toBe(1)
 			})
+
+			// Post has validatesUniquenessOf("title"), so giving every post the same title only
+			// passes validation for the first row saved.
+			it("updateAll with instantiate runs validations by default", () => {
+				transaction action="begin" {
+					validatedCount = g.model("Post").updateAll(title = "Shared title for updateAll validate spec", instantiate = true)
+					validatedPosts = g.model("Post").findAll(where = "title='Shared title for updateAll validate spec'")
+					transaction action="rollback";
+				}
+
+				expect(validatedCount).toBe(1)
+				expect(validatedPosts.recordcount).toBe(1)
+			})
+
+			it("updateAll with instantiate honours validate=false", () => {
+				transaction action="begin" {
+					totalPosts = g.model("Post").count()
+					unvalidatedCount = g.model("Post").updateAll(
+						title = "Shared title for updateAll validate spec",
+						instantiate = true,
+						validate = false
+					)
+					unvalidatedPosts = g.model("Post").findAll(where = "title='Shared title for updateAll validate spec'")
+					transaction action="rollback";
+				}
+
+				expect(totalPosts).toBeGT(1)
+				expect(unvalidatedCount).toBe(totalPosts)
+				expect(unvalidatedPosts.recordcount).toBe(totalPosts)
+			})
 		})
 
 		describe("Tests that where", () => {
