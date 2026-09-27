@@ -239,6 +239,9 @@ else
     if [ -n "$SERVER_JVM" ]; then
       kill "$SERVER_JVM" 2>/dev/null || true
     fi
+    # Floor the wait at the old fixed delay: without lsof, listener_pid is
+    # always empty and the poll below would not wait at all.
+    sleep 3
     for _ in $(seq 1 30); do
       [ -z "$(listener_pid "$PORT" || true)" ] && break
       sleep 1
