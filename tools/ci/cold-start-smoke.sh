@@ -80,10 +80,19 @@ port_listening() {
 }
 
 assert_no_healthcheck() {
-	local hc
+	local hc test0
 	hc=$(docker inspect --format '{{json .Config.Healthcheck}}' "$CONTAINER" 2>/dev/null || echo "?")
-	case "$hc" in
-		null|'{"Test":["NONE"]}') log "healthcheck disabled ($hc)";;
+	# Docker marks a disabled healthcheck with Test ["NONE"]; it keeps any
+	# Interval/Timeout/Retries the image set. null means none was ever defined.
+	test0=$(printf '%s' "$hc" | python3 -c 'import json,sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("unreadable"); sys.exit()
+t = (d or {}).get("Test") or []
+print(t[0] if t else "none")' 2>/dev/null)
+	case "$test0" in
+		NONE|none) log "healthcheck disabled ($hc)";;
 		*)
 			echo "::error::${CONTAINER} has an active healthcheck ($hc). It would send the first request and hide a cold-start failure. Start it with the healthcheck disabled."
 			exit 1;;
