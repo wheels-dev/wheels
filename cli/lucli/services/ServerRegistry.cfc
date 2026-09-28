@@ -19,13 +19,20 @@ component {
 	}
 
 	/**
-	 * Server name LuCLI assigns to a project rooted at the given path —
-	 * the basename of the directory, computed via Java so it's portable
-	 * across `/` and `\` separators. Mirrors LuCLI's own derivation; if
-	 * LuCLI ever moves to a different scheme this needs to follow.
+	 * Server name LuCLI assigns to a project rooted at the given path. LuCLI
+	 * registers the server under the `name` in the project's `lucee.json`;
+	 * only when that file is absent, unparseable, or has no non-empty string
+	 * `name` does it fall back to the directory basename (computed via Java
+	 * so it's portable across `/` and `\` separators). Deriving the name from
+	 * the basename alone missed the server in worktrees, clones into a
+	 * differently named directory, and apps whose `lucee.json` name was
+	 * edited (#3679). If LuCLI ever moves to a different scheme this needs
+	 * to follow.
 	 */
 	public string function serverNameFor(required string projectRoot) {
 		if (!len(arguments.projectRoot)) return "";
+		var configured = $configuredServerName(arguments.projectRoot);
+		if (len(configured)) return configured;
 		try {
 			return createObject("java", "java.io.File")
 				.init(arguments.projectRoot)
@@ -102,22 +109,23 @@ component {
 	 * port that may belong to a different project.
 	 */
 	public numeric function ownServerPort(required string projectRoot) {
+		if (!len(variables.lucliHome)) return 0;
 		var name = serverNameFor(arguments.projectRoot);
 		if (!len(name)) return 0;
-		var reg = inspect(name, arguments.projectRoot);
-		if (!reg.alive || !reg.ours) return 0;
+		var port = $ownRegistrationPort(name, arguments.projectRoot);
+		if (port > 0) return port;
 
-		var pidFile = variables.lucliHome & "/servers/" & name & "/server.pid";
-		if (!fileExists(pidFile)) return 0;
-		try {
-			var raw = trim(fileRead(pidFile));
-			// LuCLI writes "<pid>:<port>" into server.pid. Split off the
-			// port; a pid-only file (older format) has no usable port.
-			if (listLen(raw, ":") > 1) {
-				var port = listGetAt(raw, 2, ":");
-				if (isNumeric(port) && val(port) > 0) return val(port);
-			}
-		} catch (any e) {}
+		// Fallback: any registration whose `.project-path` points at this
+		// project proves ownership regardless of the name it was registered
+		// under — covers a `lucee.json` name edited after the server started,
+		// or a LuCLI naming scheme this service doesn't mirror (#3679).
+		var serversDir = variables.lucliHome & "/servers";
+		if (!directoryExists(serversDir)) return 0;
+		for (var entry in directoryList(serversDir, false, "name")) {
+			if (entry == name) continue;
+			port = $ownRegistrationPort(entry, arguments.projectRoot);
+			if (port > 0) return port;
+		}
 		return 0;
 	}
 
@@ -135,6 +143,48 @@ component {
 				directoryDelete(regDir, true);
 			}
 		} catch (any e) {}
+	}
+
+	/**
+	 * Port recorded by the registration `<lucliHome>/servers/<serverName>/`
+	 * when it is alive AND its `.project-path` matches this project; 0
+	 * otherwise (including a pid-only `server.pid` with no port segment).
+	 */
+	private numeric function $ownRegistrationPort(
+		required string serverName,
+		required string projectRoot
+	) {
+		var reg = inspect(arguments.serverName, arguments.projectRoot);
+		if (!reg.alive || !reg.ours) return 0;
+
+		var pidFile = variables.lucliHome & "/servers/" & arguments.serverName & "/server.pid";
+		if (!fileExists(pidFile)) return 0;
+		try {
+			var raw = trim(fileRead(pidFile));
+			// LuCLI writes "<pid>:<port>" into server.pid. Split off the
+			// port; a pid-only file (older format) has no usable port.
+			if (listLen(raw, ":") > 1) {
+				var port = listGetAt(raw, 2, ":");
+				if (isNumeric(port) && val(port) > 0) return val(port);
+			}
+		} catch (any e) {}
+		return 0;
+	}
+
+	/**
+	 * The non-empty string `name` from `<projectRoot>/lucee.json`, or "" when
+	 * the file is missing, malformed, or carries no usable name.
+	 */
+	private string function $configuredServerName(required string projectRoot) {
+		var configFile = arguments.projectRoot & "/lucee.json";
+		if (!fileExists(configFile)) return "";
+		try {
+			var cfg = deserializeJSON(fileRead(configFile));
+			if (isStruct(cfg) && structKeyExists(cfg, "name") && isSimpleValue(cfg.name)) {
+				return trim(cfg.name);
+			}
+		} catch (any e) {}
+		return "";
 	}
 
 	/**

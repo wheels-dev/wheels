@@ -1865,7 +1865,8 @@ component extends="modules.BaseModule" {
 			out("Options:", "bold");
 			out("  - Pass --force to replace the registration:");
 			out("      wheels start --force", "cyan");
-			out("  - Or rename your project directory so it gets a unique server name.");
+			out("  - Or give this project a unique 'name' in lucee.json (or, without one,");
+			out("    rename the project directory) so it gets a unique server name.");
 			return "";
 		}
 

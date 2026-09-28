@@ -46,6 +46,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		if (directoryExists(dir)) directoryDelete(dir, true);
 	}
 
+	/**
+	 * A fresh project directory (canonical path) whose basename is NOT the
+	 * lucee.json name — the worktree / renamed-clone shape from #3679.
+	 * Pass `luceeJson = ""` to create the directory without a lucee.json.
+	 */
+	private string function makeProject(string luceeJson = "") {
+		var dir = getTempDirectory() & "wheels-registry-dir-#createUUID()#";
+		directoryCreate(dir, true);
+		if (len(arguments.luceeJson)) fileWrite(dir & "/lucee.json", arguments.luceeJson);
+		return createObject("java", "java.io.File").init(dir).getCanonicalPath();
+	}
+
+	private void function dropProject(required string dir) {
+		if (directoryExists(arguments.dir)) directoryDelete(arguments.dir, true);
+	}
+
 	function run() {
 
 		describe("ServerRegistry.serverNameFor", () => {
@@ -70,6 +86,42 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// File.getName() of /tmp/foo/ returns "foo" (canonical form drops it).
 				var name = variables.registry.serverNameFor("/tmp/foo/");
 				expect(name).toBe("foo");
+			});
+
+			it("uses lucee.json's name when it differs from the directory name (##3679)", () => {
+				var dir = makeProject('{"name": "wheels-registry-configured", "port": 8097}');
+				try {
+					expect(variables.registry.serverNameFor(dir)).toBe("wheels-registry-configured");
+				} finally {
+					dropProject(dir);
+				}
+			});
+
+			it("falls back to the directory name when lucee.json has no name", () => {
+				var dir = makeProject('{"port": 8097}');
+				try {
+					expect(variables.registry.serverNameFor(dir)).toBe(listLast(dir, "/\"));
+				} finally {
+					dropProject(dir);
+				}
+			});
+
+			it("falls back to the directory name when lucee.json's name is blank", () => {
+				var dir = makeProject('{"name": "  "}');
+				try {
+					expect(variables.registry.serverNameFor(dir)).toBe(listLast(dir, "/\"));
+				} finally {
+					dropProject(dir);
+				}
+			});
+
+			it("falls back to the directory name when lucee.json is malformed", () => {
+				var dir = makeProject("{ not json");
+				try {
+					expect(variables.registry.serverNameFor(dir)).toBe(listLast(dir, "/\"));
+				} finally {
+					dropProject(dir);
+				}
 			});
 
 		});
@@ -243,6 +295,47 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("returns 0 when no registration exists", () => {
 				expect(variables.registry.ownServerPort(variables.canonicalProject)).toBe(0);
+			});
+
+			it("finds the server registered under lucee.json's name when the directory name differs (##3679)", () => {
+				// Repro: a worktree at .../wheels-2963f whose lucee.json says
+				// "name": "wheels" — LuCLI registers servers/wheels/, not
+				// servers/wheels-2963f/.
+				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
+				var dir = makeProject('{"name": "wheels-registry-renamed"}');
+				makeRegistration(name = "wheels-registry-renamed", projectPath = dir, pidContent = selfPid & ":8097");
+				try {
+					expect(variables.registry.ownServerPort(dir)).toBe(8097);
+				} finally {
+					dropRegistration("wheels-registry-renamed");
+					dropProject(dir);
+				}
+			});
+
+			it("finds a registration under any name whose .project-path points at this project", () => {
+				// lucee.json's name edited after the server started: the live
+				// registration still sits under the old name.
+				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
+				var dir = makeProject('{"name": "wheels-registry-new-name"}');
+				makeRegistration(name = "wheels-registry-old-name", projectPath = dir, pidContent = selfPid & ":8098");
+				try {
+					expect(variables.registry.ownServerPort(dir)).toBe(8098);
+				} finally {
+					dropRegistration("wheels-registry-old-name");
+					dropProject(dir);
+				}
+			});
+
+			it("still returns 0 when the lucee.json-named registration belongs to another project", () => {
+				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
+				var dir = makeProject('{"name": "wheels-registry-shared"}');
+				makeRegistration(name = "wheels-registry-shared", projectPath = "/some/other/project", pidContent = selfPid & ":8099");
+				try {
+					expect(variables.registry.ownServerPort(dir)).toBe(0);
+				} finally {
+					dropRegistration("wheels-registry-shared");
+					dropProject(dir);
+				}
 			});
 
 		});
