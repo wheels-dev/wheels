@@ -426,7 +426,6 @@ component output="false" extends="wheels.Global"{
 				request.$wheelsMigrationDidExecute = false;
 				request.$wheelsMigrationDidAnnounce = false;
 				request.$wheelsMigrationDidWork = false;
-				request.$wheelsMigrationNotImplemented = false;
 				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
 				if (application[local.appKey].writeMigratorSQLFiles) {
 					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
@@ -436,7 +435,7 @@ component output="false" extends="wheels.Global"{
 				if (arguments.direction == "down") {
 					arguments.migration.cfc.down();
 					local.result.output &= request.$wheelsMigrationOutput;
-					if ($migrationStepIsPlaceholder()) {
+					if ($migrationStepIsPlaceholder(arguments.migration.cfc, "down")) {
 						local.result.output &= $placeholderNotRecorded(arguments.migration, "down");
 					} else {
 						$removeVersionAsMigrated(arguments.migration.version);
@@ -448,7 +447,7 @@ component output="false" extends="wheels.Global"{
 				} else {
 					arguments.migration.cfc.up();
 					local.result.output &= request.$wheelsMigrationOutput;
-					if ($migrationStepIsPlaceholder()) {
+					if ($migrationStepIsPlaceholder(arguments.migration.cfc, "up")) {
 						local.result.output &= $placeholderNotRecorded(arguments.migration, "up");
 					} else {
 						$setVersionAsMigrated(arguments.migration.version, arguments.migration.name);
@@ -517,29 +516,81 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * True when the just-run up()/down() was the placeholder inherited from
+	 * True when the just-run up()/down() is the placeholder inherited from
 	 * wheels.migrator.Migration ("UP/DOWN MIGRATION NOT IMPLEMENTED") and
-	 * nothing else ran through the migrator, so its version must not be
+	 * nothing ran through $execute or the ORM, so its version must not be
 	 * recorded (up) or dropped (down) (#3402 B1).
 	 *
-	 * Any other step that completes without an error is tracked, as in 4.0.x.
+	 * Decided by DECLARATION: the first component in the migration's
+	 * inheritance chain that declares the method must be the framework's
+	 * Migration. A migration that declares its own up() (even one that ends
+	 * by calling super.up()) or inherits one from an app base class is user
+	 * code and is tracked whenever it completes, as in 4.0.x.
+	 *
 	 * Do not infer "did nothing" from announce() plus the absence of $execute
 	 * or ORM work: raw queryExecute()/cfquery calls, including ones against
 	 * another datasource, are invisible to the migrator, and treating such a
 	 * step as announce-only left it unrecorded, so it re-ran on every migrate
 	 * and a non-idempotent re-run stalled every migration behind it.
 	 */
-	private boolean function $migrationStepIsPlaceholder() {
-		if (!StructKeyExists(request, "$wheelsMigrationNotImplemented") || !request.$wheelsMigrationNotImplemented) {
-			return false;
-		}
+	private boolean function $migrationStepIsPlaceholder(required any cfc, required string method) {
 		if (StructKeyExists(request, "$wheelsMigrationDidExecute") && request.$wheelsMigrationDidExecute) {
 			return false;
 		}
 		if (StructKeyExists(request, "$wheelsMigrationDidWork") && request.$wheelsMigrationDidWork) {
 			return false;
 		}
-		return true;
+		local.declaredBy = $methodDeclaredBy(arguments.cfc, arguments.method);
+		if (!Len(local.declaredBy.name) && !Len(local.declaredBy.path)) {
+			// Not found in the metadata (for example a function assigned at
+			// runtime): not provably the placeholder, so it is tracked.
+			return false;
+		}
+		local.base = $baseMigrationMetadata();
+		return (Len(local.declaredBy.name) && CompareNoCase(local.declaredBy.name, local.base.name) == 0)
+			|| (Len(local.declaredBy.path) && CompareNoCase(local.declaredBy.path, local.base.path) == 0);
+	}
+
+	/**
+	 * `{name, path}` of the first component in `cfc`'s inheritance chain whose
+	 * metadata declares `method`; both empty when none does.
+	 */
+	public struct function $methodDeclaredBy(required any cfc, required string method) {
+		local.rv = {name = "", path = ""};
+		local.meta = GetMetadata(arguments.cfc);
+		local.depth = 0;
+		while (IsStruct(local.meta) && local.depth < 50) {
+			local.depth++;
+			if (StructKeyExists(local.meta, "functions") && IsArray(local.meta.functions)) {
+				for (local.fn in local.meta.functions) {
+					if (IsStruct(local.fn) && StructKeyExists(local.fn, "name") && CompareNoCase(local.fn.name, arguments.method) == 0) {
+						local.rv.name = StructKeyExists(local.meta, "name") ? ToString(local.meta.name) : "";
+						local.rv.path = StructKeyExists(local.meta, "path") ? ToString(local.meta.path) : "";
+						return local.rv;
+					}
+				}
+			}
+			if (!StructKeyExists(local.meta, "extends") || !IsStruct(local.meta.extends) || StructIsEmpty(local.meta.extends)) {
+				break;
+			}
+			local.meta = local.meta.extends;
+		}
+		return local.rv;
+	}
+
+	/**
+	 * `{name, path}` of wheels.migrator.Migration as this engine reports it,
+	 * so the comparison above uses the engine's own spelling.
+	 */
+	public struct function $baseMigrationMetadata() {
+		if (!StructKeyExists(variables, "$baseMigrationMeta")) {
+			local.meta = GetComponentMetadata("wheels.migrator.Migration");
+			variables.$baseMigrationMeta = {
+				name = StructKeyExists(local.meta, "name") ? ToString(local.meta.name) : "",
+				path = StructKeyExists(local.meta, "path") ? ToString(local.meta.path) : ""
+			};
+		}
+		return variables.$baseMigrationMeta;
 	}
 
 	/**

@@ -35,6 +35,14 @@ component extends="wheels.WheelsTest" {
 			migratePath = "/wheels/tests/_assets/migrator/announceraw_other/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw_other/"
 		);
+		variables.rawSuperMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/announceraw_super/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw_super/"
+		);
+		variables.rawBaseMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/announceraw_base/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw_base/"
+		);
 		variables.sqlMigrator = CreateObject("component", "wheels.Migrator").init(
 			migratePath = "/wheels/tests/_assets/migrator/migrations/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql/"
@@ -61,7 +69,6 @@ component extends="wheels.WheelsTest" {
 				StructDelete(request, "$wheelsMigrationDidExecute");
 				StructDelete(request, "$wheelsMigrationDidAnnounce");
 				StructDelete(request, "$wheelsMigrationDidWork");
-				StructDelete(request, "$wheelsMigrationNotImplemented");
 				try {
 					queryExecute(
 						"DELETE FROM c_o_r_e_tags WHERE name = 'hardener_b1_announce_then_orm'",
@@ -77,7 +84,6 @@ component extends="wheels.WheelsTest" {
 				StructDelete(request, "$wheelsMigrationDidExecute");
 				StructDelete(request, "$wheelsMigrationDidAnnounce");
 				StructDelete(request, "$wheelsMigrationDidWork");
-				StructDelete(request, "$wheelsMigrationNotImplemented");
 				try {
 					queryExecute(
 						"DELETE FROM c_o_r_e_tags WHERE name = 'hardener_b1_announce_then_orm'",
@@ -178,6 +184,42 @@ component extends="wheels.WheelsTest" {
 				expect(rows.recordCount).toBe(
 					1,
 					"Raw queryExecute() is invisible to the migrator; announce() after it must not leave the version unrecorded."
+				);
+			});
+
+			it("records a migration's own up() that runs raw SQL and then calls super.up()", () => {
+				// Placeholder detection is by declaration: this migration declares
+				// up(), so it is user code even though it ends in the placeholder.
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				variables.rawSuperMigrator.migrateTo("90000000000006");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000006'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(
+					1,
+					"An own up() that calls super.up() must still INSERT the migrator versions row."
+				);
+			});
+
+			it("records a migration that inherits up() from an app base class", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				variables.rawBaseMigrator.migrateTo("90000000000007");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000007'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(
+					1,
+					"up() declared by an app base class is user code and must INSERT the migrator versions row."
 				);
 			});
 
