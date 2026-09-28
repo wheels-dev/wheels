@@ -1,18 +1,16 @@
 {
-  "engineVersion": "v0.691.0",
+  "engineVersion": "v0.693.0",
   "totals": {
     "totalSpecs": 5816,
     "totalPass": 5793,
-    "totalFail": 1,
+    "totalFail": 0,
     "totalError": 0,
     "totalSkipped": 22
   },
-  "failing": [
-    "wheels.tests.specs.internal.testClientSpec :: TestClient > assertions :: assertNotFound() passes on 404 response"
-  ],
+  "failing": [],
   "_notes": [
-    "Linux baseline from this PR run: https://github.com/wheels-dev/wheels/actions/runs/36338113712/job/108672765311 (cc2c26537, v0.691.0): 5793 pass / 1 fail / 0 error / 22 skipped. totalSpecs is the sum of those reported categories.",
-    "The sole known failure is TestClient assertNotFound(): a missing-view response is 500 instead of 404 because RustCFML loses custom exception type/detail across include. Standalone rustcfml -c reproduction: https://github.com/RustCFML/RustCFML/issues/431 . Keep the strict 404 assertion active; remove this baseline entry once the engine preserves the exception. The include defect also reproduces on v0.637.0; this note does not claim it began in v0.691.0.",
+    "v0.693.0: 0 fail / 0 error expected; pass/skipped totals to be refreshed from this PR's RustCFML (Linux) run (a local macOS run gave 5850 pass / 0 fail / 0 error / 29 skipped). totalSpecs is the sum of those reported categories.",
+    "RustCFML#431 (an exception thrown from an included template lost its custom type and detail, so TestClient assertNotFound() saw 500 instead of 404) is fixed in v0.693.0 (https://github.com/RustCFML/RustCFML/issues/431, closed 2026-09-28). Its baseline entry is removed; the strict 404 assertion passes.",
     "The previous migrationSpec multi-column index failure was a Wheels metadata-shape assumption, fixed in wheels-dev/wheels#3697, not the closed RustCFML#377. Both previously baselined Linux StorageSpec errors pass on this v0.691.0 run and are removed.",
     "SystemUtilSpec retains missing-property default/error assertions on every engine; java.version is required only when EngineCapabilities confirms real JVM class loading. RustCFML is JVM-free, so a null Java-version placeholder is not an engine defect."
   ]
