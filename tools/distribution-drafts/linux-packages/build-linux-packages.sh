@@ -121,7 +121,7 @@ cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
 # /usr/bin/wheels — Wheels CLI wrapper for Linux .deb/.rpm install.
 #
 # Mirrors the macOS Homebrew wrapper's behavior:
-#   - exports JAVA_HOME and LUCLI_HOME
+#   - exports JAVA_HOME (a pre-set one only if it is Java 21+) and LUCLI_HOME
 #   - on first run (or version mismatch), syncs the module + framework from
 #     /opt/wheels/module/ into ~/.wheels/modules/wheels/
 #   - stages SQLite JDBC into Lucee Express's lib/ext/ (cliff fix)
@@ -131,8 +131,64 @@ cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
 
 set -euo pipefail
 
-# Honor user-set JAVA_HOME if present; otherwise probe for OpenJDK 21 across the
-# Debian/Ubuntu AND RHEL/Fedora layouts, on amd64 and arm64.
+# --- java-resolve begin ---------------------------------------------------
+# tools/test-linux-launcher-java.sh extracts everything between the begin/end
+# markers and runs it against fake JDKs, so keep this block self-contained
+# (bash builtins + readlink only) and keep the markers intact.
+#
+# Every candidate — including a user-set JAVA_HOME — must be Java 21+. The
+# LuCLI jar is class-file version 65, so an older JVM dies with
+# UnsupportedClassVersionError before Wheels starts. GitHub's ubuntu runners
+# (and many dev machines) export JAVA_HOME at Temurin 17, which used to win
+# over the openjdk-21 the package had just pulled in (#3728 smoke).
+
+# Print the major version of the JDK/JRE rooted at $1 (empty when unknown).
+# Reads $1/release first so the common path starts no JVM; falls back to
+# parsing `java -version` ("21.0.2", "25-ea", legacy "1.8.0_402" -> 8).
+_wheels_java_major() {
+  local home="$1" v="" line=""
+  if [ -f "${home}/release" ]; then
+    while IFS= read -r line || [ -n "${line}" ]; do
+      case "${line}" in
+        JAVA_VERSION=*) v="${line#JAVA_VERSION=}"; v="${v//\"/}"; break ;;
+      esac
+    done < "${home}/release"
+  fi
+  if [ -z "${v}" ] && [ -x "${home}/bin/java" ]; then
+    # Scan for the ` version "..."` line rather than taking line 1: the JVM
+    # prints "Picked up JAVA_TOOL_OPTIONS: ..." first when that is set.
+    while IFS= read -r line; do
+      case "${line}" in
+        *" version \""*\"*) v="${line#* version \"}"; v="${v%%\"*}"; break ;;
+      esac
+    done <<< "$("${home}/bin/java" -version 2>&1 || true)"
+  fi
+  case "${v}" in 1.*) v="${v#1.}" ;; esac
+  v="${v%%[!0-9]*}"
+  printf '%s' "${v}"
+}
+
+# Succeed when $1/bin/java exists and is Java 21 or newer.
+_wheels_java_ok() {
+  local major
+  [ -x "${1}/bin/java" ] || return 1
+  major="$(_wheels_java_major "$1")"
+  [ -n "${major}" ] && [ "${major}" -ge 21 ]
+}
+
+# Honor a user-set JAVA_HOME only when it is Java 21+; otherwise say so on
+# stderr and fall through to the probes below.
+if [ -n "${JAVA_HOME:-}" ] && ! _wheels_java_ok "${JAVA_HOME}"; then
+  if [ -x "${JAVA_HOME}/bin/java" ]; then
+    _jm="$(_wheels_java_major "${JAVA_HOME}")"
+    echo "wheels: ignoring JAVA_HOME=${JAVA_HOME} (Java ${_jm:-version unknown}); Wheels needs Java 21+" >&2
+  else
+    echo "wheels: ignoring JAVA_HOME=${JAVA_HOME} (no bin/java there); Wheels needs Java 21+" >&2
+  fi
+  unset JAVA_HOME
+fi
+# Probe for OpenJDK 21 across the Debian/Ubuntu AND RHEL/Fedora layouts, on
+# amd64 and arm64. default-java may point at an older JDK, hence the check.
 if [ -z "${JAVA_HOME:-}" ]; then
   for candidate in \
     /usr/lib/jvm/java-21-openjdk-amd64 \
@@ -145,7 +201,7 @@ if [ -z "${JAVA_HOME:-}" ]; then
     /usr/lib/jvm/temurin-21-jdk-arm64 \
     /usr/lib/jvm/zulu-21 \
     /usr/lib/jvm/default-java; do
-    if [ -x "${candidate}/bin/java" ]; then
+    if _wheels_java_ok "${candidate}"; then
       export JAVA_HOME="${candidate}"
       break
     fi
@@ -153,17 +209,19 @@ if [ -z "${JAVA_HOME:-}" ]; then
 fi
 # RHEL/Fedora install into a version-stamped dir (java-21-openjdk-21.0.x...elN.<arch>)
 # that the fixed names above don't match, but the headless package registers
-# /usr/bin/java via the alternatives system — resolve JAVA_HOME from it.
+# /usr/bin/java via the alternatives system — resolve JAVA_HOME from it. The
+# alternatives default can be an older JDK (it is Temurin 17 on GitHub's
+# ubuntu runners), hence the version check.
 if [ -z "${JAVA_HOME:-}" ] && command -v java >/dev/null 2>&1; then
   _j="$(command -v java)"
   command -v readlink >/dev/null 2>&1 && _j="$(readlink -f "${_j}" 2>/dev/null || echo "${_j}")"
   _jh="${_j%/bin/java}"
-  [ -x "${_jh}/bin/java" ] && export JAVA_HOME="${_jh}"
+  _wheels_java_ok "${_jh}" && export JAVA_HOME="${_jh}"
 fi
 # Last resort: glob the version-stamped RHEL/Fedora directories directly.
 if [ -z "${JAVA_HOME:-}" ]; then
   for d in /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/*jre-21* /usr/lib/jvm/*-21-*; do
-    if [ -x "${d}/bin/java" ]; then export JAVA_HOME="${d}"; break; fi
+    if _wheels_java_ok "${d}"; then export JAVA_HOME="${d}"; break; fi
   done
 fi
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
@@ -171,6 +229,7 @@ if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
   echo "        or java-21-openjdk-headless (yum/dnf)." >&2
   exit 1
 fi
+# --- java-resolve end -----------------------------------------------------
 
 export LUCLI_HOME="${HOME}/.wheels"
 export PATH="${JAVA_HOME}/bin:${PATH}"

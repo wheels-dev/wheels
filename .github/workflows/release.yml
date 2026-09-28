@@ -384,6 +384,12 @@ jobs:
             | sudo tar -xzf - -C /usr/local/bin nfpm
           nfpm --version
 
+      # Container-free (fake JDK stubs): guards the wrapper's Java 21 resolution,
+      # e.g. that a pre-set JAVA_HOME at Java 17 — which this very runner
+      # exports — is ignored rather than crashing LuCLI (#3728 smoke).
+      - name: Test the Linux launcher's Java resolution
+        run: bash tools/test-linux-launcher-java.sh
+
       - name: Build Linux packages (.deb / .rpm)
         # CHANNEL derives from the version so develop snapshots produce the
         # `wheels-be` package (which the Phase 2 bleeding-edge receiver
