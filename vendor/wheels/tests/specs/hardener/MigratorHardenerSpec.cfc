@@ -237,15 +237,23 @@ component extends="wheels.WheelsTest" {
 					skip("The second SQLite datasource #otherDs# is not configured on this run.");
 					return;
 				}
-				if (!StructKeyExists(server, "lucee") && !StructKeyExists(server, "boxlang")) {
-					// Adobe ColdFusion refuses a second datasource inside the
-					// per-migration cftransaction ("Datasource names for all the
-					// database tags within the cftransaction tag must be the
-					// same"), so this step fails before tracking is decided.
+				// Two engines cannot run a second datasource inside the migrator's
+				// per-step transaction, so the step fails before tracking is decided:
+				//   Adobe ColdFusion refuses it ("Datasource names for all the
+				//   database tags within the cftransaction tag must be the same");
+				//   RustCFML sends every statement in a transaction to the first
+				//   datasource it used, so the version INSERT lands in the second
+				//   database ("no such table: wheels_migrator_versions").
+				var adapter = application.wheels.engineAdapter;
+				if (adapter.isAdobe()) {
 					skip("Adobe ColdFusion does not allow a second datasource inside the migrator's transaction.");
 					return;
 				}
-				variables.rawOtherMigrator.migrateTo("90000000000005");
+				if (adapter.isRustCFML()) {
+					skip("RustCFML routes every statement in a transaction to the first datasource it used.");
+					return;
+				}
+				var output = variables.rawOtherMigrator.migrateTo("90000000000005");
 				var rows = queryExecute(
 					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000005'",
 					{},
@@ -253,7 +261,7 @@ component extends="wheels.WheelsTest" {
 				);
 				expect(rows.recordCount).toBe(
 					1,
-					"announce() after raw SQL on a second datasource must still INSERT the migrator versions row."
+					"announce() after raw SQL on a second datasource must still INSERT the migrator versions row. Migration output: " & output
 				);
 			});
 
