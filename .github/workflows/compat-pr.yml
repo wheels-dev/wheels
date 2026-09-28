@@ -3,8 +3,8 @@
 # database (SQLite, no external container).
 #
 # This is the subset of compat-matrix.yml that catches the class of bug the
-# weekly matrix exists for (cross-engine regressions), at PR time instead of
-# at release preflight. The full engine x database matrix stays weekly +
+# nightly matrix exists for (cross-engine regressions), at PR time instead of
+# at release preflight. The full engine x database matrix stays nightly +
 # manual (compat-matrix.yml); SQLite is sufficient to catch engine-specific
 # breakage, which is independent of the database.
 #

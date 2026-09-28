@@ -1,4 +1,4 @@
-# Compatibility matrix: runs all engines x databases on a weekly schedule
+# Compatibility matrix: runs all engines x databases on a nightly schedule
 # and on manual dispatch. Non-blocking — informational only.
 #
 # Each engine x database combination is its own matrix job, so the ~30 legs
@@ -12,8 +12,8 @@ name: Wheels Compatibility Matrix
 
 on:
   schedule:
-    # Weekly: Sunday 02:00 UTC
-    - cron: '0 2 * * 0'
+    # Nightly: 02:00 UTC
+    - cron: '0 2 * * *'
   workflow_dispatch:
 
 env:
