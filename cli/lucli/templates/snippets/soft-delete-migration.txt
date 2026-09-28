@@ -3,11 +3,11 @@ component extends="wheels.migrator.Migration" {
 	function up() {
 		// Add to your table: change "tablename" below
 		addColumn(table="tablename", columnType="datetime", columnName="deletedAt", allowNull=true, default="NULL");
-		addIndex(table="tablename", columnNames="deletedAt");
+		addIndex(table="tablename", columnNames="deletedAt", indexName="tablename_deletedAt");
 	}
 
 	function down() {
-		removeIndex(table="tablename", columnNames="deletedAt");
+		removeIndex(table="tablename", indexName="tablename_deletedAt");
 		removeColumn(table="tablename", columnName="deletedAt");
 	}
 

@@ -112,8 +112,10 @@ component extends="Base" {
 	 * [category: Migration Functions]
 	 *
 	 * @name Name of the table to drop
+	 * @tableName Alias for `name` (the form `wheels destroy` generated before 4.1.1). Pass one or the other — not both.
 	 */
-	public void function dropTable(required string name) {
+	public void function dropTable(string name, string tableName) {
+		$combineArguments(args = arguments, combine = "name,tableName", required = true);
 		local.appKey = $appKey();
 		// init() already resolved the engine — no need to re-sniff via $getDBType().
 		local.adapterName = this.adapter.adapterName();

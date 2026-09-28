@@ -4,7 +4,7 @@ component extends="wheels.migrator.Migration" hint="Migration: {{className}}" {
 		var state = {};
 		transaction {
 			try {
-				dropTable(tableName="{{tableName}}");
+				dropTable(name="{{tableName}}");
 			} catch (any e) {
 				state.exception = e;
 			}

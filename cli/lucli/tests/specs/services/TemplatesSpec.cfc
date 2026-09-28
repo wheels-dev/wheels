@@ -202,6 +202,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(mixin).notToInclude(", null=true");
 				});
 
+				it("soft-delete migration snippet passes indexName to removeIndex (it has no columnNames)", () => {
+					var migration = fileRead(expandPath("/cli/lucli/templates/snippets/soft-delete-migration.txt"));
+					// Migration.cfc::removeIndex(required string table, required string indexName)
+					expect(migration).toInclude('removeIndex(table="tablename", indexName="tablename_deletedAt")');
+					expect(migration).toInclude('indexName="tablename_deletedAt");');
+					expect(migration).notToInclude('removeIndex(table="tablename", columnNames=');
+				});
+
 			});
 
 		});
