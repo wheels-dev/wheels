@@ -462,7 +462,7 @@ component output="false" {
 		// already lost — fall back to a minimal HTML response rather than
 		// cascading into "The key [WO] does not exist." (issue ##2773).
 		if (!StructKeyExists(application, "wo")) {
-			$renderMinimalError(arguments.Exception);
+			$renderMinimalError(arguments.Exception, arguments.EventName ?: "");
 			return;
 		}
 
@@ -496,7 +496,7 @@ component output="false" {
 			// reclaimed before the dereferences below run, so degrade to the
 			// minimal fallback rather than cascade the torn-down-scope error
 			// over the real one.
-			$renderMinimalError(arguments.Exception);
+			$renderMinimalError(arguments.Exception, arguments.EventName ?: "");
 		}
 	}
 
@@ -504,8 +504,11 @@ component output="false" {
 	// Wheels global never came up (issue ##2773), and the application scope
 	// being torn down mid-onError (issue ##3379). Kept in one place so both
 	// paths render identically.
-	private void function $renderMinimalError( required any Exception ) {
+	private void function $renderMinimalError( required any Exception, string eventName = "" ) {
 		setting requestTimeout=30;
+		// Write the real failure to wheels.log first, so the page's "check
+		// the server log" points at an entry that exists (issue ##3671).
+		$logStartupFailure(arguments.Exception, arguments.eventName);
 		// Surface a real 5xx so monitoring tools and CDNs don't cache this
 		// failure as a successful response. Use a plain struct for
 		// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
@@ -517,7 +520,7 @@ component output="false" {
 			// Header may already have been written; the body still renders.
 		}
 		WriteOutput("<h1>Application Error</h1>");
-		WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
+		WriteOutput("<p>Wheels failed to initialize. Check the server log (wheels.log) for details.</p>");
 		try {
 			if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
 				WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
@@ -525,6 +528,129 @@ component output="false" {
 		} catch (any fallbackErr) {
 			// Last-ditch render must never throw.
 		}
+	}
+
+	// Log the failure behind the minimal error page to wheels.log (issue
+	// ##3671). Adobe CF wraps a failure inside an application event in an
+	// event-handler exception whose message hides the real one, so walk
+	// RootCause / Cause to the innermost error and log its type, message,
+	// detail and first tag-context frame, plus the wrapper. Runs on the
+	// last-ditch error path: it must never throw, and it only logs (the
+	// rendered page stays minimal).
+	private void function $logStartupFailure( required any Exception, string eventName = "" ) {
+		try {
+			local.root = arguments.Exception;
+			local.depth = 0;
+			while (local.depth < 10) {
+				local.next = $startupFailureCause(local.root);
+				if (IsSimpleValue(local.next)) {
+					break;
+				}
+				local.root = local.next;
+				local.depth++;
+			}
+
+			local.text = "Wheels failed to initialize";
+			if (Len(arguments.eventName)) {
+				local.text &= " in " & arguments.eventName;
+			}
+			local.text &= ": [" & $startupFailureField(local.root, "Type") & "] "
+				& $startupFailureField(local.root, "Message");
+			local.detail = $startupFailureField(local.root, "Detail");
+			if (Len(local.detail)) {
+				local.text &= " -- " & local.detail;
+			}
+			local.frame = $startupFailureFrame(local.root);
+			if (!Len(local.frame)) {
+				local.frame = $startupFailureFrame(arguments.Exception);
+			}
+			if (Len(local.frame)) {
+				local.text &= " (at " & local.frame & ")";
+			}
+			local.wrapper = "[" & $startupFailureField(arguments.Exception, "Type") & "] "
+				& $startupFailureField(arguments.Exception, "Message");
+			if (local.depth > 0 && Compare(local.wrapper, "[" & $startupFailureField(local.root, "Type") & "] "
+				& $startupFailureField(local.root, "Message")) != 0) {
+				local.text &= " (reported as " & local.wrapper & ")";
+			}
+			local.text = ReReplace(local.text, "[\r\n\t]+", " ", "all");
+			if (Len(local.text) > 4000) {
+				local.text = Left(local.text, 4000) & "...";
+			}
+			WriteLog(file = "wheels", type = "error", text = local.text);
+		} catch (any logErr) {
+			// Logging must never mask the original error.
+		}
+	}
+
+	// The exception that caused this one (Adobe RootCause, Lucee/Java Cause),
+	// or "" when there is none.
+	private any function $startupFailureCause( required any failure ) {
+		try {
+			if (IsStruct(arguments.failure)) {
+				for (local.key in ["RootCause", "Cause"]) {
+					if (StructKeyExists(arguments.failure, local.key)) {
+						local.candidate = arguments.failure[local.key];
+						if (!IsNull(local.candidate) && !IsSimpleValue(local.candidate)
+							&& Len($startupFailureField(local.candidate, "Message"))) {
+							return local.candidate;
+						}
+					}
+				}
+			} else if (IsObject(arguments.failure)) {
+				local.candidate = arguments.failure.getCause();
+				if (!IsNull(local.candidate)) {
+					return local.candidate;
+				}
+			}
+		} catch (any causeErr) {
+			// No usable cause.
+		}
+		return "";
+	}
+
+	// A simple field (Type, Message, Detail) of a CFML exception struct or a
+	// Java Throwable, or "" when absent.
+	private string function $startupFailureField( required any failure, required string key ) {
+		try {
+			if (IsStruct(arguments.failure)) {
+				if (StructKeyExists(arguments.failure, arguments.key)) {
+					local.value = arguments.failure[arguments.key];
+					if (!IsNull(local.value) && IsSimpleValue(local.value)) {
+						return Trim(ToString(local.value));
+					}
+				}
+			} else if (IsObject(arguments.failure)) {
+				if (arguments.key == "Type") {
+					return arguments.failure.getClass().getName();
+				}
+				if (arguments.key == "Message") {
+					local.value = arguments.failure.getMessage();
+					if (!IsNull(local.value)) {
+						return Trim(ToString(local.value));
+					}
+				}
+			}
+		} catch (any fieldErr) {
+			// Unreadable field.
+		}
+		return "";
+	}
+
+	// "template:line" of the first tag-context frame, or "" when absent.
+	private string function $startupFailureFrame( required any failure ) {
+		try {
+			if (IsStruct(arguments.failure) && StructKeyExists(arguments.failure, "TagContext")) {
+				local.tagContext = arguments.failure.TagContext;
+				if (IsArray(local.tagContext) && ArrayLen(local.tagContext)) {
+					local.top = local.tagContext[1];
+					return $startupFailureField(local.top, "Template") & ":" & $startupFailureField(local.top, "Line");
+				}
+			}
+		} catch (any frameErr) {
+			// No usable frame.
+		}
+		return "";
 	}
 
 	public boolean function onMissingTemplate( string targetPage ) {
