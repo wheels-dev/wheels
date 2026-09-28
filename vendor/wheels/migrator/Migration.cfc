@@ -24,6 +24,9 @@ component extends="Base" {
 	 *
 	 */
 	public void function up() {
+		// Only this inherited placeholder is left untracked by the migrator; a
+		// migration's own up() is recorded whenever it completes (#3402 B1).
+		request.$wheelsMigrationNotImplemented = true;
 		announce("UP MIGRATION NOT IMPLEMENTED");
 	}
 
@@ -37,6 +40,8 @@ component extends="Base" {
 	 *
 	 */
 	public void function down() {
+		// See up(): only the inherited placeholder keeps its tracking row.
+		request.$wheelsMigrationNotImplemented = true;
 		announce("DOWN MIGRATION NOT IMPLEMENTED");
 	}
 

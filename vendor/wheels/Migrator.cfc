@@ -426,6 +426,7 @@ component output="false" extends="wheels.Global"{
 				request.$wheelsMigrationDidExecute = false;
 				request.$wheelsMigrationDidAnnounce = false;
 				request.$wheelsMigrationDidWork = false;
+				request.$wheelsMigrationNotImplemented = false;
 				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
 				if (application[local.appKey].writeMigratorSQLFiles) {
 					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
@@ -435,7 +436,9 @@ component output="false" extends="wheels.Global"{
 				if (arguments.direction == "down") {
 					arguments.migration.cfc.down();
 					local.result.output &= request.$wheelsMigrationOutput;
-					if ($migrationStepMutatedSchema()) {
+					if ($migrationStepIsPlaceholder()) {
+						local.result.output &= $placeholderNotRecorded(arguments.migration, "down");
+					} else {
 						$removeVersionAsMigrated(arguments.migration.version);
 					}
 				} else if (arguments.direction == "redo") {
@@ -445,7 +448,9 @@ component output="false" extends="wheels.Global"{
 				} else {
 					arguments.migration.cfc.up();
 					local.result.output &= request.$wheelsMigrationOutput;
-					if ($migrationStepMutatedSchema()) {
+					if ($migrationStepIsPlaceholder()) {
+						local.result.output &= $placeholderNotRecorded(arguments.migration, "up");
+					} else {
 						$setVersionAsMigrated(arguments.migration.version, arguments.migration.name);
 					}
 				}
@@ -512,26 +517,42 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * True when the just-run up()/down() did real work. Skip version
-	 * tracking only when the step is truly announce-only: announced,
-	 * no $execute, and no ORM/other persist work. announce() plus
-	 * model().create()/save()/delete() still counts.
+	 * True when the just-run up()/down() was the placeholder inherited from
+	 * wheels.migrator.Migration ("UP/DOWN MIGRATION NOT IMPLEMENTED") and
+	 * nothing else ran through the migrator, so its version must not be
+	 * recorded (up) or dropped (down) (#3402 B1).
+	 *
+	 * Any other step that completes without an error is tracked, as in 4.0.x.
+	 * Do not infer "did nothing" from announce() plus the absence of $execute
+	 * or ORM work: raw queryExecute()/cfquery calls, including ones against
+	 * another datasource, are invisible to the migrator, and treating such a
+	 * step as announce-only left it unrecorded, so it re-ran on every migrate
+	 * and a non-idempotent re-run stalled every migration behind it.
 	 */
-	private boolean function $migrationStepMutatedSchema() {
-		if (!StructKeyExists(request, "$wheelsMigrationDidExecute")) {
-			request.$wheelsMigrationDidExecute = false;
+	private boolean function $migrationStepIsPlaceholder() {
+		if (!StructKeyExists(request, "$wheelsMigrationNotImplemented") || !request.$wheelsMigrationNotImplemented) {
+			return false;
 		}
-		if (!StructKeyExists(request, "$wheelsMigrationDidAnnounce")) {
-			request.$wheelsMigrationDidAnnounce = false;
+		if (StructKeyExists(request, "$wheelsMigrationDidExecute") && request.$wheelsMigrationDidExecute) {
+			return false;
 		}
-		if (!StructKeyExists(request, "$wheelsMigrationDidWork")) {
-			request.$wheelsMigrationDidWork = false;
+		if (StructKeyExists(request, "$wheelsMigrationDidWork") && request.$wheelsMigrationDidWork) {
+			return false;
 		}
-		return !(
-			request.$wheelsMigrationDidAnnounce
-			&& !request.$wheelsMigrationDidExecute
-			&& !request.$wheelsMigrationDidWork
-		);
+		return true;
+	}
+
+	/**
+	 * Logs, and returns for the migration output, the notice for a
+	 * placeholder step whose version tracking was skipped, so an untracked
+	 * version is never silent.
+	 */
+	private string function $placeholderNotRecorded(required struct migration, required string direction) {
+		local.text = arguments.direction == "down"
+			? "Migration #arguments.migration.version# (#arguments.migration.cfcfile#) has no down() of its own; it runs the NOT IMPLEMENTED placeholder, so its version stays recorded as migrated."
+			: "Migration #arguments.migration.version# (#arguments.migration.cfcfile#) has no up() of its own; it runs the NOT IMPLEMENTED placeholder, so its version was not recorded as migrated.";
+		writeLog(file = "wheels", type = "warning", text = local.text);
+		return "Warning: " & local.text & Chr(13) & Chr(10);
 	}
 
 	/**
