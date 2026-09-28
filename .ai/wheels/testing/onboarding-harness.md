@@ -37,7 +37,9 @@ The harness creates a temporary `LUCLI_HOME` at `$TMPDIR/.lucli` (the literal
 directory name when deciding whether to load `Module.cfc` by absolute file
 path). It then mounts the worktree's `cli/lucli/` into
 `$LUCLI_HOME/modules/wheels` (default: symlink, `MODE=copy` for closer
-brew-install simulation), sets `WHEELS_FRAMEWORK_PATH` to the worktree's
+brew-install simulation), also passes `-Dlucli.home=$LUCLI_HOME` through
+`LUCLI_JAVA_ARGS` (the Homebrew launcher re-exports `LUCLI_HOME=~/.wheels`,
+and the system property outranks the env var), sets `WHEELS_FRAMEWORK_PATH` to the worktree's
 `vendor/wheels`, and symlinks the user's existing Lucee Express install
 under `$LUCLI_HOME/express` so the 74MB download is skipped.
 
@@ -47,7 +49,10 @@ falling back to `brew --prefix openjdk@21` for keg-only installs). The
 harness uses to avoid the wrapper's 30-second startup timeout) does not, so
 `JAVA_HOME` must be exported explicitly.
 
-The temp directory is wiped on exit. Use `KEEP_TEMP=1` to preserve it for
+The temp directory is wiped on exit. Cleanup also stops whatever still
+listens on `$PORT` (the Lucee JVM outlives the `server run` launcher) and
+removes `~/.wheels/servers/onboarding-test` / `~/.lucli/servers/onboarding-test`
+if the run created them. Use `KEEP_TEMP=1` to preserve it for
 inspection (logs, generated app, server stdout) — paths are printed at the
 end of the run.
 
@@ -66,7 +71,7 @@ Phase 9:  wheels test prints non-zero counts when a spec exists (issue #2318)
 Phase 10: dev error pages return 5xx/4xx not HTTP 200 (issue #2319)
 Phase 11: wheels generate scaffold tolerates existing model (issue #2327)
 Phase 12: wheels browser setup fetches Playwright (issue #2332)
-Phase 13: wheels destroy controller removes both .cfc and views/ (issue #2330)
+Phase 13: wheels destroy — controller keeps views/, resource form removes them (#2330, #2513)
 Phase 14: wheels generate model produces clean output (issue #2329)
 Phase 15: dev toolbar shows real version (issue #2333)
 ```
@@ -81,6 +86,26 @@ PASS once the fix is detectable in the worktree. All of those issues
 fixed, so on a current worktree the phases run and pass. The harness stays
 green during normal development and lights up regressions automatically —
 you don't need to remember to re-enable a check when an issue closes.
+
+Three phases have caveats worth knowing:
+
+- **Phase 11** re-scaffolds `Post` over Phase 6's tutorial app, then writes
+  the tutorial app back (the scaffold's `index` view links `newPost`, which
+  Phase 6's `only="index,show"` routes don't define, so `/` would 404).
+- **Phase 13** asserts the post-#2513 contract: `wheels destroy <Name>
+  controller` keeps `app/views/<plural>/`; `wheels destroy <Name>` (resource
+  form) removes it.
+- **Phase 15** passes when the toolbar shows a real version. `wheels new`
+  stamps the app's `vendor/wheels/wheels.json`, which `BuildInfo.version()`
+  falls back to, so a worktree run normally shows `<version>-dev`. It skips
+  (instead of failing) only when both `BuildInfo.cfc` and `wheels.json` still
+  hold `@build.version@`, where `0.0.0-dev` is the designed sentinel.
+
+When checking a captured page body, use a here-string —
+`grep -q "needle" <<<"$BODY"` — never `echo "$BODY" | grep -q`. The script
+runs under `set -o pipefail`; dev pages are larger than the 64 KB pipe buffer,
+so `grep -q` exits early, `echo` dies of SIGPIPE, and a present match reads as
+missing (#3733).
 
 ## Modes
 
@@ -145,6 +170,8 @@ The harness needs:
 - `wheels` (i.e. lucli) on `PATH`
 - Java 21 (`brew install openjdk@21` on macOS)
 - An existing Lucee Express install under `~/.wheels/express/` or `~/.lucli/express/` (created by any prior `wheels start` — the symlink reuses it). If neither exists, the harness will trigger one during Phase 3 (slower first run).
+- `BaseModule.cfc` under `~/.wheels/modules/` or `~/.lucli/modules/` (from the installed CLI)
+- `lsof` (or `fuser`) to stop the server JVM on exit
 - `sqlite3` on PATH (used to verify schema)
 
 If `sqlite3` is missing, the schema verification check skips with a warning;

@@ -48,6 +48,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// call-site gating tests below can drive it directly.
 		makePublic(variables.mod, "generateAdmin");
 		makePublic(variables.mod, "$requireOwnRunningServer");
+		makePublic(variables.mod, "$resolveLucliHome");
 	}
 
 	function afterAll() {
@@ -271,6 +272,32 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				registry.clean(registry.serverNameFor(variables.tempRoot));
 				var m = moduleWithRegistry(registry);
 				expect(() => m.$requireOwnRunningServer(["hint"])).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+		});
+
+		describe("LuCLI home resolution — $resolveLucliHome (##3733)", () => {
+
+			// The server registry lives under <home>/servers/. LuCLI itself
+			// ranks -Dlucli.home above $LUCLI_HOME (the documented way past the
+			// brew launcher's LUCLI_HOME export), so the module must too — or
+			// `wheels test` looks for the server in a different tree than the
+			// one `server run` registered it in.
+
+			it("prefers the lucli.home system property over the LUCLI_HOME env var", () => {
+				var sys = createObject("java", "java.lang.System");
+				var prior = sys.getProperty("lucli.home");
+				var probe = getTempDirectory() & "wheels-lucli-home-" & createUUID();
+				sys.setProperty("lucli.home", probe);
+				try {
+					expect(variables.mod.$resolveLucliHome()).toBe(probe);
+				} finally {
+					if (isNull(prior)) {
+						sys.clearProperty("lucli.home");
+					} else {
+						sys.setProperty("lucli.home", prior);
+					}
+				}
 			});
 
 		});

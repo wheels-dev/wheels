@@ -9445,6 +9445,11 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Resolve the LuCLI home root. Order of resolution:
+	 *   0. The -Dlucli.home JVM system property, set only when passed
+	 *      explicitly. LuCLI ranks it above the env var, and it is the
+	 *      documented way past the brew launcher's LUCLI_HOME export. Reading
+	 *      the env var first sent `wheels test` to the wrong server registry
+	 *      (#3733).
 	 *   1. $LUCLI_HOME if set (e.g. brew wrapper exports $HOME/.wheels).
 	 *   2. $HOME/.<lucli.binary.name> — LuCLI auto-roots to ~/.<binary> when
 	 *      invoked under a symlinked binary name. `wheels` resolves to
@@ -9453,6 +9458,11 @@ component extends="modules.BaseModule" {
 	 */
 	private string function $resolveLucliHome() {
 		var javaSystem = createObject("java", "java.lang.System");
+		// 0. JVM system property (outranks the env var, as in LuCLI itself).
+		try {
+			var homeProp = javaSystem.getProperty("lucli.home");
+			if (!isNull(homeProp) && len(homeProp)) return homeProp;
+		} catch (any e) {}
 		// 1. Explicit override.
 		try {
 			var override = javaSystem.getenv("LUCLI_HOME");

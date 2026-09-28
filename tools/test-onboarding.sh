@@ -2,7 +2,8 @@
 # tools/test-onboarding.sh — Local fresh-install onboarding harness
 #
 # Simulates what a brand-new user experiences: fresh wheels CLI, fresh app,
-# tutorial walkthrough. Uses LUCLI_HOME isolation so it doesn't touch your
+# tutorial walkthrough. Uses LUCLI_HOME isolation (env var + -Dlucli.home, which
+# survives the brew launcher's LUCLI_HOME override) so it doesn't touch your
 # daily wheels install at ~/.wheels/.
 #
 # Mirrors the structure of the journals produced by fresh-VM tutorial
@@ -28,7 +29,7 @@
 #   Phase 2 also covers — wheels new printed paths missing prefixes (#2328)
 #   Phase 11 — wheels generate scaffold aborts when model exists (#2327)
 #   Phase 12 — wheels browser install does nothing (#2332)
-#   Phase 13 — wheels destroy controller leaves views behind (#2330)
+#   Phase 13 — wheels destroy: controller keeps views, resource form cascades (#2330, #2513)
 #   Phase 14 — wheels generate model writes orphan blank lines (#2329)
 #   Phase 15 — dev toolbar shows 0.0.0-dev (#2333)
 #
@@ -37,6 +38,11 @@
 # development and lights up regressions automatically.
 
 set -uo pipefail
+# Under pipefail, never test a captured page with `echo "$BODY" | grep -q`:
+# grep -q exits on the first match, and on a body larger than the pipe buffer
+# (~64 KB; the dev toolbar alone pushes pages past that) `echo` then dies of
+# SIGPIPE, so the pipeline fails and a PRESENT match reads as missing (#3733).
+# Feed grep a here-string instead: `grep -q "needle" <<<"$BODY"`.
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${PORT:-9988}"
@@ -54,6 +60,21 @@ SERVER_STARTED=false
 TMPDIR=""
 APP_DIR=""
 
+# LuCLI keeps per-server state (conf, logs, lucee-server, server.pid) in
+# <home>/servers/<name>. The Homebrew `wheels` launcher exports
+# LUCLI_HOME=~/.wheels unconditionally, so on a brew install that state lands
+# in the real ~/.wheels/servers/ even though Phase 1 exports an isolated
+# LUCLI_HOME (#3733). Phase 1 also passes -Dlucli.home, which outranks the
+# environment variable; as a backstop, cleanup() removes these directories when
+# they did not exist before this run.
+SERVER_DIR_CANDIDATES="$HOME/.wheels/servers/$APP_NAME
+$HOME/.lucli/servers/$APP_NAME"
+SERVER_DIRS_PREEXISTING=""
+while IFS= read -r dir; do
+    [ -n "$dir" ] && [ -e "$dir" ] && SERVER_DIRS_PREEXISTING="$SERVER_DIRS_PREEXISTING$dir
+"
+done <<<"$SERVER_DIR_CANDIDATES"
+
 # ── Helpers ────────────────────────────────────────
 
 cleanup() {
@@ -63,7 +84,21 @@ cleanup() {
         kill "$SERVER_PID" 2>/dev/null || true
         sleep 1
         kill -9 "$SERVER_PID" 2>/dev/null || true
+        # $SERVER_PID is the `server run` launcher. Its Lucee JVM child
+        # survives the launcher's death (re-parented to PID 1) and keeps
+        # listening on $PORT, so the next run on that port fails Phase 3 with
+        # "port already in use" (#3733). Stop whatever still listens there.
+        stop_port_listeners
     fi
+    # Remove per-server state LuCLI wrote outside $LUCLI_HOME, but only the
+    # directories this run created (see SERVER_DIR_CANDIDATES).
+    while IFS= read -r dir; do
+        [ -z "$dir" ] && continue
+        case "$SERVER_DIRS_PREEXISTING" in
+            *"$dir"*) ;;
+            *) [ -d "$dir" ] && rm -rf "$dir" ;;
+        esac
+    done <<<"$SERVER_DIR_CANDIDATES"
     if [ "${KEEP_TEMP:-0}" != "1" ] && [ -n "${TMPDIR:-}" ] && [ -d "$TMPDIR" ]; then
         rm -rf "$TMPDIR"
     elif [ "${KEEP_TEMP:-0}" = "1" ] && [ -n "${TMPDIR:-}" ]; then
@@ -75,6 +110,27 @@ cleanup() {
     fi
 }
 trap cleanup EXIT
+
+# PIDs listening on $PORT. lsof is the portable choice (macOS + Linux); fall
+# back to fuser where lsof is missing.
+port_listener_pids() {
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true
+    elif command -v fuser >/dev/null 2>&1; then
+        fuser -n tcp "$PORT" 2>/dev/null || true
+    fi
+}
+
+stop_port_listeners() {
+    local pids pid
+    pids="$(port_listener_pids)"
+    [ -z "$pids" ] && return 0
+    for pid in $pids; do kill "$pid" 2>/dev/null || true; done
+    sleep 2
+    pids="$(port_listener_pids)"
+    for pid in $pids; do kill -9 "$pid" 2>/dev/null || true; done
+    return 0
+}
 
 pass() { TOTAL=$((TOTAL+1)); PASS=$((PASS+1)); echo "  ✓ $1"; }
 fail() { TOTAL=$((TOTAL+1)); FAIL=$((FAIL+1)); echo "  ✗ $1"; }
@@ -94,6 +150,15 @@ phase() {
     fi
     section "Phase $n: $title"
     return 0
+}
+
+# Byte size of a file (0 when missing). Not `stat -f %z || stat -c %s`: GNU
+# `stat -f` means --file-system and exits 0, so on Linux that chain captured a
+# multi-line filesystem report instead of a number.
+file_size() {
+    local n
+    n=$(wc -c < "$1" 2>/dev/null | tr -d ' ') || n=0
+    echo "${n:-0}"
 }
 
 http_get() {
@@ -197,6 +262,14 @@ if phase 1 "Setup isolated LUCLI_HOME"; then
         # LuceeScriptEngine.java:1107-1126.
         export LUCLI_HOME="$TMPDIR/.lucli"
         mkdir -p "$LUCLI_HOME/modules"
+        # The Homebrew `wheels` launcher re-exports LUCLI_HOME=~/.wheels, which
+        # silently undoes the export above (server state then lands in
+        # ~/.wheels/servers/, #3733). LuCLI's JVM bootstrap appends
+        # LUCLI_JAVA_ARGS to the java command line, and the -Dlucli.home system
+        # property outranks the LUCLI_HOME env variable (in LuCLI, and in the
+        # module's $resolveLucliHome(), which `wheels test` uses to find this
+        # server's registration).
+        export LUCLI_JAVA_ARGS="${LUCLI_JAVA_ARGS:-} -Dlucli.home=$LUCLI_HOME"
 
         # Mount the worktree's cli/lucli/ as the wheels module. We use a SYMLINK
         # rather than a copy because Module.cfc and several services/ files use
@@ -224,14 +297,23 @@ if phase 1 "Setup isolated LUCLI_HOME"; then
             exit 1
         fi
 
-        # Copy BaseModule.cfc (lives in ~/.wheels/modules/, not in cli/lucli/).
-        if [ -f "$HOME/.wheels/modules/BaseModule.cfc" ]; then
-            cp "$HOME/.wheels/modules/BaseModule.cfc" "$LUCLI_HOME/modules/BaseModule.cfc"
-            [ -f "$HOME/.wheels/modules/.BaseModule.version" ] && \
-                cp "$HOME/.wheels/modules/.BaseModule.version" "$LUCLI_HOME/modules/.BaseModule.version"
-            pass "BaseModule.cfc copied from installed wheels"
+        # Copy BaseModule.cfc (lives in the installed CLI's modules/ dir, not in
+        # cli/lucli/): ~/.wheels for the brew `wheels` binary, ~/.lucli for a
+        # raw `lucli` runtime.
+        BASEMODULE_SRC=""
+        for src in "$HOME/.wheels/modules" "$HOME/.lucli/modules"; do
+            if [ -f "$src/BaseModule.cfc" ]; then
+                BASEMODULE_SRC="$src"
+                break
+            fi
+        done
+        if [ -n "$BASEMODULE_SRC" ]; then
+            cp "$BASEMODULE_SRC/BaseModule.cfc" "$LUCLI_HOME/modules/BaseModule.cfc"
+            [ -f "$BASEMODULE_SRC/.BaseModule.version" ] && \
+                cp "$BASEMODULE_SRC/.BaseModule.version" "$LUCLI_HOME/modules/.BaseModule.version"
+            pass "BaseModule.cfc copied from $BASEMODULE_SRC"
         else
-            fail "BaseModule.cfc not found at \$HOME/.wheels/modules/BaseModule.cfc — install wheels via brew first"
+            fail "BaseModule.cfc not found under \$HOME/.wheels/modules or \$HOME/.lucli/modules — install wheels via brew first"
             exit 1
         fi
 
@@ -403,7 +485,7 @@ if phase 3 "Server boot + sqlite-jdbc shim (formula simulation)"; then
     [ -f "$APP_DIR/db/test.sqlite" ]        || touch "$APP_DIR/db/test.sqlite"
 
     # Free the port if anything is squatting it.
-    lsof -ti :"$PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
+    stop_port_listeners
     sleep 1
 
     # Start the server in the background. Use `lucli server run` directly rather
@@ -461,21 +543,21 @@ if phase 3 "Server boot + sqlite-jdbc shim (formula simulation)"; then
     # markers too.
     http_get "/" BODY CODE
     if [ "$CODE" = "200" ]; then
-        if echo "$BODY" | grep -qiE "DI\.CircularDependency|Circular dependency detected"; then
+        if grep -qiE "DI\.CircularDependency|Circular dependency detected" <<<"$BODY"; then
             # F1 / issue #2331: the very first request shows DI.CircularDependency
             # with HTTP 200. The fresh-VM workaround is `wheels reload` then
             # refresh; the harness shouldn't silently mask this if it reproduces.
             skip "homepage returns 200 but body contains DI.CircularDependency — issue #2331 not fixed yet"
-            echo "$BODY" | grep -m1 -iE "Resolution chain|Circular dependency" | sed 's/^/      | /'
-        elif echo "$BODY" | grep -qiE "BundleException|sqlite-jdbc|sqlite\.JDBC"; then
+            grep -m1 -iE "Resolution chain|Circular dependency" <<<"$BODY" | sed 's/^/      | /'
+        elif grep -qiE "BundleException|sqlite-jdbc|sqlite\.JDBC" <<<"$BODY"; then
             fail "homepage returns 200 but body shows JDBC bundle error — sqlite-jdbc not loaded"
-            echo "$BODY" | grep -iE "BundleException|sqlite-jdbc|sqlite\.JDBC" | head -3 | sed 's/^/      /'
+            grep -iE "BundleException|sqlite-jdbc|sqlite\.JDBC" <<<"$BODY" | head -3 | sed 's/^/      /'
         else
             pass "homepage returns 200 with no known error markers"
         fi
     else
         fail "homepage returns $CODE (expected 200) — sqlite-jdbc may not be loading"
-        echo "$BODY" | grep -iE "BundleException|sqlite-jdbc|sqlite\.JDBC" | head -3 | sed 's/^/      /'
+        grep -iE "BundleException|sqlite-jdbc|sqlite\.JDBC" <<<"$BODY" | head -3 | sed 's/^/      /'
     fi
 fi
 
@@ -551,7 +633,7 @@ CFML
     # F2/F5: this is where the second user got the "false success" — verify the
     # actual schema by hitting the database file directly.
     SQLITE_DB="$APP_DIR/db/development.sqlite"
-    DB_SIZE=$(stat -f %z "$SQLITE_DB" 2>/dev/null || stat -c %s "$SQLITE_DB" 2>/dev/null || echo 0)
+    DB_SIZE=$(file_size "$SQLITE_DB")
     if [ "$DB_SIZE" -gt 0 ]; then
         pass "F5: db/development.sqlite is non-empty ($DB_SIZE bytes)"
     else
@@ -561,7 +643,7 @@ CFML
 
     if command -v sqlite3 >/dev/null 2>&1; then
         SCHEMA=$(sqlite3 "$SQLITE_DB" ".schema posts" 2>/dev/null || true)
-        if echo "$SCHEMA" | grep -qi "CREATE TABLE.*posts"; then
+        if grep -qi "CREATE TABLE.*posts" <<<"$SCHEMA"; then
             pass "F5: posts table exists in development.sqlite"
             echo "      $SCHEMA" | head -1 | sed 's/^/      | /'
         else
@@ -652,15 +734,12 @@ CFML
     fi
 fi
 
-# ══════════════════════════════════════════════════
-#  Phase 6: CRUD walkthrough (chapters 2-3 checkpoints)
-# ══════════════════════════════════════════════════
-
-if phase 6 "CRUD walkthrough — controller + views + routes (ch02-ch03 checkpoints)"; then
-    cd "$APP_DIR" || exit 1
-
+# Chapter 2-3 tutorial app: Post model, index/show controller + views, and
+# routes with root -> posts##index. Phase 6 writes it; Phase 11 writes it again
+# after its scaffold probe regenerates the same files (#3733).
+write_tutorial_posts_app() {
     # Chapter 2 model
-    cat > "app/models/Post.cfc" <<'CFML'
+    cat > "$APP_DIR/app/models/Post.cfc" <<'CFML'
 component extends="Model" {
     function config() {
         enum(property="status", values="draft,published,archived");
@@ -669,7 +748,7 @@ component extends="Model" {
 CFML
 
     # Chapter 2 controller (index + show only)
-    cat > "app/controllers/Posts.cfc" <<'CFML'
+    cat > "$APP_DIR/app/controllers/Posts.cfc" <<'CFML'
 component extends="Controller" {
     function index() {
         posts = model("Post").published().findAll(order="publishedAt DESC");
@@ -680,9 +759,11 @@ component extends="Controller" {
 }
 CFML
 
-    # Views
-    mkdir -p "app/views/posts"
-    cat > "app/views/posts/index.cfm" <<'CFML'
+    # Views. Start from an empty directory so a re-write also drops any
+    # scaffold-generated views (new/edit/_form) that link undefined routes.
+    rm -rf "$APP_DIR/app/views/posts"
+    mkdir -p "$APP_DIR/app/views/posts"
+    cat > "$APP_DIR/app/views/posts/index.cfm" <<'CFML'
 <cfparam name="posts" default="">
 <cfoutput>
 <h1>Posts</h1>
@@ -695,7 +776,7 @@ CFML
 </cfoutput>
 CFML
 
-    cat > "app/views/posts/show.cfm" <<'CFML'
+    cat > "$APP_DIR/app/views/posts/show.cfm" <<'CFML'
 <cfparam name="post" default="">
 <cfoutput>
 <h1>#post.title#</h1>
@@ -704,7 +785,7 @@ CFML
 CFML
 
     # Routes
-    cat > "config/routes.cfm" <<'CFML'
+    cat > "$APP_DIR/config/routes.cfm" <<'CFML'
 <cfscript>
 mapper()
     .resources(name="posts", only="index,show")
@@ -713,7 +794,16 @@ mapper()
 .end();
 </cfscript>
 CFML
+}
 
+# ══════════════════════════════════════════════════
+#  Phase 6: CRUD walkthrough (chapters 2-3 checkpoints)
+# ══════════════════════════════════════════════════
+
+if phase 6 "CRUD walkthrough — controller + views + routes (ch02-ch03 checkpoints)"; then
+    cd "$APP_DIR" || exit 1
+
+    write_tutorial_posts_app
     pass "ch02-ch03 model/controller/views/routes written"
 
     # Reload
@@ -724,21 +814,21 @@ CFML
     # Index page
     http_get "/posts" BODY CODE
     if [ "$CODE" = "200" ]; then
-        if echo "$BODY" | grep -q "Hello world"; then
+        if grep -q "Hello world" <<<"$BODY"; then
             pass "GET /posts returns 200 with seeded post"
         else
             fail "GET /posts returns 200 but missing 'Hello world' content"
-            echo "$BODY" | head -20 | sed 's/^/      /'
+            head -20 <<<"$BODY" | sed 's/^/      /'
         fi
     else
         fail "GET /posts returns $CODE (expected 200)"
-        echo "$BODY" | grep -iE "error|exception" | head -3 | sed 's/^/      /'
+        grep -iE "error|exception" <<<"$BODY" | head -3 | sed 's/^/      /'
     fi
 
     # Show page
     http_get "/posts/1" BODY CODE
     if [ "$CODE" = "200" ]; then
-        if echo "$BODY" | grep -qE "Hello world|Learning Wheels"; then
+        if grep -qE "Hello world|Learning Wheels" <<<"$BODY"; then
             pass "GET /posts/1 returns 200 with post body"
         else
             fail "GET /posts/1 returns 200 but missing post content"
@@ -750,7 +840,7 @@ CFML
     # Root → posts index
     http_get "/" BODY CODE
     if [ "$CODE" = "200" ]; then
-        if echo "$BODY" | grep -q "Posts"; then
+        if grep -q "Posts" <<<"$BODY"; then
             pass "GET / returns 200 (root mapped to posts##index)"
         else
             skip "GET / returns 200 but no 'Posts' heading (welcome page may be intercepting)"
@@ -810,7 +900,7 @@ if phase 8 "wheels routes returns route table not API JSON dump (issue #2317)"; 
 
     ROUTES_LOG="$TMPDIR/wheels-routes.log"
     if "$WHEELS_CMD" routes > "$ROUTES_LOG" 2>&1; then
-        SIZE=$(stat -f %z "$ROUTES_LOG" 2>/dev/null || stat -c %s "$ROUTES_LOG" 2>/dev/null || echo 0)
+        SIZE=$(file_size "$ROUTES_LOG")
         # The framework API-reference dump is hundreds of KB; a route table for a
         # fresh app is dozens to a few thousand bytes. 50KB is well above any
         # plausible route table for a fresh app and well below the API dump.
@@ -938,6 +1028,8 @@ if phase 11 "wheels generate scaffold tolerates existing model (issue #2327)"; t
     cd "$APP_DIR" || exit 1
 
     SCAFFOLD_LOG="$TMPDIR/wheels-scaffold.log"
+    MIGRATIONS_BEFORE="$TMPDIR/phase11-migrations.before"
+    ls "$APP_DIR/app/migrator/migrations" > "$MIGRATIONS_BEFORE" 2>/dev/null || true
     "$WHEELS_CMD" generate scaffold Post title:string body:text status:enum --force \
         > "$SCAFFOLD_LOG" 2>&1 || true
 
@@ -956,6 +1048,17 @@ if phase 11 "wheels generate scaffold tolerates existing model (issue #2327)"; t
         skip "wheels generate scaffold output unrecognized — review $SCAFFOLD_LOG"
         head -10 "$SCAFFOLD_LOG" | sed 's/^/      | /'
     fi
+
+    # The probe overwrote Phase 6's tutorial app: the scaffold's index view
+    # links route="newPost", which Phase 6's only="index,show" routes don't
+    # define, so `/` rendered Wheels.RouteNotFound (404) and Phase 15 could
+    # not read the toolbar (#3733). Put the tutorial app back and drop any
+    # migration the scaffold added.
+    write_tutorial_posts_app
+    for f in "$APP_DIR/app/migrator/migrations/"*; do
+        [ -e "$f" ] || continue
+        grep -qxF "$(basename "$f")" "$MIGRATIONS_BEFORE" 2>/dev/null || rm -f "$f"
+    done
 fi
 
 # ══════════════════════════════════════════════════
@@ -999,55 +1102,70 @@ if phase 12 "wheels browser setup fetches Playwright (issue #2332)"; then
 fi
 
 # ══════════════════════════════════════════════════
-#  Phase 13: wheels destroy controller removes views too (issue #2330)
+#  Phase 13: wheels destroy scoping — controller keeps views, resource cascades
 # ══════════════════════════════════════════════════
 #
-# Surfaced by fresh-VM 2026-04-27 finding #9: `wheels destroy <Name> controller`
-# (a) silently does nothing without --force, and (b) with --force removes only
-# the .cfc but leaves the matching app/views/<plural>/ directory behind. The
-# tutorial says "Drop the hand-written controller and views" — the docs and
-# the CLI disagree.
+# Surfaced by fresh-VM 2026-04-27 finding #9 (#2330): `wheels destroy <Name>
+# controller` left app/views/<plural>/ behind. #2330 briefly made the type-scoped
+# form cascade to views, but #2493/#2513 reversed that on purpose — a
+# hand-written partial must not be wiped by `destroy controller`. The contract
+# now (cli/lucli/services/Destroy.cfc::destroyController / destroyResource):
+#   - `wheels destroy <Name> controller` removes the .cfc and KEEPS the views;
+#   - `wheels destroy <Name>` (resource form) removes controller AND views.
 
-if phase 13 "wheels destroy controller removes both .cfc and views/ (issue #2330)"; then
+if phase 13 "wheels destroy — controller keeps views/, resource form removes them (#2330, #2513)"; then
     cd "$APP_DIR" || exit 1
 
     # Use a plural, conventional name. Non-conventional singular names (e.g.
-    # 'WidgetTest') trigger a separate name-mangling bug where destroy looks
-    # for 'Widgettests.cfc' and emits "Not found" — that's its own bug, but
-    # not the one we're isolating here. Stick to convention to test the
-    # views-not-removed claim cleanly.
+    # 'WidgetTest') used to trigger a separate name-mangling bug (#2330
+    # side-finding); stick to convention to isolate the view-scoping contract.
+    MIGRATIONS_BEFORE="$TMPDIR/phase13-migrations.before"
+    ls "$APP_DIR/app/migrator/migrations" > "$MIGRATIONS_BEFORE" 2>/dev/null || true
     "$WHEELS_CMD" generate controller Widgets index > /dev/null 2>&1 || true
 
-    if [ ! -f "$APP_DIR/app/controllers/Widgets.cfc" ]; then
-        skip "could not generate Widgets controller — skipping destroy check"
+    if [ ! -f "$APP_DIR/app/controllers/Widgets.cfc" ] || [ ! -d "$APP_DIR/app/views/widgets" ]; then
+        skip "could not generate Widgets controller + views — skipping destroy check"
     else
+        # 1. Type-scoped form: controller goes, views stay.
         DESTROY_LOG="$TMPDIR/wheels-destroy.log"
         "$WHEELS_CMD" destroy Widgets controller --force > "$DESTROY_LOG" 2>&1 || true
 
-        CONTROLLER_REMOVED="false"
-        [ ! -f "$APP_DIR/app/controllers/Widgets.cfc" ] && CONTROLLER_REMOVED="true"
-
-        VIEWS_REMOVED="true"
-        [ -d "$APP_DIR/app/views/widgets" ] && VIEWS_REMOVED="false"
-
-        if [ "$CONTROLLER_REMOVED" = "true" ] && [ "$VIEWS_REMOVED" = "true" ]; then
-            pass "wheels destroy controller removed both .cfc and views/"
-        elif [ "$CONTROLLER_REMOVED" = "true" ] && [ "$VIEWS_REMOVED" = "false" ]; then
-            skip "wheels destroy controller removed .cfc but left views/ behind — issue #2330 not fixed yet"
-            ls "$APP_DIR/app/views/widgets" 2>/dev/null | head -3 | sed 's/^/      | views\/widgets\//'
-        elif grep -qiE "Not found|skip[[:space:]]+Not found" "$DESTROY_LOG"; then
-            skip "wheels destroy reported 'Not found' on the file it just created — name-mangling bug related to #2330"
+        if [ -f "$APP_DIR/app/controllers/Widgets.cfc" ]; then
+            fail "wheels destroy Widgets controller --force left app/controllers/Widgets.cfc in place"
             head -8 "$DESTROY_LOG" | sed 's/^/      | /'
+        elif [ -d "$APP_DIR/app/views/widgets" ]; then
+            pass "wheels destroy controller removed the .cfc and kept app/views/widgets/ (#2513 contract)"
         else
-            skip "wheels destroy behavior unclear (controller_removed=$CONTROLLER_REMOVED views_removed=$VIEWS_REMOVED)"
+            fail "wheels destroy controller also deleted app/views/widgets/ — views must be kept (#2513 regression)"
             head -8 "$DESTROY_LOG" | sed 's/^/      | /'
         fi
 
-        # Belt-and-suspenders cleanup so re-runs don't accumulate stale dirs.
-        rm -rf "$APP_DIR/app/views/widgets" 2>/dev/null
-        rm -f "$APP_DIR/app/controllers/Widgets.cfc" 2>/dev/null
-        rm -f "$APP_DIR/tests/specs/controllers/WidgetsSpec.cfc" 2>/dev/null
+        # 2. Resource form: cascades to views. Regenerate the controller first
+        # so the cascade has both a .cfc and a views/ directory to remove.
+        "$WHEELS_CMD" generate controller Widgets index > /dev/null 2>&1 || true
+        mkdir -p "$APP_DIR/app/views/widgets"
+        DESTROY_RES_LOG="$TMPDIR/wheels-destroy-resource.log"
+        "$WHEELS_CMD" destroy Widgets --force > "$DESTROY_RES_LOG" 2>&1 || true
+
+        if [ ! -d "$APP_DIR/app/views/widgets" ] && [ ! -f "$APP_DIR/app/controllers/Widgets.cfc" ]; then
+            pass "wheels destroy Widgets (resource form) removed the controller and app/views/widgets/"
+        else
+            fail "wheels destroy Widgets (resource form) left controller or views behind"
+            ls -d "$APP_DIR/app/controllers/Widgets.cfc" "$APP_DIR/app/views/widgets" 2>/dev/null | sed 's/^/      | /'
+            head -12 "$DESTROY_RES_LOG" | sed 's/^/      | /'
+        fi
     fi
+
+    # Cleanup so later phases and re-runs see no Widgets leftovers — including
+    # the drop-table migration the resource form generates.
+    rm -rf "$APP_DIR/app/views/widgets" 2>/dev/null
+    rm -f "$APP_DIR/app/controllers/Widgets.cfc" 2>/dev/null
+    rm -f "$APP_DIR/tests/specs/controllers/WidgetsSpec.cfc" \
+          "$APP_DIR/tests/specs/controllers/WidgetsControllerSpec.cfc" 2>/dev/null
+    for f in "$APP_DIR/app/migrator/migrations/"*; do
+        [ -e "$f" ] || continue
+        grep -qxF "$(basename "$f")" "$MIGRATIONS_BEFORE" 2>/dev/null || rm -f "$f"
+    done
 fi
 
 # ══════════════════════════════════════════════════
@@ -1105,15 +1223,30 @@ if phase 15 "dev toolbar shows real version (issue #2333)"; then
     curl -s -o /dev/null --max-time 30 "http://localhost:$PORT/?reload=true&password=$local_password" || true
     sleep 2
 
+    # BuildInfo.version() falls back to vendor/wheels/wheels.json when
+    # BuildInfo.cfc is unstamped, and reports the 0.0.0-dev sentinel only when
+    # BOTH still hold the `@build.version@` placeholder (a raw source copy that
+    # neither tools/build/scripts/prepare-core.sh nor `wheels new` stamped).
+    # 0.0.0-dev is then correct by design, so skip rather than fail.
+    UNSTAMPED_BUILD=false
+    if grep -qF "@build.version@" "$APP_DIR/vendor/wheels/BuildInfo.cfc" 2>/dev/null && \
+       { [ ! -f "$APP_DIR/vendor/wheels/wheels.json" ] || \
+         grep -qF "@build.version@" "$APP_DIR/vendor/wheels/wheels.json" 2>/dev/null; }; then
+        UNSTAMPED_BUILD=true
+    fi
+
     http_get "/" BODY CODE
     if [ "$CODE" != "200" ]; then
-        skip "homepage returned $CODE (expected 200) — cannot check toolbar version"
-    elif echo "$BODY" | grep -qiE "0\.0\.0-dev"; then
-        skip "dev toolbar still shows 0.0.0-dev — issue #2333 not fixed yet"
-        echo "$BODY" | grep -oiE "Wheels Version[^<]{0,40}" | head -1 | sed 's/^/      | /'
-    elif echo "$BODY" | grep -qiE "Wheels Version"; then
+        fail "homepage returned $CODE (expected 200) — cannot check toolbar version"
+        grep -oiE "Wheels\.[A-Za-z]+|RouteNotFound[^<]{0,80}" <<<"$BODY" | head -2 | sed 's/^/      | /'
+    elif grep -qiE "0\.0\.0-dev" <<<"$BODY" && [ "$UNSTAMPED_BUILD" = "true" ]; then
+        skip "dev toolbar shows 0.0.0-dev — expected for an unstamped source checkout (@build.version@)"
+    elif grep -qiE "0\.0\.0-dev" <<<"$BODY"; then
+        fail "dev toolbar shows 0.0.0-dev on a stamped build (issue #2333 regression)"
+        tr -d '\n' <<<"$BODY" | grep -oiE "Wheels Version</dt>[[:space:]]*<dd>[^<]{0,40}" | head -1 | sed -e 's/<[^>]*>/ /g' -e 's/^/      | /'
+    elif grep -qiE "Wheels Version" <<<"$BODY"; then
         pass "dev toolbar shows a non-placeholder version"
-        echo "$BODY" | grep -oiE "Wheels Version[^<]{0,40}" | head -1 | sed 's/^/      | /'
+        tr -d '\n' <<<"$BODY" | grep -oiE "Wheels Version</dt>[[:space:]]*<dd>[^<]{0,40}" | head -1 | sed -e 's/<[^>]*>/ /g' -e 's/^/      | /'
     else
         skip "no 'Wheels Version' marker in homepage body — toolbar layout may have changed"
     fi
