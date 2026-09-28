@@ -106,6 +106,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
   RewriteRule ^/ws/.*$ - [L]
   ```
   CommandBox/Undertow (`urlrewrite.xml`) is unchanged: on Undertow the extension accepts the upgrade but never runs the listener, so there is no working WebSocket path there yet (#3676, wheels-dev/wheels-websockets#1)
+- Migrations whose `up()` does its work with raw `queryExecute()` or `cfquery`, for example DDL against a second datasource, and then calls `announce()` are recorded in the migrator versions table again. 4.1.0 treated them as announce-only and never recorded them, so they re-ran on every migrate, and a re-run that fails (such as `CREATE TABLE` on an existing table) stalled every migration behind it. Only a migration that keeps the inherited `NOT IMPLEMENTED` placeholder `up()`/`down()` is left untracked now, and the migrator logs a warning when it skips one. After upgrading, a version 4.1.0 left unrecorded runs once more and is then recorded. If that re-run fails because its work is already applied, mark it as applied with `wheels migrate pretend <version> --yes`
 
 ### Security
 
