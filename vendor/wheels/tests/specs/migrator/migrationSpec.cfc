@@ -1165,7 +1165,10 @@ component extends="wheels.WheelsTest" {
 			it("throws Wheels.IncorrectArguments when neither name nor tableName is passed", () => {
 				// $combineArguments(required=true) only throws when
 				// showErrorInformation is on (see primaryKeySpec.cfc).
-				var _origShowErr = application.wheels.showErrorInformation
+				// Keep the semicolon: on Adobe 2023 an unterminated
+				// `var x = application.<...>` followed by a non-`var` statement
+				// fails to compile (MissingNameException on the describe line).
+				var _origShowErr = application.wheels.showErrorInformation;
 				application.wheels.showErrorInformation = true
 				try {
 					expect(function() {
