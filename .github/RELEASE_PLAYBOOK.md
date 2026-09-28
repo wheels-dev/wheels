@@ -45,6 +45,40 @@ on them is green. ~5 minutes/day max.
    the last GA, the `bump-develop-version.yml` workflow set it to next-patch;
    if you're shipping a bigger bump, update it manually.
 
+### Release readiness (required)
+
+Policy: every release should be better than the last, so nothing ships while
+known problems are still open. Two checks on the release PR into `main` enforce
+this; both must be green before you merge.
+
+1. **Every open issue and PR is resolved or explicitly deferred.**
+   `release-readiness.yml` ("Release readiness" check) lists every open issue
+   and every open PR in the repository, excluding the release PR itself, and
+   fails if any are not labelled `deferred`. That includes draft PRs,
+   Dependabot/Renovate PRs, and the `compat-matrix-failure` tracking issue (an
+   open matrix failure always blocks). To defer something, label it `deferred`
+   **and** leave a comment giving the reason. The `deferred` label is created
+   by the workflow if it is missing.
+2. **The full compatibility matrix is green on the release PR.**
+   `compat-matrix.yml` runs every engine x database leg (including Oracle and
+   RustCFML) on PRs into `main`, so the exact tree being released is tested.
+   The "Compatibility Matrix Gate" check is the single pass/fail for all legs,
+   and the per-leg grid is posted as a "Wheels Test Matrix" PR comment.
+
+**Reading the gate:** open the "Release readiness" run and look at its job
+summary. It has a **blocking** table (number, type, title, labels, author,
+link) and a **deferred** table. Deferred items don't block, but they are listed
+so you can sanity-check each one before you ship. Issues and PRs change without
+a push to the release PR, so after resolving or deferring items, click
+**Re-run jobs** on the check. You can also run "Release Readiness" from the
+Actions tab (optionally with the release PR number as `exclude`) at any time to
+see how far a release is from ready.
+
+**Repository setting (admin, one-time):** in the `main` ruleset, add
+**Release readiness** and **Compatibility Matrix Gate** as required status
+checks. Until that's done, both checks report but a red result doesn't stop
+the merge.
+
 ### Release day
 
 `main` has a **"PRs only" ruleset** — `git push origin main` is rejected with
@@ -59,6 +93,9 @@ git checkout -b release/X.Y.Z-to-main
 git push -u origin release/X.Y.Z-to-main
 gh pr create --base main --head release/X.Y.Z-to-main \
   --title "Release X.Y.Z" --body "Cut X.Y.Z. See CHANGELOG."
+
+#    Wait for "Release readiness" and "Compatibility Matrix Gate" to go green
+#    (see "Release readiness (required)" above). Do not merge on red.
 
 # 2. Merge with "Create a merge commit" (NOT squash — preserves develop
 #    history on main). Requires the repo setting "Allow merge commits"
@@ -211,3 +248,5 @@ If any pin to `<X.Y.Z`, open issues on those repos to widen the constraint.
 - [.github/workflows/release.yml](workflows/release.yml) — GA + snapshot release pipeline (channel-aware: snapshots target wheels-dev/wheels-snapshots, stable targets wheels-dev/wheels)
 - [.github/workflows/snapshot.yml](workflows/snapshot.yml) — develop-branch driver (fast-test gate + calls release.yml + deploys API docs to CF Pages)
 - [.github/workflows/bump-develop-version.yml](workflows/bump-develop-version.yml) — auto-bumps develop after GA
+- [.github/workflows/release-readiness.yml](workflows/release-readiness.yml) — release gate: open issues/PRs must be resolved or `deferred` (logic in `.github/scripts/release-readiness.sh`, fixtures in `tools/test-release-readiness.sh`)
+- [.github/workflows/compat-matrix.yml](workflows/compat-matrix.yml) — full engine x database matrix: nightly, on dispatch, and on release PRs into `main`

@@ -13,6 +13,12 @@
 name: Wheels Compatibility Matrix
 
 on:
+  # Release gate: a release is cut by a PR into `main` (release/X.Y.Z-to-main),
+  # so running here puts every engine x database leg on the exact tree being
+  # released. Day-to-day PRs target `develop` and are not affected. See
+  # .github/RELEASE_PLAYBOOK.md ("Release readiness").
+  pull_request:
+    branches: [main]
   schedule:
     # Nightly: 02:00 UTC
     - cron: '0 2 * * *'
@@ -853,7 +859,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PR_NUMBER=$(gh pr list --head "${{ github.head_ref || github.ref_name }}" --json number --jq '.[0].number' 2>/dev/null)
+          # Use the triggering PR directly: a release branch can have more than
+          # one open PR (e.g. into develop and main), so a --head lookup is ambiguous.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -z "$PR_NUMBER" ]; then
+            PR_NUMBER=$(gh pr list --head "${{ github.head_ref || github.ref_name }}" --json number --jq '.[0].number' 2>/dev/null)
+          fi
           if [ -z "$PR_NUMBER" ]; then
             echo "No PR found, skipping comment"
             exit 0
@@ -942,4 +953,29 @@ jobs:
             gh issue create --label "$LABEL" \
               --title "Compatibility matrix failing on ${GITHUB_REF_NAME}" \
               --body-file "$BODY_FILE"
+          fi
+
+  #############################################
+  # Single aggregate gate (release PRs)
+  #############################################
+  # One stable check name to mark as required on the `main` ruleset, instead of
+  # ~30 per-leg names. Fails unless every leg job and RustCFML succeeded.
+  # Soft-fail legs (Oracle, while SOFT_FAIL_DBS lists it) exit 0 in the tests
+  # job, so they pass this gate.
+  matrix-gate:
+    name: Compatibility Matrix Gate
+    needs: [tests, rustcfml]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require every leg to pass
+        env:
+          TESTS_RESULT: ${{ needs.tests.result }}
+          RUSTCFML_RESULT: ${{ needs.rustcfml.result }}
+        run: |
+          echo "tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT}"
+          if [ "$TESTS_RESULT" != "success" ] || [ "$RUSTCFML_RESULT" != "success" ]; then
+            echo "::error::Compatibility matrix is not green (tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT})"
+            exit 1
           fi

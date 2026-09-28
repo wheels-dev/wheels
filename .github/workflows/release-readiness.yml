@@ -1,0 +1,74 @@
+# Release readiness gate.
+#
+# A release is cut by a PR into `main` (release/X.Y.Z-to-main). This check fails
+# that PR unless every open issue and every open PR in the repository is either
+# resolved or explicitly labelled `deferred` (with the reason in a comment).
+# The release PR itself is excluded. Deferred items are still listed in the job
+# summary so they stay visible.
+#
+# The companion gate is the full compatibility matrix, which also runs on PRs
+# into `main` (compat-matrix.yml, "Compatibility Matrix Gate" job).
+#
+# Issues and PRs change without touching the release PR, so after resolving or
+# deferring items, re-run this job (or dispatch it) to refresh the result.
+#
+# See .github/RELEASE_PLAYBOOK.md ("Release readiness (required)").
+name: Release Readiness
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      exclude:
+        description: 'Issue/PR number to ignore (normally the release PR); blank for none'
+        type: string
+        default: ''
+
+permissions: {}
+
+concurrency:
+  group: release-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Label creation needs issues: write, so it lives in its own job; the gate job
+  # below only reads. Never blocks the gate (fork PRs get a read-only token).
+  ensure-label:
+    name: Ensure deferred label
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update the deferred label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh label create deferred --color C5DEF5 \
+            --description "Explicitly deferred past the next release (reason in a comment)" \
+            --force
+
+  readiness:
+    name: Release readiness
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+          fetch-depth: 1
+
+      - name: Check open issues and PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EXCLUDE_NUMBER: ${{ github.event.pull_request.number || inputs.exclude }}
+          DEFERRED_LABEL: deferred
+        run: bash .github/scripts/release-readiness.sh
