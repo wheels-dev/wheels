@@ -594,7 +594,7 @@ if (isMySQLFamily) {
 
 ### CockroachDB (Full Matrix Leg)
 
-CockroachDB is a full (non-soft-fail) leg of the compat matrix — each engine × cockroachdb combination runs as its own parallel job in `.github/workflows/compat-matrix.yml`. The only remaining soft-fail database is Oracle (`SOFT_FAIL_DBS="oracle"` in the same workflow, tracked in #2663).
+CockroachDB is a full (non-soft-fail) leg of the compat matrix — each engine × cockroachdb combination runs as its own parallel job in `.github/workflows/compat-matrix.yml`. No database is soft-fail any more: Oracle became a hard leg in #3738 (`SOFT_FAIL_DBS` in the same workflow is empty). Oracle readiness uses `tools/ci/oracle-ready.sh` (a checked SQL probe), and every leg waits for the engine itself to reach its datasource via `tools/ci/wait-engine-db.sh` before the suite starts.
 
 ### Oracle — Bulk INSERT, RETURNING and Generated Keys
 

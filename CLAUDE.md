@@ -421,7 +421,7 @@ tools/test-matrix.sh --rebuild lucee7         # force image rebuild
 tools/test-matrix.sh --down                   # teardown
 ```
 
-Engines: `lucee6`, `lucee7`, `adobe2023`, `adobe2025`, `boxlang` (CI matrix). Ports: 60006 / 60007 / 62023 / 62025 / 60001. Databases: `sqlite`, `h2` (Lucee only), `mysql`, `postgres`, `sqlserver`, `cockroachdb`, `oracle`. Oracle is soft-fail in CI (see `SOFT_FAIL_DBS` in `.github/workflows/compat-matrix.yml`).
+Engines: `lucee6`, `lucee7`, `adobe2023`, `adobe2025`, `boxlang` (CI matrix). Ports: 60006 / 60007 / 62023 / 62025 / 60001. Databases: `sqlite`, `h2` (Lucee only), `mysql`, `postgres`, `sqlserver`, `cockroachdb`, `oracle`. Every database gates CI, Oracle included: `SOFT_FAIL_DBS` in `.github/workflows/compat-matrix.yml` is empty, and even a soft-fail database fails its leg on a missing result or fewer than `MIN_SPECS` testcases (#3738). Narrow a dispatch with its `engines` / `databases` inputs (e.g. `gh workflow run compat-matrix.yml --ref <branch> -f databases=oracle`).
 
 Java 21 + Wheels CLI 4.0.0+ required for `tools/test-local.sh`. Docker required for `tools/test-matrix.sh`. `compose.yml` bind-mounts source at `./:/wheels-test-suite` so edit-reload-test cycles don't require image rebuilds.
 
