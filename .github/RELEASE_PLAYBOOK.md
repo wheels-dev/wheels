@@ -1,7 +1,8 @@
 # Release Playbook
 
-Operational runbook for cutting Wheels releases. The high-level architecture
-and rationale lives in [docs/contributing/release-process.md](../docs/contributing/release-process.md);
+Operational runbook for cutting Wheels releases. The user-facing explanation of
+the stable / bleeding-edge channel model (and why snapshots live in a separate
+repo) is the [Release Channels guide](../web/sites/guides/src/content/docs/v4-0-0/start-here/release-channels.mdx);
 this file is the step-by-step "what do I run, in what order" reference for a
 maintainer cutting a release at 3am.
 
@@ -243,7 +244,7 @@ If any pin to `<X.Y.Z`, open issues on those repos to widen the constraint.
 
 ## See also
 
-- [docs/contributing/release-process.md](../docs/contributing/release-process.md) — design rationale (versioning, channel model, why two repos)
+- [Release Channels guide](../web/sites/guides/src/content/docs/v4-0-0/start-here/release-channels.mdx) — channel model (stable vs bleeding-edge, version shapes, why two repos)
 - [docs/contributing/wheels-bot.md](../docs/contributing/wheels-bot.md) — Claude-powered bot that triages issues and PRs
 - [.github/workflows/release.yml](workflows/release.yml) — GA + snapshot release pipeline (channel-aware: snapshots target wheels-dev/wheels-snapshots, stable targets wheels-dev/wheels)
 - [.github/workflows/snapshot.yml](workflows/snapshot.yml) — develop-branch driver (fast-test gate + calls release.yml + deploys API docs to CF Pages)
