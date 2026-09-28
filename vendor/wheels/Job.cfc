@@ -68,7 +68,7 @@ component {
 	 */
 	public struct function enqueue(struct data = {}, string queue = this.queue, numeric priority = this.priority) {
 		return $enqueueJob(
-			jobClass = GetMetadata(this).name,
+			jobClass = $persistableJobClass(),
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
@@ -90,7 +90,7 @@ component {
 		numeric priority = this.priority
 	) {
 		return $enqueueJob(
-			jobClass = GetMetadata(this).name,
+			jobClass = $persistableJobClass(),
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
@@ -112,12 +112,95 @@ component {
 		numeric priority = this.priority
 	) {
 		return $enqueueJob(
-			jobClass = GetMetadata(this).name,
+			jobClass = $persistableJobClass(),
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
 			runAt = arguments.runAt
 		);
+	}
+
+	/**
+	 * Internal: The component path `enqueue()` persists to `wheels_jobs.jobClass`.
+	 *
+	 * `GetMetadata(this).name` is not safe to persist verbatim. On a case-insensitive
+	 * filesystem (macOS, Windows, or a macOS checkout bind-mounted into Docker) a miscased
+	 * `new app.jobs.sendwelcomeemailjob()` resolves, and Adobe CF reports the metadata name
+	 * with the caller's casing rather than the file's. A row enqueued that way names a class a
+	 * case-sensitive Linux worker cannot resolve (issue #3731). Canonicalize against the
+	 * directory listing so the persisted string always carries the on-disk casing.
+	 */
+	public string function $persistableJobClass() {
+		local.meta = GetMetadata(this);
+		return $canonicalJobClass(name = local.meta.name, path = StructKeyExists(local.meta, "path") ? local.meta.path : "");
+	}
+
+	/**
+	 * Internal: Rewrite a dotted component name so every segment that maps to a component of
+	 * `path` carries that entry's casing as it exists on disk.
+	 *
+	 * Walks the name from its last segment (the .cfc file) up through its package directories,
+	 * pairing each with the matching trailing component of `path`. For each pair, the parent
+	 * directory is listed and the entry that matches case-insensitively supplies the casing (an
+	 * exact match wins, so a case-sensitive filesystem holding both `Foo.cfc` and `foo.cfc` is
+	 * left alone). The walk stops at the first segment that does not name its path component —
+	 * a mapping whose name differs from its directory — so mapping roots are never rewritten.
+	 * Any failure keeps the segment as given: this must never break an enqueue.
+	 *
+	 * @name The dotted component name, e.g. from `GetMetadata(obj).name`.
+	 * @path The component's absolute file path, e.g. from `GetMetadata(obj).path`.
+	 */
+	public string function $canonicalJobClass(required string name, string path = "") {
+		local.segments = ListToArray(arguments.name, ".");
+		local.current = Replace(arguments.path, "\", "/", "all");
+		local.segmentCount = ArrayLen(local.segments);
+		if (!local.segmentCount || Right(local.current, 4) != ".cfc") {
+			return arguments.name;
+		}
+		for (local.i = local.segmentCount; local.i >= 1; local.i--) {
+			local.entryName = ListLast(local.current, "/");
+			local.isLeaf = local.i == local.segmentCount;
+			local.expected = local.isLeaf ? local.segments[local.i] & ".cfc" : local.segments[local.i];
+			if (!Len(local.entryName) || CompareNoCase(local.entryName, local.expected) != 0) {
+				break;
+			}
+			local.parentLength = Len(local.current) - Len(local.entryName) - 1;
+			if (local.parentLength <= 0) {
+				break;
+			}
+			local.parentDir = Left(local.current, local.parentLength);
+			local.onDisk = $onDiskEntryName(directory = local.parentDir, entryName = local.entryName);
+			if (Len(local.onDisk)) {
+				local.segments[local.i] = local.isLeaf ? Left(local.onDisk, Len(local.onDisk) - 4) : local.onDisk;
+			}
+			local.current = local.parentDir;
+		}
+		return ArrayToList(local.segments, ".");
+	}
+
+	/**
+	 * Internal: The name `entryName` has in `directory`'s listing — itself when an exact match
+	 * exists, the single case-insensitive match otherwise, and "" when neither is unambiguous
+	 * or the directory cannot be listed.
+	 */
+	public string function $onDiskEntryName(required string directory, required string entryName) {
+		local.rv = "";
+		local.matches = 0;
+		try {
+			// Iterate only: BoxLang returns a fixed-size array (cross-engine invariant 20).
+			for (local.candidate in DirectoryList(arguments.directory, false, "name")) {
+				if (Compare(local.candidate, arguments.entryName) == 0) {
+					return local.candidate;
+				}
+				if (CompareNoCase(local.candidate, arguments.entryName) == 0) {
+					local.matches++;
+					local.rv = local.candidate;
+				}
+			}
+		} catch (any e) {
+			return "";
+		}
+		return local.matches == 1 ? local.rv : "";
 	}
 
 	/**
@@ -277,11 +360,11 @@ component {
 	/**
 	 * Internal: Turn a persisted `jobClass` string back into a job instance.
 	 *
-	 * `jobClass` is written on enqueue from `GetMetadata(this).name` and read back here as a
+	 * `jobClass` is written on enqueue by `$persistableJobClass()` and read back here as a
 	 * component path, so the round trip depends on that string still resolving — including its
-	 * casing, on a case-sensitive filesystem. Lucee derives the metadata name from the file
-	 * rather than from how the component was instantiated, so it is canonical there; the
-	 * cross-engine guarantee is pinned by JobClassRoundTripSpec rather than assumed.
+	 * casing, on a case-sensitive filesystem. Lucee derives the metadata name from the file, but
+	 * Adobe echoes a miscased caller's path when the filesystem lets it resolve (#3731), so the
+	 * enqueue side canonicalizes against the directory listing; JobClassRoundTripSpec pins it.
 	 *
 	 * When it does not resolve, the raw engine error is `component not found` for a class that
 	 * plainly exists on disk, which sends people to look at mappings and deployment. Name the
