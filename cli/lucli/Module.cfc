@@ -5082,9 +5082,16 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		// Add a foreign-key column per --belongsTo parent (unless the user
+		// listed one), exactly as scaffold/api-resource do. Without it the
+		// migration had no FK column, so the association's default key named a
+		// column that didn't exist and `wheels seed` failed (#3723).
+		var scaffold = getService("scaffold");
+		var props = scaffold.$addForeignKeyColumns(parsed.properties, arrayToList(parsed.belongsTo));
+
 		var result = codegen.generateModel(
 			name = modelName,
-			properties = parsed.properties,
+			properties = props,
 			belongsTo = arrayToList(parsed.belongsTo),
 			hasMany = arrayToList(parsed.hasMany),
 			hasOne = arrayToList(parsed.hasOne)
@@ -5097,10 +5104,9 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// Also generate migration if properties provided
-		if (arrayLen(parsed.properties)) {
-			var scaffold = getService("scaffold");
-			var migrationPath = scaffold.createMigrationWithProperties(modelName, parsed.properties);
+		// Also generate migration if properties (or belongsTo FK columns) exist
+		if (arrayLen(props)) {
+			var migrationPath = scaffold.createMigrationWithProperties(modelName, props);
 			var migrationFileName = listLast(migrationPath, "/\");
 			printCreated("app/migrator/migrations/#migrationFileName#");
 		}
