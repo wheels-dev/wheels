@@ -1,7 +1,12 @@
-# Compatibility matrix: runs all engines x databases on a nightly schedule
-# and on manual dispatch (optionally narrowed with the `engines` / `databases`
-# inputs). Not a required PR check, but every leg gates the run's result,
-# Oracle included (#3738).
+# Compatibility matrix: runs all engines x databases (plus the RustCFML lane)
+# on a nightly schedule, on manual dispatch (optionally narrowed with the
+# `engines` / `databases` inputs), and on every release PR into `main`.
+# Every leg gates the run's result, Oracle included (#3738): SOFT_FAIL_DBS is
+# empty, and a leg with no result or fewer than MIN_SPECS testcases fails.
+# The "Compatibility Matrix Gate" job rolls all legs into one check. On release
+# PRs it requires the full, unnarrowed matrix to pass, and it is meant to be a
+# required status check on the `main` ruleset (.github/RELEASE_PLAYBOOK.md,
+# "Release readiness"). PRs into `develop` do not run this workflow.
 #
 # Each engine x database combination is its own matrix job, so the ~30 legs
 # run in PARALLEL instead of sequentially inside one job per engine. Wall
@@ -36,6 +41,13 @@ on:
         description: 'Comma list of databases to run (blank = all: mysql,postgres,sqlserver,h2,cockroachdb,oracle,sqlite)'
         type: string
         default: ''
+
+# A new push to a release PR supersedes the previous matrix for that PR, so
+# cancel it. Scheduled and dispatched runs get a per-run group (run_id) and
+# are never cancelled or queued behind each other.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) || format('{0}-run-{1}', github.workflow, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -959,23 +971,36 @@ jobs:
   # Single aggregate gate (release PRs)
   #############################################
   # One stable check name to mark as required on the `main` ruleset, instead of
-  # ~30 per-leg names. Fails unless every leg job and RustCFML succeeded.
-  # Soft-fail legs (Oracle, while SOFT_FAIL_DBS lists it) exit 0 in the tests
-  # job, so they pass this gate.
+  # ~30 per-leg names. Every leg gates (SOFT_FAIL_DBS is empty, Oracle
+  # included), so this passes only when the planner, every engine x database
+  # leg, and RustCFML all succeeded.
+  #
+  # On pull_request (release PRs into main) the plan is always the full matrix
+  # (dispatch inputs are blank), and both jobs must be `success`. A skipped job
+  # there means legs did not run, so it fails. Only a narrowed workflow_dispatch
+  # may legitimately skip `tests` or `rustcfml`; skipped is accepted there.
   matrix-gate:
     name: Compatibility Matrix Gate
-    needs: [tests, rustcfml]
+    needs: [plan, tests, rustcfml]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - name: Require every leg to pass
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          PLAN_RESULT: ${{ needs.plan.result }}
           TESTS_RESULT: ${{ needs.tests.result }}
           RUSTCFML_RESULT: ${{ needs.rustcfml.result }}
         run: |
-          echo "tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT}"
-          if [ "$TESTS_RESULT" != "success" ] || [ "$RUSTCFML_RESULT" != "success" ]; then
-            echo "::error::Compatibility matrix is not green (tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT})"
+          echo "event: ${EVENT_NAME}; plan: ${PLAN_RESULT}, tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT}"
+          ok() {
+            [ "$1" = "success" ] && return 0
+            [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$1" = "skipped" ] && return 0
+            return 1
+          }
+          if [ "$PLAN_RESULT" != "success" ] || ! ok "$TESTS_RESULT" || ! ok "$RUSTCFML_RESULT"; then
+            echo "::error::Compatibility matrix is not green (plan: ${PLAN_RESULT}, tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT})"
             exit 1
           fi
+          echo "Compatibility matrix green."
