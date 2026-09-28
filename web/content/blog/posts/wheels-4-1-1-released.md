@@ -17,6 +17,7 @@ excerpt: >-
   4.1.0. Every compatibility-matrix leg passed, test by test, before it shipped.
 coverImage: '/blog-images/4-1/wheels-4-1-1-released.png'
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/3776'
   title: 'Wheels 4.1.1 is out'
   body: |
     **[Wheels 4.1.1 is released](https://blog.wheels.dev/blog/wheels-4-1-1-released)**: a CLI security fix, Adobe ColdFusion first-request fixes, multi-database migrations that no longer stall, and the rough edges people hit in 4.1.0.
