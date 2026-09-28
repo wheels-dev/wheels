@@ -131,21 +131,52 @@ cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
 
 set -euo pipefail
 
-# Honor user-set JAVA_HOME if present; otherwise probe for OpenJDK 21 across the
-# Debian/Ubuntu AND RHEL/Fedora layouts, on amd64 and arm64.
+# --- java-select:begin ---
+# LuCLI is compiled for Java 21 (class file 65), so the wrapper only ever runs a
+# Java 21+ runtime. A user-set JAVA_HOME is used when it is Java 21 or newer;
+# an older one (GitHub's Ubuntu runners export JAVA_HOME=Java 17) is skipped
+# with a one-line notice. Every probed candidate is version-checked too:
+# /usr/lib/jvm/default-java and the alternatives `java` can be an older JDK.
+# tools/distribution-drafts/linux-packages/test-wrapper-java.sh extracts and
+# tests this block; WHEELS_JVM_DIR only exists for that test.
+_wheels_jvm_dir="${WHEELS_JVM_DIR:-/usr/lib/jvm}"
+_wheels_java_major() {
+  # Major Java version of the home $1: from its `release` file (no JVM start),
+  # else from `java -version`. Prints 0 when it cannot tell.
+  local v=""
+  if [ -f "$1/release" ]; then
+    v="$(sed -n 's/^JAVA_VERSION="\{0,1\}\([^"]*\)"\{0,1\}.*$/\1/p' "$1/release" | head -n 1)"
+  fi
+  if [ -z "${v}" ] && [ -x "$1/bin/java" ]; then
+    v="$("$1/bin/java" -version 2>&1 | sed -n 's/.* version "\([^"]*\)".*/\1/p' | head -n 1)"
+  fi
+  case "${v}" in 1.*) v="${v#1.}" ;; esac
+  v="${v%%[!0-9]*}"
+  echo "${v:-0}"
+}
+_wheels_java_ok() {
+  [ -n "$1" ] && [ -x "$1/bin/java" ] && [ "$(_wheels_java_major "$1")" -ge 21 ]
+}
+if [ -n "${JAVA_HOME:-}" ] && ! _wheels_java_ok "${JAVA_HOME}"; then
+  _wheels_seen="$(_wheels_java_major "${JAVA_HOME}")"
+  [ "${_wheels_seen}" = "0" ] && _wheels_seen="unknown" || _wheels_seen="Java ${_wheels_seen}"
+  echo "wheels: ignoring JAVA_HOME=${JAVA_HOME} (${_wheels_seen}); Wheels needs Java 21 or newer, looking for one." >&2
+  unset JAVA_HOME
+fi
+# Probe the Debian/Ubuntu AND RHEL/Fedora layouts, on amd64 and arm64.
 if [ -z "${JAVA_HOME:-}" ]; then
   for candidate in \
-    /usr/lib/jvm/java-21-openjdk-amd64 \
-    /usr/lib/jvm/java-21-openjdk-arm64 \
-    /usr/lib/jvm/java-21-openjdk \
-    /usr/lib/jvm/jre-21-openjdk \
-    /usr/lib/jvm/java-21 \
-    /usr/lib/jvm/jre-21 \
-    /usr/lib/jvm/temurin-21-jdk-amd64 \
-    /usr/lib/jvm/temurin-21-jdk-arm64 \
-    /usr/lib/jvm/zulu-21 \
-    /usr/lib/jvm/default-java; do
-    if [ -x "${candidate}/bin/java" ]; then
+    "${_wheels_jvm_dir}/java-21-openjdk-amd64" \
+    "${_wheels_jvm_dir}/java-21-openjdk-arm64" \
+    "${_wheels_jvm_dir}/java-21-openjdk" \
+    "${_wheels_jvm_dir}/jre-21-openjdk" \
+    "${_wheels_jvm_dir}/java-21" \
+    "${_wheels_jvm_dir}/jre-21" \
+    "${_wheels_jvm_dir}/temurin-21-jdk-amd64" \
+    "${_wheels_jvm_dir}/temurin-21-jdk-arm64" \
+    "${_wheels_jvm_dir}/zulu-21" \
+    "${_wheels_jvm_dir}/default-java"; do
+    if _wheels_java_ok "${candidate}"; then
       export JAVA_HOME="${candidate}"
       break
     fi
@@ -158,19 +189,20 @@ if [ -z "${JAVA_HOME:-}" ] && command -v java >/dev/null 2>&1; then
   _j="$(command -v java)"
   command -v readlink >/dev/null 2>&1 && _j="$(readlink -f "${_j}" 2>/dev/null || echo "${_j}")"
   _jh="${_j%/bin/java}"
-  [ -x "${_jh}/bin/java" ] && export JAVA_HOME="${_jh}"
+  _wheels_java_ok "${_jh}" && export JAVA_HOME="${_jh}"
 fi
 # Last resort: glob the version-stamped RHEL/Fedora directories directly.
 if [ -z "${JAVA_HOME:-}" ]; then
-  for d in /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/*jre-21* /usr/lib/jvm/*-21-*; do
-    if [ -x "${d}/bin/java" ]; then export JAVA_HOME="${d}"; break; fi
+  for d in "${_wheels_jvm_dir}"/java-21-openjdk-* "${_wheels_jvm_dir}"/*jre-21* "${_wheels_jvm_dir}"/*-21-*; do
+    if _wheels_java_ok "${d}"; then export JAVA_HOME="${d}"; break; fi
   done
 fi
-if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
-  echo "wheels: cannot find a Java 21 runtime. Install openjdk-21-jre-headless (apt)" >&2
-  echo "        or java-21-openjdk-headless (yum/dnf)." >&2
+if [ -z "${JAVA_HOME:-}" ]; then
+  echo "wheels: Java 21 or newer is required but was not found. Install openjdk-21-jre-headless (apt)" >&2
+  echo "        or java-21-openjdk-headless (yum/dnf), or set JAVA_HOME to a Java 21+ runtime." >&2
   exit 1
 fi
+# --- java-select:end ---
 
 export LUCLI_HOME="${HOME}/.wheels"
 export PATH="${JAVA_HOME}/bin:${PATH}"
