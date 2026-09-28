@@ -15,6 +15,11 @@ on:
     # Nightly: 02:00 UTC
     - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      notify:
+        description: 'Open/update/close the tracking issue as a scheduled run would (to test notify-on-failure)'
+        type: boolean
+        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -661,6 +666,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+    outputs:
+      grid: ${{ steps.matrix.outputs.grid }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -737,6 +744,13 @@ jobs:
           # Save for PR comment
           echo "$MATRIX_MD" > /tmp/matrix-comment.md
 
+          # Expose for the notify-on-failure job
+          {
+            echo "grid<<MATRIX_GRID_EOF"
+            echo "$MATRIX_MD"
+            echo "MATRIX_GRID_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Post matrix to PR
         if: github.event_name == 'pull_request'
         env:
@@ -762,4 +776,71 @@ jobs:
           else
             gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
             echo "Created new comment on PR #${PR_NUMBER}"
+          fi
+
+  #############################################
+  # Notify on failure (scheduled runs)
+  #############################################
+  # A scheduled run has no PR to comment on, so a red nightly would otherwise go
+  # unnoticed until someone opens the Actions tab. Keep ONE open tracking issue,
+  # labelled `compat-matrix-failure`: open it (or comment on the open one) when a
+  # nightly run fails, and close it with a comment when a nightly run is green again.
+  # Soft-fail legs (Oracle) exit 0 in the tests job, so they never trip this.
+  notify-on-failure:
+    name: Notify on failure
+    needs: [tests, rustcfml, test-matrix-summary]
+    if: always() && (github.event_name == 'schedule' || inputs.notify == true)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      issues: write
+    steps:
+      - name: Open, update, or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          RUSTCFML_RESULT: ${{ needs.rustcfml.result }}
+          GRID: ${{ needs.test-matrix-summary.outputs.grid }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          LABEL="compat-matrix-failure"
+          gh label create "$LABEL" --color B60205 \
+            --description "Nightly compatibility matrix is failing" --force >/dev/null
+
+          ISSUE=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // empty')
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+
+          if [ "$TESTS_RESULT" = "success" ] && [ "$RUSTCFML_RESULT" = "success" ]; then
+            if [ -n "$ISSUE" ]; then
+              gh issue comment "$ISSUE" --body "Compatibility matrix is green again on \`${SHORT_SHA}\` ([run](${RUN_URL})). Closing."
+              gh issue close "$ISSUE" --reason completed
+            fi
+            echo "Matrix green; nothing to report."
+            exit 0
+          fi
+
+          FAILED_JOBS=$(gh api "repos/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}/jobs" --paginate \
+            --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out") | "- `\(.name)` (\(.conclusion)): \(.html_url)"')
+
+          BODY_FILE=$(mktemp)
+          {
+            echo "The compatibility matrix failed on \`${SHORT_SHA}\` (\`${GITHUB_REF_NAME}\`)."
+            echo ""
+            echo "Run: ${RUN_URL}"
+            echo ""
+            echo "**Failed jobs**"
+            echo ""
+            if [ -n "$FAILED_JOBS" ]; then echo "$FAILED_JOBS"; else echo "- (tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT})"; fi
+            echo ""
+            echo "$GRID"
+          } > "$BODY_FILE"
+
+          if [ -n "$ISSUE" ]; then
+            gh issue comment "$ISSUE" --body-file "$BODY_FILE"
+            echo "Commented on tracking issue #${ISSUE}"
+          else
+            gh issue create --label "$LABEL" \
+              --title "Compatibility matrix failing on ${GITHUB_REF_NAME}" \
+              --body-file "$BODY_FILE"
           fi
