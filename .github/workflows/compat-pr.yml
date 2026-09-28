@@ -63,9 +63,19 @@ jobs:
 
       - name: Detect framework changes
         id: changes
+        env:
+          # Diff against the PR's base commit, which the full-history checkout
+          # already holds. Re-fetching the base branch with --depth=1 grafted
+          # its tip as a shallow root, so once develop moved past the merge ref
+          # `origin/develop...HEAD` had no merge base; git diff then exited 128
+          # and every such PR ran the full compat suites, docs-only or not.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}" 2>/dev/null || true
-          if git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- \
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$BASE_SHA" 2>/dev/null || true
+          fi
+          # A failed diff (exit > 1) falls through to framework_changed=true.
+          if git diff --quiet "${BASE_SHA}...HEAD" -- \
               vendor/wheels cli/lucli .github/workflows/compat-pr.yml; then
             echo "framework_changed=false" >> "$GITHUB_OUTPUT"
             echo "No framework/CLI changes — skipping the compat suites (no-op success)."
