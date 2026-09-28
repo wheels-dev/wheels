@@ -1,0 +1,63 @@
+name: Linux launcher
+
+# The /usr/bin/wheels launcher in the .deb/.rpm packages must run LuCLI (class
+# file 65) on Java 21+, even when JAVA_HOME points at an older JDK (#3766).
+# release.yml runs tools/test-linux-launcher-java.sh before building packages;
+# this runs it on the PRs that can break it, plus a leg on the runner's REAL
+# JDKs: JAVA_HOME at Temurin 17 with Temurin 21 installed alongside, which is
+# the exact environment that broke `wheels info` on the 4.1.1 apt packages.
+
+on:
+  pull_request:
+    paths:
+      - 'tools/distribution-drafts/linux-packages/**'
+      - 'tools/test-linux-launcher-java.sh'
+      - '.github/workflows/linux-launcher.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'tools/distribution-drafts/linux-packages/**'
+      - 'tools/test-linux-launcher-java.sh'
+      - '.github/workflows/linux-launcher.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  java-resolution:
+    name: "Launcher selects Java 21+"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Test the launcher's Java resolution (fake JDKs)
+        run: bash tools/test-linux-launcher-java.sh
+
+      - name: Real JDKs on the runner (JAVA_HOME = Temurin 17, Temurin 21 alongside)
+        run: |
+          set -euo pipefail
+          OLD_HOME="${JAVA_HOME_17_X64:?the runner image no longer provides JAVA_HOME_17_X64}"
+          echo "JAVA_HOME for this leg: ${OLD_HOME}"
+          "${OLD_HOME}/bin/java" -version 2>&1 | head -n 1
+          ls -d /usr/lib/jvm/* || true
+
+          BLOCK="${RUNNER_TEMP}/java-resolve.sh"
+          sed -n '/^# --- java-resolve begin/,/^# --- java-resolve end/p' \
+            tools/distribution-drafts/linux-packages/build-linux-packages.sh > "${BLOCK}"
+          grep -q 'java-resolve end' "${BLOCK}" || { echo "::error::could not extract the java-resolve block"; exit 1; }
+
+          SELECTED="$(JAVA_HOME="${OLD_HOME}" bash -c 'set -euo pipefail; source "$1"; printf "%s" "${JAVA_HOME}"' _ "${BLOCK}" 2> "${RUNNER_TEMP}/stderr")"
+          cat "${RUNNER_TEMP}/stderr"
+          echo "selected JAVA_HOME: ${SELECTED}"
+          "${SELECTED}/bin/java" -version 2>&1 | head -n 1
+
+          MAJOR="$("${SELECTED}/bin/java" -XshowSettings:properties -version 2>&1 | sed -n 's/^ *java\.specification\.version = //p')"
+          if [ "${MAJOR%%.*}" -lt 21 ]; then
+            echo "::error::the launcher selected Java ${MAJOR} with JAVA_HOME at Temurin 17"
+            exit 1
+          fi
+          if ! grep -q "ignoring JAVA_HOME=${OLD_HOME}" "${RUNNER_TEMP}/stderr"; then
+            echo "::error::the launcher did not report that it ignored the Java 17 JAVA_HOME"
+            exit 1
+          fi
+          echo "OK: JAVA_HOME at Java 17 was ignored with a notice; the launcher selected Java ${MAJOR}."
