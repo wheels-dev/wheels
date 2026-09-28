@@ -122,6 +122,25 @@ component {
 	}
 
 	/**
+	 * Return a localhost port that is guaranteed closed right now.
+	 *
+	 * Binds an ephemeral ServerSocket (port 0), reads the port the OS
+	 * assigned, then closes it. The OS just handed the port out as free and
+	 * nothing else has it, so a connect refuses immediately. Use this instead
+	 * of a hard-coded "bogus" port such as 59999: on some CI runners a
+	 * connect to an arbitrary high port hangs until the HTTP timeout instead
+	 * of being refused (##3751).
+	 */
+	public numeric function closedPort() {
+		var probe = createObject("java", "java.net.ServerSocket").init(0);
+		try {
+			return probe.getLocalPort();
+		} finally {
+			probe.close();
+		}
+	}
+
+	/**
 	 * HTTP GET request, returns response body string.
 	 * Returns empty string on connection failure.
 	 */

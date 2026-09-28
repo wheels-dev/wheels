@@ -90,9 +90,10 @@ component {
 	 *
 	 * @serverPort Port of the running Wheels server
 	 * @options Struct with keys: coreTests, db, filter, format
+	 * @timeout HTTP timeout in seconds (default 600 — a full core run is slow)
 	 * @return Struct with test results
 	 */
-	public struct function runViaHttp(required numeric serverPort, struct options = {}) {
+	public struct function runViaHttp(required numeric serverPort, struct options = {}, numeric timeout = 600) {
 		var coreTests = options.coreTests ?: true;
 		var db = options.db ?: "sqlite";
 		var filter = options.filter ?: "";
@@ -104,7 +105,7 @@ component {
 			testUrl &= "&directory=#filter#";
 		}
 
-		var httpService = new http(url=testUrl, method="GET", timeout=600);
+		var httpService = new http(url=testUrl, method="GET", timeout=arguments.timeout);
 		var httpResult = httpService.send().getPrefix();
 
 		if (httpResult.statusCode contains "200" && isJSON(httpResult.fileContent)) {

@@ -90,8 +90,10 @@ component {
 	 * reload password — the framework's /wheels/cli bridge rejects them
 	 * over GET so they cannot be CSRF-fired from a browser. Read-only
 	 * commands like info stay on GET.
+	 *
+	 * @timeout HTTP timeout in seconds (default 120)
 	 */
-	public struct function runViaHttp(required numeric serverPort, required string action) {
+	public struct function runViaHttp(required numeric serverPort, required string action, numeric timeout = 120) {
 		var command = "";
 		switch (action) {
 			case "latest": command = "migrateToLatest"; break;
@@ -103,7 +105,7 @@ component {
 
 		var mutating = listFindNoCase("migrateToLatest,migrateUp,migrateDown", command) > 0;
 		var bridgeUrl = "http://localhost:#serverPort#/wheels/cli?command=#command#&format=json";
-		var httpService = new http(url=bridgeUrl, method=(mutating ? "POST" : "GET"), timeout=120);
+		var httpService = new http(url=bridgeUrl, method=(mutating ? "POST" : "GET"), timeout=arguments.timeout);
 		if (mutating) {
 			httpService.addParam(type="formfield", name="password", value=detectReloadPassword());
 		}
