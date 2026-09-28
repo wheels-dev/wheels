@@ -52,7 +52,9 @@ jobs:
           "${SELECTED}/bin/java" -version 2>&1 | head -n 1
 
           MAJOR="$("${SELECTED}/bin/java" -XshowSettings:properties -version 2>&1 | sed -n 's/^ *java\.specification\.version = //p')"
-          if [ "${MAJOR%%.*}" -lt 21 ]; then
+          MAJOR="${MAJOR%%.*}"
+          case "${MAJOR}" in ''|*[!0-9]*) echo "::error::could not read the Java major version of ${SELECTED}"; exit 1;; esac
+          if [ "${MAJOR}" -lt 21 ]; then
             echo "::error::the launcher selected Java ${MAJOR} with JAVA_HOME at Temurin 17"
             exit 1
           fi
