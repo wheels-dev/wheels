@@ -268,7 +268,9 @@
 			StructDelete(arguments, "password");
 		}
 		if (StructKeyExists(arguments, "table") && Len(arguments.table)) {
-			if (!ReFindNoCase("^[A-Za-z_][A-Za-z0-9_]*$", arguments.table)) {
+			// `$` is legal after the first character on every supported database
+			// (#3669). A leading `$` stays out: it starts a bind or dollar-quote.
+			if (!ReFindNoCase("^[A-Za-z_][A-Za-z0-9_$]*$", arguments.table)) {
 				Throw(
 					type = "Wheels.InvalidArgument",
 					message = "$dbinfo table name must be a SQL identifier"

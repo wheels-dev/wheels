@@ -150,10 +150,7 @@ component {
 	 */
 	public struct function $readFlash() {
 		local.rv = {};
-		if (!StructKeyExists(arguments, "$locked")) {
-			local.lockName = "flashLock" & application.applicationName;
-			local.rv = $simpleLock(name = local.lockName, type = "readonly", execute = "$readFlash", executeArgs = arguments);
-		} else if ($getFlashStorage() == "cookie" && $inTestHarness() && StructKeyExists(request, "$testCookieFlash")) {
+		if ($getFlashStorage() == "cookie" && $inTestHarness() && StructKeyExists(request, "$testCookieFlash")) {
 			// Test-harness shim: cookie writes can't round-trip after the
 			// response buffer commits (Undertow auto-commit), so tests read
 			// from a request-scoped slot instead of the real cookie scope.
@@ -172,13 +169,18 @@ component {
 					"action": cookie.flash
 				};
 			}
-		} else if ($getFlashStorage() == "session" && StructKeyExists(session, "flash")) {
-			if (isStruct(session.flash)) {
-				local.rv = Duplicate(session.flash);
-			} else {
-				local.rv = {
-					"action": Duplicate(session.flash)
-				};
+		} else if ($getFlashStorage() == "session") {
+			// Session flash is per user, so lock the session, not the whole application.
+			lock scope="session" type="readonly" timeout="30" {
+				if (StructKeyExists(session, "flash")) {
+					if (isStruct(session.flash)) {
+						local.rv = Duplicate(session.flash);
+					} else {
+						local.rv = {
+							"action": Duplicate(session.flash)
+						};
+					}
+				}
 			}
 		}
 		return local.rv;
@@ -188,31 +190,26 @@ component {
 	 * Internal function.
 	 */
 	public any function $writeFlash(struct flash = {}) {
-		if (!StructKeyExists(arguments, "$locked")) {
-			local.lockName = "flashLock" & application.applicationName;
-			local.rv = $simpleLock(name = local.lockName, type = "exclusive", execute = "$writeFlash", executeArgs = arguments);
-		} else {
-			if ($getFlashStorage() == "cookie") {
-				if ($inTestHarness()) {
-					// Test-harness shim: writing to the cookie scope triggers
-					// a Set-Cookie response header, which throws
-					// IllegalStateException on Undertow once the response
-					// buffer has auto-committed (which happens mid-run
-					// because the runner streams the large results JSON back
-					// to the client before this spec executes). Round-trip
-					// through a request-scoped slot instead.
-					request.$testCookieFlash = SerializeJSON(arguments.flash);
-				} else {
-					// Write through an attribute collection so the cookie carries
-					// httpOnly / secure / sameSite flags (mirrors the CSRF cookie).
-					cookie["flash"] = $flashCookieAttributeCollection(SerializeJSON(arguments.flash));
-				}
-			} else if ($getFlashStorage() == "session") {
+		if ($getFlashStorage() == "cookie") {
+			if ($inTestHarness()) {
+				// Test-harness shim: writing to the cookie scope triggers
+				// a Set-Cookie response header, which throws
+				// IllegalStateException on Undertow once the response
+				// buffer has auto-committed (which happens mid-run
+				// because the runner streams the large results JSON back
+				// to the client before this spec executes). Round-trip
+				// through a request-scoped slot instead.
+				request.$testCookieFlash = SerializeJSON(arguments.flash);
+			} else {
+				// Write through an attribute collection so the cookie carries
+				// httpOnly / secure / sameSite flags (mirrors the CSRF cookie).
+				cookie["flash"] = $flashCookieAttributeCollection(SerializeJSON(arguments.flash));
+			}
+		} else if ($getFlashStorage() == "session") {
+			// Session flash is per user, so lock the session, not the whole application.
+			lock scope="session" type="exclusive" timeout="30" {
 				session.flash = arguments.flash;
 			}
-		}
-		if (StructKeyExists(local, "rv")) {
-			return local.rv;
 		}
 	}
 
@@ -247,6 +244,14 @@ component {
 	 * Internal function.
 	 */
 	public void function $flashClear() {
+		// Nothing in the session flash, so skip the write (and its lock) on every request.
+		if (
+			$getFlashStorage() == "session"
+			&& (!StructKeyExists(session, "flash") || (IsStruct(session.flash) && StructIsEmpty(session.flash)))
+		) {
+			return;
+		}
+
 		// Only save the old flash if they want to keep anything.
 		if (StructKeyExists(request.wheels, "flashKeep")) {
 			local.flash = $readFlash();

@@ -60,8 +60,16 @@ component extends="wheels.WheelsTest" {
                 });
 
                 it("getSystemProperty() reads JVM properties with a default", () => {
-                    expect(env.getSystemProperty(key = "java.version", defaultValue = "")).notToBe("");
+                    // Lucee, Adobe CF and BoxLang expose a real JVM property.
+                    // RustCFML has no JVM; its Java compatibility shim may return
+                    // null instead of a synthetic java.version. That is not an
+                    // Env failure: missing properties still obey the same contract.
+                    var capabilities = new wheels.wheelstest.EngineCapabilities();
+                    if (capabilities.hasJvmClassLoading()) {
+                        expect(env.getSystemProperty(key = "java.version", defaultValue = "")).notToBe("");
+                    }
                     expect(env.getSystemProperty(key = "not.a.real.property", defaultValue = "dflt")).toBe("dflt");
+                    expect(() => env.getSystemProperty(key = "not.a.real.property")).toThrow("SystemSettingNotFound");
                 });
 
                 it("getEnv() reads process env vars with a default", () => {

@@ -963,6 +963,15 @@ component extends="wheels.WheelsTest" {
 
 	}
 
+	/**
+	 * Seed the two RefParent rows the foreign-key tests assert on.
+	 *
+	 * The assertions name the parents' actual keys (41 and 97) and depend on them
+	 * being noncontiguous — that is what proves the seeder cycles real column
+	 * values rather than row indices — so the rows must carry explicit ids.
+	 * On SQL Server that needs IDENTITY_INSERT, which the adapter now turns on
+	 * for an INSERT that supplies its own identity value (#3647).
+	 */
 	public void function $createSeederParents() {
 		model("RefParent").create(id = 41, name = "Parent forty one");
 		model("RefParent").create(id = 97, name = "Parent ninety seven");

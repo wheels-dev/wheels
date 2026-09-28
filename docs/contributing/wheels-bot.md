@@ -274,16 +274,6 @@ address-review's commit triggers `pull_request: synchronize` → a fresh
 review on the new SHA. Whether to address *that* review is again a human
 opt-in (re-apply the label or dispatch).
 
-### 8. Senior Advisor (`bot-advisor.yml`) — legacy
-
-The deadlock-breaker for the retired Reviewer A / Reviewer B
-convergence loop. Its trigger (Reviewer B's `:terminal` marker at the
-old 10-round cap) is no longer produced by any stage, so the workflow
-is inert — retained only so historical PRs that already carry a
-terminal marker can be advised via a manual rerun. Its `converged-*`
-output markers no longer trigger anything (Address Review is label-gated
-opt-in). A follow-up may repurpose or remove this stage.
-
 ## Maintenance: auto-close stale triage (`bot-auto-close.yml`)
 
 Runs on cron at 06:00 UTC daily. Closes issues that:
@@ -320,11 +310,10 @@ they make every workflow safely retryable.
 | `wheels-bot:review-a:<pr>:<sha>` | The Reviewer submitted its review at this SHA (legacy `review-a` name retained from before the single-reviewer consolidation). |
 | `wheels-bot:address-review:<pr>:<sha>:<round>` | Address-review applied reviewer findings at SHA, round N (outer loop). |
 | `wheels-bot:address-held:<pr>:<sha>` | Address-review would have made changes but the safety net held it for a human. |
-| `wheels-bot:advisor:<pr>:<sha>` | Senior Advisor verdict (legacy — only on PRs from the retired A/B loop era). |
 | `wheels-bot:auto-close:<issue>` | Auto-close cron closed this issue. |
 
 Markers from the retired A/B loop (`wheels-bot:review-a-response:`,
-`wheels-bot:review-b:`, `wheels-bot:converged-approve:`,
+`wheels-bot:review-b:`, `wheels-bot:advisor:`, `wheels-bot:converged-approve:`,
 `wheels-bot:converged-changes:`) still appear on historical PRs but are
 no longer produced or consumed.
 

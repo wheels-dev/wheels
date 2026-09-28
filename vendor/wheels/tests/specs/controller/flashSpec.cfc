@@ -179,6 +179,33 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("Tests that flash locking", () => {
+
+			beforeEach(() => {
+				_controller.$setFlashStorage("session")
+				_controller.flashClear()
+			})
+
+			afterEach(() => {
+				_controller.flashClear()
+			})
+
+			it("skips writing an empty session flash on $flashClear", () => {
+				StructDelete(session, "flash")
+				_controller.$flashClear()
+
+				expect(StructKeyExists(session, "flash")).toBeFalse()
+			})
+
+			it("still clears a populated session flash on $flashClear", () => {
+				StructDelete(request.wheels, "flashKeep")
+				_controller.flashInsert(success = "Congrats!")
+				_controller.$flashClear()
+
+				expect(_controller.flashIsEmpty()).toBeTrue()
+			})
+		})
+
 		describe("Tests that flashCount", () => {
 
 			beforeEach(() => {

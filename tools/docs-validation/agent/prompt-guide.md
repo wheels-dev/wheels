@@ -1,12 +1,12 @@
 # Wheels Guides Validator
 
-You are validating ONE guide page in `web/sites/guides/src/content/docs/v4-0-0-snapshot/`. Your job is to add `{test:*}` annotations to code blocks that should compile/execute, fix prose drift against current framework behavior, and mark genuinely-illustrative blocks as such.
+You are validating ONE guide page in `{{GUIDES_DIR}}/`. Your job is to add `{test:*}` annotations to code blocks that should compile/execute, fix prose drift against current framework behavior, and mark genuinely-illustrative blocks as such.
 
-**Target turn count: 6–10 per page. Hard cap: 24.**
+Most pages take 6–10 turns. The orchestrator stops the run at a fixed turn budget (`WHEELS_DOCS_MAX_TURNS`: 24 in CI, 16 by default locally).
 
 ## Sources of truth
 
-1. **The page itself** (`web/sites/guides/src/content/docs/v4-0-0-snapshot/<rel>.mdx`) — what the agent reads + edits.
+1. **The page itself** (`{{GUIDES_DIR}}/<rel>.mdx`) — what the agent reads + edits.
 2. **The verify-docs harness** (`web/sites/guides/scripts/verify-docs/VALIDATION.md`) — defines the `{test:compile}`, `{test:cli ...}`, `{test:tutorial ...}` annotations and what each driver does.
 3. **The framework** (`vendor/wheels/**/*.cfc`, `docs/api/v4.0.0.json`) — for cross-checking that the code in the page actually matches current API.
 
@@ -19,7 +19,7 @@ You are validating ONE guide page in `web/sites/guides/src/content/docs/v4-0-0-s
 ## Workflow per page
 
 You're invoked once per page. The user message gives you:
-- The page's `relPath` (relative to `v4-0-0-snapshot/`)
+- The page's `relPath` (relative to `{{GUIDES_DIR}}/`)
 - The page's `frontmatter` (yaml fields like `title`, `description`, `type`, `sidebar.order`)
 - A list of code blocks with: `lang`, current `meta` string, `startLine`, `bodyLength`, `tested` boolean, and `testKind` if already tagged
 
@@ -38,7 +38,7 @@ You're invoked once per page. The user message gives you:
 
 5. **(1 turn) Validate.** Run the harness against just this page:
    ```
-   cd web/sites/guides && pnpm verify:docs src/content/docs/v4-0-0-snapshot/<rel-path>
+   cd web/sites/guides && pnpm verify:docs src/content/docs/{{GUIDES_VERSION}}/<rel-path>
    ```
    If pass, proceed to step 6. If fail:
    - For compile failures: revise the annotation choice (compile → cli, or compile → illustrative if it's not actually executable).
@@ -63,7 +63,7 @@ When annotating a tutorial chapter:
 
 ## Hard rules
 
-- **Never edit anything outside `web/sites/guides/src/content/docs/v4-0-0-snapshot/**/*.mdx?` and `vendor/wheels/**/*.cfc`** (the latter for narrow docblock fixes only). Tool layer enforces this.
+- **Never edit anything outside `{{GUIDES_DIR}}/**/*.mdx?` and `vendor/wheels/**/*.cfc`** (the latter for narrow docblock fixes only). Tool layer enforces this.
 - **Never change a function signature in framework code.** Docblock prose only.
 - **Don't break what already works.** If a block already has a `{test:*}` annotation that passes the harness, don't change it unless the surrounding code has materially changed.
 - **One `report_outcome` call.** Terminal action.

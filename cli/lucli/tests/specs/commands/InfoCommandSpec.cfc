@@ -22,6 +22,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			'}'
 		);
 
+		// Isolate `wheels info` from whatever the developer/CI machine has
+		// listening on a common port (##3717). info() reports server status
+		// via detectServerPort(), which would otherwise attach to:
+		//   - the repo-root lucee.json that scaffoldTempProject copies in
+		//     (it pins port 8080), and
+		//   - the read-side common-port fallback (8080/60000/3000/8500).
+		// Drop the inherited lucee.json and opt out of the fallback via the
+		// project .env (##3693) — the same "no server" mode sibling command
+		// specs use; a closed PORT alone does not stop the common-port scan.
+		if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+		fileWrite(tempRoot & "/.env", "WHEELS_SERVER_FALLBACK=false" & chr(10));
+
 		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 	}
 
@@ -34,8 +46,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		describe("wheels info", () => {
 
 			it("runs without error", () => {
-				mod.info();
+				// The server-status line probes ports; keep it off the real
+				// common ports so the run never touches a server it did not
+				// start (the fallback-port sentinel fails the suite if it does).
+				var infoMod = new cli.lucli.Module(cwd = variables.tempRoot);
+				prepareMock(infoMod);
+				infoMod.$("isPortOpen", false);
+				infoMod.info();
 				expect(true).toBeTrue();
+			});
+
+			it("never attaches to a server on a common port (##3717)", () => {
+				// Simulate a sibling app on a "common" port with an ephemeral
+				// listener, then ask the same probe info() uses. The fixture's
+				// opt-out must win, so the spec's outcome never depends on what
+				// is listening on 8080 on the machine running the suite.
+				var probeMod = new cli.lucli.Module(cwd = variables.tempRoot);
+				prepareMock(probeMod);
+				makePublic(probeMod, "detectServerPort");
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var siblingPort = siblingSocket.getLocalPort();
+					expect(probeMod.detectServerPort(commonPorts = [siblingPort])).toBeFalse();
+				} finally {
+					siblingSocket.close();
+				}
 			});
 
 		});

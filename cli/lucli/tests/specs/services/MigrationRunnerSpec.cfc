@@ -18,11 +18,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			describe("runViaHttp()", () => {
 
+				// Guaranteed-closed ephemeral port plus a short timeout: a
+				// hard-coded port (59998) hung 120 s (the full timeout) on
+				// a CI runner and blew Lucee's request timeout (##3751).
 				it("returns error struct when no server on bogus port", () => {
 					try {
 						var result = migrationRunner.runViaHttp(
-							serverPort = 59998,
-							action = "info"
+							serverPort = testHelper.closedPort(),
+							action = "info",
+							timeout = 5
 						);
 						// If we get a struct, check it
 						if (isStruct(result)) {
@@ -37,8 +41,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("returns error for invalid action", () => {
 					try {
 						var result = migrationRunner.runViaHttp(
-							serverPort = 59998,
-							action = "invalid"
+							serverPort = testHelper.closedPort(),
+							action = "invalid",
+							timeout = 5
 						);
 						if (isStruct(result)) {
 							expect(result.success).toBeFalse();

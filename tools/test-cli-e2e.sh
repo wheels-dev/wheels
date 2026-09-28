@@ -33,12 +33,113 @@ TOTAL=0
 
 # ── Helpers ────────────────────────────────────────
 
+# PID of the process listening on a TCP port (empty without lsof).
+listener_pid() {
+    lsof -ti :"$1" -sTCP:LISTEN 2>/dev/null | head -1
+}
+
+# All descendants of a PID. `ps -A -o pid= -o ppid=` works on Linux and macOS.
+descendant_pids() {
+    ps -A -o pid= -o ppid= 2>/dev/null | awk -v root="$1" '
+        { parent[$1] = $2 }
+        END {
+            found[root] = 1; changed = 1
+            while (changed) {
+                changed = 0
+                for (p in parent) if (!(p in found) && (parent[p] in found)) { found[p] = 1; changed = 1 }
+            }
+            for (p in found) if (p != root) print p
+        }'
+}
+
+# JVMs whose command line mentions this run's unique mktemp dir. The dir goes
+# to awk through ITS environment (not argv, so awk never matches itself; and
+# not as a prefix on `ps`, which would leave awk with an empty needle that
+# matches every process). awk re-checks the needle length as a second guard.
+tmpdir_pids() {
+    case "$TMPDIR" in ""|/|/tmp|/tmp/) return 0 ;; esac
+    ps -A -o pid= -o command= 2>/dev/null | E2E_NEEDLE="$TMPDIR" awk -v self="$$" '
+        BEGIN { needle = ENVIRON["E2E_NEEDLE"]; if (length(needle) < 8) exit }
+        $1 != self && $2 ~ /(^|\/)java$/ && index($0, needle) > 0 { print $1 }'
+}
+
+# The JVM LuCLI's server registry recorded for THIS app, as "<pid>:<port>" in
+# <home>/servers/<name>/server.pid, matched by .project-path (never by name:
+# a stale "e2etest" entry from an earlier run points at a different temp dir).
+registry_jvm_pid() {
+    local home d real app_real
+    app_real="$(cd "$APP_DIR" 2>/dev/null && pwd -P)" || return 0
+    for home in "${LUCLI_HOME:-}" "$HOME/.lucli" "$HOME/.wheels"; do
+        [ -n "$home" ] && [ -d "$home/servers" ] || continue
+        for d in "$home"/servers/*/; do
+            [ -f "${d}.project-path" ] && [ -f "${d}server.pid" ] || continue
+            real="$(cd "$(cat "${d}.project-path")" 2>/dev/null && pwd -P)" || continue
+            if [ "$real" = "$app_real" ]; then
+                cut -d: -f1 "${d}server.pid" 2>/dev/null
+                return 0
+            fi
+        done
+    done
+}
+
+# Stop the scaffolded app's server. `kill $SERVER_PID` alone only kills the
+# `lucli server run` launcher; the Lucee/Tomcat JVM survives and keeps the HTTP
+# and shutdown ports, so the next run fails with "port conflicts detected"
+# (#3721). Only PIDs provably belonging to this run are signalled: the launcher
+# and its descendants, the JVM that took our (freshly cleared) port, the JVM the
+# registry recorded for this temp app dir, and any JVM naming the temp dir.
+stop_test_server() {
+    local pids="" pid i stop_pid
+
+    # 1. Ask LuCLI to stop it cleanly, bounded (no `timeout` on stock macOS).
+    if [ -d "$APP_DIR" ]; then
+        ( cd "$APP_DIR" && lucli server stop >/dev/null 2>&1 ) &
+        stop_pid=$!
+        for i in $(seq 1 30); do
+            kill -0 "$stop_pid" 2>/dev/null || break
+            sleep 0.5
+        done
+        kill "$stop_pid" 2>/dev/null || true
+        wait "$stop_pid" 2>/dev/null || true
+    fi
+
+    # 2. Collect everything that is ours (computed before killing the launcher,
+    #    while the parent/child links still exist).
+    pids="${SERVER_JVM:-} $(registry_jvm_pid || true) $(tmpdir_pids || true)"
+    if [ -n "${SERVER_PID:-}" ]; then
+        pids="$pids $SERVER_PID $(descendant_pids "$SERVER_PID" || true)"
+    fi
+    pids="$(printf '%s\n' $pids | awk -v self="$$" '/^[0-9]+$/ && $1 != self && !seen[$1]++')"
+    [ -n "$pids" ] || return 0
+
+    # 3. TERM, bounded wait (~15s), then KILL survivors.
+    for pid in $pids; do kill "$pid" 2>/dev/null || true; done
+    local alive=""
+    for i in $(seq 1 30); do
+        alive=""
+        for pid in $pids; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
+        [ -z "$alive" ] && break
+        sleep 0.5
+    done
+    # SIGKILL only the processes that are still alive: a PID that already exited may
+    # have been recycled by an unrelated process during the grace period.
+    for pid in $alive; do kill -9 "$pid" 2>/dev/null || true; done
+
+    # 4. Wait (bounded) for the port to actually come free.
+    for i in $(seq 1 20); do
+        [ -z "$(listener_pid "$PORT" || true)" ] && break
+        sleep 0.5
+    done
+    if [ -n "$(listener_pid "$PORT" || true)" ]; then
+        echo "WARNING: port $PORT is still held by PID $(listener_pid "$PORT") after cleanup"
+    fi
+}
+
 cleanup() {
     if [ "${SERVER_STARTED:-false}" = "true" ]; then
         echo ""
         echo "Stopping test server..."
-        kill "$SERVER_PID" 2>/dev/null || true
-        sleep 1
+        stop_test_server || true
     fi
     if [ "${KEEP_PROJECT:-0}" != "1" ]; then
         rm -rf "$TMPDIR"
@@ -423,12 +524,28 @@ else
     echo "Cannot test HTTP endpoints. Aborting E2E."
     exit 1
 fi
+# Record the JVM (not the launcher) so cleanup can stop what actually holds the
+# port. The port was cleared just above, so whoever listens on it now is ours.
+SERVER_JVM="$(listener_pid "$PORT" || true)"
 
 # Warm up Wheels (first request triggers onApplicationStart)
 echo "  Warming up application..."
 local_password=$(grep RELOAD_PASSWORD "$APP_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "$APP_NAME")
 curl -s -o /dev/null --max-time 60 "http://localhost:$PORT/" || true
 sleep 3
+
+# Migrate BEFORE the HTTP checks. The scaffolded Articles actions query the
+# `articles` table; without it the model layer throws Wheels.TableNotFound,
+# which onError maps to HTTP 404 (any `Wheels.*NotFound` is a 404), so
+# GET /articles and /articles/new "404" for a reason unrelated to routing
+# (#3722). Phase 7 still runs `migrate latest` again as its own check.
+echo "  Running migrations before HTTP checks..."
+if lucli wheels migrate latest > "$TMPDIR/migrate_prehttp.log" 2>&1; then
+    pass "wheels migrate latest (before HTTP checks)"
+else
+    fail "wheels migrate latest (before HTTP checks) failed"
+    tail -20 "$TMPDIR/migrate_prehttp.log" 2>/dev/null || true
+fi
 curl -s -o /dev/null --max-time 60 "http://localhost:$PORT/?reload=true&password=$local_password" || true
 sleep 3
 

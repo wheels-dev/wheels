@@ -1,0 +1,9 @@
+{
+  "LUCLI_REPO": "wheels-dev/LuCLI",
+  "LUCLI_VERSION": "0.6.2.1",
+  "LUCLI_SHA256": {
+    "linux": "edcc131e2101c2e5ec08a235f6ac16e5bbdcd8e3f3ea167cb115704f515a0844",
+    "macos": "edcc131e2101c2e5ec08a235f6ac16e5bbdcd8e3f3ea167cb115704f515a0844",
+    "jar": "b48f1cc7794c07b82aa6eaf818c1aee26de03eacd0e08e615cda24eb58ac4499"
+  }
+}

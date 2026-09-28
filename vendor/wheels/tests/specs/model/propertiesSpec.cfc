@@ -108,8 +108,6 @@ component extends="wheels.WheelsTest" {
 				}
 				if(isInstanceOf(user.birthTime,"java.time.LocalDateTime")){
 					user.birthTime = createDateTime(user.birthTime.getYear(),user.birthTime.getMonthValue(),user.birthTime.getDayOfMonth(),user.birthTime.getHour(),user.birthTime.getMinute(),user.birthTime.getSecond());
-				} else if (isInstanceOf(user.birthTime, "oracle.sql.TIMESTAMP")){
-					user.birthTime = user.birthTime.timestampValue();
 				}
 				expect(user).toHaveKey("birthTime")
 				expect(TimeFormat(user.birthTime, "HH:mm:ss")).toBe("18:26:08")
@@ -123,8 +121,6 @@ component extends="wheels.WheelsTest" {
 				}
 				if(isInstanceOf(user.birthTime,"java.time.LocalDateTime")){
 					user.birthTime = createDateTime(user.birthTime.getYear(),user.birthTime.getMonthValue(),user.birthTime.getDayOfMonth(),user.birthTime.getHour(),user.birthTime.getMinute(),user.birthTime.getSecond());
-				} else if (isInstanceOf(user.birthTime, "oracle.sql.TIMESTAMP")){
-					user.birthTime = user.birthTime.timestampValue();
 				}
 				expect(user).toHaveKey("birthTime")
 				expect(TimeFormat(user.birthTime, "HH:mm:ss")).toBe("18:26:08")
@@ -756,17 +752,14 @@ component extends="wheels.WheelsTest" {
 	}
 
 	/**
-	 * Normalizes a timestamp value (which may be oracle.sql.TIMESTAMP,
-	 * java.time.LocalDateTime, or a CFML date) to a consistent string
+	 * Normalizes a timestamp value (java.time.LocalDateTime or a CFML date;
+	 * finders no longer return oracle.sql.TIMESTAMP, #3719) to a consistent string
 	 * for comparison in tests.
 	 */
 	private string function $normalizeTimestamp(required any value) {
 		if (IsObject(arguments.value) && !IsStruct(arguments.value)) {
 			try {
 				local.className = GetMetadata(arguments.value).getName();
-				if (local.className == "oracle.sql.TIMESTAMP" || local.className == "oracle.sql.DATE") {
-					return DateTimeFormat(ParseDateTime(arguments.value.toString()), "yyyy-mm-dd HH:nn:ss");
-				}
 				if (local.className contains "LocalDateTime") {
 					return DateTimeFormat(
 						CreateDateTime(arguments.value.getYear(), arguments.value.getMonthValue(), arguments.value.getDayOfMonth(),

@@ -575,6 +575,59 @@ component extends="wheels.WheelsTest" {
 
 			})
 
+			/* ── params with pageNumberAsParam=false ──── */
+
+			describe("params forwarding with pageNumberAsParam=false", () => {
+
+				beforeEach(() => {
+					_origRoutes = Duplicate(application.wheels.routes)
+					_origStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
+					_origNamedRoutePositions = StructKeyExists(application.wheels, "namedRoutePositions") ? StructCopy(application.wheels.namedRoutePositions) : {}
+					_origRewrite = application.wheels.URLRewriting
+					$clearRoutes()
+					g.mapper().$match(name = "postsPaged", pattern = "posts/page/[page]", to = "posts##index").end()
+					g.$setNamedRoutePositions()
+					application.wheels.URLRewriting = "On"
+					g.model("author").findAll(page = 2, perPage = 3, order = "lastName")
+				})
+
+				afterEach(() => {
+					application.wheels.routes = _origRoutes
+					application.wheels.staticRoutes = _origStaticRoutes
+					application.wheels.namedRoutePositions = _origNamedRoutePositions
+					application.wheels.URLRewriting = _origRewrite
+				})
+
+				it("keeps string params on nextPageLink", () => {
+					result = _controller.nextPageLink(route = "postsPaged", pageNumberAsParam = false, params = "sort=title")
+					expect(result).toInclude("/posts/page/3?sort=title")
+				})
+
+				it("keeps struct params on previousPageLink", () => {
+					result = _controller.previousPageLink(route = "postsPaged", pageNumberAsParam = false, params = {sort = "title"})
+					expect(result).toInclude("/posts/page/1?")
+					expect(result).toInclude("sort=title")
+				})
+
+				it("keeps params on every pageNumberLinks anchor", () => {
+					result = _controller.pageNumberLinks(route = "postsPaged", pageNumberAsParam = false, params = "sort=title")
+					expect(result).toInclude("/posts/page/1?sort=title")
+					expect(result).toInclude("/posts/page/3?sort=title")
+				})
+
+				it("keeps params on paginationNav anchors", () => {
+					result = _controller.paginationNav(route = "postsPaged", pageNumberAsParam = false, params = "sort=title")
+					expect(result).toInclude("/posts/page/1?sort=title")
+					expect(result).toInclude("/posts/page/3?sort=title")
+				})
+
+				it("keeps params under a viewStyle preset", () => {
+					result = _controller.paginationNav(route = "postsPaged", pageNumberAsParam = false, params = "sort=title", viewStyle = "bootstrap5")
+					expect(result).toInclude("/posts/page/3?sort=title")
+				})
+
+			})
+
 			/* ── paginationNav anchor display modes ────── */
 
 			describe("paginationNav anchor display modes", () => {

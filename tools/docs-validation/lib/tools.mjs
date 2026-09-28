@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, isAbsolute, normalize, relative, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { GUIDES_DIR } from './guides.mjs';
 
 const REPO_ROOT = resolve(new URL('../../..', import.meta.url).pathname);
 
@@ -18,14 +19,17 @@ const READ_ROOTS = [
   'web/sites/guides/scripts/verify-docs',
 ];
 
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+const GUIDES_PAGE_RE = new RegExp(`^${escapeRe(GUIDES_DIR)}/.+\\.mdx?$`);
+
 const WRITE_GLOBS = [
   /^vendor\/wheels\/public\/docs\/reference\/(controller|model|mapper|migration|migrator|deprecated|tabledefinition)\/[a-z][a-z0-9]*\.txt$/,
-  /^web\/sites\/guides\/src\/content\/docs\/v4-0-0-snapshot\/.+\.mdx?$/,
+  GUIDES_PAGE_RE,
 ];
 
 const EDIT_GLOBS = [
   /^vendor\/wheels\/.+\.cfc$/,
-  /^web\/sites\/guides\/src\/content\/docs\/v4-0-0-snapshot\/.+\.mdx?$/,
+  GUIDES_PAGE_RE,
 ];
 
 function withinRoot(absPath) {
@@ -58,11 +62,14 @@ export const TOOLS = [
   {
     name: 'read_file',
     description:
-      'Read a file from the repo. Allowed roots: vendor/wheels, tools/docs-validation, docs/api, .ai, app, tests, config, CLAUDE.md.',
+      'Read a whole file from the repo and return its full UTF-8 content (no line ranges, no truncation). ' +
+      'Allowed roots: vendor/wheels, tools/docs-validation, docs/api, .ai, app, tests, config, CLAUDE.md, ' +
+      'web/sites/guides/src/content, web/sites/guides/scripts/verify-docs. Paths outside these, directories, and missing files return {ok:false, error}. ' +
+      'To find one phrase in a large file, run_bash with grep is cheaper.',
     input_schema: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Repo-relative or absolute path' },
+        path: { type: 'string', description: 'Repo-relative, or absolute inside the repo' },
       },
       required: ['path'],
     },
@@ -70,12 +77,15 @@ export const TOOLS = [
   {
     name: 'write_file',
     description:
-      'Write a file. Allowed only for vendor/wheels/public/docs/reference/<scope>/<name>.txt. Anything else is rejected.',
+      'Create or overwrite a whole file (parent directories are created). Allowed targets: ' +
+      'vendor/wheels/public/docs/reference/<scope>/<name>.txt, where <scope> is one of controller, model, mapper, migration, migrator, deprecated, tabledefinition ' +
+      `and <name> is the lowercased function name (letters and digits only); and ${GUIDES_DIR}/**/*.md(x). ` +
+      'Anything else returns {ok:false, error}. To change part of an existing file, use edit_file.',
     input_schema: {
       type: 'object',
       properties: {
-        path: { type: 'string' },
-        content: { type: 'string' },
+        path: { type: 'string', description: 'Repo-relative target path' },
+        content: { type: 'string', description: 'Complete new file content' },
       },
       required: ['path', 'content'],
     },
@@ -83,13 +93,15 @@ export const TOOLS = [
   {
     name: 'edit_file',
     description:
-      'Replace exactly one occurrence of old_string with new_string in a vendor/wheels/**/*.cfc file. old_string must be unique and match verbatim including whitespace. Use this to edit docblock prose or, when a behavior bug is unambiguous, function bodies.',
+      'Replace exactly one occurrence of old_string with new_string in an existing file. Allowed targets: vendor/wheels/**/*.cfc ' +
+      `and ${GUIDES_DIR}/**/*.md(x). old_string must match verbatim including whitespace and occur exactly once; ` +
+      'zero or multiple matches return {ok:false, error} and change nothing. Use it for docblock prose, narrow CFC body fixes, and guide annotation/prose edits.',
     input_schema: {
       type: 'object',
       properties: {
-        path: { type: 'string' },
-        old_string: { type: 'string' },
-        new_string: { type: 'string' },
+        path: { type: 'string', description: 'Repo-relative path of the file to edit' },
+        old_string: { type: 'string', description: 'Exact existing text; include surrounding lines to make it unique' },
+        new_string: { type: 'string', description: 'Replacement text' },
       },
       required: ['path', 'old_string', 'new_string'],
     },
@@ -97,12 +109,14 @@ export const TOOLS = [
   {
     name: 'run_bash',
     description:
-      'Run a shell command. Output is captured. Use for `wheels cfml "<expr>"` (compile-validates a CFML snippet), `bash tools/test-local.sh <scope>` (runs tests for a scope), `git diff`, `grep`, etc. Hard timeout: 180s.',
+      'Run a command with `bash -lc` from the repo root; returns {ok, exit_code, timed_out, stdout, stderr}, each stream capped at 32,000 chars. ' +
+      'Use for `wheels cfml "<expr>"` (bare CFML with no Wheels framework loaded, so a syntax check only), `bash tools/test-local.sh <scope>`, ' +
+      '`pnpm verify:docs <page>` (from web/sites/guides), `git diff`, and `grep`. The whole process tree is killed at the timeout and ok is false.',
     input_schema: {
       type: 'object',
       properties: {
-        command: { type: 'string' },
-        timeout_seconds: { type: 'number', default: 60 },
+        command: { type: 'string', description: 'Shell command line' },
+        timeout_seconds: { type: 'number', default: 60, description: 'Seconds before the command is killed; clamped to 1–180' },
       },
       required: ['command'],
     },
@@ -110,14 +124,16 @@ export const TOOLS = [
   {
     name: 'report_outcome',
     description:
-      'Terminal action. Reports the result for the current function. Call exactly once at the end. status=done means examples written and validated; status=needs_human means a fix is required but the agent cannot apply it safely; status=failed means validation failed.',
+      'Terminal action: records the result for the current function or guide page and ends the run. Call exactly once, last. ' +
+      'status=done: the reference example (api) or page annotations (guide) are written; status=needs_human: a doc/code conflict or fix remains that you could not apply safely (explain in notes); ' +
+      'status=failed: you could not produce a usable result.',
     input_schema: {
       type: 'object',
       properties: {
         status: { enum: ['done', 'needs_human', 'failed'] },
         summary: { type: 'string', description: '1-2 sentence summary of what was done.' },
-        files_changed: { type: 'array', items: { type: 'string' } },
-        notes: { type: 'string' },
+        files_changed: { type: 'array', items: { type: 'string' }, description: 'Repo-relative paths you wrote or edited' },
+        notes: { type: 'string', description: 'Open questions, harness failure tails, or anything a reviewer should check' },
       },
       required: ['status', 'summary'],
     },
@@ -183,7 +199,7 @@ async function doWrite(path, content) {
 async function doEdit(path, oldStr, newStr) {
   try {
     const { abs, rel } = resolveRel(path);
-    if (!editAllowed(rel)) return { ok: false, error: `edit denied for ${rel} (only vendor/wheels/**/*.cfc)` };
+    if (!editAllowed(rel)) return { ok: false, error: `edit denied for ${rel} (only vendor/wheels/**/*.cfc and ${GUIDES_DIR} pages)` };
     if (!existsSync(abs)) return { ok: false, error: `not found: ${rel}` };
     const current = await readFile(abs, 'utf8');
     const occurrences = current.split(oldStr).length - 1;

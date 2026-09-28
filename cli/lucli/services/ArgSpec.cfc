@@ -12,7 +12,7 @@
  * `ArgSpec` consumes LuCLI's structured map directly. Each command either
  * declares its positionals, flags, and options up front and calls
  * `.parse(arguments)` for a typed result struct, or — when it forwards to its
- * own downstream argv parser (generate, deploy, packages, ...) — calls
+ * own downstream argv parser (generate, deploy, migrate, ...) — calls
  * `.toArgv(arguments)` for a non-lossy collection->argv reconstruction. Either
  * way: no per-command flatten, no re-parse, no lossy `false` round trip. The
  * Module.cfc getArgs()/argsFromCollection() shim this replaced has been removed
@@ -35,6 +35,21 @@ component {
 	public any function init() {
 		variables.positionals = [];
 		variables.named = {};
+		// Keys parse() accepts without declaring or advertising them. `offline`
+		// is the one documented GLOBAL flag ("applies to every command",
+		// command-line-tools guide); commands that act on it read it through
+		// $consumeOfflineFlag or declare it.
+		variables.accepted = ["offline"];
+		return this;
+	}
+
+	/**
+	 * Accept a named key that parse() must not reject but the MCP schema must
+	 * not advertise — a CLI-only spelling the command reads itself (e.g.
+	 * upgrade's `--no-backup`, which LuCLI normalizes to backup=false).
+	 */
+	public any function accept(required string name) {
+		arrayAppend(variables.accepted, arguments.name);
 		return this;
 	}
 
@@ -43,14 +58,16 @@ component {
 		boolean required = false,
 		any default = "",
 		string type = "string",
-		string description = ""
+		string description = "",
+		string choices = ""
 	) {
 		arrayAppend(variables.positionals, {
 			"name" = arguments.name,
 			"required" = arguments.required,
 			"default" = arguments.default,
 			"type" = arguments.type,
-			"description" = arguments.description
+			"description" = arguments.description,
+			"choices" = listToArray(arguments.choices)
 		});
 		return this;
 	}
@@ -63,26 +80,73 @@ component {
 		variables.named[arguments.name] = {
 			"default" = arguments.default,
 			"type" = "boolean",
-			"description" = arguments.description
+			"description" = arguments.description,
+			"choices" = []
 		};
 		return this;
 	}
 
+	/**
+	 * `choices` (comma-delimited) fixes the accepted values: parse() rejects
+	 * anything else and toInputSchema() advertises them as a JSON Schema
+	 * `enum`, so the parser and the MCP schema share one declaration (#2963).
+	 * Positionals take the same argument.
+	 */
 	public any function option(
 		required string name,
 		any default = "",
 		string type = "string",
-		string description = ""
+		string description = "",
+		string choices = ""
 	) {
 		variables.named[arguments.name] = {
 			"default" = arguments.default,
 			"type" = arguments.type,
-			"description" = arguments.description
+			"description" = arguments.description,
+			"choices" = listToArray(arguments.choices)
 		};
 		return this;
 	}
 
-	public struct function parse(required struct coll) {
+	/**
+	 * The declared choices for a positional or option (empty array when it
+	 * has none). For commands that bind a value outside parse() — destroy's
+	 * legacy <name> <type> reorder — and must validate it the same way.
+	 */
+	public array function choicesFor(required string name) {
+		for (var p in variables.positionals) {
+			if (p.name == arguments.name) {
+				return p.choices;
+			}
+		}
+		return structKeyExists(variables.named, arguments.name) ? variables.named[arguments.name].choices : [];
+	}
+
+	/**
+	 * Throw Wheels.InvalidArguments when a supplied value is not one of the
+	 * declared choices. Empty values are not validated: they mean "not
+	 * given" (db's subcommand defaults to "" to print usage).
+	 */
+	private void function $assertChoice(required string name, required any value, required array choices) {
+		if (!arrayLen(arguments.choices) || !isSimpleValue(arguments.value) || !len(trim(arguments.value))) {
+			return;
+		}
+		if (!arrayFindNoCase(arguments.choices, trim(arguments.value))) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "Invalid value '#arguments.value#' for #arguments.name#. Valid values: #arrayToList(arguments.choices, ', ')#."
+			);
+		}
+	}
+
+	/**
+	 * `strict` (default) enforces the schema's additionalProperties:false: a
+	 * named key that is not declared, not a positional's name, and not
+	 * accept()ed throws Wheels.InvalidArguments naming it (#2963). Pass
+	 * strict=false only for a partial spec whose caller forwards the rest to
+	 * a parser that is itself strict (create -> new).
+	 */
+	public struct function parse(required struct coll, boolean strict = true) {
 		var result = {};
 
 		// 1. Seed named defaults so every declared option is present in the result.
@@ -97,12 +161,77 @@ component {
 		//    arg<N> key and sort numerically instead of probing literal
 		//    arg1..argN; fixed-index probing made gap-following positionals
 		//    silently bind nothing (the appName above was ignored).
+		// A key that is present with a NULL value (the stdio MCP transport
+		// turns an empty JSON string into null) is "no value", never
+		// "omitted": `migrate {action: null}` must not fall back to the default
+		// action `latest`. structKeyExists() is false for a null value, so scan
+		// the keys directly.
+		var nullKeys = [];
+		for (var nk in arguments.coll) {
+			if (isNull(arguments.coll[nk])) {
+				arrayAppend(nullKeys, nk);
+			}
+		}
+		for (var nk in nullKeys) {
+			if (reFindNoCase("^arg\d+$", nk)) {
+				throw(type = "Wheels.InvalidArguments", message = "Positional argument #mid(nk, 4, len(nk))# has no value.");
+			}
+		}
+		for (var p in variables.positionals) {
+			if (arrayFindNoCase(nullKeys, p.name)) {
+				throw(type = "Wheels.InvalidArguments", message = "<" & p.name & "> has no value.");
+			}
+		}
+		// ...declared or not: an undeclared null key is still input the
+		// command might read raw (upgrade's dry-run did, and applied).
+		for (var nk in nullKeys) {
+			throw(type = "Wheels.InvalidArguments", message = "--" & nk & " has no value.");
+		}
+
+		if (arguments.strict) {
+			for (var key in arguments.coll) {
+				if (
+					reFindNoCase("^arg\d+$", key)
+					|| structKeyExists(variables.named, key)
+					|| arrayFindNoCase(variables.accepted, key)
+					|| $isPositionalName(key)
+				) {
+					continue;
+				}
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "Unknown argument '--#key#'. Accepted: #arrayLen($acceptedNames()) ? arrayToList($acceptedNames(), ', ') : 'none (this command takes no arguments)'#."
+				);
+			}
+		}
+
 		var positionalIndices = $positionalIndices(arguments.coll);
 		var positionalCount = arrayLen(variables.positionals);
 		for (var i = 1; i <= positionalCount; i++) {
 			var pSpec = variables.positionals[i];
 			if (i <= arrayLen(positionalIndices)) {
-				result[pSpec.name] = $coerce(arguments.coll["arg" & positionalIndices[i]], pSpec.type);
+				result[pSpec.name] = $coerce(arguments.coll["arg" & positionalIndices[i]], pSpec.type, pSpec.name);
+				$assertChoice(pSpec.name, result[pSpec.name], pSpec.choices);
+			} else if (structKeyExists(arguments.coll, pSpec.name) && isSimpleValue(arguments.coll[pSpec.name])) {
+				// By-name fallback (#2963). LuCLI's MCP server delivers
+				// tools/call arguments as named keys — toInputSchema()
+				// advertises positionals as named properties, so
+				// {type: "model"} arrives as type=model, never arg1. A typed
+				// positional token still wins; the name only fills a slot the
+				// tokens left unbound.
+				//
+				// A bare CLI `--name` arrives as name=true: a flag, not a value.
+				// It must ERROR, never fall back to the default — MCP
+				// migrate {action: "true"} falling back to `latest` would run
+				// migrations.
+				if (pSpec.type == "string" && compareNoCase(toString(arguments.coll[pSpec.name]), "true") == 0) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "<" & pSpec.name & "> needs a value, e.g. --" & pSpec.name & "=<value> (a bare --" & pSpec.name & " is a flag)."
+					);
+				}
+				result[pSpec.name] = $coerce(arguments.coll[pSpec.name], pSpec.type, pSpec.name);
+				$assertChoice(pSpec.name, result[pSpec.name], pSpec.choices);
 			} else if (pSpec.required) {
 				throw(
 					type = "Wheels.CLI.MissingArgument",
@@ -117,11 +246,24 @@ component {
 		//    so we just consume the structured handoff. Unknown keys are
 		//    ignored so a stray LuCLI flag never lands in the result.
 		for (var key in arguments.coll) {
-			if (reFindNoCase("^arg\d+$", key)) {
+			if (reFindNoCase("^arg\d+$", key) || arrayFindNoCase(nullKeys, key)) {
 				continue;
 			}
 			if (structKeyExists(variables.named, key)) {
-				result[key] = $coerce(arguments.coll[key], variables.named[key].type);
+				// A bare `--to` arrives as to=true: a flag, not a value. For a
+				// string option that must ERROR, never bind the literal "true".
+				if (
+					variables.named[key].type == "string"
+					&& isSimpleValue(arguments.coll[key])
+					&& compareNoCase(trim(toString(arguments.coll[key])), "true") == 0
+				) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "--#key# needs a value, e.g. --#key#=<value> (a bare --#key# is a flag)."
+					);
+				}
+				result[key] = $coerce(arguments.coll[key], variables.named[key].type, key);
+				$assertChoice(key, result[key], variables.named[key].choices);
 			}
 		}
 
@@ -134,8 +276,8 @@ component {
 	 * The inverse of LuCLI's parse: positionals (arg1, arg2, ...) emit first
 	 * in index order, then named keys emit as `--key` (true), `--no-key`
 	 * (false), or `--key=value`. This is the non-lossy passthrough that
-	 * commands with their own downstream argv parsers (generate, create, db,
-	 * browser, deploy, packages, migrate, start) use to forward LuCLI's
+	 * commands with their own downstream argv parsers (generate, create,
+	 * browser, deploy, migrate, start) use to forward LuCLI's
 	 * structured handoff to a flat-array parser — replacing the Module.cfc
 	 * getArgs()/argsFromCollection() round trip (#2855, #2861).
 	 *
@@ -170,6 +312,11 @@ component {
 		for (var key in arguments.coll) {
 			if (reFindNoCase("^arg\d+$", key)) {
 				continue;
+			}
+			if (isNull(arguments.coll[key])) {
+				// The MCP transport turns "" into null; forwarding it as a flag
+				// would change meaning downstream (#2963).
+				throw(type = "Wheels.InvalidArguments", message = "--" & key & " has no value.");
 			}
 			var value = arguments.coll[key];
 			if (!isSimpleValue(value)) {
@@ -221,7 +368,7 @@ component {
 		var required = [];
 
 		for (var p in variables.positionals) {
-			properties[p.name] = $toSchemaProperty(p.type, p["default"], p.description);
+			properties[p.name] = $toSchemaProperty(p.type, p["default"], p.description, p.choices);
 			if (p.required) {
 				arrayAppend(required, p.name);
 			}
@@ -229,7 +376,7 @@ component {
 
 		for (var optName in variables.named) {
 			var spec = variables.named[optName];
-			properties[optName] = $toSchemaProperty(spec.type, spec["default"], spec.description);
+			properties[optName] = $toSchemaProperty(spec.type, spec["default"], spec.description, spec.choices);
 		}
 
 		return {
@@ -243,12 +390,18 @@ component {
 	private struct function $toSchemaProperty(
 		required string type,
 		required any default,
-		string description = ""
+		string description = "",
+		array choices = []
 	) {
-		var prop = {
-			"type" = $toJsonSchemaType(arguments.type),
-			"default" = arguments.default
-		};
+		var prop = {"type" = $toJsonSchemaType(arguments.type)};
+		if (arrayLen(arguments.choices)) {
+			prop["enum"] = arguments.choices;
+		}
+		// A default outside the enum (db's "" = print usage) would contradict
+		// the schema, so it is left out; the command still applies it.
+		if (!arrayLen(arguments.choices) || arrayFindNoCase(arguments.choices, toString(arguments.default))) {
+			prop["default"] = arguments.default;
+		}
 		if (len(arguments.description)) {
 			prop["description"] = arguments.description;
 		}
@@ -273,10 +426,40 @@ component {
 	 * arg<N> key — so consumers must never assume the indices are contiguous
 	 * or start at 1.
 	 */
+	private boolean function $isPositionalName(required string name) {
+		for (var p in variables.positionals) {
+			if (p.name == arguments.name) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Every name parse() accepts, for the unknown-argument message.
+	 */
+	private array function $acceptedNames() {
+		var names = [];
+		for (var p in variables.positionals) {
+			arrayAppend(names, p.name);
+		}
+		for (var n in variables.named) {
+			arrayAppend(names, n);
+		}
+		arraySort(names, "textnocase");
+		return names;
+	}
+
 	private array function $positionalIndices(required struct coll) {
 		var indices = [];
 		for (var key in arguments.coll) {
-			if (reFindNoCase("^arg\d+$", key)) {
+			// An empty token is not a token (#2963): it must not bind a slot
+			// and shadow the named key, or {arg1: "", action: "bogus"} would
+			// bind action="" and fall back to the default action.
+			if (
+				reFindNoCase("^arg\d+$", key)
+				&& !(isSimpleValue(arguments.coll[key]) && !len(trim(toString(arguments.coll[key]))))
+			) {
 				arrayAppend(indices, val(mid(key, 4, len(key))));
 			}
 		}
@@ -284,20 +467,39 @@ component {
 		return indices;
 	}
 
-	private any function $coerce(required any v, required string type) {
+	/**
+	 * Coerce a supplied value to its declared type, rejecting anything that is
+	 * not a real value of that type (#2963). A value that cannot be read must
+	 * never become a silent default: `strict=bogus` used to read as false and
+	 * `--interval` (bare) as 0. Destructive verbs like `upgrade apply` depend
+	 * on this to throw before acting.
+	 */
+	private any function $coerce(required any v, required string type, string name = "") {
+		var label = len(arguments.name) ? "--" & arguments.name : "value";
+		var text = trim(toString(arguments.v));
 		switch (arguments.type) {
 			case "boolean":
-				// Normalize to a strict CFML boolean regardless of whether the
-				// runtime handed us a literal true/false or the string "true"/
-				// "false". `isBoolean("false")` is true on every supported
-				// engine, but the *value* is still a string; the ternary forces
-				// the conversion so downstream `if (out.flag)` is unambiguous.
-				if (isBoolean(arguments.v)) {
-					return arguments.v ? true : false;
+				// LuCLI normalizes flags to the strings "true"/"false"; MCP
+				// clients send native booleans (toString gives "true"/"false").
+				// Nothing else is a boolean here — not yes/no/1/0, not "".
+				if (compareNoCase(text, "true") == 0) {
+					return true;
 				}
-				return lCase(trim(toString(arguments.v))) == "true";
+				if (compareNoCase(text, "false") == 0) {
+					return false;
+				}
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "#label# expects true or false, got '#text#'."
+				);
 			case "numeric":
-				return val(arguments.v);
+				if (!isNumeric(text)) {
+					throw(
+						type = "Wheels.InvalidArguments",
+						message = "#label# expects a number, got '#text#'."
+					);
+				}
+				return val(text);
 			default:
 				return toString(arguments.v);
 		}

@@ -19,17 +19,35 @@
 	 * Internal function.
 	 */
 	public void function $initializeRequestScope() {
+		// Each key is initialized on its own, and only when missing. request.wheels
+		// can exist without them: on Adobe CF 2025 the engine raises an error during
+		// application startup and the app's onError sets request.wheels.exception /
+		// eventName before this runs, and helpers (cache, pagination, settings,
+		// middleware) create request.wheels on demand. The old all-or-nothing guard
+		// then left httpRequestData unset, and Dispatch failed with "Element
+		// WHEELS.HTTPREQUESTDATA.HEADERS is undefined" (#3726). Keys that are already
+		// present, including what onError recorded, are kept.
 		if (!StructKeyExists(request, "wheels")) {
 			request.wheels = {};
+		}
+		if (!StructKeyExists(request.wheels, "params")) {
 			request.wheels.params = {};
+		}
+		if (!StructKeyExists(request.wheels, "cache")) {
 			request.wheels.cache = {};
+		}
+		if (!StructKeyExists(request.wheels, "urlForCache")) {
 			request.wheels.urlForCache = {};
+		}
+		if (!StructKeyExists(request.wheels, "tickCountId")) {
 			request.wheels.tickCountId = GetTickCount();
-
+		}
+		if (!StructKeyExists(request.wheels, "httpRequestData")) {
 			// Copy HTTP request data (contains content, headers, method and protocol).
 			// This makes internal testing easier since we can overwrite it temporarily from the test suite.
 			request.wheels.httpRequestData = GetHTTPRequestData();
-
+		}
+		if (!StructKeyExists(request.wheels, "transactions")) {
 			// Create a structure to track the transaction status for all adapters.
 			request.wheels.transactions = {};
 		}
@@ -152,9 +170,11 @@
 			}
 		}
 
-		// some web servers incorrectly place index.cfm in the path_info but since that should never be there we can safely remove it
-		if (Find("index.cfm/", local.rv.path_info)) {
-			Replace(local.rv.path_info, "index.cfm/", "");
+		// some web servers incorrectly place index.cfm in the path_info (e.g. the IIS fallbacks above copy
+		// request_uri "/index.cfm/users/list" verbatim) but since that should never be there we can safely
+		// remove it. Anchored to the start so a later segment such as "/docs/myindex.cfm/x" is left alone.
+		if (ReFindNoCase("^/index\.cfm/", local.rv.path_info)) {
+			local.rv.path_info = ReReplaceNoCase(local.rv.path_info, "^/index\.cfm/", "/");
 		}
 		return local.rv;
 	}

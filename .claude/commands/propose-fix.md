@@ -44,9 +44,8 @@ is enforced by code, so don't skip steps.
    was found.
 
 3. **Read the supporting docs.**
-   - `CLAUDE.md` § "Critical Anti-Patterns" + § "Wheels Conventions" + §
-     "Commit Message Conventions"
-   - `.ai/wheels/<layer>/` for the affected layer
+   - `CLAUDE.md` § "Cross-Engine Invariants" + § "Anti-Patterns" + §
+     "Wheels Conventions" + § "Commit Message Conventions"
    - `.ai/wheels/cross-engine-compatibility.md` always
    - `.github/pull_request_template.md` — you will fill this checklist
 
@@ -107,8 +106,8 @@ is enforced by code, so don't skip steps.
    - `.github/workflows/pr.yml`
    - Any other developer's in-flight branch
 
-   Honor every CLAUDE.md anti-pattern. Reference `.ai/wheels/<layer>/`
-   patterns for the right shape.
+   Honor every CLAUDE.md anti-pattern and cross-engine invariant. Existing
+   code in the same layer is the reference for the right shape.
 
 8. **Re-run the spec.**
 
@@ -135,7 +134,7 @@ is enforced by code, so don't skip steps.
 10. **Stage, commit, and prepare the PR.**
 
     Conventional commit. Type from `feat`/`fix`/`refactor`/`perf`/`test`/
-    `docs`/`chore`. Scope from the allowlist (or no scope). Subject ≤ 100
+    `docs`/`chore`. Scope optional and unrestricted. Whole header ≤ 100
     chars, sentence-case, not ALL-CAPS.
 
     Examples:
@@ -156,9 +155,8 @@ is enforced by code, so don't skip steps.
       issue's complete scope.** If the PR is a stage, a partial fix, or
       defers any of the issue's acceptance criteria to follow-ups, write
       `Refs #<issue-number>` instead so the merge does not auto-close the
-      tracking issue. (Three multi-stage issues were silently orphaned
-      this way during the 2026-06 remediation campaign — #2897, #2959,
-      #2963 — each auto-closed by its Stage-1 PR.)
+      tracking issue — a `Fixes` on a stage PR closes the tracker and
+      orphans the remaining stages.
     - **If a research comment was used**: include
       `Recommended path from research: <link to research comment>`
     - Fill the `.github/pull_request_template.md` checklist honestly:

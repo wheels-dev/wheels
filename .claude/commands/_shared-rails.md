@@ -1,4 +1,4 @@
-# Shared Rails (paste verbatim into every wheels-bot command)
+# Shared Rails (every wheels-bot command reads this file first)
 
 These rails apply to every wheels-bot slash command. The caller workflow assumes
 they are honored. Violating them is a bug — fix the prompt, not the rails.
@@ -20,18 +20,18 @@ they are honored. Violating them is a bug — fix the prompt, not the rails.
 
 ## Wheels-specific reasoning
 
-- **Read `.ai/wheels/` before reasoning about CFML semantics.** It contains
-  the canonical agent reference for cross-engine compatibility, ORM
-  conventions, controller patterns, view helpers, testing, and security.
-  Specifically check `.ai/wheels/cross-engine-compatibility.md` for any
-  Lucee-vs-Adobe-vs-BoxLang concerns.
+- **Read `.ai/wheels/cross-engine-compatibility.md` before reasoning about
+  CFML semantics** — it is the deep reference for Lucee-vs-Adobe-vs-BoxLang
+  behavior. The rest of `.ai/wheels/` is maintainer runbooks (deploy, bot,
+  testing harnesses); framework behavior itself is documented by the code
+  under `vendor/wheels/`.
 - **Read `CLAUDE.md`** at the repo root. It encodes the project's anti-patterns
   (mixed argument styles, query vs array confusion, route order, etc.) and
   the canonical conventions for models / controllers / views / migrations.
 - **Cross-engine compatibility is non-negotiable.** Do not propose Lucee-only
   or Adobe-only APIs. Closures, struct member functions, `client` scope, and
   `application` scope all have engine-specific gotchas — see
-  `CLAUDE.md` § "Known cross-engine gotchas".
+  `CLAUDE.md` § "Cross-Engine Invariants".
 
 ## Commit & PR conventions
 

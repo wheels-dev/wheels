@@ -85,7 +85,80 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayLen(directoryList(variables.tempRoot & "/app/migrator/migrations", false, "name"))).toBe(0);
 				expect(fileRead(variables.tempRoot & "/config/routes.cfm")).toBe('mapper().wildcard().end();');
 			});
+
+			it("treats an explicit dry-run=false as a real run (MCP sends schema defaults, ##2963)", () => {
+				// toArgv() re-emits dry-run=false as --no-dry-run, which the
+				// generator's flag parser rejected as `Unknown flag`.
+				mod.generate(type = "model", name = "Tag", attributes = "name:string{30} slug:string", "dry-run" = false);
+				expect($source("app/models/Tag.cfc")).toInclude('validatesPresenceOf("name,slug")');
+			});
+
+			it("does not inherit a stale dry-run left on the request by an earlier call", () => {
+				// The stdio MCP server reuses the request across tool calls; a
+				// dry run that threw before its cleanup must not make the next
+				// generate write nothing.
+				request.$wheelsGenerateDryRun = true;
+				request.$wheelsDryRunPaths = [];
+				mod.generate(type = "model", name = "Tag", attributes = "name:string{30} slug:string");
+				expect(fileExists(variables.tempRoot & "/app/models/Tag.cfc")).toBeTrue();
+			});
 		});
+
+		// #3723: `generate model --belongsTo=X` wrote a model with belongsTo("x")
+		// and a migration with no FK column, so the association's default key
+		// named a column that didn't exist and `wheels seed` failed.
+		describe("generate model --belongsTo adds the foreign-key column", () => {
+			beforeEach(() => {
+				variables.tempRoot = getTempDirectory() & "wheels-generate-belongsto-" & createUUID();
+				for (var dir in ["vendor/wheels", "app/models", "app/controllers", "app/views", "app/migrator/migrations", "config", "tests/specs"]) {
+					directoryCreate(variables.tempRoot & "/" & dir, true, true);
+				}
+				fileWrite(variables.tempRoot & "/config/routes.cfm", 'mapper().wildcard().end();');
+				variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
+			});
+
+			afterEach(() => {
+				structDelete(request, "$wheelsGenerateDryRun");
+				structDelete(request, "$wheelsDryRunPaths");
+				if (directoryExists(variables.tempRoot)) directoryDelete(variables.tempRoot, true);
+			});
+
+			it("adds a camelCase FK column through the MCP named-argument path", () => {
+				mod.generate(type = "model", name = "Review", attributes = "body:text rating:integer", belongsTo = "Product");
+				var migration = $migration("reviews");
+				expect($fkCount(migration, "productId")).toBe(1);
+				expect($fkCount(migration, "product_id")).toBe(0);
+				expect($source("app/models/Review.cfc")).toInclude("belongsTo");
+			});
+
+			it("adds a <name>_id FK column when useUnderscoreReferenceColumns=true (CLI argv via g)", () => {
+				fileWrite(variables.tempRoot & "/config/settings.cfm", "set(useUnderscoreReferenceColumns=true);");
+				mod.__arguments = ["model", "Review", "body:text", "rating:integer", "--belongsTo=Product"];
+				mod.g();
+				var migration = $migration("reviews");
+				expect($fkCount(migration, "product_id")).toBe(1);
+				expect($fkCount(migration, "productId")).toBe(0);
+			});
+
+			it("writes a migration with the FK column when --belongsTo is the only attribute", () => {
+				mod.__arguments = ["model", "Review", "--belongsTo=Product"];
+				mod.generate();
+				expect($fkCount($migration("reviews"), "productId")).toBe(1);
+			});
+
+			it("does not duplicate an FK column the user already listed, in either reference shape", () => {
+				fileWrite(variables.tempRoot & "/config/settings.cfm", "set(useUnderscoreReferenceColumns=true);");
+				mod.__arguments = ["model", "Review", "productId:integer", "body:text", "--belongsTo=Product"];
+				mod.generate();
+				var migration = $migration("reviews");
+				expect($fkCount(migration, "productId")).toBe(1);
+				expect($fkCount(migration, "product_id")).toBe(0);
+			});
+		});
+	}
+
+	private numeric function $fkCount(required string migration, required string column) {
+		return arrayLen(reMatch("columnNames\s*=\s*['""]" & arguments.column & "['""]", arguments.migration));
 	}
 
 	private void function $expectTagFields() {

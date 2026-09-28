@@ -106,7 +106,10 @@ component extends="wheels.WheelsTest" {
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(rows.recordCount).toBe(1);
-				expect(IsDate(rows.applied_at)).toBeTrue();
+				// Raw queryExecute, so the shape is the driver's: Oracle returns
+				// oracle.sql.TIMESTAMP, which IsDate() rejects on Adobe CF
+				// (#3649). Normalize through the framework helper first.
+				expect(IsDate(application.wo.$normalizeDbTimestamp(rows.applied_at))).toBeTrue();
 			});
 
 			it("re-runs ALTER when the tracking table is dropped+recreated (regression)", () => {
@@ -169,7 +172,10 @@ component extends="wheels.WheelsTest" {
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(rows.recordCount).toBe(1);
-				expect(IsDate(rows.applied_at)).toBeTrue();
+				// Raw queryExecute, so the shape is the driver's: Oracle returns
+				// oracle.sql.TIMESTAMP, which IsDate() rejects on Adobe CF
+				// (#3649). Normalize through the framework helper first.
+				expect(IsDate(application.wo.$normalizeDbTimestamp(rows.applied_at))).toBeTrue();
 			});
 
 		});

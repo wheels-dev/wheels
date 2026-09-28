@@ -96,6 +96,59 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     }
 
     /**
+     * Delete a directory and everything in it, symlink-safe.
+     *
+     * `DirectoryDelete(path, recurse=true)` leaves the directory behind on
+     * Adobe CF 2023 when the tree contains a symlink — it throws "The specified
+     * directory ... cannot be deleted. This directory is not empty." — which
+     * errored the symlink-fixture specs (S4 and the mappings-escape spec in
+     * `hardener/PluginsHardenerShouldSpec.cfc`) on every adobe2023 matrix leg
+     * and cascaded into the specs that share the same fixture root.
+     *
+     * Walk the tree first and unlink symlinks with `java.nio.file.Files`, which
+     * removes the link itself instead of following it, then hand the now
+     * link-free tree to the plain recursive delete. On a JVM-free engine
+     * (RustCFML, which never builds symlink fixtures) the walk is a no-op and
+     * the recursive delete runs unchanged.
+     *
+     * @path Directory to remove. A path that does not exist is a no-op.
+     */
+    public void function $removeTree(required string path) {
+        if (!DirectoryExists(arguments.path)) {
+            return;
+        }
+        try {
+            $unlinkSymlinks(arguments.path);
+        } catch (any e) {
+            // No JVM (RustCFML) — nothing to unlink.
+        }
+        DirectoryDelete(arguments.path, true);
+    }
+
+    /**
+     * Internal function for `$removeTree()`. Recursively deletes every symlink
+     * an entry points at, leaving real files and directories for the caller's
+     * recursive delete.
+     */
+    private void function $unlinkSymlinks(required string path) {
+        var jFiles = CreateObject("java", "java.nio.file.Files");
+        var jPaths = CreateObject("java", "java.nio.file.Paths");
+        // Copy into a fresh array: BoxLang returns a fixed-size array from
+        // DirectoryList() and ArrayAppend on it throws with no message.
+        var entries = [];
+        for (var listed in DirectoryList(arguments.path, false, "path")) {
+            ArrayAppend(entries, listed);
+        }
+        for (var entry in entries) {
+            if (jFiles.isSymbolicLink(jPaths.get(entry, []))) {
+                jFiles.delete(jPaths.get(entry, []));
+            } else if (DirectoryExists(entry)) {
+                $unlinkSymlinks(entry);
+            }
+        }
+    }
+
+    /**
      * Return a configured TestClient instance.
      * The base URL is auto-detected from the current server port.
      *

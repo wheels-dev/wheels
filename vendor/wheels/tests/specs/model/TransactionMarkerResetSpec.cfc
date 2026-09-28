@@ -62,6 +62,68 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
+			it("clears the open-transaction marker when a transaction='none' call throws", () => {
+				// transaction="none" still sets the marker (so nested calls skip their own
+				// transaction), and used to leave it set when the method threw. The core
+				// runner runs with transactionMode="none", so one create() that hit a
+				// database error broke OuterTransactionSignalSpec's rollback bundles later.
+				var tag = application.wo.model("tag");
+				var connectionArgs = tag.$hashedConnectionArgs();
+
+				if (!StructKeyExists(request, "wheels")) {
+					request.wheels = {};
+				}
+				if (!StructKeyExists(request.wheels, "transactions")) {
+					request.wheels.transactions = {};
+				}
+				request.wheels.transactions[connectionArgs] = false;
+
+				var state = {threw = false};
+				try {
+					// An unknown select column makes findAll() throw Wheels.ColumnNotFound
+					// inside the invoked method, after the marker has been set, before any
+					// query runs. A Wheels Throw() rather than a missing required argument,
+					// which RustCFML does not enforce through cfinvoke.
+					tag.invokeWithTransaction(method = "findAll", transaction = "none", select = "wheelsNoSuchColumn");
+				} catch (any e) {
+					state.threw = true;
+				}
+
+				expect(state.threw).toBeTrue("findAll() with an unknown select column should have thrown.");
+				expect(request.wheels.transactions[connectionArgs]).toBeFalse(
+					"A throwing transaction='none' call must clear the marker it set, otherwise every "
+					& "later model call in this request silently skips its own transaction."
+				);
+			});
+
+			it("leaves an outer owner's marker set when a nested call throws", () => {
+				var tag = application.wo.model("tag");
+				var connectionArgs = tag.$hashedConnectionArgs();
+
+				if (!StructKeyExists(request, "wheels")) {
+					request.wheels = {};
+				}
+				if (!StructKeyExists(request.wheels, "transactions")) {
+					request.wheels.transactions = {};
+				}
+				request.wheels.transactions[connectionArgs] = true;
+
+				var state = {threw = false};
+				try {
+					tag.invokeWithTransaction(method = "findAll", transaction = "commit", select = "wheelsNoSuchColumn");
+				} catch (any e) {
+					state.threw = true;
+				}
+				var stillOpen = request.wheels.transactions[connectionArgs];
+				// Restore before asserting, so a failure here cannot leak into later bundles.
+				request.wheels.transactions[connectionArgs] = false;
+
+				expect(state.threw).toBeTrue("findAll() with an unknown select column should have thrown.");
+				expect(stillOpen).toBeTrue(
+					"A nested ('alreadyopen') call does not own the marker; the outer owner clears it."
+				);
+			});
+
 		});
 
 	}

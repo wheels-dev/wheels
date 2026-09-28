@@ -317,13 +317,23 @@ component {
 			local.oldestRow = queryExecute(local.oldestSql, local.oldestParams, {datasource = variables.$datasource});
 			if (local.oldestRow.recordCount) {
 				// This reads through a raw queryExecute, so the Wheels adapter's
-				// date canonicalization never runs. Adobe's JDBC driver returns
-				// timestamp columns as epoch-millis longs (java.lang.Long) on
-				// SQLite — normalize them so the public oldestPending contract
-				// is always a CFML date. Lucee/MySQL/etc. return real date
-				// objects, which IsNumeric() leaves untouched.
-				local.result.oldestPending = IsNumeric(local.oldestRow.createdAt)
-					? DateAdd("s", Int(local.oldestRow.createdAt / 1000), CreateDate(1970, 1, 1))
+				// date canonicalization never runs. The shapes the drivers hand
+				// back vary: epoch-millis longs (Adobe + sqlite-jdbc), real date
+				// objects, fractional-second strings, and Oracle's
+				// oracle.sql.TIMESTAMP (which is not a java.util.Date, #3649).
+				// This component is standalone (no Global mixin), so reach the
+				// shared normalizer through the application object and keep the
+				// old epoch-milliseconds conversion as the fallback.
+				local.normalized = "";
+				try {
+					local.normalized = application.wo.$normalizeDbTimestamp(local.oldestRow.createdAt);
+				} catch (any e) {
+					local.normalized = IsNumeric(local.oldestRow.createdAt)
+						? DateAdd("s", Int(local.oldestRow.createdAt / 1000), CreateDate(1970, 1, 1))
+						: local.oldestRow.createdAt;
+				}
+				local.result.oldestPending = IsDate(local.normalized)
+					? local.normalized
 					: local.oldestRow.createdAt;
 			}
 		} catch (any e) {

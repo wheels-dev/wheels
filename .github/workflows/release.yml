@@ -46,7 +46,6 @@ on:
 
 env:
   WHEELS_PRERELEASE: false
-  LUCLI_VERSION: "0.6.1"
   # Route JS actions through Node 24 instead of the deprecated Node 20 runtime.
   # The lone Node 20 action here — Wandalen/wretry.action@v3, which wraps
   # softprops/action-gh-release — began failing its pre/post hooks with
@@ -810,11 +809,7 @@ jobs:
           java-version: '21'
 
       - name: Install LuCLI
-        run: |
-          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
-            -o /usr/local/bin/lucli
-          chmod +x /usr/local/bin/lucli
-          lucli --version
+        uses: ./.github/actions/setup-lucli
 
       - name: Download built module artifact
         uses: actions/download-artifact@v4

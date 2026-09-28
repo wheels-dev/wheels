@@ -27,6 +27,22 @@ component extends="wheels.WheelsTest" {
 			migratePath = "/wheels/tests/_assets/migrator/announceorm/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceorm/"
 		);
+		variables.rawMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/announceraw/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw/"
+		);
+		variables.rawOtherMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/announceraw_other/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw_other/"
+		);
+		variables.rawSuperMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/announceraw_super/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw_super/"
+		);
+		variables.rawBaseMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/announceraw_base/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw_base/"
+		);
 		variables.sqlMigrator = CreateObject("component", "wheels.Migrator").init(
 			migratePath = "/wheels/tests/_assets/migrator/migrations/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql/"
@@ -39,7 +55,13 @@ component extends="wheels.WheelsTest" {
 
 		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
 
-		describe("B1 announce-only migrations do not update the version table", () => {
+		// #3402 B1 originally skipped version tracking for any step that
+		// announced without $execute or ORM work. That also skipped steps
+		// whose work was raw queryExecute() (for example DDL on a second
+		// datasource), which then re-ran on every migrate. Only the inherited
+		// NOT IMPLEMENTED placeholder is untracked now; every migration whose
+		// own up()/down() completes is tracked, as in 4.0.x.
+		describe("B1 only the inherited placeholder migration skips version tracking", () => {
 
 			beforeEach(() => {
 				deleteMigratorVersions(2);
@@ -71,7 +93,7 @@ component extends="wheels.WheelsTest" {
 				} catch (any e) {}
 			});
 
-			it("does not mark an announce-only up() as migrated", () => {
+			it("records a migration's own up() that only announces", () => {
 				if (_isCockroachDB) {
 					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
 					return;
@@ -83,8 +105,8 @@ component extends="wheels.WheelsTest" {
 					{datasource: application.wheels.dataSourceName}
 				);
 				expect(rows.recordCount).toBe(
-					0,
-					"Announce-only up() must not INSERT into the migrator versions table."
+					1,
+					"A migration's own up() that completes must INSERT its version, even when it only announces."
 				);
 			});
 
@@ -105,7 +127,16 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
-			it("does not remove a tracking row when down() is announce-only", () => {
+			it("says why the placeholder's version was not recorded", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var output = variables.stubMigrator.migrateTo("90000000000002");
+				expect(output).toInclude("NOT IMPLEMENTED placeholder, so its version was not recorded");
+			});
+
+			it("keeps the tracking row when down() is the inherited placeholder", () => {
 				if (_isCockroachDB) {
 					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
 					return;
@@ -113,8 +144,137 @@ component extends="wheels.WheelsTest" {
 				var priorDown = application.wheels.allowMigrationDown;
 				application.wheels.allowMigrationDown = true;
 				try {
-					// Ensure the tracking table exists without relying on up()
-					// to write the row (that write is the bug under test).
+					variables.stubMigrator.migrateTo("90000000000002");
+					queryExecute(
+						"DELETE FROM #application.wheels.migratorTableName# WHERE version = '90000000000002'",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					queryExecute(
+						"INSERT INTO #application.wheels.migratorTableName# (version, core_level) VALUES ('90000000000002', #application.wheels.migrationLevel#)",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					variables.stubMigrator.migrateTo("0");
+					var rows = queryExecute(
+						"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000002'",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					expect(rows.recordCount).toBe(
+						1,
+						"The inherited NOT IMPLEMENTED down() must not DELETE the migrator versions row."
+					);
+				} finally {
+					application.wheels.allowMigrationDown = priorDown;
+				}
+			});
+
+			it("records a version when up() runs raw queryExecute() and then announces", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				variables.rawMigrator.migrateTo("90000000000004");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000004'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(
+					1,
+					"Raw queryExecute() is invisible to the migrator; announce() after it must not leave the version unrecorded."
+				);
+			});
+
+			it("records a migration's own up() that runs raw SQL and then calls super.up()", () => {
+				// Placeholder detection is by declaration: this migration declares
+				// up(), so it is user code even though it ends in the placeholder.
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				variables.rawSuperMigrator.migrateTo("90000000000006");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000006'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(
+					1,
+					"An own up() that calls super.up() must still INSERT the migrator versions row."
+				);
+			});
+
+			it("records a migration that inherits up() from an app base class", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				variables.rawBaseMigrator.migrateTo("90000000000007");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000007'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(
+					1,
+					"up() declared by an app base class is user code and must INSERT the migrator versions row."
+				);
+			});
+
+			it("records a version when up() runs raw SQL on a second datasource and then announces", () => {
+				// The multi-database app shape: DDL through queryExecute() against
+				// another datasource, then announce().
+				var otherDs = "wheelstestdb_sqlite_tenant_b";
+				var state = {available = true};
+				try {
+					queryExecute("SELECT 1 AS x", {}, {datasource: otherDs});
+				} catch (any e) {
+					state.available = false;
+				}
+				if (!state.available) {
+					skip("The second SQLite datasource #otherDs# is not configured on this run.");
+					return;
+				}
+				// Two engines cannot run a second datasource inside the migrator's
+				// per-step transaction, so the step fails before tracking is decided:
+				//   Adobe ColdFusion refuses it ("Datasource names for all the
+				//   database tags within the cftransaction tag must be the same");
+				//   RustCFML sends every statement in a transaction to the first
+				//   datasource it used, so the version INSERT lands in the second
+				//   database ("no such table: wheels_migrator_versions").
+				var adapter = application.wheels.engineAdapter;
+				if (adapter.isAdobe()) {
+					skip("Adobe ColdFusion does not allow a second datasource inside the migrator's transaction.");
+					return;
+				}
+				if (adapter.isRustCFML()) {
+					skip("RustCFML routes every statement in a transaction to the first datasource it used.");
+					return;
+				}
+				var output = variables.rawOtherMigrator.migrateTo("90000000000005");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000005'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(rows.recordCount).toBe(
+					1,
+					"announce() after raw SQL on a second datasource must still INSERT the migrator versions row. Migration output: " & output
+				);
+			});
+
+			it("removes the tracking row when a migration's own down() only announces", () => {
+				if (_isCockroachDB) {
+					skip("CockroachDB is skipped for this migrator assertion; a bare return would mark it green.");
+					return;
+				}
+				var priorDown = application.wheels.allowMigrationDown;
+				application.wheels.allowMigrationDown = true;
+				try {
+					// Ensure the tracking table exists, then force the row present
+					// so down() is actually invoked.
 					variables.announceMigrator.migrateTo("90000000000001");
 					queryExecute(
 						"DELETE FROM #application.wheels.migratorTableName# WHERE version = '90000000000001'",
@@ -133,8 +293,8 @@ component extends="wheels.WheelsTest" {
 						{datasource: application.wheels.dataSourceName}
 					);
 					expect(rows.recordCount).toBe(
-						1,
-						"Announce-only down() must not DELETE the migrator versions row."
+						0,
+						"A migration's own down() that completes must DELETE its version, even when it only announces."
 					);
 				} finally {
 					application.wheels.allowMigrationDown = priorDown;

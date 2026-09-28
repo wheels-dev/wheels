@@ -142,7 +142,7 @@ WinGet support (`winget install Wheels.Wheels`) is planned for post-v4.0.0 GA on
 
 If Homebrew and Scoop don't fit your environment — a locked-down CI host, a Docker image, or a Windows box where Scoop isn't an option — you can wire the pieces up directly. The install has two independent artifacts:
 
-1. **LuCLI launcher.** Download from [github.com/cybersonic/LuCLI/releases](https://github.com/cybersonic/LuCLI/releases). Pick the asset matching your OS — `lucli-<version>-macos`, `lucli-<version>-linux`, or `lucli-<version>.bat` on Windows. Rename it to `wheels` (or `wheels.bat`) so LuCLI's binary-name detection activates the Wheels branding, and drop it somewhere on your `PATH`.
+1. **LuCLI launcher.** Download from [github.com/wheels-dev/LuCLI/releases](https://github.com/wheels-dev/LuCLI/releases), the LuCLI build Wheels ships (upstream LuCLI plus a small queue of fixes). Pick the asset matching your OS: `lucli-<version>-macos`, `lucli-<version>-linux`, or `lucli-<version>.exe` on Windows. Rename it to `wheels` (or `wheels.exe`) so LuCLI's binary-name detection activates the Wheels branding, and drop it somewhere on your `PATH`. Keep the plain name: a launcher that still has the version in its filename is not recognised as `wheels`.
 
 2. **Wheels Module.** Download `wheels-module-<version>.tar.gz` (or `.zip` on Windows) from [github.com/wheels-dev/wheels/releases](https://github.com/wheels-dev/wheels/releases). Extract it into `~/.wheels/modules/wheels/`:
 
@@ -160,7 +160,7 @@ If Homebrew and Scoop don't fit your environment — a locked-down CI host, a Do
 
    Persist these in your shell profile (`~/.zshrc`, `~/.bashrc`, or `$PROFILE` on PowerShell).
 
-Pick LuCLI and Wheels Module versions that are known to be paired — the Homebrew formula's `LUCLI_VERSION` and `MODULE_VERSION` constants in [`Formula/wheels.rb`](https://github.com/wheels-dev/homebrew-wheels/blob/main/Formula/wheels.rb) are the canonical source for "what's currently shipping together."
+Pick LuCLI and Wheels Module versions that are known to be paired. [`tools/lucli.json`](https://github.com/wheels-dev/wheels/blob/develop/tools/lucli.json) names the LuCLI release every channel (CI, Homebrew, Scoop, apt/yum) ships with the current Wheels.
 
 ## Advanced: existing LuCLI install
 

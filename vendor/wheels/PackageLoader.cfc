@@ -55,6 +55,9 @@ component output="false" {
 		// safe alias usable in `new <alias>.Sibling()` even when the on-disk dir
 		// name contains hyphens (e.g. `wheels-sentry`). See GH#2712.
 		variables.packageMappings = {};
+		// Mapping aliases the engine refused to honour (see
+		// getUnresolvedMappings()). Keyed by dotted alias.
+		variables.unresolvedMappings = {};
 		// Tracks which package first claimed each alias so a later collision can
 		// be reported instead of silently overwriting.
 		variables.$mappingProviders = {};
@@ -125,6 +128,29 @@ component output="false" {
 	 */
 	public struct function getPackageMappings() {
 		return Duplicate(variables.packageMappings);
+	}
+
+	/**
+	 * Returns the mapping aliases this loader registered but the ENGINE did not
+	 * actually honour — keyed by dotted alias, value {alias, dirName, path}.
+	 *
+	 * WHY THIS EXISTS. Registration writes `application.mappings[...]`, and
+	 * Lucee 7 snapshots the mapping table before packages load, so an entry
+	 * added during application start is present in the struct yet does NOT
+	 * resolve:
+	 *
+	 *     application.mappings["/plugins/sentry"] exists   → true
+	 *     CreateObject("component", "plugins.sentry.Sentry") → "could not find component"
+	 *     (the same alias declared in the app's this.mappings resolves fine)
+	 *
+	 * Every other Wheel is a silent "could not find component" at the point of
+	 * use, in package code the app author did not write. This accessor — plus
+	 * one boot log line — turns that into a diagnosable fact.
+	 *
+	 * Empty on engines that do honour runtime mappings.
+	 */
+	public struct function getUnresolvedMappings() {
+		return Duplicate(variables.unresolvedMappings);
 	}
 
 	/**
@@ -258,6 +284,24 @@ component output="false" {
 				// registries never disagree about which packages loaded.
 				$rollbackPackage(local.dirName);
 			}
+		}
+
+		// Mapping aliases the engine refused to honour — ONE line, because on
+		// Lucee this is true for every package alias: the engine snapshots its
+		// mapping table before packages load, so a runtime write to
+		// application.mappings is stored but never consulted. Without this the
+		// only symptom is "could not find component" inside package code the
+		// app author did not write (GH#2712 follow-up).
+		if (!StructIsEmpty(variables.unresolvedMappings)) {
+			local.aliases = StructKeyArray(variables.unresolvedMappings);
+			ArraySort(local.aliases, "textnocase");
+			WriteLog(
+				text = "[Wheels] #ArrayLen(local.aliases)# package mapping alias(es) are registered but NOT resolvable on this engine: #ArrayToList(local.aliases, ", ")#. "
+					& "Lucee ignores application.mappings written after application start, so declare the alias in the application's this.mappings when package code references it as new <alias>.Something(). "
+					& "See PackageLoader.getUnresolvedMappings().",
+				type = "information",
+				file = "wheels"
+			);
 		}
 	}
 
@@ -445,7 +489,7 @@ component output="false" {
 		} catch (any e) {}
 
 		// Eager loading: instantiate CFC now
-		$instantiatePackage(arguments.dirName, arguments.pkgDir, local.mixinTargets, local.provides);
+		$instantiatePackage(arguments.dirName, arguments.pkgDir, local.mixinTargets, local.provides, local.manifest);
 
 		// Register the per-package CFML mapping LAST so any earlier failure
 		// (validation, instantiation, mixin collection) doesn't leave a stale
@@ -608,28 +652,149 @@ component output="false" {
 	}
 
 	/**
+	 * Resolve a package's ENTRY-POINT CFC (the one whose `init()` boots it and
+	 * whose public methods become mixins).
+	 *
+	 * THE BUG THIS REPLACES. The rule used to be "<dirName>.cfc, else the FIRST
+	 * *.cfc from DirectoryList()", and DirectoryList's order is filesystem
+	 * dependent. Measured 2026-09-21 with wheels-sentry installed: Lucee
+	 * returned ["SentryClient.cfc", "Sentry.cfc"] — even with sort="asc" — so
+	 * the loader instantiated the transport class, whose init() requires
+	 * arguments, and the package died at boot with
+	 *
+	 *     The parameter [release] to function [init] is required but was not passed in.
+	 *
+	 * A package with two root CFCs therefore loaded or did not load depending on
+	 * directory order, and the failure named none of the real causes. The same
+	 * shape loads the WRONG component silently whenever the first CFC happens to
+	 * have a no-argument init().
+	 *
+	 * Resolution order, first hit wins:
+	 *   1. manifest "main"                  explicit; the answer for any package
+	 *                                       with helper CFCs at its root
+	 *   2. <dirName>.cfc                    the documented convention
+	 *   3. <dirName>.cfc, case-insensitive  "sentrystyle/Sentrystyle.cfc" on a
+	 *                                       case-sensitive filesystem
+	 *   4. the package NAME camel-cased     "wheels-seo-suite" -> SeoSuite.cfc,
+	 *                                       "wheels-sentry" -> Sentry.cfc
+	 *   5. exactly ONE root CFC             unambiguous, keep working
+	 * Anything else THROWS and names the candidates, because the old behaviour
+	 * let a mis-packaged plugin "load" while doing nothing at all.
+	 */
+	private string function $resolveEntryPointCfc(
+		required string dirName,
+		required string pkgDir,
+		required struct manifest
+	) {
+		local.rootCfcs = DirectoryList(arguments.pkgDir, false, "name", "*.cfc");
+		if (!ArrayLen(local.rootCfcs)) {
+			Throw(
+				type = "Wheels.PackageNoCFC",
+				message = "Package '#arguments.dirName#' has no CFC files"
+			);
+		}
+
+		// Case-insensitive index lowercased-basename -> on-disk basename, plus
+		// the list in on-disk order for diagnostics.
+		local.byLower = {};
+		local.names = [];
+		for (local.file in local.rootCfcs) {
+			local.base = ReplaceNoCase(local.file, ".cfc", "", "one");
+			local.byLower[LCase(local.base)] = local.base;
+			ArrayAppend(local.names, local.base);
+		}
+
+		// 1. Explicit "main". A declared entry point that cannot be honoured is
+		// an authoring error, never a reason to fall back to guessing.
+		if (StructKeyExists(arguments.manifest, "main") && IsSimpleValue(arguments.manifest.main)) {
+			local.declared = Trim(ReplaceNoCase(arguments.manifest.main, ".cfc", "", "one"));
+			if (!Len(local.declared)) {
+				Throw(
+					type = "Wheels.PackageEntryPointInvalid",
+					message = "Package '#arguments.dirName#' declares an empty 'main' in package.json",
+					detail = "Expected the name of a CFC at the package root, e.g. { ""main"": ""Sentry"" }."
+				);
+			}
+			if (Find("/", local.declared) || Find("\", local.declared)) {
+				Throw(
+					type = "Wheels.PackageEntryPointInvalid",
+					message = "Package '#arguments.dirName#' declares main '#arguments.manifest.main#', which is not a package-root CFC name",
+					detail = "Use a bare CFC name (no path): { ""main"": ""Sentry"" }."
+				);
+			}
+			if (StructKeyExists(local.byLower, LCase(local.declared))) {
+				return local.byLower[LCase(local.declared)];
+			}
+			Throw(
+				type = "Wheels.PackageEntryPointMissing",
+				message = "Package '#arguments.dirName#' declares main '#arguments.manifest.main#', which does not exist at the package root",
+				detail = "Root CFCs found: #ArrayToList(local.names, ", ")#."
+			);
+		}
+
+		// 2 + 3. Directory-name convention, exact then case-insensitive.
+		if (StructKeyExists(local.byLower, LCase(arguments.dirName))) {
+			return local.byLower[LCase(arguments.dirName)];
+		}
+
+		// 4. Package-name convention: drop a leading "wheels" segment and
+		// camel-case the rest.
+		local.derived = $deriveCfcName(arguments.manifest, arguments.dirName);
+		if (Len(local.derived) && StructKeyExists(local.byLower, LCase(local.derived))) {
+			return local.byLower[LCase(local.derived)];
+		}
+
+		// 5. A single root CFC cannot be ambiguous.
+		if (ArrayLen(local.names) == 1) {
+			return local.names[1];
+		}
+
+		Throw(
+			type = "Wheels.PackageAmbiguousEntryPoint",
+			message = "Package '#arguments.dirName#' has #ArrayLen(local.names)# CFCs at its root and none of them is identifiable as the entry point",
+			detail = "Candidates: #ArrayToList(local.names, ", ")#. Declare it in package.json, e.g. { ""main"": ""#local.names[1]#"" }, or move the helper CFCs into a subdirectory."
+		);
+	}
+
+	/**
+	 * Derive the entry-point CFC name from the package name: "wheels-seo-suite"
+	 * -> "SeoSuite", "wheels-i18n" -> "I18n", "wheels-sentry" -> "Sentry".
+	 * The leading vendor segment ("wheels") is not part of the CFC name.
+	 * Returns "" when nothing usable can be derived.
+	 */
+	private string function $deriveCfcName(required struct manifest, required string dirName) {
+		local.source = (StructKeyExists(arguments.manifest, "name")
+			&& IsSimpleValue(arguments.manifest.name)
+			&& Len(Trim(arguments.manifest.name)))
+			? Trim(arguments.manifest.name)
+			: arguments.dirName;
+
+		local.segments = ListToArray(local.source, "-_");
+		if (ArrayLen(local.segments) > 1 && LCase(local.segments[1]) == "wheels") {
+			ArrayDeleteAt(local.segments, 1);
+		}
+
+		local.name = "";
+		for (local.segment in local.segments) {
+			if (!Len(local.segment)) {
+				continue;
+			}
+			local.name &= UCase(Left(local.segment, 1)) & LCase(Mid(local.segment, 2, Len(local.segment)));
+		}
+		return local.name;
+	}
+
+	/**
 	 * Instantiates a package CFC and collects its mixins/services/middleware.
 	 */
 	private void function $instantiatePackage(
 		required string dirName,
 		required string pkgDir,
 		required string mixinTargets,
-		required struct provides
+		required struct provides,
+		required struct manifest
 	) {
-		// Find the main CFC: convention is directory name matches CFC name
-		local.cfcName = arguments.dirName;
-		local.cfcPath = arguments.pkgDir & "/" & local.cfcName & ".cfc";
-		if (!FileExists(local.cfcPath)) {
-			// Fallback: find first CFC in directory
-			local.cfcFiles = DirectoryList(arguments.pkgDir, false, "name", "*.cfc");
-			if (ArrayLen(local.cfcFiles) == 0) {
-				Throw(
-					type = "Wheels.PackageNoCFC",
-					message = "Package '#arguments.dirName#' has no CFC files"
-				);
-			}
-			local.cfcName = Replace(local.cfcFiles[1], ".cfc", "");
-		}
+		local.cfcName = $resolveEntryPointCfc(arguments.dirName, arguments.pkgDir, arguments.manifest);
 
 		// Instantiate the package CFC
 		local.componentPath = "#variables.componentPrefix#.#arguments.dirName#.#local.cfcName#";
@@ -717,7 +882,8 @@ component output="false" {
 			dirName = arguments.dirName,
 			pkgDir = local.info.pkgDir,
 			mixinTargets = local.info.mixinTargets,
-			provides = local.provides
+			provides = local.provides,
+			manifest = local.info.manifest
 		);
 
 		// Remove from lazy registry
@@ -1308,6 +1474,7 @@ component output="false" {
 		try {
 			if (StructKeyExists(application, "mappings") && IsStruct(application.mappings)) {
 				application.mappings["/" & local.alias] = arguments.pkgDir;
+				$noteMappingResolution(local.alias, arguments.dirName, arguments.pkgDir);
 			}
 		} catch (any e) {
 			WriteLog(
@@ -1318,6 +1485,44 @@ component output="false" {
 		}
 
 		return {ok = true, error = "", detail = "", alias = local.alias};
+	}
+
+	/**
+	 * Verify that a mapping the loader just wrote is actually honoured by the
+	 * ENGINE, and record it when it is not (see getUnresolvedMappings()).
+	 *
+	 * The probe is ExpandPath(): it resolves a REAL mapping to the mapped
+	 * directory and silently falls back to the webroot for an unknown one, so a
+	 * comparison catches the difference without instantiating anything.
+	 * Measured on Lucee 7.0.0.395 (2026-09-21): a mapping declared in the app's
+	 * this.mappings resolves, the same alias written to application.mappings
+	 * during application start does NOT — the write is stored and never
+	 * consulted. Engines that do honour runtime writes record nothing here.
+	 */
+	private void function $noteMappingResolution(
+		required string alias,
+		required string dirName,
+		required string expectedPath
+	) {
+		local.resolved = "";
+		try {
+			local.resolved = ExpandPath("/" & Replace(arguments.alias, ".", "/", "all") & "/");
+		} catch (any e) {
+			local.resolved = "";
+		}
+
+		// Normalise both sides: forward slashes, no trailing separator.
+		local.want = ReReplace(ReReplace(arguments.expectedPath, "\\", "/", "all"), "/+$", "");
+		local.got = ReReplace(ReReplace(local.resolved, "\\", "/", "all"), "/+$", "");
+		if (Compare(LCase(local.got), LCase(local.want)) == 0) {
+			return;
+		}
+
+		variables.unresolvedMappings[arguments.alias] = {
+			alias = arguments.alias,
+			dirName = arguments.dirName,
+			path = arguments.expectedPath
+		};
 	}
 
 	/**
@@ -1406,6 +1611,7 @@ component output="false" {
 			try {
 				if (StructKeyExists(application, "mappings") && IsStruct(application.mappings)) {
 					application.mappings[local.slashForm] = local.resolution.path;
+					$noteMappingResolution(local.name, arguments.dirName, local.resolution.path);
 				}
 			} catch (any e) {
 				WriteLog(

@@ -78,7 +78,7 @@ jobs:
           # SHA (threaded into the prompt as <head-sha>) in a single `gh pr
           # view`, so the marker SHA is captured once here — at run start,
           # exactly once — instead of being re-derived by the model
-          # mid-session (the #2848 race). Unlike bot-advisor.yml the checkout
+          # mid-session (the #2848 race). The checkout
           # stays branch-name-keyed: this stage commits and pushes back, and a
           # detached-HEAD SHA checkout would break `git push origin HEAD`. The
           # captured SHA is therefore the head at run start — exactly the

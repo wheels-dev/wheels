@@ -1,9 +1,27 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(new URL('../../..', import.meta.url).pathname);
-const GUIDES_ROOT = `${REPO_ROOT}/web/sites/guides/src/content/docs/v4-0-0-snapshot`;
+const DOCS_ROOT = 'web/sites/guides/src/content/docs';
+
+// The guides are versioned (v3-0-0, v4-0-0, v4-1-0, ...). Validate the newest
+// one unless WHEELS_DOCS_GUIDES_VERSION names another.
+function newestGuidesVersion() {
+  const versions = readdirSync(`${REPO_ROOT}/${DOCS_ROOT}`, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && /^v\d+-\d+-\d+$/.test(e.name))
+    .map((e) => e.name);
+  const key = (v) => v.slice(1).split('-').map(Number);
+  versions.sort((a, b) => {
+    const [x, y] = [key(a), key(b)];
+    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+  });
+  return versions.at(-1);
+}
+
+export const GUIDES_VERSION = process.env.WHEELS_DOCS_GUIDES_VERSION ?? newestGuidesVersion();
+export const GUIDES_DIR = `${DOCS_ROOT}/${GUIDES_VERSION}`;
+const GUIDES_ROOT = `${REPO_ROOT}/${GUIDES_DIR}`;
 
 const MDX_RE = /\.(mdx?|md)$/i;
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n/;

@@ -61,6 +61,24 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	private void function stopStubServer(required any stubServer) {
 		arguments.stubServer.stop();
 		if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+		if (fileExists(tempRoot & "/public/Application.cfc")) fileDelete(tempRoot & "/public/Application.cfc");
+	}
+
+	/**
+	 * A module that treats the stub as this project's own (registered)
+	 * server. reload() refuses anything it cannot verify as this project's
+	 * (GHSA-x3cm-2j3q-jgg4), and a raw-socket stub is never in the registry.
+	 */
+	private any function ownerModule(required any stubServer) {
+		var ownerMod = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(ownerMod);
+		ownerMod.$("$requireOwnRunningServer", arguments.stubServer.getPort());
+		return ownerMod;
+	}
+
+	private void function writeAppCfc(required string body) {
+		directoryCreate(tempRoot & "/public", true, true);
+		fileWrite(tempRoot & "/public/Application.cfc", arguments.body);
 	}
 
 	function run() {
@@ -132,7 +150,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("throws Wheels.ReloadFailed when the reload endpoint returns 500", () => {
 				var stubServer = startStubServer(500);
 				try {
-					expect(() => mod.reload(password = "testpw"))
+					var ownerMod = ownerModule(stubServer);
+					expect(() => ownerMod.reload(password = "testpw"))
 						.toThrow(type = "Wheels.ReloadFailed");
 				} finally {
 					stopStubServer(stubServer);
@@ -142,7 +161,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("throws Wheels.ReloadFailed when the server serves the page normally (200, wrong password)", () => {
 				var stubServer = startStubServer(200);
 				try {
-					expect(() => mod.reload(password = "wrongpw"))
+					var ownerMod = ownerModule(stubServer);
+					expect(() => ownerMod.reload(password = "wrongpw"))
 						.toThrow(type = "Wheels.ReloadFailed");
 				} finally {
 					stopStubServer(stubServer);
@@ -152,10 +172,102 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("succeeds quietly on the reload redirect (302)", () => {
 				var stubServer = startStubServer(302);
 				try {
-					expect(mod.reload(password = "testpw")).toBe("");
+					expect(ownerModule(stubServer).reload(password = "testpw")).toBe("");
 				} finally {
 					stopStubServer(stubServer);
 				}
+			});
+
+		});
+
+		describe("reload password detection from .env (GHSA-x3cm-2j3q-jgg4)", () => {
+
+			it("reads WHEELS_RELOAD_PASSWORD / RELOAD_PASSWORD only at a line start", () => {
+				var pwMod = new cli.lucli.Module(cwd = variables.tempRoot);
+				prepareMock(pwMod);
+				makePublic(pwMod, "detectReloadPassword");
+				var nl = chr(10);
+				try {
+					fileWrite(tempRoot & "/.env", "MY_RELOAD_PASSWORD=not-this#nl#WHEELS_RELOAD_PASSWORD=the-app-secret#nl#");
+					expect(pwMod.detectReloadPassword()).toBe("the-app-secret");
+
+					fileWrite(tempRoot & "/.env", "## WHEELS_RELOAD_PASSWORD=commented-out#nl#RELOAD_PASSWORD=legacy-secret#nl#");
+					expect(pwMod.detectReloadPassword()).toBe("legacy-secret");
+
+					fileWrite(tempRoot & "/.env", "  WHEELS_RELOAD_PASSWORD = spaced-secret#chr(13)##nl#");
+					expect(pwMod.detectReloadPassword()).toBe("spaced-secret");
+
+					fileWrite(tempRoot & "/.env", "OTHER_RELOAD_PASSWORD=not-this#nl#");
+					expect(pwMod.detectReloadPassword()).toBe("");
+				} finally {
+					if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				}
+			});
+
+		});
+
+		describe("reload password transport (GHSA-x3cm-2j3q-jgg4)", () => {
+
+			it("sends the password in the X-Wheels-Reload-Password header, never the URL, when the app supports it", () => {
+				var stubServer = startStubServer(302);
+				try {
+					writeAppCfc('component { function onRequestStart() { if (IsDefined("cgi.http_x_wheels_reload_password")) {} } }');
+					ownerModule(stubServer).reload(password = "s3cret-pw");
+					var heads = stubServer.requests();
+					expect(arrayLen(heads)).toBe(1);
+					var requestLine = listFirst(heads[1], chr(13) & chr(10));
+					expect(requestLine).toInclude("reload=true");
+					expect(requestLine).notToInclude("s3cret-pw");
+					expect(requestLine).notToInclude("password");
+					expect(findNoCase(chr(10) & "X-Wheels-Reload-Password: s3cret-pw" & chr(13), heads[1])).toBeGT(
+						0,
+						"no X-Wheels-Reload-Password header in the request: " & replace(replace(heads[1], chr(13), "\r", "all"), chr(10), "\n", "all")
+					);
+				} finally {
+					stopStubServer(stubServer);
+				}
+			});
+
+			it("falls back to ?password= for an app whose Application.cfc predates header support", () => {
+				var stubServer = startStubServer(302);
+				try {
+					writeAppCfc('component { function onRequestStart() { if (StructKeyExists(url, "password")) {} } }');
+					ownerModule(stubServer).reload(password = "s3cret pw");
+					var heads = stubServer.requests();
+					expect(arrayLen(heads)).toBe(1);
+					expect(listFirst(heads[1], chr(13) & chr(10))).toInclude("password=s3cret%20pw");
+					expect(heads[1]).notToInclude("X-Wheels-Reload-Password");
+				} finally {
+					stopStubServer(stubServer);
+				}
+			});
+
+			it("does not count a commented-out header mention as support", () => {
+				writeAppCfc('component { // cgi.http_x_wheels_reload_password' & chr(10) & '}');
+				try {
+					var built = mod.$buildReloadRequest("http://localhost:1/", "pw");
+					expect(built.requestUrl).toInclude("password=pw");
+					expect(built.headers).toBeEmpty();
+				} finally {
+					fileDelete(tempRoot & "/public/Application.cfc");
+				}
+			});
+
+			it("falls back to ?password= for a password an HTTP header cannot carry", () => {
+				writeAppCfc('component { function onRequestStart() { if (IsDefined("cgi.http_x_wheels_reload_password")) {} } }');
+				try {
+					var built = mod.$buildReloadRequest("http://127.0.0.1:1/", "pässwörd✓");
+					expect(built.headers).toBeEmpty();
+					expect(built.requestUrl).toInclude("password=" & urlEncodedFormat("pässwörd✓"));
+				} finally {
+					fileDelete(tempRoot & "/public/Application.cfc");
+				}
+			});
+
+			it("sends no password at all when none is configured", () => {
+				var built = mod.$buildReloadRequest("http://localhost:1/wheels/app/tests?db=sqlite", "");
+				expect(built.requestUrl).toBe("http://localhost:1/wheels/app/tests?db=sqlite&reload=true");
+				expect(built.headers).toBeEmpty();
 			});
 
 		});

@@ -265,13 +265,13 @@
 						);
 					} else if (Find(".", local.iItem)) {
 						// Prevent SQL injection via dot-notation — only allow table.column identifiers
-						if (REFind("^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*(\s+(ASC|DESC))?$", local.iItem)) {
+						if (REFind("^[a-zA-Z_][a-zA-Z0-9_$]*\.[a-zA-Z_][a-zA-Z0-9_$]*(\s+(ASC|DESC))?$", local.iItem)) {
 							local.rv = ListAppend(local.rv, local.iItem);
 						} else {
 							Throw(
 								type = "Wheels.InvalidOrderClause",
 								message = "Invalid dot-notation in ORDER BY clause: `#local.iItem#`.",
-								extendedInfo = "Dot-notation order items must follow the `tablename.columnname` pattern using only alphanumeric characters and underscores."
+								extendedInfo = "Dot-notation order items must follow the `tablename.columnname` pattern using only alphanumeric characters, underscores, and `$` (not as the first character)."
 							);
 						}
 					} else {
@@ -373,7 +373,7 @@
 						extendedInfo = "The GROUP BY item '#EncodeForHTML(local.gItem)#' contains invalid characters."
 					);
 				}
-				if (Find(".", local.gItem) && !REFind("^[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*$", local.gItem)) {
+				if (Find(".", local.gItem) && !REFind("^[a-zA-Z_][a-zA-Z0-9_$]*\.[a-zA-Z_][a-zA-Z0-9_$]*$", local.gItem)) {
 					Throw(
 						type = "Wheels.InvalidGroupByClause",
 						message = "Invalid GROUP BY clause.",
@@ -1040,9 +1040,11 @@
 			}
 			local.wherePos = ArrayLen(local.rv) + 1;
 			local.params = [];
+			// split on AND/OR only where they stand as keywords: `_` and `$` are identifier
+			// characters, so `ORDER_AND_ITEMS.id` / `X$OR_Y.id` must not be cut in two (#3675)
 			local.where = ReReplace(
 				ReReplace(arguments.where, variables.wheels.class.RESQLWhere, "\1?\8", "all"),
-				"([^a-zA-Z0-9])(AND|OR)([^a-zA-Z0-9])",
+				"([^a-zA-Z0-9_$])(AND|OR)([^a-zA-Z0-9_$])",
 				"\1#Chr(7)#\2\3",
 				"all"
 			);
@@ -1060,9 +1062,10 @@
 				} else {
 					local.elementDataPart = local.element;
 				}
-				local.elementDataPart = Trim(ReReplace(local.elementDataPart, "^(AND|OR)", ""));
+				// strip a leading AND/OR keyword only, never the start of an identifier like ORDERS (#3675)
+				local.elementDataPart = Trim(ReReplace(local.elementDataPart, "^(AND|OR)([^a-zA-Z0-9_$]|$)", "\2"));
 				local.temp = ReFind(
-					"^([a-zA-Z0-9-_\.]*) ?#variables.wheels.class.RESQLOperators#",
+					"^([a-zA-Z0-9-_\.$]*) ?#variables.wheels.class.RESQLOperators#",
 					local.elementDataPart,
 					1,
 					true
@@ -1120,7 +1123,7 @@
 						}
 					}
 					local.temp = ReFind(
-						"^[a-zA-Z0-9-_\.]* ?#variables.wheels.class.RESQLOperators#",
+						"^[a-zA-Z0-9-_\.$]* ?#variables.wheels.class.RESQLOperators#",
 						local.elementDataPart,
 						1,
 						true

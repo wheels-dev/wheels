@@ -93,8 +93,11 @@ component {
 		var logPath = variables.wheelsHome & "/rustcfml/servers/" & $projectKey(arguments.projectRoot) & ".log";
 		$ensureParent(logPath);
 
+		// The serve directory is passed as an ABSOLUTE path so the running
+		// process's command line names this project: isProjectServerProcess()
+		// relies on it to tell this project's server from a reused pid.
 		var pb = createObject("java", "java.lang.ProcessBuilder").init(
-			[bin, "--serve", "public", "--port", toString(arguments.port)]
+			[bin, "--serve", $servePath(arguments.projectRoot), "--port", toString(arguments.port)]
 		);
 		// Run from the project root so `public` resolves, and detach I/O to a
 		// log file so the server survives this command's exit without tying
@@ -114,6 +117,59 @@ component {
 		$writeState(arguments.projectRoot, state);
 		state.log = logPath;
 		return state;
+	}
+
+	/**
+	 * Is `pid` THIS project's RustCFML server (GHSA-x3cm-2j3q-jgg4)? A live
+	 * pid is not proof: it can be stale and reused by another process. The
+	 * process must run a binary this engine manages (under
+	 * <wheelsHome>/rustcfml/bin) and its command line must serve this
+	 * project's public directory by absolute path, as start() launches it.
+	 * If the OS does not expose the executable or command line, the answer
+	 * is no (fail closed). A server started by an older CLI with a relative
+	 * `--serve public` is not recognised; restarting it fixes that.
+	 */
+	public boolean function isProjectServerProcess(required string pid, required string projectRoot) {
+		var info = $processInfo(arguments.pid);
+		if (!len(info.command) || !len(info.commandLine)) return false;
+		var binDir = $binDir() & "/";
+		if (left($canonical(info.command), len(binDir)) != binDir) return false;
+		return find(" --serve " & $servePath(arguments.projectRoot) & " ", " " & info.commandLine & " ") > 0;
+	}
+
+	/** Canonical directory holding the RustCFML binaries this engine manages. */
+	public string function $binDir() {
+		return $canonical(variables.wheelsHome & "/rustcfml/bin");
+	}
+
+	/** Absolute path of the project's public directory, as passed to --serve. */
+	public string function $servePath(required string projectRoot) {
+		return $canonical(arguments.projectRoot) & "/public";
+	}
+
+	/**
+	 * {command, commandLine} of `pid` ("" when not exposed). Public so specs
+	 * can stub it.
+	 */
+	public struct function $processInfo(required string pid) {
+		var info = {command: "", commandLine: ""};
+		try {
+			var handle = createObject("java", "java.lang.ProcessHandle").of(javaCast("long", arguments.pid));
+			if (handle.isPresent()) {
+				var details = handle.get().info();
+				if (details.command().isPresent()) info.command = details.command().get();
+				if (details.commandLine().isPresent()) info.commandLine = details.commandLine().get();
+			}
+		} catch (any e) {}
+		return info;
+	}
+
+	private string function $canonical(required string path) {
+		try {
+			return replace(createObject("java", "java.io.File").init(arguments.path).getCanonicalPath(), "\", "/", "all");
+		} catch (any e) {
+			return replace(arguments.path, "\", "/", "all");
+		}
 	}
 
 	/**

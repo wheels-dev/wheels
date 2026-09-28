@@ -112,7 +112,173 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		$removeColumnAliasesInOrderClause(args = arguments);
 		$addColumnsToSelectAndGroupBy(args = arguments);
 		$moveAggregateToHaving(args = arguments);
-		return $performQuery(argumentCollection = arguments);
+		local.rv = $performQuery(argumentCollection = arguments);
+		// Every engine: BoxLang and Adobe 2023 both hand Oracle TIMESTAMP columns
+		// back as raw driver objects (#3719). Engines that already return dates
+		// pay one class-name check per column.
+		if (StructKeyExists(local.rv, "query")) {
+			local.rv.query = $normalizeOracleTemporalResult(local.rv.query);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Normalize whatever shape the finder returned: a query, or the native
+	 * `returnType="array"` (an array of row structs) / `returnType="struct"`
+	 * (a struct of row structs) results that finders can ask cfquery for.
+	 */
+	public any function $normalizeOracleTemporalResult(required any result) {
+		if (IsQuery(arguments.result)) {
+			return $normalizeOracleTemporalColumns(arguments.result);
+		}
+		if (IsArray(arguments.result)) {
+			for (local.i = 1; local.i <= ArrayLen(arguments.result); local.i++) {
+				if (IsStruct(arguments.result[local.i])) {
+					$normalizeOracleTemporalRow(arguments.result[local.i]);
+				}
+			}
+			return arguments.result;
+		}
+		if (IsStruct(arguments.result)) {
+			for (local.key in arguments.result) {
+				if (IsNull(arguments.result[local.key])) {
+					continue;
+				}
+				if (IsStruct(arguments.result[local.key])) {
+					$normalizeOracleTemporalRow(arguments.result[local.key]);
+				} else if ($isOracleDriverValue(arguments.result[local.key])) {
+					local.converted = $oracleTemporalToDate(arguments.result[local.key]);
+					if (IsDate(local.converted)) {
+						arguments.result[local.key] = local.converted;
+					}
+				}
+			}
+		}
+		return arguments.result;
+	}
+
+	/** Internal function: convert the Oracle temporal values in one row struct. */
+	public void function $normalizeOracleTemporalRow(required struct row) {
+		for (local.key in arguments.row) {
+			if (IsNull(arguments.row[local.key]) || !$isOracleDriverValue(arguments.row[local.key])) {
+				continue;
+			}
+			local.converted = $oracleTemporalToDate(arguments.row[local.key]);
+			if (IsDate(local.converted)) {
+				arguments.row[local.key] = local.converted;
+			}
+		}
+	}
+
+	/**
+	 * Internal function: an Oracle TIMESTAMP/DATE driver object as a CFML
+	 * date, to the millisecond. Converted from the driver's own
+	 * java.sql.Timestamp (the instant in the JVM's timezone, like the other
+	 * framework readers) with its sub-second part carried over, so a finder
+	 * returns the same value on every engine. Returns "" when
+	 * the object cannot be bridged without a connection (TIMESTAMP WITH TIME
+	 * ZONE); callers then leave the value as it was.
+	 */
+	public any function $oracleTemporalToDate(required any value) {
+		try {
+			local.stamp = arguments.value.timestampValue();
+		} catch (any e) {
+			return "";
+		}
+		if (IsNull(local.stamp)) {
+			return "";
+		}
+		local.date = $javaDateToCfml(local.stamp);
+		local.millis = Int(local.stamp.getNanos() / 1000000);
+		if (local.millis > 0) {
+			local.date = DateAdd("l", local.millis, local.date);
+		}
+		return local.date;
+	}
+
+	/**
+	 * On some engines (BoxLang, Adobe 2023) the Oracle driver's DATE/TIMESTAMP
+	 * columns reach query results as raw `oracle.sql.*` driver objects instead
+	 * of CFML dates. App code then cannot format, compare, output or JSON-render them
+	 * (#3719). Convert, in place, every column whose first non-empty value is
+	 * an Oracle TIMESTAMP/TIMESTAMPTZ/TIMESTAMPLTZ/DATE object into CFML dates,
+	 * to the millisecond, through `$oracleTemporalToDate()`.
+	 *
+	 * One value per column is inspected to decide, so columns of simple values
+	 * or real dates cost a single check. A cell is only replaced when the
+	 * conversion yields a date; anything it cannot convert (for example a
+	 * TIMESTAMP WITH TIME ZONE that needs a live connection) is left as it was
+	 * rather than blanked.
+	 */
+	public query function $normalizeOracleTemporalColumns(required query query) {
+		local.rowCount = arguments.query.recordCount;
+		if (!local.rowCount) {
+			return arguments.query;
+		}
+		local.columns = ListToArray(arguments.query.columnList);
+		for (local.column in local.columns) {
+			if (!$isOracleTemporalColumn(arguments.query, local.column, local.rowCount)) {
+				continue;
+			}
+			for (local.row = 1; local.row <= local.rowCount; local.row++) {
+				local.cell = arguments.query[local.column][local.row];
+				if (IsNull(local.cell) || !$isOracleDriverValue(local.cell)) {
+					continue;
+				}
+				local.converted = $oracleTemporalToDate(local.cell);
+				if (IsDate(local.converted)) {
+					QuerySetCell(arguments.query, local.column, local.converted, local.row);
+				}
+			}
+		}
+		return arguments.query;
+	}
+
+	/**
+	 * Internal function for `$normalizeOracleTemporalColumns()`: is the first
+	 * non-empty value in `column` an Oracle temporal driver object? Decided by
+	 * the Java class name alone: the driver objects throw on Len(), string
+	 * casts and date functions, so nothing else is called on them.
+	 */
+	public boolean function $isOracleTemporalColumn(required query query, required string column, required numeric rowCount) {
+		for (local.row = 1; local.row <= arguments.rowCount; local.row++) {
+			local.cell = arguments.query[arguments.column][local.row];
+			if (IsNull(local.cell)) {
+				continue;
+			}
+			if ($isOracleDriverValue(local.cell)) {
+				return true;
+			}
+			// An empty string is a NULL column value: keep looking. Any other
+			// value (text, number, CFML date) means this is not such a column.
+			if ($javaClassName(local.cell) == "java.lang.String" && !Len(local.cell)) {
+				continue;
+			}
+			return false;
+		}
+		return false;
+	}
+
+	/**
+	 * Internal function: is `value` one of the Oracle driver's temporal
+	 * objects? Exactly these classes, not every `oracle.sql.*`: the
+	 * conversion treats numbers as epoch milliseconds, so a raw
+	 * oracle.sql.NUMBER must never reach it.
+	 */
+	public boolean function $isOracleDriverValue(required any value) {
+		return ListFind(
+			"oracle.sql.TIMESTAMP,oracle.sql.TIMESTAMPTZ,oracle.sql.TIMESTAMPLTZ,oracle.sql.DATE",
+			$javaClassName(arguments.value)
+		) > 0;
+	}
+
+	/** Internal function: the Java class name of `value`, or "" when unknown. */
+	public string function $javaClassName(required any value) {
+		try {
+			return arguments.value.getClass().getName();
+		} catch (any e) {
+			return "";
+		}
 	}
 
 	/**
@@ -173,6 +339,34 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * The text form of a driver-supplied generated key. Simple values pass through
+	 * unchanged. A key OBJECT (BoxLang returns oracle.sql.ROWID as-is, #3708) is read
+	 * via stringValue() (oracle.sql.ROWID) or, failing that, toString() (the
+	 * java.sql.RowId contract). Anything without a readable text form is "" (no
+	 * usable key), so the caller falls back to CURRVAL. The result is still gated by
+	 * the numeric / extended-ROWID checks before it reaches any SQL.
+	 */
+	public string function $generatedKeyText(required any value) {
+		if (IsSimpleValue(arguments.value)) {
+			return arguments.value;
+		}
+		var state = {text = ""};
+		try {
+			state.text = arguments.value.stringValue();
+		} catch (any e) {
+			state.text = "";
+		}
+		if (!IsSimpleValue(state.text) || !Len(state.text)) {
+			try {
+				state.text = arguments.value.toString();
+			} catch (any e) {
+				state.text = "";
+			}
+		}
+		return IsSimpleValue(state.text) ? state.text : "";
+	}
+
+	/**
 	 * Override Base adapter's $identitySelect hook.
 	 */
 	public any function $lastIdLookup(
@@ -189,12 +383,15 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		// Oracle JDBC driver returns the inserted row's ROWID. Lucee surfaces it
 		// as result.generatedKey (StructKeyExists is case-insensitive so the
 		// lowercase `generatedkey` key matches); ACF surfaces it as result.rowid.
-		// ListFirst because multi-row inserts can return a list.
+		// ListFirst because multi-row inserts can return a list. BoxLang hands back
+		// the driver's key as an oracle.sql.ROWID OBJECT rather than a string, so read
+		// its text form before any Len()/ListFirst() (#3708).
 		local.generated = "";
-		if (StructKeyExists(arguments.result, "generatedKey") && Len(arguments.result.generatedKey)) {
-			local.generated = ListFirst(arguments.result.generatedKey);
-		} else if (StructKeyExists(arguments.result, "rowid") && Len(arguments.result.rowid)) {
-			local.generated = arguments.result.rowid;
+		if (StructKeyExists(arguments.result, "generatedKey")) {
+			local.generated = ListFirst($generatedKeyText(arguments.result.generatedKey));
+		}
+		if (!Len(local.generated) && StructKeyExists(arguments.result, "rowid")) {
+			local.generated = $generatedKeyText(arguments.result.rowid);
 		}
 		if (Len(local.generated)) {
 			// Some driver/engine combos return the identity value itself.
@@ -300,6 +497,18 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * default is evaluated per row. It is also the shape `$upsertSQL` below already
 	 * uses for its MERGE source, including the alias-the-first-branch-only detail.
 	 *
+	 * Oracle rejects RETURNING after `INSERT ... SELECT` too (ORA-03048), so this
+	 * statement must also reach the driver without a generated-key request. insertAll()
+	 * runs it with `$captureResult=false`, which drops the cfquery `result` attribute —
+	 * the thing that makes Lucee request generated keys (#3653).
+	 *
+	 * BoxLang requests generated keys on every INSERT regardless of `result`, and
+	 * for `INSERT ... SELECT` the Oracle driver then fails with ORA-17009 (Closed
+	 * statement), which inside a transaction surfaces only as "Connection is closed"
+	 * (#3715). The statement is therefore wrapped in an anonymous PL/SQL block:
+	 * `BEGIN INSERT ... SELECT ...; END;` is not an INSERT to the engine, so no
+	 * engine asks for keys, and bind parameters work inside the block.
+	 *
 	 * Uses parameterized values via `$buildBulkParam` — never interpolates user data
 	 * into SQL.
 	 */
@@ -322,7 +531,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.colList &= $quoteIdentifier(local.col);
 		}
 
-		ArrayAppend(local.sql, "INSERT INTO #arguments.tableName# (#local.colList#) ");
+		ArrayAppend(local.sql, "BEGIN INSERT INTO #arguments.tableName# (#local.colList#) ");
 
 		local.propCount = ArrayLen(arguments.validProperties);
 		for (local.r = arguments.batchStart; local.r <= arguments.batchEnd; local.r++) {
@@ -349,6 +558,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			}
 			ArrayAppend(local.sql, " FROM dual");
 		}
+		ArrayAppend(local.sql, "; END;");
 
 		return local.sql;
 	}

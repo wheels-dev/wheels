@@ -18,6 +18,7 @@ excerpt: >-
   didn't start with a features list.
 coverImage: '/blog-images/4-1/wheels-4-1-0-released.png'
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/3629'
   title: 'Wheels 4.1.0 is out'
   body: |
     **[Wheels 4.1.0 is released](https://blog.wheels.dev/blog/wheels-4-1-0-released)** — the full changelog and where to get it.

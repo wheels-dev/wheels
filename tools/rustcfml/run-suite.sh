@@ -14,11 +14,15 @@
 #                                                     # (run after bumping ENGINE_VERSION)
 #
 # Environment overrides:
-#   RUSTCFML_BIN   path to an existing engine binary (skips download)
-#   RUSTCFML_PORT  port to serve on (default 8513)
+#   RUSTCFML_BIN          path to an existing engine binary (skips download)
+#   RUSTCFML_PORT         port to serve on (default 8513)
+#   RUSTCFML_RESULT_JSON  write a machine-readable verdict here (compare mode)
 #
-# Exit codes: 0 = no new failures (or baseline written); 1 = boot break, new
-# failures, or infrastructure error.
+# Exit codes: 0 = no new failures (or baseline written); 3 = the suite ran and
+# the engine was REJECTED (new named failures, or fail/error totals above the
+# baseline); 1 = the engine could not be evaluated (download, boot, unparseable
+# response, missing baseline). Callers that only need pass/fail treat any
+# non-zero code as a failure; tools/rustcfml/check-version.sh tells 3 from 1.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -83,10 +87,17 @@ curl -s --max-time 900 \
   -o "$OUT" || { echo "suite request failed"; exit 1; }
 
 # --- parse + compare -----------------------------------------------------------
-python3 - "$OUT" "$BASELINE" "$MODE" "$VERSION" <<'PY'
-import json, os, sys
+python3 - "$OUT" "$BASELINE" "$MODE" "$VERSION" "$REPO_ROOT" <<'PY'
+import hashlib, importlib.util, json, os, sys
 
-out_path, baseline_path, mode, version = sys.argv[1:5]
+out_path, baseline_path, mode, version, repo_root = sys.argv[1:6]
+
+# Shared TestBox result walker (also used by the CLI harness): it recurses
+# suiteStats at every level, which the old in-line walker did not (#3687).
+_spec = importlib.util.spec_from_file_location(
+    "testbox_results", os.path.join(repo_root, "tools", "ci", "testbox_results.py"))
+tbr = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(tbr)
 
 raw = open(out_path, encoding="utf-8", errors="replace").read().lstrip()
 try:
@@ -97,33 +108,36 @@ except Exception as exc:
     print(raw[:400])
     sys.exit(1)
 
+# Not a usable TestBox result (error envelope, no bundle tree, bad totals, empty
+# run): the engine could not be evaluated, so this is exit 1, never a verdict.
+unusable = tbr.validate(data)
+if unusable:
+    print("BOOT BREAK: the suite response is not a usable TestBox result:")
+    for reason in unusable:
+        print(f"  - {reason}")
+    print(raw[:400])
+    sys.exit(1)
+
 totals = {k: int(data.get(k, 0)) for k in
           ("totalSpecs", "totalPass", "totalFail", "totalError", "totalSkipped")}
 
+failures = tbr.walk(data)
 failing = {}
-def walk(node, bundle, path):
-    for spec in node.get("specStats", []):
-        if spec.get("status") not in ("Passed", "Skipped"):
-            key = f"{bundle} :: {path} :: {spec.get('name', '?')}"
-            failing[key] = {
-                "status": spec.get("status", "?"),
-                "message": str(spec.get("failMessage") or "").replace("\n", " | "),
-                "detail": str(spec.get("failDetail") or "").replace("\n", " | "),
-            }
-    for nested in node.get("nestedSuiteStats", []) or []:
-        walk(nested, bundle, f"{path} > {nested.get('name', '?')}")
-
-for b in data.get("bundleStats", []):
-    name = b.get("name", "?")
-    ge = b.get("globalException") or {}
-    if isinstance(ge, dict) and ge.get("message"):
-        failing[f"{name} :: (bundle-level exception)"] = {
-            "status": "Exception",
-            "message": str(ge.get("message") or "").replace("\n", " | "),
-            "detail": str(ge.get("detail") or "").replace("\n", " | "),
-        }
-    for su in b.get("suiteStats", []):
-        walk(su, name, su.get("name", "?"))
+for f in failures:
+    # Keys are committed in baseline.json: "<bundle> :: <suite> > <nested> :: <spec>",
+    # or "<bundle> :: (bundle-level exception)". Keep the shape stable.
+    if f["kind"] == "BundleError":
+        key = f"{f['bundle']} :: (bundle-level exception)"
+    else:
+        key = f"{f['bundle']} :: {f['path_text']} :: {f['name']}"
+    failing[key] = {
+        "status": f["status"] or "?",
+        "message": f["message"].replace("\n", " | "),
+        "detail": f["detail"].replace("\n", " | "),
+    }
+# Diagnostic only: when the walk and TestBox's own totals disagree, say so.
+# The totals backstop below still gates on the numbers.
+walk_mismatch = tbr.reconcile(data, failures)
 
 print(f"RustCFML {version}: {totals['totalPass']} pass, {totals['totalFail']} fail, "
       f"{totals['totalError']} error, {totals['totalSkipped']} skipped "
@@ -205,8 +219,35 @@ if new:
 if totals_worse:
     summary_lines.append("TOTALS REGRESSION vs baseline (no named entry — check response shape):")
     summary_lines += [f"  - {item}" for item in totals_worse]
+if walk_mismatch:
+    summary_lines.append("WALK/TOTALS MISMATCH (the named list may be incomplete):")
+    summary_lines += [f"  - {item}" for item in walk_mismatch]
 for line in summary_lines:
     print(line)
+
+rejected = bool(new or totals_worse)
+result_path = os.environ.get("RUSTCFML_RESULT_JSON")
+if result_path:
+    # The fingerprint identifies "this candidate, failing these specs", so a
+    # daily re-check of an already-rejected candidate stays quiet (#3687). It
+    # is built from names only, never counts: a flaky total must not re-notify.
+    fingerprint = hashlib.sha256(
+        (version + "\n" + "\n".join(sorted(new))).encode("utf-8")
+    ).hexdigest()[:16]
+    with open(result_path, "w") as fh:
+        json.dump({
+            "engineVersion": version,
+            "baselineVersion": baseline.get("engineVersion", "?"),
+            "verdict": "rejected" if rejected else "accepted",
+            "fingerprint": fingerprint,
+            "totals": totals,
+            "baselineTotals": base_totals,
+            "new": [dict(key=k, **failing[k]) for k in new],
+            "newlyPassing": fixed,
+            "totalsWorse": totals_worse,
+            "walkMismatch": walk_mismatch,
+        }, fh, indent=2)
+        fh.write("\n")
 
 step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
 if step_summary:
@@ -220,5 +261,5 @@ if step_summary:
         if not new and not totals_worse:
             fh.write("\nNo new failures versus baseline.\n")
 
-sys.exit(1 if (new or totals_worse) else 0)
+sys.exit(3 if rejected else 0)
 PY

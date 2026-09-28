@@ -200,8 +200,10 @@ wait_for_db() {
       ;;
     oracle)
       echo "  Waiting for Oracle..."
-      wait_for_cmd 300 5 'docker exec wheels-oracle-1 sqlplus -S wheelstestdb/wheelstestdb@localhost:1521/wheelstestdb <<< "SELECT 1 FROM DUAL; EXIT;"' \
-        || echo "::warning::Oracle not ready after 300s" >&2
+      # Checked probe (#3738): runs a query and verifies the row, unlike the
+      # old `docker exec` without -i, which never delivered its SQL.
+      wait_for_cmd 300 5 "bash '${PROJECT_ROOT}/tools/ci/oracle-ready.sh'" \
+        || echo "::warning::Oracle could not run SQL after 300s" >&2
       ;;
   esac
 }

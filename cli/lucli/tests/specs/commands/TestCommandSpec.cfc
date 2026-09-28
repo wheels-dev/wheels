@@ -129,11 +129,27 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(mod.$resolveTestTimeout(" 45 ")).toBe(45);
 			});
 
-			it("falls back to the default rather than throwing on junk input", () => {
-				// a mistyped timeout must not be the thing that stops a test run
+			it("falls back to the default rather than throwing on junk input — but says so", () => {
+				// a mistyped timeout must not be the thing that stops a test run...
 				expect(mod.$resolveTestTimeout("soon")).toBe(900);
 				expect(mod.$resolveTestTimeout("0")).toBe(900);
 				expect(mod.$resolveTestTimeout("-30")).toBe(900);
+				// ...but the fallback must not be silent (maintainer decision on ##2963).
+				expect(mod.$testTimeoutWarning("soon", 900)).toBeWithCase('Warning: ignoring invalid timeout "soon"; using 900s');
+				expect(mod.$testTimeoutWarning("0", 900)).toInclude('"0"');
+				expect(mod.$testTimeoutWarning("-30", 1200)).toInclude("using 1200s");
+			});
+
+			it("points the timed-out hint at --test-timeout, which works on every LuCLI runtime (##3678)", () => {
+				var source = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				expect(source).toInclude("wheels test --test-timeout=");
+				expect(source).notToInclude("On the terminal, --timeout is taken by LuCLI");
+			});
+
+			it("warns about nothing when the timeout is valid or absent", () => {
+				expect(mod.$testTimeoutWarning("", 900)).toBe("");
+				expect(mod.$testTimeoutWarning("   ", 900)).toBe("");
+				expect(mod.$testTimeoutWarning("45", 45)).toBe("");
 			});
 		});
 

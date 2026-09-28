@@ -99,7 +99,22 @@
 			case "false":
 			case "none":
 			case "alreadyopen":
-				local.rv = $invoke(method = arguments.method, componentReference = this, invokeArgs = local.methodArgs);
+				// The same reset the commit/rollback branch does. "none" still sets the
+				// open marker above (so nested calls skip their own transaction too), and
+				// a throw from the method used to skip the reset below: the marker stayed
+				// `true` for the rest of the request and every later model call took the
+				// "alreadyopen" path with no transaction, so transaction="rollback" stopped
+				// rolling back. The core test runner uses transactionMode="none", so one
+				// failing create() broke OuterTransactionSignalSpec bundles later. Only
+				// the call that set the marker clears it; an outer owner clears its own.
+				try {
+					local.rv = $invoke(method = arguments.method, componentReference = this, invokeArgs = local.methodArgs);
+				} catch (any e) {
+					if (local.closeTransaction) {
+						request.wheels.transactions[local.connectionArgs] = false;
+					}
+					rethrow;
+				}
 				break;
 			default:
 				Throw(

@@ -1,5 +1,12 @@
-# Compatibility matrix: runs all engines x databases on a weekly schedule
-# and on manual dispatch. Non-blocking — informational only.
+# Compatibility matrix: runs all engines x databases (plus the RustCFML lane)
+# on a nightly schedule, on manual dispatch (optionally narrowed with the
+# `engines` / `databases` inputs), and on every release PR into `main`.
+# Every leg gates the run's result, Oracle included (#3738): SOFT_FAIL_DBS is
+# empty, and a leg with no result or fewer than MIN_SPECS testcases fails.
+# The "Compatibility Matrix Gate" job rolls all legs into one check. On release
+# PRs it requires the full, unnarrowed matrix to pass, and it is meant to be a
+# required status check on the `main` ruleset (.github/RELEASE_PLAYBOOK.md,
+# "Release readiness"). PRs into `develop` do not run this workflow.
 #
 # Each engine x database combination is its own matrix job, so the ~30 legs
 # run in PARALLEL instead of sequentially inside one job per engine. Wall
@@ -11,33 +18,117 @@
 name: Wheels Compatibility Matrix
 
 on:
+  # Release gate: a release is cut by a PR into `main` (release/X.Y.Z-to-main),
+  # so running here puts every engine x database leg on the exact tree being
+  # released. Day-to-day PRs target `develop` and are not affected. See
+  # .github/RELEASE_PLAYBOOK.md ("Release readiness").
+  pull_request:
+    branches: [main]
   schedule:
-    # Weekly: Sunday 02:00 UTC
-    - cron: '0 2 * * 0'
+    # Nightly: 02:00 UTC
+    - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      notify:
+        description: 'Open/update/close the tracking issue as a scheduled run would (to test notify-on-failure)'
+        type: boolean
+        default: false
+      engines:
+        description: 'Comma list of engines to run (blank = all: lucee6,lucee7,adobe2023,adobe2025,boxlang; add rustcfml to include that lane in a narrowed run)'
+        type: string
+        default: ''
+      databases:
+        description: 'Comma list of databases to run (blank = all: mysql,postgres,sqlserver,h2,cockroachdb,oracle,sqlite)'
+        type: string
+        default: ''
+
+# A new push to a release PR supersedes the previous matrix for that PR, so
+# cancel it. Scheduled and dispatched runs get a per-run group (run_id) and
+# are never cancelled or queued behind each other.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) || format('{0}-run-{1}', github.workflow, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Databases whose legs may report spec FAILURES without failing the run.
+  # Empty: every database gates (#3738 made Oracle a hard leg). The mechanism
+  # stays so a new database can be phased in, but it only ever covers counted
+  # spec failures from a complete run. A leg with no result, an error
+  # envelope, or fewer than MIN_SPECS testcases fails regardless.
+  SOFT_FAIL_DBS: ""
+  # Zero-test guard (#3302): a compile-wiped leg returns HTTP 200 with
+  # totalSpecs=0, which used to render as a pass. Every leg runs the same core
+  # suite (~5,800 specs), so anything below the floor means it never ran.
+  MIN_SPECS: 4000
 
 jobs:
+  # Build the leg list. Scheduled runs and a plain dispatch cover the full
+  # matrix; the `engines` / `databases` dispatch inputs narrow it for quick
+  # iteration on one engine or database.
+  plan:
+    name: Plan matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_legs: ${{ steps.plan.outputs.has_legs }}
+      rustcfml: ${{ steps.plan.outputs.rustcfml }}
+    steps:
+      - name: Compute legs
+        id: plan
+        env:
+          ENGINES_INPUT: ${{ inputs.engines }}
+          DATABASES_INPUT: ${{ inputs.databases }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          ENGINES = ["lucee6", "lucee7", "adobe2023", "adobe2025", "boxlang"]
+          DATABASES = ["mysql", "postgres", "sqlserver", "h2", "cockroachdb", "oracle", "sqlite"]
+          LUCEE_ONLY = {"h2"}
+
+          def pick(raw, allowed, extra=()):
+              items = [x.strip().lower() for x in (raw or "").split(",") if x.strip()]
+              if not items:
+                  return list(allowed), True
+              bad = [x for x in items if x not in allowed and x not in extra]
+              if bad:
+                  print(f"::error::Unknown value(s) {bad}; valid: {list(allowed) + list(extra)}")
+                  sys.exit(1)
+              return items, False
+
+          engines, all_engines = pick(os.environ.get("ENGINES_INPUT"), ENGINES, extra=("rustcfml",))
+          databases, all_databases = pick(os.environ.get("DATABASES_INPUT"), DATABASES)
+          run_rustcfml = (all_engines and all_databases) or "rustcfml" in engines
+          engines = [e for e in engines if e != "rustcfml"]
+
+          include = [
+              {"cfengine": e, "database": d}
+              for e in ENGINES if e in engines
+              for d in DATABASES if d in databases
+              if not (d in LUCEE_ONLY and not e.startswith("lucee"))
+          ]
+          if not include and not run_rustcfml:
+              print("::error::The engines/databases inputs select no legs")
+              sys.exit(1)
+          print(f"{len(include)} leg(s): " + ", ".join(f"{l['cfengine']}+{l['database']}" for l in include))
+          print(f"rustcfml lane: {run_rustcfml}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              # An empty include list is not a valid matrix; the tests job
+              # is skipped in that case (rustcfml-only dispatch).
+              out.write("matrix=" + json.dumps({"include": include}) + "\n")
+              out.write("has_legs=" + ("true" if include else "false") + "\n")
+              out.write("rustcfml=" + ("true" if run_rustcfml else "false") + "\n")
+          PY
+
   tests:
     name: "${{ matrix.cfengine }} + ${{ matrix.database }}"
+    needs: plan
+    if: needs.plan.outputs.has_legs == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        cfengine:
-          ["lucee6", "lucee7", "adobe2023", "adobe2025", "boxlang"]
-        database:
-          ["mysql", "postgres", "sqlserver", "h2", "cockroachdb", "oracle", "sqlite"]
-        exclude:
-          # h2 is a Lucee-only datasource
-          - cfengine: adobe2023
-            database: h2
-          - cfengine: adobe2025
-            database: h2
-          - cfengine: boxlang
-            database: h2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       PORT_lucee6: 60006
       PORT_lucee7: 60007
@@ -109,11 +200,22 @@ jobs:
           # Tracks the last HTTP status code so timeout diagnostics can
           # distinguish "no response" (engine didn't bind) from "5xx"
           # (engine bound but app returning errors — e.g. issue #2646).
-          MAX_WAIT=60
+          #
+          # Ceiling: measured over four matrix runs (2026-09-27), the Adobe
+          # engines answered on attempt 42-57 (2023) and 48-60 (2025) of the old
+          # 60; Lucee and BoxLang on 1-12. 120 leaves ~2x the observed worst
+          # case. Each attempt is ~5-10s, so a dead engine now fails after
+          # ~10-20 min instead of ~5-10. A ready-after-3/4 warning (below)
+          # makes future drift visible before it turns red.
+          MAX_WAIT=120
           WAIT_COUNT=0
           RESTARTS=0
           MAX_RESTARTS=3
           LAST_HTTP_CODE="000"
+          # Track readiness explicitly: success on the final attempt leaves
+          # WAIT_COUNT == MAX_WAIT, so the count alone can't tell success from
+          # exhaustion (#3685).
+          READY=false
           while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
             WAIT_COUNT=$((WAIT_COUNT + 1))
 
@@ -139,7 +241,11 @@ jobs:
             LAST_HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" 2>/dev/null || true)
             LAST_HTTP_CODE=${LAST_HTTP_CODE:-000}
             if echo "$LAST_HTTP_CODE" | grep -qE "^(200|302|404)$"; then
-              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT)"
+              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT/$MAX_WAIT)"
+              if [ $((WAIT_COUNT * 4)) -gt $((MAX_WAIT * 3)) ]; then
+                echo "::warning::${CFENGINE} became ready at attempt $WAIT_COUNT/$MAX_WAIT (past 3/4 of the ceiling); readiness headroom is shrinking."
+              fi
+              READY=true
               break
             fi
 
@@ -154,7 +260,7 @@ jobs:
             fi
           done
 
-          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+          if [ "$READY" != "true" ]; then
             echo "::error::CF engine not ready after ${MAX_WAIT} attempts (last HTTP code: $LAST_HTTP_CODE)"
             if [ "$LAST_HTTP_CODE" = "000" ]; then
               echo "::notice::No HTTP response received — engine likely never bound to port $PORT."
@@ -181,31 +287,53 @@ jobs:
             "echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/cfusion/lib/serialfilter.txt"
           docker restart wheels-${{ matrix.cfengine }}-1
 
-          # Wait for engine to come back up after restart
+          # Wait for engine to come back up after restart. This used to fall
+          # through silently when the engine never came back, so the suite ran
+          # against a dead engine; fail loudly instead. A full Adobe restart has
+          # the same cold-start profile as the readiness wait above, so it gets
+          # the same ceiling (the old 30 was never measured: it could not fail).
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
-          MAX_WAIT=30
+          CONTAINER="wheels-${{ matrix.cfengine }}-1"
+          MAX_WAIT=120
           WAIT_COUNT=0
+          READY=false
           while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
             WAIT_COUNT=$((WAIT_COUNT + 1))
             if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
-              echo "CF engine back up after restart"
+              echo "CF engine back up after restart (attempt $WAIT_COUNT/$MAX_WAIT)"
+              READY=true
               break
             fi
-            sleep 5
+            if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
+              sleep 5
+            fi
           done
+          if [ "$READY" != "true" ]; then
+            echo "::error::CF engine did not come back after the serialfilter restart (${MAX_WAIT} attempts)"
+            echo "=== Container logs (raw, last 200 lines) ==="
+            docker logs "$CONTAINER" 2>&1 | tail -200
+            echo "=== /end raw logs ==="
+            exit 1
+          fi
 
       - name: Install CFPM packages (Adobe 2023/2025)
         if: matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025'
         run: |
           MAX_RETRIES=3
           RETRY_COUNT=0
+          PACKAGES="image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle"
+          # Adobe 2025 raises "The graphqlclient package is not installed." while
+          # loading an app's datasources at startup when this package is absent.
+          if [ "${{ matrix.cfengine }}" = "adobe2025" ]; then
+            PACKAGES="${PACKAGES},graphqlclient"
+          fi
 
           while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
             RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "Attempt $RETRY_COUNT of $MAX_RETRIES: Installing CFPM packages..."
+            echo "Attempt $RETRY_COUNT of $MAX_RETRIES: Installing CFPM packages (${PACKAGES})..."
 
-            if docker exec wheels-${{ matrix.cfengine }}-1 box cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle; then
+            if docker exec wheels-${{ matrix.cfengine }}-1 box cfpm install "${PACKAGES}"; then
               echo "CFPM packages installed successfully"
               exit 0
             else
@@ -250,26 +378,53 @@ jobs:
               echo "CockroachDB init complete"
               ;;
             oracle)
-              echo "Waiting for Oracle to accept connections..."
+              # Checked probe (#3738): tools/ci/oracle-ready.sh runs a real
+              # query against the wheelstestdb service and verifies the row.
+              # The old inline probe never delivered its SQL (docker exec
+              # without -i) and only warned on timeout, so a leg could start
+              # against a service that could not run SQL.
+              echo "Waiting for the Oracle wheelstestdb service to run SQL..."
               MAX_WAIT=60
               WAIT_COUNT=0
+              ORACLE_READY=false
               while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
                 WAIT_COUNT=$((WAIT_COUNT + 1))
-                if docker exec wheels-oracle-1 sqlplus -S wheelstestdb/wheelstestdb@localhost:1521/wheelstestdb <<< "SELECT 1 FROM DUAL; EXIT;" > /dev/null 2>&1; then
-                  echo "Oracle is ready! (attempt ${WAIT_COUNT})"
+                if PROBE_ERR=$(bash tools/ci/oracle-ready.sh 2>&1); then
+                  echo "Oracle is ready! (attempt ${WAIT_COUNT}/${MAX_WAIT})"
+                  ORACLE_READY=true
                   break
                 fi
-                echo "Oracle not ready yet (attempt ${WAIT_COUNT}/${MAX_WAIT})..."
-                sleep 5
+                echo "Oracle not ready yet (attempt ${WAIT_COUNT}/${MAX_WAIT})"
+                # Show the probe's own diagnostic every 6th attempt (~30s).
+                if [ $((WAIT_COUNT % 6)) -eq 0 ]; then echo "$PROBE_ERR"; fi
+                if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then sleep 5; fi
               done
-              if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
-                echo "::warning::Oracle may not be fully ready after ${MAX_WAIT} attempts"
+              # Same final-attempt boundary as the CF readiness loop (#3685).
+              if [ "$ORACLE_READY" != "true" ]; then
+                echo "::error::Oracle could not run SQL after ${MAX_WAIT} attempts"
+                echo "$PROBE_ERR"
+                echo "=== Oracle container logs (last 60 lines) ==="
+                docker logs wheels-oracle-1 2>&1 | tail -60
+                exit 1
               fi
               ;;
             h2|sqlite)
               echo "$DB requires no external container"
               ;;
           esac
+
+      - name: Wait for the engine to reach ${{ matrix.database }}
+        # A database-side probe proves the database answers its own client,
+        # not that the engine's JDBC datasource can connect (#3738: Oracle
+        # passed its probe, then all three suite attempts failed with
+        # ORA-12514 from the engine). Ask the engine itself, through the test
+        # runner, before starting the suite.
+        run: |
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          # Warm-up: trigger Wheels onApplicationStart first. The engine
+          # readiness check only verifies the web server responds.
+          curl -s -o /dev/null --max-time 120 "http://localhost:${!PORT_VAR}/" || true
+          bash tools/ci/wait-engine-db.sh "${!PORT_VAR}" "${{ matrix.database }}" 30 10
 
       - name: Run test suite for ${{ matrix.database }}
         id: run-tests
@@ -279,9 +434,7 @@ jobs:
           BASE_URL="http://localhost:${PORT}/wheels/core/tests"
           DB="${{ matrix.database }}"
 
-          # Databases whose failures are logged but don't block CI.
-          # oracle: tracked in #2663 — datasource registration, DBMS_LOCK, and constraint cleanup.
-          SOFT_FAIL_DBS="oracle"
+          # SOFT_FAIL_DBS and MIN_SPECS come from the workflow-level env.
 
           mkdir -p /tmp/test-results
           mkdir -p /tmp/junit-results
@@ -392,12 +545,7 @@ jobs:
           " || { echo "JUnit conversion failed for ${DB} (non-fatal)"; rm -f "$JUNIT_FILE"; }
           fi
 
-          # Zero-test guard (#3302): a compile-wiped leg returns HTTP 200 with
-          # totalSpecs=0 (one bad CFC zeroes the whole directory compile), which
-          # previously rendered as a pass. Every engine runs the same core suite
-          # (~4,700 specs), so anything below the floor means the suite never
-          # actually ran. Revisit the floor if per-DB spec subsets ever ship.
-          MIN_SPECS=4000
+          # Zero-test guard (#3302): MIN_SPECS (workflow env) is the floor.
           TOTAL_SPECS="-1"
           if [ -f "$RESULT_FILE" ] && { [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; }; then
             TOTAL_SPECS=$(python3 -c "
@@ -411,26 +559,66 @@ jobs:
           fi
 
           SPECS_OK=true
-          if { [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; } && [ "$TOTAL_SPECS" -lt "$MIN_SPECS" ]; then
+          if [ "$TOTAL_SPECS" -lt "$MIN_SPECS" ]; then
             SPECS_OK=false
-            echo "::error::${{ matrix.cfengine }} + ${DB}: HTTP ${HTTP_CODE} but only ${TOTAL_SPECS} testcases reported (floor: ${MIN_SPECS}) — suite likely compile-wiped, treating leg as failed"
           fi
 
-          # Track per-database result
+          # Outcome. Only a COMPLETE run (HTTP 200/417 with at least MIN_SPECS
+          # testcases) is evidence. A soft-fail database may report spec
+          # failures (417) without failing the leg; an error envelope, a
+          # missing result or a compile-wiped run fails the leg for every
+          # database, soft-fail or not (#3738: a zero-test Oracle leg used to
+          # read green).
+          LEG="${{ matrix.cfengine }} + ${DB}"
           if [ "$HTTP_CODE" = "200" ] && [ "$SPECS_OK" = true ]; then
-            echo "PASSED: ${{ matrix.cfengine }} + ${DB} (${TOTAL_SPECS} testcases)"
+            echo "PASSED: ${LEG} (${TOTAL_SPECS} testcases)"
+          elif [ "$HTTP_CODE" = "417" ] && [ "$SPECS_OK" = true ] && echo ",${SOFT_FAIL_DBS}," | grep -q ",${DB},"; then
+            echo "FAILED: ${LEG} (spec failures in ${TOTAL_SPECS} testcases)"
+            echo "::warning::${LEG}: spec failures, but ${DB} is in SOFT_FAIL_DBS (non-blocking)"
           else
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "FAILED: ${{ matrix.cfengine }} + ${DB} (HTTP 200 but zero-test guard tripped)"
+            if [ "$HTTP_CODE" = "417" ] && [ "$SPECS_OK" = true ]; then
+              echo "FAILED: ${LEG} (spec failures in ${TOTAL_SPECS} testcases)"
+            elif [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "417" ]; then
+              echo "::error::${LEG}: HTTP ${HTTP_CODE} but only ${TOTAL_SPECS} testcases reported (floor: ${MIN_SPECS}) — no valid result, treating leg as failed"
             else
-              echo "FAILED: ${{ matrix.cfengine }} + ${DB} (HTTP ${HTTP_CODE})"
+              echo "::error::${LEG}: no valid result (HTTP ${HTTP_CODE} after ${RETRY_COUNT} attempts)"
+              if [ -f "$RESULT_FILE" ]; then
+                echo "=== Response body (first 1500 bytes) ==="
+                head -c 1500 "$RESULT_FILE" || true
+                echo
+                echo "=== /end response body ==="
+              fi
             fi
-            if echo "$SOFT_FAIL_DBS" | grep -qw "$DB"; then
-              echo "::warning::${DB} tests failed but marked as soft-fail (non-blocking)"
-            else
-              echo "One or more database suites failed"
-              exit 1
-            fi
+            exit 1
+          fi
+
+      - name: Report container exit state
+        # A cgroup OOM-kill ends the JVM with exit 137 and NO Java error, so
+        # a leg could otherwise fail (or pass on stale results) silently.
+        if: always()
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+          DB: ${{ matrix.database }}
+        run: |
+          # An OOM-killed or dead container invalidates the leg's result, so
+          # this fails every leg, including a SOFT_FAIL_DBS one (#3738).
+          BAD=0
+          for C in "wheels-${CFENGINE}-1" "wheels-${DB}-1"; do
+            STATE=$(docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} oomkilled={{.State.OOMKilled}} restarts={{.RestartCount}}' "$C" 2>/dev/null || echo "missing")
+            # OOMKilled only reflects PID 1 (the CommandBox launcher); the server
+            # JVM is its child, so a kernel kill of the JVM can leave the container
+            # "running, oomkilled=false". The cgroup's oom_kill counter sees it.
+            KILLS=$(docker exec "$C" sh -c 'cat /sys/fs/cgroup/memory.events 2>/dev/null || cat /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null' 2>/dev/null | awk '$1=="oom_kill"{print $2}')
+            STATE="$STATE cgroup_oom_kill=${KILLS:-n/a}"
+            echo "$C: $STATE"
+            echo "- \`$C\`: $STATE" >> "$GITHUB_STEP_SUMMARY"
+            case "$STATE" in
+              *oomkilled=true*|*cgroup_oom_kill=[1-9]*) echo "::error::$C had a process OOM-killed by the kernel (cgroup memory limit): $STATE"; BAD=1 ;;
+              exited*|dead*) echo "::error::$C is not running after the suite: $STATE"; BAD=1 ;;
+            esac
+          done
+          if [ "$BAD" = 1 ]; then
+            exit 1
           fi
 
       - name: Generate per-leg summary
@@ -442,11 +630,9 @@ jobs:
           echo "| Database | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          SOFT_FAIL_DBS="oracle"
-          # Keep in sync with MIN_SPECS in the run-tests step (#3302).
-          MIN_SPECS=4000
+          # SOFT_FAIL_DBS and MIN_SPECS come from the workflow-level env.
           IS_SOFT_FAIL=false
-          if echo "$SOFT_FAIL_DBS" | grep -qw "$DB"; then
+          if echo ",${SOFT_FAIL_DBS}," | grep -q ",${DB},"; then
             IS_SOFT_FAIL=true
           fi
 
@@ -464,25 +650,21 @@ jobs:
             FAIL_COUNT="${STATS% *}"
             SPEC_COUNT="${STATS#* }"
 
-            if [ "$FAIL_COUNT" = "0" ] && [ "$SPEC_COUNT" -ge "$MIN_SPECS" ]; then
-              echo "| ${DB} | :white_check_mark: Pass |" >> $GITHUB_STEP_SUMMARY
+            # Soft-fail only ever softens counted spec failures from a
+            # complete run; an invalid result is a failure for every DB (#3738).
+            if [ "$FAIL_COUNT" = "-1" ]; then
+              echo "| ${DB} | :x: No valid result (error envelope) |" >> $GITHUB_STEP_SUMMARY
+            elif [ "$SPEC_COUNT" -lt "$MIN_SPECS" ]; then
+              echo "| ${DB} | :x: ${SPEC_COUNT} tests (zero-test guard) |" >> "$GITHUB_STEP_SUMMARY"
             elif [ "$FAIL_COUNT" = "0" ]; then
-              echo "| ${DB} | :warning: ${SPEC_COUNT} tests (zero-test guard) |" >> "$GITHUB_STEP_SUMMARY"
-            elif [ "$FAIL_COUNT" = "-1" ] && [ "$IS_SOFT_FAIL" = true ]; then
-              echo "| ${DB} | :warning: Error (soft-fail) |" >> $GITHUB_STEP_SUMMARY
-            elif [ "$FAIL_COUNT" = "-1" ]; then
-              echo "| ${DB} | :warning: Error |" >> $GITHUB_STEP_SUMMARY
+              echo "| ${DB} | :white_check_mark: Pass (${SPEC_COUNT} tests) |" >> $GITHUB_STEP_SUMMARY
             elif [ "$IS_SOFT_FAIL" = true ]; then
               echo "| ${DB} | :warning: ${FAIL_COUNT} failures (soft-fail) |" >> $GITHUB_STEP_SUMMARY
             else
               echo "| ${DB} | :x: ${FAIL_COUNT} failures |" >> $GITHUB_STEP_SUMMARY
             fi
           else
-            if [ "$IS_SOFT_FAIL" = true ]; then
-              echo "| ${DB} | :warning: No result (soft-fail) |" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "| ${DB} | :grey_question: No result |" >> $GITHUB_STEP_SUMMARY
-            fi
+            echo "| ${DB} | :x: No result |" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Debug information
@@ -526,6 +708,10 @@ jobs:
   # on Linux, and commit both files together.
   rustcfml:
     name: "rustcfml"
+    needs: plan
+    # Full runs always include it; a narrowed dispatch only when `engines`
+    # lists rustcfml.
+    if: needs.plan.outputs.rustcfml == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -593,6 +779,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+    outputs:
+      grid: ${{ steps.matrix.outputs.grid }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -610,20 +798,18 @@ jobs:
           MATRIX_MD="${MATRIX_MD}
           "
           MATRIX_MD="${MATRIX_MD}
-          | Engine | MySQL | PostgreSQL | SQL Server | H2 | CockroachDB | Oracle (soft-fail) | SQLite |"
+          | Engine | MySQL | PostgreSQL | SQL Server | H2 | CockroachDB | Oracle | SQLite |"
           MATRIX_MD="${MATRIX_MD}
-          |--------|:-----:|:----------:|:----------:|:--:|:-----------:|:------------------:|:------:|"
+          |--------|:-----:|:----------:|:----------:|:--:|:-----------:|:------:|:------:|"
 
-          # Keep in sync with SOFT_FAIL_DBS and MIN_SPECS in the tests job (#3302).
-          SOFT_FAIL_DBS="oracle"
-          MIN_SPECS=4000
+          # SOFT_FAIL_DBS and MIN_SPECS come from the workflow-level env.
 
           for engine in lucee6 lucee7 adobe2023 adobe2025 boxlang; do
             ROW="| **${engine}** |"
             for db in mysql postgres sqlserver h2 cockroachdb oracle sqlite; do
               FILE="results/test-results-${engine}-${db}/${engine}-${db}-result.txt"
               IS_SOFT_FAIL=false
-              if echo "$SOFT_FAIL_DBS" | grep -qw "$db"; then
+              if echo ",${SOFT_FAIL_DBS}," | grep -q ",${db},"; then
                 IS_SOFT_FAIL=true
               fi
               if [ -f "$FILE" ]; then
@@ -637,12 +823,12 @@ jobs:
           " 2>/dev/null || echo "-1 -1")
                 FAIL="${STATS% *}"
                 SPECS="${STATS#* }"
-                if [ "$FAIL" = "0" ] && [ "$SPECS" -ge "$MIN_SPECS" ]; then
-                  ROW="${ROW} :white_check_mark: |"
-                elif [ "$FAIL" = "-1" ]; then
-                  ROW="${ROW} :warning: |"
+                if [ "$FAIL" = "-1" ]; then
+                  ROW="${ROW} :x: no result |"
+                elif [ "$SPECS" -lt "$MIN_SPECS" ]; then
+                  ROW="${ROW} :x: ${SPECS} tests |"
                 elif [ "$FAIL" = "0" ]; then
-                  ROW="${ROW} :warning: ${SPECS} tests |"
+                  ROW="${ROW} :white_check_mark: |"
                 elif [ "$IS_SOFT_FAIL" = true ]; then
                   ROW="${ROW} :warning: ${FAIL} |"
                 else
@@ -656,10 +842,14 @@ jobs:
           ${ROW}"
           done
 
+          SOFT_FAIL_NOTE=""
+          if [ -n "$SOFT_FAIL_DBS" ]; then
+            SOFT_FAIL_NOTE="*Soft-fail databases (${SOFT_FAIL_DBS}): :warning: N cells are spec failures that do not gate the run.*
+          "
+          fi
           MATRIX_MD="${MATRIX_MD}
 
-          *Oracle is soft-fail (non-blocking, tracked in #2663) — :warning: cells in that column never gate the run.*
-          *A ':warning: N tests' cell means the leg reported fewer than ${MIN_SPECS} testcases (suite likely compile-wiped, counted as failed).*
+          ${SOFT_FAIL_NOTE}*A ':x: N tests' cell means the leg reported fewer than ${MIN_SPECS} testcases (suite never ran; counted as failed). ':x: no result' means the leg returned no parseable result.*
 
           *Results for commit ${GITHUB_SHA:0:7}.*"
 
@@ -669,12 +859,24 @@ jobs:
           # Save for PR comment
           echo "$MATRIX_MD" > /tmp/matrix-comment.md
 
+          # Expose for the notify-on-failure job
+          {
+            echo "grid<<MATRIX_GRID_EOF"
+            echo "$MATRIX_MD"
+            echo "MATRIX_GRID_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Post matrix to PR
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PR_NUMBER=$(gh pr list --head "${{ github.head_ref || github.ref_name }}" --json number --jq '.[0].number' 2>/dev/null)
+          # Use the triggering PR directly: a release branch can have more than
+          # one open PR (e.g. into develop and main), so a --head lookup is ambiguous.
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ -z "$PR_NUMBER" ]; then
+            PR_NUMBER=$(gh pr list --head "${{ github.head_ref || github.ref_name }}" --json number --jq '.[0].number' 2>/dev/null)
+          fi
           if [ -z "$PR_NUMBER" ]; then
             echo "No PR found, skipping comment"
             exit 0
@@ -695,3 +897,110 @@ jobs:
             gh pr comment "$PR_NUMBER" --body "$COMMENT_BODY"
             echo "Created new comment on PR #${PR_NUMBER}"
           fi
+
+  #############################################
+  # Notify on failure (scheduled runs)
+  #############################################
+  # A scheduled run has no PR to comment on, so a red nightly would otherwise go
+  # unnoticed until someone opens the Actions tab. Keep ONE open tracking issue,
+  # labelled `compat-matrix-failure`: open it (or comment on the open one) when a
+  # nightly run fails, and close it with a comment when a nightly run is green again.
+  # Every leg gates (SOFT_FAIL_DBS is empty), so a red Oracle leg trips this too.
+  notify-on-failure:
+    name: Notify on failure
+    needs: [tests, rustcfml, test-matrix-summary]
+    if: always() && (github.event_name == 'schedule' || inputs.notify == true)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      issues: write
+    steps:
+      - name: Open, update, or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          RUSTCFML_RESULT: ${{ needs.rustcfml.result }}
+          GRID: ${{ needs.test-matrix-summary.outputs.grid }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          LABEL="compat-matrix-failure"
+          gh label create "$LABEL" --color B60205 \
+            --description "Nightly compatibility matrix is failing" --force >/dev/null
+
+          ISSUE=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // empty')
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+
+          # A narrowed dispatch can skip either job; skipped is not a failure.
+          ok() { [ "$1" = "success" ] || [ "$1" = "skipped" ]; }
+          if ok "$TESTS_RESULT" && ok "$RUSTCFML_RESULT"; then
+            if [ -n "$ISSUE" ]; then
+              gh issue comment "$ISSUE" --body "Compatibility matrix is green again on \`${SHORT_SHA}\` ([run](${RUN_URL})). Closing."
+              gh issue close "$ISSUE" --reason completed
+            fi
+            echo "Matrix green; nothing to report."
+            exit 0
+          fi
+
+          FAILED_JOBS=$(gh api "repos/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}/jobs" --paginate \
+            --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out") | "- `\(.name)` (\(.conclusion)): \(.html_url)"')
+
+          BODY_FILE=$(mktemp)
+          {
+            echo "The compatibility matrix failed on \`${SHORT_SHA}\` (\`${GITHUB_REF_NAME}\`)."
+            echo ""
+            echo "Run: ${RUN_URL}"
+            echo ""
+            echo "**Failed jobs**"
+            echo ""
+            if [ -n "$FAILED_JOBS" ]; then echo "$FAILED_JOBS"; else echo "- (tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT})"; fi
+            echo ""
+            echo "$GRID"
+          } > "$BODY_FILE"
+
+          if [ -n "$ISSUE" ]; then
+            gh issue comment "$ISSUE" --body-file "$BODY_FILE"
+            echo "Commented on tracking issue #${ISSUE}"
+          else
+            gh issue create --label "$LABEL" \
+              --title "Compatibility matrix failing on ${GITHUB_REF_NAME}" \
+              --body-file "$BODY_FILE"
+          fi
+
+  #############################################
+  # Single aggregate gate (release PRs)
+  #############################################
+  # One stable check name to mark as required on the `main` ruleset, instead of
+  # ~30 per-leg names. Every leg gates (SOFT_FAIL_DBS is empty, Oracle
+  # included), so this passes only when the planner, every engine x database
+  # leg, and RustCFML all succeeded.
+  #
+  # On pull_request (release PRs into main) the plan is always the full matrix
+  # (dispatch inputs are blank), and both jobs must be `success`. A skipped job
+  # there means legs did not run, so it fails. Only a narrowed workflow_dispatch
+  # may legitimately skip `tests` or `rustcfml`; skipped is accepted there.
+  matrix-gate:
+    name: Compatibility Matrix Gate
+    needs: [plan, tests, rustcfml]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require every leg to pass
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PLAN_RESULT: ${{ needs.plan.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          RUSTCFML_RESULT: ${{ needs.rustcfml.result }}
+        run: |
+          echo "event: ${EVENT_NAME}; plan: ${PLAN_RESULT}, tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT}"
+          ok() {
+            [ "$1" = "success" ] && return 0
+            [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$1" = "skipped" ] && return 0
+            return 1
+          }
+          if [ "$PLAN_RESULT" != "success" ] || ! ok "$TESTS_RESULT" || ! ok "$RUSTCFML_RESULT"; then
+            echo "::error::Compatibility matrix is not green (plan: ${PLAN_RESULT}, tests: ${TESTS_RESULT}, rustcfml: ${RUSTCFML_RESULT})"
+            exit 1
+          fi
+          echo "Compatibility matrix green."

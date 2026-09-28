@@ -63,7 +63,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("binds multiple gap-numbered positionals in numeric index order", () => {
 					var spec = new cli.lucli.services.ArgSpec()
 						.positional(name = "first")
-						.positional(name = "second");
+						.positional(name = "second")
+						.flag(name = "force");
 					var out = spec.parse({"arg2": "a", "arg5": "b", "force": "true"});
 					expect(out.first).toBe("a");
 					expect(out.second).toBe("b");
@@ -74,6 +75,73 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						.positional(name = "appName", required = true);
 					var out = spec.parse({"arg3": "blog"});
 					expect(out.appName).toBe("blog");
+				});
+
+			});
+
+			describe("parse() — positionals passed by name (the MCP call shape, ##2963)", () => {
+
+				// LuCLI's MCP server hands tools/call arguments to the module as
+				// NAMED keys — {subcommand: "status"} arrives as subcommand=status,
+				// never arg1 — because toInputSchema() advertises positionals as
+				// named properties. Without a by-name fallback every advertised
+				// positional was silently ignored over MCP.
+
+				it("binds a positional from its named key when no arg<N> is present", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "type", default = "resource")
+						.positional(name = "name", default = "");
+					var out = spec.parse({"type": "model", "name": "Post"});
+					expect(out.type).toBe("model");
+					expect(out.name).toBe("Post");
+				});
+
+				it("satisfies a required positional from its named key", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "appName", required = true);
+					var out = spec.parse({"appName": "blog"});
+					expect(out.appName).toBe("blog");
+				});
+
+				it("prefers a typed positional token over a same-named key", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all");
+					var out = spec.parse({"arg1": "models", "target": "views"});
+					expect(out.target).toBe("models");
+				});
+
+				it("fills only the positionals the tokens left unbound", () => {
+					// arg1 binds the first positional; the second comes by name.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "subcommand", default = "list")
+						.positional(name = "target", default = "");
+					var out = spec.parse({"arg1": "show", "target": "wheels-auth"});
+					expect(out.subcommand).toBe("show");
+					expect(out.target).toBe("wheels-auth");
+				});
+
+				it("coerces a named positional to its declared type", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "count", default = 0, type = "numeric");
+					var out = spec.parse({"count": "7"});
+					expect(out.count).toBe(7);
+				});
+
+				it("rejects a bare flag (name=true) for a string positional instead of using the default", () => {
+					// `wheels destroy --name` arrives as name=true. Falling back to
+					// the default is dangerous: MCP migrate {action: "true"} became
+					// the default action `latest` and would run migrations.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "action", default = "latest");
+					expect(() => spec.parse({"action": "true"})).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => spec.parse({"action": true})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("ignores a non-simple named value and keeps the default", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all");
+					var out = spec.parse({"target": {nested: true}});
+					expect(out.target).toBe("all");
 				});
 
 			});
@@ -141,10 +209,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			describe("parse() — unknown keys", () => {
 
-				it("ignores keys in coll that the spec did not declare", () => {
+				it("ignores undeclared keys only when the caller opts out of strict parsing", () => {
+					// Strict (the default) rejects them; see "strict parse" below (##2963).
 					var spec = new cli.lucli.services.ArgSpec()
 						.flag(name = "sqlite", default = true);
-					var out = spec.parse({sqlite: "false", mystery: "value"});
+					var out = spec.parse({sqlite: "false", mystery: "value"}, false);
 					expect(out.sqlite).toBeFalse();
 					expect(structKeyExists(out, "mystery")).toBeFalse();
 				});
@@ -350,6 +419,167 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var schema = new cli.lucli.services.ArgSpec().toInputSchema();
 					expect(structIsEmpty(schema.properties)).toBeTrue();
 					expect(arrayLen(schema.required)).toBe(0);
+				});
+
+			});
+
+			describe("booleans and bare flags must be real values, never a silent default (##2963)", () => {
+
+				it("accepts true/false in every shape LuCLI and MCP deliver", () => {
+					var spec = new cli.lucli.services.ArgSpec().flag(name = "strict", default = false);
+					expect(spec.parse({"strict": true}).strict).toBeTrue();
+					expect(spec.parse({"strict": "true"}).strict).toBeTrue();
+					expect(spec.parse({"strict": false}).strict).toBeFalse();
+					expect(spec.parse({"strict": "false"}).strict).toBeFalse();
+					expect(spec.parse({"strict": "FALSE"}).strict).toBeFalse();
+				});
+
+				it("rejects a non-boolean value for a flag instead of reading it as false", () => {
+					// upgrade apply {strict: "bogus"} coerced to false and reached
+					// the framework swap.
+					var spec = new cli.lucli.services.ArgSpec().flag(name = "strict", default = false);
+					expect(() => spec.parse({"strict": "bogus"})).toThrow(type = "Wheels.InvalidArguments", regex = "strict");
+					expect(() => spec.parse({"strict": "1"})).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => spec.parse({"strict": ""})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("treats a key present with a NULL value as no value, never as omitted", () => {
+					// The stdio MCP transport turns "" into null. structKeyExists()
+					// is false for a null value, so migrate {action: null} fell back
+					// to the default action `latest`.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "action", default = "latest")
+						.flag(name = "force", default = false);
+					var withNullPositional = createObject("java", "java.util.HashMap").init();
+					withNullPositional.put("action", javaCast("null", ""));
+					expect(() => spec.parse(withNullPositional)).toThrow(type = "Wheels.InvalidArguments", regex = "action");
+					var withNullFlag = createObject("java", "java.util.HashMap").init();
+					withNullFlag.put("force", javaCast("null", ""));
+					expect(() => spec.parse(withNullFlag)).toThrow(type = "Wheels.InvalidArguments", regex = "force");
+					var withNullToken = createObject("java", "java.util.HashMap").init();
+					withNullToken.put("arg1", javaCast("null", ""));
+					expect(() => spec.parse(withNullToken)).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("rejects a bare flag (key=true) given to a string option", () => {
+					// `--to` with no value arrives as to=true.
+					var spec = new cli.lucli.services.ArgSpec().option(name = "to", default = "");
+					expect(() => spec.parse({"to": "true"})).toThrow(type = "Wheels.InvalidArguments");
+					expect(() => spec.parse({"to": true})).toThrow(type = "Wheels.InvalidArguments");
+					expect(spec.parse({"to": "4.1.0"}).to).toBe("4.1.0");
+				});
+
+			});
+
+			describe("strict parse — the schema's additionalProperties:false is enforced (##2963)", () => {
+
+				it("rejects an undeclared named key, naming it", () => {
+					var spec = new cli.lucli.services.ArgSpec().option(name = "format", default = "text");
+					expect(() => spec.parse({"formt": "json"})).toThrow(type = "Wheels.InvalidArguments", regex = "formt");
+				});
+
+				it("accepts tokens, declared keys, positional names, accept()ed keys and the global offline", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "")
+						.option(name = "format", default = "text")
+						.accept("backup");
+					var out = spec.parse({"arg1": "x", "format": "json", "backup": "false", "offline": "true"});
+					expect(out.target).toBe("x");
+					expect(out.format).toBe("json");
+					expect(spec.parse({"target": "y"}).target).toBe("y");
+				});
+
+				it("does not advertise accept()ed keys in the schema", () => {
+					var schema = new cli.lucli.services.ArgSpec().option(name = "format").accept("backup").toInputSchema();
+					expect(schema.properties).notToHaveKey("backup");
+					expect(schema.properties).notToHaveKey("offline");
+				});
+
+				it("allows unknown keys only when a caller opts out with strict=false", () => {
+					var spec = new cli.lucli.services.ArgSpec().positional(name = "type");
+					expect(spec.parse({"type": "app", "port": "3000"}, false).type).toBe("app");
+				});
+
+				it("rejects a NULL value for an undeclared key too", () => {
+					// upgrade read the undeclared dry-run raw; {dry-run: null} from the
+					// MCP transport counted as absent and apply ran.
+					var spec = new cli.lucli.services.ArgSpec().accept("dry-run");
+					var coll = createObject("java", "java.util.HashMap").init();
+					coll.put("dry-run", javaCast("null", ""));
+					expect(() => spec.parse(coll)).toThrow(type = "Wheels.InvalidArguments", regex = "dry-run");
+					var lenientColl = createObject("java", "java.util.HashMap").init();
+					lenientColl.put("anything", javaCast("null", ""));
+					expect(() => spec.parse(lenientColl, false)).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+			});
+
+			describe("choices — one declaration drives parser rejection and schema enum (##2963)", () => {
+
+				// An invalid value for a fixed-choice parameter used to fall
+				// back silently: routes format=bogus printed the text table,
+				// seed mode=bogus generated rows.
+
+				it("accepts a positional token that is one of the choices, case-insensitively", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all", choices = "all,models,views");
+					expect(spec.parse({"arg1": "Models"}).target).toBe("Models");
+				});
+
+				it("rejects a positional token outside the choices", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all", choices = "all,models,views");
+					expect(() => spec.parse({"arg1": "bogus"})).toThrow(type = "Wheels.InvalidArguments", regex = "all, models, views");
+				});
+
+				it("rejects a positional passed by name outside the choices", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "target", default = "all", choices = "all,models,views");
+					expect(() => spec.parse({"target": "bogus"})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("rejects an option value outside the choices", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.option(name = "format", default = "text", choices = "text,json");
+					expect(spec.parse({"format": "json"}).format).toBe("json");
+					expect(() => spec.parse({"format": "bogus"})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("rejects a bare flag given to a choice option (format=true)", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.option(name = "format", default = "text", choices = "text,json");
+					expect(() => spec.parse({"format": "true"})).toThrow(type = "Wheels.InvalidArguments");
+				});
+
+				it("does not validate defaults or an explicit empty value", () => {
+					// db's subcommand defaults to "" (print usage), which is not a choice.
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "subcommand", default = "", choices = "reset,status,version");
+					expect(spec.parse({}).subcommand).toBe("");
+					expect(spec.parse({"subcommand": ""}).subcommand).toBe("");
+				});
+
+				it("emits the choices as a JSON Schema enum", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.option(name = "format", default = "text", choices = "text,json")
+						.toInputSchema();
+					expect(schema.properties.format.enum).toBe(["text", "json"]);
+					expect(schema.properties.format["default"]).toBe("text");
+				});
+
+				it("omits a default that is not one of the choices", () => {
+					var schema = new cli.lucli.services.ArgSpec()
+						.positional(name = "subcommand", default = "", choices = "reset,status,version")
+						.toInputSchema();
+					expect(schema.properties.subcommand.enum).toBe(["reset", "status", "version"]);
+					expect(schema.properties.subcommand).notToHaveKey("default");
+				});
+
+				it("exposes the declared choices so a caller can validate a value it binds itself", () => {
+					var spec = new cli.lucli.services.ArgSpec()
+						.positional(name = "type", choices = "resource,model");
+					expect(spec.choicesFor("type")).toBe(["resource", "model"]);
+					expect(spec.choicesFor("undeclared")).toBe([]);
 				});
 
 			});

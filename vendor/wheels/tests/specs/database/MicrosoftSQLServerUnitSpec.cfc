@@ -217,6 +217,113 @@ component extends="wheels.WheelsTest" {
 					expect(ArrayToList(probe.capturedSql, " ")).notToInclude("@@IDENTITY");
 				});
 			});
+
+			// #3647: an INSERT that supplies its own identity value needs IDENTITY_INSERT.
+			// The live behaviour is covered by model/explicitIdentityInsertSpec on the
+			// sqlserver legs; these pin the statement on every leg.
+			describe("$identityInsertSQL", () => {
+
+				it("leaves an INSERT that does not supply the primary key unchanged", () => {
+					var sql = [
+						"INSERT INTO [c_o_r_e_refparents] (", "[name]", ")",
+						" VALUES (", {value = "Generated", type = "cf_sql_varchar"}, ")"
+					];
+					var wrapped = adapter.$identityInsertSQL(sql = sql, primaryKey = "id");
+					expect(ArrayLen(wrapped)).toBe(6);
+					expect(wrapped[1]).toBe("INSERT INTO [c_o_r_e_refparents] (");
+				});
+
+				it("wraps an INSERT that supplies the primary key in a guarded ON/OFF pair", () => {
+					var sql = [
+						"INSERT INTO [c_o_r_e_refparents] (", "[id]", ",", "[name]", ")",
+						" VALUES (", {value = 41, type = "cf_sql_integer"}, ",", {value = "Explicit", type = "cf_sql_varchar"}, ")"
+					];
+					var wrapped = adapter.$identityInsertSQL(sql = sql, primaryKey = "id");
+
+					// One statement: the prefix, the untouched INSERT, the suffix.
+					expect(ArrayLen(wrapped)).toBe(12);
+					expect(wrapped[2]).toBe("INSERT INTO [c_o_r_e_refparents] (");
+
+					// ON only when the supplied key really is the table's identity column:
+					// SET IDENTITY_INSERT on a table without one is an error.
+					expect(wrapped[1]).toInclude("sys.identity_columns");
+					expect(wrapped[1]).toInclude("OBJECT_ID(N'[c_o_r_e_refparents]')");
+					expect(wrapped[1]).toInclude("name IN (N'id')");
+					expect(wrapped[1]).toInclude("SET IDENTITY_INSERT [c_o_r_e_refparents] ON");
+
+					// The OFF rides in the same batch, so it shares the connection.
+					expect(wrapped[12]).toInclude("SET IDENTITY_INSERT [c_o_r_e_refparents] OFF");
+				});
+
+				it("only names the primary-key columns the INSERT supplies", () => {
+					var sql = [
+						"INSERT INTO [c_o_r_e_combikeys] (", "[id1]", ",", "[userId]", ")",
+						" VALUES (", {value = 1, type = "cf_sql_integer"}, ",", {value = 2, type = "cf_sql_integer"}, ")"
+					];
+					var wrapped = adapter.$identityInsertSQL(sql = sql, primaryKey = "ID1,id2");
+					expect(wrapped[1]).toInclude("name IN (N'ID1')");
+					expect(wrapped[1]).notToInclude("id2");
+				});
+
+				it("escapes single quotes in the identifiers it embeds as literals", () => {
+					var sql = [
+						"INSERT INTO [odd'table] (", "[o'id]", ")",
+						" VALUES (", {value = 1, type = "cf_sql_integer"}, ")"
+					];
+					var wrapped = adapter.$identityInsertSQL(sql = sql, primaryKey = "o'id");
+					expect(wrapped[1]).toInclude("OBJECT_ID(N'[odd''table]')");
+					expect(wrapped[1]).toInclude("name IN (N'o''id')");
+				});
+
+				it("leaves an INSERT with no column list unchanged", () => {
+					var sql = ["INSERT INTO [c_o_r_e_refparents] DEFAULT VALUES"];
+					var wrapped = adapter.$identityInsertSQL(sql = sql, primaryKey = "id");
+					expect(ArrayLen(wrapped)).toBe(1);
+				});
+			});
+
+			describe("$querySetup explicit identity insert", () => {
+
+				it("wraps an INSERT whose column list carries the primary key", () => {
+					var probe = CreateObject("component", "wheels.tests._assets.adapters.MSSQLProbe");
+					var out = probe.$querySetup(
+						sql = ["INSERT INTO [users] (", "[id]", ",", "[firstname]", ")", " VALUES (41, 'x')"],
+						limit = 0,
+						offset = 0,
+						parameterize = true,
+						$primaryKey = "id"
+					);
+					expect(out.sql[1]).toInclude("SET IDENTITY_INSERT [users] ON");
+					expect(out.sql[ArrayLen(out.sql)]).toInclude("SET IDENTITY_INSERT [users] OFF");
+				});
+
+				it("does not also append SCOPE_IDENTITY() on BoxLang, since the key is already known", () => {
+					var probe = CreateObject("component", "wheels.tests._assets.adapters.MSSQLProbe");
+					probe.boxlangMode = true;
+					var out = probe.$querySetup(
+						sql = ["INSERT INTO [users] (", "[id]", ",", "[firstname]", ")", " VALUES (41, 'x')"],
+						limit = 0,
+						offset = 0,
+						parameterize = true,
+						$primaryKey = "id"
+					);
+					expect(ArrayToList(out.sql, " ")).notToInclude("SCOPE_IDENTITY");
+					expect(out.sql[ArrayLen(out.sql)]).toInclude("SET IDENTITY_INSERT [users] OFF");
+				});
+
+				it("ignores statements without a primary-key hint (the bulk paths)", () => {
+					var probe = CreateObject("component", "wheels.tests._assets.adapters.MSSQLProbe");
+					var out = probe.$querySetup(
+						sql = ["INSERT INTO [users] (", "[id]", ",", "[firstname]", ")", " VALUES (41, 'x'), (42, 'y')"],
+						limit = 0,
+						offset = 0,
+						parameterize = true,
+						$primaryKey = ""
+					);
+					expect(ArrayLen(out.sql)).toBe(6);
+					expect(ArrayToList(out.sql, " ")).notToInclude("IDENTITY_INSERT");
+				});
+			});
 		});
 	}
 

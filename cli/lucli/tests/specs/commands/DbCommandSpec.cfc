@@ -15,7 +15,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// subcommands deterministically throw Wheels.ServerNotRunning in
 		// every environment (a local dev server on 8080 would otherwise
 		// answer the common-port fallback and flip these assertions).
-		fileWrite(tempRoot & "/.env", "PORT=1" & chr(10));
+		// PORT=1 alone is not "no server": read-side discovery still scans the
+		// common ports and finds a live server on 8080 (CI). Opt out (##3693).
+		fileWrite(tempRoot & "/.env", "PORT=1" & chr(10) & "WHEELS_SERVER_FALLBACK=false" & chr(10));
 
 		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 	}
@@ -80,6 +82,26 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				} catch (any e) {
 					expect(e.type).toBe("Wheels.ServerNotRunning");
 				}
+			});
+
+		});
+
+		describe("wheels db — named arguments (the MCP call shape, ##2963)", () => {
+
+			it("routes a named subcommand with a native boolean flag", () => {
+				expect(() => mod.db(arg1 = "status", pending = true)).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+			it("reads a named subcommand when no positional is present", () => {
+				// An MCP client sends every schema property by name, so the
+				// subcommand can arrive as `subcommand=` rather than arg1.
+				expect(() => mod.db(subcommand = "version", detailed = true)).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+			it("does not reset without force, even when other flags are passed", () => {
+				// reset without --force must print its warning and change
+				// nothing — it returns before the migration/server step.
+				expect(mod.db(arg1 = "reset", force = false, "skip-seed" = true)).toBe("");
 			});
 
 		});

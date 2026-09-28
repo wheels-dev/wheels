@@ -162,7 +162,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("reads --mode", () => {
-				expect(probe.$parseSeedArgs({mode: "development"}).mode).toBe("development");
+				expect(probe.$parseSeedArgs({mode: "convention"}).mode).toBe("convention");
+			});
+
+			it("rejects a --mode outside auto/convention/generate (##2963)", () => {
+				// An unknown mode fell through to auto and generated rows.
+				expect(() => probe.$parseSeedArgs({mode: "development"})).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 			it("maps --generate to mode=generate", () => {
@@ -201,6 +206,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(o.hasTarget).toBeTrue();
 			});
 
+			it("rejects an unknown target instead of silently analyzing everything (##2963)", () => {
+				expect(() => probe.$parseAnalyzeArgs({target: "bogus"})).toThrow(type = "Wheels.InvalidArguments");
+				expect(() => probe.$parseAnalyzeArgs({arg1: "Bogus"})).toThrow(type = "Wheels.InvalidArguments");
+			});
+
+			it("reads target by name, the MCP call shape (##2963)", () => {
+				// LuCLI's MCP server passes {target: "..."} as a named key; the
+				// target used to be ignored and `all` analyzed instead.
+				var o = probe.$parseAnalyzeArgs({target: "Models"});
+				expect(o.target).toBe("models");
+				expect(o.hasTarget).toBeTrue();
+			});
+
 		});
 
 		describe("parseVerboseFlag (doctor / stats — named-only fix + -v preserved)", () => {
@@ -234,9 +252,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("detects the --dry-run and --to misfires for the nudge", () => {
-				var o = probe.$parseUpgradeArgs({arg1: "oops", "dry-run": "true", to: "4.0.0"});
+				var o = probe.$parseUpgradeArgs({arg1: "apply", "dry-run": "true", to: "4.0.0"});
 				expect(o.sawDryRun).toBeTrue();
 				expect(o.sawTo).toBeTrue();
+			});
+
+			it("rejects any key present with a NULL value before deciding anything (##2963)", () => {
+				// The stdio transport turns {"dry-run": ""} into dry-run=null.
+				// dry-run is undeclared and structKeyExists() is false for a
+				// null value, so it counted as "not passed" and apply ran.
+				for (var key in ["dry-run", "backup", "help", "strict"]) {
+					var coll = createObject("java", "java.util.HashMap").init();
+					coll.put("subcommand", "apply");
+					coll.put(key, javaCast("null", ""));
+					expect(() => probe.$parseUpgradeArgs(coll)).toThrow(type = "Wheels.InvalidArguments", regex = key);
+				}
+			});
+
+			it("treats explicit false/empty values as not passed (MCP sends schema defaults, ##2963)", () => {
+				// sawX used key presence, so apply {strict: false} was refused
+				// as "--strict is not supported by the apply verb".
+				var o = probe.$parseUpgradeArgs({arg1: "apply", strict: false, "dry-run": "false", format: "", to: ""});
+				expect(o.sawStrict).toBeFalse();
+				expect(o.sawDryRun).toBeFalse();
+				expect(o.sawFormat).toBeFalse();
+				expect(o.sawTo).toBeFalse();
 			});
 
 			it("reads --format=json for machine-readable CI output", () => {
@@ -285,6 +325,44 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(o.force).toBeTrue();
 			});
 
+			it("reads type and name by name, the MCP call shape (##2963)", () => {
+				// {type: "model", name: "User"} arrives as named keys over MCP;
+				// both were ignored and destroy printed its usage instead.
+				var o = probe.$parseDestroyArgs({type: "model", name: "User"});
+				expect(o.type).toBe("model");
+				expect(o.name).toBe("User");
+				expect(o.positionalCount).toBe(2);
+			});
+
+			it("defaults a named-only name to type resource, like the one-token CLI form", () => {
+				var o = probe.$parseDestroyArgs({name: "User"});
+				expect(o.type).toBe("resource");
+				expect(o.name).toBe("User");
+				expect(o.positionalCount).toBe(1);
+			});
+
+			it("treats a named type without a name as no target (shows usage)", () => {
+				// Never let {type: "model"} become a resource NAMED "model".
+				expect(probe.$parseDestroyArgs({type: "model"}).positionalCount).toBe(0);
+			});
+
+			it("keeps named values in place instead of running the legacy reorder", () => {
+				// The reorder guesses which token is the type; named keys say so.
+				var o = probe.$parseDestroyArgs({type: "view", name: "model"});
+				expect(o.name).toBe("model");
+				expect(o.type).toBe("view");
+			});
+
+			it("rejects a named type outside the choices (##2963)", () => {
+				expect(() => probe.$parseDestroyArgs({type: "bogus", name: "User"})).toThrow(type = "Wheels.InvalidArguments");
+			});
+
+			it("prefers typed positional tokens over named keys", () => {
+				var o = probe.$parseDestroyArgs({arg1: "controller", arg2: "Posts", type: "model", name: "User"});
+				expect(o.type).toBe("controller");
+				expect(o.name).toBe("Posts");
+			});
+
 		});
 
 		describe("parseConsoleArgs (named-only — previously dropped)", () => {
@@ -307,6 +385,40 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		});
 
 		describe("parseTestArgs", () => {
+
+			it("reads --test-timeout, the terminal spelling that works on every LuCLI runtime (##3678)", () => {
+				expect(probe.$parseTestArgs({"test-timeout": "45"}).timeout).toBe(45);
+				expect(probe.$parseTestArgs({"test-timeout": "45"}).timeoutWarning).toBe("");
+			});
+
+			it("prefers --test-timeout over timeout when both are given", () => {
+				expect(probe.$parseTestArgs({"test-timeout": "45", "timeout": "60"}).timeout).toBe(45);
+			});
+
+			it("warns instead of throwing a cast error for a non-simple --test-timeout", () => {
+				var o = probe.$parseTestArgs({"test-timeout": {nested: 1}});
+				expect(o.timeout).toBe(900);
+				expect(len(o.timeoutWarning)).toBeGT(0);
+			});
+
+			it("warns and falls back for a junk --test-timeout, like timeout", () => {
+				var o = probe.$parseTestArgs({"test-timeout": "soon"});
+				expect(o.timeout).toBe(900);
+				expect(o.timeoutWarning).toInclude('"soon"');
+			});
+
+			it("carries a warning for a non-numeric timeout instead of dropping it silently", () => {
+				var o = probe.$parseTestArgs({timeout: "soon"});
+				expect(o.timeout).toBe(900);
+				expect(o.timeoutWarning).toInclude('"soon"');
+				expect(probe.$parseTestArgs({timeout: "60"}).timeoutWarning).toBe("");
+			});
+
+			it("lower-cases --db, since the core runner matches its dialect list case-sensitively", () => {
+				// `--db=MySQL` passed the case-insensitive choice check but the
+				// runner's listFind() missed it and used the default datasource.
+				expect(probe.$parseTestArgs({db: "MySQL"}).db).toBeWithCase("mysql");
+			});
 
 			it("defaults reporter=simple, db=sqlite, format=json, flags off, useTestDB on", () => {
 				var o = probe.$parseTestArgs({});

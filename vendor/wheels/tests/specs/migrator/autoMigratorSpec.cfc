@@ -131,12 +131,20 @@ component extends="wheels.WheelsTest" {
 
 			describe("$normalizeMigTypeForDiff (SQLite text affinity, issue 3565)", () => {
 
-				it("treats text vs string as equivalent", () => {
-					expect(autoMigrator.$normalizeMigTypeForDiff("text", "string")).toBe("string");
+				// The equivalence only fires on SQLite: `$normalizeMigTypeForDiff()`
+				// is gated on `$getDBType() == "sqlite"`, because SQLite reports every
+				// text-affinity column as `text` regardless of the declared migration
+				// type. The compat matrix runs this file on every database, so assert
+				// the equivalences only where the affinity exists. Unguarded, these
+				// five specs failed on every non-SQLite leg of the matrix (#3588).
+				beforeEach(() => {
+					if (autoMigrator.$getDBType() != "sqlite") {
+						skip("SQLite text affinity does not apply to `#autoMigrator.$getDBType()#`");
+					}
 				});
 
-				it("treats text vs text as a no-op", () => {
-					expect(autoMigrator.$normalizeMigTypeForDiff("text", "text")).toBe("text");
+				it("treats text vs string as equivalent", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "string")).toBe("string");
 				});
 
 				it("treats text vs datetime as equivalent", () => {
@@ -153,6 +161,17 @@ component extends="wheels.WheelsTest" {
 
 				it("treats text vs boolean as equivalent", () => {
 					expect(autoMigrator.$normalizeMigTypeForDiff("text", "boolean")).toBe("boolean");
+				});
+
+			});
+
+			describe("$normalizeMigTypeForDiff (adapter-independent no-ops)", () => {
+
+				// These hold on every adapter: a non-text actual type is returned
+				// untouched, and a `text`/`text` pair is already equivalent, so the
+				// SQLite-only branch is not what makes them pass.
+				it("treats text vs text as a no-op", () => {
+					expect(autoMigrator.$normalizeMigTypeForDiff("text", "text")).toBe("text");
 				});
 
 				it("does NOT normalize text vs integer (not a text-affinity pair)", () => {

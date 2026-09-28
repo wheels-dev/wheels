@@ -27,43 +27,91 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("never persists a caller's miscased path", () => {
-				// The risk is an engine ECHOING BACK the path it was handed instead of
-				// deriving the name from the file: the persisted string would then carry
-				// whatever casing the caller happened to type, and that string is what a
-				// Linux worker later has to resolve.
+				// The risk is the persisted string carrying whatever casing the caller happened
+				// to type, because that string is what a Linux worker later has to resolve.
 				//
-				// Engines close that off two different ways, and either is sufficient:
-				//
-				//   Lucee/BoxLang — a miscased path RESOLVES (the filesystem is
-				//     case-insensitive here) but the metadata name comes back canonical.
-				//   Adobe         — a miscased path does not resolve AT ALL. Its component
-				//     resolver is case-sensitive independently of the filesystem, throwing
-				//     "Could not find the ColdFusion component ... probejob". Nothing can be
-				//     persisted because nothing can be constructed.
-				//
-				// Asserting only the first would fail on Adobe for a reason that is *safer*
-				// than the one being tested, so assert the property both satisfy.
+				// Whether a miscased path even constructs depends on the FILESYSTEM, not only
+				// the engine: on case-sensitive Linux every engine throws "could not find
+				// ... probejob"; on a case-insensitive one (macOS, Windows, a macOS checkout
+				// bind-mounted into Docker) it resolves. And once it resolves, Adobe 2025
+				// reports GetMetadata().name with the CALLER's casing (#3731) where Lucee and
+				// BoxLang report the file's. So this asserts the framework's persisted value
+				// — $persistableJobClass(), what enqueue() writes — not raw engine metadata.
+				// The deterministic specs below exercise the canonicalization on any filesystem.
 				local.canonical = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")).name
-				local.resolved = {miscasedConstructed = false, name = ""}
+				local.resolved = {miscasedConstructed = false, persisted = ""}
 
 				try {
-					local.resolved.name = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.probejob")).name
+					local.miscased = CreateObject("component", "wheels.tests._assets.jobs.probejob")
 					local.resolved.miscasedConstructed = true
+					local.resolved.persisted = local.miscased.$persistableJobClass()
 				} catch (any e) {
-					// case-sensitive resolver — the stronger guarantee
+					// case-sensitive filesystem — nothing can be persisted because nothing
+					// can be constructed
 				}
 
 				if (local.resolved.miscasedConstructed) {
-					expect(Compare(local.resolved.name, local.canonical)).toBe(0)
+					expect(Compare(local.resolved.persisted, local.canonical)).toBe(0)
 				} else {
-					expect(local.resolved.name).toBe("")
+					expect(local.resolved.persisted).toBe("")
 				}
 			})
 
+			it("persists the canonical name for a correctly cased instance", () => {
+				local.job = CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")
+				local.canonical = GetMetadata(local.job).name
+				expect(Compare(local.job.$persistableJobClass(), local.canonical)).toBe(0)
+			})
+		})
+
+		describe("Tests that $canonicalJobClass", () => {
+
+			it("restores the file's casing when metadata echoes a miscased path", () => {
+				// The shape Adobe reports on a case-insensitive filesystem: name AND path carry
+				// the caller's casing. The real directory exists, so its listing is authoritative.
+				local.bridge = new wheels.Job()
+				local.realPath = Replace(GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")).path, "\", "/", "all")
+				local.echoedPath = Left(local.realPath, Len(local.realPath) - Len("ProbeJob.cfc")) & "probejob.cfc"
+
+				local.rv = local.bridge.$canonicalJobClass(name = "wheels.tests._assets.jobs.probejob", path = local.echoedPath)
+
+				expect(Compare(local.rv, "wheels.tests._assets.jobs.ProbeJob")).toBe(0)
+			})
+
+			it("restores package directory casing too", () => {
+				local.bridge = new wheels.Job()
+				local.realPath = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")).path
+
+				local.rv = local.bridge.$canonicalJobClass(name = "wheels.tests._assets.JOBS.PROBEJOB", path = local.realPath)
+
+				expect(Compare(local.rv, "wheels.tests._assets.jobs.ProbeJob")).toBe(0)
+			})
+
+			it("leaves segments above a mapping boundary untouched", () => {
+				// `someMapping` does not name its directory, so the walk stops there rather
+				// than rewriting a mapping root to a directory name.
+				local.bridge = new wheels.Job()
+				local.realPath = GetMetadata(CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")).path
+
+				local.rv = local.bridge.$canonicalJobClass(name = "someMapping.jobs.probejob", path = local.realPath)
+
+				expect(Compare(local.rv, "someMapping.jobs.ProbeJob")).toBe(0)
+			})
+
+			it("returns the name unchanged when there is no usable path", () => {
+				local.bridge = new wheels.Job()
+
+				expect(Compare(local.bridge.$canonicalJobClass(name = "app.jobs.someJob", path = ""), "app.jobs.someJob")).toBe(0)
+				expect(Compare(local.bridge.$canonicalJobClass(name = "app.jobs.someJob", path = "/no/such/dir/someJob.cfc"), "app.jobs.someJob")).toBe(0)
+			})
+		})
+
+		describe("Tests that the persisted jobClass re-instantiates", () => {
+
 			it("re-instantiates from its own persisted metadata name", () => {
-				// the actual enqueue -> drain round trip, without touching the queue table
+				// the actual enqueue -> drain round trip (what enqueue() persists), without the queue table
 				local.original = CreateObject("component", "wheels.tests._assets.jobs.ProbeJob")
-				local.persisted = GetMetadata(local.original).name
+				local.persisted = local.original.$persistableJobClass()
 
 				// Hoisted receiver. A parenthesized `new` in receiver position — `(new X()).m()`
 				// — is rejected by Adobe's parser with `Invalid construct: Either argument or

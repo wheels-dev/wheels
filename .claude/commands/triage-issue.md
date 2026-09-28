@@ -99,8 +99,8 @@ below. Highlights for this command:
 
    - **`high`**: the gap is concrete (specific feature/behavior to
      document), the right page/path is clear from the issue or from
-     existing structure under
-     `web/sites/guides/src/content/docs/v4-0-0-snapshot/`, the work is
+     existing structure under the newest
+     `web/sites/guides/src/content/docs/v*/` directory, the work is
      mostly translation-of-code (not requiring deep design decisions).
    - **`medium`**: the gap is real but the right page/path is ambiguous,
      OR a new top-level section is needed (a structural design decision),
@@ -150,8 +150,8 @@ below. Highlights for this command:
 
 5. **Identify the layer (bug path only).** Pick one of: model / controller /
    view / router / middleware / migrator / cli / di / job / mailer / sse /
-   seed / config. Read the corresponding `.ai/wheels/<layer>/` doc to ground
-   your reasoning. **Do not write specs and do not run tests** — that work
+   seed / config. Ground your reasoning in that layer's source under
+   `vendor/wheels/<layer>/` and `CLAUDE.md`. **Do not write specs and do not run tests** — that work
    belongs in propose-fix. Triage's job here is to tell propose-fix which
    doc to read and roughly where the fix lives.
 
@@ -196,7 +196,7 @@ below. Highlights for this command:
 
    ### Suspected layer
 
-   `<layer>` — see `.ai/wheels/<layer>/` for canonical patterns.
+   `<layer>` — likely under `vendor/wheels/<layer>/`.
 
    ### Fix sketch
 

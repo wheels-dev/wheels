@@ -52,9 +52,13 @@
 				propertyInfo = variables.wheels.class.properties
 			);
 
+			// Nothing here reads the result or a generated key, so don't request one:
+			// on Lucee that asks the driver for generated keys, and the Oracle driver
+			// then appends a RETURNING clause Oracle rejects (#3653).
 			variables.wheels.class.adapter.$querySetup(
 				parameterize = arguments.parameterize,
-				sql = local.sql
+				sql = local.sql,
+				$captureResult = false
 			);
 
 			local.totalInserted += (local.batchEnd - local.batchStart + 1);
@@ -75,7 +79,7 @@
 	 *
 	 * @records Array of structs, each containing property name/value pairs.
 	 * @uniqueBy Comma-delimited list of property names that form the unique constraint for conflict detection.
-	 * @timestamps Set to `false` to skip automatic `createdAt`/`updatedAt` timestamping.
+	 * @timestamps Set to `false` to skip automatic `createdAt`/`updatedAt` timestamping. An auto-stamped `createdAt` is only written when a row is inserted; an existing row keeps its original value (except on H2, whose `MERGE ... KEY` rewrites every column).
 	 * @transaction [see:save].
 	 * @parameterize [see:findAll].
 	 */
@@ -93,6 +97,21 @@
 		}
 
 		$validateBulkRecordKeys(arguments.records);
+
+		// When the framework (not the caller) supplies the create timestamp, its column must stay out of
+		// the conflict-update list below, otherwise an upsert that hits an existing row overwrites that
+		// row's original createdAt with now. A createdAt the caller put in the records is written as given.
+		local.excludeColumns = [];
+		if (
+			arguments.timestamps
+			&& variables.wheels.class.timeStampingOnCreate
+			&& !StructKeyExists(arguments.records[1], variables.wheels.class.timeStampOnCreateProperty)
+		) {
+			ArrayAppend(
+				local.excludeColumns,
+				variables.wheels.class.properties[variables.wheels.class.timeStampOnCreateProperty].column
+			);
+		}
 
 		if (arguments.timestamps) {
 			arguments.records = $addBulkTimestamps(records = arguments.records, isInsert = true);
@@ -115,12 +134,21 @@
 			ArrayAppend(local.uniqueByColumns, variables.wheels.class.properties[local.uProp].column);
 		}
 
-		// Update columns = all columns except the unique constraint columns.
+		// Update columns = all columns except the unique constraint columns and an auto-added createdAt.
 		local.updateColumns = [];
 		for (local.c = 1; local.c <= ArrayLen(local.mapped.columns); local.c++) {
-			if (!ArrayFindNoCase(local.uniqueByColumns, local.mapped.columns[local.c])) {
+			if (
+				!ArrayFindNoCase(local.uniqueByColumns, local.mapped.columns[local.c])
+				&& !ArrayFindNoCase(local.excludeColumns, local.mapped.columns[local.c])
+			) {
 				ArrayAppend(local.updateColumns, local.mapped.columns[local.c]);
 			}
+		}
+		// Excluding createdAt must never leave the conflict clause empty (e.g. a model that stamps only
+		// createdAt, upserting records that carry nothing but the uniqueBy columns): several adapters then
+		// emit no update clause and a conflict raises a duplicate-key error. Keep the prior behaviour there.
+		if (!ArrayLen(local.updateColumns) && ArrayLen(local.excludeColumns)) {
+			local.updateColumns = local.excludeColumns;
 		}
 
 		// Batch in groups of 1000 rows.
@@ -143,9 +171,11 @@
 				propertyInfo = variables.wheels.class.properties
 			);
 
+			// Same as insertAll(): no result or generated key is read (#3653).
 			variables.wheels.class.adapter.$querySetup(
 				parameterize = arguments.parameterize,
-				sql = local.sql
+				sql = local.sql,
+				$captureResult = false
 			);
 
 			local.totalUpserted += (local.batchEnd - local.batchStart + 1);

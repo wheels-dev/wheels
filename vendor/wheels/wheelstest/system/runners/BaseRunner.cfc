@@ -53,10 +53,10 @@ component {
 
 		// verify we have some?
 		if ( arrayLen( testSpecs ) ) {
-			// Test by id first
-			return ( arrayFindNoCase( testSpecs, arguments.spec.id ) ? true : false );
-			// Test by name second
-			return ( arrayFindNoCase( testSpecs, arguments.spec.name ) ? true : false );
+			// Both IDs and names are valid selectors. Do not return a failed
+			// ID match before checking the spec name.
+			return arrayFindNoCase( testSpecs, arguments.spec.id ) > 0
+				|| arrayFindNoCase( testSpecs, arguments.spec.name ) > 0;
 		}
 
 		// we can run it.

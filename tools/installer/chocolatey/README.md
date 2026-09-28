@@ -43,13 +43,9 @@ Output: `lucli.<version>.nupkg`
 
 ## Publishing
 
-The GitHub Actions workflow `publish-chocolatey.yml` handles automated publishing:
-
-1. Go to Actions > "Publish Chocolatey Package"
-2. Enter the LuCLI version to package
-3. The workflow downloads the release, computes checksums, builds, and pushes to Chocolatey
-
-Requires the `CHOCOLATEY_API_KEY` repository secret.
+Chocolatey is a retired channel (#2761): there is no publishing workflow. The
+`publish-chocolatey.yml` workflow that used to push this package was removed.
+Windows users install through Scoop.
 
 ## File structure
 

@@ -24,6 +24,10 @@ component extends="Base" {
 	 *
 	 */
 	public void function up() {
+		// The placeholder for a migration that never declares its own up().
+		// The migrator leaves only this inherited body untracked, detected by
+		// declaration (Migrator.$migrationStepIsPlaceholder, #3402 B1), so a
+		// migration's own up() that calls super.up() is still recorded.
 		announce("UP MIGRATION NOT IMPLEMENTED");
 	}
 
@@ -37,6 +41,7 @@ component extends="Base" {
 	 *
 	 */
 	public void function down() {
+		// See up(): only this inherited placeholder keeps its tracking row.
 		announce("DOWN MIGRATION NOT IMPLEMENTED");
 	}
 
@@ -112,8 +117,10 @@ component extends="Base" {
 	 * [category: Migration Functions]
 	 *
 	 * @name Name of the table to drop
+	 * @tableName Alias for `name` (the form `wheels destroy` generated before 4.1.1). Pass one or the other — not both.
 	 */
-	public void function dropTable(required string name) {
+	public void function dropTable(string name, string tableName) {
+		$combineArguments(args = arguments, combine = "name,tableName", required = true);
 		local.appKey = $appKey();
 		// init() already resolved the engine — no need to re-sniff via $getDBType().
 		local.adapterName = this.adapter.adapterName();

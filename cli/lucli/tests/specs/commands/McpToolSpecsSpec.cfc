@@ -32,7 +32,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("returns a populated object schema for every ArgSpec-backed tool", () => {
 				var specs = probe.mcpToolSpecs();
 				expect(specs).toBeStruct();
-				for (var toolName in ["test", "seed", "analyze", "destroy", "notes", "upgrade", "doctor", "stats", "generate", "create"]) {
+				for (var toolName in ["test", "seed", "analyze", "destroy", "notes", "upgrade", "doctor", "stats", "generate", "create", "db", "packages", "reload"]) {
 					expect(specs).toHaveKey(toolName, "Expected an inputSchema entry for the `#toolName#` tool.");
 					expect(specs[toolName].type).toBe("object");
 					expect(structCount(specs[toolName].properties)).toBeGT(
@@ -69,6 +69,60 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(schema.properties).toHaveKey("format");
 			});
 
+			it("advertises db's subcommand and every per-subcommand flag", () => {
+				// `db` parsed raw argv by hand, so it advertised an empty schema
+				// and an MCP client could not pass `reset --force` at all.
+				var schema = probe.mcpToolSpecs().db;
+				for (var key in ["subcommand", "force", "skip-seed", "pending", "detailed", "offline"]) {
+					expect(schema.properties).toHaveKey(key);
+				}
+				expect(schema.properties.force.type).toBe("boolean");
+				expect(schema.properties.force["default"]).toBeFalse();
+			});
+
+			it("advertises packages' verb, target, tag, and confirmation flags", () => {
+				var schema = probe.mcpToolSpecs().packages;
+				for (var key in ["subcommand", "target", "tag", "all", "yes", "force", "offline"]) {
+					expect(schema.properties).toHaveKey(key);
+				}
+				expect(schema.properties.subcommand["default"]).toBe("list");
+				expect(schema.properties.yes.type).toBe("boolean");
+			});
+
+			it("advertises reload's password override", () => {
+				// reload reads an optional --password (overriding the one it
+				// auto-detects from .env / config), so an empty schema was wrong.
+				var schema = probe.mcpToolSpecs().reload;
+				expect(schema.properties).toHaveKey("password");
+				expect(schema.properties.password.type).toBe("string");
+			});
+
+			it("never advertises a `help` or `h` property (LuCLI intercepts the key)", () => {
+				// LuCLI's MCP server treats ANY `help` key as a help request and
+				// prints the global CLI help instead of running the tool. MCP
+				// clients send schema defaults, so an advertised help=false
+				// silently disabled `packages` (##2963).
+				var specs = probe.mcpToolSpecs();
+				for (var toolName in specs) {
+					expect(specs[toolName].properties).notToHaveKey("help", "#toolName# advertises `help`");
+					expect(specs[toolName].properties).notToHaveKey("h", "#toolName# advertises `h`");
+				}
+			});
+
+			it("keeps timeout, not the terminal-only --test-timeout, in the test schema (##3678)", () => {
+				var props = probe.mcpToolSpecs().test.properties;
+				expect(props).toHaveKey("timeout");
+				expect(props).notToHaveKey("test-timeout");
+			});
+
+			it("leaves the argument-free tools out of the registry", () => {
+				// info and validate read no arguments, so the runtime's empty
+				// schema is accurate for them.
+				var specs = probe.mcpToolSpecs();
+				expect(specs).notToHaveKey("info");
+				expect(specs).notToHaveKey("validate");
+			});
+
 			it("describes every property so MCP clients see usable parameter docs", () => {
 				var specs = probe.mcpToolSpecs();
 				for (var toolName in specs) {
@@ -95,6 +149,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(variables.moduleSource).toInclude("testArgSpec().parse(");
 				expect(variables.moduleSource).toInclude("seedArgSpec().parse(");
 				expect(variables.moduleSource).toInclude("upgradeArgSpec().parse(");
+				expect(variables.moduleSource).toInclude("dbArgSpec().parse(");
+				expect(variables.moduleSource).toInclude("packagesArgSpec().parse(");
+				// reload and console share one --password declaration.
+				expect(variables.moduleSource).toInclude("reloadPasswordSpec().parse(");
 			});
 
 		});

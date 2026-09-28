@@ -55,7 +55,7 @@ That runs a single MCP method and exits — useful for smoke-testing without ope
 
 ## Tools exposed
 
-Every public function in the Wheels Module is auto-discovered as an MCP tool. Names in `tools/list` are the bare function names — 18 tools on a 4.0.3 install:
+Every public function in the Wheels Module is auto-discovered as an MCP tool. Names in `tools/list` are the bare function names — 17 tools (4.1.0 and earlier also list `deploy`; see below):
 
 | Tool | Purpose |
 |---|---|
@@ -63,7 +63,7 @@ Every public function in the Wheels Module is auto-discovered as an MCP tool. Na
 | `destroy` | Remove a previously generated component. The default `resource` type cascades (model + controller + views + tests + route + drop-table migration); `model`, `controller`, and `view` are scoped to that artefact only. |
 | `migrate` | Run, roll back, or inspect database migrations. |
 | `seed` | Run convention-based seeds against the configured environment. |
-| `db` | Database utility operations (schema, reset, status). |
+| `db` | Database utility operations: `reset` (migrate, then reseed), `status`, and `version`. |
 | `test` | Run the app or core test suite and return results. |
 | `reload` | Reload the app via the running dev server. |
 | `routes` | List registered routes. |
@@ -75,7 +75,6 @@ Every public function in the Wheels Module is auto-discovered as an MCP tool. Na
 | `notes` | Surface `TODO`, `FIXME`, `HACK`, `OPTIMIZE` annotations from the codebase. |
 | `create` | Create an application (currently only `wheels create app <name>`; forwards to `wheels new`). |
 | `upgrade` | Scan the project for breaking changes (`check`, read-only) or swap `vendor/wheels/` to a newer release (`apply`, writes with a backup). |
-| `deploy` | Kamal-style production deploys (full deploy, rollback, config, setup, bootstrap, exec). |
 | `packages` | Search, show, add, update, and remove Wheels packages; manage the registry cache. |
 
 ### Tools deliberately hidden
@@ -87,6 +86,7 @@ A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenT
 - `new` — scaffolds an entire new project. Destructive and requires interactive prompts for project context.
 - `browser` — multi-step browser testing flow with its own subcommand tree.
 - `jobs` — `jobs work` is a long-lived worker poll loop with no single-call MCP semantics.
+- `deploy` — Kamal-style production deploys. It reaches remote hosts over SSH, pushes images, and restarts containers, so its side effects land outside your machine. Run it from a terminal. (4.1.0 and earlier still list it as a tool.)
 - `mcpToolSpecs` — the per-tool inputSchema registry LuCLI reads; not itself a tool.
 - `mcp` — the meta command itself; exposing it would let an agent recursively launch MCP servers.
 - `d` — short alias for `destroy`, excluded to avoid a duplicate tool entry (the canonical `destroy` is exposed).

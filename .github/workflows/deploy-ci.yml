@@ -10,11 +10,15 @@
 # matrix, and deploy-subsystem edits pick up an extra gate.
 #
 # Prerequisites (already present in this repo's CI):
-#   - LuCLI install recipe mirrors .github/workflows/pr.yml (cybersonic/LuCLI release).
+#   - LuCLI install recipe mirrors .github/workflows/pr.yml (tools/lucli.json pin).
 #   - Java 21 via actions/setup-java@v5.
 #
 # Gating model:
-#   1. cli-tests              - runs `tools/test-cli-local.sh`, must be 365+/0/0.
+#   1. cli-tests              - runs `tools/test-cli-local.sh` with
+#      WHEELS_CLI_TEST_STRICT=1: tools/ci/testbox_results.py walks the full
+#      result tree and fails on ANY failure or error, or on counts that don't
+#      reconcile. (Locally the default still gates only deploy bundles.)
+#      The raw result JSON is uploaded as the `cli-test-results` artifact.
 #   2. deploy-config-diff     - informational (`continue-on-error: true`).
 #      The script expects Ruby Kamal on PATH *and* a routable `wheels deploy`.
 #      Neither is wired in CI yet, so this step's exit 1 is expected and
@@ -26,47 +30,93 @@
 
 name: Deploy Subsystem CI
 
+# No workflow-level `paths:` filter: the "CLI suite" job below is meant to be a
+# REQUIRED check, and a path-filtered required check leaves every unrelated PR
+# stuck at "Expected" (the failure mode documented in rustcfml-ci.yml). The
+# `changes` job decides relevance instead, and "CLI suite" always reports.
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'cli/lucli/services/deploy/**'
-      - 'cli/lucli/lib/deploy/**'
-      - 'cli/lucli/templates/deploy/**'
-      - 'cli/lucli/tests/_fixtures/deploy/**'
-      - 'cli/lucli/tests/specs/deploy/**'
-      - 'cli/lucli/tests/_helpers/DeployShellHelper.cfc'
-      - 'cli/lucli/Module.cfc'
-      - 'tools/deploy-*.sh'
-      - 'tools/deploy-dry-run-normalize.py'
-      - 'tools/test-cli-local.sh'
-      - '.github/workflows/deploy-ci.yml'
   pull_request:
-    paths:
-      - 'cli/lucli/services/deploy/**'
-      - 'cli/lucli/lib/deploy/**'
-      - 'cli/lucli/templates/deploy/**'
-      - 'cli/lucli/tests/_fixtures/deploy/**'
-      - 'cli/lucli/tests/specs/deploy/**'
-      - 'cli/lucli/tests/_helpers/DeployShellHelper.cfc'
-      - 'cli/lucli/Module.cfc'
-      - 'tools/deploy-*.sh'
-      - 'tools/deploy-dry-run-normalize.py'
-      - 'tools/test-cli-local.sh'
-      - '.github/workflows/deploy-ci.yml'
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: "Detect CLI changes"
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.diff.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Diff against the base
+        id: diff
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          # The PR's base commit. Diff against it rather than re-fetching the
+          # base branch tip: `git fetch --depth=1 origin develop` after the
+          # full-history checkout grafted the fresh tip as a shallow root, so
+          # once develop moved past the merge ref `origin/develop...HEAD` had
+          # no merge base and this job failed closed on every such PR.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # Anything that can change what the CLI suite tests or how it is judged.
+          # The suite runs INSIDE the booted demo app (tools/test-cli-local.sh
+          # serves ./public via lucee.json and calls /wheels/cli/tests), so besides
+          # the CLI and its tooling this lists what that request path loads:
+          #   lucee.json, public/                     server config, webroot, Application.cfc
+          #   config/                                 datasources, reloadPassword, routes
+          #   app/events/, app/global/, app/migrator/ demo boot hooks + migrations (db specs)
+          #   vendor/wheels/public/, Public.cfc       /wheels/cli bridge, routes, clitests view
+          #   vendor/wheels/events/                   app start + test context
+          #   vendor/wheels/wheelstest/               the TestBox runner the view uses
+          #   vendor/wheels/migrator/, Seeder.cfc, JobWorker.cfc  what CliBridge calls
+          # Wider framework boot breakage is caught by the core suite, which is
+          # required on its own.
+          PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fallback_port_sentinel\.py$|tools/ci/test_fallback_port_sentinel\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$|\.github/actions/setup-lucli/|tools/lucli\.json$|lucee\.json$|public/|config/|app/(events|global|migrator)/|vendor/wheels/(public/|Public\.cfc$|events/|wheelstest/|migrator/|Seeder\.cfc$|JobWorker\.cfc$))'
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # fetch-depth: 0 already holds the base commit; fetch it (with full
+            # history, never --depth) only if it is somehow missing.
+            if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              git fetch --no-tags origin "$BASE_SHA" || true
+            fi
+            if ! CHANGED="$(git diff --name-only "${BASE_SHA}...HEAD")"; then
+              echo "Could not diff against the PR base (${BASE_SHA}): treating as relevant."
+              echo "relevant=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          elif [ -n "${BEFORE:-}" ] && ! echo "$BEFORE" | grep -qE '^0+$' && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            CHANGED="$(git diff --name-only "$BEFORE" HEAD)"
+          else
+            echo "No usable base commit (new branch or force push): treating as relevant."
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          MATCHES="$(printf '%s\n' "$CHANGED" | grep -E "$PATTERN" || true)"
+          if [ -n "$MATCHES" ]; then
+            echo "CLI-relevant changes:"; printf '%s\n' "$MATCHES" | sed 's/^/  /'
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No CLI-relevant changes."
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
   deploy-gate:
     name: "Deploy CLI tests + verb smoke"
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      LUCLI_VERSION: "0.6.1"
       WHEELS_CI: "true"
-      PORT: "8080"
+      # Off the CLI's common fallback ports (8080/60000/3000/8500) so the
+      # fallback-port sentinel below can guard all four.
+      PORT: "8190"
     steps:
       - uses: actions/checkout@v5
 
@@ -77,11 +127,7 @@ jobs:
           java-version: '21'
 
       - name: Install LuCLI
-        run: |
-          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
-            -o /usr/local/bin/lucli
-          chmod +x /usr/local/bin/lucli
-          lucli --version
+        uses: ./.github/actions/setup-lucli
 
       - name: Create test databases
         run: |
@@ -89,8 +135,38 @@ jobs:
           sqlite3 wheelstestdb.db "SELECT 1;"
           sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
 
+      - name: Test the TestBox result walker
+        # tools/ci/testbox_results.py decides pass/fail for the suite below;
+        # its fixtures cover nested failures and bundle-level exceptions,
+        # which the old inline parser let through as a pass (#3694).
+        run: python3 tools/ci/test_testbox_results.py
+
+      - name: Test the fallback-port sentinel
+        run: python3 tools/ci/test_fallback_port_sentinel.py
+
       - name: Run CLI test suite
+        env:
+          WHEELS_CLI_TEST_RESULT_FILE: ${{ runner.temp }}/cli-test-results.json
+          # Every CLI failure gates, not just deploy bundles. Safe now that the
+          # walker sees the whole result tree and reconciles counts (#3694)
+          # and the routing specs no longer reach a live server (#3693).
+          WHEELS_CLI_TEST_STRICT: "1"
+          # Fail the run if anything contacts a common fallback port: no spec
+          # may reach a server it did not start, and no command that changes
+          # state or carries the reload password may fall back at all.
+          WHEELS_CLI_FALLBACK_SENTINEL: "1"
         run: bash tools/test-cli-local.sh
+
+      - name: Upload raw CLI test results
+        # Keep the raw TestBox JSON on every run, pass or fail, so every
+        # failure in an aggregate can be identified afterwards (#3694: a
+        # run reported 9 failures but only 8 could be named).
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-test-results
+          path: ${{ runner.temp }}/cli-test-results.json
+          if-no-files-found: warn
 
       - name: Run deploy-config-diff (informational)
         continue-on-error: true
@@ -105,3 +181,35 @@ jobs:
         if: failure()
         run: |
           cat /tmp/wheels-cli-test-server.log 2>/dev/null || true
+
+  # The stable-named check to require in branch protection. It ALWAYS reports:
+  # quick success when nothing CLI-relevant changed, otherwise the verdict of the
+  # real suite above. A skipped job counts as success for branch protection, so
+  # the suite job itself must not be the required check.
+  cli-suite:
+    name: "CLI suite"
+    needs: [changes, deploy-gate]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report the CLI suite verdict
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          RELEVANT: ${{ needs.changes.outputs.relevant }}
+          SUITE_RESULT: ${{ needs.deploy-gate.result }}
+        run: |
+          set -euo pipefail
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::Could not determine whether this change touches the CLI (changes job: ${CHANGES_RESULT}); failing closed."
+            exit 1
+          fi
+          if [ "$RELEVANT" != "true" ]; then
+            echo "No CLI changes: the CLI suite is not needed for this change."
+            exit 0
+          fi
+          if [ "$SUITE_RESULT" = "success" ]; then
+            echo "CLI suite passed."
+            exit 0
+          fi
+          echo "::error::CLI suite did not pass (Deploy CLI tests + verb smoke: ${SUITE_RESULT})."
+          exit 1

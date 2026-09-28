@@ -1,0 +1,1 @@
+{"totalPass":0,"totalFail":0,"totalError":1,"bundleStats":[{"name":"cli.lucli.tests.specs.deploy.BrokenSpec","globalException":{"message":"sentinel beforeAll failure"},"suiteStats":[]}]}

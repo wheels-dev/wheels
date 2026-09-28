@@ -175,6 +175,29 @@ component extends="wheels.WheelsTest" {
 						);
 					});
 
+					it("accepts the reload password from the X-Wheels-Reload-Password header in " & relPath, () => {
+						var absolute = repoRoot & "/" & relPath;
+						expect(fileExists(absolute)).toBeTrue("Missing file: " & absolute);
+						var content = fileRead(absolute);
+
+						// The Wheels CLI sends the password in a header so it stays out of
+						// URLs and server logs. The header is mapped onto url.password (an
+						// explicit url.password wins) BEFORE the reload gate, so the gate,
+						// the cold-start path and the soft-reload skip see one value.
+						var mapIdx = find("url.password = ToString(cgi.http_x_wheels_reload_password)", content);
+						expect(mapIdx).toBeGT(
+							0,
+							relPath & " must map the X-Wheels-Reload-Password header onto url.password."
+						);
+						expect(
+							reFind("!StructKeyExists\(url,\s*""password""\)\s*&&\s*IsDefined\(""cgi\.http_x_wheels_reload_password""\)", content) > 0
+						).toBeTrue(relPath & " must let an explicit ?password= win over the header.");
+						var gateIdx = find("application.wo.$secureCompare(url.password, application.wheels.reloadPassword)", content);
+						expect(gateIdx > mapIdx).toBeTrue(
+							relPath & " must map the header before the reload gate compares url.password."
+						);
+					});
+
 				})(rel);
 			}
 

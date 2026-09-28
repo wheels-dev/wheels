@@ -39,6 +39,28 @@ component extends="wheels.WheelsTest" {
 				expect(g.singularize("camelCasedFailure")).toBeWithCase("camelCasedFailure")
 			})
 
+			it("singularizes Latin -i plurals via an alternation, not a character class", () => {
+				expect(g.singularize("octopi")).toBeWithCase("octopus")
+				expect(g.singularize("viri")).toBeWithCase("virus")
+				expect(g.singularize("cacti")).toBeWithCase("cactus")
+				expect(g.singularize("radii")).toBeWithCase("radius")
+				expect(g.singularize("foci")).toBeWithCase("focus")
+			})
+
+			it("leaves ordinary words ending in i unchanged when singularizing", () => {
+				expect(g.singularize("safari")).toBeWithCase("safari")
+				expect(g.singularize("spaghetti")).toBeWithCase("spaghetti")
+				expect(g.singularize("taxi")).toBeWithCase("taxi")
+				expect(g.singularize("pi")).toBeWithCase("pi")
+				expect(g.singularize("api")).toBeWithCase("api")
+				expect(g.singularize("userApi")).toBeWithCase("userApi")
+			})
+
+			it("keeps singular -us words intact when singularizing", () => {
+				expect(g.singularize("octopus")).toBeWithCase("octopus")
+				expect(g.singularize("virus")).toBeWithCase("virus")
+			})
+
 			it("pluralizes", () => {
 				expect(g.pluralize("status")).toBeWithCase("statuses")
 			})

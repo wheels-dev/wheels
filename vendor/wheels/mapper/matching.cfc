@@ -464,6 +464,12 @@ component {
 			arguments.name = local.name;
 		}
 
+		// Remember where this call's routes start so typed constraint helpers
+		// (whereNumber() etc.) can reach every optional-segment variant registered
+		// below — including unnamed ones, which cannot be grouped by name. Kept on
+		// the mapper, not the route struct, so nothing leaks into route listings.
+		variables.lastMatchFirstRouteIndex = ArrayLen(variables.routes) + 1;
+
 		// Handle optional pattern segments.
 		if (Find("(", arguments.pattern)) {
 			// Confirm nesting of optional segments.
@@ -626,8 +632,18 @@ component {
 		// Apply constraint to the last route (and its optional-segment variants).
 		// When optional segments are used, $match adds multiple routes. We apply the
 		// constraint to all routes that share the same name as the last one.
+		// Unnamed routes cannot be grouped by name, so they use the first index of the
+		// most recent $match() call instead (falling back to just the last route).
 		local.lastRoute = local.routes[local.routeCount];
 		local.lastRouteName = StructKeyExists(local.lastRoute, "name") ? local.lastRoute.name : "";
+		local.firstGroupIndex = local.routeCount;
+		if (
+			StructKeyExists(variables, "lastMatchFirstRouteIndex")
+			&& variables.lastMatchFirstRouteIndex >= 1
+			&& variables.lastMatchFirstRouteIndex <= local.routeCount
+		) {
+			local.firstGroupIndex = variables.lastMatchFirstRouteIndex;
+		}
 
 		local.variableNames = ListToArray(arguments.variableName);
 		for (local.varName in local.variableNames) {
@@ -662,8 +678,8 @@ component {
 					local.routes[local.i] = local.route;
 				}
 
-				// If no name, only update the very last route.
-				if (!Len(local.lastRouteName)) {
+				// If no name, only update the routes added by the last $match() call.
+				if (!Len(local.lastRouteName) && local.i <= local.firstGroupIndex) {
 					break;
 				}
 			}

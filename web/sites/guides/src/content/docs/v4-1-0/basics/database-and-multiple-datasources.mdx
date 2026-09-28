@@ -77,6 +77,10 @@ For MySQL/Postgres, swap `class`/`dsn` for the driver's JDBC form (e.g. `com.mys
 If the app connects but models and the migrator act as if your tables don't exist, add `nullCatalogMeansCurrent=true` to the datasource's Connection String in the CF Administrator — MySQL Connector/J 8 changed its metadata default and schema reads come back empty without it. Details in [IIS and Windows Deployment](/v4-1-0/deployment/iis-and-windows/#adobe-coldfusion--mysql-8).
 </Aside>
 
+<Aside type="note" title="Adobe ColdFusion 2025: install graphqlclient">
+Install the `graphqlclient` package (`cfpm install graphqlclient`). Without it, Adobe ColdFusion 2025 raises `The graphqlclient package is not installed.` while loading your application's datasources at startup, and the error log records it after every restart, even though the app never uses GraphQL. Installing the package stops the notice and the log noise.
+</Aside>
+
 ## Per-environment datasource
 
 Development, test, and production usually point at different databases. Keep the shared default in `config/settings.cfm`, then shadow it from `config/<environment>/settings.cfm`:

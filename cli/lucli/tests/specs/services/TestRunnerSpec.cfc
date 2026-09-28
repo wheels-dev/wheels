@@ -74,7 +74,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			describe("runViaHttp()", () => {
 
 				it("returns error struct when no server is running on bogus port", () => {
-					var result = testRunner.runViaHttp(serverPort = 59999);
+					// A guaranteed-closed ephemeral port plus a short timeout: a
+					// hard-coded port (59999) hung ~136 s instead of refusing
+					// on a CI runner and blew Lucee's request timeout (##3751).
+					var result = testRunner.runViaHttp(serverPort = testHelper.closedPort(), timeout = 5);
 					expect(result.success).toBeFalse();
 					expect(structKeyExists(result, "message")).toBeTrue();
 				});

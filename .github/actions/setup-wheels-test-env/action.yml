@@ -16,10 +16,6 @@ inputs:
     description: 'Port to bind Lucee to'
     required: false
     default: '60007'
-  lucli-version:
-    description: 'LuCLI release version'
-    required: false
-    default: '0.6.1'
   install-playwright:
     description: 'Install Playwright + Chromium (set "false" to skip if no browser tests run)'
     required: false
@@ -35,14 +31,7 @@ runs:
         java-version: '21'
 
     - name: Install LuCLI
-      shell: bash
-      env:
-        LUCLI_VERSION: ${{ inputs.lucli-version }}
-      run: |
-        curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
-          -o /usr/local/bin/lucli
-        chmod +x /usr/local/bin/lucli
-        lucli --version
+      uses: ./.github/actions/setup-lucli
 
     - name: Create test databases
       shell: bash

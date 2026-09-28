@@ -125,7 +125,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					// unscoped read resolves the variables scope in the
 					// in-server suite, so db() would see zero args and print
 					// usage help instead of dispatching reset.
-					expect(() => mod.db(arg1 = "reset", arg2 = "--force"))
+					//
+					// `force = true` is the shape LuCLI hands over for `--force`
+					// (it normalizes flags before dispatch) and what an MCP call
+					// sends; db parses through ArgSpec since ##2963, so a literal
+					// "--force" positional token is no longer a flag.
+					expect(() => mod.db(arg1 = "reset", force = true))
 						.toThrow(type = "Wheels.ServerNotRunning");
 				});
 

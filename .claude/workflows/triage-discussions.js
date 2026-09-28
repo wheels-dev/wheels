@@ -89,19 +89,10 @@ function fetchCmd(num) {
 }
 
 const fetchPrompt = [
-  `Build the candidate list of GitHub Discussions to triage for repo ${REPO}.`,
-  ``,
-  `Run this in Bash (the API returns the 100 most-recently-updated; that is enough for a recency sweep):`,
+  `Run this in Bash and transcribe every returned node, unfiltered:`,
   `gh api graphql -f query='query { repository(owner:"${OWNER}", name:"${NAME}") { discussions(first:100, orderBy:{field:UPDATED_AT, direction:DESC}) { nodes { number title url createdAt updatedAt isAnswered category{name} comments{totalCount} author{login} } } } }'`,
   ``,
-  `Filter the nodes:`,
-  `- EXCLUDE category == "Announcements" (maintainer marketing / release posts — not actionable).`,
-  `- EXCLUDE author login "github-actions" (automated monthly metrics reports).`,
-  `- KEEP only discussions whose updatedAt >= ${SINCE}.`,
-  `Sort the kept set by updatedAt descending and return at most ${MAX}.`,
-  ``,
-  `For each kept discussion emit: number, title, category (name), comments (the comments.totalCount integer), isAnswered (use false when the GraphQL value is null), updatedAt (date only, "YYYY-MM-DD"), author (login).`,
-  `Return ONLY the structured object {candidates: [...]}.`,
+  `For each node emit: number, title, category (name), comments (comments.totalCount), isAnswered (false when null), updatedAt (date only, "YYYY-MM-DD"), author (login).`,
 ].join('\n')
 
 function triagePrompt(c) {
@@ -127,7 +118,7 @@ function triagePrompt(c) {
 
 function verifyPrompt(t, c) {
   return [
-    `You are an ADVERSARIAL verifier for the Wheels CFML framework (${REPO}); working tree is the develop branch. DEFAULT TO SKEPTICAL — assume the proposed action is unnecessary until evidence proves otherwise.`,
+    `You are verifying a proposed maintainer action for the Wheels CFML framework (${REPO}); working tree is the develop branch. Treat the proposal as unconfirmed until the evidence below supports it — triage works from thread text alone, so many proposals turn out already fixed or already tracked.`,
     `A triage agent reviewed Discussion #${c.number} ("${c.title}") and proposed: ${t.proposedAction} — "${t.actionDetail}" (classification: ${t.classification}, severity: ${t.severity}).`,
     `Thread summary: ${t.summary}`,
     ``,
@@ -145,7 +136,12 @@ function verifyPrompt(t, c) {
 
 phase('Fetch')
 const fetched = await agent(fetchPrompt, { label: 'fetch-discussions', phase: 'Fetch', schema: CANDIDATES_SCHEMA, effort: 'low' })
-const candidates = (fetched && fetched.candidates) || []
+// Filtering, sorting and capping are deterministic — done here, not by the model.
+// Announcements are maintainer release posts; github-actions posts are metrics reports.
+const candidates = ((fetched && fetched.candidates) || [])
+  .filter(c => c.category !== 'Announcements' && c.author !== 'github-actions' && c.updatedAt >= SINCE)
+  .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+  .slice(0, MAX)
 log(`Fetched ${candidates.length} candidate discussions (updated since ${SINCE}, excluding Announcements + bots).`)
 if (!candidates.length) return { reviewed: 0, confirmedCount: 0, findings: [] }
 

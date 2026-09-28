@@ -195,6 +195,81 @@ component extends="wheels.WheelsTest" {
 
 			})
 
+			// Authors by firstName: Adam, Andy, Chris, David, James, Per, Peter, Raul, Tom, Tony.
+			describe("offset()", () => {
+
+				it("skips rows before applying limit()", () => {
+					var result = model("author").orderBy("firstName", "ASC").limit(2).offset(1).get();
+					expect(result.recordcount).toBe(2);
+					expect(result.firstname[1]).toBe("Andy");
+					expect(result.firstname[2]).toBe("Chris");
+				})
+
+				it("returns every remaining row when used without limit()", () => {
+					var everyone = model("author").orderBy("firstName", "ASC").get();
+					var result = model("author").orderBy("firstName", "ASC").offset(everyone.recordcount - 3).get();
+					expect(result.recordcount).toBe(3);
+					expect(result.firstname[1]).toBe(everyone.firstname[everyone.recordcount - 2]);
+					expect(result.firstname[3]).toBe(everyone.firstname[everyone.recordcount]);
+				})
+
+				it("keeps the sort order when an explicit limit() plus offset() passes the 32-bit maximum (##3684)", () => {
+					// H2 1.3.172 mis-sorts once LIMIT + OFFSET exceeds 2147483647.
+					var everyone = model("author").orderBy("firstName", "ASC").get();
+					var result = model("author").orderBy("firstName", "ASC").limit(2147483647).offset(everyone.recordcount - 3).get();
+					expect(result.recordcount).toBe(3);
+					expect(result.firstname[1]).toBe(everyone.firstname[everyone.recordcount - 2]);
+					expect(result.firstname[3]).toBe(everyone.firstname[everyone.recordcount]);
+				})
+
+				it("returns only the rows that are left when limit() runs past the end", () => {
+					var everyone = model("author").orderBy("firstName", "ASC").get();
+					var result = model("author").orderBy("firstName", "ASC").limit(5).offset(everyone.recordcount - 2).get();
+					expect(result.recordcount).toBe(2);
+					expect(result.firstname[1]).toBe(everyone.firstname[everyone.recordcount - 1]);
+					expect(result.firstname[2]).toBe(everyone.firstname[everyone.recordcount]);
+				})
+
+				it("returns no rows when the offset is past the last row", () => {
+					var total = model("author").count();
+					var result = model("author").orderBy("firstName", "ASC").limit(5).offset(total).get();
+					expect(result.recordcount).toBe(0);
+				})
+
+				it("applies to object results", () => {
+					var result = model("author").orderBy("firstName", "ASC").limit(1).offset(3).get(returnAs = "objects");
+					expect(ArrayLen(result)).toBe(1);
+					expect(result[1].firstName).toBe("David");
+				})
+
+				it("defaults to primary key order when no orderBy() is given", () => {
+					var ordered = model("author").orderBy("id", "ASC").get();
+					var result = model("author").limit(2).offset(4).get();
+					expect(result.recordcount).toBe(2);
+					expect(result.id[1]).toBe(ordered.id[5]);
+					expect(result.id[2]).toBe(ordered.id[6]);
+				})
+
+				it("first() returns the record at the offset", () => {
+					var result = model("author").orderBy("firstName", "ASC").offset(2).first();
+					expect(IsObject(result)).toBeTrue();
+					expect(result.firstName).toBe("Chris");
+				})
+
+				it("first() returns false when the offset is past the last row", () => {
+					var total = model("author").count();
+					var result = model("author").orderBy("firstName", "ASC").offset(total).first();
+					expect(result).toBeFalse();
+				})
+
+				it("count() ignores limit() and offset()", () => {
+					var total = model("author").count();
+					var result = model("author").limit(2).offset(1).count();
+					expect(result).toBe(total);
+				})
+
+			})
+
 			describe("terminal methods", () => {
 
 				it("get() is an alias for findAll()", () => {

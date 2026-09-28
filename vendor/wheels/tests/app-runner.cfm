@@ -57,7 +57,20 @@
     // request holds the swap + lock would deadlock on the shared lock. The
     // runner-owns-swap flag plus a unique per-request suffix turn a re-entrant
     // request's lock into a no-op, matching the core runner.
-    local.runnerOwnsSwap = !StructKeyExists(application, "$$$appTestOriginalDataSource");
+    //
+    // A re-entrant request must also echo the in-progress run's token
+    // (url.wheelsTestRun = application.$$$appTestRunToken). The marker alone
+    // is not enough: a run the CLI abandoned on timeout keeps executing, and an
+    // immediate re-run used to see its marker, skip the lock and run
+    // concurrently against the same test database (issue #3683). Without the
+    // token an overlapping run now queues on the lock instead.
+    local.activeRunToken = StructKeyExists(application, "$$$appTestRunToken") ? application["$$$appTestRunToken"] : "";
+    local.requestRunToken = (StructKeyExists(url, "wheelsTestRun") && IsSimpleValue(url.wheelsTestRun)) ? url.wheelsTestRun : "";
+    local.runnerOwnsSwap = !(
+        StructKeyExists(application, "$$$appTestOriginalDataSource")
+        && Len(local.activeRunToken)
+        && Compare(local.requestRunToken, local.activeRunToken) == 0
+    );
     local.runnerLockSuffix = local.runnerOwnsSwap ? "" : "_sub_" & CreateUUID();
     // Timeout must exceed the worst-case full-suite duration; matches the
     // requestTimeout at the top of this template.
@@ -67,9 +80,23 @@
             // owner restores before releasing, so the captured value is the
             // configured datasource, never a stranded test DB.
             local.originalDataSource = application.wheels.dataSourceName;
+            // Holding the exclusive lock means no other owner is live, so a
+            // marker still present was stranded by a run that died before its
+            // finally block. It records the configured datasource — recover it
+            // rather than capturing the stranded test datasource as original.
+            if (local.runnerOwnsSwap && StructKeyExists(application, "$$$appTestOriginalDataSource")) {
+                local.originalDataSource = application.$$$appTestOriginalDataSource;
+                if (Compare(application.wheels.dataSourceName, local.originalDataSource) != 0) {
+                    local.dbResolver.applyDataSource(
+                        wheelsScope = application.wheels,
+                        name = local.originalDataSource
+                    );
+                }
+            }
             local.targetDataSource = local.originalDataSource;
             local.swappedDataSource = false;
             if (local.runnerOwnsSwap) {
+                application["$$$appTestRunToken"] = CreateUUID();
                 // Record the pre-swap datasource as the ownership marker so
                 // re-entrant sub-requests skip the swap and the shared lock.
                 application.$$$appTestOriginalDataSource = local.originalDataSource;
@@ -269,6 +296,7 @@
                     );
                 }
                 structDelete(application, "$$$appTestOriginalDataSource");
+                structDelete(application, "$$$appTestRunToken");
             }
             // Coverage mode (`wheels coverage`): dump the function-level counter
             // map to an absolute path the CLI reads. Failure must never break the

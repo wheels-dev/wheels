@@ -168,6 +168,11 @@ services:
       - wheels-network
 
   adobe2023:
+    # The JVM heap is pinned in tools/docker/adobe2023/server.json (heapSize 2048 MB,
+    # the same on both Adobe engines). Left to ergonomics, the two engines differed
+    # 5x: adobe2025's JDK 21 honours this 3G limit and took 25% (768 MB), while
+    # adobe2023's JDK 11 ignores the cgroup v2 limit and took 25% of the host
+    # (4 GB). The Oracle suite ran out of heap on 2025 only (#3709).
     build:
       context: ./
       dockerfile: ./tools/docker/adobe2023/Dockerfile
@@ -194,13 +199,21 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          # 4G = the 2 GB pinned heap plus Adobe's ~0.5-1 GB of non-heap
+          # (metaspace, code cache, threads), with headroom so the kernel
+          # never OOM-kills the JVM silently (exit 137, no Java error).
+          memory: 4G
         reservations:
           memory: 1G
     networks:
       - wheels-network
 
   adobe2025:
+    # The JVM heap is pinned in tools/docker/adobe2025/server.json (heapSize 2048 MB,
+    # the same on both Adobe engines). Left to ergonomics, the two engines differed
+    # 5x: adobe2025's JDK 21 honours this 3G limit and took 25% (768 MB), while
+    # adobe2023's JDK 11 ignores the cgroup v2 limit and took 25% of the host
+    # (4 GB). The Oracle suite ran out of heap on 2025 only (#3709).
     build:
       context: ./
       dockerfile: ./tools/docker/adobe2025/Dockerfile
@@ -227,7 +240,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3G
+          # 4G = the 2 GB pinned heap plus Adobe's ~0.5-1 GB of non-heap
+          # (metaspace, code cache, threads), with headroom so the kernel
+          # never OOM-kills the JVM silently (exit 137, no Java error).
+          memory: 4G
         reservations:
           memory: 1G
     networks:

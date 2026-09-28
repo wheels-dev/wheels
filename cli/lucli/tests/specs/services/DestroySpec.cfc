@@ -40,6 +40,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(migContent).toInclude("deletemes");
 				});
 
+				it("generates dropTable() with the canonical name= argument", () => {
+					var modelPath = tempRoot & "/app/models/Dropcanon.cfc";
+					directoryCreate(getDirectoryFromPath(modelPath), true, true);
+					fileWrite(modelPath, 'component extends="Model" {}');
+
+					var result = destroy.destroyModel("Dropcanon");
+					var migContent = fileRead(result.migrationPath);
+					// Migration.cfc::dropTable() declares `name`; the template used to
+					// emit tableName=, which failed "parameter [name] ... is required".
+					expect(migContent).toInclude('dropTable(name="dropcanons")');
+					expect(migContent).notToInclude("dropTable(tableName=");
+				});
+
 				it("warns when model file does not exist", () => {
 					var result = destroy.destroyModel("Nonexistent");
 					expect(result.success).toBeTrue();

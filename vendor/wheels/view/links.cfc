@@ -47,7 +47,7 @@ component {
 				if (!StructKeyExists(arguments, "rel")) {
 					arguments.rel = "";
 				}
-				arguments.rel = ListAppend(arguments.rel, "no-follow", " ");
+				arguments.rel = ListAppend(arguments.rel, "nofollow", " ");
 			}
 		}
 
@@ -96,6 +96,47 @@ component {
 			return "";
 		}
 		return arguments.href;
+	}
+
+	/**
+	 * Internal function. Reports whether the ambient route name from
+	 * `request.wheels.params` can safely be adopted as paginationLinks()'s own
+	 * `route` (#3638).
+	 *
+	 * Two things have to hold. The name must resolve to exactly one configured
+	 * route: a multi-candidate name such as `wildcard` (one candidate per method x
+	 * pattern) cannot be disambiguated by `$findRoute()` without an HTTP method or
+	 * path variables, and paginationLinks() supplies neither, so the adoption used
+	 * to throw `Wheels.RouteNotFound` — a whole-page 404 in production, where the
+	 * route error path aborts. And every path variable the chosen route requires
+	 * must already be present in `args`, because `URLFor()` throws
+	 * `Wheels.IncorrectRoutingArguments` for an adopted route with an unsupplied
+	 * variable. When either check fails, the caller leaves `route` unset and
+	 * `URLFor()` builds the controller/action URL instead.
+	 */
+	public boolean function $canAdoptAmbientRoute(required string route, required struct args) {
+		if (!Len(arguments.route) || !StructKeyExists(application.wheels, "namedRoutePositions")) {
+			return false;
+		}
+		if (!StructKeyExists(application.wheels.namedRoutePositions, arguments.route)) {
+			return false;
+		}
+		local.positions = application.wheels.namedRoutePositions[arguments.route];
+		if (Find(",", local.positions)) {
+			return false;
+		}
+		local.route = application.wheels.routes[ListGetAt(local.positions, 1)];
+		if (!StructKeyExists(local.route, "foundvariables")) {
+			return true;
+		}
+		local.iEnd = ListLen(local.route.foundvariables);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.variable = ListGetAt(local.route.foundvariables, local.i);
+			if (!StructKeyExists(arguments.args, local.variable) || !Len(arguments.args[local.variable])) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -278,11 +319,19 @@ component {
 			https://github.com/wheels-dev/wheels/issues/942
 
 			The paginationLinks() function does not set the correct URL on the anchor tag if route is not passed in. Added condition to default the route, if it is not passed in, to the route defined in the request.wheels.params, if the action is index.
+
+			The ambient name is only adopted when it can actually be resolved from
+			here (#3638): paginationLinks() passes neither an HTTP method nor the
+			current request's route variables, so an ambiguous name (the six
+			`wildcard` candidates) or a route with unsupplied path variables would
+			throw instead of rendering the pagination.
 		*/
 		if (!StructKeyExists(arguments, "route")) {
 			if(structKeyExists(request.wheels, 'params') AND structKeyExists(request.wheels.params, 'route')) {
 				if(request.wheels.params.action EQ "index"){
-					arguments.route = request.wheels.params.route;
+					if ($canAdoptAmbientRoute(route = request.wheels.params.route, args = arguments)) {
+						arguments.route = request.wheels.params.route;
+					}
 				}
 			}
 		}
@@ -303,7 +352,7 @@ component {
 		local.start = "";
 		local.middle = "";
 		local.end = "";
-		if (StructKeyExists(arguments, "route")) {
+		if (StructKeyExists(arguments, "route") && Len(arguments.route)) {
 			// when a route name is specified and the name argument is part
 			// of the route variables specified, we need to force the
 			// arguments.pageNumberAsParam to be false
@@ -363,11 +412,22 @@ component {
 		}
 		if (Len(local.middle)) {
 			if (Len(arguments.prependToPage) && !arguments.prependOnFirst) {
-				local.middle = Mid(
-					local.middle,
-					Len(arguments.prependToPage) + 1,
-					Len(local.middle) - Len(arguments.prependToPage)
+				// Strip exactly the prefix emitted for the first page in the window. That is the
+				// sanitized (and possibly entity-decoded) string, or its "active " variant when the
+				// first page is the current page, so its length can differ from the raw argument.
+				local.firstPrefix = $paginationPrependForPage(
+					args = arguments,
+					sanitizedPrepend = local.sanitizedPrepend,
+					isCurrentPage = (Max(1, local.currentPage - arguments.windowSize) == local.currentPage)
 				);
+				local.firstPrefixLen = Len(local.firstPrefix);
+				if (
+					local.firstPrefixLen > 0
+					&& Len(local.middle) >= local.firstPrefixLen
+					&& Compare(Left(local.middle, local.firstPrefixLen), local.firstPrefix) == 0
+				) {
+					local.middle = Mid(local.middle, local.firstPrefixLen + 1, Len(local.middle) - local.firstPrefixLen);
+				}
 			}
 			if (Len(local.sanitizedAppend) && !arguments.appendOnLast) {
 				local.middle = Mid(local.middle, 1, Len(local.middle) - Len(local.sanitizedAppend));
@@ -469,27 +529,11 @@ component {
 						The changes made here set the active class to the immediate parent of the current page element in case nested elements are passed in.
 					 */
 
-					if (arguments.currentPage == local.i && arguments.args.addActiveClassToPrependedParent && findNoCase('class', arguments.sanitizedPrepend)) {
-						// Inject "active " into the class attribute value via regex
-						if (reFindNoCase('class\s*=\s*[''"]', arguments.sanitizedPrepend)) {
-							local.activePrependToPage = reReplaceNoCase(
-								arguments.sanitizedPrepend,
-								'(class\s*=\s*[''"])',
-								'\1active ',
-								'one'
-							);
-						} else {
-							local.activePrependToPage = reReplaceNoCase(
-								arguments.sanitizedPrepend,
-								'(class\s*=\s*)',
-								'\1active ',
-								'one'
-							);
-						}
-						local.middle &= local.activePrependToPage;
-					} else {
-						local.middle &= arguments.sanitizedPrepend;
-					}
+					local.middle &= $paginationPrependForPage(
+						args = arguments.args,
+						sanitizedPrepend = arguments.sanitizedPrepend,
+						isCurrentPage = (arguments.currentPage == local.i)
+					);
 				}
 				if (arguments.currentPage != local.i || arguments.args.linkToCurrentPage) {
 					local.middle &= linkTo(argumentCollection = local.lta);
@@ -511,6 +555,30 @@ component {
 			}
 		}
 		return local.middle;
+	}
+
+	/**
+	 * Internal: returns the `prependToPage` string `paginationLinks()` emits before a page link,
+	 * injecting "active " into the parent's class attribute for the current page when
+	 * `addActiveClassToPrependedParent` is set.
+	 */
+	public string function $paginationPrependForPage(
+		required struct args,
+		required string sanitizedPrepend,
+		required boolean isCurrentPage
+	) {
+		if (
+			arguments.isCurrentPage
+			&& arguments.args.addActiveClassToPrependedParent
+			&& findNoCase('class', arguments.sanitizedPrepend)
+		) {
+			// Inject "active " into the class attribute value via regex
+			if (reFindNoCase('class\s*=\s*[''"]', arguments.sanitizedPrepend)) {
+				return reReplaceNoCase(arguments.sanitizedPrepend, '(class\s*=\s*[''"])', '\1active ', 'one');
+			}
+			return reReplaceNoCase(arguments.sanitizedPrepend, '(class\s*=\s*)', '\1active ', 'one');
+		}
+		return arguments.sanitizedPrepend;
 	}
 
 	/**

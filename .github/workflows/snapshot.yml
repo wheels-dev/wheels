@@ -13,7 +13,6 @@ permissions:
 env:
   WHEELS_PRERELEASE: true
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  LUCLI_VERSION: "0.6.1"
 
 jobs:
   #############################################
@@ -36,11 +35,7 @@ jobs:
           java-version: '21'
 
       - name: Install LuCLI
-        run: |
-          curl -sL "https://github.com/cybersonic/LuCLI/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-linux" \
-            -o /usr/local/bin/lucli
-          chmod +x /usr/local/bin/lucli
-          lucli --version
+        uses: ./.github/actions/setup-lucli
 
       - name: Create test databases
         run: |

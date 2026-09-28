@@ -417,6 +417,70 @@ Note the interaction with anti-pattern 11 (reserved scope names shadowing parame
 
 **Reference fix**: [#3338](https://github.com/wheels-dev/wheels/pull/3338) — the tenant-context hardening for [#3336](https://github.com/wheels-dev/wheels/issues/3336) added a `StructKeyExists(request, "wheels")` guard to `TenantResolver.handle()`; it errored on all five Adobe 2025 database legs (8 specs each) while every other engine stayed green, and was switched to the `IsDefined()` form already used by the same function's `finally` block.
 
+### First Subclass Created Inside a Mixin UDF Breaks the Super-Scope Stack (Adobe CF 2023/2025)
+
+**Symptom.** The first request after every cold start returns HTTP 500. `wheels-errors.log`
+has `Event handler exception (onApplicationStart)`, caused by `java.util.EmptyStackException`
+at `NeoPageContext.popSuperScope`, from `UDFMethod.invoke` for the
+`application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init")`
+line in `onapplicationstart.cfc`. The second request succeeds.
+
+**Cause: an Adobe engine bug.** Reproduced with no Wheels code:
+
+```cfm
+// Base.cfc
+component { include "mix.cfm"; promote(); }
+// mix.cfm
+public any function make() { return CreateObject("component", "Child"); }
+public void function promote() { this.make = variables.make; }   // Global's promote scan, reduced
+// Child.cfc
+component extends="Base" {}
+// index.cfm: the first request throws, the second passes
+CreateObject("component", "Base").make();
+```
+
+A mixin (include-declared) UDF runs on object A and creates a subclass B, and B's
+pseudo-constructor assigns that same UDF to B's `this`. The first time this happens in a JVM,
+the UDF's prologue does not push a super scope but its epilogue pops one:
+
+- `NullPointerException: "this.SymTab_superScopes" is null` when nothing has been pushed yet
+  in the request.
+- `EmptyStackException` otherwise.
+
+The body completes normally. The following do **not** trigger it:
+
+- copying a different UDF;
+- a UDF declared in the component itself rather than included;
+- creating any subclass of the same hierarchy first, outside a mixin call (this initializes
+  the state).
+
+Creating an unrelated subclass (`Foo extends Bar`) first does not help. Lucee 7 and BoxLang
+are unaffected.
+
+**Wheels mapping.** `application.wo` is a plain `wheels.Global`. `$createObjectFromRoot` is
+included from `global/objects.cfm`. Global's pseudo-constructor calls
+`$promoteIncludedGlobalsToThis()`, which copies every included UDF onto `this`. `wheels.Public`
+is the first Global subclass the JVM creates, and it is created by `$createObjectFromRoot`
+on `application.wo`. So that line always fails first.
+
+**Why it hid.** Any earlier request absorbs the once-per-JVM failure: the compose healthcheck
+`GET /` every 20s, readiness retries, or an unguarded `onError` that creates
+`wheels.events.EventMethods` via `$simpleLock` → `$invoke`. The test suite runs in an
+already-started JVM, and "graphqlclient installed" looked like a fix only because the
+healthcheck ran first. 51edf9dce blamed an include nest in `Public.$init` and un-nested it.
+The failure recurred ([#3730](https://github.com/wheels-dev/wheels/issues/3730)).
+
+**Fix.** `onapplicationstart.$init()` creates `wheels.events.SuperScopePrimer`, an empty
+`extends="wheels.Global"` component, as its first statement, before any `application.wo`
+call. Keep it first, and keep the primer empty. Any new code path that creates a Global
+subclass from inside a Global mixin before `onApplicationStart` runs, for example in
+`onError` before the application starts, can still absorb the one-time failure there.
+
+**Verifying.** The suite cannot reproduce it. Use a cold first request with the healthcheck
+disabled (compose override `healthcheck: {disable: true}`). Wait for the engine's
+`Server is up` log line, **not** an HTTP poll, then issue exactly one `GET /`. Structural
+guard: `vendor/wheels/tests/specs/events/SuperScopePrimerSpec.cfc`.
+
 ## Database-Specific Gotchas
 
 ### H2 Database (Lucee-Only Matrix Leg)
@@ -530,15 +594,29 @@ if (isMySQLFamily) {
 
 ### CockroachDB (Full Matrix Leg)
 
-CockroachDB is a full (non-soft-fail) leg of the compat matrix — each engine × cockroachdb combination runs as its own parallel job in `.github/workflows/compat-matrix.yml`. The only remaining soft-fail database is Oracle (`SOFT_FAIL_DBS="oracle"` in the same workflow, tracked in #2663).
+CockroachDB is a full (non-soft-fail) leg of the compat matrix — each engine × cockroachdb combination runs as its own parallel job in `.github/workflows/compat-matrix.yml`. No database is soft-fail any more: Oracle became a hard leg in #3738 (`SOFT_FAIL_DBS` in the same workflow is empty). Oracle readiness uses `tools/ci/oracle-ready.sh` (a checked SQL probe), and every leg waits for the engine itself to reach its datasource via `tools/ci/wait-engine-db.sh` before the suite starts.
 
-### Oracle — Multi-Row INSERT and RETURNING Incompatibility
+### Oracle — Bulk INSERT, RETURNING and Generated Keys
 
-Oracle 23 rejects `INSERT INTO t (cols) VALUES (?,?), (?,?), ...` (the SQL-standard table value constructor) when the JDBC driver also requests `RETURN_GENERATED_KEYS`. The Oracle JDBC driver translates `RETURN_GENERATED_KEYS` into a `RETURNING ROWID INTO` clause, and Oracle 23 does not permit `RETURNING` combined with multi-row VALUES.
+The Oracle JDBC driver implements `Statement.RETURN_GENERATED_KEYS` by appending `RETURNING ROWID INTO ?` to every INSERT it is handed, and Oracle rejects that clause after two bulk shapes:
 
-`OracleModel` overrides `$bulkInsertSQL()` to emit `INSERT ALL INTO t (cols) VALUES (...) INTO t (cols) VALUES (...) SELECT 1 FROM dual` — Oracle's idiomatic multi-row form, which avoids both the table value constructor and the RETURNING expansion. This is transparent to framework users; `insertAll()` works the same on Oracle as on other databases.
+- a multi-row `VALUES (?,?), (?,?)` table value constructor — `returning clause is not allowed with INSERT and Table Value Constructor` on Oracle 23 (#2745);
+- `INSERT INTO t (cols) SELECT ... FROM dual UNION ALL ...` — `ORA-03048: SQL reserved word 'ROWID' is not syntactically valid following '... FROM dual RETURNING'` (#3653).
 
-If you write code that generates raw bulk-insert SQL for Oracle (or adds a new adapter), use `INSERT ALL ... SELECT 1 FROM dual` rather than multi-row VALUES. The canonical implementation is `vendor/wheels/databaseAdapters/Oracle/OracleModel.cfc::$bulkInsertSQL`.
+Lucee requests generated keys for any `cfquery` that carries a `result` attribute. Probed on Lucee 7 + ojdbc11, the same `INSERT ... SELECT` succeeds once `result` is dropped, and a leading `/* comment */` does not help because the driver skips comments when it classifies the statement.
+
+How the framework handles it:
+
+- `OracleModel::$bulkInsertSQL` emits `INSERT INTO t (cols) SELECT ... FROM dual UNION ALL SELECT ... FROM dual`: one driving row per record, so identity defaults are evaluated per row. The older `INSERT ALL ... SELECT 1 FROM dual` form had a single driving row and handed every record the same generated key (#3302), so don't reintroduce it.
+- `insertAll()` and `upsertAll()` run their statements with `$performQuery(..., $captureResult = false)`, which omits the `result` attribute, so no RETURNING clause is appended. Anything else that runs a multi-row INSERT through `$performQuery` and does not read the result or a key should opt out the same way.
+- Don't dodge the rewrite with a PL/SQL block (`BEGIN INSERT ...; END;`). It works, but it halves the bind capacity: 1,000 rows × 40 columns fails with `ORA-16951` where the plain statement passes. It was also several times slower in the same probe.
+
+### SQL Server — Explicit Identity Values and Multi-Statement Batches
+
+`create()` with an explicit primary key needs `SET IDENTITY_INSERT <table> ON` when that key is an IDENTITY column (#3647). `MicrosoftSQLServerModel::$identityInsertSQL` sends the ON, the INSERT and the OFF as one batch, guarded by a `sys.identity_columns` lookup. Two engine facts shaped it, both probed on Lucee 7 + SQL Server:
+
+- **Lucee drops an error raised after a batch's first result.** Wrapping the INSERT in `BEGIN TRY ... END TRY BEGIN CATCH ... THROW; END CATCH` made a duplicate-key insert report success: the failed statement's result came back first, and Lucee never surfaced the re-raised error that followed it. Don't use CATCH + THROW (or `RAISERROR` after other output) to report failures from a multi-statement batch.
+- **A `SET` in a statement with inlined values outlives the batch** and stays on the pooled connection. With `parameterize = false`, a leftover `IDENTITY_INSERT ON` made the connection's next plain insert fail ("Explicit value must be specified for identity column"). So the OFF must run even when the INSERT fails. A constraint violation only ends its own statement, so a trailing OFF in the same batch still runs.
 
 ### Oracle — DDL Auto-Commit and Transaction Wrapper
 

@@ -48,6 +48,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		// call-site gating tests below can drive it directly.
 		makePublic(variables.mod, "generateAdmin");
 		makePublic(variables.mod, "$requireOwnRunningServer");
+		makePublic(variables.mod, "$resolveLucliHome");
 	}
 
 	function afterAll() {
@@ -87,6 +88,32 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	/**
+	 * Which server guard a command reaches: "own" ($requireOwnRunningServer,
+	 * the registry ownership check) or "any" ($requireRunningServer, which
+	 * trusts an open declared port and, read-side, the common-port fallback).
+	 * Both guards are mocked to throw, so nothing is contacted.
+	 */
+	private string function guardReachedBy(required any invoker) {
+		createObject("java", "java.io.File").init(expandPath("/testbox/system/stubs")).mkdirs();
+		var m = new cli.lucli.Module(cwd = variables.tempRoot);
+		prepareMock(m);
+		m.$(method = "$requireOwnRunningServer", throwException = true, throwType = "TestAbort.OwnGuard", throwMessage = "own");
+		m.$(method = "$requireRunningServer", throwException = true, throwType = "TestAbort.AnyGuard", throwMessage = "any");
+		makePublic(m, "generateAdmin");
+		makePublic(m, "browserTest");
+		m.$("$browserVerifyPlaywright", true);
+		var state = {type: ""};
+		try {
+			arguments.invoker(m);
+		} catch (any e) {
+			state.type = e.type;
+		}
+		if (state.type == "TestAbort.OwnGuard") return "own";
+		if (state.type == "TestAbort.AnyGuard") return "any";
+		return "neither (#state.type#)";
+	}
+
+	/**
 	 * Fresh Module whose getService("serverRegistry") returns the supplied
 	 * registry, with `$requireOwnRunningServer` exposed for direct calls.
 	 * Each test gets its own instance so the getService mock never leaks
@@ -117,6 +144,83 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(detected).toBe(siblingPort);
 				} finally {
 					siblingSocket.close();
+				}
+			});
+
+			it("skips the commonPorts fallback when the project opts out (WHEELS_SERVER_FALLBACK=false, ##3693)", () => {
+				// A real "no server" mode: specs (and users) that must never
+				// attach to a sibling app on a common port can say so, instead
+				// of hoping a closed PORT=1 stops the scan (it does not).
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var siblingPort = siblingSocket.getLocalPort();
+					fileWrite(tempRoot & "/.env", "WHEELS_SERVER_FALLBACK=false" & chr(10));
+					expect(mod.detectServerPort(commonPorts = [siblingPort])).toBeFalse();
+				} finally {
+					siblingSocket.close();
+					if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				}
+			});
+
+			it("reads PORT, not DB_PORT or another *PORT key, from .env", () => {
+				// The PORT match was unanchored: DB_PORT=<n> above PORT= won.
+				var dbSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					fileWrite(
+						tempRoot & "/.env",
+						"DB_PORT=" & dbSocket.getLocalPort() & chr(10) & "PORT=1" & chr(10) & "WHEELS_SERVER_FALLBACK=false" & chr(10)
+					);
+					expect(mod.detectServerPort(commonPorts = [])).toBeFalse();
+				} finally {
+					dbSocket.close();
+					if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
+				}
+			});
+
+			it("prints a not-verified notice whenever it falls back to a common port (GHSA-x3cm-2j3q-jgg4)", () => {
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var capture = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+					prepareMock(capture);
+					makePublic(capture, "detectServerPort");
+					var detected = capture.detectServerPort(commonPorts = [siblingSocket.getLocalPort()]);
+					expect(detected).toBe(siblingSocket.getLocalPort());
+					expect(capture.capturedOutput()).toInclude("not verified as this project's");
+					expect(capture.capturedOutput()).toInclude(":#siblingSocket.getLocalPort()#");
+				} finally {
+					siblingSocket.close();
+				}
+			});
+
+			it("says so when a read command uses a server on the configured port that is not this project's (GHSA-x3cm-2j3q-jgg4)", () => {
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					fileWrite(tempRoot & "/lucee.json", serializeJSON({port: siblingSocket.getLocalPort()}));
+					var capture = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+					prepareMock(capture);
+					capture.$("$verifyOwnServer", {port: 0, reason: "not-registered", pid: "", hosts: []});
+					makePublic(capture, "$requireRunningServer");
+					expect(capture.$requireRunningServer()).toBe(siblingSocket.getLocalPort());
+					expect(capture.capturedOutput()).toInclude("not verified as this project's");
+				} finally {
+					siblingSocket.close();
+					if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+				}
+			});
+
+			it("prints no notice when the server on the configured port is this project's own", () => {
+				var siblingSocket = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					fileWrite(tempRoot & "/lucee.json", serializeJSON({port: siblingSocket.getLocalPort()}));
+					var capture = new cli.lucli.tests._fixtures.commands.ModuleOutputCapture(cwd = variables.tempRoot);
+					prepareMock(capture);
+					capture.$("$verifyOwnServer", {port: siblingSocket.getLocalPort(), reason: "", pid: "1", hosts: ["127.0.0.1"]});
+					makePublic(capture, "$requireRunningServer");
+					expect(capture.$requireRunningServer()).toBe(siblingSocket.getLocalPort());
+					expect(capture.capturedOutput()).notToInclude("not verified");
+				} finally {
+					siblingSocket.close();
+					if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
 				}
 			});
 
@@ -175,36 +279,78 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(capturedRequireProjectConfig("doctor")).toBeFalse();
 			});
 
-			it("migrate latest still refuses the common-port fallback (requireProjectConfig=true)", () => {
-				expect(capturedRequireProjectConfig("latest")).toBeTrue();
-			});
-
-			it("migrate up still refuses the common-port fallback (requireProjectConfig=true)", () => {
-				expect(capturedRequireProjectConfig("up")).toBeTrue();
-			});
-
-			it("migrate down still refuses the common-port fallback (requireProjectConfig=true)", () => {
-				expect(capturedRequireProjectConfig("down")).toBeTrue();
-			});
+			// latest/up/down now require an OWNED server — see the
+			// GHSA-x3cm-2j3q-jgg4 describe block below.
 
 			it("migrate info in a no-config project never throws the project-bound refusal", () => {
-				// End-to-end through the real (unmocked) guard. Environment
-				// tolerant: when something IS listening on a common port the
-				// command proceeds past the guard (and fails later on HTTP /
-				// response parsing — fine); when nothing is listening it must
-				// throw the READ-SIDE ServerNotRunning message (which names
-				// the probed ports), never the project-bound refusal.
+				// Through the real guard, with every port reported closed so
+				// the spec never contacts a real common port (the
+				// fallback-port sentinel fails the run if it does). With
+				// nothing listening it must throw the READ-SIDE
+				// ServerNotRunning message, which names the probed common
+				// ports, never the project-bound refusal.
 				if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
 				if (fileExists(tempRoot & "/.env")) fileDelete(tempRoot & "/.env");
-				var state = {sawProjectBoundRefusal = false};
+				var closedMod = new cli.lucli.Module(cwd = variables.tempRoot);
+				prepareMock(closedMod);
+				closedMod.$("isPortOpen", false);
+				var state = {type = "", message = ""};
 				try {
-					mod.migrate(arg1 = "info");
+					closedMod.migrate(arg1 = "info");
 				} catch (any e) {
-					if (e.type == "Wheels.ServerNotRunning" && !findNoCase("8080", e.message)) {
-						state.sawProjectBoundRefusal = true;
-					}
+					state.type = e.type;
+					state.message = e.message;
 				}
-				expect(state.sawProjectBoundRefusal).toBeFalse();
+				expect(state.type).toBe("Wheels.ServerNotRunning");
+				expect(state.message).toInclude("8080", "expected the read-side message naming the probed ports: #state.message#");
+			});
+
+		});
+
+		describe("commands that change state or run code require an OWNED server (GHSA-x3cm-2j3q-jgg4)", () => {
+
+			// "The declared port is open" is not proof the server there is this
+			// project's. Everything that mutates state, sends the reload
+			// password, or evaluates code must pass the registry ownership check.
+
+			it("migrate latest / up / down", () => {
+				for (var action in ["latest", "up", "down"]) {
+					var act = action;
+					expect(guardReachedBy((m) => m.migrate(arg1 = act))).toBe("own", "migrate #act#");
+				}
+			});
+
+			it("migrate forget / pretend / rename-system-tables / diff", () => {
+				expect(guardReachedBy((m) => m.migrate(arg1 = "forget", arg2 = "20240101000000", yes = true))).toBe("own");
+				expect(guardReachedBy((m) => m.migrate(arg1 = "pretend", arg2 = "20240101000000", yes = true))).toBe("own");
+				expect(guardReachedBy((m) => m.migrate(arg1 = "rename-system-tables", "dry-run" = true))).toBe("own");
+				expect(guardReachedBy((m) => m.migrate(arg1 = "diff", write = true))).toBe("own");
+			});
+
+			it("seed and db reset", () => {
+				expect(guardReachedBy((m) => m.seed())).toBe("own");
+				expect(guardReachedBy((m) => m.db(arg1 = "reset", force = true))).toBe("own");
+			});
+
+			it("reload and console (they send the reload password / evaluate code)", () => {
+				expect(guardReachedBy((m) => m.reload())).toBe("own");
+				expect(guardReachedBy((m) => m.console())).toBe("own");
+			});
+
+			it("browser test (runs the app suite, which evaluates code)", () => {
+				expect(guardReachedBy((m) => m.browserTest([]))).toBe("own");
+			});
+
+			it("jobs work, generate admin and coverage", () => {
+				expect(guardReachedBy((m) => m.jobs(arg1 = "work"))).toBe("own");
+				expect(guardReachedBy((m) => m.generateAdmin(["Post"]))).toBe("own");
+				expect(guardReachedBy((m) => m.coverage())).toBe("own");
+			});
+
+			it("read-only migrate info / doctor and db status keep the fallback guard", () => {
+				expect(guardReachedBy((m) => m.migrate(arg1 = "info"))).toBe("any");
+				expect(guardReachedBy((m) => m.migrate(arg1 = "doctor"))).toBe("any");
+				expect(guardReachedBy((m) => m.db(arg1 = "status"))).toBe("any");
 			});
 
 		});
@@ -239,9 +385,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("returns the port of the project's own registered server", () => {
 				var canonical = createObject("java", "java.io.File")
 					.init(variables.tempRoot).getCanonicalPath();
-				var registry = registryWithRegistration(canonical, "8094");
-				var m = moduleWithRegistry(registry);
-				expect(m.$requireOwnRunningServer(["hint"])).toBe(8094);
+				// Ownership is proven against the listener (GHSA-x3cm-2j3q-jgg4):
+				// the registered pid (this JVM) must really hold the port.
+				var listener = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var registry = registryWithRegistration(canonical, listener.getLocalPort());
+					var m = moduleWithRegistry(registry);
+					expect(m.$requireOwnRunningServer(["hint"])).toBe(listener.getLocalPort());
+				} finally {
+					listener.close();
+				}
 			});
 
 			it("throws when the registration belongs to a different project", () => {
@@ -250,12 +403,64 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(() => m.$requireOwnRunningServer(["hint"])).toThrow(type = "Wheels.ServerNotRunning");
 			});
 
+			it("names the configured port when a server there is not this project's (GHSA-x3cm-2j3q-jgg4)", () => {
+				// Something answers on this project's configured port, but the
+				// registry says it belongs to another project: refuse, and say which
+				// port and why, instead of a generic "no server".
+				var squatter = createObject("java", "java.net.ServerSocket").init(0);
+				try {
+					var port = squatter.getLocalPort();
+					fileWrite(tempRoot & "/lucee.json", serializeJSON({port: port}));
+					var registry = registryWithRegistration("/some/other/project", port);
+					var m = moduleWithRegistry(registry);
+					var state = {type: "", message: ""};
+					try {
+						m.$requireOwnRunningServer(["hint"]);
+					} catch (any e) {
+						state.type = e.type;
+						state.message = e.message;
+					}
+					expect(state.type).toBe("Wheels.ServerNotOwned");
+					expect(state.message).toInclude("port #port#");
+					expect(state.message).toInclude("wheels start");
+				} finally {
+					squatter.close();
+					if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+				}
+			});
+
 			it("throws when no registration exists for this project", () => {
 				var registry = registryWithRegistration("/some/other/project", "8094");
 				// Wipe the registration so ownServerPort() resolves nothing.
 				registry.clean(registry.serverNameFor(variables.tempRoot));
 				var m = moduleWithRegistry(registry);
 				expect(() => m.$requireOwnRunningServer(["hint"])).toThrow(type = "Wheels.ServerNotRunning");
+			});
+
+		});
+
+		describe("LuCLI home resolution — $resolveLucliHome (##3733)", () => {
+
+			// The server registry lives under <home>/servers/. LuCLI itself
+			// ranks -Dlucli.home above $LUCLI_HOME (the documented way past the
+			// brew launcher's LUCLI_HOME export), so the module must too — or
+			// `wheels test` looks for the server in a different tree than the
+			// one `server run` registered it in.
+
+			it("prefers the lucli.home system property over the LUCLI_HOME env var", () => {
+				var sys = createObject("java", "java.lang.System");
+				var prior = sys.getProperty("lucli.home");
+				var probe = getTempDirectory() & "wheels-lucli-home-" & createUUID();
+				sys.setProperty("lucli.home", probe);
+				try {
+					expect(variables.mod.$resolveLucliHome()).toBe(probe);
+				} finally {
+					if (isNull(prior)) {
+						sys.clearProperty("lucli.home");
+					} else {
+						sys.setProperty("lucli.home", prior);
+					}
+				}
 			});
 
 		});
@@ -271,6 +476,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		var home = getTempDirectory() & "wheels-own-server-" & createUUID();
 		directoryCreate(home & "/servers", true);
 		var registry = new cli.lucli.services.ServerRegistry(lucliHome = home);
+		// This JVM is not a registered LuCLI server, so its real command line
+		// never matches; "" means "not exposed" and leaves the listener check.
+		prepareMock(registry);
+		registry.$("$processCommandLine", "");
 		var serverName = registry.serverNameFor(variables.tempRoot);
 		directoryCreate(home & "/servers/" & serverName, true);
 		fileWrite(home & "/servers/" & serverName & "/.project-path", arguments.projectPath);

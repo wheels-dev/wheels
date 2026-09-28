@@ -93,6 +93,22 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
+			it("app-runner.cfm requires a run token before treating a request as re-entrant (issue ##3683)", () => {
+				// A timed-out CLI run keeps executing server-side; an immediate
+				// re-run must queue on the lock, not skip it because the
+				// abandoned run's marker is still present.
+				var source = FileRead(ExpandPath("/wheels/tests/app-runner.cfm"));
+				expect(FindNoCase("url.wheelsTestRun", source) > 0).toBeTrue(
+					"app-runner.cfm must read the re-entrant request's url.wheelsTestRun token"
+				);
+				expect(FindNoCase("Compare(local.requestRunToken, local.activeRunToken) == 0", source) > 0).toBeTrue(
+					"app-runner.cfm must only skip the shared lock when the request's token matches the in-progress run's token"
+				);
+				expect(Find("structDelete(application, ""$$$appTestRunToken"")", source) > 0).toBeTrue(
+					"app-runner.cfm must clear the run token when the owning run finishes"
+				);
+			});
+
 			it("app-runner.cfm restores the datasource and clears the marker in a finally block", () => {
 				var source = FileRead(ExpandPath("/wheels/tests/app-runner.cfm"));
 				expect(Find("finally", source) > 0).toBeTrue(

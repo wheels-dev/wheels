@@ -71,10 +71,11 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
       "modern consensus" or do the trade-offs split reasonable people?
 
    c. **Cross-reference Wheels constraints.** Read:
-      - `CLAUDE.md` § "Critical Anti-Patterns"
+      - `CLAUDE.md` § "Cross-Engine Invariants"
+      - `CLAUDE.md` § "Anti-Patterns"
       - `CLAUDE.md` § "Wheels Conventions"
       - `.ai/wheels/cross-engine-compatibility.md`
-      - `.ai/wheels/<closest-layer>/`
+      - existing code in the closest layer under `vendor/wheels/`
 
       Flag any conflict between the dominant pattern and existing Wheels
       conventions. Specifically:
@@ -96,7 +97,7 @@ Read `.claude/commands/_shared-rails.md` first. Highlights for this command:
    - Default = `high` if the dominant pattern is clear AND your CFML sketch
      respects all Wheels conventions AND no cross-engine concerns surfaced.
    - **Downgrade to `medium`** if:
-     - The dominant pattern conflicts with a CLAUDE.md "Critical Anti-Pattern"
+     - The dominant pattern conflicts with a CLAUDE.md anti-pattern
        and you had to adapt it
      - The dominant pattern conflicts with an existing Wheels convention
        (naming, association style, scope semantics) and you had to adapt it

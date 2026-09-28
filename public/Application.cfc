@@ -250,6 +250,21 @@ component output="false" {
 			application.contentOnly = false;
 		}
 
+		// Reload password transport: the Wheels CLI sends it in the
+		// X-Wheels-Reload-Password request header so it stays out of URLs, access
+		// logs and proxy logs. Map it onto url.password so the reload gate below,
+		// the cold-start path and the soft-reload skip all see one value.
+		// ?reload=true&password=... from a browser keeps working unchanged, and
+		// an explicit url.password wins over the header.
+		if (
+			StructKeyExists(url, "reload")
+			&& !StructKeyExists(url, "password")
+			&& IsDefined("cgi.http_x_wheels_reload_password")
+			&& Len(ToString(cgi.http_x_wheels_reload_password))
+		) {
+			url.password = ToString(cgi.http_x_wheels_reload_password);
+		}
+
 		local.lockName = "reloadLock" & this.name;
 
 		// Abort if called from incorrect file.
@@ -465,6 +480,22 @@ component output="false" {
 	}
 
 	public void function onError( any Exception, string EventName ) {
+		// Adobe ColdFusion 2025 without its optional graphqlclient package
+		// calls onError with that notice before the application starts, then
+		// continues the same request (onApplicationStart, onRequest).
+		// Rendering it here would make that request an HTTP 500 (##3726).
+		// Only that exact notice is passed over; it is logged to wheels.log.
+		// Nothing here may throw or touch the application scope.
+		try {
+			local.startupNotice = new wheels.events.EngineStartupNotice();
+			if (local.startupNotice.isBenign(arguments.Exception, arguments.EventName ?: "")) {
+				local.startupNotice.record();
+				return;
+			}
+		} catch (any e) {
+			// Fall through to normal error handling.
+		}
+
 		try {
 			// Only rebuild the DI container when it never came up (e.g. the
 			// Injector failed during onApplicationStart). Injector.init()
@@ -495,7 +526,7 @@ component output="false" {
 		// already lost — fall back to a minimal HTML response rather than
 		// cascading into "The key [WO] does not exist." (issue ##2773).
 		if (!StructKeyExists(application, "wo")) {
-			$renderMinimalError(arguments.Exception);
+			$renderMinimalError(arguments.Exception, arguments.EventName ?: "");
 			return;
 		}
 
@@ -529,7 +560,7 @@ component output="false" {
 			// reclaimed before the dereferences below run, so degrade to the
 			// minimal fallback rather than cascade the torn-down-scope error
 			// over the real one.
-			$renderMinimalError(arguments.Exception);
+			$renderMinimalError(arguments.Exception, arguments.EventName ?: "");
 		}
 	}
 
@@ -537,8 +568,11 @@ component output="false" {
 	// Wheels global never came up (issue ##2773), and the application scope
 	// being torn down mid-onError (issue ##3379). Kept in one place so both
 	// paths render identically.
-	private void function $renderMinimalError( required any Exception ) {
+	private void function $renderMinimalError( required any Exception, string eventName = "" ) {
 		setting requestTimeout=30;
+		// Write the real failure to wheels.log first, so the page's "check
+		// the server log" points at an entry that exists (issue ##3671).
+		$logStartupFailure(arguments.Exception, arguments.eventName);
 		// Surface a real 5xx so monitoring tools and CDNs don't cache this
 		// failure as a successful response. Use a plain struct for
 		// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
@@ -550,7 +584,7 @@ component output="false" {
 			// Header may already have been written; the body still renders.
 		}
 		WriteOutput("<h1>Application Error</h1>");
-		WriteOutput("<p>Wheels failed to initialize. Check the server log for details.</p>");
+		WriteOutput("<p>Wheels failed to initialize. Check the server log (wheels.log) for details.</p>");
 		try {
 			if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
 				WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
@@ -558,6 +592,129 @@ component output="false" {
 		} catch (any fallbackErr) {
 			// Last-ditch render must never throw.
 		}
+	}
+
+	// Log the failure behind the minimal error page to wheels.log (issue
+	// ##3671). Adobe CF wraps a failure inside an application event in an
+	// event-handler exception whose message hides the real one, so walk
+	// RootCause / Cause to the innermost error and log its type, message,
+	// detail and first tag-context frame, plus the wrapper. Runs on the
+	// last-ditch error path: it must never throw, and it only logs (the
+	// rendered page stays minimal).
+	private void function $logStartupFailure( required any Exception, string eventName = "" ) {
+		try {
+			local.root = arguments.Exception;
+			local.depth = 0;
+			while (local.depth < 10) {
+				local.next = $startupFailureCause(local.root);
+				if (IsSimpleValue(local.next)) {
+					break;
+				}
+				local.root = local.next;
+				local.depth++;
+			}
+
+			local.text = "Wheels failed to initialize";
+			if (Len(arguments.eventName)) {
+				local.text &= " in " & arguments.eventName;
+			}
+			local.text &= ": [" & $startupFailureField(local.root, "Type") & "] "
+				& $startupFailureField(local.root, "Message");
+			local.detail = $startupFailureField(local.root, "Detail");
+			if (Len(local.detail)) {
+				local.text &= " -- " & local.detail;
+			}
+			local.frame = $startupFailureFrame(local.root);
+			if (!Len(local.frame)) {
+				local.frame = $startupFailureFrame(arguments.Exception);
+			}
+			if (Len(local.frame)) {
+				local.text &= " (at " & local.frame & ")";
+			}
+			local.wrapper = "[" & $startupFailureField(arguments.Exception, "Type") & "] "
+				& $startupFailureField(arguments.Exception, "Message");
+			if (local.depth > 0 && Compare(local.wrapper, "[" & $startupFailureField(local.root, "Type") & "] "
+				& $startupFailureField(local.root, "Message")) != 0) {
+				local.text &= " (reported as " & local.wrapper & ")";
+			}
+			local.text = ReReplace(local.text, "[\r\n\t]+", " ", "all");
+			if (Len(local.text) > 4000) {
+				local.text = Left(local.text, 4000) & "...";
+			}
+			WriteLog(file = "wheels", type = "error", text = local.text);
+		} catch (any logErr) {
+			// Logging must never mask the original error.
+		}
+	}
+
+	// The exception that caused this one (Adobe RootCause, Lucee/Java Cause),
+	// or "" when there is none.
+	private any function $startupFailureCause( required any failure ) {
+		try {
+			if (IsStruct(arguments.failure)) {
+				for (local.key in ["RootCause", "Cause"]) {
+					if (StructKeyExists(arguments.failure, local.key)) {
+						local.candidate = arguments.failure[local.key];
+						if (!IsNull(local.candidate) && !IsSimpleValue(local.candidate)
+							&& Len($startupFailureField(local.candidate, "Message"))) {
+							return local.candidate;
+						}
+					}
+				}
+			} else if (IsObject(arguments.failure)) {
+				local.candidate = arguments.failure.getCause();
+				if (!IsNull(local.candidate)) {
+					return local.candidate;
+				}
+			}
+		} catch (any causeErr) {
+			// No usable cause.
+		}
+		return "";
+	}
+
+	// A simple field (Type, Message, Detail) of a CFML exception struct or a
+	// Java Throwable, or "" when absent.
+	private string function $startupFailureField( required any failure, required string key ) {
+		try {
+			if (IsStruct(arguments.failure)) {
+				if (StructKeyExists(arguments.failure, arguments.key)) {
+					local.value = arguments.failure[arguments.key];
+					if (!IsNull(local.value) && IsSimpleValue(local.value)) {
+						return Trim(ToString(local.value));
+					}
+				}
+			} else if (IsObject(arguments.failure)) {
+				if (arguments.key == "Type") {
+					return arguments.failure.getClass().getName();
+				}
+				if (arguments.key == "Message") {
+					local.value = arguments.failure.getMessage();
+					if (!IsNull(local.value)) {
+						return Trim(ToString(local.value));
+					}
+				}
+			}
+		} catch (any fieldErr) {
+			// Unreadable field.
+		}
+		return "";
+	}
+
+	// "template:line" of the first tag-context frame, or "" when absent.
+	private string function $startupFailureFrame( required any failure ) {
+		try {
+			if (IsStruct(arguments.failure) && StructKeyExists(arguments.failure, "TagContext")) {
+				local.tagContext = arguments.failure.TagContext;
+				if (IsArray(local.tagContext) && ArrayLen(local.tagContext)) {
+					local.top = local.tagContext[1];
+					return $startupFailureField(local.top, "Template") & ":" & $startupFailureField(local.top, "Line");
+				}
+			}
+		} catch (any frameErr) {
+			// No usable frame.
+		}
+		return "";
 	}
 
 	public boolean function onMissingTemplate( string targetPage ) {
@@ -729,8 +886,12 @@ component output="false" {
 					}
 					
 					// Type casting for boolean and numeric values
-					if (local.value == "true" || local.value == "false") {
-						local.value = (local.value == "true");
+					// Type casting for boolean and numeric values. STRING comparison,
+					// never `==`: Lucee compares `"1.0" == "true"` NUMERICALLY (1 == 1,
+					// so true), which turned every .env value of numeric 1 into the BOOLEAN
+					// true and made numeric settings silently take their defaults instead.
+					if (Compare(lCase(local.value), "true") == 0 || Compare(lCase(local.value), "false") == 0) {
+						local.value = (Compare(lCase(local.value), "true") == 0);
 					} else if (isNumeric(local.value) && !find(".", local.value)) {
 						// Only convert integers, leave decimals as strings
 						local.value = val(local.value);

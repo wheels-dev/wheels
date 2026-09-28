@@ -1,0 +1,1 @@
+{"totalPass":0,"totalFail":1,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.deploy.NestedSpec","suiteStats":[{"name":"outer","specStats":[],"suiteStats":[{"name":"inner","specStats":[{"status":"Failed","name":"sentinel","failMessage":"must gate"}]}]}]}]}

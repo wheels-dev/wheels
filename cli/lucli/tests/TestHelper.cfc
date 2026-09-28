@@ -108,6 +108,15 @@ component {
 	 * Returns port number or 0 if no server found.
 	 */
 	public numeric function detectServerPort() {
+		// These specs run inside the test server itself, so its own port is
+		// the answer: no probing, and never a fallback port that may belong to
+		// another app (the fallback-port sentinel fails the run on contact).
+		try {
+			if (isNumeric(cgi.server_port) && cgi.server_port > 0 && isPortResponding(val(cgi.server_port))) {
+				return val(cgi.server_port);
+			}
+		} catch (any e) {}
+
 		// Check environment variable (set by CI)
 		var envPort = createObject("java", "java.lang.System").getenv("PORT");
 		if (!isNull(envPort) && len(envPort) && isPortResponding(val(envPort))) {
@@ -119,6 +128,25 @@ component {
 		if (isPortResponding(60007)) return 60007;
 
 		return 0;
+	}
+
+	/**
+	 * Return a localhost port that is guaranteed closed right now.
+	 *
+	 * Binds an ephemeral ServerSocket (port 0), reads the port the OS
+	 * assigned, then closes it. The OS just handed the port out as free and
+	 * nothing else has it, so a connect refuses immediately. Use this instead
+	 * of a hard-coded "bogus" port such as 59999: on some CI runners a
+	 * connect to an arbitrary high port hangs until the HTTP timeout instead
+	 * of being refused (##3751).
+	 */
+	public numeric function closedPort() {
+		var probe = createObject("java", "java.net.ServerSocket").init(0);
+		try {
+			return probe.getLocalPort();
+		} finally {
+			probe.close();
+		}
 	}
 
 	/**

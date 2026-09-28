@@ -88,7 +88,7 @@ wheels-monorepo/
 ```
 
 **Key Components:**
-- **CLI** (`wheels`): Development tools and generators, distributed via Homebrew and Chocolatey formulas that bundle [LuCLI](https://github.com/cybersonic/LuCLI)
+- **CLI** (`wheels`): Development tools and generators, distributed via Homebrew, Scoop and apt/yum packages that bundle [LuCLI](https://github.com/cybersonic/LuCLI) (the Wheels build, [wheels-dev/LuCLI](https://github.com/wheels-dev/LuCLI), pinned in `tools/lucli.json`)
 - **Core** (`wheels-core`): Framework runtime installed in `/vendor/wheels`
 - **Base Template** (`wheels-base-template`): Starting structure used by the CLI for new applications
 - **Documentation**: Comprehensive guides published to wheels.dev/guides

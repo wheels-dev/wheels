@@ -122,7 +122,10 @@ component extends="wheels.WheelsTest" {
 				var ctx = {root = ""};
 
 				beforeEach(function() {
-					ctx.root = GetTempDirectory() & "wheels-storage-spec-" & CreateUUID();
+					// $tempPath(), not GetTempDirectory() & ...: RustCFML v0.637.0 returns
+					// "/tmp" without a trailing separator on Linux (RustCFML/RustCFML#380),
+					// which puts the join at the filesystem root. Same fix as #3444.
+					ctx.root = $tempPath("wheels-storage-spec-" & CreateUUID());
 					disk = new wheels.storage.drivers.LocalDisk(config = {
 						root = ctx.root,
 						urlPrefix = "/uploads",
@@ -186,7 +189,7 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("follows a symlink under root to a file outside (Find('..') does not see the hop)", function() {
-					var outside = GetTempDirectory() & "wheels-storage-outside-" & CreateUUID();
+					var outside = $tempPath("wheels-storage-outside-" & CreateUUID());
 					var linkPath = ctx.root & "/link";
 					DirectoryCreate(outside);
 					if (!DirectoryExists(ctx.root)) {
@@ -469,7 +472,7 @@ component extends="wheels.WheelsTest" {
 					manager = new wheels.storage.StorageManager(config = {
 						default = "local",
 						disks = {
-							local = {driver = "local", root = GetTempDirectory() & "wheels-storage-mgr", urlPrefix = "/uploads"},
+							local = {driver = "local", root = $tempPath("wheels-storage-mgr"), urlPrefix = "/uploads"},
 							s3 = {
 								driver = "s3", bucket = "myapp", region = "us-east-1",
 								accessKeyId = "AKIAIOSFODNN7EXAMPLE",

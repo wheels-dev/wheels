@@ -141,7 +141,8 @@ component {
 						force = arguments.force,
 						properties = viewProps,
 						belongsTo = arguments.belongsTo,
-						hasMany = arguments.hasMany
+						hasMany = arguments.hasMany,
+						crud = true
 					);
 					if (viewResult.success) {
 						arrayAppend(results.generated, {type: "view", path: viewResult.path});
@@ -310,15 +311,29 @@ component {
 	/**
 	 * Append foreign-key columns for belongsTo relationships that aren't
 	 * already present in the properties list.
+	 *
+	 * Public (`$`-prefixed) so `wheels generate model` shares it with scaffold
+	 * and api-resource: a `--belongsTo` model used to get a migration with no
+	 * FK column, so the association's default key resolved to a column that
+	 * didn't exist (#3723). A user-listed column in EITHER reference shape
+	 * (`userId` / `user_id`, any case) counts as present, so an explicit
+	 * column is never duplicated in the other convention.
 	 */
-	private array function $addForeignKeyColumns(required array properties, required string belongsTo) {
+	public array function $addForeignKeyColumns(required array properties, required string belongsTo) {
 		var props = duplicate(arguments.properties);
 		if (len(arguments.belongsTo)) {
 			for (var parent in listToArray(arguments.belongsTo)) {
 				var fkName = $foreignKeyName(parent);
 				var hasFK = false;
 				for (var p in props) {
-					if (p.name == fkName) { hasFK = true; break; }
+					if (
+						compareNoCase(p.name, fkName) == 0
+						|| compareNoCase(p.name, trim(parent) & "id") == 0
+						|| compareNoCase(p.name, trim(parent) & "_id") == 0
+					) {
+						hasFK = true;
+						break;
+					}
 				}
 				if (!hasFK) {
 					arrayAppend(props, {name: fkName, type: "integer"});
@@ -575,19 +590,7 @@ component {
 
 		try {
 			// Add foreign key columns for belongsTo relationships
-			var props = duplicate(arguments.properties);
-			if (len(arguments.belongsTo)) {
-				for (var parent in listToArray(arguments.belongsTo)) {
-					var fkName = $foreignKeyName(parent);
-					var hasFK = false;
-					for (var p in props) {
-						if (p.name == fkName) { hasFK = true; break; }
-					}
-					if (!hasFK) {
-						arrayAppend(props, {name: fkName, type: "integer"});
-					}
-				}
-			}
+			var props = $addForeignKeyColumns(arguments.properties, arguments.belongsTo);
 
 			// 1. Generate Model
 			var modelResult = variables.codeGenService.generateModel(

@@ -1,0 +1,1 @@
+{"totalPass":10,"totalFail":9,"totalError":0,"bundleStats":[{"name":"cli.lucli.tests.specs.commands.SomeSpec","suiteStats":[{"name":"a","specStats":[{"status":"Failed","name":"only one visible","failMessage":"x"}]}]}]}

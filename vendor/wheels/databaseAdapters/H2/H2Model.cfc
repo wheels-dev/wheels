@@ -9,6 +9,25 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return true;
 	}
 
+	/**
+	 * H2 1.3.172 (the driver Lucee bundles) returns rows in the wrong order once
+	 * LIMIT + OFFSET exceeds the 32-bit maximum (#3684), and the query builder's
+	 * offset() without limit() passes exactly that maximum as "no limit" (#3665).
+	 * Clamp the limit so the sum stays at 2147483647: still effectively
+	 * unlimited, and correct on H2 1.3.172 and 2.x alike. There is no
+	 * version-independent sentinel: 1.3.172 has no OFFSET-only form, and H2 2.x
+	 * rejects LIMIT -1 and LIMIT NULL.
+	 */
+	public string function $limitOffsetClause(required numeric limit, required numeric offset) {
+		local.maxInt = 2147483647;
+		local.limit = arguments.limit;
+		if (arguments.offset > 0 && arguments.offset < local.maxInt && local.limit + arguments.offset > local.maxInt) {
+			// NumberFormat keeps a large computed value out of scientific notation.
+			local.limit = NumberFormat(local.maxInt - arguments.offset, "0");
+		}
+		return super.$limitOffsetClause(limit = local.limit, offset = arguments.offset);
+	}
+
 	variables.h2TypeMap = {
 		"bigint": "cf_sql_bigint",
 		"int8": "cf_sql_bigint",

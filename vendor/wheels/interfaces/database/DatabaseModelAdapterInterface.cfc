@@ -57,6 +57,7 @@ interface {
 	 * @dataSource Override datasource.
 	 * @$primaryKey Primary key for identity retrieval.
 	 * @$debugName Debug/logging name.
+	 * @$captureResult False when the caller reads neither the result nor a generated key (bulk paths).
 	 * @return Struct with query and result metadata.
 	 */
 	public struct function $performQuery(
@@ -66,7 +67,8 @@ interface {
 		numeric offset,
 		string dataSource,
 		string $primaryKey,
-		string $debugName
+		string $debugName,
+		boolean $captureResult
 	);
 
 	/**

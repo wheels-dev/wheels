@@ -1,8 +1,8 @@
 # /auto-close-stale-triage
 
-Close issues that the bot triaged but couldn't reproduce, when nobody has
-followed up after a grace period. Mirrors Bun's
-`auto-close-duplicates.yml` pattern.
+Close triaged issues that a maintainer has labelled `cannot-reproduce`,
+when nobody has followed up after a grace period. (Triage itself never
+applies that label; only humans do.)
 
 ## Rails
 
@@ -44,8 +44,8 @@ Read `.claude/commands/_shared-rails.md` first. Highlights:
       ```
       ## Wheels Bot — Auto-close
 
-      This issue was triaged on <date> with classification `cannot-reproduce`
-      and has had no follow-up in 14 days. Closing as stale.
+      This issue was labelled `cannot-reproduce` and has had no follow-up
+      in the 14 days since triage (<date>). Closing as stale.
 
       If you have a fresh reproduction or new context, please reopen with
       the additional information.

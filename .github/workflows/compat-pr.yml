@@ -3,10 +3,16 @@
 # database (SQLite, no external container).
 #
 # This is the subset of compat-matrix.yml that catches the class of bug the
-# weekly matrix exists for (cross-engine regressions), at PR time instead of
-# at release preflight. The full engine x database matrix stays weekly +
+# nightly matrix exists for (cross-engine regressions), at PR time instead of
+# at release preflight. The full engine x database matrix stays nightly +
 # manual (compat-matrix.yml); SQLite is sufficient to catch engine-specific
 # breakage, which is independent of the database.
+#
+# One database-specific leg rides along: Lucee 7 + H2. H2 is embedded (no
+# external container) and its SQL dialect diverges enough to break on its own:
+# an H2-only query-builder regression (#3684) went unseen until the weekly
+# matrix. The two sqlite legs keep their check names, which branch protection
+# requires; the H2 leg is not required unless maintainers add it.
 #
 # The workflow triggers on EVERY PR (no path filter) and reports a success
 # no-op when the PR doesn't touch framework/CLI code. This is required
@@ -34,16 +40,21 @@ env:
 
 jobs:
   compat:
-    name: "${{ matrix.cfengine }} + sqlite"
+    name: "${{ matrix.cfengine }} + ${{ matrix.database }}"
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         cfengine: [boxlang, adobe2023]
+        database: [sqlite]
+        include:
+          - cfengine: lucee7
+            database: h2
     env:
       PORT_boxlang: 60001
       PORT_adobe2023: 62023
+      PORT_lucee7: 60007
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -52,9 +63,19 @@ jobs:
 
       - name: Detect framework changes
         id: changes
+        env:
+          # Diff against the PR's base commit, which the full-history checkout
+          # already holds. Re-fetching the base branch with --depth=1 grafted
+          # its tip as a shallow root, so once develop moved past the merge ref
+          # `origin/develop...HEAD` had no merge base; git diff then exited 128
+          # and every such PR ran the full compat suites, docs-only or not.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}" 2>/dev/null || true
-          if git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- \
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$BASE_SHA" 2>/dev/null || true
+          fi
+          # A failed diff (exit > 1) falls through to framework_changed=true.
+          if git diff --quiet "${BASE_SHA}...HEAD" -- \
               vendor/wheels cli/lucli .github/workflows/compat-pr.yml; then
             echo "framework_changed=false" >> "$GITHUB_OUTPUT"
             echo "No framework/CLI changes — skipping the compat suites (no-op success)."
@@ -98,11 +119,19 @@ jobs:
           CONTAINER="wheels-${CFENGINE}-1"
           echo "Waiting for ${CFENGINE} on port ${PORT}..."
 
-          MAX_WAIT=60
+          # Ceiling: Adobe 2023 answered on attempt 42-57 of the old 60 across
+          # four compat-matrix runs (2026-09-27); BoxLang on 7-12. 120 leaves ~2x
+          # the observed worst case; a dead engine fails after ~10-20 min, inside
+          # this job's 45-minute timeout. See compat-matrix.yml for the details.
+          MAX_WAIT=120
           WAIT_COUNT=0
           RESTARTS=0
           MAX_RESTARTS=3
           LAST_HTTP_CODE="000"
+          # Track readiness explicitly: success on the final attempt leaves
+          # WAIT_COUNT == MAX_WAIT, so the count alone can't tell success from
+          # exhaustion (#3685).
+          READY=false
           while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
             WAIT_COUNT=$((WAIT_COUNT + 1))
 
@@ -124,7 +153,11 @@ jobs:
             LAST_HTTP_CODE=$(curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" 2>/dev/null || true)
             LAST_HTTP_CODE=${LAST_HTTP_CODE:-000}
             if echo "$LAST_HTTP_CODE" | grep -qE "^(200|302|404)$"; then
-              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT)"
+              echo "CF engine is ready! (HTTP $LAST_HTTP_CODE on attempt $WAIT_COUNT/$MAX_WAIT)"
+              if [ $((WAIT_COUNT * 4)) -gt $((MAX_WAIT * 3)) ]; then
+                echo "::warning::${CFENGINE} became ready at attempt $WAIT_COUNT/$MAX_WAIT (past 3/4 of the ceiling); readiness headroom is shrinking."
+              fi
+              READY=true
               break
             fi
 
@@ -137,7 +170,7 @@ jobs:
             fi
           done
 
-          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+          if [ "$READY" != "true" ]; then
             echo "::error::CF engine not ready after ${MAX_WAIT} attempts (last HTTP code: $LAST_HTTP_CODE)"
             echo "=== Container logs (raw, last 200 lines) ==="
             docker logs "$CONTAINER" 2>&1 | tail -200
@@ -167,14 +200,15 @@ jobs:
           echo "Failed to install CFPM packages after $MAX_RETRIES attempts"
           exit 1
 
-      - name: Run test suite for sqlite
+      - name: Run test suite for ${{ matrix.database }}
         if: steps.changes.outputs.framework_changed == 'true'
+        env:
+          DB: ${{ matrix.database }}
         run: |
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
           BASE_URL="http://localhost:${PORT}/wheels/core/tests"
-          DB="sqlite"
-          RESULT_FILE="/tmp/${{ matrix.cfengine }}-sqlite-result.txt"
+          RESULT_FILE="/tmp/${{ matrix.cfengine }}-${DB}-result.txt"
 
           echo "Warming up Wheels application before first test run..."
           curl -s -o /dev/null --max-time 60 "http://localhost:${PORT}/" || true
@@ -237,3 +271,27 @@ jobs:
             docker logs "wheels-${{ matrix.cfengine }}-1" 2>&1 | tail -100
             exit 1
           fi
+
+      - name: Report container exit state
+        # A cgroup OOM-kill ends the JVM with exit 137 and NO Java error; name it.
+        if: always() && steps.changes.outputs.framework_changed == 'true'
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+          DB: ${{ matrix.database }}
+        run: |
+          BAD=0
+          for C in "wheels-${CFENGINE}-1" "wheels-${DB}-1"; do
+            STATE=$(docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} oomkilled={{.State.OOMKilled}} restarts={{.RestartCount}}' "$C" 2>/dev/null || echo "missing")
+            # OOMKilled only reflects PID 1 (the CommandBox launcher); the server
+            # JVM is its child, so a kernel kill of the JVM can leave the container
+            # "running, oomkilled=false". The cgroup's oom_kill counter sees it.
+            KILLS=$(docker exec "$C" sh -c 'cat /sys/fs/cgroup/memory.events 2>/dev/null || cat /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null' 2>/dev/null | awk '$1=="oom_kill"{print $2}')
+            STATE="$STATE cgroup_oom_kill=${KILLS:-n/a}"
+            echo "$C: $STATE"
+            case "$STATE" in
+              missing*) ;;  # sqlite/h2 legs have no database container
+              *oomkilled=true*|*cgroup_oom_kill=[1-9]*) echo "::error::$C had a process OOM-killed by the kernel (cgroup memory limit): $STATE"; BAD=1 ;;
+              exited*|dead*) echo "::error::$C is not running after the suite: $STATE"; BAD=1 ;;
+            esac
+          done
+          exit "$BAD"

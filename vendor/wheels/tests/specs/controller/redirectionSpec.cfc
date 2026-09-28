@@ -311,6 +311,48 @@ component extends="wheels.WheelsTest" {
 				}).toThrow("Wheels.UnsafeRedirect")
 			})
 
+			// Userinfo ("user:pass@host") precedes the real host in the authority; browsers navigate to
+			// the host after the "@", so a same-host prefix before it must not satisfy the gate.
+			it("throws on redirectTo url hiding an external host behind same-host userinfo", () => {
+				expect(function(){
+					_controller.redirectTo(url = "https://" & request.cgi.server_name & ":1@evil.com/phish")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo protocol-relative url hiding an external host behind same-host userinfo", () => {
+				expect(function(){
+					_controller.redirectTo(url = "//" & request.cgi.server_name & ":1@evil.com/phish")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("throws on redirectTo url with userinfo in front of the same host", () => {
+				expect(function(){
+					_controller.redirectTo(url = "https://user:pass@" & request.cgi.server_name & "/page")
+				}).toThrow("Wheels.UnsafeRedirect")
+			})
+
+			it("allows redirectTo url matching current domain with a port", () => {
+				_controller.redirectTo(url = "https://" & request.cgi.server_name & ":8443/page")
+				r = _controller.getRedirect()
+
+				expect(r.url).toBe("https://" & request.cgi.server_name & ":8443/page")
+			})
+
+			it("allows redirectTo same-domain url whose query string contains an at-sign", () => {
+				_controller.redirectTo(url = "https://" & request.cgi.server_name & "/page?email=a@b.com")
+				r = _controller.getRedirect()
+
+				expect(r.url).toBe("https://" & request.cgi.server_name & "/page?email=a@b.com")
+			})
+
+			it("rejects referer hiding an external host behind same-host userinfo", () => {
+				request.cgi.http_referer = "https://" & request.cgi.server_name & ":1@evil.com/phish"
+				_controller.redirectTo(back = true)
+				r = _controller.getRedirect()
+
+				expect(r.url).toBe(application.wheels.webPath)
+			})
+
 			it("throws on redirectTo url with javascript scheme", () => {
 				expect(function(){
 					_controller.redirectTo(url = "javascript:alert(1)")
