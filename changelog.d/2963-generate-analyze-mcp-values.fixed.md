@@ -1,1 +1,0 @@
-- `wheels generate` accepts an explicit `dry-run=false` (sent by MCP clients as `--no-dry-run`) instead of failing with `Unknown flag`, and a failed dry run no longer leaves later `generate` calls in the same MCP session writing nothing. `wheels analyze` rejects an unknown target instead of silently analyzing everything (#2963)

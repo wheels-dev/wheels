@@ -1,2 +1,0 @@
-- The MCP `test` tool now prints a warning when its `timeout` is not a positive number, e.g. `Warning: ignoring invalid timeout "x"; using 900s`. The run still goes ahead with the default, as before; it just no longer falls back silently (#2963)
-- `wheels generate app <name> --offline` now passes `--offline` through to `wheels new`, which skips its update check; before, generate consumed the flag and `new` reset it (#2963)

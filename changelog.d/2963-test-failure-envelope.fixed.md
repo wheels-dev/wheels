@@ -1,1 +1,0 @@
-- `wheels test` (and the MCP `test` tool) now exits non-zero when the test runner refuses before running anything, e.g. a failed test-database migration. The runner answers with a `{success: false, error, message}` document that has no test counts, which the CLI used to read as a clean run; it now prints the runner's explanation and fails (#2963)
