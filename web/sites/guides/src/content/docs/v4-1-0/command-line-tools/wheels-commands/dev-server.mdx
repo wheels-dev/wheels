@@ -69,10 +69,18 @@ Stop the running Wheels development server for the current project.
 #### Synopsis
 
 ```txt title="
-wheels stop
+wheels stop [--name=<name>] [--config=<file>] [--all]
 ```
 
-Resolves the server instance from the project directory and asks LuCLI to stop it. Under the hood it runs `wheels server stop` scoped to the project root.
+With no flags, resolves the server instance from the project directory and asks LuCLI to stop it. Under the hood it runs `wheels server stop` scoped to the project root.
+
+| Flag | Description |
+|---|---|
+| `--name=<name>` | Stop the named server instance. Use it when more than one server is registered to the project directory (`wheels server list` shows them). `--name <name>` also works. |
+| `--config=<file>` | Resolve the server name from a `lucee*.json` file (e.g. `lucee-docker.json`). |
+| `--all` | Stop every running Lucee server on the machine. |
+
+Since 4.1.1 these flags are forwarded to `wheels server stop`; earlier releases ignored them.
 
 #### Example
 
@@ -83,7 +91,7 @@ wheels stop
 Prints `Stopping Wheels server...` in cyan and delegates to `wheels server stop`. Run it from the project root to take down the background server that `wheels start` brought up.
 
 <Aside type="tip" title="Stopping by name or all at once">
-To stop a server by explicit name or to stop every running Lucee server on the machine, drop down to the core command: `wheels server stop --name=<name>` or `wheels server stop --all`. See the [`server`](../../core-commands/server/) reference.
+`wheels stop --name=<name>` and `wheels stop --all` are equivalent to the core commands `wheels server stop --name=<name>` and `wheels server stop --all`. See the [`server`](../../core-commands/server/) reference for the rest of the server-management flags.
 </Aside>
 
 ### `wheels reload`

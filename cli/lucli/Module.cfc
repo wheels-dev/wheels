@@ -1946,9 +1946,91 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * hint: Stop the running Wheels development server
+	 * Parse `wheels stop` arguments: `--name=<server>`, `--config=<lucee*.json>`
+	 * and `--all`, which forward to LuCLI's `server stop` (#3680). stop() used
+	 * to declare nothing and run a bare `server stop`, so a project with two
+	 * registered servers could not be stopped through `wheels stop` at all.
+	 *
+	 * LuCLI delivers the space form `--name wsapp` as a bare flag (name=true)
+	 * plus a positional (arg2=wsapp). stop() takes no positionals of its own,
+	 * so when exactly one value option is bare and exactly one positional was
+	 * given, bind them; anything more ambiguous errors and asks for `=`.
+	 */
+	private struct function $parseStopArgs(required struct coll) {
+		var coll = duplicate(arguments.coll);
+		var positionalKeys = [];
+		for (var key in coll) {
+			if (reFindNoCase("^arg\d+$", key)) {
+				arrayAppend(positionalKeys, key);
+			}
+		}
+		var bareOptions = [];
+		for (var opt in ["name", "config"]) {
+			if (
+				structKeyExists(coll, opt)
+				&& isSimpleValue(coll[opt])
+				&& compareNoCase(trim(toString(coll[opt])), "true") == 0
+			) {
+				arrayAppend(bareOptions, opt);
+			}
+		}
+		if (arrayLen(bareOptions) == 1 && arrayLen(positionalKeys) == 1) {
+			coll[bareOptions[1]] = coll[positionalKeys[1]];
+			structDelete(coll, positionalKeys[1]);
+			positionalKeys = [];
+		}
+		if (arrayLen(positionalKeys)) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "wheels stop takes no positional arguments (got '#coll[positionalKeys[1]]#'). Use --name=<server-name>, --config=<file> or --all."
+			);
+		}
+		var parsed = new services.ArgSpec()
+			.option(name = "name", default = "", description = "Name of the server instance to stop")
+			.option(name = "config", default = "", description = "lucee*.json file to resolve the server name from")
+			.flag(name = "all", default = false, description = "Stop every running server on the machine")
+			// LuCLI normally answers `--help` itself; if it ever reaches the
+			// module, print usage rather than reject it (or stop anything).
+			.accept("help")
+			.parse(coll);
+		return {
+			name = trim(parsed.name),
+			config = trim(parsed.config),
+			all = parsed.all,
+			help = structKeyExists(coll, "help") && isSimpleValue(coll.help) && compareNoCase(toString(coll.help), "true") == 0
+		};
+	}
+
+	/**
+	 * hint: Stop the running Wheels development server (--name=<server>, --config=<file>, --all)
 	 */
 	public string function stop() {
+		var opts = $parseStopArgs(structuredArgs(arguments));
+		if (opts.help) {
+			out("Usage: wheels stop [--name=<server-name>] [--config=<lucee*.json>] [--all]");
+			return "";
+		}
+
+		// An explicit target (#3680) goes straight to LuCLI's `server stop`:
+		// the cwd-based discovery below cannot pick between several servers
+		// registered to one directory, and a named/config/all stop never
+		// creates the cwd-basename phantom registration it guards against.
+		if (opts.all || len(opts.name) || len(opts.config)) {
+			var stopArgs = ["stop"];
+			if (len(opts.name)) {
+				arrayAppend(stopArgs, "--name=" & opts.name);
+			}
+			if (len(opts.config)) {
+				arrayAppend(stopArgs, "--config=" & opts.config);
+			}
+			if (opts.all) {
+				arrayAppend(stopArgs, "--all");
+			}
+			out("Stopping Wheels server...", "cyan");
+			executeCommand("server", stopArgs, variables.projectRoot);
+			return "";
+		}
+
 		// RustCFML backend — if a recorded RustCFML server is alive, stop it
 		// before touching LuCLI's registry. Auto-detected, so `wheels stop`
 		// works regardless of which engine was started.
@@ -1980,7 +2062,7 @@ component extends="modules.BaseModule" {
 					out("  - " & s.name & " (port " & s.port & ", project " & s.projectPath & ")");
 				}
 				out("");
-				out("To stop a specific server: wheels server stop --name <name>", "cyan");
+				out("To stop a specific server: wheels stop --name=<name>", "cyan");
 				out("To list all servers:      wheels server list", "cyan");
 				return "";
 			}

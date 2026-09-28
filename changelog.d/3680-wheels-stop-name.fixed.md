@@ -1,0 +1,1 @@
+- `wheels stop` now forwards `--name=<server>`, `--config=<file>` and `--all` to `wheels server stop` (the space form `--name <server>` works too); it previously dropped them, so a project with more than one registered server could not be stopped with `wheels stop` (#3680)
