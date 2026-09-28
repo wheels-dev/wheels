@@ -114,13 +114,16 @@ stop_test_server() {
 
     # 3. TERM, bounded wait (~15s), then KILL survivors.
     for pid in $pids; do kill "$pid" 2>/dev/null || true; done
+    local alive=""
     for i in $(seq 1 30); do
-        local alive=""
+        alive=""
         for pid in $pids; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
         [ -z "$alive" ] && break
         sleep 0.5
     done
-    for pid in $pids; do kill -9 "$pid" 2>/dev/null || true; done
+    # SIGKILL only the processes that are still alive: a PID that already exited may
+    # have been recycled by an unrelated process during the grace period.
+    for pid in $alive; do kill -9 "$pid" 2>/dev/null || true; done
 
     # 4. Wait (bounded) for the port to actually come free.
     for i in $(seq 1 20); do
