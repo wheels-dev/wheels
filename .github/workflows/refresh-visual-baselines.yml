@@ -127,6 +127,12 @@ jobs:
       # workflow wins over a per-site pnpm --filter mapping.
       - name: Build all sites
         working-directory: web
+        # The packages site fetches its registry from the GitHub API during
+        # prerender. Unauthenticated, that shares the runner IP's 60/hr cap and
+        # fails with 403 rate limit exceeded; the token raises it (same as
+        # web-deploy.yml).
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm build
 
       - name: Refresh baseline(s)
