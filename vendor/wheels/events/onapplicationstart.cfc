@@ -14,7 +14,6 @@ component {
 		// first request after a cold start fails with EmptyStackException when
 		// `$createObjectFromRoot` creates wheels.Public below (##3730). See
 		// wheels.events.SuperScopePrimer. Keep this the first statement.
-		CreateObject("component", "wheels.events.SuperScopePrimer");
 
 		// Embedding values from `Application.cfc`'s `this` scope into the current component's `this` scope.
 		for (key in keys) {
