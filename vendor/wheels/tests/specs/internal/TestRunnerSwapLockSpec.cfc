@@ -78,6 +78,27 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
+			it("runner.cfm requires a run token before treating a request as a sub-request (issue ##3683)", () => {
+				// A timed-out CLI run keeps executing server-side. An immediate
+				// re-run used to see its backup, take itself for a sub-request,
+				// skip the lock and collide with it. Only a request echoing the
+				// in-progress run's token may bypass the lock now.
+				expect(StructKeyExists(application, "$$$wheelsTestRunToken")).toBeTrue(
+					"the owning run must publish a run token while it holds the swap"
+				);
+				expect(Len(application["$$$wheelsTestRunToken"]) > 0).toBeTrue();
+				var source = FileRead(ExpandPath("/wheels/tests/runner.cfm"));
+				expect(FindNoCase("url.wheelsTestRun", source) > 0).toBeTrue(
+					"runner.cfm must read the sub-request's url.wheelsTestRun token"
+				);
+				expect(FindNoCase("Compare(local.requestRunToken, local.activeRunToken) == 0", source) > 0).toBeTrue(
+					"runner.cfm must only skip the shared lock when the request's token matches the in-progress run's token"
+				);
+				expect(Find("structDelete(application, ""$$$wheelsTestRunToken"")", source) > 0).toBeTrue(
+					"runner.cfm must clear the run token when the owning run finishes"
+				);
+			});
+
 			it("a completed nested run leaves the parent request's swap intact", () => {
 				// This spec itself executes inside the swap window, so the
 				// backup key must be present right now.
@@ -101,6 +122,10 @@ component extends="wheels.WheelsTest" {
 				if (StructKeyExists(url, "db")) {
 					requestParams.db = url.db;
 				}
+				// A sub-request proves it belongs to this run by echoing the
+				// run token; without it the runner would queue it on the lock
+				// this request holds (issue ##3683).
+				requestParams.wheelsTestRun = application["$$$wheelsTestRunToken"];
 				var tc = $testClient().get(path = "/wheels/core/tests", params = requestParams);
 				expect(tc.statusCode()).toBe(200, "the nested runner request must complete green");
 
@@ -111,6 +136,9 @@ component extends="wheels.WheelsTest" {
 				// ...and must NOT have restored live config over the
 				// in-progress parent run (transactionMode='none' is one of
 				// the swapped-in test settings).
+				expect(StructKeyExists(application, "$$$wheelsTestRunToken")).toBeTrue(
+					"a completed nested run must not clear the parent's run token"
+				);
 				expect(application.wheels.transactionMode).toBe(
 					"none",
 					"a completed nested run must not restore the live config while the parent run is still executing"

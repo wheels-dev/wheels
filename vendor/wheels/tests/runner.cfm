@@ -217,13 +217,37 @@
     // (application.$$$wheels exists) and skip BOTH the swap and the shared
     // lock — contending on the parent's lock would deadlock parallel mode.
     // A unique per-request suffix turns their lock into a no-op.
-    local.runnerOwnsSwap = !StructKeyExists(application, "$$$wheels");
+    //
+    // A sub-request must also prove it belongs to the run in progress by
+    // echoing that run's token (url.wheelsTestRun, taken from
+    // application.$$$wheelsTestRunToken). An existing backup alone is not
+    // enough: a run the CLI abandoned on timeout keeps executing server-side,
+    // and an immediate re-run used to see its backup, conclude it was a
+    // sub-request, skip the lock and run concurrently against the same test
+    // database — crashing or failing real specs (issue #3683). Without the
+    // token, an overlapping run now queues on the lock behind the running one.
+    local.activeRunToken = StructKeyExists(application, "$$$wheelsTestRunToken") ? application["$$$wheelsTestRunToken"] : "";
+    local.requestRunToken = (StructKeyExists(url, "wheelsTestRun") && IsSimpleValue(url.wheelsTestRun)) ? url.wheelsTestRun : "";
+    local.runnerOwnsSwap = !(
+        StructKeyExists(application, "$$$wheels")
+        && Len(local.activeRunToken)
+        && Compare(local.requestRunToken, local.activeRunToken) == 0
+    );
     local.runnerLockSuffix = local.runnerOwnsSwap ? "" : "_sub_" & CreateUUID();
     // Timeout must exceed the worst-case full-suite duration on the slowest
     // engine; matches the requestTimeout at the top of this template.
     lock name="wheelsTestRunner_#application.applicationName##local.runnerLockSuffix#" type="exclusive" timeout="1800" throwontimeout="true" {
         try {
             if (local.runnerOwnsSwap) {
+                // Holding the exclusive lock means no other owner is live, so
+                // a backup still present was stranded by a run that died
+                // before its finally block. Restore it first so the swap below
+                // backs up the real config, not the stranded test config.
+                if (StructKeyExists(application, "$$$wheels")) {
+                    application.wheels = application.$$$wheels;
+                    structDelete(application, "$$$wheels");
+                }
+                application["$$$wheelsTestRunToken"] = CreateUUID();
                 variables.$_setTestboxEnv();
             }
             if (!structKeyExists(url, "format") || url.format eq "html") {
@@ -369,6 +393,9 @@
             if (local.runnerOwnsSwap && StructKeyExists(application, "$$$wheels")) {
                 application.wheels = application.$$$wheels;
                 structDelete(application, "$$$wheels");
+            }
+            if (local.runnerOwnsSwap) {
+                structDelete(application, "$$$wheelsTestRunToken");
             }
             // Coverage mode: dump the function-level counter map to an
             // absolute path the coverage tooling reads. Best-effort — a

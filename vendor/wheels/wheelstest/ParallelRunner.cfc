@@ -168,6 +168,13 @@ component {
 		var threadNames = [];
 		var runId = replace(createUUID(), "-", "", "all");
 
+		// When launched from inside a test run (the runner holds the config
+		// swap and the shared lock), each partition must echo that run's token
+		// so the runner treats it as a re-entrant sub-request instead of
+		// queueing it on the lock the parent holds (issue #3683).
+		var tokenKey = (arguments.type == "app") ? "$$$appTestRunToken" : "$$$wheelsTestRunToken";
+		var parentRunToken = StructKeyExists(application, tokenKey) ? application[tokenKey] : "";
+
 		for (var i = 1; i <= arrayLen(arguments.partitions); i++) {
 			var threadName = "parallelTest_#runId#_#i#";
 			arrayAppend(threadNames, threadName);
@@ -181,6 +188,7 @@ component {
 				testType="#arguments.type#"
 				testDb="#arguments.db#"
 				bundleList="#bundleList#"
+				parentRunToken="#parentRunToken#"
 				partitionIndex="#i#"
 			{
 				var partitionStart = getTickCount();
@@ -190,6 +198,9 @@ component {
 						& testPath & "?db=" & attributes.testDb
 						& "&format=json&cli=true"
 						& "&testBundles=" & urlEncodedFormat(attributes.bundleList);
+					if (len(attributes.parentRunToken)) {
+						testUrl &= "&wheelsTestRun=" & urlEncodedFormat(attributes.parentRunToken);
+					}
 
 					cfhttp(
 						url = testUrl,

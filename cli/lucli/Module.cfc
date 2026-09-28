@@ -8113,6 +8113,9 @@ component extends="modules.BaseModule" {
 			if (reFindNoCase("(read timed out|SocketTimeout)", e.message)) {
 				out("Test run timed out after #arguments.timeoutSeconds#s waiting for the suite to finish.", "red");
 				out("The specs may have passed — the CLI stopped waiting, the runner did not stop running.", "yellow");
+				// The abandoned run still holds the server's test-runner lock, so a
+				// re-run queues behind it rather than starting at once (issue #3683).
+				out("That run is still executing on the server; a re-run waits for it to finish first.", "yellow");
 				// --test-timeout works on every LuCLI runtime; a plain --timeout
 				// only reaches the module on builds with the LuCLI #130 fix.
 				out("Give it longer:  wheels test --test-timeout=#arguments.timeoutSeconds * 2#", "yellow");
