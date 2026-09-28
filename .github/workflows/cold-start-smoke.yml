@@ -1,0 +1,169 @@
+name: Smoke (cold first request)
+
+# Regression net for issue #3730 (tracked by #3735, CLAUDE.md invariant 21).
+#
+# Some engine bugs fire only on the FIRST request a JVM serves. On Adobe CF
+# 2023/2025 every cold start answered HTTP 500 from onApplicationStart until
+# the SuperScopePrimer fix (#3736). The core suite, compat-matrix and
+# smoke-env.yml cannot see this class: each sends earlier requests (the image's
+# Docker healthcheck, HTTP readiness polling, warm-up calls) that absorb the
+# one-time failure.
+#
+# This workflow boots each engine from a fresh container with the healthcheck
+# DISABLED, waits for the port without sending HTTP, and asserts that the very
+# first request succeeds. It does that twice: after the fresh start and after a
+# plain `docker compose restart`. See tools/ci/cold-start-smoke.sh.
+#
+# Adobe 2025 runs with the graphqlclient package installed (the
+# tools/docker/adobe2025/server.json cfpm list, #3737). The missing-package
+# first-request failure (#3726) is guarded in onError by #3734 and is not
+# exercised here.
+#
+# Lucee 7 and BoxLang are cheap controls: they never had the Adobe bug, so a
+# red control points at the harness rather than the engine.
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - 'vendor/wheels/events/**'
+      - 'vendor/wheels/Global.cfc'
+      - 'vendor/wheels/Public.cfc'
+      - 'vendor/wheels/global/**'
+      - 'public/Application.cfc'
+      - 'cli/lucli/templates/app/public/Application.cfc'
+      - 'config/app.cfm'
+      - 'compose.yml'
+      - 'tools/docker/adobe2023/**'
+      - 'tools/docker/adobe2025/**'
+      - 'tools/docker/lucee7/**'
+      - 'tools/docker/boxlang/**'
+      - 'tools/ci/cold-start-smoke.sh'
+      - '.github/workflows/cold-start-smoke.yml'
+  schedule:
+    # Nightly, offset from compat-matrix (02:00 UTC).
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cold-start-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cold-start:
+    name: "Cold start: ${{ matrix.engine }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: adobe2023
+            port: 62023
+          - engine: adobe2025
+            port: 62025
+          - engine: lucee7
+            port: 60007
+          - engine: boxlang
+            port: 60001
+    steps:
+      - uses: actions/checkout@v5
+
+      # The commandbox base image ships a Docker HEALTHCHECK that GETs
+      # HEALTHCHECK_URI (`/`) every 20s. That request would be the cold first
+      # request and hide the failure, so turn it off for this service. The
+      # override lives in RUNNER_TEMP so it never enters the bind mount.
+      # COMPOSE_FILE makes every later `docker compose` call (including the
+      # script's restart) layer it on top of compose.yml.
+      - name: Disable the ${{ matrix.engine }} healthcheck
+        run: |
+          OVERRIDE="$RUNNER_TEMP/cold-start.override.yml"
+          cat > "$OVERRIDE" <<'YAML'
+          services:
+            ${{ matrix.engine }}:
+              healthcheck:
+                disable: true
+          YAML
+          cat "$OVERRIDE"
+          echo "COMPOSE_FILE=compose.yml:$OVERRIDE" >> "$GITHUB_ENV"
+          echo "SMOKE_OUT_DIR=$RUNNER_TEMP/cold-start-artifacts" >> "$GITHUB_ENV"
+          COMPOSE_FILE="compose.yml:$OVERRIDE" docker compose config "${{ matrix.engine }}" | grep -A2 'healthcheck:' || true
+
+      # The probes run in development (config/environment.cfm as checked in):
+      # `/` renders the welcome page and /wheels/core/tests is available. Point
+      # the harness settings at SQLite so no probe depends on a database
+      # container this job does not start. The CFConfig wheelstestdb_sqlite
+      # datasource reads these files at the repo root via the bind mount. Must
+      # run before `docker compose up` (sed -i replaces the inode the bind
+      # mount captures at container start).
+      - name: Point the ${{ matrix.engine }} harness datasources at SQLite
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y --no-install-recommends sqlite3
+          sqlite3 wheelstestdb.db "SELECT 1;"
+          sqlite3 wheelstestdb_tenant_b.db "SELECT 1;"
+          SETTINGS="tools/docker/${{ matrix.engine }}/settings.cfm"
+          sed -i -E 's/set\((coreTestDataSourceName|dataSourceName)="[^"]*"\)/set(\1="wheelstestdb_sqlite")/' "$SETTINGS"
+          grep -qF 'set(dataSourceName="wheelstestdb_sqlite")' "$SETTINGS" || {
+            echo "::error::$SETTINGS datasource substitution failed — pattern drift?"; exit 1; }
+          grep -n 'DataSourceName' "$SETTINGS"
+          grep -n 'set(environment' config/environment.cfm
+
+      # Mirrors compat-matrix.yml's "Start CF engine" step: the retry absorbs
+      # transient download failures and only `up -d` runs after a good build.
+      # `up -d` creates a fresh container; the engine home (.engine/ in the
+      # bind-mounted workspace) starts empty on a hosted runner.
+      - name: Build and start ${{ matrix.engine }}
+        run: |
+          set -e
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          until docker compose build "${{ matrix.engine }}"; do
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "::error::docker compose build failed after ${MAX_ATTEMPTS} attempts"
+              exit 1
+            fi
+            echo "::warning::Build attempt ${ATTEMPT} failed — sleeping 30s before retry"
+            ATTEMPT=$((ATTEMPT + 1))
+            sleep 30
+          done
+          docker compose up -d "${{ matrix.engine }}"
+
+      # No readiness step before this one: any HTTP readiness poll would be the
+      # first request. The script waits on the socket table and the console.
+      - name: Cold first-request probes
+        run: bash tools/ci/cold-start-smoke.sh "${{ matrix.engine }}" "${{ matrix.port }}"
+
+      - name: Collect engine logs
+        if: failure()
+        run: |
+          OUT="$SMOKE_OUT_DIR/logs"
+          mkdir -p "$OUT"
+          docker logs "wheels-${{ matrix.engine }}-1" > "$OUT/docker.log" 2>&1 || true
+          tail -200 "$OUT/docker.log" || true
+          # Adobe and BoxLang keep their engine home in the bind-mounted
+          # workspace (server.json serverHomeDirectory); Lucee 7 keeps it in
+          # the image, so copy any logs directories out of the container.
+          if [ -d ".engine/${{ matrix.engine }}" ]; then
+            find ".engine/${{ matrix.engine }}" -type f \( -name '*.log' -o -name '*.out*' \) -size -20M \
+              -exec cp --parents {} "$OUT/" \; 2>/dev/null || true
+          fi
+          docker exec "wheels-${{ matrix.engine }}-1" sh -c \
+            'find / -xdev -type f \( -name "wheels-errors.log" -o -name "application.log" -o -name "exception.log" -o -name "server.out.txt" \) -not -path "/proc/*" 2>/dev/null | tar -czf - -T - 2>/dev/null' \
+            > "$OUT/container-logs.tgz" 2>/dev/null || true
+          find "$OUT" -name 'wheels-errors.log' -exec sh -c 'echo "=== $1"; tail -80 "$1"' _ {} \; || true
+
+      - name: Upload probe responses and logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: cold-start-${{ matrix.engine }}
+          path: ${{ runner.temp }}/cold-start-artifacts/
+          if-no-files-found: ignore
+
+      - name: Stop container
+        if: always()
+        run: docker compose down -v 2>/dev/null || true
