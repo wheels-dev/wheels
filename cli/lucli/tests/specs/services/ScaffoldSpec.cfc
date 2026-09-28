@@ -588,6 +588,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).notToInclude('class="btn btn-default"');
 				});
 
+				it("index.cfm keeps the CRUD template's newPost route link (##3722)", () => {
+					$scaffoldPost();
+					var content = fileRead(tempRoot & "/app/views/posts/index.cfm");
+					expect(content).toInclude('route="newPost"');
+				});
+
 				it("show.cfm has clean heading + link/buttonTo footer (no Bootstrap)", () => {
 					$scaffoldPost();
 					var content = fileRead(tempRoot & "/app/views/posts/show.cfm");

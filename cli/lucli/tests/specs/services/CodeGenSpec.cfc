@@ -468,6 +468,61 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
+			describe("generateView() (##3722)", () => {
+
+				it("gives a plain controller's index action the plain view, not the CRUD index", () => {
+					var result = codegen.generateView(name = "Pages", action = "index", force = true);
+					expect(result.success).toBeTrue();
+					var content = fileRead(tempRoot & "/app/views/pages/index.cfm");
+					// The CRUD index links to route="newPage", which a plain controller
+					// never registers, so rendering threw Wheels.RouteNotFound (404).
+					expect(content).notToInclude("newPage");
+					expect(content).notToInclude("route=");
+					// chr(60) keeps Lucee's tag-balance scan from seeing an open tag here.
+					expect(content).notToInclude(chr(60) & "cfloop");
+				});
+
+				it("gives a plain controller's show action the plain view as well", () => {
+					codegen.generateView(name = "Pages", action = "show", force = true);
+					var content = fileRead(tempRoot & "/app/views/pages/show.cfm");
+					expect(content).notToInclude("route=");
+				});
+
+				it("matches the view a non-CRUD action name gets", () => {
+					codegen.generateView(name = "Pages", action = "about", force = true);
+					var aboutView = fileRead(tempRoot & "/app/views/pages/about.cfm");
+					codegen.generateView(name = "Pages", action = "index", force = true);
+					var indexView = fileRead(tempRoot & "/app/views/pages/index.cfm");
+					expect(indexView).toBe(aboutView);
+				});
+
+				it("still uses the CRUD index template when crud=true (scaffold path)", () => {
+					var result = codegen.generateView(
+						name = "Widgets",
+						action = "index",
+						crud = true,
+						force = true,
+						properties = [{name: "title", type: "string"}]
+					);
+					expect(result.success).toBeTrue();
+					var content = fileRead(tempRoot & "/app/views/widgets/index.cfm");
+					expect(content).toInclude('route="newWidget"');
+				});
+
+				it("honours an explicit template even without crud", () => {
+					codegen.generateView(
+						name = "Gadgets",
+						action = "index",
+						template = "crud/index.txt",
+						force = true,
+						properties = [{name: "title", type: "string"}]
+					);
+					var content = fileRead(tempRoot & "/app/views/gadgets/index.cfm");
+					expect(content).toInclude('route="newGadget"');
+				});
+
+			});
+
 			describe("generatePolicy()", () => {
 
 				it("creates the policy and the base Policy.cfc stub on first run", () => {

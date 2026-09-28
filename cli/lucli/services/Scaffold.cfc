@@ -141,7 +141,8 @@ component {
 						force = arguments.force,
 						properties = viewProps,
 						belongsTo = arguments.belongsTo,
-						hasMany = arguments.hasMany
+						hasMany = arguments.hasMany,
+						crud = true
 					);
 					if (viewResult.success) {
 						arrayAppend(results.generated, {type: "view", path: viewResult.path});

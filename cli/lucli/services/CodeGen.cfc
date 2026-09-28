@@ -242,7 +242,14 @@ component {
 	}
 
 	/**
-	 * Generate view files
+	 * Generate view files.
+	 *
+	 * `crud = true` selects the resource CRUD templates (crud/index.txt, crud/show.txt, ...)
+	 * for the matching action names. Only the scaffold passes it: those templates link to
+	 * resource routes such as `new<Model>` that a plain controller from
+	 * `wheels g controller Pages index` does not have, so rendering its index view threw
+	 * Wheels.RouteNotFound (served as a 404). Plain controllers and `wheels g view` get
+	 * the plain ViewContent.txt template for every action (#3722).
 	 */
 	public struct function generateView(
 		required string name,
@@ -251,7 +258,8 @@ component {
 		string belongsTo = "",
 		string hasMany = "",
 		string template = "",
-		boolean force = false
+		boolean force = false,
+		boolean crud = false
 	) {
 		var controllerName = variables.helpers.capitalize(arguments.name);
 		var viewDir = variables.projectRoot & "/app/views/#lCase(controllerName)#";
@@ -262,7 +270,10 @@ component {
 			return {success: false, error: "View already exists: app/views/#lCase(controllerName)#/#fileName#", path: filePath};
 		}
 
-		// Auto-detect template based on action name
+		// Auto-detect template based on action name (CRUD templates only for resources)
+		if (!len(arguments.template) && !arguments.crud) {
+			arguments.template = "ViewContent.txt";
+		}
 		if (!len(arguments.template)) {
 			switch (arguments.action) {
 				case "index": arguments.template = "crud/index.txt"; break;
