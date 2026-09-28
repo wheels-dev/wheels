@@ -252,49 +252,84 @@ component {
 	public string function peerHeldBy(required string pid, required numeric serverPort, required numeric clientPort) {
 		if (!isNumeric(arguments.pid)) return "no";
 		if (fileExists("/proc/net/tcp")) {
-			var inodes = [];
-			for (var table in ["/proc/net/tcp", "/proc/net/tcp6"]) {
-				if (!fileExists(table)) continue;
-				var lines = listToArray(fileRead(table), chr(10));
-				for (var n = 2; n <= arrayLen(lines); n++) {
-					var cols = listToArray(trim(lines[n]), " ");
-					if (arrayLen(cols) < 10 || cols[4] != "01") continue;
-					if (
-						inputBaseN(listLast(cols[2], ":"), 16) == arguments.serverPort
-						&& inputBaseN(listLast(cols[3], ":"), 16) == arguments.clientPort
-						&& cols[10] != "0"
-					) {
-						arrayAppend(inodes, cols[10]);
-					}
-				}
-			}
-			if (!arrayLen(inodes)) return "no";
-			var held = $procSocketInodes(arguments.pid);
-			if (isNull(held)) return "unknown";
-			for (var inode in inodes) {
-				if (structKeyExists(held, inode)) return "yes";
-			}
-			return "no";
+			return $peerHeldByProc(arguments.pid, arguments.serverPort, arguments.clientPort);
 		}
 
 		var osName = lCase(createObject("java", "java.lang.System").getProperty("os.name"));
 		if (findNoCase("windows", osName)) {
-			var result = $runCommand(["netstat", "-ano", "-p", "TCP"]);
-			var result6 = $runCommand(["netstat", "-ano", "-p", "TCPv6"]);
-			if (!result.ran || result.exitCode != 0) return "unknown";
-			for (var line in listToArray(result.output & chr(10) & (result6.ran ? result6.output : ""), chr(10) & chr(13))) {
-				var cols = listToArray(trim(line), " " & chr(9));
+			return $peerHeldByNetstat(arguments.pid, arguments.serverPort, arguments.clientPort);
+		}
+		return $peerHeldByLsof(arguments.pid, arguments.serverPort, arguments.clientPort);
+	}
+
+	/**
+	 * peerHeldBy() on Linux: the ESTABLISHED sockets from /proc/net/tcp{,6}
+	 * whose local end is `serverPort` and remote end is `clientPort`, matched
+	 * by inode against the sockets `pid` holds open.
+	 */
+	public string function $peerHeldByProc(required string pid, required numeric serverPort, required numeric clientPort) {
+		var inodes = $procEstablishedInodes(arguments.serverPort, arguments.clientPort);
+		if (!arrayLen(inodes)) return "no";
+		var held = $procSocketInodes(arguments.pid);
+		if (isNull(held)) return "unknown";
+		for (var inode in inodes) {
+			if (structKeyExists(held, inode)) return "yes";
+		}
+		return "no";
+	}
+
+	/**
+	 * Inodes of the ESTABLISHED sockets in /proc/net/tcp{,6} whose local end
+	 * is `serverPort` and remote end is `clientPort`.
+	 */
+	public array function $procEstablishedInodes(required numeric serverPort, required numeric clientPort) {
+		var inodes = [];
+		for (var table in ["/proc/net/tcp", "/proc/net/tcp6"]) {
+			if (!fileExists(table)) continue;
+			var lines = listToArray(fileRead(table), chr(10));
+			for (var n = 2; n <= arrayLen(lines); n++) {
+				var cols = listToArray(trim(lines[n]), " ");
+				if (arrayLen(cols) < 10 || cols[4] != "01") continue;
 				if (
-					arrayLen(cols) == 5
-					&& listLast(cols[2], ":") == arguments.serverPort
-					&& listLast(cols[3], ":") == arguments.clientPort
+					inputBaseN(listLast(cols[2], ":"), 16) == arguments.serverPort
+					&& inputBaseN(listLast(cols[3], ":"), 16) == arguments.clientPort
+					&& cols[10] != "0"
 				) {
-					return cols[5] == arguments.pid ? "yes" : "no";
+					arrayAppend(inodes, cols[10]);
 				}
 			}
-			return "no";
 		}
+		return inodes;
+	}
 
+	/**
+	 * peerHeldBy() on Windows: the TCP (and TCPv6) connection from netstat
+	 * whose local end is `serverPort` and remote end is `clientPort`, and the
+	 * pid that owns it.
+	 */
+	public string function $peerHeldByNetstat(required string pid, required numeric serverPort, required numeric clientPort) {
+		var result = $runCommand(["netstat", "-ano", "-p", "TCP"]);
+		var result6 = $runCommand(["netstat", "-ano", "-p", "TCPv6"]);
+		if (!result.ran || result.exitCode != 0) return "unknown";
+		for (var line in listToArray(result.output & chr(10) & (result6.ran ? result6.output : ""), chr(10) & chr(13))) {
+			var cols = listToArray(trim(line), " " & chr(9));
+			if (
+				arrayLen(cols) == 5
+				&& listLast(cols[2], ":") == arguments.serverPort
+				&& listLast(cols[3], ":") == arguments.clientPort
+			) {
+				return cols[5] == arguments.pid ? "yes" : "no";
+			}
+		}
+		return "no";
+	}
+
+	/**
+	 * peerHeldBy() on macOS and other Unixes: `pid`'s TCP connections on
+	 * `clientPort` from lsof, looking for one whose ends are `serverPort`
+	 * and `clientPort`.
+	 */
+	public string function $peerHeldByLsof(required string pid, required numeric serverPort, required numeric clientPort) {
 		var lsof = $lsofPath();
 		if (!len(lsof)) return "unknown";
 		var result = $runCommand([lsof, "-nP", "-a", "-p", arguments.pid, "-iTCP:" & arguments.clientPort, "-Fn"]);
