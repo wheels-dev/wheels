@@ -465,6 +465,22 @@ component output="false" {
 	}
 
 	public void function onError( any Exception, string EventName ) {
+		// Adobe ColdFusion 2025 without its optional graphqlclient package
+		// calls onError with that notice before the application starts, then
+		// continues the same request (onApplicationStart, onRequest).
+		// Rendering it here would make that request an HTTP 500 (##3726).
+		// Only that exact notice is passed over; it is logged to wheels.log.
+		// Nothing here may throw or touch the application scope.
+		try {
+			local.startupNotice = new wheels.events.EngineStartupNotice();
+			if (local.startupNotice.isBenign(arguments.Exception, arguments.EventName ?: "")) {
+				local.startupNotice.record();
+				return;
+			}
+		} catch (any e) {
+			// Fall through to normal error handling.
+		}
+
 		try {
 			// Only rebuild the DI container when it never came up (e.g. the
 			// Injector failed during onApplicationStart). Injector.init()

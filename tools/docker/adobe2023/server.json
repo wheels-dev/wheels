@@ -18,6 +18,10 @@
 			"libDirs":"tools/docker/adobe2023/lib",
 			"serverHomeDirectory":".engine/adobe2023"
 	},
+	"jvm":{
+        "heapSize":"2048",
+        "minHeapSize":"512"
+    },
 	"cfconfigFile":"CFConfig.json",
 	"scripts":{
         "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle"

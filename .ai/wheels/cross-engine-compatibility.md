@@ -417,6 +417,70 @@ Note the interaction with anti-pattern 11 (reserved scope names shadowing parame
 
 **Reference fix**: [#3338](https://github.com/wheels-dev/wheels/pull/3338) — the tenant-context hardening for [#3336](https://github.com/wheels-dev/wheels/issues/3336) added a `StructKeyExists(request, "wheels")` guard to `TenantResolver.handle()`; it errored on all five Adobe 2025 database legs (8 specs each) while every other engine stayed green, and was switched to the `IsDefined()` form already used by the same function's `finally` block.
 
+### First Subclass Created Inside a Mixin UDF Breaks the Super-Scope Stack (Adobe CF 2023/2025)
+
+**Symptom.** The first request after every cold start returns HTTP 500. `wheels-errors.log`
+has `Event handler exception (onApplicationStart)`, caused by `java.util.EmptyStackException`
+at `NeoPageContext.popSuperScope`, from `UDFMethod.invoke` for the
+`application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init")`
+line in `onapplicationstart.cfc`. The second request succeeds.
+
+**Cause: an Adobe engine bug.** Reproduced with no Wheels code:
+
+```cfm
+// Base.cfc
+component { include "mix.cfm"; promote(); }
+// mix.cfm
+public any function make() { return CreateObject("component", "Child"); }
+public void function promote() { this.make = variables.make; }   // Global's promote scan, reduced
+// Child.cfc
+component extends="Base" {}
+// index.cfm: the first request throws, the second passes
+CreateObject("component", "Base").make();
+```
+
+A mixin (include-declared) UDF runs on object A and creates a subclass B, and B's
+pseudo-constructor assigns that same UDF to B's `this`. The first time this happens in a JVM,
+the UDF's prologue does not push a super scope but its epilogue pops one:
+
+- `NullPointerException: "this.SymTab_superScopes" is null` when nothing has been pushed yet
+  in the request.
+- `EmptyStackException` otherwise.
+
+The body completes normally. The following do **not** trigger it:
+
+- copying a different UDF;
+- a UDF declared in the component itself rather than included;
+- creating any subclass of the same hierarchy first, outside a mixin call (this initializes
+  the state).
+
+Creating an unrelated subclass (`Foo extends Bar`) first does not help. Lucee 7 and BoxLang
+are unaffected.
+
+**Wheels mapping.** `application.wo` is a plain `wheels.Global`. `$createObjectFromRoot` is
+included from `global/objects.cfm`. Global's pseudo-constructor calls
+`$promoteIncludedGlobalsToThis()`, which copies every included UDF onto `this`. `wheels.Public`
+is the first Global subclass the JVM creates, and it is created by `$createObjectFromRoot`
+on `application.wo`. So that line always fails first.
+
+**Why it hid.** Any earlier request absorbs the once-per-JVM failure: the compose healthcheck
+`GET /` every 20s, readiness retries, or an unguarded `onError` that creates
+`wheels.events.EventMethods` via `$simpleLock` → `$invoke`. The test suite runs in an
+already-started JVM, and "graphqlclient installed" looked like a fix only because the
+healthcheck ran first. 51edf9dce blamed an include nest in `Public.$init` and un-nested it.
+The failure recurred ([#3730](https://github.com/wheels-dev/wheels/issues/3730)).
+
+**Fix.** `onapplicationstart.$init()` creates `wheels.events.SuperScopePrimer`, an empty
+`extends="wheels.Global"` component, as its first statement, before any `application.wo`
+call. Keep it first, and keep the primer empty. Any new code path that creates a Global
+subclass from inside a Global mixin before `onApplicationStart` runs, for example in
+`onError` before the application starts, can still absorb the one-time failure there.
+
+**Verifying.** The suite cannot reproduce it. Use a cold first request with the healthcheck
+disabled (compose override `healthcheck: {disable: true}`). Wait for the engine's
+`Server is up` log line, **not** an HTTP poll, then issue exactly one `GET /`. Structural
+guard: `vendor/wheels/tests/specs/events/SuperScopePrimerSpec.cfc`.
+
 ## Database-Specific Gotchas
 
 ### H2 Database (Lucee-Only Matrix Leg)

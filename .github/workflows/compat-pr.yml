@@ -3,8 +3,8 @@
 # database (SQLite, no external container).
 #
 # This is the subset of compat-matrix.yml that catches the class of bug the
-# weekly matrix exists for (cross-engine regressions), at PR time instead of
-# at release preflight. The full engine x database matrix stays weekly +
+# nightly matrix exists for (cross-engine regressions), at PR time instead of
+# at release preflight. The full engine x database matrix stays nightly +
 # manual (compat-matrix.yml); SQLite is sufficient to catch engine-specific
 # breakage, which is independent of the database.
 #
@@ -63,9 +63,19 @@ jobs:
 
       - name: Detect framework changes
         id: changes
+        env:
+          # Diff against the PR's base commit, which the full-history checkout
+          # already holds. Re-fetching the base branch with --depth=1 grafted
+          # its tip as a shallow root, so once develop moved past the merge ref
+          # `origin/develop...HEAD` had no merge base; git diff then exited 128
+          # and every such PR ran the full compat suites, docs-only or not.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}" 2>/dev/null || true
-          if git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- \
+          if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$BASE_SHA" 2>/dev/null || true
+          fi
+          # A failed diff (exit > 1) falls through to framework_changed=true.
+          if git diff --quiet "${BASE_SHA}...HEAD" -- \
               vendor/wheels cli/lucli .github/workflows/compat-pr.yml; then
             echo "framework_changed=false" >> "$GITHUB_OUTPUT"
             echo "No framework/CLI changes — skipping the compat suites (no-op success)."
@@ -261,3 +271,27 @@ jobs:
             docker logs "wheels-${{ matrix.cfengine }}-1" 2>&1 | tail -100
             exit 1
           fi
+
+      - name: Report container exit state
+        # A cgroup OOM-kill ends the JVM with exit 137 and NO Java error; name it.
+        if: always() && steps.changes.outputs.framework_changed == 'true'
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+          DB: ${{ matrix.database }}
+        run: |
+          BAD=0
+          for C in "wheels-${CFENGINE}-1" "wheels-${DB}-1"; do
+            STATE=$(docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} oomkilled={{.State.OOMKilled}} restarts={{.RestartCount}}' "$C" 2>/dev/null || echo "missing")
+            # OOMKilled only reflects PID 1 (the CommandBox launcher); the server
+            # JVM is its child, so a kernel kill of the JVM can leave the container
+            # "running, oomkilled=false". The cgroup's oom_kill counter sees it.
+            KILLS=$(docker exec "$C" sh -c 'cat /sys/fs/cgroup/memory.events 2>/dev/null || cat /sys/fs/cgroup/memory/memory.oom_control 2>/dev/null' 2>/dev/null | awk '$1=="oom_kill"{print $2}')
+            STATE="$STATE cgroup_oom_kill=${KILLS:-n/a}"
+            echo "$C: $STATE"
+            case "$STATE" in
+              missing*) ;;  # sqlite/h2 legs have no database container
+              *oomkilled=true*|*cgroup_oom_kill=[1-9]*) echo "::error::$C had a process OOM-killed by the kernel (cgroup memory limit): $STATE"; BAD=1 ;;
+              exited*|dead*) echo "::error::$C is not running after the suite: $STATE"; BAD=1 ;;
+            esac
+          done
+          exit "$BAD"

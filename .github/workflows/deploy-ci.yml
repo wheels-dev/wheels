@@ -56,7 +56,12 @@ jobs:
         id: diff
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
+          # The PR's base commit. Diff against it rather than re-fetching the
+          # base branch tip: `git fetch --depth=1 origin develop` after the
+          # full-history checkout grafted the fresh tip as a shallow root, so
+          # once develop moved past the merge ref `origin/develop...HEAD` had
+          # no merge base and this job failed closed on every such PR.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
@@ -75,8 +80,16 @@ jobs:
           # required on its own.
           PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$|\.github/actions/setup-lucli/|tools/lucli\.json$|lucee\.json$|public/|config/|app/(events|global|migrator)/|vendor/wheels/(public/|Public\.cfc$|events/|wheelstest/|migrator/|Seeder\.cfc$|JobWorker\.cfc$))'
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            git fetch --no-tags --depth=1 origin "$BASE_REF"
-            CHANGED="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            # fetch-depth: 0 already holds the base commit; fetch it (with full
+            # history, never --depth) only if it is somehow missing.
+            if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              git fetch --no-tags origin "$BASE_SHA" || true
+            fi
+            if ! CHANGED="$(git diff --name-only "${BASE_SHA}...HEAD")"; then
+              echo "Could not diff against the PR base (${BASE_SHA}): treating as relevant."
+              echo "relevant=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           elif [ -n "${BEFORE:-}" ] && ! echo "$BEFORE" | grep -qE '^0+$' && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             CHANGED="$(git diff --name-only "$BEFORE" HEAD)"
           else

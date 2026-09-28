@@ -4,15 +4,16 @@
  * application.wo / onError String[] stacks on that same issue).
  *
  * Field stack: onapplicationstart.cfc:409 `$createObjectFromRoot` →
- * Public.$init → Adobe `NeoPageContext.popSuperScope` EmptyStack. 4.0.5
- * Public.$init is include helpers + return only. 4.0.6 and develop call
- * `$scanAndPromoteIncludedGlobals()` (a parent-class method on Global)
- * immediately after the raw `include` in the same `$init` body. Adobe's
- * first compile of helpers.cfm after a cold start unbalances the
- * super-scope stack; a later request succeeds.
+ * Public.$init → Adobe `NeoPageContext.popSuperScope` EmptyStack.
  *
- * This VM cannot run Adobe CF 2023 + CommandBox, so the field EmptyStack
- * cannot be reproduced here. What CI can prove:
+ * Correction (##3730): the include/promote nest in Public.$init was NOT the
+ * cause, and un-nesting it did not stop the EmptyStack. The real cause is an
+ * Adobe engine bug. When Global's pseudo-constructor copies the running
+ * `$createObjectFromRoot` mixin onto the new Public object, the call's
+ * epilogue pops a super scope it never pushed. It is fixed by
+ * wheels.events.SuperScopePrimer (see events/SuperScopePrimerSpec.cfc). The
+ * un-nest and these specs stay because they still guard the ##3302 promote
+ * contract. What this spec proves:
  *   1. `$init` does not throw on the LuCLI engine.
  *   2. The ##3302 promote still lands helpers.cfm UDFs on `this`.
  *   3. The promote scan runs after `$includePublicHelpers` returns — not

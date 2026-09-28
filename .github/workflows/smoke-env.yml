@@ -92,7 +92,7 @@ jobs:
   # error template + HTTP 500 on `/` and `/wheels/info` in non-dev
   # environments) only manifests on Adobe engines — the Lucee job above stays
   # green on the pre-fix tree. Boots the same adobe2023 Docker engine the
-  # weekly compat-matrix builds (engine images are not registry-pullable, but
+  # nightly compat-matrix builds (engine images are not registry-pullable, but
   # the `docker compose build` is ~90s in CI and the engine is serving in
   # ~4 min — measured on compat-matrix run 27081098861). No database
   # containers: the probes never touch the datasource, and the harness

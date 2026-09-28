@@ -1,0 +1,1 @@
+- With Oracle on BoxLang and Adobe 2023, model finders returned datetime columns as raw `oracle.sql.TIMESTAMP` driver objects, which `DateFormat()`, `DateCompare()`, output, concatenation and `SerializeJSON()` could not handle. They are now CFML dates, to the millisecond, as on every other engine and database (#3719)
