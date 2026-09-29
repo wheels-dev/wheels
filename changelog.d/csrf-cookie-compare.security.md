@@ -1,0 +1,1 @@
+- With `set(csrfStore="cookie")`, the authenticity token is now compared exactly and in constant time (`$secureCompare()`), instead of with CFML `==`, which ignores case and stops at the first differing character. The default session store (`CsrfVerifyToken()`) is unchanged.

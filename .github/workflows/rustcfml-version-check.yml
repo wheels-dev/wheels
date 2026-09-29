@@ -61,8 +61,10 @@ jobs:
             **Pinned** `${{ env.RUSTCFML_PINNED }}` → **`${{ env.RUSTCFML_LATEST }}`**.
 
             The full core suite ran **green** against the new engine, so this PR
-            bumps `tools/rustcfml/ENGINE_VERSION` (and the CLI's copy of the pin
-            in `cli/lucli/services/rustcfml/RustCFMLEngine.cfc`) and regenerates
+            bumps `tools/rustcfml/ENGINE_VERSION` and the per-asset sha256 pins in
+            `tools/rustcfml/ENGINE_SHA256` (from the release's published digests),
+            plus the CLI's copies of both in
+            `cli/lucli/services/rustcfml/RustCFMLEngine.cfc`, and regenerates
             `tools/rustcfml/baseline.json` to the new engine's result set.
 
             If the suite had shown new failures, the pin would have been left

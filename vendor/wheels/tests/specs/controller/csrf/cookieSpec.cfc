@@ -56,6 +56,25 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 			
+			it("rejects the cookie token with its letter case changed", () => {
+				// The comparison must be exact: CFML == ignores case.
+				var swapped = "";
+				for (var i = 1; i <= Len(csrfToken); i++) {
+					var ch = Mid(csrfToken, i, 1);
+					swapped &= Compare(ch, UCase(ch)) == 0 ? LCase(ch) : UCase(ch);
+				}
+				expect(Compare(swapped, csrfToken) != 0).toBeTrue("the token has no letters to change");
+				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = swapped}
+				_controller = application.wo.controller("csrfProtectedExcept", params)
+				var state = {type = ""};
+				try {
+					_controller.processAction("update", params)
+				} catch (any e) {
+					state.type = e.Type
+				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
+			})
+
 			it("performs csrf protection on ajax with valid x csrf token header", () => {
 				request.$wheelsHeaders["X-CSRF-TOKEN"] = csrfToken
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"

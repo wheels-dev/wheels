@@ -22,10 +22,21 @@ component {
 	 * `rawResponse` (binary), when given, is written verbatim instead of the
 	 * fixed status line, then the connection closes: specs use it to send
 	 * truncated, chunked or interim (1xx) responses.
+	 *
+	 * `routes`, when given, maps a request path (e.g. "/docs.zip", query
+	 * string ignored) to a raw binary response for that path; any other path
+	 * gets the fixed status / rawResponse. Build responses with
+	 * binaryResponse().
 	 */
-	public any function init(required numeric statusCode, any rawResponse = "", string bindAddress = "") {
+	public any function init(
+		required numeric statusCode,
+		any rawResponse = "",
+		string bindAddress = "",
+		struct routes = {}
+	) {
 		variables.statusCode = arguments.statusCode;
 		variables.rawResponse = arguments.rawResponse;
+		variables.routes = arguments.routes;
 		if (len(arguments.bindAddress)) {
 			// One address, exclusively (issue 3804): see TestSockets for why a
 			// wildcard bind can be shadowed on macOS and BSD.
@@ -46,7 +57,7 @@ component {
 		// Thread attributes are passed unquoted so the ServerSocket arrives as
 		// the live object, not a string render. Unscoped assignments inside a
 		// thread body are thread-local (`var` is reserved for functions).
-		thread name="#variables.threadName#" srv=variables.serverSocket code=variables.statusCode heads=variables.requestHeads raw=variables.rawResponse {
+		thread name="#variables.threadName#" srv=variables.serverSocket code=variables.statusCode heads=variables.requestHeads raw=variables.rawResponse routes=variables.routes {
 			crlf = chr(13) & chr(10);
 			response = "HTTP/1.1 " & attributes.code & " Stub" & crlf
 				& "Content-Length: 0" & crlf
@@ -75,8 +86,10 @@ component {
 						if (len(head)) {
 							attributes.heads.add(head);
 						}
+						// "GET /path?query HTTP/1.1" -> "/path"
+						reqPath = listFirst(listGetAt(listFirst(head, chr(13) & chr(10)) & " /", 2, " "), "?");
 						outStream = sock.getOutputStream();
-						outStream.write(responseBytes);
+						outStream.write(structKeyExists(attributes.routes, reqPath) ? attributes.routes[reqPath] : responseBytes);
 						outStream.flush();
 					} catch (any inner) {
 						// Per-connection failure (probe disconnects, read
@@ -105,6 +118,26 @@ component {
 			arrayAppend(heads, head);
 		}
 		return heads;
+	}
+
+	/**
+	 * A complete HTTP/1.1 response (status line, Content-Length, body) as
+	 * bytes, for `routes` / `rawResponse`. `body` may be a string or binary.
+	 */
+	public binary function binaryResponse(required numeric statusCode, required any body) {
+		var bodyBytes = isBinary(arguments.body) ? arguments.body : charsetDecode(arguments.body, "utf-8");
+		var crlf = chr(13) & chr(10);
+		var headBytes = charsetDecode(
+			"HTTP/1.1 " & arguments.statusCode & " Stub" & crlf
+				& "Content-Type: application/octet-stream" & crlf
+				& "Content-Length: " & len(bodyBytes) & crlf
+				& "Connection: close" & crlf & crlf,
+			"ISO-8859-1"
+		);
+		var buffer = createObject("java", "java.io.ByteArrayOutputStream").init();
+		buffer.write(headBytes);
+		buffer.write(bodyBytes);
+		return buffer.toByteArray();
 	}
 
 	public numeric function getPort() {

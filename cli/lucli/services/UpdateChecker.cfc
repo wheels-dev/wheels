@@ -104,10 +104,14 @@ component {
 	 * after the base SemVer. For stable, plain SemVer.
 	 */
 	public boolean function $isNewer(required string current, required string latest, required string channel) {
-		// SemVer.compare ignores pre-release labels by design (that's its
-		// stable-channel behavior). For bleeding-edge we need to also look at
-		// the trailing snapshot.N — so we compare base first, then N.
-		var baseCmp = variables.semver.compare(arguments.current, arguments.latest);
+		// Compare MAJOR.MINOR.PATCH only (SemVer.compare also orders pre-release
+		// labels, which would rank the legacy "-SNAPSHOT+N" spelling below
+		// "-snapshot.N" by case alone). For bleeding-edge we then look at the
+		// trailing snapshot.N — so we compare base first, then N.
+		var baseCmp = variables.semver.compare(
+			variables.semver.format(variables.semver.parse(arguments.current)),
+			variables.semver.format(variables.semver.parse(arguments.latest))
+		);
 		if (baseCmp != 0) {
 			return baseCmp < 0; // current is older
 		}

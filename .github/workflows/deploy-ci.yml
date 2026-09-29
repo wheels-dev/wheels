@@ -180,7 +180,8 @@ jobs:
       - name: Debug server logs
         if: failure()
         run: |
-          cat /tmp/wheels-cli-test-server.log 2>/dev/null || true
+          # tools/test-cli-local.sh logs per checkout (#3828); one per runner.
+          cat /tmp/wheels-cli-test-server-*.log 2>/dev/null || true
 
   # The stable-named check to require in branch protection. It ALWAYS reports:
   # quick success when nothing CLI-relevant changed, otherwise the verdict of the

@@ -604,23 +604,48 @@
 	public void function reload() {
 		local.query = findByKey(key = key(), reload = true, returnAs = "query");
 		local.properties = propertyNames();
+		local.columnInfo = variables.wheels.class.properties;
 		local.iEnd = ListLen(local.properties);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			// Wrap in try / catch since Coldfusion has a problem with blank boolean values in the query.
 			try {
 				local.property = ListGetAt(local.properties, local.i);
 				this[local.property] = local.query[local.property][1];
-				if (isNumeric(this[local.property]) && !reFind("^0\d*$", this[local.property])) {
-					if (this[local.property] <= 2147483647) {
-						this[local.property] =  JavaCast("int", this[local.property]);
-					} else if (this[local.property] <= 9223372036854775807) {
-						this[local.property] = JavaCast("long", this[local.property]);
-					}
+				// Normalize only integer columns holding a whole number: casting every
+				// numeric value truncated decimals (149.25 -> 149), which the next save()
+				// then wrote back.
+				if (
+					StructKeyExists(local.columnInfo, local.property)
+					&& StructKeyExists(local.columnInfo[local.property], "validationtype")
+					&& local.columnInfo[local.property].validationtype == "integer"
+					&& reFind("^-?[0-9]+$", this[local.property])
+					&& !reFind("^0\d*$", this[local.property])
+				) {
+					this[local.property] = $normalizeReloadedInteger(this[local.property]);
 				}
 			} catch (any e) {
 				this[local.property] = "";
 			}
 		}
+	}
+
+	/**
+	 * Internal function. A whole number read back by `reload()` as a Java int when
+	 * it fits in 32 bits, a long when it fits in 64, otherwise unchanged. Both
+	 * bounds are checked: a value below -2147483648 (a negative BIGINT) must not
+	 * reach JavaCast("int"), which would throw or saturate.
+	 */
+	public any function $normalizeReloadedInteger(required any value) {
+		if (arguments.value >= -2147483648 && arguments.value <= 2147483647) {
+			return JavaCast("int", arguments.value);
+		}
+		// -9223372036854775807, not Long.MIN_VALUE: BoxLang cannot parse the literal
+		// -9223372036854775808 (its positive part overflows a long), which failed
+		// Model.cfc at load. Long.MIN_VALUE itself is left as returned.
+		if (arguments.value >= -9223372036854775807 && arguments.value <= 9223372036854775807) {
+			return JavaCast("long", arguments.value);
+		}
+		return arguments.value;
 	}
 
 	/**

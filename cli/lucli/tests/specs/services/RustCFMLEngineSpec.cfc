@@ -1,8 +1,9 @@
 /**
  * Coverage for the RustCFML engine backend's pure helpers (platform→asset
  * mapping, project-key hashing, state path) and the source-level shape of
- * the process plumbing. The process-bound methods (install/start/stop)
- * shell out to curl/kill and are exercised end-to-end manually, not here.
+ * the process plumbing. install()'s download verification is covered by
+ * RustCFMLEngineInstallSpec; start/stop shell out to kill and are exercised
+ * end-to-end manually, not here.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 

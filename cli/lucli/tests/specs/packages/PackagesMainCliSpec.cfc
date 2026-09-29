@@ -174,6 +174,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				DirectoryDelete(proj, true);
 			});
 
+			it("update keeps an installed pre-release newer than the latest release", () => {
+				var proj = $scratch();
+				var stack = $buildStack(proj);
+				DirectoryCreate(proj & "vendor/wheels-fake", true);
+				FileWrite(proj & "vendor/wheels-fake/package.json", "{""name"":""wheels-fake"",""version"":""1.1.0-rc.1""}");
+				var single = stack.cli.update({target: "wheels-fake", yes: true});
+				expect(single).toInclude("leaving it in place");
+				expect(FileRead(proj & "vendor/wheels-fake/package.json")).toInclude("1.1.0-rc.1");
+				stack.cache.refresh();
+				DirectoryDelete(proj, true);
+			});
+
 			it("remove refuses a dir without package.json", () => {
 				var proj = $scratch();
 				var stack = $buildStack(proj);

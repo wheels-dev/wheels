@@ -527,6 +527,7 @@ component extends="modules.BaseModule" {
 			.option(name = "format", default = "", choices = "text,json", description = "check only: text (default) or json for machine-readable output")
 			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
 			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework")
+			.flag(name = "allow-downgrade", default = false, description = "apply only: proceed even when the CLI's bundled framework is older than the app's vendor/wheels/ (refused by default)")
 			// CLI-only spellings read by parseUpgradeArgs, deliberately NOT
 			// advertised: `--no-backup` (LuCLI normalizes it to backup=false),
 			// `--help`/`-h`, and `--dry-run`, which neither verb supports and is
@@ -1518,17 +1519,20 @@ component extends="modules.BaseModule" {
 	 * when that version is already unpacked, so this is safe to run repeatedly
 	 * (the Homebrew formula's wrapper does essentially the same thing on
 	 * install/upgrade).
+	 *
+	 * The zip is checked against the .sha512 file the release publishes next
+	 * to it before anything is unpacked. Every failure throws
+	 * Wheels.DocsFetchFailed, so the command exits non-zero, and leaves any
+	 * previously installed docs for that version in place.
 	 */
 	private string function docsFetch(boolean force = false) {
 		var version = $docsFrameworkVersion();
 		if (!len(version)) {
-			out("Could not determine the framework version — is this a Wheels project?", "red");
-			return "";
+			$docsFetchFail("Could not determine the framework version — is this a Wheels project?");
 		}
 		var home = $resolveLucliHome();
 		if (!len(home)) {
-			out("Could not resolve the Wheels CLI home directory.", "red");
-			return "";
+			$docsFetchFail("Could not resolve the Wheels CLI home directory.");
 		}
 		var target = home & "/docs/" & version;
 
@@ -1543,57 +1547,129 @@ component extends="modules.BaseModule" {
 		// and the download then receives the URL scope struct instead of the
 		// string ("Can't cast Complex Object Type [URL scope] to String").
 		var bundleUrl = $docsBundleUrl(version);
-		var tmp = getTempDirectory() & "wheels-docs-#version#.zip";
+		var checksumUrl = bundleUrl & ".sha512";
+		var httpClient = new services.packages.HttpClient(timeoutSeconds = 300);
 		out("Fetching docs for #version#...");
 		out("  #bundleUrl#");
 
+		// The published checksum first: without it there is nothing to verify
+		// the bundle against, so there is no point downloading the bundle.
+		// Downloaded to a file rather than via get(): GitHub serves release
+		// assets as application/octet-stream, which cfhttp returns as binary.
+		// A per-run temp name, so two concurrent fetches never share a file.
+		var runId = createUUID();
+		var checksumTmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip.sha512";
+		var checksumText = "";
 		try {
-			new services.packages.HttpClient(timeoutSeconds = 300).download(bundleUrl, tmp);
+			httpClient.download(checksumUrl, checksumTmp);
+			checksumText = fileRead(checksumTmp, "utf-8");
 		} catch (any e) {
-			out("Download failed: #e.message#", "red");
-			out("  A release without a docs asset will 404 here — the bundle is built by");
-			out("  tools/build/scripts/build-docs.sh and attached to the release.");
-			return "";
+			$docsFetchFail(
+				"Could not download the bundle's published SHA-512 checksum: #e.message#",
+				["  The bundle is only installed after it matches #checksumUrl#.",
+				 "  A release without a docs asset will 404 here — the bundle and its .sha512 are",
+				 "  built by tools/build/scripts/build-docs.sh and attached to the release."]
+			);
+		} finally {
+			if (fileExists(checksumTmp)) {
+				fileDelete(checksumTmp);
+			}
+		}
+		var expected = $docsParseChecksum(checksumText);
+		if (!len(expected)) {
+			$docsFetchFail("The bundle's checksum file at #checksumUrl# does not contain a SHA-512 hash.");
 		}
 
+		var tmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip";
+		// Unpack into a sibling staging directory and swap it in only once
+		// unzip succeeds, so a failure never leaves a half-unpacked docs dir
+		// (or deletes a working install on --force).
+		var staging = home & "/docs/." & version & ".partial-" & runId;
 		try {
-			if (directoryExists(target)) {
-				directoryDelete(target, true);
+			try {
+				httpClient.download(bundleUrl, tmp);
+			} catch (any e) {
+				$docsFetchFail("Download failed: #e.message#");
 			}
-			directoryCreate(target, true);
+
+			var actual = lCase(hash(fileReadBinary(tmp), "SHA-512"));
+			if (actual != expected) {
+				$docsFetchFail(
+					"The downloaded bundle does not match its published SHA-512 checksum; nothing was installed.",
+					["  expected: #expected#", "  actual:   #actual#"]
+				);
+			}
+
+			directoryCreate(staging, true);
 			// The bundle is zipped with its contents at the root (manifest.json,
-			// guides/, api/), so unpack straight into the version directory.
+			// guides/, api/), so unpack straight into the staging directory.
 			// Shell out to `unzip` rather than Lucee's extract(): `extract` is
 			// shadowed in this module's scope and resolves to a helper with a
 			// different arity. Same approach Installer::$extract() takes with
 			// `tar`, for the same reason.
 			var unzipResult = {};
-			cfexecute(
-				name = "unzip",
-				arguments = "-o -q #tmp# -d #target#",
-				timeout = 300,
-				variable = "local.unzipOut",
-				errorVariable = "local.unzipErr",
-				result = "unzipResult"
-			);
-			if (unzipResult.exitCode != 0) {
-				out("Could not unpack the bundle (unzip exit #unzipResult.exitCode#).", "red");
-				out("  #local.unzipErr#");
-				return "";
+			try {
+				cfexecute(
+					name = "unzip",
+					arguments = "-o -q #tmp# -d #staging#",
+					timeout = 300,
+					variable = "local.unzipOut",
+					errorVariable = "local.unzipErr",
+					result = "unzipResult"
+				);
+			} catch (any e) {
+				$docsFetchFail("Could not unpack the bundle: #e.message#");
 			}
-		} catch (any e) {
-			out("Could not unpack the bundle: #e.message#", "red");
-			return "";
+			if (unzipResult.exitCode != 0) {
+				$docsFetchFail(
+					"Could not unpack the bundle (unzip exit #unzipResult.exitCode#).",
+					["  #local.unzipErr ?: ''#"]
+				);
+			}
+
+			try {
+				if (directoryExists(target)) {
+					directoryDelete(target, true);
+				}
+				directoryRename(staging, target);
+			} catch (any e) {
+				$docsFetchFail("Could not install the unpacked bundle at #target#: #e.message#");
+			}
 		} finally {
 			if (fileExists(tmp)) {
 				fileDelete(tmp);
 			}
+			if (directoryExists(staging)) {
+				directoryDelete(staging, true);
+			}
 		}
 
-		out("Installed documentation for #version#.", "green");
+		out("Installed documentation for #version# (SHA-512 verified).", "green");
 		out("  #target#");
 		$docsMountIntoWebroot(target);
 		return "";
+	}
+
+	/**
+	 * Prints the failure (plus any hint lines) and throws, so `wheels docs
+	 * fetch` exits non-zero instead of reporting success after a failure.
+	 */
+	private void function $docsFetchFail(required string message, array hints = []) {
+		out(arguments.message, "red");
+		for (var hint in arguments.hints) {
+			out(hint);
+		}
+		throw(type = "Wheels.DocsFetchFailed", message = arguments.message);
+	}
+
+	/**
+	 * The hash from a published .sha512 file, lower-cased: the first token of
+	 * `sha512sum`/`shasum -a 512` output ("<hex>  wheels-docs-<v>.zip").
+	 * Returns "" when that token is not a 128-character hex string.
+	 */
+	private string function $docsParseChecksum(required string content) {
+		var first = lCase(listFirst(trim(arguments.content), " #chr(9)##chr(10)##chr(13)#"));
+		return reFind("^[0-9a-f]{128}$", first) ? first : "";
 	}
 
 	/**
@@ -5007,6 +5083,7 @@ component extends="modules.BaseModule" {
 			// --fail-level WARNING / Mix --warnings-as-errors.
 			strict = parsed.strict,
 			doBackup = doBackup,
+			allowDowngrade = parsed["allow-downgrade"],
 			// "Passed" means a real value, not key presence: MCP clients send
 			// schema defaults, so apply {strict: false} was refused as
 			// "--strict is not supported by the apply verb" (#2963).
@@ -5045,12 +5122,14 @@ component extends="modules.BaseModule" {
 	 * that will break against a target framework version without modifying
 	 * any files. Breaking findings throw Wheels.UpgradeCheckFailed after the
 	 * report is printed, so the command exits non-zero and can gate CI.
-	 * --strict escalates advisory findings the same way. (--dry-run is not
+	 * --strict escalates advisory findings the same way, and so does a failed
+	 * latest-release lookup when no --to= is given. (--dry-run is not
 	 * supported — `check` is the preview.)
 	 *
 	 * Examples:
 	 *   wheels upgrade apply                       - apply the swap, with backup
 	 *   wheels upgrade apply --nobackup            - apply without the backup
+	 *   wheels upgrade apply --allow-downgrade     - apply even if the bundled framework is older
 	 *   wheels upgrade check                       - scan against the latest stable release
 	 *   wheels upgrade check --to=4.0.0            - scan against a specific target version
 	 *   wheels upgrade check --format=json         - machine-readable report (CI pipelines)
@@ -5112,7 +5191,7 @@ component extends="modules.BaseModule" {
 		// Unknown named keys hard-stop too. ArgSpec ignores them by design
 		// (fine for read-only commands, kept for `check` above), but a
 		// destructive verb must not run alongside a flag the user typo'd.
-		var knownKeys = "to,format,strict,nobackup,backup,subcommand,help,h,dry-run";
+		var knownKeys = "to,format,strict,nobackup,allow-downgrade,backup,subcommand,help,h,dry-run";
 		for (var key in coll) {
 			if (reFindNoCase("^arg\d+$", key) || listFindNoCase(knownKeys, key)) {
 				continue;
@@ -5129,7 +5208,7 @@ component extends="modules.BaseModule" {
 		if (!opts.isApply) {
 			throw(type = "Wheels.InvalidArguments", message = "Refusing to run upgrade apply for subcommand '#opts.subcommand#'.");
 		}
-		return runUpgradeApply(opts.targetVersion, opts.doBackup);
+		return runUpgradeApply(opts.targetVersion, opts.doBackup, opts.allowDowngrade);
 	}
 
 	/**
@@ -5140,7 +5219,7 @@ component extends="modules.BaseModule" {
 		var nl = chr(10);
 		var help = "Usage:" & nl
 			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
-			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
+			& "  wheels upgrade apply [--to=<version>] [--nobackup] [--allow-downgrade]" & nl
 			& nl
 			& "Upgrade the Wheels framework in your app (vendor/wheels/)." & nl
 			& nl
@@ -5162,6 +5241,8 @@ component extends="modules.BaseModule" {
 			& "                    CLI's bundled framework version." & nl
 			& "  --nobackup        Apply only: skip the vendor/wheels.bak-<timestamp>/" & nl
 			& "                    backup. Useful when vendor/wheels/ is tracked in git." & nl
+			& "  --allow-downgrade Apply only: proceed when the CLI's bundled framework" & nl
+			& "                    is OLDER than vendor/wheels/. Refused by default." & nl
 			& "  --strict          Check only: treat advisory findings as failures" & nl
 			& "                    (non-zero exit) so CI can gate on them." & nl
 			& "  --format=json     Check only: emit a machine-readable JSON report." & nl
@@ -7179,11 +7260,10 @@ component extends="modules.BaseModule" {
 		var jsonMode = lCase(arguments.format) == "json";
 		var currentVersion = $upgradeResolveCurrentVersion();
 
-		// Determine target version
-		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode);
-		if (!len(target)) {
-			return "";
-		}
+		// Determine target version. Throws Wheels.UpgradeCheckFailed when no
+		// --to= was given and the latest release can't be looked up, so a CI
+		// gate never passes without having scanned anything.
+		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode, arguments.strict);
 
 		if (!jsonMode) {
 			out("Current version: #currentVersion#", "bold");
@@ -7288,24 +7368,54 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Determine the target version: the explicit --to= value when supplied,
-	 * otherwise the latest GitHub release. Returns "" (after printing the
-	 * error) when the release fetch fails so the caller can bail out early.
+	 * otherwise the latest GitHub release. When the lookup fails (offline,
+	 * GitHub rate limit, unexpected response) the error is printed — as a
+	 * JSON document in JSON mode — and Wheels.UpgradeCheckFailed is thrown,
+	 * so `upgrade check` exits non-zero instead of reporting success without
+	 * scanning anything.
 	 */
-	private string function $upgradeResolveTargetVersion(required string targetVersion, required boolean jsonMode) {
-		var target = arguments.targetVersion;
-		if (!len(target)) {
-			try {
-				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
-				var response = makeHttpRequest(apiUrl);
-				var releaseData = deserializeJSON(response);
-				target = replace(releaseData.tag_name, "v", "");
-			} catch (any e) {
-				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
-				out(arguments.jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
-				return "";
-			}
+	private string function $upgradeResolveTargetVersion(
+		required string targetVersion,
+		required boolean jsonMode,
+		boolean strict = false
+	) {
+		var target = trim(arguments.targetVersion);
+		if (len(target)) {
+			return target;
 		}
-		return target;
+		var reason = "";
+		try {
+			var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
+			var releaseData = deserializeJSON(makeHttpRequest(apiUrl));
+			if (isStruct(releaseData) && structKeyExists(releaseData, "tag_name") && isSimpleValue(releaseData.tag_name)) {
+				target = trim(replace(releaseData.tag_name, "v", ""));
+			}
+			// GitHub error bodies (rate limit, not found) carry a `message`.
+			if (!len(target) && isStruct(releaseData) && structKeyExists(releaseData, "message") && isSimpleValue(releaseData.message)) {
+				reason = releaseData.message;
+			}
+		} catch (any e) {
+			reason = e.message;
+		}
+		if (len(target)) {
+			return target;
+		}
+
+		var fetchMsg = "Could not determine the latest Wheels version from GitHub"
+			& (len(reason) ? " (#reason#)" : "")
+			& ". Use --to=<version> to specify the target version.";
+		if (arguments.jsonMode) {
+			out(serializeJSON({
+				"success": false,
+				"strict": arguments.strict,
+				"error": fetchMsg
+			}));
+		} else {
+			out(fetchMsg, "red");
+		}
+		// throw maps to non-zero exit; return "" would let a CI gate pass
+		// without scanning anything (and bypass --strict).
+		throw(type = "Wheels.UpgradeCheckFailed", message = fetchMsg);
 	}
 
 	/**
@@ -7830,12 +7940,15 @@ component extends="modules.BaseModule" {
 	 * doesn't match the bundled version is a hard error. Downloading
 	 * arbitrary --to= targets (via ReleaseChannel) is the PR2 follow-up.
 	 *
+	 * A bundled framework older than the installed vendor/wheels/ is
+	 * refused unless --allow-downgrade is passed.
+	 *
 	 * Every refusal throws Wheels.UpgradeApplyFailed AFTER printing the
 	 * guidance, mirroring validate()'s print-then-throw convention so the
 	 * process exits non-zero (#2941) without losing the human-readable
 	 * explanation.
 	 */
-	private string function runUpgradeApply(string targetVersion = "", boolean doBackup = true) {
+	private string function runUpgradeApply(string targetVersion = "", boolean doBackup = true, boolean allowDowngrade = false) {
 		var nl = chr(10);
 
 		// resolveProjectRoot() falls back to cwd when no vendor/wheels/ is
@@ -7888,6 +8001,22 @@ component extends="modules.BaseModule" {
 			throw(type = "Wheels.UpgradeApplyFailed", message = validationError);
 		}
 
+		// Refuse a silent downgrade: when the app's vendor/wheels/ is newer
+		// than the CLI's bundled framework (app made with a newer CLI or a
+		// wheels-be snapshot), applying would replace it with an older copy.
+		var installedVersion = upgrader.readFrameworkVersion(vendorDir);
+		var direction = $upgradeApplyDirection(installedVersion, bundledVersion);
+		if (direction == "downgrade" && !arguments.allowDowngrade) {
+			out("vendor/wheels/ is at #installedVersion#, but the CLI's bundled framework is older (#bundledVersion#). Nothing was changed.", "red");
+			out("Either:");
+			out("  - Install a CLI that bundles #installedVersion# or newer (brew upgrade wheels / scoop update wheels), then re-run wheels upgrade apply.");
+			out("  - Or re-run with --allow-downgrade to replace vendor/wheels/ with #bundledVersion# anyway.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "Refusing to downgrade the framework from #installedVersion# to #bundledVersion# (the CLI's bundled version). Install a newer CLI, or pass --allow-downgrade to proceed."
+			);
+		}
+
 		out("Source:  #sourceDir#");
 		out("Target:  #vendorDir#");
 		out("");
@@ -7899,14 +8028,21 @@ component extends="modules.BaseModule" {
 		// of a stack trace. The reserved path is passed into applyUpgrade()
 		// so the announcement and the actual backup always agree.
 		var plan = "";
+		if (direction == "upgrade") {
+			plan &= "Upgrading framework: #installedVersion# -> #bundledVersion#" & nl;
+		} else if (direction == "downgrade") {
+			plan &= "Downgrading framework (--allow-downgrade): #installedVersion# -> #bundledVersion#" & nl;
+		} else if (direction == "same") {
+			plan &= "Reinstalling framework #bundledVersion# (vendor/wheels/ is already at this version)" & nl;
+		}
 		var backupPath = "";
 		if (arguments.doBackup) {
 			backupPath = upgrader.reserveBackupPath(vendorDir);
-			plan = "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
+			plan &= "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
 				& "If this is interrupted, restore with:" & nl
 				& "  rm -rf ""#vendorDir#"" && mv ""#backupPath#"" ""#vendorDir#""" & nl;
 		} else {
-			plan = "Replacing vendor/wheels WITHOUT a backup (--nobackup) — the current copy is not recoverable if the swap fails." & nl;
+			plan &= "Replacing vendor/wheels WITHOUT a backup (--nobackup) — the current copy is not recoverable if the swap fails." & nl;
 		}
 		out(plan);
 
@@ -7931,7 +8067,8 @@ component extends="modules.BaseModule" {
 
 		var summary = "";
 		if (len(result.oldVersion)) {
-			summary &= "Framework upgraded: #result.oldVersion# -> #result.newVersion#" & nl;
+			var verb = {upgrade: "upgraded", downgrade: "downgraded", same: "reinstalled"};
+			summary &= "Framework #structKeyExists(verb, direction) ? verb[direction] : "replaced"#: #result.oldVersion# -> #result.newVersion#" & nl;
 		} else {
 			summary &= "Framework installed: #result.newVersion#" & nl;
 		}
@@ -7954,6 +8091,21 @@ component extends="modules.BaseModule" {
 		// Return value carries the pre-swap plan too, so callers (and the
 		// dispatch specs) see the full command output in order.
 		return plan & nl & summary;
+	}
+
+	/**
+	 * Direction of an apply swap from the installed vendor/wheels/ version
+	 * to the bundled one: "upgrade", "downgrade", "same", or "unknown" when
+	 * either side is missing or not a version (e.g. an unbuilt checkout's
+	 * "@build.version@") — unknown never blocks the swap.
+	 */
+	private string function $upgradeApplyDirection(required string installedVersion, required string bundledVersion) {
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		if (!reFind(versionPattern, trim(arguments.installedVersion)) || !reFind(versionPattern, trim(arguments.bundledVersion))) {
+			return "unknown";
+		}
+		var cmp = new services.SemVer().compare(arguments.bundledVersion, arguments.installedVersion);
+		return cmp > 0 ? "upgrade" : (cmp < 0 ? "downgrade" : "same");
 	}
 
 	/**
