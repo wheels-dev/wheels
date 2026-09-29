@@ -84,6 +84,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// Doubled quotes stay inside their string; an escaped ## is not interpolation.
 				expect($countRawHttp('x = "a""b"; new http(url = u);')).toBe(1);
 				expect($countRawHttp('x = "####cfhttp(url = u)";')).toBe(0);
+				// A CFML string in script source may span lines (issue 3800): a call
+				// after one counts, and a token inside one doesn't.
+				expect($countRawHttp('x = "line one' & nl & 'line two"; new http(url = u);')).toBe(1);
+				expect($countRawHttp('x = "a' & nl & 'cfhttp(url = u) b";')).toBe(0);
+				// In .cfm template text a stray apostrophe ends at its line break.
+				expect($countRawHttp("<p>Don't worry</p>" & nl & lt & 'cfhttp url="x" result="r">', true)).toBe(1);
 				// A call token inside a string is not a call.
 				expect($countRawHttp('out("cfhttp(url=x) is not allowed here");')).toBe(0);
 				// Names that only contain "http" are not calls.
@@ -118,7 +124,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			if (Left(rel, 6) == "tests/") {
 				continue;
 			}
-			var count = $countRawHttp(FileRead(file));
+			var count = $countRawHttp(FileRead(file), LCase(ListLast(file, ".")) == "cfm");
 			if (count > 0) {
 				result[rel] = count;
 			}
@@ -133,11 +139,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	 * code. Doing it in one pass is what makes it right: a comment stripper
 	 * that is not string-aware reads the "//" of a URL literal as a comment,
 	 * and blanking strings first lets a quote inside a comment swallow code.
-	 * A string or interpolation ends at a line break, so a stray apostrophe in
-	 * template text hides at most the rest of its line. The CLI's
+	 * In `.cfm` template text (`templateText`) a string or interpolation ends
+	 * at a line break, so a stray apostrophe in HTML hides at most the rest of
+	 * its line; in script source a CFML string may span lines (issue 3800). The CLI's
 	 * $stripCfmlComments() is not string-aware, so it isn't used here.
 	 */
-	public string function $codeOnly(required string src) {
+	public string function $codeOnly(required string src, boolean templateText = false) {
 		var s = arguments.src;
 		var n = Len(s);
 		var out = CreateObject("java", "java.lang.StringBuilder").init();
@@ -148,7 +155,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			var c = Mid(s, i, 1);
 			var mode = ArrayLen(stack) ? stack[ArrayLen(stack)].mode : "code";
 			if (c == Chr(10) || c == Chr(13)) {
-				stack = [];
+				if (arguments.templateText) {
+					stack = [];
+				}
 				out.append(c);
 				i++;
 				continue;
@@ -219,8 +228,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	 * `new http`, `cfhttp(...)`, the parenthesis-free script-tag forms
 	 * (`cfhttp url=... {}`, `http url=...;`) and the cfhttp tag.
 	 */
-	public numeric function $countRawHttp(required string src) {
-		var code = $codeOnly(arguments.src);
+	public numeric function $countRawHttp(required string src, boolean templateText = false) {
+		var code = $codeOnly(arguments.src, arguments.templateText);
 		var patterns = [
 			// new http(...) and new http;
 			"\bnew\s+http\b",
