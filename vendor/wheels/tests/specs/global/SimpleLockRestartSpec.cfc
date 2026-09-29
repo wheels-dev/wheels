@@ -34,12 +34,13 @@ component extends="wheels.WheelsTest" {
 	}
 
 	// Put and delete a restart marker in server.$restartLockFlip.scope until
-	// server.$restartLockFlip.stop, on another thread.
+	// server.$restartLockFlip.stop, on another thread. The deadline bounds the
+	// loop so the thread cannot outlive a spec that fails before stopping it.
 	private string function $flipMarkerOnOtherThread() {
 		var threadName = "restartLockFlipper_" & Replace(CreateUUID(), "-", "", "all");
 		thread name="#threadName#" action="run" {
 			flip = server.$restartLockFlip;
-			while (!flip.stop) {
+			while (!flip.stop && GetTickCount() < flip.deadline) {
 				flip.scope["$wheelsRestartLock"] = {name = "flipLock", token = "t", expiresAt = DateAdd("s", 60, Now())};
 				StructDelete(flip.scope, "$wheelsRestartLock");
 			}
@@ -245,12 +246,22 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("never throws while the restart clears the marker concurrently", () => {
-					server.$restartLockFlip = {scope = {wheels = {eventPath = "/app/events"}}, stop = false};
+					server.$restartLockFlip = {
+						scope = {wheels = {eventPath = "/app/events"}},
+						stop = false,
+						deadline = GetTickCount() + 30000
+					};
 					var flipper = $flipMarkerOnOtherThread();
-					var result = $checkMarkerRepeatedly();
-					server.$restartLockFlip.stop = true;
-					$joinThread(flipper);
-					StructDelete(server, "$restartLockFlip");
+					// A struct, not local., so the value survives the try on every engine.
+					var state = {result = {}};
+					try {
+						state.result = $checkMarkerRepeatedly();
+					} finally {
+						server.$restartLockFlip.stop = true;
+						$joinThread(flipper);
+						StructDelete(server, "$restartLockFlip");
+					}
+					var result = state.result;
 					expect(result.markerSeen).toBeGT(0, "the reader never saw the marker, so the threads do not share the struct");
 					expect(result.markerAbsent).toBeGT(0, "the reader never saw the marker absent");
 					expect(result.errors).toBe(0, "marker check threw " & result.errors & " of " & result.calls & " times: " & result.lastError);
