@@ -6,14 +6,19 @@
  *   1. Refuse if vendor/<name>/ already exists, unless force=true.
  *   2. Download tarball URL from the version entry to a temp file.
  *   3. Compute SHA-256, compare to the manifest's sha256. Mismatch = hard abort.
- *   4. Extract via `tar -xzmf` into vendor/. The tarball's top-level dir
+ *   4. Extract via `tar -xzmf` into a staging dir under vendor/
+ *      (vendor/.wheels-pkg-staging-<uuid>/). The tarball's top-level dir
  *      is the package name by construction (mirror-tarball.yml
- *      `mv src/ <name>/` before taring), so vendor/<name>/ appears naturally.
+ *      `mv src/ <name>/` before taring), so <staging>/<name>/ appears naturally.
  *      `-m` is required: source tarballs are built with `--mtime=@0` for
  *      reproducible sha256, but Lucee 7 cannot compile CFCs whose mtime is
  *      epoch-0. Without `-m` the package "extracts cleanly" but every helper
  *      call 500s with a misleading "invalid component definition" error.
- *   5. Clean up the temp file.
+ *   5. Swap <staging>/<name>/ into vendor/<name>/. An existing copy is only
+ *      moved aside at this point and is restored if the swap fails, so a
+ *      failed download, checksum or extraction never touches an installed
+ *      package (`update` and `add --force` rely on this).
+ *   6. Clean up the temp file and the staging dir (which holds the old copy).
  *
  * Tarball extraction shells out to `tar`. All target platforms (macOS,
  * Linux, Windows 10+) ship it. If Windows Server compat becomes a real
@@ -77,7 +82,6 @@ component {
 						& "Use --force to overwrite."
 				);
 			}
-			DirectoryDelete(local.target, true);
 		}
 
 		if (!DirectoryExists(local.vendorDir)) {
@@ -92,6 +96,10 @@ component {
 			local.tmpDir &= "/";
 		}
 		local.tmpFile = local.tmpDir & "wheels-pkg-" & CreateUUID() & ".tar.gz";
+		// Staging lives under vendor/ so the final swap is a same-filesystem
+		// rename. The leading dot keeps PackageLoader from treating it as a
+		// package if a crash ever leaves it behind.
+		local.stagingDir = local.vendorDir & ".wheels-pkg-staging-" & CreateUUID() & "/";
 		try {
 			variables.http.download(arguments.version.tarball, local.tmpFile);
 
@@ -107,19 +115,29 @@ component {
 				);
 			}
 
-			// Extract.
-			$extract(local.tmpFile, local.vendorDir);
+			// Extract into staging, not straight into vendor/.
+			DirectoryCreate(local.stagingDir, true);
+			$extract(local.tmpFile, local.stagingDir);
 
-			if (!DirectoryExists(local.target)) {
+			if (!DirectoryExists(local.stagingDir & arguments.name)) {
 				Throw(
 					type = "Wheels.Packages.ExtractionFailed",
 					message = "Extraction completed but vendor/#arguments.name#/ was not produced. "
 						& "The tarball layout does not match the expected '<name>/...' convention."
 				);
 			}
+
+			$swapIn(local.stagingDir & arguments.name, local.target, local.stagingDir & ".previous");
 		} finally {
 			if (FileExists(local.tmpFile)) {
 				FileDelete(local.tmpFile);
+			}
+			// Best-effort: a cleanup failure must not mask the install's outcome.
+			try {
+				if (DirectoryExists(local.stagingDir)) {
+					DirectoryDelete(local.stagingDir, true);
+				}
+			} catch (any e) {
 			}
 		}
 
@@ -168,6 +186,32 @@ component {
 	private string function $sha256File(required string path) {
 		local.bin = FileReadBinary(arguments.path);
 		return Hash(local.bin, "SHA-256");
+	}
+
+	/**
+	 * Moves newDir into target. An existing target is renamed to backupDir
+	 * first and renamed back if the move fails; the caller deletes backupDir.
+	 */
+	private void function $swapIn(
+		required string newDir,
+		required string target,
+		required string backupDir
+	) {
+		local.hadOld = DirectoryExists(arguments.target);
+		if (local.hadOld) {
+			DirectoryRename(arguments.target, arguments.backupDir);
+		}
+		try {
+			DirectoryRename(arguments.newDir, arguments.target);
+		} catch (any e) {
+			if (local.hadOld) {
+				if (DirectoryExists(arguments.target)) {
+					DirectoryDelete(arguments.target, true);
+				}
+				DirectoryRename(arguments.backupDir, arguments.target);
+			}
+			rethrow;
+		}
 	}
 
 	private void function $extract(required string tarballPath, required string destDir) {

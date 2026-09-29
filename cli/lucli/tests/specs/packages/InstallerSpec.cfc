@@ -28,6 +28,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				return fake;
 			};
 
+			// Stands in for an already-installed older copy of a package.
+			var $seedInstalled = (proj, name) => {
+				var dir = proj & "vendor/" & name;
+				DirectoryCreate(dir, true);
+				FileWrite(dir & "/package.json", "{""name"":""#name#"",""version"":""0.9.0""}");
+				FileWrite(dir & "/old-only.txt", "old");
+			};
+
+			// Everything directly under vendor/, dot-entries included, so a
+			// leftover staging dir fails the assertion.
+			var $vendorEntries = (proj) => {
+				var names = DirectoryList(proj & "vendor", false, "name");
+				ArraySort(names, "textnocase");
+				return ArrayToList(names);
+			};
+
 			it("fails loudly if the fixture tarball is missing", () => {
 				expect(FileExists(fixturePath)).toBeTrue();
 			});
@@ -48,6 +64,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(FileExists(path & "/package.json")).toBeTrue();
 				expect(installer.isInstalled("wheels-fake")).toBeTrue();
 				expect(installer.installedVersion("wheels-fake")).toBe("1.0.0");
+				expect($vendorEntries(proj)).toBe("wheels-fake");
 				DirectoryDelete(proj, true);
 			});
 
@@ -102,6 +119,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 				expect(threw).toBeTrue();
 				expect(DirectoryExists(proj & "vendor/wheels-fake")).toBeFalse();
+				expect(DirectoryExists(proj & "vendor") ? $vendorEntries(proj) : "").toBe("");
 				DirectoryDelete(proj, true);
 			});
 
@@ -144,6 +162,111 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}, true);
 				expect(FileExists(proj & "vendor/wheels-fake/package.json")).toBeTrue();
 				expect(FileExists(proj & "vendor/wheels-fake/leftover.txt")).toBeFalse();
+				DirectoryDelete(proj, true);
+			});
+
+			it("force=true replaces the installed copy and leaves nothing behind in vendor/", () => {
+				var proj = $scratch();
+				$seedInstalled(proj, "wheels-fake");
+				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
+				var installer = new cli.lucli.services.packages.Installer(
+					httpClient = $seededClient(tarballHref),
+					projectRoot = proj
+				);
+				installer.install("wheels-fake", {
+					version: "1.0.0",
+					tarball: tarballHref,
+					sha256: $sha(fixturePath)
+				}, true);
+				expect(installer.installedVersion("wheels-fake")).toBe("1.0.0");
+				expect(FileExists(proj & "vendor/wheels-fake/README.md")).toBeTrue();
+				expect(FileExists(proj & "vendor/wheels-fake/old-only.txt")).toBeFalse();
+				expect($vendorEntries(proj)).toBe("wheels-fake");
+				DirectoryDelete(proj, true);
+			});
+
+			it("force=true keeps the installed copy when the download fails", () => {
+				var proj = $scratch();
+				$seedInstalled(proj, "wheels-fake");
+				// Unseeded URL: FakeHttpClient.download() throws DownloadFailed.
+				var fake = new cli.lucli.tests.specs.packages._stubs.FakeHttpClient();
+				var installer = new cli.lucli.services.packages.Installer(
+					httpClient = fake,
+					projectRoot = proj
+				);
+				var threw = false;
+				try {
+					installer.install("wheels-fake", {
+						version: "1.0.0",
+						tarball: "https://example/offline.tar.gz",
+						sha256: $sha(fixturePath)
+					}, true);
+				} catch (any e) {
+					threw = true;
+					expect(e.type).toBe("Wheels.Packages.DownloadFailed");
+				}
+				expect(threw).toBeTrue();
+				expect(installer.installedVersion("wheels-fake")).toBe("0.9.0");
+				expect(FileExists(proj & "vendor/wheels-fake/old-only.txt")).toBeTrue();
+				expect($vendorEntries(proj)).toBe("wheels-fake");
+				DirectoryDelete(proj, true);
+			});
+
+			it("force=true keeps the installed copy on a checksum mismatch", () => {
+				var proj = $scratch();
+				$seedInstalled(proj, "wheels-fake");
+				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
+				var fake = $seededClient(tarballHref);
+				var installer = new cli.lucli.services.packages.Installer(
+					httpClient = fake,
+					projectRoot = proj
+				);
+				var threw = false;
+				try {
+					installer.install("wheels-fake", {
+						version: "1.0.0",
+						tarball: tarballHref,
+						sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+					}, true);
+				} catch (any e) {
+					threw = true;
+					expect(e.type).toBe("Wheels.Packages.ChecksumMismatch");
+				}
+				expect(threw).toBeTrue();
+				expect(installer.installedVersion("wheels-fake")).toBe("0.9.0");
+				expect(FileExists(proj & "vendor/wheels-fake/old-only.txt")).toBeTrue();
+				expect($vendorEntries(proj)).toBe("wheels-fake");
+				// The downloaded temp tarball is cleaned up too.
+				expect(FileExists(fake.calls()[1].destPath)).toBeFalse();
+				DirectoryDelete(proj, true);
+			});
+
+			it("force=true keeps the installed copy when the tarball has no <name>/ dir", () => {
+				// The fixture's top-level dir is wheels-fake/, so installing it
+				// as 'other-pkg' extracts cleanly but never produces other-pkg/.
+				var proj = $scratch();
+				$seedInstalled(proj, "other-pkg");
+				var tarballHref = "https://example/wheels-fake-1.0.0.tar.gz";
+				var installer = new cli.lucli.services.packages.Installer(
+					httpClient = $seededClient(tarballHref),
+					projectRoot = proj
+				);
+				var threw = false;
+				try {
+					installer.install("other-pkg", {
+						version: "1.0.0",
+						tarball: tarballHref,
+						sha256: $sha(fixturePath)
+					}, true);
+				} catch (any e) {
+					threw = true;
+					expect(e.type).toBe("Wheels.Packages.ExtractionFailed");
+				}
+				expect(threw).toBeTrue();
+				expect(installer.installedVersion("other-pkg")).toBe("0.9.0");
+				expect(FileExists(proj & "vendor/other-pkg/old-only.txt")).toBeTrue();
+				// Nothing from the mismatched tarball lands in vendor/ either.
+				expect($vendorEntries(proj)).toBe("other-pkg");
 				DirectoryDelete(proj, true);
 			});
 
