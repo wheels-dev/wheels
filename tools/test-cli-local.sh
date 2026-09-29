@@ -36,6 +36,13 @@ PASSWORD="wheels-dev"
 # shasum is not on every system; fall back rather than die under `set -e`.
 CHECKOUT_KEY="$(echo "$PROJECT_ROOT" | { shasum 2>/dev/null || sha1sum 2>/dev/null || cksum; } | cut -c1-12 | tr -d ' ')"
 RESULT_FILE="${WHEELS_CLI_TEST_RESULT_FILE:-/tmp/wheels-cli-test-results-${CHECKOUT_KEY}.json}"
+# The server this script starts gets a name of its own, per checkout. The
+# name the runtime takes from lucee.json ("wheels" here) is shared by every
+# checkout and worktree, so a second run was refused while another
+# checkout's server ran (#3828, as #3810 was for test-local.sh). The prefix
+# differs from test-local.sh's so both suites can run in one checkout.
+TEST_SERVER_NAME="wheels-cli-test-${CHECKOUT_KEY}"
+SERVER_LOG="/tmp/wheels-cli-test-server-${CHECKOUT_KEY}.log"
 
 cd "$PROJECT_ROOT"
 
@@ -97,6 +104,15 @@ listener_pid() {
   lsof -ti :"$1" -sTCP:LISTEN 2>/dev/null | head -1
 }
 
+# This run's own registration, under whichever home the runtime uses (the
+# brew `wheels` wrapper sets LUCLI_HOME=~/.wheels; a raw `lucli` uses ~/.lucli).
+test_server_dirs() {
+  local home
+  for home in ${LUCLI_HOME:+"$LUCLI_HOME"} "$HOME/.wheels" "$HOME/.lucli"; do
+    printf '%s\n' "$home/servers/$TEST_SERVER_NAME"
+  done
+}
+
 # ── Lifecycle ───────────────────────────────────────
 cleanup() {
   if [ -n "${SENTINEL_PID:-}" ]; then
@@ -113,7 +129,7 @@ cleanup() {
   fi
   if [ "${STARTED_SERVER:-false}" = "true" ]; then
     echo "Stopping test server..."
-    ( cd "$PROJECT_ROOT" && "$CLI_BIN" server stop >/dev/null 2>&1 ) || true
+    ( cd "$PROJECT_ROOT" && "$CLI_BIN" server stop --name="$TEST_SERVER_NAME" >/dev/null 2>&1 ) || true
     # `kill $SERVER_PID` only kills the launcher: the JVM survives it and keeps
     # holding the port, so whichever project wants that port next silently gets
     # THIS app's responses. Kill the JVM the registry recorded, then wait for
@@ -129,6 +145,14 @@ cleanup() {
       kill -9 "$jvm" 2>/dev/null || true
     fi
     rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
+    # The registration is this run's alone (its name is per checkout), so
+    # remove it rather than leave a server directory behind per worktree.
+    case "$TEST_SERVER_NAME" in
+      wheels-cli-test-?*)
+        local dir
+        while IFS= read -r dir; do rm -rf "$dir"; done < <(test_server_dirs)
+        ;;
+    esac
   fi
 }
 trap cleanup EXIT
@@ -188,7 +212,7 @@ else
   fi
 
   start_lucli() {
-    nohup "$CLI_BIN" server run --port="$PORT" --force > /tmp/wheels-cli-test-server.log 2>&1 &
+    nohup "$CLI_BIN" server run --port="$PORT" --name="$TEST_SERVER_NAME" --force > "$SERVER_LOG" 2>&1 &
     SERVER_PID=$!
     STARTED_SERVER=true
   }
@@ -200,14 +224,14 @@ else
         return 0
       fi
       if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-        echo "Server process died. Check /tmp/wheels-cli-test-server.log"
-        cat /tmp/wheels-cli-test-server.log 2>/dev/null | tail -20
+        echo "Server process died. Check ${SERVER_LOG}"
+        tail -20 "$SERVER_LOG" 2>/dev/null
         exit 1
       fi
       sleep 2
     done
     echo "Server failed to become ready within 240s"
-    cat /tmp/wheels-cli-test-server.log 2>/dev/null | tail -20
+    tail -20 "$SERVER_LOG" 2>/dev/null
     exit 1
   }
 
@@ -247,7 +271,7 @@ else
     echo "Restarting ${CLI_BIN} server to pick up new JAR..."
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
-    "$CLI_BIN" server stop 2>/dev/null || true
+    "$CLI_BIN" server stop --name="$TEST_SERVER_NAME" 2>/dev/null || true
     # The JVM can outlive both the launcher and `server stop`; while it still
     # answers, wait_for_server below would "succeed" against the old process
     # and the new one would be left running unrecorded after cleanup.
@@ -274,10 +298,12 @@ else
   if [ -n "$SERVER_JVM" ]; then
     printf '%s:%s\n' "$SERVER_JVM" "$PORT" > "$PROJECT_ROOT/.wheels-test-server.pid"
   else
-    OWN_DIR="$(project_server_dir || true)"
-    if [ -n "$OWN_DIR" ] && [ -f "$OWN_DIR/server.pid" ]; then
-      cp "$OWN_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
-    fi
+    while IFS= read -r OWN_DIR; do
+      if [ -f "$OWN_DIR/server.pid" ]; then
+        cp "$OWN_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
+        break
+      fi
+    done < <(test_server_dirs)
   fi
 fi
 
