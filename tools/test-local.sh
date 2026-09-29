@@ -158,6 +158,19 @@ pid_is_ours() {
   return 1
 }
 
+# True when PID is ANCESTOR or one of its descendants.
+# Usage: is_descendant_of <pid> <ancestor>
+is_descendant_of() {
+  local pid="$1" ancestor="$2"
+  [ -n "$pid" ] && [ -n "$ancestor" ] || return 1
+  for _ in $(seq 1 32); do
+    [ "$pid" = "$ancestor" ] && return 0
+    case "$pid" in ""|0|1) return 1 ;; esac
+    pid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
+  done
+  return 1
+}
+
 # SIGTERM the given PIDs that are still ours on PORT, wait (bounded) for
 # those, then SIGKILL only survivors that are still ours. A PID that is not
 # ours is left alone, and not waited on.
@@ -179,12 +192,28 @@ stop_pids() {
   return 0
 }
 
+# The PID recorded in this checkout's lock. A run writes it just after its
+# mkdir, so a lock with no PID yet may belong to a run that is starting right
+# now: wait briefly for it before treating the lock as stale (#3796).
+lock_owner_pid() {
+  local owner
+  for _ in $(seq 1 20); do
+    owner="$(cat "$RUN_LOCK/pid" 2>/dev/null || true)"
+    if [ -n "$owner" ]; then
+      printf '%s\n' "$owner"
+      return 0
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
 # The run that owns this checkout's lock, if it is still alive. PID alone is
 # not proof (a dead run's PID can be reused), so the process must also still
 # be this script.
 live_lock_owner() {
   local owner
-  owner="$(cat "$RUN_LOCK/pid" 2>/dev/null || true)"
+  owner="$(lock_owner_pid || true)"
   [ -n "$owner" ] && [ "$owner" != "$$" ] || return 1
   kill -0 "$owner" 2>/dev/null || return 1
   ps -o command= -p "$owner" 2>/dev/null | grep -q 'test-local\.sh' || return 1
@@ -211,7 +240,8 @@ acquire_run_lock() {
       exit 1
     }
   fi
-  echo "$$" > "$RUN_LOCK/pid"
+  # Written whole, then renamed, so a reader never sees a partial PID.
+  echo "$$" > "$RUN_LOCK/pid.$$" && mv "$RUN_LOCK/pid.$$" "$RUN_LOCK/pid"
   RUN_LOCK_HELD=true
 }
 
@@ -278,6 +308,15 @@ trap cleanup EXIT
 if [ -f "$LUCEE_BAK" ]; then
   echo "Restoring lucee.json from an interrupted run's ${LUCEE_BAK}..."
   mv "$LUCEE_BAK" lucee.json
+fi
+# Before #3789 the backup was named lucee.json.bak, which a user may also use
+# for their own copy, so it is never restored automatically. Say so when one
+# differs from lucee.json: an interrupted older run leaves lucee.json pinned
+# to its ports (#3796).
+if [ -f lucee.json.bak ] && ! cmp -s lucee.json lucee.json.bak; then
+  echo "::warning::Found lucee.json.bak, which differs from lucee.json. If an interrupted run of an" >&2
+  echo "  older tools/test-local.sh left lucee.json pinned to its ports, restore it with:" >&2
+  echo "  mv lucee.json.bak lucee.json" >&2
 fi
 
 # ── Resolve {project} placeholder if the Wheels CLI doesn't support it yet ──
@@ -372,6 +411,21 @@ else
   OWN_DIR="$(project_server_dir || true)"
   if [ -n "$OWN_DIR" ] && [ -f "$OWN_DIR/server.pid" ]; then
     cp "$OWN_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
+  fi
+
+  # The listener captured above is this run's server only if it is the
+  # registry's JVM or a descendant of the launcher. Another process can bind
+  # the port between the free-port check and our JVM's bind; it then answers
+  # the test requests, and cleanup must not stop it (#3796).
+  if [ -n "${STARTED_PORT_PID:-}" ]; then
+    REGISTRY_JVM="$(cut -d: -f1 "$PROJECT_ROOT/.wheels-test-server.pid" 2>/dev/null || true)"
+    if [ "$STARTED_PORT_PID" != "$REGISTRY_JVM" ] && ! is_descendant_of "$STARTED_PORT_PID" "$SERVER_PID"; then
+      echo "::error::Port ${PORT} is answered by PID ${STARTED_PORT_PID}, which this run did not start." >&2
+      echo "  Refusing to run — testing a foreign server reports results for the wrong app." >&2
+      echo "  Fix: stop PID ${STARTED_PORT_PID}, or re-run with PORT=<free port>." >&2
+      STARTED_PORT_PID=""
+      exit 1
+    fi
   fi
 fi
 
