@@ -90,6 +90,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect($countRawHttp('x = "a' & nl & 'cfhttp(url = u) b";')).toBe(0);
 				// In .cfm template text a stray apostrophe ends at its line break.
 				expect($countRawHttp("<p>Don't worry</p>" & nl & lt & 'cfhttp url="x" result="r">', true)).toBe(1);
+				// Script source that ends inside a string fails loudly; template text doesn't (issue 3805).
+				expect(() => $countRawHttp('x = "never closed; new http(url = u);')).toThrow(type = "NoRawDevServerHttp.UnterminatedString");
+				expect(() => $countRawHttp('x = "a' & nl & 'b ##cfhttp(url = u)')).toThrow(type = "NoRawDevServerHttp.UnterminatedString");
+				expect($countRawHttp("<p>it's fine</p>", true)).toBe(0);
 				// A call token inside a string is not a call.
 				expect($countRawHttp('out("cfhttp(url=x) is not allowed here");')).toBe(0);
 				// Names that only contain "http" are not calls.
@@ -124,7 +128,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			if (Left(rel, 6) == "tests/") {
 				continue;
 			}
-			var count = $countRawHttp(FileRead(file), LCase(ListLast(file, ".")) == "cfm");
+			var count = $countRawHttp(FileRead(file), LCase(ListLast(file, ".")) == "cfm", rel);
 			if (count > 0) {
 				result[rel] = count;
 			}
@@ -144,7 +148,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	 * its line; in script source a CFML string may span lines (issue 3800). The CLI's
 	 * $stripCfmlComments() is not string-aware, so it isn't used here.
 	 */
-	public string function $codeOnly(required string src, boolean templateText = false) {
+	public string function $codeOnly(required string src, boolean templateText = false, string sourceName = "source") {
 		var s = arguments.src;
 		var n = Len(s);
 		var out = CreateObject("java", "java.lang.StringBuilder").init();
@@ -219,6 +223,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			out.append(c);
 			i++;
 		}
+		// Script source that ends inside a string was misread somewhere, and
+		// everything after the misread was blanked: fail loudly rather than
+		// silently count nothing in the rest of the file (issue 3805).
+		if (!arguments.templateText && ArrayLen(stack)) {
+			throw(
+				type = "NoRawDevServerHttp.UnterminatedString",
+				message = "#arguments.sourceName# ends inside an unterminated string or ##...## interpolation, so the raw-HTTP scan can't trust the rest of it. Check its quotes, or teach $codeOnly() the construct it misread."
+			);
+		}
 		return out.toString();
 	}
 
@@ -228,8 +241,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	 * `new http`, `cfhttp(...)`, the parenthesis-free script-tag forms
 	 * (`cfhttp url=... {}`, `http url=...;`) and the cfhttp tag.
 	 */
-	public numeric function $countRawHttp(required string src, boolean templateText = false) {
-		var code = $codeOnly(arguments.src, arguments.templateText);
+	public numeric function $countRawHttp(required string src, boolean templateText = false, string sourceName = "source") {
+		var code = $codeOnly(arguments.src, arguments.templateText, arguments.sourceName);
 		var patterns = [
 			// new http(...) and new http;
 			"\bnew\s+http\b",
