@@ -26,6 +26,14 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ---
 
+# [4.1.2](https://github.com/wheels-dev/wheels/releases/tag/v4.1.2) => 2026-09-29
+
+### Fixed
+
+- The `apt`/`dnf` `wheels` launcher no longer uses a pre-set `JAVA_HOME` that points at a JDK older than 21. It now checks the version, prints `wheels: ignoring JAVA_HOME=<path> (Java N); Wheels needs Java 21+` to stderr, and uses the Java 21 the package installed. Previously every command except `wheels --version` crashed with `UnsupportedClassVersionError` on machines, including GitHub's Ubuntu runners, that export `JAVA_HOME` at Java 17. The fallback probes also skip an older `default-java` or alternatives `java`. On 4.1.1, run `unset JAVA_HOME` or point `JAVA_HOME` at a Java 21+ install as a workaround (Refs #3728)
+
+---
+
 # [4.1.1](https://github.com/wheels-dev/wheels/releases/tag/v4.1.1) => 2026-09-28
 
 ### Added
