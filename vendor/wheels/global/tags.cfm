@@ -485,7 +485,8 @@
 	 * Column metadata for an Oracle table in the current schema, read from the
 	 * data dictionary with one ordinary query, in the shape of
 	 * `cfdbinfo(type="columns")`: the columns and values the Oracle JDBC
-	 * driver's `getColumns()` produces (a NULL scale reads as 0, as JDBC's
+	 * driver's `getColumns()` produces (an unconstrained NUMBER reports a scale
+	 * of -127, as ojdbc does; any other NULL scale reads as 0, as JDBC's
 	 * getInt() does), plus Adobe's IS_PRIMARYKEY, IS_FOREIGNKEY and
 	 * REFERENCED_PRIMARYKEY[_TABLE] ("N/A" when not a foreign key). Used on Adobe
 	 * CF, where cfdbinfo retains JDBC statements (#3732); the parity spec
@@ -511,7 +512,10 @@
 					WHEN c.DATA_TYPE IN ('CHAR', 'VARCHAR', 'VARCHAR2', 'NCHAR', 'NVARCHAR2') THEN c.CHAR_LENGTH
 					ELSE c.DATA_LENGTH
 				END AS COLUMN_SIZE,
-				NVL(c.DATA_SCALE, 0) AS DECIMAL_DIGITS,
+				CASE
+					WHEN c.DATA_TYPE = 'NUMBER' AND c.DATA_PRECISION IS NULL AND c.DATA_SCALE IS NULL THEN -127
+					ELSE NVL(c.DATA_SCALE, 0)
+				END AS DECIMAL_DIGITS,
 				CASE WHEN c.NULLABLE = 'N' THEN 'NO' ELSE 'YES' END AS IS_NULLABLE,
 				c.DATA_DEFAULT AS COLUMN_DEFAULT_VALUE,
 				c.COLUMN_ID AS ORDINAL_POSITION,
