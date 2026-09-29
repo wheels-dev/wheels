@@ -248,9 +248,11 @@ component {
 	 * write would keep a leftover file's wider permissions. No token is
 	 * issued (and any old one is removed) when the registration directory, or
 	 * the servers directory above it, is not a real directory owned by this
-	 * user and closed to group/other writes; or on Windows, where the file's
-	 * access comes from wherever LUCLI_HOME sits. Without a token the CLI
-	 * proves the server the way it always has, through the OS.
+	 * user and closed to group/other writes, or carries a macOS ACL (which can
+	 * grant, and hand down to new files, access the mode bits don't show);
+	 * or on Windows and other platforms whose file access we can't read from
+	 * the mode bits. Without a token the CLI proves the server the way it
+	 * always has, through the OS.
 	 */
 	public boolean function writeStartToken(required string name) {
 		if (!$tokenStorageSafe(arguments.name)) {
@@ -262,7 +264,10 @@ component {
 		var tmp = "";
 		try {
 			tmp = files.createTempFile(regDir, ".wheels-cli-token-", ".tmp", $ownerOnlyAttributes());
-			files.write(tmp, charsetDecode(new ServerChallenge().newSecret(), "utf-8"), $noOptions("java.nio.file.OpenOption"));
+			// Checked while the file is still empty, so no secret byte is ever
+			// written to a file another user can read.
+			if ($hasExtendedAcl(tmp)) throw(type = "Wheels.TokenStorageUnsafe", message = "token file carries an ACL");
+			files.write(tmp, charsetDecode(new ServerChallenge().newSecret(), "utf-8"), $writeOptions());
 			var moveOptions = $noOptions("java.nio.file.CopyOption", 2);
 			var copyOption = createObject("java", "java.nio.file.StandardCopyOption");
 			var arrays = createObject("java", "java.lang.reflect.Array");
@@ -289,8 +294,8 @@ component {
 	 * The token of the server registered as `name`, or "" when there is
 	 * none that is safe to use: the storage checks of writeStartToken()
 	 * hold, the file is a regular file (not a link) owned by this user with
-	 * no group or other permission bits, and it holds exactly 64 lowercase
-	 * hex characters.
+	 * no group or other permission bits and no ACL, and it holds exactly 64
+	 * lowercase hex characters.
 	 */
 	public string function readStartToken(required string name) {
 		try {
@@ -303,6 +308,7 @@ component {
 			var ownerOnly = createObject("java", "java.nio.file.attribute.PosixFilePermissions").fromString("rw-------");
 			var perms = files.getPosixFilePermissions(tokenPath, noFollow);
 			if (!ownerOnly.containsAll(perms)) return "";
+			if ($hasExtendedAcl(tokenPath)) return "";
 			var token = trim(charsetEncode(files.readAllBytes(tokenPath), "utf-8"));
 			return new ServerChallenge().isNonce(token) ? token : "";
 		} catch (any e) {
@@ -311,12 +317,33 @@ component {
 	}
 
 	public void function deleteStartToken(required string name) {
-		if (!len(arguments.name) || !len(variables.lucliHome)) return;
+		if (!$isRegistrationName(arguments.name) || !len(variables.lucliHome)) return;
 		try {
 			createObject("java", "java.nio.file.Files").deleteIfExists(
 				$path(variables.lucliHome & "/servers/" & arguments.name & "/" & variables.TOKEN_FILE)
 			);
 		} catch (any e) {}
+	}
+
+	/** Remove the start token of every registration, e.g. after `wheels stop --all`. */
+	public void function deleteAllStartTokens() {
+		var serversDir = variables.lucliHome & "/servers";
+		if (!len(variables.lucliHome) || !directoryExists(serversDir)) return;
+		for (var entry in directoryList(serversDir, false, "name")) {
+			deleteStartToken(entry);
+		}
+	}
+
+	/**
+	 * The server name a `lucee*.json` config file declares (a relative path
+	 * resolves against `projectRoot`), or "" when there is none.
+	 */
+	public string function serverNameInConfig(required string configPath, string projectRoot = "") {
+		var configFile = arguments.configPath;
+		if (!fileExists(configFile) && len(arguments.projectRoot)) {
+			configFile = arguments.projectRoot & "/" & arguments.configPath;
+		}
+		return $nameInConfigFile(configFile);
 	}
 
 	/**
@@ -336,21 +363,28 @@ component {
 		return "";
 	}
 
-	/** POSIX only; the servers dir and the registration dir are private to this user. */
+	/**
+	 * Linux and macOS only; the servers dir and the registration dir are
+	 * private to this user. On Linux the mode bits are the whole story (a
+	 * POSIX ACL's mask shows in the group bits); macOS ACLs don't show there,
+	 * so they are checked separately. Elsewhere we can't tell, so no token.
+	 */
 	public boolean function $tokenStorageSafe(required string name) {
-		if (!len(arguments.name) || !len(variables.lucliHome)) return false;
-		if (reFind("[/\\]|^\.\.?$", arguments.name)) return false;
+		if (!$isRegistrationName(arguments.name) || !len(variables.lucliHome)) return false;
 		try {
 			var fs = createObject("java", "java.nio.file.FileSystems").getDefault();
 			if (!fs.supportedFileAttributeViews().contains("posix")) return false;
-			return $dirIsPrivate($path(variables.lucliHome & "/servers"))
+			if (!listFindNoCase("linux,mac", $aclPlatform())) return false;
+			// LUCLI_HOME too: whoever can write it can swap `servers/` under us.
+			return $dirIsPrivate($path(variables.lucliHome))
+				&& $dirIsPrivate($path(variables.lucliHome & "/servers"))
 				&& $dirIsPrivate($path(variables.lucliHome & "/servers/" & arguments.name));
 		} catch (any e) {
 			return false;
 		}
 	}
 
-	/** A real directory (not a link), owned by this user, not group- or world-writable. */
+	/** A real directory (not a link), owned by this user, not group- or world-writable, with no macOS ACL. */
 	public boolean function $dirIsPrivate(required any dirPath) {
 		var files = createObject("java", "java.nio.file.Files");
 		var noFollow = $noFollow();
@@ -358,7 +392,51 @@ component {
 		if (!$ownedByCurrentUser(arguments.dirPath)) return false;
 		var perms = files.getPosixFilePermissions(arguments.dirPath, noFollow);
 		var perm = createObject("java", "java.nio.file.attribute.PosixFilePermission");
-		return !perms.contains(perm.GROUP_WRITE) && !perms.contains(perm.OTHERS_WRITE);
+		if (perms.contains(perm.GROUP_WRITE) || perms.contains(perm.OTHERS_WRITE)) return false;
+		return !$hasExtendedAcl(arguments.dirPath);
+	}
+
+	/** A single path segment: not empty, no separator, not `.` or `..`. */
+	private boolean function $isRegistrationName(required string name) {
+		return len(arguments.name) && !reFind("[/\\]|^\.\.?$", arguments.name);
+	}
+
+	/** WRITE + TRUNCATE_EXISTING + NOFOLLOW_LINKS: never write the token through a planted link. */
+	private any function $writeOptions() {
+		var opts = $noOptions("java.nio.file.OpenOption", 3);
+		var arrays = createObject("java", "java.lang.reflect.Array");
+		var std = createObject("java", "java.nio.file.StandardOpenOption");
+		arrays.set(opts, javaCast("int", 0), std.WRITE);
+		arrays.set(opts, javaCast("int", 1), std.TRUNCATE_EXISTING);
+		arrays.set(opts, javaCast("int", 2), createObject("java", "java.nio.file.LinkOption").NOFOLLOW_LINKS);
+		return opts;
+	}
+
+	/** "linux", "mac" or "other": decides whether the mode bits describe a file's access. */
+	private string function $aclPlatform() {
+		var osName = lCase(createObject("java", "java.lang.System").getProperty("os.name"));
+		if (findNoCase("linux", osName)) return "linux";
+		if (findNoCase("mac", osName)) return "mac";
+		return "other";
+	}
+
+	/**
+	 * Whether `target` carries a macOS extended ACL, which can grant another
+	 * user access that its mode bits don't show (and that new files inherit).
+	 * Java can't read these on macOS, so ask `ls -led`: ACL entries follow
+	 * the first line as ` N: ...`. Anything we can't read counts as an ACL, so
+	 * the caller falls back to the OS proof. Always false off macOS.
+	 */
+	public boolean function $hasExtendedAcl(required any target) {
+		if ($aclPlatform() != "mac") return false;
+		var result = $runCommand(["/bin/ls", "-led", arguments.target.toString()]);
+		if (!result.ran || result.exitCode != 0 || !len(result.output)) return true;
+		var lines = listToArray(result.output, chr(10));
+		if (reFind("^\S+\+\s", lines[1])) return true;
+		for (var i = 2; i <= arrayLen(lines); i++) {
+			if (reFind("^\s*[0-9]+: ", lines[i])) return true;
+		}
+		return false;
 	}
 
 	private boolean function $ownedByCurrentUser(required any target) {
@@ -843,10 +921,13 @@ component {
 	 * the file is missing, malformed, or carries no usable name.
 	 */
 	private string function $configuredServerName(required string projectRoot) {
-		var configFile = arguments.projectRoot & "/lucee.json";
-		if (!fileExists(configFile)) return "";
+		return $nameInConfigFile(arguments.projectRoot & "/lucee.json");
+	}
+
+	private string function $nameInConfigFile(required string configFile) {
+		if (!len(arguments.configFile) || !fileExists(arguments.configFile)) return "";
 		try {
-			var cfg = deserializeJSON(fileRead(configFile));
+			var cfg = deserializeJSON(fileRead(arguments.configFile));
 			if (isStruct(cfg) && structKeyExists(cfg, "name") && isSimpleValue(cfg.name)) {
 				return trim(cfg.name);
 			}

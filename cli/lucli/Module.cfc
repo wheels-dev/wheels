@@ -2050,8 +2050,15 @@ component extends="modules.BaseModule" {
 			}
 			out("Stopping Wheels server...", "cyan");
 			executeCommand("server", stopArgs, variables.projectRoot);
+			var registry = getService("serverRegistry");
+			if (opts.all) {
+				registry.deleteAllStartTokens();
+			}
 			if (len(opts.name)) {
-				getService("serverRegistry").deleteStartToken(opts.name);
+				registry.deleteStartToken(opts.name);
+			}
+			if (len(opts.config)) {
+				registry.deleteStartToken(registry.serverNameInConfig(opts.config, variables.projectRoot));
 			}
 			return "";
 		}

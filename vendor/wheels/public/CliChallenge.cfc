@@ -91,14 +91,103 @@ component {
 		return base & "/wheels-cli.token";
 	}
 
-	/** Lowercase hex of the address bytes; IPv4-mapped IPv6 collapses to IPv4. */
+	/**
+	 * Lowercase hex of the address bytes; IPv4-mapped IPv6 collapses to IPv4,
+	 * and an IPv6 scope id or brackets are dropped. Plain CFML on purpose: the
+	 * servlet reports address literals, so no lookup is needed, and not every
+	 * engine exposes java.net.InetAddress.getAddress() (RustCFML doesn't).
+	 * Anything that isn't an address literal throws, which respond() turns
+	 * into "unavailable".
+	 */
 	public string function $canonicalAddress(required string literal) {
-		var bytes = CreateObject("java", "java.net.InetAddress").getByName(arguments.literal).getAddress();
-		var hex = LCase(BinaryEncode(bytes, "hex"));
-		if (Len(hex) == 32 && Left(hex, 24) == "00000000000000000000ffff") {
+		var addr = Trim(arguments.literal);
+		if (Len(addr) > 1 && Left(addr, 1) == "[" && Right(addr, 1) == "]") {
+			addr = Mid(addr, 2, Len(addr) - 2);
+		}
+		var pct = Find("%", addr);
+		if (pct == 1) {
+			$badAddress();
+		}
+		if (pct > 1) {
+			addr = Left(addr, pct - 1);
+		}
+		if (!Find(":", addr)) {
+			return $ipv4Hex(addr);
+		}
+		var hex = $ipv6Hex(addr);
+		if (Left(hex, 24) == "00000000000000000000ffff") {
 			return Right(hex, 8);
 		}
 		return hex;
+	}
+
+	/** Dotted-quad IPv4 as 8 lowercase hex characters. */
+	public string function $ipv4Hex(required string dotted) {
+		var parts = ListToArray(arguments.dotted, ".", true);
+		if (ArrayLen(parts) != 4) {
+			$badAddress();
+		}
+		var hex = "";
+		for (var part in parts) {
+			// No regex `$` here: in CFML it also matches before a trailing newline.
+			if (!Len(part) || Len(part) > 3 || ReFind("[^0-9]", part) || Val(part) > 255) {
+				$badAddress();
+			}
+			hex &= Right("0" & LCase(FormatBaseN(Val(part), 16)), 2);
+		}
+		return hex;
+	}
+
+	/** An IPv6 literal (with `::` and an optional dotted IPv4 tail) as 32 lowercase hex characters. */
+	public string function $ipv6Hex(required string literal) {
+		var addr = LCase(arguments.literal);
+		if (Find(".", addr)) {
+			var lastColon = Len(addr) - Find(":", Reverse(addr)) + 1;
+			var v4 = $ipv4Hex(Mid(addr, lastColon + 1, Len(addr)));
+			addr = Left(addr, lastColon) & Left(v4, 4) & ":" & Right(v4, 4);
+		}
+		var groups = [];
+		var gap = Find("::", addr);
+		if (gap) {
+			if (Find("::", addr, gap + 1)) {
+				$badAddress();
+			}
+			var head = gap > 1 ? ListToArray(Left(addr, gap - 1), ":", true) : [];
+			var rest = Mid(addr, gap + 2, Len(addr));
+			var tail = Len(rest) ? ListToArray(rest, ":", true) : [];
+			var missing = 8 - ArrayLen(head) - ArrayLen(tail);
+			if (missing < 1) {
+				$badAddress();
+			}
+			for (var h in head) {
+				ArrayAppend(groups, h);
+			}
+			for (var i = 1; i <= missing; i++) {
+				ArrayAppend(groups, "0");
+			}
+			for (var t in tail) {
+				ArrayAppend(groups, t);
+			}
+		} else {
+			for (var g in ListToArray(addr, ":", true)) {
+				ArrayAppend(groups, g);
+			}
+		}
+		if (ArrayLen(groups) != 8) {
+			$badAddress();
+		}
+		var hex = "";
+		for (var group in groups) {
+			if (!Len(group) || Len(group) > 4 || ReFind("[^0-9a-f]", group)) {
+				$badAddress();
+			}
+			hex &= Right("000" & group, 4);
+		}
+		return hex;
+	}
+
+	public void function $badAddress() {
+		Throw(type = "Wheels.CliChallenge.BadAddress", message = "Not an IP address literal.");
 	}
 
 	public string function $message(

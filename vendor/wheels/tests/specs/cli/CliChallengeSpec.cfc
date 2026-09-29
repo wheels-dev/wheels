@@ -42,6 +42,34 @@ component extends="wheels.WheelsTest" {
 				expect(challenge.$canonicalAddress("::1%1")).toBe(loopback6);
 			});
 
+			it("canonicalises address literals without java.net.InetAddress (RustCFML)", () => {
+				var challenge = new wheels.public.CliChallenge();
+				expect(challenge.$canonicalAddress("10.0.255.1")).toBe("0a00ff01");
+				expect(challenge.$canonicalAddress("0:0:0:0:0:0:0:1%lo0")).toBe(loopback6);
+				expect(challenge.$canonicalAddress("[::1]")).toBe(loopback6);
+				expect(challenge.$canonicalAddress("0:0:0:0:0:ffff:7f00:1")).toBe("7f000001");
+				expect(challenge.$canonicalAddress("FE80::1:2%eth0")).toBe("fe800000000000000000000000010002");
+				expect(challenge.$canonicalAddress("2001:db8::")).toBe("20010db8000000000000000000000000");
+				expect(challenge.$canonicalAddress("64:ff9b::192.0.2.33")).toBe("0064ff9b0000000000000000c0000221");
+			});
+
+			it("rejects anything that is not an address literal", () => {
+				var challenge = new wheels.public.CliChallenge();
+				var bad = [
+					"", "localhost", "256.0.0.1", "1.2.3", "1.2.3.4.5", "1.2.3.x", "1..2.3",
+					"1:2:3:4:5:6:7:8:9", "1::2::3", "12345::1", "::g", "%1", "1:2:3:4:5:6:7::8"
+				];
+				for (var literal in bad) {
+					var state = {threw = false};
+					try {
+						challenge.$canonicalAddress(literal);
+					} catch (any e) {
+						state.threw = true;
+					}
+					expect(state.threw).toBeTrue("accepted [#literal#]");
+				}
+			});
+
 		});
 
 		describe("CliChallenge.respond() (##3769)", () => {

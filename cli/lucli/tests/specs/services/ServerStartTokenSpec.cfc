@@ -21,6 +21,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		variables.tempProject = createObject("java", "java.io.File")
 			.init(getTempDirectory() & "wheels-token-project-#createUUID()#").getCanonicalPath();
 		directoryCreate(variables.tempProject, true);
+		variables.macOs = findNoCase("mac", createObject("java", "java.lang.System").getProperty("os.name")) > 0;
 	}
 
 	function afterAll() {
@@ -60,6 +61,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 	private string function tokenFile(required string name) {
 		return variables.tempHome & "/servers/" & arguments.name & "/wheels-cli.token";
+	}
+
+	/** Run /bin/chmod with `args` (macOS ACL edits: `+a <entry>`, `-N`); returns the exit code. */
+	private numeric function chmodAcl(required array args) {
+		var cmd = ["/bin/chmod"];
+		for (var a in arguments.args) arrayAppend(cmd, a);
+		var proc = createObject("java", "java.lang.ProcessBuilder").init(cmd).redirectErrorStream(true).start();
+		proc.waitFor();
+		return proc.exitValue();
 	}
 
 	/** A registry whose OS introspection answers `owner`, with no command line to compare. */
@@ -185,6 +195,91 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				for (var bad in ["", "..", ".", "a/b", "..\x"]) {
 					expect(registry.writeStartToken(bad)).toBeFalse("accepted name [#bad#]");
 				}
+			});
+
+			// macOS extended ACLs grant access the POSIX mode bits don't show: a 0600
+			// file under an "everyone allow read,file_inherit" directory is readable by
+			// every user. Linux POSIX ACLs are masked by the mode's group bits, which the
+			// mode checks above already see.
+			it("issues no token when the registration dir carries a macOS ACL (inherited read)", () => {
+				if (!variables.macOs) return;
+				var name = newRegistration();
+				var dir = variables.tempHome & "/servers/" & name;
+				expect(chmodAcl(["+a", "everyone allow read,file_inherit", dir])).toBe(0);
+				expect(registry.writeStartToken(name)).toBeFalse("issued a token under an inheritable read ACL");
+				expect(fileExists(tokenFile(name))).toBeFalse("left a token under an inheritable read ACL");
+				expect(registry.readStartToken(name)).toBe("");
+			});
+
+			it("issues no token when the servers dir above it carries a macOS ACL (write grant)", () => {
+				if (!variables.macOs) return;
+				var name = newRegistration();
+				var servers = variables.tempHome & "/servers";
+				// A write grant: another user could swap files in the dir under us.
+				expect(chmodAcl(["+a", "everyone allow add_file,delete_child", servers])).toBe(0);
+				try {
+					expect(registry.writeStartToken(name)).toBeFalse();
+					expect(fileExists(tokenFile(name))).toBeFalse();
+				} finally {
+					chmodAcl(["-N", servers]);
+				}
+			});
+
+			it("refuses to use a token file that carries a macOS ACL", () => {
+				if (!variables.macOs) return;
+				var name = newRegistration();
+				expect(registry.writeStartToken(name)).toBeTrue();
+				expect(chmodAcl(["+a", "everyone allow read", tokenFile(name)])).toBe(0);
+				expect(modeOf(tokenFile(name))).toBe("rw-------");
+				expect(registry.readStartToken(name)).toBe("");
+			});
+
+			it("issues no token when LUCLI_HOME itself is group- or world-writable", () => {
+				if (!variables.posix) return;
+				var name = newRegistration();
+				for (var mode in ["rwxrwxr-x", "rwxr-xrwx"]) {
+					setMode(variables.tempHome, mode);
+					try {
+						expect(registry.writeStartToken(name)).toBeFalse("issued a token under a #mode# LUCLI_HOME");
+						expect(fileExists(tokenFile(name))).toBeFalse();
+					} finally {
+						setMode(variables.tempHome, "rwxr-xr-x");
+					}
+				}
+			});
+
+			it("deleteStartToken() only touches a registration inside the servers dir", () => {
+				if (!variables.posix) return;
+				// A token-named file one level up must survive `--name=..` style input.
+				var outside = variables.tempHome & "/wheels-cli.token";
+				fileWrite(outside, "keep");
+				try {
+					for (var bad in ["..", ".", "../x", "a/b", "..\x", ""]) {
+						registry.deleteStartToken(bad);
+					}
+					expect(fileExists(outside)).toBeTrue();
+				} finally {
+					if (fileExists(outside)) fileDelete(outside);
+				}
+			});
+
+			it("deleteAllStartTokens() removes every registration's token (wheels stop --all)", () => {
+				if (!variables.posix) return;
+				var first = newRegistration();
+				var second = newRegistration();
+				registry.writeStartToken(first);
+				registry.writeStartToken(second);
+				registry.deleteAllStartTokens();
+				expect(fileExists(tokenFile(first))).toBeFalse();
+				expect(fileExists(tokenFile(second))).toBeFalse();
+			});
+
+			it("serverNameInConfig() reads the name a lucee*.json declares (wheels stop --config)", () => {
+				var cfgFile = variables.tempProject & "/lucee-alt.json";
+				fileWrite(cfgFile, serializeJSON({"name" = "alt-server", "port" = 8123}));
+				expect(registry.serverNameInConfig(cfgFile)).toBe("alt-server");
+				expect(registry.serverNameInConfig("lucee-alt.json", variables.tempProject)).toBe("alt-server");
+				expect(registry.serverNameInConfig("missing.json", variables.tempProject)).toBe("");
 			});
 
 			it("deleteStartToken() removes the token", () => {
