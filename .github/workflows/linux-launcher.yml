@@ -12,12 +12,14 @@ on:
     paths:
       - 'tools/distribution-drafts/linux-packages/**'
       - 'tools/test-linux-launcher-java.sh'
+      - 'tools/test-linux-launcher-docs-mirror.sh'
       - '.github/workflows/linux-launcher.yml'
   push:
     branches: [develop, main]
     paths:
       - 'tools/distribution-drafts/linux-packages/**'
       - 'tools/test-linux-launcher-java.sh'
+      - 'tools/test-linux-launcher-docs-mirror.sh'
       - '.github/workflows/linux-launcher.yml'
 
 permissions:
@@ -32,6 +34,9 @@ jobs:
 
       - name: Test the launcher's Java resolution (fake JDKs)
         run: bash tools/test-linux-launcher-java.sh
+
+      - name: Test the launcher's offline-docs mirror into public/wheels-docs
+        run: bash tools/test-linux-launcher-docs-mirror.sh
 
       - name: Real JDKs on the runner (JAVA_HOME = Temurin 17, Temurin 21 alongside)
         run: |

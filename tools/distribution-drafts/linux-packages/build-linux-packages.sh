@@ -272,16 +272,39 @@ if [ -f "${DOCS_SRC}/wheels-docs-${INSTALLED_VERSION}.zip" ] && [ ! -f "${DOCS_D
     || echo "WARNING: could not unpack the offline docs bundle" >&2
 fi
 
+# --- docs-mirror begin ----------------------------------------------------
+# tools/test-linux-launcher-docs-mirror.sh extracts and runs this block.
 # Mirror the bundle into the current app's webroot when run from inside one.
 # Required, not a convenience: the dev server's Lucee urlRewrite only routes
 # extension-less paths to the front controller, so the bundle's
 # extension-bearing asset URLs must be real files under the webroot for the
-# container to serve them. Hardlinked so the shared cache is not duplicated.
-if [ -f "./vendor/wheels/wheels.json" ] && [ -d "./public" ] && [ -d "${DOCS_DST}" ]; then
-  rm -rf "./public/wheels-docs"
-  cp -R -l "${DOCS_DST}" "./public/wheels-docs" 2>/dev/null \
-    || cp -R "${DOCS_DST}" "./public/wheels-docs"
+# container to serve them.
+# Copied only when missing or stamped with another version: the stamp file
+# marks a wrapper-made mirror, so a public/wheels-docs without one (the user's
+# own, or one from `wheels docs`) is left alone. A plain copy, not hardlinks,
+# so edits in the app cannot change the shared cache; it is built beside the
+# target and renamed in. A failure warns and the command still runs.
+DOCS_MIRROR="./public/wheels-docs"
+DOCS_STAMP="${DOCS_MIRROR}/.wheels-docs-version"
+_wheels_docs_mirror() {
+  local tmp="./public/.wheels-docs-new.$$" old="./public/.wheels-docs-old.$$"
+  rm -rf "${tmp}" "${old}"
+  { cp -R "${DOCS_DST}" "${tmp}" && printf '%s\n' "${INSTALLED_VERSION}" > "${tmp}/.wheels-docs-version"; } \
+    || { rm -rf "${tmp}"; return 1; }
+  if [ -e "${DOCS_MIRROR}" ]; then
+    mv "${DOCS_MIRROR}" "${old}" || { rm -rf "${tmp}"; return 1; }
+  fi
+  mv "${tmp}" "${DOCS_MIRROR}" || { mv "${old}" "${DOCS_MIRROR}"; rm -rf "${tmp}"; return 1; }
+  rm -rf "${old}"
+}
+if [ -f "./vendor/wheels/wheels.json" ] && [ -d "./public" ] && [ -f "${DOCS_DST}/manifest.json" ]; then
+  if [ ! -e "${DOCS_MIRROR}" ] || { [ -f "${DOCS_STAMP}" ] \
+      && [ "$(cat "${DOCS_STAMP}" 2>/dev/null)" != "${INSTALLED_VERSION}" ]; }; then
+    _wheels_docs_mirror 2>/dev/null \
+      || echo "wheels: could not copy the offline docs into public/wheels-docs; continuing" >&2
+  fi
 fi
+# --- docs-mirror end ------------------------------------------------------
 
 # Stage SQLite JDBC into Lucee Express on first run.
 LUCEE_EXT_DIR="$(find "${LUCLI_HOME}/express" -path "*/lib/ext" -type d 2>/dev/null | head -1 || true)"

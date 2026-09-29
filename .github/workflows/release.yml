@@ -390,6 +390,9 @@ jobs:
       - name: Test the Linux launcher's Java resolution
         run: bash tools/test-linux-launcher-java.sh
 
+      - name: Test the Linux launcher's offline-docs mirror
+        run: bash tools/test-linux-launcher-docs-mirror.sh
+
       - name: Build Linux packages (.deb / .rpm)
         # CHANNEL derives from the version so develop snapshots produce the
         # `wheels-be` package (which the Phase 2 bleeding-edge receiver
