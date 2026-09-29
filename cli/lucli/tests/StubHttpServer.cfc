@@ -23,14 +23,27 @@ component {
 	 * fixed status line, then the connection closes: specs use it to send
 	 * truncated, chunked or interim (1xx) responses.
 	 */
-	public any function init(required numeric statusCode, any rawResponse = "") {
+	public any function init(required numeric statusCode, any rawResponse = "", string bindAddress = "") {
 		variables.statusCode = arguments.statusCode;
 		variables.rawResponse = arguments.rawResponse;
-		// Port 0 + no bind address = ephemeral port on the wildcard address,
-		// covering both stacks so the CLI's `http://localhost:<port>/...`
-		// connect succeeds whether localhost resolves to 127.0.0.1 or ::1
-		// (same dual-stack concern as PortProbeSpec).
-		variables.serverSocket = createObject("java", "java.net.ServerSocket").init(javacast("int", 0));
+		if (len(arguments.bindAddress)) {
+			// One address, exclusively (issue 3804). On macOS and BSD a socket
+			// with SO_REUSEADDR (Java's default) may bind the more specific
+			// 127.0.0.1:<port> while we hold the wildcard, and then it, not
+			// this stub, answers 127.0.0.1:<port>. Binding the address the spec
+			// connects to, without SO_REUSEADDR, leaves no room for that.
+			variables.serverSocket = createObject("java", "java.net.ServerSocket").init();
+			variables.serverSocket.setReuseAddress(false);
+			variables.serverSocket.bind(
+				createObject("java", "java.net.InetSocketAddress").init(arguments.bindAddress, javacast("int", 0))
+			);
+		} else {
+			// Port 0 + no bind address = ephemeral port on the wildcard address,
+			// covering both stacks so the CLI's `http://localhost:<port>/...`
+			// connect succeeds whether localhost resolves to 127.0.0.1 or ::1
+			// (same dual-stack concern as PortProbeSpec).
+			variables.serverSocket = createObject("java", "java.net.ServerSocket").init(javacast("int", 0));
+		}
 		variables.threadName = "stub-http-" & createUUID();
 		// Raw request heads (request line + headers), in arrival order, so
 		// specs can assert what the CLI actually put on the wire. A Java
