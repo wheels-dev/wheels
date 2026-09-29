@@ -234,11 +234,36 @@ acquire_run_lock() {
       echo "  its server mid-suite. Wait for it, or run from a separate worktree." >&2
       exit 1
     fi
+    # The lock is stale. Several runs can find the same stale lock at once,
+    # and each replacing it lets a slow one delete the lock another just made,
+    # so only the run that creates the takeover lock (mkdir is atomic) may
+    # replace it, after checking again that nothing live owns it (#3796). A
+    # takeover lock a killed run left behind is cleared after a minute.
+    if [ -d "$RUN_LOCK.takeover" ] && [ -n "$(find "$RUN_LOCK.takeover" -prune -mmin +1 2>/dev/null)" ]; then
+      rm -rf "$RUN_LOCK.takeover"
+    fi
+    if ! mkdir "$RUN_LOCK.takeover" 2>/dev/null; then
+      echo "::error::Another tools/test-local.sh run is taking over this checkout's stale lock right now." >&2
+      echo "  Run again once it has started, or run from a separate worktree." >&2
+      exit 1
+    fi
+    if owner="$(live_lock_owner)"; then
+      rmdir "$RUN_LOCK.takeover" 2>/dev/null || true
+      echo "::error::Another tools/test-local.sh run (PID ${owner}) is using this checkout." >&2
+      echo "  Wait for it, or run from a separate worktree." >&2
+      exit 1
+    fi
     rm -rf "$RUN_LOCK"
-    mkdir "$RUN_LOCK" 2>/dev/null || {
+    if ! mkdir "$RUN_LOCK" 2>/dev/null; then
+      rmdir "$RUN_LOCK.takeover" 2>/dev/null || true
       echo "::error::Another tools/test-local.sh run took this checkout's lock just now." >&2
       exit 1
-    }
+    fi
+    # Written whole, then renamed, so a reader never sees a partial PID.
+    echo "$$" > "$RUN_LOCK/pid.$$" && mv "$RUN_LOCK/pid.$$" "$RUN_LOCK/pid"
+    RUN_LOCK_HELD=true
+    rmdir "$RUN_LOCK.takeover" 2>/dev/null || true
+    return 0
   fi
   # Written whole, then renamed, so a reader never sees a partial PID.
   echo "$$" > "$RUN_LOCK/pid.$$" && mv "$RUN_LOCK/pid.$$" "$RUN_LOCK/pid"

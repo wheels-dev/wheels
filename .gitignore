@@ -114,4 +114,5 @@ public/wheels-docs/
 
 # Run lock and lucee.json backup left by an interrupted tools/test-local.sh run
 .wheels-test-local.lock/
+.wheels-test-local.lock.takeover/
 lucee.json.test-local.bak
