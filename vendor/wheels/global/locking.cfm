@@ -54,12 +54,111 @@
 			}
 		} else {
 			arguments.executeArgs.$locked = true;
-			lock name="#arguments.name#" type="#arguments.type#" timeout="#arguments.timeout#" {
-				local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
+			// Written only inside the lock body below; a struct (not local.) so
+			// the finally reads it on every engine (cross-engine invariant 11).
+			var restart = {token = ""};
+			if (
+				$isSessionEndDuringOwnRestart(
+					name = arguments.name,
+					type = arguments.type,
+					execute = arguments.execute,
+					executeArgs = arguments.executeArgs
+				)
+			) {
+				// The exclusive holder is the restart, parked in applicationStop()
+				// waiting for this very session end (BoxLang ends sessions on
+				// ForkJoin worker threads there), so no other writer can exist and
+				// the read lock could only wait out its timeout (issue 3770). A
+				// scope already torn down has nothing left to run against
+				// (invariant 19): return without running.
+				if (
+					StructKeyExists(arguments.executeArgs.applicationScope, "wheels")
+					&& StructKeyExists(arguments.executeArgs.applicationScope.wheels, "eventPath")
+				) {
+					local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
+				}
+			} else if (CompareNoCase(arguments.type, "exclusive") == 0 && CompareNoCase(arguments.execute, "$handleRestartAppRequest") == 0) {
+				lock name="#arguments.name#" type="#arguments.type#" timeout="#arguments.timeout#" {
+					restart.token = $markRestartLock(name = arguments.name, timeout = arguments.timeout);
+					try {
+						local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
+					} finally {
+						$clearRestartLock(token = restart.token);
+					}
+				}
+			} else {
+				lock name="#arguments.name#" type="#arguments.type#" timeout="#arguments.timeout#" {
+					local.rv = $invoke(method = "#arguments.execute#", argumentCollection = "#arguments.executeArgs#");
+				}
 			}
 		}
 		if (StructKeyExists(local, "rv")) {
 			return local.rv;
 		}
+	}
+
+	/**
+	 * Record, in the application scope, that a restart holds the exclusive lock
+	 * NAME (issue 3770). The token identifies this restart and expiresAt bounds
+	 * how long the marker counts, so a marker a failed or aborted restart left
+	 * behind is detectably stale. Returns the token for $clearRestartLock().
+	 */
+	public string function $markRestartLock(required string name, required numeric timeout) {
+		local.token = CreateUUID();
+		application["$wheelsRestartLock"] = {
+			name = arguments.name,
+			token = local.token,
+			expiresAt = DateAdd("s", Max(arguments.timeout, 60), Now())
+		};
+		return local.token;
+	}
+
+	/**
+	 * Remove this restart's marker. After a successful applicationStop() the
+	 * marker went with the old application scope, and the scope itself can be
+	 * torn down (invariant 19), so a missing marker or a failing read is fine.
+	 */
+	public void function $clearRestartLock(required string token) {
+		try {
+			if (
+				StructKeyExists(application, "$wheelsRestartLock")
+				&& IsStruct(application["$wheelsRestartLock"])
+				&& StructKeyExists(application["$wheelsRestartLock"], "token")
+				&& Compare(application["$wheelsRestartLock"].token, arguments.token) == 0
+			) {
+				StructDelete(application, "$wheelsRestartLock");
+			}
+		} catch (any e) {
+			// The application scope is already gone; so is the marker.
+		}
+	}
+
+	/**
+	 * True for a read-locked session end whose application scope carries a
+	 * live restart marker for the same lock (issue 3770): the only case in
+	 * which $simpleLock runs its body without taking the lock.
+	 */
+	public boolean function $isSessionEndDuringOwnRestart(
+		required string name,
+		required string type,
+		required string execute,
+		required struct executeArgs
+	) {
+		if (CompareNoCase(arguments.type, "readOnly") != 0 || CompareNoCase(arguments.execute, "$runOnSessionEnd") != 0) {
+			return false;
+		}
+		if (!StructKeyExists(arguments.executeArgs, "applicationScope") || !IsStruct(arguments.executeArgs.applicationScope)) {
+			return false;
+		}
+		if (!StructKeyExists(arguments.executeArgs.applicationScope, "$wheelsRestartLock")) {
+			return false;
+		}
+		local.marker = arguments.executeArgs.applicationScope["$wheelsRestartLock"];
+		return IsStruct(local.marker)
+			&& StructKeyExists(local.marker, "name")
+			&& StructKeyExists(local.marker, "expiresAt")
+			&& CompareNoCase(local.marker.name, arguments.name) == 0
+			&& IsDate(local.marker.expiresAt)
+			&& DateCompare(Now(), local.marker.expiresAt) < 0;
 	}
 </cfscript>
