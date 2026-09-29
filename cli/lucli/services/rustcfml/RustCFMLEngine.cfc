@@ -24,12 +24,20 @@
 component {
 
 	/**
-	 * Pinned engine version. Keep in sync with tools/rustcfml/ENGINE_VERSION
-	 * (the CI leg and compat matrix pin the same build).
+	 * Pinned engine version: the build the framework is tested against. It
+	 * must equal tools/rustcfml/ENGINE_VERSION (the CI leg and the compat
+	 * matrix run that build). The installed CLI doesn't ship tools/, so the pin
+	 * lives here too: tools/rustcfml/check-version.sh rewrites this line when
+	 * it bumps ENGINE_VERSION, and RustCFMLEnginePinSpec fails on drift (#3812).
 	 */
-	variables.engineVersion = "v0.637.0";
+	variables.engineVersion = "v0.693.0";
 
 	variables.wheelsHome = "";
+
+	/** The pinned RustCFML release tag, e.g. "v0.693.0". */
+	public string function getEngineVersion() {
+		return variables.engineVersion;
+	}
 
 	public RustCFMLEngine function init() {
 		variables.wheelsHome = $resolveWheelsHome();
