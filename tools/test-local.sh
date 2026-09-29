@@ -104,6 +104,15 @@ sqlite3 wheelstestdb_tenant_b.db "SELECT 1;" 2>/dev/null || true
 LUCEE_BAK="lucee.json.test-local.bak"
 RUN_LOCK="$PROJECT_ROOT/.wheels-test-local.lock"
 
+# The server this script starts gets a name of its own, per checkout. The
+# name LuCLI takes from lucee.json ("wheels" here) is shared by every
+# checkout and worktree: a run was refused while another checkout's server
+# ran, and --force deleted another checkout's stopped registration (#3810).
+CHECKOUT_KEY="$(cd "$PROJECT_ROOT" && pwd -P | shasum | cut -c1-12)"
+TEST_SERVER_NAME="wheels-test-${CHECKOUT_KEY}"
+TEST_SERVER_DIR="$HOME/.wheels/servers/$TEST_SERVER_NAME"
+SERVER_LOG="/tmp/wheels-test-server-${CHECKOUT_KEY}.log"
+
 # ── Server ownership helpers ────────────────────────
 #
 # The CLI records which project a server belongs to in
@@ -295,7 +304,7 @@ cleanup() {
   # instead of the ports this run pinned (#3771).
   if [ "${STARTED_SERVER:-false}" = "true" ]; then
     echo "Stopping test server..."
-    ( cd "$PROJECT_ROOT" && wheels server stop >/dev/null 2>&1 ) || true
+    ( cd "$PROJECT_ROOT" && wheels server stop --name="$TEST_SERVER_NAME" >/dev/null 2>&1 ) || true
     # `kill $SERVER_PID` only kills the launcher: the JVM survives it and keeps
     # holding the port, so whichever project wants that port next silently gets
     # THIS app's responses. Stop the JVMs this run recorded (the registry's, and
@@ -309,6 +318,11 @@ cleanup() {
     # shellcheck disable=SC2086
     stop_pids "$PORT" $pids
     rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
+    # The registration is this run's alone (its name is per checkout), so
+    # remove it rather than leave a server directory behind per worktree.
+    case "$TEST_SERVER_NAME" in
+      wheels-test-?*) rm -rf "$TEST_SERVER_DIR" ;;
+    esac
   fi
   # Restore original lucee.json if we modified it
   if [ "${RESTORED_LUCEE_JSON:-false}" = "true" ] && [ -f "$LUCEE_BAK" ]; then
@@ -411,7 +425,7 @@ else
       -o "$LUCEE_LIB/sqlite-jdbc-3.49.1.0.jar"
   fi
 
-  nohup wheels server run --port="$PORT" --force > /tmp/wheels-test-server.log 2>&1 &
+  nohup wheels server run --port="$PORT" --name="$TEST_SERVER_NAME" --force > "$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
   STARTED_SERVER=true
 
@@ -424,8 +438,8 @@ else
       break
     fi
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-      echo "Server process died. Check /tmp/wheels-test-server.log"
-      cat /tmp/wheels-test-server.log 2>/dev/null | tail -20
+      echo "Server process died. Check ${SERVER_LOG}"
+      tail -20 "$SERVER_LOG" 2>/dev/null
       exit 1
     fi
     sleep 2
@@ -433,9 +447,8 @@ else
 
   # Record the JVM (not the launcher) so cleanup can stop what actually holds
   # the port. The registry writes "<pid>:<port>" once the server is up.
-  OWN_DIR="$(project_server_dir || true)"
-  if [ -n "$OWN_DIR" ] && [ -f "$OWN_DIR/server.pid" ]; then
-    cp "$OWN_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
+  if [ -f "$TEST_SERVER_DIR/server.pid" ]; then
+    cp "$TEST_SERVER_DIR/server.pid" "$PROJECT_ROOT/.wheels-test-server.pid"
   fi
 
   # The listener captured above is this run's server only if it is the
