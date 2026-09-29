@@ -138,7 +138,10 @@ component {
 	 */
 	public boolean function $isCookieAuthenticityTokenValid() {
 		local.authenticityToken = $generateCookieAuthenticityToken();
-		return Len(local.authenticityToken) && local.authenticityToken == params.authenticityToken;
+		// Exact and constant-time: CFML == ignores case and stops at the first difference.
+		return Len(local.authenticityToken)
+			&& IsSimpleValue(params.authenticityToken)
+			&& $secureCompare(local.authenticityToken, params.authenticityToken);
 	}
 
 	/**
