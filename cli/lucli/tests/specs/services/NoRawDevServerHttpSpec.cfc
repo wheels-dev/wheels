@@ -8,35 +8,79 @@
  * used a raw `new http` to localhost and skipped that proof; they had no
  * callers and were removed.
  *
- * This spec pins the set of CLI source files that make raw HTTP calls. Each
- * allowlisted file only talks to an external host. A new file on the list
- * must either do the same or switch to the verified transport.
+ * This spec pins how many raw HTTP call sites each CLI source file has. Every
+ * pinned site talks to an external host. A new raw call anywhere, including a
+ * second one in a pinned file, fails: route it through the verified
+ * transport, or, if it really is an external download, raise the count here.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
+
+	function beforeAll() {
+		// Comment stripping reuses the CLI's own helper (anti-pattern 14).
+		variables.analysis = new cli.lucli.services.Analysis(
+			helpers = new cli.lucli.services.Helpers(),
+			projectRoot = expandPath("/")
+		);
+		makePublic(variables.analysis, "$stripCfmlComments");
+	}
 
 	function run() {
 
 		describe("CLI raw HTTP call sites (##3768)", () => {
 
-			it("only the allowlisted external-download files use raw HTTP", () => {
-				var allowed = [
-					"Module.cfc", // browser setup: Playwright JAR download from Maven Central
-					"services/UpdateChecker.cfc", // release feed
-					"services/packages/HttpClient.cfc" // package registry
-				];
-				var found = $filesWithRawHttp(expandPath("/cli/lucli"));
+			it("only the pinned external-download sites use raw HTTP", () => {
+				var expected = {
+					// browser setup: Playwright JAR download from Maven Central
+					"Module.cfc": 1,
+					// release feed
+					"services/UpdateChecker.cfc": 1,
+					// package registry: JSON GET + file download
+					"services/packages/HttpClient.cfc": 2
+				};
+				var found = $rawHttpSites(expandPath("/cli/lucli"));
 				for (var path in found) {
-					expect(ArrayFindNoCase(allowed, path) > 0).toBeTrue(
-						"#path# makes a raw HTTP call. Requests to the dev server must use the"
+					expect(found[path]).toBe(
+						StructKeyExists(expected, path) ? expected[path] : 0,
+						"#path# has #found[path]# raw HTTP call site(s). Requests to the dev server must use the"
 						& " verified transport (makeHttpRequest* / makeHttpPost in Module.cfc)."
 					);
 				}
-				// Every allowlisted entry is still real, so the list can't go stale.
-				for (var path in allowed) {
-					expect(ArrayFindNoCase(found, path) > 0).toBeTrue(
-						"#path# no longer makes a raw HTTP call; drop it from the allowlist."
+				// Every pinned file still has its sites, so the counts can't go stale.
+				for (var path in expected) {
+					expect(StructKeyExists(found, path) ? found[path] : 0).toBe(
+						expected[path],
+						"#path# no longer has #expected[path]# raw HTTP call site(s); update the pinned count."
 					);
 				}
+			});
+
+			it("counts every raw HTTP form, and nothing inside comments", () => {
+				var lt = Chr(60);
+				var nl = Chr(10);
+				// Script function forms.
+				expect($countRawHttp('r = new http(url = "x");')).toBe(1);
+				expect($countRawHttp('h = new http();' & nl & 'h.send();')).toBe(1);
+				expect($countRawHttp('cfhttp(url = "https://x", result = "r");')).toBe(1);
+				// Lucee script-tag forms without parentheses.
+				expect($countRawHttp('cfhttp url = "https://x" result = "r" {}')).toBe(1);
+				expect($countRawHttp('cfhttp url="x" result="r";')).toBe(1);
+				expect($countRawHttp('http url = "https://x" result = "r";')).toBe(1);
+				expect($countRawHttp('if (a) { http url="x" result="r"; }')).toBe(1);
+				expect($countRawHttp('x = 1; http method="get" url="x";')).toBe(1);
+				// Tag form.
+				expect($countRawHttp(lt & 'cfhttp url="https://x" result="r">')).toBe(1);
+				// Several sites in one source are each counted.
+				expect($countRawHttp('cfhttp(url="a");' & nl & 'http url="b";' & nl & 'new http();')).toBe(3);
+				// Comments hide calls: line, block (also mid-line), doc and tag comments.
+				expect($countRawHttp('// cfhttp(url="x");')).toBe(0);
+				expect($countRawHttp('/* new http(url="x") */ x = 1;')).toBe(0);
+				expect($countRawHttp('x = 1; /* cfhttp url="x" {} */ y = 2;')).toBe(0);
+				expect($countRawHttp('/**' & nl & ' * Uses cfhttp (script syntax), not new http()' & nl & ' */')).toBe(0);
+				expect($countRawHttp(lt & '!--- ' & lt & 'cfhttp url="x"> --->')).toBe(0);
+				// Names that only contain "http" are not calls.
+				expect($countRawHttp('var httpResult = makeHttpRequest(requestUrl = u);')).toBe(0);
+				expect($countRawHttp('c = new packages.HttpClient();')).toBe(0);
+				expect($countRawHttp('out("Use http or https");')).toBe(0);
 			});
 
 			it("the removed runViaHttp helpers stay removed", () => {
@@ -51,46 +95,49 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	/**
-	 * Relative paths (forward slashes) of non-test .cfc/.cfm files under
-	 * `root` with a raw HTTP call on a non-comment line.
+	 * Raw HTTP call-site counts, keyed by path relative to `root` (forward
+	 * slashes), for the non-test .cfc/.cfm files that have any.
 	 */
-	public array function $filesWithRawHttp(required string root) {
+	public struct function $rawHttpSites(required string root) {
 		var base = Replace(arguments.root, "\", "/", "all");
 		if (Right(base, 1) != "/") {
 			base &= "/";
 		}
-		var result = [];
-		// Copy DirectoryList into our own array before appending (BoxLang's is fixed-size).
+		var result = {};
 		for (var file in DirectoryList(arguments.root, true, "path", "*.cfc|*.cfm")) {
 			var rel = Replace(Replace(file, "\", "/", "all"), base, "");
 			if (Left(rel, 6) == "tests/") {
 				continue;
 			}
-			if ($hasRawHttp(FileRead(file))) {
-				ArrayAppend(result, rel);
+			var count = $countRawHttp(FileRead(file));
+			if (count > 0) {
+				result[rel] = count;
 			}
 		}
 		return result;
 	}
 
-	/** True when a non-comment line holds `new http(`, `cfhttp(` or a cfhttp tag. */
-	public boolean function $hasRawHttp(required string src) {
-		for (var line in ListToArray(arguments.src, Chr(10))) {
-			var trimmed = Trim(line);
-			if (
-				Left(trimmed, 1) == "*"
-				|| Left(trimmed, 2) == "//"
-				|| Left(trimmed, 2) == "/*"
-				|| Left(trimmed, 5) == Chr(60) & "!---"
-			) {
-				continue;
-			}
-			// Chr(60) keeps a literal tag opener out of this file (Lucee's tag scanner).
-			if (ReFindNoCase("\bnew\s+http\s*\(|\bcfhttp\s*\(|" & Chr(60) & "cfhttp\b", trimmed)) {
-				return true;
-			}
+	/**
+	 * Raw HTTP call sites in CFML source, comments stripped first:
+	 * `new http`, `cfhttp(...)`, the parenthesis-free script-tag forms
+	 * (`cfhttp url=... {}`, `http url=...;`) and the cfhttp tag.
+	 */
+	public numeric function $countRawHttp(required string src) {
+		var code = variables.analysis.$stripCfmlComments(arguments.src);
+		var patterns = [
+			// new http(...) and new http;
+			"\bnew\s+http\b",
+			// cfhttp(...), script-tag cfhttp url=... and the cfhttp tag: the \b
+			// also sits between the tag opener and "cfhttp", so each counts once.
+			"\bcfhttp(\s*\(|\s+[a-z]+\s*=)",
+			// Lucee script-tag http url=...; at the start of a statement.
+			"(?m)(^|[;{}])[ \t]*http\s+[a-z]+\s*="
+		];
+		var count = 0;
+		for (var pattern in patterns) {
+			count += ArrayLen(ReMatchNoCase(pattern, code));
 		}
-		return false;
+		return count;
 	}
 
 }
