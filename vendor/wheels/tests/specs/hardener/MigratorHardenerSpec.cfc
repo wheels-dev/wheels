@@ -290,17 +290,40 @@ component extends="wheels.WheelsTest" {
 					skip("The second SQLite datasource #otherDs# is not configured on this run.");
 					return;
 				}
-				var output = variables.noTxOtherMigrator.migrateTo("90000000000011");
-				var rows = queryExecute(
-					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000011'",
-					{},
-					{datasource: application.wheels.dataSourceName}
-				);
-				expect(output).notToInclude("Error migrating");
-				expect(rows.recordCount).toBe(
-					1,
-					"A step run without a transaction must be recorded after it succeeds. Migration output: " & output
-				);
+				try {
+					queryExecute("DROP TABLE IF EXISTS notx_probe_3772", {}, {datasource: otherDs});
+				} catch (any e) {}
+				try {
+					var output = variables.noTxOtherMigrator.migrateTo("90000000000011");
+					var rows = queryExecute(
+						"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000011'",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					expect(output).notToInclude("Error migrating");
+					expect(rows.recordCount).toBe(
+						1,
+						"A step run without a transaction must be recorded after it succeeds. Migration output: " & output
+					);
+					// The step's DDL landed on the second datasource, not the primary.
+					var created = queryExecute(
+						"SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'notx_probe_3772'",
+						{},
+						{datasource: otherDs}
+					);
+					expect(created.recordCount).toBe(1, "The step's CREATE TABLE must run on #otherDs#.");
+					var probe = {onPrimary = true};
+					try {
+						queryExecute("SELECT COUNT(*) AS n FROM notx_probe_3772", {}, {datasource: application.wheels.dataSourceName});
+					} catch (any e) {
+						probe.onPrimary = false;
+					}
+					expect(probe.onPrimary).toBeFalse("The step's CREATE TABLE must not land on the primary datasource.");
+				} finally {
+					try {
+						queryExecute("DROP TABLE IF EXISTS notx_probe_3772", {}, {datasource: otherDs});
+					} catch (any e) {}
+				}
 			});
 
 			it("records nothing when an opted-out step fails", () => {
