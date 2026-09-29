@@ -59,20 +59,19 @@ component extends="wheels.WheelsTest" {
 		var conn = createObject("java", "coldfusion.server.ServiceFactory").getDataSourceService().getDatasource(arguments.ds).getConnection();
 		try {
 			var md = conn.getMetaData();
-			var nul = javaCast("null", "");
 			var rs = "";
 			switch (arguments.kind) {
 				case "columns":
-					rs = md.getColumns(nul, nul, "C_O_R_E_AUTHORS", nul);
+					rs = md.getColumns(javaCast("null", ""), javaCast("null", ""), "C_O_R_E_AUTHORS", javaCast("null", ""));
 					break;
 				case "pk":
-					rs = md.getPrimaryKeys(nul, nul, "C_O_R_E_AUTHORS");
+					rs = md.getPrimaryKeys(javaCast("null", ""), javaCast("null", ""), "C_O_R_E_AUTHORS");
 					break;
 				case "fk":
-					rs = md.getImportedKeys(nul, nul, "C_O_R_E_AUTHORS");
+					rs = md.getImportedKeys(javaCast("null", ""), javaCast("null", ""), "C_O_R_E_AUTHORS");
 					break;
 				case "index":
-					rs = md.getIndexInfo(nul, nul, "C_O_R_E_AUTHORS", javaCast("boolean", false), javaCast("boolean", true));
+					rs = md.getIndexInfo(javaCast("null", ""), javaCast("null", ""), "C_O_R_E_AUTHORS", javaCast("boolean", false), javaCast("boolean", true));
 					break;
 			}
 			while (rs.next()) {
