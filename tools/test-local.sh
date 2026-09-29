@@ -285,17 +285,22 @@ acquire_run_lock() {
 # the run that wrote it is gone; a PID in it is ours to stop only while it
 # still listens on the port it recorded.
 stop_orphaned_test_server() {
-  local marker="$PROJECT_ROOT/.wheels-test-server.pid" jvm port
-  [ -f "$marker" ] || return 0
-  jvm="$(cut -d: -f1 "$marker" 2>/dev/null || true)"
-  port="$(cut -d: -f2 "$marker" 2>/dev/null || true)"
-  # Only while it still listens on the port it recorded: a marker that
-  # outlived a reboot may name a PID the OS has since given to another process.
-  if [ -n "$jvm" ] && [ -n "$port" ] && [ "$(listener_pid "$port" || true)" = "$jvm" ]; then
-    echo "Stopping a test server a previous run left behind (PID ${jvm})..."
-    stop_pids "$port" "$jvm"
-  fi
-  rm -f "$marker"
+  local record jvm port
+  # The marker, and this checkout's own registration: a run killed during
+  # startup never wrote the marker, but its JVM is recorded there. No other
+  # run can own that registration while this run holds the lock (#3810).
+  for record in "$PROJECT_ROOT/.wheels-test-server.pid" "$TEST_SERVER_DIR/server.pid"; do
+    [ -f "$record" ] || continue
+    jvm="$(cut -d: -f1 "$record" 2>/dev/null || true)"
+    port="$(cut -d: -f2 "$record" 2>/dev/null || true)"
+    # Only while it still listens on the port it recorded: a record that
+    # outlived a reboot may name a PID the OS has since given to another process.
+    if [ -n "$jvm" ] && [ -n "$port" ] && [ "$(listener_pid "$port" || true)" = "$jvm" ]; then
+      echo "Stopping a test server a previous run left behind (PID ${jvm})..."
+      stop_pids "$port" "$jvm"
+    fi
+  done
+  rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
 }
 
 cleanup() {
