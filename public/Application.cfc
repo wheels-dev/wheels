@@ -585,13 +585,91 @@ component output="false" {
 		}
 		WriteOutput("<h1>Application Error</h1>");
 		WriteOutput("<p>Wheels failed to initialize. Check the server log (wheels.log) for details.</p>");
+		// How much to show follows the app's showErrorInformation setting
+		// (false in production by default) once startup got far enough to set
+		// it: the root cause in full, or nothing beyond the log pointer. Before
+		// that, only the message, as always (issue ##3671).
 		try {
-			if (isStruct(arguments.Exception) && StructKeyExists(arguments.Exception, "message")) {
+			local.showDetail = $startupFailureShowDetail();
+			if (local.showDetail == "yes") {
+				WriteOutput($startupFailureDetailHtml(arguments.Exception, arguments.eventName));
+			} else if (
+				local.showDetail == "unknown"
+				&& isStruct(arguments.Exception)
+				&& StructKeyExists(arguments.Exception, "message")
+			) {
 				WriteOutput("<pre>" & encodeForHTML(arguments.Exception.message) & "</pre>");
 			}
 		} catch (any fallbackErr) {
 			// Last-ditch render must never throw.
 		}
+	}
+
+	// "yes" or "no" from showErrorInformation in the settings being started
+	// (application.$wheels) or the live ones (application.wheels): "no" when
+	// either says false. "unknown" when startup failed before either was set,
+	// or the application scope is being torn down (issue ##3379).
+	private string function $startupFailureShowDetail() {
+		local.rv = "unknown";
+		try {
+			for (local.scopeKey in ["$wheels", "wheels"]) {
+				if (
+					StructKeyExists(application, local.scopeKey)
+					&& IsStruct(application[local.scopeKey])
+					&& StructKeyExists(application[local.scopeKey], "showErrorInformation")
+					&& IsBoolean(application[local.scopeKey].showErrorInformation)
+				) {
+					if (!application[local.scopeKey].showErrorInformation) {
+						return "no";
+					}
+					local.rv = "yes";
+				}
+			}
+		} catch (any settingErr) {
+			return "unknown";
+		}
+		return local.rv;
+	}
+
+	// The root cause behind the minimal error page as HTML: its type,
+	// message, detail and tag context, plus the wrapper it was reported as.
+	// Every value is HTML-encoded.
+	private string function $startupFailureDetailHtml( required any Exception, string eventName = "" ) {
+		local.root = $startupFailureRoot(arguments.Exception);
+		local.html = "<h2>" & encodeForHTML(
+			"[" & $startupFailureField(local.root, "Type") & "] " & $startupFailureField(local.root, "Message")
+		) & "</h2>";
+		local.detail = $startupFailureField(local.root, "Detail");
+		if (Len(local.detail)) {
+			local.html &= "<p>" & encodeForHTML(local.detail) & "</p>";
+		}
+		if (Len(arguments.eventName)) {
+			local.html &= "<p>Event: " & encodeForHTML(arguments.eventName) & "</p>";
+		}
+		local.wrapper = "[" & $startupFailureField(arguments.Exception, "Type") & "] "
+			& $startupFailureField(arguments.Exception, "Message");
+		if (Compare(local.wrapper, "[" & $startupFailureField(local.root, "Type") & "] "
+			& $startupFailureField(local.root, "Message")) != 0) {
+			local.html &= "<p>Reported as: " & encodeForHTML(local.wrapper) & "</p>";
+		}
+		local.frames = [];
+		for (local.failure in [local.root, arguments.Exception]) {
+			if (IsStruct(local.failure) && StructKeyExists(local.failure, "TagContext") && IsArray(local.failure.TagContext)) {
+				for (local.frame in local.failure.TagContext) {
+					ArrayAppend(local.frames, $startupFailureField(local.frame, "Template") & ":" & $startupFailureField(local.frame, "Line"));
+					if (ArrayLen(local.frames) >= 20) {
+						break;
+					}
+				}
+				if (ArrayLen(local.frames)) {
+					break;
+				}
+			}
+		}
+		if (ArrayLen(local.frames)) {
+			local.html &= "<pre>" & encodeForHTML(ArrayToList(local.frames, Chr(10))) & "</pre>";
+		}
+		return local.html;
 	}
 
 	// Log the failure behind the minimal error page to wheels.log (issue
@@ -603,16 +681,7 @@ component output="false" {
 	// rendered page stays minimal).
 	private void function $logStartupFailure( required any Exception, string eventName = "" ) {
 		try {
-			local.root = arguments.Exception;
-			local.depth = 0;
-			while (local.depth < 10) {
-				local.next = $startupFailureCause(local.root);
-				if (IsSimpleValue(local.next)) {
-					break;
-				}
-				local.root = local.next;
-				local.depth++;
-			}
+			local.root = $startupFailureRoot(arguments.Exception);
 
 			local.text = "Wheels failed to initialize";
 			if (Len(arguments.eventName)) {
@@ -633,7 +702,7 @@ component output="false" {
 			}
 			local.wrapper = "[" & $startupFailureField(arguments.Exception, "Type") & "] "
 				& $startupFailureField(arguments.Exception, "Message");
-			if (local.depth > 0 && Compare(local.wrapper, "[" & $startupFailureField(local.root, "Type") & "] "
+			if (Compare(local.wrapper, "[" & $startupFailureField(local.root, "Type") & "] "
 				& $startupFailureField(local.root, "Message")) != 0) {
 				local.text &= " (reported as " & local.wrapper & ")";
 			}
@@ -645,6 +714,20 @@ component output="false" {
 		} catch (any logErr) {
 			// Logging must never mask the original error.
 		}
+	}
+
+	// The innermost cause of `failure` (at most 10 levels down), or `failure`
+	// itself when it has none.
+	private any function $startupFailureRoot( required any failure ) {
+		local.root = arguments.failure;
+		for (local.depth = 1; local.depth <= 10; local.depth++) {
+			local.next = $startupFailureCause(local.root);
+			if (IsSimpleValue(local.next)) {
+				break;
+			}
+			local.root = local.next;
+		}
+		return local.root;
 	}
 
 	// The exception that caused this one (Adobe RootCause, Lucee/Java Cause),

@@ -1,6 +1,7 @@
 /**
  * Every copy of public/Application.cfc writes the failure behind the minimal
- * "Wheels failed to initialize" page to wheels.log before rendering it
+ * "Wheels failed to initialize" page to wheels.log before rendering it, and
+ * shows the root cause on the page only when showErrorInformation is on
  * (#3671). The page tells the operator to check the server log, so an entry
  * has to exist, and it has to name the root cause: Adobe CF wraps a failure
  * inside an application event in an event-handler exception whose message
@@ -45,6 +46,34 @@ component extends="wheels.WheelsTest" {
 						);
 						expect(reFindNoCase("^\s*try\s*\{", logger) > 0).toBeTrue(
 							relPath & " $logStartupFailure() must wrap its body in try/catch so logging never masks the error."
+						);
+
+						// The page follows showErrorInformation: full detail only when it is
+						// true, nothing when any copy of it is false, the bare message
+						// only before startup set it (##3671).
+						expect(reFindNoCase("\$startupFailureShowDetail\s*\(\s*\)", render) > 0).toBeTrue(
+							relPath & " $renderMinimalError() must decide what to show via $startupFailureShowDetail()."
+						);
+						expect(reFindNoCase("showDetail\s*==\s*""yes""\s*\)\s*\{\s*WriteOutput\s*\(\s*\$startupFailureDetailHtml", render) > 0).toBeTrue(
+							relPath & " $renderMinimalError() must render $startupFailureDetailHtml() only when showDetail is ""yes""."
+						);
+						expect(reFindNoCase("showDetail\s*==\s*""unknown""", render) > 0).toBeTrue(
+							relPath & " $renderMinimalError() must show the bare message only while showErrorInformation is unknown."
+						);
+						var decide = $functionBody(content, "\$startupFailureShowDetail", relPath);
+						expect(reFindNoCase("showErrorInformation\)\s*\{\s*return\s+""no""", decide) > 0).toBeTrue(
+							relPath & " $startupFailureShowDetail() must answer ""no"" as soon as any showErrorInformation is false."
+						);
+						expect(findNoCase("""$wheels""", decide) > 0 && findNoCase("""wheels""", decide) > 0).toBeTrue(
+							relPath & " $startupFailureShowDetail() must read both application.$wheels and application.wheels."
+						);
+						expect(reFindNoCase("catch\s*\(\s*any\s+\w+\s*\)\s*\{\s*return\s+""unknown""", decide) > 0).toBeTrue(
+							relPath & " $startupFailureShowDetail() must answer ""unknown"" when the application scope can't be read (##3379)."
+						);
+						var detailHtml = $functionBody(content, "\$startupFailureDetailHtml", relPath);
+						var rawConcats = reMatchNoCase("html\s*&=\s*""[^""]*""\s*&\s*(?!encodeForHTML)[a-z\$]", detailHtml);
+						expect(arrayLen(rawConcats)).toBe(0,
+							relPath & " $startupFailureDetailHtml() must HTML-encode every value it writes: " & arrayToList(rawConcats, " | ")
 						);
 
 						var cause = $functionBody(content, "\$startupFailureCause", relPath);
