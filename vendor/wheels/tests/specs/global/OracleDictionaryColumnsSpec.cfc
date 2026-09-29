@@ -9,6 +9,36 @@
  */
 component extends="wheels.WheelsTest" {
 
+	// Number shapes the core tables lack. An unconstrained NUMBER must report
+	// decimal_digits -127 like ojdbc: a 0 would map t.decimal() columns to
+	// cf_sql_integer.
+	variables.numbersTable = "c_o_r_e_dict3732_" & Left(LCase(Hash(CreateUUID())), 8);
+
+	function beforeAll() {
+		if (application.wheels.adapterName != "OracleModel") return;
+		QueryExecute(
+			"CREATE TABLE #variables.numbersTable# (
+				id NUMBER(10) PRIMARY KEY,
+				bare_number NUMBER,
+				star_scaled NUMBER(*, 2),
+				int_column INTEGER,
+				float_column FLOAT(10),
+				double_column BINARY_DOUBLE,
+				nchar_column NVARCHAR2(20)
+			)",
+			[],
+			{datasource = application.wheels.dataSourceName}
+		);
+	}
+
+	function afterAll() {
+		if (application.wheels.adapterName != "OracleModel") return;
+		try {
+			QueryExecute("DROP TABLE #variables.numbersTable#", [], {datasource = application.wheels.dataSourceName});
+		} catch (any e) {
+		}
+	}
+
 	function run() {
 
 		describe("Oracle data-dictionary column metadata (##3732)", () => {
@@ -18,7 +48,7 @@ component extends="wheels.WheelsTest" {
 			var g = application.wo;
 			var tables = [
 				"c_o_r_e_sqltypes", "c_o_r_e_authors", "c_o_r_e_posts", "c_o_r_e_combikeys",
-				"c_o_r_e_CATEGORIES", "c_o_r_e_uuidrecords", "c_o_r_e_users"
+				"c_o_r_e_CATEGORIES", "c_o_r_e_uuidrecords", "c_o_r_e_users", variables.numbersTable
 			];
 			var fields = [
 				"type_name", "column_size", "decimal_digits", "is_nullable", "is_primarykey", "column_default_value",
@@ -63,6 +93,18 @@ component extends="wheels.WheelsTest" {
 				var viaDictionary = g.$oracleDictionaryColumns(table = "c_o_r_e_authors", datasource = ds);
 				expect(viaDbinfo.recordCount).toBe(viaDictionary.recordCount);
 				expect(ValueList(viaDbinfo.column_name)).toBe(ValueList(viaDictionary.column_name));
+			});
+
+			it("reports an unconstrained NUMBER's scale as -127, like ojdbc", () => {
+				if (!isOracle) return;
+				var cols = g.$oracleDictionaryColumns(table = variables.numbersTable, datasource = ds);
+				var byName = {};
+				for (var i = 1; i <= cols.recordCount; i++) {
+					byName[UCase(cols.column_name[i])] = cols.decimal_digits[i];
+				}
+				expect(byName["BARE_NUMBER"]).toBe(-127);
+				expect(byName["STAR_SCALED"]).toBe(2);
+				expect(byName["INT_COLUMN"]).toBe(0);
 			});
 
 			it("finds nothing for a table it can't see, so $dbinfo falls back to cfdbinfo", () => {
