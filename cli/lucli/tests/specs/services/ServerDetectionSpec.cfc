@@ -387,7 +387,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					.init(variables.tempRoot).getCanonicalPath();
 				// Ownership is proven against the listener (GHSA-x3cm-2j3q-jgg4):
 				// the registered pid (this JVM) must really hold the port.
-				var listener = createObject("java", "java.net.ServerSocket").init(0);
+				var listener = new cli.lucli.tests.TestSockets().exclusiveLoopbackListener();
 				try {
 					var registry = registryWithRegistration(canonical, listener.getLocalPort());
 					var m = moduleWithRegistry(registry);
