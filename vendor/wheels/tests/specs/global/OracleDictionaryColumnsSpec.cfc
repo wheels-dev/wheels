@@ -2,8 +2,10 @@
  * $dbinfo(type="columns") on Oracle reads the data dictionary on Adobe CF,
  * because cfdbinfo there retains JDBC statements on every call (#3732). The
  * dictionary read must be interchangeable with cfdbinfo: this compares the
- * two, field by field, for the core test tables on every Oracle leg (every
- * engine; $oracleDictionaryColumns() is engine-neutral SQL).
+ * two, field by field, for the core test tables on every Oracle leg. On Adobe,
+ * the only engine that uses it, every field must match exactly. Other engines'
+ * cfdbinfo has a different shape, so there a field the engine does not return
+ * is skipped and an empty and a 0 decimal_digits count as equal.
  */
 component extends="wheels.WheelsTest" {
 
@@ -18,7 +20,11 @@ component extends="wheels.WheelsTest" {
 				"c_o_r_e_sqltypes", "c_o_r_e_authors", "c_o_r_e_posts", "c_o_r_e_combikeys",
 				"c_o_r_e_CATEGORIES", "c_o_r_e_uuidrecords", "c_o_r_e_users"
 			];
-			var fields = ["type_name", "column_size", "decimal_digits", "is_nullable", "is_primarykey", "column_default_value"];
+			var fields = [
+				"type_name", "column_size", "decimal_digits", "is_nullable", "is_primarykey", "column_default_value",
+				"is_foreignkey", "referenced_primarykey", "referenced_primarykey_table"
+			];
+			var strict = g.$engineAdapter().isAdobe();
 
 			it("matches cfdbinfo field by field for the core test tables", () => {
 				if (!isOracle) return;
@@ -34,7 +40,15 @@ component extends="wheels.WheelsTest" {
 					}
 					for (var col in expected.order) {
 						for (var f in fields) {
-							if (Compare(expected.rows[col][f], actual.rows[col][f]) != 0) {
+							var want = expected.rows[col][f];
+							var got = actual.rows[col][f];
+							if (!strict && Compare(want, "(absent)") == 0) continue;
+							if (
+								!strict && f == "decimal_digits"
+								&& (!Len(want) || Compare(want, "0") == 0)
+								&& (!Len(got) || Compare(got, "0") == 0)
+							) continue;
+							if (Compare(want, got) != 0) {
 								ArrayAppend(mismatches, t & "." & col & "." & f & ": cfdbinfo [" & expected.rows[col][f] & "] vs dictionary [" & actual.rows[col][f] & "]");
 							}
 						}
@@ -70,7 +84,10 @@ component extends="wheels.WheelsTest" {
 			}
 			var name = UCase(arguments.q.column_name[i]);
 			var row = {};
-			for (var f in ["type_name", "column_size", "decimal_digits", "is_nullable", "is_primarykey", "column_default_value"]) {
+			for (var f in [
+				"type_name", "column_size", "decimal_digits", "is_nullable", "is_primarykey", "column_default_value",
+				"is_foreignkey", "referenced_primarykey", "referenced_primarykey_table"
+			]) {
 				row[f] = ListFindNoCase(arguments.q.columnList, f) ? normalise(arguments.q[f][i]) : "(absent)";
 			}
 			ArrayAppend(rv.order, name);
