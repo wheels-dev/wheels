@@ -64,6 +64,31 @@ component extends="wheels.WheelsTest" {
 				expect(storedDecimal).toBe(149.25);
 			});
 
+			it("keeps a negative integer column value", () => {
+				transaction action="begin" {
+					var rec = g.model("sqltype").create(
+						stringVariableType = "reload-negative-int",
+						textType = "precision check",
+						intType = -7,
+						transaction = "none"
+					);
+					rec.reload();
+					var reloaded = rec.intType;
+					transaction action="rollback";
+				}
+				expect(reloaded).toBe(-7);
+			});
+
+			it("normalizes whole numbers by range without truncating 64-bit values", () => {
+				var m = g.model("sqltype").new();
+				expect(m.$normalizeReloadedInteger(-5)).toBe(-5);
+				expect(m.$normalizeReloadedInteger(2147483647)).toBe(2147483647);
+				expect(m.$normalizeReloadedInteger(3000000000)).toBe(3000000000);
+				// Below the 32-bit range: must become a long, not a thrown or saturated int.
+				expect(ToString(m.$normalizeReloadedInteger(-3000000000))).toBe("-3000000000");
+				expect(ToString(m.$normalizeReloadedInteger(-2147483649))).toBe("-2147483649");
+			});
+
 			it("still normalizes integer columns", () => {
 				transaction action="begin" {
 					var rec = g.model("sqltype").create(

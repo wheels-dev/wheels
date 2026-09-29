@@ -621,16 +621,28 @@
 					&& reFind("^-?[0-9]+$", this[local.property])
 					&& !reFind("^0\d*$", this[local.property])
 				) {
-					if (this[local.property] <= 2147483647) {
-						this[local.property] =  JavaCast("int", this[local.property]);
-					} else if (this[local.property] <= 9223372036854775807) {
-						this[local.property] = JavaCast("long", this[local.property]);
-					}
+					this[local.property] = $normalizeReloadedInteger(this[local.property]);
 				}
 			} catch (any e) {
 				this[local.property] = "";
 			}
 		}
+	}
+
+	/**
+	 * Internal function. A whole number read back by `reload()` as a Java int when
+	 * it fits in 32 bits, a long when it fits in 64, otherwise unchanged. Both
+	 * bounds are checked: a value below -2147483648 (a negative BIGINT) must not
+	 * reach JavaCast("int"), which would throw or saturate.
+	 */
+	public any function $normalizeReloadedInteger(required any value) {
+		if (arguments.value >= -2147483648 && arguments.value <= 2147483647) {
+			return JavaCast("int", arguments.value);
+		}
+		if (arguments.value >= -9223372036854775808 && arguments.value <= 9223372036854775807) {
+			return JavaCast("long", arguments.value);
+		}
+		return arguments.value;
 	}
 
 	/**
