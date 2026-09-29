@@ -279,18 +279,19 @@ fi
 # extension-less paths to the front controller, so the bundle's
 # extension-bearing asset URLs must be real files under the webroot for the
 # container to serve them.
-# Copied only when missing or stamped with another version: the stamp file
-# marks a wrapper-made mirror, so a public/wheels-docs without one (the user's
-# own, or one from `wheels docs`) is left alone. A plain copy, not hardlinks,
+# Copied only when missing or when its manifest.json differs from the cache's
+# (a package upgrade). A public/wheels-docs without manifest.json is the
+# user's own and is left alone; one with it is a docs mirror, whether this
+# wrapper, an older one or `wheels docs` made it. A plain copy, not hardlinks,
 # so edits in the app cannot change the shared cache; it is built beside the
-# target and renamed in. A failure warns and the command still runs.
+# target and renamed in. A failure warns and the command still runs. The
+# manifest is compared in bash rather than with cmp, which minimal images lack.
 DOCS_MIRROR="./public/wheels-docs"
-DOCS_STAMP="${DOCS_MIRROR}/.wheels-docs-version"
 _wheels_docs_mirror() {
   local tmp="./public/.wheels-docs-new.$$" old="./public/.wheels-docs-old.$$"
-  rm -rf "${tmp}" "${old}"
-  { cp -R "${DOCS_DST}" "${tmp}" && printf '%s\n' "${INSTALLED_VERSION}" > "${tmp}/.wheels-docs-version"; } \
-    || { rm -rf "${tmp}"; return 1; }
+  # Clear leftovers from runs that were killed mid-copy.
+  rm -rf ./public/.wheels-docs-new.* ./public/.wheels-docs-old.*
+  cp -R "${DOCS_DST}" "${tmp}" || { rm -rf "${tmp}"; return 1; }
   if [ -e "${DOCS_MIRROR}" ]; then
     mv "${DOCS_MIRROR}" "${old}" || { rm -rf "${tmp}"; return 1; }
   fi
@@ -298,8 +299,8 @@ _wheels_docs_mirror() {
   rm -rf "${old}"
 }
 if [ -f "./vendor/wheels/wheels.json" ] && [ -d "./public" ] && [ -f "${DOCS_DST}/manifest.json" ]; then
-  if [ ! -e "${DOCS_MIRROR}" ] || { [ -f "${DOCS_STAMP}" ] \
-      && [ "$(cat "${DOCS_STAMP}" 2>/dev/null)" != "${INSTALLED_VERSION}" ]; }; then
+  if [ ! -e "${DOCS_MIRROR}" ] || { [ -f "${DOCS_MIRROR}/manifest.json" ] \
+      && [ "$(cat "${DOCS_MIRROR}/manifest.json" 2>/dev/null)" != "$(cat "${DOCS_DST}/manifest.json")" ]; }; then
     _wheels_docs_mirror 2>/dev/null \
       || echo "wheels: could not copy the offline docs into public/wheels-docs; continuing" >&2
   fi

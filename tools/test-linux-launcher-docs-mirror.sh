@@ -84,8 +84,8 @@ echo "edited" > "${M}/guides/index.html" 2>/dev/null || true
 check "editing the mirror leaves the cache intact" \
   "$(is "$(cat "${CACHE}/1.0.0/guides/index.html")" "guide 1.0.0")"
 
-# 3. A second run at the same version leaves the mirror in place (a sentinel
-#    written into it survives; nothing is deleted and re-copied).
+# 3. A second run at the same version (identical manifest.json) leaves the
+#    mirror in place: a sentinel written into it survives.
 echo keep > "${M}/sentinel"
 run_case 1.0.0
 check "same-version rerun keeps the existing mirror" "$(yes [ -f "${M}/sentinel" ])"
@@ -99,8 +99,8 @@ check "version change drops the old mirror's files" "$(yes [ ! -e "${M}/sentinel
 check "version change leaves no temp dirs in public/" \
   "$(is "$(cd "${APP}/public" && ls -A)" "wheels-docs")"
 
-# 5. A public/wheels-docs the wrapper did not create (no stamp) is left alone,
-#    on the same version and after an upgrade.
+# 5. A public/wheels-docs that is not a docs mirror (no manifest.json) is the
+#    user's own: left alone on the same version and after an upgrade.
 new_case
 mkdir -p "${APP}/${MIRROR_REL}"
 echo mine > "${APP}/${MIRROR_REL}/notes.txt"
@@ -111,6 +111,34 @@ make_cache 2.0.0
 run_case 2.0.0
 check "user-owned public/wheels-docs is untouched after an upgrade" \
   "$(is "$(ls -A "${APP}/${MIRROR_REL}")" "notes.txt")"
+
+# 5b. A mirror made by the old wrapper (or `wheels docs`): manifest.json, no
+#     other marker, hardlinked to the cache. Same version: left as-is.
+new_case
+cp -R -l "${CACHE}/1.0.0" "${APP}/${MIRROR_REL}"
+M="${APP}/${MIRROR_REL}"
+check "setup: old-wrapper mirror is hardlinked to the cache" \
+  "$(yes [ "${M}/guides/index.html" -ef "${CACHE}/1.0.0/guides/index.html" ])"
+echo keep > "${M}/sentinel"
+run_case 1.0.0
+check "same-version old-wrapper mirror is left as-is" \
+  "$([ -f "${M}/sentinel" ] && [ "${M}/guides/index.html" -ef "${CACHE}/1.0.0/guides/index.html" ]; echo $?)"
+check "same-version old-wrapper mirror: exits 0 and continues" "$(is "${RC}:${AFTER}" "0:after-block")"
+
+# 5c. ...and a package upgrade refreshes it (plus clears temp dirs a killed
+#     run left behind), without touching the old version's cache.
+make_cache 2.0.0
+mkdir -p "${APP}/public/.wheels-docs-new.99999/x" "${APP}/public/.wheels-docs-old.99999/x"
+run_case 2.0.0
+check "old-wrapper mirror is refreshed on a version change" \
+  "$(is "$(cat "${M}/guides/index.html")" "guide 2.0.0")"
+check "refreshed mirror is not hardlinked to the cache" \
+  "$(yes [ ! "${M}/guides/index.html" -ef "${CACHE}/2.0.0/guides/index.html" ])"
+check "replacing the hardlinked mirror leaves the old cache intact" \
+  "$(is "$(cat "${CACHE}/1.0.0/guides/index.html"):$(cat "${CACHE}/1.0.0/manifest.json")" \
+    'guide 1.0.0:{"version":"1.0.0"}')"
+check "leftover temp dirs from killed runs are cleared" \
+  "$(is "$(cd "${APP}/public" && ls -A)" "wheels-docs")"
 
 # 6. A copy failure warns on stderr but does not abort the user's command.
 new_case
