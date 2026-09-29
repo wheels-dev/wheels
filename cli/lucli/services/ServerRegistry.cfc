@@ -13,6 +13,8 @@
  */
 component {
 
+	variables.TOKEN_FILE = "wheels-cli.token";
+
 	public function init(required string lucliHome) {
 		variables.lucliHome = arguments.lucliHome;
 		return this;
@@ -124,15 +126,21 @@ component {
 	 *      when the OS exposes the command line;
 	 *   3. every process LISTENING on the recorded port is that pid.
 	 *
-	 * Returns `{port, reason, pid, hosts}`: port > 0 only when all hold (then
-	 * pid is the server process and hosts the addresses it binds, see
-	 * boundHosts); otherwise port
-	 * is 0 and reason is one of not-registered, registered-elsewhere,
-	 * not-running, no-port, pid-not-server, listener-mismatch, unverifiable.
+	 * Returns `{port, reason, pid, hosts, name, token, challengeRequired}`:
+	 * port > 0 only when all hold (then pid is the server process and hosts
+	 * the addresses it binds, see boundHosts); otherwise port is 0 and reason
+	 * is one of not-registered, registered-elsewhere, not-running, no-port,
+	 * pid-not-server, listener-mismatch, unverifiable.
+	 *
+	 * `name` is the registration that passed, and `token` its per-start
+	 * token ("" when it has none; see readStartToken). When the OS cannot
+	 * tell who listens (step 3 unknown), a server with a token still passes
+	 * with challengeRequired=true: the CLI must then prove each connection
+	 * with the token challenge (#3769), since there is nothing to fall back to.
 	 */
 	public struct function verifyOwnServer(required string projectRoot) {
 		var name = serverNameFor(arguments.projectRoot);
-		if (!len(name)) return {port: 0, reason: "not-registered", pid: "", hosts: []};
+		if (!len(name)) return {port: 0, reason: "not-registered", pid: "", hosts: [], name: "", token: "", challengeRequired: false};
 		var best = $verifyRegistration(name, arguments.projectRoot);
 		if (best.port > 0 || !len(variables.lucliHome)) return best;
 
@@ -163,7 +171,7 @@ component {
 	 * `<lucliHome>/servers/<name>/`. Public so specs can drive it directly.
 	 */
 	public struct function $verifyRegistration(required string name, required string projectRoot) {
-		var rv = {port: 0, reason: "not-registered", pid: "", hosts: []};
+		var rv = {port: 0, reason: "not-registered", pid: "", hosts: [], name: arguments.name, token: "", challengeRequired: false};
 		var name = arguments.name;
 		if (!len(name)) return rv;
 		var reg = inspect(name, arguments.projectRoot);
@@ -200,16 +208,197 @@ component {
 			return rv;
 		}
 
+		// The per-start token (#3769) comes from THIS registration, the one
+		// the server runs from (its catalina.base), never from the primary
+		// name: under the #3679 fallback the two can differ.
+		rv.token = readStartToken(name);
 		var owner = listenerOwnedBy(port, pid);
 		if (owner == "yes") {
 			rv.port = port;
 			rv.reason = "";
 			rv.pid = pid;
 			rv.hosts = boundHosts(pid, port);
+		} else if (owner == "unknown" && len(rv.token)) {
+			// The OS can't say who listens (no /proc, lsof or netstat), but
+			// the server can prove itself per connection: every check above
+			// (registration, .project-path, live pid, command line) still
+			// holds, and the challenge replaces only the socket introspection.
+			rv.port = port;
+			rv.reason = "";
+			rv.pid = pid;
+			rv.hosts = boundHosts(pid, port);
+			rv.challengeRequired = true;
 		} else {
 			rv.reason = owner == "no" ? "listener-mismatch" : "unverifiable";
 		}
 		return rv;
+	}
+
+	// ── Per-start token (#3769) ─────────────────────────────────────
+
+	/**
+	 * Give the server registered as `name` a fresh per-start token, readable
+	 * by this OS user only: `<lucliHome>/servers/<name>/wheels-cli.token`,
+	 * which the server finds in its own catalina.base. Returns true when a
+	 * token was written.
+	 *
+	 * Any token can answer the connection challenge, so it must never be
+	 * readable by another user. It is written to a new owner-only temp file in
+	 * the same directory and moved over the old one atomically: an in-place
+	 * write would keep a leftover file's wider permissions. No token is
+	 * issued (and any old one is removed) when the registration directory, or
+	 * the servers directory above it, is not a real directory owned by this
+	 * user and closed to group/other writes; or on Windows, where the file's
+	 * access comes from wherever LUCLI_HOME sits. Without a token the CLI
+	 * proves the server the way it always has, through the OS.
+	 */
+	public boolean function writeStartToken(required string name) {
+		if (!$tokenStorageSafe(arguments.name)) {
+			deleteStartToken(arguments.name);
+			return false;
+		}
+		var files = createObject("java", "java.nio.file.Files");
+		var regDir = $path(variables.lucliHome & "/servers/" & arguments.name);
+		var tmp = "";
+		try {
+			tmp = files.createTempFile(regDir, ".wheels-cli-token-", ".tmp", $ownerOnlyAttributes());
+			files.write(tmp, charsetDecode(new ServerChallenge().newSecret(), "utf-8"), $noOptions("java.nio.file.OpenOption"));
+			var moveOptions = $noOptions("java.nio.file.CopyOption", 2);
+			var copyOption = createObject("java", "java.nio.file.StandardCopyOption");
+			var arrays = createObject("java", "java.lang.reflect.Array");
+			arrays.set(moveOptions, javaCast("int", 0), copyOption.ATOMIC_MOVE);
+			arrays.set(moveOptions, javaCast("int", 1), copyOption.REPLACE_EXISTING);
+			files.move(tmp, regDir.resolve(variables.TOKEN_FILE), moveOptions);
+			tmp = "";
+		} catch (any e) {
+			if (!isSimpleValue(tmp)) {
+				try { files.deleteIfExists(tmp); } catch (any cleanupErr) {}
+			}
+			deleteStartToken(arguments.name);
+			return false;
+		}
+		// Belt and braces: never leave a token another user could read.
+		if (!len(readStartToken(arguments.name))) {
+			deleteStartToken(arguments.name);
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * The token of the server registered as `name`, or "" when there is
+	 * none that is safe to use: the storage checks of writeStartToken()
+	 * hold, the file is a regular file (not a link) owned by this user with
+	 * no group or other permission bits, and it holds exactly 64 lowercase
+	 * hex characters.
+	 */
+	public string function readStartToken(required string name) {
+		try {
+			if (!$tokenStorageSafe(arguments.name)) return "";
+			var files = createObject("java", "java.nio.file.Files");
+			var tokenPath = $path(variables.lucliHome & "/servers/" & arguments.name & "/" & variables.TOKEN_FILE);
+			var noFollow = $noFollow();
+			if (!files.isRegularFile(tokenPath, noFollow)) return "";
+			if (!$ownedByCurrentUser(tokenPath)) return "";
+			var ownerOnly = createObject("java", "java.nio.file.attribute.PosixFilePermissions").fromString("rw-------");
+			var perms = files.getPosixFilePermissions(tokenPath, noFollow);
+			if (!ownerOnly.containsAll(perms)) return "";
+			var token = trim(charsetEncode(files.readAllBytes(tokenPath), "utf-8"));
+			return new ServerChallenge().isNonce(token) ? token : "";
+		} catch (any e) {
+			return "";
+		}
+	}
+
+	public void function deleteStartToken(required string name) {
+		if (!len(arguments.name) || !len(variables.lucliHome)) return;
+		try {
+			createObject("java", "java.nio.file.Files").deleteIfExists(
+				$path(variables.lucliHome & "/servers/" & arguments.name & "/" & variables.TOKEN_FILE)
+			);
+		} catch (any e) {}
+	}
+
+	/**
+	 * Name of this project's registration to give a start token: the primary
+	 * name when its `.project-path` is this project, else the first other
+	 * registration that is this project's and alive. "" when there is none.
+	 */
+	public string function tokenRegistrationFor(required string projectRoot) {
+		var name = serverNameFor(arguments.projectRoot);
+		if (len(name) && inspect(name, arguments.projectRoot).ours) return name;
+		var serversDir = variables.lucliHome & "/servers";
+		if (!len(variables.lucliHome) || !directoryExists(serversDir)) return "";
+		for (var entry in directoryList(serversDir, false, "name")) {
+			var reg = inspect(entry, arguments.projectRoot);
+			if (reg.ours && reg.alive) return entry;
+		}
+		return "";
+	}
+
+	/** POSIX only; the servers dir and the registration dir are private to this user. */
+	public boolean function $tokenStorageSafe(required string name) {
+		if (!len(arguments.name) || !len(variables.lucliHome)) return false;
+		if (reFind("[/\\]|^\.\.?$", arguments.name)) return false;
+		try {
+			var fs = createObject("java", "java.nio.file.FileSystems").getDefault();
+			if (!fs.supportedFileAttributeViews().contains("posix")) return false;
+			return $dirIsPrivate($path(variables.lucliHome & "/servers"))
+				&& $dirIsPrivate($path(variables.lucliHome & "/servers/" & arguments.name));
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/** A real directory (not a link), owned by this user, not group- or world-writable. */
+	public boolean function $dirIsPrivate(required any dirPath) {
+		var files = createObject("java", "java.nio.file.Files");
+		var noFollow = $noFollow();
+		if (!files.isDirectory(arguments.dirPath, noFollow)) return false;
+		if (!$ownedByCurrentUser(arguments.dirPath)) return false;
+		var perms = files.getPosixFilePermissions(arguments.dirPath, noFollow);
+		var perm = createObject("java", "java.nio.file.attribute.PosixFilePermission");
+		return !perms.contains(perm.GROUP_WRITE) && !perms.contains(perm.OTHERS_WRITE);
+	}
+
+	private boolean function $ownedByCurrentUser(required any target) {
+		var owner = createObject("java", "java.nio.file.Files").getOwner(arguments.target, $noFollow());
+		return owner.getName() == createObject("java", "java.lang.System").getProperty("user.name");
+	}
+
+	private any function $path(required string location) {
+		return createObject("java", "java.io.File").init(arguments.location).toPath();
+	}
+
+	/** A one-element LinkOption[] holding NOFOLLOW_LINKS. */
+	private any function $noFollow() {
+		var opts = $noOptions("java.nio.file.LinkOption", 1);
+		createObject("java", "java.lang.reflect.Array").set(
+			opts,
+			javaCast("int", 0),
+			createObject("java", "java.nio.file.LinkOption").NOFOLLOW_LINKS
+		);
+		return opts;
+	}
+
+	/** A one-element FileAttribute[] for POSIX rw------- (owner read/write only). */
+	private any function $ownerOnlyAttributes() {
+		var perms = createObject("java", "java.nio.file.attribute.PosixFilePermissions");
+		var attrs = $noOptions("java.nio.file.attribute.FileAttribute", 1);
+		createObject("java", "java.lang.reflect.Array").set(
+			attrs,
+			javaCast("int", 0),
+			perms.asFileAttribute(perms.fromString("rw-------"))
+		);
+		return attrs;
+	}
+
+	/** A typed Java array of `size` nulls, for varargs parameters. */
+	private any function $noOptions(required string className, numeric size = 0) {
+		return createObject("java", "java.lang.reflect.Array").newInstance(
+			createObject("java", "java.lang.Class").forName(arguments.className),
+			javaCast("int", arguments.size)
+		);
 	}
 
 	/**

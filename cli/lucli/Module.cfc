@@ -1946,7 +1946,25 @@ component extends="modules.BaseModule" {
 		// zero-config without the user knowing the difference.
 		$ensureWheelsBundles();
 
+		$issueStartToken(registry);
+
 		return "";
+	}
+
+	/**
+	 * Give the server just started a fresh per-start token (#3769), so later
+	 * commands can prove each connection with the token challenge. Written
+	 * after LuCLI's `server start` returns: LuCLI treats a registration
+	 * directory it did not create as another project's. Best effort: without
+	 * a token the CLI verifies the server through the OS, as before.
+	 */
+	private void function $issueStartToken(required any registry) {
+		try {
+			var name = arguments.registry.tokenRegistrationFor(variables.projectRoot);
+			if (len(name)) {
+				arguments.registry.writeStartToken(name);
+			}
+		} catch (any e) {}
 	}
 
 	/**
@@ -2032,6 +2050,9 @@ component extends="modules.BaseModule" {
 			}
 			out("Stopping Wheels server...", "cyan");
 			executeCommand("server", stopArgs, variables.projectRoot);
+			if (len(opts.name)) {
+				getService("serverRegistry").deleteStartToken(opts.name);
+			}
 			return "";
 		}
 
@@ -2104,6 +2125,7 @@ component extends="modules.BaseModule" {
 		}
 
 		executeCommand("server", ["stop"], variables.projectRoot);
+		getService("serverRegistry").deleteStartToken(match);
 		return "";
 	}
 
@@ -10137,7 +10159,12 @@ component extends="modules.BaseModule" {
 	 */
 	private void function $recordVerifiedServer(required struct own) {
 		if (!structKeyExists(variables, "verifiedServers")) variables.verifiedServers = {};
-		variables.verifiedServers[arguments.own.port] = {pid: arguments.own.pid, hosts: arguments.own.hosts};
+		variables.verifiedServers[arguments.own.port] = {
+			pid: arguments.own.pid,
+			hosts: arguments.own.hosts,
+			token: arguments.own.token ?: "",
+			challengeRequired: arguments.own.challengeRequired ?: false
+		};
 	}
 
 	private void function $forgetVerifiedServer(required numeric port) {
@@ -10724,7 +10751,8 @@ component extends="modules.BaseModule" {
 		string body = "",
 		boolean followRedirects = true,
 		numeric readTimeout = 120000,
-		numeric redirectsLeft = 5
+		numeric redirectsLeft = 5,
+		boolean skipChallenge = false
 	) {
 		var uri = createObject("java", "java.net.URI").init(arguments.requestUrl);
 		var host = replace(replace(uri.getHost(), "[", ""), "]", "");
@@ -10761,7 +10789,15 @@ component extends="modules.BaseModule" {
 		try {
 			sock.setSoTimeout(javaCast("int", arguments.readTimeout));
 			if (structCount(verified)) {
-				$assertPeerIsServer(sock, port, verified.pid, host);
+				var proof = $proveConnection(sock, port, verified, host, arguments.skipChallenge);
+				if (proof == "reconnect") {
+					// The challenge answer closed the connection (an older
+					// framework): prove a fresh one the way it always was.
+					try { sock.close(); } catch (any e) {}
+					var retryArgs = duplicate(arguments);
+					retryArgs.skipChallenge = true;
+					return $httpExchange(argumentCollection = retryArgs);
+				}
 			}
 
 			var crlf = chr(13) & chr(10);
@@ -10837,6 +10873,95 @@ component extends="modules.BaseModule" {
 				? "Wheels could not verify which process accepted its connection to #$urlHost(arguments.host)#:#arguments.port#, so it sent nothing."
 				: "The connection to #$urlHost(arguments.host)#:#arguments.port# was accepted by a process other than this project's server (pid #arguments.pid#), so Wheels sent nothing. Another program is listening on that port; stop it, or restart this project's server with: wheels start."
 		);
+	}
+
+	/**
+	 * Prove that this project's server holds the connection `sock`, before
+	 * anything is written on it. Returns "proven", or "reconnect" when the
+	 * caller must retry on a fresh connection; throws Wheels.ServerNotOwned
+	 * otherwise.
+	 *
+	 * With a per-start token (#3769), the server answers the connection
+	 * challenge on this very connection. A right answer proves it with no OS
+	 * introspection at all; a wrong one fails closed. When the server can't
+	 * answer (a framework without the challenge, a bridge that is off), the
+	 * CLI falls back to today's proof, the OS peer check, so a forced
+	 * "can't answer" never gets an attacker more than that check allows. A
+	 * server whose listener the OS could not see (challengeRequired) has no
+	 * such fallback: $assertPeerIsServer() refuses it.
+	 */
+	private string function $proveConnection(
+		required any sock,
+		required numeric port,
+		required struct verified,
+		required string host,
+		boolean skipChallenge = false
+	) {
+		if (!arguments.skipChallenge && len(arguments.verified.token ?: "")) {
+			var outcome = $challengeConnection(arguments.sock, arguments.host, arguments.port, arguments.verified.token);
+			if (outcome.state == "valid") return "proven";
+			if (outcome.state == "invalid") {
+				try { arguments.sock.close(); } catch (any e) {}
+				throw(
+					type = "Wheels.ServerNotOwned",
+					message = "The server on #$urlHost(arguments.host)#:#arguments.port# answered the connection check with the wrong proof, so Wheels sent nothing. Another program may be answering on that port, or the server was restarted without wheels start. Restart this project's server with: wheels start."
+				);
+			}
+			if (!outcome.reusable) return "reconnect";
+		}
+		$assertPeerIsServer(arguments.sock, arguments.port, arguments.verified.pid, arguments.host);
+		return "proven";
+	}
+
+	/**
+	 * Run the connection challenge on `sock` (keep-alive; the request carries
+	 * no secret): `{state, reusable}`. state is "valid" (the MAC matches this
+	 * connection), "invalid" (a MAC that does not), or "unavailable" (no MAC:
+	 * any other answer); reusable says whether the next request can follow
+	 * on the same connection.
+	 */
+	private struct function $challengeConnection(
+		required any sock,
+		required string host,
+		required numeric port,
+		required string token
+	) {
+		var challenge = new services.ServerChallenge();
+		var nonce = challenge.newSecret();
+		var crlf = chr(13) & chr(10);
+		var head = "GET /wheels/cli?command=cliChallenge&v=1&nonce=" & nonce & " HTTP/1.1" & crlf
+			& "Host: " & $urlHost(arguments.host) & ":" & arguments.port & crlf
+			& "User-Agent: wheels-cli" & crlf
+			& "Accept: application/json" & crlf
+			& "Connection: keep-alive" & crlf & crlf;
+		var previousTimeout = arguments.sock.getSoTimeout();
+		var response = {};
+		try {
+			// A server that neither frames nor closes its answer must not
+			// stall the command for the full request timeout.
+			arguments.sock.setSoTimeout(javaCast("int", 10000));
+			var outStream = arguments.sock.getOutputStream();
+			outStream.write(charsetDecode(head, "iso-8859-1"));
+			outStream.flush();
+			response = $readHttpResponse(arguments.sock.getInputStream());
+			arguments.sock.setSoTimeout(javaCast("int", previousTimeout));
+		} catch (any e) {
+			return {state: "unavailable", reusable: false};
+		}
+		var framed = structKeyExists(response.headers, "content-length")
+			|| findNoCase("chunked", response.headers["transfer-encoding"] ?: "");
+		var reusable = framed && !findNoCase("close", response.headers["connection"] ?: "");
+		var answer = {};
+		if (response.statusCode == 200 && isJSON(response.body)) {
+			try {
+				answer = deserializeJSON(response.body);
+			} catch (any e) {}
+		}
+		if (!isStruct(answer) || !structKeyExists(answer, "mac") || !isSimpleValue(answer.mac)) {
+			return {state: "unavailable", reusable: reusable};
+		}
+		var expected = challenge.expectedMac(arguments.token, nonce, arguments.sock);
+		return {state: challenge.macsMatch(expected, answer.mac) ? "valid" : "invalid", reusable: reusable};
 	}
 
 	/**

@@ -560,8 +560,45 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 	function cli() {
 		$blockInProduction();
+		// The CLI connection challenge (#3769) is answered here, after the
+		// production gate and before the bridge preamble (it needs no
+		// migrator and carries no secret). $cliChallenge() never throws.
+		if (StructKeyExists(request.wheels.params, "command") && request.wheels.params.command == "cliChallenge") {
+			$cliChallenge();
+			return "";
+		}
 		include "/wheels/public/views/cli.cfm";
 		return "";
+	}
+
+	/**
+	 * Write the connection-challenge answer (#3769) and end the request.
+	 * Everything is caught: a failure answers the generic "unavailable", so
+	 * no error page (which shows exception messages in development) can
+	 * ever carry the per-start token.
+	 */
+	public void function $cliChallenge() {
+		var answer = {status = 200, body = {"v" = 1, "unavailable" = true}};
+		try {
+			var challenge = new wheels.public.CliChallenge();
+			var servletRequest = GetPageContext().getRequest();
+			answer = challenge.respond(
+				nonce = StructKeyExists(request.wheels.params, "nonce") && IsSimpleValue(request.wheels.params.nonce) ? request.wheels.params.nonce : "",
+				version = StructKeyExists(request.wheels.params, "v") && IsSimpleValue(request.wheels.params.v) ? request.wheels.params.v : "",
+				tokenPath = challenge.$tokenPath(),
+				localAddr = servletRequest.getLocalAddr(),
+				localPort = servletRequest.getLocalPort(),
+				remoteAddr = servletRequest.getRemoteAddr(),
+				remotePort = servletRequest.getRemotePort()
+			);
+		} catch (any e) {
+			answer = {status = 200, body = {"v" = 1, "unavailable" = true}};
+		}
+		cfheader(statuscode = answer.status);
+		cfheader(name = "Cache-Control", value = "no-store");
+		cfcontent(reset = true, type = "application/json");
+		WriteOutput(SerializeJSON(answer.body));
+		abort;
 	}
 	function packagelist() {
 		$blockInProduction();
