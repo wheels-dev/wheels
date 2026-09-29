@@ -95,6 +95,15 @@ fi
 sqlite3 wheelstestdb.db "SELECT 1;" 2>/dev/null || true
 sqlite3 wheelstestdb_tenant_b.db "SELECT 1;" 2>/dev/null || true
 
+# ── Recover from an interrupted run ─────────────────
+# A run killed before its EXIT trap (e.g. kill -9) leaves lucee.json with
+# this run's pinned ports and the original in lucee.json.bak. Restore it
+# before anything below copies lucee.json over that backup (#3771).
+if [ -f lucee.json.bak ]; then
+  echo "Restoring lucee.json from a previous run's lucee.json.bak..."
+  mv lucee.json.bak lucee.json
+fi
+
 # ── Resolve {project} placeholder if the Wheels CLI doesn't support it yet ──
 # Check if lucee.json has {project} and the runtime version is too old to
 # resolve the placeholder.
@@ -112,52 +121,104 @@ fi
 # ~/.wheels/servers/<name>/.project-path, and its JVM as "<pid>:<port>" in
 # server.pid. Both are authoritative; probing the port is not, because any
 # HTTP responder there will answer — including a completely different app.
+#
+# More than one registration can point at the same project: the name LuCLI
+# uses comes from lucee.json's "name", and a registration left under an
+# earlier name keeps the same .project-path. Prefer the one named after
+# lucee.json; a stale one sorted first made the next run refuse its own
+# server (#3771).
+lucee_server_name() {
+  sed -n 's/^[[:space:]]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$PROJECT_ROOT/lucee.json" 2>/dev/null | head -1
+}
+
 project_server_dir() {
-  local d real
+  local d real name project_real fallback=""
+  project_real="$(cd "$PROJECT_ROOT" && pwd -P)"
+  name="$(lucee_server_name)"
+  if [ -n "$name" ] && [ -f "$HOME/.wheels/servers/$name/.project-path" ]; then
+    real="$(cd "$(cat "$HOME/.wheels/servers/$name/.project-path")" 2>/dev/null && pwd -P)" || real=""
+    if [ "$real" = "$project_real" ]; then
+      printf '%s\n' "$HOME/.wheels/servers/$name"
+      return 0
+    fi
+  fi
   for d in "$HOME"/.wheels/servers/*/; do
     [ -f "${d}.project-path" ] || continue
     real="$(cd "$(cat "${d}.project-path")" 2>/dev/null && pwd -P)" || continue
-    if [ "$real" = "$(cd "$PROJECT_ROOT" && pwd -P)" ]; then
-      printf '%s\n' "${d%/}"
-      return 0
-    fi
+    [ "$real" = "$project_real" ] || continue
+    [ -n "$fallback" ] || fallback="${d%/}"
   done
-  return 1
+  [ -n "$fallback" ] || return 1
+  printf '%s\n' "$fallback"
 }
 
 listener_pid() {
   lsof -ti :"$1" -sTCP:LISTEN 2>/dev/null | head -1
 }
 
-cleanup() {
-  # Restore original lucee.json if we modified it
-  if [ "${RESTORED_LUCEE_JSON:-false}" = "true" ] && [ -f lucee.json.bak ]; then
-    mv lucee.json.bak lucee.json
+# SIGTERM the given PIDs, wait (bounded), then SIGKILL only those that are
+# still the process we signalled. A PID that exited during the grace period
+# may already belong to an unrelated process.
+stop_pids() {
+  local pid alive
+  [ -n "$*" ] || return 0
+  for pid in "$@"; do kill "$pid" 2>/dev/null || true; done
+  for _ in $(seq 1 20); do
+    alive=""
+    for pid in "$@"; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
+    [ -n "$alive" ] || return 0
+    sleep 0.5
+  done
+  for pid in $alive; do kill -9 "$pid" 2>/dev/null || true; done
+}
+
+# The JVM a previous run of this script recorded and did not get to stop
+# (it was killed, or its cleanup failed). ".wheels-test-server.pid" is
+# written only by this script, so a live PID in it is ours to stop.
+stop_orphaned_test_server() {
+  local marker="$PROJECT_ROOT/.wheels-test-server.pid" jvm port
+  [ -f "$marker" ] || return 0
+  jvm="$(cut -d: -f1 "$marker" 2>/dev/null || true)"
+  port="$(cut -d: -f2 "$marker" 2>/dev/null || true)"
+  # Only while it still listens on the port it recorded: a marker that
+  # outlived a reboot may name a PID the OS has since given to another process.
+  if [ -n "$jvm" ] && [ -n "$port" ] && [ "$(listener_pid "$port" || true)" = "$jvm" ]; then
+    echo "Stopping a test server a previous run left behind (PID ${jvm})..."
+    stop_pids "$jvm"
   fi
-  # Kill server if we started it
+  rm -f "$marker"
+}
+
+cleanup() {
+  # Stop the server BEFORE restoring lucee.json: `wheels server stop` reads
+  # the ports from lucee.json, and restoring first pointed it at 8080/8081
+  # instead of the ports this run pinned (#3771).
   if [ "${STARTED_SERVER:-false}" = "true" ]; then
     echo "Stopping test server..."
     ( cd "$PROJECT_ROOT" && wheels server stop >/dev/null 2>&1 ) || true
     # `kill $SERVER_PID` only kills the launcher: the JVM survives it and keeps
     # holding the port, so whichever project wants that port next silently gets
-    # THIS app's responses. Kill the JVM the registry recorded, then wait for
-    # the port to actually come free.
-    local jvm
+    # THIS app's responses. Stop the JVM the registry recorded, and whatever
+    # listens on the port this run found free and started on.
+    local jvm port_jvm pids=""
     jvm="$(cut -d: -f1 "$PROJECT_ROOT/.wheels-test-server.pid" 2>/dev/null || true)"
-    if [ -n "$jvm" ]; then
-      kill "$jvm" 2>/dev/null || true
-      for _ in $(seq 1 20); do
-        kill -0 "$jvm" 2>/dev/null || break
-        sleep 0.5
-      done
-      kill -9 "$jvm" 2>/dev/null || true
-    fi
+    port_jvm="$(listener_pid "$PORT" || true)"
+    [ -n "$jvm" ] && pids="$jvm"
+    [ -n "$port_jvm" ] && [ "$port_jvm" != "$jvm" ] && pids="$pids $port_jvm"
+    [ -n "${SERVER_PID:-}" ] && pids="$pids $SERVER_PID"
+    # shellcheck disable=SC2086
+    stop_pids $pids
     rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
+  fi
+  # Restore original lucee.json if we modified it
+  if [ "${RESTORED_LUCEE_JSON:-false}" = "true" ] && [ -f lucee.json.bak ]; then
+    mv lucee.json.bak lucee.json
   fi
 }
 trap cleanup EXIT
 
 # ── Start server if not already running ─────────────
+stop_orphaned_test_server
 STARTED_SERVER=false
 EXISTING_PID="$(listener_pid "$PORT" || true)"
 if [ -n "$EXISTING_PID" ]; then
