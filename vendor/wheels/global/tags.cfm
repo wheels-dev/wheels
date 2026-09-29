@@ -279,6 +279,27 @@
 			local.tableName = arguments.table;
 		}
 
+		// Adobe CF + Oracle: every cfdbinfo(type="columns") call leaves about
+		// seven JDBC statements open on the pooled connection, and they are never
+		// released (#3732). Read the same metadata from the data dictionary with
+		// an ordinary query instead. No rows (a synonym, a table in another
+		// schema, a missing table) falls through to cfdbinfo, as before.
+		// $forceCfdbinfo is internal: the parity spec compares the two paths.
+		local.forceCfdbinfo = StructKeyExists(arguments, "$forceCfdbinfo") && arguments.$forceCfdbinfo;
+		StructDelete(arguments, "$forceCfdbinfo");
+		if (
+			!local.forceCfdbinfo
+			&& StructKeyExists(arguments, "type") && arguments.type == "columns"
+			&& StructKeyExists(local, "tableName")
+			&& $engineAdapter().isAdobe()
+			&& $get("adapterName") == "OracleModel"
+		) {
+			local.dictionary = $oracleDictionaryColumns(argumentCollection = arguments);
+			if (local.dictionary.recordCount) {
+				return local.dictionary;
+			}
+		}
+
 		// BoxLang specific fix for index queries (MSSQL/Oracle)
 		if (
 			$engineAdapter().isBoxLang() &&
@@ -457,6 +478,72 @@
 		}
 
 		return local.rv;
+	}
+
+
+	/**
+	 * Column metadata for an Oracle table in the current schema, read from the
+	 * data dictionary with one ordinary query, in the shape of
+	 * `cfdbinfo(type="columns")`: the columns and values the Oracle JDBC
+	 * driver's `getColumns()` produces, plus Adobe's IS_PRIMARYKEY. Used on Adobe
+	 * CF, where cfdbinfo retains JDBC statements (#3732); the parity spec
+	 * checks it field by field against cfdbinfo on every Oracle leg. The table
+	 * name matches as stored (unquoted names are upper case) or upper-cased.
+	 */
+	public query function $oracleDictionaryColumns(
+		required string table,
+		required string datasource,
+		string username = "",
+		string password = ""
+	) {
+		local.sql = "
+			SELECT
+				NULL AS TABLE_CAT,
+				c.OWNER AS TABLE_SCHEM,
+				c.TABLE_NAME,
+				c.COLUMN_NAME,
+				c.DATA_TYPE AS TYPE_NAME,
+				CASE
+					WHEN c.DATA_PRECISION IS NOT NULL THEN c.DATA_PRECISION
+					WHEN c.DATA_TYPE = 'NUMBER' THEN CASE WHEN c.DATA_SCALE IS NULL THEN 0 ELSE 38 END
+					WHEN c.DATA_TYPE IN ('CHAR', 'VARCHAR', 'VARCHAR2', 'NCHAR', 'NVARCHAR2') THEN c.CHAR_LENGTH
+					ELSE c.DATA_LENGTH
+				END AS COLUMN_SIZE,
+				c.DATA_SCALE AS DECIMAL_DIGITS,
+				CASE WHEN c.NULLABLE = 'N' THEN 'NO' ELSE 'YES' END AS IS_NULLABLE,
+				c.DATA_DEFAULT AS COLUMN_DEFAULT_VALUE,
+				c.COLUMN_ID AS ORDINAL_POSITION,
+				CASE WHEN pk.COLUMN_NAME IS NULL THEN 'NO' ELSE 'YES' END AS IS_PRIMARYKEY
+			FROM ALL_TAB_COLUMNS c
+			LEFT JOIN (
+				SELECT cc.OWNER, cc.TABLE_NAME, cc.COLUMN_NAME
+				FROM ALL_CONSTRAINTS k
+				JOIN ALL_CONS_COLUMNS cc ON cc.OWNER = k.OWNER AND cc.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+				WHERE k.CONSTRAINT_TYPE = 'P'
+			) pk ON pk.OWNER = c.OWNER AND pk.TABLE_NAME = c.TABLE_NAME AND pk.COLUMN_NAME = c.COLUMN_NAME
+			WHERE c.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+				AND c.TABLE_NAME = (
+					SELECT MIN(t.TABLE_NAME) FROM ALL_TAB_COLUMNS t
+					WHERE t.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+						AND t.TABLE_NAME IN (?, UPPER(?))
+				)
+			ORDER BY c.COLUMN_ID
+		";
+		local.options = {datasource = arguments.datasource};
+		if (Len(arguments.username)) {
+			local.options.username = arguments.username;
+		}
+		if (Len(arguments.password)) {
+			local.options.password = arguments.password;
+		}
+		return QueryExecute(
+			PreserveSingleQuotes(local.sql),
+			[
+				{value = arguments.table, cfsqltype = "cf_sql_varchar"},
+				{value = arguments.table, cfsqltype = "cf_sql_varchar"}
+			],
+			local.options
+		);
 	}
 
 
