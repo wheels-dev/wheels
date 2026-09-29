@@ -4,6 +4,8 @@
  */
 component extends="wheels.WheelsTest" {
 
+	include "rateLimiterWindow.cfm";
+
 	function run() {
 
 		describe("RateLimiter trustProxy default", function() {
@@ -29,6 +31,7 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
+				$awaitRateLimitWindow(60);
 				var result1 = limiter.handle(request = req1, next = nextFn);
 				var result2 = limiter.handle(request = req2, next = nextFn);
 				expect(result1).toBe("ok");
@@ -55,6 +58,7 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
+				$awaitRateLimitWindow(60);
 				var result1 = limiter.handle(request = req1, next = nextFn);
 				var result2 = limiter.handle(request = req2, next = nextFn);
 				expect(result1).toBe("ok");
@@ -116,6 +120,7 @@ component extends="wheels.WheelsTest" {
 				var attackerIp = "10.0.0.99";
 
 				// Attacker sends 3 requests with different spoofed X-Forwarded-For headers.
+				$awaitRateLimitWindow(60);
 				for (var i = 1; i <= 3; i++) {
 					var req = {
 						cgi: {
@@ -194,6 +199,7 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
+				$awaitRateLimitWindow(60);
 				var result1 = limiter.handle(request = req1, next = nextFn);
 				var result2 = limiter.handle(request = req2, next = nextFn);
 
@@ -227,6 +233,7 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
+				$awaitRateLimitWindow(60);
 				var result1 = limiter.handle(request = req1, next = nextFn);
 				var result2 = limiter.handle(request = req2, next = nextFn);
 
@@ -265,6 +272,7 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
+				$awaitRateLimitWindow(60);
 				var result1 = limiter.handle(request = req1, next = nextFn);
 				var result2 = limiter.handle(request = req2, next = nextFn);
 				var result3 = limiter.handle(request = req3, next = nextFn);
@@ -299,6 +307,7 @@ component extends="wheels.WheelsTest" {
 					}
 				};
 
+				$awaitRateLimitWindow(60);
 				var result1 = limiter.handle(request = req1, next = nextFn);
 				expect(result1).toBe("ok");
 
@@ -459,6 +468,7 @@ component extends="wheels.WheelsTest" {
 				var nextFn = function(req) { return "ok"; };
 				var longKey = RepeatString("K", 129);
 				var hashed = Hash(longKey, "SHA-256");
+				$awaitRateLimitWindow(60);
 				expect(limiter.handle(request = {remoteAddr: longKey}, next = nextFn)).toBe("ok");
 				expect(limiter.handle(request = {remoteAddr: hashed}, next = nextFn)).toInclude(
 					"Rate limit exceeded"
@@ -512,6 +522,7 @@ component extends="wheels.WheelsTest" {
 				var nextFn = function(req) { return "ok"; };
 
 				// First request should pass.
+				$awaitRateLimitWindow(60);
 				var r1 = limiter.handle(request = {}, next = nextFn);
 				expect(r1).toBe("ok");
 
@@ -598,6 +609,7 @@ component extends="wheels.WheelsTest" {
 
 				var nextFn = function(req) { return "ok"; };
 
+				$awaitRateLimitWindow(60);
 				var r1 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
 				var r2 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
 				var r3 = limiter.handle(request = {remoteAddr: "failclose-fw-1"}, next = nextFn);
@@ -653,6 +665,7 @@ component extends="wheels.WheelsTest" {
 
 				var nextFn = function(req) { return "ok"; };
 
+				$awaitRateLimitWindow(60);
 				var r1 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
 				var r2 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
 				var r3 = limiter.handle(request = {remoteAddr: "failopen-normal-1"}, next = nextFn);
@@ -803,6 +816,7 @@ component extends="wheels.WheelsTest" {
 					return "ok";
 				};
 
+				$awaitRateLimitWindow(60);
 				for (var i = 1; i <= 3; i++) {
 					pipeline.run(request = {}, coreHandler = handler);
 				}
@@ -823,6 +837,7 @@ component extends="wheels.WheelsTest" {
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var handler = function(required struct request) { return "ok"; };
 
+				$awaitRateLimitWindow(60);
 				pipeline.run(request = {}, coreHandler = handler);
 				var result = pipeline.run(request = {}, coreHandler = handler);
 				expect(result).toInclude("Rate limit exceeded");
@@ -841,6 +856,7 @@ component extends="wheels.WheelsTest" {
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 				var handler = function(required struct request) { return "ok"; };
 
+				$awaitRateLimitWindow(60);
 				pipeline.run(request = {}, coreHandler = handler);
 				pipeline.run(request = {}, coreHandler = handler);
 
@@ -983,6 +999,7 @@ component extends="wheels.WheelsTest" {
 					return "ok";
 				};
 
+				$awaitRateLimitWindow(60);
 				pipeline.run(request = {}, coreHandler = handler);
 				shared.coreReached = false;
 

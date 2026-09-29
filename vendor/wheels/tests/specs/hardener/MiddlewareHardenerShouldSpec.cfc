@@ -21,6 +21,8 @@
  */
 component extends="wheels.WheelsTest" {
 
+	include "../middleware/rateLimiterWindow.cfm";
+
 	function run() {
 
 		describe("CoS lock: middleware public defaults stay conservative", function() {
@@ -184,6 +186,7 @@ component extends="wheels.WheelsTest" {
 						http_x_forwarded_for: "203.0.113.10"
 					}
 				};
+				$awaitRateLimitWindow(60);
 				expect(limiter.handle(request = req1, next = nextFn)).toBe("ok");
 				expect(limiter.handle(request = req2, next = nextFn)).toInclude("Rate limit exceeded");
 			});
@@ -328,6 +331,7 @@ component extends="wheels.WheelsTest" {
 				};
 				var longKey = RepeatString("H", 129);
 				var hashed = Hash(longKey, "SHA-256");
+				$awaitRateLimitWindow(60);
 				expect(limiter.handle(request = {remoteAddr: longKey}, next = nextFn)).toBe("ok");
 				expect(limiter.handle(request = {remoteAddr: hashed}, next = nextFn)).toInclude(
 					"Rate limit exceeded"

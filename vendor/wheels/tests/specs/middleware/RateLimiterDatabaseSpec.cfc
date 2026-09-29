@@ -9,6 +9,8 @@
  */
 component extends="wheels.WheelsTest" {
 
+	include "rateLimiterWindow.cfm";
+
 	function run() {
 
 		describe("RateLimiter database storage", function() {
@@ -32,6 +34,7 @@ component extends="wheels.WheelsTest" {
 				};
 				var clientKey = "rl-db-fixed-#CreateUUID()#";
 
+				$awaitRateLimitWindow(3600);
 				var result1 = limiter.handle(request = {remoteAddr: clientKey}, next = nextFn);
 				var result2 = limiter.handle(request = {remoteAddr: clientKey}, next = nextFn);
 				var result3 = limiter.handle(request = {remoteAddr: clientKey}, next = nextFn);
@@ -54,6 +57,7 @@ component extends="wheels.WheelsTest" {
 				};
 				var clientKey = "rl-db-row-#CreateUUID()#";
 
+				$awaitRateLimitWindow(3600);
 				limiter.handle(request = {remoteAddr: clientKey}, next = nextFn);
 				limiter.handle(request = {remoteAddr: clientKey}, next = nextFn);
 
@@ -370,6 +374,7 @@ component extends="wheels.WheelsTest" {
 					return "ok";
 				};
 
+				$awaitRateLimitWindow(3600);
 				var r1 = pipeline.run(request = {}, coreHandler = handler);
 				var r2 = pipeline.run(request = {}, coreHandler = handler);
 				var r3 = pipeline.run(request = {}, coreHandler = handler);
@@ -426,6 +431,7 @@ component extends="wheels.WheelsTest" {
 				};
 
 				var lastResult = "";
+				$awaitRateLimitWindow(3600);
 				for (var i = 1; i <= 5; i++) {
 					lastResult = pipeline.run(request = {}, coreHandler = handler);
 				}
@@ -451,6 +457,7 @@ component extends="wheels.WheelsTest" {
 					return "ok";
 				};
 
+				$awaitRateLimitWindow(3600);
 				for (var i = 1; i <= 5; i++) {
 					pipeline.run(request = {}, coreHandler = handler);
 				}
