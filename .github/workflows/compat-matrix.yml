@@ -426,8 +426,80 @@ jobs:
           curl -s -o /dev/null --max-time 120 "http://localhost:${!PORT_VAR}/" || true
           bash tools/ci/wait-engine-db.sh "${!PORT_VAR}" "${{ matrix.database }}" 30 10
 
+      # DIAG (#3709): effective heap facts for the JVM that runs the suite (after
+      # the serialfilter restart), and a heap_info sampler every 20s during the
+      # suite. Class names/counts and sizes only; no heap dumps.
+      - name: "DIAG: JVM heap facts + start sampler"
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+        run: |
+          C="wheels-${CFENGINE}-1"
+          docker exec "$C" sh -c '
+            PID=$(pgrep -f "java.*runwar" | head -1); echo "CF JVM pid=$PID"
+            JH=$(dirname "$(dirname "$(readlink -f /proc/$PID/exe)")"); echo "java home=$JH"
+            echo "--- heap-related JVM args:"; tr "\0" "\n" < /proc/$PID/cmdline | grep -E "^-Xm[sx]|^-XX:.*(RAM|Heap|GC)" || echo "(none: ergonomic defaults)"
+            echo "--- VM.flags (heap/GC):"; "$JH/bin/jcmd" "$PID" VM.flags | tr " " "\n" | grep -E "MaxHeapSize|InitialHeapSize|MaxRAMPercentage|MaxRAM=|Use[A-Za-z]*GC" || echo "jcmd unavailable"
+            echo "--- container memory limit:"; cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes
+            echo "--- GC.heap_info at start:"; "$JH/bin/jcmd" "$PID" GC.heap_info | head -8
+            echo "--- java -version / ergonomic MaxHeapSize for this JRE + container (works without jcmd):"
+            "$JH/bin/java" -version 2>&1 | head -2
+            "$JH/bin/java" -XX:+PrintFlagsFinal -version 2>/dev/null | grep -E " MaxHeapSize | MaxRAMPercentage | UseContainerSupport "
+            echo "--- ojdbc jars visible in the container:"; find / -name "ojdbc*.jar" -not -path "/proc/*" 2>/dev/null | head
+            echo "--- Adobe statement-pool settings for the oracle DSN (keys only, no credentials):"
+            F=$(find / -name neo-datasource.xml -not -path "/proc/*" 2>/dev/null | head -1); echo "file=$F"
+            [ -n "$F" ] && grep -oiE "(pooled|maxpooledstatements|pooling|timeout|maxconnections|disable|interval)[a-z_]*</var><[a-z]+>[^<]{0,20}" "$F" | sort | uniq -c | head -30
+          '
+          nohup bash -c "while true; do date -u +%T; docker exec $C sh -c 'PID=\$(pgrep -f \"java.*runwar\" | head -1); JH=\$(dirname \"\$(dirname \"\$(readlink -f /proc/\$PID/exe)\")\"); \"\$JH/bin/jcmd\" \$PID GC.heap_info | head -3'; sleep 20; done" > /tmp/heap-samples.txt 2>&1 &
+          # Live-object counts every 60s: does the statement count plateau (a
+          # bounded cache) or keep climbing (a leak)? Class names/counts only.
+          cat > /tmp/histo.sh <<'SAMPLER'
+          #!/bin/bash
+          while true; do
+            date -u +%T
+            docker exec "$1" sh -c 'PID=$(pgrep -f "java.*runwar" | head -1); JH=$(dirname "$(dirname "$(readlink -f /proc/$PID/exe)")"); "$JH/bin/jcmd" "$PID" GC.class_histogram' \
+              | grep -E ' \[[JBIZ] |T4CPreparedStatement$|T4CStatement$|T4CCallableStatement$|OracleSql$|T4CConnection$|imq\.Row$'
+            sleep 60
+          done
+          SAMPLER
+          nohup bash /tmp/histo.sh "$C" > /tmp/histo-samples.txt 2>&1 &
+          echo "sampler started"
+
+      # DIAG (#3709, option C): one suspect per request, live Oracle statement
+      # counts (after a full GC) before and after each. Class names/counts only.
+      - name: "DIAG: statement-leak probe"
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+        run: |
+          PORT_VAR="PORT_${CFENGINE}"; PORT="${!PORT_VAR}"
+          C="wheels-${CFENGINE}-1"
+          B="http://localhost:${PORT}/wheels/core/tests?db=oracle&format=json&directory=wheels.tests.specs.zzleakprobe"
+          live() {
+            docker exec "$C" sh -c 'PID=$(pgrep -f "java.*runwar" | head -1); [ -n "$PID" ] || PID=$(pgrep -f "java" | tail -1); JH=$(dirname "$(dirname "$(readlink -f /proc/$PID/exe)")"); [ -x "$JH/bin/jcmd" ] || { echo "jcmd-unavailable"; exit 0; }; "$JH/bin/jcmd" "$PID" GC.class_histogram' \
+              | grep -E 'jcmd-unavailable|T4CPreparedStatement$|T4CStatement$|T4CCallableStatement$|OracleSql$|T4CConnection$' \
+              | awk '{ if ($1=="jcmd-unavailable") { printf "jcmd-unavailable"; next } n=$4; sub(/.*\./,"",n); printf "%s=%s ", n, $2 }'
+          }
+          hit() {
+            local out=/tmp/probe.json code
+            code=$(curl -s -o "$out" --max-time 600 -w "%{http_code}" "$B&leakphase=$1&leakn=$2" || true)
+            echo -n "http=$code $(python3 -c "import json;d=json.load(open('$out'));print('pass',d.get('totalPass'),'err',d.get('totalError'),'fail',d.get('totalFail'))" 2>/dev/null || echo 'non-json')"
+          }
+          curl -s -o /dev/null --max-time 120 "http://localhost:${PORT}/" || true
+          echo "warm-up #1: $(hit none 0)"   # first test-app init fails on Adobe 2025 (#3726)
+          echo "warm-up #2: $(hit none 0)"
+          echo "baseline: $(live)"
+          for round in 1 2; do
+            for phase in dbinfo_columns jdbc_columns_closed jdbc_columns_open jdbc_pk_closed jdbc_fk_closed jdbc_index_closed dict_columns query_plain; do
+              BEFORE="$(live)"; R="$(hit $phase 200)"; AFTER="$(live)"
+              echo "round $round | $phase x200 | $R"
+              echo "    before: $BEFORE"
+              echo "    after:  $AFTER"
+            done
+          done
+
       - name: Run test suite for ${{ matrix.database }}
         id: run-tests
+        # DIAG: the probe above is the experiment; skip the full suite (it OOMs).
+        if: false
         run: |
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
@@ -620,6 +692,28 @@ jobs:
           if [ "$BAD" = 1 ]; then
             exit 1
           fi
+
+      # DIAG (#3709): what the heap holds after the suite (live objects, top 40
+      # classes by bytes) and how it grew. Class names and counts only; no dump.
+      - name: "DIAG: heap samples + class histogram"
+        if: always()
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+        run: |
+          C="wheels-${CFENGINE}-1"
+          pkill -f "heap-samples" 2>/dev/null || true
+          echo "=== GC.heap_info samples (every 20s during the suite) ==="
+          grep -E "^[0-9]{2}:[0-9]{2}:[0-9]{2}$|garbage-first heap|total [0-9]+K, used|def new generation|tenured|region size" /tmp/heap-samples.txt | head -400 || true
+          echo "=== live-object samples (every 60s) ==="
+          cat /tmp/histo-samples.txt | head -600 || true
+          echo "=== GC.class_histogram (top 40 by bytes) ==="
+          docker exec "$C" sh -c '
+            PID=$(pgrep -f "java.*runwar" | head -1)
+            JH=$(dirname "$(dirname "$(readlink -f /proc/$PID/exe)")")
+            if [ -n "$PID" ]; then "$JH/bin/jcmd" "$PID" GC.class_histogram | head -45; else echo "CF JVM not running"; fi
+          ' || true
+          echo "=== container memory ==="
+          docker stats --no-stream --format "{{.Name}} {{.MemUsage}}" "$C" || true
 
       - name: Generate per-leg summary
         if: always()
