@@ -55,6 +55,21 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 			});
 
+			it("gives an x86_64 JVM on Apple Silicon (Rosetta) the native arm64 build", () => {
+				expect(variables.svc.$assetFor("Mac OS X", "x86_64", true)).toBe("rustcfml-macos-aarch64");
+				expect(variables.svc.$assetFor("Mac OS X", "amd64", true)).toBe("rustcfml-macos-aarch64");
+				// The hardware flag never turns Linux x86_64 into an arm build.
+				expect(variables.svc.$assetFor("Linux", "amd64", true)).toBe("rustcfml-linux-x86_64");
+			});
+
+			it("reads the Mac's hardware arch as a boolean, false off macOS", () => {
+				var answer = variables.svc.$macHasArm64Hardware();
+				expect(isBoolean(answer)).toBeTrue();
+				if (!findNoCase("mac", createObject("java", "java.lang.System").getProperty("os.name"))) {
+					expect(answer).toBeFalse();
+				}
+			});
+
 			it("refuses a platform RustCFML has no build for", () => {
 				expect(() => variables.svc.$assetFor("Windows 11", "amd64")).toThrow(type = "Wheels.RustCFML.UnsupportedPlatform");
 				expect(() => variables.svc.$assetFor("FreeBSD", "amd64")).toThrow(type = "Wheels.RustCFML.UnsupportedPlatform");
