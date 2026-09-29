@@ -44,7 +44,7 @@ class BumpPinTest(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.tools = os.path.join(self.tmp, "tools", "rustcfml")
         os.makedirs(self.tools)
-        for name in ("bump-pin.sh", "ENGINE_VERSION", "ENGINE_SHA256"):
+        for name in ("bump-pin.sh", "engine-sha256.sh", "ENGINE_VERSION", "ENGINE_SHA256"):
             shutil.copy(os.path.join(HERE, name), self.tools)
         self.cfc = os.path.join(self.tmp, CFC_REL)
         os.makedirs(os.path.dirname(self.cfc))

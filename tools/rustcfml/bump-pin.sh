@@ -13,6 +13,8 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=engine-sha256.sh
+. "$DIR/engine-sha256.sh"
 TAG="${1:-}"
 if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "::error::bump-pin.sh needs a release tag vX.Y.Z (got '$TAG')."
@@ -43,14 +45,13 @@ for asset in $ASSETS; do
   fi
 done
 
-if ! DIGESTS="$(gh api "repos/RustCFML/RustCFML/releases/tags/$TAG" --jq '.assets[] | "\(.name) \(.digest)"')"; then
+if ! DIGESTS="$(rustcfml_release_digests "$TAG")"; then
   echo "::error::Could not read the $TAG release assets; pins unchanged."
   exit 1
 fi
 NEW_SHA256=""
 for asset in $ASSETS; do
-  sha="$(awk -v a="$asset" '$1 == a { print $2 }' <<<"$DIGESTS" | sed -nE 's/^sha256:([0-9a-f]{64})$/\1/p')"
-  if ! [[ "$sha" =~ ^[0-9a-f]{64}$ ]]; then
+  if ! sha="$(rustcfml_digest_sha256 "$asset" "$DIGESTS")"; then
     echo "::error::The $TAG release publishes no single sha256 digest for $asset; pins unchanged."
     exit 1
   fi
