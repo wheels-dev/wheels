@@ -77,6 +77,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect($countRawHttp('x = 1; /* cfhttp url="x" {} */ y = 2;')).toBe(0);
 				expect($countRawHttp('/**' & nl & ' * Uses cfhttp (script syntax), not new http()' & nl & ' */')).toBe(0);
 				expect($countRawHttp(lt & '!--- ' & lt & 'cfhttp url="x"> --->')).toBe(0);
+				// A URL literal earlier on the line doesn't hide the call (##3794).
+				expect($countRawHttp('u = "http://localhost:8190/"; cfhttp(url=u, result="r");')).toBe(1);
+				expect($countRawHttp('out("see https://x"); http url=u result="r";')).toBe(1);
+				expect($countRawHttp("u = 'http://x/'; new http(url=u);")).toBe(1);
+				// Brace-less if / else bodies (##3794).
+				expect($countRawHttp('if (x) http url=u result="r";')).toBe(1);
+				expect($countRawHttp('if (x) y = 1; else http url=u result="r";')).toBe(1);
+				// A call token inside a string is not a call.
+				expect($countRawHttp('out("cfhttp(url=x) is not allowed here");')).toBe(0);
 				// Names that only contain "http" are not calls.
 				expect($countRawHttp('var httpResult = makeHttpRequest(requestUrl = u);')).toBe(0);
 				expect($countRawHttp('c = new packages.HttpClient();')).toBe(0);
@@ -118,20 +127,27 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	/**
-	 * Raw HTTP call sites in CFML source, comments stripped first:
+	 * Raw HTTP call sites in CFML source, string literals blanked and comments
+	 * stripped first:
 	 * `new http`, `cfhttp(...)`, the parenthesis-free script-tag forms
 	 * (`cfhttp url=... {}`, `http url=...;`) and the cfhttp tag.
 	 */
 	public numeric function $countRawHttp(required string src) {
-		var code = variables.analysis.$stripCfmlComments(arguments.src);
+		// Blank string literals first (quotes kept), so the "//" in a URL literal
+		// can't read as a line comment and hide the rest of its line (##3794).
+		// Neither pattern crosses a line break, so the scan stays line-anchored.
+		var code = ReReplace(arguments.src, '"(?:[^"\r\n]|"")*"', '""', "all");
+		code = ReReplace(code, "'(?:[^'\r\n]|'')*'", "''", "all");
+		code = variables.analysis.$stripCfmlComments(code);
 		var patterns = [
 			// new http(...) and new http;
 			"\bnew\s+http\b",
 			// cfhttp(...), script-tag cfhttp url=... and the cfhttp tag: the \b
 			// also sits between the tag opener and "cfhttp", so each counts once.
 			"\bcfhttp(\s*\(|\s+[a-z]+\s*=)",
-			// Lucee script-tag http url=...; at the start of a statement.
-			"(?m)(^|[;{}])[ \t]*http\s+[a-z]+\s*="
+			// Lucee script-tag http url=...; at the start of a statement, including
+			// the body of a brace-less if (...) / else (##3794).
+			"(?m)(^|[;{})]|\belse)[ \t]*http\s+[a-z]+\s*="
 		];
 		var count = 0;
 		for (var pattern in patterns) {
