@@ -470,6 +470,26 @@ jobs:
         env:
           CFENGINE: ${{ matrix.cfengine }}
         run: |
+          cat > /tmp/probe_summary.py <<'PYEOF'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          msgs = []
+          def walk(x):
+              if isinstance(x, dict):
+                  for k in ("error", "failMessage", "failDetail"):
+                      v = x.get(k)
+                      if isinstance(v, dict):
+                          v = str(v.get("message", "")) + " " + str(v.get("detail", ""))
+                      if v:
+                          msgs.append(str(v)[:300])
+                  for v in x.values():
+                      walk(v)
+              elif isinstance(x, list):
+                  for v in x:
+                      walk(v)
+          walk(d.get("bundleStats", []))
+          print("pass", d.get("totalPass"), "err", d.get("totalError"), "fail", d.get("totalFail"), "|", " / ".join(dict.fromkeys(msgs))[:600])
+          PYEOF
           PORT_VAR="PORT_${CFENGINE}"; PORT="${!PORT_VAR}"
           C="wheels-${CFENGINE}-1"
           B="http://localhost:${PORT}/wheels/core/tests?db=oracle&format=json&directory=wheels.tests.specs.zzleakprobe"
@@ -481,7 +501,7 @@ jobs:
           hit() {
             local out=/tmp/probe.json code
             code=$(curl -s -o "$out" --max-time 600 -w "%{http_code}" "$B&leakphase=$1&leakn=$2" || true)
-            echo -n "http=$code $(python3 -c "import json;d=json.load(open('$out'));print('pass',d.get('totalPass'),'err',d.get('totalError'),'fail',d.get('totalFail'))" 2>/dev/null || echo 'non-json')"
+            echo -n "http=$code $(python3 /tmp/probe_summary.py "$out" 2>/dev/null || echo 'non-json')"
           }
           curl -s -o /dev/null --max-time 120 "http://localhost:${PORT}/" || true
           echo "warm-up #1: $(hit none 0)"   # first test-app init fails on Adobe 2025 (#3726)
