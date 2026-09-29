@@ -1446,15 +1446,23 @@ component extends="modules.BaseModule" {
 		}
 		var prefix = arguments.coreTests ? "wheels.tests.specs" : "tests.specs";
 		var rootPath = createObject("java", "java.io.File").init(specRoot).getCanonicalPath();
+		// The separator is part of the prefix: without it a sibling such as
+		// tests/specsOld, reached through a symlink, looks inside (issue 3800).
+		var rootPrefix = rootPath & createObject("java", "java.io.File").separator;
 		var matches = [];
 		for (var path in directoryList(specRoot, true, "path", "*.cfc")) {
 			var filePath = createObject("java", "java.io.File").init(path).getCanonicalPath();
 			var fileName = listLast(replace(filePath, "\", "/", "all"), "/");
-			if (compareNoCase(fileName, raw & ".cfc") != 0 || left(filePath, len(rootPath)) != rootPath) {
+			if (compareNoCase(fileName, raw & ".cfc") != 0 || left(filePath, len(rootPrefix)) != rootPrefix) {
 				continue;
 			}
-			var rel = replace(mid(filePath, len(rootPath) + 2, len(filePath)), "\", "/", "all");
-			arrayAppend(matches, prefix & "." & replace(left(rel, len(rel) - 4), "/", ".", "all"));
+			var rel = replace(mid(filePath, len(rootPrefix) + 1, len(filePath)), "\", "/", "all");
+			var dotted = prefix & "." & replace(left(rel, len(rel) - 4), "/", ".", "all");
+			// A folder symlinked from elsewhere inside the root lists the same
+			// file twice under one canonical path: count it once (issue 3800).
+			if (!arrayFind(matches, dotted)) {
+				arrayAppend(matches, dotted);
+			}
 		}
 		if (arrayLen(matches) == 1) {
 			return matches[1];

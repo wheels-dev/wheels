@@ -31,6 +31,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 	}
 
+	private any function pathOf(required string location) {
+		return createObject("java", "java.io.File").init(arguments.location).toPath();
+	}
+
+	/** Create a symbolic link at `link` pointing to `target`. */
+	private void function symlink(required string link, required string target) {
+		var noAttributes = createObject("java", "java.lang.reflect.Array").newInstance(
+			createObject("java", "java.lang.Class").forName("java.nio.file.attribute.FileAttribute"),
+			javaCast("int", 0)
+		);
+		createObject("java", "java.nio.file.Files").createSymbolicLink(pathOf(arguments.link), pathOf(arguments.target), noAttributes);
+	}
+
 	function afterAll() {
 		if (Len(variables.tempRoot) > 10 && directoryExists(variables.tempRoot)) {
 			directoryDelete(variables.tempRoot, true);
@@ -76,6 +89,55 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(state.type).toBe("Wheels.AmbiguousTestFilter");
 				expect(state.message).toInclude("tests.specs.controllers.UserSpec");
 				expect(state.message).toInclude("tests.specs.models.UserSpec");
+			});
+
+		});
+
+		describe("$resolveTestFilter and symlinks (issue 3800)", () => {
+
+			beforeEach(() => {
+				variables.linkRoot = getTempDirectory() & "wheels-cli-spec-links-" & createUUID();
+				directoryCreate(variables.linkRoot & "/config", true, true);
+				directoryCreate(variables.linkRoot & "/tests/specs/favorites", true, true);
+				directoryCreate(variables.linkRoot & "/tests/specsOld", true, true);
+				fileWrite(variables.linkRoot & "/config/settings.cfm", "<cfscript>" & chr(10) & "</cfscript>" & chr(10));
+				fileWrite(variables.linkRoot & "/tests/specs/favorites/PageFavoritesToggleSpec.cfc", "component {}" & chr(10));
+				fileWrite(variables.linkRoot & "/tests/specsOld/OrphanSpec.cfc", "component {}" & chr(10));
+				variables.linksMade = true;
+				try {
+					// A sibling whose name starts with the spec root's name.
+					symlink(variables.linkRoot & "/tests/specs/legacy", variables.linkRoot & "/tests/specsOld");
+					// A second path to a folder already inside the spec root.
+					symlink(variables.linkRoot & "/tests/specs/alias", variables.linkRoot & "/tests/specs/favorites");
+				} catch (any e) {
+					// No symlink support here (e.g. Windows without the privilege).
+					variables.linksMade = false;
+				}
+				variables.linkMod = new cli.lucli.Module(cwd = variables.linkRoot);
+			});
+
+			afterEach(() => {
+				for (var link in ["/tests/specs/legacy", "/tests/specs/alias"]) {
+					try {
+						createObject("java", "java.nio.file.Files").deleteIfExists(pathOf(variables.linkRoot & link));
+					} catch (any e) {
+					}
+				}
+				if (Len(variables.linkRoot) > 10 && directoryExists(variables.linkRoot)) {
+					directoryDelete(variables.linkRoot, true);
+				}
+			});
+
+			it("does not treat a sibling folder that starts with the spec root's name as inside it", () => {
+				if (!variables.linksMade) return;
+				// Before: "tests.specs.ld.OrphanSpec" (the prefix test had no separator boundary).
+				expect(linkMod.$resolveTestFilter("OrphanSpec")).toBe("tests.specs.OrphanSpec");
+			});
+
+			it("counts a file reached by two paths inside the spec root once", () => {
+				if (!variables.linksMade) return;
+				// Before: Wheels.AmbiguousTestFilter listing the same path twice.
+				expect(linkMod.$resolveTestFilter("PageFavoritesToggleSpec")).toBe("tests.specs.favorites.PageFavoritesToggleSpec");
 			});
 
 		});
