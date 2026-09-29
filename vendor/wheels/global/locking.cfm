@@ -153,7 +153,17 @@
 		if (!StructKeyExists(arguments.executeArgs.applicationScope, "$wheelsRestartLock")) {
 			return false;
 		}
-		local.marker = arguments.executeArgs.applicationScope["$wheelsRestartLock"];
+		// The restart can clear the marker between the check above and this
+		// read ($clearRestartLock runs on its own thread): a missing or null
+		// marker means no restart holds the lock, never an error.
+		try {
+			local.marker = arguments.executeArgs.applicationScope["$wheelsRestartLock"];
+		} catch (any e) {
+			return false;
+		}
+		if (!StructKeyExists(local, "marker")) {
+			return false;
+		}
 		return IsStruct(local.marker)
 			&& StructKeyExists(local.marker, "name")
 			&& StructKeyExists(local.marker, "expiresAt")

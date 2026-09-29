@@ -33,6 +33,47 @@ component extends="wheels.WheelsTest" {
 		thread action="join" name="#arguments.threadName#" timeout="15000";
 	}
 
+	// Put and delete a restart marker in server.$restartLockFlip.scope until
+	// server.$restartLockFlip.stop, on another thread.
+	private string function $flipMarkerOnOtherThread() {
+		var threadName = "restartLockFlipper_" & Replace(CreateUUID(), "-", "", "all");
+		thread name="#threadName#" action="run" {
+			flip = server.$restartLockFlip;
+			while (!flip.stop) {
+				flip.scope["$wheelsRestartLock"] = {name = "flipLock", token = "t", expiresAt = DateAdd("s", 60, Now())};
+				StructDelete(flip.scope, "$wheelsRestartLock");
+			}
+		}
+		return threadName;
+	}
+
+	// Call the marker check many times against the flipping scope; count throws.
+	private struct function $checkMarkerRepeatedly(numeric iterations = 50000) {
+		var result = {calls = 0, errors = 0, lastError = "", markerSeen = 0, markerAbsent = 0};
+		var args = $sessionEndArgs(server.$restartLockFlip.scope);
+		for (var i = 1; i <= arguments.iterations; i++) {
+			// Proof that both threads share the struct: the reader must see both states.
+			if (StructKeyExists(args.applicationScope, "$wheelsRestartLock")) {
+				result.markerSeen++;
+			} else {
+				result.markerAbsent++;
+			}
+			try {
+				application.wo.$isSessionEndDuringOwnRestart(
+					name = "flipLock",
+					type = "readOnly",
+					execute = "$runOnSessionEnd",
+					executeArgs = args
+				);
+			} catch (any e) {
+				result.errors++;
+				result.lastError = e.message;
+			}
+			result.calls++;
+		}
+		return result;
+	}
+
 	private struct function $sessionEndArgs(required struct appScope) {
 		return {
 			componentReference = variables.PROBE,
@@ -201,6 +242,18 @@ component extends="wheels.WheelsTest" {
 					$joinThread(holder);
 					expect(state.threw).toBeTrue();
 					expect(request.$restartLockProbe.sessionEndRan).toBeFalse();
+				});
+
+				it("never throws while the restart clears the marker concurrently", () => {
+					server.$restartLockFlip = {scope = {wheels = {eventPath = "/app/events"}}, stop = false};
+					var flipper = $flipMarkerOnOtherThread();
+					var result = $checkMarkerRepeatedly();
+					server.$restartLockFlip.stop = true;
+					$joinThread(flipper);
+					StructDelete(server, "$restartLockFlip");
+					expect(result.markerSeen).toBeGT(0, "the reader never saw the marker, so the threads do not share the struct");
+					expect(result.markerAbsent).toBeGT(0, "the reader never saw the marker absent");
+					expect(result.errors).toBe(0, "marker check threw " & result.errors & " of " & result.calls & " times: " & result.lastError);
 				});
 
 				it("returns without running or waiting when the marked scope is already torn down", () => {
