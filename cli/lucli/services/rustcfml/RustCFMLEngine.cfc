@@ -9,7 +9,8 @@
  *
  * This service provides the CLI-facing lifecycle for that backend:
  *
- *   install  — download + cache the pinned binary for this platform
+ *   install  — download, verify (pinned sha256) + cache the pinned binary
+ *              for this platform
  *   start    — spawn `rustcfml --serve` as a detached background process,
  *              recording pid/port in a per-project state file
  *   stop     — kill the recorded pid and clear the state file
@@ -27,16 +28,34 @@ component {
 	 * Pinned engine version: the build the framework is tested against. It
 	 * must equal tools/rustcfml/ENGINE_VERSION (the CI leg and the compat
 	 * matrix run that build). The installed CLI doesn't ship tools/, so the pin
-	 * lives here too: tools/rustcfml/check-version.sh rewrites this line when
-	 * it bumps ENGINE_VERSION, and RustCFMLEnginePinSpec fails on drift (#3812).
+	 * lives here too: tools/rustcfml/bump-pin.sh rewrites this line when
+	 * check-version.sh bumps ENGINE_VERSION, and RustCFMLEnginePinSpec fails
+	 * on drift (#3812).
 	 */
 	variables.engineVersion = "v0.693.0";
+
+	/**
+	 * sha256 of each release asset of the pinned version. install() refuses a
+	 * binary that doesn't match. These must equal tools/rustcfml/ENGINE_SHA256;
+	 * tools/rustcfml/bump-pin.sh rewrites these lines from the release's
+	 * published digests when it moves the pin, and RustCFMLEnginePinSpec fails
+	 * on drift.
+	 */
+	variables.engineSha256 = {};
+	variables.engineSha256["rustcfml-linux-aarch64"] = "95c74453632ab3da99b06e24b36539b3af642cdc29b60e38ebe4fe60a356d523";
+	variables.engineSha256["rustcfml-linux-x86_64"] = "cb053823ddbebf5d130e5a0eaf564a2148d0d93c6781f253e4cd52e8a7bd75fb";
+	variables.engineSha256["rustcfml-macos-aarch64"] = "890a970d31a49d98c779722aad86ac8846fdaad10901edb74078e814c495e333";
 
 	variables.wheelsHome = "";
 
 	/** The pinned RustCFML release tag, e.g. "v0.693.0". */
 	public string function getEngineVersion() {
 		return variables.engineVersion;
+	}
+
+	/** The pinned sha256 per release asset name (a copy). */
+	public struct function getEngineSha256() {
+		return duplicate(variables.engineSha256);
 	}
 
 	public RustCFMLEngine function init() {
@@ -51,30 +70,96 @@ component {
 	/**
 	 * Download (if needed) and cache the RustCFML binary for this platform.
 	 * Returns the absolute path to the executable.
+	 *
+	 * The binary is only ever used after its sha256 matches the pin for its
+	 * release asset. A cached binary that doesn't match is discarded and
+	 * downloaded again. A download goes to a temp file next to the final path,
+	 * is verified, made executable, and only then renamed into place; on any
+	 * failure the temp file is deleted and Wheels.RustCFML.InstallFailed (or
+	 * Wheels.RustCFML.ChecksumMismatch for a mismatched download) is thrown.
 	 */
 	public string function install() {
 		var asset = assetName();
+		var expected = $expectedSha256(asset);
 		var binDir = variables.wheelsHome & "/rustcfml/bin";
 		var binPath = binDir & "/rustcfml-" & variables.engineVersion;
 		if (fileExists(binPath)) {
-			return binPath;
+			if ($sha256File(binPath) == expected) {
+				return binPath;
+			}
+			// Never use a cached binary that doesn't match the pin.
+			fileDelete(binPath);
 		}
 
 		if (!directoryExists(binDir)) {
 			directoryCreate(binDir, true);
 		}
-		var url = "https://github.com/RustCFML/RustCFML/releases/download/"
+		var downloadUrl = "https://github.com/RustCFML/RustCFML/releases/download/"
 			& variables.engineVersion & "/" & asset;
-		var exit = $runSync(["curl", "-sSL", "--fail", "-o", binPath, url]);
-		if (exit != 0) {
-			if (fileExists(binPath)) fileDelete(binPath);
+		var tempPath = binPath & ".download-" & createUUID();
+		try {
+			var exit = $runSync(["curl", "-sSL", "--fail", "-o", tempPath, downloadUrl]);
+			if (exit != 0) {
+				throw(
+					type = "Wheels.RustCFML.InstallFailed",
+					message = "Could not download RustCFML " & variables.engineVersion & " (" & asset & ") from " & downloadUrl
+				);
+			}
+			var actual = fileExists(tempPath) ? $sha256File(tempPath) : "";
+			if (actual != expected) {
+				throw(
+					type = "Wheels.RustCFML.ChecksumMismatch",
+					message = "The RustCFML " & variables.engineVersion & " download (" & asset & ") does not match its pinned sha256; it was deleted and not installed.",
+					detail = "Expected sha256 " & expected & ", got " & (len(actual) ? actual : "no file") & " from " & downloadUrl & "."
+				);
+			}
+			var tempFile = createObject("java", "java.io.File").init(tempPath);
+			if (!tempFile.setExecutable(true, false) || !tempFile.renameTo(createObject("java", "java.io.File").init(binPath))) {
+				throw(
+					type = "Wheels.RustCFML.InstallFailed",
+					message = "Could not install the verified RustCFML " & variables.engineVersion & " binary at " & binPath
+				);
+			}
+		} catch (any e) {
+			if (fileExists(tempPath)) fileDelete(tempPath);
+			rethrow;
+		}
+		return binPath;
+	}
+
+	/**
+	 * The pinned sha256 for release asset `asset`, or
+	 * Wheels.RustCFML.InstallFailed when none is pinned (nothing unverified is
+	 * ever downloaded or run).
+	 */
+	public string function $expectedSha256(required string asset) {
+		if (!structKeyExists(variables.engineSha256, arguments.asset) || !len(variables.engineSha256[arguments.asset])) {
 			throw(
 				type = "Wheels.RustCFML.InstallFailed",
-				message = "Could not download RustCFML " & variables.engineVersion & " (" & asset & ") from " & url
+				message = "No sha256 is pinned for RustCFML " & variables.engineVersion & " (" & arguments.asset & "), so it can't be verified and won't be installed."
 			);
 		}
-		$runSync(["chmod", "+x", binPath]);
-		return binPath;
+		return lCase(variables.engineSha256[arguments.asset]);
+	}
+
+	/** Lowercase hex sha256 of the file at `path`, read in chunks. */
+	public string function $sha256File(required string path) {
+		var digest = createObject("java", "java.security.MessageDigest").getInstance("SHA-256");
+		var stream = createObject("java", "java.io.FileInputStream").init(arguments.path);
+		try {
+			var buffer = createObject("java", "java.lang.reflect.Array").newInstance(
+				createObject("java", "java.lang.Byte").TYPE,
+				javaCast("int", 65536)
+			);
+			var count = stream.read(buffer);
+			while (count > 0) {
+				digest.update(buffer, javaCast("int", 0), javaCast("int", count));
+				count = stream.read(buffer);
+			}
+		} finally {
+			stream.close();
+		}
+		return lCase(binaryEncode(digest.digest(), "hex"));
 	}
 
 	/**
@@ -317,7 +402,7 @@ component {
 
 	/**
 	 * Run a command to completion; return its exit code. Used for the
-	 * blocking curl download and the chmod call.
+	 * blocking curl download and the kill/liveness probes.
 	 */
 	public numeric function $runSync(required array cmdArgs) {
 		var pb = createObject("java", "java.lang.ProcessBuilder").init(arguments.cmdArgs);

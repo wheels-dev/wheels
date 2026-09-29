@@ -40,6 +40,7 @@ component {
 		variables.resolver = IsObject(arguments.resolver)
 			? arguments.resolver
 			: new modules.wheels.services.packages.VersionResolver();
+		variables.semver = new modules.wheels.services.SemVer();
 		variables.runtime = Len(arguments.runtimeVersion)
 			? arguments.runtimeVersion
 			: $detectRuntime();
@@ -188,6 +189,11 @@ component {
 				message = "Update is explicit. Re-run with --yes to confirm updating '#local.name#' to the latest compatible version."
 			);
 		}
+		local.picked = variables.resolver.pick(variables.registry.fetchManifest(local.name), variables.runtime);
+		if ($installedIsNewer(local.name, local.picked.version)) {
+			return "#local.name#: installed #variables.installer.installedVersion(local.name)# is newer than "
+				& "the latest compatible release #local.picked.version#; leaving it in place." & Chr(10);
+		}
 		return $doInstall(local.name, "", true);
 	}
 
@@ -203,6 +209,13 @@ component {
 	public string function runtime() { return variables.runtime; }
 
 	// ── Private ─────────────────────────────────────────────
+
+	// An update never downgrades: a pre-release installed by an explicit pin
+	// (e.g. 1.2.0-rc.1) stays put until a release at least as new exists.
+	private boolean function $installedIsNewer(required string name, required string picked) {
+		local.current = variables.installer.installedVersion(arguments.name);
+		return Len(local.current) && variables.semver.compare(local.current, arguments.picked) > 0;
+	}
 
 	private string function $doInstall(required string name, required string pin, required boolean force) {
 		local.manifest = variables.registry.fetchManifest(arguments.name);
@@ -240,6 +253,11 @@ component {
 				local.picked = variables.resolver.pick(local.manifest, variables.runtime);
 				if (variables.installer.installedVersion(local.name) == local.picked.version) {
 					ArrayAppend(local.report, "  #local.name#: already at #local.picked.version#");
+					continue;
+				}
+				if ($installedIsNewer(local.name, local.picked.version)) {
+					ArrayAppend(local.report, "  #local.name#: kept #variables.installer.installedVersion(local.name)#"
+						& " (newer than the latest compatible release #local.picked.version#)");
 					continue;
 				}
 				variables.installer.install(local.name, local.picked, true);

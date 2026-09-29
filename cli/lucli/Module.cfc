@@ -5045,7 +5045,8 @@ component extends="modules.BaseModule" {
 	 * that will break against a target framework version without modifying
 	 * any files. Breaking findings throw Wheels.UpgradeCheckFailed after the
 	 * report is printed, so the command exits non-zero and can gate CI.
-	 * --strict escalates advisory findings the same way. (--dry-run is not
+	 * --strict escalates advisory findings the same way, and so does a failed
+	 * latest-release lookup when no --to= is given. (--dry-run is not
 	 * supported — `check` is the preview.)
 	 *
 	 * Examples:
@@ -7179,11 +7180,10 @@ component extends="modules.BaseModule" {
 		var jsonMode = lCase(arguments.format) == "json";
 		var currentVersion = $upgradeResolveCurrentVersion();
 
-		// Determine target version
-		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode);
-		if (!len(target)) {
-			return "";
-		}
+		// Determine target version. Throws Wheels.UpgradeCheckFailed when no
+		// --to= was given and the latest release can't be looked up, so a CI
+		// gate never passes without having scanned anything.
+		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode, arguments.strict);
 
 		if (!jsonMode) {
 			out("Current version: #currentVersion#", "bold");
@@ -7288,24 +7288,54 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Determine the target version: the explicit --to= value when supplied,
-	 * otherwise the latest GitHub release. Returns "" (after printing the
-	 * error) when the release fetch fails so the caller can bail out early.
+	 * otherwise the latest GitHub release. When the lookup fails (offline,
+	 * GitHub rate limit, unexpected response) the error is printed — as a
+	 * JSON document in JSON mode — and Wheels.UpgradeCheckFailed is thrown,
+	 * so `upgrade check` exits non-zero instead of reporting success without
+	 * scanning anything.
 	 */
-	private string function $upgradeResolveTargetVersion(required string targetVersion, required boolean jsonMode) {
-		var target = arguments.targetVersion;
-		if (!len(target)) {
-			try {
-				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
-				var response = makeHttpRequest(apiUrl);
-				var releaseData = deserializeJSON(response);
-				target = replace(releaseData.tag_name, "v", "");
-			} catch (any e) {
-				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
-				out(arguments.jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
-				return "";
-			}
+	private string function $upgradeResolveTargetVersion(
+		required string targetVersion,
+		required boolean jsonMode,
+		boolean strict = false
+	) {
+		var target = trim(arguments.targetVersion);
+		if (len(target)) {
+			return target;
 		}
-		return target;
+		var reason = "";
+		try {
+			var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
+			var releaseData = deserializeJSON(makeHttpRequest(apiUrl));
+			if (isStruct(releaseData) && structKeyExists(releaseData, "tag_name") && isSimpleValue(releaseData.tag_name)) {
+				target = trim(replace(releaseData.tag_name, "v", ""));
+			}
+			// GitHub error bodies (rate limit, not found) carry a `message`.
+			if (!len(target) && isStruct(releaseData) && structKeyExists(releaseData, "message") && isSimpleValue(releaseData.message)) {
+				reason = releaseData.message;
+			}
+		} catch (any e) {
+			reason = e.message;
+		}
+		if (len(target)) {
+			return target;
+		}
+
+		var fetchMsg = "Could not determine the latest Wheels version from GitHub"
+			& (len(reason) ? " (#reason#)" : "")
+			& ". Use --to=<version> to specify the target version.";
+		if (arguments.jsonMode) {
+			out(serializeJSON({
+				"success": false,
+				"strict": arguments.strict,
+				"error": fetchMsg
+			}));
+		} else {
+			out(fetchMsg, "red");
+		}
+		// throw maps to non-zero exit; return "" would let a CI gate pass
+		// without scanning anything (and bypass --strict).
+		throw(type = "Wheels.UpgradeCheckFailed", message = fetchMsg);
 	}
 
 	/**
