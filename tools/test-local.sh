@@ -156,20 +156,35 @@ listener_pid() {
   lsof -ti :"$1" -sTCP:LISTEN 2>/dev/null | head -1
 }
 
-# SIGTERM the given PIDs, wait (bounded), then SIGKILL only those that are
-# still the process we signalled. A PID that exited during the grace period
-# may already belong to an unrelated process.
+# True when PID is still provably ours: the process listening on PORT (the
+# caller only passes a PID it recorded for that port), or a child of this
+# script (the launcher). A bare "is alive" check is not enough: once our
+# process exits, the OS can give its PID, or another process the port, to
+# something unrelated (#3771).
+pid_is_ours() {
+  local pid="$1" port="$2"
+  [ -n "$pid" ] || return 1
+  [ -n "$port" ] && [ "$(listener_pid "$port" || true)" = "$pid" ] && return 0
+  [ "$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')" = "$$" ] && return 0
+  return 1
+}
+
+# SIGTERM the given PIDs (each must be ours on PORT), wait (bounded), then
+# SIGKILL only survivors that are still ours.
+# Usage: stop_pids <port> <pid>...
 stop_pids() {
-  local pid alive
+  local port="$1" pid alive
+  shift
   [ -n "$*" ] || return 0
-  for pid in "$@"; do kill "$pid" 2>/dev/null || true; done
+  for pid in "$@"; do pid_is_ours "$pid" "$port" && kill "$pid" 2>/dev/null; done
   for _ in $(seq 1 20); do
     alive=""
     for pid in "$@"; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
     [ -n "$alive" ] || return 0
     sleep 0.5
   done
-  for pid in $alive; do kill -9 "$pid" 2>/dev/null || true; done
+  for pid in $alive; do pid_is_ours "$pid" "$port" && kill -9 "$pid" 2>/dev/null; done
+  return 0
 }
 
 # The JVM a previous run of this script recorded and did not get to stop
@@ -184,7 +199,7 @@ stop_orphaned_test_server() {
   # outlived a reboot may name a PID the OS has since given to another process.
   if [ -n "$jvm" ] && [ -n "$port" ] && [ "$(listener_pid "$port" || true)" = "$jvm" ]; then
     echo "Stopping a test server a previous run left behind (PID ${jvm})..."
-    stop_pids "$jvm"
+    stop_pids "$port" "$jvm"
   fi
   rm -f "$marker"
 }
@@ -198,16 +213,16 @@ cleanup() {
     ( cd "$PROJECT_ROOT" && wheels server stop >/dev/null 2>&1 ) || true
     # `kill $SERVER_PID` only kills the launcher: the JVM survives it and keeps
     # holding the port, so whichever project wants that port next silently gets
-    # THIS app's responses. Stop the JVM the registry recorded, and whatever
-    # listens on the port this run found free and started on.
-    local jvm port_jvm pids=""
+    # THIS app's responses. Stop the JVMs this run recorded (the registry's, and
+    # the one that answered on PORT when the server came up), but only while
+    # they still hold PORT: never whatever happens to listen there now (#3771).
+    local jvm pids=""
     jvm="$(cut -d: -f1 "$PROJECT_ROOT/.wheels-test-server.pid" 2>/dev/null || true)"
-    port_jvm="$(listener_pid "$PORT" || true)"
     [ -n "$jvm" ] && pids="$jvm"
-    [ -n "$port_jvm" ] && [ "$port_jvm" != "$jvm" ] && pids="$pids $port_jvm"
+    [ -n "${STARTED_PORT_PID:-}" ] && [ "$STARTED_PORT_PID" != "$jvm" ] && pids="$pids $STARTED_PORT_PID"
     [ -n "${SERVER_PID:-}" ] && pids="$pids $SERVER_PID"
     # shellcheck disable=SC2086
-    stop_pids $pids
+    stop_pids "$PORT" $pids
     rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
   fi
   # Restore original lucee.json if we modified it
@@ -280,6 +295,8 @@ else
   for i in $(seq 1 60); do
     if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:${PORT}/" 2>/dev/null; then
       echo "Server ready (attempt $i)"
+      # The port was free when this run started, so its listener now is ours.
+      STARTED_PORT_PID="$(listener_pid "$PORT" || true)"
       break
     fi
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
