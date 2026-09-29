@@ -29,6 +29,17 @@ component extends="wheels.WheelsTest" {
 				expect(result.status).toBe(200);
 			});
 
+			it("does not log out on a GET to the delete action", () => {
+				// The default wildcard route also maps GET /sessions/delete.
+				request.cgi.request_method = "GET";
+				session.wheels = {auth: {id: -1, email: "auth-spec-get-logout@example.com"}};
+				var sessionsController = application.wo.controller("sessions", {controller: "sessions", action: "delete"});
+				sessionsController.processAction();
+				var stillLoggedIn = StructKeyExists(session, "wheels") && StructKeyExists(session.wheels, "auth");
+				StructDelete(session, "wheels");
+				expect(stillLoggedIn).toBeTrue("a GET must not end the session");
+			});
+
 			it("re-renders the form with an error for invalid credentials", () => {
 				var loginParams = {
 					controller: "sessions",

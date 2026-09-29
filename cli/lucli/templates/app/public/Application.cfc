@@ -112,14 +112,22 @@ component output="false" {
 	}
 
 	// Harden the session cookie: httpOnly blocks JavaScript access and sameSite=lax
-	// limits cross-site sends. The secure flag (HTTPS-only cookie) turns on
-	// automatically in production. Override in config/app.cfm if your setup differs,
-	// e.g. `this.sessionCookie.secure = true;` when non-production environments are
-	// also served over HTTPS.
+	// limits cross-site sends. The secure flag (HTTPS-only cookie) is on whenever the
+	// request that creates the session arrives over HTTPS: directly, or through a
+	// proxy that terminates TLS and sends X-Forwarded-Proto: https. That header can
+	// only turn Secure ON, so trusting it here is safe. It is also on for
+	// WHEELS_ENV=production. The Wheels environment set in config/environment.cfm
+	// can't be read here, because this runs before the application starts. Logging
+	// in rotates the session ID, so an HTTPS login always issues a Secure cookie.
+	// Override in config/app.cfm if your setup differs, e.g.
+	// `this.sessionCookie.secure = true;`.
 	this.sessionCookie = {
 		httpOnly: true,
 		sameSite: "lax",
-		secure: structKeyExists(variables, "currentEnv") && currentEnv == "production"
+		secure: (structKeyExists(variables, "currentEnv") && currentEnv == "production")
+			|| (IsBoolean(cgi.server_port_secure) && cgi.server_port_secure)
+			|| cgi.https == "on"
+			|| cgi.http_x_forwarded_proto == "https"
 	};
 
 	function onServerStart() {}
