@@ -527,6 +527,7 @@ component extends="modules.BaseModule" {
 			.option(name = "format", default = "", choices = "text,json", description = "check only: text (default) or json for machine-readable output")
 			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
 			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework")
+			.flag(name = "allow-downgrade", default = false, description = "apply only: proceed even when the CLI's bundled framework is older than the app's vendor/wheels/ (refused by default)")
 			// CLI-only spellings read by parseUpgradeArgs, deliberately NOT
 			// advertised: `--no-backup` (LuCLI normalizes it to backup=false),
 			// `--help`/`-h`, and `--dry-run`, which neither verb supports and is
@@ -5007,6 +5008,7 @@ component extends="modules.BaseModule" {
 			// --fail-level WARNING / Mix --warnings-as-errors.
 			strict = parsed.strict,
 			doBackup = doBackup,
+			allowDowngrade = parsed["allow-downgrade"],
 			// "Passed" means a real value, not key presence: MCP clients send
 			// schema defaults, so apply {strict: false} was refused as
 			// "--strict is not supported by the apply verb" (#2963).
@@ -5051,6 +5053,7 @@ component extends="modules.BaseModule" {
 	 * Examples:
 	 *   wheels upgrade apply                       - apply the swap, with backup
 	 *   wheels upgrade apply --nobackup            - apply without the backup
+	 *   wheels upgrade apply --allow-downgrade     - apply even if the bundled framework is older
 	 *   wheels upgrade check                       - scan against the latest stable release
 	 *   wheels upgrade check --to=4.0.0            - scan against a specific target version
 	 *   wheels upgrade check --format=json         - machine-readable report (CI pipelines)
@@ -5112,7 +5115,7 @@ component extends="modules.BaseModule" {
 		// Unknown named keys hard-stop too. ArgSpec ignores them by design
 		// (fine for read-only commands, kept for `check` above), but a
 		// destructive verb must not run alongside a flag the user typo'd.
-		var knownKeys = "to,format,strict,nobackup,backup,subcommand,help,h,dry-run";
+		var knownKeys = "to,format,strict,nobackup,allow-downgrade,backup,subcommand,help,h,dry-run";
 		for (var key in coll) {
 			if (reFindNoCase("^arg\d+$", key) || listFindNoCase(knownKeys, key)) {
 				continue;
@@ -5129,7 +5132,7 @@ component extends="modules.BaseModule" {
 		if (!opts.isApply) {
 			throw(type = "Wheels.InvalidArguments", message = "Refusing to run upgrade apply for subcommand '#opts.subcommand#'.");
 		}
-		return runUpgradeApply(opts.targetVersion, opts.doBackup);
+		return runUpgradeApply(opts.targetVersion, opts.doBackup, opts.allowDowngrade);
 	}
 
 	/**
@@ -5140,7 +5143,7 @@ component extends="modules.BaseModule" {
 		var nl = chr(10);
 		var help = "Usage:" & nl
 			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
-			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
+			& "  wheels upgrade apply [--to=<version>] [--nobackup] [--allow-downgrade]" & nl
 			& nl
 			& "Upgrade the Wheels framework in your app (vendor/wheels/)." & nl
 			& nl
@@ -5162,6 +5165,8 @@ component extends="modules.BaseModule" {
 			& "                    CLI's bundled framework version." & nl
 			& "  --nobackup        Apply only: skip the vendor/wheels.bak-<timestamp>/" & nl
 			& "                    backup. Useful when vendor/wheels/ is tracked in git." & nl
+			& "  --allow-downgrade Apply only: proceed when the CLI's bundled framework" & nl
+			& "                    is OLDER than vendor/wheels/. Refused by default." & nl
 			& "  --strict          Check only: treat advisory findings as failures" & nl
 			& "                    (non-zero exit) so CI can gate on them." & nl
 			& "  --format=json     Check only: emit a machine-readable JSON report." & nl
@@ -7830,12 +7835,15 @@ component extends="modules.BaseModule" {
 	 * doesn't match the bundled version is a hard error. Downloading
 	 * arbitrary --to= targets (via ReleaseChannel) is the PR2 follow-up.
 	 *
+	 * A bundled framework older than the installed vendor/wheels/ is
+	 * refused unless --allow-downgrade is passed.
+	 *
 	 * Every refusal throws Wheels.UpgradeApplyFailed AFTER printing the
 	 * guidance, mirroring validate()'s print-then-throw convention so the
 	 * process exits non-zero (#2941) without losing the human-readable
 	 * explanation.
 	 */
-	private string function runUpgradeApply(string targetVersion = "", boolean doBackup = true) {
+	private string function runUpgradeApply(string targetVersion = "", boolean doBackup = true, boolean allowDowngrade = false) {
 		var nl = chr(10);
 
 		// resolveProjectRoot() falls back to cwd when no vendor/wheels/ is
@@ -7888,6 +7896,22 @@ component extends="modules.BaseModule" {
 			throw(type = "Wheels.UpgradeApplyFailed", message = validationError);
 		}
 
+		// Refuse a silent downgrade: when the app's vendor/wheels/ is newer
+		// than the CLI's bundled framework (app made with a newer CLI or a
+		// wheels-be snapshot), applying would replace it with an older copy.
+		var installedVersion = upgrader.readFrameworkVersion(vendorDir);
+		var direction = $upgradeApplyDirection(installedVersion, bundledVersion);
+		if (direction == "downgrade" && !arguments.allowDowngrade) {
+			out("vendor/wheels/ is at #installedVersion#, but the CLI's bundled framework is older (#bundledVersion#). Nothing was changed.", "red");
+			out("Either:");
+			out("  - Install a CLI that bundles #installedVersion# or newer (brew upgrade wheels / scoop update wheels), then re-run wheels upgrade apply.");
+			out("  - Or re-run with --allow-downgrade to replace vendor/wheels/ with #bundledVersion# anyway.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "Refusing to downgrade the framework from #installedVersion# to #bundledVersion# (the CLI's bundled version). Install a newer CLI, or pass --allow-downgrade to proceed."
+			);
+		}
+
 		out("Source:  #sourceDir#");
 		out("Target:  #vendorDir#");
 		out("");
@@ -7899,14 +7923,21 @@ component extends="modules.BaseModule" {
 		// of a stack trace. The reserved path is passed into applyUpgrade()
 		// so the announcement and the actual backup always agree.
 		var plan = "";
+		if (direction == "upgrade") {
+			plan &= "Upgrading framework: #installedVersion# -> #bundledVersion#" & nl;
+		} else if (direction == "downgrade") {
+			plan &= "Downgrading framework (--allow-downgrade): #installedVersion# -> #bundledVersion#" & nl;
+		} else if (direction == "same") {
+			plan &= "Reinstalling framework #bundledVersion# (vendor/wheels/ is already at this version)" & nl;
+		}
 		var backupPath = "";
 		if (arguments.doBackup) {
 			backupPath = upgrader.reserveBackupPath(vendorDir);
-			plan = "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
+			plan &= "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
 				& "If this is interrupted, restore with:" & nl
 				& "  rm -rf ""#vendorDir#"" && mv ""#backupPath#"" ""#vendorDir#""" & nl;
 		} else {
-			plan = "Replacing vendor/wheels WITHOUT a backup (--nobackup) — the current copy is not recoverable if the swap fails." & nl;
+			plan &= "Replacing vendor/wheels WITHOUT a backup (--nobackup) — the current copy is not recoverable if the swap fails." & nl;
 		}
 		out(plan);
 
@@ -7931,7 +7962,8 @@ component extends="modules.BaseModule" {
 
 		var summary = "";
 		if (len(result.oldVersion)) {
-			summary &= "Framework upgraded: #result.oldVersion# -> #result.newVersion#" & nl;
+			var verb = {upgrade: "upgraded", downgrade: "downgraded", same: "reinstalled"};
+			summary &= "Framework #structKeyExists(verb, direction) ? verb[direction] : "replaced"#: #result.oldVersion# -> #result.newVersion#" & nl;
 		} else {
 			summary &= "Framework installed: #result.newVersion#" & nl;
 		}
@@ -7954,6 +7986,21 @@ component extends="modules.BaseModule" {
 		// Return value carries the pre-swap plan too, so callers (and the
 		// dispatch specs) see the full command output in order.
 		return plan & nl & summary;
+	}
+
+	/**
+	 * Direction of an apply swap from the installed vendor/wheels/ version
+	 * to the bundled one: "upgrade", "downgrade", "same", or "unknown" when
+	 * either side is missing or not a version (e.g. an unbuilt checkout's
+	 * "@build.version@") — unknown never blocks the swap.
+	 */
+	private string function $upgradeApplyDirection(required string installedVersion, required string bundledVersion) {
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		if (!reFind(versionPattern, trim(arguments.installedVersion)) || !reFind(versionPattern, trim(arguments.bundledVersion))) {
+			return "unknown";
+		}
+		var cmp = new services.SemVer().compare(arguments.bundledVersion, arguments.installedVersion);
+		return cmp > 0 ? "upgrade" : (cmp < 0 ? "downgrade" : "same");
 	}
 
 	/**

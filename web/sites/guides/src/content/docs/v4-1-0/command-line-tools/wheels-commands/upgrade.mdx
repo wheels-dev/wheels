@@ -21,7 +21,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ```txt title="
 wheels upgrade check [--to=<version>] [--format=json] [--strict]
-wheels upgrade apply [--to=<version>] [--nobackup]
+wheels upgrade apply [--to=<version>] [--nobackup] [--allow-downgrade]
 ```
 
 Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0. Any other subcommand — a typo like `wheels upgrade chekc` — prints an error naming the valid verbs (`check`, `apply`, `help`) and the usage, then exits non-zero, so a misspelled verb in a script fails loudly instead of looking like a successful run.
@@ -149,6 +149,7 @@ Safety checks run before any mutation:
 - Source (CLI-bundled) and target (`vendor/wheels/`) must each sniff as a valid Wheels framework directory — a generic `box.json` is not sufficient.
 - The command refuses to run inside the Wheels repo checkout itself (source = target).
 - The command refuses outside a Wheels app (no `vendor/wheels/`).
+- The command refuses a downgrade: if `vendor/wheels/` is newer than the CLI's bundled framework (for example, the app was created with a newer CLI or a `wheels-be` snapshot), it names both versions and exits non-zero. Install a newer CLI, or pass `--allow-downgrade` to install the older framework anyway; the summary then reads `Framework downgraded: <old> -> <new>`.
 
 #### Flags — `apply`
 
@@ -156,6 +157,7 @@ Safety checks run before any mutation:
 |---|---|
 | `--to=<version>` | Assert that the CLI's bundled framework is exactly this version. Errors if the bundled version does not match — `--to` on `apply` is a safety assertion, not a download trigger. Use `wheels upgrade check --to=<version>` to scan before applying. |
 | `--nobackup` | Skip the backup. The old `vendor/wheels/` is deleted before the new copy is placed. Useful when disk space is a concern or you have your own rollback strategy (git). |
+| `--allow-downgrade` | Proceed even when the CLI's bundled framework is older than `vendor/wheels/`. Without it, a downgrade is refused before anything is changed. |
 
 #### Example
 
