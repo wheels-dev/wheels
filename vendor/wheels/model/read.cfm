@@ -639,7 +639,10 @@
 		if (arguments.value >= -2147483648 && arguments.value <= 2147483647) {
 			return JavaCast("int", arguments.value);
 		}
-		if (arguments.value >= -9223372036854775808 && arguments.value <= 9223372036854775807) {
+		// -9223372036854775807, not Long.MIN_VALUE: BoxLang cannot parse the literal
+		// -9223372036854775808 (its positive part overflows a long), which failed
+		// Model.cfc at load. Long.MIN_VALUE itself is left as returned.
+		if (arguments.value >= -9223372036854775807 && arguments.value <= 9223372036854775807) {
 			return JavaCast("long", arguments.value);
 		}
 		return arguments.value;
