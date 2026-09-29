@@ -80,20 +80,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				it("migrate info endpoint responds", () => {
 					if (skipIntegration) { debug(skipReason); return; }
 
-					try {
-						var runner = new cli.lucli.services.MigrationRunner(
-							projectRoot = projectRoot
-						);
-						var result = runner.runViaHttp(
-							serverPort = serverPort,
-							action = "info"
-						);
-						if (isStruct(result)) {
-							expect(structKeyExists(result, "success")).toBeTrue();
-						}
-					} catch (any e) {
-						// Migration endpoint may differ per server setup
-						debug("Migration: " & e.message);
+					var response = testHelper.httpGet(
+						"#baseUrl#/wheels/cli?command=info&format=json"
+					);
+					expect(len(response)).toBeGT(0);
+
+					if (isJSON(response)) {
+						var data = deserializeJSON(response);
+						expect(structKeyExists(data, "success")).toBeTrue();
 					}
 				});
 

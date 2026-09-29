@@ -70,7 +70,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		describe("S7 PROVE — TestRunner.runViaHttp is a mirrored helper, not live wheels test", () => {
+		describe("S7 PROVE — wheels test runs the app|core runners, not /wheels/cli/tests", () => {
 
 			it("$buildTestRunnerPath is app|core only — no /wheels/cli/tests", () => {
 				var body = $sliceFn(moduleSrc, "(?m)^[ \t]*public\s+string\s+function\s+\$buildTestRunnerPath\s*\(", 500);

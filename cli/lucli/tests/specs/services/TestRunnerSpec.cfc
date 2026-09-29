@@ -71,31 +71,6 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			});
 
-			describe("runViaHttp()", () => {
-
-				it("returns error struct when no server is running on bogus port", () => {
-					// A guaranteed-closed ephemeral port plus a short timeout: a
-					// hard-coded port (59999) hung ~136 s instead of refusing
-					// on a CI runner and blew Lucee's request timeout (##3751).
-					var result = testRunner.runViaHttp(serverPort = testHelper.closedPort(), timeout = 5);
-					expect(result.success).toBeFalse();
-					expect(structKeyExists(result, "message")).toBeTrue();
-				});
-
-				it("S7 PROVE: mirrored helper only accepts HTTP 200 and never hits /wheels/cli/tests", () => {
-					var src = fileRead(expandPath("/cli/lucli/services/TestRunner.cfc"));
-					var startIdx = reFindNoCase("(?m)^[ \t]*public\s+struct\s+function\s+runViaHttp\s*\(", src);
-					expect(startIdx).toBeGT(0);
-					var body = mid(src, startIdx, 1200);
-					expect(body).toInclude("/wheels/core/tests");
-					expect(body).toInclude("/wheels/app/tests");
-					expect(findNoCase("/wheels/cli/tests", body)).toBe(0);
-					expect(body).toInclude('statusCode contains "200"');
-					expect(find('contains "417"', body)).toBe(0);
-				});
-
-			});
-
 			describe("countSpecsOnDisk()", () => {
 
 				it("returns the count of *Spec.cfc files in the requested dotted directory", () => {
