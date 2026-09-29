@@ -35,6 +35,14 @@ component extends="wheels.WheelsTest" {
 			migratePath = "/wheels/tests/_assets/migrator/announceraw_other/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw_other/"
 		);
+		variables.noTxOtherMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/notransaction_other/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_notransaction_other/"
+		);
+		variables.noTxFailMigrator = CreateObject("component", "wheels.Migrator").init(
+			migratePath = "/wheels/tests/_assets/migrator/notransaction_fail/",
+			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_notransaction_fail/"
+		);
 		variables.rawSuperMigrator = CreateObject("component", "wheels.Migrator").init(
 			migratePath = "/wheels/tests/_assets/migrator/announceraw_super/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql_hardener_announceraw_super/"
@@ -244,11 +252,9 @@ component extends="wheels.WheelsTest" {
 				//   RustCFML sends every statement in a transaction to the first
 				//   datasource it used, so the version INSERT lands in the second
 				//   database ("no such table: wheels_migrator_versions").
+				// Such a migration sets this.useTransaction = false (#3772); see the
+				// opt-out specs below.
 				var adapter = application.wheels.engineAdapter;
-				if (adapter.isAdobe()) {
-					skip("Adobe ColdFusion does not allow a second datasource inside the migrator's transaction.");
-					return;
-				}
 				if (adapter.isRustCFML()) {
 					skip("RustCFML routes every statement in a transaction to the first datasource it used.");
 					return;
@@ -259,10 +265,66 @@ component extends="wheels.WheelsTest" {
 					{},
 					{datasource: application.wheels.dataSourceName}
 				);
+				if (adapter.isAdobe()) {
+					// Adobe refuses the mix. The failure has to say how to fix it, and the
+					// step must not be recorded.
+					expect(output).toInclude("this.useTransaction = false");
+					expect(rows.recordCount).toBe(0, "A refused step must not be recorded. Migration output: " & output);
+					return;
+				}
 				expect(rows.recordCount).toBe(
 					1,
 					"announce() after raw SQL on a second datasource must still INSERT the migrator versions row. Migration output: " & output
 				);
+			});
+
+			it("records an opted-out step (this.useTransaction = false) that uses a second datasource, on every engine", () => {
+				var otherDs = "wheelstestdb_sqlite_tenant_b";
+				var state = {available = true};
+				try {
+					queryExecute("SELECT 1 AS x", {}, {datasource: otherDs});
+				} catch (any e) {
+					state.available = false;
+				}
+				if (!state.available) {
+					skip("The second SQLite datasource #otherDs# is not configured on this run.");
+					return;
+				}
+				var output = variables.noTxOtherMigrator.migrateTo("90000000000011");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000011'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(output).notToInclude("Error migrating");
+				expect(rows.recordCount).toBe(
+					1,
+					"A step run without a transaction must be recorded after it succeeds. Migration output: " & output
+				);
+			});
+
+			it("records nothing when an opted-out step fails", () => {
+				var output = variables.noTxFailMigrator.migrateTo("90000000000012");
+				var rows = queryExecute(
+					"SELECT version FROM #application.wheels.migratorTableName# WHERE version = '90000000000012'",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(output).toInclude("Error migrating to 90000000000012");
+				expect(output).toInclude("deliberate failure after the step started");
+				// Nothing rolled back: the report says so instead of implying it did.
+				expect(output).toInclude("without a transaction");
+				expect(rows.recordCount).toBe(0, "A failed step must leave no version row. Migration output: " & output);
+			});
+
+			it("names the opt-out when the engine rejects a second datasource inside the transaction", () => {
+				var migrator = variables.rawOtherMigrator;
+				var hint = migrator.$mixedDatasourceTransactionHint({
+					message = "Datasource wheelstestdb verification failed.",
+					detail = "The root cause was that: java.sql.SQLException: Datasource names for all the database tags within the cftransaction tag must be the same."
+				});
+				expect(hint).toInclude("this.useTransaction = false");
+				expect(migrator.$mixedDatasourceTransactionHint({message = "Table not found", detail = ""})).toBe("");
 			});
 
 			it("removes the tracking row when a migration's own down() only announces", () => {
