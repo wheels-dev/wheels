@@ -279,25 +279,11 @@
 			local.tableName = arguments.table;
 		}
 
-		// Adobe CF + Oracle: every cfdbinfo(type="columns") call leaves about
-		// seven JDBC statements open on the pooled connection, and they are never
-		// released (#3732). Read the same metadata from the data dictionary with
-		// an ordinary query instead. No rows (a synonym, a table in another
-		// schema, a missing table) falls through to cfdbinfo, as before.
-		// $forceCfdbinfo is internal: the parity spec compares the two paths.
-		local.forceCfdbinfo = StructKeyExists(arguments, "$forceCfdbinfo") && arguments.$forceCfdbinfo;
+		// Adobe CF + Oracle columns come from the data dictionary (#3732).
+		local.dictionary = $dbinfoOracleDictionary(arguments);
 		StructDelete(arguments, "$forceCfdbinfo");
-		if (
-			!local.forceCfdbinfo
-			&& StructKeyExists(arguments, "type") && arguments.type == "columns"
-			&& StructKeyExists(local, "tableName")
-			&& $engineAdapter().isAdobe()
-			&& $get("adapterName") == "OracleModel"
-		) {
-			local.dictionary = $oracleDictionaryColumns(argumentCollection = arguments);
-			if (local.dictionary.recordCount) {
-				return local.dictionary;
-			}
+		if (IsQuery(local.dictionary)) {
+			return local.dictionary;
 		}
 
 		// BoxLang specific fix for index queries (MSSQL/Oracle)
@@ -478,6 +464,32 @@
 		}
 
 		return local.rv;
+	}
+
+
+	/**
+	 * `$dbinfo()`'s Adobe CF + Oracle branch (#3732). Every
+	 * `cfdbinfo(type="columns")` call there leaves about seven JDBC statements
+	 * open on the pooled connection, never released (cfdbinfo does not close
+	 * the DatabaseMetaData result sets it opens), so column metadata is read
+	 * from the data dictionary instead. Returns that query, or "" when the
+	 * branch doesn't apply: another engine, adapter or type, no table, the
+	 * internal `$forceCfdbinfo` flag (the parity spec compares the two paths),
+	 * or no rows (a synonym, a table in another schema, a missing table), so
+	 * `$dbinfo()` goes on to cfdbinfo as before. `args` is only read.
+	 */
+	public any function $dbinfoOracleDictionary(required any args) {
+		if (
+			(StructKeyExists(arguments.args, "$forceCfdbinfo") && arguments.args.$forceCfdbinfo)
+			|| !StructKeyExists(arguments.args, "type") || arguments.args.type != "columns"
+			|| !StructKeyExists(arguments.args, "table") || !Len(arguments.args.table)
+			|| !$engineAdapter().isAdobe()
+			|| $get("adapterName") != "OracleModel"
+		) {
+			return "";
+		}
+		local.columns = $oracleDictionaryColumns(argumentCollection = arguments.args);
+		return local.columns.recordCount ? local.columns : "";
 	}
 
 
