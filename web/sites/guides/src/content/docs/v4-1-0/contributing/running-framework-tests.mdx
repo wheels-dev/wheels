@@ -42,20 +42,20 @@ curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json"
 # Filter by directory
 curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.model"
 
-# Filter to a single spec file — use testBundles, not directory
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&testBundles=wheels.tests.specs.model.callbacksSpec"
+# Run a single spec file: its dotted path runs it as one bundle
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=wheels.tests.specs.model.callbacksSpec"
 
 # Skip populate when iterating on one spec and the schema is already in place
-curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&populate=false&testBundles=wheels.tests.specs.model.callbacksSpec"
+curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&populate=false&directory=wheels.tests.specs.model.callbacksSpec"
 
 # Scope to a single installed package's tests (e.g. wheels-sentry, wheels-i18n)
 curl "http://localhost:60007/wheels/core/tests?db=sqlite&format=json&directory=vendor.wheels-sentry.tests"
 ```
 
-`directory=` only filters down to a *directory* — pointing it at a single spec file matches zero bundles and runs nothing; use `testBundles=` for one file. The core endpoint only accepts `directory` values starting with `wheels.tests` (or `vendor.<package>.tests`); anything else is rejected and the **full** suite runs instead — the JSON flags this with `directoryRejected: true` and a `warnings[]` entry rather than silently reporting green ([#3083](https://github.com/wheels-dev/wheels/issues/3083)). `populate=false` is the other inner-loop trick: populate drops and recreates every test table, so skipping it once the schema exists shaves the run down to just your specs.
+`directory=` takes a directory or the dotted path of one spec file, which runs as a single bundle ([#3759](https://github.com/wheels-dev/wheels/issues/3759)). `bash tools/test-local.sh` accepts the same, as `dispatch/TestScopeVisibilitySpec` or in dotted form. The core endpoint only accepts `directory` values starting with `wheels.tests` (or `vendor.<package>.tests`); anything else is rejected and the **full** suite runs instead — the JSON flags this with `directoryRejected: true` and a `warnings[]` entry rather than silently reporting green ([#3083](https://github.com/wheels-dev/wheels/issues/3083)). `populate=false` is the other inner-loop trick: populate drops and recreates every test table, so skipping it once the schema exists shaves the run down to just your specs.
 
 <Aside type="note" title="Scope-visibility fields in the JSON response">
-  The payload includes `directoryRequested`, `directoryResolved`, `directoryRejected`, `bundlesDiscovered`, and `warnings[]`. A path naming a single spec file yields `bundlesDiscovered: 0` and a warning — reach for `testBundles=` instead.
+  The payload includes `directoryRequested`, `directoryResolved`, `directoryRejected`, `bundleResolved` (the spec file's dotted path, when `directory=` named one), `bundlesDiscovered`, and `warnings[]`. A path that names neither a folder of specs nor a spec file yields `bundlesDiscovered: 0` and a warning, and `wheels test` exits non-zero.
 </Aside>
 
 ## Docker cross-engine matrix

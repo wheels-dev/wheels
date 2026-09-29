@@ -149,10 +149,9 @@
             local.testDirectoryExists = DirectoryExists(local.testFsPath);
 
             try {
-                testBox = new wheels.wheelstest.system.TestBox(
-                    directory = local.testDirectory,
-                    options   = { coverage = { enabled = false } }
-                );
+                // A single spec file runs as its one bundle (issue 3759).
+                local.testBoxArgs = local.dirResolver.testBoxArgs(scope = local.testScope);
+                testBox = new wheels.wheelstest.system.TestBox(argumentCollection = local.testBoxArgs);
             } catch (any e) {
                 cfheader(statuscode="500");
                 cfcontent(type="application/json");

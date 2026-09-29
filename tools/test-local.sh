@@ -16,9 +16,11 @@
 #                                                     # controllers/views also accepted)
 #   bash tools/test-local.sh model/associations       # a nested directory
 #   bash tools/test-local.sh wheels.tests.specs.model # the dotted TestBox form
+#   bash tools/test-local.sh dispatch/TestScopeVisibilitySpec  # one spec file
 #   PORT=9090 bash tools/test-local.sh                # use custom port
 #
-# An area that is not a directory under vendor/wheels/tests/specs/ exits 2
+# An area that is neither a directory nor a spec file under
+# vendor/wheels/tests/specs/ exits 2
 # with the list of valid areas; it never falls back to the full suite.
 #
 # Browser-test behavior:
@@ -72,7 +74,7 @@ if [ -n "$FILTER" ]; then
   REL="$FILTER"
   case "$REL" in
     wheels.tests.specs) REL="" ;;
-    wheels.tests.specs.*) REL="${REL#wheels.tests.specs.}"; REL="${REL//./\/}"; [ -n "$REL" ] || REL="." ;;
+    wheels.tests.specs.*) REL="${REL#wheels.tests.specs.}"; REL="$(printf '%s' "$REL" | tr . /)"; [ -n "$REL" ] || REL="." ;;
     *) REL="${REL%/}" ;;
   esac
   # Plural aliases for the three areas that have always accepted them.
@@ -81,12 +83,13 @@ if [ -n "$FILTER" ]; then
   esac
   if [ -z "$REL" ]; then
     FILTER=""
-  elif [[ "$REL" =~ ^[A-Za-z0-9_]+(/[A-Za-z0-9_]+)*$ ]] && [ -d "$SPECS_DIR/$REL" ]; then
+  elif [[ "$REL" =~ ^[A-Za-z0-9_]+(/[A-Za-z0-9_]+)*$ ]] && { [ -d "$SPECS_DIR/$REL" ] || [ -f "$SPECS_DIR/$REL.cfc" ]; }; then
+    # A folder, or one spec file: the runner runs a file as its one bundle (#3759).
     FILTER="wheels.tests.specs.${REL//\//.}"
   else
     echo "ERROR: unknown test area '${1}'." >&2
     echo "  Valid areas (directories under $SPECS_DIR/): $(list_areas)" >&2
-    echo "  Also accepted: a nested path (model/associations) or the dotted form (wheels.tests.specs.model)." >&2
+    echo "  Also accepted: a nested path (model/associations), one spec file (dispatch/TestScopeVisibilitySpec), or the dotted form (wheels.tests.specs.model)." >&2
     exit 2
   fi
 fi

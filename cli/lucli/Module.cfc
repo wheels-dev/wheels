@@ -465,7 +465,7 @@ component extends="modules.BaseModule" {
 
 	private any function testArgSpec() {
 		return new services.ArgSpec()
-			.option(name = "filter",    default = "", description = "Spec directory to run, as a dotted path (e.g. tests.specs.models). Directories only — a single spec file's path discovers no bundles (##3083)")
+			.option(name = "filter",    default = "", description = "What to run: a spec directory or one spec file, as a dotted path (tests.specs.models, tests.specs.models.UserSpec) or a bare name (models, UserSpec)")
 			.option(name = "directory", default = "", description = "Documented alias for --filter")
 			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format: simple, json, or tap")
 			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
@@ -1292,8 +1292,9 @@ component extends="modules.BaseModule" {
 		// both reject bare names like "browser" or "models" and silently
 		// fall back to the default scope, running the entire suite. The
 		// CLI normalizes here so `--filter=browser` does what the user
-		// expects. Onboarding finding #2.
-		filter = $normalizeTestFilter(filter, coreTests);
+		// expects. Onboarding finding #2. A bare spec name resolves to the one
+		// spec file it names, so it runs as a single bundle (issue 3759).
+		filter = $resolveTestFilter(filter, coreTests);
 
 		return runTests(
 			filter, reporter, format, verboseOutput, coreTests,
@@ -1408,6 +1409,66 @@ component extends="modules.BaseModule" {
 			return f;
 		}
 		return "tests.specs." & f;
+	}
+
+	/**
+	 * $normalizeTestFilter(), plus single-spec-file lookup (issue 3759). A
+	 * bare name that is neither a folder nor a spec file directly under the
+	 * spec root (tests/specs, or vendor/wheels/tests/specs with --core) is
+	 * matched against spec file names anywhere below it: one match becomes
+	 * its dotted path, which the runner runs as that one bundle. More than
+	 * one match throws Wheels.AmbiguousTestFilter listing them, rather than
+	 * guessing. No match is left as normalized, so the runner reports the
+	 * 0-bundle scope as a failure. An explicit dotted path is taken as
+	 * written.
+	 *
+	 * Examples (app mode):
+	 *   "favorites"            → "tests.specs.favorites"            (a folder)
+	 *   "PageFavoritesSpec"    → "tests.specs.favorites.PageFavoritesSpec"
+	 *   "tests.specs.x.YSpec"  → "tests.specs.x.YSpec"              (unchanged)
+	 */
+	public string function $resolveTestFilter(
+		required string filter,
+		boolean coreTests = false
+	) {
+		var raw = trim(arguments.filter);
+		var normalized = $normalizeTestFilter(raw, arguments.coreTests);
+		if (!len(raw) || find(".", raw)) {
+			return normalized;
+		}
+		var specRoot = variables.projectRoot & (arguments.coreTests ? "/vendor/wheels/tests/specs" : "/tests/specs");
+		if (
+			!directoryExists(specRoot)
+			|| directoryExists(specRoot & "/" & raw)
+			|| fileExists(specRoot & "/" & raw & ".cfc")
+		) {
+			return normalized;
+		}
+		var prefix = arguments.coreTests ? "wheels.tests.specs" : "tests.specs";
+		var rootPath = createObject("java", "java.io.File").init(specRoot).getCanonicalPath();
+		var matches = [];
+		for (var path in directoryList(specRoot, true, "path", "*.cfc")) {
+			var filePath = createObject("java", "java.io.File").init(path).getCanonicalPath();
+			var fileName = listLast(replace(filePath, "\", "/", "all"), "/");
+			if (compareNoCase(fileName, raw & ".cfc") != 0 || left(filePath, len(rootPath)) != rootPath) {
+				continue;
+			}
+			var rel = replace(mid(filePath, len(rootPath) + 2, len(filePath)), "\", "/", "all");
+			arrayAppend(matches, prefix & "." & replace(left(rel, len(rel) - 4), "/", ".", "all"));
+		}
+		if (arrayLen(matches) == 1) {
+			return matches[1];
+		}
+		if (arrayLen(matches) > 1) {
+			arraySort(matches, "textnocase");
+			throw(
+				type = "Wheels.AmbiguousTestFilter",
+				message = "'#raw#' matches #arrayLen(matches)# spec files: #arrayToList(matches, ', ')#. "
+					& "Re-run with the dotted path of the one you mean, e.g. --filter=#matches[1]#",
+				detail = arrayToList(matches, chr(10))
+			);
+		}
+		return normalized;
 	}
 
 
@@ -8572,15 +8633,16 @@ component extends="modules.BaseModule" {
 		required string duration,
 		required numeric specsFailedToLoad
 	) {
-		if (arguments.totalFail == 0 && arguments.totalError == 0) {
-			if (arguments.specsFailedToLoad > 0) {
-				out("#arguments.totalPass# passed, #arguments.specsFailedToLoad# failed to load#arguments.duration#", "yellow");
-			} else {
-				out("#arguments.totalPass# passed#arguments.duration#", "green");
-			}
-		} else {
-			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
-			out("#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#", "red");
+		var summary = $testSummaryLine(
+			result = arguments.result,
+			totalPass = arguments.totalPass,
+			totalFail = arguments.totalFail,
+			totalError = arguments.totalError,
+			duration = arguments.duration,
+			specsFailedToLoad = arguments.specsFailedToLoad
+		);
+		out(summary.text, summary.color);
+		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			out("");
 
 			// Show failure details (skip if verbose already displayed them via displaySuite)
@@ -8604,6 +8666,42 @@ component extends="modules.BaseModule" {
 				}
 			}
 		}
+	}
+
+	/**
+	 * The summary line and its colour. A run that discovered no bundles, or
+	 * whose directory was rejected, is a failure even with 0 failed specs, so
+	 * it is never green: "0 passed" in green used to print just above the
+	 * failure (issue 3759). Pure, so specs can pin every case.
+	 */
+	public struct function $testSummaryLine(
+		required any result,
+		required numeric totalPass,
+		required numeric totalFail,
+		required numeric totalError,
+		required string duration,
+		required numeric specsFailedToLoad
+	) {
+		if (arguments.totalFail > 0 || arguments.totalError > 0) {
+			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
+			return {
+				text = "#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#",
+				color = "red"
+			};
+		}
+		if (arguments.specsFailedToLoad > 0) {
+			return {
+				text = "#arguments.totalPass# passed, #arguments.specsFailedToLoad# failed to load#arguments.duration#",
+				color = "yellow"
+			};
+		}
+		if (isStruct(arguments.result) && $cliTestResultFailed(result = arguments.result)) {
+			return {
+				text = "#arguments.totalPass# passed, but no test bundles ran for this scope#arguments.duration#",
+				color = "red"
+			};
+		}
+		return {text = "#arguments.totalPass# passed#arguments.duration#", color = "green"};
 	}
 
 	/**

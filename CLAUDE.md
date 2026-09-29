@@ -151,7 +151,7 @@ curl -s "http://localhost:62023/wheels/core/tests?db=mysql&format=json" | \
 
 **Adobe serves cached compiled classes — `?reload=true` does NOT pick up an edited `.cfc`.** `?reload=true` rebuilds the Wheels application scope, not Adobe's template cache, so a source change can keep producing the *old* result for many minutes. This reads exactly like a fix that did not work, and the natural response — reverting or piling on a second change — makes it worse. After editing framework source, `docker restart wheels-adobe2023-1` (or `-adobe2025-1`) before trusting any Adobe result. Lucee and BoxLang pick edits up from the bind mount immediately; only the Adobe legs need this.
 
-**Narrow the run with `directory=` — it turns a ~19-minute CI round-trip into ~5 seconds.** The core-test endpoint accepts a dotted TestBox scope, allowlisted to `wheels.tests.*` and `vendor.<package>.tests.*`. `bundles=` is silently ignored (#3352), so `directory=` is the only working filter. Point it at a *directory*, never a single spec file — a single-file scope discovers 0 bundles and reports green (#3083); check `bundlesDiscovered` in the payload.
+**Narrow the run with `directory=` — it turns a ~19-minute CI round-trip into ~5 seconds.** The core-test endpoint accepts a dotted TestBox scope, allowlisted to `wheels.tests.*` and `vendor.<package>.tests.*`. `bundles=` is silently ignored (#3352), so `directory=` is the only working filter. Point it at a *directory*, or at one spec file's dotted path, which runs as a single bundle (#3759). A path naming neither discovers 0 bundles; check `bundlesDiscovered` in the payload (#3083).
 ```bash
 curl -s "http://localhost:62025/wheels/core/tests?db=sqlite&directory=wheels.tests.specs.security&format=json&reload=true"
 ```
