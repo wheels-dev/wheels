@@ -95,25 +95,11 @@ fi
 sqlite3 wheelstestdb.db "SELECT 1;" 2>/dev/null || true
 sqlite3 wheelstestdb_tenant_b.db "SELECT 1;" 2>/dev/null || true
 
-# ── Recover from an interrupted run ─────────────────
-# A run killed before its EXIT trap (e.g. kill -9) leaves lucee.json with
-# this run's pinned ports and the original in lucee.json.bak. Restore it
-# before anything below copies lucee.json over that backup (#3771).
-if [ -f lucee.json.bak ]; then
-  echo "Restoring lucee.json from a previous run's lucee.json.bak..."
-  mv lucee.json.bak lucee.json
-fi
-
-# ── Resolve {project} placeholder if the Wheels CLI doesn't support it yet ──
-# Check if lucee.json has {project} and the runtime version is too old to
-# resolve the placeholder.
-if grep -q '{project}' lucee.json 2>/dev/null; then
-  WHEELS_VER=$(wheels --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
-  # For safety, always create a resolved copy for the server
-  cp lucee.json lucee.json.bak
-  sed -i '' "s|{project}|${PROJECT_ROOT}|g" lucee.json
-  RESTORED_LUCEE_JSON=true
-fi
+# Everything this script leaves in the checkout while it runs. The backup
+# name is script-specific so a user's own lucee.json.bak is never taken for
+# ours; the lock records which run owns the other two (#3771).
+LUCEE_BAK="lucee.json.test-local.bak"
+RUN_LOCK="$PROJECT_ROOT/.wheels-test-local.lock"
 
 # ── Server ownership helpers ────────────────────────
 #
@@ -169,17 +155,20 @@ pid_is_ours() {
   return 1
 }
 
-# SIGTERM the given PIDs (each must be ours on PORT), wait (bounded), then
-# SIGKILL only survivors that are still ours.
+# SIGTERM the given PIDs that are still ours on PORT, wait (bounded) for
+# those, then SIGKILL only survivors that are still ours. A PID that is not
+# ours is left alone, and not waited on.
 # Usage: stop_pids <port> <pid>...
 stop_pids() {
-  local port="$1" pid alive
+  local port="$1" pid alive signalled=""
   shift
-  [ -n "$*" ] || return 0
-  for pid in "$@"; do pid_is_ours "$pid" "$port" && kill "$pid" 2>/dev/null; done
+  for pid in "$@"; do
+    pid_is_ours "$pid" "$port" && kill "$pid" 2>/dev/null && signalled="$signalled $pid"
+  done
+  [ -n "$signalled" ] || return 0
   for _ in $(seq 1 20); do
     alive=""
-    for pid in "$@"; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
+    for pid in $signalled; do kill -0 "$pid" 2>/dev/null && alive="$alive $pid"; done
     [ -n "$alive" ] || return 0
     sleep 0.5
   done
@@ -187,9 +176,47 @@ stop_pids() {
   return 0
 }
 
+# The run that owns this checkout's lock, if it is still alive. PID alone is
+# not proof (a dead run's PID can be reused), so the process must also still
+# be this script.
+live_lock_owner() {
+  local owner
+  owner="$(cat "$RUN_LOCK/pid" 2>/dev/null || true)"
+  [ -n "$owner" ] && [ "$owner" != "$$" ] || return 1
+  kill -0 "$owner" 2>/dev/null || return 1
+  ps -o command= -p "$owner" 2>/dev/null | grep -q 'test-local\.sh' || return 1
+  printf '%s\n' "$owner"
+}
+
+# Take this checkout's run lock. mkdir is atomic, so two runs starting at
+# once cannot both win. A lock whose owner is gone is stale: that run was
+# killed before its EXIT trap, and its server marker and lucee.json backup
+# are now ours to recover. A live owner means a run is in progress, and
+# touching its server or lucee.json would break it, so refuse.
+acquire_run_lock() {
+  local owner
+  if ! mkdir "$RUN_LOCK" 2>/dev/null; then
+    if owner="$(live_lock_owner)"; then
+      echo "::error::Another tools/test-local.sh run (PID ${owner}) is using this checkout." >&2
+      echo "  It owns the test server and lucee.json until it exits; running now would stop" >&2
+      echo "  its server mid-suite. Wait for it, or run from a separate worktree." >&2
+      exit 1
+    fi
+    rm -rf "$RUN_LOCK"
+    mkdir "$RUN_LOCK" 2>/dev/null || {
+      echo "::error::Another tools/test-local.sh run took this checkout's lock just now." >&2
+      exit 1
+    }
+  fi
+  echo "$$" > "$RUN_LOCK/pid"
+  RUN_LOCK_HELD=true
+}
+
 # The JVM a previous run of this script recorded and did not get to stop
 # (it was killed, or its cleanup failed). ".wheels-test-server.pid" is
-# written only by this script, so a live PID in it is ours to stop.
+# written only by this script, and this run holds the checkout's lock, so
+# the run that wrote it is gone; a PID in it is ours to stop only while it
+# still listens on the port it recorded.
 stop_orphaned_test_server() {
   local marker="$PROJECT_ROOT/.wheels-test-server.pid" jvm port
   [ -f "$marker" ] || return 0
@@ -226,11 +253,40 @@ cleanup() {
     rm -f "$PROJECT_ROOT/.wheels-test-server.pid"
   fi
   # Restore original lucee.json if we modified it
-  if [ "${RESTORED_LUCEE_JSON:-false}" = "true" ] && [ -f lucee.json.bak ]; then
-    mv lucee.json.bak lucee.json
+  if [ "${RESTORED_LUCEE_JSON:-false}" = "true" ] && [ -f "$LUCEE_BAK" ]; then
+    mv "$LUCEE_BAK" lucee.json
+  fi
+  # Release the lock last, once nothing of this run is left behind.
+  if [ "${RUN_LOCK_HELD:-false}" = "true" ]; then
+    rm -rf "$RUN_LOCK"
   fi
 }
+
+# Before the trap: a run refused here must not run cleanup(), which would
+# stop the lock owner's server and restore lucee.json underneath it.
+acquire_run_lock
 trap cleanup EXIT
+
+# ── Recover from an interrupted run ─────────────────
+# A run killed before its EXIT trap (e.g. kill -9) leaves lucee.json with
+# its pinned ports and the original in $LUCEE_BAK. This run holds the lock,
+# so that run is gone: restore the original before anything below copies
+# lucee.json over the backup (#3771).
+if [ -f "$LUCEE_BAK" ]; then
+  echo "Restoring lucee.json from an interrupted run's ${LUCEE_BAK}..."
+  mv "$LUCEE_BAK" lucee.json
+fi
+
+# ── Resolve {project} placeholder if the Wheels CLI doesn't support it yet ──
+# Check if lucee.json has {project} and the runtime version is too old to
+# resolve the placeholder.
+if grep -q '{project}' lucee.json 2>/dev/null; then
+  WHEELS_VER=$(wheels --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
+  # For safety, always create a resolved copy for the server
+  cp lucee.json "$LUCEE_BAK"
+  sed -i '' "s|{project}|${PROJECT_ROOT}|g" lucee.json
+  RESTORED_LUCEE_JSON=true
+fi
 
 # ── Start server if not already running ─────────────
 stop_orphaned_test_server
@@ -261,13 +317,14 @@ else
   # HTTP port, so `PORT=9090` still tried to bind shutdown 8081 and died with
   # "port conflicts detected:" (empty list) whenever any other Wheels app held
   # it. Pin a free shutdown port next to the HTTP port for this run; cleanup()
-  # already restores lucee.json.bak — this is what actually creates it.
+  # already restores $LUCEE_BAK — this is what actually creates it.
   if [ "$PORT" != "8080" ] && [ -f lucee.json ]; then
     SHUTDOWN_PORT=$((PORT + 1))
     while lsof -nP -iTCP:"$SHUTDOWN_PORT" -sTCP:LISTEN >/dev/null 2>&1; do
       SHUTDOWN_PORT=$((SHUTDOWN_PORT + 1))
     done
-    cp lucee.json lucee.json.bak
+    # A {project}-resolved copy above already backed up the original.
+    [ -f "$LUCEE_BAK" ] || cp lucee.json "$LUCEE_BAK"
     RESTORED_LUCEE_JSON=true
     sed -i.tmp -E \
       -e "s/(\"port\"[[:space:]]*:[[:space:]]*)[0-9]+/\1${PORT}/" \

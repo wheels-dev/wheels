@@ -111,3 +111,7 @@ public/wheels-docs/
 
 # Test-server JVM pid recorded by tools/test-cli-local.sh
 .wheels-test-server.pid
+
+# Run lock and lucee.json backup left by an interrupted tools/test-local.sh run
+.wheels-test-local.lock/
+lucee.json.test-local.bak
