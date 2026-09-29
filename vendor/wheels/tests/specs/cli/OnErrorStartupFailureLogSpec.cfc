@@ -94,6 +94,32 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+		describe("showErrorInformation is never briefly true in production (##3671)", () => {
+
+			var source = fileRead(expandPath("/wheels/events/init/debugging.cfm"));
+
+			it("derives it from the environment in its only assignment", () => {
+				var assignments = reMatchNoCase("showErrorInformation\s*=[^;]*;", source);
+				expect(arrayLen(assignments)).toBe(1, "debugging.cfm must assign showErrorInformation exactly once: " & arrayToList(assignments, " | "));
+				expect(reFindNoCase("showErrorInformation\s*=\s*application\.\$wheels\.environment\s*!=\s*""production""", assignments[1]) > 0).toBeTrue(
+					"showErrorInformation must be set from the environment, not true-then-overridden: " & assignments[1]
+				);
+			});
+
+			it("sets it before anything that can throw on the request (the Host-derived error address)", () => {
+				var assignPos = reFindNoCase("showErrorInformation\s*=", source);
+				var hostPos = findNoCase("request.cgi.server_name", source);
+				expect(assignPos > 0 && assignPos < hostPos).toBeTrue();
+			});
+
+			it("derives the error address only from a host with at least two labels", () => {
+				expect(reFindNoCase("ListLen\(\s*request\.cgi\.server_name\s*,\s*""\.""\s*\)\s*>=\s*2", source) > 0).toBeTrue(
+					"A Host such as ""example."" has a dot but one label; ListGetAt(..., 2, ""."") would throw."
+				);
+			});
+
+		});
+
 	}
 
 	/** Body of the named function, found by brace counting. */
