@@ -15,15 +15,6 @@
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
-	function beforeAll() {
-		// Comment stripping reuses the CLI's own helper (anti-pattern 14).
-		variables.analysis = new cli.lucli.services.Analysis(
-			helpers = new cli.lucli.services.Helpers(),
-			projectRoot = expandPath("/")
-		);
-		makePublic(variables.analysis, "$stripCfmlComments");
-	}
-
 	function run() {
 
 		describe("CLI raw HTTP call sites (##3768)", () => {
@@ -84,6 +75,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// Brace-less if / else bodies (##3794).
 				expect($countRawHttp('if (x) http url=u result="r";')).toBe(1);
 				expect($countRawHttp('if (x) y = 1; else http url=u result="r";')).toBe(1);
+				// A quote inside a comment doesn't hide a call on its line (##3794 review).
+				expect($countRawHttp('/* it''s */ cfhttp(url = "x");')).toBe(1);
+				expect($countRawHttp('x = 1; /* say "hi */ new http(url = u);')).toBe(1);
+				// A call inside a #...# interpolation is still a call.
+				expect($countRawHttp('out("status: ##new http(url = u).send().getPrefix().statusCode##");')).toBe(1);
+				expect($countRawHttp("msg = 'got ##cfhttp(url = u, result = ""r"")##';")).toBe(1);
+				// Doubled quotes stay inside their string; an escaped ## is not interpolation.
+				expect($countRawHttp('x = "a""b"; new http(url = u);')).toBe(1);
+				expect($countRawHttp('x = "####cfhttp(url = u)";')).toBe(0);
 				// A call token inside a string is not a call.
 				expect($countRawHttp('out("cfhttp(url=x) is not allowed here");')).toBe(0);
 				// Names that only contain "http" are not calls.
@@ -127,18 +127,100 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	/**
-	 * Raw HTTP call sites in CFML source, string literals blanked and comments
-	 * stripped first:
+	 * The code in CFML source, in one left-to-right pass (##3794): line, block
+	 * and tag comments are removed (their line breaks kept), and string text
+	 * becomes spaces (quotes kept), except `#...#` interpolations, which are
+	 * code. Doing it in one pass is what makes it right: a comment stripper
+	 * that is not string-aware reads the "//" of a URL literal as a comment,
+	 * and blanking strings first lets a quote inside a comment swallow code.
+	 * A string or interpolation ends at a line break, so a stray apostrophe in
+	 * template text hides at most the rest of its line. The CLI's
+	 * $stripCfmlComments() is not string-aware, so it isn't used here.
+	 */
+	public string function $codeOnly(required string src) {
+		var s = arguments.src;
+		var n = Len(s);
+		var out = CreateObject("java", "java.lang.StringBuilder").init();
+		var tagCommentOpen = Chr(60) & "!---";
+		var stack = [];
+		var i = 1;
+		while (i <= n) {
+			var c = Mid(s, i, 1);
+			var mode = ArrayLen(stack) ? stack[ArrayLen(stack)].mode : "code";
+			if (c == Chr(10) || c == Chr(13)) {
+				stack = [];
+				out.append(c);
+				i++;
+				continue;
+			}
+			if (mode == "string") {
+				var q = stack[ArrayLen(stack)].q;
+				if (Compare(c, q) == 0) {
+					if (Compare(Mid(s, i + 1, 1), q) == 0) {
+						out.append("  ");
+						i += 2;
+						continue;
+					}
+					ArrayDeleteAt(stack, ArrayLen(stack));
+					out.append(c);
+					i++;
+					continue;
+				}
+				if (c == "##") {
+					if (Mid(s, i + 1, 1) == "##") {
+						out.append("  ");
+						i += 2;
+						continue;
+					}
+					ArrayAppend(stack, {mode = "interpolation"});
+				}
+				out.append(" ");
+				i++;
+				continue;
+			}
+			if (mode == "interpolation" && c == "##") {
+				ArrayDeleteAt(stack, ArrayLen(stack));
+				out.append(" ");
+				i++;
+				continue;
+			}
+			var two = Mid(s, i, 2);
+			if (two == "//") {
+				while (i <= n && Mid(s, i, 1) != Chr(10) && Mid(s, i, 1) != Chr(13)) {
+					i++;
+				}
+				continue;
+			}
+			var closer = "";
+			if (two == "/*") {
+				closer = "*/";
+			} else if (Mid(s, i, 5) == tagCommentOpen) {
+				closer = "--->";
+			}
+			if (Len(closer)) {
+				var stop = Find(closer, s, i + 2);
+				stop = stop ? stop + Len(closer) - 1 : n;
+				out.append(ReReplace(Mid(s, i, stop - i + 1), "[^\r\n]", "", "all"));
+				i = stop + 1;
+				continue;
+			}
+			if (c == '"' || c == "'") {
+				ArrayAppend(stack, {mode = "string", q = c});
+			}
+			out.append(c);
+			i++;
+		}
+		return out.toString();
+	}
+
+	/**
+	 * Raw HTTP call sites in CFML source, read through $codeOnly() (comments
+	 * and string text removed, #...# interpolations kept):
 	 * `new http`, `cfhttp(...)`, the parenthesis-free script-tag forms
 	 * (`cfhttp url=... {}`, `http url=...;`) and the cfhttp tag.
 	 */
 	public numeric function $countRawHttp(required string src) {
-		// Blank string literals first (quotes kept), so the "//" in a URL literal
-		// can't read as a line comment and hide the rest of its line (##3794).
-		// Neither pattern crosses a line break, so the scan stays line-anchored.
-		var code = ReReplace(arguments.src, '"(?:[^"\r\n]|"")*"', '""', "all");
-		code = ReReplace(code, "'(?:[^'\r\n]|'')*'", "''", "all");
-		code = variables.analysis.$stripCfmlComments(code);
+		var code = $codeOnly(arguments.src);
 		var patterns = [
 			// new http(...) and new http;
 			"\bnew\s+http\b",
