@@ -263,14 +263,52 @@ jobs:
               echo "::error::${{ matrix.cfengine }} + ${DB}: only ${TOTAL_SPECS} testcases (floor ${MIN_SPECS}) — suite likely compile-wiped"
             fi
             if [ -f "$RESULT_FILE" ]; then
-              echo "=== Result head (first 2000 bytes) ==="
-              head -c 2000 "$RESULT_FILE"
-              echo
+              # Name every failing/erroring spec. The walker reads the whole
+              # result tree (nested suites, bundle-level exceptions); a raw
+              # head of the JSON ended inside the first bundle and named
+              # nothing (#3763). The full file is uploaded as an artifact below.
+              echo "=== Failing specs ==="
+              WALK_RC=0
+              python3 tools/ci/testbox_results.py --strict "$RESULT_FILE" || WALK_RC=$?
+              if [ "$WALK_RC" = "2" ]; then
+                # Not a TestBox result (e.g. an error page): the head is the clue.
+                echo "=== Result head (first 2000 bytes) ==="
+                head -c 2000 "$RESULT_FILE"
+                echo
+              else
+                python3 - "$RESULT_FILE" "${{ matrix.cfengine }} + ${DB}" <<'PY' || true
+          import json, sys
+          sys.path.insert(0, "tools/ci")
+          import testbox_results as tb
+          def prop(v):  # workflow-command property value (title=...)
+              return v.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A").replace(":", "%3A").replace(",", "%2C")
+          def data(v):  # workflow-command message
+              return v.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          failures = tb.walk(json.load(open(sys.argv[1], encoding="utf-8")))
+          for f in failures[:20]:
+              where = f" > {f['path_text']}" if f["path_text"] else ""
+              msg = f["message"].replace("\n", " | ")[:200]
+              title = prop(f"{sys.argv[2]}: {f['kind']}")
+              print(f"::error title={title}::{data(f['bundle'] + where + ': ' + f['name'] + ': ' + msg)}")
+          if len(failures) > 20:
+              print(f"::error title={prop(sys.argv[2])}::{len(failures) - 20} more failing specs; see the job log and the result artifact")
+          PY
+              fi
             fi
             echo "=== Container logs (last 100 lines) ==="
             docker logs "wheels-${{ matrix.cfengine }}-1" 2>&1 | tail -100
             exit 1
           fi
+
+      - name: Upload the test result JSON
+        # The whole result, so any failure can be read after the job ends (#3763).
+        if: failure() && steps.changes.outputs.framework_changed == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: compat-pr-result-${{ matrix.cfengine }}-${{ matrix.database }}
+          path: /tmp/${{ matrix.cfengine }}-${{ matrix.database }}-result.txt
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Report container exit state
         # A cgroup OOM-kill ends the JVM with exit 137 and NO Java error; name it.
