@@ -16,14 +16,48 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("RustCFMLEngine", () => {
 
-			it("maps the current platform to one of the four known assets", () => {
-				var asset = variables.svc.assetName();
-				expect(
-					listFindNoCase(
-						"rustcfml-linux-x86_64,rustcfml-linux-aarch64,rustcfml-macos-aarch64,rustcfml-macos-x86_64",
-						asset
-					) > 0
-				).toBeTrue("unexpected asset name: " & asset);
+			it("maps the current platform to one of the published assets, or refuses it clearly", () => {
+				var state = {asset = "", type = ""};
+				try {
+					state.asset = variables.svc.assetName();
+				} catch (any e) {
+					state.type = e.type;
+				}
+				if (Len(state.type)) {
+					expect(state.type).toBe("Wheels.RustCFML.UnsupportedPlatform");
+				} else {
+					expect(
+						listFindNoCase("rustcfml-linux-x86_64,rustcfml-linux-aarch64,rustcfml-macos-aarch64", state.asset) > 0
+					).toBeTrue("unexpected asset name: " & state.asset);
+				}
+			});
+
+			it("maps each published platform to its release asset", () => {
+				expect(variables.svc.$assetFor("Mac OS X", "aarch64")).toBe("rustcfml-macos-aarch64");
+				expect(variables.svc.$assetFor("Mac OS X", "arm64")).toBe("rustcfml-macos-aarch64");
+				expect(variables.svc.$assetFor("Linux", "amd64")).toBe("rustcfml-linux-x86_64");
+				expect(variables.svc.$assetFor("Linux", "x86_64")).toBe("rustcfml-linux-x86_64");
+				expect(variables.svc.$assetFor("Linux", "aarch64")).toBe("rustcfml-linux-aarch64");
+			});
+
+			it("refuses an Intel Mac with a clear unsupported-platform error, not a 404 download", () => {
+				for (var arch in ["x86_64", "amd64"]) {
+					var state = {type = "", message = ""};
+					try {
+						variables.svc.$assetFor("Mac OS X", arch);
+					} catch (any e) {
+						state.type = e.type;
+						state.message = e.message & " " & e.detail;
+					}
+					expect(state.type).toBe("Wheels.RustCFML.UnsupportedPlatform", "Mac OS X / #arch#");
+					expect(state.message).toInclude("Intel");
+					expect(state.message).toInclude("wheels start");
+				}
+			});
+
+			it("refuses a platform RustCFML has no build for", () => {
+				expect(() => variables.svc.$assetFor("Windows 11", "amd64")).toThrow(type = "Wheels.RustCFML.UnsupportedPlatform");
+				expect(() => variables.svc.$assetFor("FreeBSD", "amd64")).toThrow(type = "Wheels.RustCFML.UnsupportedPlatform");
 			});
 
 			it("hashes a project root to a stable filesystem key", () => {

@@ -1,0 +1,1 @@
+- On an Intel Mac, `wheels start --engine=rustcfml` and `wheels engines rustcfml install|start` now say that RustCFML publishes no macOS Intel (x86_64) build and to use the default engine (`wheels start`), instead of failing on a 404 download (#3815)

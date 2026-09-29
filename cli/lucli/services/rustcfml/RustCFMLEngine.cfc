@@ -217,20 +217,37 @@ component {
 	 * Mirrors tools/rustcfml/run-suite.sh.
 	 */
 	public string function assetName() {
-		var os = createObject("java", "java.lang.System").getProperty("os.name");
-		var arch = createObject("java", "java.lang.System").getProperty("os.arch");
-		var isMac = findNoCase("mac", os) > 0;
-		var isLinux = findNoCase("linux", os) > 0;
-		var isArm = findNoCase("aarch64", arch) > 0 || findNoCase("arm64", arch) > 0;
-		var isX64 = findNoCase("amd64", arch) > 0 || findNoCase("x86_64", arch) > 0;
+		var system = createObject("java", "java.lang.System");
+		return $assetFor(system.getProperty("os.name"), system.getProperty("os.arch"));
+	}
+
+	/**
+	 * The RustCFML release asset for `osName` / `osArch` (Java's os.name and
+	 * os.arch), or Wheels.RustCFML.UnsupportedPlatform when RustCFML publishes
+	 * no build for it. RustCFML releases ship Linux x86_64 and aarch64 and
+	 * macOS aarch64 (Apple Silicon); there is no macOS x86_64 (Intel) build,
+	 * which used to surface as a 404 from the download instead of this error.
+	 */
+	public string function $assetFor(required string osName, required string osArch) {
+		var isMac = findNoCase("mac", arguments.osName) > 0;
+		var isLinux = findNoCase("linux", arguments.osName) > 0;
+		var isArm = findNoCase("aarch64", arguments.osArch) > 0 || findNoCase("arm64", arguments.osArch) > 0;
+		var isX64 = findNoCase("amd64", arguments.osArch) > 0 || findNoCase("x86_64", arguments.osArch) > 0;
 
 		if (isMac && isArm) return "rustcfml-macos-aarch64";
-		if (isMac && isX64) return "rustcfml-macos-x86_64";
 		if (isLinux && isArm) return "rustcfml-linux-aarch64";
 		if (isLinux && isX64) return "rustcfml-linux-x86_64";
+		if (isMac && isX64) {
+			throw(
+				type = "Wheels.RustCFML.UnsupportedPlatform",
+				message = "RustCFML publishes no macOS Intel (x86_64) build, so the RustCFML engine can't run on this Mac.",
+				detail = "Use the default engine (wheels start), or run RustCFML on Apple Silicon or Linux."
+			);
+		}
 		throw(
 			type = "Wheels.RustCFML.UnsupportedPlatform",
-			message = "No RustCFML binary for " & os & " / " & arch
+			message = "RustCFML publishes no build for #arguments.osName# / #arguments.osArch#.",
+			detail = "RustCFML builds exist for Linux (x86_64, aarch64) and macOS on Apple Silicon. Use the default engine (wheels start)."
 		);
 	}
 

@@ -1912,7 +1912,11 @@ component extends="modules.BaseModule" {
 		// Express), so it never touches the server registry below.
 		if (engine == "rustcfml") {
 			var rustSvc = new services.rustcfml.RustCFMLEngine();
-			var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
+			try {
+				var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
+			} catch (Wheels.RustCFML.UnsupportedPlatform e) {
+				return $reportUnsupportedRustPlatform(e);
+			}
 			out("RustCFML server started (pid " & rustState.pid & ") at http://127.0.0.1:" & rustState.port, "green");
 			out("Log: " & rustState.log, "cyan");
 			return "";
@@ -2236,10 +2240,18 @@ component extends="modules.BaseModule" {
 		switch (action) {
 			case "install":
 				out("Installing RustCFML...", "cyan");
-				out("Installed: " & svc.install(), "green");
+				try {
+					out("Installed: " & svc.install(), "green");
+				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
+					return $reportUnsupportedRustPlatform(e);
+				}
 				break;
 			case "start":
-				var st = svc.start(variables.projectRoot, val(opts.port));
+				try {
+					var st = svc.start(variables.projectRoot, val(opts.port));
+				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
+					return $reportUnsupportedRustPlatform(e);
+				}
 				out("RustCFML server started (pid " & st.pid & ") at http://127.0.0.1:" & st.port, "green");
 				out("Log: " & st.log, "cyan");
 				break;
@@ -10435,6 +10447,18 @@ component extends="modules.BaseModule" {
 			type="Wheels.ServerNotRunning",
 			message="No running Wheels server detected for this project (start one with: wheels start)"
 		);
+	}
+
+	/**
+	 * Say plainly that RustCFML has no build for this platform (for example an
+	 * Intel Mac), with what to use instead, rather than a raw exception.
+	 */
+	private string function $reportUnsupportedRustPlatform(required any error) {
+		out(arguments.error.message, "red");
+		if (len(arguments.error.detail)) {
+			out(arguments.error.detail, "yellow");
+		}
+		return "";
 	}
 
 	/**

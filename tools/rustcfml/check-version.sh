@@ -57,15 +57,17 @@ set -e
 case "$rc" in
   0)
     echo "Suite green against $LATEST — bumping the pin and regenerating the baseline."
-    echo "$LATEST" > "$DIR/ENGINE_VERSION"
     # The installed CLI can't read ENGINE_VERSION (it doesn't ship tools/), so
     # it carries its own copy of the pin: move it in the same step (#3812).
+    # Check it can be moved BEFORE touching ENGINE_VERSION, so a failure leaves
+    # both pins as they were.
     CLI_ENGINE="$DIR/../../cli/lucli/services/rustcfml/RustCFMLEngine.cfc"
     PIN_LINE='^([[:space:]]*variables\.engineVersion = ")v[0-9]+\.[0-9]+\.[0-9]+(";)$'
     if [ "$(grep -Ec "$PIN_LINE" "$CLI_ENGINE")" != "1" ]; then
       echo "::error::Could not find exactly one engineVersion pin line in $CLI_ENGINE; update it to $LATEST by hand."
       exit 1
     fi
+    echo "$LATEST" > "$DIR/ENGINE_VERSION"
     sed -E -i.bak "s/$PIN_LINE/\1$LATEST\2/" "$CLI_ENGINE" && rm -f "$CLI_ENGINE.bak"
     RUSTCFML_VERSION="$LATEST" bash "$DIR/run-suite.sh" --write-baseline
     echo "Pinned version bumped to $LATEST and baseline.json regenerated."
