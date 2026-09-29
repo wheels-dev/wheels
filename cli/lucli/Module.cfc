@@ -1518,17 +1518,20 @@ component extends="modules.BaseModule" {
 	 * when that version is already unpacked, so this is safe to run repeatedly
 	 * (the Homebrew formula's wrapper does essentially the same thing on
 	 * install/upgrade).
+	 *
+	 * The zip is checked against the .sha512 file the release publishes next
+	 * to it before anything is unpacked. Every failure throws
+	 * Wheels.DocsFetchFailed, so the command exits non-zero, and leaves any
+	 * previously installed docs for that version in place.
 	 */
 	private string function docsFetch(boolean force = false) {
 		var version = $docsFrameworkVersion();
 		if (!len(version)) {
-			out("Could not determine the framework version — is this a Wheels project?", "red");
-			return "";
+			$docsFetchFail("Could not determine the framework version — is this a Wheels project?");
 		}
 		var home = $resolveLucliHome();
 		if (!len(home)) {
-			out("Could not resolve the Wheels CLI home directory.", "red");
-			return "";
+			$docsFetchFail("Could not resolve the Wheels CLI home directory.");
 		}
 		var target = home & "/docs/" & version;
 
@@ -1543,57 +1546,129 @@ component extends="modules.BaseModule" {
 		// and the download then receives the URL scope struct instead of the
 		// string ("Can't cast Complex Object Type [URL scope] to String").
 		var bundleUrl = $docsBundleUrl(version);
-		var tmp = getTempDirectory() & "wheels-docs-#version#.zip";
+		var checksumUrl = bundleUrl & ".sha512";
+		var httpClient = new services.packages.HttpClient(timeoutSeconds = 300);
 		out("Fetching docs for #version#...");
 		out("  #bundleUrl#");
 
+		// The published checksum first: without it there is nothing to verify
+		// the bundle against, so there is no point downloading the bundle.
+		// Downloaded to a file rather than via get(): GitHub serves release
+		// assets as application/octet-stream, which cfhttp returns as binary.
+		// A per-run temp name, so two concurrent fetches never share a file.
+		var runId = createUUID();
+		var checksumTmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip.sha512";
+		var checksumText = "";
 		try {
-			new services.packages.HttpClient(timeoutSeconds = 300).download(bundleUrl, tmp);
+			httpClient.download(checksumUrl, checksumTmp);
+			checksumText = fileRead(checksumTmp, "utf-8");
 		} catch (any e) {
-			out("Download failed: #e.message#", "red");
-			out("  A release without a docs asset will 404 here — the bundle is built by");
-			out("  tools/build/scripts/build-docs.sh and attached to the release.");
-			return "";
+			$docsFetchFail(
+				"Could not download the bundle's published SHA-512 checksum: #e.message#",
+				["  The bundle is only installed after it matches #checksumUrl#.",
+				 "  A release without a docs asset will 404 here — the bundle and its .sha512 are",
+				 "  built by tools/build/scripts/build-docs.sh and attached to the release."]
+			);
+		} finally {
+			if (fileExists(checksumTmp)) {
+				fileDelete(checksumTmp);
+			}
+		}
+		var expected = $docsParseChecksum(checksumText);
+		if (!len(expected)) {
+			$docsFetchFail("The bundle's checksum file at #checksumUrl# does not contain a SHA-512 hash.");
 		}
 
+		var tmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip";
+		// Unpack into a sibling staging directory and swap it in only once
+		// unzip succeeds, so a failure never leaves a half-unpacked docs dir
+		// (or deletes a working install on --force).
+		var staging = home & "/docs/." & version & ".partial-" & runId;
 		try {
-			if (directoryExists(target)) {
-				directoryDelete(target, true);
+			try {
+				httpClient.download(bundleUrl, tmp);
+			} catch (any e) {
+				$docsFetchFail("Download failed: #e.message#");
 			}
-			directoryCreate(target, true);
+
+			var actual = lCase(hash(fileReadBinary(tmp), "SHA-512"));
+			if (actual != expected) {
+				$docsFetchFail(
+					"The downloaded bundle does not match its published SHA-512 checksum; nothing was installed.",
+					["  expected: #expected#", "  actual:   #actual#"]
+				);
+			}
+
+			directoryCreate(staging, true);
 			// The bundle is zipped with its contents at the root (manifest.json,
-			// guides/, api/), so unpack straight into the version directory.
+			// guides/, api/), so unpack straight into the staging directory.
 			// Shell out to `unzip` rather than Lucee's extract(): `extract` is
 			// shadowed in this module's scope and resolves to a helper with a
 			// different arity. Same approach Installer::$extract() takes with
 			// `tar`, for the same reason.
 			var unzipResult = {};
-			cfexecute(
-				name = "unzip",
-				arguments = "-o -q #tmp# -d #target#",
-				timeout = 300,
-				variable = "local.unzipOut",
-				errorVariable = "local.unzipErr",
-				result = "unzipResult"
-			);
-			if (unzipResult.exitCode != 0) {
-				out("Could not unpack the bundle (unzip exit #unzipResult.exitCode#).", "red");
-				out("  #local.unzipErr#");
-				return "";
+			try {
+				cfexecute(
+					name = "unzip",
+					arguments = "-o -q #tmp# -d #staging#",
+					timeout = 300,
+					variable = "local.unzipOut",
+					errorVariable = "local.unzipErr",
+					result = "unzipResult"
+				);
+			} catch (any e) {
+				$docsFetchFail("Could not unpack the bundle: #e.message#");
 			}
-		} catch (any e) {
-			out("Could not unpack the bundle: #e.message#", "red");
-			return "";
+			if (unzipResult.exitCode != 0) {
+				$docsFetchFail(
+					"Could not unpack the bundle (unzip exit #unzipResult.exitCode#).",
+					["  #local.unzipErr ?: ''#"]
+				);
+			}
+
+			try {
+				if (directoryExists(target)) {
+					directoryDelete(target, true);
+				}
+				directoryRename(staging, target);
+			} catch (any e) {
+				$docsFetchFail("Could not install the unpacked bundle at #target#: #e.message#");
+			}
 		} finally {
 			if (fileExists(tmp)) {
 				fileDelete(tmp);
 			}
+			if (directoryExists(staging)) {
+				directoryDelete(staging, true);
+			}
 		}
 
-		out("Installed documentation for #version#.", "green");
+		out("Installed documentation for #version# (SHA-512 verified).", "green");
 		out("  #target#");
 		$docsMountIntoWebroot(target);
 		return "";
+	}
+
+	/**
+	 * Prints the failure (plus any hint lines) and throws, so `wheels docs
+	 * fetch` exits non-zero instead of reporting success after a failure.
+	 */
+	private void function $docsFetchFail(required string message, array hints = []) {
+		out(arguments.message, "red");
+		for (var hint in arguments.hints) {
+			out(hint);
+		}
+		throw(type = "Wheels.DocsFetchFailed", message = arguments.message);
+	}
+
+	/**
+	 * The hash from a published .sha512 file, lower-cased: the first token of
+	 * `sha512sum`/`shasum -a 512` output ("<hex>  wheels-docs-<v>.zip").
+	 * Returns "" when that token is not a 128-character hex string.
+	 */
+	private string function $docsParseChecksum(required string content) {
+		var first = lCase(listFirst(trim(arguments.content), " #chr(9)##chr(10)##chr(13)#"));
+		return reFind("^[0-9a-f]{128}$", first) ? first : "";
 	}
 
 	/**
