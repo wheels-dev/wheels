@@ -51,6 +51,14 @@ component extends="wheels.WheelsTest" {
 						// The page follows showErrorInformation: full detail only when it is
 						// true, nothing when any copy of it is false, the bare message
 						// only before startup set it (##3671).
+						// Logged in every environment: before, and outside, the decision about the page.
+						var decidePos = reFindNoCase("\$startupFailureShowDetail\s*\(\s*\)", render);
+						expect(logPos > 0 && logPos < decidePos).toBeTrue(
+							relPath & " $renderMinimalError() must log before deciding what the page shows, so production still logs."
+						);
+						expect(reFindNoCase("\$startupFailureFrames\s*\(", $functionBody(content, "\$logStartupFailure", relPath)) > 0).toBeTrue(
+							relPath & " $logStartupFailure() must log the whole tag context via $startupFailureFrames()."
+						);
 						expect(reFindNoCase("\$startupFailureShowDetail\s*\(\s*\)", render) > 0).toBeTrue(
 							relPath & " $renderMinimalError() must decide what to show via $startupFailureShowDetail()."
 						);

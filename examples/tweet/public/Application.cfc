@@ -603,20 +603,7 @@ component output="false" {
 			& $startupFailureField(local.root, "Message")) != 0) {
 			local.html &= "<p>Reported as: " & encodeForHTML(local.wrapper) & "</p>";
 		}
-		local.frames = [];
-		for (local.failure in [local.root, arguments.Exception]) {
-			if (IsStruct(local.failure) && StructKeyExists(local.failure, "TagContext") && IsArray(local.failure.TagContext)) {
-				for (local.frame in local.failure.TagContext) {
-					ArrayAppend(local.frames, $startupFailureField(local.frame, "Template") & ":" & $startupFailureField(local.frame, "Line"));
-					if (ArrayLen(local.frames) >= 20) {
-						break;
-					}
-				}
-				if (ArrayLen(local.frames)) {
-					break;
-				}
-			}
-		}
+		local.frames = $startupFailureFrames(local.root, arguments.Exception);
 		if (ArrayLen(local.frames)) {
 			local.html &= "<pre>" & encodeForHTML(ArrayToList(local.frames, Chr(10))) & "</pre>";
 		}
@@ -644,12 +631,9 @@ component output="false" {
 			if (Len(local.detail)) {
 				local.text &= " -- " & local.detail;
 			}
-			local.frame = $startupFailureFrame(local.root);
-			if (!Len(local.frame)) {
-				local.frame = $startupFailureFrame(arguments.Exception);
-			}
-			if (Len(local.frame)) {
-				local.text &= " (at " & local.frame & ")";
+			local.frames = $startupFailureFrames(local.root, arguments.Exception);
+			if (ArrayLen(local.frames)) {
+				local.text &= " (at " & ArrayToList(local.frames, " < ") & ")";
 			}
 			local.wrapper = "[" & $startupFailureField(arguments.Exception, "Type") & "] "
 				& $startupFailureField(arguments.Exception, "Message");
@@ -658,8 +642,8 @@ component output="false" {
 				local.text &= " (reported as " & local.wrapper & ")";
 			}
 			local.text = ReReplace(local.text, "[\r\n\t]+", " ", "all");
-			if (Len(local.text) > 4000) {
-				local.text = Left(local.text, 4000) & "...";
+			if (Len(local.text) > 16000) {
+				local.text = Left(local.text, 16000) & "...";
 			}
 			WriteLog(file = "wheels", type = "error", text = local.text);
 		} catch (any logErr) {
@@ -735,20 +719,28 @@ component output="false" {
 		return "";
 	}
 
-	// "template:line" of the first tag-context frame, or "" when absent.
-	private string function $startupFailureFrame( required any failure ) {
+	// Up to 20 "template:line" tag-context frames, innermost first: the root
+	// cause's own, else the wrapper's. [] when neither has any.
+	private array function $startupFailureFrames( required any root, required any wrapper ) {
+		local.frames = [];
 		try {
-			if (IsStruct(arguments.failure) && StructKeyExists(arguments.failure, "TagContext")) {
-				local.tagContext = arguments.failure.TagContext;
-				if (IsArray(local.tagContext) && ArrayLen(local.tagContext)) {
-					local.top = local.tagContext[1];
-					return $startupFailureField(local.top, "Template") & ":" & $startupFailureField(local.top, "Line");
+			for (local.failure in [arguments.root, arguments.wrapper]) {
+				if (IsStruct(local.failure) && StructKeyExists(local.failure, "TagContext") && IsArray(local.failure.TagContext)) {
+					for (local.frame in local.failure.TagContext) {
+						ArrayAppend(local.frames, $startupFailureField(local.frame, "Template") & ":" & $startupFailureField(local.frame, "Line"));
+						if (ArrayLen(local.frames) >= 20) {
+							break;
+						}
+					}
+					if (ArrayLen(local.frames)) {
+						break;
+					}
 				}
 			}
 		} catch (any frameErr) {
-			// No usable frame.
+			// No usable frames.
 		}
-		return "";
+		return local.frames;
 	}
 
 	public boolean function onMissingTemplate( string targetPage ) {
