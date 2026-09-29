@@ -44,7 +44,6 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		);
 	}
 
-	/** GET through the CLI transport from a stub that sends `raw` verbatim. */
 	/**
 	 * One request to a stub that answers `raw`, bound to 127.0.0.1 alone so no
 	 * other loopback listener can take the connection (issue 3804). The stub

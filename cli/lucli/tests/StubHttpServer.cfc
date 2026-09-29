@@ -27,16 +27,9 @@ component {
 		variables.statusCode = arguments.statusCode;
 		variables.rawResponse = arguments.rawResponse;
 		if (len(arguments.bindAddress)) {
-			// One address, exclusively (issue 3804). On macOS and BSD a socket
-			// with SO_REUSEADDR (Java's default) may bind the more specific
-			// 127.0.0.1:<port> while we hold the wildcard, and then it, not
-			// this stub, answers 127.0.0.1:<port>. Binding the address the spec
-			// connects to, without SO_REUSEADDR, leaves no room for that.
-			variables.serverSocket = createObject("java", "java.net.ServerSocket").init();
-			variables.serverSocket.setReuseAddress(false);
-			variables.serverSocket.bind(
-				createObject("java", "java.net.InetSocketAddress").init(arguments.bindAddress, javacast("int", 0))
-			);
+			// One address, exclusively (issue 3804): see TestSockets for why a
+			// wildcard bind can be shadowed on macOS and BSD.
+			variables.serverSocket = new TestSockets().exclusiveListener(arguments.bindAddress);
 		} else {
 			// Port 0 + no bind address = ephemeral port on the wildcard address,
 			// covering both stacks so the CLI's `http://localhost:<port>/...`

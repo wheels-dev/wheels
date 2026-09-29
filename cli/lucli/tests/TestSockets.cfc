@@ -14,9 +14,14 @@ component {
 
 	/** A ServerSocket on 127.0.0.1:<ephemeral>, bound without SO_REUSEADDR. */
 	public any function exclusiveLoopbackListener() {
+		return exclusiveListener("127.0.0.1");
+	}
+
+	/** A ServerSocket on `address`:<ephemeral>, bound without SO_REUSEADDR. */
+	public any function exclusiveListener(required string address) {
 		var listener = createObject("java", "java.net.ServerSocket").init();
 		listener.setReuseAddress(false);
-		listener.bind(createObject("java", "java.net.InetSocketAddress").init("127.0.0.1", javacast("int", 0)));
+		listener.bind(createObject("java", "java.net.InetSocketAddress").init(arguments.address, javacast("int", 0)));
 		return listener;
 	}
 
