@@ -2,6 +2,11 @@
 param name="request.wheels.params.migrationName";
 param name="request.wheels.params.templateName";
 
+// Creating a migration writes a file to disk, so this endpoint gets the same
+// localhost + no-forwarded-client + CSRF-token gate as migrator/command.cfm.
+include "/wheels/public/migrator/_guard.cfm";
+$migratorApplyDevToolGuards();
+
 migrator = application.wheels.migrator;
 
 if (StructKeyExists(request.wheels.params, "migrationPrefix") && Len(request.wheels.params.migrationPrefix)) {
