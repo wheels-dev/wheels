@@ -104,18 +104,40 @@ if (!StructKeyExists(variables, "$migratorHostIsLocal")) {
 			if (local.close <= 2) {
 				return false;
 			}
+			// Only an optional :port may follow the closing bracket — reject
+			// anything else so "[::1]evil" cannot slip through.
+			local.after = Mid(local.host, local.close + 1, Len(local.host));
+			if (Len(local.after) && ReFind("^:[0-9]+$", local.after) == 0) {
+				return false;
+			}
 			local.host = Mid(local.host, 2, local.close - 2);
 		} else if (Find(":", local.host)) {
 			local.host = ListFirst(local.host, ":");
 		}
 		local.host = LCase(Trim(local.host));
-		// Built-in local names / loopback literals.
-		if (ListFindNoCase("localhost,127.0.0.1,::1,0:0:0:0:0:0:0:1", local.host)) {
+		// Built-in local names / IPv6 loopback literals.
+		if (ListFindNoCase("localhost,::1,0:0:0:0:0:0:0:1", local.host)) {
 			return true;
 		}
-		// Any address in the 127.0.0.0/8 loopback block.
-		if (ReFind("^127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$", local.host)) {
+		// RFC 6761: the .localhost TLD (and any name under it) is reserved for
+		// loopback, so a developer's *.localhost dev host works without config.
+		if (Right(local.host, 10) == ".localhost") {
 			return true;
+		}
+		// Any address in the 127.0.0.0/8 loopback block: exactly four octets, the
+		// first is 127, and each octet is 0-255.
+		local.octets = ListToArray(local.host, ".");
+		if (ArrayLen(local.octets) == 4 && local.octets[1] == "127") {
+			local.octetsValid = true;
+			for (local.octet in local.octets) {
+				if (ReFind("^[0-9]{1,3}$", local.octet) == 0 || Val(local.octet) > 255) {
+					local.octetsValid = false;
+					break;
+				}
+			}
+			if (local.octetsValid) {
+				return true;
+			}
 		}
 		// Extra host names the developer allowed via set(migratorAllowedHosts="...").
 		local.extra = "";
@@ -139,7 +161,7 @@ if (!StructKeyExists(variables, "$migratorEnforceLocalHostname")) {
 		if (!$migratorHostIsLocal(hostHeader = local.hostHeader)) {
 			cfheader(statuscode=403);
 			cfcontent(type="text/plain", reset=true);
-			writeOutput("Migrator dev tools only accept requests addressed to a local host name (localhost, 127.0.0.1, or [::1]). Allow another local name with set(migratorAllowedHosts=""your.host"").");
+			writeOutput("Migrator dev tools only accept requests addressed to a local host name (localhost, *.localhost, 127.0.0.1, or [::1]). For a custom local hostname like myapp.test, add it with set(migratorAllowedHosts=""myapp.test"").");
 			abort;
 		}
 	};

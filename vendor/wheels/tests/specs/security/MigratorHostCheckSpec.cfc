@@ -45,6 +45,14 @@ component extends="wheels.WheelsTest" {
 				expect(variables.$migratorHostIsLocal(hostHeader = "[::1]:8080")).toBeTrue();
 			});
 
+			it("accepts any *.localhost name by default (RFC 6761 loopback)", () => {
+				expect(variables.$migratorHostIsLocal(hostHeader = "myapp.localhost")).toBeTrue();
+				expect(variables.$migratorHostIsLocal(hostHeader = "myapp.localhost:8080")).toBeTrue();
+				expect(variables.$migratorHostIsLocal(hostHeader = "foo.bar.localhost")).toBeTrue();
+				// A foreign name that merely embeds "localhost" as a non-final label is not local.
+				expect(variables.$migratorHostIsLocal(hostHeader = "evil.localhost.attacker.com")).toBeFalse();
+			});
+
 			it("rejects a foreign host name", () => {
 				expect(variables.$migratorHostIsLocal(hostHeader = "example.com")).toBeFalse();
 				expect(variables.$migratorHostIsLocal(hostHeader = "example.com:8080")).toBeFalse();
@@ -57,6 +65,19 @@ component extends="wheels.WheelsTest" {
 			it("rejects a non-loopback IP literal", () => {
 				expect(variables.$migratorHostIsLocal(hostHeader = "10.0.0.5")).toBeFalse();
 				expect(variables.$migratorHostIsLocal(hostHeader = "192.168.1.10:8080")).toBeFalse();
+			});
+
+			it("rejects a bracketed IPv6 host with anything but a port after ]", () => {
+				expect(variables.$migratorHostIsLocal(hostHeader = "[::1]x")).toBeFalse();
+				expect(variables.$migratorHostIsLocal(hostHeader = "[::1]extra")).toBeFalse();
+				expect(variables.$migratorHostIsLocal(hostHeader = "[::1]:80x")).toBeFalse();
+			});
+
+			it("rejects a 127/8 address with an out-of-range or wrong-count octet", () => {
+				expect(variables.$migratorHostIsLocal(hostHeader = "127.0.0.256")).toBeFalse();
+				expect(variables.$migratorHostIsLocal(hostHeader = "127.999.0.1")).toBeFalse();
+				expect(variables.$migratorHostIsLocal(hostHeader = "127.0.0")).toBeFalse();
+				expect(variables.$migratorHostIsLocal(hostHeader = "127.0.0.1.5")).toBeFalse();
 			});
 
 			it("accepts a configured extra host name", () => {
@@ -80,6 +101,12 @@ component extends="wheels.WheelsTest" {
 			it("the command endpoint enforces the local host name", () => {
 				var c = readPublic("migrator/command.cfm");
 				expect(c).toInclude("$migratorEnforceLocalHostname()");
+			});
+
+			it("the 403 names the exact fix for a custom local hostname", () => {
+				var g = readPublic("migrator/_guard.cfm");
+				expect(g).toInclude("add it with set(migratorAllowedHosts");
+				expect(g).toInclude("myapp.test");
 			});
 
 			it("the token-issuing views enforce local access before issuing a token", () => {
