@@ -345,6 +345,10 @@ component {
 			application.wo.$includeConfig(template = "/config/#application.$wheels.environment#/settings.cfm");
 		}
 
+		// Parse set(baseUrl=...) now: a malformed value stops the application
+		// from starting instead of failing the first absolute URL (#3842).
+		application.wo.$cacheBaseUrl(application.$wheels);
+
 		// Re-derive framework paths now that settings.cfm has loaded. Detection
 		// priority for the URL subpath (issue #2968):
 		//   1. set(subpath="/wheelsproject1") in config/settings.cfm

@@ -26,6 +26,15 @@
 	set(reloadPassword=env("WHEELS_RELOAD_PASSWORD", ""));
 
 	/*
+		Canonical base URL for absolute links, redirects and emails. When set, its
+		scheme, host and port are used instead of the incoming request's (which a
+		client can influence). Recommended in production; a bad value stops the
+		application from starting. Put it in config/production/settings.cfm to set
+		it for production only.
+	*/
+	// set(baseUrl="https://your-app.com");
+
+	/*
 		Migrator: produce `<name>_id` columns from t.references() and friends
 		(matching Wheels model `belongsTo` defaults). Default in the framework
 		is `false` for backwards compatibility with existing apps; new apps

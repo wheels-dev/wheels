@@ -96,6 +96,79 @@ component extends="wheels.WheelsTest" {
 				expect(() => application.wo.$prependUrl(path = "/x")).toThrow("Wheels.IncorrectConfiguration");
 			});
 
+			it("accepts a bracketed IPv6 host, with or without a port (##3842)", () => {
+				application.wheels.baseUrl = "https://[::1]:8443";
+				expect(application.wo.$prependUrl(path = "/x")).toBe("https://[::1]:8443/x");
+				application.wheels.baseUrl = "http://[2001:db8::7]";
+				expect(application.wo.$prependUrl(path = "/x")).toBe("http://[2001:db8::7]/x");
+			});
+
+			it("rejects a query, fragment, user info, or a bad host or port (##3842)", () => {
+				var bad = [
+					"https://example.com?next=/x",
+					"https://example.com##top",
+					"https://user:pass@example.com",
+					"https://evil.test@example.com",
+					"https://example.com\evil",
+					"https://::1",
+					"https://[::1",
+					"https://[zz::1]",
+					"https://[::1]8443",
+					"https://example.com:",
+					"https://example.com:0",
+					"https://example.com:70000",
+					"https://example.com:80:81",
+					"https://:8080",
+					"https://exa mple.com",
+					"https://"
+				];
+				for (var value in bad) {
+					var state = {type = ""};
+					try {
+						application.wo.$parseBaseUrl(baseUrl = value);
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.IncorrectConfiguration", "accepted baseUrl [#value#]");
+				}
+			});
+
+			it("parses baseUrl once at application start and fails fast on a bad value (##3842)", () => {
+				var settings = {baseUrl = "https://example.com:8443"};
+				application.wo.$cacheBaseUrl(settings);
+				expect(settings.$baseUrlParts.parts.host).toBe("example.com");
+				expect(settings.$baseUrlParts.parts.port).toBe(8443);
+				expect(() => application.wo.$cacheBaseUrl({baseUrl = "https://example.com/app"})).toThrow("Wheels.IncorrectConfiguration");
+				var unset = {baseUrl = "", $baseUrlParts = {source = "stale", parts = {}}};
+				application.wo.$cacheBaseUrl(unset);
+				expect(StructKeyExists(unset, "$baseUrlParts")).toBeFalse();
+				// onApplicationStart runs it right after the settings files load.
+				var source = FileRead(ExpandPath("/wheels/events/onapplicationstart.cfc"));
+				var settingsLoad = Find('$includeConfig(template = "/config/##application.$wheels.environment##/settings.cfm")', source);
+				var cacheCall = Find("application.wo.$cacheBaseUrl(application.$wheels)", source);
+				expect(settingsLoad > 0 && cacheCall > settingsLoad).toBeTrue("$cacheBaseUrl must run after the settings files load");
+			});
+
+			it("uses the parts cached at start, and re-parses a value changed at runtime (##3842)", () => {
+				var hadParts = StructKeyExists(application.wheels, "$baseUrlParts");
+				var savedParts = hadParts ? application.wheels.$baseUrlParts : {};
+				try {
+					application.wheels.baseUrl = "https://example.com";
+					// A cache entry for this exact value is used as-is (not re-parsed).
+					application.wheels.$baseUrlParts = {source = "https://example.com", parts = {protocol = "https", host = "cached.example", port = 0, hasPort = false}};
+					expect(application.wo.$prependUrl(path = "/x")).toBe("https://cached.example/x");
+					// A different value (set at runtime) is parsed directly.
+					application.wheels.baseUrl = "https://runtime.example";
+					expect(application.wo.$prependUrl(path = "/x")).toBe("https://runtime.example/x");
+				} finally {
+					if (hadParts) {
+						application.wheels.$baseUrlParts = savedParts;
+					} else {
+						StructDelete(application.wheels, "$baseUrlParts");
+					}
+				}
+			});
+
 			it("warns once in production when baseUrl is unset", () => {
 				application.wheels.environment = "production";
 				application.wheels.baseUrl = "";

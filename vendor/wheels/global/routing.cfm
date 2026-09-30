@@ -220,7 +220,16 @@
 			local.baseUrl = application.wheels.baseUrl;
 		}
 		if (Len(local.baseUrl)) {
-			local.base = $parseBaseUrl(baseUrl = local.baseUrl);
+			// Parsed once at application start ($cacheBaseUrl); a value changed at
+			// runtime with set(baseUrl=...) is parsed here instead.
+			if (
+				StructKeyExists(application.wheels, "$baseUrlParts")
+				&& Compare(application.wheels.$baseUrlParts.source, local.baseUrl) == 0
+			) {
+				local.base = application.wheels.$baseUrlParts.parts;
+			} else {
+				local.base = $parseBaseUrl(baseUrl = local.baseUrl);
+			}
 		} else {
 			local.base = {protocol = "", host = "", port = 0, hasPort = false};
 		}
@@ -283,11 +292,28 @@
 	}
 
 	/**
-	 * Internal. Parses a configured `baseUrl` ("https://host[:port]") into its
-	 * scheme, host, and optional port using plain string operations (regex
-	 * subexpression indexing drifts across CFML engines). Throws
-	 * `Wheels.IncorrectConfiguration` when the value is not an absolute http(s)
-	 * URL or carries a path.
+	 * Internal. Parses `set(baseUrl=...)` once at application start (#3842), so a
+	 * malformed value stops the application from starting instead of failing the
+	 * first absolute URL a request builds. Caches the parts on `settings` (the
+	 * application.$wheels struct being started) for $prependUrl().
+	 */
+	public void function $cacheBaseUrl(required struct settings) {
+		StructDelete(arguments.settings, "$baseUrlParts");
+		if (StructKeyExists(arguments.settings, "baseUrl") && Len(Trim(arguments.settings.baseUrl))) {
+			arguments.settings.$baseUrlParts = {
+				source = arguments.settings.baseUrl,
+				parts = $parseBaseUrl(baseUrl = arguments.settings.baseUrl)
+			};
+		}
+	}
+
+	/**
+	 * Internal. Parses a configured `baseUrl` ("https://host[:port]", or a
+	 * bracketed IPv6 host such as "https://[::1]:8443") into its scheme, host, and
+	 * optional port using plain string operations (regex subexpression indexing
+	 * drifts across CFML engines). Throws `Wheels.IncorrectConfiguration` when the
+	 * value is not an absolute http(s) URL, or carries a path, query, fragment,
+	 * user info, or an invalid host or port.
 	 */
 	public struct function $parseBaseUrl(required string baseUrl) {
 		local.rv = {protocol = "", host = "", port = 0, hasPort = false};
@@ -300,10 +326,7 @@
 			local.rv.protocol = "http";
 			local.rest = Mid(local.value, 8, Len(local.value));
 		} else {
-			Throw(
-				type = "Wheels.IncorrectConfiguration",
-				message = "The `baseUrl` setting must be an absolute http:// or https:// URL (for example ""https://example.com""). Received: #arguments.baseUrl#"
-			);
+			$throwBadBaseUrl("must be an absolute http:// or https:// URL (for example ""https://example.com"")", arguments.baseUrl);
 		}
 
 		// Tolerate a single trailing slash, then reject any remaining path.
@@ -311,35 +334,71 @@
 			local.rest = Mid(local.rest, 1, Len(local.rest) - 1);
 		}
 		if (Find("/", local.rest)) {
-			Throw(
-				type = "Wheels.IncorrectConfiguration",
-				message = "The `baseUrl` setting must not include a path — only the scheme, host, and optional port (for example ""https://example.com:8443""). Received: #arguments.baseUrl#"
-			);
+			$throwBadBaseUrl("must not include a path — only the scheme, host, and optional port (for example ""https://example.com:8443"")", arguments.baseUrl);
+		}
+		if (ReFind("[?##@\\]", local.rest)) {
+			$throwBadBaseUrl("must not include a query (?), fragment (##), user info (@) or backslash — only the scheme, host, and optional port", arguments.baseUrl);
 		}
 
-		if (Find(":", local.rest)) {
-			local.rv.host = Trim(ListFirst(local.rest, ":"));
-			local.portStr = Trim(ListLast(local.rest, ":"));
-			if (ReFind("^[0-9]+$", local.portStr) == 0) {
-				Throw(
-					type = "Wheels.IncorrectConfiguration",
-					message = "The `baseUrl` setting has a non-numeric port. Received: #arguments.baseUrl#"
-				);
+		// Split host and port. A bracketed IPv6 literal keeps its brackets in the
+		// host (that is how it appears in a URL); any other host has at most one colon.
+		local.portText = "";
+		local.hasPort = false;
+		if (Left(local.rest, 1) == "[") {
+			local.close = Find("]", local.rest);
+			if (local.close < 3) {
+				$throwBadBaseUrl("has an invalid IPv6 host: use a bracketed literal such as ""https://[::1]:8443""", arguments.baseUrl);
 			}
-			local.rv.port = Int(Val(local.portStr));
-			local.rv.hasPort = true;
+			local.literal = Mid(local.rest, 2, local.close - 2);
+			if (ReFind("[^0-9A-Fa-f:.]", local.literal) || !Find(":", local.literal)) {
+				$throwBadBaseUrl("has an invalid IPv6 host: use a bracketed literal such as ""https://[::1]:8443""", arguments.baseUrl);
+			}
+			local.rv.host = "[" & local.literal & "]";
+			local.after = Mid(local.rest, local.close + 1, Len(local.rest));
+			if (Len(local.after)) {
+				if (Left(local.after, 1) != ":") {
+					$throwBadBaseUrl("has unexpected text after the IPv6 host", arguments.baseUrl);
+				}
+				local.hasPort = true;
+				local.portText = Mid(local.after, 2, Len(local.after));
+			}
 		} else {
-			local.rv.host = local.rest;
+			local.colon = Find(":", local.rest);
+			if (local.colon) {
+				if (Find(":", local.rest, local.colon + 1)) {
+					$throwBadBaseUrl("has more than one colon: put an IPv6 host in brackets (for example ""https://[::1]:8443"")", arguments.baseUrl);
+				}
+				local.rv.host = local.colon > 1 ? Left(local.rest, local.colon - 1) : "";
+				local.hasPort = true;
+				local.portText = Mid(local.rest, local.colon + 1, Len(local.rest));
+			} else {
+				local.rv.host = local.rest;
+			}
+			if (Len(local.rv.host) && ReFind("[^A-Za-z0-9._-]", local.rv.host)) {
+				$throwBadBaseUrl("has an invalid host: use letters, digits, dots and hyphens (or a bracketed IPv6 address)", arguments.baseUrl);
+			}
 		}
 
 		if (!Len(local.rv.host)) {
-			Throw(
-				type = "Wheels.IncorrectConfiguration",
-				message = "The `baseUrl` setting is missing a host. Received: #arguments.baseUrl#"
-			);
+			$throwBadBaseUrl("is missing a host", arguments.baseUrl);
+		}
+		if (local.hasPort) {
+			if (ReFind("^[0-9]{1,5}$", local.portText) == 0 || Val(local.portText) < 1 || Val(local.portText) > 65535) {
+				$throwBadBaseUrl("has an invalid port (use 1-65535)", arguments.baseUrl);
+			}
+			local.rv.port = Int(Val(local.portText));
+			local.rv.hasPort = true;
 		}
 
 		return local.rv;
+	}
+
+	/** Internal. Throws the configuration error for a bad `baseUrl`. */
+	public void function $throwBadBaseUrl(required string problem, required string baseUrl) {
+		Throw(
+			type = "Wheels.IncorrectConfiguration",
+			message = "The `baseUrl` setting #arguments.problem#. Received: #arguments.baseUrl#"
+		);
 	}
 
 	/**
