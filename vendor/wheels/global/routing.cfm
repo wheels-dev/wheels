@@ -210,20 +210,47 @@
 	 */
 	public string function $prependUrl(required string path, string host = "", string protocol = "", numeric port = 0) {
 		local.rv = arguments.path;
+
+		// Canonical base URL: when set(baseUrl="https://host[:port]") is configured
+		// it supplies the authority for absolute URLs. Precedence for each part is
+		// explicit argument > baseUrl > the incoming request. A caller reading this
+		// before application.wheels exists (cold start) resolves to "unset".
+		local.baseUrl = "";
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "baseUrl")) {
+			local.baseUrl = application.wheels.baseUrl;
+		}
+		if (Len(local.baseUrl)) {
+			local.base = $parseBaseUrl(baseUrl = local.baseUrl);
+		} else {
+			local.base = {protocol = "", host = "", port = 0, hasPort = false};
+		}
+
 		if (arguments.port != 0) {
 			// use the port that was passed in by the developer
 			local.rv = ":" & arguments.port & local.rv;
+		} else if (Len(local.base.host)) {
+			// baseUrl governs the authority: use its port (or none) — never the
+			// request port, so a dev server on :8080 still yields the canonical host.
+			if (local.base.hasPort) {
+				local.rv = ":" & local.base.port & local.rv;
+			}
 		} else if (request.cgi.server_port != 80 && request.cgi.server_port != 443) {
 			// if the port currently in use is not 80 or 443 we set it explicitly in the URL
 			local.rv = ":" & request.cgi.server_port & local.rv;
 		}
+
 		if (Len(arguments.host)) {
 			local.rv = arguments.host & local.rv;
+		} else if (Len(local.base.host)) {
+			local.rv = local.base.host & local.rv;
 		} else {
 			local.rv = request.cgi.server_name & local.rv;
 		}
+
 		if (Len(arguments.protocol)) {
 			local.rv = arguments.protocol & "://" & local.rv;
+		} else if (Len(local.base.protocol)) {
+			local.rv = local.base.protocol & "://" & local.rv;
 		} else if (
 			request.cgi.server_port_secure == "true"
 			|| request.cgi.http_x_forwarded_proto == "https"
@@ -245,7 +272,100 @@
 		} else {
 			local.rv = "http://" & local.rv;
 		}
+
+		// Advisory: in production an unset baseUrl means every absolute URL depends
+		// on the incoming request's host and scheme. Nudge once toward pinning it.
+		if (!Len(local.baseUrl)) {
+			$warnBaseUrlUnsetOnce();
+		}
+
 		return local.rv;
+	}
+
+	/**
+	 * Internal. Parses a configured `baseUrl` ("https://host[:port]") into its
+	 * scheme, host, and optional port using plain string operations (regex
+	 * subexpression indexing drifts across CFML engines). Throws
+	 * `Wheels.IncorrectConfiguration` when the value is not an absolute http(s)
+	 * URL or carries a path.
+	 */
+	public struct function $parseBaseUrl(required string baseUrl) {
+		local.rv = {protocol = "", host = "", port = 0, hasPort = false};
+		local.value = Trim(arguments.baseUrl);
+
+		if (Left(LCase(local.value), 8) == "https://") {
+			local.rv.protocol = "https";
+			local.rest = Mid(local.value, 9, Len(local.value));
+		} else if (Left(LCase(local.value), 7) == "http://") {
+			local.rv.protocol = "http";
+			local.rest = Mid(local.value, 8, Len(local.value));
+		} else {
+			Throw(
+				type = "Wheels.IncorrectConfiguration",
+				message = "The `baseUrl` setting must be an absolute http:// or https:// URL (for example ""https://example.com""). Received: #arguments.baseUrl#"
+			);
+		}
+
+		// Tolerate a single trailing slash, then reject any remaining path.
+		if (Len(local.rest) && Right(local.rest, 1) == "/") {
+			local.rest = Mid(local.rest, 1, Len(local.rest) - 1);
+		}
+		if (Find("/", local.rest)) {
+			Throw(
+				type = "Wheels.IncorrectConfiguration",
+				message = "The `baseUrl` setting must not include a path — only the scheme, host, and optional port (for example ""https://example.com:8443""). Received: #arguments.baseUrl#"
+			);
+		}
+
+		if (Find(":", local.rest)) {
+			local.rv.host = Trim(ListFirst(local.rest, ":"));
+			local.portStr = Trim(ListLast(local.rest, ":"));
+			if (ReFind("^[0-9]+$", local.portStr) == 0) {
+				Throw(
+					type = "Wheels.IncorrectConfiguration",
+					message = "The `baseUrl` setting has a non-numeric port. Received: #arguments.baseUrl#"
+				);
+			}
+			local.rv.port = Int(Val(local.portStr));
+			local.rv.hasPort = true;
+		} else {
+			local.rv.host = local.rest;
+		}
+
+		if (!Len(local.rv.host)) {
+			Throw(
+				type = "Wheels.IncorrectConfiguration",
+				message = "The `baseUrl` setting is missing a host. Received: #arguments.baseUrl#"
+			);
+		}
+
+		return local.rv;
+	}
+
+	/**
+	 * Internal. Logs a one-time advisory when an absolute URL is generated in
+	 * production with no `baseUrl` configured, so links, redirects, and emails
+	 * depend on the incoming request's host and scheme.
+	 */
+	public void function $warnBaseUrlUnsetOnce() {
+		if (!StructKeyExists(application, "wheels") || StructKeyExists(application.wheels, "$baseUrlUnsetWarned")) {
+			return;
+		}
+		if (!StructKeyExists(application.wheels, "environment") || application.wheels.environment != "production") {
+			return;
+		}
+		cflock(name = "wheels.baseUrlUnset.#application.applicationName#", type = "exclusive", timeout = 5) {
+			if (!StructKeyExists(application.wheels, "$baseUrlUnsetWarned")) {
+				application.wheels.$baseUrlUnsetWarned = true;
+				cflog(
+					type = "warning",
+					file = "wheels",
+					text = "An absolute URL was generated from the incoming request's host and scheme because baseUrl is not set. "
+						& "Set set(baseUrl=""https://your-canonical-host"") in production so links, redirects, and emails "
+						& "always use your canonical address regardless of how the request arrived."
+				);
+			}
+		}
 	}
 
 	/**

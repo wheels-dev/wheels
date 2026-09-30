@@ -77,6 +77,9 @@ Create `config/production/settings.cfm`. This file is read only when the active 
 
     // URL rewriting: "On" when your web server rewrites /foo → /index.cfm/foo.
     set(URLRewriting="On");
+
+    // Canonical host for absolute URLs (links in emails and background jobs).
+    set(baseUrl=env("WHEELS_BASE_URL", "https://myapp.com"));
 </cfscript>
 ```
 
@@ -91,9 +94,14 @@ Nothing in that block is invented. Each key is defined in `vendor/wheels/events/
 | `errorEmailToAddress`, `errorEmailFromAddress` | `""` |
 | `URLRewriting` | detected from CGI |
 | `subpath` | `""` |
+| `baseUrl` | `""` |
 
 <Aside type="note" title="Subfolder deployments">
   If your app is mounted under a URL prefix — `/myapp/`, `/team/site/`, or similar — via a reverse proxy or IIS subfolder, set `subpath` in `config/settings.cfm` (not the per-environment file, since the mount point is the same in every environment): `set(subpath="/myapp")`. Alternatively, export `WHEELS_SUBPATH=/myapp` in the process environment — useful in CommandBox `server.json` `envVars` or an IIS `web.config` `environmentVariables` block. Link, form, and asset helpers that read `application.wheels.webPath` pick up the prefix automatically; without this setting, `cgi.script_name` may not reflect the public mount point and all generated URLs will be missing the prefix.
+</Aside>
+
+<Aside type="note" title="Canonical host for absolute URLs">
+  `subpath` fixes the path prefix; `baseUrl` fixes the scheme and host. Set `baseUrl` to your public address so `urlFor()`, `linkTo()`, `redirectTo(onlyPath=false)`, and asset URLs build every absolute URL from it instead of from the incoming request. This matters most for links in emails and [background jobs](/v4-1-0/digging-deeper/sending-email/#set-a-canonical-baseurl-for-emailed-links), where the request host may be `localhost`, an internal name, or absent. Explicit `host`/`protocol`/`port` arguments still win, and leaving it unset keeps the request-derived behaviour. Wheels writes a one-time `wheels` log reminder on boot-plus-first-absolute-URL if it is unset in production.
 </Aside>
 
 <Aside type="caution">

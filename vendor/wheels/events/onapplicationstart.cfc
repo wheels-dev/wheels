@@ -256,6 +256,12 @@ component {
 			application.$wheels.URLRewriting = "Off";
 		}
 
+		// Canonical base URL for absolute links, redirects, and asset URLs. When set
+		// with set(baseUrl="https://your-host") it supplies the scheme/host/port for
+		// absolute URLs regardless of how the request arrived; empty means derive
+		// them from the incoming request (the historical behaviour).
+		application.$wheels.baseUrl = "";
+
 		// Set datasource name to same as the folder the app resides in unless the developer has set it with the global setting already.
 		if (StructKeyExists(application, "dataSource")) {
 			application.$wheels.dataSourceName = application.dataSource;

@@ -141,6 +141,16 @@ Templates are regular Wheels view files. Any custom key you pass to `sendEmail()
 
 Pass `onlyPath=false` to `linkTo()` inside email templates — a relative path like `/login` is useless in an inbox.
 
+:::tip[Set a canonical `baseUrl` for emailed links]
+`onlyPath=false` builds the scheme and host from the current request. That is fine for a link on a page, but an email is often sent from a [background job](#send-in-a-background-job) or a scheduled task where there is no meaningful request — so the link can come out with the wrong host, `localhost`, or `http://` instead of `https://`. Pin your canonical address once in `config/settings.cfm`:
+
+```cfm title="config/settings.cfm"
+set(baseUrl="https://your-app.com");
+```
+
+`urlFor()`, `linkTo()`, `redirectTo(onlyPath=false)`, and asset URLs then use it for every absolute URL regardless of how (or whether) a request triggered them. Leave it unset in development to keep using the request host. In `production` Wheels logs a one-time reminder if it is unset.
+:::
+
 ## Send in a background job
 
 `sendEmail()` runs synchronously: the template render, message composition, and spool/handoff all happen inside the request before the redirect fires. By default both Lucee and Adobe spool the message to disk rather than waiting for the SMTP handoff, so the cost is usually the render and compose — but with spooling disabled, or a slow template, the user's browser eats that latency on every signup. Push the send into a job:
