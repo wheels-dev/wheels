@@ -23,7 +23,7 @@ if (StructKeyExists(request.wheels.params, "migrationPrefix") && Len(request.whe
 <cfoutput>
 	<div class="ui info message">
 		<div class="header">Result</div>
-		#message#
+		#EncodeForHTML(message)#
 	</div>
 </cfoutput>
 <!--- cfformat-ignore-end --->
