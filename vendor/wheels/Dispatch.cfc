@@ -412,8 +412,19 @@ component output="false" extends="wheels.Global"{
 				// BoxLang compatibility: Check for null action parameter
 				if (IsNull(local.params.action) || !Len(local.params.action)) {
 					throw(
-						type="Wheels.ActionParameterMissing", 
+						type="Wheels.ActionParameterMissing",
 						message="The action parameter is missing or null. Controller: #local.params.controller#");
+				}
+
+				// Dev-tools network-origin gate: the password-less /wheels GUI
+				// endpoints only answer requests addressed to a local host name
+				// (Host header + no non-loopback X-Forwarded-For; not the socket, so
+				// Docker port-mapped access keeps working). Mutating endpoints add
+				// their own loopback-socket + CSRF / password checks on top. Guarded
+				// so a test double swapped in for the public component (which need not
+				// implement the gate) still dispatches.
+				if (StructKeyExists(application.wheels.public, "$enforceDevToolLocalAccess")) {
+					application.wheels.public.$enforceDevToolLocalAccess();
 				}
 
 				$engineAdapter().invokeMethod(application.wheels.public, local.params.action);
