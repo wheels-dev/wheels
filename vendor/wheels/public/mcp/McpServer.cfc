@@ -605,9 +605,31 @@ component output="false" displayName="MCP Server" {
 			}
 		];
 
+		// The deprecated HTTP surface is read-only — advertise only the read-only
+		// tools so the listing matches what tools/call will actually permit.
+		local.readOnlyTools = $httpReadOnlyTools();
+		local.filteredTools = [];
+		for (local.tool in local.tools) {
+			if (ListFindNoCase(local.readOnlyTools, local.tool.name)) {
+				ArrayAppend(local.filteredTools, local.tool);
+			}
+		}
+
 		return createSuccessResponse(arguments.id, {
-			"tools": local.tools
+			"tools": local.filteredTools
 		});
+	}
+
+	/**
+	 * The read-only tools that may be called over the DEPRECATED HTTP MCP surface
+	 * (this component backs only /wheels/mcp; the canonical MCP is the stdio
+	 * server, `wheels mcp wheels`). Everything else — generate, migrate, test,
+	 * validate, server, reload, develop — writes files, changes state, or runs
+	 * commands, so it is refused here and available only over stdio. Fail-closed:
+	 * a tool not named here is treated as mutating.
+	 */
+	private string function $httpReadOnlyTools() {
+		return "analyze";
 	}
 
 	private any function handleToolsCall(required struct params, required string sessionId, required any id) {
@@ -621,6 +643,18 @@ component output="false" displayName="MCP Server" {
 
 		local.toolName = arguments.params.name;
 		local.args = structKeyExists(arguments.params, "arguments") ? arguments.params.arguments : {};
+
+		// The HTTP MCP surface is deprecated and read-only. Refuse any tool that is
+		// not on the read-only allow-list before it can execute, so an unauthenticated
+		// request to this endpoint cannot write files, migrate, or run commands.
+		if (!ListFindNoCase($httpReadOnlyTools(), local.toolName)) {
+			return createErrorResponse(
+				{"id": arguments.id},
+				-32002,
+				"Tool '#local.toolName#' is not available over the deprecated HTTP MCP endpoint",
+				"Use the stdio MCP server instead: wheels mcp wheels"
+			);
+		}
 
 		try {
 			local.result = "";
