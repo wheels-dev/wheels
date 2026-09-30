@@ -552,7 +552,9 @@
 
 		// Historic test helper defaults to ignore. Opt in to exception/abort
 		// without flipping the production protectsFromForgery() default.
-		local.controller.protectsFromForgery(with = arguments.csrf);
+		// The override is applied to this controller instance only: protectsFromForgery() would
+		// write it into the application-wide cached controller class (#3843).
+		local.controller.$setCsrfOverride(type = arguments.csrf);
 
 		local.controller.processAction(includeFilters = arguments.includeFilters);
 		local.response = local.controller.response();
