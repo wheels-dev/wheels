@@ -224,7 +224,13 @@
 		}
 		if (Len(arguments.protocol)) {
 			local.rv = arguments.protocol & "://" & local.rv;
-		} else if (request.cgi.http_x_forwarded_proto == "https" || request.cgi.server_port_secure == "true") {
+		} else if (
+			($trustProxyHeaders() && request.cgi.http_x_forwarded_proto == "https")
+			|| request.cgi.server_port_secure == "true"
+		) {
+			// X-Forwarded-Proto is client-controlled and only trusted behind a
+			// trusted proxy (set(trustProxyHeaders=true)) — the same gate as
+			// `isSecure()`. server_port_secure is the real socket TLS state.
 			local.rv = "https://" & local.rv;
 		} else {
 			local.rv = "http://" & local.rv;
