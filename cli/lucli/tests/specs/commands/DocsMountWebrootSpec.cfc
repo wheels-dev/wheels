@@ -162,6 +162,45 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(fx.mount & "/manifest.json")).toBeTrue();
 			});
 
+			it("fails with Wheels.DocsFetchFailed when the copy fails, leaving the old mirror as it was", () => {
+				var fx = newFixture();
+				mountModule(fx).$docsMountIntoWebroot(fx.cache);
+				writeBundle(fx.cache, "2.0.0", {"guides/index.html": "<h1>Guides 2</h1>"});
+				// A read-only webroot: the copy into public/.wheels-docs-new.<id> fails.
+				fileSetAccessMode(fx.app & "/public", "555");
+				try {
+					expect(() => mountModule(fx).$docsMountIntoWebroot(fx.cache)).toThrow("Wheels.DocsFetchFailed");
+				} finally {
+					fileSetAccessMode(fx.app & "/public", "755");
+				}
+				expect(fileRead(fx.mount & "/guides/index.html")).toBe("<h1>Guides 1</h1>");
+				expect(fileExists(fx.mount & "/old-only.html")).toBeTrue();
+				var leftovers = directoryList(fx.app & "/public", false, "name").filter((n) => left(n, 13) == ".wheels-docs-");
+				expect(leftovers).toBeEmpty();
+			});
+
+			it("fails with Wheels.DocsFetchFailed when the installed docs have no manifest.json", () => {
+				var fx = newFixture();
+				fileDelete(fx.cache & "/manifest.json");
+				expect(() => mountModule(fx).$docsMountIntoWebroot(fx.cache)).toThrow("Wheels.DocsFetchFailed");
+				expect(directoryExists(fx.mount)).toBeFalse();
+			});
+
+			it("does not fail when it leaves a user's own folder or a symlink alone", () => {
+				var fx = newFixture();
+				directoryCreate(fx.mount, true);
+				fileWrite(fx.mount & "/mine.txt", "the user's own file");
+				expect(() => mountModule(fx).$docsMountIntoWebroot(fx.cache)).notToThrow();
+
+				var fx2 = newFixture();
+				directoryCreate(fx2.app & "/elsewhere", true);
+				variables.Files.createSymbolicLink(nioPath(fx2.mount), nioPath(fx2.app & "/elsewhere"), []);
+				var m = mountModule(fx2);
+				expect(() => m.$docsMountIntoWebroot(fx2.cache)).notToThrow();
+				expect(printed(m)).toInclude("symbolic link");
+				expect(directoryList(fx2.app & "/elsewhere")).toBeEmpty();
+			});
+
 			it("skips the mount when the project has no public/ webroot", () => {
 				var fx = newFixture(withPublic = false);
 				var m = mountModule(fx);

@@ -1687,9 +1687,10 @@ component extends="modules.BaseModule" {
 	 * The mirror is refreshed only when missing or when its manifest.json
 	 * differs from the cache's (a version change). It is a real copy, never
 	 * hardlinks, so edits in the app cannot change the shared cache. It is
-	 * built beside the target and swapped in by rename. Failures print a
-	 * warning and do not fail the calling command. Same rules as the Linux
-	 * package wrapper's docs-mirror block.
+	 * built beside the target and swapped in by rename. A failed copy or swap
+	 * goes through $docsFetchFail, so `wheels docs fetch` exits non-zero; a
+	 * user's own folder or a symlink left alone is not a failure. Same rules
+	 * as the Linux package wrapper's docs-mirror block.
 	 */
 	private void function $docsMountIntoWebroot(required string source) {
 		var webroot = variables.projectRoot & "/public";
@@ -1713,8 +1714,10 @@ component extends="modules.BaseModule" {
 		}
 
 		if (!fileExists(sourceManifest)) {
-			out("  The docs at #arguments.source# have no manifest.json; not mounting them into the webroot.", "red");
-			return;
+			$docsFetchFail(
+				"The docs at #arguments.source# have no manifest.json, so they were not mounted into the webroot.",
+				["  Re-run `wheels docs fetch --force` to reinstall the bundle."]
+			);
 		}
 		var mountPath = createObject("java", "java.io.File").init(mount).toPath();
 		if (createObject("java", "java.nio.file.Files").isSymbolicLink(mountPath)) {
@@ -1746,8 +1749,10 @@ component extends="modules.BaseModule" {
 			if (directoryExists(tmp)) {
 				try { directoryDelete(tmp, true); } catch (any ignored) {}
 			}
-			out("  Could not copy the docs into the webroot: #e.message#", "red");
-			return;
+			$docsFetchFail(
+				"The docs were installed, but copying them into the webroot failed: #e.message#",
+				["  #mount# was left as it was."]
+			);
 		}
 		var hadOld = directoryExists(mount);
 		if (hadOld) {
@@ -1755,8 +1760,10 @@ component extends="modules.BaseModule" {
 				directoryRename(mount, old);
 			} catch (any e) {
 				try { directoryDelete(tmp, true); } catch (any ignored) {}
-				out("  Could not move the old docs mirror at #mount# aside: #e.message#", "red");
-				return;
+				$docsFetchFail(
+					"The docs were installed, but the old docs mirror at #mount# could not be moved aside: #e.message#",
+					["  #mount# was left as it was."]
+				);
 			}
 		}
 		try {
@@ -1766,8 +1773,10 @@ component extends="modules.BaseModule" {
 				try { directoryRename(old, mount); } catch (any ignored) {}
 			}
 			try { directoryDelete(tmp, true); } catch (any ignored) {}
-			out("  Could not put the docs mirror in place at #mount#: #e.message#", "red");
-			return;
+			$docsFetchFail(
+				"The docs were installed, but the new docs mirror could not be put in place at #mount#: #e.message#",
+				[hadOld && directoryExists(mount) ? "  The previous mirror was restored." : "  Re-run `wheels docs fetch --force`."]
+			);
 		}
 		if (hadOld) {
 			try {
