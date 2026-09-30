@@ -233,6 +233,31 @@ component {
 	}
 
 	/**
+	 * Internal function. Names in `directory` that are `file` plus an extension
+	 * ("report" matches "report.txt"), for sendFile()'s extension-less lookup.
+	 * Matched here rather than with a cfdirectory `filter="report.*"`, which
+	 * BoxLang and RustCFML don't apply the way Lucee and Adobe do (#3852).
+	 */
+	public array function $sendFileExtensionMatches(required string directory, required string file) {
+		local.rv = [];
+		if (!Len(arguments.file) || !DirectoryExists(arguments.directory)) {
+			return local.rv;
+		}
+		local.prefix = arguments.file & ".";
+		local.prefixLength = Len(local.prefix);
+		for (local.entry in DirectoryList(arguments.directory, false, "name")) {
+			if (
+				Len(local.entry) > local.prefixLength
+				&& CompareNoCase(Left(local.entry, local.prefixLength), local.prefix) == 0
+				&& FileExists(arguments.directory & "/" & local.entry)
+			) {
+				ArrayAppend(local.rv, local.entry);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Internal function. The web root's folder on disk, with a trailing slash: the
 	 * folder of the request's entry template (public/index.cfm in a standard app).
 	 * Unlike `rootPath`, which is a URL path, this is right however URL rewrites or
@@ -331,12 +356,16 @@ component {
 				// public/, so ExpandPath(rootPath & filePath) looked in <app>/files instead.
 				local.fullPath = $sendFileWebrootDirectory() & $get("filePath") & "/" & Replace(arguments.file, "\", "/", "all");
 				local.fullPath = Replace(local.fullPath, "//", "/", "all");
-				local.file = ListLast(local.fullPath, "/");
-				local.directory = Reverse(ListRest(Reverse(local.fullPath), "/"));
 				if (Left(Replace(GetDirectoryFromPath(GetBaseTemplatePath()), "\", "/", "all"), 2) == "//") {
 					// Keep a UNC path's leading double slash.
 					local.fullPath = "/" & local.fullPath;
-					local.directory = "/" & local.directory;
+				}
+				local.file = ListLast(local.fullPath, "/");
+				// GetDirectoryFromPath, not Reverse(ListRest(Reverse(...))): BoxLang's ListRest
+				// drops the leading "/", which turned the folder into a relative path there.
+				local.directory = GetDirectoryFromPath(local.fullPath);
+				if (Len(local.directory) > 1 && Right(local.directory, 1) == "/") {
+					local.directory = Left(local.directory, Len(local.directory) - 1);
 				}
 			} else {
 				if (Left(local.folder, Len(local.root)) == local.root) {
@@ -373,11 +402,11 @@ component {
 
 			// If the file is not found, try searching for it.
 			if (!FileExists(local.fullPath)) {
-				local.match = $directory(action = "list", directory = local.directory, filter = "#local.file#.*");
+				local.matches = $sendFileExtensionMatches(directory = local.directory, file = local.file);
 
 				// Only extract the extension if we find a single match.
-				if (local.match.recordCount == 1) {
-					local.file &= "." & ListLast(local.match.name, ".");
+				if (ArrayLen(local.matches) == 1) {
+					local.file &= "." & ListLast(local.matches[1], ".");
 					local.fullPath = local.directory & "/" & local.file;
 				} else {
 					Throw(
