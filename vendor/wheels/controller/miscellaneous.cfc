@@ -214,12 +214,45 @@ component {
 	}
 
 	/**
+	 * Internal function. True when sendFile() should resolve `file` inside the
+	 * `filePath` folder on disk (#3852): no `directory`, a relative `filePath`
+	 * setting, and a plain relative `file`. Root-anchored or mapping paths
+	 * ("/wheels/..."), drive-letter or UNC paths, and URLs keep the legacy handling.
+	 */
+	public boolean function $sendFileUsesFilesFolder(required string file, required string directory) {
+		local.file = Replace(arguments.file, "\", "/", "all");
+		local.filePath = Replace($get("filePath"), "\", "/", "all");
+		return !Len(arguments.directory)
+			&& Len(local.file)
+			&& Left(local.file, 1) != "/"
+			&& !REFind("^[A-Za-z]:", local.file)
+			&& !Find("://", local.file)
+			&& Len(local.filePath)
+			&& Left(local.filePath, 1) != "/"
+			&& !REFind("^[A-Za-z]:", local.filePath);
+	}
+
+	/**
+	 * Internal function. The web root's folder on disk, with a trailing slash: the
+	 * folder of the request's entry template (public/index.cfm in a standard app).
+	 * Unlike `rootPath`, which is a URL path, this is right however URL rewrites or
+	 * `set(subpath=...)` map the app's URL onto disk.
+	 */
+	public string function $sendFileWebrootDirectory() {
+		local.rv = Replace(GetDirectoryFromPath(GetBaseTemplatePath()), "\", "/", "all");
+		if (Right(local.rv, 1) != "/") {
+			local.rv &= "/";
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Sends a file to the user (from the `files` folder or a path relative to it by default).
 	 *
 	 * [section: Controller]
 	 * [category: Miscellaneous Functions]
 	 *
-	 * @file The file to send to the user. Values containing the `..` character sequence anywhere (even as part of a legitimate file name) are rejected to prevent path traversal.
+	 * @file The file to send to the user, relative to the `filePath` folder on disk (`public/files` by default; subfolders such as `reports/2026/q1.zip` are fine). Values containing the `..` character sequence anywhere (even as part of a legitimate file name) are rejected to prevent path traversal.
 	 * @name The file name to show in the browser download dialog box.
 	 * @type The HTTP content type to deliver the file as.
 	 * @disposition Set to `inline` to have the browser handle the opening of the file (possibly inline in the browser) or set to `attachment` to force a download dialog box.
@@ -289,6 +322,22 @@ component {
 				local.directory = local.normalizedDir;
 				local.file = arguments.file;
 				local.fullPath = local.directory & "/" & local.file;
+			} else if ($sendFileUsesFilesFolder(file = arguments.file, directory = arguments.directory)) {
+				// https://github.com/wheels-dev/wheels/issues/3852 — a plain relative `file`
+				// (e.g. "reports/2026/q1.zip") is relative to the `filePath` folder (public/files)
+				// on disk. Build that from the web root's physical folder, not from `rootPath`:
+				// rootPath is the app's URL path, and under a subdirectory install whose rewrites
+				// fold /public/ out of the URL (or set(subpath=...)) it points one level above
+				// public/, so ExpandPath(rootPath & filePath) looked in <app>/files instead.
+				local.fullPath = $sendFileWebrootDirectory() & $get("filePath") & "/" & Replace(arguments.file, "\", "/", "all");
+				local.fullPath = Replace(local.fullPath, "//", "/", "all");
+				local.file = ListLast(local.fullPath, "/");
+				local.directory = Reverse(ListRest(Reverse(local.fullPath), "/"));
+				if (Left(Replace(GetDirectoryFromPath(GetBaseTemplatePath()), "\", "/", "all"), 2) == "//") {
+					// Keep a UNC path's leading double slash.
+					local.fullPath = "/" & local.fullPath;
+					local.directory = "/" & local.directory;
+				}
 			} else {
 				if (Left(local.folder, Len(local.root)) == local.root) {
 					local.folder = RemoveChars(local.folder, 1, Len(local.root));
