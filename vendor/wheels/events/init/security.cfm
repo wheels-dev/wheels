@@ -69,14 +69,11 @@
 		// neither list exists — a breaking opt-in, not the framework default.
 		application.$wheels.massAssignmentStrict = false;
 
-		// The migrator dev tools only answer requests whose Host header names the
-		// local machine (localhost, 127.0.0.1, [::1]). Add extra host names here as
-		// a comma-delimited list if you reach the dev tools under another local name.
-		application.$wheels.migratorAllowedHosts = "";
-
 		// The password-less /wheels dev endpoints (GUI pages, docs, test runners,
-		// the deprecated HTTP MCP) only answer requests whose Host header names the
-		// local machine. Add extra local host names here (comma-delimited) if you
-		// reach the dev tools under another name, e.g. a *.test hostname.
+		// the migrator, the deprecated HTTP MCP) only answer requests whose Host
+		// header names the local machine (localhost, *.localhost, 127.0.0.0/8,
+		// [::1]). Add extra local host names here (comma-delimited) if you reach the
+		// dev tools under another name, e.g. a *.test hostname. This one setting and
+		// parser is shared by the dispatch-level gate and the migrator's guard.
 		application.$wheels.devToolsAllowedHosts = "";
 </cfscript>
