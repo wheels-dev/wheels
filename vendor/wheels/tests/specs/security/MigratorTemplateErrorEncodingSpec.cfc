@@ -32,6 +32,16 @@ component extends="wheels.WheelsTest" {
 				expect(ListFindNoCase(names, "<img src=x onerror=alert(1)>")).toBe(0, "markup is not a valid name");
 			});
 
+			it("resolves a case variant to the canonical snippet name for the file path", () => {
+				// The allow-list matches case-insensitively, but the file path must use
+				// the on-disk case so "Blank" opens "blank.txt" on a case-sensitive
+				// (Linux) filesystem. createMigration uses ListGetAt on the match index.
+				var names = variables.migrator.$getAvailableTemplateNames();
+				var idx = ListFindNoCase(names, "BLANK");
+				expect(idx).toBeGT(0);
+				expect(ListGetAt(names, idx)).toBe("blank", "canonical on-disk case");
+			});
+
 		});
 
 		describe("the migrator template output is HTML-encoded", () => {

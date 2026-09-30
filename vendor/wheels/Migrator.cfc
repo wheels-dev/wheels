@@ -791,12 +791,16 @@ component output="false" extends="wheels.Global"{
 		// or gets reflected back in the message (see R2-4). The message lists the
 		// valid names instead, so it stays useful.
 		local.availableTemplates = $getAvailableTemplateNames();
-		if (!ListLen(local.availableTemplates) || !ListFindNoCase(local.availableTemplates, arguments.templateName)) {
+		local.templateMatch = ListFindNoCase(local.availableTemplates, arguments.templateName);
+		if (!ListLen(local.availableTemplates) || !local.templateMatch) {
 			return "The requested migration template could not be found. Available templates: "
 				& local.availableTemplates
 				& ". Run `wheels g snippets` from the root of your application to generate the template files.";
 		}
-		local.templateFile = this.paths.templates & "/" & arguments.templateName & ".txt";
+		// Use the canonical-case name from the allow-list so a case variant (e.g.
+		// "Blank") still resolves to "blank.txt" on a case-sensitive filesystem.
+		local.templateNameCanonical = ListGetAt(local.availableTemplates, local.templateMatch);
+		local.templateFile = this.paths.templates & "/" & local.templateNameCanonical & ".txt";
 		local.extendsPath = "wheels.migrator.Migration";
 		if (!DirectoryExists(this.paths.migrate)) {
 			DirectoryCreate(this.paths.migrate);
