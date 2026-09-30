@@ -1,3 +1,10 @@
+<cfscript>
+// Dev-tool access gate: reject requests not addressed to the local machine
+// before rendering the create GUI or issuing the anti-CSRF token. Runs before
+// the layout header so a rejected request gets a clean 403 with no page output.
+include "/wheels/public/migrator/_guard.cfm";
+$migratorEnforceLocalAccess();
+</cfscript>
 <cfinclude template="../layout/_header.cfm">
 <cfscript>
 datasourceAvailable=true;

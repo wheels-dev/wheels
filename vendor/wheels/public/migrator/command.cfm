@@ -72,6 +72,7 @@ if (!StructKeyExists(variables, "$migratorComputeResult")) {
 
 $migratorEnforceLocalhost();
 $migratorEnforceNoForwardedClients();
+$migratorEnforceLocalHostname();
 $migratorVerifyCsrfToken();
 local.computed = $migratorComputeResult();
 executeAction = local.computed.executeAction;

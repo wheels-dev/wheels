@@ -68,4 +68,9 @@
 		// protectedProperties() is configured. Set true to fail closed when
 		// neither list exists — a breaking opt-in, not the framework default.
 		application.$wheels.massAssignmentStrict = false;
+
+		// The migrator dev tools only answer requests whose Host header names the
+		// local machine (localhost, 127.0.0.1, [::1]). Add extra host names here as
+		// a comma-delimited list if you reach the dev tools under another local name.
+		application.$wheels.migratorAllowedHosts = "";
 </cfscript>
