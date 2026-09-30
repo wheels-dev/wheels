@@ -225,17 +225,53 @@
 		if (Len(arguments.protocol)) {
 			local.rv = arguments.protocol & "://" & local.rv;
 		} else if (
-			($trustProxyHeaders() && request.cgi.http_x_forwarded_proto == "https")
-			|| request.cgi.server_port_secure == "true"
+			request.cgi.server_port_secure == "true"
+			|| request.cgi.http_x_forwarded_proto == "https"
 		) {
-			// X-Forwarded-Proto is client-controlled and only trusted behind a
-			// trusted proxy (set(trustProxyHeaders=true)) — the same gate as
-			// `isSecure()`. server_port_secure is the real socket TLS state.
+			// The real socket TLS state (server_port_secure) always wins. The
+			// X-Forwarded-Proto header is client-controlled: it still sets the
+			// scheme today so an app behind a TLS-terminating proxy keeps its
+			// https:// URLs, but when it is the ONLY reason and the app has not
+			// opted in with set(trustProxyHeaders=true), warn once that 4.2 will
+			// require the opt-in — the same gate isSecure() already applies.
+			if (
+				request.cgi.server_port_secure != "true"
+				&& request.cgi.http_x_forwarded_proto == "https"
+				&& !$trustProxyHeaders()
+			) {
+				$warnUntrustedForwardedProtoOnce();
+			}
 			local.rv = "https://" & local.rv;
 		} else {
 			local.rv = "http://" & local.rv;
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal. Logs a one-time warning when an absolute URL's scheme was taken
+	 * from an untrusted `X-Forwarded-Proto` header (the app has not set
+	 * `trustProxyHeaders=true` and the request is not really on TLS). The header
+	 * still sets the scheme today so proxied apps keep their https:// URLs, but
+	 * Wheels 4.2 will require the opt-in, matching `isSecure()`.
+	 */
+	public void function $warnUntrustedForwardedProtoOnce() {
+		if (!StructKeyExists(application, "wheels") || StructKeyExists(application.wheels, "$forwardedProtoTrustWarned")) {
+			return;
+		}
+		cflock(name = "wheels.forwardedProtoTrust.#application.applicationName#", type = "exclusive", timeout = 5) {
+			if (!StructKeyExists(application.wheels, "$forwardedProtoTrustWarned")) {
+				application.wheels.$forwardedProtoTrustWarned = true;
+				cflog(
+					type = "warning",
+					file = "wheels",
+					text = "An absolute URL's https scheme was taken from the X-Forwarded-Proto header, but "
+						& "trustProxyHeaders is not enabled. The header is client-controlled; set "
+						& "set(trustProxyHeaders=true) if this app sits behind a trusted TLS-terminating proxy. "
+						& "Wheels 4.2 will require the opt-in and otherwise ignore the header for the URL scheme."
+				);
+			}
+		}
 	}
 
 
