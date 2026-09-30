@@ -78,6 +78,27 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("connection challenge on the CLI transport (##3769)", () => {
 
+			it("the stub's loopback port can't be shadowed by another 127.0.0.1 bind (##3834)", () => {
+				// On macOS/BSD a SO_REUSEADDR socket may bind 127.0.0.1:<port> over a
+				// wildcard listener and take its loopback connections, so the peer
+				// check rightly answers "not this pid" (the ##3804 family).
+				var stub = new cli.lucli.tests.ChallengeStubServer("unavailable", variables.token);
+				var shadow = createObject("java", "java.net.ServerSocket").init();
+				var state = {bound: false};
+				try {
+					shadow.setReuseAddress(true);
+					try {
+						shadow.bind(createObject("java", "java.net.InetSocketAddress").init("127.0.0.1", javacast("int", stub.getPort())));
+						state.bound = true;
+					} catch (any e) {
+					}
+					expect(state.bound).toBeFalse("another socket bound 127.0.0.1 on the stub's port");
+				} finally {
+					try { shadow.close(); } catch (any e) {}
+					stub.stop();
+				}
+			});
+
 			it("a right answer proves the connection without OS introspection", () => {
 				var stub = new cli.lucli.tests.ChallengeStubServer("valid", variables.token);
 				var other = otherProcess();
