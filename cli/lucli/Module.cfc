@@ -1681,8 +1681,15 @@ component extends="modules.BaseModule" {
 	 * under the webroot for the container to serve them. Pages still go through
 	 * the framework route.
 	 *
-	 * Hardlinks where possible so the shared cache is not duplicated per app;
-	 * falls back to a copy across filesystems.
+	 * Only a docs mirror is ever replaced: the bundle's manifest.json marks
+	 * one (made by this command, an older CLI or the Linux package wrapper).
+	 * A public/wheels-docs without it is the user's own and is left alone.
+	 * The mirror is refreshed only when missing or when its manifest.json
+	 * differs from the cache's (a version change). It is a real copy, never
+	 * hardlinks, so edits in the app cannot change the shared cache. It is
+	 * built beside the target and swapped in by rename. Failures print a
+	 * warning and do not fail the calling command. Same rules as the Linux
+	 * package wrapper's docs-mirror block.
 	 */
 	private void function $docsMountIntoWebroot(required string source) {
 		var webroot = variables.projectRoot & "/public";
@@ -1691,42 +1698,86 @@ component extends="modules.BaseModule" {
 			return;
 		}
 		var mount = webroot & "/wheels-docs";
-		if (directoryExists(mount)) {
-			// directoryDelete rather than rm -rf so a partially-written mount
-			// from an interrupted run is cleared cleanly.
-			try {
-				directoryDelete(mount, true);
-			} catch (any e) {
-				out("  Could not clear the existing mount at #mount#.", "red");
+		var sourceManifest = arguments.source & "/manifest.json";
+		var mountManifest = mount & "/manifest.json";
+
+		// Clear leftovers from runs that were killed mid-copy or mid-swap.
+		for (var name in directoryList(webroot, false, "name")) {
+			if (left(name, 17) == ".wheels-docs-new." || left(name, 17) == ".wheels-docs-old.") {
+				try {
+					directoryDelete(webroot & "/" & name, true);
+				} catch (any e) {
+					// Best effort; a stale temp dir does not block the mount.
+				}
+			}
+		}
+
+		if (!fileExists(sourceManifest)) {
+			out("  The docs at #arguments.source# have no manifest.json; not mounting them into the webroot.", "red");
+			return;
+		}
+		var mountPath = createObject("java", "java.io.File").init(mount).toPath();
+		if (createObject("java", "java.nio.file.Files").isSymbolicLink(mountPath)) {
+			// Never swap out a link: deleting it recursively could follow it
+			// into whatever it points at.
+			out("  Left #mount# alone: it is a symbolic link, not a docs mirror.", "yellow");
+			out("  Remove the link and run `wheels docs fetch --force` to mount the docs there.");
+			return;
+		}
+		if (directoryExists(mount) || fileExists(mount)) {
+			if (!fileExists(mountManifest)) {
+				out("  Left #mount# alone: it has no manifest.json, so it is not a docs mirror.", "yellow");
+				out("  Move or rename it and run `wheels docs fetch --force` to mount the docs there.");
+				return;
+			}
+			if (compare(fileRead(mountManifest), fileRead(sourceManifest)) == 0) {
+				out("  The webroot mirror at #mount# is current.", "green");
+				out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
 				return;
 			}
 		}
-		// -R -l hardlinks; -R alone copies. Try links first: same filesystem is
-		// the common case and costs no extra disk.
-		var linked = false;
+
+		var runId = createUUID();
+		var tmp = webroot & "/.wheels-docs-new." & runId;
+		var old = webroot & "/.wheels-docs-old." & runId;
 		try {
-			cfexecute(name = "cp", arguments = "-R -l #arguments.source# #mount#", timeout = 300, variable = "local.o1", errorVariable = "local.e1");
-			linked = directoryExists(mount);
+			directoryCopy(arguments.source, tmp, true);
 		} catch (any e) {
-			linked = false;
+			if (directoryExists(tmp)) {
+				try { directoryDelete(tmp, true); } catch (any ignored) {}
+			}
+			out("  Could not copy the docs into the webroot: #e.message#", "red");
+			return;
 		}
-		if (!linked) {
+		var hadOld = directoryExists(mount);
+		if (hadOld) {
 			try {
-				cfexecute(name = "cp", arguments = "-R #arguments.source# #mount#", timeout = 600, variable = "local.o2", errorVariable = "local.e2");
+				directoryRename(mount, old);
 			} catch (any e) {
-				out("  Could not mount the docs into the webroot: #e.message#", "red");
+				try { directoryDelete(tmp, true); } catch (any ignored) {}
+				out("  Could not move the old docs mirror at #mount# aside: #e.message#", "red");
 				return;
 			}
 		}
-		if (directoryExists(mount)) {
-			out("  Mounted at #mount#", "green");
-			out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
-			if (!linked) {
-				out("  (copied — the cache and webroot are on different filesystems)");
+		try {
+			directoryRename(tmp, mount);
+		} catch (any e) {
+			if (hadOld && !directoryExists(mount)) {
+				try { directoryRename(old, mount); } catch (any ignored) {}
 			}
-		} else {
-			out("  Could not mount the docs into the webroot.", "red");
+			try { directoryDelete(tmp, true); } catch (any ignored) {}
+			out("  Could not put the docs mirror in place at #mount#: #e.message#", "red");
+			return;
 		}
+		if (hadOld) {
+			try {
+				directoryDelete(old, true);
+			} catch (any e) {
+				// Cleared as a leftover on the next run.
+			}
+		}
+		out("  Mounted at #mount#", "green");
+		out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
 	}
 
 	/**
