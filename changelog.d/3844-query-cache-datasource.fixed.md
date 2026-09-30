@@ -1,0 +1,1 @@
+- The per-request query cache now keys on the datasource a query actually runs against, after tenant resolution. An app that switches tenant (or datasource) within one request no longer receives another datasource's cached `findAll()`/`count()` result for an identical finder call (#3844)

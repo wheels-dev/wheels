@@ -135,6 +135,28 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function.
+	 *
+	 * The datasource a query with this `dataSource` argument actually runs against. Multi-tenant
+	 * override: when a tenant is active and this model is not shared, a query on the model's
+	 * default datasource is routed to the tenant's datasource. $performQuery() uses this, and the
+	 * per-request query cache keys on it, so both always agree on the datasource (#3844).
+	 */
+	public string function $effectiveDataSource(string dataSource = variables.dataSource) {
+		// Use IsDefined() for safe nested scope traversal — StructKeyExists on
+		// the request scope can throw during app startup when request.wheels is absent.
+		if (
+			!variables.$sharedModel
+			&& arguments.dataSource == variables.dataSource
+			&& IsDefined("request.wheels.tenant.dataSource")
+			&& Len(request.wheels.tenant.dataSource)
+		) {
+			return request.wheels.tenant.dataSource;
+		}
+		return arguments.dataSource;
+	}
+
+	/**
 	 * Returns whether this adapter's model is shared.
 	 */
 	public boolean function $isSharedModel() {
@@ -877,18 +899,7 @@ component output=false extends="wheels.Global"{
 		string $debugName = "query",
 		boolean $captureResult = true
 	) {
-		// Multi-tenant datasource override: if a tenant is active and this model
-		// is not shared, route the query to the tenant's datasource.
-		// Use IsDefined() for safe nested scope traversal — StructKeyExists on
-		// the request scope can throw during app startup when request.wheels is absent.
-		if (
-			!variables.$sharedModel
-			&& arguments.dataSource == variables.dataSource
-			&& IsDefined("request.wheels.tenant.dataSource")
-			&& Len(request.wheels.tenant.dataSource)
-		) {
-			arguments.dataSource = request.wheels.tenant.dataSource;
-		}
+		arguments.dataSource = $effectiveDataSource(arguments.dataSource);
 
 		local.queryAttributes = {};
 		local.queryAttributes.dataSource = arguments.dataSource;

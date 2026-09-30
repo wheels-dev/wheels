@@ -314,7 +314,12 @@
 				$ensureRequestQueryCache();
 
 				// Derive the request cache key from the SQL shell key computed above (it already encodes the model name and the full arguments struct) so we don't have to serialize all arguments a second time.
-				local.queryKey = $hashedKey(local.queryShellKey, local.originalWhere);
+				// The effective datasource (after tenant resolution) is part of the key: the tenant datasource is applied inside the adapter, so the dataSource argument alone does not identify where the query runs (#3844).
+				local.queryKey = $hashedKey(
+					local.queryShellKey,
+					local.originalWhere,
+					variables.wheels.class.adapter.$effectiveDataSource(arguments.dataSource)
+				);
 			}
 
 			// return existing query result if it has been run already in current request, otherwise pass off the sql array to the query
