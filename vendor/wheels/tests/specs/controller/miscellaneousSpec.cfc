@@ -385,6 +385,15 @@ component extends="wheels.WheelsTest" {
 					expect(r.name).toBe("report.txt")
 				})
 
+				it("uses the on-disk name when the extension-less name differs only in case", () => {
+					args.file = "sub3852/2026/REPORT"
+					r = _controller.sendFile(argumentCollection = args)
+
+					// toBeWithCase: toBe compares strings case-insensitively.
+					expect(r.name).toBeWithCase("report.txt")
+					expect(ListLast(Replace(r.file, "\", "/", "all"), "/")).toBeWithCase("report.txt")
+				})
+
 				it("reports the files folder on disk when the file is missing", () => {
 					args.file = "sub3852/2026/missing.pdf"
 					expect(() => {

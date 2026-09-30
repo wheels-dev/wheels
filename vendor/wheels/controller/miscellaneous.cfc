@@ -406,7 +406,9 @@ component {
 
 				// Only extract the extension if we find a single match.
 				if (ArrayLen(local.matches) == 1) {
-					local.file &= "." & ListLast(local.matches[1], ".");
+					// The on-disk name: the match is case-insensitive, and "Report" & ".pdf"
+					// would not exist on a case-sensitive filesystem.
+					local.file = local.matches[1];
 					local.fullPath = local.directory & "/" & local.file;
 				} else {
 					Throw(
