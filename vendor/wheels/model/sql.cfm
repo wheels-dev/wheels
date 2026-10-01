@@ -1004,6 +1004,28 @@
 		local.i = 1;
 		while (local.i <= local.n) {
 			local.ch = Mid(arguments.where, local.i, 1);
+			// A CFML date interpolated into the string renders as an ODBC escape,
+			// {ts '2020-01-01 00:00:00'} (or {d '...'} / {t '...'}), either bare or
+			// inside a quoted literal. Its inner quotes would otherwise end the
+			// surrounding literal early. Only the exact form with a date/time value
+			// (digits, - : . and spaces) is recognised; it is masked as one literal
+			// holding the inner value. Anything else falls through to the ordinary
+			// handling below.
+			if (local.ch == "'" || local.ch == "{") {
+				local.odbc = $matchOdbcDateLiteral(arguments.where, local.i, local.ch == "'");
+				if (local.odbc.matched) {
+					local.out.append("'");
+					local.out.append(local.sentinel);
+					// The escape kind rides in front of the hex ("ts:", "d:", "t:"), so a
+					// position that isn't bound can write the escape back (see
+					// $restoreMaskedLiterals); a bound position takes the plain value.
+					local.out.append(local.odbc.kind & ":");
+					local.out.append(LCase(BinaryEncode(CharsetDecode(local.odbc.value, "utf-8"), "hex")));
+					local.out.append("'");
+					local.i += local.odbc.length;
+					continue;
+				}
+			}
 			if (local.ch != "'") {
 				local.out.append(local.ch);
 				local.i += 1;
@@ -1064,6 +1086,27 @@
 	}
 
 	/**
+	 * Matches an ODBC date escape ({ts '...'}, {d '...'} or {t '...'}) starting
+	 * at `start` in `where`. When `quoted` is true the escape must be wrapped in
+	 * single quotes ('{ts '...'}'). The inner value may only contain digits,
+	 * hyphens, colons, dots and spaces, so no quote can ever be part of a match.
+	 * Returns {matched, kind, value, length}.
+	 */
+	public struct function $matchOdbcDateLiteral(required string where, required numeric start, required boolean quoted) {
+		local.rv = {matched = false, kind = "", value = "", length = 0};
+		local.pattern = "^" & (arguments.quoted ? "'" : "") & "\{(ts|d|t) '([0-9:. -]+)'\}" & (arguments.quoted ? "'" : "");
+		local.rest = Mid(arguments.where, arguments.start, 60);
+		local.found = REFind(local.pattern, local.rest, 1, true);
+		if (local.found.pos[1] == 1) {
+			local.rv.matched = true;
+			local.rv.kind = LCase(Mid(local.rest, local.found.pos[2], local.found.len[2]));
+			local.rv.value = Mid(local.rest, local.found.pos[3], local.found.len[3]);
+			local.rv.length = local.found.len[1];
+		}
+		return local.rv;
+	}
+
+	/**
 	 * The sentinel that marks a masked literal's content, so a bound value is
 	 * decoded only from a placeholder this model produced, never from text
 	 * that merely looks like hex. Shared with the adapter's decode.
@@ -1106,6 +1149,14 @@
 				break;
 			}
 			local.hex = Mid(arguments.sql, local.hexStart, local.closeIdx - local.hexStart);
+			// An ODBC date mask ("ts:", "d:", "t:" + hex) goes back as the escape the
+			// author wrote, {ts '...'}, which JDBC converts to a date.
+			local.odbcKind = ListFirst(local.hex, ":");
+			if (Find(":", local.hex) && ListFind("ts,d,t", local.odbcKind)) {
+				local.out.append("{" & local.odbcKind & " '" & CharsetEncode(BinaryDecode(ListRest(local.hex, ":"), "hex"), "utf-8") & "'}");
+				local.pos = local.closeIdx + 1;
+				continue;
+			}
 			local.value = Len(local.hex) ? CharsetEncode(BinaryDecode(local.hex, "hex"), "utf-8") : "";
 			local.out.append("'");
 			local.out.append(Replace(local.value, "'", "''", "all"));
