@@ -178,7 +178,7 @@ component extends="Model" {
 - Comparisons using `eq neq lt lte gt gte` or `== != < <= > >=`, compound `&&` / `||` (`&&` binds tighter), `!` and parentheses.
 - A lone `true` or `false`.
 
-Always reference properties through `this.`. A bare name such as `status` is not resolved and throws. Put a `this.` reference on the left of a comparison (`this.frequency eq 'weekly'`, not `'weekly' eq this.frequency`). For anything more complex, move the logic into a model method and use `condition="this.needsCheck()"`.
+Prefer referencing properties through `this.`. A bare name on its own or on the left of a comparison (`isActive`, `status != 'draft'`) is also accepted and resolved as `this.isActive` / `this.status` when the record has that property or method; a name it doesn't have throws. On the right of a comparison, a bare word is a string literal (`this.status neq draft` compares with the text `draft`), and a `this.` reference there throws: put it on the left (`this.frequency eq 'weekly'`, not `'weekly' eq this.frequency`). For anything more complex, move the logic into a model method and use `condition="this.needsCheck()"`.
 
 <Aside type="tip">
   Validations on associations — like requiring child records to be valid before the parent saves — happen through nested properties: when a parent saves children via `nestedProperties()`, each child runs its own validations and an invalid child blocks the save. See the [associations guide](/v4-1-0/basics/associations/) for the setup. (There is no `validatesAssociated` helper in Wheels.)

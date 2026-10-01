@@ -387,10 +387,29 @@ component extends="wheels.WheelsTest" {
 				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
 			})
 
-			// A condition that is neither a reference nor a full "a op b" comparison
-			// used to evaluate to false silently, which skipped the validation.
-			it("fails closed for a single bare word condition instead of skipping the validation", () => {
-				args.condition = "isActive"
+			// Bare names resolve as this.<name> when the key exists; anything else that
+			// is not a reference or a full "a op b" comparison throws (#3928). Before,
+			// these evaluated to false silently, which skipped the validation.
+			it("runs a rule whose bare-name condition is a true property, and skips it when false", () => {
+				user.isActive = true
+				expect(user.$evaluateCondition(condition = "isActive")).toBeTrue()
+				user.isActive = false
+				expect(user.$evaluateCondition(condition = "isActive")).toBeFalse()
+			})
+
+			it("inverts a bare-name unless", () => {
+				user.isActive = true
+				expect(user.$evaluateCondition(unless = "isActive")).toBeFalse()
+				user.isActive = false
+				expect(user.$evaluateCondition(unless = "isActive")).toBeTrue()
+			})
+
+			it("calls a bare-name method", () => {
+				expect(user.$evaluateCondition(condition = "isNew")).toBe(user.isNew())
+			})
+
+			it("fails closed for a bare name that is not a property or method", () => {
+				args.condition = "noSuchName"
 				user.validatesLengthOf(argumentCollection = args)
 				var callValid = () => {
 					user.valid()
@@ -398,13 +417,36 @@ component extends="wheels.WheelsTest" {
 				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
 			})
 
-			it("fails closed for a single bare word unless", () => {
-				args.unless = "isActive"
+			it("fails closed for a bare-name unless that is not a property or method", () => {
+				args.unless = "noSuchName"
 				user.validatesLengthOf(argumentCollection = args)
 				var callValid = () => {
 					user.valid()
 				}
 				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
+			it("resolves a bare left operand: the guide's status != 'draft' skips a draft", () => {
+				user.status = "draft"
+				expect(user.$evaluateCondition(condition = "status != 'draft'")).toBeFalse()
+				user.status = "published"
+				expect(user.$evaluateCondition(condition = "status != 'draft'")).toBeTrue()
+			})
+
+			it("treats a bare right-hand word as a string literal, with or without this. on the left", () => {
+				user.status = "draft"
+				expect(user.$evaluateConditionString("status neq draft")).toBeFalse()
+				expect(user.$evaluateConditionString("this.status neq draft")).toBeFalse()
+				user.status = "published"
+				expect(user.$evaluateConditionString("status neq draft")).toBeTrue()
+				expect(user.$evaluateConditionString("this.status neq draft")).toBeTrue()
+			})
+
+			it("fails closed for a bare left operand that is not a property", () => {
+				var callBare = () => {
+					user.$evaluateConditionString("noSuchName neq 'draft'")
+				}
+				expect(callBare).toThrow()
 			})
 
 			it("fails closed for an incomplete comparison", () => {
@@ -421,11 +463,11 @@ component extends="wheels.WheelsTest" {
 				expect(callLong).toThrow()
 			})
 
-			it("fails closed for a bare word operand instead of comparing the literal word", () => {
-				var callBare = () => {
-					user.$evaluateConditionString("status neq 'draft'")
+			it("fails closed for a this. reference on the right of a comparison", () => {
+				var callRight = () => {
+					user.$evaluateConditionString("'weekly' eq this.frequency")
 				}
-				expect(callBare).toThrow()
+				expect(callRight).toThrow()
 			})
 
 			it("evaluates the guide's this.status != 'draft' example", () => {
@@ -438,13 +480,6 @@ component extends="wheels.WheelsTest" {
 			it("evaluates a lone boolean literal as its value", () => {
 				expect(user.$evaluateConditionString("true")).toBeTrue()
 				expect(user.$evaluateConditionString("false")).toBeFalse()
-			})
-
-			it("fails closed for a this. reference on the right of a comparison", () => {
-				var callRight = () => {
-					user.$evaluateConditionString("'weekly' eq this.frequency")
-				}
-				expect(callRight).toThrow()
 			})
 
 			it("still evaluates literal comparisons of numbers, quoted strings and booleans", () => {
