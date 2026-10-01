@@ -16,17 +16,21 @@ component extends="wheels.Job" {
     }
 
     public void function perform(struct data = {}) {
-        sendEmail(to=arguments.data.email, subject="Welcome!", from="app@example.com");
+        user = model("User").findByKey(arguments.data.userId);
+        new app.mailers.UserMailer().sendWelcome(user);
     }
 }
 ```
+
+`model()` works inside a job. `sendEmail()` does not: it is a controller
+function, so send mail through a mailer (see `app/mailers/README.md`).
 
 Enqueue from a controller:
 
 ```cfm
 var job = new app.jobs.SendWelcomeEmailJob();
-job.enqueue(data={email: user.email});           // immediate
-job.enqueueIn(seconds=300, data={email: "..."}); // delayed 5 minutes
+job.enqueue(data={userId: user.id});                // immediate
+job.enqueueIn(seconds=300, data={userId: user.id}); // delayed 5 minutes
 ```
 
 ## Running jobs
@@ -39,13 +43,7 @@ wheels jobs work --queue=mailers          # specific queue
 wheels jobs status                        # per-queue breakdown
 ```
 
-## Requirements
-
-The first job enqueued needs the job table. Generate and run the migration:
-
-```bash
-wheels generate migration create_wheels_jobs_table
-wheels migrate latest
-```
+The `wheels_jobs` table is created automatically on first use; there is no
+migration to run.
 
 See [Background Jobs](https://guides.wheels.dev/v4-0-0/digging-deeper/background-jobs/) in the guides for retries, backoff, priority queues, and the monitoring dashboard.

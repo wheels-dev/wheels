@@ -1,0 +1,2 @@
+- `Wheels.TableNotFound`, `Wheels.DataSourceNotFound`, and `Wheels.ColumnNotFound` error pages now return HTTP **500** instead of 404. These signal a misconfigured or unmigrated deploy (a server fault), so a 404 hid them from monitoring and made an unmigrated deploy look like missing pages. Genuine client not-found errors (record, route, view, action) still return 404.
+- A missing or invalid CSRF token (`Wheels.InvalidAuthenticityToken`) error page now returns HTTP **403** instead of 500, so a forged or expired-form POST is not counted as a server error.

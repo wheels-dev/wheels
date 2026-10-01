@@ -38,14 +38,16 @@ component extends="wheels.Job" {
 
     public void function perform(required struct data) {
         user = model("User").findByKey(arguments.data.userId);
-        sendEmail(
-            to=user.email,
-            subject="Welcome!",
-            from="app@example.com"
-        );
+        new app.mailers.UserMailer().sendWelcome(user);
     }
 }
 ```
+
+`UserMailer` is the mailer from [Sending Email](/v4-1-0/digging-deeper/sending-email/#organize-sends-in-appmailers). A job is not a controller, so `sendEmail()` isn't available inside `perform()`; send mail through a mailer, which builds the controller instance `sendEmail()` needs. `model()` is available: the base class delegates it to `application.wo.model()`.
+
+<Aside type="note">
+  `model()` inside a job needs Wheels 4.1.2 or later. On earlier 4.x releases, call `application.wo.model("User")` instead.
+</Aside>
 
 Three rules:
 

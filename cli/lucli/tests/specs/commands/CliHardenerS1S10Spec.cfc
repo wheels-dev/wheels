@@ -20,22 +20,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		describe("S2 PROVE — generate controller ../X never hits validateName", () => {
 
 			it("Module.generateController does not call validateName before CodeGen", () => {
-				var body = $sliceFn(moduleSrc, "(?m)^[ \t]*private\s+string\s+function\s+generateController\s*\(", 500);
+				var body = $sliceFn(moduleSrc, "(?m)^[ \t]*private\s+string\s+function\s+generateController\s*\(", 1200);
 				expect(findNoCase("validateName", body)).toBe(0);
 				expect(body).toInclude("codegen.generateController");
 			});
 
 		});
 
-		describe("S3 HOLD — wheels doctor CRITICAL then return empty string", () => {
+		describe("S3 — wheels doctor CRITICAL exits non-zero (4.1.2: CI and agents gate on it)", () => {
 
-			it("doctor() prints CRITICAL then returns empty string and does not throw", () => {
-				var body = $sliceFn(moduleSrc, "(?m)^[ \t]*public\s+string\s+function\s+doctor\s*\(", 6000);
+			it("doctor() prints CRITICAL, then fails with Wheels.DoctorCritical", () => {
+				var body = $sliceFn(moduleSrc, "(?m)^[ \t]*public\s+string\s+function\s+doctor\s*\(", 8000);
 				expect(body).toInclude('case "CRITICAL"');
 				expect(body).toInclude("Status: CRITICAL");
-				expect(body).toInclude("return """"");
-				expect(findNoCase("throw(", body)).toBe(0);
-				expect(findNoCase("rethrow", body)).toBe(0);
+				expect(body).toInclude("Wheels.DoctorCritical");
 			});
 
 			it("validate() already throws Wheels.ValidationFailed (contrast, not flipped)", () => {
@@ -58,14 +56,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		describe("S5 HOLD — wheels start refuse paths return empty string", () => {
+		describe("S5 — wheels start refusals exit non-zero (4.1.2: a refusal that exits 0 hides the failure from scripts and CI)", () => {
 
-			it("start() not-a-project and name-collision refuses return empty string", () => {
+			it("start() not-a-project and name-collision refusals throw after printing guidance", () => {
 				var body = $sliceFn(moduleSrc, "(?m)^[ \t]*public\s+string\s+function\s+start\s*\(", 8000);
 				expect(body).toInclude("$isWheelsProjectDir");
 				expect(body).toInclude("!reg.ours");
-				expect(body).toInclude("return """"");
-				expect(findNoCase("throw(", body)).toBe(0);
+				expect(body).toInclude("Wheels.NotAWheelsProject");
+				expect(body).toInclude("Wheels.ServerNameConflict");
 			});
 
 		});

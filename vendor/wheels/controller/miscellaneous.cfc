@@ -12,7 +12,7 @@ component {
 	 * @to List of email addresses to send the email to.
 	 * @subject The subject line of the email.
 	 * @layout Layout(s) to wrap the email template in. This argument is also aliased as `layouts`.
-	 * @file A list of the names of the files to attach to the email. This will reference files stored in the `files` folder (or a path relative to it). This argument is also aliased as `files`.
+	 * @file A list of the files to attach to the email. A relative path is relative to the `filePath` folder on disk (`public/files` by default; subfolders such as `reports/q3.txt` are fine). Absolute paths and URLs are passed to `cfmailparam` as they are. This argument is also aliased as `files`.
 	 * @detectMultipart When set to `true` and multiple values are provided for the `template` argument, Wheels will detect which of the templates is text and which one is HTML (by counting the `<` characters).
 	 * @deliver When set to `false`, the email will not be sent.
 	 * @writeToFile Path that receives the rendered text and/or HTML body. This is a debug dump of the body content, not a MIME `.eml` — no `From`/`To`/`Subject`/`Content-Type` headers are written. A `.eml` extension will not open as a rendered message in Outlook; use `.html`/`.txt` and open the file in a browser or editor.
@@ -149,8 +149,17 @@ component {
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.item = local.fileArray[local.i];
 				arguments.mailparams[local.i] = {};
-				if (!ReFindNoCase("\\|/", local.item)) {
-					// no directory delimiter is present so append the path
+				// A relative attachment, with or without subfolders, lives in the `filePath`
+				// folder (#3852). Absolute paths and URLs go to cfmailparam as they are.
+				if ($sendFileUsesFilesFolder(file = local.item, directory = "")) {
+					// Same on-disk folder as sendFile(): the web root's folder plus filePath.
+					local.folder = Replace($get("filePath"), "\", "/", "all");
+					if (Right(local.folder, 1) == "/") {
+						local.folder = Left(local.folder, Len(local.folder) - 1);
+					}
+					local.item = $sendFileWebrootDirectory() & local.folder & "/" & Replace(local.item, "\", "/", "all");
+				} else if ($isRelativeFilePath(local.item)) {
+					// filePath is a root-anchored or mapping path.
 					local.item = ExpandPath($get("filePath")) & "/" & local.item;
 				}
 				arguments.mailparams[local.i].file = local.item;
@@ -220,16 +229,21 @@ component {
 	 * ("/wheels/..."), drive-letter or UNC paths, and URLs keep the legacy handling.
 	 */
 	public boolean function $sendFileUsesFilesFolder(required string file, required string directory) {
-		local.file = Replace(arguments.file, "\", "/", "all");
-		local.filePath = Replace($get("filePath"), "\", "/", "all");
-		return !Len(arguments.directory)
-			&& Len(local.file)
-			&& Left(local.file, 1) != "/"
-			&& !REFind("^[A-Za-z]:", local.file)
-			&& !Find("://", local.file)
-			&& Len(local.filePath)
-			&& Left(local.filePath, 1) != "/"
-			&& !REFind("^[A-Za-z]:", local.filePath);
+		return !Len(arguments.directory) && $isRelativeFilePath(arguments.file) && $isRelativeFilePath($get("filePath"));
+	}
+
+	/**
+	 * Internal function. True for a non-empty relative path ("q3.txt", "reports/q3.txt").
+	 * False for a root-anchored or mapping path ("/wheels/..."), a drive-letter or UNC
+	 * path, and a URL. Used by sendFile() and sendEmail() to decide whether a file
+	 * lives in the `filePath` folder (#3852).
+	 */
+	public boolean function $isRelativeFilePath(required string path) {
+		local.path = Replace(arguments.path, "\", "/", "all");
+		return Len(local.path)
+			&& Left(local.path, 1) != "/"
+			&& !REFind("^[A-Za-z]:", local.path)
+			&& !Find("://", local.path);
 	}
 
 	/**

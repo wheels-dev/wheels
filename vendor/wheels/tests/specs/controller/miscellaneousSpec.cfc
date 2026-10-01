@@ -538,6 +538,47 @@ component extends="wheels.WheelsTest" {
 				expect(result.mailparams[3].file).toInclude("c:\inetpub\wwwroot\cfwheels\something.pdf")
 			})
 
+			describe("an attachment in a subfolder of the files folder (##3852)", () => {
+
+				it("resolves a bare name in the files folder, as before", () => {
+					args.template = "plainEmailTemplate"
+					args.file = "wheels-logo.png"
+					result = _controller.sendEmail(argumentCollection = args)
+
+					expect(result.mailparams[1].file).toBe(ExpandPath(application.wheels.filePath) & "/wheels-logo.png")
+				})
+
+				it("resolves a relative path with a subfolder in the files folder", () => {
+					args.template = "plainEmailTemplate"
+					args.file = "reports/q3.txt"
+					result = _controller.sendEmail(argumentCollection = args)
+
+					expect(result.mailparams[1].file).toBe(ExpandPath(application.wheels.filePath) & "/reports/q3.txt")
+				})
+
+				it("resolves it in the web root's files folder on disk when filePath is relative", () => {
+					application.wheels.filePath = "files"
+					args.template = "plainEmailTemplate"
+					args.file = "reports/q3.txt,top.txt"
+					result = _controller.sendEmail(argumentCollection = args)
+
+					local.filesDir = Replace(GetDirectoryFromPath(GetBaseTemplatePath()), "\", "/", "all") & "files"
+					expect(Replace(result.mailparams[1].file, "\", "/", "all")).toBe(local.filesDir & "/reports/q3.txt")
+					expect(Replace(result.mailparams[2].file, "\", "/", "all")).toBe(local.filesDir & "/top.txt")
+				})
+
+				it("leaves absolute paths and URLs as they are", () => {
+					args.template = "plainEmailTemplate"
+					args.file = "/var/app/pdfs/invoice.pdf,c:\reports\q3.txt,\\server\share\q3.txt,https://example.com/q3.txt"
+					result = _controller.sendEmail(argumentCollection = args)
+
+					expect(result.mailparams[1].file).toBe("/var/app/pdfs/invoice.pdf")
+					expect(result.mailparams[2].file).toBe("c:\reports\q3.txt")
+					expect(result.mailparams[3].file).toBe("\\server\share\q3.txt")
+					expect(result.mailparams[4].file).toBe("https://example.com/q3.txt")
+				})
+			})
+
 			it("sends mail with custom argument", () => {
 				args.template = "plainEmailTemplate"
 				args.customArgument = "IPassedInThisAsACustomArgument"
