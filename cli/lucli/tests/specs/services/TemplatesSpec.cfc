@@ -151,7 +151,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						{path: expandPath("/cli/src/templates/dbmigrate"), filter: "*.txt"},
 						{path: expandPath("/vendor/wheels/migrator/templates"), filter: "*.cfc"},
 						{path: expandPath("/cli/lucli/templates/migrations"), filter: "*.txt"},
-						{path: expandPath("/app/snippets/dbmigrate"), filter: "*.txt"}
+						{path: expandPath("/app/snippets/dbmigrate"), filter: "*.txt"},
+						{path: expandPath("/cli/lucli/templates/app/app/snippets/dbmigrate"), filter: "*.txt"},
+						{path: expandPath("/cli/lucli/templates/codegen/dbmigrate"), filter: "*.txt"}
 					];
 					for (var dirSpec in templateDirs) {
 						if (directoryExists(dirSpec.path)) {
@@ -160,7 +162,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					}
 					var singleFiles = [
 						expandPath("/cli/src/templates/DBMigrate.txt"),
-						expandPath("/cli/lucli/templates/app/app/snippets/DBMigrate.txt"),
+						expandPath("/cli/lucli/templates/codegen/DBMigrate.txt"),
 						expandPath("/app/snippets/DBMigrate.txt")
 					];
 					for (var singleFile in singleFiles) {

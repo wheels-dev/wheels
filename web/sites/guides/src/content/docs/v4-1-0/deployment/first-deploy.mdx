@@ -44,7 +44,7 @@ Three quick checks before running anything:
    Creates four files:
 
    - `config/deploy.yml` — the deploy manifest. Under git.
-   - `.kamal/secrets` — secret values. **Never under git.** Add `.kamal/secrets` to `.gitignore` immediately.
+   - `.kamal/secrets` — secret values. **Never under git.** `init` adds `.kamal/secrets` to `.gitignore` for you; check it's there before your next commit.
    - `Dockerfile` — a starter production Dockerfile. If one already exists, `init` refuses to overwrite it unless you pass `--force`.
    - `.dockerignore` — keeps build context lean.
 

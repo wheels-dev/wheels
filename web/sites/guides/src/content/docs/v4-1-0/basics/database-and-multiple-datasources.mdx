@@ -38,7 +38,7 @@ The name you set here must match a datasource registered with your CFML engine �
 
 Where the registration lives depends on what serves your app:
 
-**With the wheels CLI** — datasources live in `lucee.json` at the app root. `wheels new` writes the SQLite pair for you; add more under `configuration.datasources` using the same shape:
+**With the wheels CLI** — datasources live in `lucee.json` at the app root. `wheels new` writes the SQLite pair for you (it also registers them as `this.datasources` in `config/app.cfm`); add more under `configuration.datasources` using the same shape:
 
 ```json title="lucee.json (excerpt — the shape wheels new generates)"
 "configuration": {
@@ -56,7 +56,7 @@ Where the registration lives depends on what serves your app:
 
 For MySQL/Postgres, swap `class`/`dsn` for the driver's JDBC form (e.g. `com.mysql.cj.jdbc.Driver` with `jdbc:mysql://localhost:3306/myapp`). Restart the server (`wheels stop && wheels start`) after editing.
 
-**With CommandBox** — the scaffolded `box.json` already includes `commandbox-cfconfig`; declare datasources in `server.json` and CFConfig applies them at server start:
+**With CommandBox** — apps installed with CommandBox (`box install wheels-base-template`) ship a `box.json` that includes `commandbox-cfconfig`; declare datasources in `server.json` and CFConfig applies them at server start. A `wheels new` app has no `box.json` or `server.json`:
 
 ```json title="server.json (excerpt)"
 "cfconfig": {

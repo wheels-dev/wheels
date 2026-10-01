@@ -160,7 +160,7 @@ Each nested resource inherits the scope's binding value unless it explicitly ove
 
 When binding is enabled and `params.key` is present, the dispatcher calls `model(ModelName).findByKey(params.key)`. If that returns `false` — Wheels' "no record" sentinel — the dispatcher raises `Wheels.RecordNotFound` before your action runs, with an extended-info message that includes the failing key (HTML-encoded for safety).
 
-You handle the error the same way you handle any other uncaught exception: wire a custom error page in `config/events/onerror.cfm`, or let Wheels render the framework default 404. Because the throw happens in dispatch, the member action never executes on a missing record. Your `show`, `edit`, `update`, and `delete` bodies can assume `params.<singular>` is a valid, hydrated model instance — no `IsObject()` guards needed.
+You handle the error the same way you handle any other uncaught exception: wire a custom error page in `app/events/onerror.cfm`, or let Wheels render the framework default 404. Because the throw happens in dispatch, the member action never executes on a missing record. Your `show`, `edit`, `update`, and `delete` bodies can assume `params.<singular>` is a valid, hydrated model instance — no `IsObject()` guards needed.
 
 ## The dev-mode warning
 

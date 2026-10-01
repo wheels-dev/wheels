@@ -1,5 +1,0 @@
-{
-    "VERSION":"|version|",
-    "SLUG":"wheels",
-    "TYPE":"mvc"
-}

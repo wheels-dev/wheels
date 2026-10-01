@@ -43,11 +43,11 @@ FROM node:20-bookworm-slim AS builder
 
 WORKDIR /build
 
-COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --no-fund
-
 COPY . .
-RUN npm run build     # produces public/assets/ (Vite, Tailwind, etc.)
+
+# npm steps are for apps with a front-end build; they skip when there's no package.json.
+RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
+RUN if [ -f package.json ]; then npm run build; fi     # produces public/assets/ (Vite, Tailwind, etc.)
 
 # --- Stage 2: runtime ---------------------------------------------------------
 # Lucee 7.1 (stable) on Java 25. The lucee/lucee image serves /var/www as its

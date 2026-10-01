@@ -59,6 +59,110 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(arrayToList(missing)).toBe("");
 			});
 
+			it("ships a commented config/<environment>/settings.cfm for every environment", () => {
+				// The guides and examples document per-environment overrides in
+				// config/<environment>/settings.cfm; the framework includes the
+				// file only when it exists. The stubs must stay comment-only so a
+				// new app behaves exactly as it does without them.
+				var missing = [];
+				var active = [];
+				for (var env in ["development", "testing", "production", "maintenance"]) {
+					var path = templateRoot & "config/" & env & "/settings.cfm";
+					if (!fileExists(path)) {
+						arrayAppend(missing, env);
+						continue;
+					}
+					for (var line in listToArray(fileRead(path), Chr(10))) {
+						var trimmed = trim(line);
+						if (len(trimmed) && left(trimmed, 2) != "//" && findNoCase("set(", trimmed)) {
+							arrayAppend(active, env & ": " & trimmed);
+						}
+					}
+				}
+				expect(arrayToList(missing)).toBe("", "missing environments");
+				expect(arrayToList(active, " | ")).toBe("", "uncommented set() calls");
+			});
+
+			it("commits vendor/: the generated .gitignore doesn't ignore it", () => {
+				// A clone, CI checkout or image build needs vendor/wheels/ (the
+				// framework) and any packages added with `wheels packages add`.
+				var ignored = [];
+				for (var line in listToArray(fileRead(templateRoot & "_gitignore"), Chr(10))) {
+					var rule = trim(line);
+					if (len(rule) && left(rule, 1) != "##" && reFindNoCase("^/?vendor(/|$)", rule)) {
+						arrayAppend(ignored, rule);
+					}
+				}
+				expect(arrayToList(ignored, " | ")).toBe("");
+			});
+
+			it("ships .env.example next to .env with the same keys and no secret values", () => {
+				expect(fileExists(templateRoot & "_env.example")).toBeTrue();
+				var keys = function(path) {
+					var found = [];
+					for (var line in listToArray(fileRead(path), Chr(10))) {
+						if (reFind("^[A-Z_]+=", trim(line))) {
+							arrayAppend(found, listFirst(trim(line), "="));
+						}
+					}
+					return arrayToList(found);
+				};
+				expect(keys(templateRoot & "_env.example")).toBe(keys(templateRoot & "_env"));
+				var example = fileRead(templateRoot & "_env.example");
+				expect(example).notToInclude("{{reloadPassword}}");
+				expect(example).notToInclude("{{luceeAdminPassword}}");
+			});
+
+			it("ships app/middleware/ and keeps the legacy plugins README in the root plugins/ the framework reads", () => {
+				expect(directoryExists(templateRoot & "app/middleware")).toBeTrue();
+				expect(fileExists(templateRoot & "app/middleware/README.md")).toBeTrue();
+				// vendor/wheels/events/init/views.cfm loads plugins from /plugins,
+				// which public/Application.cfc maps to the app root.
+				expect(directoryExists(templateRoot & "app/plugins")).toBeFalse();
+				expect(fileExists(templateRoot & "plugins/README.md")).toBeTrue();
+			});
+
+			it("ships the migrator's dbmigrate templates and no frozen generator overrides", () => {
+				// vendor/wheels/Migrator.cfc reads /app/snippets/dbmigrate/ for the
+				// development migrator UI. Generator .txt copies would shadow the
+				// CLI's own templates (Templates.cfc findTemplate) and freeze them:
+				// that is how the #3608 404 guard shipped in templates/codegen/
+				// CRUDContent.txt yet was missing from stock `wheels new` apps.
+				// Shipping no copies removes the drift instead of pinning one pair.
+				var codegenDir = expandPath("/cli/lucli/templates/codegen/dbmigrate/");
+				var dbmigrate = directoryList(templateRoot & "app/snippets/dbmigrate", false, "name", "*.txt");
+				expect(arrayLen(dbmigrate)).toBe(arrayLen(directoryList(codegenDir, false, "name", "*.txt")));
+				// The app copy and the one `wheels generate snippets templates` copies
+				// from must not drift apart.
+				var drifted = [];
+				for (var name in dbmigrate) {
+					if (compare(fileRead(templateRoot & "app/snippets/dbmigrate/" & name), fileRead(codegenDir & name)) != 0) {
+						arrayAppend(drifted, name);
+					}
+				}
+				expect(arrayToList(drifted)).toBe("");
+				expect(arrayToList(directoryList(templateRoot & "app/snippets", false, "name", "*.txt"))).toBe("");
+			});
+
+			it("writes a lucee.json SQLite DSN with the ##project:path## placeholder LuCLI resolves", () => {
+				var m = new cli.lucli.Module(cwd = expandPath("/"));
+				makePublic(m, "buildSQLiteDatasourcesBlock");
+				var block = m.buildSQLiteDatasourcesBlock("probe");
+				expect(block).toInclude("jdbc:sqlite:##project:path##/db/development.sqlite");
+				expect(block).toInclude("jdbc:sqlite:##project:path##/db/test.sqlite");
+				expect(block).notToInclude("{project}");
+			});
+
+			it("links the template's comments to the current (v4-1-0) guides", () => {
+				var stale = [];
+				for (var path in directoryList(templateRoot, true, "path", "*.cfm|*.md|*.cfc")) {
+					if (findNoCase("guides.wheels.dev/v4-0-0/", fileRead(path))) {
+						arrayAppend(stale, replace(path, templateRoot, ""));
+					}
+				}
+				expect(arrayToList(stale)).toBe("");
+			});
+
 			it("ships both public/Application.cfc and public/miscellaneous/Application.cfc", () => {
 				// Issue #2311 reported a duplicate "create blog/Application.cfc"
 				// line. The root cause was the copyTemplateDir() recursion bug
@@ -133,26 +237,6 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileExists(templateRoot & "tests/specs/controllers/.gitkeep")).toBeTrue();
 				expect(fileExists(templateRoot & "tests/specs/functional/.gitkeep")).toBeTrue();
 				expect(fileExists(templateRoot & "tests/specs/models/.gitkeep")).toBeTrue();
-			});
-
-			it("ships app/snippets/CRUDContent.txt identical to the bundled codegen template", () => {
-				// `wheels new` copies every codegen template into the app's
-				// app/snippets/, and Templates.cfc resolves THOSE first — they
-				// shadow the bundled copy. So a fix to templates/codegen/
-				// CRUDContent.txt is invisible to every freshly generated app
-				// unless the snippet copy moves with it. That is exactly how the
-				// 404 guard shipped in a release and then failed to appear in a
-				// stock `wheels new` app: the two files had silently diverged.
-				//
-				// Only this pair is pinned. Two other twins differ on purpose
-				// (the app copies read the reload password from .env), so a
-				// blanket "all snippets match codegen" rule would be wrong.
-				var bundled = fileRead(expandPath("/cli/lucli/templates/codegen/CRUDContent.txt"));
-				var shipped = fileRead(templateRoot & "app/snippets/CRUDContent.txt");
-				expect(compare(shipped, bundled)).toBe(0);
-				// And the shipped copy must actually carry the guard.
-				expect(shipped).toInclude('filters(through="requireRecord"');
-				expect(shipped).toInclude("$throwErrorOrShow404Page(");
 			});
 
 		});

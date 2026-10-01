@@ -106,22 +106,28 @@ A fresh project has the following top-level layout:
 
 ```text title="generated directory layout"
 myblog/
+  .ai/                    # AI reference notes (see AGENTS.md, CLAUDE.md)
   app/
-    controllers/          # Main.cfc starter controller
-    models/
-    views/                # main/index.cfm starter view
+    controllers/          # Controller.cfc base, Main.cfc starter, Up.cfc /up endpoint
+    models/               # Model.cfc base
+    views/                # layout.cfm, helpers.cfm, main/index.cfm starter view
     migrator/migrations/
     events/
     global/
     jobs/
     lib/
     mailers/
-    plugins/
-    snippets/
-  config/                 # app.cfm, settings.cfm, routes.cfm
+    middleware/
+    policies/             # Policy.cfc base
+    snippets/             # dbmigrate/ generator templates
+  config/                 # app.cfm, environment.cfm, routes.cfm, services.cfm, settings.cfm
+    <env>/settings.cfm    # development, testing, production, maintenance
   db/                     # development.sqlite (or db/h2/ with --setup-h2)
+  plugins/                # legacy plugin drop-in (deprecated)
   public/                 # images/, javascripts/, stylesheets/, files/, miscellaneous/
   tests/
+    populate.cfm
+    runner.cfm
     specs/
       models/
       controllers/
@@ -129,8 +135,12 @@ myblog/
   vendor/
     wheels/               # framework installed by the scaffolder
   .env
+  .env.example
   .gitignore
+  AGENTS.md
+  CLAUDE.md
   lucee.json
+  rewrite.config
 ```
 
 The `.env` file is created from the template's `_env` stub and carries environment-specific values; it is gitignored by the generated `.gitignore`. `lucee.json` pins the server port, shutdown port, and Lucee-level JDBC datasource entries. `config/app.cfm` carries the runtime datasource configuration. Both files honor `--no-sqlite`: the flag emits an empty `datasources` object in `lucee.json` so Lucee never auto-creates `db/development.sqlite` and `db/test.sqlite` on first connection, and omits the datasource block from `config/app.cfm`.

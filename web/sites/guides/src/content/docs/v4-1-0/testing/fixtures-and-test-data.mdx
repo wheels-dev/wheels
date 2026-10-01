@@ -151,7 +151,7 @@ component extends="Model" {
 }
 ```
 
-A test-only model lives at `tests/_assets/models/` and maps to a table created by `populate.cfm`. To make the framework discover models in that directory during tests, point the app at it in `tests/TestRunner.cfc` (or the equivalent bootstrap) using `application.wheels.modelPath`. The framework's own `runner.cfm` does this with `set(modelPath = "/wheels/tests/_assets/models")`.
+A test-only model lives at `tests/_assets/models/` and maps to a table created by `populate.cfm`. `wheels new` doesn't scaffold that folder; create it yourself when you need one. To make the framework discover models in that directory during tests, point the app at it in `tests/runner.cfm` (before its include of the framework runner) using `application.wheels.modelPath`. The framework's own `runner.cfm` does this with `set(modelPath = "/wheels/tests/_assets/models")`.
 
 ## Factory-style builders
 
@@ -193,7 +193,7 @@ Factories trade a few lines of setup for a shorter, more readable spec body. Whe
 
 ## The scope gotcha
 
-Wheels' internal functions (`model()`, `$dbinfo`, and friends) are not available as bare globals inside plain `.cfm` files that are included from CFCs like `TestRunner.cfc`. If you write `execute("CREATE TABLE ...")` in `populate.cfm`, you'll get a "No matching function [EXECUTE] found" error (Adobe words it as "variable EXECUTE is undefined").
+Wheels' internal functions (`model()`, `$dbinfo`, and friends) are not available as bare globals inside plain `.cfm` files that the test runner (`tests/runner.cfm`) includes. If you write `execute("CREATE TABLE ...")` in `populate.cfm`, you'll get a "No matching function [EXECUTE] found" error (Adobe words it as "variable EXECUTE is undefined").
 
 <Aside type="caution">
   Call framework internals via `application.wo.` (the scope where Wheels stores its callable methods) or use native CFML. `application.wo.model("Post")` works if you need to seed through the ORM. For raw SQL there is no framework helper at all here — `execute()` exists only on migration CFCs (`wheels.migrator.Migration`), not on `application.wo` — so use native `queryExecute(...)` with an explicit `datasource`, or `<cfquery>`/`<cfdbinfo>`.

@@ -1,0 +1,1 @@
+- `wheels new` apps now commit `vendor/`: the generated `.gitignore` no longer ignores it, so a clone, CI run or image build has the framework (`vendor/wheels/`) and every package added with `wheels packages add`. Before, a fresh clone had no framework and no command to restore it. In an existing app, remove the `/vendor/` line from `.gitignore` and commit `vendor/`.

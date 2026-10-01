@@ -1,27 +1,31 @@
 # app/snippets/
 
-Template overrides for `wheels generate`.
+Per-app template overrides.
 
-The generators (`wheels generate model`, `controller`, `scaffold`, `migration`, `mailer`, etc.) emit files built from `.txt` templates. When a template exists in this directory, it overrides the framework default. When it doesn't, the generator falls back to the bundled template.
+**`dbmigrate/`** holds the migration templates the development migrator UI (`/wheels/migrator`) uses to create a migration file. Edit them to change what that UI writes. (`wheels generate migration` builds its file itself and doesn't read them.)
 
-## Customizing a template
+**Generator overrides:** `wheels generate` (model, controller, view, scaffold, api-resource, …) builds files from `.txt` templates bundled with the CLI. A file with the same name in this directory overrides the bundled one, for this app only. None ships by default, so new apps always get the CLI's current templates.
 
-1. Find the framework's version of the template you want to override in `vendor/wheels/` or the generator source.
-2. Copy it into this directory with the same filename.
-3. Edit to taste.
+## Customizing a generator template
 
-Next run of `wheels generate` picks up your override.
+1. Copy the bundled templates into this directory:
 
-## Common template files
+   ```bash
+   wheels generate snippets templates
+   ```
 
-- `ModelContent.txt` — the body of a generated model
-- `ControllerContent.txt` — the body of a generated controller
-- `CRUDContent.txt` — the full scaffold controller
-- `ActionContent.txt` — a single action stub
-- `ConfigAppContent.txt` — `config/app.cfm` body
-- `BoxJSON.txt` — `box.json` seed
+2. Delete the ones you don't want to override, and edit the rest.
+
+The next `wheels generate` run uses your copies. An override is frozen: it won't pick up fixes when the CLI's own template changes, so keep only the ones you need.
+
+Common ones:
+- `ModelContent.txt`: a generated model
+- `ControllerContent.txt`: a generated controller
+- `CRUDContent.txt`: the scaffold controller
+- `ViewContent.txt`: a generated view
+- `ApiControllerContent.txt`: an API resource controller
 
 ## Notes
 
-- Overrides are per-app. They ship with your app's repository — treat them as code.
-- Overrides don't extend the generator surface. If you want a new generator command, extend the CLI instead.
+- Overrides are per-app and ship with your app's repository. Treat them as code.
+- Overrides don't add generator commands. To add one, extend the CLI instead.
