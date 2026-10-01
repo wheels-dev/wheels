@@ -121,6 +121,10 @@ jobs:
           bash tools/build/scripts/prepare-core.sh "${PKG_VERSION}" "develop" "${{ github.run_number }}" "false"
           test -d build-wheels-base || { echo "::error::prepare-base.sh produced no build-wheels-base/"; exit 1; }
           test -d build-wheels-core/wheels || { echo "::error::prepare-core.sh produced no build-wheels-core/wheels/"; exit 1; }
+          # Both packages carry the consumer AI docs, never the maintainer tier (#3947).
+          for pkg in build-wheels-base build-wheels-core/wheels; do
+            bash tools/build/scripts/ship-consumer-docs.sh verify "$pkg"
+          done
 
       # Structural guards on the prepared base artifact (cheap, pre-boot). These
       # pin the three packaging defects the campaign repaired so a regression is

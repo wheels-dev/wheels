@@ -269,17 +269,8 @@ jobs:
           echo "=========================================="
           ./tools/build/scripts/ship-consumer-docs.sh check
 
-          for pkg in build-wheels-core/wheels build-wheels-starterApp; do
-            if [ ! -f "$pkg/CLAUDE.md" ] || [ ! -f "$pkg/AGENTS.md" ]; then
-              echo "ERROR: $pkg is missing the consumer AI docs (CLAUDE.md / AGENTS.md)"
-              exit 1
-            fi
-            for leaked in docs/superpowers docs/plans .claude .github CLAUDE.local.md; do
-              if [ -e "$pkg/$leaked" ]; then
-                echo "ERROR: $pkg leaks maintainer-only path: $leaked"
-                exit 1
-              fi
-            done
+          for pkg in build-wheels-base build-wheels-core/wheels build-wheels-starterApp; do
+            ./tools/build/scripts/ship-consumer-docs.sh verify "$pkg"
           done
           echo "  ✓ Two-tier AI docs validated"
 

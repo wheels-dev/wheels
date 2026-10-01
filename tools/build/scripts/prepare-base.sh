@@ -107,12 +107,11 @@ fi
 mkdir -p "${BUILD_DIR}/vendor"
 touch "${BUILD_DIR}/vendor/.keep"
 
-# Copy AI documentation files from the repo root.
-echo "Copying AI documentation..."
-cp -r "${REPO_ROOT}/.ai" "${BUILD_DIR}/"
-cp "${REPO_ROOT}/CLAUDE.md" "${BUILD_DIR}/"
-cp -r "${REPO_ROOT}/.claude" "${BUILD_DIR}/"
-cp -r "${REPO_ROOT}/.opencode" "${BUILD_DIR}/" 2>/dev/null || true
+# Ship the CONSUMER AI doc tier (CLAUDE.md + AGENTS.md + .ai/README.md), as the
+# core and starter-app packages do. The repo-root CLAUDE.md, .ai/ and .claude/
+# are the maintainer tier and must never reach an app.
+echo "Shipping consumer AI docs..."
+"${REPO_ROOT}/tools/build/scripts/ship-consumer-docs.sh" ship "${BUILD_DIR}"
 
 # Apache 2.0 §4(d) requires NOTICE to propagate to derivatives.
 cp "${REPO_ROOT}/LICENSE" "${BUILD_DIR}/"
