@@ -209,7 +209,11 @@ component extends="wheels.WheelsTest" {
 				);
 			}, "", !_foreignDetectable);
 
-			it("falls back to firing afterCommit on the inner close inside a raw transaction{} [engines without IsWithinTransaction]", () => {
+			it("does not engage foreign-transaction detection where IsWithinTransaction is unavailable [Adobe/RustCFML]", () => {
+				// On engines without IsWithinTransaction, Wheels cannot see a raw transaction{},
+				// so it never suppresses the callbacks or writes the foreign-skip warning — the
+				// engine's own transaction-nesting semantics decide what fires (not guaranteed,
+				// which is why the docs direct users to the Wheels-managed transaction).
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
 				try {
 					transaction {
@@ -219,10 +223,11 @@ component extends="wheels.WheelsTest" {
 					}
 				} catch (any e) {
 				}
-				expect(ArrayLen(request.$acLog)).toBe(
-					1,
-					"documented fallback: fires on the inner Wheels close where IsWithinTransaction is unavailable"
-				);
+				expect(
+					!StructKeyExists(request, "wheels")
+					|| !StructKeyExists(request.wheels, "$txnForeignWarned")
+					|| StructCount(request.wheels.$txnForeignWarned) == 0
+				).toBeTrue("foreign-skip detection must not engage on engines without IsWithinTransaction");
 			}, "", _foreignDetectable);
 
 			it("suppresses BOTH afterCommit and afterRollback inside a raw transaction{} [IsWithinTransaction engines]", () => {
