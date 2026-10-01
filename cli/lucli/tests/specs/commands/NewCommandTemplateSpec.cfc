@@ -129,8 +129,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// that is how the #3608 404 guard shipped in templates/codegen/
 				// CRUDContent.txt yet was missing from stock `wheels new` apps.
 				// Shipping no copies removes the drift instead of pinning one pair.
+				var codegenDir = expandPath("/cli/lucli/templates/codegen/dbmigrate/");
 				var dbmigrate = directoryList(templateRoot & "app/snippets/dbmigrate", false, "name", "*.txt");
-				expect(arrayLen(dbmigrate)).toBe(arrayLen(directoryList(expandPath("/cli/lucli/templates/codegen/dbmigrate"), false, "name", "*.txt")));
+				expect(arrayLen(dbmigrate)).toBe(arrayLen(directoryList(codegenDir, false, "name", "*.txt")));
+				// The app copy and the one `wheels generate snippets templates` copies
+				// from must not drift apart.
+				var drifted = [];
+				for (var name in dbmigrate) {
+					if (compare(fileRead(templateRoot & "app/snippets/dbmigrate/" & name), fileRead(codegenDir & name)) != 0) {
+						arrayAppend(drifted, name);
+					}
+				}
+				expect(arrayToList(drifted)).toBe("");
 				expect(arrayToList(directoryList(templateRoot & "app/snippets", false, "name", "*.txt"))).toBe("");
 			});
 
