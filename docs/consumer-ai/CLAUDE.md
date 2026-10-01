@@ -50,6 +50,13 @@ component extends="Model" {
 
         // Callbacks
         beforeSave("sanitizeInput");
+        // afterCommit/afterRollback run AFTER the transaction resolves — use these
+        // for side effects that must not happen on a rollback (jobs, mail, caches,
+        // external calls). Optional on="create,update,delete" filter; nested writes
+        // and invokeWithTransaction() blocks fire once together on the outermost
+        // commit; with transactionMode="none" afterCommit fires immediately per op.
+        afterCommit("enqueueSearchIndex", on="create,update");
+        afterRollback("releaseReservation");
 
         // Calculated SQL properties — select=false keeps them off the default SELECT (hot path)
         property(name="fullName", sql="firstName || ' ' || lastName", select=false);
