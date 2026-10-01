@@ -94,7 +94,7 @@
 	private string function getBooleanType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
-				return "TINYINT";
+				return "BOOLEAN";
 			case "MicrosoftSQLServer":
 				return "BIT";
 			case "MySQL":
@@ -102,7 +102,7 @@
 			case "PostgreSQL":
 				return "BOOLEAN";
 			case "SQLite":
-				return "INTEGER";
+				return "BOOLEAN";
 			default:
 				return "`addboolean()` not supported for " & migration.adapter.adapterName();
 		}
