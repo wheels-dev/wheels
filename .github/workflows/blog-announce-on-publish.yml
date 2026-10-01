@@ -11,8 +11,9 @@ name: Blog — Announce on Publish
 # the Discussion already existed but the publish never landed, so the next
 # day's run re-announced and duplicated the thread. Announcing only on
 # push-to-develop means a post is durable before any announcement is made,
-# and the dedupe in web/scripts/blog-announce-discussion.mjs (exact title /
-# blog-URL search before create) is a second line of defence.
+# and the dedupe in web/scripts/blog-announce-discussion.mjs (before create it
+# lists the category and matches the post's slug marker, title or blog URL) is
+# a second line of defence.
 
 on:
   push:
@@ -56,6 +57,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
+
+      # Fail closed: never announce with a dedupe that doesn't pass its own tests.
+      - name: Test the announcement helper
+        run: node --test web/scripts/blog-announce-discussion.test.mjs
 
       - name: Announce and write back discussion URLs
         env:

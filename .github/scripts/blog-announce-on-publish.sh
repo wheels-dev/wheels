@@ -10,8 +10,9 @@
 #      `announcement:` block still lacks a `discussionUrl` (backfill).
 # 2. Run web/scripts/blog-announce-discussion.mjs over the candidates. The
 #    dedupe already lives in that script: before creating a discussion it
-#    searches existing Announcements by exact title and/or the post's blog URL,
-#    and on a hit writes that URL back instead of creating a duplicate.
+#    lists the Announcements category and matches the post's slug marker,
+#    exact title or blog URL, and on a hit writes that URL back instead of
+#    creating a duplicate.
 # 3. If the frontmatter gained a discussionUrl, commit it on
 #    docs/bot-blog-announce-<shortsha> and open a tiny PR to develop (same
 #    pattern as the publish workflow — never push to develop directly).

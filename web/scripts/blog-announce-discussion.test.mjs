@@ -4,13 +4,13 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-	buildDiscussionSearchQuery,
 	extractAnnouncement,
 	extractBlogUrls,
 	extractSlug,
 	findExistingDiscussion,
+	listCategoryDiscussions,
 	pickExistingDiscussion,
-	quoteSearchTerm,
+	slugMarker,
 	splitFrontmatter,
 	writeDiscussionUrl,
 	announceFiles,
@@ -66,25 +66,6 @@ test('extractBlogUrls falls back to the filename slug', () => {
 	assert.deepEqual(urls, [
 		'https://blog.wheels.dev/blog/cli-workflow-upgrades-migrate-diff-dry-run-offline',
 	]);
-});
-
-test('quoteSearchTerm escapes quotes and backslashes', () => {
-	assert.equal(quoteSearchTerm('say "hi"'), '"say \\"hi\\""');
-	assert.equal(quoteSearchTerm('a\\b'), '"a\\\\b"');
-});
-
-test('buildDiscussionSearchQuery ORs exact title and blog URL clauses', () => {
-	const query = buildDiscussionSearchQuery({
-		owner: 'wheels-dev',
-		name: 'wheels',
-		category: 'Announcements',
-		title: 'Pretty URLs with bindBy',
-		urls: ['https://blog.wheels.dev/blog/pretty-urls-with-route-bindby'],
-	});
-	assert.equal(
-		query,
-		'repo:wheels-dev/wheels category:"Announcements" (in:title "Pretty URLs with bindBy" OR in:body "https://blog.wheels.dev/blog/pretty-urls-with-route-bindby")',
-	);
 });
 
 test('pickExistingDiscussion matches an exact title in the category', () => {
@@ -170,20 +151,44 @@ test('writeDiscussionUrl inserts discussionUrl under announcement', () => {
 	assert.equal(extractAnnouncement(fm).discussionUrl, 'https://github.com/wheels-dev/wheels/discussions/9');
 });
 
-test('findExistingDiscussion issues a DISCUSSION search and exact-filters', async () => {
+// The categories lookup and the category listing, the two read calls
+// announceFiles makes before deciding. `listed` is what the category holds.
+function readMock(listed, onOther = null) {
+	return async (_token, query, variables) => {
+		if (query.includes('discussionCategories')) {
+			return {
+				repository: {
+					id: 'repo1',
+					discussionCategories: { nodes: [{ id: 'cat1', name: 'Announcements' }] },
+				},
+			};
+		}
+		if (query.includes('discussions(categoryId')) {
+			assert.equal(variables.categoryId, 'cat1');
+			return { repository: { discussions: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: listed } } };
+		}
+		if (onOther) return onOther(query, variables);
+		throw new Error(`unexpected query: ${query}`);
+	};
+}
+
+test('findExistingDiscussion lists the category directly, with no search call', async () => {
 	const calls = [];
 	const gqlFn = async (_token, query, variables) => {
 		calls.push({ query, variables });
 		return {
-			search: {
-				nodes: [
-					{
-						title: 'Pretty URLs with bindBy',
-						url: 'https://github.com/wheels-dev/wheels/discussions/1',
-						body: 'https://blog.wheels.dev/blog/pretty-urls-with-route-bindby',
-						category: { name: 'Announcements' },
-					},
-				],
+			repository: {
+				discussions: {
+					pageInfo: { hasNextPage: false, endCursor: null },
+					nodes: [
+						{
+							title: 'Pretty URLs with bindBy',
+							url: 'https://github.com/wheels-dev/wheels/discussions/1',
+							body: 'https://blog.wheels.dev/blog/pretty-urls-with-route-bindby',
+							category: { name: 'Announcements' },
+						},
+					],
+				},
 			},
 		};
 	};
@@ -193,20 +198,58 @@ test('findExistingDiscussion issues a DISCUSSION search and exact-filters', asyn
 		{
 			owner: 'wheels-dev',
 			name: 'wheels',
+			categoryId: 'cat1',
 			category: 'Announcements',
 			title: 'Pretty URLs with bindBy',
 			urls: ['https://blog.wheels.dev/blog/pretty-urls-with-route-bindby'],
+			slug: 'pretty-urls-with-route-bindby',
 		},
 		gqlFn,
 	);
 
 	assert.equal(found.url, 'https://github.com/wheels-dev/wheels/discussions/1');
 	assert.equal(calls.length, 1);
-	assert.match(calls[0].query, /type: DISCUSSION/);
-	assert.equal(
-		calls[0].variables.query,
-		'repo:wheels-dev/wheels category:"Announcements" (in:title "Pretty URLs with bindBy" OR in:body "https://blog.wheels.dev/blog/pretty-urls-with-route-bindby")',
+	assert.match(calls[0].query, /discussions\(categoryId: \$categoryId/);
+	assert.doesNotMatch(calls[0].query, /search\(/);
+	assert.equal(calls[0].variables.categoryId, 'cat1');
+});
+
+test('listCategoryDiscussions follows pagination until hasNextPage is false', async () => {
+	const pages = [
+		{ pageInfo: { hasNextPage: true, endCursor: 'c1' }, nodes: [{ title: 'a', url: 'u1' }] },
+		{ pageInfo: { hasNextPage: false, endCursor: 'c2' }, nodes: [{ title: 'b', url: 'u2' }] },
+	];
+	const afters = [];
+	const gqlFn = async (_token, _query, variables) => {
+		afters.push(variables.after);
+		return { repository: { discussions: pages[afters.length - 1] } };
+	};
+	const nodes = await listCategoryDiscussions('t', { owner: 'o', name: 'n', categoryId: 'c' }, gqlFn);
+	assert.deepEqual(nodes.map((n) => n.url), ['u1', 'u2']);
+	assert.deepEqual(afters, [null, 'c1']);
+});
+
+test('pickExistingDiscussion matches the slug marker even when the title changed', () => {
+	const found = pickExistingDiscussion(
+		[
+			{
+				title: 'A retitled announcement',
+				url: 'https://github.com/wheels-dev/wheels/discussions/7',
+				body: `Some text\n\n${slugMarker('pretty-urls-with-route-bindby')}`,
+				category: { name: 'Announcements' },
+			},
+		],
+		{ title: 'Pretty URLs with bindBy', urls: [], category: 'Announcements', slug: 'pretty-urls-with-route-bindby' },
 	);
+	assert.equal(found.url, 'https://github.com/wheels-dev/wheels/discussions/7');
+});
+
+test('pickExistingDiscussion does not match another post\'s slug marker', () => {
+	const found = pickExistingDiscussion(
+		[{ title: 'Other', url: 'u', body: slugMarker('pretty-urls-with-route-bindby-2'), category: { name: 'Announcements' } }],
+		{ title: 'Pretty URLs with bindBy', urls: [], category: 'Announcements', slug: 'pretty-urls-with-route-bindby' },
+	);
+	assert.equal(found, null);
 });
 
 test('announceFiles skips when discussionUrl is already set and does not search', async () => {
@@ -258,17 +301,20 @@ test('announceFiles writes the existing discussion URL and does not create', asy
 				},
 			};
 		}
-		if (query.includes('type: DISCUSSION')) {
+		if (query.includes('discussions(categoryId')) {
 			return {
-				search: {
-					nodes: [
-						{
-							title: 'Pretty URLs with bindBy',
-							url: 'https://github.com/wheels-dev/wheels/discussions/3475',
-							body: 'https://blog.wheels.dev/blog/pretty-urls-with-route-bindby',
-							category: { name: 'Announcements' },
-						},
-					],
+				repository: {
+					discussions: {
+						pageInfo: { hasNextPage: false, endCursor: null },
+						nodes: [
+							{
+								title: 'Pretty URLs with bindBy',
+								url: 'https://github.com/wheels-dev/wheels/discussions/3475',
+								body: 'https://blog.wheels.dev/blog/pretty-urls-with-route-bindby',
+								category: { name: 'Announcements' },
+							},
+						],
+					},
 				},
 			};
 		}
@@ -285,7 +331,7 @@ test('announceFiles writes the existing discussion URL and does not create', asy
 		assert.equal(updated.discussionUrl, 'https://github.com/wheels-dev/wheels/discussions/3475');
 
 		const gqlFnSecond = async (_token, query) => {
-			if (query.includes('createDiscussion') || query.includes('type: DISCUSSION')) {
+			if (query.includes('createDiscussion') || query.includes('discussions(categoryId')) {
 				throw new Error('second announce must be a no-op after discussionUrl is written');
 			}
 			return {
@@ -302,38 +348,126 @@ test('announceFiles writes the existing discussion URL and does not create', asy
 	}
 });
 
-test('announceFiles creates only when search finds no match', async () => {
+test('announceFiles creates only when the category has no match, and tags the body with the slug marker', async () => {
 	const dir = await mkdtemp(join(tmpdir(), 'blog-announce-'));
 	const file = join(dir, 'pretty-urls-with-route-bindby.md');
 	await writeFile(file, SAMPLE_POST, 'utf8');
 	const calls = [];
+	let createdBody = '';
 
-	const gqlFn = async (_token, query) => {
-		if (query.includes('discussionCategories')) {
-			return {
-				repository: {
-					id: 'repo1',
-					discussionCategories: { nodes: [{ id: 'cat1', name: 'Announcements' }] },
-				},
-			};
-		}
-		if (query.includes('type: DISCUSSION')) {
-			calls.push('search');
-			return { search: { nodes: [] } };
-		}
+	const gqlFn = readMock([], (query, variables) => {
 		if (query.includes('createDiscussion')) {
 			calls.push('create');
+			createdBody = variables.body;
 			return { createDiscussion: { discussion: { url: 'https://github.com/wheels-dev/wheels/discussions/new' } } };
 		}
 		throw new Error(`unexpected query: ${query}`);
-	};
+	});
 
 	try {
 		const posted = await announceFiles([file], { token: 'x', gqlFn });
 		assert.equal(posted, 1);
-		assert.deepEqual(calls, ['search', 'create']);
+		assert.deepEqual(calls, ['create']);
+		assert.ok(createdBody.endsWith(slugMarker('pretty-urls-with-route-bindby')));
 		const updated = extractAnnouncement(splitFrontmatter(await readFile(file, 'utf8')).fm);
 		assert.equal(updated.discussionUrl, 'https://github.com/wheels-dev/wheels/discussions/new');
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+// The Sep 2026 failure mode: the post was announced by an earlier run, but its
+// discussionUrl writeback never landed, so the next run saw the post as new.
+test('a second run for a post whose writeback never landed links the first discussion instead of creating', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'blog-announce-'));
+	const file = join(dir, 'pretty-urls-with-route-bindby.md');
+	await writeFile(file, SAMPLE_POST, 'utf8');
+	const listed = [];
+	let creates = 0;
+	const gqlFn = readMock(listed, (query, variables) => {
+		if (query.includes('createDiscussion')) {
+			creates++;
+			listed.push({
+				title: variables.title,
+				url: 'https://github.com/wheels-dev/wheels/discussions/3500',
+				body: variables.body,
+				category: { name: 'Announcements' },
+			});
+			return { createDiscussion: { discussion: { url: 'https://github.com/wheels-dev/wheels/discussions/3500' } } };
+		}
+		throw new Error(`unexpected query: ${query}`);
+	});
+
+	try {
+		await announceFiles([file], { token: 'x', gqlFn });
+		await writeFile(file, SAMPLE_POST, 'utf8'); // the writeback is lost
+		await announceFiles([file], { token: 'x', gqlFn });
+		await writeFile(file, SAMPLE_POST, 'utf8');
+		await announceFiles([file], { token: 'x', gqlFn });
+		assert.equal(creates, 1);
+		const updated = extractAnnouncement(splitFrontmatter(await readFile(file, 'utf8')).fm);
+		assert.equal(updated.discussionUrl, 'https://github.com/wheels-dev/wheels/discussions/3500');
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test('a dry run with a token does the read-only lookup and never writes or creates', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'blog-announce-'));
+	const file = join(dir, 'pretty-urls-with-route-bindby.md');
+	await writeFile(file, SAMPLE_POST, 'utf8');
+	const gqlFn = readMock(
+		[{ title: 'Pretty URLs with bindBy', url: 'https://github.com/wheels-dev/wheels/discussions/3500', body: '', category: { name: 'Announcements' } }],
+		() => {
+			throw new Error('a dry run must not create');
+		},
+	);
+	try {
+		const posted = await announceFiles([file], { dryRun: true, token: 'x', gqlFn });
+		assert.equal(posted, 0);
+		assert.equal(await readFile(file, 'utf8'), SAMPLE_POST);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
+test('listCategoryDiscussions throws instead of returning a partial list when pages run out', async () => {
+	const gqlFn = async () => ({
+		repository: { discussions: { pageInfo: { hasNextPage: true, endCursor: 'c' }, nodes: [{ title: 'a', url: 'u' }] } },
+	});
+	await assert.rejects(
+		listCategoryDiscussions('t', { owner: 'o', name: 'n', categoryId: 'c', maxPages: 2 }, gqlFn),
+		/refusing to create without checking them all/,
+	);
+});
+
+test('listCategoryDiscussions throws when the listing is missing', async () => {
+	const gqlFn = async () => ({ repository: null });
+	await assert.rejects(
+		listCategoryDiscussions('t', { owner: 'o', name: 'n', categoryId: 'c' }, gqlFn),
+		/could not list existing discussions/,
+	);
+});
+
+test('announceFiles does not create when the listing cannot be read', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'blog-announce-'));
+	const file = join(dir, 'pretty-urls-with-route-bindby.md');
+	await writeFile(file, SAMPLE_POST, 'utf8');
+	let creates = 0;
+	const gqlFn = async (_token, query) => {
+		if (query.includes('discussionCategories')) {
+			return { repository: { id: 'repo1', discussionCategories: { nodes: [{ id: 'cat1', name: 'Announcements' }] } } };
+		}
+		if (query.includes('createDiscussion')) {
+			creates++;
+			return { createDiscussion: { discussion: { url: 'x' } } };
+		}
+		return { repository: { discussions: null } };
+	};
+	try {
+		await assert.rejects(announceFiles([file], { token: 'x', gqlFn }), /could not list existing discussions/);
+		assert.equal(creates, 0);
+		assert.equal(await readFile(file, 'utf8'), SAMPLE_POST);
 	} finally {
 		await rm(dir, { recursive: true, force: true });
 	}
