@@ -105,40 +105,69 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	 * Maps a `Wheels.*` error type to the HTTP status its error page should carry.
 	 * Single source of truth for both the render path and onerrorSpec.
 	 *
-	 * - 404: a client-facing "not found" — the requested record, route, view or
-	 *   action does not exist (`Wheels.*NotFound` / `Wheels.ActionNotAllowed`,
-	 *   #2319/#3075) — EXCEPT the server-side schema/config misses below.
-	 * - 500: `Wheels.TableNotFound`, `Wheels.DataSourceNotFound`,
-	 *   `Wheels.ColumnNotFound` are a misconfigured or unmigrated deploy, not a
-	 *   client 404; serving 404 for them hides a server fault from monitoring
-	 *   (A-F4). Everything unmatched is also 500.
+	 * 404 is a client-triggerable ALLOW-LIST, not "any `Wheels.*NotFound`". Only the
+	 * not-found types a client URL can produce get a 404; every other `*NotFound`
+	 * (and every unmatched type) defaults to 500 so monitoring sees the server
+	 * fault. This reverses the earlier "any `*NotFound` -> 404" rule.
+	 *
+	 * - 404: `Wheels.RouteNotFound`, `Wheels.RecordNotFound`, `Wheels.ViewNotFound`
+	 *   (a URL naming a non-existent view-only action), `Wheels.ActionNotAllowed`
+	 *   (a helper/$-named action treated as missing, #2845/#3075), and
+	 *   `Wheels.ActionParameterMissing` (a /wheels/ dev-GUI URL that names no
+	 *   action). #2319/#3075.
 	 * - 403: a policy denial (`Wheels.NotAuthorized`, #3156) or a missing/invalid
 	 *   CSRF token (`Wheels.InvalidAuthenticityToken`) — a forged or expired-form
 	 *   post is a client error, not a server error (A-F7).
+	 * - 406: `Wheels.FormatNotAcceptable` — an explicit `.ext` / `?format=` the
+	 *   action cannot answer (#3866).
+	 * - 500: everything else, including server-side schema/config misses
+	 *   (`Wheels.TableNotFound`, `Wheels.DataSourceNotFound`,
+	 *   `Wheels.ColumnNotFound` — a misconfigured or unmigrated deploy, A-F4),
+	 *   every other `*NotFound` (Model, Method, Filter, Association, Package,
+	 *   Vite assets/manifest, …), and any future type. Serving 404 for these
+	 *   hides a server fault from monitoring.
 	 */
 	public numeric function $wheelsErrorStatusCode(required string type) {
+		// 404 is a client-triggerable ALLOW-LIST: only the not-found types a client
+		// URL can produce — an unknown route, or a missing record/view/action for a
+		// resolved route. The framework commits 404 at these throw sites via
+		// $throwErrorOrShow404Page (RouteNotFound in Dispatch; RecordNotFound and
+		// ViewNotFound — a URL naming a non-existent view-only action — in
+		// controller/processing; ActionNotAllowed, a helper/$-named action treated
+		// as missing, #2845/#3075). Every OTHER Wheels.*NotFound is a server-side
+		// config/code fault (a missing table, datasource, column, model, method,
+		// filter, association, calculated property, group column, identity, key,
+		// object, package, query handle, service, job class, Vite asset/manifest,
+		// image/file, …) and defaults to 500 so monitoring sees it — including any
+		// future *NotFound type. (A-F4; follows #2319/#3075/#3156.)
 		if (
-			ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.type)
-			&& !ReFindNoCase("^Wheels\.(Table|DataSource|Column)NotFound$", arguments.type)
+			ReFindNoCase("^Wheels\.(Route|Record|View)NotFound$", arguments.type)
+			|| arguments.type == "Wheels.ActionNotAllowed"
+			|| arguments.type == "Wheels.ActionParameterMissing"
 		) {
 			return 404;
 		}
+		// 403: a policy denial (#3156) or a missing/invalid CSRF token (A-F7).
 		if (ReFindNoCase("^Wheels\.(NotAuthorized|InvalidAuthenticityToken)$", arguments.type)) {
 			return 403;
+		}
+		// 406: an explicit .[format] / ?format= the action cannot answer (#3866).
+		if (arguments.type == "Wheels.FormatNotAcceptable") {
+			return 406;
 		}
 		return 500;
 	}
 
 
 	public string function $runOnErrorRenderWheelsError(required wheelsError, required format) {
-		// Map Wheels error types to HTTP status codes. Any
-		// `Wheels.*NotFound` (RouteNotFound, RecordNotFound,
-		// ViewNotFound, etc) is a 404, as is `Wheels.ActionNotAllowed`
-		// — the action-dispatch gate blocks framework helpers and
-		// $-prefixed internals by treating them as missing actions
-		// (#2845, #3075); `Wheels.NotAuthorized` — a policy denial
-		// from the authorization layer (#3156) — is a 403; everything
-		// else is a 500.
+		// Map Wheels error types to HTTP status codes via the
+		// $wheelsErrorStatusCode allow-list: the client-triggerable
+		// not-found types (RouteNotFound, RecordNotFound, ViewNotFound,
+		// ActionNotAllowed, ActionParameterMissing) are 404; a policy
+		// denial or missing/invalid CSRF token is 403; FormatNotAcceptable
+		// is 406; everything else — including server-side *NotFound
+		// (table/datasource/column/model/package/…) — is 500. See
+		// $wheelsErrorStatusCode for the full rationale (#2319/#3075/#3156).
 		// Set the status BEFORE writing the body so the response
 		// header is committed at the right code regardless of
 		// when the servlet engine flushes (HTML-format Wheels

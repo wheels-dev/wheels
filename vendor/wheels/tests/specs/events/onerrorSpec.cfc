@@ -38,10 +38,30 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.ViewNotFound")).toBe(404)
 			})
 
-			it("maps Wheels.PackageNotFound to HTTP 404 (##2319)", () => {
-				// Any type ending in NotFound counts — futureproof against
-				// new not-found types without requiring an enum update.
-				expect($expectedStatusFor("Wheels.PackageNotFound")).toBe(404)
+			// A-F4 allow-list: the 404 set is now client-URL-triggerable types only
+			// (route/record/view/action). A missing package is a server-side
+			// config/code fault, so it is 500 — as is any other non-client *NotFound
+			// (Model/Method/Filter/Association/Vite*/JobClass/…), including future
+			// types, which default to 500. (This reverses the earlier "any *NotFound
+			// -> 404" rule.)
+			it("maps Wheels.PackageNotFound to HTTP 500 (server-side, not client-triggerable)", () => {
+				expect($expectedStatusFor("Wheels.PackageNotFound")).toBe(500)
+			})
+
+			it("maps Wheels.ModelNotFound to HTTP 500 (server-side)", () => {
+				expect($expectedStatusFor("Wheels.ModelNotFound")).toBe(500)
+			})
+
+			it("maps Wheels.ViteManifestNotFound to HTTP 500 (server-side; allow-list defaults it)", () => {
+				expect($expectedStatusFor("Wheels.ViteManifestNotFound")).toBe(500)
+			})
+
+			it("maps a future Wheels.SomethingNotFound to HTTP 500 by default (allow-list)", () => {
+				expect($expectedStatusFor("Wheels.SomethingNotFound")).toBe(500)
+			})
+
+			it("maps Wheels.FormatNotAcceptable to HTTP 406 (##3866)", () => {
+				expect($expectedStatusFor("Wheels.FormatNotAcceptable")).toBe(406)
 			})
 
 			// A-F4: a missing datasource, table or column is a misconfigured or
@@ -93,8 +113,12 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.UnknownThingHappened")).toBe(500)
 			})
 
-			it("maps Wheels.ActionParameterMissing to HTTP 500 (Missing != NotFound, ##2319)", () => {
-				expect($expectedStatusFor("Wheels.ActionParameterMissing")).toBe(500)
+			// Thrown only at Dispatch.cfc:415 — a /wheels/ GUI request that resolves
+			// to controller=wheels with a null/empty action. Client-triggerable
+			// (a dev-GUI URL that names no action), so it is "no such page" -> 404,
+			// not a 500 server error. (Reverses the earlier "Missing != NotFound".)
+			it("maps Wheels.ActionParameterMissing to HTTP 404 (client-triggerable dev-GUI URL)", () => {
+				expect($expectedStatusFor("Wheels.ActionParameterMissing")).toBe(404)
 			})
 		})
 
