@@ -101,6 +101,35 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		return local.wheelsError;
 	}
 
+	/**
+	 * Maps a `Wheels.*` error type to the HTTP status its error page should carry.
+	 * Single source of truth for both the render path and onerrorSpec.
+	 *
+	 * - 404: a client-facing "not found" — the requested record, route, view or
+	 *   action does not exist (`Wheels.*NotFound` / `Wheels.ActionNotAllowed`,
+	 *   #2319/#3075) — EXCEPT the server-side schema/config misses below.
+	 * - 500: `Wheels.TableNotFound`, `Wheels.DataSourceNotFound`,
+	 *   `Wheels.ColumnNotFound` are a misconfigured or unmigrated deploy, not a
+	 *   client 404; serving 404 for them hides a server fault from monitoring
+	 *   (A-F4). Everything unmatched is also 500.
+	 * - 403: a policy denial (`Wheels.NotAuthorized`, #3156) or a missing/invalid
+	 *   CSRF token (`Wheels.InvalidAuthenticityToken`) — a forged or expired-form
+	 *   post is a client error, not a server error (A-F7).
+	 */
+	public numeric function $wheelsErrorStatusCode(required string type) {
+		if (
+			ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.type)
+			&& !ReFindNoCase("^Wheels\.(Table|DataSource|Column)NotFound$", arguments.type)
+		) {
+			return 404;
+		}
+		if (ReFindNoCase("^Wheels\.(NotAuthorized|InvalidAuthenticityToken)$", arguments.type)) {
+			return 403;
+		}
+		return 500;
+	}
+
+
 	public string function $runOnErrorRenderWheelsError(required wheelsError, required format) {
 		// Map Wheels error types to HTTP status codes. Any
 		// `Wheels.*NotFound` (RouteNotFound, RecordNotFound,
@@ -121,19 +150,11 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		// $header(statusCode=403)), but onError reaches us via
 		// Application.cfc which can reset the response, so we
 		// re-assert the status here.
-		if (
-			StructKeyExists(arguments.wheelsError, "type")
-			&& ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.wheelsError.type)
-		) {
-			$header(statusCode = 404);
-		} else if (
-			StructKeyExists(arguments.wheelsError, "type")
-			&& ReFindNoCase("^Wheels\.NotAuthorized$", arguments.wheelsError.type)
-		) {
-			$header(statusCode = 403);
-		} else {
-			$header(statusCode = 500);
-		}
+		$header(
+			statusCode = StructKeyExists(arguments.wheelsError, "type")
+				? $wheelsErrorStatusCode(arguments.wheelsError.type)
+				: 500
+		);
 		local.rv = "";
 		if (arguments.format == "json") {
 			$header(name = "Content-Type", value = "application/json");

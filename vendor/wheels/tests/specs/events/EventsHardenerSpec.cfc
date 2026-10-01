@@ -29,24 +29,28 @@ component extends="wheels.WheelsTest" {
 				application.wheels.showErrorInformation = _savedShowError;
 			});
 
-			it("EventMethods.$runOnError source holds the frozen 404/403/500 map", () => {
-				// The live mapping lives in the $runOnErrorRenderWheelsError helper
-				// that $runOnError dispatches to (the helper IS the live path).
-				var body = $functionBody("EventMethods.cfc", "$runOnErrorRenderWheelsError");
+			it("EventMethods.$wheelsErrorStatusCode holds the frozen 404/403/500 map", () => {
+				// The status map is the single source of truth $runOnErrorRenderWheelsError
+				// (the live path) and onerrorSpec both call.
+				var body = $functionBody("EventMethods.cfc", "$wheelsErrorStatusCode");
 				expect(Find('ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$"', body)).toBeGT(
 					0,
-					"live $runOnError no longer maps Wheels.*NotFound / ActionNotAllowed via the frozen regex"
+					"status map no longer matches Wheels.*NotFound / ActionNotAllowed via the frozen regex"
 				);
-				expect(Find('ReFindNoCase("^Wheels\.NotAuthorized$"', body)).toBeGT(
+				// Server-side schema/config misses are carved out of the 404 branch (A-F4).
+				expect(Find('ReFindNoCase("^Wheels\.(Table|DataSource|Column)NotFound$"', body)).toBeGT(
 					0,
-					"live $runOnError no longer maps Wheels.NotAuthorized via the frozen regex"
+					"server-side *NotFound (Table/DataSource/Column) must be excluded from the 404 branch"
 				);
-				expect(Find("$header(statusCode = 404)", body)).toBeGT(0);
-				expect(Find("$header(statusCode = 403)", body)).toBeGT(0);
-				expect(Find("$header(statusCode = 500)", body)).toBeGT(0);
-				var pos404 = Find("$header(statusCode = 404)", body);
-				var pos403 = Find("$header(statusCode = 403)", body);
-				expect(pos403).toBeGT(pos404, "403 mapping must follow the 404 *NotFound / ActionNotAllowed branch");
+				// NotAuthorized and InvalidAuthenticityToken (A-F7) are the 403 set.
+				expect(Find('ReFindNoCase("^Wheels\.(NotAuthorized|InvalidAuthenticityToken)$"', body)).toBeGT(
+					0,
+					"status map no longer maps NotAuthorized / InvalidAuthenticityToken to 403"
+				);
+				expect(Find("return 404", body)).toBeGT(0);
+				expect(Find("return 403", body)).toBeGT(0);
+				expect(Find("return 500", body)).toBeGT(0);
+				expect(Find("return 403", body)).toBeGT(Find("return 404", body), "403 branch follows the 404 branch");
 			});
 
 			it("maps Wheels.RouteNotFound to 404 through live $runOnError", () => {
@@ -71,6 +75,32 @@ component extends="wheels.WheelsTest" {
 				var em = $onErrorDouble();
 				em.$runOnError(exception = $wheelsTypedException("Wheels.UnknownThingHappened"), eventName = "onRequest");
 				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+			// A-F4: server-side schema/config misses are 500, not a client 404.
+			it("maps Wheels.TableNotFound to 500 through live $runOnError", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.TableNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+			it("maps Wheels.DataSourceNotFound to 500 through live $runOnError", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.DataSourceNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+			it("maps Wheels.ColumnNotFound to 500 through live $runOnError", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.ColumnNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
+			});
+
+			// A-F7: a missing/invalid CSRF token is a client error (403), not a 500.
+			it("maps Wheels.InvalidAuthenticityToken to 403 through live $runOnError", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.InvalidAuthenticityToken"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(403);
 			});
 
 		});
