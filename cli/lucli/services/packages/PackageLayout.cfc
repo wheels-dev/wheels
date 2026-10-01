@@ -11,7 +11,10 @@
  */
 component {
 
-	/** Throws Wheels.Packages.ExtractionFailed describing the first mismatch. */
+	/**
+	 * Throws Wheels.Packages.ExtractionFailed describing the first mismatch.
+	 * Once every check passes, also deletes the Mac metadata inside `<name>/`.
+	 */
 	public void function assertSingleTree(required string stageDir, required string name) {
 		var files = createObject("java", "java.nio.file.Files");
 		var paths = createObject("java", "java.nio.file.Paths");
