@@ -9134,6 +9134,14 @@ component extends="modules.BaseModule" {
 			);
 		}
 
+		// `wheels generate app <name> --dry-run`: report the project folder that
+		// would be created and write nothing (no files, no .env, no database).
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, targetDir & "/");
+			out("Would create a new Wheels application in #appName#/", "cyan");
+			return "";
+		}
+
 		// Merge defaults for any missing options
 		var opts = {
 			port: structKeyExists(options, "port") ? options.port : 8080,
