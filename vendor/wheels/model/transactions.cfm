@@ -77,15 +77,12 @@
 			local.closeTransaction = false;
 		} else {
 			request.wheels.transactions[local.connectionArgs] = true;
-			// #3934 R1: detect a raw, non-Wheels transaction{} we are nested inside,
-			// BEFORE opening our own (after which IsWithinTransaction() reports ours).
-			// Capability-guarded: Adobe CF / RustCFML lack IsWithinTransaction, so this
-			// is false there and the callbacks fall back to firing on the inner close.
-			// The foreign marker rides in the per-connection store; $enqueueTransactionCallbacks
-			// then skips both callbacks + warns once instead of firing on an unobservable outcome.
-			if ($withinForeignTransaction()) {
-				request.wheels.$txnCallbacks[local.connectionArgs] = {real = false, foreign = true, queue = []};
-			}
+			// #3934 R1: mark a raw, non-Wheels transaction{} we are nested inside, BEFORE
+			// opening our own (IsWithinTransaction() then still reflects only the outer block).
+			// Capability-guarded: on Adobe CF / RustCFML it is a no-op and the callbacks fall
+			// back to the inner close. $enqueueTransactionCallbacks then skips both callbacks
+			// and warns once instead of firing on an outcome Wheels cannot observe.
+			$markForeignTransaction(local.connectionArgs);
 		}
 
 		// Run the method.
@@ -106,9 +103,7 @@
 				// v4.2.0: the owner of a real (commit/rollback) transaction collects
 				// afterCommit/afterRollback callbacks from every write (incl. nested)
 				// and fires them once the outermost transaction resolves.
-				if (local.closeTransaction && !$transactionForeign(local.connectionArgs)) {
-					request.wheels.$txnCallbacks[local.connectionArgs] = {real = true, queue = []};
-				}
+				$prepareTransactionCallbackStore(local.connectionArgs, local.closeTransaction);
 				local.txnState = {rolledBack = false};
 				try {
 					transaction action="begin" isolation=arguments.isolation {
@@ -184,10 +179,7 @@
 				} catch (any e) {
 					if (local.closeTransaction) {
 						request.wheels.transactions[local.connectionArgs] = false;
-						// Clear a foreign marker set for none/false mode (nothing was queued).
-						if ($transactionForeign(local.connectionArgs)) {
-							StructDelete(request.wheels.$txnCallbacks, local.connectionArgs);
-						}
+						$clearForeignTransaction(local.connectionArgs);
 					}
 					rethrow;
 				}
@@ -202,11 +194,7 @@
 
 		if (local.closeTransaction) {
 			request.wheels.transactions[local.connectionArgs] = false;
-			// Clear a foreign marker set for none/false mode (the commit/rollback branch
-			// already cleared its own store when it resolved).
-			if ($transactionForeign(local.connectionArgs)) {
-				StructDelete(request.wheels.$txnCallbacks, local.connectionArgs);
-			}
+			$clearForeignTransaction(local.connectionArgs);
 		}
 
 		// Check the return type.

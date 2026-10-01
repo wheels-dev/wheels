@@ -195,14 +195,21 @@ component extends="wheels.WheelsTest" {
 
 			it("does NOT fire afterCommit for a write inside a raw transaction{} that rolls back [IsWithinTransaction engines]", () => {
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				// var struct (not local.) so writes survive the catch on BoxLang (invariant 11).
+				var state = {saved = false, errored = false, errType = ""};
 				try {
 					transaction {
 						var t = g.model("tag").new(name = "txncb-foreign-rb");
-						t.save(transaction = "commit");
+						state.saved = t.save(transaction = "commit");
 						transaction action="rollback";
 					}
 				} catch (any e) {
+					state.errored = true;
+					state.errType = e.type;
 				}
+				expect(state.errored).toBeFalse("the raw-transaction write must not error (type=" & state.errType & ")");
+				expect(state.saved).toBeTrue("the save itself succeeds inside the transaction");
+				expect(g.model("tag").count(where = "name = 'txncb-foreign-rb'")).toBe(0, "the row is rolled back by the raw transaction");
 				expect(ArrayLen(request.$acLog)).toBe(
 					0,
 					"afterCommit must not fire for a write rolled back inside a raw transaction{}"
@@ -215,14 +222,21 @@ component extends="wheels.WheelsTest" {
 				// engine's own transaction-nesting semantics decide what fires (not guaranteed,
 				// which is why the docs direct users to the Wheels-managed transaction).
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				var state = {saved = false, errored = false, errType = ""};
 				try {
 					transaction {
 						var t = g.model("tag").new(name = "txncb-foreign-fb");
-						t.save(transaction = "commit");
+						state.saved = t.save(transaction = "commit");
 						transaction action="rollback";
 					}
 				} catch (any e) {
+					state.errored = true;
+					state.errType = e.type;
 				}
+				expect(state.errored).toBeFalse("the raw-transaction write must not error (type=" & state.errType & ")");
+				expect(state.saved).toBeTrue("the save itself succeeds inside the transaction");
+				// The engine's own nesting semantics decide what fires; we assert only that
+				// Wheels' foreign detection did NOT engage (no foreign-skip warning written).
 				expect(
 					!StructKeyExists(request, "wheels")
 					|| !StructKeyExists(request.wheels, "$txnForeignWarned")
@@ -233,14 +247,20 @@ component extends="wheels.WheelsTest" {
 			it("suppresses BOTH afterCommit and afterRollback inside a raw transaction{} [IsWithinTransaction engines]", () => {
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
 				g.model("tag").$registerCallback(type = "afterRollback", methods = "recordAfterRollback");
+				var state = {saved = false, errored = false, errType = ""};
 				try {
 					transaction {
 						var t = g.model("tag").new(name = "txncb-foreign-both");
-						t.save(transaction = "commit");
+						state.saved = t.save(transaction = "commit");
 						transaction action="rollback";
 					}
 				} catch (any e) {
+					state.errored = true;
+					state.errType = e.type;
 				}
+				expect(state.errored).toBeFalse("the raw-transaction write must not error (type=" & state.errType & ")");
+				expect(state.saved).toBeTrue("the save itself succeeds inside the transaction");
+				expect(g.model("tag").count(where = "name = 'txncb-foreign-both'")).toBe(0, "the row is rolled back by the raw transaction");
 				expect(ArrayLen(request.$acLog)).toBe(
 					0,
 					"neither transaction callback fires when Wheels can't observe the outer outcome"
@@ -249,16 +269,24 @@ component extends="wheels.WheelsTest" {
 
 			it("warns once per request+model for writes inside a raw transaction{}, not once per write [IsWithinTransaction engines]", () => {
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				var state = {saved = 0, errored = false, errType = ""};
 				try {
 					transaction {
 						for (var i = 1; i <= 3; i++) {
 							var t = g.model("tag").new(name = "txncb-foreign-bulk" & i);
-							t.save(transaction = "commit");
+							if (t.save(transaction = "commit")) {
+								state.saved = state.saved + 1;
+							}
 						}
 						transaction action="rollback";
 					}
 				} catch (any e) {
+					state.errored = true;
+					state.errType = e.type;
 				}
+				expect(state.errored).toBeFalse("the bulk raw-transaction writes must not error (type=" & state.errType & ")");
+				expect(state.saved).toBe(3, "all three saves succeed inside the transaction");
+				expect(g.model("tag").count(where = "name LIKE 'txncb-foreign-bulk%'")).toBe(0, "all three rows are rolled back");
 				expect(ArrayLen(request.$acLog)).toBe(0, "all three writes suppressed");
 				expect(
 					StructKeyExists(request, "wheels")

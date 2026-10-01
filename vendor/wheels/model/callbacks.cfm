@@ -509,6 +509,38 @@
 	}
 
 	/**
+	 * Internal. Record a foreign (raw, non-Wheels) transaction marker for this connection
+	 * when one is active. MUST be called by the transaction owner BEFORE opening Wheels'
+	 * own transaction (IsWithinTransaction() then still reflects only the outer block).
+	 */
+	public void function $markForeignTransaction(required string connection) {
+		if ($withinForeignTransaction()) {
+			request.wheels.$txnCallbacks[arguments.connection] = {real = false, foreign = true, queue = []};
+		}
+	}
+
+	/**
+	 * Internal. Set up the owner's real afterCommit/afterRollback queue — unless this
+	 * connection is inside a foreign transaction, where the foreign marker stays in place
+	 * and the callbacks are skipped instead.
+	 */
+	public void function $prepareTransactionCallbackStore(required string connection, required boolean closeTransaction) {
+		if (arguments.closeTransaction && !$transactionForeign(arguments.connection)) {
+			request.wheels.$txnCallbacks[arguments.connection] = {real = true, queue = []};
+		}
+	}
+
+	/**
+	 * Internal. Drop a foreign-transaction marker set for none/false mode (the commit/
+	 * rollback branch clears its own store when it resolves).
+	 */
+	public void function $clearForeignTransaction(required string connection) {
+		if ($transactionForeign(arguments.connection)) {
+			StructDelete(request.wheels.$txnCallbacks, arguments.connection);
+		}
+	}
+
+	/**
 	 * Internal. One wheels.log warning per request + model when afterCommit/afterRollback
 	 * are skipped because the write ran inside an unmanaged raw transaction{} block.
 	 * Guarded so a bulk import inside a raw transaction logs one line, not one per write.
