@@ -207,7 +207,7 @@ Most mail clients prefer the HTML part when both are present; the plain-text par
 
 ## Attachments
 
-Pass `file=` (or its alias `files=`) with one or more paths. Paths without any directory separator (`/` or `\`) are resolved relative to the `filePath` setting — default `files`, which expands relative to the **web root**, so `public/files/` in the standard app template:
+Pass `file=` (or its alias `files=`) with one or more paths. Relative paths are resolved relative to the `filePath` setting — default `files`, which expands relative to the **web root**, so `public/files/` in the standard app template. A subfolder path such as `file="invoices/123.pdf"` resolves to `public/files/invoices/123.pdf` ([#3852](https://github.com/wheels-dev/wheels/issues/3852)):
 
 ```cfm {test:compile}
 sendEmail(
@@ -233,7 +233,7 @@ sendEmail(
 );
 ```
 
-A path that *does* contain a separator skips the `filePath` resolution entirely and reaches `cfmailparam` unchanged — so a relative path like `invoices/123.pdf` resolves against the JVM working directory at delivery time, which is almost never what you want. For files outside `public/files/`, build an absolute path yourself (e.g. `file="#ExpandPath('../storage/invoices/#user.id#.pdf')#"`). Absolute paths and URLs work too (`/var/app/pdfs/invoice.pdf`, `https://cdn.example.com/logo.png`) — anything `cfmailparam`'s `file` attribute accepts is valid.
+Absolute paths skip the `filePath` resolution and reach `cfmailparam` unchanged. For files outside `public/files/`, build an absolute path yourself (e.g. `file="#ExpandPath('../storage/invoices/#user.id#.pdf')#"`). Absolute paths and URLs work too (`/var/app/pdfs/invoice.pdf`, `https://cdn.example.com/logo.png`) — anything `cfmailparam`'s `file` attribute accepts is valid.
 
 ## Per-environment SMTP
 
