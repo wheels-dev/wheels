@@ -1,0 +1,38 @@
+name: Consumer AI docs check
+
+# Runs tools/build/scripts/ship-consumer-docs.sh check: the consumer AI docs in
+# docs/consumer-ai/ exist, the root CLAUDE.md points at them, and the wheels new
+# template's copies (cli/lucli/templates/app/CLAUDE.md, AGENTS.md, .ai/README.md)
+# are byte-identical to them. The release and snapshot builds run the same check,
+# so without this a PR that edits only one copy passes and the next develop
+# snapshot fails.
+
+on:
+  # No path filter on pull_request, as in rustcfml-ci.yml: a path-gated check
+  # can't be made required (it never reports on PRs it skips). The check is a
+  # few seconds of shell, so running it on every PR to develop is cheap.
+  pull_request:
+    branches: [develop]
+  push:
+    branches: [develop]
+    paths:
+      - "docs/consumer-ai/**"
+      - "cli/lucli/templates/**"
+      - "CLAUDE.md"
+      - "tools/build/scripts/ship-consumer-docs.sh"
+      - ".github/workflows/consumer-docs-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  consumer-docs:
+    name: "Consumer AI docs in sync"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: Check the consumer AI docs and the template copies
+        run: bash tools/build/scripts/ship-consumer-docs.sh check
