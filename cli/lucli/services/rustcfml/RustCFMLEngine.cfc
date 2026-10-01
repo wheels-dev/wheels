@@ -182,6 +182,15 @@ component {
 			);
 		}
 
+		// Another process on the port makes RustCFML exit at once ("Address
+		// already in use"), which used to be reported as a successful start.
+		if ($portInUse(arguments.port)) {
+			throw(
+				type = "Wheels.RustCFML.PortInUse",
+				message = "Port " & arguments.port & " is already in use by another process, so RustCFML can't start there. Stop that process or pass --port=<a free port>."
+			);
+		}
+
 		var bin = install();
 		var logPath = variables.wheelsHome & "/rustcfml/servers/" & $projectKey(arguments.projectRoot) & ".log";
 		$ensureParent(logPath);
@@ -200,6 +209,20 @@ component {
 		pb.redirectError(createObject("java", "java.io.File").init(logPath));
 		var proc = pb.start();
 
+		// Started means listening. Wait briefly for the port to open; a server
+		// that exits first failed (e.g. it lost a race for the port) and is
+		// reported as such, with the end of its log, and no state is recorded.
+		var deadline = getTickCount() + 5000;
+		while (getTickCount() < deadline && proc.isAlive() && !$portInUse(arguments.port)) {
+			sleep(100);
+		}
+		if (!proc.isAlive()) {
+			throw(
+				type = "Wheels.RustCFML.StartFailed",
+				message = "The RustCFML server exited right after starting. " & $logTail(logPath)
+			);
+		}
+
 		var state = {
 			pid = proc.pid(),
 			port = arguments.port,
@@ -210,6 +233,22 @@ component {
 		$writeState(arguments.projectRoot, state);
 		state.log = logPath;
 		return state;
+	}
+
+	/** Whether something is listening on `port` (IPv4 or IPv6). Public so specs can stub it. */
+	public boolean function $portInUse(required numeric port) {
+		return new modules.wheels.services.PortProbe().portInUse(arguments.port);
+	}
+
+	/** The last few lines of a server log, for an error message. */
+	public string function $logTail(required string path) {
+		if (!fileExists(arguments.path)) return "No log was written.";
+		var lines = listToArray(fileRead(arguments.path), chr(10));
+		var tail = [];
+		for (var i = max(1, arrayLen(lines) - 4); i <= arrayLen(lines); i++) {
+			arrayAppend(tail, trim(lines[i]));
+		}
+		return arrayLen(tail) ? "Log: " & arrayToList(tail, " | ") : "The log is empty.";
 	}
 
 	/**

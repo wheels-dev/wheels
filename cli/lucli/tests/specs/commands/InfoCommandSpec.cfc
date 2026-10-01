@@ -186,10 +186,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(true).toBeTrue();
 			});
 
-			it("bare verb prints usage steering and never mutates", () => {
-				var result = mod.upgrade();
-				expect(result).toInclude("wheels upgrade check");
-				expect(result).toInclude("wheels upgrade apply");
+			it("bare verb exits non-zero with usage steering and never mutates", () => {
+				// 4.1.2: a missing subcommand is a usage error (non-zero exit, MCP isError).
+				expect(() => mod.upgrade()).toThrow(type = "Wheels.InvalidArguments", regex = "wheels upgrade check");
+				expect(() => mod.upgrade()).toThrow(regex = "wheels upgrade apply");
 			});
 
 			it("apply verb refuses over the empty vendor/wheels stub", () => {

@@ -429,14 +429,16 @@ component extends="wheels.Job" {
         this.maxRetries = 5;
     }
     public void function perform(struct data = {}) {
-        sendEmail(to=data.email, subject="Welcome!", from="app@example.com");
+        // model() works in a job; sendEmail() is controller-only, so send through a mailer
+        user = model("User").findByKey(arguments.data.userId);
+        new app.mailers.UserMailer().sendWelcome(user);
     }
 }
 
 // Enqueue
 job = new app.jobs.SendWelcomeEmailJob();
-job.enqueue(data={email: user.email});
-job.enqueueIn(seconds=300, data={email: "..."});
+job.enqueue(data={userId: user.id});
+job.enqueueIn(seconds=300, data={userId: user.id});
 job.enqueueAt(runAt=scheduledDate, data={});
 
 // Process
