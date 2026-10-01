@@ -1,0 +1,1 @@
+- A CFML date interpolated into a finder's `where` string works again. Its ODBC escape form (`{ts '2000-01-01 00:00:00'}`, `{d '...'}`, `{t '...'}`) failed with `invalid hexadecimal String` when quoted (`where="createdAt >= '#since#'"`) or `the value for cfqueryparam cannot be determined` when bare; the date is now bound as its value (#3941)

@@ -4,7 +4,7 @@ component extends="wheels.WheelsTest" {
 	 * A CFML date interpolated into a where string renders in ODBC escape form,
 	 * {ts '2020-01-01 00:00:00'} (also {d '...'} and {t '...'}). The literal masker
 	 * read the quote inside {ts '...'} as the end of the surrounding literal, so
-	 * the query failed with "invalid hexadecimal String" (#ISSUE). The masker now
+	 * the query failed with "invalid hexadecimal String" (#3941). The masker now
 	 * binds the inner date value; anything that is not exactly an ODBC date form
 	 * keeps the ordinary literal handling.
 	 */
