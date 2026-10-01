@@ -17,6 +17,12 @@ component {
 	 * @return struct { status: numeric, body: string }
 	 */
 	public struct function get(required string url, struct headers = {}) {
+		if (request.$wheelsOffline ?: false) {
+			Throw(
+				type = "Wheels.Packages.Offline",
+				message = "Offline mode is enabled by --offline or WHEELS_OFFLINE=1; #arguments.url# needs network access."
+			);
+		}
 		cfhttp(
 			url = arguments.url,
 			method = "GET",

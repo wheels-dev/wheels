@@ -20,7 +20,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 ### Synopsis
 
 ```txt title="
-wheels upgrade check [--to=<version>] [--format=json] [--strict]
+wheels upgrade check [--to=<version>] [--format=json] [--strict] [--offline]
 wheels upgrade apply [--to=<version>] [--nobackup] [--allow-downgrade]
 ```
 
@@ -45,7 +45,7 @@ None that the command enforces — but in practice:
 
 - **Commit first.** The scanner is read-only, but the actual upgrade — `wheels upgrade apply` (or a manual `vendor/wheels/` drop-in if you vendor by hand) — replaces framework code. Have a clean working tree so you can diff and roll back. (`brew upgrade wheels` only updates the CLI binary, never your app's vendored framework copy.)
 - **Run your tests.** Rerun the test suite after the framework swap, not after this command — `wheels upgrade check` does not exercise anything, it only greps.
-- **Internet access** is required when you don't pass `--to=`. The command fetches the latest release tag from GitHub.
+- **Internet access** is required when you don't pass `--to=`. The command fetches the latest release tag from GitHub. Under `--offline` (or `WHEELS_OFFLINE=1`) it never makes that call, so pass `--to=`.
 
 ### Flags — `check`
 
@@ -54,6 +54,7 @@ None that the command enforces — but in practice:
 | `--to=<version>` | Target version to scan against (e.g. `--to=4.0.0`). When omitted, the command queries GitHub for the latest release tag. If the GitHub call fails and no `--to=` is given, the command aborts. |
 | `--format=json` | Emit a single machine-readable JSON report instead of the human output — for CI pipelines. Breaking findings (and advisory findings when `--strict` is set) still exit non-zero. |
 | `--strict` | Escalate advisory findings (the "Recommended Improvements" section) to the same hard-fail path as breaking findings. The command throws `Wheels.UpgradeCheckFailed` and exits non-zero so CI can gate on opt-in convention changes. Without this flag, advisories are reported but never fail the check. Mirrors Django's `--fail-level WARNING` / Mix's `--warnings-as-errors`. |
+| `--offline` | Never call GitHub. Without `--to=` the check fails (`Wheels.UpgradeCheckFailed`) and asks for one; with `--to=` it scans normally. `WHEELS_OFFLINE=1` does the same. |
 
 ### Example
 

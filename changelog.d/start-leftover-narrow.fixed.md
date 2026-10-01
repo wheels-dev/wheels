@@ -1,0 +1,1 @@
+- `wheels start` cleans a leftover registration only when it has exactly the shape a failed start leaves (LuCLI's config file and nothing else). A stopped server registration of another project with the same name but no recorded project path (from plain LuCLI or before 4.0) is no longer wiped; `wheels start` refuses and points to `--force` instead.
