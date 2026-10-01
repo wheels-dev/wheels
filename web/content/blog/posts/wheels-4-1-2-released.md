@@ -65,16 +65,16 @@ The same PR passes the `host` and `ssl` settings to kamal-proxy (TLS and host-ba
 - **Failures exit non-zero** ([#3863](https://github.com/wheels-dev/wheels/pull/3863)). `wheels generate` refusals, missing arguments, `wheels doctor` at CRITICAL and more no longer report success, including through the MCP tools. Scripts that relied on exit 0 after printing usage need the arguments they were missing.
 - **`wheels generate app --dry-run` writes nothing** ([#3858](https://github.com/wheels-dev/wheels/pull/3858)). It used to print "Dry run — nothing will be written" and then create the whole app.
 - **`wheels upgrade`** no longer silently downgrades the framework when `vendor/wheels/` is newer than the CLI's copy; pass `--allow-downgrade` if you mean it ([#3831](https://github.com/wheels-dev/wheels/pull/3831)). `upgrade check` reaches GitHub again ([#3854](https://github.com/wheels-dev/wheels/pull/3854)), exits non-zero when the lookup fails ([#3827](https://github.com/wheels-dev/wheels/pull/3827)), and accepts `--offline` ([#3871](https://github.com/wheels-dev/wheels/pull/3871)).
-- **`wheels test` runs a single spec file** by dotted path or bare name ([#3759](https://github.com/wheels-dev/wheels/pull/3759)).
-- **The apt/dnf launcher** ignores a `JAVA_HOME` older than Java 21 and uses the Java 21 the package installed ([#3728](https://github.com/wheels-dev/wheels/pull/3728)).
+- **`wheels test` runs a single spec file** by dotted path or bare name ([#3797](https://github.com/wheels-dev/wheels/pull/3797)).
+- **The apt/dnf launcher** ignores a `JAVA_HOME` older than Java 21 and uses the Java 21 the package installed ([#3766](https://github.com/wheels-dev/wheels/pull/3766)).
 - **`wheels docs fetch`** verifies the bundle's SHA-512 checksum before unpacking ([#3823](https://github.com/wheels-dev/wheels/pull/3823)), and **`wheels coverage`** no longer reports 0% on a warm dev server ([#3859](https://github.com/wheels-dev/wheels/pull/3859)).
 
 ## Model and migrator
 
-- Migrations can opt out of the per-step transaction with `this.useTransaction = false`, so a migration that touches a second datasource runs on Adobe ColdFusion ([#3772](https://github.com/wheels-dev/wheels/pull/3772)).
+- Migrations can opt out of the per-step transaction with `this.useTransaction = false`, so a migration that touches a second datasource runs on Adobe ColdFusion ([#3792](https://github.com/wheels-dev/wheels/pull/3792)).
 - `reload()` no longer truncates decimals (`149.25` became `149`, and the next `save()` wrote it back) ([#3818](https://github.com/wheels-dev/wheels/pull/3818)).
 - An invalid `transaction` mode no longer leaves the connection marked as in a transaction ([#3817](https://github.com/wheels-dev/wheels/pull/3817)).
-- The per-request query cache keys on the datasource a query actually runs against, after tenant resolution ([#3844](https://github.com/wheels-dev/wheels/pull/3844)).
+- The per-request query cache keys on the datasource a query actually runs against, after tenant resolution ([#3846](https://github.com/wheels-dev/wheels/pull/3846)).
 - On SQLite and H2, new boolean columns from migrations are real `BOOLEAN` columns ([#3870](https://github.com/wheels-dev/wheels/pull/3870)).
 - On Oracle, `whereBetween()` on a date column no longer fails ([#3877](https://github.com/wheels-dev/wheels/pull/3877)).
 
@@ -103,8 +103,8 @@ These items ask for an edit in your app:
 4. **`generate auth` logout** ([#3819](https://github.com/wheels-dev/wheels/pull/3819)). Add `if (!isPost() && !isDelete()) { redirectTo(route="login"); return; }` at the top of `delete()` in `app/controllers/Sessions.cfc`.
 5. **IP-based debug access** ([GHSA-8r22-vwcc-v55m](https://github.com/wheels-dev/wheels/security/advisories/GHSA-8r22-vwcc-v55m)). If you use it, replace the IP-based access block in `onRequestStart()` with `application.wo.$applyIPDebugAccess();`, and in `onRequestEnd()` replace `application.wheels.showDebugInformation &&` with `application.wo.$get("showDebugInformation") &&`.
 6. **Error emails** ([GHSA-8gcv-3v9h-7gj2](https://github.com/wheels-dev/wheels/security/advisories/GHSA-8gcv-3v9h-7gj2)). Apps that relied on the default must set `errorEmailAddress` (or `errorEmailToAddress`) explicitly.
-7. **Startup error page** ([#3671](https://github.com/wheels-dev/wheels/pull/3671)). Copy the updated `$renderMinimalError()` and related helpers from the current `wheels new` template into `public/Application.cfc`.
-8. **Custom local hostnames** ([#3840](https://github.com/wheels-dev/wheels/pull/3840)). If you reach the dev tools as something like `myapp.test`, allow it with `set(devToolsAllowedHosts="myapp.test")`.
+7. **Startup error page** ([#3795](https://github.com/wheels-dev/wheels/pull/3795)). Copy the updated `$renderMinimalError()` and related helpers from the current `wheels new` template into `public/Application.cfc`.
+8. **Custom local hostnames** ([#3850](https://github.com/wheels-dev/wheels/pull/3850)). If you reach the dev tools as something like `myapp.test`, allow it with `set(devToolsAllowedHosts="myapp.test")`.
 9. **Behind a TLS proxy** ([#3835](https://github.com/wheels-dev/wheels/pull/3835)). Wheels 4.2 will require `trustProxyHeaders=true` to honour `X-Forwarded-Proto`; set it now if you're behind a trusted reverse proxy.
 
 ## Install / upgrade
