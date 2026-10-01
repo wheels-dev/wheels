@@ -52,6 +52,7 @@ CONSUMER_DIR="$REPO_ROOT/docs/consumer-ai"
 MAINTAINER_PATTERNS=(
     ".ai"
     ".claude"
+    ".opencode"
     ".github"
     "CLAUDE.local.md"
     "docs/superpowers"
