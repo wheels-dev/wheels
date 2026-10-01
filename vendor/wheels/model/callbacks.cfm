@@ -483,32 +483,6 @@
 	}
 
 	/**
-	 * Internal. Drain the per-connection afterCommit queue (outermost commit).
-	 * FIFO across instances; registration order within each.
-	 */
-	public void function $drainAfterCommitQueue(required string connection) {
-		local.queue = $transactionCallbackQueue(arguments.connection);
-		local.iEnd = ArrayLen(local.queue);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.entry = local.queue[local.i];
-			local.entry.object.$runTransactionCallbacks(type = "afterCommit", operation = local.entry.operation);
-		}
-	}
-
-	/**
-	 * Internal. The outermost transaction rolled back: discard queued afterCommit
-	 * callbacks and fire afterRollback for each enqueued instance.
-	 */
-	public void function $fireAfterRollbackQueue(required string connection) {
-		local.queue = $transactionCallbackQueue(arguments.connection);
-		local.iEnd = ArrayLen(local.queue);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.entry = local.queue[local.i];
-			local.entry.object.$runTransactionCallbacks(type = "afterRollback", operation = local.entry.operation);
-		}
-	}
-
-	/**
 	 * Internal. The per-connection queue array, or an empty array if none.
 	 */
 	public array function $transactionCallbackQueue(required string connection) {
@@ -520,6 +494,35 @@
 			return request.wheels.$txnCallbacks[arguments.connection].queue;
 		}
 		return [];
+	}
+
+	/**
+	 * Internal. Fire `type` (afterCommit | afterRollback) across a CAPTURED queue
+	 * of {object, operation} entries, FIFO; registration order within each
+	 * instance. The caller captures the queue and clears both the open-transaction
+	 * marker and the context BEFORE calling this, so a throwing callback can never
+	 * leave a stuck transaction marker or a leaked queue.
+	 */
+	public void function $runQueueCallbacks(required array queue, required string type) {
+		local.iEnd = ArrayLen(arguments.queue);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.entry = arguments.queue[local.i];
+			local.entry.object.$runTransactionCallbacks(type = arguments.type, operation = local.entry.operation);
+		}
+	}
+
+	/**
+	 * Internal. Capture the per-connection queue, CLEAR the context, then fire
+	 * `type`. One method so callers (incl. exception catch blocks) do no local-scope
+	 * writes in a catch (BoxLang-safe) and so a throwing callback cannot leave the
+	 * queue behind. The caller must have already reset the open-transaction marker.
+	 */
+	public void function $resolveTransactionCallbacks(required string connection, required string type) {
+		local.queue = $transactionCallbackQueue(arguments.connection);
+		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$txnCallbacks")) {
+			StructDelete(request.wheels.$txnCallbacks, arguments.connection);
+		}
+		$runQueueCallbacks(queue = local.queue, type = arguments.type);
 	}
 
 </cfscript>

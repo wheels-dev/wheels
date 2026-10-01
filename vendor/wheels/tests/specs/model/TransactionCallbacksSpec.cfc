@@ -78,6 +78,96 @@ component extends="wheels.WheelsTest" {
 				expect(ArrayLen(request.$acLog)).toBe(1, "afterCommit fires immediately in none mode (B1)");
 			});
 
+			it("the public afterCommit() API registers and honours the on= filter", () => {
+				// on=create -> fires on create, NOT on a later update.
+				g.model("tag").afterCommit(methods = "recordAfterCommit", on = "create");
+				var t = g.model("tag").new(name = "txncb-onfilter");
+				t.save(transaction = "commit");
+				expect(ArrayLen(request.$acLog)).toBe(1, "on=create fires for a create");
+				request.$acLog = [];
+				t.update(name = "txncb-onfilter2", transaction = "commit");
+				expect(ArrayLen(request.$acLog)).toBe(0, "on=create must NOT fire for an update");
+			});
+
+			it("nested writes in one outer transaction all fire afterCommit together after the outer commit", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				// invokeWithTransaction(method=...) is Wheels' transaction block: the two
+				// nested creates share the outer transaction and fire together on commit.
+				g.model("tag").invokeWithTransaction(method = "txnCreateTwoTags", transaction = "commit");
+				expect(ArrayLen(request.$acLog)).toBe(2, "both nested creates fire afterCommit once, after the outer commit");
+				expect(request.$acLog[1]).toBe("commit:txncb-nest1");
+				expect(request.$acLog[2]).toBe("commit:txncb-nest2");
+			});
+
+			it("a nested exception rolls back the outer and fires afterRollback for the enqueued write, then rethrows", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				g.model("tag").$registerCallback(type = "afterRollback", methods = "recordAfterRollback");
+				var state = {threw = false};
+				try {
+					g.model("tag").invokeWithTransaction(method = "txnCreateThenThrow", transaction = "commit");
+				} catch (any e) {
+					state.threw = true;
+				}
+				expect(state.threw).toBeTrue("the nested exception must propagate");
+				// no afterCommit (rolled back); afterRollback fires for the enqueued create.
+				expect(ArrayLen(request.$acLog)).toBe(1);
+				expect(request.$acLog[1]).toBe("rollback:txncb-beforethrow");
+			});
+
+			it("a self-vetoed save (afterSave=false) enqueues nothing — neither afterCommit nor afterRollback fires", () => {
+				// The op never 'succeeded' ($save returned false), so it never enqueued;
+				// the uncommitted insert is rolled back, but afterRollback is reserved for
+				// records that DID succeed and were then rolled back by a later failure.
+				g.model("tagFalseCallbacks").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				g.model("tagFalseCallbacks").$registerCallback(type = "afterRollback", methods = "recordAfterRollback");
+				var t = g.model("tagFalseCallbacks").new(name = "txncb-veto");
+				t.save(transaction = "commit");
+				expect(ArrayLen(request.$acLog)).toBe(0, "a self-vetoed save fires neither transaction callback");
+				g.model("tagFalseCallbacks").$clearCallbacks(type = "afterCommit");
+				g.model("tagFalseCallbacks").$clearCallbacks(type = "afterRollback");
+			});
+
+			it("a throwing afterCommit propagates and the commit stands (decision C)", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "callbackThatThrows");
+				var state = {threw = false};
+				var t = g.model("tag").new(name = "txncb-boom");
+				try {
+					t.save(transaction = "commit");
+				} catch (any e) {
+					state.threw = true;
+					expect(e.type).toBe("Wheels.TestAfterCommitBoom");
+				}
+				expect(state.threw).toBeTrue("a throwing afterCommit must propagate");
+				// the row is committed (afterCommit runs AFTER commit) — it still exists.
+				expect(g.model("tag").count(where = "name = 'txncb-boom'")).toBe(1, "the commit stands");
+			});
+
+			it("fires multiple afterCommit callbacks in registration order", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "secondAfterCommit");
+				var t = g.model("tag").new(name = "txncb-order");
+				t.save(transaction = "commit");
+				expect(ArrayLen(request.$acLog)).toBe(2);
+				expect(request.$acLog[1]).toBe("commit:txncb-order");
+				expect(request.$acLog[2]).toBe("commit2:txncb-order");
+			});
+
+			it("does not leak the queue across sequential transactions (job/CLI-style)", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				var conn = g.model("tag").$hashedConnectionArgs();
+				// Three independent committed transactions in one request (as a Job/CLI
+				// run performs many): each must resolve + clear its own queue, not accumulate.
+				for (var i = 1; i <= 3; i++) {
+					var t = g.model("tag").new(name = "txncb-leak" & i);
+					t.save(transaction = "commit");
+					expect(
+						!StructKeyExists(request.wheels, "$txnCallbacks")
+						|| !StructKeyExists(request.wheels.$txnCallbacks, conn)
+					).toBeTrue("the per-connection queue context must be cleared after each outermost resolve (no leak)");
+				}
+				expect(ArrayLen(request.$acLog)).toBe(3, "exactly one afterCommit per committed transaction — no accumulation");
+			});
+
 		});
 
 	}

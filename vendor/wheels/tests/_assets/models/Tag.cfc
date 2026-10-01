@@ -56,6 +56,35 @@ component extends="Model" {
 		Throw(type = "Wheels.TestAfterCommitBoom", message = "afterCommit callback boom");
 	}
 
+	function secondAfterCommit() {
+		if (!StructKeyExists(request, "$acLog")) {
+			request.$acLog = [];
+		}
+		ArrayAppend(request.$acLog, "commit2:" & (this.name ?: ""));
+	}
+
+	// Transaction-block fixtures (invoked via invokeWithTransaction) for the
+	// nested / nested-inner-failure specs. Each returns a boolean, as the
+	// transaction wrapper requires.
+	function txnCreateTwoTags() {
+		model("tag").create(name = "txncb-nest1");
+		model("tag").create(name = "txncb-nest2");
+		return true;
+	}
+
+	function txnCreateValidThenInvalid() {
+		model("tag").create(name = "txncb-valid");
+		// The invalid create returns false (no persist, never enqueues) but we
+		// still report success, so the OUTER transaction commits.
+		model("tag").create(name = "");
+		return true;
+	}
+
+	function txnCreateThenThrow() {
+		model("tag").create(name = "txncb-beforethrow");
+		Throw(type = "Wheels.TestNestedBoom", message = "nested write then throw");
+	}
+
 	function firstCallback() {
 		if (!StructKeyExists(this, "orderTest")) {
 			this.orderTest = "";

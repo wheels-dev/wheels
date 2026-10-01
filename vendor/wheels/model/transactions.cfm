@@ -112,10 +112,9 @@
 						} catch (any e) {
 							transaction action="rollback";
 							request.wheels.transactions[local.connectionArgs] = false;
-							// Fire afterRollback (owner only) before the rethrow, then clean up.
+							// Marker reset above; fire afterRollback (owner only) before the rethrow.
 							if (local.closeTransaction) {
-								$fireAfterRollbackQueue(connection = local.connectionArgs);
-								StructDelete(request.wheels.$txnCallbacks, local.connectionArgs);
+								$resolveTransactionCallbacks(connection = local.connectionArgs, type = "afterRollback");
 							}
 							rethrow;
 						}
@@ -126,8 +125,7 @@
 						local.closeTransaction
 						&& StructKeyExists(request.wheels.$txnCallbacks, local.connectionArgs)
 					) {
-						$fireAfterRollbackQueue(connection = local.connectionArgs);
-						StructDelete(request.wheels.$txnCallbacks, local.connectionArgs);
+						$resolveTransactionCallbacks(connection = local.connectionArgs, type = "afterRollback");
 					}
 					rethrow;
 				}
@@ -135,12 +133,15 @@
 				// commit, or afterRollback on a non-exception rollback (rv false / mode
 				// rollback). Owner only; nested writes already queued into this set.
 				if (local.closeTransaction) {
-					if (local.txnState.rolledBack) {
-						$fireAfterRollbackQueue(connection = local.connectionArgs);
-					} else {
-						$drainAfterCommitQueue(connection = local.connectionArgs);
-					}
-					StructDelete(request.wheels.$txnCallbacks, local.connectionArgs);
+					// Reset the open-transaction marker BEFORE firing, so a throwing
+					// callback can never leave it stuck (every later call would then run
+					// "alreadyopen" with no transaction). $resolveTransactionCallbacks
+					// also clears the queue context before firing.
+					request.wheels.transactions[local.connectionArgs] = false;
+					$resolveTransactionCallbacks(
+						connection = local.connectionArgs,
+						type = local.txnState.rolledBack ? "afterRollback" : "afterCommit"
+					);
 				}
 				break;
 			case "false":
