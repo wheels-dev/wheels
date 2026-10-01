@@ -146,17 +146,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 				it("prints usage steering at check/apply without mutating vendor/wheels/", () => {
 					seedVendorWheels();
-					var result = mod.upgrade();
-					expect(result).toInclude("wheels upgrade check");
-					expect(result).toInclude("wheels upgrade apply");
+					// 4.1.2: exits non-zero (MCP isError) with the usage as the message.
+					expect(() => mod.upgrade()).toThrow(type = "Wheels.InvalidArguments", regex = "wheels upgrade check");
+					expect(() => mod.upgrade()).toThrow(regex = "wheels upgrade apply");
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 					expect(arrayLen(listBackups())).toBe(0);
 				});
 
 				it("steers to usage even when apply flags are present without the verb", () => {
 					seedVendorWheels();
-					var result = mod.upgrade(nobackup = true);
-					expect(result).toInclude("wheels upgrade apply");
+					expect(() => mod.upgrade(nobackup = true)).toThrow(type = "Wheels.InvalidArguments", regex = "wheels upgrade apply");
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 					expect(arrayLen(listBackups())).toBe(0);
 				});
