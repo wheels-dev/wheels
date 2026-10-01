@@ -1390,20 +1390,84 @@
 	}
 
 	/**
-	 * Evaluates a space-separated logical expression like "1 eq 0" or "5 gt 3".
+	 * Evaluates a space-separated expression that is not a `this.` reference, a
+	 * bare `name()` call or a whitelisted function call (those are handled
+	 * earlier in `$evaluateSingleConditionString`):
+	 *   - a lone `true` / `false`;
+	 *   - a lone name, resolved as `this.<name>` (property value or method call)
+	 *     when `this` has that key;
+	 *   - `left op right`, where `left` is a number, quoted string, boolean or a
+	 *     name resolved as above, and `right` is a number, boolean, quoted string
+	 *     or bare word (a string literal, as in the `this.` path).
+	 * Anything else throws, so `$evaluateCondition()` fails closed: before #3928
+	 * a short expression evaluated to false (skipping the validation), extra
+	 * tokens were ignored, and a bare left-hand name was compared as its own text.
 	 */
 	public any function $evaluateLogicalExpression(required string condition) {
 		local.tokens = ListToArray(arguments.condition, " ");
-		if (ArrayLen(local.tokens) < 3) {
-			return false;
+		if (ArrayLen(local.tokens) == 1) {
+			if (ListFindNoCase("true,false", local.tokens[1])) {
+				return CompareNoCase(local.tokens[1], "true") == 0; // not ==, which coerces boolean-ish strings on BoxLang
+			}
+			return $resolveConditionName(local.tokens[1], arguments.condition);
 		}
-		local.leftOperand = IsNumeric(local.tokens[1]) ? JavaCast("double", local.tokens[1]) : local.tokens[1];
-		local.rightOperand = IsNumeric(local.tokens[3]) ? JavaCast("double", local.tokens[3]) : local.tokens[3];
+		if (ArrayLen(local.tokens) != 3) {
+			throw(
+				"Could not parse `#arguments.condition#`: expected a reference such as `this.property` or `this.method()`, or a comparison of the form `left operator right`."
+			);
+		}
+		local.leftOperand = $conditionLiteral(local.tokens[1]);
+		if (!StructKeyExists(local, "leftOperand")) {
+			local.leftOperand = $resolveConditionName(local.tokens[1], arguments.condition);
+		}
+		if (Left(local.tokens[3], 5) == "this.") {
+			throw(
+				"Unsupported operand `#local.tokens[3]#` in `#arguments.condition#`: put the `this.` reference on the left side of the comparison."
+			);
+		}
+		local.rightOperand = $conditionLiteral(local.tokens[3]);
+		if (!StructKeyExists(local, "rightOperand")) {
+			// A bare right-hand word is a string literal, as in the `this.` path.
+			local.rightOperand = local.tokens[3];
+		}
 		// LCase keeps word-form operators ("1 EQ 0") compatible with the
 		// case-sensitive switch in $resolveOperator on Adobe CF — symbolic
 		// operators are already lowercased by $normalizeConditionOperators,
 		// but word-form ones arrive raw (#2977).
 		return $resolveOperator(local.leftOperand, local.rightOperand, LCase(local.tokens[2]));
+	}
+
+	/**
+	 * The value of a literal condition operand (number, boolean or quoted
+	 * string), or nothing for anything else. Quotes are stripped so a quoted
+	 * value compares equal to a resolved property value.
+	 */
+	public any function $conditionLiteral(required string token) {
+		if (IsNumeric(arguments.token)) {
+			return JavaCast("double", arguments.token);
+		}
+		if (ListFindNoCase("true,false", arguments.token)) {
+			return arguments.token;
+		}
+		if (REFind("^'[^']*'$", arguments.token) || REFind('^"[^"]*"$', arguments.token)) {
+			return $unquoteConditionValue(arguments.token);
+		}
+	}
+
+	/**
+	 * Resolves a bare name in a condition as `this.<name>` (a property value or
+	 * a method call), and throws when `this` has no such key.
+	 */
+	public any function $resolveConditionName(required string name, required string condition) {
+		if (REFind("^[A-Za-z_][A-Za-z0-9_]*$", arguments.name) && StructKeyExists(this, arguments.name)) {
+			local.resolved = $resolveThisReference(arguments.name);
+			if (StructKeyExists(local.resolved, "value")) {
+				return local.resolved.value;
+			}
+		}
+		throw(
+			"Could not resolve `#arguments.name#` in `#arguments.condition#`: it is not a property or method of this object. Use `this.property` or `this.method()`, or a quoted string for a literal."
+		);
 	}
 
 	/**
