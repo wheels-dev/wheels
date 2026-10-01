@@ -121,12 +121,14 @@ component extends="Base" {
      */
     private string function $duration(required any value) {
         var v = trim(toString(arguments.value));
-        if (len(v) && !reFind("[^0-9]", v)) {
+        // Seconds, whole or fractional: 3 -> 3s, 0.5 -> 0.5s.
+        if (len(v) && !reFind("[^0-9.]", v) && reFind("^[0-9]+(\.[0-9]+)?$", v)) {
             return v & "s";
         }
-        if (len(v) && !reFind("[^0-9a-z.]", v) && reFind("^[0-9.]+(ns|us|ms|s|m|h)$", v)) {
+        // An explicit Go duration with one unit: 500ms, 1.5s, 2m.
+        if (len(v) && !reFind("[^0-9a-z.]", v) && reFind("^[0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h)$", v)) {
             return v;
         }
-        throw(type = "DeployConfigError", message = "invalid proxy healthcheck duration: '#v#' (use seconds, e.g. 3, or a duration such as 500ms)");
+        throw(type = "DeployConfigError", message = "invalid proxy healthcheck duration: '#v#' (use seconds such as 3 or 0.5, or a duration such as 500ms)");
     }
 }

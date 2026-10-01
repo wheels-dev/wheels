@@ -58,9 +58,13 @@ component {
 	 * expect("local", cmd, result); exit 0 by default. Keeps specs from ever
 	 * running docker locally.
 	 */
-	public struct function runLocal(required string cmd, string stdin = "") {
-		arrayAppend(variables.calls, {host: "local", cmd: arguments.cmd, opts: {stdin: arguments.stdin}, kind: "local"});
-		var key = "local|#arguments.cmd#";
+	public struct function runLocal(required array argv, string stdin = "") {
+		// For a shell string run as ["bash","-c",cmd], record cmd as the command text.
+		var cmd = (arrayLen(arguments.argv) == 3 && arguments.argv[1] == "bash" && arguments.argv[2] == "-c")
+			? arguments.argv[3]
+			: arrayToList(arguments.argv, " ");
+		arrayAppend(variables.calls, {host: "local", cmd: cmd, argv: arguments.argv, opts: {stdin: arguments.stdin}, kind: "local"});
+		var key = "local|#cmd#";
 		return structKeyExists(variables.expectations, key)
 			? variables.expectations[key]
 			: {exitCode: 0, stdout: "", stderr: "", durationMs: 0};

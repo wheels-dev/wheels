@@ -21,6 +21,7 @@ component {
         variables.dryRunBuffer = [];
         // Injectable so the permission-failure path can be specified.
         variables.fileModes = arguments.opts.fileModes ?: new modules.wheels.services.deploy.lib.FileModes();
+        variables.localRunner = arguments.opts.localRunner ?: new modules.wheels.services.deploy.lib.LocalRunner();
         return this;
     }
 
@@ -716,6 +717,8 @@ component {
             return;
         }
         var cmd = new modules.wheels.services.deploy.commands.RegistryCommands(arguments.cfg).login();
+        // Locally: argv, no shell, so registry fields such as robot$ci are literal.
+        var localArgv = ["docker", "login", arguments.cfg.registry().server(), "-u", arguments.cfg.registry().username(), "--password-stdin"];
         var password = "";
         var keys = arguments.cfg.registry().password();
         var resolver = variables.loader.secretResolver();
@@ -733,7 +736,7 @@ component {
             );
             return;
         }
-        $runLocal(cmd, arguments.dryRun, password);
+        $runLocal(localArgv, arguments.dryRun, password);
         if (arguments.dryRun) {
             for (var h in arguments.hosts) {
                 arrayAppend(variables.dryRunBuffer, "[" & h & "] " & cmd);
@@ -749,49 +752,39 @@ component {
     }
 
     /**
-     * Run a command on this machine (build, push, local login). Dry-run
-     * records it as "[local] <cmd>". `stdinData` is written to the process's
-     * stdin; the command line never carries it.
+     * Run a command on this machine: an argv array (no shell), or a shell
+     * string whose dynamic parts are already shellEscape()d (the build).
+     * Dry-run records "[local] <command>". `stdinData` goes to stdin only.
      */
-    private void function $runLocal(required string cmd, required boolean dryRun, string stdinData = "") {
+    private void function $runLocal(required any command, required boolean dryRun, string stdinData = "") {
+        var argv = isArray(arguments.command) ? arguments.command : ["bash", "-c", arguments.command];
+        var shown = isArray(arguments.command) ? $displayArgv(arguments.command) : arguments.command;
         if (arguments.dryRun) {
-            arrayAppend(variables.dryRunBuffer, "[local] " & arguments.cmd);
+            arrayAppend(variables.dryRunBuffer, "[local] " & shown);
             return;
         }
         // A pool that runs local commands itself (the spec fake) keeps tests
         // from executing docker on the machine running them.
-        if (isObject(variables.sshPool) && structKeyExists(variables.sshPool, "runLocal")) {
-            var faked = variables.sshPool.runLocal(arguments.cmd, arguments.stdinData);
-            if ((faked.exitCode ?: 0) != 0) {
-                throw(
-                    type = "DeployMainCli.LocalCommandFailed",
-                    message = new modules.wheels.services.deploy.lib.SecretRedaction().redact(
-                        "Local command failed (exit " & faked.exitCode & "): " & arguments.cmd
-                    )
-                );
-            }
-            return;
-        }
-        var pb = createObject("java", "java.lang.ProcessBuilder").init(["bash", "-c", arguments.cmd]);
-        pb.redirectErrorStream(true);
-        if (!len(arguments.stdinData)) {
-            pb.redirectOutput(createObject("java", "java.lang.ProcessBuilder$Redirect").INHERIT);
-        }
-        var proc = pb.start();
-        if (len(arguments.stdinData)) {
-            var w = proc.getOutputStream();
-            w.write(charsetDecode(arguments.stdinData, "utf-8"));
-            w.close();
-        }
-        proc.waitFor();
-        if (proc.exitValue() != 0) {
+        var result = (isObject(variables.sshPool) && structKeyExists(variables.sshPool, "runLocal"))
+            ? variables.sshPool.runLocal(argv, arguments.stdinData)
+            : variables.localRunner.run(argv, arguments.stdinData);
+        if ((result.exitCode ?: 0) != 0) {
+            var redaction = new modules.wheels.services.deploy.lib.SecretRedaction();
             throw(
                 type = "DeployMainCli.LocalCommandFailed",
-                message = new modules.wheels.services.deploy.lib.SecretRedaction().redact(
-                    "Local command failed (exit " & proc.exitValue() & "): " & arguments.cmd
-                )
+                message = redaction.redact("Local command failed (exit " & result.exitCode & "): " & shown),
+                detail = redaction.redact(result.outputTail ?: "")
             );
         }
+    }
+
+    /** argv as one readable line, quoting only the arguments that need it. */
+    private string function $displayArgv(required array argv) {
+        var parts = [];
+        for (var a in arguments.argv) {
+            arrayAppend(parts, (len(a) && !reFind("[^A-Za-z0-9._/:@=,+-]", a)) ? a : "'" & replace(a, "'", "'\''", "all") & "'");
+        }
+        return arrayToList(parts, " ");
     }
 
     /**

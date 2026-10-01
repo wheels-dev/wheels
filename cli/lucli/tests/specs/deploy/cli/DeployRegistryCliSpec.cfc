@@ -13,7 +13,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 cli.login({configPath: variables.fixture, password: "s3cret"});
                 var cmds = $cmdsFrom(fake);
                 expect($anyInclude(cmds, "docker login")).toBeTrue();
-                expect($anyInclude(cmds, "-u demo")).toBeTrue();
+                expect($anyInclude(cmds, "-u 'demo'")).toBeTrue();
                 expect($anyInclude(cmds, "--password-stdin")).toBeTrue();
                 expect($anyInclude(cmds, "s3cret")).toBeFalse();
             });

@@ -12,7 +12,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var cmd = new cli.lucli.services.deploy.commands.RegistryCommands(variables.cfg)
                     .login();
                 expect(cmd).toInclude("docker login");
-                expect(cmd).toInclude("-u demo");
+                expect(cmd).toInclude("-u 'demo'");
                 expect(cmd).toInclude("--password-stdin");
                 expect(cmd).notToInclude("s3cr3t");
                 expect(cmd).notToInclude("-p ");

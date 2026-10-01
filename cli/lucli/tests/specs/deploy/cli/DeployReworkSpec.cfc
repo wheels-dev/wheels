@@ -110,10 +110,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					try {
 						var lines = $lines($cli(root).deploy({configPath: root & "/config/deploy.yml", version: "v1", dryRun: true}));
 						var localLogin = $indexOf(lines, "[local] docker login registry.example.com -u demo --password-stdin");
-						var hostLogin = $indexOf(lines, "[1.2.3.4] docker login registry.example.com -u demo --password-stdin");
+						var hostLogin = $indexOf(lines, "[1.2.3.4] docker login 'registry.example.com' -u 'demo' --password-stdin");
 						var push = $indexOf(lines, "[local] docker buildx build --push --tag 'registry.example.com/acme/demo:v1'");
 						var pull = $indexOf(lines, "[1.2.3.4] docker pull 'registry.example.com/acme/demo:v1'");
 						expect(localLogin).toBeGT(0);
+						expect(hostLogin).toBeGT(0);
 						expect($indexOf(lines, "[1.2.3.5] docker login")).toBeGT(0);
 						expect(push).toBeGT(localLogin);
 						expect(pull).toBeGT(push);
@@ -184,6 +185,55 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 						expect(out).toInclude("docker pull");
 					} finally {
 						directoryDelete(root, true);
+					}
+				});
+			});
+
+			describe("registry fields with shell characters", () => {
+				it("runs the local login as argv and quotes the remote login", () => {
+					var root = $project();
+					try {
+						var yml = fileRead(root & "/config/deploy.yml");
+						yml = replace(yml, "  username: demo", "  username: robot$ci");
+						fileWrite(root & "/config/deploy.yml", yml);
+						var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
+						var dc = new cli.lucli.services.deploy.cli.DeployMainCli(fake, {projectRoot: root});
+						dc.deploy({configPath: root & "/config/deploy.yml", version: "v1"});
+						var localArgv = [];
+						var remoteCmd = "";
+						for (var c in fake.calls()) {
+							if (c.host == "local" && isArray(c.argv ?: "") && arrayLen(c.argv) > 1 && c.argv[2] == "login") localArgv = c.argv;
+							if (c.host == "1.2.3.4" && findNoCase("docker login", c.cmd ?: "")) remoteCmd = c.cmd;
+						}
+						expect(localArgv).toBe(["docker", "login", "registry.example.com", "-u", "robot$ci", "--password-stdin"]);
+						expect(remoteCmd).toInclude("-u 'robot$ci'");
+						expect(remoteCmd).toInclude("login 'registry.example.com'");
+					} finally {
+						directoryDelete(root, true);
+					}
+				});
+			});
+
+			describe("proxy config", () => {
+				it("rejects ssl without a host at config load", () => {
+					var thrown = {type = ""};
+					try {
+						new cli.lucli.services.deploy.config.Validator().validate(
+							{service: "demo", image: "acme/demo", servers: ["1.2.3.4"], proxy: {ssl: true}}, "deploy.yml");
+					} catch (any e) {
+						thrown.type = e.type;
+					}
+					expect(thrown.type).toBe("DeployConfigError");
+				});
+
+				it("accepts fractional seconds and Go durations, rejects malformed ones", () => {
+					var mk = (hc) => new cli.lucli.services.deploy.commands.ProxyCommands(
+						new cli.lucli.services.deploy.config.Config({service: "demo", image: "acme/demo", servers: ["1.2.3.4"], proxy: {healthcheck: hc}}));
+					var role = new cli.lucli.services.deploy.config.Config({service: "demo", image: "acme/demo", servers: ["1.2.3.4"]}).roles()[1];
+					expect(mk({interval: 0.5}).deploy(role, "t:80")).toInclude("--health-check-interval 0.5s");
+					expect(mk({interval: "500ms"}).deploy(role, "t:80")).toInclude("--health-check-interval 500ms");
+					for (var bad in ["1.2.3s", "..s", "5x", "-1"]) {
+						expect(() => mk({interval: bad}).deploy(role, "t:80")).toThrow("DeployConfigError");
 					}
 				});
 			});
