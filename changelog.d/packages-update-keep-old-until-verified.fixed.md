@@ -1,1 +1,0 @@
-- `wheels packages update` and `wheels packages add --force` keep the installed package when moving the verified new version into `vendor/` fails, for example on a full disk or a permissions error. The installed copy is renamed aside, restored if the move fails, and removed once the new copy is in place (#3826)
