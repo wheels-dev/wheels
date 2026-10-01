@@ -93,7 +93,17 @@
 					transaction action="begin" isolation=arguments.isolation {
 						try {
 							local.rv = $invoke(method = arguments.method, componentReference = this, invokeArgs = local.methodArgs);
-							if (!IsBoolean(local.rv) || !local.rv || arguments.transaction eq "rollback") {
+							// Roll back only on a GENUINE failure or an explicit rollback mode.
+							// $deleteAll / $updateAll return a numeric COUNT; a count of 0 is falsy,
+							// so the old `!local.rv` check mistook a 0-row bulk op for a failed op and
+							// rolled back. Nested in a raw transaction{} on Lucee/Adobe, that rollback
+							// discarded the enclosing transaction and silently lost its other writes.
+							// IsNumeric cleanly separates a count from a boolean false: IsBoolean(0) and
+							// IsNumeric(0) are both true, but IsNumeric(false) is false on every engine.
+							if (
+								(!IsNumeric(local.rv) && IsBoolean(local.rv) && !local.rv)
+								|| arguments.transaction eq "rollback"
+							) {
 								transaction action="rollback";
 							}
 						} catch (any e) {
