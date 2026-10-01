@@ -20,14 +20,14 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("the generated app's plugins/README does not reference `wheels packages install`", () => {
-				var path = ExpandPath("/cli/lucli/templates/app/app/plugins/README.md");
+				var path = ExpandPath("/cli/lucli/templates/app/plugins/README.md");
 				expect(FileExists(path)).toBeTrue();
 				var contents = FileRead(path);
 				expect(contents).notToInclude("wheels packages install");
 			});
 
 			it("the generated app's plugins/README points at the canonical `wheels packages add` verb", () => {
-				var path = ExpandPath("/cli/lucli/templates/app/app/plugins/README.md");
+				var path = ExpandPath("/cli/lucli/templates/app/plugins/README.md");
 				var contents = FileRead(path);
 				expect(contents).toInclude("wheels packages add");
 			});

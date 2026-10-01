@@ -494,7 +494,7 @@ component extends="wheels.WheelsTest" {
 
 ### Two test suites
 
-- **App tests**: `/wheels/app/tests` — project-specific, in `tests/specs/`. Uses `tests/populate.cfm` and `tests/TestRunner.cfc`.
+- **App tests**: `/wheels/app/tests` — project-specific, in `tests/specs/`. Uses `tests/populate.cfm` and `tests/runner.cfm`.
 - **Core tests**: `/wheels/core/tests` — framework, in `vendor/wheels/tests/specs/`. Uses `vendor/wheels/tests/populate.cfm`. **This is what CI runs across all engines × DBs.**
 
 **Isolated test application:** `public/Application.cfc` includes `vendor/wheels/events/testcontext.cfm` after `config/app.cfm`, so runner URLs (and TestClient/browser requests that send `X-Wheels-Test-Context`) bind `<this.name>_wheelsTest` — a separate CFML application scope; the live `application.wheels` is untouched. `$testClient(testContext=false)` addresses the live app. Apps whose `Application.cfc` lacks the include run tests against the live application scope under a named lock.
@@ -503,7 +503,7 @@ The runner compiles every CFC under the spec directory, so one compilation error
 
 ### Test-specific gotchas
 
-- **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files included from plain CFCs like `TestRunner.cfc`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
+- **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files the test runner includes, such as `tests/populate.cfm`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
 - **`$clearRoutes()` in test specs**: not inherited from `wheels.WheelsTest`. A spec that manipulates routes defines its own:
   `public void function $clearRoutes() { application.wheels.routes = []; application.wheels.staticRoutes = {}; application.wheels.namedRoutePositions = {}; }`

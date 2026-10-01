@@ -30,7 +30,7 @@ wheels deploy init [--service=<name>] [--image=<path>] [--registry-username=<use
 - `.kamal/secrets` — key/value placeholders for the registry password and any app secrets.
 - `.kamal/hooks/` — empty directory. Drop executable `pre-deploy`, `post-deploy`, or `post-deploy-failure` scripts here later.
 
-Add `.kamal/secrets*` to `.gitignore` before running.
+`init` also adds `.kamal/secrets` to `.gitignore` (unless git already ignores it). If the file is already tracked, it prints a warning: run `git rm --cached .kamal/secrets` and rotate the secrets it held.
 
 ## Example
 

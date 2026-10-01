@@ -13,6 +13,9 @@
  * and the demo app's config all linked 404s. All were repointed at live
  * `guides.wheels.dev/v4-0-0/...` pages.
  *
+ * Round 3 (4.1.3): the template's links moved to the current `v4-1-0` guides, and
+ * `wheels new` no longer ships an app/snippets/ConfigRoutes.txt copy.
+ *
  * This spec pins the canonical routing URL in the routes templates AND scans
  * the scaffold template tree plus the known runtime-message files for any
  * reintroduction of retired URL shapes: `v4-0-0-snapshot`, `wheels.dev/3.1.0`,
@@ -29,10 +32,10 @@ component extends="wheels.WheelsTest" {
 			var repoRoot = expandPath("/wheels/../..");
 			var targets = [
 				"cli/src/templates/ConfigRoutes.txt",
-				"cli/lucli/templates/app/app/snippets/ConfigRoutes.txt",
+				"cli/lucli/templates/codegen/ConfigRoutes.txt",
 				"cli/lucli/templates/app/config/routes.cfm"
 			];
-			var canonical = "https://guides.wheels.dev/v4-0-0/basics/routing/";
+			var canonical = "https://guides.wheels.dev/v4-1-0/basics/routing/";
 
 			for (var rel in targets) {
 				// Capture the loop variable so the closure body binds the

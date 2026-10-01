@@ -9571,7 +9571,7 @@ component extends="modules.BaseModule" {
 		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
 		block &= inner & '"database": "#datasourceName#",' & nl;
 		block &= inner & '"dbdriver": "Other",' & nl;
-		block &= inner & '"dsn": "jdbc:sqlite:{project}/db/development.sqlite",' & nl;
+		block &= inner & '"dsn": "jdbc:sqlite:##project:path##/db/development.sqlite",' & nl;
 		block &= inner & '"host": "",' & nl;
 		block &= inner & '"password": "",' & nl;
 		block &= inner & '"username": ""' & nl;
@@ -9580,7 +9580,7 @@ component extends="modules.BaseModule" {
 		block &= inner & '"class": "org.sqlite.JDBC",' & nl;
 		block &= inner & '"database": "#datasourceName#_test",' & nl;
 		block &= inner & '"dbdriver": "Other",' & nl;
-		block &= inner & '"dsn": "jdbc:sqlite:{project}/db/test.sqlite",' & nl;
+		block &= inner & '"dsn": "jdbc:sqlite:##project:path##/db/test.sqlite",' & nl;
 		block &= inner & '"host": "",' & nl;
 		block &= inner & '"password": "",' & nl;
 		block &= inner & '"username": ""' & nl;
@@ -10227,8 +10227,9 @@ component extends="modules.BaseModule" {
 			var sourcePath = arguments.sourceDir & "/" & entry.name;
 			var targetName = entry.name;
 
-			// Rename _env -> .env, _gitignore -> .gitignore
+			// Rename _env -> .env, _env.example -> .env.example, _gitignore -> .gitignore
 			if (targetName == "_env") targetName = ".env";
+			else if (targetName == "_env.example") targetName = ".env.example";
 			else if (targetName == "_gitignore") targetName = ".gitignore";
 
 			var targetPath = arguments.targetDir & "/" & targetName;

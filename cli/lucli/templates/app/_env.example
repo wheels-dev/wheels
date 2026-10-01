@@ -1,0 +1,7 @@
+# Environment variables this app reads. Copy to .env and fill in the values;
+# .env stays out of version control, this file is committed.
+
+WHEELS_ENV=development
+WHEELS_DATASOURCE={{datasourceName}}
+WHEELS_RELOAD_PASSWORD=
+WHEELS_LUCEE_ADMIN_PASSWORD=

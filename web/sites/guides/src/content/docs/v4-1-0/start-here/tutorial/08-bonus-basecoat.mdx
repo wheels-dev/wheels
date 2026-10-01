@@ -32,7 +32,7 @@ basecoat goes further. It ships **CFML view helpers** (`uiCard`, `uiField`, `uiB
 
 | | simple.css (default) | wheels-basecoat |
 |---|---|---|
-| Distribution | CDN `<link>` | Wheels package + CSS asset |
+| Distribution | Local stylesheet in `public/stylesheets/` | Wheels package + CSS asset |
 | Markup changes | None — works on plain HTML | Helper-driven (`#uiButton(...)#`) |
 | Component vocabulary | Browser defaults (h1, button, form, table) | Buttons, cards, fields, alerts, dropdowns, badges, navs |
 | Visual register | Modern editorial | Shadcn/ui dashboard-grade |
@@ -42,9 +42,9 @@ For a tutorial blog, simple.css is the right default. For a real product, you'll
 
 ## Where we left off
 
-You finished Part 7 with the full blog working: posts, comments, authentication, three test specs. The layout uses simple.css from a CDN. Every form renders with the framework's built-in helpers (`#textField()#`, `#textArea()#`, `#submitTag()#`).
+You finished Part 7 with the full blog working: posts, comments, authentication, three test specs. The layout loads simple.css and wheels.css from `public/stylesheets/` with `styleSheetLinkTag()`. Every form renders with the framework's built-in helpers (`#textField()#`, `#textArea()#`, `#submitTag()#`).
 
-You'll undo the simple.css link, add the basecoat asset, and rewrite the post show view in this chapter. The other views stay on simple.css until you decide to convert them — that's a follow-on exercise, not part of this chapter's scope.
+You'll swap out the simple.css stylesheet tag, add the basecoat asset, and rewrite the post show view in this chapter. The layout is shared, so dropping simple.css affects every view; converting the other views to basecoat's helpers is up to you — that's a follow-on exercise, not part of this chapter's scope.
 
 ## Install the package
 
@@ -152,11 +152,11 @@ The package ships its CSS+JS bundle at `vendor/wheels-basecoat/assets/basecoat/`
 
 ## Wire basecoat into your layout
 
-`app/views/layout.cfm` currently links simple.css. Replace that with the basecoat helper, which emits the CSS link and Alpine.js script tags (Alpine.js powers basecoat's interactive components — dropdowns, dialogs, tabs).
+`app/views/layout.cfm` currently loads simple.css through `styleSheetLinkTag()`. Replace that with the basecoat helper, which emits the CSS link and Alpine.js script tags (Alpine.js powers basecoat's interactive components — dropdowns, dialogs, tabs).
 
 <Steps>
 
-1. Open `app/views/layout.cfm`. Find the simple.css `<link>` (added by `wheels new` in Part 1):
+1. Open `app/views/layout.cfm`. Find the `styleSheetLinkTag()` call (added by `wheels new` in Part 1, below a comment about the default styling):
 
    ```cfm title="app/views/layout.cfm — current state"
    <head>
@@ -164,11 +164,11 @@ The package ships its CSS+JS bundle at `vendor/wheels-basecoat/assets/basecoat/`
        <meta name="viewport" content="width=device-width, initial-scale=1">
        <title>blog</title>
        <cfoutput>#csrfMetaTags()#</cfoutput>
-       <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+       <cfoutput>#styleSheetLinkTag(sources="simple,wheels")#</cfoutput>
    </head>
    ```
 
-2. Replace the simple.css link with `#basecoatIncludes()#`:
+2. Replace the `styleSheetLinkTag()` call with `#basecoatIncludes()#`:
 
    ```cfm title="app/views/layout.cfm — after"
    <head>
@@ -181,6 +181,8 @@ The package ships its CSS+JS bundle at `vendor/wheels-basecoat/assets/basecoat/`
        </cfoutput>
    </head>
    ```
+
+   If you'd rather keep `wheels.css`'s form layout and error styles, remove `simple` from `sources` instead (`#styleSheetLinkTag(sources="wheels")#`) and add `#basecoatIncludes()#` below it.
 
    `basecoatIncludes()` reads bundled defaults and emits the `<link>` for the CSS you just published, plus the `<script>` tags that power basecoat's interactive components (dropdowns, dialogs, tabs) and the Turbo cache-control hint that prevents stale previews of those widgets. If you publish to a non-default path, pass `basecoatCSSPath="/your/path/basecoat.min.css"` to override.
 
@@ -352,7 +354,7 @@ The package ships a full component gallery under `vendor/wheels-basecoat/example
 
 ## What's next
 
-This chapter converted one view. The other views (`index.cfm`, `new.cfm`, `edit.cfm`, the comment partials, the auth screens from Part 6) are still on simple.css. Converting them is a mechanical exercise — the helpers are documented in the [wheels-basecoat README](https://github.com/wheels-dev/wheels-basecoat#component-reference).
+This chapter converted one view. The other views (`index.cfm`, `new.cfm`, `edit.cfm`, the comment partials, the auth screens from Part 6) still use plain markup, and no longer get simple.css's styling once the layout stops loading it. Converting them to the `ui*` helpers is a mechanical exercise — the helpers are documented in the [wheels-basecoat README](https://github.com/wheels-dev/wheels-basecoat#component-reference).
 
 You've now seen the full Wheels package model end-to-end:
 

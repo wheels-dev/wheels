@@ -1,0 +1,9 @@
+- `wheels new` creates what the guides and the framework expect:
+  - `config/development/settings.cfm`, `config/testing/settings.cfm`, `config/production/settings.cfm` and `config/maintenance/settings.cfm` again, as commented stubs (the 3.x template shipped them; the 4.x one didn't). The stubs set nothing, so a new app behaves as before.
+  - `.env.example`, with the same keys as `.env` and the secrets (reload and Lucee admin passwords) left blank.
+  - `app/middleware/`.
+  - `app/snippets/dbmigrate/`, which the development migrator UI needs to create a migration.
+  - The `lucee.json` SQLite datasource now uses the `#project:path#` placeholder LuCLI resolves; the old `{project}` was never substituted.
+  - The legacy plugins README moved to the root `plugins/` folder the framework actually loads plugins from, instead of an `app/plugins/` folder it never reads.
+  - New apps no longer ship frozen copies of the generator templates in `app/snippets/`, which kept an app on old templates after a CLI update.
+  - Template comments link to the 4.1 guides.

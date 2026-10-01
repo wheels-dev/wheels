@@ -18,8 +18,9 @@ WEB-INF
 /temp/
 /bin/
 
-# Vendor dependencies (install with: wheels packages add <name>)
-/vendor/
+# vendor/ is committed on purpose: it holds the framework (vendor/wheels/) and
+# any packages added with `wheels packages add`, so a clone, CI run or image
+# build has everything it needs.
 
 # Local copy of the Wheels docs (wheels docs fetch), about 300 MB
 /public/wheels-docs/
