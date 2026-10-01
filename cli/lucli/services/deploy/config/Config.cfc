@@ -15,7 +15,7 @@ component {
 
 	public any function init(required struct raw, struct opts = {destination: ""}) {
 		variables.raw = arguments.raw;
-		variables.destination = arguments.opts.destination ?: "";
+		variables.destination = new DeployToken().assert(arguments.opts.destination ?: "", "destination", true);
 		return this;
 	}
 
@@ -111,7 +111,7 @@ component {
 	public string function absoluteImage(required string version) {
 		var reg = registry().server();
 		var prefix = (reg == "docker.io") ? "" : reg & "/";
-		return prefix & image() & ":" & arguments.version;
+		return prefix & image() & ":" & new DeployToken().assert(arguments.version, "version");
 	}
 
 	public array function accessories() {

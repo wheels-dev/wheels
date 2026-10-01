@@ -14,21 +14,21 @@ component extends="Base" {
         return docker(
             "buildx", "build",
             "--push",
-            "--tag", variables.config.absoluteImage(arguments.version),
+            "--tag", shellEscape(variables.config.absoluteImage(arguments.version)),
             "--file", shellEscape(b.dockerfile()),
             shellEscape(b.context())
         );
     }
 
     public string function pull(required string version) {
-        return docker("pull", variables.config.absoluteImage(arguments.version));
+        return docker("pull", shellEscape(variables.config.absoluteImage(arguments.version)));
     }
 
     public string function tag(required string version, required string aliasName) {
         return docker(
             "tag",
-            variables.config.absoluteImage(arguments.version),
-            variables.config.absoluteImage(arguments.aliasName)
+            shellEscape(variables.config.absoluteImage(arguments.version)),
+            shellEscape(variables.config.absoluteImage(arguments.aliasName))
         );
     }
 
@@ -49,7 +49,7 @@ component extends="Base" {
         return docker(
             "buildx", "build",
             "--load",
-            "--tag", variables.config.image() & ":dirty",
+            "--tag", shellEscape(variables.config.image() & ":dirty"),
             "--file", shellEscape(b.dockerfile()),
             shellEscape(b.context())
         );

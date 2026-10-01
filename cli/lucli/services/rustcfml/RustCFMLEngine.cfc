@@ -9,7 +9,8 @@
  *
  * This service provides the CLI-facing lifecycle for that backend:
  *
- *   install  — download + cache the pinned binary for this platform
+ *   install  — download, verify (pinned sha256) + cache the pinned binary
+ *              for this platform
  *   start    — spawn `rustcfml --serve` as a detached background process,
  *              recording pid/port in a per-project state file
  *   stop     — kill the recorded pid and clear the state file
@@ -24,12 +25,38 @@
 component {
 
 	/**
-	 * Pinned engine version. Keep in sync with tools/rustcfml/ENGINE_VERSION
-	 * (the CI leg and compat matrix pin the same build).
+	 * Pinned engine version: the build the framework is tested against. It
+	 * must equal tools/rustcfml/ENGINE_VERSION (the CI leg and the compat
+	 * matrix run that build). The installed CLI doesn't ship tools/, so the pin
+	 * lives here too: tools/rustcfml/bump-pin.sh rewrites this line when
+	 * check-version.sh bumps ENGINE_VERSION, and RustCFMLEnginePinSpec fails
+	 * on drift (#3812).
 	 */
-	variables.engineVersion = "v0.637.0";
+	variables.engineVersion = "v0.693.0";
+
+	/**
+	 * sha256 of each release asset of the pinned version. install() refuses a
+	 * binary that doesn't match. These must equal tools/rustcfml/ENGINE_SHA256;
+	 * tools/rustcfml/bump-pin.sh rewrites these lines from the release's
+	 * published digests when it moves the pin, and RustCFMLEnginePinSpec fails
+	 * on drift.
+	 */
+	variables.engineSha256 = {};
+	variables.engineSha256["rustcfml-linux-aarch64"] = "95c74453632ab3da99b06e24b36539b3af642cdc29b60e38ebe4fe60a356d523";
+	variables.engineSha256["rustcfml-linux-x86_64"] = "cb053823ddbebf5d130e5a0eaf564a2148d0d93c6781f253e4cd52e8a7bd75fb";
+	variables.engineSha256["rustcfml-macos-aarch64"] = "890a970d31a49d98c779722aad86ac8846fdaad10901edb74078e814c495e333";
 
 	variables.wheelsHome = "";
+
+	/** The pinned RustCFML release tag, e.g. "v0.693.0". */
+	public string function getEngineVersion() {
+		return variables.engineVersion;
+	}
+
+	/** The pinned sha256 per release asset name (a copy). */
+	public struct function getEngineSha256() {
+		return duplicate(variables.engineSha256);
+	}
 
 	public RustCFMLEngine function init() {
 		variables.wheelsHome = $resolveWheelsHome();
@@ -43,30 +70,96 @@ component {
 	/**
 	 * Download (if needed) and cache the RustCFML binary for this platform.
 	 * Returns the absolute path to the executable.
+	 *
+	 * The binary is only ever used after its sha256 matches the pin for its
+	 * release asset. A cached binary that doesn't match is discarded and
+	 * downloaded again. A download goes to a temp file next to the final path,
+	 * is verified, made executable, and only then renamed into place; on any
+	 * failure the temp file is deleted and Wheels.RustCFML.InstallFailed (or
+	 * Wheels.RustCFML.ChecksumMismatch for a mismatched download) is thrown.
 	 */
 	public string function install() {
 		var asset = assetName();
+		var expected = $expectedSha256(asset);
 		var binDir = variables.wheelsHome & "/rustcfml/bin";
 		var binPath = binDir & "/rustcfml-" & variables.engineVersion;
 		if (fileExists(binPath)) {
-			return binPath;
+			if ($sha256File(binPath) == expected) {
+				return binPath;
+			}
+			// Never use a cached binary that doesn't match the pin.
+			fileDelete(binPath);
 		}
 
 		if (!directoryExists(binDir)) {
 			directoryCreate(binDir, true);
 		}
-		var url = "https://github.com/RustCFML/RustCFML/releases/download/"
+		var downloadUrl = "https://github.com/RustCFML/RustCFML/releases/download/"
 			& variables.engineVersion & "/" & asset;
-		var exit = $runSync(["curl", "-sSL", "--fail", "-o", binPath, url]);
-		if (exit != 0) {
-			if (fileExists(binPath)) fileDelete(binPath);
+		var tempPath = binPath & ".download-" & createUUID();
+		try {
+			var exit = $runSync(["curl", "-sSL", "--fail", "-o", tempPath, downloadUrl]);
+			if (exit != 0) {
+				throw(
+					type = "Wheels.RustCFML.InstallFailed",
+					message = "Could not download RustCFML " & variables.engineVersion & " (" & asset & ") from " & downloadUrl
+				);
+			}
+			var actual = fileExists(tempPath) ? $sha256File(tempPath) : "";
+			if (actual != expected) {
+				throw(
+					type = "Wheels.RustCFML.ChecksumMismatch",
+					message = "The RustCFML " & variables.engineVersion & " download (" & asset & ") does not match its pinned sha256; it was deleted and not installed.",
+					detail = "Expected sha256 " & expected & ", got " & (len(actual) ? actual : "no file") & " from " & downloadUrl & "."
+				);
+			}
+			var tempFile = createObject("java", "java.io.File").init(tempPath);
+			if (!tempFile.setExecutable(true, false) || !tempFile.renameTo(createObject("java", "java.io.File").init(binPath))) {
+				throw(
+					type = "Wheels.RustCFML.InstallFailed",
+					message = "Could not install the verified RustCFML " & variables.engineVersion & " binary at " & binPath
+				);
+			}
+		} catch (any e) {
+			if (fileExists(tempPath)) fileDelete(tempPath);
+			rethrow;
+		}
+		return binPath;
+	}
+
+	/**
+	 * The pinned sha256 for release asset `asset`, or
+	 * Wheels.RustCFML.InstallFailed when none is pinned (nothing unverified is
+	 * ever downloaded or run).
+	 */
+	public string function $expectedSha256(required string asset) {
+		if (!structKeyExists(variables.engineSha256, arguments.asset) || !len(variables.engineSha256[arguments.asset])) {
 			throw(
 				type = "Wheels.RustCFML.InstallFailed",
-				message = "Could not download RustCFML " & variables.engineVersion & " (" & asset & ") from " & url
+				message = "No sha256 is pinned for RustCFML " & variables.engineVersion & " (" & arguments.asset & "), so it can't be verified and won't be installed."
 			);
 		}
-		$runSync(["chmod", "+x", binPath]);
-		return binPath;
+		return lCase(variables.engineSha256[arguments.asset]);
+	}
+
+	/** Lowercase hex sha256 of the file at `path`, read in chunks. */
+	public string function $sha256File(required string path) {
+		var digest = createObject("java", "java.security.MessageDigest").getInstance("SHA-256");
+		var stream = createObject("java", "java.io.FileInputStream").init(arguments.path);
+		try {
+			var buffer = createObject("java", "java.lang.reflect.Array").newInstance(
+				createObject("java", "java.lang.Byte").TYPE,
+				javaCast("int", 65536)
+			);
+			var count = stream.read(buffer);
+			while (count > 0) {
+				digest.update(buffer, javaCast("int", 0), javaCast("int", count));
+				count = stream.read(buffer);
+			}
+		} finally {
+			stream.close();
+		}
+		return lCase(binaryEncode(digest.digest(), "hex"));
 	}
 
 	/**
@@ -89,6 +182,15 @@ component {
 			);
 		}
 
+		// Another process on the port makes RustCFML exit at once ("Address
+		// already in use"), which used to be reported as a successful start.
+		if ($portInUse(arguments.port)) {
+			throw(
+				type = "Wheels.RustCFML.PortInUse",
+				message = "Port " & arguments.port & " is already in use by another process, so RustCFML can't start there. Stop that process or pass --port=<a free port>."
+			);
+		}
+
 		var bin = install();
 		var logPath = variables.wheelsHome & "/rustcfml/servers/" & $projectKey(arguments.projectRoot) & ".log";
 		$ensureParent(logPath);
@@ -107,6 +209,20 @@ component {
 		pb.redirectError(createObject("java", "java.io.File").init(logPath));
 		var proc = pb.start();
 
+		// Started means listening. Wait briefly for the port to open; a server
+		// that exits first failed (e.g. it lost a race for the port) and is
+		// reported as such, with the end of its log, and no state is recorded.
+		var deadline = getTickCount() + 5000;
+		while (getTickCount() < deadline && proc.isAlive() && !$portInUse(arguments.port)) {
+			sleep(100);
+		}
+		if (!proc.isAlive()) {
+			throw(
+				type = "Wheels.RustCFML.StartFailed",
+				message = "The RustCFML server exited right after starting. " & $logTail(logPath)
+			);
+		}
+
 		var state = {
 			pid = proc.pid(),
 			port = arguments.port,
@@ -117,6 +233,22 @@ component {
 		$writeState(arguments.projectRoot, state);
 		state.log = logPath;
 		return state;
+	}
+
+	/** Whether something is listening on `port` (IPv4 or IPv6). Public so specs can stub it. */
+	public boolean function $portInUse(required numeric port) {
+		return new modules.wheels.services.PortProbe().portInUse(arguments.port);
+	}
+
+	/** The last few lines of a server log, for an error message. */
+	public string function $logTail(required string path) {
+		if (!fileExists(arguments.path)) return "No log was written.";
+		var lines = listToArray(fileRead(arguments.path), chr(10));
+		var tail = [];
+		for (var i = max(1, arrayLen(lines) - 4); i <= arrayLen(lines); i++) {
+			arrayAppend(tail, trim(lines[i]));
+		}
+		return arrayLen(tail) ? "Log: " & arrayToList(tail, " | ") : "The log is empty.";
 	}
 
 	/**
@@ -180,24 +312,68 @@ component {
 		var statePath = $statePath(arguments.projectRoot);
 		if (!fileExists(statePath)) return false;
 		var state = $readState(arguments.projectRoot);
-		if (structKeyExists(state, "pid") && state.pid > 0) {
+		// Only signal the recorded pid when it is still THIS project's server: after a
+		// crash the state file outlives the process, and the pid can be reused by an
+		// unrelated program that must not be killed.
+		if ($ownsRecordedPid(state, arguments.projectRoot)) {
 			$kill(state.pid);
+			fileDelete(statePath);
+			return true;
+		}
+		// A live pid that is not this project's server (a reused pid, or a server
+		// started by an older CLI that the ownership check can't recognise) is
+		// neither killed nor forgotten: status() reports it by pid so it can be
+		// found and stopped by hand.
+		if (structKeyExists(state, "pid") && isNumeric(state.pid) && state.pid > 0 && $isAlive(state.pid)) {
+			return false;
 		}
 		fileDelete(statePath);
-		return true;
+		return false;
 	}
 
 	/**
-	 * Report the recorded state and whether the process is still alive.
+	 * Report the recorded state and whether this project's server is still
+	 * running. A recorded pid that is dead, or alive but no longer this
+	 * project's server (a reused pid), is stale: running is false and the
+	 * state file is removed.
 	 */
 	public struct function status(required string projectRoot) {
 		var state = $readState(arguments.projectRoot);
 		var running = false;
 		if (structCount(state) && structKeyExists(state, "pid")) {
-			running = $isAlive(state.pid);
+			running = $ownsRecordedPid(state, arguments.projectRoot);
+			if (!running) {
+				state.stale = true;
+				if (isNumeric(state.pid) && state.pid > 0 && $isAlive(state.pid)) {
+					// Alive but not this project's server: a reused pid, or a server an
+					// older CLI started. Keep the state so the pid stays findable.
+					state.staleReason = "pid-not-server";
+					state.message = notOursMessage(state.pid);
+				} else {
+					// Nothing runs under the pid any more: the state is just left over.
+					state.staleReason = "dead";
+					try {
+						fileDelete($statePath(arguments.projectRoot));
+					} catch (any e) {}
+				}
+			}
 		}
 		state.running = running;
 		return state;
+	}
+
+	/** What to tell the user about a recorded pid that is alive but not this project's server. */
+	public string function notOursMessage(required any pid) {
+		return "RustCFML pid " & arguments.pid & " is recorded for this project but is not its server. Stop it manually only if it is a RustCFML server you started; otherwise wheels start replaces the record.";
+	}
+
+	/** True when the recorded pid is alive AND is this project's RustCFML server. */
+	private boolean function $ownsRecordedPid(required struct state, required string projectRoot) {
+		return structKeyExists(arguments.state, "pid")
+			&& isNumeric(arguments.state.pid)
+			&& arguments.state.pid > 0
+			&& $isAlive(arguments.state.pid)
+			&& isProjectServerProcess(arguments.state.pid, arguments.projectRoot);
 	}
 
 	// -------------------------------------------------------------------------
@@ -209,20 +385,60 @@ component {
 	 * Mirrors tools/rustcfml/run-suite.sh.
 	 */
 	public string function assetName() {
-		var os = createObject("java", "java.lang.System").getProperty("os.name");
-		var arch = createObject("java", "java.lang.System").getProperty("os.arch");
-		var isMac = findNoCase("mac", os) > 0;
-		var isLinux = findNoCase("linux", os) > 0;
-		var isArm = findNoCase("aarch64", arch) > 0 || findNoCase("arm64", arch) > 0;
-		var isX64 = findNoCase("amd64", arch) > 0 || findNoCase("x86_64", arch) > 0;
+		var system = createObject("java", "java.lang.System");
+		var osName = system.getProperty("os.name");
+		var osArch = system.getProperty("os.arch");
+		// An x86_64 JVM on a Mac may be an Intel JDK under Rosetta on Apple
+		// Silicon: ask the hardware, since the native binary runs there.
+		var arm64Hardware = findNoCase("mac", osName) && !findNoCase("aarch64", osArch) && !findNoCase("arm64", osArch)
+			? $macHasArm64Hardware()
+			: false;
+		return $assetFor(osName, osArch, arm64Hardware);
+	}
 
-		if (isMac && isArm) return "rustcfml-macos-aarch64";
-		if (isMac && isX64) return "rustcfml-macos-x86_64";
+	/** Whether this Mac's CPU is Apple Silicon (`sysctl hw.optional.arm64` is 1), whatever the JVM's arch. */
+	public boolean function $macHasArm64Hardware() {
+		try {
+			var proc = createObject("java", "java.lang.ProcessBuilder").init(["/usr/sbin/sysctl", "-n", "hw.optional.arm64"])
+				.redirectErrorStream(true).start();
+			var answer = createObject("java", "java.io.BufferedReader")
+				.init(createObject("java", "java.io.InputStreamReader").init(proc.getInputStream())).readLine();
+			proc.waitFor();
+			return !isNull(answer) && trim(answer) == "1";
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * The RustCFML release asset for `osName` / `osArch` (Java's os.name and
+	 * os.arch), or Wheels.RustCFML.UnsupportedPlatform when RustCFML publishes
+	 * no build for it. RustCFML releases ship Linux x86_64 and aarch64 and
+	 * macOS aarch64 (Apple Silicon); there is no macOS x86_64 (Intel) build,
+	 * which used to surface as a 404 from the download instead of this error.
+	 * `arm64Hardware` marks an x86_64 JVM on Apple Silicon (Rosetta), which
+	 * gets the native arm64 build.
+	 */
+	public string function $assetFor(required string osName, required string osArch, boolean arm64Hardware = false) {
+		var isMac = findNoCase("mac", arguments.osName) > 0;
+		var isLinux = findNoCase("linux", arguments.osName) > 0;
+		var isArm = findNoCase("aarch64", arguments.osArch) > 0 || findNoCase("arm64", arguments.osArch) > 0;
+		var isX64 = findNoCase("amd64", arguments.osArch) > 0 || findNoCase("x86_64", arguments.osArch) > 0;
+
+		if (isMac && (isArm || arguments.arm64Hardware)) return "rustcfml-macos-aarch64";
 		if (isLinux && isArm) return "rustcfml-linux-aarch64";
 		if (isLinux && isX64) return "rustcfml-linux-x86_64";
+		if (isMac && isX64) {
+			throw(
+				type = "Wheels.RustCFML.UnsupportedPlatform",
+				message = "RustCFML publishes no macOS Intel (x86_64) build, so the RustCFML engine can't run on this Mac.",
+				detail = "Use the default engine (wheels start), or run RustCFML on Apple Silicon or Linux."
+			);
+		}
 		throw(
 			type = "Wheels.RustCFML.UnsupportedPlatform",
-			message = "No RustCFML binary for " & os & " / " & arch
+			message = "RustCFML publishes no build for #arguments.osName# / #arguments.osArch#.",
+			detail = "RustCFML builds exist for Linux (x86_64, aarch64) and macOS on Apple Silicon. Use the default engine (wheels start)."
 		);
 	}
 
@@ -269,7 +485,7 @@ component {
 
 	/**
 	 * Run a command to completion; return its exit code. Used for the
-	 * blocking curl download and the chmod call.
+	 * blocking curl download and the kill/liveness probes.
 	 */
 	public numeric function $runSync(required array cmdArgs) {
 		var pb = createObject("java", "java.lang.ProcessBuilder").init(arguments.cmdArgs);

@@ -33,6 +33,24 @@
     // so the dump at the end of this request reflects only THIS run.
     if (StructKeyExists(url, "coverage") && url.coverage) {
         server.__wheels_cov = {};
+        // `wheels coverage` instruments app/ just before this request. Under
+        // Lucee's inspectTemplate=once a template already compiled is never
+        // re-read, so a server that had served the app kept running the
+        // uninstrumented code and reported 0% (deleting cfclasses on disk does
+        // not drop the compiled pages held in memory). Clear them so this run
+        // compiles the instrumented source. Lucee-only function, hence the guard.
+        if (StructKeyExists(GetFunctionList(), "pagePoolClear")) {
+            pagePoolClear();
+        }
+        // Wheels runs each controller's and model's config() once and caches the
+        // class, so on a warm server config() never ran during the suite and its
+        // counters stayed at zero. Drop the class caches so they are rebuilt from
+        // the instrumented code; the app rebuilds them lazily on the next use.
+        for (local.classCache in ["controllers", "models"]) {
+            if (StructKeyExists(application.wheels, local.classCache) && IsStruct(application.wheels[local.classCache])) {
+                StructClear(application.wheels[local.classCache]);
+            }
+        }
     }
 
     // Resolve the target datasource. When url.useTestDB=true and a
@@ -149,10 +167,9 @@
             local.testDirectoryExists = DirectoryExists(local.testFsPath);
 
             try {
-                testBox = new wheels.wheelstest.system.TestBox(
-                    directory = local.testDirectory,
-                    options   = { coverage = { enabled = false } }
-                );
+                // A single spec file runs as its one bundle (issue 3759).
+                local.testBoxArgs = local.dirResolver.testBoxArgs(scope = local.testScope);
+                testBox = new wheels.wheelstest.system.TestBox(argumentCollection = local.testBoxArgs);
             } catch (any e) {
                 cfheader(statuscode="500");
                 cfcontent(type="application/json");

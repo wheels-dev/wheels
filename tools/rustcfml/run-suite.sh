@@ -14,9 +14,16 @@
 #                                                     # (run after bumping ENGINE_VERSION)
 #
 # Environment overrides:
-#   RUSTCFML_BIN          path to an existing engine binary (skips download)
+#   RUSTCFML_BIN          path to an existing engine binary (skips download; used as
+#                         is, NOT sha256-verified)
+#   RUSTCFML_CACHE_DIR    engine download cache (default ~/.cache/wheels-rustcfml)
 #   RUSTCFML_PORT         port to serve on (default 8513)
 #   RUSTCFML_RESULT_JSON  write a machine-readable verdict here (compare mode)
+#
+# Without RUSTCFML_BIN the engine is downloaded once per version and cached. Every
+# download, and a cached binary before each use, is checked against its sha256:
+# the ENGINE_SHA256 pin for the pinned ENGINE_VERSION, or the release's published
+# asset digest (GitHub API) for any other RUSTCFML_VERSION. A mismatch is exit 1.
 #
 # Exit codes: 0 = no new failures (or baseline written); 3 = the suite ran and
 # the engine was REJECTED (new named failures, or fail/error totals above the
@@ -47,13 +54,53 @@ esac
 
 BIN="${RUSTCFML_BIN:-}"
 if [ -z "$BIN" ]; then
+  # shellcheck source=engine-sha256.sh
+  . "$DIR/engine-sha256.sh"
+  # The sha256 this binary must have: the checked-in pin for the pinned version,
+  # the release's own published digest for a candidate version.
+  if [ "$VERSION" = "$(tr -d '[:space:]' < "$DIR/ENGINE_VERSION")" ]; then
+    if ! WANT_SHA256="$(rustcfml_pinned_sha256 "$ASSET" "$DIR/ENGINE_SHA256")"; then
+      echo "::error::$DIR/ENGINE_SHA256 has no sha256 pin for $ASSET; cannot verify RustCFML $VERSION."
+      exit 1
+    fi
+  else
+    if ! DIGESTS="$(rustcfml_release_digests "$VERSION")"; then
+      echo "::error::Could not read the RustCFML $VERSION release assets to verify $ASSET."
+      exit 1
+    fi
+    if ! WANT_SHA256="$(rustcfml_digest_sha256 "$ASSET" "$DIGESTS")"; then
+      echo "::error::The RustCFML $VERSION release publishes no single sha256 digest for $ASSET; cannot verify it."
+      exit 1
+    fi
+  fi
+
   CACHE_DIR="${RUSTCFML_CACHE_DIR:-$HOME/.cache/wheels-rustcfml}"
   mkdir -p "$CACHE_DIR"
   BIN="$CACHE_DIR/rustcfml-$VERSION"
-  if [ ! -x "$BIN" ]; then
+  if [ -e "$BIN" ]; then
+    HAVE_SHA256="$(rustcfml_file_sha256 "$BIN")"
+    if [ "$HAVE_SHA256" = "$WANT_SHA256" ]; then
+      chmod +x "$BIN"
+    else
+      echo "Cached $BIN does not match its sha256 (expected $WANT_SHA256, got $HAVE_SHA256); downloading again."
+      rm -f "$BIN"
+    fi
+  fi
+  if [ ! -e "$BIN" ]; then
     echo "Downloading RustCFML $VERSION ($ASSET)..."
-    gh release download "$VERSION" --repo RustCFML/RustCFML --pattern "$ASSET" --output "$BIN"
-    chmod +x "$BIN"
+    DOWNLOAD_DIR="$(mktemp -d "$CACHE_DIR/.download.XXXXXX")"
+    trap 'rm -rf "$DOWNLOAD_DIR"' EXIT
+    gh release download "$VERSION" --repo RustCFML/RustCFML --pattern "$ASSET" \
+      --output "$DOWNLOAD_DIR/$ASSET"
+    HAVE_SHA256="$(rustcfml_file_sha256 "$DOWNLOAD_DIR/$ASSET")"
+    if [ "$HAVE_SHA256" != "$WANT_SHA256" ]; then
+      echo "::error::RustCFML $VERSION ($ASSET) failed sha256 verification: expected $WANT_SHA256, got $HAVE_SHA256."
+      exit 1
+    fi
+    chmod +x "$DOWNLOAD_DIR/$ASSET"
+    mv "$DOWNLOAD_DIR/$ASSET" "$BIN"
+    rm -rf "$DOWNLOAD_DIR"
+    trap - EXIT
   fi
 fi
 echo "Engine: $BIN"

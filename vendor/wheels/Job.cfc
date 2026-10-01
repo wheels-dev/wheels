@@ -14,14 +14,15 @@
  *       this.maxRetries = 5;
  *     }
  *     public void function perform(struct data = {}) {
- *       // Send the email
- *       sendEmail(to=data.email, subject="Welcome!", from="noreply@example.com");
+ *       // model() works here; sendEmail() is a controller function, so send through a mailer
+ *       user = model("User").findByKey(arguments.data.userId);
+ *       new app.mailers.UserMailer().sendWelcome(user);
  *     }
  *   }
  *
  *   // Enqueue from a controller:
  *   job = new app.jobs.SendWelcomeEmailJob();
- *   job.enqueue(data={email: user.email});
+ *   job.enqueue(data={userId: user.id});
  */
 component {
 
@@ -58,6 +59,15 @@ component {
 	 */
 	public void function perform(struct data = {}) {
 		throw(type = "Wheels.NotImplemented", message = "The perform() method must be implemented in the job subclass.");
+	}
+
+	/**
+	 * Returns a model class object, so perform() can call model("User") as a controller does.
+	 * Delegates to application.wo.model(); a job extends no controller or model base class.
+	 * @name Name of the model, e.g. "User".
+	 */
+	public any function model(required string name) {
+		return application.wo.model(name = arguments.name);
 	}
 
 	/**

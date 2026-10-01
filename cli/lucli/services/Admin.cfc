@@ -26,6 +26,7 @@ component {
 		boolean noRoutes = false
 	) {
 		var result = {success: true, generated: [], errors: []};
+		$validateModelData(arguments.modelData);
 		var singular = lCase(arguments.modelData.model);
 		// Prefer tableName from modelData for view/controller paths when provided
 		var plural = len(arguments.modelData.tableName ?: "") ? lCase(arguments.modelData.tableName) : variables.helpers.pluralize(singular);
@@ -59,24 +60,34 @@ component {
 		context.showFields = buildShowFields(allColumns, singular);
 		context.formFields = buildFormFields(formColumns, singular);
 
-		// Generate controller
+		// Every destination must resolve inside the project (a symlinked
+		// app/controllers/admin, view directory or config/routes.cfm must not
+		// carry the write outside), checked before anything is created.
+		var paths = new modules.wheels.services.GeneratorPaths();
 		var controllerDir = variables.projectRoot & "/app/controllers/admin";
-		if (!directoryExists(controllerDir)) directoryCreate(controllerDir, true);
 		var controllerPath = controllerDir & "/" & pluralCap & ".cfc";
+		var viewDir = variables.projectRoot & "/app/views/admin/" & plural;
+		var viewTemplates = ["index", "show", "new", "edit", "_form"];
+		for (var destination in [controllerPath, variables.projectRoot & "/config/routes.cfm"]) {
+			paths.assertInside(variables.projectRoot, destination);
+		}
+		for (var viewName in viewTemplates) {
+			paths.assertInside(variables.projectRoot, viewDir & "/" & viewName & ".cfm");
+		}
+
+		// Generate controller
+		paths.ensureDirectoryInside(variables.projectRoot, controllerDir);
 		if (fileExists(controllerPath) && !arguments.force) {
 			arrayAppend(result.errors, "Controller already exists: app/controllers/admin/#pluralCap#.cfc (use --force to overwrite)");
 			result.success = false;
 			return result;
 		}
 		var controllerTemplate = fileRead(variables.moduleRoot & "templates/admin/controller.txt");
-		fileWrite(controllerPath, processTemplate(controllerTemplate, context));
+		$writeFile(controllerPath, processTemplate(controllerTemplate, context));
 		arrayAppend(result.generated, "app/controllers/admin/#pluralCap#.cfc");
 
 		// Generate views
-		var viewDir = variables.projectRoot & "/app/views/admin/" & plural;
-		if (!directoryExists(viewDir)) directoryCreate(viewDir, true);
-
-		var viewTemplates = ["index", "show", "new", "edit", "_form"];
+		paths.ensureDirectoryInside(variables.projectRoot, viewDir);
 		for (var viewName in viewTemplates) {
 			var viewPath = viewDir & "/" & viewName & ".cfm";
 			if (fileExists(viewPath) && !arguments.force) {
@@ -84,7 +95,7 @@ component {
 				continue;
 			}
 			var viewTemplate = fileRead(variables.moduleRoot & "templates/admin/" & viewName & ".txt");
-			fileWrite(viewPath, processTemplate(viewTemplate, context));
+			$writeFile(viewPath, processTemplate(viewTemplate, context));
 			arrayAppend(result.generated, "app/views/admin/#plural#/#viewName#.cfm");
 		}
 
@@ -97,6 +108,29 @@ component {
 		}
 
 		return result;
+	}
+
+	/**
+	 * Every name from the introspection payload is written into the controller,
+	 * views and routes, so each must be a plain identifier before anything is
+	 * written.
+	 */
+	private void function $validateModelData(required struct modelData) {
+		var names = new modules.wheels.services.GeneratorPaths();
+		names.identifier(arguments.modelData.model ?: "", "model");
+		if (len(arguments.modelData.tableName ?: "")) {
+			names.identifier(arguments.modelData.tableName, "table");
+		}
+		names.identifier(arguments.modelData.primaryKey ?: "id", "primary key");
+		for (var col in arguments.modelData.columns ?: []) {
+			names.identifier(col.name ?: "", "column");
+		}
+		for (var assoc in arguments.modelData.associations ?: []) {
+			names.identifier(assoc.name ?: "", "association");
+			if (structKeyExists(assoc, "modelName")) {
+				names.identifier(assoc.modelName, "association model");
+			}
+		}
 	}
 
 	// ── Template builders ──────────────────────────────────────
@@ -146,7 +180,7 @@ component {
 		var nl = chr(10);
 		var t = chr(9);
 		for (var col in arguments.columns) {
-			cells &= t & t & t & "<td>###arguments.plural#.#col.name###</td>" & nl;
+			cells &= t & t & t & "<td>##encodeForHTML(#arguments.plural#.#col.name#)##</td>" & nl;
 		}
 		return cells;
 	}
@@ -157,7 +191,7 @@ component {
 		var t = chr(9);
 		for (var col in arguments.columns) {
 			fields &= t & "<dt>#variables.helpers.capitalize(col.name)#</dt>" & nl;
-			fields &= t & "<dd>###arguments.singular#.#col.name###</dd>" & nl;
+			fields &= t & "<dd>##encodeForHTML(#arguments.singular#.#col.name#)##</dd>" & nl;
 		}
 		return fields;
 	}
@@ -231,6 +265,7 @@ component {
 	private boolean function injectAdminRoute(required string plural) {
 		var routesPath = variables.projectRoot & "/config/routes.cfm";
 		if (!fileExists(routesPath)) return false;
+		new modules.wheels.services.GeneratorPaths().assertInside(variables.projectRoot, routesPath);
 
 		var content = fileRead(routesPath);
 		var nl = chr(10);
@@ -259,7 +294,7 @@ component {
 				if (endPos > 0) {
 					var insertAt = adminScopePos + endPos - 2;
 					content = left(content, insertAt) & t & t & resourceLine & nl & t & mid(content, insertAt + 1, len(content));
-					fileWrite(routesPath, content);
+					$writeFile(routesPath, content);
 					return true;
 				}
 			}
@@ -285,8 +320,20 @@ component {
 			}
 		}
 
-		fileWrite(routesPath, content);
+		$writeFile(routesPath, content);
 		return true;
+	}
+
+	/**
+	 * Writes a generated file, or under `wheels generate --dry-run` records the
+	 * path for the caller to print and writes nothing.
+	 */
+	private void function $writeFile(required string path, required string content) {
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, arguments.path);
+			return;
+		}
+		fileWrite(arguments.path, arguments.content);
 	}
 
 	private string function processTemplate(required string template, required struct context) {

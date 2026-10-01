@@ -37,6 +37,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(opts.version).toBe("abc1234");
             });
 
+            it("parses --skip-push (Kamal) into skipPush", () => {
+                expect(parser.parse(["--skip-push"]).skipPush).toBeTrue();
+                expect(structKeyExists(parser.parse(["--dry-run"]), "skipPush")).toBeFalse();
+            });
+
             it("treats --release and --version as equivalent", () => {
                 var a = parser.parse(["--release=v1"]);
                 var b = parser.parse(["--version=v1"]);

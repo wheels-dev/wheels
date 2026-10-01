@@ -42,6 +42,8 @@ else
 fi
 SQLITE_JDBC_VERSION="3.49.1.0"
 SQLITE_JDBC_URL="https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/${SQLITE_JDBC_VERSION}/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
+# sha256 of the Maven Central jar (cross-checked against its published .sha1).
+SQLITE_JDBC_SHA256="5c8609d2ca341deb8c6f71778974b5ba4995c7d32d7c7c89d9392a3e72c39291"
 OUT_DIR="${OUT_DIR:-dist}"
 BUILD_DIR="$(pwd)/.linux-pkg-build"
 
@@ -53,6 +55,26 @@ else
   NFPM_CONFIG="tools/distribution-drafts/linux-packages/nfpm-wheels.yaml"
   PKG_NAME="wheels"
 fi
+
+# --- verify-sha256 begin ---------------------------------------------------
+# tools/test-linux-package-checksums.sh extracts everything between the
+# begin/end markers and runs it against local files, so keep it self-contained.
+#
+# verify_sha256 <file> <expected-sha256> <label>
+# Fail closed: the package never ships a download that is not the pinned one.
+verify_sha256() {
+  local actual
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum "$1" | cut -d' ' -f1)
+  else
+    actual=$(shasum -a 256 "$1" | cut -d' ' -f1)
+  fi
+  if [ "${actual}" != "$2" ]; then
+    echo "$3 checksum mismatch: expected $2, got ${actual}" >&2
+    exit 1
+  fi
+}
+# --- verify-sha256 end -----------------------------------------------------
 
 echo "── Building Linux packages ──"
 echo "  Channel:  ${CHANNEL}"
@@ -96,16 +118,7 @@ fi
 #    installs on amd64 AND arm64. See issue #2700 (routing) and the arch-independent
 #    refactor.
 curl -fsSL -o "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_URL}"
-# Fail closed: the package never ships a runtime that is not the pinned one.
-if command -v sha256sum >/dev/null 2>&1; then
-  LUCLI_JAR_ACTUAL=$(sha256sum "${BUILD_DIR}/build/lucli.jar" | cut -d' ' -f1)
-else
-  LUCLI_JAR_ACTUAL=$(shasum -a 256 "${BUILD_DIR}/build/lucli.jar" | cut -d' ' -f1)
-fi
-if [ "${LUCLI_JAR_ACTUAL}" != "${LUCLI_JAR_SHA256}" ]; then
-  echo "LuCLI jar checksum mismatch: expected ${LUCLI_JAR_SHA256}, got ${LUCLI_JAR_ACTUAL}" >&2
-  exit 1
-fi
+verify_sha256 "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_SHA256}" "LuCLI jar"
 LUCLI_JAR_REPORTED=$(unzip -p "${BUILD_DIR}/build/lucli.jar" lucli/version.properties | sed -n 's/^lucli\.version=//p' | tr -d '\r')
 if [ -z "${LUCLI_JAR_URL_OVERRIDDEN:-}" ] && [ "${LUCLI_JAR_REPORTED}" != "${LUCLI_VERSION}" ]; then
   echo "LuCLI jar reports version '${LUCLI_JAR_REPORTED}', expected '${LUCLI_VERSION}'" >&2
@@ -114,6 +127,7 @@ fi
 
 # 4. Download SQLite JDBC
 curl -fsSL -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"
+verify_sha256 "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_SHA256}" "SQLite JDBC jar"
 
 # 5. Generate the user-facing /usr/bin/wheels wrapper
 cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
@@ -121,7 +135,7 @@ cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
 # /usr/bin/wheels — Wheels CLI wrapper for Linux .deb/.rpm install.
 #
 # Mirrors the macOS Homebrew wrapper's behavior:
-#   - exports JAVA_HOME and LUCLI_HOME
+#   - exports JAVA_HOME (a pre-set one only if it is Java 21+) and LUCLI_HOME
 #   - on first run (or version mismatch), syncs the module + framework from
 #     /opt/wheels/module/ into ~/.wheels/modules/wheels/
 #   - stages SQLite JDBC into Lucee Express's lib/ext/ (cliff fix)
@@ -131,8 +145,64 @@ cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
 
 set -euo pipefail
 
-# Honor user-set JAVA_HOME if present; otherwise probe for OpenJDK 21 across the
-# Debian/Ubuntu AND RHEL/Fedora layouts, on amd64 and arm64.
+# --- java-resolve begin ---------------------------------------------------
+# tools/test-linux-launcher-java.sh extracts everything between the begin/end
+# markers and runs it against fake JDKs, so keep this block self-contained
+# (bash builtins + readlink only) and keep the markers intact.
+#
+# Every candidate — including a user-set JAVA_HOME — must be Java 21+. The
+# LuCLI jar is class-file version 65, so an older JVM dies with
+# UnsupportedClassVersionError before Wheels starts. GitHub's ubuntu runners
+# (and many dev machines) export JAVA_HOME at Temurin 17, which used to win
+# over the openjdk-21 the package had just pulled in (#3728 smoke).
+
+# Print the major version of the JDK/JRE rooted at $1 (empty when unknown).
+# Reads $1/release first so the common path starts no JVM; falls back to
+# parsing `java -version` ("21.0.2", "25-ea", legacy "1.8.0_402" -> 8).
+_wheels_java_major() {
+  local home="$1" v="" line=""
+  if [ -f "${home}/release" ]; then
+    while IFS= read -r line || [ -n "${line}" ]; do
+      case "${line}" in
+        JAVA_VERSION=*) v="${line#JAVA_VERSION=}"; v="${v//\"/}"; break ;;
+      esac
+    done < "${home}/release"
+  fi
+  if [ -z "${v}" ] && [ -x "${home}/bin/java" ]; then
+    # Scan for the ` version "..."` line rather than taking line 1: the JVM
+    # prints "Picked up JAVA_TOOL_OPTIONS: ..." first when that is set.
+    while IFS= read -r line; do
+      case "${line}" in
+        *" version \""*\"*) v="${line#* version \"}"; v="${v%%\"*}"; break ;;
+      esac
+    done <<< "$("${home}/bin/java" -version 2>&1 || true)"
+  fi
+  case "${v}" in 1.*) v="${v#1.}" ;; esac
+  v="${v%%[!0-9]*}"
+  printf '%s' "${v}"
+}
+
+# Succeed when $1/bin/java exists and is Java 21 or newer.
+_wheels_java_ok() {
+  local major
+  [ -x "${1}/bin/java" ] || return 1
+  major="$(_wheels_java_major "$1")"
+  [ -n "${major}" ] && [ "${major}" -ge 21 ]
+}
+
+# Honor a user-set JAVA_HOME only when it is Java 21+; otherwise say so on
+# stderr and fall through to the probes below.
+if [ -n "${JAVA_HOME:-}" ] && ! _wheels_java_ok "${JAVA_HOME}"; then
+  if [ -x "${JAVA_HOME}/bin/java" ]; then
+    _jm="$(_wheels_java_major "${JAVA_HOME}")"
+    echo "wheels: ignoring JAVA_HOME=${JAVA_HOME} (Java ${_jm:-version unknown}); Wheels needs Java 21+" >&2
+  else
+    echo "wheels: ignoring JAVA_HOME=${JAVA_HOME} (no bin/java there); Wheels needs Java 21+" >&2
+  fi
+  unset JAVA_HOME
+fi
+# Probe for OpenJDK 21 across the Debian/Ubuntu AND RHEL/Fedora layouts, on
+# amd64 and arm64. default-java may point at an older JDK, hence the check.
 if [ -z "${JAVA_HOME:-}" ]; then
   for candidate in \
     /usr/lib/jvm/java-21-openjdk-amd64 \
@@ -145,7 +215,7 @@ if [ -z "${JAVA_HOME:-}" ]; then
     /usr/lib/jvm/temurin-21-jdk-arm64 \
     /usr/lib/jvm/zulu-21 \
     /usr/lib/jvm/default-java; do
-    if [ -x "${candidate}/bin/java" ]; then
+    if _wheels_java_ok "${candidate}"; then
       export JAVA_HOME="${candidate}"
       break
     fi
@@ -153,17 +223,19 @@ if [ -z "${JAVA_HOME:-}" ]; then
 fi
 # RHEL/Fedora install into a version-stamped dir (java-21-openjdk-21.0.x...elN.<arch>)
 # that the fixed names above don't match, but the headless package registers
-# /usr/bin/java via the alternatives system — resolve JAVA_HOME from it.
+# /usr/bin/java via the alternatives system — resolve JAVA_HOME from it. The
+# alternatives default can be an older JDK (it is Temurin 17 on GitHub's
+# ubuntu runners), hence the version check.
 if [ -z "${JAVA_HOME:-}" ] && command -v java >/dev/null 2>&1; then
   _j="$(command -v java)"
   command -v readlink >/dev/null 2>&1 && _j="$(readlink -f "${_j}" 2>/dev/null || echo "${_j}")"
   _jh="${_j%/bin/java}"
-  [ -x "${_jh}/bin/java" ] && export JAVA_HOME="${_jh}"
+  _wheels_java_ok "${_jh}" && export JAVA_HOME="${_jh}"
 fi
 # Last resort: glob the version-stamped RHEL/Fedora directories directly.
 if [ -z "${JAVA_HOME:-}" ]; then
   for d in /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/*jre-21* /usr/lib/jvm/*-21-*; do
-    if [ -x "${d}/bin/java" ]; then export JAVA_HOME="${d}"; break; fi
+    if _wheels_java_ok "${d}"; then export JAVA_HOME="${d}"; break; fi
   done
 fi
 if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
@@ -171,6 +243,7 @@ if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
   echo "        or java-21-openjdk-headless (yum/dnf)." >&2
   exit 1
 fi
+# --- java-resolve end -----------------------------------------------------
 
 export LUCLI_HOME="${HOME}/.wheels"
 export PATH="${JAVA_HOME}/bin:${PATH}"
@@ -213,16 +286,40 @@ if [ -f "${DOCS_SRC}/wheels-docs-${INSTALLED_VERSION}.zip" ] && [ ! -f "${DOCS_D
     || echo "WARNING: could not unpack the offline docs bundle" >&2
 fi
 
+# --- docs-mirror begin ----------------------------------------------------
+# tools/test-linux-launcher-docs-mirror.sh extracts and runs this block.
 # Mirror the bundle into the current app's webroot when run from inside one.
 # Required, not a convenience: the dev server's Lucee urlRewrite only routes
 # extension-less paths to the front controller, so the bundle's
 # extension-bearing asset URLs must be real files under the webroot for the
-# container to serve them. Hardlinked so the shared cache is not duplicated.
-if [ -f "./vendor/wheels/wheels.json" ] && [ -d "./public" ] && [ -d "${DOCS_DST}" ]; then
-  rm -rf "./public/wheels-docs"
-  cp -R -l "${DOCS_DST}" "./public/wheels-docs" 2>/dev/null \
-    || cp -R "${DOCS_DST}" "./public/wheels-docs"
+# container to serve them.
+# Copied only when missing or when its manifest.json differs from the cache's
+# (a package upgrade). A public/wheels-docs without manifest.json is the
+# user's own and is left alone; one with it is a docs mirror, whether this
+# wrapper, an older one or `wheels docs` made it. A plain copy, not hardlinks,
+# so edits in the app cannot change the shared cache; it is built beside the
+# target and renamed in. A failure warns and the command still runs. The
+# manifest is compared in bash rather than with cmp, which minimal images lack.
+DOCS_MIRROR="./public/wheels-docs"
+_wheels_docs_mirror() {
+  local tmp="./public/.wheels-docs-new.$$" old="./public/.wheels-docs-old.$$"
+  # Clear leftovers from runs that were killed mid-copy.
+  rm -rf ./public/.wheels-docs-new.* ./public/.wheels-docs-old.*
+  cp -R "${DOCS_DST}" "${tmp}" || { rm -rf "${tmp}"; return 1; }
+  if [ -e "${DOCS_MIRROR}" ]; then
+    mv "${DOCS_MIRROR}" "${old}" || { rm -rf "${tmp}"; return 1; }
+  fi
+  mv "${tmp}" "${DOCS_MIRROR}" || { mv "${old}" "${DOCS_MIRROR}"; rm -rf "${tmp}"; return 1; }
+  rm -rf "${old}"
+}
+if [ -f "./vendor/wheels/wheels.json" ] && [ -d "./public" ] && [ -f "${DOCS_DST}/manifest.json" ]; then
+  if [ ! -e "${DOCS_MIRROR}" ] || { [ -f "${DOCS_MIRROR}/manifest.json" ] \
+      && [ "$(cat "${DOCS_MIRROR}/manifest.json" 2>/dev/null)" != "$(cat "${DOCS_DST}/manifest.json")" ]; }; then
+    _wheels_docs_mirror 2>/dev/null \
+      || echo "wheels: could not copy the offline docs into public/wheels-docs; continuing" >&2
+  fi
 fi
+# --- docs-mirror end ------------------------------------------------------
 
 # Stage SQLite JDBC into Lucee Express on first run.
 LUCEE_EXT_DIR="$(find "${LUCLI_HOME}/express" -path "*/lib/ext" -type d 2>/dev/null | head -1 || true)"

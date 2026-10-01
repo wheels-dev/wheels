@@ -47,6 +47,26 @@ The runner wraps each migration in a transaction so a failing `up()` or `down()`
 On MySQL and Oracle, DDL statements (`CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`, …) implicitly commit the surrounding transaction. A multi-statement migration that fails midway on those databases leaves the statements that already ran committed — partial schema the transaction wrapper cannot undo. PostgreSQL, SQL Server, and SQLite support transactional DDL, so the all-or-nothing guarantee holds there. On MySQL/Oracle, prefer small single-purpose migrations, and if one does die halfway, use `wheels migrate doctor` and the reconciliation subcommands below to get the tracking table and schema back in line.
 </Aside>
 
+### Migrations that touch a second datasource
+
+A migration step that runs SQL against another datasource, through `queryExecute(..., {datasource: "other"})` or a model with `dataSource("other")`, can't run inside the per-step transaction on Adobe ColdFusion. Adobe rejects the mix with `Datasource names for all the database tags within the cftransaction tag must be the same`, and the migrator reports that error along with the fix below.
+
+Opt that migration out of the transaction:
+
+```cfm
+component extends="wheels.migrator.Migration" {
+
+    this.useTransaction = false;
+
+    function up() {
+        queryExecute("CREATE TABLE audit_log (id INT)", {}, {datasource: "reporting"});
+    }
+
+}
+```
+
+With `this.useTransaction = false`, the migrator runs `up()`/`down()` without a transaction and records (or removes) the version only **after** the step succeeds, so a failed step is never marked as applied. Nothing is rolled back if the step fails part-way, so keep such migrations small and idempotent where you can. Every other migration keeps the default per-step transaction.
+
 ## Running migrations without the wheels CLI
 
 The CLI is a convenience, not a requirement — CommandBox teams and manual installs have the same capabilities:

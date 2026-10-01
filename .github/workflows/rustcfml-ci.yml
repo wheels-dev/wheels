@@ -39,6 +39,16 @@ jobs:
       - name: Test the result comparison (no engine)
         run: python3 tools/rustcfml/test_run_suite.py
 
+      # Engine-free: bump-pin.sh moves ENGINE_VERSION and the sha256 pins (and
+      # the CLI's copies) together, and touches nothing when it can't (#3812).
+      - name: Test the pin bump (no engine)
+        run: python3 tools/rustcfml/test_bump_pin.py
+
+      # Engine-free: run-suite.sh only uses an engine binary whose sha256 matches
+      # the ENGINE_SHA256 pin (or a candidate release's published digest).
+      - name: Test the engine download verification (no engine)
+        run: python3 tools/rustcfml/test_resolve_engine.py
+
       - name: Read pinned engine version
         id: engine
         run: echo "version=$(tr -d '[:space:]' < tools/rustcfml/ENGINE_VERSION)" >> $GITHUB_OUTPUT

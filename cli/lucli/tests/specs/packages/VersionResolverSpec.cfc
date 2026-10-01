@@ -76,6 +76,88 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(list[1].version).toBe("1.1.0");    // highest first
 				expect(list[ArrayLen(list)].version).toBe("0.9.0");
 			});
+
+			describe("pre-release versions", () => {
+
+				// Registry order is ascending, so the RC precedes its release.
+				var rcManifest = {
+					name: "wheels-rc",
+					versions: [
+						{version: "1.1.0", wheelsVersion: ">=4.0", tarball: "x", sha256: "a"},
+						{version: "1.2.0-rc.1", wheelsVersion: ">=4.0", tarball: "x", sha256: "b"},
+						{version: "1.2.0", wheelsVersion: ">=4.0", tarball: "x", sha256: "c"}
+					]
+				};
+
+				it("picks the stable release over its equal pre-release with no pin", () => {
+					var r = new cli.lucli.services.packages.VersionResolver();
+					expect(r.pick(rcManifest, "4.1.2").version).toBe("1.2.0");
+				});
+
+				it("matches an exact release pin to the release, not its pre-release", () => {
+					var r = new cli.lucli.services.packages.VersionResolver();
+					expect(r.pick(rcManifest, "4.1.2", "1.2.0").version).toBe("1.2.0");
+				});
+
+				it("honours an exact pre-release pin", () => {
+					var r = new cli.lucli.services.packages.VersionResolver();
+					expect(r.pick(rcManifest, "4.1.2", "1.2.0-rc.1").version).toBe("1.2.0-rc.1");
+				});
+
+				it("picks the newest stable when only a pre-release is newer", () => {
+					var r = new cli.lucli.services.packages.VersionResolver();
+					var m = {
+						name: "wheels-rc",
+						versions: [
+							{version: "1.1.0", wheelsVersion: ">=4.0", tarball: "x", sha256: "a"},
+							{version: "1.2.0-rc.1", wheelsVersion: ">=4.0", tarball: "x", sha256: "b"}
+						]
+					};
+					expect(r.pick(m, "4.1.2").version).toBe("1.1.0");
+					expect(r.pick(m, "4.1.2", "^1.0.0").version).toBe("1.1.0");
+				});
+
+				it("considers pre-releases when a range pin names one", () => {
+					var r = new cli.lucli.services.packages.VersionResolver();
+					var m = {
+						name: "wheels-rc",
+						versions: [
+							{version: "1.1.0", tarball: "x", sha256: "a"},
+							{version: "1.2.0-rc.1", tarball: "x", sha256: "b"},
+							{version: "1.2.0-rc.2", tarball: "x", sha256: "c"}
+						]
+					};
+					expect(r.pick(m, "4.1.2", ">=1.2.0-rc.1").version).toBe("1.2.0-rc.2");
+				});
+
+				it("throws NoCompatibleVersion when only pre-releases exist and no pin names one", () => {
+					var r = new cli.lucli.services.packages.VersionResolver();
+					var m = {name: "wheels-rc", versions: [{version: "1.0.0-beta.1", tarball: "x", sha256: "a"}]};
+					var state = {type: ""};
+					try {
+						r.pick(m, "4.1.2");
+					} catch (any e) {
+						state.type = e.type;
+					}
+					expect(state.type).toBe("Wheels.Packages.NoCompatibleVersion");
+				});
+
+				it("treats a snapshot runtime like its release for wheelsVersion", () => {
+					var r = new cli.lucli.services.packages.VersionResolver();
+					var m = {name: "x", versions: [{version: "1.0.0", wheelsVersion: ">=4.1.2", tarball: "t", sha256: "s"}]};
+					expect(r.pick(m, "4.1.2-snapshot.500").version).toBe("1.0.0");
+					expect(ArrayLen(r.compatibleVersions(m, "4.1.2-snapshot.500"))).toBe(1);
+				});
+
+				it("compatibleVersions orders a release above its pre-release", () => {
+					var r = new cli.lucli.services.packages.VersionResolver();
+					var list = r.compatibleVersions(rcManifest, "4.1.2");
+					expect(ArrayLen(list)).toBe(3);
+					expect(list[1].version).toBe("1.2.0");
+					expect(list[2].version).toBe("1.2.0-rc.1");
+					expect(list[3].version).toBe("1.1.0");
+				});
+			});
 		});
 	}
 }

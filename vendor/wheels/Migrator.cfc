@@ -415,76 +415,154 @@ component output="false" extends="wheels.Global"{
 			return local.result;
 		}
 		local.divider = arguments.direction == "up" ? "--------" : "-------";
+		// A migration can opt out of the per-step transaction with
+		// `this.useTransaction = false` (#3772): a step that touches a second
+		// datasource can't run inside one on Adobe ColdFusion. Without the
+		// transaction its version row is still written only after the step
+		// succeeds, so a failed step is never recorded. The default stays atomic.
+		if (!$migrationUsesTransaction(arguments.migration.cfc)) {
+			return $executeMigrationStep(
+				migration = arguments.migration,
+				direction = arguments.direction,
+				errorLabel = arguments.errorLabel,
+				divider = local.divider,
+				inTransaction = false
+			);
+		}
 		transaction action="begin" {
-			try {
-				// Test query to establish datasource for BoxLang compatibility
-				if (structKeyExists(server, "boxlang")) {
-					$query(datasource = $migratorDataSource(), sql = "SELECT 1 as test");
-				}
-				local.result.output &= "#Chr(13) & Chr(10)##local.divider# " & arguments.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(arguments.migration.cfcfile)))##Chr(13) & Chr(10)#";
-				request.$wheelsMigrationOutput = "";
-				request.$wheelsMigrationDidExecute = false;
-				request.$wheelsMigrationDidAnnounce = false;
-				request.$wheelsMigrationDidWork = false;
-				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
-				if (application[local.appKey].writeMigratorSQLFiles) {
-					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
-				}
-				// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
-				request.$wheelsTransactionWrapper = true;
-				if (arguments.direction == "down") {
-					arguments.migration.cfc.down();
-					local.result.output &= request.$wheelsMigrationOutput;
-					if ($migrationStepIsPlaceholder(arguments.migration.cfc, "down")) {
-						local.result.output &= $placeholderNotRecorded(arguments.migration, "down");
-					} else {
-						$removeVersionAsMigrated(arguments.migration.version);
-					}
-				} else if (arguments.direction == "redo") {
-					arguments.migration.cfc.down();
-					arguments.migration.cfc.up();
-					local.result.output &= request.$wheelsMigrationOutput;
-				} else {
-					arguments.migration.cfc.up();
-					local.result.output &= request.$wheelsMigrationOutput;
-					if ($migrationStepIsPlaceholder(arguments.migration.cfc, "up")) {
-						local.result.output &= $placeholderNotRecorded(arguments.migration, "up");
-					} else {
-						$setVersionAsMigrated(arguments.migration.version, arguments.migration.name);
-					}
-				}
-			} catch (any e) {
-				local.result.success = false;
-				local.result.output &= "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
-				if ($ddlAutoCommits()) {
-					local.result.output &= "Warning: this database auto-commits DDL. The per-migration transaction did not roll back schema changes.#Chr(13) & Chr(10)#";
-				}
-				// A failed step must never be silent. This output is RETURNED, not
-				// thrown, so the failure is only visible to a caller that inspects the
-				// string. The CLI does (it maps the "Error migrating" signature to a
-				// non-zero exit — #3081), but the application-start auto-migrate path in
-				// events/onapplicationstart.cfc discards it entirely: a migration that
-				// cannot run stalls every migration queued behind it while the app boots
-				// healthy and nothing is written anywhere. Log at the point of failure so
-				// every entry point records it, not just the ones that read the report.
-				writeLog(
-					file = "wheels",
-					type = "error",
-					text = $migrationFailureLogMessage(
-						migration = arguments.migration,
-						direction = arguments.direction,
-						error = e
-					)
-				);
+			local.result = $executeMigrationStep(
+				migration = arguments.migration,
+				direction = arguments.direction,
+				errorLabel = arguments.errorLabel,
+				divider = local.divider,
+				inTransaction = true
+			);
+			if (local.result.success) {
+				transaction action="commit";
+			} else {
 				transaction action="rollback";
-				StructDelete(request, "$wheelsTransactionWrapper");
-				// Skip the commit below — rollback already closed the transaction.
-				return local.result;
 			}
-			StructDelete(request, "$wheelsTransactionWrapper");
-			transaction action="commit";
 		}
 		return local.result;
+	}
+
+	/**
+	 * Internal function for `$runMigration()`. Runs one migration's up()/down()
+	 * and records or removes its version once it succeeds. Returns
+	 * `{success, output}`; the caller owns the transaction, if any.
+	 */
+	private struct function $executeMigrationStep(
+		required struct migration,
+		required string direction,
+		required string errorLabel,
+		required string divider,
+		required boolean inTransaction
+	) {
+		local.appKey = $appKey();
+		local.result = {success = true, output = ""};
+		local.divider = arguments.divider;
+		try {
+			// Test query to establish datasource for BoxLang compatibility
+			if (arguments.inTransaction && structKeyExists(server, "boxlang")) {
+				$query(datasource = $migratorDataSource(), sql = "SELECT 1 as test");
+			}
+			local.result.output &= "#Chr(13) & Chr(10)##local.divider# " & arguments.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(arguments.migration.cfcfile)))##Chr(13) & Chr(10)#";
+			request.$wheelsMigrationOutput = "";
+			request.$wheelsMigrationDidExecute = false;
+			request.$wheelsMigrationDidAnnounce = false;
+			request.$wheelsMigrationDidWork = false;
+			request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
+			if (application[local.appKey].writeMigratorSQLFiles) {
+				$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
+			}
+			// Issue #2789: skip nested cftransaction when migrator's outer one owns commit/rollback.
+			if (arguments.inTransaction) {
+				request.$wheelsTransactionWrapper = true;
+			}
+			if (arguments.direction == "down") {
+				arguments.migration.cfc.down();
+				local.result.output &= request.$wheelsMigrationOutput;
+				if ($migrationStepIsPlaceholder(arguments.migration.cfc, "down")) {
+					local.result.output &= $placeholderNotRecorded(arguments.migration, "down");
+				} else {
+					$removeVersionAsMigrated(arguments.migration.version);
+				}
+			} else if (arguments.direction == "redo") {
+				arguments.migration.cfc.down();
+				arguments.migration.cfc.up();
+				local.result.output &= request.$wheelsMigrationOutput;
+			} else {
+				arguments.migration.cfc.up();
+				local.result.output &= request.$wheelsMigrationOutput;
+				if ($migrationStepIsPlaceholder(arguments.migration.cfc, "up")) {
+					local.result.output &= $placeholderNotRecorded(arguments.migration, "up");
+				} else {
+					$setVersionAsMigrated(arguments.migration.version, arguments.migration.name);
+				}
+			}
+		} catch (any e) {
+			local.result.success = false;
+			local.result.output &= "#arguments.errorLabel# #arguments.migration.version#.#Chr(13) & Chr(10)##e.message##Chr(13) & Chr(10)##e.detail##Chr(13) & Chr(10)#";
+			local.hint = $mixedDatasourceTransactionHint(e);
+			if (Len(local.hint)) {
+				local.result.output &= local.hint & Chr(13) & Chr(10);
+			}
+			if (!arguments.inTransaction) {
+				local.result.output &= "This step ran without a transaction (this.useTransaction = false), so changes it made before the failure were not rolled back.#Chr(13) & Chr(10)#";
+			} else if ($ddlAutoCommits()) {
+				local.result.output &= "Warning: this database auto-commits DDL. The per-migration transaction did not roll back schema changes.#Chr(13) & Chr(10)#";
+			}
+			// A failed step must never be silent. This output is RETURNED, not
+			// thrown, so the failure is only visible to a caller that inspects the
+			// string. The CLI does (it maps the "Error migrating" signature to a
+			// non-zero exit — #3081), but the application-start auto-migrate path in
+			// events/onapplicationstart.cfc discards it entirely: a migration that
+			// cannot run stalls every migration queued behind it while the app boots
+			// healthy and nothing is written anywhere. Log at the point of failure so
+			// every entry point records it, not just the ones that read the report.
+			writeLog(
+				file = "wheels",
+				type = "error",
+				text = $migrationFailureLogMessage(
+					migration = arguments.migration,
+					direction = arguments.direction,
+					error = e
+				) & (Len(local.hint) ? " | " & local.hint : "")
+			);
+			StructDelete(request, "$wheelsTransactionWrapper");
+			return local.result;
+		}
+		StructDelete(request, "$wheelsTransactionWrapper");
+		return local.result;
+	}
+
+	/**
+	 * Internal function for `$runMigration()`. False only when the migration
+	 * opts out of the per-step transaction with `this.useTransaction = false`.
+	 */
+	private boolean function $migrationUsesTransaction(required any cfc) {
+		if (StructKeyExists(arguments.cfc, "useTransaction") && IsBoolean(arguments.cfc.useTransaction)) {
+			return arguments.cfc.useTransaction ? true : false;
+		}
+		return true;
+	}
+
+	/**
+	 * Internal function.
+	 * When a step failed because the engine refuses statements on more than one
+	 * datasource inside one transaction (Adobe ColdFusion: "Datasource names for
+	 * all the database tags within the cftransaction tag must be the same"),
+	 * returns a message naming the opt-out; otherwise "" (#3772).
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 */
+	public string function $mixedDatasourceTransactionHint(required any error) {
+		local.text = (arguments.error.message ?: "") & " " & (arguments.error.detail ?: "");
+		if (!FindNoCase("within the cftransaction tag must be the same", local.text)) {
+			return "";
+		}
+		return "This migration uses more than one datasource, which this engine does not allow inside the migrator's per-step transaction. Set this.useTransaction = false in the migration to run it without a transaction; its version is still recorded only after the step succeeds.";
 	}
 
 	/**
@@ -707,11 +785,23 @@ component output="false" extends="wheels.Global"{
 		required string templateName,
 		string migrationPrefix = ""
 	) {
-		local.templateFile = this.paths.templates & "/" & arguments.templateName & ".txt";
-		local.extendsPath = "wheels.migrator.Migration";
-		if (!FileExists(local.templateFile)) {
-			return "Template #arguments.templateName# could not be found. <br/> To resolve this, generate the necessary template files by running `wheels g snippets` from the root of your application";
+		// Allow-list the requested template against the snippet files that actually
+		// exist. An unknown name — including any HTML an attacker might submit, or a
+		// path-traversal attempt — is rejected here and never reaches the file path
+		// or gets reflected back in the message (see R2-4). The message lists the
+		// valid names instead, so it stays useful.
+		local.availableTemplates = $getAvailableTemplateNames();
+		local.templateMatch = ListFindNoCase(local.availableTemplates, arguments.templateName);
+		if (!ListLen(local.availableTemplates) || !local.templateMatch) {
+			return "The requested migration template could not be found. Available templates: "
+				& local.availableTemplates
+				& ". Run `wheels g snippets` from the root of your application to generate the template files.";
 		}
+		// Use the canonical-case name from the allow-list so a case variant (e.g.
+		// "Blank") still resolves to "blank.txt" on a case-sensitive filesystem.
+		local.templateNameCanonical = ListGetAt(local.availableTemplates, local.templateMatch);
+		local.templateFile = this.paths.templates & "/" & local.templateNameCanonical & ".txt";
+		local.extendsPath = "wheels.migrator.Migration";
 		if (!DirectoryExists(this.paths.migrate)) {
 			DirectoryCreate(this.paths.migrate);
 		}
@@ -735,6 +825,25 @@ component output="false" extends="wheels.Global"{
 			return "There was an error when creating the migration: #e.message#";
 		}
 		return "The migration #local.migrationFile# file was created";
+	}
+
+	/**
+	 * Returns the comma-delimited list of available migration-template names (the
+	 * `.txt` snippet basenames in the templates directory). Used as the allow-list
+	 * for createMigration so an unknown or attacker-supplied template name is
+	 * rejected before it reaches the filesystem or a reflected error message.
+	 */
+	public string function $getAvailableTemplateNames() {
+		local.names = "";
+		if (!DirectoryExists(this.paths.templates)) {
+			return "";
+		}
+		// Iterate the listing directly (do not ArrayAppend to it — BoxLang's
+		// DirectoryList returns a fixed-size array) and collect the basenames.
+		for (local.file in DirectoryList(this.paths.templates, false, "name", "*.txt")) {
+			local.names = ListAppend(local.names, ReReplaceNoCase(local.file, "\.txt$", "", "one"));
+		}
+		return local.names;
 	}
 
 	/**

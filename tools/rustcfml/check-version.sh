@@ -4,9 +4,10 @@
 # When a newer release exists, run the full core suite against it (compare mode
 # against the current baseline.json). Three outcomes (#3687):
 #
-#   accepted  no new failures vs the pinned baseline: bump ENGINE_VERSION,
-#             regenerate baseline.json, and export RUSTCFML_LATEST/PINNED via
-#             GITHUB_ENV so the workflow opens the bump PR.
+#   accepted  no new failures vs the pinned baseline: bump ENGINE_VERSION and
+#             the ENGINE_SHA256 pins (bump-pin.sh), regenerate baseline.json,
+#             and export RUSTCFML_LATEST/PINNED via GITHUB_ENV so the workflow
+#             opens the bump PR.
 #   rejected  the suite ran and has new failures: leave the pin unchanged,
 #             emit a ::warning:: with the named diff, and export
 #             RUSTCFML_REJECTED/RUSTCFML_FINGERPRINT/RUSTCFML_RESULT_JSON so the
@@ -57,7 +58,12 @@ set -e
 case "$rc" in
   0)
     echo "Suite green against $LATEST — bumping the pin and regenerating the baseline."
-    echo "$LATEST" > "$DIR/ENGINE_VERSION"
+    # Moves ENGINE_VERSION, the per-asset sha256 pins in ENGINE_SHA256 (from
+    # the release's published digests), and the CLI's copies of both in
+    # RustCFMLEngine.cfc, which can't read tools/ once installed (#3812).
+    # bump-pin.sh checks everything BEFORE touching a file, so a failure
+    # leaves every pin as it was.
+    bash "$DIR/bump-pin.sh" "$LATEST"
     RUSTCFML_VERSION="$LATEST" bash "$DIR/run-suite.sh" --write-baseline
     echo "Pinned version bumped to $LATEST and baseline.json regenerated."
     if [ -n "${GITHUB_ENV:-}" ]; then

@@ -1,6 +1,6 @@
 <cfparam name="|ObjectNameSingular|" default="">
 <cfoutput>
-<h1>#|ObjectNameSingular|.|DisplayProperty|#</h1>
+<h1>#encodeForHTML(|ObjectNameSingular|.|DisplayProperty|)#</h1>
 <!--- CLI-Appends-Here --->
 <!--- All three actions carry simple.css's `.button` class so they read as one
      row of buttons. `linkTo` takes extra HTML attributes directly; `buttonTo`

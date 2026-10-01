@@ -74,6 +74,18 @@
 	 * Called from get().
 	 */
 	public any function $get(required string name, string functionName = "") {
+		// IP-based debug access grants the public component and debug/error
+		// information to one request only; it lives in request.wheels.debugAccess
+		// (see $applyIPDebugAccess) and wins over the application setting, which
+		// is never changed for it.
+		if (
+			!Len(arguments.functionName)
+			&& StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "debugAccess")
+			&& StructKeyExists(request.wheels.debugAccess, arguments.name)
+		) {
+			return request.wheels.debugAccess[arguments.name];
+		}
 		// Multi-tenant config override: per-tenant settings take precedence
 		// over application-level settings (non-function settings only).
 		// Security-sensitive settings cannot be overridden per-tenant.
@@ -92,6 +104,29 @@
 			)
 		) {
 			return request.wheels.tenant.config[arguments.name];
+		}
+		// GHSA-8r22 fail-closed backstop. An app that still carries the pre-4.1.2
+		// IP-debug block in its own Application.cfc switches these three flags on
+		// and off in the shared application.wheels scope per request (only that
+		// block creates the debugIPAccess bookkeeping struct). Reading the shared
+		// value would show one client's grant to every concurrent request, so for
+		// these flags serve the boot snapshot instead, and warn once to say the
+		// Application.cfc block must be updated. The per-request grant above still
+		// wins for the client that is actually allowed.
+		if (
+			!Len(arguments.functionName)
+			&& StructKeyExists(application, "wheels")
+			&& StructKeyExists(application.wheels, "debugIPAccess")
+			&& StructKeyExists(application.wheels, "$debugSettingsSnapshot")
+			&& StructKeyExists(application.wheels.$debugSettingsSnapshot, arguments.name)
+		) {
+			if (
+				StructKeyExists(application.wheels, arguments.name)
+				&& application.wheels[arguments.name] != application.wheels.$debugSettingsSnapshot[arguments.name]
+			) {
+				$warnLegacyDebugIpBlockOnce();
+			}
+			return application.wheels.$debugSettingsSnapshot[arguments.name];
 		}
 		local.appKey = $appKey();
 		if (Len(arguments.functionName)) {
@@ -122,6 +157,43 @@
 			}
 		} else {
 			application[local.appKey][StructKeyList(arguments)] = arguments[1];
+			// GHSA-8r22: keep the debug-settings boot snapshot in step with an
+			// explicit set() of these flags, so a runtime set() is still honoured
+			// while $get() serves the snapshot for an app with the legacy block.
+			if (
+				StructKeyExists(application[local.appKey], "$debugSettingsSnapshot")
+				&& StructKeyExists(application[local.appKey].$debugSettingsSnapshot, StructKeyList(arguments))
+			) {
+				application[local.appKey].$debugSettingsSnapshot[StructKeyList(arguments)] = arguments[1];
+			}
+		}
+	}
+
+
+	/**
+	 * Internal. Logs a one-time warning when an app still carries the pre-4.1.2
+	 * IP-debug block in its own Application.cfc. That block writes the shared debug
+	 * flags per request, so the GHSA-8r22 backstop serves the boot snapshot to keep
+	 * a concurrent request from seeing another client's grant. The app must update
+	 * Application.cfc to call $applyIPDebugAccess() (see the advisory).
+	 */
+	public void function $warnLegacyDebugIpBlockOnce() {
+		if (!StructKeyExists(application, "wheels") || StructKeyExists(application.wheels, "$legacyDebugIpBlockWarned")) {
+			return;
+		}
+		cflock(name = "wheels.legacyDebugIpBlock.#application.applicationName#", type = "exclusive", timeout = 5) {
+			if (!StructKeyExists(application.wheels, "$legacyDebugIpBlockWarned")) {
+				application.wheels.$legacyDebugIpBlockWarned = true;
+				cflog(
+					type = "warning",
+					file = "wheels",
+					text = "IP-based debug access: public/Application.cfc still carries the pre-4.1.2 debug-IP block, which "
+						& "writes showErrorInformation / showDebugInformation / enablePublicComponent into the shared application "
+						& "scope per request. Wheels is ignoring those writes and serving the boot values so a concurrent request "
+						& "cannot see another client's grant. Update onRequestStart() to call application.wo.$applyIPDebugAccess() "
+						& "and remove the old block (see GHSA-8r22-vwcc-v55m)."
+				);
+			}
 		}
 	}
 

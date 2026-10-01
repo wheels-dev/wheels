@@ -26,6 +26,17 @@
 				extendedInfo = "Valid isolation levels are read_uncommitted, read_committed, repeatable_read, and serializable."
 			);
 		}
+		// Validate the mode here too, before the open-transaction marker is touched:
+		// rejected only in the switch's default branch, an invalid mode left the
+		// marker set, and every later call in the request silently ran as
+		// "alreadyopen" with no transaction.
+		if (!ListFindNoCase("commit,rollback,false,none,alreadyopen", arguments.transaction)) {
+			Throw(
+				type = "Wheels",
+				message = "Invalid transaction type",
+				extendedInfo = "The transaction type of `#arguments.transaction#` is invalid. Please use `commit`, `rollback` or `false`."
+			);
+		}
 		local.methodArgs = $setProperties(
 			argumentCollection = arguments,
 			properties = {},

@@ -56,12 +56,16 @@ component {
     }
 
     /**
-     * Parses --dry-run, --destination, --version, and --release.
+     * Parses --dry-run, --skip-push, --destination, --version, and --release.
      */
     private numeric function $parseDeployFlags(required struct opts, required array args, required numeric i, required numeric n) {
         var a = arguments.args[arguments.i];
         if (a == "--dry-run") {
             arguments.opts.dryRun = true;
+            return arguments.i + 1;
+        } else if (a == "--skip-push") {
+            // Kamal's flag: the image for this version is already pushed.
+            arguments.opts.skipPush = true;
             return arguments.i + 1;
         } else if (left(a, 14) == "--destination=") {
             arguments.opts.destination = mid(a, 15, 99999);

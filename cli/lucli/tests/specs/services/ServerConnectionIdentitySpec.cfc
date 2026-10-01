@@ -44,13 +44,26 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		);
 	}
 
-	/** GET through the CLI transport from a stub that sends `raw` verbatim. */
+	/**
+	 * One request to a stub that answers `raw`, bound to 127.0.0.1 alone so no
+	 * other loopback listener can take the connection (issue 3804). The stub
+	 * records the request before it answers, so if it saw none, whatever
+	 * answered was something else: that fails loudly instead of letting a
+	 * stranger's response pass or fail the spec's own assertion.
+	 */
 	private struct function exchangeRaw(required any raw) {
-		var stub = new cli.lucli.tests.StubHttpServer(200, arguments.raw);
+		var stub = new cli.lucli.tests.StubHttpServer(200, arguments.raw, "127.0.0.1");
 		try {
 			return freshModule().makeHttpRequestWithStatus(requestUrl = "http://127.0.0.1:#stub.getPort()#/", followRedirects = false);
 		} finally {
+			var received = arrayLen(stub.requests());
 			stub.stop();
+			if (received != 1) {
+				throw(
+					type = "StubHttpServer.NotReached",
+					message = "The stub on 127.0.0.1:#stub.getPort()# received #received# request(s), not 1: something else answered."
+				);
+			}
 		}
 	}
 
@@ -61,6 +74,29 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	function run() {
+
+		describe("StubHttpServer loopback binding (issue 3804)", () => {
+
+			it("holds its 127.0.0.1 port exclusively, so no other listener can answer there", () => {
+				var stub = new cli.lucli.tests.StubHttpServer(200, "", "127.0.0.1");
+				var state = {bound = false};
+				var shadow = createObject("java", "java.net.ServerSocket").init();
+				try {
+					shadow.setReuseAddress(true);
+					try {
+						shadow.bind(createObject("java", "java.net.InetSocketAddress").init("127.0.0.1", javacast("int", stub.getPort())));
+						state.bound = true;
+					} catch (any e) {
+						state.bound = false;
+					}
+				} finally {
+					try { shadow.close(); } catch (any e) {}
+					stub.stop();
+				}
+				expect(state.bound).toBeFalse("another socket bound 127.0.0.1:#stub.getPort()# while the stub held it");
+			});
+
+		});
 
 		describe("peer-identity check on every request to a verified server", () => {
 

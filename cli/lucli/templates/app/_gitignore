@@ -21,6 +21,9 @@ WEB-INF
 # Vendor dependencies (install with: wheels packages add <name>)
 /vendor/
 
+# Local copy of the Wheels docs (wheels docs fetch), about 300 MB
+/public/wheels-docs/
+
 # Database files (SQLite databases are created by the server)
 /db/*.sqlite
 /db/*.db

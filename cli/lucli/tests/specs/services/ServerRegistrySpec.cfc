@@ -290,7 +290,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("returns the port when the project's own server is registered, alive and listening", () => {
 				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
-				var listener = createObject("java", "java.net.ServerSocket").init(0);
+				var listener = new cli.lucli.tests.TestSockets().exclusiveLoopbackListener();
 				var reg = selfCommandLineRegistry("");
 				var name = reg.serverNameFor(variables.canonicalProject);
 				makeRegistration(name = name, projectPath = variables.canonicalProject, pidContent = selfPid & ":" & listener.getLocalPort());
@@ -304,7 +304,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("accepts a recorded pid whose command line is this registration's server", () => {
 				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
-				var listener = createObject("java", "java.net.ServerSocket").init(0);
+				var listener = new cli.lucli.tests.TestSockets().exclusiveLoopbackListener();
 				var name = variables.registry.serverNameFor(variables.canonicalProject);
 				var reg = selfCommandLineRegistry("java -Dcatalina.base=" & variables.tempHome & "/servers/" & name & " org.apache.catalina.startup.Bootstrap start");
 				makeRegistration(name = name, projectPath = variables.canonicalProject, pidContent = selfPid & ":" & listener.getLocalPort());
@@ -368,7 +368,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("listenerOwnedBy tells this JVM's listener from another pid's", () => {
 				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
-				var listener = createObject("java", "java.net.ServerSocket").init(0);
+				var listener = new cli.lucli.tests.TestSockets().exclusiveLoopbackListener();
 				try {
 					expect(variables.registry.listenerOwnedBy(listener.getLocalPort(), selfPid)).toBe("yes");
 					expect(variables.registry.listenerOwnedBy(listener.getLocalPort(), 1)).toBe("no");
@@ -418,7 +418,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// "name": "wheels" — LuCLI registers servers/wheels/, not
 				// servers/wheels-2963f/.
 				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
-				var listener = createObject("java", "java.net.ServerSocket").init(0);
+				var listener = new cli.lucli.tests.TestSockets().exclusiveLoopbackListener();
 				var reg = selfCommandLineRegistry("");
 				var dir = makeProject('{"name": "wheels-registry-renamed"}');
 				makeRegistration(name = "wheels-registry-renamed", projectPath = dir, pidContent = selfPid & ":" & listener.getLocalPort());
@@ -435,7 +435,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// lucee.json's name edited after the server started: the live
 				// registration still sits under the old name.
 				var selfPid = createObject("java", "java.lang.ProcessHandle").current().pid();
-				var listener = createObject("java", "java.net.ServerSocket").init(0);
+				var listener = new cli.lucli.tests.TestSockets().exclusiveLoopbackListener();
 				var reg = selfCommandLineRegistry("");
 				var dir = makeProject('{"name": "wheels-registry-new-name"}');
 				makeRegistration(name = "wheels-registry-old-name", projectPath = dir, pidContent = selfPid & ":" & listener.getLocalPort());

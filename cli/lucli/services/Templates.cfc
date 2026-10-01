@@ -47,7 +47,10 @@ component {
 		var templateContent = fileRead(templatePath);
 		var processedContent = processTemplate(templateContent, arguments.context);
 
-		var destinationPath = variables.projectRoot & "/" & arguments.destination;
+		var destinationPath = new modules.wheels.services.GeneratorPaths().assertInside(
+			variables.projectRoot,
+			variables.projectRoot & "/" & arguments.destination
+		);
 
 		// Dry run (request.$wheelsGenerateDryRun set by `wheels generate
 		// --dry-run`): record the would-be path, write nothing.
@@ -700,7 +703,7 @@ component {
 				// Keep the friendly label but render the raw FK column value.
 				label = variables.helpers.capitalize($foreignKeyParts(prop.name).association);
 			}
-			arrayAppend(blocks, '<p>' & label & ': ##|ObjectNamePlural|.' & prop.name & '##</p>');
+			arrayAppend(blocks, '<p>' & label & ': ##encodeForHTML(|ObjectNamePlural|.' & prop.name & ')##</p>');
 		}
 		return arrayToList(blocks, chr(10) & chr(9) & chr(9));
 	}
@@ -733,7 +736,7 @@ component {
 		// authorId); the table header still shows the association label.
 		for (var prop in arguments.properties) {
 			var cellCode = '<td>' & chr(10);
-			cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.#prop.name###' & chr(10);
+			cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##encodeForHTML(|ObjectNamePlural|.#prop.name#)##' & chr(10);
 			cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '</td>';
 			arrayAppend(cells, cellCode);
 		}

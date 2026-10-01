@@ -13,7 +13,9 @@
  *      reproducible sha256, but Lucee 7 cannot compile CFCs whose mtime is
  *      epoch-0. Without `-m` the package "extracts cleanly" but every helper
  *      call 500s with a misleading "invalid component definition" error.
- *   5. Clean up the temp file.
+ *   5. Swap the verified tree into vendor/<name>/. An existing copy is
+ *      renamed aside first and restored if the move fails.
+ *   6. Clean up the temp file and the staging dir.
  *
  * Tarball extraction shells out to `tar`. All target platforms (macOS,
  * Linux, Windows 10+) ship it. If Windows Server compat becomes a real
@@ -67,31 +69,29 @@ component {
 		}
 
 		local.vendorDir = variables.projectRoot & "vendor/";
-		local.target = local.vendorDir & arguments.name;
+		// Validates the name and pins the target to a direct child of vendor/
+		// before anything below deletes, downloads or extracts.
+		local.target = new modules.wheels.services.packages.PackageName().childOf(local.vendorDir, arguments.name);
 
-		if (DirectoryExists(local.target)) {
-			if (!arguments.force) {
-				Throw(
-					type = "Wheels.Packages.AlreadyInstalled",
-					message = "Package '#arguments.name#' is already installed at #local.target#. "
-						& "Use --force to overwrite."
-				);
-			}
-			DirectoryDelete(local.target, true);
+		if (DirectoryExists(local.target) && !arguments.force) {
+			Throw(
+				type = "Wheels.Packages.AlreadyInstalled",
+				message = "Package '#arguments.name#' is already installed at #local.target#. "
+					& "Use --force to overwrite."
+			);
 		}
 
-		if (!DirectoryExists(local.vendorDir)) {
-			DirectoryCreate(local.vendorDir, true);
-		}
-
-		// Download to a temp file. Normalize the separator: engines differ on
-		// whether GetTempDirectory() carries a trailing slash (RustCFML does
-		// not), and a bare concatenation would target the filesystem root.
+		// Download to a temp file and extract into a private staging directory.
+		// Normalize the separator: engines differ on whether GetTempDirectory()
+		// carries a trailing slash (RustCFML does not), and a bare concatenation
+		// would target the filesystem root.
 		local.tmpDir = GetTempDirectory();
 		if (Right(local.tmpDir, 1) != "/" && Right(local.tmpDir, 1) != "\") {
 			local.tmpDir &= "/";
 		}
-		local.tmpFile = local.tmpDir & "wheels-pkg-" & CreateUUID() & ".tar.gz";
+		local.token = CreateUUID();
+		local.tmpFile = local.tmpDir & "wheels-pkg-" & local.token & ".tar.gz";
+		local.stageDir = local.tmpDir & "wheels-pkg-stage-" & local.token & "/";
 		try {
 			variables.http.download(arguments.version.tarball, local.tmpFile);
 
@@ -107,19 +107,28 @@ component {
 				);
 			}
 
-			// Extract.
-			$extract(local.tmpFile, local.vendorDir);
+			// Extract into staging and check the layout before vendor/ is touched:
+			// only a single <name>/ tree (with package.json, no links) is moved in.
+			// Extraction itself stays inside stageDir because GNU tar and bsdtar
+			// refuse absolute and ".." member names by default; the layout check
+			// below then governs what may leave staging.
+			DirectoryCreate(local.stageDir, true);
+			$extract(local.tmpFile, local.stageDir);
+			new modules.wheels.services.packages.PackageLayout().assertSingleTree(local.stageDir, arguments.name);
 
-			if (!DirectoryExists(local.target)) {
-				Throw(
-					type = "Wheels.Packages.ExtractionFailed",
-					message = "Extraction completed but vendor/#arguments.name#/ was not produced. "
-						& "The tarball layout does not match the expected '<name>/...' convention."
-				);
+			if (!DirectoryExists(local.vendorDir)) {
+				DirectoryCreate(local.vendorDir, true);
 			}
+			// The previous install is replaced only once the new one is verified,
+			// and kept beside it until the new copy is in place. The leading dot
+			// keeps PackageLoader from loading the backup.
+			$swapInto(local.stageDir & arguments.name, local.target, local.vendorDir & ".wheels-pkg-previous-" & local.token);
 		} finally {
 			if (FileExists(local.tmpFile)) {
 				FileDelete(local.tmpFile);
+			}
+			if (DirectoryExists(local.stageDir)) {
+				DirectoryDelete(local.stageDir, true);
 			}
 		}
 
@@ -131,7 +140,7 @@ component {
 	 * Throws if the dir doesn't exist or doesn't look like a Wheels package.
 	 */
 	public void function uninstall(required string name) {
-		local.target = variables.projectRoot & "vendor/" & arguments.name;
+		local.target = new modules.wheels.services.packages.PackageName().childOf(variables.projectRoot & "vendor/", arguments.name);
 		if (!DirectoryExists(local.target)) {
 			Throw(
 				type = "Wheels.Packages.NotInstalled",
@@ -149,11 +158,11 @@ component {
 	}
 
 	public boolean function isInstalled(required string name) {
-		return DirectoryExists(variables.projectRoot & "vendor/" & arguments.name);
+		return DirectoryExists(new modules.wheels.services.packages.PackageName().childOf(variables.projectRoot & "vendor/", arguments.name));
 	}
 
 	public string function installedVersion(required string name) {
-		local.pkgJson = variables.projectRoot & "vendor/" & arguments.name & "/package.json";
+		local.pkgJson = new modules.wheels.services.packages.PackageName().childOf(variables.projectRoot & "vendor/", arguments.name) & "/package.json";
 		if (!FileExists(local.pkgJson)) return "";
 		try {
 			local.parsed = DeserializeJSON(FileRead(local.pkgJson));
@@ -164,6 +173,47 @@ component {
 	}
 
 	// ── Private ─────────────────────────────────────────────
+
+	/**
+	 * Moves a verified staged tree to target. An existing target is renamed
+	 * aside first (same directory, so a plain rename) and renamed back if the
+	 * move fails, so a failed swap never leaves the app without the package.
+	 */
+	private void function $swapInto(required string src, required string target, required string backupDir) {
+		local.hadOld = DirectoryExists(arguments.target);
+		if (local.hadOld) {
+			DirectoryRename(arguments.target, arguments.backupDir);
+		}
+		try {
+			$moveInto(arguments.src, arguments.target);
+		} catch (any e) {
+			if (local.hadOld) {
+				// A cross-volume copy can stop part way; drop what it wrote.
+				if (DirectoryExists(arguments.target)) {
+					DirectoryDelete(arguments.target, true);
+				}
+				DirectoryRename(arguments.backupDir, arguments.target);
+			}
+			rethrow;
+		}
+		if (local.hadOld) {
+			// Best-effort: the new copy is in place; a leftover backup is only clutter.
+			try {
+				DirectoryDelete(arguments.backupDir, true);
+			} catch (any e) {
+			}
+		}
+	}
+
+	/** Moves a staged tree into place; falls back to copy+delete across volumes. */
+	private void function $moveInto(required string src, required string dest) {
+		try {
+			DirectoryRename(arguments.src, arguments.dest);
+		} catch (any e) {
+			DirectoryCopy(arguments.src, arguments.dest, true);
+			DirectoryDelete(arguments.src, true);
+		}
+	}
 
 	private string function $sha256File(required string path) {
 		local.bin = FileReadBinary(arguments.path);

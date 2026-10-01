@@ -50,12 +50,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             it("leaves a no-secret command unchanged and skips empty/short values", () => {
                 var ssh = new cli.lucli.services.deploy.lib.SshClient();
                 ssh.$setSecretValues(["", "x"]);
-                var cmd = "docker pull acme/demo:v1";
+                var cmd = "docker pull 'acme/demo:v1'";
                 try {
                     ssh.$raiseRemoteFailure("h1", cmd, {exitCode: 125, stderr: "denied"});
                     fail("expected throw");
                 } catch (any e) {
-                    expect(e.message).toInclude("docker pull acme/demo:v1");
+                    expect(e.message).toInclude("docker pull 'acme/demo:v1'");
                     expect(e.message).notToInclude("[REDACTED]");
                 }
             });

@@ -136,7 +136,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 }
 
                 var log = $readRemoteLog();
-                expect(log).toInclude("docker start demo-web-v1");
+                expect(log).toInclude("docker start 'demo-web-v1'");
                 expect(log).toInclude("kamal-proxy deploy demo");
             });
         });

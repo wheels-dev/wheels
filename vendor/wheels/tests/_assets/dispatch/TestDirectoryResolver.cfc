@@ -48,11 +48,15 @@ component {
 	 * and the core runner (`wheels.tests` / `vendor.<pkg>.tests`, default
 	 * `wheels.tests.specs`).
 	 *
-	 * Returns: { requested, resolved, rejected }
+	 * Returns: { requested, resolved, rejected, bundle }
 	 *   requested — the trimmed url.directory ("" when none was supplied)
-	 *   resolved  — the directory actually handed to TestBox
+	 *   resolved  — the directory the run is scoped to (for a single spec
+	 *               file, the folder that holds it)
 	 *   rejected  — true when a non-empty value failed the allowlist and was
 	 *               swapped for the default (the silent-fallback trap)
+	 *   bundle    — the dotted path of the one spec file to run, when the
+	 *               accepted value names an existing .cfc rather than a
+	 *               folder (issue 3759); "" otherwise
 	 */
 	public struct function resolveScope(
 		required struct url,
@@ -62,7 +66,8 @@ component {
 		var scope = {
 			requested = "",
 			resolved = arguments.defaultDirectory,
-			rejected = false
+			rejected = false,
+			bundle = ""
 		};
 		if (!StructKeyExists(arguments.url, "directory")) {
 			return scope;
@@ -74,10 +79,44 @@ component {
 		}
 		if (ReFindNoCase(arguments.allowlistPattern, scope.requested)) {
 			scope.resolved = scope.requested;
+			// A single spec FILE is not a folder: TestBox's directory scan finds
+			// 0 bundles in it. Run it as the one bundle instead (issue 3759).
+			if ($isSpecFile(scope.requested)) {
+				scope.bundle = scope.requested;
+				scope.resolved = ListDeleteAt(scope.requested, ListLen(scope.requested, "."), ".");
+			}
 		} else {
 			scope.rejected = true;
 		}
 		return scope;
+	}
+
+	/**
+	 * True when a dotted path names an existing .cfc (and not a folder of
+	 * the same name) under the mapping it starts with. Only called for
+	 * values that already passed the allowlist.
+	 */
+	public boolean function $isSpecFile(required string dottedPath) {
+		if (ListLen(arguments.dottedPath, ".") < 2) {
+			return false;
+		}
+		var basePath = ExpandPath("/" & Replace(arguments.dottedPath, ".", "/", "all"));
+		return !DirectoryExists(basePath) && FileExists(basePath & ".cfc");
+	}
+
+	/**
+	 * The TestBox constructor arguments for a resolved scope: the single
+	 * bundle for a spec-file scope, otherwise the directory. Both runners
+	 * build TestBox from this, so a spec file runs the same way on each.
+	 */
+	public struct function testBoxArgs(required struct scope, struct options = {coverage = {enabled = false}}) {
+		var tbArgs = {options = arguments.options};
+		if (StructKeyExists(arguments.scope, "bundle") && Len(arguments.scope.bundle)) {
+			tbArgs.bundles = [arguments.scope.bundle];
+		} else {
+			tbArgs.directory = arguments.scope.resolved;
+		}
+		return tbArgs;
 	}
 
 	/**
@@ -102,7 +141,7 @@ component {
 			ArrayAppend(
 				warnings,
 				"No test bundles were discovered for directory '" & arguments.scope.resolved & "'. "
-				& "A single spec FILE is not a directory scope — use testBundles= to run one bundle."
+				& "Pass a folder that holds specs, or the dotted path of one spec file."
 			);
 		}
 		return warnings;
@@ -126,6 +165,7 @@ component {
 			"directoryRequested" = arguments.scope.requested,
 			"directoryResolved" = arguments.scope.resolved,
 			"directoryRejected" = arguments.scope.rejected,
+			"bundleResolved" = StructKeyExists(arguments.scope, "bundle") ? arguments.scope.bundle : "",
 			"bundlesDiscovered" = arguments.bundlesDiscovered,
 			"warnings" = arguments.warnings
 		};

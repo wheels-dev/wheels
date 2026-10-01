@@ -35,15 +35,31 @@ component {
 	 * Internal function.
 	 */
 	public function $runCsrfProtection(string action) {
-		if (StructKeyExists(variables.$class, "csrf")) {
+		// An instance-level override (set by processRequest()) wins over the class settings.
+		// It lives on this controller instance only, so the cached class is never changed (#3843).
+		if (StructKeyExists(variables, "$csrfOverride")) {
+			local.csrf = variables.$csrfOverride;
+		} else if (StructKeyExists(variables.$class, "csrf")) {
 			local.csrf = variables.$class.csrf;
-			if ($appliesToAction(action = arguments.action, only = local.csrf.only, except = local.csrf.except)) {
-				$storeAuthenticityToken();
-				$flagRequestAsProtected();
-				$setAuthenticityToken();
-				$verifyAuthenticityToken();
-			}
+		} else {
+			return;
 		}
+		if ($appliesToAction(action = arguments.action, only = local.csrf.only, except = local.csrf.except)) {
+			$storeAuthenticityToken();
+			$flagRequestAsProtected();
+			$setAuthenticityToken();
+			$verifyAuthenticityToken(type = local.csrf.type);
+		}
+	}
+
+	/**
+	 * Internal function.
+	 *
+	 * Applies CSRF handling (`exception`, `abort` or `ignore`) to every action of this controller
+	 * instance, without touching the controller's class settings. Used by processRequest().
+	 */
+	public void function $setCsrfOverride(required string type) {
+		variables.$csrfOverride = {type = arguments.type, only = "", except = ""};
 	}
 
 	/**
@@ -56,9 +72,9 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public function $verifyAuthenticityToken() {
+	public function $verifyAuthenticityToken(string type = variables.$class.csrf.type) {
 		if (!$isVerifiedRequest()) {
-			switch (variables.$class.csrf.type) {
+			switch (arguments.type) {
 				case "abort":
 					abort;
 				case "ignore":
@@ -138,7 +154,10 @@ component {
 	 */
 	public boolean function $isCookieAuthenticityTokenValid() {
 		local.authenticityToken = $generateCookieAuthenticityToken();
-		return Len(local.authenticityToken) && local.authenticityToken == params.authenticityToken;
+		// Exact and constant-time: CFML == ignores case and stops at the first difference.
+		return Len(local.authenticityToken)
+			&& IsSimpleValue(params.authenticityToken)
+			&& $secureCompare(local.authenticityToken, params.authenticityToken);
 	}
 
 	/**

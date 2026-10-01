@@ -19,7 +19,7 @@ component {
         return this;
     }
 
-    public array function dryRunOutput() { return variables.dryRunBuffer; }
+    public array function dryRunOutput() { return new modules.wheels.services.deploy.lib.SecretRedaction().redactAll(variables.dryRunBuffer); }
 
     public string function deliver(required struct opts) {
         // push clears the buffer and writes; tell pull to preserve what push wrote.
@@ -95,9 +95,9 @@ component {
 
     private string function $renderResult(required struct opts, required string summary) {
         if (arguments.opts.dryRun ?: false) {
-            return arrayToList(variables.dryRunBuffer, chr(10));
+            return new modules.wheels.services.deploy.lib.SecretRedaction().render(arrayToList(variables.dryRunBuffer, chr(10)));
         }
-        return arguments.summary;
+        return new modules.wheels.services.deploy.lib.SecretRedaction().render(arguments.summary);
     }
 
     private any function $loadCfg(required struct opts) {

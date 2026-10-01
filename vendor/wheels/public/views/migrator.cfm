@@ -1,4 +1,11 @@
 <cfscript>
+// Dev-tool access gate: reject requests not addressed to the local machine
+// before issuing the anti-CSRF token or rendering the migrator GUI. Mirrors the
+// network-origin checks on the command/create endpoints (localhost, no
+// forwarded clients, local Host header) without the token check this page issues.
+include "/wheels/public/migrator/_guard.cfm";
+$migratorEnforceLocalAccess();
+
 // Check for JSON format request
 param name="request.wheels.params.format" default="html";
 

@@ -33,13 +33,24 @@ component extends="Base" {
     }
 
     public string function deploy(required any role, required string target) {
-        var hc = variables.config.proxy().healthcheck();
+        var p = variables.config.proxy();
+        var hc = p.healthcheck();
         var innerArgs = [
             "kamal-proxy", "deploy", variables.config.service(),
-            "--target", arguments.target,
-            "--health-check-path", hc.path ?: "/up",
-            "--health-check-timeout", hc.timeout ?: 30
+            "--target", shellEscape(arguments.target)
         ];
+        // Host routing and TLS (Let's Encrypt), as Kamal 2 passes them.
+        if (len(p.host())) {
+            arrayAppend(innerArgs, ["--host", shellEscape(p.host())], true);
+        }
+        if (p.ssl()) {
+            arrayAppend(innerArgs, "--tls");
+        }
+        arrayAppend(innerArgs, [
+            "--health-check-path", shellEscape(hc.path ?: "/up"),
+            "--health-check-interval", $duration(hc.interval ?: 1),
+            "--health-check-timeout", $duration(hc.timeout ?: 30)
+        ], true);
         return docker("exec", variables.PROXY_CONTAINER_NAME) & " " & arrayToList(innerArgs, " ");
     }
 
@@ -101,5 +112,23 @@ component extends="Base" {
     private string function $remoteHome() {
         var sshUser = variables.config.ssh().user();
         return compare(sshUser, "root") == 0 ? "/root" : "/home/" & sshUser;
+    }
+
+    /**
+     * kamal-proxy takes Go durations: a bare number of seconds becomes "Ns";
+     * an explicit duration such as "500ms" or "2m" is passed through.
+     * Anything else is a config error rather than a shell token.
+     */
+    private string function $duration(required any value) {
+        var v = trim(toString(arguments.value));
+        // Seconds, whole or fractional: 3 -> 3s, 0.5 -> 0.5s.
+        if (len(v) && !reFind("[^0-9.]", v) && reFind("^[0-9]+(\.[0-9]+)?$", v)) {
+            return v & "s";
+        }
+        // An explicit Go duration with one unit: 500ms, 1.5s, 2m.
+        if (len(v) && !reFind("[^0-9a-z.]", v) && reFind("^[0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h)$", v)) {
+            return v;
+        }
+        throw(type = "DeployConfigError", message = "invalid proxy healthcheck duration: '#v#' (use seconds such as 3 or 0.5, or a duration such as 500ms)");
     }
 }

@@ -41,10 +41,16 @@ component {
 
 		if (len(dest)) {
 			var overlayPath = $overlayPathFor(arguments.path, dest);
-			if (fileExists(overlayPath)) {
-				var overlay = variables.yaml.parse(fileRead(overlayPath));
-				raw = variables.yaml.deepMerge(raw, overlay);
+			// A destination names its own config file. A typo must not deploy
+			// the base config to the base hosts (Kamal fails here too).
+			if (!fileExists(overlayPath)) {
+				variables.validator.$raise(
+					arguments.path,
+					"destination '#dest#' has no config file: #getFileFromPath(overlayPath)# was not found next to it"
+				);
 			}
+			var overlay = variables.yaml.parse(fileRead(overlayPath));
+			raw = variables.yaml.deepMerge(raw, overlay);
 		}
 
 		// Build a SecretResolver lazily if the caller didn't inject one.
@@ -61,6 +67,7 @@ component {
 			});
 		}
 
+		$noteEnvClearInterpolations(raw);
 		raw = $interpolate(raw);
 		variables.validator.validate(raw, arguments.path);
 		return new Config(raw, {destination: dest});
@@ -163,7 +170,10 @@ component {
 			return variables.envOverride[arguments.name];
 		}
 		if (isObject(variables.secretResolver) && variables.secretResolver.has(arguments.name)) {
-			return variables.secretResolver.get(arguments.name);
+			var secret = variables.secretResolver.get(arguments.name);
+			// A value from .kamal/secrets must never be printed, wherever it is interpolated.
+			new modules.wheels.services.deploy.lib.SecretRedaction().register(secret);
+			return secret;
 		}
 		var sys = createObject("java", "java.lang.System");
 		var fromEnv = sys.getenv(javaCast("string", arguments.name));
@@ -171,4 +181,59 @@ component {
 		return "";
 	}
 
+
+	/**
+	 * env.clear values are passed as `-e KEY=value` on the docker run command
+	 * line of every host. When one interpolates a ${VAR}, register the
+	 * resolved value for redaction (so no printed command shows it) and warn
+	 * that a secret belongs in env.secret, which is delivered as a file.
+	 * Checks the top-level env, every role's env and every accessory's env.
+	 */
+	public void function $noteEnvClearInterpolations(required struct raw) {
+		var scopes = [];
+		if (structKeyExists(arguments.raw, "env") && isStruct(arguments.raw.env)) {
+			arrayAppend(scopes, {prefix: "env.clear", env: arguments.raw.env});
+		}
+		if (structKeyExists(arguments.raw, "servers") && isStruct(arguments.raw.servers)) {
+			for (var role in arguments.raw.servers) {
+				var r = arguments.raw.servers[role];
+				if (isStruct(r) && structKeyExists(r, "env") && isStruct(r.env)) {
+					arrayAppend(scopes, {prefix: "servers.#role#.env.clear", env: r.env});
+				}
+			}
+		}
+		if (structKeyExists(arguments.raw, "accessories") && isStruct(arguments.raw.accessories)) {
+			for (var accName in arguments.raw.accessories) {
+				var acc = arguments.raw.accessories[accName];
+				if (isStruct(acc) && structKeyExists(acc, "env") && isStruct(acc.env)) {
+					arrayAppend(scopes, {prefix: "accessories.#accName#.env.clear", env: acc.env});
+				}
+			}
+		}
+		var redaction = new modules.wheels.services.deploy.lib.SecretRedaction();
+		for (var scope in scopes) {
+			if (!structKeyExists(scope.env, "clear") || !isStruct(scope.env.clear)) {
+				continue;
+			}
+			for (var key in scope.env.clear) {
+				var value = scope.env.clear[key];
+				if (!isSimpleValue(value) || !find("${", value)) {
+					continue;
+				}
+				var names = [];
+				for (var token in reMatch("\$\{[A-Za-z_][A-Za-z0-9_]*\}", value)) {
+					var name = mid(token, 3, len(token) - 3);
+					redaction.register($resolveVar(name));
+					arrayAppend(names, "${" & name & "}");
+				}
+				if (arrayLen(names)) {
+					redaction.addWarning(
+						"#scope.prefix#.#key# interpolates #arrayToList(names, ", ")#. env.clear values are passed on the "
+						& "docker run command line on every host; move secret values to env.secret, which Wheels delivers "
+						& "as a permission-600 env file."
+					);
+				}
+			}
+		}
+	}
 }

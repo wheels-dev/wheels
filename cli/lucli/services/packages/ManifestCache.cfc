@@ -102,7 +102,7 @@ component {
 	}
 
 	private string function $manifestPath(required string name) {
-		return $manifestsDir() & "/" & arguments.name & ".json";
+		return $manifestsDir() & "/" & new modules.wheels.services.packages.PackageName().assert(arguments.name) & ".json";
 	}
 
 	private boolean function $freshFile(required string path) {

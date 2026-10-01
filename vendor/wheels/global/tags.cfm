@@ -279,6 +279,13 @@
 			local.tableName = arguments.table;
 		}
 
+		// Adobe CF + Oracle columns come from the data dictionary (#3732).
+		local.dictionary = $dbinfoOracleDictionary(arguments);
+		StructDelete(arguments, "$forceCfdbinfo");
+		if (IsQuery(local.dictionary)) {
+			return local.dictionary;
+		}
+
 		// BoxLang specific fix for index queries (MSSQL/Oracle)
 		if (
 			$engineAdapter().isBoxLang() &&
@@ -457,6 +464,115 @@
 		}
 
 		return local.rv;
+	}
+
+
+	/**
+	 * `$dbinfo()`'s Adobe CF + Oracle branch (#3732). Every
+	 * `cfdbinfo(type="columns")` call there leaves about seven JDBC statements
+	 * open on the pooled connection, never released (cfdbinfo does not close
+	 * the DatabaseMetaData result sets it opens), so column metadata is read
+	 * from the data dictionary instead. Returns that query, or "" when the
+	 * branch doesn't apply: another engine, adapter or type, no table, the
+	 * internal `$forceCfdbinfo` flag (the parity spec compares the two paths),
+	 * or no rows (a synonym, a table in another schema, a missing table), so
+	 * `$dbinfo()` goes on to cfdbinfo as before. `args` is only read.
+	 */
+	public any function $dbinfoOracleDictionary(required any args) {
+		if (
+			(StructKeyExists(arguments.args, "$forceCfdbinfo") && arguments.args.$forceCfdbinfo)
+			|| !StructKeyExists(arguments.args, "type") || arguments.args.type != "columns"
+			|| !StructKeyExists(arguments.args, "table") || !Len(arguments.args.table)
+			|| !$engineAdapter().isAdobe()
+			|| $get("adapterName") != "OracleModel"
+		) {
+			return "";
+		}
+		local.columns = $oracleDictionaryColumns(argumentCollection = arguments.args);
+		return local.columns.recordCount ? local.columns : "";
+	}
+
+
+	/**
+	 * Column metadata for an Oracle table in the current schema, read from the
+	 * data dictionary with one ordinary query, in the shape of
+	 * `cfdbinfo(type="columns")`: the columns and values the Oracle JDBC
+	 * driver's `getColumns()` produces (an unconstrained NUMBER reports a scale
+	 * of -127, as ojdbc does; any other NULL scale reads as 0, as JDBC's
+	 * getInt() does), plus Adobe's IS_PRIMARYKEY, IS_FOREIGNKEY and
+	 * REFERENCED_PRIMARYKEY[_TABLE] ("N/A" when not a foreign key). Used on Adobe
+	 * CF, where cfdbinfo retains JDBC statements (#3732); the parity spec
+	 * checks it field by field against cfdbinfo on every Oracle leg. The table
+	 * name matches as stored (unquoted names are upper case) or upper-cased.
+	 */
+	public query function $oracleDictionaryColumns(
+		required string table,
+		required string datasource,
+		string username = "",
+		string password = ""
+	) {
+		local.sql = "
+			SELECT
+				NULL AS TABLE_CAT,
+				c.OWNER AS TABLE_SCHEM,
+				c.TABLE_NAME,
+				c.COLUMN_NAME,
+				c.DATA_TYPE AS TYPE_NAME,
+				CASE
+					WHEN c.DATA_PRECISION IS NOT NULL THEN c.DATA_PRECISION
+					WHEN c.DATA_TYPE = 'NUMBER' THEN CASE WHEN c.DATA_SCALE IS NULL THEN 0 ELSE 38 END
+					WHEN c.DATA_TYPE IN ('CHAR', 'VARCHAR', 'VARCHAR2', 'NCHAR', 'NVARCHAR2') THEN c.CHAR_LENGTH
+					ELSE c.DATA_LENGTH
+				END AS COLUMN_SIZE,
+				CASE
+					WHEN c.DATA_TYPE = 'NUMBER' AND c.DATA_PRECISION IS NULL AND c.DATA_SCALE IS NULL THEN -127
+					ELSE NVL(c.DATA_SCALE, 0)
+				END AS DECIMAL_DIGITS,
+				CASE WHEN c.NULLABLE = 'N' THEN 'NO' ELSE 'YES' END AS IS_NULLABLE,
+				c.DATA_DEFAULT AS COLUMN_DEFAULT_VALUE,
+				c.COLUMN_ID AS ORDINAL_POSITION,
+				CASE WHEN pk.COLUMN_NAME IS NULL THEN 'NO' ELSE 'YES' END AS IS_PRIMARYKEY,
+				CASE WHEN fk.COLUMN_NAME IS NULL THEN 'NO' ELSE 'YES' END AS IS_FOREIGNKEY,
+				NVL(fk.REF_COLUMN, 'N/A') AS REFERENCED_PRIMARYKEY,
+				NVL(fk.REF_TABLE, 'N/A') AS REFERENCED_PRIMARYKEY_TABLE
+			FROM ALL_TAB_COLUMNS c
+			LEFT JOIN (
+				SELECT cc.OWNER, cc.TABLE_NAME, cc.COLUMN_NAME
+				FROM ALL_CONSTRAINTS k
+				JOIN ALL_CONS_COLUMNS cc ON cc.OWNER = k.OWNER AND cc.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+				WHERE k.CONSTRAINT_TYPE = 'P' AND k.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+			) pk ON pk.OWNER = c.OWNER AND pk.TABLE_NAME = c.TABLE_NAME AND pk.COLUMN_NAME = c.COLUMN_NAME
+			LEFT JOIN (
+				SELECT fc.OWNER, fc.TABLE_NAME, fc.COLUMN_NAME, MIN(rc.COLUMN_NAME) AS REF_COLUMN, MIN(rc.TABLE_NAME) AS REF_TABLE
+				FROM ALL_CONSTRAINTS f
+				JOIN ALL_CONS_COLUMNS fc ON fc.OWNER = f.OWNER AND fc.CONSTRAINT_NAME = f.CONSTRAINT_NAME
+				JOIN ALL_CONS_COLUMNS rc ON rc.OWNER = f.R_OWNER AND rc.CONSTRAINT_NAME = f.R_CONSTRAINT_NAME AND rc.POSITION = fc.POSITION
+				WHERE f.CONSTRAINT_TYPE = 'R' AND f.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+				GROUP BY fc.OWNER, fc.TABLE_NAME, fc.COLUMN_NAME
+			) fk ON fk.OWNER = c.OWNER AND fk.TABLE_NAME = c.TABLE_NAME AND fk.COLUMN_NAME = c.COLUMN_NAME
+			WHERE c.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+				AND c.TABLE_NAME = (
+					SELECT MIN(t.TABLE_NAME) FROM ALL_TAB_COLUMNS t
+					WHERE t.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+						AND t.TABLE_NAME IN (?, UPPER(?))
+				)
+			ORDER BY c.COLUMN_ID
+		";
+		local.options = {datasource = arguments.datasource};
+		if (Len(arguments.username)) {
+			local.options.username = arguments.username;
+		}
+		if (Len(arguments.password)) {
+			local.options.password = arguments.password;
+		}
+		return QueryExecute(
+			PreserveSingleQuotes(local.sql),
+			[
+				{value = arguments.table, cfsqltype = "cf_sql_varchar"},
+				{value = arguments.table, cfsqltype = "cf_sql_varchar"}
+			],
+			local.options
+		);
 	}
 
 

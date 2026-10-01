@@ -206,11 +206,15 @@ component output="false" extends="wheels.Global" {
 		// Split on the original placeholders once and rejoin with quoted
 		// values so a substituted value that itself contains `?` cannot
 		// absorb a later placeholder (same rebuild as ScopeChain.$mergeSpecs).
+		// Each value is SQL-escaped (`'` -> `''`); the WHERE parser reverses
+		// that escaping and binds the original value through cfqueryparam, so
+		// an apostrophe (O'Brien) matches the stored row on a later call and
+		// never ends the literal early.
 		local.clauseParts = ListToArray(local.whereClause, "?", true);
 		local.resolvedWhere = local.clauseParts[1];
 		local.iEnd = ArrayLen(local.clauseParts);
 		for (local.i = 2; local.i <= local.iEnd; local.i++) {
-			local.resolvedWhere &= "'" & local.boundValues[local.i - 1] & "'";
+			local.resolvedWhere &= "'" & Replace(local.boundValues[local.i - 1], "'", "''", "all") & "'";
 			local.resolvedWhere &= local.clauseParts[local.i];
 		}
 

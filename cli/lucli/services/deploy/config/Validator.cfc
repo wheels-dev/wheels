@@ -47,16 +47,43 @@ component {
 		// (some piped to `xargs docker rm -f`), so they must be format-
 		// validated rather than quoted (##2956).
 		$validateName(arguments.parsed.service, "service", arguments.filePath);
+		$validateImage(arguments.parsed.image, "image", arguments.filePath);
+		// kamal-proxy's --tls needs a host to request a certificate for.
+		if (
+			structKeyExists(arguments.parsed, "proxy") && isStruct(arguments.parsed.proxy)
+			&& isBoolean(arguments.parsed.proxy.ssl ?: false) && (arguments.parsed.proxy.ssl ?: false)
+			&& !len(trim(arguments.parsed.proxy.host ?: ""))
+		) {
+			$raise(arguments.filePath, "proxy.ssl requires proxy.host (the host name TLS is issued for)");
+		}
 		$validateServers(arguments.parsed.servers, arguments.filePath);
 		$validateBoot(arguments.parsed, arguments.filePath);
 		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {
 			for (var accName in arguments.parsed.accessories) {
 				$validateName(accName, "accessory", arguments.filePath);
+				var acc = arguments.parsed.accessories[accName];
+				if (isStruct(acc)) {
+					if (structKeyExists(acc, "image")) {
+						$validateImage(acc.image, "accessory #accName# image", arguments.filePath);
+					}
+					for (var hostKey in ["host", "hosts"]) {
+						if (structKeyExists(acc, hostKey)) {
+							for (var accHost in (isArray(acc[hostKey]) ? acc[hostKey] : [acc[hostKey]])) {
+								$validateHost(accHost, arguments.filePath);
+							}
+						}
+					}
+				}
 			}
 		}
 	}
 
 	public void function $validateServers(required any servers, required string filePath) {
+		// No hosts means nothing to deploy to: a dry run "succeeded" with no
+		// output and a real deploy did nothing, both with exit 0.
+		if ($serverHostCount(arguments.servers) == 0) {
+			$raise(arguments.filePath, "servers lists no hosts; add at least one host to deploy to");
+		}
 		if (isArray(arguments.servers)) {
 			for (var host in arguments.servers) $validateHost(host, arguments.filePath);
 		} else if (isStruct(arguments.servers)) {
@@ -70,6 +97,25 @@ component {
 				}
 			}
 		}
+	}
+
+	/** Hosts listed under servers:, as a list or by role (role: [hosts] or role: {hosts: [...]}). */
+	public numeric function $serverHostCount(required any servers) {
+		var count = 0;
+		if (isArray(arguments.servers)) {
+			return arrayLen(arguments.servers);
+		}
+		if (isStruct(arguments.servers)) {
+			for (var role in arguments.servers) {
+				var entry = arguments.servers[role];
+				if (isArray(entry)) {
+					count += arrayLen(entry);
+				} else if (isStruct(entry) && structKeyExists(entry, "hosts") && isArray(entry.hosts)) {
+					count += arrayLen(entry.hosts);
+				}
+			}
+		}
+		return count;
 	}
 
 	/**
@@ -103,7 +149,35 @@ component {
 		}
 	}
 
+	/**
+	 * Image references go into local `bash -c` build commands and remote
+	 * `docker pull`/`run`. Allow the reference grammar's characters only
+	 * (registry host, port, path, tag, digest), checked as a negated class
+	 * plus explicit bounds so a trailing line feed can't pass (`$` matches
+	 * before one in the CFML regex dialect).
+	 */
+	public void function $validateImage(required any image, required string kind, required string filePath) {
+		if (
+			!isSimpleValue(arguments.image)
+			|| len(arguments.image) < 1 || len(arguments.image) > 255
+			|| reFind("[^A-Za-z0-9._/:@-]", arguments.image)
+			|| !reFind("^[A-Za-z0-9]", arguments.image)
+		) {
+			$raise(arguments.filePath, "invalid #arguments.kind#: '#arguments.image#' (letters, digits and . _ / : @ - only)");
+		}
+	}
+
 	public void function $validateHost(required string host, required string filePath) {
+		// Hosts reach ssh and remote shell commands: allow host-name, IP,
+		// user@host:port and [IPv6] characters only, starting with an
+		// alphanumeric or '[' (a leading '-' would read as an ssh option).
+		if (
+			len(arguments.host) < 1 || len(arguments.host) > 255
+			|| reFind("[^A-Za-z0-9._:@\[\]-]", arguments.host)
+			|| !reFind("^[A-Za-z0-9\[]", arguments.host)
+		) {
+			$raise(arguments.filePath, "invalid host: '#arguments.host#'");
+		}
 		// A bare host or user@host is fine; user@host:port has 1 colon; IPv6
 		// literals must be bracketed ([::1]:22) — anything else is ambiguous.
 		// Count colons directly: listToArray(includeEmptyFields=false)
@@ -122,7 +196,9 @@ component {
 	 * via the unquoted interpolation sites listed in validate().
 	 */
 	public void function $validateName(required string name, required string kind, required string filePath) {
-		if (!reFind("^[a-zA-Z0-9][a-zA-Z0-9_.-]*$", arguments.name)) {
+		// Negated class plus first-character check, not ^...$: `$` also matches
+		// before a trailing line feed in the CFML regex dialect.
+		if (!len(arguments.name) || reFind("[^a-zA-Z0-9_.-]", arguments.name) || !reFind("^[a-zA-Z0-9]", arguments.name)) {
 			$raise(
 				arguments.filePath,
 				"invalid #arguments.kind# name: '#arguments.name#' (must match [a-zA-Z0-9][a-zA-Z0-9_.-]*)"

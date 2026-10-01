@@ -130,8 +130,8 @@ creating the tag at main HEAD automatically. Do **not** run `git tag` /
 `git push --tags` — the legacy `git push origin main --tags` flow is rejected
 by the ruleset anyway.
 
-The tag push triggers:
-- `release.yml` builds artifacts, publishes to `wheels-dev/wheels/releases`
+The tag push itself triggers no workflow. That same push-to-main `release.yml` run:
+- builds artifacts, publishes to `wheels-dev/wheels/releases`
 - `release.yml`'s dispatch steps then fire `repository_dispatch` events via
   PATs (`DOWNSTREAM_DISPATCH_TOKEN`, `LINUX_REPO_DISPATCH_TOKEN`):
   - `wheels-released` → `wheels-dev/homebrew-wheels` (brew formula bump)
@@ -196,12 +196,12 @@ For severe regressions where users on the broken version need to be alerted:
 ## Cutting a release candidate
 
 ```bash
-git checkout -b release/X.Y.Z develop
+git checkout -b release/X.Y.Z-rc.N develop
 # Stabilize.
-git push origin release/X.Y.Z
+git push origin release/X.Y.Z-rc.N
 ```
 
-`release-candidate.yml` runs on every push to a `release/*` branch and
+`release-candidate.yml` runs on every push to a `release/**-rc.*` branch and
 publishes RC artifacts to `wheels-dev/wheels-snapshots` (alongside develop
 snapshots, but with version `X.Y.Z-rc.N`). Users testing RCs install via:
 

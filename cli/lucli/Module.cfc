@@ -465,7 +465,7 @@ component extends="modules.BaseModule" {
 
 	private any function testArgSpec() {
 		return new services.ArgSpec()
-			.option(name = "filter",    default = "", description = "Spec directory to run, as a dotted path (e.g. tests.specs.models). Directories only — a single spec file's path discovers no bundles (##3083)")
+			.option(name = "filter",    default = "", description = "What to run: a spec directory or one spec file, as a dotted path (tests.specs.models, tests.specs.models.UserSpec) or a bare name (models, UserSpec)")
 			.option(name = "directory", default = "", description = "Documented alias for --filter")
 			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format: simple, json, or tap")
 			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
@@ -527,6 +527,8 @@ component extends="modules.BaseModule" {
 			.option(name = "format", default = "", choices = "text,json", description = "check only: text (default) or json for machine-readable output")
 			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
 			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework")
+			.flag(name = "allow-downgrade", default = false, description = "apply only: proceed even when the CLI's bundled framework is older than the app's vendor/wheels/ (refused by default)")
+			.flag(name = "offline", default = false, description = "check only: skip the latest-release lookup on GitHub (pass --to). Also set by WHEELS_OFFLINE=1")
 			// CLI-only spellings read by parseUpgradeArgs, deliberately NOT
 			// advertised: `--no-backup` (LuCLI normalizes it to backup=false),
 			// `--help`/`-h`, and `--dry-run`, which neither verb supports and is
@@ -563,7 +565,7 @@ component extends="modules.BaseModule" {
 			.positional(name = "target", default = "", description = "search: the query. show/remove: the package name. add: name or name@version. update: the package name (omit with --all). registry: refresh or info")
 			.option(name = "tag", default = "", description = "list only: show only packages carrying this tag (pass as --tag=<tag>)")
 			.flag(name = "all", default = false, description = "update only: update every installed package")
-			.flag(name = "yes", default = false, description = "update only: confirm the update (required)")
+			.flag(name = "yes", default = false, description = "update and remove: confirm the change (required)")
 			.flag(name = "force", default = false, description = "add only: overwrite vendor/<name>/ if it already exists")
 			.flag(name = "offline", default = false, description = "Refuse registry network access (cached registry data still works). Also set by WHEELS_OFFLINE=1")
 			// `help` is honoured from in-process callers but never advertised:
@@ -790,13 +792,14 @@ component extends="modules.BaseModule" {
 	 * would-be path and skips the write.
 	 */
 	private string function $generateWrite(required string path, required string content) {
+		new services.GeneratorPaths().assertInside(variables.projectRoot, arguments.path);
 		if (request.$wheelsGenerateDryRun ?: false) {
 			arrayAppend(request.$wheelsDryRunPaths, arguments.path);
 			return arguments.path;
 		}
 		var dir = getDirectoryFromPath(arguments.path);
 		if (!directoryExists(dir)) {
-			directoryCreate(dir, true);
+			$ensureProjectDirectory(dir);
 		}
 		FileWrite(arguments.path, arguments.content);
 		return arguments.path;
@@ -814,7 +817,7 @@ component extends="modules.BaseModule" {
 
 		if (!arrayLen(args)) {
 			$printGenerateUsage();
-			return "";
+			$refuse("wheels generate: a generator type is required. Usage: wheels generate <type> <name> [options], where <type> is one of: app, model, controller, view, migration, scaffold, api-resource, route, test, property, helper, policy, snippets, admin, auth.");
 		}
 
 		// Reset dry-run state first: the stdio MCP server reuses the request
@@ -1024,6 +1027,137 @@ component extends="modules.BaseModule" {
 				// throw maps to non-zero exit; return "" would silently succeed.
 				throw(type = "Wheels.InvalidArguments", message = "Unknown generator type: #arguments.type#");
 		}
+	}
+
+	/**
+	 * LuCLI's out() wraps the text in ANSI colour codes. Those belong on a
+	 * terminal only: under the stdio MCP server (`wheels mcp wheels`) the output
+	 * is captured into the tool result, where escapes like \x1b[36m... are noise
+	 * to the client, and the same goes for piped or redirected output. Colour is
+	 * dropped there and whenever NO_COLOR is set (https://no-color.org).
+	 */
+	private void function out(any message, string colour = "", string style = "") {
+		if (!$useColour()) {
+			super.out(arguments.message);
+			return;
+		}
+		super.out(argumentCollection = arguments);
+	}
+
+	/** True when output goes to an interactive terminal and NO_COLOR is unset. */
+	private boolean function $useColour() {
+		try {
+			var env = createObject("java", "java.lang.System").getenv();
+			if (!isNull(env.get("NO_COLOR")) && len(env.get("NO_COLOR"))) {
+				return false;
+			}
+			// The stdio MCP server captures every out() into a tool result, and a
+			// console can still look present there, so check for it explicitly.
+			if ($isMcpServerProcess()) {
+				return false;
+			}
+			var console = createObject("java", "java.lang.System").console();
+			if (isNull(console)) {
+				return false;
+			}
+			// JDK 22+ returns a Console even when the streams are redirected;
+			// isTerminal() (22+) tells the two apart. Java 21 has no isTerminal().
+			try {
+				return console.isTerminal();
+			} catch (any noIsTerminal) {
+				return true;
+			}
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Whether this process is the stdio MCP server (`wheels mcp <module>`):
+	 * LuCLI reserves the `mcp` token, so its presence among the process
+	 * arguments means MCP mode. Process-constant, so cached.
+	 */
+	private boolean function $isMcpServerProcess() {
+		if (!structKeyExists(variables, "$mcpServerProcess")) {
+			var args = [];
+			try {
+				var info = createObject("java", "java.lang.ProcessHandle").current().info();
+				if (info.arguments().isPresent()) {
+					args = info.arguments().get();
+				}
+			} catch (any e) {}
+			var found = false;
+			for (var a in args) {
+				if (a == "mcp") {
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				var command = createObject("java", "java.lang.System").getProperty("sun.java.command");
+				found = !isNull(command) && listFind(command, "mcp", " ") > 0;
+			}
+			variables.$mcpServerProcess = found;
+		}
+		return variables.$mcpServerProcess;
+	}
+
+	/**
+	 * True when a server registration is exactly what a failed `wheels start`
+	 * leaves behind: not running, no `.project-path`, and nothing in the folder
+	 * but LuCLI's `.config-file`.
+	 */
+	private boolean function $isFailedStartLeftover(required string serverName, required struct reg) {
+		if (arguments.reg.alive || len(arguments.reg.registeredPath)) return false;
+		var dir = $resolveLucliHome() & "/servers/" & arguments.serverName;
+		if (!directoryExists(dir)) return false;
+		var entries = directoryList(dir, false, "name");
+		return arrayLen(entries) == 1 && entries[1] == ".config-file";
+	}
+
+	/**
+	 * Fail a command: print any guidance lines, then throw so the CLI exits
+	 * non-zero and an MCP client gets isError. The message itself is printed
+	 * once, by the thrown error, not as a separate red line as well.
+	 */
+	private void function $refuse(required string message, string type = "Wheels.InvalidArguments", array hints = []) {
+		for (var hint in arguments.hints) {
+			out(hint, "yellow");
+		}
+		throw(type = arguments.type, message = arguments.message);
+	}
+
+	/**
+	 * Whether any item in a destroy preview exists: a listed file or folder
+	 * under the project, or the listed resource route in config/routes.cfm.
+	 * The drop-table migration line is not evidence on its own.
+	 */
+	private boolean function $destroyFindsSomething(required array preview) {
+		for (var item in arguments.preview) {
+			if (left(item, 7) == "Invalid" || left(item, 10) == "Migration:") {
+				continue;
+			}
+			if (left(item, 6) == "Route:") {
+				// The resource name between the quotes of `.resources("name")`, matched
+				// exactly (positional or name=) rather than as a substring.
+				var routeName = reReplace(item, '^Route: \.resources\("([^"]*)"\).*$', "\1");
+				var routesPath = variables.projectRoot & "/config/routes.cfm";
+				// Escape regex metacharacters: the name comes from user input.
+				routeName = reReplace(routeName, "([.^$|()\[\]{}*+?\\])", "\\\1", "all");
+				if (
+					len(routeName) && routeName != item && fileExists(routesPath)
+					&& reFindNoCase("\.resources\(\s*(name\s*=\s*)?[""']" & routeName & "[""']\s*[,)]", fileRead(routesPath))
+				) {
+					return true;
+				}
+				continue;
+			}
+			var path = variables.projectRoot & "/" & item;
+			if (fileExists(path) || directoryExists(path)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -1292,8 +1426,9 @@ component extends="modules.BaseModule" {
 		// both reject bare names like "browser" or "models" and silently
 		// fall back to the default scope, running the entire suite. The
 		// CLI normalizes here so `--filter=browser` does what the user
-		// expects. Onboarding finding #2.
-		filter = $normalizeTestFilter(filter, coreTests);
+		// expects. Onboarding finding #2. A bare spec name resolves to the one
+		// spec file it names, so it runs as a single bundle (issue 3759).
+		filter = $resolveTestFilter(filter, coreTests);
 
 		return runTests(
 			filter, reporter, format, verboseOutput, coreTests,
@@ -1410,6 +1545,74 @@ component extends="modules.BaseModule" {
 		return "tests.specs." & f;
 	}
 
+	/**
+	 * $normalizeTestFilter(), plus single-spec-file lookup (issue 3759). A
+	 * bare name that is neither a folder nor a spec file directly under the
+	 * spec root (tests/specs, or vendor/wheels/tests/specs with --core) is
+	 * matched against spec file names anywhere below it: one match becomes
+	 * its dotted path, which the runner runs as that one bundle. More than
+	 * one match throws Wheels.AmbiguousTestFilter listing them, rather than
+	 * guessing. No match is left as normalized, so the runner reports the
+	 * 0-bundle scope as a failure. An explicit dotted path is taken as
+	 * written.
+	 *
+	 * Examples (app mode):
+	 *   "favorites"            → "tests.specs.favorites"            (a folder)
+	 *   "PageFavoritesSpec"    → "tests.specs.favorites.PageFavoritesSpec"
+	 *   "tests.specs.x.YSpec"  → "tests.specs.x.YSpec"              (unchanged)
+	 */
+	public string function $resolveTestFilter(
+		required string filter,
+		boolean coreTests = false
+	) {
+		var raw = trim(arguments.filter);
+		var normalized = $normalizeTestFilter(raw, arguments.coreTests);
+		if (!len(raw) || find(".", raw)) {
+			return normalized;
+		}
+		var specRoot = variables.projectRoot & (arguments.coreTests ? "/vendor/wheels/tests/specs" : "/tests/specs");
+		if (
+			!directoryExists(specRoot)
+			|| directoryExists(specRoot & "/" & raw)
+			|| fileExists(specRoot & "/" & raw & ".cfc")
+		) {
+			return normalized;
+		}
+		var prefix = arguments.coreTests ? "wheels.tests.specs" : "tests.specs";
+		var rootPath = createObject("java", "java.io.File").init(specRoot).getCanonicalPath();
+		// The separator is part of the prefix: without it a sibling such as
+		// tests/specsOld, reached through a symlink, looks inside (issue 3800).
+		var rootPrefix = rootPath & createObject("java", "java.io.File").separator;
+		var matches = [];
+		for (var path in directoryList(specRoot, true, "path", "*.cfc")) {
+			var filePath = createObject("java", "java.io.File").init(path).getCanonicalPath();
+			var fileName = listLast(replace(filePath, "\", "/", "all"), "/");
+			if (compareNoCase(fileName, raw & ".cfc") != 0 || left(filePath, len(rootPrefix)) != rootPrefix) {
+				continue;
+			}
+			var rel = replace(mid(filePath, len(rootPrefix) + 1, len(filePath)), "\", "/", "all");
+			var dotted = prefix & "." & replace(left(rel, len(rel) - 4), "/", ".", "all");
+			// A folder symlinked from elsewhere inside the root lists the same
+			// file twice under one canonical path: count it once (issue 3800).
+			if (!arrayFind(matches, dotted)) {
+				arrayAppend(matches, dotted);
+			}
+		}
+		if (arrayLen(matches) == 1) {
+			return matches[1];
+		}
+		if (arrayLen(matches) > 1) {
+			arraySort(matches, "textnocase");
+			throw(
+				type = "Wheels.AmbiguousTestFilter",
+				message = "'#raw#' matches #arrayLen(matches)# spec files: #arrayToList(matches, ', ')#. "
+					& "Re-run with the dotted path of the one you mean, e.g. --filter=#matches[1]#",
+				detail = arrayToList(matches, chr(10))
+			);
+		}
+		return normalized;
+	}
+
 
 	// ─────────────────────────────────────────────────
 	//  docs — Local offline documentation bundle
@@ -1438,8 +1641,7 @@ component extends="modules.BaseModule" {
 			case "status":
 				return docsStatus();
 			default:
-				out("Unknown docs action: #action#. Try: fetch, status", "red");
-				return "";
+				$refuse("Unknown docs action: #action#. Try: fetch, status");
 		}
 	}
 
@@ -1449,17 +1651,20 @@ component extends="modules.BaseModule" {
 	 * when that version is already unpacked, so this is safe to run repeatedly
 	 * (the Homebrew formula's wrapper does essentially the same thing on
 	 * install/upgrade).
+	 *
+	 * The zip is checked against the .sha512 file the release publishes next
+	 * to it before anything is unpacked. Every failure throws
+	 * Wheels.DocsFetchFailed, so the command exits non-zero, and leaves any
+	 * previously installed docs for that version in place.
 	 */
 	private string function docsFetch(boolean force = false) {
 		var version = $docsFrameworkVersion();
 		if (!len(version)) {
-			out("Could not determine the framework version — is this a Wheels project?", "red");
-			return "";
+			$docsFetchFail("Could not determine the framework version — is this a Wheels project?");
 		}
 		var home = $resolveLucliHome();
 		if (!len(home)) {
-			out("Could not resolve the Wheels CLI home directory.", "red");
-			return "";
+			$docsFetchFail("Could not resolve the Wheels CLI home directory.");
 		}
 		var target = home & "/docs/" & version;
 
@@ -1474,57 +1679,130 @@ component extends="modules.BaseModule" {
 		// and the download then receives the URL scope struct instead of the
 		// string ("Can't cast Complex Object Type [URL scope] to String").
 		var bundleUrl = $docsBundleUrl(version);
-		var tmp = getTempDirectory() & "wheels-docs-#version#.zip";
+		var checksumUrl = bundleUrl & ".sha512";
+		var httpClient = new services.packages.HttpClient(timeoutSeconds = 300);
 		out("Fetching docs for #version#...");
 		out("  #bundleUrl#");
 
+		// The published checksum first: without it there is nothing to verify
+		// the bundle against, so there is no point downloading the bundle.
+		// Downloaded to a file rather than via get(): GitHub serves release
+		// assets as application/octet-stream, which cfhttp returns as binary.
+		// A per-run temp name, so two concurrent fetches never share a file.
+		var runId = createUUID();
+		var checksumTmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip.sha512";
+		var checksumText = "";
 		try {
-			new services.packages.HttpClient(timeoutSeconds = 300).download(bundleUrl, tmp);
+			httpClient.download(checksumUrl, checksumTmp);
+			checksumText = fileRead(checksumTmp, "utf-8");
 		} catch (any e) {
-			out("Download failed: #e.message#", "red");
-			out("  A release without a docs asset will 404 here — the bundle is built by");
-			out("  tools/build/scripts/build-docs.sh and attached to the release.");
-			return "";
+			$docsFetchFail(
+				"Could not download the bundle's published SHA-512 checksum: #e.message#",
+				["  The bundle is only installed after it matches #checksumUrl#.",
+				 "  A release without a docs asset will 404 here — the bundle and its .sha512 are",
+				 "  built by tools/build/scripts/build-docs.sh and attached to the release."]
+			);
+		} finally {
+			if (fileExists(checksumTmp)) {
+				fileDelete(checksumTmp);
+			}
+		}
+		var expected = $docsParseChecksum(checksumText);
+		if (!len(expected)) {
+			$docsFetchFail("The bundle's checksum file at #checksumUrl# does not contain a SHA-512 hash.");
 		}
 
+		var tmp = getTempDirectory() & "wheels-docs-#version#-#runId#.zip";
+		// Unpack into a sibling staging directory and swap it in only once
+		// unzip succeeds, so a failure never leaves a half-unpacked docs dir
+		// (or deletes a working install on --force).
+		var staging = home & "/docs/." & version & ".partial-" & runId;
 		try {
-			if (directoryExists(target)) {
-				directoryDelete(target, true);
+			try {
+				httpClient.download(bundleUrl, tmp);
+			} catch (any e) {
+				$docsFetchFail("Download failed: #e.message#");
 			}
-			directoryCreate(target, true);
+
+			var actual = lCase(hash(fileReadBinary(tmp), "SHA-512"));
+			if (actual != expected) {
+				$docsFetchFail(
+					"The downloaded bundle does not match its published SHA-512 checksum; nothing was installed.",
+					["  expected: #expected#", "  actual:   #actual#"]
+				);
+			}
+
+			directoryCreate(staging, true);
 			// The bundle is zipped with its contents at the root (manifest.json,
-			// guides/, api/), so unpack straight into the version directory.
+			// guides/, api/), so unpack straight into the staging directory.
 			// Shell out to `unzip` rather than Lucee's extract(): `extract` is
 			// shadowed in this module's scope and resolves to a helper with a
 			// different arity. Same approach Installer::$extract() takes with
 			// `tar`, for the same reason.
 			var unzipResult = {};
-			cfexecute(
-				name = "unzip",
-				arguments = "-o -q #tmp# -d #target#",
-				timeout = 300,
-				variable = "local.unzipOut",
-				errorVariable = "local.unzipErr",
-				result = "unzipResult"
-			);
-			if (unzipResult.exitCode != 0) {
-				out("Could not unpack the bundle (unzip exit #unzipResult.exitCode#).", "red");
-				out("  #local.unzipErr#");
-				return "";
+			try {
+				cfexecute(
+					name = "unzip",
+					arguments = "-o -q #tmp# -d #staging#",
+					timeout = 300,
+					variable = "local.unzipOut",
+					errorVariable = "local.unzipErr",
+					result = "unzipResult"
+				);
+			} catch (any e) {
+				$docsFetchFail("Could not unpack the bundle: #e.message#");
 			}
-		} catch (any e) {
-			out("Could not unpack the bundle: #e.message#", "red");
-			return "";
+			if (unzipResult.exitCode != 0) {
+				$docsFetchFail(
+					"Could not unpack the bundle (unzip exit #unzipResult.exitCode#).",
+					["  #local.unzipErr ?: ''#"]
+				);
+			}
+
+			try {
+				if (directoryExists(target)) {
+					directoryDelete(target, true);
+				}
+				directoryRename(staging, target);
+			} catch (any e) {
+				$docsFetchFail("Could not install the unpacked bundle at #target#: #e.message#");
+			}
 		} finally {
 			if (fileExists(tmp)) {
 				fileDelete(tmp);
 			}
+			if (directoryExists(staging)) {
+				directoryDelete(staging, true);
+			}
 		}
 
-		out("Installed documentation for #version#.", "green");
+		out("Installed documentation for #version# (SHA-512 verified).", "green");
 		out("  #target#");
 		$docsMountIntoWebroot(target);
 		return "";
+	}
+
+	/**
+	 * Prints the failure (plus any hint lines) and throws, so `wheels docs
+	 * fetch` exits non-zero instead of reporting success after a failure.
+	 */
+	private void function $docsFetchFail(required string message, array hints = []) {
+		// The thrown error prints the message; printing it here as well showed
+		// every docs fetch failure twice.
+		for (var hint in arguments.hints) {
+			out(hint);
+		}
+		throw(type = "Wheels.DocsFetchFailed", message = arguments.message);
+	}
+
+	/**
+	 * The hash from a published .sha512 file, lower-cased: the first token of
+	 * `sha512sum`/`shasum -a 512` output ("<hex>  wheels-docs-<v>.zip").
+	 * Returns "" when that token is not a 128-character hex string.
+	 */
+	private string function $docsParseChecksum(required string content) {
+		var first = lCase(listFirst(trim(arguments.content), " #chr(9)##chr(10)##chr(13)#"));
+		return reFind("^[0-9a-f]{128}$", first) ? first : "";
 	}
 
 	/**
@@ -1536,8 +1814,16 @@ component extends="modules.BaseModule" {
 	 * under the webroot for the container to serve them. Pages still go through
 	 * the framework route.
 	 *
-	 * Hardlinks where possible so the shared cache is not duplicated per app;
-	 * falls back to a copy across filesystems.
+	 * Only a docs mirror is ever replaced: the bundle's manifest.json marks
+	 * one (made by this command, an older CLI or the Linux package wrapper).
+	 * A public/wheels-docs without it is the user's own and is left alone.
+	 * The mirror is refreshed only when missing or when its manifest.json
+	 * differs from the cache's (a version change). It is a real copy, never
+	 * hardlinks, so edits in the app cannot change the shared cache. It is
+	 * built beside the target and swapped in by rename. A failed copy or swap
+	 * goes through $docsFetchFail, so `wheels docs fetch` exits non-zero; a
+	 * user's own folder or a symlink left alone is not a failure. Same rules
+	 * as the Linux package wrapper's docs-mirror block.
 	 */
 	private void function $docsMountIntoWebroot(required string source) {
 		var webroot = variables.projectRoot & "/public";
@@ -1546,41 +1832,107 @@ component extends="modules.BaseModule" {
 			return;
 		}
 		var mount = webroot & "/wheels-docs";
-		if (directoryExists(mount)) {
-			// directoryDelete rather than rm -rf so a partially-written mount
-			// from an interrupted run is cleared cleanly.
-			try {
-				directoryDelete(mount, true);
-			} catch (any e) {
-				out("  Could not clear the existing mount at #mount#.", "red");
+		var sourceManifest = arguments.source & "/manifest.json";
+		var mountManifest = mount & "/manifest.json";
+
+		// Clear leftovers from runs that were killed mid-copy or mid-swap.
+		for (var name in directoryList(webroot, false, "name")) {
+			if (left(name, 17) == ".wheels-docs-new." || left(name, 17) == ".wheels-docs-old.") {
+				try {
+					directoryDelete(webroot & "/" & name, true);
+				} catch (any e) {
+					// Best effort; a stale temp dir does not block the mount.
+				}
+			}
+		}
+
+		if (!fileExists(sourceManifest)) {
+			$docsFetchFail(
+				"The docs at #arguments.source# have no manifest.json, so they were not mounted into the webroot.",
+				["  Re-run `wheels docs fetch --force` to reinstall the bundle."]
+			);
+		}
+		var mountPath = createObject("java", "java.io.File").init(mount).toPath();
+		if (createObject("java", "java.nio.file.Files").isSymbolicLink(mountPath)) {
+			// Never swap out a link: deleting it recursively could follow it
+			// into whatever it points at.
+			out("  Left #mount# alone: it is a symbolic link, not a docs mirror.", "yellow");
+			out("  Remove the link and run `wheels docs fetch --force` to mount the docs there.");
+			return;
+		}
+		if (directoryExists(mount) || fileExists(mount)) {
+			if (!fileExists(mountManifest)) {
+				out("  Left #mount# alone: it has no manifest.json, so it is not a docs mirror.", "yellow");
+				out("  Move or rename it and run `wheels docs fetch --force` to mount the docs there.");
+				return;
+			}
+			if (compare(fileRead(mountManifest), fileRead(sourceManifest)) == 0) {
+				$docsMirrorGitignore(mount);
+				out("  The webroot mirror at #mount# is current.", "green");
+				out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
 				return;
 			}
 		}
-		// -R -l hardlinks; -R alone copies. Try links first: same filesystem is
-		// the common case and costs no extra disk.
-		var linked = false;
+
+		var runId = createUUID();
+		var tmp = webroot & "/.wheels-docs-new." & runId;
+		var old = webroot & "/.wheels-docs-old." & runId;
 		try {
-			cfexecute(name = "cp", arguments = "-R -l #arguments.source# #mount#", timeout = 300, variable = "local.o1", errorVariable = "local.e1");
-			linked = directoryExists(mount);
+			directoryCopy(arguments.source, tmp, true);
+			$docsMirrorGitignore(tmp);
 		} catch (any e) {
-			linked = false;
+			if (directoryExists(tmp)) {
+				try { directoryDelete(tmp, true); } catch (any ignored) {}
+			}
+			$docsFetchFail(
+				"The docs were installed, but copying them into the webroot failed: #e.message#",
+				["  #mount# was left as it was."]
+			);
 		}
-		if (!linked) {
+		var hadOld = directoryExists(mount);
+		if (hadOld) {
 			try {
-				cfexecute(name = "cp", arguments = "-R #arguments.source# #mount#", timeout = 600, variable = "local.o2", errorVariable = "local.e2");
+				directoryRename(mount, old);
 			} catch (any e) {
-				out("  Could not mount the docs into the webroot: #e.message#", "red");
-				return;
+				try { directoryDelete(tmp, true); } catch (any ignored) {}
+				$docsFetchFail(
+					"The docs were installed, but the old docs mirror at #mount# could not be moved aside: #e.message#",
+					["  #mount# was left as it was."]
+				);
 			}
 		}
-		if (directoryExists(mount)) {
-			out("  Mounted at #mount#", "green");
-			out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
-			if (!linked) {
-				out("  (copied — the cache and webroot are on different filesystems)");
+		try {
+			directoryRename(tmp, mount);
+		} catch (any e) {
+			if (hadOld && !directoryExists(mount)) {
+				try { directoryRename(old, mount); } catch (any ignored) {}
 			}
-		} else {
-			out("  Could not mount the docs into the webroot.", "red");
+			try { directoryDelete(tmp, true); } catch (any ignored) {}
+			$docsFetchFail(
+				"The docs were installed, but the new docs mirror could not be put in place at #mount#: #e.message#",
+				[hadOld && directoryExists(mount) ? "  The previous mirror was restored." : "  Re-run `wheels docs fetch --force`."]
+			);
+		}
+		if (hadOld) {
+			try {
+				directoryDelete(old, true);
+			} catch (any e) {
+				// Cleared as a leftover on the next run.
+			}
+		}
+		out("  Mounted at #mount#", "green");
+		out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
+	}
+
+	/**
+	 * Keeps the docs mirror out of git: a `.gitignore` of `*` inside it, so apps
+	 * created before the template listed public/wheels-docs/ don't commit the
+	 * ~300 MB mirror. Written only when missing.
+	 */
+	private void function $docsMirrorGitignore(required string dir) {
+		var path = arguments.dir & "/.gitignore";
+		if (!fileExists(path)) {
+			fileWrite(path, "## The Wheels docs mirror (wheels docs fetch); not part of the app." & chr(10) & "*" & chr(10));
 		}
 	}
 
@@ -1591,8 +1943,7 @@ component extends="modules.BaseModule" {
 		var version = $docsFrameworkVersion();
 		var home = $resolveLucliHome();
 		if (!len(version) || !len(home)) {
-			out("Could not determine the framework version or the CLI home.", "red");
-			return "";
+			$refuse("Could not determine the framework version or the CLI home: run wheels docs status from a Wheels project.", "Wheels.DocsStatusFailed");
 		}
 		var target = home & "/docs/" & version;
 		if (!directoryExists(target)) {
@@ -1795,7 +2146,8 @@ component extends="modules.BaseModule" {
 			out("");
 			out("Tip: cd into your project directory, or run `wheels new <appname>`", "cyan");
 			out("     to scaffold one.", "cyan");
-			return "";
+			// Non-zero exit: printing guidance and returning "" reported success.
+			throw(type = "Wheels.NotAWheelsProject", message = "wheels start: this directory is not a Wheels project (no config/settings.cfm).");
 		}
 
 		// Detect a stale `<lucliHome>/servers/<basename>/` registration before
@@ -1842,8 +2194,14 @@ component extends="modules.BaseModule" {
 		// RustCFML backend — separate lifecycle from LuCLI (no JDK/Lucee
 		// Express), so it never touches the server registry below.
 		if (engine == "rustcfml") {
-			var rustSvc = new services.rustcfml.RustCFMLEngine();
-			var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
+			var rustSvc = $rustcfmlEngine();
+			try {
+				var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
+			} catch (Wheels.RustCFML.UnsupportedPlatform e) {
+				$reportUnsupportedRustPlatform(e);
+				// rethrow maps to non-zero exit; return "" would silently succeed.
+				rethrow;
+			}
 			out("RustCFML server started (pid " & rustState.pid & ") at http://127.0.0.1:" & rustState.port, "green");
 			out("Log: " & rustState.log, "cyan");
 			return "";
@@ -1859,7 +2217,13 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		if (reg.exists && !reg.ours && !force) {
+		// A failed start leaves a registration holding only LuCLI's config file
+		// and no project path. That exact shape is a leftover, not another
+		// project's server: it falls through to the clean-up below instead of
+		// being reported as "registered to a different project: <unknown>".
+		// Anything else without a project path (e.g. a stopped server from a
+		// plain-LuCLI or pre-4.0 project of the same name) still refuses.
+		if (reg.exists && !reg.ours && !$isFailedStartLeftover(serverName, reg) && !force) {
 			out("");
 			out("Server name '" & serverName & "' is registered to a different project:", "yellow");
 			out("  registered: " & (len(reg.registeredPath) ? reg.registeredPath : "<unknown>"), "yellow");
@@ -1870,7 +2234,7 @@ component extends="modules.BaseModule" {
 			out("      wheels start --force", "cyan");
 			out("  - Or give this project a unique 'name' in lucee.json (or, without one,");
 			out("    rename the project directory) so it gets a unique server name.");
-			return "";
+			throw(type = "Wheels.ServerNameConflict", message = "wheels start: server name '#serverName#' is registered to another project (#reg.registeredPath#). Use --force or a unique name.");
 		}
 
 		// Stale-but-ours, or --force was passed: wipe the dead registration so
@@ -1946,7 +2310,25 @@ component extends="modules.BaseModule" {
 		// zero-config without the user knowing the difference.
 		$ensureWheelsBundles();
 
+		$issueStartToken(registry);
+
 		return "";
+	}
+
+	/**
+	 * Give the server just started a fresh per-start token (#3769), so later
+	 * commands can prove each connection with the token challenge. Written
+	 * after LuCLI's `server start` returns: LuCLI treats a registration
+	 * directory it did not create as another project's. Best effort: without
+	 * a token the CLI verifies the server through the OS, as before.
+	 */
+	private void function $issueStartToken(required any registry) {
+		try {
+			var name = arguments.registry.tokenRegistrationFor(variables.projectRoot);
+			if (len(name)) {
+				arguments.registry.writeStartToken(name);
+			}
+		} catch (any e) {}
 	}
 
 	/**
@@ -2032,6 +2414,16 @@ component extends="modules.BaseModule" {
 			}
 			out("Stopping Wheels server...", "cyan");
 			executeCommand("server", stopArgs, variables.projectRoot);
+			var registry = getService("serverRegistry");
+			if (opts.all) {
+				registry.deleteAllStartTokens();
+			}
+			if (len(opts.name)) {
+				registry.deleteStartToken(opts.name);
+			}
+			if (len(opts.config)) {
+				registry.deleteStartToken(registry.serverNameInConfig(opts.config, variables.projectRoot));
+			}
 			return "";
 		}
 
@@ -2044,6 +2436,9 @@ component extends="modules.BaseModule" {
 			rustSvc.stop(variables.projectRoot);
 			out("RustCFML server stopped.", "cyan");
 			return "";
+		}
+		if ((rustStatus.staleReason ?: "") == "pid-not-server") {
+			out(rustStatus.message, "yellow");
 		}
 
 		out("Stopping Wheels server...", "cyan");
@@ -2104,6 +2499,7 @@ component extends="modules.BaseModule" {
 		}
 
 		executeCommand("server", ["stop"], variables.projectRoot);
+		getService("serverRegistry").deleteStartToken(match);
 		return "";
 	}
 
@@ -2134,26 +2530,43 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var svc = new services.rustcfml.RustCFMLEngine();
+		var svc = $rustcfmlEngine();
 		switch (action) {
 			case "install":
 				out("Installing RustCFML...", "cyan");
-				out("Installed: " & svc.install(), "green");
+				try {
+					out("Installed: " & svc.install(), "green");
+				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
+					$reportUnsupportedRustPlatform(e);
+					rethrow;
+				}
 				break;
 			case "start":
-				var st = svc.start(variables.projectRoot, val(opts.port));
+				try {
+					var st = svc.start(variables.projectRoot, val(opts.port));
+				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
+					$reportUnsupportedRustPlatform(e);
+					rethrow;
+				}
 				out("RustCFML server started (pid " & st.pid & ") at http://127.0.0.1:" & st.port, "green");
 				out("Log: " & st.log, "cyan");
 				break;
 			case "stop":
+				var before = svc.status(variables.projectRoot);
+				if ((before.staleReason ?: "") == "pid-not-server") {
+					out(before.message, "yellow");
+					break;
+				}
 				out(svc.stop(variables.projectRoot)
 					? "RustCFML server stopped."
-					: "No RustCFML server recorded for this project.", "cyan");
+					: "No RustCFML server running for this project.", "cyan");
 				break;
 			case "status":
 				var status = svc.status(variables.projectRoot);
 				if (status.running) {
 					out("RustCFML running (pid " & status.pid & ") at http://127.0.0.1:" & status.port, "green");
+				} else if ((status.staleReason ?: "") == "pid-not-server") {
+					out(status.message, "yellow");
 				} else {
 					out("No RustCFML server running for this project.", "yellow");
 				}
@@ -2234,6 +2647,16 @@ component extends="modules.BaseModule" {
 		}
 
 		var appName = opts.appName;
+		// The app name becomes a directory and is written into config/app.cfm
+		// (this.name) and the datasource name: letters, digits, underscores and
+		// hyphens only, starting with a letter.
+		var appNames = new services.GeneratorPaths();
+		if (!appNames.isToken(appName) || !reFind("[A-Za-z]", left(appName, 1))) {
+			throw(
+				type = "Wheels.Generate.InvalidName",
+				message = "Invalid app name '#appName#': use letters, digits, underscores and hyphens, starting with a letter."
+			);
+		}
 		var options = {
 			port: opts.port,
 			datasource: opts.datasource,
@@ -2283,7 +2706,7 @@ component extends="modules.BaseModule" {
 			out("Examples:", "bold");
 			out("  wheels create app myapp");
 			out("  wheels create app myapp --port=3000 --setup-h2");
-			return "";
+			$refuse("wheels create: missing required arguments. Usage: wheels create <type> <name> [options]");
 		}
 
 		switch (type) {
@@ -3423,8 +3846,7 @@ component extends="modules.BaseModule" {
 		var target = opts.target;
 
 		if (!opts.hasTarget && !directoryExists(variables.projectRoot & "/app")) {
-			out("No app/ directory found. Are you in a Wheels project?", "red");
-			return "";
+			$refuse("No app/ directory found: run wheels analyze from a Wheels project root.");
 		}
 
 		out("Analyzing code...", "cyan");
@@ -3650,7 +4072,7 @@ component extends="modules.BaseModule" {
 			out("  wheels destroy controller Products    (remove just the Products controller)");
 			out("  wheels destroy model Product          (remove just the Product model)");
 			out("  wheels destroy view products/index    (remove a single view)");
-			return "";
+			$refuse("wheels destroy: missing required arguments. Usage: wheels destroy <type> <name>");
 		}
 
 		var name = opts.name;
@@ -3668,9 +4090,16 @@ component extends="modules.BaseModule" {
 
 		// Show preview and confirm
 		var preview = svc.previewDestroy(name, type);
-		if (!arrayLen(preview)) {
-			out("Nothing to destroy.", "yellow");
-			return "";
+		// Nothing found is a failure, not a success: without this a destroy of
+		// a name that never existed "succeeded" and still wrote a migration
+		// dropping a table that was never created.
+		if (!arrayLen(preview) || !$destroyFindsSomething(preview)) {
+			$refuse(
+				arrayLen(preview) && left(preview[1], 7) == "Invalid"
+					? "wheels destroy: #preview[1]#"
+					: "wheels destroy: nothing named '#name#' was found to destroy.",
+				"Wheels.NothingToDestroy"
+			);
 		}
 
 		out("The following will be deleted:", "yellow");
@@ -3833,6 +4262,13 @@ component extends="modules.BaseModule" {
 			}
 		}
 
+		// CRITICAL means real issues: exit non-zero so CI and agents can gate on
+		// the health check. WARNING still exits 0.
+		if (results.status == "CRITICAL") {
+			// Self-contained: an MCP client receives only this message, not the report printed above.
+			$refuse("wheels doctor: status CRITICAL with #arrayLen(results.issues)# issue(s): " & arrayToList(results.issues, "; "), "Wheels.DoctorCritical");
+		}
+
 		return "";
 	}
 
@@ -3856,6 +4292,9 @@ component extends="modules.BaseModule" {
 	 *   wheels deploy version                  - show version pinning
 	 */
 	public string function deploy() {
+		// Each command starts with an empty secret/warning registry, so a
+		// long-lived process never carries one command's secrets into the next.
+		new modules.wheels.services.deploy.lib.SecretRedaction().reset();
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var opts = $deployArgsToOptions(args);
 		if (!structKeyExists(opts, "configPath") || !len(opts.configPath)) {
@@ -4560,7 +4999,7 @@ component extends="modules.BaseModule" {
 			out("  wheels db status");
 			out("  wheels db status --pending");
 			out("  wheels db version --detailed");
-			return "";
+			$refuse("wheels db: missing required arguments. Usage: wheels db <command>");
 		}
 
 		var subcommand = lCase(trim(opts.subcommand));
@@ -4892,7 +5331,9 @@ component extends="modules.BaseModule" {
 			// recommendations, not just breaking changes. Mirrors Django
 			// --fail-level WARNING / Mix --warnings-as-errors.
 			strict = parsed.strict,
+			offline = parsed.offline,
 			doBackup = doBackup,
+			allowDowngrade = parsed["allow-downgrade"],
 			// "Passed" means a real value, not key presence: MCP clients send
 			// schema defaults, so apply {strict: false} was refused as
 			// "--strict is not supported by the apply verb" (#2963).
@@ -4931,12 +5372,14 @@ component extends="modules.BaseModule" {
 	 * that will break against a target framework version without modifying
 	 * any files. Breaking findings throw Wheels.UpgradeCheckFailed after the
 	 * report is printed, so the command exits non-zero and can gate CI.
-	 * --strict escalates advisory findings the same way. (--dry-run is not
+	 * --strict escalates advisory findings the same way, and so does a failed
+	 * latest-release lookup when no --to= is given. (--dry-run is not
 	 * supported — `check` is the preview.)
 	 *
 	 * Examples:
 	 *   wheels upgrade apply                       - apply the swap, with backup
 	 *   wheels upgrade apply --nobackup            - apply without the backup
+	 *   wheels upgrade apply --allow-downgrade     - apply even if the bundled framework is older
 	 *   wheels upgrade check                       - scan against the latest stable release
 	 *   wheels upgrade check --to=4.0.0            - scan against a specific target version
 	 *   wheels upgrade check --format=json         - machine-readable report (CI pipelines)
@@ -4956,6 +5399,10 @@ component extends="modules.BaseModule" {
 			rethrow;
 		}
 
+		// Assign the offline state for THIS call (resets a stale value left by an
+		// earlier MCP call on the reused Module); the release lookup honours it.
+		$consumeOfflineFlag(opts.offline ? ["--offline"] : []);
+
 		if (opts.wantsHelp) {
 			return $printUpgradeHelp();
 		}
@@ -4965,13 +5412,13 @@ component extends="modules.BaseModule" {
 		}
 
 		// Bare `wheels upgrade` (no verb) is deliberately inert: print the
-		// usage steer and exit 0. Destructive commands deserve an explicit
-		// verb, and MCP clients calling wheels_upgrade with {} must never
-		// mutate vendor/wheels/ — requiring `apply` fixes that transport-
-		// independently (#3039 review). Exit 0 matches the pre-apply-mode
-		// bare behavior, so no CI surprise.
+		// usage steer and change nothing. Destructive commands deserve an
+		// explicit verb, and MCP clients calling wheels_upgrade with {} must
+		// never mutate vendor/wheels/ — requiring `apply` fixes that transport-
+		// independently (#3039 review). It exits non-zero (an MCP client gets
+		// isError): a missing subcommand is a usage error, not a success.
 		if (!len(opts.subcommand)) {
-			return $printUpgradeUsageSteer();
+			$refuse($printUpgradeUsageSteer());
 		}
 
 		// ── Apply verb. Every refusal below fires before any file mutation.
@@ -4998,7 +5445,7 @@ component extends="modules.BaseModule" {
 		// Unknown named keys hard-stop too. ArgSpec ignores them by design
 		// (fine for read-only commands, kept for `check` above), but a
 		// destructive verb must not run alongside a flag the user typo'd.
-		var knownKeys = "to,format,strict,nobackup,backup,subcommand,help,h,dry-run";
+		var knownKeys = "to,format,strict,offline,nobackup,allow-downgrade,backup,subcommand,help,h,dry-run";
 		for (var key in coll) {
 			if (reFindNoCase("^arg\d+$", key) || listFindNoCase(knownKeys, key)) {
 				continue;
@@ -5015,7 +5462,7 @@ component extends="modules.BaseModule" {
 		if (!opts.isApply) {
 			throw(type = "Wheels.InvalidArguments", message = "Refusing to run upgrade apply for subcommand '#opts.subcommand#'.");
 		}
-		return runUpgradeApply(opts.targetVersion, opts.doBackup);
+		return runUpgradeApply(opts.targetVersion, opts.doBackup, opts.allowDowngrade);
 	}
 
 	/**
@@ -5025,8 +5472,8 @@ component extends="modules.BaseModule" {
 	private string function $printUpgradeHelp() {
 		var nl = chr(10);
 		var help = "Usage:" & nl
-			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
-			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
+			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json] [--offline]" & nl
+			& "  wheels upgrade apply [--to=<version>] [--nobackup] [--allow-downgrade]" & nl
 			& nl
 			& "Upgrade the Wheels framework in your app (vendor/wheels/)." & nl
 			& nl
@@ -5046,8 +5493,12 @@ component extends="modules.BaseModule" {
 			& "  --to=<version>    Target Wheels version. For check, defaults to the" & nl
 			& "                    latest stable release. For apply, must match the" & nl
 			& "                    CLI's bundled framework version." & nl
+			& "  --offline         Check only: never call GitHub. Without --to the" & nl
+			& "                    check fails and asks for one. Also WHEELS_OFFLINE=1." & nl
 			& "  --nobackup        Apply only: skip the vendor/wheels.bak-<timestamp>/" & nl
 			& "                    backup. Useful when vendor/wheels/ is tracked in git." & nl
+			& "  --allow-downgrade Apply only: proceed when the CLI's bundled framework" & nl
+			& "                    is OLDER than vendor/wheels/. Refused by default." & nl
 			& "  --strict          Check only: treat advisory findings as failures" & nl
 			& "                    (non-zero exit) so CI can gate on them." & nl
 			& "  --format=json     Check only: emit a machine-readable JSON report." & nl
@@ -5079,14 +5530,15 @@ component extends="modules.BaseModule" {
 		var nl = chr(10);
 		var usage = "wheels upgrade needs an explicit subcommand (nothing was changed):" & nl
 			& nl
-			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
+			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json] [--offline]" & nl
 			& "      Scan the app for breaking changes (read-only)." & nl
 			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
 			& "      Replace vendor/wheels/ with the CLI's bundled framework" & nl
 			& "      (backs up to vendor/wheels.bak-<timestamp>/ first)." & nl
 			& nl
 			& "Run `wheels upgrade help` for full usage." & nl;
-		out(usage, "yellow");
+		// Returned for the caller to throw: the thrown error prints it once and
+		// an MCP client gets it as the isError text.
 		return usage;
 	}
 
@@ -5152,7 +5604,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate model <Name> [properties...]", "yellow");
 			out("  Example: wheels generate model User name email:string active:boolean");
-			return "";
+			$refuse("wheels generate model: missing required arguments. Usage: wheels generate model <Name> [properties...]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5165,8 +5617,7 @@ component extends="modules.BaseModule" {
 		var codegen = getService("codegen");
 		var validation = codegen.validateName(modelName, "model");
 		if (!validation.valid) {
-			out("Invalid model name: #arrayToList(validation.errors, '; ')#", "red");
-			return "";
+			$refuse("Invalid model name: #arrayToList(validation.errors, '; ')#", "Wheels.Generate.InvalidName");
 		}
 
 		// Add a foreign-key column per --belongsTo parent (unless the user
@@ -5187,8 +5638,7 @@ component extends="modules.BaseModule" {
 		if (result.success) {
 			printCreated("app/models/#modelName#.cfc");
 		} else {
-			out(result.error, "red");
-			return "";
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 
 		// Also generate migration if properties (or belongsTo FK columns) exist
@@ -5205,7 +5655,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate controller <Name> [actions...]", "yellow");
 			out("  Example: wheels generate controller Users index show create");
-			return "";
+			$refuse("wheels generate controller: missing required arguments. Usage: wheels generate controller <Name> [actions...]");
 		}
 
 		var controllerName = capitalize(args[1]);
@@ -5217,8 +5667,7 @@ component extends="modules.BaseModule" {
 		if (result.success) {
 			printCreated("app/controllers/#controllerName#.cfc");
 		} else {
-			out(result.error, "red");
-			return "";
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 
 		// Use the normalized action list from the generator (comma-joined tokens like
@@ -5230,7 +5679,7 @@ component extends="modules.BaseModule" {
 
 		// Create view files for non-mutation actions
 		var viewDir = variables.projectRoot & "/app/views/#lCase(controllerName)#";
-		ensureDirectory(viewDir);
+		$ensureProjectDirectory(viewDir);
 
 		for (var action in actions) {
 			if (!listFindNoCase("create,update,delete,destroy", action)) {
@@ -5251,7 +5700,7 @@ component extends="modules.BaseModule" {
 	private string function generateView(required array args) {
 		if (arrayLen(args) < 2) {
 			out("Usage: wheels generate view <controller> <action>", "yellow");
-			return "";
+			$refuse("wheels generate view: missing required arguments. Usage: wheels generate view <controller> <action>");
 		}
 
 		var controllerName = args[1];
@@ -5263,7 +5712,7 @@ component extends="modules.BaseModule" {
 		if (result.success) {
 			printCreated("app/views/#lCase(controllerName)#/#actionName#.cfm");
 		} else {
-			out(result.error, "red");
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 		return "";
 	}
@@ -5272,16 +5721,16 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate migration <Name>", "yellow");
 			out("  Example: wheels generate migration AddEmailToUsers");
-			return "";
+			$refuse("wheels generate migration: missing required arguments. Usage: wheels generate migration <Name>");
 		}
 
-		var migrationName = args[1];
+		var migrationName = new services.GeneratorPaths().identifier($underscoreHyphens(args[1], "migration"), "migration");
 		var timestamp = getService("helpers").generateMigrationTimestamp();
 		var fileName = "#timestamp#_#migrationName#.cfc";
 		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
 		var filePath = migrationDir & "/#fileName#";
 
-		ensureDirectory(migrationDir);
+		$ensureProjectDirectory(migrationDir);
 
 		// Always build the migration inline. The shipped codegen template
 		// dbmigrate/blank.txt carries |DBMigrateExtends|/|DBMigrateDescription|
@@ -5300,7 +5749,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate scaffold <Name> [properties...] [--force]", "yellow");
 			out("  Example: wheels generate scaffold Post title body:text publishedAt:datetime");
-			return "";
+			$refuse("wheels generate scaffold: missing required arguments. Usage: wheels generate scaffold <Name> [properties...] [--force]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5369,10 +5818,7 @@ component extends="modules.BaseModule" {
 				out("  2. Start server: wheels start");
 			}
 		} else {
-			out("Scaffold failed:", "red");
-			for (var err in results.errors) {
-				out("  #err#", "red");
-			}
+			$refuse("Scaffold failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -5382,31 +5828,28 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate route <name>", "yellow");
 			out("  Example: wheels generate route posts");
-			return "";
+			$refuse("wheels generate route: missing required arguments. Usage: wheels generate route <name>");
 		}
 
-		var routeName = lCase(args[1]);
+		var routeName = lCase(new services.GeneratorPaths().token(args[1], "route"));
 		var routesPath = variables.projectRoot & "/config/routes.cfm";
 
 		if (!fileExists(routesPath)) {
-			out("config/routes.cfm not found.", "red");
-			return "";
+			$refuse("config/routes.cfm not found.", "Wheels.Generate.Refused");
 		}
 
 		// Check for duplicate before delegating
 		var content = fileRead(routesPath);
 		var resourceRoute = '.resources("' & routeName & '")';
 		if (findNoCase(resourceRoute, content)) {
-			out("Route already exists: #resourceRoute#", "yellow");
-			return "";
+			$refuse("Route already exists: #resourceRoute#", "Wheels.Generate.Refused");
 		}
 		// Also detect the named-arg form (e.g. .resources(name="posts", only="...")),
 		// which updateRoutes() treats as a duplicate. Without this, an existing
 		// named-arg route was misreported as "Could not find insertion point". M5.
 		var namedArgPattern = "\.resources\s*\([^)]*name\s*=\s*[""']" & routeName & "[""']";
 		if (reFindNoCase(namedArgPattern, content)) {
-			out("Route already exists: .resources(name=""#routeName#"", ...)", "yellow");
-			return "";
+			$refuse("Route already exists: .resources(name=""#routeName#"", ...)", "Wheels.Generate.Refused");
 		}
 
 		// Delegate to Scaffold service for the actual route insertion
@@ -5416,8 +5859,7 @@ component extends="modules.BaseModule" {
 		if (inserted) {
 			out("  route   #resourceRoute# added to config/routes.cfm", "green");
 		} else {
-			out("Could not find insertion point in routes.cfm. Add manually:", "yellow");
-			out("  #resourceRoute#");
+			$refuse("Could not find an insertion point in config/routes.cfm; add the route manually: #resourceRoute#", "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -5433,15 +5875,14 @@ component extends="modules.BaseModule" {
 			out("Usage: wheels generate test <type> <Name> [--force]", "yellow");
 			out("  Types: model, controller");
 			out("  Example: wheels generate test model User");
-			return "";
+			$refuse("wheels generate test: missing required arguments. Usage: wheels generate test <type> <Name> [--force]");
 		}
 
 		var testType = lCase(pos[1]);
 		var testName = capitalize(pos[2]);
 
 		if (!listFindNoCase("model,controller", testType)) {
-			out("Unknown test type: #testType#. Use 'model' or 'controller'.", "red");
-			return "";
+			$refuse("Unknown test type: #testType#. Use 'model' or 'controller'.");
 		}
 
 		var codegen = getService("codegen");
@@ -5451,7 +5892,7 @@ component extends="modules.BaseModule" {
 			var relPath = listLast(result.path, "/\");
 			printCreated(relPath);
 		} else {
-			out(result.error, "red");
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -5461,14 +5902,15 @@ component extends="modules.BaseModule" {
 		if (arrayLen(args) < 2) {
 			out("Usage: wheels generate property <ModelName> <property:type>", "yellow");
 			out("  Example: wheels generate property User email:string");
-			return "";
+			$refuse("wheels generate property: missing required arguments. Usage: wheels generate property <ModelName> <property:type>");
 		}
 
-		var modelName = capitalize(args[1]);
+		var names = new services.GeneratorPaths();
+		var modelName = capitalize(names.identifier(args[1], "model"));
 		var propArg = args[2];
 		var parts = listToArray(propArg, ":");
-		var propName = parts[1];
-		var propType = arrayLen(parts) > 1 ? parts[2] : "string";
+		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
+		var propType = names.identifier(arrayLen(parts) > 1 ? parts[2] : "string", "property type");
 
 		var tableName = getService("helpers").pluralize(lCase(modelName));
 		var timestamp = getService("helpers").generateMigrationTimestamp();
@@ -5476,7 +5918,7 @@ component extends="modules.BaseModule" {
 		var fileName = "#timestamp#_#migrationName#.cfc";
 		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
 
-		ensureDirectory(migrationDir);
+		$ensureProjectDirectory(migrationDir);
 
 		var colType = mapPropertyType(propType);
 		var nl = chr(10);
@@ -5519,7 +5961,7 @@ component extends="modules.BaseModule" {
 			out("  Tests:      tests/specs/models/<Name>Spec.cfc");
 			out("              tests/specs/controllers/Api<Names>ControllerSpec.cfc");
 			out("  Routes:     .namespace(""api"").resources(name=""<names>"", except=""new,edit"")");
-			return "";
+			$refuse("wheels generate api-resource: missing required arguments. Usage: wheels generate api-resource <Name> [properties...]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5553,10 +5995,7 @@ component extends="modules.BaseModule" {
 			out("  2. Start server: wheels start");
 			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
 		} else {
-			out("API resource generation failed:", "red");
-			for (var err in results.errors) {
-				out("  #err#", "red");
-			}
+			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -5566,7 +6005,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate helper <name> [functions...]", "yellow");
 			out("  Example: wheels generate helper formatting truncateText formatCurrency");
-			return "";
+			$refuse("wheels generate helper: missing required arguments. Usage: wheels generate helper <name> [functions...]");
 		}
 
 		var helperName = capitalize(args[1]);
@@ -5586,8 +6025,7 @@ component extends="modules.BaseModule" {
 		var codegen = getService("codegen");
 		var validation = codegen.validateName(helperName, "helper");
 		if (!validation.valid) {
-			out("Invalid helper name: #arrayToList(validation.errors, '; ')#", "red");
-			return "";
+			$refuse("Invalid helper name: #arrayToList(validation.errors, '; ')#", "Wheels.Generate.InvalidName");
 		}
 
 		var result = codegen.generateHelper(
@@ -5601,8 +6039,7 @@ component extends="modules.BaseModule" {
 			var fileName = listLast(result.path, "/\");
 			printCreated("app/helpers/#fileName#");
 		} else {
-			out(result.error, "red");
-			return "";
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 
 		out("");
@@ -5630,14 +6067,13 @@ component extends="modules.BaseModule" {
 			out("");
 			out("Writes app/policies/<ModelName>Policy.cfc — default-deny, one method per action.");
 			out("Enforce with authorize()/can()/policyScope() in your controllers and views.");
-			return "";
+			$refuse("wheels generate policy: missing required arguments. Usage: wheels generate policy <ModelName> [--force]");
 		}
 
 		var codegen = getService("codegen");
 		var validation = codegen.validateName(positional[1], "policy");
 		if (!validation.valid) {
-			out("Invalid policy name: #arrayToList(validation.errors, '; ')#", "red");
-			return "";
+			$refuse("Invalid policy name: #arrayToList(validation.errors, '; ')#", "Wheels.Generate.InvalidName");
 		}
 
 		var result = codegen.generatePolicy(name = positional[1], force = force);
@@ -5657,7 +6093,7 @@ component extends="modules.BaseModule" {
 			out("  3. Check in views without throwing: can('update', post)");
 			out("  4. Narrow index collections: policyScope(model('#reReplace(fileName, 'Policy\.cfc$', '')#')).findAll()");
 		} else {
-			out(result.error, "red");
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 		return "";
 	}
@@ -5722,10 +6158,11 @@ component extends="modules.BaseModule" {
 			out("");
 			out("Generates an admin controller and views by introspecting an existing model.");
 			out("Requires a running server.");
-			return "";
+			$refuse("wheels generate admin: missing required arguments. Usage: wheels generate admin <modelName> [--force] [--no-routes]");
 		}
 
-		var modelName = capitalize(arguments.args[1]);
+		// Checked before introspection: the name goes into the introspection URL too.
+		var modelName = capitalize(new services.GeneratorPaths().identifier(arguments.args[1], "model"));
 		var force = false;
 		var noRoutes = false;
 		for (var i = 2; i <= arrayLen(arguments.args); i++) {
@@ -5752,8 +6189,7 @@ component extends="modules.BaseModule" {
 			// issue #2315.
 			var modelData = parseCliResponse(response, "Model introspection");
 		} catch (any e) {
-			out("Error introspecting model: #e.message#", "red");
-			return "";
+			$refuse("Error introspecting model: #e.message#", "Wheels.Generate.Refused");
 		}
 
 		// Generate admin files
@@ -5769,9 +6205,7 @@ component extends="modules.BaseModule" {
 			var adminPath = lCase(getService("helpers").pluralize(modelName));
 			out("Visit /admin/#adminPath# after reloading.", "cyan");
 		} else {
-			for (var err in result.errors) {
-				out(err, "red");
-			}
+			$refuse(arrayToList(result.errors, "; "), "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -6046,10 +6480,7 @@ component extends="modules.BaseModule" {
 		if (fileExists(fullPath) && !arguments.force) {
 			return "";
 		}
-		var dir = getDirectoryFromPath(fullPath);
-		if (!directoryExists(dir)) {
-			directoryCreate(dir, true);
-		}
+		// $generateWrite checks the path and creates its directory inside the project.
 		$generateWrite(fullPath, arguments.content);
 		return arguments.relativePath;
 	}
@@ -6067,7 +6498,7 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		ensureDirectory(snippetsDir);
+		$ensureProjectDirectory(snippetsDir);
 
 		var copied = 0;
 		var skipped = 0;
@@ -6087,7 +6518,7 @@ component extends="modules.BaseModule" {
 				continue;
 			}
 
-			fileCopy(sourcePath, destPath);
+			fileCopy(sourcePath, new services.GeneratorPaths().assertInside(variables.projectRoot, destPath));
 			printCreated("app/snippets/#entry#");
 			copied++;
 		}
@@ -6113,7 +6544,7 @@ component extends="modules.BaseModule" {
 	 * Recursively copy a snippet template subdirectory
 	 */
 	private void function copySnippetDir(required string source, required string dest, boolean force = false) {
-		ensureDirectory(arguments.dest);
+		$ensureProjectDirectory(arguments.dest);
 		var entries = directoryList(arguments.source, false, "name");
 		for (var entry in entries) {
 			var sourcePath = arguments.source & "/" & entry;
@@ -6122,7 +6553,7 @@ component extends="modules.BaseModule" {
 				copySnippetDir(sourcePath, destPath, arguments.force);
 			} else {
 				if (!fileExists(destPath) || arguments.force) {
-					fileCopy(sourcePath, destPath);
+					fileCopy(sourcePath, new services.GeneratorPaths().assertInside(variables.projectRoot, destPath));
 					var relPath = replace(destPath, variables.projectRoot & "/", "");
 					printCreated(relPath);
 				}
@@ -6290,10 +6721,7 @@ component extends="modules.BaseModule" {
 		var verb = arguments.command == "forgetVersion" ? "forget" : "pretend";
 
 		if (!Len(version)) {
-			out("Missing required argument: <version>", "red");
-			out("Usage:");
-			out("  wheels migrate #verb# <version> --yes");
-			return "";
+			$refuse("Missing required argument: <version>", "Wheels.InvalidArguments", ["Usage:", "  wheels migrate #verb# <version> --yes"]);
 		}
 
 		if (!yes) {
@@ -7065,11 +7493,10 @@ component extends="modules.BaseModule" {
 		var jsonMode = lCase(arguments.format) == "json";
 		var currentVersion = $upgradeResolveCurrentVersion();
 
-		// Determine target version
-		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode);
-		if (!len(target)) {
-			return "";
-		}
+		// Determine target version. Throws Wheels.UpgradeCheckFailed when no
+		// --to= was given and the latest release can't be looked up, so a CI
+		// gate never passes without having scanned anything.
+		var target = $upgradeResolveTargetVersion(arguments.targetVersion, jsonMode, arguments.strict);
 
 		if (!jsonMode) {
 			out("Current version: #currentVersion#", "bold");
@@ -7174,24 +7601,79 @@ component extends="modules.BaseModule" {
 
 	/**
 	 * Determine the target version: the explicit --to= value when supplied,
-	 * otherwise the latest GitHub release. Returns "" (after printing the
-	 * error) when the release fetch fails so the caller can bail out early.
+	 * otherwise the latest GitHub release. When the lookup fails (offline,
+	 * GitHub rate limit, unexpected response) the error is printed — as a
+	 * JSON document in JSON mode — and Wheels.UpgradeCheckFailed is thrown,
+	 * so `upgrade check` exits non-zero instead of reporting success without
+	 * scanning anything.
 	 */
-	private string function $upgradeResolveTargetVersion(required string targetVersion, required boolean jsonMode) {
-		var target = arguments.targetVersion;
-		if (!len(target)) {
-			try {
-				var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
-				var response = makeHttpRequest(apiUrl);
-				var releaseData = deserializeJSON(response);
-				target = replace(releaseData.tag_name, "v", "");
-			} catch (any e) {
-				var fetchMsg = "Could not fetch latest version. Use --to=<version> to specify.";
-				out(arguments.jsonMode ? serializeJSON({"error": fetchMsg}) : fetchMsg, "yellow");
-				return "";
-			}
+	private string function $upgradeResolveTargetVersion(
+		required string targetVersion,
+		required boolean jsonMode,
+		boolean strict = false
+	) {
+		var target = trim(arguments.targetVersion);
+		if (len(target)) {
+			return target;
 		}
-		return target;
+		var reason = "";
+		try {
+			var response = $latestReleaseResponse();
+			// Only parse a JSON body: an offline proxy page or an HTML error
+			// would otherwise surface as a JSON syntax error, not the status.
+			var releaseData = isJSON(response.body) ? deserializeJSON(response.body) : {};
+			if (response.status == 200 && isStruct(releaseData) && structKeyExists(releaseData, "tag_name") && isSimpleValue(releaseData.tag_name)) {
+				target = trim(replace(releaseData.tag_name, "v", ""));
+			}
+			if (!len(target)) {
+				reason = "HTTP #response.status#";
+				// GitHub error bodies (rate limit, not found) carry a `message`.
+				if (isStruct(releaseData) && structKeyExists(releaseData, "message") && isSimpleValue(releaseData.message)) {
+					reason &= ": " & releaseData.message;
+				}
+			}
+		} catch (any e) {
+			reason = e.message;
+		}
+		if (len(target)) {
+			return target;
+		}
+
+		var fetchMsg = "Could not determine the latest Wheels version from GitHub"
+			& (len(reason) ? " (#reason#)" : "")
+			& ". Use --to=<version> to specify the target version.";
+		if (arguments.jsonMode) {
+			out(serializeJSON({
+				"success": false,
+				"strict": arguments.strict,
+				"error": fetchMsg
+			}));
+		} else {
+			out(fetchMsg, "red");
+		}
+		// throw maps to non-zero exit; return "" would let a CI gate pass
+		// without scanning anything (and bypass --strict).
+		throw(type = "Wheels.UpgradeCheckFailed", message = fetchMsg);
+	}
+
+	/**
+	 * GET the latest Wheels release from the GitHub API: `{status, body}`.
+	 *
+	 * An external HTTPS URL, so it goes through the cfhttp-based HttpClient
+	 * (TLS, redirects), not makeHttpRequest(): that one rides $httpExchange,
+	 * the raw-socket transport reserved for the local dev server, which
+	 * speaks plain HTTP and cannot reach https://api.github.com.
+	 */
+	private struct function $latestReleaseResponse() {
+		var response = new services.packages.HttpClient(timeoutSeconds = 15).get(
+			"https://api.github.com/repos/wheels-dev/wheels/releases/latest",
+			{"Accept": "application/vnd.github+json"}
+		);
+		if (isBinary(response.body)) {
+			response.body = charsetEncode(response.body, "utf-8");
+		}
+		response.body = trim(response.body);
+		return response;
 	}
 
 	/**
@@ -7716,12 +8198,15 @@ component extends="modules.BaseModule" {
 	 * doesn't match the bundled version is a hard error. Downloading
 	 * arbitrary --to= targets (via ReleaseChannel) is the PR2 follow-up.
 	 *
+	 * A bundled framework older than the installed vendor/wheels/ is
+	 * refused unless --allow-downgrade is passed.
+	 *
 	 * Every refusal throws Wheels.UpgradeApplyFailed AFTER printing the
 	 * guidance, mirroring validate()'s print-then-throw convention so the
 	 * process exits non-zero (#2941) without losing the human-readable
 	 * explanation.
 	 */
-	private string function runUpgradeApply(string targetVersion = "", boolean doBackup = true) {
+	private string function runUpgradeApply(string targetVersion = "", boolean doBackup = true, boolean allowDowngrade = false) {
 		var nl = chr(10);
 
 		// resolveProjectRoot() falls back to cwd when no vendor/wheels/ is
@@ -7774,6 +8259,22 @@ component extends="modules.BaseModule" {
 			throw(type = "Wheels.UpgradeApplyFailed", message = validationError);
 		}
 
+		// Refuse a silent downgrade: when the app's vendor/wheels/ is newer
+		// than the CLI's bundled framework (app made with a newer CLI or a
+		// wheels-be snapshot), applying would replace it with an older copy.
+		var installedVersion = upgrader.readFrameworkVersion(vendorDir);
+		var direction = $upgradeApplyDirection(installedVersion, bundledVersion);
+		if (direction == "downgrade" && !arguments.allowDowngrade) {
+			out("vendor/wheels/ is at #installedVersion#, but the CLI's bundled framework is older (#bundledVersion#). Nothing was changed.", "red");
+			out("Either:");
+			out("  - Install a CLI that bundles #installedVersion# or newer (brew upgrade wheels / scoop update wheels), then re-run wheels upgrade apply.");
+			out("  - Or re-run with --allow-downgrade to replace vendor/wheels/ with #bundledVersion# anyway.");
+			throw(
+				type = "Wheels.UpgradeApplyFailed",
+				message = "Refusing to downgrade the framework from #installedVersion# to #bundledVersion# (the CLI's bundled version). Install a newer CLI, or pass --allow-downgrade to proceed."
+			);
+		}
+
 		out("Source:  #sourceDir#");
 		out("Target:  #vendorDir#");
 		out("");
@@ -7785,14 +8286,21 @@ component extends="modules.BaseModule" {
 		// of a stack trace. The reserved path is passed into applyUpgrade()
 		// so the announcement and the actual backup always agree.
 		var plan = "";
+		if (direction == "upgrade") {
+			plan &= "Upgrading framework: #installedVersion# -> #bundledVersion#" & nl;
+		} else if (direction == "downgrade") {
+			plan &= "Downgrading framework (--allow-downgrade): #installedVersion# -> #bundledVersion#" & nl;
+		} else if (direction == "same") {
+			plan &= "Reinstalling framework #bundledVersion# (vendor/wheels/ is already at this version)" & nl;
+		}
 		var backupPath = "";
 		if (arguments.doBackup) {
 			backupPath = upgrader.reserveBackupPath(vendorDir);
-			plan = "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
+			plan &= "Backing up vendor/wheels -> vendor/#listLast(backupPath, "/")#" & nl
 				& "If this is interrupted, restore with:" & nl
 				& "  rm -rf ""#vendorDir#"" && mv ""#backupPath#"" ""#vendorDir#""" & nl;
 		} else {
-			plan = "Replacing vendor/wheels WITHOUT a backup (--nobackup) — the current copy is not recoverable if the swap fails." & nl;
+			plan &= "Replacing vendor/wheels WITHOUT a backup (--nobackup) — the current copy is not recoverable if the swap fails." & nl;
 		}
 		out(plan);
 
@@ -7817,7 +8325,8 @@ component extends="modules.BaseModule" {
 
 		var summary = "";
 		if (len(result.oldVersion)) {
-			summary &= "Framework upgraded: #result.oldVersion# -> #result.newVersion#" & nl;
+			var verb = {upgrade: "upgraded", downgrade: "downgraded", same: "reinstalled"};
+			summary &= "Framework #structKeyExists(verb, direction) ? verb[direction] : "replaced"#: #result.oldVersion# -> #result.newVersion#" & nl;
 		} else {
 			summary &= "Framework installed: #result.newVersion#" & nl;
 		}
@@ -7840,6 +8349,21 @@ component extends="modules.BaseModule" {
 		// Return value carries the pre-swap plan too, so callers (and the
 		// dispatch specs) see the full command output in order.
 		return plan & nl & summary;
+	}
+
+	/**
+	 * Direction of an apply swap from the installed vendor/wheels/ version
+	 * to the bundled one: "upgrade", "downgrade", "same", or "unknown" when
+	 * either side is missing or not a version (e.g. an unbuilt checkout's
+	 * "@build.version@") — unknown never blocks the swap.
+	 */
+	private string function $upgradeApplyDirection(required string installedVersion, required string bundledVersion) {
+		var versionPattern = "^[vV]?\d+(\.\d+)*([-+][^\r\n]*)?$";
+		if (!reFind(versionPattern, trim(arguments.installedVersion)) || !reFind(versionPattern, trim(arguments.bundledVersion))) {
+			return "unknown";
+		}
+		var cmp = new services.SemVer().compare(arguments.bundledVersion, arguments.installedVersion);
+		return cmp > 0 ? "upgrade" : (cmp < 0 ? "downgrade" : "same");
 	}
 
 	/**
@@ -8543,15 +9067,16 @@ component extends="modules.BaseModule" {
 		required string duration,
 		required numeric specsFailedToLoad
 	) {
-		if (arguments.totalFail == 0 && arguments.totalError == 0) {
-			if (arguments.specsFailedToLoad > 0) {
-				out("#arguments.totalPass# passed, #arguments.specsFailedToLoad# failed to load#arguments.duration#", "yellow");
-			} else {
-				out("#arguments.totalPass# passed#arguments.duration#", "green");
-			}
-		} else {
-			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
-			out("#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#", "red");
+		var summary = $testSummaryLine(
+			result = arguments.result,
+			totalPass = arguments.totalPass,
+			totalFail = arguments.totalFail,
+			totalError = arguments.totalError,
+			duration = arguments.duration,
+			specsFailedToLoad = arguments.specsFailedToLoad
+		);
+		out(summary.text, summary.color);
+		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			out("");
 
 			// Show failure details (skip if verbose already displayed them via displaySuite)
@@ -8575,6 +9100,42 @@ component extends="modules.BaseModule" {
 				}
 			}
 		}
+	}
+
+	/**
+	 * The summary line and its colour. A run that discovered no bundles, or
+	 * whose directory was rejected, is a failure even with 0 failed specs, so
+	 * it is never green: "0 passed" in green used to print just above the
+	 * failure (issue 3759). Pure, so specs can pin every case.
+	 */
+	public struct function $testSummaryLine(
+		required any result,
+		required numeric totalPass,
+		required numeric totalFail,
+		required numeric totalError,
+		required string duration,
+		required numeric specsFailedToLoad
+	) {
+		if (arguments.totalFail > 0 || arguments.totalError > 0) {
+			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
+			return {
+				text = "#arguments.totalPass# passed, #arguments.totalFail# failed, #arguments.totalError# error(s)#failedToLoadStr##arguments.duration#",
+				color = "red"
+			};
+		}
+		if (arguments.specsFailedToLoad > 0) {
+			return {
+				text = "#arguments.totalPass# passed, #arguments.specsFailedToLoad# failed to load#arguments.duration#",
+				color = "yellow"
+			};
+		}
+		if (isStruct(arguments.result) && $cliTestResultFailed(result = arguments.result)) {
+			return {
+				text = "#arguments.totalPass# passed, but no test bundles ran for this scope#arguments.duration#",
+				color = "red"
+			};
+		}
+		return {text = "#arguments.totalPass# passed#arguments.duration#", color = "green"};
 	}
 
 	/**
@@ -8744,6 +9305,14 @@ component extends="modules.BaseModule" {
 				type="Wheels.TargetDirectoryExists",
 				message="wheels new #appName#: target directory already exists at #targetDir#"
 			);
+		}
+
+		// `wheels generate app <name> --dry-run`: report the project folder that
+		// would be created and write nothing (no files, no .env, no database).
+		if (request.$wheelsGenerateDryRun ?: false) {
+			arrayAppend(request.$wheelsDryRunPaths, targetDir & "/");
+			out("Would create a new Wheels application in #appName#/", "cyan");
+			return "";
 		}
 
 		// Merge defaults for any missing options
@@ -9779,13 +10348,13 @@ component extends="modules.BaseModule" {
 		for (var arg in args) {
 			// Named association flags
 			if (reFindNoCase("^--belongsTo=", arg)) {
-				var rels = listToArray(valueAfterEquals(arg));
+				var rels = $validAssociationNames(listToArray(valueAfterEquals(arg)), "belongsTo");
 				result.belongsTo.append(rels, true);
 			} else if (reFindNoCase("^--hasMany=", arg)) {
-				var rels = listToArray(valueAfterEquals(arg));
+				var rels = $validAssociationNames(listToArray(valueAfterEquals(arg)), "hasMany");
 				result.hasMany.append(rels, true);
 			} else if (reFindNoCase("^--hasOne=", arg)) {
-				var rels = listToArray(valueAfterEquals(arg));
+				var rels = $validAssociationNames(listToArray(valueAfterEquals(arg)), "hasOne");
 				result.hasOne.append(rels, true);
 			} else if (arg.startsWith("--")) {
 				var flagName = listFirst(arg, "=");
@@ -9853,15 +10422,34 @@ component extends="modules.BaseModule" {
 	 * Brace modifiers attach to the type token only, so they never steal
 	 * the value list from `name:enum:a,b`.
 	 */
+	/**
+	 * A hyphen can't appear in a CFC or property name, and people do type
+	 * `create-users-table` or `display-name`, so hyphens in those names become
+	 * underscores (with a note) before the name is validated.
+	 */
+	private string function $underscoreHyphens(required string name, required string kind) {
+		if (!find("-", arguments.name)) {
+			return arguments.name;
+		}
+		var normalized = replace(arguments.name, "-", "_", "all");
+		out("  note    #arguments.kind# name '#arguments.name#' uses '#normalized#' (hyphens become underscores)", "yellow");
+		return normalized;
+	}
+
 	private struct function $parsePropertyArg(required string arg) {
 		// Split on the FIRST two colons only — any additional colons
 		// (e.g. inside the comma-separated value list) belong in the
 		// values segment.
 		var parts = listToArray(arguments.arg, ":");
+		var names = new services.GeneratorPaths();
+		// Property names and types are written into generated CFML (models,
+		// migrations, forms), so only plain identifiers are accepted.
+		var propName = names.identifier($underscoreHyphens(arrayLen(parts) ? parts[1] : "", "property"), "property");
 		var typeToken = arrayLen(parts) > 1 ? parts[2] : "string";
 		var modifiers = $parseTypeModifiers(typeToken);
+		names.identifier(modifiers.type, "property type");
 		var prop = {
-			name: parts[1],
+			name: propName,
 			type: modifiers.type
 		};
 		if (structKeyExists(modifiers, "limit")) {
@@ -9883,9 +10471,32 @@ component extends="modules.BaseModule" {
 			for (var i = 3; i <= arrayLen(parts); i++) {
 				arrayAppend(valueSegments, parts[i]);
 			}
-			prop.values = arrayToList(valueSegments, ":");
+			// Validate and emit the same (trimmed) values.
+			var enumValues = [];
+			for (var enumValue in listToArray(arrayToList(valueSegments, ":"))) {
+				enumValue = trim(enumValue);
+				if (!names.isToken(enumValue)) {
+					throw(
+						type = "Wheels.Generate.InvalidName",
+						message = "Invalid enum value '#enumValue#' for property '#prop.name#': use letters, digits, underscores and hyphens."
+					);
+				}
+				arrayAppend(enumValues, enumValue);
+			}
+			prop.values = arrayToList(enumValues);
 		}
 		return prop;
+	}
+
+	/** Association names from --belongsTo / --hasMany / --hasOne: plain identifiers only. */
+	private array function $validAssociationNames(required array names, required string flag) {
+		var paths = new services.GeneratorPaths();
+		// Validate and return the same (trimmed) names.
+		var valid = [];
+		for (var assoc in arguments.names) {
+			arrayAppend(valid, paths.identifier(trim(assoc), arguments.flag & " association"));
+		}
+		return valid;
 	}
 
 	/**
@@ -10137,7 +10748,12 @@ component extends="modules.BaseModule" {
 	 */
 	private void function $recordVerifiedServer(required struct own) {
 		if (!structKeyExists(variables, "verifiedServers")) variables.verifiedServers = {};
-		variables.verifiedServers[arguments.own.port] = {pid: arguments.own.pid, hosts: arguments.own.hosts};
+		variables.verifiedServers[arguments.own.port] = {
+			pid: arguments.own.pid,
+			hosts: arguments.own.hosts,
+			token: arguments.own.token ?: "",
+			challengeRequired: arguments.own.challengeRequired ?: false
+		};
 	}
 
 	private void function $forgetVerifiedServer(required numeric port) {
@@ -10221,6 +10837,11 @@ component extends="modules.BaseModule" {
 		var rustSvc = new services.rustcfml.RustCFMLEngine();
 		var rustStatus = rustSvc.status(variables.projectRoot);
 		var rustVerdict = {port: 0, reason: "not-registered", pid: "", hosts: []};
+		// status() already refuses a recorded pid that is alive but not this
+		// project's server; keep that reason so the caller can say so.
+		if ((rustStatus.staleReason ?: "") == "pid-not-server") {
+			rustVerdict.reason = "pid-not-server";
+		}
 		if (
 			rustStatus.running
 			&& structKeyExists(rustStatus, "port") && isNumeric(rustStatus.port) && rustStatus.port > 0
@@ -10295,6 +10916,23 @@ component extends="modules.BaseModule" {
 			type="Wheels.ServerNotRunning",
 			message="No running Wheels server detected for this project (start one with: wheels start)"
 		);
+	}
+
+	/**
+	 * Say plainly that RustCFML has no build for this platform (for example an
+	 * Intel Mac), with what to use instead. Callers rethrow afterwards so the
+	 * command still exits non-zero.
+	 */
+	private void function $reportUnsupportedRustPlatform(required any error) {
+		out(arguments.error.message, "red");
+		if (len(arguments.error.detail)) {
+			out(arguments.error.detail, "yellow");
+		}
+	}
+
+	/** The RustCFML engine backend (a seam for specs). */
+	private any function $rustcfmlEngine() {
+		return new services.rustcfml.RustCFMLEngine();
 	}
 
 	/**
@@ -10724,7 +11362,8 @@ component extends="modules.BaseModule" {
 		string body = "",
 		boolean followRedirects = true,
 		numeric readTimeout = 120000,
-		numeric redirectsLeft = 5
+		numeric redirectsLeft = 5,
+		boolean skipChallenge = false
 	) {
 		var uri = createObject("java", "java.net.URI").init(arguments.requestUrl);
 		var host = replace(replace(uri.getHost(), "[", ""), "]", "");
@@ -10761,7 +11400,15 @@ component extends="modules.BaseModule" {
 		try {
 			sock.setSoTimeout(javaCast("int", arguments.readTimeout));
 			if (structCount(verified)) {
-				$assertPeerIsServer(sock, port, verified.pid, host);
+				var proof = $proveConnection(sock, port, verified, host, arguments.skipChallenge);
+				if (proof == "reconnect") {
+					// The challenge answer closed the connection (an older
+					// framework): prove a fresh one the way it always was.
+					try { sock.close(); } catch (any e) {}
+					var retryArgs = duplicate(arguments);
+					retryArgs.skipChallenge = true;
+					return $httpExchange(argumentCollection = retryArgs);
+				}
 			}
 
 			var crlf = chr(13) & chr(10);
@@ -10837,6 +11484,95 @@ component extends="modules.BaseModule" {
 				? "Wheels could not verify which process accepted its connection to #$urlHost(arguments.host)#:#arguments.port#, so it sent nothing."
 				: "The connection to #$urlHost(arguments.host)#:#arguments.port# was accepted by a process other than this project's server (pid #arguments.pid#), so Wheels sent nothing. Another program is listening on that port; stop it, or restart this project's server with: wheels start."
 		);
+	}
+
+	/**
+	 * Prove that this project's server holds the connection `sock`, before
+	 * anything is written on it. Returns "proven", or "reconnect" when the
+	 * caller must retry on a fresh connection; throws Wheels.ServerNotOwned
+	 * otherwise.
+	 *
+	 * With a per-start token (#3769), the server answers the connection
+	 * challenge on this very connection. A right answer proves it with no OS
+	 * introspection at all; a wrong one fails closed. When the server can't
+	 * answer (a framework without the challenge, a bridge that is off), the
+	 * CLI falls back to today's proof, the OS peer check, so a forced
+	 * "can't answer" never gets an attacker more than that check allows. A
+	 * server whose listener the OS could not see (challengeRequired) has no
+	 * such fallback: $assertPeerIsServer() refuses it.
+	 */
+	private string function $proveConnection(
+		required any sock,
+		required numeric port,
+		required struct verified,
+		required string host,
+		boolean skipChallenge = false
+	) {
+		if (!arguments.skipChallenge && len(arguments.verified.token ?: "")) {
+			var outcome = $challengeConnection(arguments.sock, arguments.host, arguments.port, arguments.verified.token);
+			if (outcome.state == "valid") return "proven";
+			if (outcome.state == "invalid") {
+				try { arguments.sock.close(); } catch (any e) {}
+				throw(
+					type = "Wheels.ServerNotOwned",
+					message = "The server on #$urlHost(arguments.host)#:#arguments.port# answered the connection check with the wrong proof, so Wheels sent nothing. Another program may be answering on that port, or the server was restarted without wheels start. Restart this project's server with: wheels start."
+				);
+			}
+			if (!outcome.reusable) return "reconnect";
+		}
+		$assertPeerIsServer(arguments.sock, arguments.port, arguments.verified.pid, arguments.host);
+		return "proven";
+	}
+
+	/**
+	 * Run the connection challenge on `sock` (keep-alive; the request carries
+	 * no secret): `{state, reusable}`. state is "valid" (the MAC matches this
+	 * connection), "invalid" (a MAC that does not), or "unavailable" (no MAC:
+	 * any other answer); reusable says whether the next request can follow
+	 * on the same connection.
+	 */
+	private struct function $challengeConnection(
+		required any sock,
+		required string host,
+		required numeric port,
+		required string token
+	) {
+		var challenge = new services.ServerChallenge();
+		var nonce = challenge.newSecret();
+		var crlf = chr(13) & chr(10);
+		var head = "GET /wheels/cli?command=cliChallenge&v=1&nonce=" & nonce & " HTTP/1.1" & crlf
+			& "Host: " & $urlHost(arguments.host) & ":" & arguments.port & crlf
+			& "User-Agent: wheels-cli" & crlf
+			& "Accept: application/json" & crlf
+			& "Connection: keep-alive" & crlf & crlf;
+		var previousTimeout = arguments.sock.getSoTimeout();
+		var response = {};
+		try {
+			// A server that neither frames nor closes its answer must not
+			// stall the command for the full request timeout.
+			arguments.sock.setSoTimeout(javaCast("int", 10000));
+			var outStream = arguments.sock.getOutputStream();
+			outStream.write(charsetDecode(head, "iso-8859-1"));
+			outStream.flush();
+			response = $readHttpResponse(arguments.sock.getInputStream());
+			arguments.sock.setSoTimeout(javaCast("int", previousTimeout));
+		} catch (any e) {
+			return {state: "unavailable", reusable: false};
+		}
+		var framed = structKeyExists(response.headers, "content-length")
+			|| findNoCase("chunked", response.headers["transfer-encoding"] ?: "");
+		var reusable = framed && !findNoCase("close", response.headers["connection"] ?: "");
+		var answer = {};
+		if (response.statusCode == 200 && isJSON(response.body)) {
+			try {
+				answer = deserializeJSON(response.body);
+			} catch (any e) {}
+		}
+		if (!isStruct(answer) || !structKeyExists(answer, "mac") || !isSimpleValue(answer.mac)) {
+			return {state: "unavailable", reusable: reusable};
+		}
+		var expected = challenge.expectedMac(arguments.token, nonce, arguments.sock);
+		return {state: challenge.macsMatch(expected, answer.mac) ? "valid" : "invalid", reusable: reusable};
 	}
 
 	/**
@@ -11014,6 +11750,11 @@ component extends="modules.BaseModule" {
 	/**
 	 * Ensure a directory exists, creating it if necessary
 	 */
+	/** ensureDirectory() for generator output: refuses a directory that resolves outside the project. */
+	private void function $ensureProjectDirectory(required string path) {
+		new services.GeneratorPaths().ensureDirectoryInside(variables.projectRoot, arguments.path);
+	}
+
 	private void function ensureDirectory(required string path) {
 		if (!directoryExists(path)) {
 			directoryCreate(path, true);

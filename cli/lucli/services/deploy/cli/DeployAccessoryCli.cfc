@@ -21,7 +21,7 @@ component {
         return this;
     }
 
-    public array function dryRunOutput() { return variables.dryRunBuffer; }
+    public array function dryRunOutput() { return new modules.wheels.services.deploy.lib.SecretRedaction().redactAll(variables.dryRunBuffer); }
 
     public string function boot(required struct opts)     { return $forEach(arguments.opts, "run",     "Booted accessory"); }
     public string function reboot(required struct opts)   { return $forEach(arguments.opts, "reboot",  "Rebooted accessory"); }
@@ -102,9 +102,9 @@ component {
 
     private string function $renderResult(required struct opts, required string summary) {
         if (arguments.opts.dryRun ?: false) {
-            return arrayToList(variables.dryRunBuffer, chr(10));
+            return new modules.wheels.services.deploy.lib.SecretRedaction().render(arrayToList(variables.dryRunBuffer, chr(10)));
         }
-        return arguments.summary;
+        return new modules.wheels.services.deploy.lib.SecretRedaction().render(arguments.summary);
     }
 
     private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {

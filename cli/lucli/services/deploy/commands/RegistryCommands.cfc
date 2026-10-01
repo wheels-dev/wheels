@@ -21,8 +21,8 @@ component extends="Base" {
         var reg = variables.config.registry();
         return docker(
             "login",
-            reg.server(),
-            "-u", reg.username(),
+            shellEscape(reg.server()),
+            "-u", shellEscape(reg.username()),
             "--password-stdin"
         );
     }

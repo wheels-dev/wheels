@@ -26,6 +26,10 @@ name: Distribution install smoke (brew / scoop / apt / yum)
 #      the clobber was bidirectional (a stable publish could wipe BE too).
 #   2. the per-channel install legs — install the CLI the exact documented way
 #      on each channel and assert `wheels --version` reports the current GA.
+#      `wheels --version` is answered by the channel wrapper without starting
+#      LuCLI, so each leg also reads the version the installed LuCLI runtime
+#      carries (lucli/version.properties), requires the tools/lucli.json pin,
+#      and runs `wheels info`, which boots the JVM and the Wheels module.
 #
 # Runs daily (propagation has settled by then) and on demand. It does NOT run on
 # `release: published` on purpose — right after a tag the channels lag, which
@@ -62,7 +66,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      lucli: ${{ steps.pin.outputs.lucli }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: tools/lucli.json
+          sparse-checkout-cone-mode: false
+      - name: Read the LuCLI runtime pin every channel must ship
+        id: pin
+        run: |
+          set -euo pipefail
+          LUCLI=$(jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))' tools/lucli.json)
+          echo "lucli=$LUCLI" >> "$GITHUB_OUTPUT"
+          echo "Every channel must ship LuCLI $LUCLI (tools/lucli.json)"
       - name: Determine the GA version each channel must serve
         id: v
         env:
@@ -275,6 +291,34 @@ jobs:
             exit 1
           fi
 
+      # `wheels --version` is answered by the wrapper without starting LuCLI,
+      # so on its own it never proves the runtime works. Read the version the
+      # installed runtime carries, require the pin, and run a command that
+      # boots the JVM and the Wheels module through LuCLI.
+      - name: Assert the installed LuCLI runtime == pin, and that it boots
+        env:
+          CHANNEL: "Homebrew (${{ matrix.os }})"
+          PINNED_LUCLI: ${{ needs.resolve.outputs.lucli }}
+        run: |
+          set -euo pipefail
+          RUNTIME="$(brew --prefix wheels)/libexec/wheels"
+          if [ ! -f "$RUNTIME" ]; then
+            echo "::error::${CHANNEL}: no LuCLI runtime at ${RUNTIME}"; exit 1
+          fi
+          GOT="$(unzip -p "$RUNTIME" lucli/version.properties 2>/dev/null | sed -n 's/^lucli\.version=//p' | tr -d '\r' || true)"
+          echo "${CHANNEL}: installed LuCLI runtime => '${GOT}' (pinned '${PINNED_LUCLI}')"
+          if [ "$GOT" != "$PINNED_LUCLI" ]; then
+            echo "::error::${CHANNEL} ships LuCLI '${GOT:-unknown}', expected the pinned ${PINNED_LUCLI}"; exit 1
+          fi
+          if ! OUT="$(wheels info 2>&1)"; then
+            echo "::error::${CHANNEL}: wheels info failed (the LuCLI runtime did not start)"
+            printf '%s\n' "$OUT" | tail -40; exit 1
+          fi
+          printf '%s\n' "$OUT" | head -20
+          if ! grep -q "Wheels CLI" <<<"$OUT"; then
+            echo "::error::${CHANNEL}: wheels info did not reach the Wheels module through LuCLI"; exit 1
+          fi
+
   scoop:
     needs: resolve
     name: "Scoop (windows)"
@@ -309,6 +353,39 @@ jobs:
             Write-Host $raw
             exit 1
           }
+
+      # `wheels --version` is answered by the wrapper without starting LuCLI.
+      # Require the pinned runtime and boot it (see the Homebrew job).
+      - name: Assert the installed LuCLI runtime == pin, and that it boots
+        shell: pwsh
+        env:
+          PINNED_LUCLI: ${{ needs.resolve.outputs.lucli }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $jar = "$env:USERPROFILE\scoop\apps\wheels\current\lucli.jar"
+          if (-not (Test-Path $jar)) {
+            Write-Host "::error::Scoop: no lucli.jar at $jar (an older runtime layout)"; exit 1
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($jar)
+          try {
+            $entry = $zip.GetEntry('lucli/version.properties')
+            $text = ''
+            if ($entry) {
+              $reader = New-Object System.IO.StreamReader($entry.Open())
+              $text = $reader.ReadToEnd()
+              $reader.Close()
+            }
+          } finally { $zip.Dispose() }
+          $got = [regex]::Match($text, 'lucli\.version=([^\r\n]+)').Groups[1].Value.Trim()
+          Write-Host "Scoop: installed LuCLI runtime => '$got' (pinned '$env:PINNED_LUCLI')"
+          if ($got -ne $env:PINNED_LUCLI) {
+            Write-Host "::error::Scoop ships LuCLI '$got', expected the pinned $env:PINNED_LUCLI"; exit 1
+          }
+          $out = (wheels info 2>&1 | Out-String)
+          Write-Host $out
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::Scoop: wheels info failed (the LuCLI runtime did not start)"; exit 1 }
+          if ($out -notmatch 'Wheels CLI') { Write-Host "::error::Scoop: wheels info did not reach the Wheels module through LuCLI"; exit 1 }
 
   apt:
     needs: resolve
@@ -362,6 +439,34 @@ jobs:
             exit 1
           fi
 
+      # `wheels --version` is answered by the wrapper without starting LuCLI,
+      # so on its own it never proves the runtime works. Read the version the
+      # installed runtime carries, require the pin, and run a command that
+      # boots the JVM and the Wheels module through LuCLI.
+      - name: Assert the installed LuCLI runtime == pin, and that it boots
+        env:
+          CHANNEL: "apt (${{ matrix.arch }})"
+          PINNED_LUCLI: ${{ needs.resolve.outputs.lucli }}
+        run: |
+          set -euo pipefail
+          RUNTIME="/opt/wheels/lucli.jar"
+          if [ ! -f "$RUNTIME" ]; then
+            echo "::error::${CHANNEL}: no LuCLI runtime at ${RUNTIME}"; exit 1
+          fi
+          GOT="$(unzip -p "$RUNTIME" lucli/version.properties 2>/dev/null | sed -n 's/^lucli\.version=//p' | tr -d '\r' || true)"
+          echo "${CHANNEL}: installed LuCLI runtime => '${GOT}' (pinned '${PINNED_LUCLI}')"
+          if [ "$GOT" != "$PINNED_LUCLI" ]; then
+            echo "::error::${CHANNEL} ships LuCLI '${GOT:-unknown}', expected the pinned ${PINNED_LUCLI}"; exit 1
+          fi
+          if ! OUT="$(wheels info 2>&1)"; then
+            echo "::error::${CHANNEL}: wheels info failed (the LuCLI runtime did not start)"
+            printf '%s\n' "$OUT" | tail -40; exit 1
+          fi
+          printf '%s\n' "$OUT" | head -20
+          if ! grep -q "Wheels CLI" <<<"$OUT"; then
+            echo "::error::${CHANNEL}: wheels info did not reach the Wheels module through LuCLI"; exit 1
+          fi
+
   yum:
     needs: resolve
     name: "yum (rocky 9)"
@@ -399,4 +504,33 @@ jobs:
             echo "::error::${CHANNEL} serves '${GOT}', expected '${EXPECTED}'"
             echo "--- raw wheels --version ---"; printf '%s\n' "$RAW" | head -20
             exit 1
+          fi
+
+      # `wheels --version` is answered by the wrapper without starting LuCLI,
+      # so on its own it never proves the runtime works. Read the version the
+      # installed runtime carries, require the pin, and run a command that
+      # boots the JVM and the Wheels module through LuCLI.
+      - name: Assert the installed LuCLI runtime == pin, and that it boots
+        env:
+          CHANNEL: "yum (rocky 9)"
+          PINNED_LUCLI: ${{ needs.resolve.outputs.lucli }}
+        run: |
+          set -euo pipefail
+          dnf -y install unzip >/dev/null
+          RUNTIME="/opt/wheels/lucli.jar"
+          if [ ! -f "$RUNTIME" ]; then
+            echo "::error::${CHANNEL}: no LuCLI runtime at ${RUNTIME}"; exit 1
+          fi
+          GOT="$(unzip -p "$RUNTIME" lucli/version.properties 2>/dev/null | sed -n 's/^lucli\.version=//p' | tr -d '\r' || true)"
+          echo "${CHANNEL}: installed LuCLI runtime => '${GOT}' (pinned '${PINNED_LUCLI}')"
+          if [ "$GOT" != "$PINNED_LUCLI" ]; then
+            echo "::error::${CHANNEL} ships LuCLI '${GOT:-unknown}', expected the pinned ${PINNED_LUCLI}"; exit 1
+          fi
+          if ! OUT="$(wheels info 2>&1)"; then
+            echo "::error::${CHANNEL}: wheels info failed (the LuCLI runtime did not start)"
+            printf '%s\n' "$OUT" | tail -40; exit 1
+          fi
+          printf '%s\n' "$OUT" | head -20
+          if ! grep -q "Wheels CLI" <<<"$OUT"; then
+            echo "::error::${CHANNEL}: wheels info did not reach the Wheels module through LuCLI"; exit 1
           fi

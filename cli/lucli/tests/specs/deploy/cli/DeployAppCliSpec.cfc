@@ -20,14 +20,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
                 cli.stop({configPath: variables.fixture, version: "v1"});
-                expect($anyInclude($cmdsFrom(fake), "docker stop demo-web-v1")).toBeTrue();
+                expect($anyInclude($cmdsFrom(fake), "docker stop 'demo-web-v1'")).toBeTrue();
             });
 
             it("start emits docker start via SshPool", () => {
                 var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                 var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
                 cli.start({configPath: variables.fixture, version: "v1"});
-                expect($anyInclude($cmdsFrom(fake), "docker start demo-web-v1")).toBeTrue();
+                expect($anyInclude($cmdsFrom(fake), "docker start 'demo-web-v1'")).toBeTrue();
             });
 
             it("containers emits docker ps filter", () => {
@@ -64,8 +64,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var cli = new cli.lucli.services.deploy.cli.DeployAppCli(fake);
                 cli.remove({configPath: variables.fixture, version: "v1"});
                 var cmds = $cmdsFrom(fake);
-                expect($anyInclude(cmds, "docker stop demo-web-v1")).toBeTrue();
-                expect($anyInclude(cmds, "docker rm demo-web-v1")).toBeTrue();
+                expect($anyInclude(cmds, "docker stop 'demo-web-v1'")).toBeTrue();
+                expect($anyInclude(cmds, "docker rm 'demo-web-v1'")).toBeTrue();
             });
 
             it("dry-run buffers output instead of dispatching", () => {
@@ -174,7 +174,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
                     expect(calls[uploadIdx].remote).toBe(".kamal/apps/demo/env/roles/web.env");
                     expect(calls[uploadIdx].content).toInclude("APP_SECRET=s3cr3t-value-42");
-                    expect(calls[runIdx].cmd).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    expect(calls[runIdx].cmd).toInclude("--env-file '.kamal/apps/demo/env/roles/web.env'");
                     for (var c in calls) {
                         expect(c.cmd ?: "").notToInclude("s3cr3t-value-42");
                     }
@@ -204,7 +204,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                             break;
                         }
                     }
-                    expect(runCmd).toInclude("super-secret-db-pw-9000");
+                    // Dry-run output is itself redacted now; rebuild the real command the
+                    // pool receives by putting the known value back.
+                    expect(runCmd).notToInclude("super-secret-db-pw-9000");
+                    expect(runCmd).toInclude("[REDACTED]");
+                    runCmd = replace(runCmd, "[REDACTED]", "super-secret-db-pw-9000", "all");
 
                     var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                     fake.expect("1.2.3.4", runCmd, {exitCode: 125, stdout: "", stderr: "boom"});

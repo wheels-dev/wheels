@@ -369,7 +369,7 @@
 		$combineArguments(args = arguments, combine = "methods,method", required = true);
 		$combineArguments(args = arguments, combine = "properties,property", required = false);
 
-		if (application.wheels.showErrorInformation) {
+		if ($get("showErrorInformation")) {
 			if (StructKeyExists(arguments, "properties")) {
 				if (!Len(arguments.properties)) {
 					Throw(

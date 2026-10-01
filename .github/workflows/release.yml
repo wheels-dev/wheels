@@ -380,9 +380,23 @@ jobs:
       - name: Install nfpm
         run: |
           NFPM_VERSION="2.40.0"
-          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
-            | sudo tar -xzf - -C /usr/local/bin nfpm
+          # From the release's checksums.txt; bump together with NFPM_VERSION.
+          NFPM_SHA256="535962c4771db671352884b5591254481f851822557ad8476605c1e77a12504c"
+          NFPM_TGZ="${RUNNER_TEMP}/nfpm.tar.gz"
+          curl -fsSL -o "${NFPM_TGZ}" \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "${NFPM_SHA256}  ${NFPM_TGZ}" | sha256sum -c -
+          sudo tar -xzf "${NFPM_TGZ}" -C /usr/local/bin nfpm
           nfpm --version
+
+      # Container-free (fake JDK stubs): guards the wrapper's Java 21 resolution,
+      # e.g. that a pre-set JAVA_HOME at Java 17 — which this very runner
+      # exports — is ignored rather than crashing LuCLI (#3728 smoke).
+      - name: Test the Linux launcher's Java resolution
+        run: bash tools/test-linux-launcher-java.sh
+
+      - name: Test the Linux launcher's offline-docs mirror
+        run: bash tools/test-linux-launcher-docs-mirror.sh
 
       - name: Build Linux packages (.deb / .rpm)
         # CHANNEL derives from the version so develop snapshots produce the

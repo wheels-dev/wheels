@@ -20,11 +20,11 @@ component extends="Base" {
             "run",
             "--detach",
             "--restart unless-stopped",
-            "--name #container_name(arguments.role, arguments.version)#",
+            "--name " & shellEscape(container_name(arguments.role, arguments.version)),
             "--network kamal",
             $labelArgs(arguments.role, arguments.version),
             $envArgs(arguments.role),
-            variables.config.absoluteImage(arguments.version),
+            shellEscape(variables.config.absoluteImage(arguments.version)),
             arguments.role.cmd()
         );
     }
@@ -40,7 +40,7 @@ component extends="Base" {
     public string function remove_conflicting(required any role, required string version) {
         return pipe([
             docker("container", "ls", "--all",
-                   "--filter name=^#container_name(arguments.role, arguments.version)#$",
+                   "--filter " & shellEscape("name=^" & container_name(arguments.role, arguments.version) & "$"),
                    "--quiet"),
             "xargs -r docker container rm --force"
         ]);
@@ -57,30 +57,30 @@ component extends="Base" {
     public string function stop_old_versions(required any role, required string version) {
         return pipe([
             docker("ps",
-                   "--filter label=service=#variables.config.service()#",
-                   "--filter label=role=#arguments.role.name()#",
-                   "--filter label=destination=#variables.config.destination()#",
+                   "--filter " & shellEscape("label=service=" & variables.config.service()),
+                   "--filter " & shellEscape("label=role=" & arguments.role.name()),
+                   "--filter " & shellEscape("label=destination=" & variables.config.destination()),
                    "--format {{.Names}}"),
-            "grep -v '^#container_name(arguments.role, arguments.version)#$'",
+            "grep -v " & shellEscape("^" & container_name(arguments.role, arguments.version) & "$"),
             "xargs -r docker stop"
         ]);
     }
 
     public string function start(required any role, required string version) {
-        return docker("start", container_name(arguments.role, arguments.version));
+        return docker("start", shellEscape(container_name(arguments.role, arguments.version)));
     }
 
     public string function stop(required any role, required string version) {
-        return docker("stop", container_name(arguments.role, arguments.version));
+        return docker("stop", shellEscape(container_name(arguments.role, arguments.version)));
     }
 
     public string function status(required any role, required string version) {
         return docker("inspect", "--format={{.State.Status}}",
-                      container_name(arguments.role, arguments.version));
+                      shellEscape(container_name(arguments.role, arguments.version)));
     }
 
     public string function containers() {
-        return docker("ps", "--filter", "label=service=#variables.config.service()#");
+        return docker("ps", "--filter", shellEscape("label=service=" & variables.config.service()));
     }
 
     public string function images() {
@@ -98,7 +98,8 @@ component extends="Base" {
     }
 
     public string function container_name(required any role, required string version) {
-        return "#variables.config.service()#-#arguments.role.name()#-#arguments.version#";
+        var version = new modules.wheels.services.deploy.config.DeployToken().assert(arguments.version, "version");
+        return "#variables.config.service()#-#arguments.role.name()#-#version#";
     }
 
     /**
@@ -116,17 +117,17 @@ component extends="Base" {
 
     public string function remove(required any role, required string version) {
         return chain([
-            docker("stop", container_name(arguments.role, arguments.version)),
-            docker("rm", container_name(arguments.role, arguments.version))
+            docker("stop", shellEscape(container_name(arguments.role, arguments.version))),
+            docker("rm", shellEscape(container_name(arguments.role, arguments.version)))
         ]);
     }
 
     private array function $labelArgs(required any role, required string version) {
         return [
-            "--label", "service=#variables.config.service()#",
-            "--label", "role=#arguments.role.name()#",
-            "--label", "destination=#variables.config.destination()#",
-            "--label", "version=#arguments.version#"
+            "--label", shellEscape("service=" & variables.config.service()),
+            "--label", shellEscape("role=" & arguments.role.name()),
+            "--label", shellEscape("destination=" & variables.config.destination()),
+            "--label", shellEscape("version=" & arguments.version)
         ];
     }
 
@@ -146,7 +147,7 @@ component extends="Base" {
         }
         if (arrayLen(env.secret())) {
             arrayAppend(parts, "--env-file");
-            arrayAppend(parts, env_file_path(arguments.role));
+            arrayAppend(parts, shellEscape(env_file_path(arguments.role)));
         }
         return parts;
     }

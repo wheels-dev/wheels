@@ -97,6 +97,7 @@ component {
 	 * an Expression-level error.
 	 */
 	public struct function fetchManifest(required string name) {
+		new modules.wheels.services.packages.PackageName().assert(arguments.name);
 		if (variables.cache.hasFreshManifest(arguments.name)) {
 			local.cached = variables.cache.readManifest(arguments.name);
 			$validateManifest(arguments.name, local.cached);

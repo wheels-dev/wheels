@@ -15,6 +15,7 @@ component extends="wheels.events.EventMethods" {
 	public any function init() {
 		this.headerCalls = [];
 		this.mailCalls = 0;
+		this.mailArgs = [];
 		this.mailShouldThrow = false;
 		this.formatOverride = "json";
 		return this;
@@ -30,6 +31,11 @@ component extends="wheels.events.EventMethods" {
 
 	public void function $mail() {
 		this.mailCalls = this.mailCalls + 1;
+		var recorded = {};
+		for (var key in arguments) {
+			recorded[key] = arguments[key];
+		}
+		ArrayAppend(this.mailArgs, recorded);
 		if (this.mailShouldThrow) {
 			throw(type = "UnitTest.MailFailure", message = "forced mail failure");
 		}

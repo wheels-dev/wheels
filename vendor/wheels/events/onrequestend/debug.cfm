@@ -72,6 +72,16 @@
 		};
 	}
 </cfscript>
+<!--- GHSA-8r22: render the debug bar only for a request that is actually granted
+      debug information. An app still carrying the pre-4.1.2 IP-debug block
+      includes this template from its own onRequestEnd based on the shared
+      application-scope debug flag, which does not reflect the per-request grant
+      (and rendering.cfc always sets the request copy true on a layout render).
+      Gate on $get() so a concurrent request never renders another client's
+      debug bar. --->
+<cfif NOT $get("showDebugInformation")>
+	<cfexit>
+</cfif>
 <!--- Skip debug bar for AJAX, HTMX, Turbo, and fetch requests to avoid breaking partial responses --->
 <cfset local.reqHeaders = GetHTTPRequestData().headers>
 <cfif $debugBarSkipRequest(local.reqHeaders)>

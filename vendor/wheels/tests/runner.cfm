@@ -167,10 +167,9 @@
 
     try {
         // Try to create TestBox instance with coverage disabled
-        testBox = new wheels.wheelstest.system.TestBox(
-            directory=local.testDirectory,
-            options={ coverage = { enabled = false } }
-        );
+        // A single spec file runs as its one bundle (issue 3759).
+        local.testBoxArgs = local.scopeResolver.testBoxArgs(scope = local.testScope);
+        testBox = new wheels.wheelstest.system.TestBox(argumentCollection = local.testBoxArgs);
     } catch (any e) {
         // Best-effort response setup — `application.wo.$header()` / `$content()`
         // short-circuit if the response is already committed (Adobe CF + Undertow)

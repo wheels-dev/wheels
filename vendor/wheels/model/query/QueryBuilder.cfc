@@ -114,9 +114,11 @@ component output="false" {
 	 */
 	public any function whereBetween(required string property, required any low, required any high) {
 		$validatePropertyName(arguments.property);
-		local.lowQuoted = $quoteValue(arguments.property, arguments.low);
-		local.highQuoted = $quoteValue(arguments.property, arguments.high);
-		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# BETWEEN #local.lowQuoted# AND #local.highQuoted#"});
+		// A grouped >= / <= pair, so each bound gets the same handling as a
+		// where() comparison, typed by the column.
+		local.lowCondition = $buildCondition(arguments.property, ">=", arguments.low);
+		local.highCondition = $buildCondition(arguments.property, "<=", arguments.high);
+		ArrayAppend(variables.whereClauses, {type = "AND", clause = "(#local.lowCondition# AND #local.highCondition#)"});
 		return this;
 	}
 
@@ -627,12 +629,12 @@ component output="false" {
 		}
 		switch (arguments.type) {
 			case "integer":
-				if (!ReFind("^-?[0-9]+$", arguments.value)) {
+				if (!ReFind("^-?[0-9]+$", arguments.value) || ReFind("[^0-9-]", arguments.value)) {
 					$throwInvalidValue(arguments.property, arguments.value, "integer");
 				}
 				break;
 			case "float":
-				if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", arguments.value)) {
+				if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", arguments.value) || ReFind("[^0-9.-]", arguments.value)) {
 					$throwInvalidValue(arguments.property, arguments.value, "float");
 				}
 				break;

@@ -96,6 +96,48 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
+			it("rejects an invalid transaction mode without leaving the marker set, so a later rollback still rolls back", () => {
+				// An invalid mode used to be rejected only in the switch's default branch,
+				// AFTER the marker was set and outside both catches: the marker stayed true
+				// and the next save(transaction="rollback") ran as "alreadyopen", with no
+				// transaction at all, and persisted.
+				var tagModel = application.wo.model("tag");
+				var connectionArgs = tagModel.$hashedConnectionArgs();
+
+				if (!StructKeyExists(request, "wheels")) {
+					request.wheels = {};
+				}
+				if (!StructKeyExists(request.wheels, "transactions")) {
+					request.wheels.transactions = {};
+				}
+				request.wheels.transactions[connectionArgs] = false;
+
+				var uniqueName = "txmode-" & Left(Hash(CreateUUID()), 12);
+				var state = {threw = false, type = ""};
+				try {
+					tagModel.new(name = "txmode-invalid").save(transaction = "commti");
+				} catch (any e) {
+					state.threw = true;
+					state.type = e.type;
+				}
+				var markerAfterInvalid = request.wheels.transactions[connectionArgs];
+
+				var rolledBack = tagModel.new(name = uniqueName);
+				rolledBack.save(transaction = "rollback");
+				var persisted = tagModel.findOne(where = "name = '#uniqueName#'");
+				// Clean up before asserting, in case the rollback didn't happen.
+				tagModel.deleteAll(where = "name IN ('#uniqueName#', 'txmode-invalid')");
+				request.wheels.transactions[connectionArgs] = false;
+
+				expect(state.threw).toBeTrue("save(transaction=""commti"") should throw.");
+				expect(markerAfterInvalid).toBeFalse(
+					"An invalid transaction mode must not leave the connection marked as having an open transaction."
+				);
+				expect(IsObject(persisted)).toBeFalse(
+					"save(transaction=""rollback"") after an invalid mode must still roll back; the row was persisted."
+				);
+			});
+
 			it("leaves an outer owner's marker set when a nested call throws", () => {
 				var tag = application.wo.model("tag");
 				var connectionArgs = tag.$hashedConnectionArgs();

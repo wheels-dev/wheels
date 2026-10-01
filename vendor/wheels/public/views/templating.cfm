@@ -1,3 +1,10 @@
+<cfscript>
+// Dev-tool access gate: reject requests not addressed to the local machine
+// before rendering the create GUI or issuing the anti-CSRF token. Runs before
+// the layout header so a rejected request gets a clean 403 with no page output.
+include "/wheels/public/migrator/_guard.cfm";
+$migratorEnforceLocalAccess();
+</cfscript>
 <cfinclude template="../layout/_header.cfm">
 <cfscript>
 datasourceAvailable=true;
@@ -14,6 +21,18 @@ try {
 	datasourceAvailable = false;
 	message = err.message;
 }
+
+// Ensure the migrator anti-CSRF token exists (the create endpoint requires it,
+// same as the command endpoint) and expose it to the form's XHR below. Mirrors
+// views/migrator.cfm so visiting this page directly still issues a token.
+if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
+	cflock(scope="application", type="exclusive", timeout=5) {
+		if (!structKeyExists(application.wheels, "$migratorCsrfToken")) {
+			application.wheels.$migratorCsrfToken = LCase(Hash(GenerateSecretKey("AES") & CreateUUID(), "SHA-512"));
+		}
+	}
+}
+migratorCsrfToken = application.wheels.$migratorCsrfToken;
 </cfscript>
 <cfoutput>
 <!--- cfformat-ignore-start --->
@@ -130,6 +149,7 @@ try {
 </cfoutput>
 
 <script>
+var wheelsMigratorCsrfToken = '<cfoutput>#JSStringFormat(migratorCsrfToken)#</cfoutput>';
 $(document).ready(function() {
 	$(".createMigration").on("click", function(e){
 		var url = $(this).data("data-url");
@@ -141,7 +161,8 @@ $(document).ready(function() {
 		var resp = $.ajax({
 				url: url,
 				method: 'post',
-				data: data
+				data: data,
+				headers: { 'X-Wheels-Csrf-Token': wheelsMigratorCsrfToken }
 		})
 		.done(function(data, status, req) {
 			var res = $("#result");

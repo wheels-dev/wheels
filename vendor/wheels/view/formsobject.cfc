@@ -422,6 +422,13 @@ component {
 		if (!StructKeyExists(arguments, "value") || !Len(arguments.value)) {
 			arguments.value = $formValue(argumentCollection = arguments);
 		}
+		// HTML5 <input type="date"> only displays a bare yyyy-mm-dd value; a date
+		// or datetime value carrying a time component (e.g. from a datetime column)
+		// renders as blank/invalid in the browser. Reduce a real date value to the
+		// date, leaving an already-bare yyyy-mm-dd or a non-date string untouched.
+		if (Len(arguments.value) && !ReFind("^\d{4}-\d{2}-\d{2}$", arguments.value) && IsDate(arguments.value)) {
+			arguments.value = DateFormat(arguments.value, "yyyy-mm-dd");
+		}
 		local.encode = IsBoolean(arguments.encode) && !arguments.encode ? false : true;
 		return local.before & $tag(
 			name = "input",

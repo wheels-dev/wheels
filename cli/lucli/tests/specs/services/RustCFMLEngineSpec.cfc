@@ -1,8 +1,9 @@
 /**
  * Coverage for the RustCFML engine backend's pure helpers (platform→asset
  * mapping, project-key hashing, state path) and the source-level shape of
- * the process plumbing. The process-bound methods (install/start/stop)
- * shell out to curl/kill and are exercised end-to-end manually, not here.
+ * the process plumbing. install()'s download verification is covered by
+ * RustCFMLEngineInstallSpec; start/stop shell out to kill and are exercised
+ * end-to-end manually, not here.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -14,16 +15,126 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function run() {
 
+		describe("RustCFMLEngine with a stale state file", () => {
+
+			// After a crash the state file outlives the server, and its pid can be
+			// reused by an unrelated process. status/start/stop must not treat that
+			// process as this project's server, and stop must never kill it.
+			it("a live foreign pid is not running, is not killed by stop, and stays findable by pid", () => {
+				if (findNoCase("win", createObject("java", "java.lang.System").getProperty("os.name"))) {
+					return;
+				}
+				var engine = new cli.lucli.services.rustcfml.RustCFMLEngine();
+				var root = getTempDirectory() & "rust-stale-" & createUUID();
+				directoryCreate(root);
+				var foreign = createObject("java", "java.lang.ProcessBuilder").init(["sleep", "60"]).start();
+				var statePath = engine.$statePath(root);
+				try {
+					directoryCreate(getDirectoryFromPath(statePath), true, true);
+					fileWrite(statePath, serializeJSON({pid: foreign.pid(), port: 8513, projectRoot: root}));
+					var st = engine.status(root);
+					expect(st.running).toBeFalse("a reused pid was reported as this project's server");
+					expect(st.staleReason).toBe("pid-not-server");
+					expect(st.message).toInclude("pid " & foreign.pid());
+					// Kept, so the pid can still be found (e.g. a server an older CLI started).
+					expect(fileExists(statePath)).toBeTrue("the state of a live, unrecognised pid was dropped");
+
+					expect(engine.stop(root)).toBeFalse();
+					sleep(200);
+					expect(foreign.isAlive()).toBeTrue("stop() killed an unrelated process");
+					expect(fileExists(statePath)).toBeTrue();
+				} finally {
+					foreign.destroy();
+					if (fileExists(statePath)) fileDelete(statePath);
+					directoryDelete(root, true);
+				}
+			});
+
+			it("a dead recorded pid is not running and its state is removed", () => {
+				var engine = new cli.lucli.services.rustcfml.RustCFMLEngine();
+				var root = getTempDirectory() & "rust-dead-" & createUUID();
+				directoryCreate(root);
+				var statePath = engine.$statePath(root);
+				try {
+					directoryCreate(getDirectoryFromPath(statePath), true, true);
+					fileWrite(statePath, serializeJSON({pid: 2147480000, port: 8513, projectRoot: root}));
+					expect(engine.status(root).running).toBeFalse();
+					expect(fileExists(statePath)).toBeFalse();
+				} finally {
+					if (fileExists(statePath)) fileDelete(statePath);
+					directoryDelete(root, true);
+				}
+			});
+
+			it("start()'s AlreadyRunning check and stop()'s kill go through the ownership check", () => {
+				var src = fileRead(expandPath("/cli/lucli/services/rustcfml/RustCFMLEngine.cfc"));
+				expect(src).toInclude("if ($ownsRecordedPid(state, arguments.projectRoot)) {");
+				expect(src).toInclude("state.staleReason = ""pid-not-server"";");
+				expect(src).toInclude("running = $ownsRecordedPid(state, arguments.projectRoot);");
+				expect(src).toInclude("&& isProjectServerProcess(arguments.state.pid, arguments.projectRoot);");
+			});
+
+		});
+
 		describe("RustCFMLEngine", () => {
 
-			it("maps the current platform to one of the four known assets", () => {
-				var asset = variables.svc.assetName();
-				expect(
-					listFindNoCase(
-						"rustcfml-linux-x86_64,rustcfml-linux-aarch64,rustcfml-macos-aarch64,rustcfml-macos-x86_64",
-						asset
-					) > 0
-				).toBeTrue("unexpected asset name: " & asset);
+			it("maps the current platform to one of the published assets, or refuses it clearly", () => {
+				var state = {asset = "", type = ""};
+				try {
+					state.asset = variables.svc.assetName();
+				} catch (any e) {
+					state.type = e.type;
+				}
+				if (Len(state.type)) {
+					expect(state.type).toBe("Wheels.RustCFML.UnsupportedPlatform");
+				} else {
+					expect(
+						listFindNoCase("rustcfml-linux-x86_64,rustcfml-linux-aarch64,rustcfml-macos-aarch64", state.asset) > 0
+					).toBeTrue("unexpected asset name: " & state.asset);
+				}
+			});
+
+			it("maps each published platform to its release asset", () => {
+				expect(variables.svc.$assetFor("Mac OS X", "aarch64")).toBe("rustcfml-macos-aarch64");
+				expect(variables.svc.$assetFor("Mac OS X", "arm64")).toBe("rustcfml-macos-aarch64");
+				expect(variables.svc.$assetFor("Linux", "amd64")).toBe("rustcfml-linux-x86_64");
+				expect(variables.svc.$assetFor("Linux", "x86_64")).toBe("rustcfml-linux-x86_64");
+				expect(variables.svc.$assetFor("Linux", "aarch64")).toBe("rustcfml-linux-aarch64");
+			});
+
+			it("refuses an Intel Mac with a clear unsupported-platform error, not a 404 download", () => {
+				for (var arch in ["x86_64", "amd64"]) {
+					var state = {type = "", message = ""};
+					try {
+						variables.svc.$assetFor("Mac OS X", arch);
+					} catch (any e) {
+						state.type = e.type;
+						state.message = e.message & " " & e.detail;
+					}
+					expect(state.type).toBe("Wheels.RustCFML.UnsupportedPlatform", "Mac OS X / #arch#");
+					expect(state.message).toInclude("Intel");
+					expect(state.message).toInclude("wheels start");
+				}
+			});
+
+			it("gives an x86_64 JVM on Apple Silicon (Rosetta) the native arm64 build", () => {
+				expect(variables.svc.$assetFor("Mac OS X", "x86_64", true)).toBe("rustcfml-macos-aarch64");
+				expect(variables.svc.$assetFor("Mac OS X", "amd64", true)).toBe("rustcfml-macos-aarch64");
+				// The hardware flag never turns Linux x86_64 into an arm build.
+				expect(variables.svc.$assetFor("Linux", "amd64", true)).toBe("rustcfml-linux-x86_64");
+			});
+
+			it("reads the Mac's hardware arch as a boolean, false off macOS", () => {
+				var answer = variables.svc.$macHasArm64Hardware();
+				expect(isBoolean(answer)).toBeTrue();
+				if (!findNoCase("mac", createObject("java", "java.lang.System").getProperty("os.name"))) {
+					expect(answer).toBeFalse();
+				}
+			});
+
+			it("refuses a platform RustCFML has no build for", () => {
+				expect(() => variables.svc.$assetFor("Windows 11", "amd64")).toThrow(type = "Wheels.RustCFML.UnsupportedPlatform");
+				expect(() => variables.svc.$assetFor("FreeBSD", "amd64")).toThrow(type = "Wheels.RustCFML.UnsupportedPlatform");
 			});
 
 			it("hashes a project root to a stable filesystem key", () => {

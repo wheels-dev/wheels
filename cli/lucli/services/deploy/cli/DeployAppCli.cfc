@@ -22,7 +22,7 @@ component {
         return this;
     }
 
-    public array function dryRunOutput() { return variables.dryRunBuffer; }
+    public array function dryRunOutput() { return new modules.wheels.services.deploy.lib.SecretRedaction().redactAll(variables.dryRunBuffer); }
 
     public string function boot(required struct opts) {
         // boot (re)creates the container, so env.secret values must be
@@ -169,12 +169,12 @@ component {
 
     private string function $renderResult(required struct opts, required string summary) {
         if (arguments.opts.dryRun ?: false) {
-            return arrayToList(variables.dryRunBuffer, chr(10));
+            return new modules.wheels.services.deploy.lib.SecretRedaction().render(arrayToList(variables.dryRunBuffer, chr(10)));
         }
         if (arrayLen(variables.liveOutput)) {
-            return arguments.summary & chr(10) & arrayToList(variables.liveOutput, chr(10));
+            return new modules.wheels.services.deploy.lib.SecretRedaction().render(arguments.summary & chr(10) & arrayToList(variables.liveOutput, chr(10)));
         }
-        return arguments.summary;
+        return new modules.wheels.services.deploy.lib.SecretRedaction().render(arguments.summary);
     }
 
     private void function $dispatch(required array hosts, required string cmd, required boolean dryRun, boolean allowFail = false) {
@@ -211,6 +211,7 @@ component {
         var values = [];
         for (var k in resolved) {
             arrayAppend(values, toString(resolved[k]));
+            new modules.wheels.services.deploy.lib.SecretRedaction().register(toString(resolved[k]));
         }
         variables.sshPool.$setSecretValues(values);
     }

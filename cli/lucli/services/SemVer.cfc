@@ -10,13 +10,19 @@
  * a `/wheels` mapping that doesn't exist when the CLI dispatches outside
  * an HTTP request context. Keep this file in sync with the framework
  * version when its semantics change.
+ *
+ * Divergence: this copy orders pre-release versions per SemVer 2.0.0 §11
+ * (1.2.0-rc.1 < 1.2.0) so the package resolver never treats a release
+ * candidate as equal to its release. vendor/wheels/SemVer.cfc still ignores
+ * pre-release labels.
  */
 component output="false" {
 
 	/**
 	 * Parses a version string into a struct with major, minor, patch components.
 	 * Strips leading "v" prefix, defaults missing components to 0.
-	 * Pre-release labels (e.g., "-beta.1") are stored but ignored in comparisons.
+	 * Pre-release labels (e.g., "-beta.1") are stored and ordered by compare();
+	 * build metadata (e.g., "+build.5") is dropped.
 	 *
 	 * @version The version string to parse (e.g., "1.2.3", "v2.0", "1.0.0-beta.1")
 	 * @return Struct with keys: major, minor, patch, preRelease, raw
@@ -27,15 +33,16 @@ component output="false" {
 		if (Left(local.v, 1) == "v" || Left(local.v, 1) == "V") {
 			local.v = Mid(local.v, 2, Len(local.v) - 1);
 		}
+		// Strip build metadata (+) first: it never takes part in precedence and
+		// may itself contain "-" (e.g. "1.0.0+build-7").
+		if (Find("+", local.v)) {
+			local.v = Left(local.v, Find("+", local.v) - 1);
+		}
 		// Separate pre-release label if present
 		local.preRelease = "";
 		if (Find("-", local.v)) {
 			local.preRelease = Mid(local.v, Find("-", local.v) + 1, Len(local.v));
 			local.v = Left(local.v, Find("-", local.v) - 1);
-		}
-		// Also strip build metadata (+)
-		if (Find("+", local.v)) {
-			local.v = Left(local.v, Find("+", local.v) - 1);
 		}
 		local.parts = ListToArray(local.v, ".");
 		local.result = {
@@ -49,7 +56,10 @@ component output="false" {
 	}
 
 	/**
-	 * Compares two parsed or unparsed versions.
+	 * Compares two parsed or unparsed versions. MAJOR.MINOR.PATCH are compared
+	 * numerically; when they tie, a version with a pre-release label is lower
+	 * than the same version without one (1.2.0-rc.1 < 1.2.0), and two labels
+	 * are ordered per SemVer 2.0.0 §11. Build metadata is ignored.
 	 *
 	 * @v1 First version (string or parsed struct)
 	 * @v2 Second version (string or parsed struct)
@@ -67,7 +77,7 @@ component output="false" {
 		if (local.a.patch != local.b.patch) {
 			return local.a.patch > local.b.patch ? 1 : -1;
 		}
-		return 0;
+		return $comparePreRelease(local.a.preRelease ?: "", local.b.preRelease ?: "");
 	}
 
 	/**
@@ -153,6 +163,53 @@ component output="false" {
 	 */
 	public string function format(required struct version) {
 		return arguments.version.major & "." & arguments.version.minor & "." & arguments.version.patch;
+	}
+
+	/**
+	 * Orders two pre-release labels per SemVer 2.0.0 §11: no label beats any
+	 * label; otherwise identifiers are compared dot by dot — numeric ones
+	 * numerically, alphanumeric ones in ASCII order, numeric lower than
+	 * alphanumeric — and a longer label wins when every shared identifier ties.
+	 */
+	private numeric function $comparePreRelease(required string a, required string b) {
+		if (!Len(arguments.a) && !Len(arguments.b)) {
+			return 0;
+		}
+		if (!Len(arguments.a)) {
+			return 1;
+		}
+		if (!Len(arguments.b)) {
+			return -1;
+		}
+		local.x = ListToArray(arguments.a, ".");
+		local.y = ListToArray(arguments.b, ".");
+		local.shared = Min(ArrayLen(local.x), ArrayLen(local.y));
+		for (local.i = 1; local.i <= local.shared; local.i++) {
+			local.xi = local.x[local.i];
+			local.yi = local.y[local.i];
+			local.xNum = REFind("^[0-9]+$", local.xi) > 0;
+			local.yNum = REFind("^[0-9]+$", local.yi) > 0;
+			if (local.xNum && local.yNum) {
+				// Compare digit strings by length, then lexically, so large
+				// build numbers never lose precision.
+				local.xi = REReplace(local.xi, "^0+(?=[0-9])", "");
+				local.yi = REReplace(local.yi, "^0+(?=[0-9])", "");
+				if (Len(local.xi) != Len(local.yi)) {
+					return Len(local.xi) > Len(local.yi) ? 1 : -1;
+				}
+			} else if (local.xNum != local.yNum) {
+				return local.xNum ? -1 : 1;
+			}
+			// Java String.compareTo: case-sensitive, code-unit (ASCII) order.
+			local.cmp = JavaCast("string", local.xi).compareTo(JavaCast("string", local.yi));
+			if (local.cmp != 0) {
+				return local.cmp > 0 ? 1 : -1;
+			}
+		}
+		if (ArrayLen(local.x) != ArrayLen(local.y)) {
+			return ArrayLen(local.x) > ArrayLen(local.y) ? 1 : -1;
+		}
+		return 0;
 	}
 
 	/**

@@ -8,10 +8,6 @@
  * Usage from LuceeScriptEngine:
  *   var runner = new modules.wheels.services.TestRunner(projectRoot);
  *   var result = runner.run(options);
- *
- * Usage from HTTP fallback (Module.cfc delegates here when server is available):
- *   var runner = new modules.wheels.services.TestRunner(projectRoot);
- *   var result = runner.runViaHttp(serverPort, options);
  */
 component {
 
@@ -80,42 +76,6 @@ component {
 			success: false,
 			message: "Unexpected test result format",
 			raw: isSimpleValue(testResult) ? testResult : serializeJSON(testResult)
-		};
-	}
-
-	/**
-	 * Run tests via HTTP to a running Wheels server.
-	 *
-	 * This is the Phase 2-3 path — used when a server is running.
-	 *
-	 * @serverPort Port of the running Wheels server
-	 * @options Struct with keys: coreTests, db, filter, format
-	 * @timeout HTTP timeout in seconds (default 600 — a full core run is slow)
-	 * @return Struct with test results
-	 */
-	public struct function runViaHttp(required numeric serverPort, struct options = {}, numeric timeout = 600) {
-		var coreTests = options.coreTests ?: true;
-		var db = options.db ?: "sqlite";
-		var filter = options.filter ?: "";
-		var format = options.format ?: "json";
-
-		var testPath = coreTests ? "/wheels/core/tests" : "/wheels/app/tests";
-		var testUrl = "http://localhost:#serverPort##testPath#?format=#format#&db=#db#&reload=true";
-		if (len(filter)) {
-			testUrl &= "&directory=#filter#";
-		}
-
-		var httpService = new http(url=testUrl, method="GET", timeout=arguments.timeout);
-		var httpResult = httpService.send().getPrefix();
-
-		if (httpResult.statusCode contains "200" && isJSON(httpResult.fileContent)) {
-			return deserializeJSON(httpResult.fileContent);
-		}
-
-		return {
-			success: false,
-			message: "HTTP #httpResult.statusCode#",
-			raw: httpResult.fileContent
 		};
 	}
 
