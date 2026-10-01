@@ -44,7 +44,7 @@ wheels test --reporter=tap
 wheels test --ci
 ```
 
-The supported flags are `--filter=<dir>`, `--reporter=<simple|json|tap>`, `--verbose` / `-v`, `--ci`, `--no-test-db` (don't auto-swap to the `<datasource>_test` test database), and `--base-path=<path>` (URL prefix for subfolder-mounted apps — auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` when omitted). A positional argument acts as the filter. There's also `--core` (with `--db=`) for running the framework's own suite — see [the framework-testing page](/v4-1-0/contributing/running-framework-tests/).
+The supported flags are `--filter=<dir>`, `--reporter=<simple|json|tap>`, `--verbose` / `-v`, `--ci`, `--no-test-db` (don't auto-swap to the `<datasource>_test` test database), `--base-path=<path>` (URL prefix for subfolder-mounted apps — auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` when omitted), and `--test-timeout=<seconds>` (how long to wait for the suite, default 900; also `WHEELS_TEST_TIMEOUT`). A positional argument acts as the filter. There's also `--core` (with `--db=`) for running the framework's own suite — see [the framework-testing page](/v4-1-0/contributing/running-framework-tests/).
 
 <Aside type="note" title="The test database">
 By default `wheels test` swaps your app onto a test copy of its datasource (`<datasource>_test` — for a fresh `wheels new` app that's the `db/test.sqlite` file scaffolded next to `db/development.sqlite`). First run against an empty test DB, the framework includes `tests/populate.cfm` so you can build schema and fixtures; subsequent runs reuse it. Pass `--no-test-db` to run against your development database instead.

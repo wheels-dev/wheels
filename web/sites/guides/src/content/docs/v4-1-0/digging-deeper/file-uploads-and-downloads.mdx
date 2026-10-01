@@ -200,7 +200,7 @@ component extends="Controller" {
 
 Signature: `sendFile(file, name, type, disposition, directory, deleteFile, deliver)`. Defaults worth knowing:
 
-- `file` is resolved relative to the `filePath` setting, which defaults to `files/` under the web root (`public/files/` in the default app layout). Pass an absolute `directory` (e.g. `directory="/var/uploads"`) to serve from outside the web root — absolute paths that exist on disk are used verbatim on all engines ([#3077](https://github.com/wheels-dev/wheels/issues/3077)). A leading-slash path that does not exist on disk (e.g. `directory="/reports/"`) keeps its historical meaning and resolves relative to the web root.
+- `file` is resolved relative to the `filePath` setting, which defaults to `files/` under the web root (`public/files/` in the default app layout). A subfolder path such as `file="reports/2026/q1.zip"` works too. The folder is found on disk, so it is the same when the app runs in a subdirectory, whether URL rewrites fold `/public/` out of the URL or you set `set(subpath="/admin")` ([#3852](https://github.com/wheels-dev/wheels/issues/3852)). Pass an absolute `directory` (e.g. `directory="/var/uploads"`) to serve from outside the web root — absolute paths that exist on disk are used verbatim on all engines ([#3077](https://github.com/wheels-dev/wheels/issues/3077)). A leading-slash path that does not exist on disk (e.g. `directory="/reports/"`) keeps its historical meaning and resolves relative to the web root.
 - `name` overrides what the browser shows in the Save dialog. Use it to hide storage filenames from the client.
 - `type` overrides the auto-detected MIME type.
 - `disposition` is `"attachment"` by default (force download) — pass `"inline"` to render in-browser for PDFs and images.
