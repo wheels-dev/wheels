@@ -30,10 +30,17 @@
 #       carries the pointer section, and no maintainer-only subtree sits
 #       under docs/consumer-ai/. Exits 1 with a message on failure.
 #
+#   ship-consumer-docs.sh verify <artifact-root>
+#       Validate a BUILT package: its CLAUDE.md, AGENTS.md and .ai/README.md
+#       are byte-identical to the consumer tier, .ai/ holds nothing else, and
+#       no maintainer-only path is present. Exits 1 with a message on failure.
+#
 # Keep in sync with:
 #   - tools/build/scripts/prepare-core.sh        (calls `ship`)
 #   - tools/build/scripts/prepare-starterApp.sh  (calls `ship`)
-#   - .github/workflows/release.yml              (calls `check` + artifact assertions)
+#   - tools/build/scripts/prepare-base.sh        (calls `ship`)
+#   - .github/workflows/release.yml              (calls `check` + `verify`)
+#   - .github/workflows/commandbox-install-smoke.yml (calls `verify` on the base template)
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -116,8 +123,36 @@ ship() {
     echo "Shipped consumer AI docs -> $dest"
 }
 
+verify() {
+    local root="${1:?artifact root required}"
+    local failures=0
+    for f in CLAUDE.md AGENTS.md .ai/README.md; do
+        if ! cmp -s "$CONSUMER_DIR/$f" "$root/$f"; then
+            echo "ERROR: $root/$f is missing or differs from docs/consumer-ai/$f" >&2
+            failures=$((failures + 1))
+        fi
+    done
+    if [ -d "$root/.ai" ] && [ "$(find "$root/.ai" -type f | wc -l | tr -d ' ')" != "1" ]; then
+        echo "ERROR: $root/.ai holds more than the consumer README" >&2
+        failures=$((failures + 1))
+    fi
+    for pattern in "${MAINTAINER_PATTERNS[@]}"; do
+        [ "$pattern" = ".ai" ] && continue
+        if [ -e "$root/$pattern" ]; then
+            echo "ERROR: $root leaks maintainer-only path: $pattern" >&2
+            failures=$((failures + 1))
+        fi
+    done
+    if [ "$failures" -gt 0 ]; then
+        echo "consumer-docs verify FAILED for $root ($failures problem(s))" >&2
+        exit 1
+    fi
+    echo "consumer-docs verify OK: $root"
+}
+
 case "${1:-}" in
     ship)   ship "${2:?usage: ship-consumer-docs.sh ship <dest-root>}" ;;
     check)  check ;;
-    *)      echo "usage: ship-consumer-docs.sh {ship <dest-root>|check}" >&2; exit 2 ;;
+    verify) verify "${2:?usage: ship-consumer-docs.sh verify <artifact-root>}" ;;
+    *)      echo "usage: ship-consumer-docs.sh {ship <dest-root>|check|verify <artifact-root>}" >&2; exit 2 ;;
 esac
