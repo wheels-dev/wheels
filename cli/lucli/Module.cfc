@@ -1624,6 +1624,7 @@ component extends="modules.BaseModule" {
 	 */
 	public string function docs() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		$consumeOfflineFlag(args);
 		var action = arrayLen(args) ? lCase(args[1]) : "fetch";
 		// Resolve --force HERE, in the command that actually receives the parsed
 		// argv. docsFetch() takes no arguments, so a helper reading its

@@ -1,0 +1,1 @@
+- The docs fetch command now honors offline mode and avoids requesting the bundle checksum when offline (#3899)
