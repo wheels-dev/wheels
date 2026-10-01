@@ -56,6 +56,16 @@ component extends="Model" {
 		Throw(type = "Wheels.TestAfterCommitBoom", message = "afterCommit callback boom");
 	}
 
+	// Records then throws, used as an afterRollback to prove a throwing rollback
+	// callback on the exception path does not mask the original exception (#3934 R2).
+	function recordRollbackThenThrow() {
+		if (!StructKeyExists(request, "$acLog")) {
+			request.$acLog = [];
+		}
+		ArrayAppend(request.$acLog, "rollback-boom:" & (this.name ?: ""));
+		Throw(type = "Wheels.TestAfterRollbackBoom", message = "afterRollback callback boom");
+	}
+
 	function secondAfterCommit() {
 		if (!StructKeyExists(request, "$acLog")) {
 			request.$acLog = [];

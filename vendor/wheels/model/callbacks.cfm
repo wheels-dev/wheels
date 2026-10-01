@@ -423,13 +423,22 @@
 	 * Internal. Called by $save / $delete after their in-transaction after*
 	 * callbacks succeed. Enqueues this instance for the outermost transaction to
 	 * fire; or, with no real transaction (none/false mode), fires afterCommit now
-	 * because the write is already committed (decision B1).
+	 * because the write is already committed (decision B1). Inside a foreign raw
+	 * transaction{} (detectable engines only) it skips both callbacks and warns once.
 	 */
 	public void function $enqueueTransactionCallbacks(required string operation) {
 		if (!$hasTransactionCallbacks()) {
 			return;
 		}
 		local.conn = this.$hashedConnectionArgs();
+		// #3934 R1: a write inside a foreign, non-Wheels transaction{} — Wheels cannot
+		// observe the outer commit/rollback, so skip BOTH afterCommit and afterRollback
+		// and warn once (per request + model). Only reachable where IsWithinTransaction()
+		// is available (Lucee/BoxLang); on Adobe/RustCFML the flag is never set.
+		if (this.$transactionForeign(local.conn)) {
+			this.$warnForeignTransactionCallbacksOnce();
+			return;
+		}
 		if (
 			StructKeyExists(request, "wheels")
 			&& StructKeyExists(request.wheels, "$txnCallbacks")
@@ -446,12 +455,99 @@
 	}
 
 	/**
+	 * Internal. True if the engine provides IsWithinTransaction() (used to spot a raw,
+	 * non-Wheels transaction we are nested in). Probed once, cached per application.
+	 * Lucee 6/7 and BoxLang have it; Adobe CF and RustCFML do not — there, foreign-
+	 * transaction detection is unavailable and callbacks fall back to the inner close.
+	 * Probe by capability, never by engine name (RustCFML reports as Lucee but lacks it).
+	 */
+	public boolean function $supportsForeignTransactionCheck() {
+		if (!StructKeyExists(application, "wheels")) {
+			return false;
+		}
+		if (!StructKeyExists(application.wheels, "$supportsIsWithinTransaction")) {
+			local.supported = false;
+			try {
+				IsWithinTransaction();
+				local.supported = true;
+			} catch (any e) {
+				// Engine lacks the function (Adobe CF, RustCFML) — leave false.
+			}
+			application.wheels.$supportsIsWithinTransaction = local.supported;
+		}
+		return application.wheels.$supportsIsWithinTransaction;
+	}
+
+	/**
+	 * Internal. True when a transaction Wheels did not open is already active — i.e. a
+	 * raw transaction{} block we are nested inside. MUST be called BEFORE Wheels opens
+	 * its own transaction (after which IsWithinTransaction() reports Wheels' own).
+	 */
+	public boolean function $withinForeignTransaction() {
+		if (!$supportsForeignTransactionCheck()) {
+			return false;
+		}
+		try {
+			return IsWithinTransaction();
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Internal. True when the per-connection store marks this connection as being
+	 * inside a foreign (raw, non-Wheels) transaction.
+	 */
+	public boolean function $transactionForeign(required string connection) {
+		return (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "$txnCallbacks")
+			&& StructKeyExists(request.wheels.$txnCallbacks, arguments.connection)
+			&& StructKeyExists(request.wheels.$txnCallbacks[arguments.connection], "foreign")
+			&& request.wheels.$txnCallbacks[arguments.connection].foreign
+		);
+	}
+
+	/**
+	 * Internal. One wheels.log warning per request + model when afterCommit/afterRollback
+	 * are skipped because the write ran inside an unmanaged raw transaction{} block.
+	 * Guarded so a bulk import inside a raw transaction logs one line, not one per write.
+	 */
+	public void function $warnForeignTransactionCallbacksOnce() {
+		if (!StructKeyExists(request, "wheels")) {
+			return;
+		}
+		if (!StructKeyExists(request.wheels, "$txnForeignWarned")) {
+			request.wheels.$txnForeignWarned = {};
+		}
+		local.modelName = variables.wheels.class.modelName;
+		if (StructKeyExists(request.wheels.$txnForeignWarned, local.modelName)) {
+			return;
+		}
+		request.wheels.$txnForeignWarned[local.modelName] = true;
+		try {
+			writeLog(
+				file = "wheels",
+				type = "warning",
+				text = "afterCommit/afterRollback callbacks on model `" & local.modelName
+					& "` were skipped: the write ran inside a raw transaction{} block that Wheels does not "
+					& "manage, so the commit/rollback outcome is not observable. Use the Wheels-managed "
+					& "transaction (transaction() / invokeWithTransaction) for these callbacks to fire."
+			);
+		} catch (any e) {
+		}
+	}
+
+	/**
 	 * Internal. Runs this instance's registered callbacks of `type`, filtered by
 	 * `operation` (an entry's `on`; blank = all). A throwing callback is logged to
-	 * wheels.log (model + method) then propagated, stopping the rest; the database
-	 * change is NOT rolled back (decision C).
+	 * wheels.log (model + method); the database change is NOT rolled back (decision C).
+	 * With `propagateErrors` (the default) the exception propagates and stops the rest.
+	 * On the exception-unwinding path the caller passes `propagateErrors=false` so a
+	 * throwing afterRollback is logged + swallowed and does NOT mask the original
+	 * transaction exception the caller is about to rethrow (#3934 R2).
 	 */
-	public void function $runTransactionCallbacks(required string type, required string operation) {
+	public void function $runTransactionCallbacks(required string type, required string operation, boolean propagateErrors = true) {
 		if (!StructKeyExists(variables.wheels.class.callbacks, arguments.type)) {
 			return;
 		}
@@ -472,12 +568,16 @@
 						file = "wheels",
 						type = "error",
 						text = "A `" & arguments.type & "` callback failed after the transaction resolved on model `"
-							& variables.wheels.class.modelName & "`, method `" & local.method
-							& "`: " & e.message & " - the database change is NOT rolled back; the exception is propagating."
+							& variables.wheels.class.modelName & "`, method `" & local.method & "`: " & e.message
+							& (arguments.propagateErrors
+								? " - the database change is NOT rolled back; the exception is propagating."
+								: " - suppressed so it does not mask the original transaction exception.")
 					);
 				} catch (any logErr) {
 				}
-				rethrow;
+				if (arguments.propagateErrors) {
+					rethrow;
+				}
 			}
 		}
 	}
@@ -503,11 +603,15 @@
 	 * marker and the context BEFORE calling this, so a throwing callback can never
 	 * leave a stuck transaction marker or a leaked queue.
 	 */
-	public void function $runQueueCallbacks(required array queue, required string type) {
+	public void function $runQueueCallbacks(required array queue, required string type, boolean propagateErrors = true) {
 		local.iEnd = ArrayLen(arguments.queue);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.entry = arguments.queue[local.i];
-			local.entry.object.$runTransactionCallbacks(type = arguments.type, operation = local.entry.operation);
+			local.entry.object.$runTransactionCallbacks(
+				type = arguments.type,
+				operation = local.entry.operation,
+				propagateErrors = arguments.propagateErrors
+			);
 		}
 	}
 
@@ -517,12 +621,12 @@
 	 * writes in a catch (BoxLang-safe) and so a throwing callback cannot leave the
 	 * queue behind. The caller must have already reset the open-transaction marker.
 	 */
-	public void function $resolveTransactionCallbacks(required string connection, required string type) {
+	public void function $resolveTransactionCallbacks(required string connection, required string type, boolean propagateErrors = true) {
 		local.queue = $transactionCallbackQueue(arguments.connection);
 		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$txnCallbacks")) {
 			StructDelete(request.wheels.$txnCallbacks, arguments.connection);
 		}
-		$runQueueCallbacks(queue = local.queue, type = arguments.type);
+		$runQueueCallbacks(queue = local.queue, type = arguments.type, propagateErrors = arguments.propagateErrors);
 	}
 
 </cfscript>

@@ -8,11 +8,18 @@ component extends="wheels.WheelsTest" {
 	function run() {
 
 		g = application.wo;
+		// Capability decided once: foreign raw-transaction detection needs IsWithinTransaction()
+		// (Lucee/BoxLang). On Adobe CF / RustCFML it is unavailable — those specs skip-with-reason.
+		var _foreignDetectable = g.model("tag").$supportsForeignTransactionCheck();
 
 		describe("afterCommit / afterRollback", () => {
 
 			beforeEach(() => {
 				request.$acLog = [];
+				// Reset the per-request+model foreign-warn guard so warn-once is isolated per spec.
+				if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$txnForeignWarned")) {
+					StructDelete(request.wheels, "$txnForeignWarned");
+				}
 			});
 
 			afterEach(() => {
@@ -167,6 +174,93 @@ component extends="wheels.WheelsTest" {
 				}
 				expect(ArrayLen(request.$acLog)).toBe(3, "exactly one afterCommit per committed transaction — no accumulation");
 			});
+
+			it("a throwing afterRollback on the exception path does not mask the original exception", () => {
+				// On the exception-unwinding path an original exception is already propagating;
+				// a throwing afterRollback must be logged + swallowed, not replace the original.
+				g.model("tag").$registerCallback(type = "afterRollback", methods = "recordRollbackThenThrow");
+				var state = {caughtType = ""};
+				try {
+					g.model("tag").invokeWithTransaction(method = "txnCreateThenThrow", transaction = "commit");
+				} catch (any e) {
+					state.caughtType = e.type;
+				}
+				expect(state.caughtType).toBe(
+					"Wheels.TestNestedBoom",
+					"the original transaction exception must surface, not a throwing afterRollback's exception"
+				);
+			});
+
+			// --- R1: foreign raw transaction{} detection (capability-guarded) ---
+
+			it("does NOT fire afterCommit for a write inside a raw transaction{} that rolls back [IsWithinTransaction engines]", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				try {
+					transaction {
+						var t = g.model("tag").new(name = "txncb-foreign-rb");
+						t.save(transaction = "commit");
+						transaction action="rollback";
+					}
+				} catch (any e) {
+				}
+				expect(ArrayLen(request.$acLog)).toBe(
+					0,
+					"afterCommit must not fire for a write rolled back inside a raw transaction{}"
+				);
+			}, "", !_foreignDetectable);
+
+			it("falls back to firing afterCommit on the inner close inside a raw transaction{} [engines without IsWithinTransaction]", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				try {
+					transaction {
+						var t = g.model("tag").new(name = "txncb-foreign-fb");
+						t.save(transaction = "commit");
+						transaction action="rollback";
+					}
+				} catch (any e) {
+				}
+				expect(ArrayLen(request.$acLog)).toBe(
+					1,
+					"documented fallback: fires on the inner Wheels close where IsWithinTransaction is unavailable"
+				);
+			}, "", _foreignDetectable);
+
+			it("suppresses BOTH afterCommit and afterRollback inside a raw transaction{} [IsWithinTransaction engines]", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				g.model("tag").$registerCallback(type = "afterRollback", methods = "recordAfterRollback");
+				try {
+					transaction {
+						var t = g.model("tag").new(name = "txncb-foreign-both");
+						t.save(transaction = "commit");
+						transaction action="rollback";
+					}
+				} catch (any e) {
+				}
+				expect(ArrayLen(request.$acLog)).toBe(
+					0,
+					"neither transaction callback fires when Wheels can't observe the outer outcome"
+				);
+			}, "", !_foreignDetectable);
+
+			it("warns once per request+model for writes inside a raw transaction{}, not once per write [IsWithinTransaction engines]", () => {
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				try {
+					transaction {
+						for (var i = 1; i <= 3; i++) {
+							var t = g.model("tag").new(name = "txncb-foreign-bulk" & i);
+							t.save(transaction = "commit");
+						}
+						transaction action="rollback";
+					}
+				} catch (any e) {
+				}
+				expect(ArrayLen(request.$acLog)).toBe(0, "all three writes suppressed");
+				expect(
+					StructKeyExists(request, "wheels")
+					&& StructKeyExists(request.wheels, "$txnForeignWarned")
+					&& StructCount(request.wheels.$txnForeignWarned) == 1
+				).toBeTrue("exactly one model warned, once, for three writes");
+			}, "", !_foreignDetectable);
 
 		});
 

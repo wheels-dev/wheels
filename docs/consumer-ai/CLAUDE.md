@@ -55,6 +55,12 @@ component extends="Model" {
         // external calls). Optional on="create,update,delete" filter; nested writes
         // and invokeWithTransaction() blocks fire once together on the outermost
         // commit; with transactionMode="none" afterCommit fires immediately per op.
+        // IMPORTANT: afterCommit/afterRollback are only reliable inside a Wheels-managed
+        // transaction — transaction() / invokeWithTransaction(). A write placed inside a
+        // raw CFML `transaction {}` block is SKIPPED (with a one-time wheels.log warning)
+        // on Lucee and BoxLang, and is NOT detectable on Adobe CF or RustCFML (there the
+        // callback fires on the model's inner commit even if the outer block rolls back).
+        // Always use the Wheels-managed transaction for these callbacks.
         afterCommit("enqueueSearchIndex", on="create,update");
         afterRollback("releaseReservation");
 
