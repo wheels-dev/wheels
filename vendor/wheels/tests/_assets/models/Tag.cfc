@@ -32,6 +32,16 @@ component extends="Model" {
 		this.setByCallback = true;
 	}
 
+	// Writes a row then returns a NON-boolean value (invalid for invokeWithTransaction).
+	// The non-boolean return must roll the write back BEFORE the post-transaction
+	// boolean check throws — never commit-then-error (#3944). A defined non-boolean
+	// (string) is the real trigger: a void return leaves rv undefined, which the
+	// inner catch already rolls back, so it would not exercise this path.
+	function txnNonBooleanThatWrites() {
+		model("tag").create(name = "zrr-void", transaction = "none");
+		return "not-a-boolean";
+	}
+
 	function firstCallback() {
 		if (!StructKeyExists(this, "orderTest")) {
 			this.orderTest = "";

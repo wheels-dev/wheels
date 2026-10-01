@@ -61,6 +61,22 @@ component extends="wheels.WheelsTest" {
 					"a save whose afterSave returns false must still roll its own transaction back"
 				);
 			});
+
+			it("rolls back a non-boolean-returning method's write before the boolean-return check throws", () => {
+				// A non-boolean return is invalid; it must roll back the write rather than
+				// commit and then throw 'must return a boolean' (error shown + data persisted).
+				var state = {threw = false};
+				try {
+					g.model("tag").invokeWithTransaction(method = "txnNonBooleanThatWrites", transaction = "commit");
+				} catch (any e) {
+					state.threw = true;
+				}
+				expect(state.threw).toBeTrue("a non-boolean return must raise the invalid-return error");
+				expect(g.model("tag").count(where = "name = 'zrr-void'")).toBe(
+					0,
+					"the non-boolean method's write must be rolled back, not committed"
+				);
+			});
 		});
 	}
 
