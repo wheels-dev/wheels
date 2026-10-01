@@ -240,12 +240,19 @@ export async function listCategoryDiscussions(
 			}`,
 			{ owner, name, categoryId, first: LIST_PAGE_SIZE, after },
 		);
-		const conn = data.repository?.discussions;
-		nodes.push(...(conn?.nodes || []).filter(Boolean));
-		if (!conn?.pageInfo?.hasNextPage) break;
+		const conn = data?.repository?.discussions;
+		// Fail closed: an unreadable listing must never fall through to a create.
+		if (!conn || !Array.isArray(conn.nodes)) {
+			throw new Error('could not list existing discussions; refusing to create an announcement');
+		}
+		nodes.push(...conn.nodes.filter(Boolean));
+		if (!conn.pageInfo?.hasNextPage) return nodes;
 		after = conn.pageInfo.endCursor;
 	}
-	return nodes;
+	// Still more pages after maxPages: the match could be on a page we did not read.
+	throw new Error(
+		`more than ${maxPages * LIST_PAGE_SIZE} discussions in the category; refusing to create without checking them all`,
+	);
 }
 
 export async function findExistingDiscussion(

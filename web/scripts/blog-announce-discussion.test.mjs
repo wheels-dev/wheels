@@ -430,3 +430,45 @@ test('a dry run with a token does the read-only lookup and never writes or creat
 		await rm(dir, { recursive: true, force: true });
 	}
 });
+
+test('listCategoryDiscussions throws instead of returning a partial list when pages run out', async () => {
+	const gqlFn = async () => ({
+		repository: { discussions: { pageInfo: { hasNextPage: true, endCursor: 'c' }, nodes: [{ title: 'a', url: 'u' }] } },
+	});
+	await assert.rejects(
+		listCategoryDiscussions('t', { owner: 'o', name: 'n', categoryId: 'c', maxPages: 2 }, gqlFn),
+		/refusing to create without checking them all/,
+	);
+});
+
+test('listCategoryDiscussions throws when the listing is missing', async () => {
+	const gqlFn = async () => ({ repository: null });
+	await assert.rejects(
+		listCategoryDiscussions('t', { owner: 'o', name: 'n', categoryId: 'c' }, gqlFn),
+		/could not list existing discussions/,
+	);
+});
+
+test('announceFiles does not create when the listing cannot be read', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'blog-announce-'));
+	const file = join(dir, 'pretty-urls-with-route-bindby.md');
+	await writeFile(file, SAMPLE_POST, 'utf8');
+	let creates = 0;
+	const gqlFn = async (_token, query) => {
+		if (query.includes('discussionCategories')) {
+			return { repository: { id: 'repo1', discussionCategories: { nodes: [{ id: 'cat1', name: 'Announcements' }] } } };
+		}
+		if (query.includes('createDiscussion')) {
+			creates++;
+			return { createDiscussion: { discussion: { url: 'x' } } };
+		}
+		return { repository: { discussions: null } };
+	};
+	try {
+		await assert.rejects(announceFiles([file], { token: 'x', gqlFn }), /could not list existing discussions/);
+		assert.equal(creates, 0);
+		assert.equal(await readFile(file, 'utf8'), SAMPLE_POST);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
