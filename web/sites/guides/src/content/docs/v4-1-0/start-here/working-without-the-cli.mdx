@@ -17,7 +17,7 @@ This is your page too: `box` manages your server and fetches the framework, but 
 | Task | With the wheels CLI | Without the wheels CLI | Available in |
 |---|---|---|---|
 | Reload the app after config/code changes | `wheels reload` | `?reload=true&password=<your-reload-password>` appended to any app URL | Any environment with a non-empty `reloadPassword` (rate-limited; [set it in `.env`](/v4-1-0/deployment/security-hardening/#reload-password)). Restarting the app server also reloads. |
-| Run migrations | `wheels migrate latest` | Browser: the migrator GUI at `/wheels/migrator`. Programmatic: `application.wheels.migrator.migrateToLatest()` or `.migrateTo(version)` | GUI: **development only**. Programmatic: any environment. `set(autoMigrateDatabase=true)` runs pending migrations at application start. |
+| Run migrations | `wheels migrate latest` | Browser: the migrator GUI at `/wheels/migrator`. Programmatic: `application.wheels.migrator.migrateToLatest()` or `.migrateTo(version)` | GUI: **development only**, from the server itself (see below). Programmatic: any environment. `set(autoMigrateDatabase=true)` runs pending migrations at application start. |
 | Check migration status | `wheels migrate info` | `/wheels/migrator` (shows applied/pending), or `application.wheels.migrator.getCurrentMigrationVersion()` | GUI: **development only**. Programmatic: any environment. |
 | Write a migration | `wheels g migration <name>` | Create `app/migrator/migrations/[timestamp]_[description].cfc` by hand — it's a plain CFC with `up()`/`down()`; copy any existing one as a starting point. See [Migrations](/v4-1-0/basics/migrations/). | n/a (files on disk) |
 | Run app tests | `wheels test` | `/wheels/app/tests` in a browser; append `?format=json` for machine-readable results (that's all the CLI does) | **Development only** |
@@ -32,6 +32,8 @@ This is your page too: `box` manages your server and fetches the framework, but 
 ## Why the "development only" rows are locked
 
 The browser surfaces under `/wheels/*` (migrator GUI, test runners, routes, info) are gated by a **development-only allowlist** — since 4.0.4 ([#2903](https://github.com/wheels-dev/wheels/pull/2903)) they return 404 in every other environment, and `set(enablePublicComponent=true)` cannot open them outside development. That's deliberate: they expose schema and internals no production app should serve.
+
+The migrator also only answers requests from the server itself, even in development: a request from another machine, or one forwarded through a proxy for another machine, gets `403 Migrator commands are restricted to localhost`. On a remote development server, open `/wheels/migrator` in a browser on that server (`http://localhost/...`), or migrate programmatically as below.
 
 So the production-safe versions are the programmatic ones: `application.wheels.migrator.migrateToLatest()` and `application.wheels.seeder.runSeeds()` called from your own protected code path (a deploy hook, an authenticated admin action), plus the URL reload — which works in production precisely because it demands the `reloadPassword` you set in `.env`. [Production Configuration](/v4-1-0/deployment/production-config/) and [Security Hardening](/v4-1-0/deployment/security-hardening/) cover hardening both.
 
