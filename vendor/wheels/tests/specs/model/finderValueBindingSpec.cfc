@@ -12,13 +12,16 @@ component extends="wheels.WheelsTest" {
 	/*
 	 * Sizes and growth bound for the binding-linearity specs. `large` is
 	 * `factor` times `small`. A linear binder's time grows about `factor` times
-	 * between them; a quadratic one grows about `factor` squared times. Lucee 7
-	 * measurements with factor 20 (fastest of three runs):
-	 *   current binder              plain 18-23x, run of quotes 18-20x
+	 * between them; a quadratic one grows faster. The small size is chosen so
+	 * the small call takes about 25ms on Lucee 7, well above the ~1ms timer
+	 * resolution, so taking the fastest run does not inflate the growth.
+	 * Lucee 7 measurements with factor 10 (fastest of three runs):
+	 *   current binder              plain 9.6-10.1x, run of quotes 9.1-10.9x
+	 *                               (small call 26-28ms)
 	 *   scanner that copies the rest of the string for every character
-	 *   (quadratic)                 plain ~68x, run of quotes 71-80x
-	 * so 40 leaves about 2x headroom for timer noise above a linear binder and
-	 * still fails a quadratic one.
+	 *   (quadratic)                 plain 40-42x, run of quotes 41-50x
+	 * so 25 leaves more than 2x headroom above a linear binder and still
+	 * fails a quadratic one.
 	 *
 	 * RustCFML: Mid() costs O(index) there (it walks the string to reach a
 	 * character), so any character-by-character scan, including the WHERE
@@ -29,11 +32,11 @@ component extends="wheels.WheelsTest" {
 	 */
 	private struct function linearityPlan(required string kind) {
 		var rust = application.wheels.engineAdapter.isRustCFML();
-		var plan = {factor = rust ? 10 : 20, maxGrowth = rust ? 250 : 40};
+		var plan = {factor = 10, maxGrowth = rust ? 250 : 25};
 		if (arguments.kind == "plain") {
-			plan.small = rust ? 3000 : 10000;
+			plan.small = rust ? 3000 : 50000;
 		} else {
-			plan.small = rust ? 1500 : 10000;
+			plan.small = rust ? 1500 : 30000;
 		}
 		plan.large = plan.small * plan.factor;
 		return plan;
