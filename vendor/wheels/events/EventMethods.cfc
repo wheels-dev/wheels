@@ -112,9 +112,11 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	 *
 	 * - 404: `Wheels.RouteNotFound`, `Wheels.RecordNotFound`, `Wheels.ViewNotFound`
 	 *   (a URL naming a non-existent view-only action), `Wheels.ActionNotAllowed`
-	 *   (a helper/$-named action treated as missing, #2845/#3075), and
+	 *   (a helper/$-named action treated as missing, #2845/#3075),
 	 *   `Wheels.ActionParameterMissing` (a /wheels/ dev-GUI URL that names no
-	 *   action). #2319/#3075.
+	 *   action), and `Wheels.FileNotFound` (`sendFile()` for a missing file: it
+	 *   usually serves a client-addressed download route). `Wheels.ImageFileNotFound`
+	 *   stays 500. #2319/#3075.
 	 * - 403: a policy denial (`Wheels.NotAuthorized`, #3156) or a missing/invalid
 	 *   CSRF token (`Wheels.InvalidAuthenticityToken`) — a forged or expired-form
 	 *   post is a client error, not a server error (A-F7).
@@ -134,14 +136,16 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		// $throwErrorOrShow404Page (RouteNotFound in Dispatch; RecordNotFound and
 		// ViewNotFound — a URL naming a non-existent view-only action — in
 		// controller/processing; ActionNotAllowed, a helper/$-named action treated
-		// as missing, #2845/#3075). Every OTHER Wheels.*NotFound is a server-side
+		// as missing, #2845/#3075), plus FileNotFound: sendFile() usually serves a
+		// client-addressed download route, so a missing file is the client's "not
+		// found" (ImageFileNotFound is not on the list). Every OTHER Wheels.*NotFound is a server-side
 		// config/code fault (a missing table, datasource, column, model, method,
 		// filter, association, calculated property, group column, identity, key,
 		// object, package, query handle, service, job class, Vite asset/manifest,
-		// image/file, …) and defaults to 500 so monitoring sees it — including any
+		// image file, …) and defaults to 500 so monitoring sees it — including any
 		// future *NotFound type. (A-F4; follows #2319/#3075/#3156.)
 		if (
-			ReFindNoCase("^Wheels\.(Route|Record|View)NotFound$", arguments.type)
+			ReFindNoCase("^Wheels\.(Route|Record|View|File)NotFound$", arguments.type)
 			|| arguments.type == "Wheels.ActionNotAllowed"
 			|| arguments.type == "Wheels.ActionParameterMissing"
 		) {
@@ -163,7 +167,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		// Map Wheels error types to HTTP status codes via the
 		// $wheelsErrorStatusCode allow-list: the client-triggerable
 		// not-found types (RouteNotFound, RecordNotFound, ViewNotFound,
-		// ActionNotAllowed, ActionParameterMissing) are 404; a policy
+		// FileNotFound, ActionNotAllowed, ActionParameterMissing) are 404; a policy
 		// denial or missing/invalid CSRF token is 403; FormatNotAcceptable
 		// is 406; everything else — including server-side *NotFound
 		// (table/datasource/column/model/package/…) — is 500. See

@@ -38,6 +38,17 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.ViewNotFound")).toBe(404)
 			})
 
+			// sendFile() usually serves a client-addressed download route, so a
+			// missing file is the client's "not found". A missing image file used by
+			// imageTag is a server-side asset fault and stays 500.
+			it("maps Wheels.FileNotFound (sendFile) to HTTP 404", () => {
+				expect($expectedStatusFor("Wheels.FileNotFound")).toBe(404)
+			})
+
+			it("keeps Wheels.ImageFileNotFound at HTTP 500 (server-side asset)", () => {
+				expect($expectedStatusFor("Wheels.ImageFileNotFound")).toBe(500)
+			})
+
 			// A-F4 allow-list: the 404 set is now client-URL-triggerable types only
 			// (route/record/view/action). A missing package is a server-side
 			// config/code fault, so it is 500 — as is any other non-client *NotFound

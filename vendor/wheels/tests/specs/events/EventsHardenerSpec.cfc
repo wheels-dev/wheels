@@ -34,7 +34,7 @@ component extends="wheels.WheelsTest" {
 				// (the live path) and onerrorSpec both call.
 				var body = $functionBody("EventMethods.cfc", "$wheelsErrorStatusCode");
 				// 404 is a client-triggerable ALLOW-list, not "any *NotFound".
-				expect(Find('ReFindNoCase("^Wheels\.(Route|Record|View)NotFound$"', body)).toBeGT(
+				expect(Find('ReFindNoCase("^Wheels\.(Route|Record|View|File)NotFound$"', body)).toBeGT(
 					0,
 					"404 branch must allow-list the client-triggerable not-found types"
 				);
@@ -53,6 +53,12 @@ component extends="wheels.WheelsTest" {
 				expect(Find("return 500", body)).toBeGT(0);
 				expect(Find("return 403", body)).toBeGT(Find("return 404", body), "403 branch follows the 404 branch");
 				expect(Find("return 500", body)).toBeGT(Find("return 406", body), "500 default follows the 406 branch");
+			});
+
+			it("maps Wheels.FileNotFound (sendFile, a client-addressed download) to 404 through live $runOnError", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.FileNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
 			});
 
 			it("maps Wheels.RouteNotFound to 404 through live $runOnError", () => {
