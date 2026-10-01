@@ -1319,6 +1319,23 @@ component extends="wheels.WheelsTest" {
 				)
 			})
 
+			// joinType "left" / "left outer" are aliases of "outer". Before, "left" emitted
+			// "LEFT JOIN", which the nested-include grouping does not recognise, so the
+			// nested INNER join to tags was silently dropped ("unknown column").
+			it("treats joinType left as outer and keeps a nested include", () => {
+				var expected = "FROM #qi('c_o_r_e_posts')#"
+					& " LEFT OUTER JOIN (#qi('c_o_r_e_classifications')# INNER JOIN #qi('c_o_r_e_tags')# ON #qi('c_o_r_e_classifications')#.#qi('tagid')# = #qi('c_o_r_e_tags')#.#qi('id')#) ON #qi('c_o_r_e_posts')#.#qi('id')# = #qi('c_o_r_e_classifications')#.#qi('postid')#"
+				expect(g.model("postLeftJoin").$fromClause(include = "classifications(tag)")).toBe(expected)
+				expect(g.model("postLeftOuterJoin").$fromClause(include = "classifications(tag)")).toBe(expected)
+			})
+
+			it("rejects an unknown joinType", () => {
+				var callModel = () => {
+					g.model("postUnknownJoin").$fromClause(include = "classifications")
+				}
+				expect(callModel).toThrow("Wheels.InvalidJoinType")
+			})
+
 			// Second shape of issue #3334, and a residual case of issue #3245 that the
 			// #3245 gate does not cover: a ROOT-level inner join (`Post.author` is a
 			// belongsTo) alongside a nested group. Its ON clause references the root

@@ -55,7 +55,7 @@ set(reloadPassword = env("WHEELS_RELOAD_PASSWORD", ""));
 
 One exception: don't `set(environment=...)` here. Environment selection belongs in `config/environment.cfm` only — by the time `settings.cfm` runs, the framework has already derived its environment-dependent defaults, so setting the environment this late produces a half-switched app (the environment reports `production` while verbose error details, development caching flags, and `allowMigrationDown` persist from the boot-time value).
 
-Also note that a blank `reloadPassword` currently permits *anonymous* `?reload=true` restarts — the password check is skipped entirely when no password is configured ([#3062](https://github.com/wheels-dev/wheels/issues/3062)). Set a real reload password in every environment.
+Also note that a blank `reloadPassword` disables URL-based reload entirely: since 4.0.4 the gate fails closed, so `?reload=true` requires a non-empty configured password and a matching `password` parameter ([#3062](https://github.com/wheels-dev/wheels/issues/3062)). Set a real reload password in every environment where you want reload over HTTP to work.
 
 Settings cascade: framework defaults load first, then `config/settings.cfm`, then `config/<environment>/settings.cfm`. Later writes win. A value you set in the shared file is the default for every environment; the environment-specific file only needs to name the keys it changes.
 
@@ -91,9 +91,9 @@ The gate is `allowEnvironmentSwitchViaUrl`. Any explicit boolean you `set()` is 
 
 In development, the debug bar's Environment panel offers the same switch as quick-switch links: they render when a `reloadPassword` is configured and switching via the URL is allowed, and clicking one prompts for the reload password (it is never embedded in the page).
 
-One caveat, tracked as an open issue:
+One caveat, now fixed:
 
-- The `wheels reload` CLI command can report success even when the reload didn't take effect ([#3059](https://github.com/wheels-dev/wheels/issues/3059)) — verify with the URL form.
+- Before 4.0.4, the `wheels reload` CLI command could report success even when the reload didn't take effect ([#3059](https://github.com/wheels-dev/wheels/issues/3059)). It now checks for the framework's restart redirect (302), reports anything else in red, and exits non-zero.
 
 ## Secrets handling
 

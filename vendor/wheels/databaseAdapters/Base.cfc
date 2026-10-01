@@ -565,6 +565,11 @@ component output=false extends="wheels.Global"{
 			if (!Len(local.hex)) {
 				return "";
 			}
+			// An ODBC date mask carries its kind ("ts:", "d:", "t:") before the hex;
+			// a bound parameter takes the plain value.
+			if (Find(":", local.hex) && ListFind("ts,d,t", ListFirst(local.hex, ":"))) {
+				local.hex = ListRest(local.hex, ":");
+			}
 			return CharsetEncode(BinaryDecode(local.hex, "hex"), "utf-8");
 		}
 		return arguments.value;
@@ -600,6 +605,13 @@ component output=false extends="wheels.Global"{
 				break;
 			}
 			local.hex = Mid(arguments.statement, local.hexStart, local.closeIdx - local.hexStart);
+			// An ODBC date mask goes back as its escape, as in Model::$restoreMaskedLiterals.
+			local.odbcKind = ListFirst(local.hex, ":");
+			if (Find(":", local.hex) && ListFind("ts,d,t", local.odbcKind)) {
+				local.out.append("{" & local.odbcKind & " '" & CharsetEncode(BinaryDecode(ListRest(local.hex, ":"), "hex"), "utf-8") & "'}");
+				local.pos = local.closeIdx + 1;
+				continue;
+			}
 			local.value = Len(local.hex) ? CharsetEncode(BinaryDecode(local.hex, "hex"), "utf-8") : "";
 			local.out.append("'");
 			local.out.append(Replace(local.value, "'", "''", "all"));
