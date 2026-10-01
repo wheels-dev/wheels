@@ -1028,6 +1028,19 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * True when a server registration is exactly what a failed `wheels start`
+	 * leaves behind: not running, no `.project-path`, and nothing in the folder
+	 * but LuCLI's `.config-file`.
+	 */
+	private boolean function $isFailedStartLeftover(required string serverName, required struct reg) {
+		if (arguments.reg.alive || len(arguments.reg.registeredPath)) return false;
+		var dir = $resolveLucliHome() & "/servers/" & arguments.serverName;
+		if (!directoryExists(dir)) return false;
+		var entries = directoryList(dir, false, "name");
+		return arrayLen(entries) == 1 && entries[1] == ".config-file";
+	}
+
+	/**
 	 * Normalize a generator type (or its single-letter alias) to its canonical
 	 * handler key so $generateDispatch can switch over the 15 real generators
 	 * instead of 25 type+alias labels.
@@ -2085,11 +2098,13 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// A dead registration that names no project is a leftover (a failed
-		// start leaves only LuCLI's config file behind), not another project's
-		// server: it falls through to the clean-up below instead of being
-		// reported as "registered to a different project: <unknown>".
-		if (reg.exists && !reg.ours && len(reg.registeredPath) && !force) {
+		// A failed start leaves a registration holding only LuCLI's config file
+		// and no project path. That exact shape is a leftover, not another
+		// project's server: it falls through to the clean-up below instead of
+		// being reported as "registered to a different project: <unknown>".
+		// Anything else without a project path (e.g. a stopped server from a
+		// plain-LuCLI or pre-4.0 project of the same name) still refuses.
+		if (reg.exists && !reg.ours && !$isFailedStartLeftover(serverName, reg) && !force) {
 			out("");
 			out("Server name '" & serverName & "' is registered to a different project:", "yellow");
 			out("  registered: " & (len(reg.registeredPath) ? reg.registeredPath : "<unknown>"), "yellow");

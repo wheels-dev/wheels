@@ -65,6 +65,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(directoryExists(dir)).toBeFalse("the leftover registration was not cleaned");
 			});
 
+			it("still refuses a stopped registration with no project path that isn't the failed-start shape", () => {
+				// e.g. a stopped server from a plain-LuCLI or pre-4.0 project of the same name.
+				var m = startModule(variables.tempRoot);
+				var dir = regDir(m);
+				directoryCreate(dir & "/lucee-server", true, true);
+				fileWrite(dir & "/.config-file", "{}");
+				m.__arguments = [];
+				expect(thrownType(() => m.start())).toBe("Wheels.ServerNameConflict");
+				expect(directoryExists(dir & "/lucee-server")).toBeTrue("a registration that isn't a leftover was wiped");
+				directoryDelete(dir, true);
+			});
+
 			it("still refuses a registration for another project, now with a non-zero exit", () => {
 				var m = startModule(variables.tempRoot);
 				var dir = regDir(m);
