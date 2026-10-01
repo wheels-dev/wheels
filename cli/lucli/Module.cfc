@@ -815,7 +815,7 @@ component extends="modules.BaseModule" {
 
 		if (!arrayLen(args)) {
 			$printGenerateUsage();
-			$refuse("wheels generate: a generator type is required (see the list above).");
+			$refuse("wheels generate: a generator type is required. Usage: wheels generate <type> <name> [options], where <type> is one of: app, model, controller, view, migration, scaffold, api-resource, route, test, property, helper, policy, snippets, admin, auth.");
 		}
 
 		// Reset dry-run state first: the stdio MCP server reuses the request
@@ -1050,9 +1050,16 @@ component extends="modules.BaseModule" {
 				continue;
 			}
 			if (left(item, 6) == "Route:") {
-				var route = trim(listFirst(mid(item, 7, len(item)), " "));
+				// The resource name between the quotes of `.resources("name")`, matched
+				// exactly (positional or name=) rather than as a substring.
+				var routeName = reReplace(item, '^Route: \.resources\("([^"]*)"\).*$', "\1");
 				var routesPath = variables.projectRoot & "/config/routes.cfm";
-				if (len(route) && fileExists(routesPath) && findNoCase(route, fileRead(routesPath))) {
+				// Escape regex metacharacters: the name comes from user input.
+				routeName = reReplace(routeName, "([.^$|()\[\]{}*+?\\])", "\\\1", "all");
+				if (
+					len(routeName) && routeName != item && fileExists(routesPath)
+					&& reFindNoCase("\.resources\(\s*(name\s*=\s*)?[""']" & routeName & "[""']\s*[,)]", fileRead(routesPath))
+				) {
 					return true;
 				}
 				continue;
@@ -2570,7 +2577,7 @@ component extends="modules.BaseModule" {
 			out("Examples:", "bold");
 			out("  wheels create app myapp");
 			out("  wheels create app myapp --port=3000 --setup-h2");
-			$refuse("wheels create: a type and a name are required (see the usage above).");
+			$refuse("wheels create: missing required arguments. Usage: wheels create <type> <name> [options]");
 		}
 
 		switch (type) {
@@ -3936,7 +3943,7 @@ component extends="modules.BaseModule" {
 			out("  wheels destroy controller Products    (remove just the Products controller)");
 			out("  wheels destroy model Product          (remove just the Product model)");
 			out("  wheels destroy view products/index    (remove a single view)");
-			$refuse("wheels destroy: a name is required (see the usage above).");
+			$refuse("wheels destroy: missing required arguments. Usage: wheels destroy <type> <name>");
 		}
 
 		var name = opts.name;
@@ -4129,7 +4136,8 @@ component extends="modules.BaseModule" {
 		// CRITICAL means real issues: exit non-zero so CI and agents can gate on
 		// the health check. WARNING still exits 0.
 		if (results.status == "CRITICAL") {
-			$refuse("wheels doctor: status CRITICAL (#arrayLen(results.issues)# issue(s)).", "Wheels.DoctorCritical");
+			// Self-contained: an MCP client receives only this message, not the report printed above.
+			$refuse("wheels doctor: status CRITICAL with #arrayLen(results.issues)# issue(s): " & arrayToList(results.issues, "; "), "Wheels.DoctorCritical");
 		}
 
 		return "";
@@ -4859,7 +4867,7 @@ component extends="modules.BaseModule" {
 			out("  wheels db status");
 			out("  wheels db status --pending");
 			out("  wheels db version --detailed");
-			$refuse("wheels db: a command is required (see the usage above).");
+			$refuse("wheels db: missing required arguments. Usage: wheels db <command>");
 		}
 
 		var subcommand = lCase(trim(opts.subcommand));
@@ -5457,7 +5465,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate model <Name> [properties...]", "yellow");
 			out("  Example: wheels generate model User name email:string active:boolean");
-			$refuse("wheels generate model: missing required arguments (see the usage above).");
+			$refuse("wheels generate model: missing required arguments. Usage: wheels generate model <Name> [properties...]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5508,7 +5516,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate controller <Name> [actions...]", "yellow");
 			out("  Example: wheels generate controller Users index show create");
-			$refuse("wheels generate controller: missing required arguments (see the usage above).");
+			$refuse("wheels generate controller: missing required arguments. Usage: wheels generate controller <Name> [actions...]");
 		}
 
 		var controllerName = capitalize(args[1]);
@@ -5553,7 +5561,7 @@ component extends="modules.BaseModule" {
 	private string function generateView(required array args) {
 		if (arrayLen(args) < 2) {
 			out("Usage: wheels generate view <controller> <action>", "yellow");
-			$refuse("wheels generate view: missing required arguments (see the usage above).");
+			$refuse("wheels generate view: missing required arguments. Usage: wheels generate view <controller> <action>");
 		}
 
 		var controllerName = args[1];
@@ -5574,7 +5582,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate migration <Name>", "yellow");
 			out("  Example: wheels generate migration AddEmailToUsers");
-			$refuse("wheels generate migration: missing required arguments (see the usage above).");
+			$refuse("wheels generate migration: missing required arguments. Usage: wheels generate migration <Name>");
 		}
 
 		var migrationName = args[1];
@@ -5602,7 +5610,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate scaffold <Name> [properties...] [--force]", "yellow");
 			out("  Example: wheels generate scaffold Post title body:text publishedAt:datetime");
-			$refuse("wheels generate scaffold: missing required arguments (see the usage above).");
+			$refuse("wheels generate scaffold: missing required arguments. Usage: wheels generate scaffold <Name> [properties...] [--force]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5681,7 +5689,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate route <name>", "yellow");
 			out("  Example: wheels generate route posts");
-			$refuse("wheels generate route: missing required arguments (see the usage above).");
+			$refuse("wheels generate route: missing required arguments. Usage: wheels generate route <name>");
 		}
 
 		var routeName = lCase(args[1]);
@@ -5728,7 +5736,7 @@ component extends="modules.BaseModule" {
 			out("Usage: wheels generate test <type> <Name> [--force]", "yellow");
 			out("  Types: model, controller");
 			out("  Example: wheels generate test model User");
-			$refuse("wheels generate test: missing required arguments (see the usage above).");
+			$refuse("wheels generate test: missing required arguments. Usage: wheels generate test <type> <Name> [--force]");
 		}
 
 		var testType = lCase(pos[1]);
@@ -5755,7 +5763,7 @@ component extends="modules.BaseModule" {
 		if (arrayLen(args) < 2) {
 			out("Usage: wheels generate property <ModelName> <property:type>", "yellow");
 			out("  Example: wheels generate property User email:string");
-			$refuse("wheels generate property: missing required arguments (see the usage above).");
+			$refuse("wheels generate property: missing required arguments. Usage: wheels generate property <ModelName> <property:type>");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5813,7 +5821,7 @@ component extends="modules.BaseModule" {
 			out("  Tests:      tests/specs/models/<Name>Spec.cfc");
 			out("              tests/specs/controllers/Api<Names>ControllerSpec.cfc");
 			out("  Routes:     .namespace(""api"").resources(name=""<names>"", except=""new,edit"")");
-			$refuse("wheels generate api-resource: missing required arguments (see the usage above).");
+			$refuse("wheels generate api-resource: missing required arguments. Usage: wheels generate api-resource <Name> [properties...]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5857,7 +5865,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate helper <name> [functions...]", "yellow");
 			out("  Example: wheels generate helper formatting truncateText formatCurrency");
-			$refuse("wheels generate helper: missing required arguments (see the usage above).");
+			$refuse("wheels generate helper: missing required arguments. Usage: wheels generate helper <name> [functions...]");
 		}
 
 		var helperName = capitalize(args[1]);
@@ -5919,7 +5927,7 @@ component extends="modules.BaseModule" {
 			out("");
 			out("Writes app/policies/<ModelName>Policy.cfc — default-deny, one method per action.");
 			out("Enforce with authorize()/can()/policyScope() in your controllers and views.");
-			$refuse("wheels generate policy: missing required arguments (see the usage above).");
+			$refuse("wheels generate policy: missing required arguments. Usage: wheels generate policy <ModelName> [--force]");
 		}
 
 		var codegen = getService("codegen");
@@ -6010,7 +6018,7 @@ component extends="modules.BaseModule" {
 			out("");
 			out("Generates an admin controller and views by introspecting an existing model.");
 			out("Requires a running server.");
-			$refuse("wheels generate admin: missing required arguments (see the usage above).");
+			$refuse("wheels generate admin: missing required arguments. Usage: wheels generate admin <modelName> [--force] [--no-routes]");
 		}
 
 		var modelName = capitalize(arguments.args[1]);

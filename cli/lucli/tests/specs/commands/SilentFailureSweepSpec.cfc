@@ -40,7 +40,36 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		return state.type;
 	}
 
+	/** The thrown message ("" when it returned). */
+	private string function failureMessage(required any m, required string command, required array args) {
+		var state = {message = ""};
+		arguments.m.__arguments = arguments.args;
+		try {
+			invoke(arguments.m, arguments.command);
+		} catch (any e) {
+			state.message = e.message;
+		}
+		return state.message;
+	}
+
 	function run() {
+
+		describe("failure messages are self-contained (an MCP client gets only the message, not the printed output)", () => {
+
+			it("usage refusals carry the usage line, bare generate lists the types, doctor lists its issues", () => {
+				expect(failureMessage(cli(), "generate", ["model"])).toInclude("Usage: wheels generate model <Name>");
+				expect(failureMessage(cli(), "destroy", [])).toInclude("Usage: wheels destroy <type> <name>");
+				expect(failureMessage(cli(), "db", [])).toInclude("Usage: wheels db <command>");
+				var bare = failureMessage(cli(), "generate", []);
+				expect(bare).toInclude("scaffold");
+				expect(bare).toInclude("migration");
+				var doctor = failureMessage(cli(variables.emptyDir), "doctor", []);
+				expect(doctor).toInclude("status CRITICAL");
+				expect(doctor).toInclude("Missing required");
+				expect(failureMessage(cli(), "upgrade", [])).toInclude("wheels upgrade apply");
+			});
+
+		});
 
 		describe("generator refusals and usage errors exit non-zero", () => {
 
@@ -94,6 +123,20 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(failure(cli(), "destroy", ["model", "Neverthere", "--force"])).toBe("Wheels.NothingToDestroy");
 				var after = directoryExists(migrations) ? arrayLen(directoryList(migrations, false, "name")) : 0;
 				expect(after).toBe(before, "a migration was written for something that does not exist");
+			});
+
+			it("only counts a route that matches the resource name exactly", () => {
+				var routes = tempRoot & "/config/routes.cfm";
+				var saved = fileRead(routes);
+				try {
+					// A different resource whose name merely contains this one's.
+					fileWrite(routes, Chr(60) & "cfscript>mapper().resources(""ghostlyprobes"")" & chr(10) & ".end();" & Chr(60) & "/cfscript>");
+					expect(failure(cli(), "destroy", ["Ghostlyprobe", "--force"])).toBe("");
+					fileWrite(routes, Chr(60) & "cfscript>mapper().resources(""ghostlyprobess"")" & chr(10) & ".end();" & Chr(60) & "/cfscript>");
+					expect(failure(cli(), "destroy", ["Ghostlyprobe", "--force"])).toBe("Wheels.NothingToDestroy");
+				} finally {
+					fileWrite(routes, saved);
+				}
 			});
 
 			it("of a model that exists still works", () => {
