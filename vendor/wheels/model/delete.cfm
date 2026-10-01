@@ -224,6 +224,9 @@
 			$clearRequestCache();
 			if (local.deleted.result.recordCount == 1 && $callback("afterDelete", arguments.callbacks)) {
 				local.rv = true;
+				// v4.2.0: queue afterCommit/afterRollback (fires at the outermost
+				// transaction resolve, or immediately in none/false mode).
+				$enqueueTransactionCallbacks(operation = "delete");
 			}
 		}
 		return local.rv;

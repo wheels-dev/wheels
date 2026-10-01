@@ -32,6 +32,30 @@ component extends="Model" {
 		this.setByCallback = true;
 	}
 
+	// afterCommit/afterRollback recording helpers (v4.2.0). Fire only when
+	// registered by a spec, so default tests are unaffected. Append to a
+	// request-scope log so nested / multi-instance / ordering can be asserted,
+	// and also stamp the instance so single-instance specs can read it back.
+	function recordAfterCommit() {
+		if (!StructKeyExists(request, "$acLog")) {
+			request.$acLog = [];
+		}
+		ArrayAppend(request.$acLog, "commit:" & (this.name ?: ""));
+		this.afterCommitFired = true;
+	}
+
+	function recordAfterRollback() {
+		if (!StructKeyExists(request, "$acLog")) {
+			request.$acLog = [];
+		}
+		ArrayAppend(request.$acLog, "rollback:" & (this.name ?: ""));
+		this.afterRollbackFired = true;
+	}
+
+	function callbackThatThrows() {
+		Throw(type = "Wheels.TestAfterCommitBoom", message = "afterCommit callback boom");
+	}
+
 	function firstCallback() {
 		if (!StructKeyExists(this, "orderTest")) {
 			this.orderTest = "";

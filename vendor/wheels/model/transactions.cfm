@@ -59,6 +59,11 @@
 			request.wheels.transactions[local.connectionArgs] = false;
 		}
 
+		// v4.2.0: per-connection afterCommit/afterRollback queue store.
+		if (!StructKeyExists(request.wheels, "$txnCallbacks")) {
+			request.wheels.$txnCallbacks = {};
+		}
+
 		// Issue #2789: skip model-level cftransaction when an outer owner (e.g. migrator) wraps this call.
 		local.outerTransactionActive = (
 			StructKeyExists(request, "$wheelsTransactionWrapper")
@@ -89,22 +94,53 @@
 				// CockroachDBTransactionSpec went on to fail OuterTransactionSignalSpec
 				// several bundles later (#3302). Resetting twice is harmless: the
 				// inner catch already clears the same flag before it rethrows.
+				// v4.2.0: the owner of a real (commit/rollback) transaction collects
+				// afterCommit/afterRollback callbacks from every write (incl. nested)
+				// and fires them once the outermost transaction resolves.
+				if (local.closeTransaction) {
+					request.wheels.$txnCallbacks[local.connectionArgs] = {real = true, queue = []};
+				}
+				local.txnState = {rolledBack = false};
 				try {
 					transaction action="begin" isolation=arguments.isolation {
 						try {
 							local.rv = $invoke(method = arguments.method, componentReference = this, invokeArgs = local.methodArgs);
 							if (!IsBoolean(local.rv) || !local.rv || arguments.transaction eq "rollback") {
 								transaction action="rollback";
+								local.txnState.rolledBack = true;
 							}
 						} catch (any e) {
 							transaction action="rollback";
 							request.wheels.transactions[local.connectionArgs] = false;
+							// Fire afterRollback (owner only) before the rethrow, then clean up.
+							if (local.closeTransaction) {
+								$fireAfterRollbackQueue(connection = local.connectionArgs);
+								StructDelete(request.wheels.$txnCallbacks, local.connectionArgs);
+							}
 							rethrow;
 						}
 					}
 				} catch (any e) {
 					request.wheels.transactions[local.connectionArgs] = false;
+					if (
+						local.closeTransaction
+						&& StructKeyExists(request.wheels.$txnCallbacks, local.connectionArgs)
+					) {
+						$fireAfterRollbackQueue(connection = local.connectionArgs);
+						StructDelete(request.wheels.$txnCallbacks, local.connectionArgs);
+					}
 					rethrow;
+				}
+				// Transaction block closed without an exception: fire afterCommit on
+				// commit, or afterRollback on a non-exception rollback (rv false / mode
+				// rollback). Owner only; nested writes already queued into this set.
+				if (local.closeTransaction) {
+					if (local.txnState.rolledBack) {
+						$fireAfterRollbackQueue(connection = local.connectionArgs);
+					} else {
+						$drainAfterCommitQueue(connection = local.connectionArgs);
+					}
+					StructDelete(request.wheels.$txnCallbacks, local.connectionArgs);
 				}
 				break;
 			case "false":

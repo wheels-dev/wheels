@@ -360,4 +360,166 @@
 	public any function $coerceOracleTimestamp(required any value) {
 		return $engineAdapter().coerceOracleObject(arguments.value);
 	}
+
+	/**
+	 * Registers method(s) to run AFTER the database transaction commits (v4.2.0).
+	 * They run only when the OUTERMOST transaction commits; a rollback discards
+	 * them. With no transaction (transactionMode="none"/"false") they fire
+	 * immediately after the write, since it is already committed.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Callback Functions]
+	 *
+	 * @methods [see:afterNew].
+	 * @on Restrict to one or more operations: create, update, delete (comma-delimited; blank = all).
+	 */
+	public void function afterCommit(string methods = "", string on = "") {
+		$registerTransactionCallback(type = "afterCommit", methods = arguments.methods, on = arguments.on);
+	}
+
+	/**
+	 * Registers method(s) to run AFTER the database transaction rolls back (v4.2.0).
+	 *
+	 * [section: Model Configuration]
+	 * [category: Callback Functions]
+	 *
+	 * @methods [see:afterNew].
+	 * @on Restrict to one or more operations: create, update, delete (comma-delimited; blank = all).
+	 */
+	public void function afterRollback(string methods = "", string on = "") {
+		$registerTransactionCallback(type = "afterRollback", methods = arguments.methods, on = arguments.on);
+	}
+
+	/**
+	 * Internal. Stores afterCommit/afterRollback entries as {method, on} structs
+	 * so the optional operation filter rides with each method.
+	 */
+	public void function $registerTransactionCallback(required string type, required string methods, string on = "") {
+		if (!StructKeyExists(variables.wheels.class.callbacks, arguments.type)) {
+			variables.wheels.class.callbacks[arguments.type] = [];
+		}
+		local.cleanMethods = $listClean(arguments.methods);
+		local.cleanOn = $listClean(LCase(arguments.on));
+		local.iEnd = ListLen(local.cleanMethods);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			ArrayAppend(
+				variables.wheels.class.callbacks[arguments.type],
+				{method = ListGetAt(local.cleanMethods, local.i), on = local.cleanOn}
+			);
+		}
+	}
+
+	/**
+	 * Internal. True when this model has any afterCommit/afterRollback callback.
+	 */
+	public boolean function $hasTransactionCallbacks() {
+		return (
+			(StructKeyExists(variables.wheels.class.callbacks, "afterCommit") && !ArrayIsEmpty(variables.wheels.class.callbacks.afterCommit))
+			|| (StructKeyExists(variables.wheels.class.callbacks, "afterRollback") && !ArrayIsEmpty(variables.wheels.class.callbacks.afterRollback))
+		);
+	}
+
+	/**
+	 * Internal. Called by $save / $delete after their in-transaction after*
+	 * callbacks succeed. Enqueues this instance for the outermost transaction to
+	 * fire; or, with no real transaction (none/false mode), fires afterCommit now
+	 * because the write is already committed (decision B1).
+	 */
+	public void function $enqueueTransactionCallbacks(required string operation) {
+		if (!$hasTransactionCallbacks()) {
+			return;
+		}
+		local.conn = this.$hashedConnectionArgs();
+		if (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "$txnCallbacks")
+			&& StructKeyExists(request.wheels.$txnCallbacks, local.conn)
+			&& request.wheels.$txnCallbacks[local.conn].real
+		) {
+			ArrayAppend(
+				request.wheels.$txnCallbacks[local.conn].queue,
+				{object = this, operation = arguments.operation}
+			);
+		} else {
+			this.$runTransactionCallbacks(type = "afterCommit", operation = arguments.operation);
+		}
+	}
+
+	/**
+	 * Internal. Runs this instance's registered callbacks of `type`, filtered by
+	 * `operation` (an entry's `on`; blank = all). A throwing callback is logged to
+	 * wheels.log (model + method) then propagated, stopping the rest; the database
+	 * change is NOT rolled back (decision C).
+	 */
+	public void function $runTransactionCallbacks(required string type, required string operation) {
+		if (!StructKeyExists(variables.wheels.class.callbacks, arguments.type)) {
+			return;
+		}
+		local.entries = variables.wheels.class.callbacks[arguments.type];
+		local.iEnd = ArrayLen(local.entries);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.entry = local.entries[local.i];
+			local.method = IsStruct(local.entry) ? local.entry.method : local.entry;
+			local.on = IsStruct(local.entry) ? (local.entry.on ?: "") : "";
+			if (Len(local.on) && !ListFindNoCase(local.on, arguments.operation)) {
+				continue;
+			}
+			try {
+				$invoke(method = local.method);
+			} catch (any e) {
+				try {
+					writeLog(
+						file = "wheels",
+						type = "error",
+						text = "A `" & arguments.type & "` callback failed after the transaction resolved on model `"
+							& variables.wheels.class.modelName & "`, method `" & local.method
+							& "`: " & e.message & " - the database change is NOT rolled back; the exception is propagating."
+					);
+				} catch (any logErr) {
+				}
+				rethrow;
+			}
+		}
+	}
+
+	/**
+	 * Internal. Drain the per-connection afterCommit queue (outermost commit).
+	 * FIFO across instances; registration order within each.
+	 */
+	public void function $drainAfterCommitQueue(required string connection) {
+		local.queue = $transactionCallbackQueue(arguments.connection);
+		local.iEnd = ArrayLen(local.queue);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.entry = local.queue[local.i];
+			local.entry.object.$runTransactionCallbacks(type = "afterCommit", operation = local.entry.operation);
+		}
+	}
+
+	/**
+	 * Internal. The outermost transaction rolled back: discard queued afterCommit
+	 * callbacks and fire afterRollback for each enqueued instance.
+	 */
+	public void function $fireAfterRollbackQueue(required string connection) {
+		local.queue = $transactionCallbackQueue(arguments.connection);
+		local.iEnd = ArrayLen(local.queue);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.entry = local.queue[local.i];
+			local.entry.object.$runTransactionCallbacks(type = "afterRollback", operation = local.entry.operation);
+		}
+	}
+
+	/**
+	 * Internal. The per-connection queue array, or an empty array if none.
+	 */
+	public array function $transactionCallbackQueue(required string connection) {
+		if (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "$txnCallbacks")
+			&& StructKeyExists(request.wheels.$txnCallbacks, arguments.connection)
+		) {
+			return request.wheels.$txnCallbacks[arguments.connection].queue;
+		}
+		return [];
+	}
+
 </cfscript>
