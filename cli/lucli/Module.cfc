@@ -11041,9 +11041,21 @@ component extends="modules.BaseModule" {
 			var name = trim(m.match[3]);
 			var envFile = variables.projectRoot & "/.env";
 			if (fileExists(envFile)) {
-				var envMatch = reFindNoCase("(?:^|\n)\s*" & m.match[2] & "\s*=\s*([^\r\n]+)", fileRead(envFile), 1, true);
-				if (envMatch.pos[1] > 0 && len(trim(envMatch.match[2]))) {
-					name = trim(envMatch.match[2]);
+				// Read the value the way the app's Application.cfc loadEnvFile() does:
+				// skip blank and # lines, split on the first "=", strip one pair of
+				// matching quotes, and let the last line for the key win.
+				for (var line in listToArray(fileRead(envFile), chr(10))) {
+					line = trim(line);
+					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), m.match[2]) != 0) {
+						continue;
+					}
+					var value = trim(listRest(line, "="));
+					if (len(value) >= 2 && ((left(value, 1) == '"' && right(value, 1) == '"') || (left(value, 1) == "'" && right(value, 1) == "'"))) {
+						value = mid(value, 2, len(value) - 2);
+					}
+					if (len(value)) {
+						name = value;
+					}
 				}
 			}
 			return name;

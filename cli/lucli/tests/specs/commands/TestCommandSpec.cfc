@@ -299,6 +299,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				$tearDown(sandbox);
 			});
 
+			it("reads a quoted .env value, and the last line for the key, as the app does (##3946)", () => {
+				var sandbox = $scaffold(
+					settingsBody = 'set(dataSourceName=env("WHEELS_DATASOURCE", "myapp"));',
+					envBody      = "## WHEELS_DATASOURCE=commented" & chr(10) & "WHEELS_DATASOURCE=first" & chr(10) & 'WHEELS_DATASOURCE="quoted"'
+				);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(false)).toBe("quoted");
+				$tearDown(sandbox);
+			});
+
 			it("ignores a .env WHEELS_DATASOURCE when settings.cfm hardcodes the name", () => {
 				var sandbox = $scaffold(
 					settingsBody = 'set(dataSourceName="literal");',
