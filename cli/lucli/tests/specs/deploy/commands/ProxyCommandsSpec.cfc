@@ -22,7 +22,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("docker exec kamal-proxy");
                 expect(cmd).toInclude("kamal-proxy deploy demo");
                 expect(cmd).toInclude("--target 'demo-web-v1:3000'");
-                expect(cmd).toInclude("--health-check-path /up");
+                expect(cmd).toInclude("--health-check-path '/up'");
             });
 
             it("remove() stops and removes the proxy container", () => {

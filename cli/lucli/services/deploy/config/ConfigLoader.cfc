@@ -41,10 +41,16 @@ component {
 
 		if (len(dest)) {
 			var overlayPath = $overlayPathFor(arguments.path, dest);
-			if (fileExists(overlayPath)) {
-				var overlay = variables.yaml.parse(fileRead(overlayPath));
-				raw = variables.yaml.deepMerge(raw, overlay);
+			// A destination names its own config file. A typo must not deploy
+			// the base config to the base hosts (Kamal fails here too).
+			if (!fileExists(overlayPath)) {
+				variables.validator.$raise(
+					arguments.path,
+					"destination '#dest#' has no config file: #getFileFromPath(overlayPath)# was not found next to it"
+				);
 			}
+			var overlay = variables.yaml.parse(fileRead(overlayPath));
+			raw = variables.yaml.deepMerge(raw, overlay);
 		}
 
 		// Build a SecretResolver lazily if the caller didn't inject one.

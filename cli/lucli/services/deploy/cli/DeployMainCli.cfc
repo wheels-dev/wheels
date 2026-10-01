@@ -130,6 +130,13 @@ component {
                 // completed) and are dispatched allowFail — observability
                 // must never fail a deploy.
                 $dispatch(hosts, auditor.record("started deploy of version " & ver), dryRun, true);
+                // Kamal order: registry login (here and on every host), build
+                // and push the image, then pull it on the hosts. skipPush is
+                // for pipelines that already pushed this version.
+                $registryLogin(cfg, hosts, dryRun);
+                if (!(arguments.opts.skipPush ?: false)) {
+                    $runLocal(builder.push(ver), dryRun);
+                }
                 $dispatch(hosts, builder.pull(ver), dryRun);
                 // Fresh-host bootstrap (#2957 DEP-5c): every `docker run`
                 // below joins --network kamal, so the network must exist
@@ -248,11 +255,17 @@ component {
         for (var role in cfg.roles()) {
             for (var host in role.hosts()) {
                 $dispatch([host], app.start(role, arguments.opts.version), dryRun);
-                $dispatch(
-                    [host],
-                    proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":" & appPort),
-                    dryRun
-                );
+                // Only proxy roles have kamal-proxy; worker hosts don't.
+                if (role.runningProxy()) {
+                    $dispatch(
+                        [host],
+                        proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":" & appPort),
+                        dryRun
+                    );
+                }
+                // Stop every other version, so old and restored containers
+                // (e.g. two job workers) never run side by side.
+                $dispatch([host], app.stop_old_versions(role, arguments.opts.version), dryRun, true);
                 arrayAppend(hostList, host);
             }
         }
@@ -690,6 +703,95 @@ component {
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
             ssh.run(c, {raise: doRaise});
         });
+    }
+
+    /**
+     * `docker login --password-stdin` locally (for the push) and on every
+     * host (for the pull) when the registry has a username. The password
+     * comes from the first registry.password key in .kamal/secrets and only
+     * ever travels on stdin, never in a command line or dry-run output.
+     */
+    private void function $registryLogin(required any cfg, required array hosts, required boolean dryRun) {
+        if (!len(arguments.cfg.registry().username())) {
+            return;
+        }
+        var cmd = new modules.wheels.services.deploy.commands.RegistryCommands(arguments.cfg).login();
+        var password = "";
+        var keys = arguments.cfg.registry().password();
+        var resolver = variables.loader.secretResolver();
+        if (arrayLen(keys) && isObject(resolver) && resolver.has(keys[1])) {
+            password = resolver.get(keys[1]);
+            new modules.wheels.services.deploy.lib.SecretRedaction().register(password);
+        }
+        if (!len(password)) {
+            // Hosts may already be logged in (a credential helper, or a
+            // manual `wheels deploy registry login`), so this is a warning:
+            // a pull that needs credentials then fails visibly.
+            new modules.wheels.services.deploy.lib.SecretRedaction().addWarning(
+                "registry.username is set but no registry.password key resolves from .kamal/secrets, so docker login was skipped. "
+                & "The build push and the pulls need the hosts and this machine to be logged in already."
+            );
+            return;
+        }
+        $runLocal(cmd, arguments.dryRun, password);
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & cmd);
+            }
+            return;
+        }
+        var c = cmd;
+        var sin = password;
+        $registerSecretsForRedaction();
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+            ssh.run(c, {raise: true, stdin: sin});
+        });
+    }
+
+    /**
+     * Run a command on this machine (build, push, local login). Dry-run
+     * records it as "[local] <cmd>". `stdinData` is written to the process's
+     * stdin; the command line never carries it.
+     */
+    private void function $runLocal(required string cmd, required boolean dryRun, string stdinData = "") {
+        if (arguments.dryRun) {
+            arrayAppend(variables.dryRunBuffer, "[local] " & arguments.cmd);
+            return;
+        }
+        // A pool that runs local commands itself (the spec fake) keeps tests
+        // from executing docker on the machine running them.
+        if (isObject(variables.sshPool) && structKeyExists(variables.sshPool, "runLocal")) {
+            var faked = variables.sshPool.runLocal(arguments.cmd, arguments.stdinData);
+            if ((faked.exitCode ?: 0) != 0) {
+                throw(
+                    type = "DeployMainCli.LocalCommandFailed",
+                    message = new modules.wheels.services.deploy.lib.SecretRedaction().redact(
+                        "Local command failed (exit " & faked.exitCode & "): " & arguments.cmd
+                    )
+                );
+            }
+            return;
+        }
+        var pb = createObject("java", "java.lang.ProcessBuilder").init(["bash", "-c", arguments.cmd]);
+        pb.redirectErrorStream(true);
+        if (!len(arguments.stdinData)) {
+            pb.redirectOutput(createObject("java", "java.lang.ProcessBuilder$Redirect").INHERIT);
+        }
+        var proc = pb.start();
+        if (len(arguments.stdinData)) {
+            var w = proc.getOutputStream();
+            w.write(charsetDecode(arguments.stdinData, "utf-8"));
+            w.close();
+        }
+        proc.waitFor();
+        if (proc.exitValue() != 0) {
+            throw(
+                type = "DeployMainCli.LocalCommandFailed",
+                message = new modules.wheels.services.deploy.lib.SecretRedaction().redact(
+                    "Local command failed (exit " & proc.exitValue() & "): " & arguments.cmd
+                )
+            );
+        }
     }
 
     /**

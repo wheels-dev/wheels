@@ -51,6 +51,20 @@ component {
 	}
 
 	public array function calls() { return variables.calls; }
+
+	/**
+	 * Fake of a command DeployMainCli runs on THIS machine (registry login,
+	 * image build and push). Recorded with host "local"; scripted with
+	 * expect("local", cmd, result); exit 0 by default. Keeps specs from ever
+	 * running docker locally.
+	 */
+	public struct function runLocal(required string cmd, string stdin = "") {
+		arrayAppend(variables.calls, {host: "local", cmd: arguments.cmd, opts: {stdin: arguments.stdin}, kind: "local"});
+		var key = "local|#arguments.cmd#";
+		return structKeyExists(variables.expectations, key)
+			? variables.expectations[key]
+			: {exitCode: 0, stdout: "", stderr: "", durationMs: 0};
+	}
 	public void function reset() { arrayClear(variables.calls); }
 
 	public void function onEach(required array hosts, required any callback) {
