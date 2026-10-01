@@ -187,6 +187,13 @@
 								"LEFT OUTER JOIN " & local.groupedInner,
 								"one"
 							);
+						} else {
+							// The nested joins were already taken out of the flat list, so
+							// carrying on would silently drop them from the query.
+							Throw(
+								type = "Wheels.InvalidJoin",
+								message = "Could not group nested includes under the join `#local.join#`: expected a LEFT OUTER JOIN."
+							);
 						}
 					}
 
