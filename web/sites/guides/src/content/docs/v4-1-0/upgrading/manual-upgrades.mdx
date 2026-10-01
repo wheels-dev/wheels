@@ -40,6 +40,22 @@ If you deploy from git and `vendor/wheels/` is committed (common for deliberate-
 4.1.0 moved the model mixins to compile-time includes ([#3213](https://github.com/wheels-dev/wheels/issues/3213)), so a model that overrides a mixin and delegates through the old `variables.super<name>` alias (e.g. `variables.superdelete()`) must call the parent method instead — `super.delete()` (or `super.updateAll()`, etc.). Controller and view helper `super<name>` overrides are unaffected ([#3325](https://github.com/wheels-dev/wheels/issues/3325)).
 </Aside>
 
+<Aside type="caution" title="Upgrading to 4.1.1? Patch the `.env` boolean parser">
+4.1.1 stops coercing a `.env` value of numeric 1 (such as `1.0`) to the boolean `true` ([#3641](https://github.com/wheels-dev/wheels/issues/3641)). The parser lives in the app-owned `public/Application.cfc`, so the `vendor/wheels/` swap does **not** deliver the fix. In your copy, find the `.env` type-casting block that compares with `==`:
+
+```cfm title="before — public/Application.cfc"
+if (local.value == "true" || local.value == "false") {
+	local.value = (local.value == "true");
+```
+
+and replace those two lines with the template's string comparison:
+
+```cfm title="after — public/Application.cfc (4.1.1 template)"
+if (Compare(lCase(local.value), "true") == 0 || Compare(lCase(local.value), "false") == 0) {
+	local.value = (Compare(lCase(local.value), "true") == 0);
+```
+</Aside>
+
 ## The 3.x → 4.0 upgrade
 
 The mechanics are the same swap, but 4.0 changes framework behavior and some app-side files, so there's required reading and a few extra steps:
