@@ -137,6 +137,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(() => m.upgrade(arg1 = "check")).toThrow(type = "Wheels.UpgradeCheckFailed", regex = "HTTP 301");
 			});
 
+			it("reports the HTTP status, not a JSON parse error, for an HTML error page", () => {
+				var m = newModule();
+				m.$("$latestReleaseResponse", {status: 503, body: "<html><body>Service Unavailable</body></html>"});
+				expect(() => m.upgrade(arg1 = "check")).toThrow(type = "Wheels.UpgradeCheckFailed", regex = "HTTP 503");
+				var output = m.capturedOutput();
+				expect(output).toInclude("HTTP 503");
+				expect(output).notToInclude("JSON");
+			});
+
+			it("does not accept a tag_name from a non-200 response", () => {
+				var m = newModule();
+				m.$("$latestReleaseResponse", {status: 500, body: '{"tag_name":"v9.9.9"}'});
+				expect(() => m.upgrade(arg1 = "check")).toThrow(type = "Wheels.UpgradeCheckFailed", regex = "HTTP 500");
+				expect(m.capturedOutput()).notToInclude("9.9.9");
+			});
+
 			it("looks the release up over HTTPS with the cfhttp-based client, not the raw-socket one", () => {
 				var source = fileRead(expandPath("/cli/lucli/Module.cfc"));
 				var start = find("private struct function $latestReleaseResponse(", source);

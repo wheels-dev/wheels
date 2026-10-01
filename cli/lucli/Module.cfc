@@ -7446,16 +7446,18 @@ component extends="modules.BaseModule" {
 		var reason = "";
 		try {
 			var response = $latestReleaseResponse();
-			var releaseData = len(response.body) ? deserializeJSON(response.body) : {};
-			if (isStruct(releaseData) && structKeyExists(releaseData, "tag_name") && isSimpleValue(releaseData.tag_name)) {
+			// Only parse a JSON body: an offline proxy page or an HTML error
+			// would otherwise surface as a JSON syntax error, not the status.
+			var releaseData = isJSON(response.body) ? deserializeJSON(response.body) : {};
+			if (response.status == 200 && isStruct(releaseData) && structKeyExists(releaseData, "tag_name") && isSimpleValue(releaseData.tag_name)) {
 				target = trim(replace(releaseData.tag_name, "v", ""));
 			}
-			// GitHub error bodies (rate limit, not found) carry a `message`.
-			if (!len(target) && isStruct(releaseData) && structKeyExists(releaseData, "message") && isSimpleValue(releaseData.message)) {
-				reason = releaseData.message;
-			}
-			if (!len(target) && !len(reason)) {
+			if (!len(target)) {
 				reason = "HTTP #response.status#";
+				// GitHub error bodies (rate limit, not found) carry a `message`.
+				if (isStruct(releaseData) && structKeyExists(releaseData, "message") && isSimpleValue(releaseData.message)) {
+					reason &= ": " & releaseData.message;
+				}
 			}
 		} catch (any e) {
 			reason = e.message;
