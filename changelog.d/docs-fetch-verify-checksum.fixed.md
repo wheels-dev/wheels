@@ -1,1 +1,0 @@
-- `wheels docs fetch` now verifies the downloaded docs bundle against the SHA-512 checksum published next to it on the release before unpacking, and exits non-zero with a clear message when the checksum is missing or does not match, or the download or unpack fails, leaving any existing install in place instead of a half-unpacked docs directory (#3823)

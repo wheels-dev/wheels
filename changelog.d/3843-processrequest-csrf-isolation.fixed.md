@@ -1,1 +1,0 @@
-- `processRequest()` no longer changes the cached controller class's CSRF settings. Its `csrf` option (default `ignore`) now applies only to the controller instance it builds, so real requests to a controller that a spec exercised with `processRequest()` keep their configured CSRF protection instead of skipping it until the next reload (#3843)

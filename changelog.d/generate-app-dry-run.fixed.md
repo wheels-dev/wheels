@@ -1,1 +1,0 @@
-- `wheels generate app <name> --dry-run` (and the MCP `generate` tool with `type=app` and `dry-run`) no longer creates the project. It printed "Dry run — nothing will be written" and then wrote the whole app, including a `vendor/wheels` copy and a `.env` with generated passwords. It now lists the folder it would create and writes nothing.
