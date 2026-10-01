@@ -282,6 +282,33 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				$tearDown(sandbox);
 			});
 
+			it("reads the env() default of the generated settings.cfm line (##3946)", () => {
+				var sandbox = $scaffold(settingsBody = 'set(dataSourceName=env("WHEELS_DATASOURCE", "myapp"));');
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(true)).toBe("myapp_test");
+				$tearDown(sandbox);
+			});
+
+			it("uses the .env value of the variable the settings.cfm env() call names (##3946)", () => {
+				var sandbox = $scaffold(
+					settingsBody = 'set(dataSourceName=env("WHEELS_DATASOURCE", "myapp"));',
+					envBody      = "WHEELS_ENV=development" & chr(10) & "WHEELS_DATASOURCE=from_dotenv"
+				);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(false)).toBe("from_dotenv");
+				$tearDown(sandbox);
+			});
+
+			it("ignores a .env WHEELS_DATASOURCE when settings.cfm hardcodes the name", () => {
+				var sandbox = $scaffold(
+					settingsBody = 'set(dataSourceName="literal");',
+					envBody      = "WHEELS_DATASOURCE=unused"
+				);
+				var localMod = new cli.lucli.Module(cwd = sandbox);
+				expect(localMod.$resolveAppTestDataSource(false)).toBe("literal");
+				$tearDown(sandbox);
+			});
+
 			it("prefers .env DATASOURCE_NAME over config/settings.cfm", () => {
 				var sandbox = $scaffold(
 					settingsBody = 'set(dataSourceName="from_settings");',

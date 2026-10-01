@@ -636,12 +636,17 @@ component extends="../base" {
 		// Step 2: Remove single-line comments: // ... until end of line
 		local.cleaned = REReplace(local.cleaned, "//.*", "", "all");
 
-		// Step 3: Match set(dataSourceName="...")
-		local.pattern = "set\s*\(\s*dataSourceName\s*=\s*[""']([^""']+)[""']";
-		local.match = REFind(local.pattern, local.cleaned, 1, true);
-
-		if (arrayLen(local.match.pos) >= 2 && local.match.pos[2] > 0) {
-			return Mid(local.cleaned, local.match.pos[2], local.match.len[2]);
+		// Step 3: Match set(dataSourceName="...") or, in apps generated since 4.1.3,
+		// set(dataSourceName=env("WHEELS_DATASOURCE", "...")), whose default is used
+		// (a .env or process value isn't visible here)
+		for (local.pattern in [
+			"set\s*\(\s*dataSourceName\s*=\s*env\s*\(\s*[""'][^""']*[""']\s*,\s*[""']([^""']+)[""']",
+			"set\s*\(\s*dataSourceName\s*=\s*[""']([^""']+)[""']"
+		]) {
+			local.match = REFind(local.pattern, local.cleaned, 1, true);
+			if (arrayLen(local.match.pos) >= 2 && local.match.pos[2] > 0) {
+				return Mid(local.cleaned, local.match.pos[2], local.match.len[2]);
+			}
 		}
 		return "";
 	}

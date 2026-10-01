@@ -6,6 +6,8 @@ sidebar:
   order: 8
 ---
 
+import { Aside } from '@astrojs/starlight/components';
+
 Wheels ships with three named environments, a small stack of configuration files that load in a fixed order, and one pattern — `set(key=value)` — for writing into the settings struct. Knowing which file overrides which, and where secrets belong, keeps local behavior from leaking into production and keeps production credentials out of your repository.
 
 **You'll learn:**
@@ -63,25 +65,32 @@ One development-only default worth noting: `reloadOnGlobalChange` (defaults `tru
 
 ## Environment detection
 
-The active environment is whatever `config/environment.cfm` sets — and the scaffold hard-codes it:
+The active environment is whatever `config/environment.cfm` sets. A generated app reads it from `WHEELS_ENV`:
 
-```cfm title="illustrative — config/environment.cfm (as generated)"
-set(environment = "development");
+```cfm title="illustrative — config/environment.cfm (as generated, comments trimmed)"
+local.wheelsEnvironment = Trim(env("WHEELS_ENV", ""));
+if (!Len(local.wheelsEnvironment)) {
+	local.wheelsEnvironment = "development";
+}
+if (!ListFindNoCase("development,testing,maintenance,production", local.wheelsEnvironment)) {
+	Throw(type = "Wheels.InvalidEnvironment", message = "WHEELS_ENV must be development, testing, maintenance or production.");
+}
+set(environment = LCase(local.wheelsEnvironment));
 ```
 
-Exporting `WHEELS_ENV` does **not** change the environment on a stock app: nothing in the generated `environment.cfm` reads it, and the `wheels` CLI ignores the variable entirely. In a generated app, the exported value's only built-in effect is selecting which `.env.<name>` overlay file loads at boot.
+An unset or empty `WHEELS_ENV` means `development`, so a new app runs locally with no setup. Any value other than the four environment names stops the app from starting (a "Wheels failed to initialize" page, with the value in the server log), because Wheels treats an unknown environment like development where error output is concerned: a typo such as `prod` must not quietly expose error details.
 
-To drive the environment from a variable, two edits are required:
+`env()` checks `.env` first, then the process environment, so:
 
-1. Change `config/environment.cfm` to read it:
+- In development, the `WHEELS_ENV=development` line the scaffold writes into `.env` applies.
+- On a server, set `WHEELS_ENV=production` in that server's `.env`, or export it before the app starts (a Dockerfile `ENV`, a systemd unit or a deploy script). A `WHEELS_ENV` line in `.env` wins over an exported value, so a production server's `.env` must not say `development`. Docker images built from `wheels deploy init` leave `.env` out (`.dockerignore`), so the Dockerfile's `ENV WHEELS_ENV=production` applies.
+- With neither, the app runs in `development`. Production deploys always set the variable explicitly.
 
-   ```cfm title="illustrative — config/environment.cfm"
-   set(environment = env("WHEELS_ENV", "development"));
-   ```
+The `wheels` CLI doesn't read the variable, and `WHEELS_ENV` also selects which `.env.<name>` overlay file loads at boot.
 
-2. Remove the `WHEELS_ENV=development` line the scaffold writes into `.env`. `env()` checks `.env` *before* OS environment variables, so that line shadows any exported `WHEELS_ENV=production` until it's gone.
-
-With both edits in place, export `WHEELS_ENV=production` before the app starts — a deploy script, a Dockerfile `ENV`, or a systemd unit is the usual place.
+<Aside type="caution" title="Apps generated before 4.1.3">
+  Earlier scaffolds and the `wheels-base-template` download hardcode `set(environment = "development");`, so exporting `WHEELS_ENV` changes nothing, and a production server runs in development mode, with full error details, until you change it. Replace `config/environment.cfm` with the generated version above (it rejects unknown values), or hardcode `set(environment = "production");` on production servers.
+</Aside>
 
 ## Switching environments at runtime
 

@@ -4,7 +4,21 @@
 // Don't forget to issue a reload request (e.g. reload=true) after making changes.
 // See https://guides.wheels.dev/v4-1-0/core-concepts/environments-and-configuration/ for more info.
 
-// Below, we have set it to "development" for you since that is convenient when you are building your application.
-// We recommend that you change this to "production" when you're running your application live.
-set(environment="development");
+// The environment comes from WHEELS_ENV: the value in .env if it has one, otherwise the
+// process environment (a Dockerfile ENV, a systemd unit, your deploy script).
+// Unset or empty means "development", so a new app runs locally with no setup; set
+// WHEELS_ENV=production for a live app. Any other value stops the app from starting
+// rather than running with development-style error output.
+local.wheelsEnvironment = Trim(env("WHEELS_ENV", ""));
+if (!Len(local.wheelsEnvironment)) {
+	local.wheelsEnvironment = "development";
+}
+if (!ListFindNoCase("development,testing,maintenance,production", local.wheelsEnvironment)) {
+	Throw(
+		type = "Wheels.InvalidEnvironment",
+		message = "WHEELS_ENV must be development, testing, maintenance or production.",
+		detail = "WHEELS_ENV is set to """ & local.wheelsEnvironment & """."
+	);
+}
+set(environment=LCase(local.wheelsEnvironment));
 </cfscript>

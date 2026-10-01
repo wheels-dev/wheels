@@ -101,7 +101,7 @@ Why multi-stage:
 
 1. **Smaller runtime image.** `node_modules` is several hundred megabytes. Keeping it in the builder stage means it never ships.
 2. **Reproducible front-end builds.** The builder stage pins Node 20, so the compiled CSS and JS are identical regardless of the host that ran `docker build`.
-3. **One image, any environment.** The runtime reads `WHEELS_ENV` at boot. The same artifact boots against development, staging, or production by swapping env vars — no rebuild.
+3. **One image, any environment.** The generated `config/environment.cfm` reads `WHEELS_ENV` at boot, so the same artifact boots against development, staging, or production by swapping env vars — no rebuild. Apps generated before 4.1.3 hardcode the environment instead; [change `config/environment.cfm`](/v4-1-0/core-concepts/environments-and-configuration/#environment-detection) before you build, or the container runs in development mode.
 
 <Aside type="tip">
   The plain `7.1.0.204` tag is the JRE-based image (no `javac`) — production never needs the JDK. The JDK variants (e.g. `7.1.0.204-...-jdk25-temurin-noble`) are ~150 MB larger and only useful if you compile Java inside the container.
@@ -201,7 +201,7 @@ The `:?required` suffix on an env var makes Compose refuse to start if the varia
 
 ## Environment variables
 
-Wheels reads environment variables at boot through `config/settings.cfm` and `config/environment.cfm`. The scaffolded app ships with a small set; your app will add more.
+Wheels reads environment variables at boot through `config/settings.cfm` and `config/environment.cfm`. The scaffolded app ships with a small set (apps generated before 4.1.3 don't read `WHEELS_ENV` or `WHEELS_DATASOURCE`; see the note above); your app will add more.
 
 | Variable | Where it's read | Typical value |
 |----------|----------------|---------------|

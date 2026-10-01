@@ -227,6 +227,47 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(settings).toInclude('labelPlacement="before"');
 			});
 
+			describe("config reads WHEELS_ENV and WHEELS_DATASOURCE (##3946)", () => {
+
+				// A hardcoded set(environment="development") left wheels deploy init
+				// images (ENV WHEELS_ENV=production) running in development mode.
+				var environmentFor = (struct envValues) => {
+					return new cli.lucli.tests._helpers.TemplateConfigHarness(arguments.envValues)
+						.includeConfig("/cli/lucli/templates/app/config/environment.cfm")
+						.environment;
+				};
+
+				it("uses WHEELS_ENV=production", () => {
+					expect(environmentFor({WHEELS_ENV: "production"})).toBe("production");
+				});
+
+				it("accepts each environment name, ignoring case and surrounding spaces", () => {
+					expect(environmentFor({WHEELS_ENV: "testing"})).toBe("testing");
+					expect(environmentFor({WHEELS_ENV: "maintenance"})).toBe("maintenance");
+					expect(environmentFor({WHEELS_ENV: " Production "})).toBe("production");
+					expect(environmentFor({WHEELS_ENV: "PRODUCTION"})).toBe("production");
+				});
+
+				it("falls back to development when WHEELS_ENV is unset or empty", () => {
+					expect(environmentFor({})).toBe("development");
+					expect(environmentFor({WHEELS_ENV: ""})).toBe("development");
+					expect(environmentFor({WHEELS_ENV: "  "})).toBe("development");
+				});
+
+				it("refuses to start with any other WHEELS_ENV value", () => {
+					expect(() => environmentFor({WHEELS_ENV: "prod"})).toThrow("Wheels.InvalidEnvironment");
+					expect(() => environmentFor({WHEELS_ENV: "staging"})).toThrow("Wheels.InvalidEnvironment");
+				});
+
+				it("takes the datasource from WHEELS_DATASOURCE, otherwise the scaffolded name", () => {
+					var settingsFile = "/cli/lucli/templates/app/config/settings.cfm";
+					var harness = new cli.lucli.tests._helpers.TemplateConfigHarness({});
+					expect(harness.includeConfig(settingsFile).dataSourceName).toBe("{{datasourceName}}");
+					harness = new cli.lucli.tests._helpers.TemplateConfigHarness({WHEELS_DATASOURCE: "app"});
+					expect(harness.includeConfig(settingsFile).dataSourceName).toBe("app");
+				});
+			});
+
 			it("ships .gitkeep files in tests/specs subfolders so empty dirs survive git", () => {
 				// Templates check — confirms the .gitkeep files exist on disk
 				// in the template tree. Their copying into the scaffolded app
