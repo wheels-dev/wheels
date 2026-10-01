@@ -528,6 +528,7 @@ component extends="modules.BaseModule" {
 			.flag(name = "strict", default = false, description = "check only: escalate advisory findings to a hard failure (non-zero exit) so CI can gate on them")
 			.flag(name = "nobackup", default = false, description = "apply only: skip the vendor/wheels.bak-<timestamp> backup of the existing framework")
 			.flag(name = "allow-downgrade", default = false, description = "apply only: proceed even when the CLI's bundled framework is older than the app's vendor/wheels/ (refused by default)")
+			.flag(name = "offline", default = false, description = "check only: skip the latest-release lookup on GitHub (pass --to). Also set by WHEELS_OFFLINE=1")
 			// CLI-only spellings read by parseUpgradeArgs, deliberately NOT
 			// advertised: `--no-backup` (LuCLI normalizes it to backup=false),
 			// `--help`/`-h`, and `--dry-run`, which neither verb supports and is
@@ -5218,6 +5219,7 @@ component extends="modules.BaseModule" {
 			// recommendations, not just breaking changes. Mirrors Django
 			// --fail-level WARNING / Mix --warnings-as-errors.
 			strict = parsed.strict,
+			offline = parsed.offline,
 			doBackup = doBackup,
 			allowDowngrade = parsed["allow-downgrade"],
 			// "Passed" means a real value, not key presence: MCP clients send
@@ -5285,6 +5287,10 @@ component extends="modules.BaseModule" {
 			rethrow;
 		}
 
+		// Assign the offline state for THIS call (resets a stale value left by an
+		// earlier MCP call on the reused Module); the release lookup honours it.
+		$consumeOfflineFlag(opts.offline ? ["--offline"] : []);
+
 		if (opts.wantsHelp) {
 			return $printUpgradeHelp();
 		}
@@ -5327,7 +5333,7 @@ component extends="modules.BaseModule" {
 		// Unknown named keys hard-stop too. ArgSpec ignores them by design
 		// (fine for read-only commands, kept for `check` above), but a
 		// destructive verb must not run alongside a flag the user typo'd.
-		var knownKeys = "to,format,strict,nobackup,allow-downgrade,backup,subcommand,help,h,dry-run";
+		var knownKeys = "to,format,strict,offline,nobackup,allow-downgrade,backup,subcommand,help,h,dry-run";
 		for (var key in coll) {
 			if (reFindNoCase("^arg\d+$", key) || listFindNoCase(knownKeys, key)) {
 				continue;
@@ -5354,7 +5360,7 @@ component extends="modules.BaseModule" {
 	private string function $printUpgradeHelp() {
 		var nl = chr(10);
 		var help = "Usage:" & nl
-			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
+			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json] [--offline]" & nl
 			& "  wheels upgrade apply [--to=<version>] [--nobackup] [--allow-downgrade]" & nl
 			& nl
 			& "Upgrade the Wheels framework in your app (vendor/wheels/)." & nl
@@ -5375,6 +5381,8 @@ component extends="modules.BaseModule" {
 			& "  --to=<version>    Target Wheels version. For check, defaults to the" & nl
 			& "                    latest stable release. For apply, must match the" & nl
 			& "                    CLI's bundled framework version." & nl
+			& "  --offline         Check only: never call GitHub. Without --to the" & nl
+			& "                    check fails and asks for one. Also WHEELS_OFFLINE=1." & nl
 			& "  --nobackup        Apply only: skip the vendor/wheels.bak-<timestamp>/" & nl
 			& "                    backup. Useful when vendor/wheels/ is tracked in git." & nl
 			& "  --allow-downgrade Apply only: proceed when the CLI's bundled framework" & nl
@@ -5410,7 +5418,7 @@ component extends="modules.BaseModule" {
 		var nl = chr(10);
 		var usage = "wheels upgrade needs an explicit subcommand (nothing was changed):" & nl
 			& nl
-			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json]" & nl
+			& "  wheels upgrade check [--to=<version>] [--strict] [--format=json] [--offline]" & nl
 			& "      Scan the app for breaking changes (read-only)." & nl
 			& "  wheels upgrade apply [--to=<version>] [--nobackup]" & nl
 			& "      Replace vendor/wheels/ with the CLI's bundled framework" & nl

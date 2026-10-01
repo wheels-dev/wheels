@@ -183,6 +183,43 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("wheels upgrade check — --offline", () => {
+
+			beforeEach(() => {
+				variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
+			});
+
+			afterEach(() => {
+				StructDelete(request, "$wheelsOffline");
+				testHelper.cleanupTempProject(variables.tempRoot);
+			});
+
+			it("refuses the latest-release lookup and steers to --to", () => {
+				// Not mocked: the real lookup must stop at the HttpClient gate.
+				var m = newModule();
+				expect(() => m.upgrade(arg1 = "check", offline = true)).toThrow(type = "Wheels.UpgradeCheckFailed");
+				var output = m.capturedOutput();
+				expect(output).toInclude("Offline mode is enabled");
+				expect(output).toInclude("--to=<version>");
+			});
+
+			it("still scans offline when --to is given", () => {
+				var m = offlineModule();
+				m.upgrade(arg1 = "check", to = "3.0.0", offline = true);
+				expect(m.$count("$latestReleaseResponse")).toBe(0);
+				expect(m.capturedOutput()).toInclude("Target version:  3.0.0");
+			});
+
+			it("resets an offline state left by an earlier call on the reused Module", () => {
+				request.$wheelsOffline = true;
+				var m = newModule();
+				m.$("$latestReleaseResponse", {status: 200, body: '{"tag_name":"v3.0.0"}'});
+				m.upgrade(arg1 = "check");
+				expect(request.$wheelsOffline).toBeFalse();
+			});
+
+		});
+
 	}
 
 }
