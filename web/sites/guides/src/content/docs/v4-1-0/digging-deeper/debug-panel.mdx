@@ -48,7 +48,7 @@ Do not put this override in `config/environment.cfm`. That file only selects the
 
 ## The debug bar
 
-When active, the bar appears as a slim strip pinned to the bottom of the browser window. While it is expanded, the page reserves the bar's height at the bottom (`--wdb-inset` on `html`, default 36px) so content and controls are not covered and remain reachable by scrolling. Collapsing the bar to the logo strip releases that reserved space — the corner logo stays fixed, but it does not leave a full-width dead zone. Tabs are arranged from left to right: a Wheels logo (doubles as the Request tab toggle), then Request, Timing, Params, Environment, and optionally Tools. The right side shows the current git branch (when the web root — `public/` — contains a `.git` directory), the framework version, and a one-click reload link when no reload password is configured.
+When active, the bar appears as a slim strip pinned to the bottom of the browser window. While it is expanded, the page reserves the bar's height at the bottom (`--wdb-inset` on `html`, default 36px) so content and controls are not covered and remain reachable by scrolling. Collapsing the bar to the logo strip releases that reserved space — the corner logo stays fixed, but it does not leave a full-width dead zone. Tabs are arranged from left to right: a Wheels logo (doubles as the Request tab toggle), then Request, Timing, Params and Environment. When `enablePublicComponent` is on (the default in development) they are followed by Routes, Migrate (also needs `enableMigratorComponent`), Tests, Guides and API, then Packages (when `enablePackagesComponent` is on), Tools, and Complexity. Below the width where the labels stop fitting, tabs collapse to icons and show their name in a hover tooltip. The right side shows the current git branch (when the web root — `public/` — contains a `.git` directory), the framework version, and a one-click reload link when no reload password is configured.
 
 ![The Wheels debug bar pinned to the bottom of a browser window: Wheels logo, Posts.index controller.action, timing badge, Params, Development environment, and Tools tabs, with Wheels 4.0.0-SNAPSHOT version on the right](/v4-1-0/digging-deeper/debug-panel-screenshots/01-collapsed-bar.png)
 
@@ -150,22 +150,45 @@ If any plugin warnings exist, a red **Warnings** subsection appears beneath the 
 - **Version mismatches** — plugins that require a different version of another plugin than what is loaded
 - **Mixin collisions** — cases where two plugins defined the same method name on the same mixin target; the later-loaded plugin wins
 
+## Routes tab
+
+Added in 4.1. The label shows the number of routes. The panel lists the application's route table (method, pattern, controller, action and name), so you can check a route without leaving the page. It replaces the old Routes card in the Tools tab.
+
+## Migrate tab
+
+Added in 4.1, shown when `enableMigratorComponent` is also `true`. The panel shows how many migrations are applied and how many are pending, the status of each migration, and a button to migrate to the latest version. Rolling back to an earlier version, redo, and reset to 0 are **hold-to-confirm** buttons, so a stray click can't change the schema. The state loads when you open the tab, not on every request. If a migration fails, its output appears with a **Copy** button.
+
+## Tests tab
+
+Added in 4.1. The panel runs the application's test suite and shows the results, and you can re-run a single bundle. It loads when you open the tab. When tests fail, **Copy failures** copies the failure output as plain text.
+
+## Guides and API tabs
+
+Added in 4.1. These open the guides and the API reference in a new browser tab, served from the local documentation copy at `/wheels-docs/guides/` and `/wheels-docs/api/`, so they work offline. Fetch the copy once with `wheels docs fetch` (the Homebrew formula does this on install and upgrade).
+
+## Packages tab
+
+Added in 4.1, shown when `enablePackagesComponent` is `true`. The panel lists the installed packages and, more usefully, any that failed to load, with the error. A badge on the tab shows the count. It loads when you open the tab. The same information also appears in the [Packages](#packages) section of the Environment panel.
+
+## Complexity tab
+
+Shows the cyclomatic complexity of each file in `app/`, computed statically and cached for the application lifetime. See [Code quality](/v4-1-0/command-line-tools/wheels-commands/code-quality/) for how it pairs with `wheels coverage`.
+
+## Copying output for a coding agent
+
+Since 4.1, the message blocks worth pasting into a coding agent have a **Copy** button: the reload-refused notice, configuration warnings, deprecations, the Warnings section, failing migration output and failing test output. Each copies plain text with a short header instead of raw markup.
+
+The development error page has a **Copy** button too. It copies a JSON dump of the exception: type, message, suggested action, file and line, the source snippet, and the app and framework stack frames.
+
 ## Tools tab
 
-Shown when `enablePublicComponent` is `true` (the default in development). Opens a grid of link cards, each opening in a new tab:
+Shown when `enablePublicComponent` is `true` (the default in development). Opens a short grid of link cards, each opening in a new tab. Routes, Tests, Migrator and Packages used to be cards here; since 4.1 they are tabs of their own (see above).
 
 | Card | Links to |
 |---|---|
-| System Info | `/wheels/info` — Wheels internals, environment variables, loaded settings |
-| Routes | `/wheels/routes` — all registered routes with HTTP method, path, and handler |
-| API Docs | `/wheels/api` — generated API documentation |
-| Guides | `/wheels/guides` — the documentation site |
-| Tests | `/wheels/app/tests` — the test runner |
-| Migrator | `/wheels/migrator` — the database migration UI (shown when `enableMigratorComponent` is `true`) |
-| Packages | `/wheels/packages` — the package browser (shown when `enablePackagesComponent` is `true`) |
-| Plugins | `/wheels/plugins` — the legacy plugin list (shown when `enablePluginsComponent` is `true`) |
-
-![Tools panel showing the Developer Tools link-card grid: System Info, Routes, API Docs, Guides, Tests, Migrator, Packages, and Plugins](/v4-1-0/digging-deeper/debug-panel-screenshots/06-tools-panel.png)
+| API Reference | `/wheels-docs/api/`, the local API reference |
+| Plugins | `/wheels/plugins`, the legacy plugin list (shown when `enablePluginsComponent` is `true`) |
+| Guides | `/wheels-docs/guides/`, the local guides |
 
 ## Configuration reference
 
