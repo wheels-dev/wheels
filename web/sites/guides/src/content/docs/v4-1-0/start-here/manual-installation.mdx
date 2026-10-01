@@ -21,12 +21,12 @@ Teams with their own deployment workflow — IIS or nginx in front of Lucee or A
 
 ## What to download
 
-Every release publishes its artifacts on the [GitHub releases page](https://github.com/wheels-dev/wheels/releases). For a new app you need exactly two (substitute the current version number):
+Every release publishes its artifacts on the [GitHub releases page](https://github.com/wheels-dev/wheels/releases). For a new app you need exactly two. The names below are from 4.1.2, the current 4.1 release at the time of writing; use the latest release and substitute its version number:
 
 | File | What it is | Where it goes |
 |---|---|---|
-| `wheels-base-template-4.0.5.zip` | The application skeleton: `app/`, `config/`, `public/`, `tests/`, an empty `vendor/` | Extract as your app root |
-| `wheels-core-4.0.5.zip` | The framework itself — a single `wheels/` folder | Extract into `vendor/`, so it becomes `vendor/wheels/` |
+| `wheels-base-template-4.1.2.zip` | The application skeleton: `app/`, `config/`, `public/`, `tests/`, an empty `vendor/` | Extract as your app root |
+| `wheels-core-4.1.2.zip` | The framework itself — a single `wheels/` folder | Extract into `vendor/`, so it becomes `vendor/wheels/` |
 
 That's the complete list. Wheels 4 has **no external dependencies**: the DI container (`vendor/wheels/Injector.cfc`) and the test framework (`vendor/wheels/wheelstest/`) are built in. `.md5`/`.sha512` checksum files are published alongside each zip if you want to verify downloads.
 
@@ -53,7 +53,7 @@ The 3.x recipe — wheels-base-template + wheels-core + **WireBox**, plus **Test
      server.json
    ```
 
-   A zero-byte marker file named `wheels-base-template-4.0.5-<timestamp>` ships in the zip; it identifies the build and is safe to delete.
+   A zero-byte marker file named `wheels-base-template-4.1.2-<timestamp>` ships in the zip; it identifies the build and is safe to delete.
 
 2. **Extract the core zip into `vendor/`.** The zip contains a single `wheels/` folder, so after extraction you have `vendor/wheels/` with `Dispatch.cfc`, `Model.cfc`, `Controller.cfc`, etc. directly inside it. The folder name must be exactly `wheels` — the mappings in `public/Application.cfc` depend on it.
 
@@ -90,8 +90,8 @@ The identical artifacts are published to ForgeBox as `wheels-base-template` and 
 Prefer `git clone` over zips? Clone the repo and copy `vendor/wheels/` from a release tag:
 
 ```bash title="your shell"
-git clone --depth=1 --branch v4.0.5 https://github.com/wheels-dev/wheels.git /tmp/wheels-src
+git clone --depth=1 --branch v4.1.2 https://github.com/wheels-dev/wheels.git /tmp/wheels-src
 cp -R /tmp/wheels-src/vendor/wheels myapp/vendor/wheels
 ```
 
-The repo's `vendor/wheels/` at a release tag is the same code as the core zip, with one cosmetic difference: the release pipeline stamps the real version into `wheels.json`, while a git checkout carries the `@build.version@` placeholder — the app runs identically, but version reporting (the debug bar, `application.$wheels.version`) shows the placeholder-derived value instead of `4.0.5`. If exact version metadata matters to you, prefer the zips. (Either way, don't track the framework from `develop` in production — tags are the supported line.)
+The repo's `vendor/wheels/` at a release tag is the same code as the core zip, with one cosmetic difference: the release pipeline stamps the real version into `wheels.json`, while a git checkout carries the `@build.version@` placeholder — the app runs identically, but version reporting (the debug bar, `application.$wheels.version`) shows the placeholder-derived value instead of `4.1.2`. If exact version metadata matters to you, prefer the zips. (Either way, don't track the framework from `develop` in production — tags are the supported line.)
