@@ -21,7 +21,7 @@ This page shows you how to override a core Wheels method — a model finder, a c
 
 ## How the convention works
 
-Wheels assembles models and controllers by mixing framework methods into your components at startup. Because the framework's `findAll()`, `linkTo()`, and friends arrive as mixins rather than through CFML inheritance, `super.findAll()` does not reach them — that syntax stopped working in Wheels 3.0.
+Wheels assembles controllers by mixing framework methods into your components at startup. Because the framework's `linkTo()` and friends arrive as mixins rather than through CFML inheritance, use the `super<name>` convention below to reach the original. Models work the same way through Wheels 4.0. Since 4.1.0 the model methods are compile-time includes ([#3462](https://github.com/wheels-dev/wheels/pull/3462)), so in a model `super.findAll()` reaches the framework method too; `superFindAll()` keeps working as well.
 
 Instead, when your component defines a method whose name collides with a framework mixin, Wheels keeps **your** version and registers the framework original under the same name prefixed with `super`. Override `findAll()` and the original becomes `superFindAll()`; override `linkTo()` and the original becomes `superLinkTo()`. Method names are case-insensitive, following normal CFML rules.
 
@@ -150,7 +150,7 @@ This replaces what plugins like `jsconfirm` did in older Wheels versions — no 
 If you're upgrading an application from Wheels 2.5 that overrode core methods:
 
 1. Search for usages of `super.methodName()`
-2. Replace them with `superMethodName()` — for example, `super.findAll()` becomes `superFindAll()`
+2. In controllers and view helpers, replace them with `superMethodName()`, for example `super.linkTo()` becomes `superLinkTo()`. In models on 4.1, `super.methodName()` keeps working, and `superMethodName()` is equivalent.
 3. Test the overridden behavior to make sure results match
 
 No changes are required for applications that don't override core methods.
