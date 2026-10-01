@@ -38,18 +38,66 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.ViewNotFound")).toBe(404)
 			})
 
-			it("maps Wheels.PackageNotFound to HTTP 404 (##2319)", () => {
-				// Any type ending in NotFound counts — futureproof against
-				// new not-found types without requiring an enum update.
-				expect($expectedStatusFor("Wheels.PackageNotFound")).toBe(404)
+			// sendFile() usually serves a client-addressed download route, so a
+			// missing file is the client's "not found". A missing image file used by
+			// imageTag is a server-side asset fault and stays 500.
+			it("maps Wheels.FileNotFound (sendFile) to HTTP 404", () => {
+				expect($expectedStatusFor("Wheels.FileNotFound")).toBe(404)
 			})
 
-			it("maps Wheels.DataSourceNotFound to HTTP 404 (##2319)", () => {
-				// DataSourceNotFound also matches the *NotFound rule. A
-				// missing datasource at the framework layer is closer to
-				// "configured resource missing" than a blanket server
-				// error, so 404 is the more honest status.
-				expect($expectedStatusFor("Wheels.DataSourceNotFound")).toBe(404)
+			it("keeps Wheels.ImageFileNotFound at HTTP 500 (server-side asset)", () => {
+				expect($expectedStatusFor("Wheels.ImageFileNotFound")).toBe(500)
+			})
+
+			// A-F4 allow-list: the 404 set is now client-URL-triggerable types only
+			// (route/record/view/action). A missing package is a server-side
+			// config/code fault, so it is 500 — as is any other non-client *NotFound
+			// (Model/Method/Filter/Association/Vite*/JobClass/…), including future
+			// types, which default to 500. (This reverses the earlier "any *NotFound
+			// -> 404" rule.)
+			it("maps Wheels.PackageNotFound to HTTP 500 (server-side, not client-triggerable)", () => {
+				expect($expectedStatusFor("Wheels.PackageNotFound")).toBe(500)
+			})
+
+			it("maps Wheels.ModelNotFound to HTTP 500 (server-side)", () => {
+				expect($expectedStatusFor("Wheels.ModelNotFound")).toBe(500)
+			})
+
+			it("maps Wheels.ViteManifestNotFound to HTTP 500 (server-side; allow-list defaults it)", () => {
+				expect($expectedStatusFor("Wheels.ViteManifestNotFound")).toBe(500)
+			})
+
+			it("maps a future Wheels.SomethingNotFound to HTTP 500 by default (allow-list)", () => {
+				expect($expectedStatusFor("Wheels.SomethingNotFound")).toBe(500)
+			})
+
+			it("maps Wheels.FormatNotAcceptable to HTTP 406 (##3866)", () => {
+				expect($expectedStatusFor("Wheels.FormatNotAcceptable")).toBe(406)
+			})
+
+			// A-F4: a missing datasource, table or column is a misconfigured or
+			// unmigrated deploy — a SERVER fault, not a client "page not found".
+			// Serving 404 for these hid an unmigrated deploy (TableNotFound) and
+			// a bad datasource from monitoring. They are now 500. (This reverses
+			// the earlier "404 is the more honest status" choice for
+			// DataSourceNotFound.)
+			it("maps Wheels.DataSourceNotFound to HTTP 500 (server misconfig, A-F4)", () => {
+				expect($expectedStatusFor("Wheels.DataSourceNotFound")).toBe(500)
+			})
+
+			it("maps Wheels.TableNotFound to HTTP 500 (unmigrated deploy, A-F4)", () => {
+				expect($expectedStatusFor("Wheels.TableNotFound")).toBe(500)
+			})
+
+			it("maps Wheels.ColumnNotFound to HTTP 500 (schema mismatch, A-F4)", () => {
+				expect($expectedStatusFor("Wheels.ColumnNotFound")).toBe(500)
+			})
+
+			// A-F7: a missing or invalid CSRF token is a client error (a forged or
+			// expired-form post), not a server error — monitoring must not count it
+			// as a 500.
+			it("maps Wheels.InvalidAuthenticityToken to HTTP 403 (A-F7)", () => {
+				expect($expectedStatusFor("Wheels.InvalidAuthenticityToken")).toBe(403)
 			})
 
 			// GH ##3075: the action-dispatch gate ($callAction) blocks framework
@@ -76,8 +124,12 @@ component extends="wheels.WheelsTest" {
 				expect($expectedStatusFor("Wheels.UnknownThingHappened")).toBe(500)
 			})
 
-			it("maps Wheels.ActionParameterMissing to HTTP 500 (Missing != NotFound, ##2319)", () => {
-				expect($expectedStatusFor("Wheels.ActionParameterMissing")).toBe(500)
+			// Thrown only at Dispatch.cfc:415 — a /wheels/ GUI request that resolves
+			// to controller=wheels with a null/empty action. Client-triggerable
+			// (a dev-GUI URL that names no action), so it is "no such page" -> 404,
+			// not a 500 server error. (Reverses the earlier "Missing != NotFound".)
+			it("maps Wheels.ActionParameterMissing to HTTP 404 (client-triggerable dev-GUI URL)", () => {
+				expect($expectedStatusFor("Wheels.ActionParameterMissing")).toBe(404)
 			})
 		})
 
@@ -125,14 +177,8 @@ component extends="wheels.WheelsTest" {
 	}
 
 	private numeric function $expectedStatusFor(required string wheelsType) {
-		// Mirrors the status map in EventMethods.$runOnError. Keep the regexes in
-		// sync with that source — a rename or narrowing there must break here.
-		if (ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.wheelsType)) {
-			return 404
-		}
-		if (ReFindNoCase("^Wheels\.NotAuthorized$", arguments.wheelsType)) {
-			return 403
-		}
-		return 500
+		// Exercise the real mapping (single source of truth) rather than a mirror.
+		var em = CreateObject("component", "wheels.events.EventMethods")
+		return em.$wheelsErrorStatusCode(arguments.wheelsType)
 	}
 }

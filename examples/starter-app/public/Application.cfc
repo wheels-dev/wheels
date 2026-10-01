@@ -229,47 +229,12 @@ component output="false" {
 		// Need to setup the wheels struct up here since it's used to store debugging info below if this is a reload request.
 		application.wo.$initializeRequestScope();
 
-		// IP-based access to public Component/debug GUI (only if allowed in settings)
-		if (!structKeyExists(application.wheels, "debugIPAccess")) {
-			application.wheels.debugIPAccess.originalEnablePublicComponent = application.wheels.enablePublicComponent;
-			application.wheels.debugIPAccess.originalShowDebugInformation  = application.wheels.showDebugInformation;
-			application.wheels.debugIPAccess.originalShowErrorInformation  = application.wheels.showErrorInformation;
-		}
-
-		// Conditional override for allowed IPs (but only in non-dev mode)
-		if (
-			StructKeyExists(application.wheels, "allowIPBasedDebugAccess") &&
-			application.wheels.environment != "development" &&
-			(application.wheels.allowIPBasedDebugAccess)
-		) {
-			// Client IP comes from the socket address. X-Forwarded-For is client-controlled
-			// and trivially spoofed, so it is only consulted when the app explicitly opts in
-			// via set(debugAccessTrustProxy=true) behind a trusted reverse proxy.
-			local.clientIP = Trim(CGI.REMOTE_ADDR);
-			if (
-				StructKeyExists(application.wheels, "debugAccessTrustProxy")
-				&& application.wheels.debugAccessTrustProxy
-				&& Len(Trim(CGI.HTTP_X_FORWARDED_FOR))
-			) {
-				// Rightmost entry is the one appended by the trusted proxy nearest the app.
-				local.clientIP = Trim(ListLast(CGI.HTTP_X_FORWARDED_FOR));
-			}
-			local.allowedIPs = application.wheels.debugAccessIPs;
-
-			if (arrayContains(local.allowedIPs, local.clientIP)) {
-				// Temporarily override — per request
-				application.wheels.enablePublicComponent = true;
-				application.wheels.showDebugInformation = true;
-				application.wheels.showErrorInformation = true;
-
-				// Enable the main GUI Component
-				application.wheels.public = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
-			} else {
-				application.wheels.enablePublicComponent = application.wheels.debugIPAccess.originalEnablePublicComponent;
-				application.wheels.showDebugInformation = application.wheels.debugIPAccess.originalShowDebugInformation;
-				application.wheels.showErrorInformation = application.wheels.debugIPAccess.originalShowErrorInformation;
-			}
-		}
+		// IP-based debug access (set(allowIPBasedDebugAccess=true), outside development):
+		// an allowed client IP gets the debug GUI and error details for THIS request
+		// only. The framework keeps that grant in the request scope; never set
+		// application.wheels.showErrorInformation / showDebugInformation /
+		// enablePublicComponent per request, because every concurrent request reads them.
+		application.wo.$applyIPDebugAccess();
 
 		// Loop-break for URL environment switches (issue #3030): $buildRedirectUrl()
 		// keeps ?reload=<environment>&password=... on the post-restart redirect so the
@@ -411,7 +376,7 @@ component output="false" {
 			timeout = 180
 		);
 		if (
-			application.wheels.showDebugInformation && StructKeyExists(request.wheels, "showDebugInformation") && request.wheels.showDebugInformation
+			application.wo.$get("showDebugInformation") && StructKeyExists(request.wheels, "showDebugInformation") && request.wheels.showDebugInformation
 		) {
 			if(!structKeyExists(url, "format")){
 				application.wo.$includeAndOutput(template = "/wheels/events/onrequestend/debug.cfm");

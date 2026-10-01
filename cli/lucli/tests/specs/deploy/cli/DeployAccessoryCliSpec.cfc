@@ -167,7 +167,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                             break;
                         }
                     }
-                    expect(runCmd).toInclude("super-secret-acc-pw-9000");
+                    // Dry-run output is itself redacted now; rebuild the real command the
+                    // pool receives by putting the known value back.
+                    expect(runCmd).notToInclude("super-secret-acc-pw-9000");
+                    expect(runCmd).toInclude("[REDACTED]");
+                    runCmd = replace(runCmd, "[REDACTED]", "super-secret-acc-pw-9000", "all");
 
                     var fake = new cli.lucli.services.deploy.lib.FakeSshPool();
                     fake.expect("1.2.3.5", runCmd, {exitCode: 125, stdout: "", stderr: "boom"});

@@ -22,19 +22,32 @@ component extends="wheels.WheelsTest" {
 		describe("Migrator command endpoint gating (SEC-3)", () => {
 
 			it("restricts requests to loopback clients via InetAddress.isLoopbackAddress()", () => {
-				var source = FileRead(ExpandPath("/wheels/public/migrator/command.cfm"));
-				expect(Find("java.net.InetAddress", source) > 0).toBeTrue(
-					"command.cfm must resolve cgi.REMOTE_ADDR through java.net.InetAddress"
+				// The gate logic lives in the shared _guard.cfm helper; command.cfm
+				// wires it via include and invokes the enforce functions.
+				var guard = FileRead(ExpandPath("/wheels/public/migrator/_guard.cfm"));
+				expect(Find("java.net.InetAddress", guard) > 0).toBeTrue(
+					"_guard.cfm must resolve cgi.REMOTE_ADDR through java.net.InetAddress"
 				);
-				expect(Find("isLoopbackAddress", source) > 0).toBeTrue(
-					"command.cfm must gate on InetAddress.isLoopbackAddress() like consoleeval.cfm"
+				expect(Find("isLoopbackAddress", guard) > 0).toBeTrue(
+					"_guard.cfm must gate on InetAddress.isLoopbackAddress() like consoleeval.cfm"
+				);
+				var source = FileRead(ExpandPath("/wheels/public/migrator/command.cfm"));
+				expect(FindNoCase("_guard.cfm", source) > 0).toBeTrue(
+					"command.cfm must include the shared _guard.cfm gate"
+				);
+				expect(Find("$migratorEnforceLocalhost", source) > 0).toBeTrue(
+					"command.cfm must invoke $migratorEnforceLocalhost()"
 				);
 			});
 
 			it("rejects forwarded clients via X-Forwarded-For inspection", () => {
+				var guard = FileRead(ExpandPath("/wheels/public/migrator/_guard.cfm"));
+				expect(FindNoCase("HTTP_X_FORWARDED_FOR", guard) > 0).toBeTrue(
+					"_guard.cfm must inspect X-Forwarded-For to prevent proxy bypass"
+				);
 				var source = FileRead(ExpandPath("/wheels/public/migrator/command.cfm"));
-				expect(FindNoCase("HTTP_X_FORWARDED_FOR", source) > 0).toBeTrue(
-					"command.cfm must inspect X-Forwarded-For to prevent proxy bypass"
+				expect(Find("$migratorEnforceNoForwardedClients", source) > 0).toBeTrue(
+					"command.cfm must invoke $migratorEnforceNoForwardedClients()"
 				);
 			});
 
@@ -49,9 +62,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("compares the CSRF token in constant time", () => {
+				var guard = FileRead(ExpandPath("/wheels/public/migrator/_guard.cfm"));
+				expect(Find("java.security.MessageDigest", guard) > 0).toBeTrue(
+					"_guard.cfm must use MessageDigest.isEqual for the token comparison"
+				);
 				var source = FileRead(ExpandPath("/wheels/public/migrator/command.cfm"));
-				expect(Find("java.security.MessageDigest", source) > 0).toBeTrue(
-					"command.cfm must use MessageDigest.isEqual for the token comparison"
+				expect(Find("$migratorVerifyCsrfToken", source) > 0).toBeTrue(
+					"command.cfm must invoke $migratorVerifyCsrfToken()"
 				);
 			});
 

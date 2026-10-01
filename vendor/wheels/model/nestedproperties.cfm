@@ -34,7 +34,7 @@
 				if (StructKeyExists(variables.wheels.class.accessibleProperties, "whiteList")) {
 					variables.wheels.class.accessibleProperties.whiteList[local.association] = 1;
 				}
-			} else if (application.wheels.showErrorInformation) {
+			} else if ($get("showErrorInformation")) {
 				Throw(
 					type = "Wheels.AssociationNotFound",
 					message = "The `#local.association#` association was not found on the `#variables.wheels.class.modelName#` model.",

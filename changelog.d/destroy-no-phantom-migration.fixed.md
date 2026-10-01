@@ -1,0 +1,1 @@
+- `wheels destroy <Name> --force` and `wheels destroy model <Name> --force` no longer generate a drop-table migration when there was no model to remove. That migration dropped a table that was never created, so the next `wheels migrate latest` failed.

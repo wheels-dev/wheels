@@ -151,9 +151,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			});
 
 			it("does not treat a property token containing dashes as a flag", () => {
-				// Only a leading `--` is a flag; a dash inside a name is data.
-				var parsed = probe.$parseGeneratorArgs(["display-name:string"]);
-				expect(parsed.properties[1].name).toBe("display-name");
+				// Only a leading `--` is a flag; a dash inside a name is property data.
+				// A CFML property name can't hold a hyphen, so it becomes an underscore.
+				expect(probe.$parseGeneratorArgs(["display-name:string"]).properties[1].name).toBe("display_name");
+				expect(probe.$parseGeneratorArgs(["display_name:string"]).properties[1].name).toBe("display_name");
 			});
 
 		});

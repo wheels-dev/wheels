@@ -21,14 +21,14 @@ component {
 	 * Destroy a complete resource (model + controller + views + tests + route + migration)
 	 */
 	public struct function destroyResource(required string name) {
+		$validateDestroyName(arguments.name, "resource");
 		var result = {success: true, deleted: [], warnings: [], migrationPath: ""};
 		var names = getNameVariants(arguments.name);
 
 		// Model
-		deleteFileIfExists(
-			variables.projectRoot & "/app/models/" & names.singularCap & ".cfc",
-			result
-		);
+		var modelPath = variables.projectRoot & "/app/models/" & names.singularCap & ".cfc";
+		var modelExisted = fileExists(modelPath);
+		deleteFileIfExists(modelPath, result);
 
 		// Controller
 		deleteFileIfExists(
@@ -65,8 +65,13 @@ component {
 		// Route cleanup
 		removeRoute(names.plural, result);
 
-		// Generate drop-table migration
-		result.migrationPath = generateRemoveTableMigration(names.plural);
+		// Drop-table migration only for a model that existed: with nothing found,
+		// a migration dropping a table that was never created would just fail.
+		if (modelExisted) {
+			result.migrationPath = generateRemoveTableMigration(names.plural);
+		} else {
+			arrayAppend(result.warnings, "No model found, so no drop-table migration was generated.");
+		}
 
 		return result;
 	}
@@ -80,21 +85,26 @@ component {
 	 * the case-preserving smart pluraliser produces the right output.
 	 */
 	public struct function destroyModel(required string name) {
+		$validateDestroyName(arguments.name, "model");
 		var result = {success: true, deleted: [], warnings: [], migrationPath: ""};
 		var clean = variables.helpers.stripSpecialChars(trim(arguments.name));
 		var modelCap = variables.helpers.capitalize(clean);
 
-		deleteFileIfExists(
-			variables.projectRoot & "/app/models/" & modelCap & ".cfc",
-			result
-		);
+		var modelPath = variables.projectRoot & "/app/models/" & modelCap & ".cfc";
+		var modelExisted = fileExists(modelPath);
+		deleteFileIfExists(modelPath, result);
 		deleteFileIfExists(
 			variables.projectRoot & "/tests/specs/models/" & modelCap & "Spec.cfc",
 			result
 		);
 
-		// Table name is the lowercase plural of the model name.
-		result.migrationPath = generateRemoveTableMigration(lCase(variables.helpers.pluralize(clean)));
+		// Table name is the lowercase plural of the model name. Only for a model
+		// that existed (see destroyResource).
+		if (modelExisted) {
+			result.migrationPath = generateRemoveTableMigration(lCase(variables.helpers.pluralize(clean)));
+		} else {
+			arrayAppend(result.warnings, "No model found, so no drop-table migration was generated.");
+		}
 
 		return result;
 	}
@@ -124,6 +134,7 @@ component {
 	 * #2330 and the related name-mangling side-finding.
 	 */
 	public struct function destroyController(required string name) {
+		$validateDestroyName(arguments.name, "controller");
 		var result = {success: true, deleted: [], warnings: []};
 		var clean = variables.helpers.stripSpecialChars(trim(arguments.name));
 		var controllerCap = variables.helpers.capitalize(clean);
@@ -147,6 +158,11 @@ component {
 	 */
 	public struct function destroyView(required string name) {
 		var result = {success: true, deleted: [], warnings: []};
+		if (!$isValidViewName(arguments.name)) {
+			result.success = false;
+			result.warnings = ["Invalid view path. Use: controller/viewname (e.g., products/index)"];
+			return result;
+		}
 
 		if (find("/", arguments.name)) {
 			// Single view file: "products/index"
@@ -178,6 +194,11 @@ component {
 	 * Build the list of files/dirs that would be deleted (for confirmation display)
 	 */
 	public array function previewDestroy(required string name, required string type) {
+		if (arguments.type != "view") {
+			$validateDestroyName(arguments.name, arguments.type);
+		} else if (!$isValidViewName(arguments.name)) {
+			return ["Invalid view path: " & arguments.name];
+		}
 		var preview = [];
 		var names = getNameVariants(arguments.name);
 
@@ -261,8 +282,47 @@ component {
 		return false;
 	}
 
+	/**
+	 * Destroy deletes and rewrites files, so each target must resolve inside the
+	 * project: a symlinked file or directory pointing outside is refused rather
+	 * than followed.
+	 */
+	private string function $inside(required string path) {
+		return new modules.wheels.services.GeneratorPaths().assertInside(variables.projectRoot, arguments.path);
+	}
+
+	/**
+	 * The destroy name builds file paths and the generated drop-table migration
+	 * (its file name, hint and table name), so it gets the same rule as
+	 * `wheels generate`: identifiers, optionally package/Name; a view is
+	 * controller or controller/view. Throws Wheels.Generate.InvalidName before
+	 * anything is planned or deleted.
+	 */
+	private void function $validateDestroyName(required string name, required string type) {
+		new modules.wheels.services.GeneratorPaths().componentName(trim(arguments.name), arguments.type);
+	}
+
+	/**
+	 * A view destroy name: a view folder ("products") or "folder/view"
+	 * ("products/index", "products/_form"). Invalid names are reported, not
+	 * thrown, like destroyView's other invalid paths.
+	 */
+	private boolean function $isValidViewName(required string name) {
+		var paths = new modules.wheels.services.GeneratorPaths();
+		var value = trim(arguments.name);
+		var parts = listToArray(value, "/", true);
+		if (arrayLen(parts) == 1) {
+			return paths.isIdentifier(value);
+		}
+		return arrayLen(parts) == 2
+			&& paths.isIdentifier(parts[1])
+			&& paths.isToken(parts[2])
+			&& reFind("^[A-Za-z_]", parts[2]) > 0;
+	}
+
 	private void function deleteFileIfExists(required string path, required struct result) {
 		if (fileExists(arguments.path)) {
+			$inside(arguments.path);
 			fileDelete(arguments.path);
 			arrayAppend(arguments.result.deleted, arguments.path);
 		} else {
@@ -272,6 +332,7 @@ component {
 
 	private void function deleteDirIfExists(required string path, required struct result) {
 		if (directoryExists(arguments.path)) {
+			$inside(arguments.path);
 			directoryDelete(arguments.path, true);
 			arrayAppend(arguments.result.deleted, arguments.path & "/");
 		} else {
@@ -303,7 +364,7 @@ component {
 				arrayAppend(filtered, line);
 			}
 		}
-		fileWrite(routesPath, arrayToList(filtered, nl));
+		fileWrite($inside(routesPath), arrayToList(filtered, nl));
 		arrayAppend(arguments.result.deleted, "Route: " & pattern);
 	}
 
@@ -313,9 +374,7 @@ component {
 		var fileName = timestamp & "_" & className & ".cfc";
 		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
 
-		if (!directoryExists(migrationDir)) {
-			directoryCreate(migrationDir, true);
-		}
+		new modules.wheels.services.GeneratorPaths().ensureDirectoryInside(variables.projectRoot, migrationDir);
 
 		// Read template and substitute
 		var templatePath = variables.moduleRoot & "templates/migrations/remove_table.txt";
@@ -324,7 +383,7 @@ component {
 		content = replaceNoCase(content, "{{tableName}}", arguments.tableName, "all");
 
 		var migrationPath = migrationDir & "/" & fileName;
-		fileWrite(migrationPath, content);
+		fileWrite($inside(migrationPath), content);
 		return migrationPath;
 	}
 

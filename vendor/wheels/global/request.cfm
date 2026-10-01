@@ -51,8 +51,72 @@
 			// Create a structure to track the transaction status for all adapters.
 			request.wheels.transactions = {};
 		}
+		// GHSA-8r22: apply the per-request IP-debug grant here, before the app's
+		// Application.cfc runs its own debug-IP handling. Every 4.x Application.cfc
+		// calls $initializeRequestScope() first, so an app that still carries the
+		// pre-4.1.2 block still gets the correct request-scoped grant; this is
+		// idempotent with the new template's explicit application.wo call. Guarded
+		// for the cold-start path where application.wheels is not built yet.
+		if (StructKeyExists(application, "wheels")) {
+			$applyIPDebugAccess();
+		}
 	}
 
+
+	/**
+	 * Internal function. IP-based debug access (`set(allowIPBasedDebugAccess=true)`
+	 * outside development): when the client IP is in `debugAccessIPs`, THIS request
+	 * gets the public component plus debug and error information. The grant is
+	 * stored in request.wheels.debugAccess, which $get() reads first, and never in
+	 * application.wheels: that scope is shared by every concurrent request, so
+	 * writing the grant there showed one client's permission to the others.
+	 * Called from Application.cfc's onRequestStart().
+	 */
+	public void function $applyIPDebugAccess(string clientIP = "") {
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		StructDelete(request.wheels, "debugAccess");
+		if (
+			!StructKeyExists(application.wheels, "allowIPBasedDebugAccess")
+			|| !IsBoolean(application.wheels.allowIPBasedDebugAccess)
+			|| !application.wheels.allowIPBasedDebugAccess
+			|| application.wheels.environment == "development"
+			|| !StructKeyExists(application.wheels, "debugAccessIPs")
+			|| !IsArray(application.wheels.debugAccessIPs)
+		) {
+			return;
+		}
+		local.clientIP = Len(arguments.clientIP) ? arguments.clientIP : $ipDebugAccessClientIP();
+		if (!Len(local.clientIP) || !ArrayContains(application.wheels.debugAccessIPs, local.clientIP)) {
+			return;
+		}
+		request.wheels.debugAccess = {enablePublicComponent = true, showDebugInformation = true, showErrorInformation = true};
+		// The GUI component object is only created at startup when the public
+		// component is enabled for everyone; create it once for granted requests.
+		// Creating it grants nothing: Dispatch still checks the per-request setting.
+		if (!StructKeyExists(application.wheels, "public")) {
+			application.wheels.public = $createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
+		}
+	}
+
+	/**
+	 * Internal function. The client address for IP-based debug access: the socket
+	 * address, or the rightmost X-Forwarded-For entry (the one the nearest proxy
+	 * appended) only when `set(debugAccessTrustProxy=true)`.
+	 */
+	public string function $ipDebugAccessClientIP() {
+		local.clientIP = Trim(CGI.REMOTE_ADDR);
+		if (
+			StructKeyExists(application.wheels, "debugAccessTrustProxy")
+			&& IsBoolean(application.wheels.debugAccessTrustProxy)
+			&& application.wheels.debugAccessTrustProxy
+			&& Len(Trim(CGI.HTTP_X_FORWARDED_FOR))
+		) {
+			local.clientIP = Trim(ListLast(CGI.HTTP_X_FORWARDED_FOR));
+		}
+		return local.clientIP;
+	}
 
 	/**
 	 * Get the status code (e.g. 200, 404 etc) of the response we're about to send.
@@ -403,7 +467,7 @@
 			ListLen(local.callingPath, "/") > ListLen(local.applicationPath, "/")
 		) {
 			if (StructKeyExists(application, "wheels")) {
-				if (StructKeyExists(application.wheels, "showErrorInformation") && !application.wheels.showErrorInformation) {
+				if (StructKeyExists(application.wheels, "showErrorInformation") && !$get("showErrorInformation")) {
 					$header(statusCode = 404);
 				}
 				if (StructKeyExists(application.wheels, "eventPath")) {
@@ -552,7 +616,9 @@
 
 		// Historic test helper defaults to ignore. Opt in to exception/abort
 		// without flipping the production protectsFromForgery() default.
-		local.controller.protectsFromForgery(with = arguments.csrf);
+		// The override is applied to this controller instance only: protectsFromForgery() would
+		// write it into the application-wide cached controller class (#3843).
+		local.controller.$setCsrfOverride(type = arguments.csrf);
 
 		local.controller.processAction(includeFilters = arguments.includeFilters);
 		local.response = local.controller.response();

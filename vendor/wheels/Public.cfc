@@ -169,6 +169,101 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	/**
+	 * True when a Host-header value names the local machine. Plain string checks
+	 * — no DNS lookup — so the decision is about the name the request was
+	 * addressed to. Accepts localhost, any *.localhost (RFC 6761), the
+	 * 127.0.0.0/8 block, and the [::1] IPv6 literal, plus any names configured
+	 * via set(devToolsAllowedHosts="a,b"). Empty input fails closed.
+	 */
+	public boolean function $wheelsHostIsLocal(required string hostHeader) {
+		local.host = Trim(arguments.hostHeader);
+		if (!Len(local.host)) {
+			return false;
+		}
+		// Strip the optional port, handling a bracketed IPv6 literal first.
+		if (Left(local.host, 1) == "[") {
+			local.close = Find("]", local.host);
+			if (local.close <= 2) {
+				return false;
+			}
+			local.after = Mid(local.host, local.close + 1, Len(local.host));
+			if (Len(local.after) && ReFind("^:[0-9]+$", local.after) == 0) {
+				return false;
+			}
+			local.host = Mid(local.host, 2, local.close - 2);
+		} else if (Find(":", local.host)) {
+			local.host = ListFirst(local.host, ":");
+		}
+		local.host = LCase(Trim(local.host));
+		if (ListFindNoCase("localhost,::1,0:0:0:0:0:0:0:1", local.host)) {
+			return true;
+		}
+		if (Right(local.host, 10) == ".localhost") {
+			return true;
+		}
+		// 127.0.0.0/8: exactly four octets, first is 127, each 0-255.
+		local.octets = ListToArray(local.host, ".");
+		if (ArrayLen(local.octets) == 4 && local.octets[1] == "127") {
+			local.octetsValid = true;
+			for (local.octet in local.octets) {
+				if (ReFind("^[0-9]{1,3}$", local.octet) == 0 || Val(local.octet) > 255) {
+					local.octetsValid = false;
+					break;
+				}
+			}
+			if (local.octetsValid) {
+				return true;
+			}
+		}
+		local.extra = "";
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "devToolsAllowedHosts")) {
+			local.extra = application.wheels.devToolsAllowedHosts;
+		}
+		if (Len(local.extra) && ListFindNoCase(local.extra, local.host)) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Network-origin gate for the password-less /wheels dev endpoints, applied at
+	 * the public-component dispatch chokepoint. Requires the request's Host header
+	 * to name the local machine and rejects a non-loopback X-Forwarded-For hop.
+	 *
+	 * It deliberately does NOT check the socket REMOTE_ADDR. The dev server is
+	 * commonly reached through a Docker port mapping where the socket source is
+	 * the bridge gateway (not loopback), so a socket check here would 403 the test
+	 * runners on every CI engine leg and break every Docker-hosted developer with
+	 * a browser on the host. The mutating endpoints (migrator command/create,
+	 * consoleeval, the CLI mutation bridge) keep their own loopback-socket + CSRF /
+	 * password checks on top of this Host-level gate.
+	 */
+	public void function $enforceDevToolLocalAccess() {
+		local.forwardedFor = StructKeyExists(cgi, "HTTP_X_FORWARDED_FOR") ? cgi.HTTP_X_FORWARDED_FOR : "";
+		if (Len(Trim(local.forwardedFor))) {
+			for (local.ip in ListToArray(local.forwardedFor)) {
+				if (!$isLoopbackAddress(Trim(local.ip))) {
+					$denyDevToolAccess();
+				}
+			}
+		}
+		local.hostHeader = StructKeyExists(cgi, "HTTP_HOST") ? cgi.HTTP_HOST : "";
+		if (!$wheelsHostIsLocal(hostHeader = local.hostHeader)) {
+			$denyDevToolAccess();
+		}
+	}
+
+	private void function $denyDevToolAccess() {
+		cfheader(statuscode = 403);
+		cfcontent(type = "text/plain", reset = true);
+		writeOutput(
+			"Wheels dev tools only accept requests addressed to a local host name (localhost, *.localhost, 127.0.0.1, or [::1])."
+			& " For a custom local hostname, add it with set(devToolsAllowedHosts=""my.host"")."
+		);
+		abort;
+	}
+
+	/**
 	 * Constant-time string comparison (hash both sides, compare digests via
 	 * MessageDigest.isEqual) to prevent timing attacks on the reload
 	 * password. Same construction as consoleeval.cfm / onapplicationstart.cfc.

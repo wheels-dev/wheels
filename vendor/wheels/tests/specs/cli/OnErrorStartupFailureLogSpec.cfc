@@ -106,16 +106,9 @@ component extends="wheels.WheelsTest" {
 				);
 			});
 
-			it("sets it before anything that can throw on the request (the Host-derived error address)", () => {
-				var assignPos = reFindNoCase("showErrorInformation\s*=", source);
-				var hostPos = findNoCase("request.cgi.server_name", source);
-				expect(assignPos > 0 && assignPos < hostPos).toBeTrue();
-			});
-
-			it("derives the error address only from a host with at least two labels", () => {
-				expect(reFindNoCase("ListLen\(\s*request\.cgi\.server_name\s*,\s*""\.""\s*\)\s*>=\s*2", source) > 0).toBeTrue(
-					"A Host such as ""example."" has a dot but one label; ListGetAt(..., 2, ""."") would throw."
-				);
+			it("reads nothing from the request, so no Host can throw or steer a setting", () => {
+				expect(findNoCase("request.cgi", source)).toBe(0, "debugging.cfm must not derive settings from the request");
+				expect(findNoCase("server_name", source)).toBe(0, "debugging.cfm must not derive settings from the Host");
 			});
 
 		});

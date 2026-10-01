@@ -173,7 +173,9 @@ component {
 				out = replace(out, v, "[REDACTED]", "all");
 			}
 		}
-		return out;
+		// Also every secret registered for this invocation (env.clear
+		// interpolations included), in raw and shell-escaped form.
+		return new modules.wheels.services.deploy.lib.SecretRedaction().redact(out);
 	}
 
 	private any function $makeFakeSsh(required string host) {

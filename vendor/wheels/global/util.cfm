@@ -96,7 +96,7 @@
 			arguments.args[local.first] = arguments.args[local.second];
 			StructDelete(arguments.args, local.second);
 		}
-		if (arguments.required && application.wheels.showErrorInformation) {
+		if (arguments.required && $get("showErrorInformation")) {
 			if (!StructKeyExists(arguments.args, local.first) || !Len(arguments.args[local.first])) {
 				Throw(
 					type = "Wheels.IncorrectArguments",
@@ -187,7 +187,7 @@
 				$combineArguments(args = arguments.args, combine = "#local.first#,#local.second#", required = local.required);
 			}
 		}
-		if (application.wheels.showErrorInformation) {
+		if ($get("showErrorInformation")) {
 			if (ListLen(arguments.reserved)) {
 				local.iEnd = ListLen(arguments.reserved);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {

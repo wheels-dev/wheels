@@ -14,11 +14,11 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("docker run");
                 expect(cmd).toInclude("--detach");
                 expect(cmd).toInclude("--restart unless-stopped");
-                expect(cmd).toInclude("--name demo-web-abc1234");
+                expect(cmd).toInclude("--name 'demo-web-abc1234'");
                 expect(cmd).toInclude("--network kamal");
-                expect(cmd).toInclude("--label service=demo");
-                expect(cmd).toInclude("--label role=web");
-                expect(cmd).toInclude("--label version=abc1234");
+                expect(cmd).toInclude("--label 'service=demo'");
+                expect(cmd).toInclude("--label 'role=web'");
+                expect(cmd).toInclude("--label 'version=abc1234'");
                 expect(cmd).toInclude("acme/demo:abc1234");
             });
 
@@ -30,7 +30,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             it("containers() filters by service label", () => {
                 var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg).containers();
                 expect(cmd).toInclude("docker ps");
-                expect(cmd).toInclude("--filter label=service=demo");
+                expect(cmd).toInclude("--filter 'label=service=demo'");
             });
 
             it("stop() targets the versioned container", () => {
@@ -89,7 +89,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(tmp);
                 var cmd = new cli.lucli.services.deploy.commands.AppCommands(cfg)
                     .run(cfg.roles()[1], "v1");
-                expect(cmd).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                expect(cmd).toInclude("--env-file '.kamal/apps/demo/env/roles/web.env'");
                 // The secret NAME must never surface as a -e pair.
                 expect(cmd).notToInclude("-e 'DATABASE_PASSWORD");
                 expect(cmd).notToInclude("-e DATABASE_PASSWORD");
@@ -169,7 +169,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
                     .remove_conflicting(variables.cfg.roles()[1], "v1");
                 expect(cmd).toInclude("docker container ls --all");
-                expect(cmd).toInclude("--filter name=^demo-web-v1$");
+                expect(cmd).toInclude("--filter 'name=^demo-web-v1$'");
                 expect(cmd).toInclude("--quiet");
                 expect(cmd).toInclude("xargs -r docker container rm --force");
             });
@@ -180,9 +180,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
                     .stop_old_versions(variables.cfg.roles()[1], "v2");
                 expect(cmd).toInclude("docker ps");
-                expect(cmd).toInclude("--filter label=service=demo");
-                expect(cmd).toInclude("--filter label=role=web");
-                expect(cmd).toInclude("--filter label=destination=");
+                expect(cmd).toInclude("--filter 'label=service=demo'");
+                expect(cmd).toInclude("--filter 'label=role=web'");
+                expect(cmd).toInclude("--filter 'label=destination='");
                 expect(cmd).toInclude("grep -v '^demo-web-v2$'");
                 expect(cmd).toInclude("xargs -r docker stop");
             });
@@ -190,8 +190,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             it("remove() chains docker stop and docker rm", () => {
                 var cmd = new cli.lucli.services.deploy.commands.AppCommands(variables.cfg)
                     .remove(variables.cfg.roles()[1], "v9");
-                expect(cmd).toInclude("docker stop demo-web-v9");
-                expect(cmd).toInclude("docker rm demo-web-v9");
+                expect(cmd).toInclude("docker stop 'demo-web-v9'");
+                expect(cmd).toInclude("docker rm 'demo-web-v9'");
                 expect(cmd).toInclude("&&");
             });
         });

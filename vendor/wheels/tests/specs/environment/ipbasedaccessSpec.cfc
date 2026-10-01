@@ -2,177 +2,128 @@ component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		// Store original settings to restore later
-		variables.originalEnvironment = application.wheels.environment;
-		if (StructKeyExists(application.wheels, "allowIPBasedDebugAccess")) {
-			variables.originalAllowIPBasedDebugAccess = application.wheels.allowIPBasedDebugAccess;
+		variables.originalSettings = {};
+		for (var key in ["environment", "allowIPBasedDebugAccess", "debugAccessIPs", "enablePublicComponent", "showDebugInformation", "showErrorInformation", "debugAccessTrustProxy"]) {
+			if (StructKeyExists(application.wheels, key)) {
+				variables.originalSettings[key] = application.wheels[key];
+			}
 		}
-		if (StructKeyExists(application.wheels, "debugAccessIPs")) {
-			variables.originalDebugAccessIPs = application.wheels.debugAccessIPs;
-		}
-		if (StructKeyExists(application.wheels, "enablePublicComponent")) {
-			variables.originalEnablePublicComponent = application.wheels.enablePublicComponent;
-		}
-		if (StructKeyExists(application.wheels, "debugAccessTrustProxy")) {
-			variables.originalDebugAccessTrustProxy = application.wheels.debugAccessTrustProxy;
-		}
+		variables.hadPublic = StructKeyExists(application.wheels, "public");
 	}
 
 	function afterAll() {
 		// Restore original settings
-		application.wheels.environment = variables.originalEnvironment;
-		if (StructKeyExists(variables, "originalAllowIPBasedDebugAccess")) {
-			application.wheels.allowIPBasedDebugAccess = variables.originalAllowIPBasedDebugAccess;
+		for (var key in variables.originalSettings) {
+			application.wheels[key] = variables.originalSettings[key];
 		}
-		if (StructKeyExists(variables, "originalDebugAccessIPs")) {
-			application.wheels.debugAccessIPs = variables.originalDebugAccessIPs;
+		if (!variables.hadPublic) {
+			StructDelete(application.wheels, "public");
 		}
-		if (StructKeyExists(variables, "originalEnablePublicComponent")) {
-			application.wheels.enablePublicComponent = variables.originalEnablePublicComponent;
-		}
-		if (StructKeyExists(variables, "originalDebugAccessTrustProxy")) {
-			application.wheels.debugAccessTrustProxy = variables.originalDebugAccessTrustProxy;
-		}
+		StructDelete(request.wheels, "debugAccess");
 	}
 
 	function run() {
-		
+
 		describe("IP-Based Debug Access Tests", () => {
-			
+
+			beforeEach(() => {
+				application.wheels.enablePublicComponent = false;
+				application.wheels.showDebugInformation = false;
+				application.wheels.showErrorInformation = false;
+			});
+
+			afterEach(() => {
+				StructDelete(request.wheels, "debugAccess");
+			});
+
 			it("development environment always enables public component regardless of IP", () => {
 				// Set up development environment
 				application.wheels.environment = "development";
 				application.wheels.allowIPBasedDebugAccess = false;
 				application.wheels.debugAccessIPs = [];
-				
+
 				// Simulate application restart event
 				application.wheels.enablePublicComponent = false;
 				if (application.wheels.environment == "development") {
 					application.wheels.enablePublicComponent = true;
 				}
-				
+
 				expect(application.wheels.enablePublicComponent).toBeTrue();
 			});
-			
-			it("testing environment with IP-based access enabled and matching IP should enable public component", () => {
-				// Set up testing environment with IP-based access
+
+			it("testing environment with IP-based access enabled and matching IP enables debug access for this request", () => {
 				application.wheels.environment = "testing";
 				application.wheels.allowIPBasedDebugAccess = true;
 				application.wheels.debugAccessIPs = ["127.0.0.1"];
-				application.wheels.enablePublicComponent = false;
-				
-				// Simulate request start with matching IP
-				local.clientIP = "127.0.0.1";
-				
-				// Simulate application.cfc onRequestStart logic
-				if (application.wheels.environment != 'development' && application.wheels.allowIPBasedDebugAccess) {
-					if (arrayContains(application.wheels.debugAccessIPs, local.clientIP)) {
-						application.wheels.enablePublicComponent = true;
-						application.wheels.showDebugInformation = true;
-						application.wheels.showErrorInformation = true;
-					}
-				}
-				
-				expect(application.wheels.enablePublicComponent).toBeTrue();
-				expect(application.wheels.showDebugInformation).toBeTrue();
-				expect(application.wheels.showErrorInformation).toBeTrue();
+
+				$applyIPDebugAccess(clientIP = "127.0.0.1");
+
+				expect($get("enablePublicComponent")).toBeTrue();
+				expect($get("showDebugInformation")).toBeTrue();
+				expect($get("showErrorInformation")).toBeTrue();
+				// The grant is per request: the shared settings are unchanged.
+				expect(application.wheels.enablePublicComponent).toBeFalse();
+				expect(application.wheels.showErrorInformation).toBeFalse();
 			});
-			
-			it("testing environment with IP-based access enabled and non-matching IP should not enable public component", () => {
-				// Set up testing environment with IP-based access
+
+			it("testing environment with IP-based access enabled and non-matching IP grants nothing", () => {
 				application.wheels.environment = "testing";
 				application.wheels.allowIPBasedDebugAccess = true;
 				application.wheels.debugAccessIPs = ["192.168.1.1"];
-				application.wheels.enablePublicComponent = false;
-				application.wheels.showDebugInformation = false;
-				application.wheels.showErrorInformation = false;
-				
-				// Simulate request start with non-matching IP
-				local.clientIP = "127.0.0.1";
-				
-				// Simulate application.cfc onRequestStart logic
-				if (application.wheels.environment != 'development' && application.wheels.allowIPBasedDebugAccess) {
-					if (arrayContains(application.wheels.debugAccessIPs, local.clientIP)) {
-						application.wheels.enablePublicComponent = true;
-						application.wheels.showDebugInformation = true;
-						application.wheels.showErrorInformation = true;
-					}
-				}
-				
-				expect(application.wheels.enablePublicComponent).toBeFalse();
-				expect(application.wheels.showDebugInformation).toBeFalse();
-				expect(application.wheels.showErrorInformation).toBeFalse();
+
+				$applyIPDebugAccess(clientIP = "127.0.0.1");
+
+				expect(StructKeyExists(request.wheels, "debugAccess")).toBeFalse();
+				expect($get("enablePublicComponent")).toBeFalse();
+				expect($get("showDebugInformation")).toBeFalse();
+				expect($get("showErrorInformation")).toBeFalse();
 			});
-			
-			it("testing environment with IP-based access disabled should not enable public component even with matching IP", () => {
-				// Set up testing environment with IP-based access disabled
+
+			it("testing environment with IP-based access disabled grants nothing even with a matching IP", () => {
 				application.wheels.environment = "testing";
 				application.wheels.allowIPBasedDebugAccess = false;
 				application.wheels.debugAccessIPs = ["127.0.0.1"];
-				application.wheels.enablePublicComponent = false;
-				application.wheels.showDebugInformation = false;
-				application.wheels.showErrorInformation = false;
-				
-				// Simulate request start with matching IP
-				local.clientIP = "127.0.0.1";
-				
-				// Simulate application.cfc onRequestStart logic
-				if (application.wheels.environment != 'development' && application.wheels.allowIPBasedDebugAccess) {
-					if (arrayContains(application.wheels.debugAccessIPs, local.clientIP)) {
-						application.wheels.enablePublicComponent = true;
-						application.wheels.showDebugInformation = true;
-						application.wheels.showErrorInformation = true;
-					}
-				}
-				
-				expect(application.wheels.enablePublicComponent).toBeFalse();
-				expect(application.wheels.showDebugInformation).toBeFalse();
-				expect(application.wheels.showErrorInformation).toBeFalse();
+
+				$applyIPDebugAccess(clientIP = "127.0.0.1");
+
+				expect(StructKeyExists(request.wheels, "debugAccess")).toBeFalse();
+				expect($get("enablePublicComponent")).toBeFalse();
+				expect($get("showDebugInformation")).toBeFalse();
+				expect($get("showErrorInformation")).toBeFalse();
 			});
-			
-			it("production environment with IP-based access enabled and matching IP should enable public component", () => {
-				// Set up production environment with IP-based access
+
+			it("production environment with IP-based access enabled and matching IP enables debug access for this request", () => {
 				application.wheels.environment = "production";
 				application.wheels.allowIPBasedDebugAccess = true;
 				application.wheels.debugAccessIPs = ["127.0.0.1"];
-				application.wheels.enablePublicComponent = false;
-				application.wheels.showDebugInformation = false;
-				application.wheels.showErrorInformation = false;
-				
-				// Simulate request start with matching IP
-				local.clientIP = "127.0.0.1";
-				
-				// Simulate application.cfc onRequestStart logic
-				if (application.wheels.environment != 'development' && application.wheels.allowIPBasedDebugAccess) {
-					if (arrayContains(application.wheels.debugAccessIPs, local.clientIP)) {
-						application.wheels.enablePublicComponent = true;
-						application.wheels.showDebugInformation = true;
-						application.wheels.showErrorInformation = true;
-					}
-				}
-				
-				expect(application.wheels.enablePublicComponent).toBeTrue();
-				expect(application.wheels.showDebugInformation).toBeTrue();
-				expect(application.wheels.showErrorInformation).toBeTrue();
+
+				$applyIPDebugAccess(clientIP = "127.0.0.1");
+
+				expect($get("enablePublicComponent")).toBeTrue();
+				expect($get("showDebugInformation")).toBeTrue();
+				expect($get("showErrorInformation")).toBeTrue();
+				expect(application.wheels.showErrorInformation).toBeFalse();
 			});
-			
+
 			it("should handle multiple IPs in the debugAccessIPs array", () => {
-				// Set up production environment with multiple IPs
 				application.wheels.environment = "production";
 				application.wheels.allowIPBasedDebugAccess = true;
 				application.wheels.debugAccessIPs = ["192.168.1.1", "10.0.0.1", "127.0.0.1"];
-				application.wheels.enablePublicComponent = false;
-				
-				// Simulate request start with matching IP (the last one in the array)
-				local.clientIP = "127.0.0.1";
-				
-				// Simulate application.cfc onRequestStart logic
-				if (application.wheels.environment != 'development' && application.wheels.allowIPBasedDebugAccess) {
-					if (arrayContains(application.wheels.debugAccessIPs, local.clientIP)) {
-						application.wheels.enablePublicComponent = true;
-					}
-				}
-				
-				expect(application.wheels.enablePublicComponent).toBeTrue();
+
+				$applyIPDebugAccess(clientIP = "127.0.0.1");
+
+				expect($get("enablePublicComponent")).toBeTrue();
+			});
+
+			it("a later refused call clears an earlier grant", () => {
+				application.wheels.environment = "production";
+				application.wheels.allowIPBasedDebugAccess = true;
+				application.wheels.debugAccessIPs = ["127.0.0.1"];
+
+				$applyIPDebugAccess(clientIP = "127.0.0.1");
+				$applyIPDebugAccess(clientIP = "10.9.9.9");
+
+				expect($get("showErrorInformation")).toBeFalse();
 			});
 		});
 
@@ -188,20 +139,14 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("resolves the client IP from REMOTE_ADDR when trust proxy is disabled, ignoring X-Forwarded-For", () => {
-				// Mirrors the gated resolution logic in public/Application.cfc onRequestStart.
-				var remoteAddr = "10.0.0.5";
-				var forwardedFor = "203.0.113.99"; // attacker-controlled header value
-				var trustProxy = false;
-				var clientIP = Trim(remoteAddr);
-				if (trustProxy && Len(Trim(forwardedFor))) {
-					clientIP = Trim(ListLast(forwardedFor));
-				}
-				expect(clientIP).toBe("10.0.0.5");
+				application.wheels.debugAccessTrustProxy = false;
+				expect($ipDebugAccessClientIP()).toBe(Trim(CGI.REMOTE_ADDR));
 			});
 
 			it("resolves the client IP from the rightmost X-Forwarded-For entry when trust proxy is enabled", () => {
-				// Rightmost entry is the one appended by the trusted proxy nearest the app;
-				// earlier entries are client-supplied and spoofable.
+				// Mirrors $ipDebugAccessClientIP() (vendor/wheels/global/request.cfm): the rightmost
+				// entry is the one appended by the trusted proxy nearest the app; earlier entries are
+				// client-supplied and spoofable.
 				var remoteAddr = "10.0.0.5";
 				var forwardedFor = "203.0.113.99, 198.51.100.7";
 				var trustProxy = true;
@@ -222,63 +167,35 @@ component extends="wheels.WheelsTest" {
 			// findNoCase() only (no regex) per the Lucee 7 global-regex gotcha.
 			// Repo-root resolution prior art: specs/cli/UpgradeCheckCoverageSpec.cfc.
 
-			it("public/Application.cfc does not trust X-Forwarded-For unconditionally for debug access", () => {
-				var filePath = expandPath("/wheels/../..") & "/public/Application.cfc";
-				expect(fileExists(filePath)).toBeTrue("Missing: " & filePath);
-				var src = fileRead(filePath);
+			it("the framework's client IP resolution gates X-Forwarded-For behind debugAccessTrustProxy", () => {
+				var src = fileRead(expandPath("/wheels/global/request.cfm"));
+				var body = mid(src, find("function $ipDebugAccessClientIP", src), 900);
 				expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(
 					0,
 					"Vulnerable elvis pattern present: debug-access client IP must default to CGI.REMOTE_ADDR."
 				);
-				expect(findNoCase("debugAccessTrustProxy", src) > 0).toBeTrue(
+				expect(find("Trim(CGI.REMOTE_ADDR)", body) > 0).toBeTrue("The client IP must default to the socket address.");
+				expect(findNoCase("debugAccessTrustProxy", body) > 0).toBeTrue(
 					"X-Forwarded-For use must be gated behind the debugAccessTrustProxy setting."
 				);
 			});
 
-			it("CLI app template Application.cfc does not trust X-Forwarded-For unconditionally for debug access", () => {
-				var filePath = expandPath("/wheels/../..") & "/cli/lucli/templates/app/public/Application.cfc";
-				expect(fileExists(filePath)).toBeTrue("Missing: " & filePath);
-				var src = fileRead(filePath);
-				expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(
-					0,
-					"Vulnerable elvis pattern present: debug-access client IP must default to CGI.REMOTE_ADDR."
-				);
-				expect(findNoCase("debugAccessTrustProxy", src) > 0).toBeTrue(
-					"X-Forwarded-For use must be gated behind the debugAccessTrustProxy setting."
-				);
-			});
-
-			it("starter-app example Application.cfc does not trust X-Forwarded-For unconditionally for debug access", () => {
-				var filePath = expandPath("/wheels/../..") & "/examples/starter-app/public/Application.cfc";
-				// Example trees may be pruned from some distributions; only assert when present.
-				if (fileExists(filePath)) {
-					var src = fileRead(filePath);
-					expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(
-						0,
-						"Vulnerable elvis pattern present: debug-access client IP must default to CGI.REMOTE_ADDR."
-					);
-					expect(findNoCase("debugAccessTrustProxy", src) > 0).toBeTrue(
-						"X-Forwarded-For use must be gated behind the debugAccessTrustProxy setting."
-					);
-				} else {
-					expect(true).toBeTrue();
+			it("every shipped Application.cfc delegates debug access to the framework", () => {
+				var root = expandPath("/wheels/../..");
+				var required = ["/public/Application.cfc", "/cli/lucli/templates/app/public/Application.cfc"];
+				for (var relative in required) {
+					expect(fileExists(root & relative)).toBeTrue("Missing: " & relative);
 				}
-			});
-
-			it("tweet example Application.cfc does not trust X-Forwarded-For unconditionally for debug access", () => {
-				var filePath = expandPath("/wheels/../..") & "/examples/tweet/public/Application.cfc";
 				// Example trees may be pruned from some distributions; only assert when present.
-				if (fileExists(filePath)) {
-					var src = fileRead(filePath);
-					expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(
-						0,
-						"Vulnerable elvis pattern present: debug-access client IP must default to CGI.REMOTE_ADDR."
-					);
-					expect(findNoCase("debugAccessTrustProxy", src) > 0).toBeTrue(
-						"X-Forwarded-For use must be gated behind the debugAccessTrustProxy setting."
-					);
-				} else {
-					expect(true).toBeTrue();
+				var all = ["/public/Application.cfc", "/cli/lucli/templates/app/public/Application.cfc", "/examples/starter-app/public/Application.cfc", "/examples/tweet/public/Application.cfc"];
+				for (var relative in all) {
+					if (!fileExists(root & relative)) {
+						continue;
+					}
+					var src = fileRead(root & relative);
+					expect(find("CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR", src)).toBe(0, relative & ": vulnerable elvis pattern present.");
+					expect(find("application.wo.$applyIPDebugAccess()", src) > 0).toBeTrue(relative & " must call application.wo.$applyIPDebugAccess().");
+					expect(findNoCase("debugIPAccess", src)).toBe(0, relative & " still carries the shared-scope debug access block.");
 				}
 			});
 		});

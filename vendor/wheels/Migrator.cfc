@@ -785,11 +785,23 @@ component output="false" extends="wheels.Global"{
 		required string templateName,
 		string migrationPrefix = ""
 	) {
-		local.templateFile = this.paths.templates & "/" & arguments.templateName & ".txt";
-		local.extendsPath = "wheels.migrator.Migration";
-		if (!FileExists(local.templateFile)) {
-			return "Template #arguments.templateName# could not be found. <br/> To resolve this, generate the necessary template files by running `wheels g snippets` from the root of your application";
+		// Allow-list the requested template against the snippet files that actually
+		// exist. An unknown name — including any HTML an attacker might submit, or a
+		// path-traversal attempt — is rejected here and never reaches the file path
+		// or gets reflected back in the message (see R2-4). The message lists the
+		// valid names instead, so it stays useful.
+		local.availableTemplates = $getAvailableTemplateNames();
+		local.templateMatch = ListFindNoCase(local.availableTemplates, arguments.templateName);
+		if (!ListLen(local.availableTemplates) || !local.templateMatch) {
+			return "The requested migration template could not be found. Available templates: "
+				& local.availableTemplates
+				& ". Run `wheels g snippets` from the root of your application to generate the template files.";
 		}
+		// Use the canonical-case name from the allow-list so a case variant (e.g.
+		// "Blank") still resolves to "blank.txt" on a case-sensitive filesystem.
+		local.templateNameCanonical = ListGetAt(local.availableTemplates, local.templateMatch);
+		local.templateFile = this.paths.templates & "/" & local.templateNameCanonical & ".txt";
+		local.extendsPath = "wheels.migrator.Migration";
 		if (!DirectoryExists(this.paths.migrate)) {
 			DirectoryCreate(this.paths.migrate);
 		}
@@ -813,6 +825,25 @@ component output="false" extends="wheels.Global"{
 			return "There was an error when creating the migration: #e.message#";
 		}
 		return "The migration #local.migrationFile# file was created";
+	}
+
+	/**
+	 * Returns the comma-delimited list of available migration-template names (the
+	 * `.txt` snippet basenames in the templates directory). Used as the allow-list
+	 * for createMigration so an unknown or attacker-supplied template name is
+	 * rejected before it reaches the filesystem or a reflected error message.
+	 */
+	public string function $getAvailableTemplateNames() {
+		local.names = "";
+		if (!DirectoryExists(this.paths.templates)) {
+			return "";
+		}
+		// Iterate the listing directly (do not ArrayAppend to it — BoxLang's
+		// DirectoryList returns a fixed-size array) and collect the basenames.
+		for (local.file in DirectoryList(this.paths.templates, false, "name", "*.txt")) {
+			local.names = ListAppend(local.names, ReReplaceNoCase(local.file, "\.txt$", "", "one"));
+		}
+		return local.names;
 	}
 
 	/**

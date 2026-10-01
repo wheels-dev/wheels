@@ -20,8 +20,8 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 ### Synopsis
 
 ```txt title="
-wheels upgrade check [--to=<version>] [--format=json] [--strict]
-wheels upgrade apply [--to=<version>] [--nobackup]
+wheels upgrade check [--to=<version>] [--format=json] [--strict] [--offline]
+wheels upgrade apply [--to=<version>] [--nobackup] [--allow-downgrade]
 ```
 
 Calling `wheels upgrade` with no subcommand prints concise usage listing both verbs and exits 0. Any other subcommand — a typo like `wheels upgrade chekc` — prints an error naming the valid verbs (`check`, `apply`, `help`) and the usage, then exits non-zero, so a misspelled verb in a script fails loudly instead of looking like a successful run.
@@ -45,7 +45,7 @@ None that the command enforces — but in practice:
 
 - **Commit first.** The scanner is read-only, but the actual upgrade — `wheels upgrade apply` (or a manual `vendor/wheels/` drop-in if you vendor by hand) — replaces framework code. Have a clean working tree so you can diff and roll back. (`brew upgrade wheels` only updates the CLI binary, never your app's vendored framework copy.)
 - **Run your tests.** Rerun the test suite after the framework swap, not after this command — `wheels upgrade check` does not exercise anything, it only greps.
-- **Internet access** is required when you don't pass `--to=`. The command fetches the latest release tag from GitHub.
+- **Internet access** is required when you don't pass `--to=`. The command fetches the latest release tag from GitHub. Under `--offline` (or `WHEELS_OFFLINE=1`) it never makes that call, so pass `--to=`.
 
 ### Flags — `check`
 
@@ -54,6 +54,7 @@ None that the command enforces — but in practice:
 | `--to=<version>` | Target version to scan against (e.g. `--to=4.0.0`). When omitted, the command queries GitHub for the latest release tag. If the GitHub call fails and no `--to=` is given, the command aborts. |
 | `--format=json` | Emit a single machine-readable JSON report instead of the human output — for CI pipelines. Breaking findings (and advisory findings when `--strict` is set) still exit non-zero. |
 | `--strict` | Escalate advisory findings (the "Recommended Improvements" section) to the same hard-fail path as breaking findings. The command throws `Wheels.UpgradeCheckFailed` and exits non-zero so CI can gate on opt-in convention changes. Without this flag, advisories are reported but never fail the check. Mirrors Django's `--fail-level WARNING` / Mix's `--warnings-as-errors`. |
+| `--offline` | Never call GitHub. Without `--to=` the check fails (`Wheels.UpgradeCheckFailed`) and asks for one; with `--to=` it scans normally. `WHEELS_OFFLINE=1` does the same. |
 
 ### Example
 
@@ -149,6 +150,7 @@ Safety checks run before any mutation:
 - Source (CLI-bundled) and target (`vendor/wheels/`) must each sniff as a valid Wheels framework directory — a generic `box.json` is not sufficient.
 - The command refuses to run inside the Wheels repo checkout itself (source = target).
 - The command refuses outside a Wheels app (no `vendor/wheels/`).
+- The command refuses a downgrade: if `vendor/wheels/` is newer than the CLI's bundled framework (for example, the app was created with a newer CLI or a `wheels-be` snapshot), it names both versions and exits non-zero. Install a newer CLI, or pass `--allow-downgrade` to install the older framework anyway; the summary then reads `Framework downgraded: <old> -> <new>`.
 
 #### Flags — `apply`
 
@@ -156,6 +158,7 @@ Safety checks run before any mutation:
 |---|---|
 | `--to=<version>` | Assert that the CLI's bundled framework is exactly this version. Errors if the bundled version does not match — `--to` on `apply` is a safety assertion, not a download trigger. Use `wheels upgrade check --to=<version>` to scan before applying. |
 | `--nobackup` | Skip the backup. The old `vendor/wheels/` is deleted before the new copy is placed. Useful when disk space is a concern or you have your own rollback strategy (git). |
+| `--allow-downgrade` | Proceed even when the CLI's bundled framework is older than `vendor/wheels/`. Without it, a downgrade is refused before anything is changed. |
 
 #### Example
 

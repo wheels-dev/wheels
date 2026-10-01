@@ -13,8 +13,10 @@ component extends="Base" {
     }
 
     public string function record(required string event) {
-        var line = "$(date --iso-8601=seconds) #variables.config.service()# #arguments.event#";
-        // Escape nothing — the event is produced by our Cli layer, not user input to shell.
-        return "echo """ & line & """ >> /tmp/kamal-audit.log";
+        // Only the timestamp is left to the shell; the service and event text
+        // (which carries the release version) reach it single-quoted, so
+        // $( ), backticks and separators in a version stay inert.
+        var text = "#variables.config.service()# #arguments.event#";
+        return "echo ""$(date --iso-8601=seconds)"" " & shellEscape(text) & " >> /tmp/kamal-audit.log";
     }
 }

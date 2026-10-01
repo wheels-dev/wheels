@@ -7,7 +7,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			}
 			// Fire registered onError callbacks (packages like Sentry hook in here).
 			$fireOnErrorCallbacks(arguments.exception);
-			if (application.wheels.showErrorInformation) {
+			if ($get("showErrorInformation")) {
 				// Detect request format for format-specific error handling
 				local.format = $getRequestFormat();
 				local.wheelsError = $runOnErrorResolveWheelsError(arguments.exception);
@@ -28,13 +28,22 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	public void function $runOnErrorSendEmail(required exception) {
 		local.args = {};
 		$args(name = "sendEmail", args = local.args);
-		local.args.from = application.wheels.errorEmailAddress;
-		if (Len(application.wheels.errorEmailFromAddress)) {
-			local.args.from = application.wheels.errorEmailFromAddress;
+		// Only configured addresses: errorEmailToAddress, else errorEmailAddress.
+		// The sender falls back to the recipient.
+		local.args.to = application.wheels.errorEmailToAddress;
+		if (!Len(local.args.to)) {
+			local.args.to = application.wheels.errorEmailAddress;
 		}
-		local.args.to = application.wheels.errorEmailAddress;
-		if (Len(application.wheels.errorEmailToAddress)) {
-			local.args.to = application.wheels.errorEmailToAddress;
+		local.args.from = application.wheels.errorEmailFromAddress;
+		if (!Len(local.args.from)) {
+			local.args.from = application.wheels.errorEmailAddress;
+		}
+		if (!Len(local.args.from)) {
+			local.args.from = local.args.to;
+		}
+		if (!Len(local.args.to)) {
+			$warnNoErrorEmailRecipient();
+			return;
 		}
 		if (Len(local.args.from) && Len(local.args.to)) {
 			if (StructKeyExists(application.wheels, "errorEmailServer") && Len(application.wheels.errorEmailServer)) {
@@ -61,6 +70,25 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 				$mail(argumentCollection = local.args);
 			} catch (any e) {
 			}
+		}
+	}
+
+	/**
+	 * sendEmailOnError is on but no recipient is configured: say so once per
+	 * application start in wheels.log instead of sending anything.
+	 */
+	public void function $warnNoErrorEmailRecipient() {
+		if (StructKeyExists(application.wheels, "$errorEmailRecipientWarned")) {
+			return;
+		}
+		application.wheels["$errorEmailRecipientWarned"] = true;
+		try {
+			WriteLog(
+				file = "wheels",
+				type = "warning",
+				text = "Wheels: sendEmailOnError is on but no error email recipient is configured, so no error email was sent. Set errorEmailAddress (or errorEmailToAddress) in config/settings.cfm or config/production/settings.cfm."
+			);
+		} catch (any e) {
 		}
 	}
 
@@ -101,15 +129,77 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		return local.wheelsError;
 	}
 
+	/**
+	 * Maps a `Wheels.*` error type to the HTTP status its error page should carry.
+	 * Single source of truth for both the render path and onerrorSpec.
+	 *
+	 * 404 is a client-triggerable ALLOW-LIST, not "any `Wheels.*NotFound`". Only the
+	 * not-found types a client URL can produce get a 404; every other `*NotFound`
+	 * (and every unmatched type) defaults to 500 so monitoring sees the server
+	 * fault. This reverses the earlier "any `*NotFound` -> 404" rule.
+	 *
+	 * - 404: `Wheels.RouteNotFound`, `Wheels.RecordNotFound`, `Wheels.ViewNotFound`
+	 *   (a URL naming a non-existent view-only action), `Wheels.ActionNotAllowed`
+	 *   (a helper/$-named action treated as missing, #2845/#3075),
+	 *   `Wheels.ActionParameterMissing` (a /wheels/ dev-GUI URL that names no
+	 *   action), and `Wheels.FileNotFound` (`sendFile()` for a missing file: it
+	 *   usually serves a client-addressed download route). `Wheels.ImageFileNotFound`
+	 *   stays 500. #2319/#3075.
+	 * - 403: a policy denial (`Wheels.NotAuthorized`, #3156) or a missing/invalid
+	 *   CSRF token (`Wheels.InvalidAuthenticityToken`) — a forged or expired-form
+	 *   post is a client error, not a server error (A-F7).
+	 * - 406: `Wheels.FormatNotAcceptable` — an explicit `.ext` / `?format=` the
+	 *   action cannot answer (#3866).
+	 * - 500: everything else, including server-side schema/config misses
+	 *   (`Wheels.TableNotFound`, `Wheels.DataSourceNotFound`,
+	 *   `Wheels.ColumnNotFound` — a misconfigured or unmigrated deploy, A-F4),
+	 *   every other `*NotFound` (Model, Method, Filter, Association, Package,
+	 *   Vite assets/manifest, …), and any future type. Serving 404 for these
+	 *   hides a server fault from monitoring.
+	 */
+	public numeric function $wheelsErrorStatusCode(required string type) {
+		// 404 is a client-triggerable ALLOW-LIST: only the not-found types a client
+		// URL can produce — an unknown route, or a missing record/view/action for a
+		// resolved route. The framework commits 404 at these throw sites via
+		// $throwErrorOrShow404Page (RouteNotFound in Dispatch; RecordNotFound and
+		// ViewNotFound — a URL naming a non-existent view-only action — in
+		// controller/processing; ActionNotAllowed, a helper/$-named action treated
+		// as missing, #2845/#3075), plus FileNotFound: sendFile() usually serves a
+		// client-addressed download route, so a missing file is the client's "not
+		// found" (ImageFileNotFound is not on the list). Every OTHER Wheels.*NotFound is a server-side
+		// config/code fault (a missing table, datasource, column, model, method,
+		// filter, association, calculated property, group column, identity, key,
+		// object, package, query handle, service, job class, Vite asset/manifest,
+		// image file, …) and defaults to 500 so monitoring sees it — including any
+		// future *NotFound type. (A-F4; follows #2319/#3075/#3156.)
+		if (
+			ReFindNoCase("^Wheels\.(Route|Record|View|File)NotFound$", arguments.type)
+			|| arguments.type == "Wheels.ActionNotAllowed"
+			|| arguments.type == "Wheels.ActionParameterMissing"
+		) {
+			return 404;
+		}
+		// 403: a policy denial (#3156) or a missing/invalid CSRF token (A-F7).
+		if (ReFindNoCase("^Wheels\.(NotAuthorized|InvalidAuthenticityToken)$", arguments.type)) {
+			return 403;
+		}
+		// 406: an explicit .[format] / ?format= the action cannot answer (#3866).
+		if (arguments.type == "Wheels.FormatNotAcceptable") {
+			return 406;
+		}
+		return 500;
+	}
+
+
 	public string function $runOnErrorRenderWheelsError(required wheelsError, required format) {
-		// Map Wheels error types to HTTP status codes. Any
-		// `Wheels.*NotFound` (RouteNotFound, RecordNotFound,
-		// ViewNotFound, etc) is a 404, as is `Wheels.ActionNotAllowed`
-		// — the action-dispatch gate blocks framework helpers and
-		// $-prefixed internals by treating them as missing actions
-		// (#2845, #3075); `Wheels.NotAuthorized` — a policy denial
-		// from the authorization layer (#3156) — is a 403; everything
-		// else is a 500.
+		// Map Wheels error types to HTTP status codes via the
+		// $wheelsErrorStatusCode allow-list: the client-triggerable
+		// not-found types (RouteNotFound, RecordNotFound, ViewNotFound,
+		// FileNotFound, ActionNotAllowed, ActionParameterMissing) are 404; a policy
+		// denial or missing/invalid CSRF token is 403; FormatNotAcceptable
+		// is 406; everything else — including server-side *NotFound
+		// (table/datasource/column/model/package/…) — is 500. See
+		// $wheelsErrorStatusCode for the full rationale (#2319/#3075/#3156).
 		// Set the status BEFORE writing the body so the response
 		// header is committed at the right code regardless of
 		// when the servlet engine flushes (HTML-format Wheels
@@ -121,19 +211,11 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		// $header(statusCode=403)), but onError reaches us via
 		// Application.cfc which can reset the response, so we
 		// re-assert the status here.
-		if (
-			StructKeyExists(arguments.wheelsError, "type")
-			&& ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$", arguments.wheelsError.type)
-		) {
-			$header(statusCode = 404);
-		} else if (
-			StructKeyExists(arguments.wheelsError, "type")
-			&& ReFindNoCase("^Wheels\.NotAuthorized$", arguments.wheelsError.type)
-		) {
-			$header(statusCode = 403);
-		} else {
-			$header(statusCode = 500);
-		}
+		$header(
+			statusCode = StructKeyExists(arguments.wheelsError, "type")
+				? $wheelsErrorStatusCode(arguments.wheelsError.type)
+				: 500
+		);
 		local.rv = "";
 		if (arguments.format == "json") {
 			$header(name = "Content-Type", value = "application/json");
@@ -215,7 +297,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			$location(url = local.redirectAfterReloadUrl, addToken = false);
 		}
 		// If the first debug point has not already been set in a reload request we set it here.
-		if (application.wheels.showDebugInformation) {
+		if ($get("showDebugInformation")) {
 			if (StructKeyExists(request.wheels, "execution")) {
 				$debugPoint("reload");
 			} else {
@@ -343,7 +425,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 			}
 		}
 		$include(template = "#application.wheels.eventPath#/onrequeststart.cfm");
-		if (application.wheels.showDebugInformation) {
+		if ($get("showDebugInformation")) {
 			$debugPoint("requestStart");
 		}
 
@@ -380,12 +462,12 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	}
 
 	public void function $runOnRequestEnd(required targetpage) {
-		if (application.wheels.showDebugInformation) {
+		if ($get("showDebugInformation")) {
 			$debugPoint("requestEnd");
 		}
 		$restoreTestRunnerApplicationScope();
 		$include(template = "#application.wheels.eventPath#/onrequestend.cfm");
-		if (application.wheels.showDebugInformation) {
+		if ($get("showDebugInformation")) {
 			$debugPoint("requestEnd,total");
 		}
 	}
@@ -400,7 +482,7 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 	}
 
 	public void function $runOnMissingTemplate(required targetpage) {
-		if (!application.wheels.showErrorInformation) {
+		if (!$get("showErrorInformation")) {
 			$header(statusCode = 404);
 		}
 		$includeAndOutput(template = "#application.wheels.eventPath#/onmissingtemplate.cfm");

@@ -124,7 +124,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 for (var c in calls) arrayAppend(cmds, c.cmd ?: "");
                 var startIdx = 0; var proxyIdx = 0;
                 for (var i = 1; i <= arrayLen(cmds); i++) {
-                    if (!startIdx && findNoCase("docker start demo-web-v-old", cmds[i])) startIdx = i;
+                    if (!startIdx && findNoCase("docker start 'demo-web-v-old'", cmds[i])) startIdx = i;
                     if (!proxyIdx && findNoCase("kamal-proxy deploy demo", cmds[i])) proxyIdx = i;
                 }
                 expect(startIdx).toBeGT(0);
@@ -387,7 +387,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     );
                     var dryOut = dc.deploy({configPath: cfgPath, version: "v1", dryRun: true});
                     expect(arrayLen(fake2.calls())).toBe(0);
-                    expect(dryOut).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    expect(dryOut).toInclude("--env-file '.kamal/apps/demo/env/roles/web.env'");
                     expect(dryOut).toInclude("WHEELS_RELOAD_PASSWORD");
                 } finally {
                     directoryDelete(tmpCwd, true);
@@ -480,7 +480,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 dc.details({configPath: variables.fixture});
                 var cmds = [];
                 for (var c in fake.calls()) arrayAppend(cmds, c.cmd ?: "");
-                expect($anyInclude(cmds, "docker ps --filter label=service=demo")).toBeTrue();
+                expect($anyInclude(cmds, "docker ps --filter 'label=service=demo'")).toBeTrue();
                 expect($anyInclude(cmds, "name=kamal-proxy")).toBeTrue();
             });
 
@@ -833,7 +833,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     dryRun: true,
                     version: "v1"
                 });
-                expect(out).toInclude("--target demo-web-v1:8080");
+                expect(out).toInclude("--target 'demo-web-v1:8080'");
                 expect(out).notToInclude(":3000");
             });
 
@@ -845,7 +845,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     dryRun: true,
                     version: "v-old"
                 });
-                expect(out).toInclude("--target demo-web-v-old:8080");
+                expect(out).toInclude("--target 'demo-web-v-old:8080'");
                 expect(out).notToInclude(":3000");
             });
 
@@ -857,7 +857,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     dryRun: true,
                     version: "v1"
                 });
-                expect(out).toInclude("--target demo-web-v1:80");
+                expect(out).toInclude("--target 'demo-web-v1:80'");
                 expect(out).notToInclude(":3000");
             });
 
@@ -890,7 +890,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                         // fallback (details() || boot()) also contains a
                         // `docker run --detach`, dispatched before this.
                         if (!runIdx && findNoCase("docker run --detach", cmd)
-                            && find("--name demo-web-v1", cmd)) runIdx = i;
+                            && find("--name 'demo-web-v1'", cmd)) runIdx = i;
                     }
                     // ensure (mkdir+touch+chmod 600) → upload → re-lock
                     // (chmod 600) → docker run, in order.
@@ -904,7 +904,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     expect(calls[uploadIdx].content).toInclude("APP_SECRET=s3cr3t-value-42");
 
                     // docker run references the env file; the value appears in NO command.
-                    expect(calls[runIdx].cmd).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    expect(calls[runIdx].cmd).toInclude("--env-file '.kamal/apps/demo/env/roles/web.env'");
                     for (var c in calls) {
                         expect(c.cmd ?: "").notToInclude("s3cr3t-value-42");
                     }
@@ -923,7 +923,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     expect(out).toInclude("chmod 600");
                     expect(out).toInclude(".kamal/apps/demo/env/roles/web.env");
                     expect(out).toInclude("APP_SECRET");
-                    expect(out).toInclude("--env-file .kamal/apps/demo/env/roles/web.env");
+                    expect(out).toInclude("--env-file '.kamal/apps/demo/env/roles/web.env'");
                     expect(out).notToInclude("s3cr3t-value-42");
                 } finally {
                     directoryDelete(proj.root, true);
@@ -1007,7 +1007,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(proxyDeployHosts).notToInclude("1.1.1.3");
                 expect(proxyDeployHosts).notToInclude("1.1.1.4");
                 // ...while the app containers still run on every role's hosts.
-                var runHosts = $hostsFor(fake, "docker run --detach --restart unless-stopped --name app-");
+                var runHosts = $hostsFor(fake, "docker run --detach --restart unless-stopped --name 'app-");
                 expect(runHosts).toInclude("1.1.1.3");
                 expect(runHosts).toInclude("1.1.1.4");
             });
@@ -1021,7 +1021,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var accIdx = 0; var appIdx = 0;
                 for (var i = 1; i <= arrayLen(cmds); i++) {
                     if (!accIdx && findNoCase("--name demo-db", cmds[i])) accIdx = i;
-                    if (!appIdx && findNoCase("--name demo-web-v1", cmds[i])) appIdx = i;
+                    if (!appIdx && findNoCase("--name 'demo-web-v1'", cmds[i])) appIdx = i;
                 }
                 expect(accIdx).toBeGT(0);
                 expect($anyInclude(cmds, "--name demo-redis")).toBeTrue();
@@ -1046,7 +1046,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("docker network create kamal");
                 expect(out).toInclude("--name demo-db");
                 expect(out).toInclude("docker start kamal-proxy || docker run");
-                expect(out).toInclude("--name demo-web-v1");
+                expect(out).toInclude("--name 'demo-web-v1'");
             });
 
             // Regression suite for #2957 (Wave 4 roll-ups).
@@ -1066,10 +1066,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 for (var i = 1; i <= arrayLen(cmds); i++) {
                     if (!rmIdx && findNoCase("name=^demo-web-v1$", cmds[i])
                         && findNoCase("docker container rm --force", cmds[i])) rmIdx = i;
-                    // "--name demo-web-v1" pins the APP container run — the
+                    // "--name 'demo-web-v1'" pins the APP container run — the
                     // proxy's start_or_run also embeds a "docker run --detach".
                     if (!runIdx && findNoCase("docker run --detach", cmds[i])
-                        && findNoCase("--name demo-web-v1", cmds[i])) runIdx = i;
+                        && findNoCase("--name 'demo-web-v1'", cmds[i])) runIdx = i;
                 }
                 expect(rmIdx).toBeGT(0);
                 expect(runIdx).toBeGT(rmIdx);

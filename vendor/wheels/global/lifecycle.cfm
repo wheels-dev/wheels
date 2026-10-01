@@ -130,7 +130,7 @@
 		if (ArrayLen(local.issues)) {
 			local.msg = "Interface contract warnings: " & ArrayToList(local.issues, "; ");
 			cflog(text = local.msg, type = "warning", file = "wheels-errors");
-			if (StructKeyExists(application, "wheels") && application.wheels.showDebugInformation) {
+			if (StructKeyExists(application, "wheels") && $get("showDebugInformation")) {
 				request.wheels.interfaceWarnings = local.issues;
 			}
 		}

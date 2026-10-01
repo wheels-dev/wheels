@@ -1,1 +1,0 @@
-- The CLI's RustCFML backend now downloads the engine build the framework is tested against (`v0.693.0`, from `tools/rustcfml/ENGINE_VERSION`) instead of the stale `v0.637.0` pin in `RustCFMLEngine.cfc`. The daily engine auto-bump now moves both pins together, and a CLI spec fails if they ever differ (#3812)

@@ -78,6 +78,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					// version "4.0.0-SNAPSHOT+1656". Latest published is
 					// "4.0.0-snapshot.1790". Must classify as upgrade-worthy.
 					expect(uc.$isNewer("4.0.0-SNAPSHOT+1656", "4.0.0-snapshot.1790", "bleeding-edge")).toBeTrue();
+					// The build number decides, not the spelling of the label.
+					expect(uc.$isNewer("4.0.0-snapshot.1790", "4.0.0-SNAPSHOT+1800", "bleeding-edge")).toBeTrue();
+					expect(uc.$isNewer("4.0.0-snapshot.1790", "4.0.0-SNAPSHOT+1656", "bleeding-edge")).toBeFalse();
 				});
 
 			});

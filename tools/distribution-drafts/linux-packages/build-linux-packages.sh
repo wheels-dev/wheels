@@ -42,6 +42,8 @@ else
 fi
 SQLITE_JDBC_VERSION="3.49.1.0"
 SQLITE_JDBC_URL="https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/${SQLITE_JDBC_VERSION}/sqlite-jdbc-${SQLITE_JDBC_VERSION}.jar"
+# sha256 of the Maven Central jar (cross-checked against its published .sha1).
+SQLITE_JDBC_SHA256="5c8609d2ca341deb8c6f71778974b5ba4995c7d32d7c7c89d9392a3e72c39291"
 OUT_DIR="${OUT_DIR:-dist}"
 BUILD_DIR="$(pwd)/.linux-pkg-build"
 
@@ -53,6 +55,26 @@ else
   NFPM_CONFIG="tools/distribution-drafts/linux-packages/nfpm-wheels.yaml"
   PKG_NAME="wheels"
 fi
+
+# --- verify-sha256 begin ---------------------------------------------------
+# tools/test-linux-package-checksums.sh extracts everything between the
+# begin/end markers and runs it against local files, so keep it self-contained.
+#
+# verify_sha256 <file> <expected-sha256> <label>
+# Fail closed: the package never ships a download that is not the pinned one.
+verify_sha256() {
+  local actual
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual=$(sha256sum "$1" | cut -d' ' -f1)
+  else
+    actual=$(shasum -a 256 "$1" | cut -d' ' -f1)
+  fi
+  if [ "${actual}" != "$2" ]; then
+    echo "$3 checksum mismatch: expected $2, got ${actual}" >&2
+    exit 1
+  fi
+}
+# --- verify-sha256 end -----------------------------------------------------
 
 echo "── Building Linux packages ──"
 echo "  Channel:  ${CHANNEL}"
@@ -96,16 +118,7 @@ fi
 #    installs on amd64 AND arm64. See issue #2700 (routing) and the arch-independent
 #    refactor.
 curl -fsSL -o "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_URL}"
-# Fail closed: the package never ships a runtime that is not the pinned one.
-if command -v sha256sum >/dev/null 2>&1; then
-  LUCLI_JAR_ACTUAL=$(sha256sum "${BUILD_DIR}/build/lucli.jar" | cut -d' ' -f1)
-else
-  LUCLI_JAR_ACTUAL=$(shasum -a 256 "${BUILD_DIR}/build/lucli.jar" | cut -d' ' -f1)
-fi
-if [ "${LUCLI_JAR_ACTUAL}" != "${LUCLI_JAR_SHA256}" ]; then
-  echo "LuCLI jar checksum mismatch: expected ${LUCLI_JAR_SHA256}, got ${LUCLI_JAR_ACTUAL}" >&2
-  exit 1
-fi
+verify_sha256 "${BUILD_DIR}/build/lucli.jar" "${LUCLI_JAR_SHA256}" "LuCLI jar"
 LUCLI_JAR_REPORTED=$(unzip -p "${BUILD_DIR}/build/lucli.jar" lucli/version.properties | sed -n 's/^lucli\.version=//p' | tr -d '\r')
 if [ -z "${LUCLI_JAR_URL_OVERRIDDEN:-}" ] && [ "${LUCLI_JAR_REPORTED}" != "${LUCLI_VERSION}" ]; then
   echo "LuCLI jar reports version '${LUCLI_JAR_REPORTED}', expected '${LUCLI_VERSION}'" >&2
@@ -114,6 +127,7 @@ fi
 
 # 4. Download SQLite JDBC
 curl -fsSL -o "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_URL}"
+verify_sha256 "${BUILD_DIR}/build/sqlite-jdbc.jar" "${SQLITE_JDBC_SHA256}" "SQLite JDBC jar"
 
 # 5. Generate the user-facing /usr/bin/wheels wrapper
 cat > "${BUILD_DIR}/build/wrapper.sh" <<'WRAPPER_EOF'
@@ -272,16 +286,40 @@ if [ -f "${DOCS_SRC}/wheels-docs-${INSTALLED_VERSION}.zip" ] && [ ! -f "${DOCS_D
     || echo "WARNING: could not unpack the offline docs bundle" >&2
 fi
 
+# --- docs-mirror begin ----------------------------------------------------
+# tools/test-linux-launcher-docs-mirror.sh extracts and runs this block.
 # Mirror the bundle into the current app's webroot when run from inside one.
 # Required, not a convenience: the dev server's Lucee urlRewrite only routes
 # extension-less paths to the front controller, so the bundle's
 # extension-bearing asset URLs must be real files under the webroot for the
-# container to serve them. Hardlinked so the shared cache is not duplicated.
-if [ -f "./vendor/wheels/wheels.json" ] && [ -d "./public" ] && [ -d "${DOCS_DST}" ]; then
-  rm -rf "./public/wheels-docs"
-  cp -R -l "${DOCS_DST}" "./public/wheels-docs" 2>/dev/null \
-    || cp -R "${DOCS_DST}" "./public/wheels-docs"
+# container to serve them.
+# Copied only when missing or when its manifest.json differs from the cache's
+# (a package upgrade). A public/wheels-docs without manifest.json is the
+# user's own and is left alone; one with it is a docs mirror, whether this
+# wrapper, an older one or `wheels docs` made it. A plain copy, not hardlinks,
+# so edits in the app cannot change the shared cache; it is built beside the
+# target and renamed in. A failure warns and the command still runs. The
+# manifest is compared in bash rather than with cmp, which minimal images lack.
+DOCS_MIRROR="./public/wheels-docs"
+_wheels_docs_mirror() {
+  local tmp="./public/.wheels-docs-new.$$" old="./public/.wheels-docs-old.$$"
+  # Clear leftovers from runs that were killed mid-copy.
+  rm -rf ./public/.wheels-docs-new.* ./public/.wheels-docs-old.*
+  cp -R "${DOCS_DST}" "${tmp}" || { rm -rf "${tmp}"; return 1; }
+  if [ -e "${DOCS_MIRROR}" ]; then
+    mv "${DOCS_MIRROR}" "${old}" || { rm -rf "${tmp}"; return 1; }
+  fi
+  mv "${tmp}" "${DOCS_MIRROR}" || { mv "${old}" "${DOCS_MIRROR}"; rm -rf "${tmp}"; return 1; }
+  rm -rf "${old}"
+}
+if [ -f "./vendor/wheels/wheels.json" ] && [ -d "./public" ] && [ -f "${DOCS_DST}/manifest.json" ]; then
+  if [ ! -e "${DOCS_MIRROR}" ] || { [ -f "${DOCS_MIRROR}/manifest.json" ] \
+      && [ "$(cat "${DOCS_MIRROR}/manifest.json" 2>/dev/null)" != "$(cat "${DOCS_DST}/manifest.json")" ]; }; then
+    _wheels_docs_mirror 2>/dev/null \
+      || echo "wheels: could not copy the offline docs into public/wheels-docs; continuing" >&2
+  fi
 fi
+# --- docs-mirror end ------------------------------------------------------
 
 # Stage SQLite JDBC into Lucee Express on first run.
 LUCEE_EXT_DIR="$(find "${LUCLI_HOME}/express" -path "*/lib/ext" -type d 2>/dev/null | head -1 || true)"

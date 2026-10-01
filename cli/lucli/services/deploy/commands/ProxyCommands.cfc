@@ -36,7 +36,7 @@ component extends="Base" {
         var hc = variables.config.proxy().healthcheck();
         var innerArgs = [
             "kamal-proxy", "deploy", variables.config.service(),
-            "--target", arguments.target,
+            "--target", shellEscape(arguments.target),
             "--health-check-path", hc.path ?: "/up",
             "--health-check-timeout", hc.timeout ?: 30
         ];

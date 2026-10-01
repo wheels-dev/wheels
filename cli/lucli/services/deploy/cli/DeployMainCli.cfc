@@ -19,6 +19,8 @@ component {
         variables.projectRoot = arguments.opts.projectRoot ?: expandPath("./");
         variables.loader = new modules.wheels.services.deploy.config.ConfigLoader();
         variables.dryRunBuffer = [];
+        // Injectable so the permission-failure path can be specified.
+        variables.fileModes = arguments.opts.fileModes ?: new modules.wheels.services.deploy.lib.FileModes();
         return this;
     }
 
@@ -29,7 +31,7 @@ component {
      * keeps the test runner's JSON response stream clean.
      */
     public array function dryRunOutput() {
-        return variables.dryRunBuffer;
+        return new modules.wheels.services.deploy.lib.SecretRedaction().redactAll(variables.dryRunBuffer);
     }
 
     public string function version() {
@@ -43,7 +45,9 @@ component {
         );
         var yaml = new modules.wheels.services.deploy.lib.Yaml();
         var rolesMap = $roleHosts(cfg);
-        return yaml.dump({
+        // Same output path as every other deploy verb: config warnings first,
+        // and any value resolved from .kamal/secrets redacted.
+        return new modules.wheels.services.deploy.lib.SecretRedaction().render(yaml.dump({
             service: cfg.service(),
             image: cfg.image(),
             servers: rolesMap,
@@ -51,7 +55,7 @@ component {
                 server: cfg.registry().server(),
                 username: cfg.registry().username()
             }
-        });
+        }));
     }
 
     public string function deploy(required struct opts) {
@@ -505,7 +509,18 @@ component {
         fileWrite(deployYmlPath, mustache.render(fileRead(tplDir & "/deploy.yml.mustache"), ctx));
 
         if (!directoryExists(cwd & ".kamal/hooks")) directoryCreate(cwd & ".kamal/hooks", true, true);
-        fileWrite(secretsPath, mustache.render(fileRead(tplDir & "/secrets.mustache"), ctx));
+        // .kamal/secrets may already hold real values (or lookups): never
+        // overwrite it, --force included. A new file is created empty and
+        // locked to 0600 before any content is written.
+        var secretsPreserved = fileExists(secretsPath);
+        if (!secretsPreserved) {
+            fileWrite(secretsPath, "");
+        }
+        var secretsRestricted = $restrictSecrets(secretsPath, secretsPreserved);
+        if (!secretsPreserved) {
+            fileWrite(secretsPath, mustache.render(fileRead(tplDir & "/secrets.mustache"), ctx));
+        }
+        $ensureGitignored(cwd, ".kamal/secrets");
 
         fileWrite(dockerfilePath, mustache.render(fileRead(tplDir & "/Dockerfile.mustache"), ctx));
         // .dockerignore source filename is `dockerignore.mustache` so the
@@ -518,12 +533,115 @@ component {
         var summary = dockerignoreWritten
             ? "Created config/deploy.yml, .kamal/secrets, Dockerfile, and .dockerignore."
             : "Created config/deploy.yml, .kamal/secrets, and Dockerfile (preserved existing .dockerignore).";
+        if (secretsPreserved) {
+            summary = Replace(summary, ".kamal/secrets, ", "") & " Kept (preserved existing .kamal/secrets).";
+        }
+        summary &= secretsRestricted
+            ? " .kamal/secrets is owner-only (0600) and listed in .gitignore."
+            : " .kamal/secrets is listed in .gitignore. This platform has no POSIX file modes: restrict access to it yourself.";
+        if ($gitTracks(cwd, ".kamal/secrets")) {
+            summary &= chr(10) & "WARNING: .kamal/secrets is already tracked by git, and .gitignore does not untrack it. "
+                & "Run git rm --cached .kamal/secrets, commit, and rotate every secret the file has ever held.";
+        }
         return summary & chr(10)
              & "Next steps:" & chr(10)
              & "  1. Edit config/deploy.yml — update servers, proxy host, registry username." & chr(10)
              & "  2. Review the generated Dockerfile — adjust COPY paths and the Lucee/CFML base if your app needs it." & chr(10)
              & "  3. Populate .kamal/secrets with real values (or $(cmd) substitutions)." & chr(10)
              & "  4. wheels deploy setup";
+    }
+
+    /**
+     * Make .kamal/secrets owner-only. Returns false only where the platform
+     * has no POSIX file modes. Any other failure stops `init`: a new file is
+     * removed before any content is written, and an existing file is left
+     * untouched but reported, never described as protected.
+     */
+    private boolean function $restrictSecrets(required string path, required boolean existing) {
+        try {
+            return variables.fileModes.ownerOnly(arguments.path);
+        } catch (any e) {
+            if (!arguments.existing && fileExists(arguments.path)) {
+                fileDelete(arguments.path);
+            }
+            throw(
+                type = "DeployMainCli.SecretsPermission",
+                message = arguments.existing
+                    ? "Could not make the existing .kamal/secrets owner-only (" & e.message & "). Its content is unchanged and may be readable by other users: run chmod 600 .kamal/secrets."
+                    : "Could not make .kamal/secrets owner-only (" & e.message & "), so it was not created. Fix the directory permissions and run wheels deploy init again."
+            );
+        }
+    }
+
+    /**
+     * Make sure `entry` is ignored by git in `cwd`. git itself decides when
+     * `cwd` is a repository and git is installed (`git check-ignore`), so no
+     * gitignore matching is re-implemented here. Otherwise, or when git says
+     * the file is not ignored, "/<entry>" is appended as the LAST rule of
+     * .gitignore (git applies the last matching rule), once.
+     */
+    private void function $ensureGitignored(required string cwd, required string entry) {
+        if ($gitCheckIgnore(arguments.cwd, arguments.entry) == "ignored") {
+            return;
+        }
+        var rule = "/" & arguments.entry;
+        var path = arguments.cwd & ".gitignore";
+        var content = fileExists(path) ? fileRead(path) : "";
+        var lastRule = "";
+        for (var line in listToArray(content, chr(10))) {
+            var trimmed = trim(line);
+            if (len(trimmed) && left(trimmed, 1) != "##") {
+                lastRule = trimmed;
+            }
+        }
+        // Exact, case-sensitive: "/.KAMAL/SECRETS" does not ignore the file
+        // on a case-sensitive checkout.
+        if (compare(lastRule, rule) == 0) {
+            return;
+        }
+        if (len(content) && right(content, 1) != chr(10)) {
+            content &= chr(10);
+        }
+        fileWrite(path, content & rule & chr(10));
+    }
+
+    /**
+     * "ignored" / "not-ignored" from `git check-ignore -q`, or "unknown" when
+     * git is missing, `cwd` is not a repository, or git does not answer.
+     */
+    private string function $gitCheckIgnore(required string cwd, required string entry) {
+        switch ($gitExit(arguments.cwd, ["check-ignore", "-q", arguments.entry])) {
+            case 0: return "ignored";
+            case 1: return "not-ignored";
+            default: return "unknown";
+        }
+    }
+
+    /** True only when git confirms `entry` is tracked (`git ls-files --error-unmatch`). */
+    private boolean function $gitTracks(required string cwd, required string entry) {
+        return $gitExit(arguments.cwd, ["ls-files", "--error-unmatch", arguments.entry]) == 0;
+    }
+
+    /**
+     * Run `git -C <cwd> <args>` (argv only, no shell) and return its exit
+     * code, or -1 when git is missing or does not finish within 10 seconds.
+     */
+    private numeric function $gitExit(required string cwd, required array args) {
+        try {
+            var argv = ["git", "-C", arguments.cwd];
+            arrayAppend(argv, arguments.args, true);
+            var pb = createObject("java", "java.lang.ProcessBuilder").init(argv);
+            pb.redirectErrorStream(true);
+            var proc = pb.start();
+            var seconds = createObject("java", "java.util.concurrent.TimeUnit").SECONDS;
+            if (!proc.waitFor(javaCast("long", 10), seconds)) {
+                proc.destroyForcibly();
+                return -1;
+            }
+            return proc.exitValue();
+        } catch (any e) {
+            return -1;
+        }
     }
 
     private string function $basename(required string path) {
@@ -543,9 +661,9 @@ component {
      */
     private string function $renderResult(required struct opts, required string summary) {
         if (arguments.opts.dryRun ?: false) {
-            return arrayToList(variables.dryRunBuffer, chr(10));
+            return new modules.wheels.services.deploy.lib.SecretRedaction().render(arrayToList(variables.dryRunBuffer, chr(10)));
         }
-        return arguments.summary;
+        return new modules.wheels.services.deploy.lib.SecretRedaction().render(arguments.summary);
     }
 
     private void function $dispatch(
@@ -739,6 +857,7 @@ component {
         var values = [];
         for (var k in resolved) {
             arrayAppend(values, toString(resolved[k]));
+            new modules.wheels.services.deploy.lib.SecretRedaction().register(toString(resolved[k]));
         }
         variables.sshPool.$setSecretValues(values);
     }

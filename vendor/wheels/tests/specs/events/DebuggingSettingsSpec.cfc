@@ -35,10 +35,10 @@ component extends="wheels.WheelsTest" {
 				expect(testing.settings.showDebugInformation).toBeFalse();
 			});
 
-			it("still derives the error address from a host with two or more labels", () => {
-				expect(runDebugging("production", "www.example.com").settings.errorEmailAddress).toBe("webmaster@example.com");
-				expect(runDebugging("production", "localhost").settings.errorEmailAddress).toBe("");
-				expect(runDebugging("production", ".").settings.errorEmailAddress).toBe("");
+			it("never derives the error email address from the request Host", () => {
+				for (var host in ["x.attacker.tld", "www.example.com", "localhost", ".", "example."]) {
+					expect(runDebugging("production", host).settings.errorEmailAddress).toBe("", "derived an address from Host [#host#]");
+				}
 			});
 
 		});

@@ -54,6 +54,13 @@ component extends="Controller" {
 
 	// DELETE /logout — destroy the session
 	function delete() {
+		// Only a form submission (POST with _method=delete) or a real DELETE logs
+		// out. A GET or HEAD — e.g. /sessions/delete reached through the wildcard
+		// route, or a link on another site — must not end the session.
+		if (!isPost() && !isDelete()) {
+			redirectTo(route="login");
+			return;
+		}
 		service("sessionStrategy").logout();
 		redirectTo(route="login", success="You have been logged out.");
 	}

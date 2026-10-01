@@ -13,13 +13,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     .push("abc123");
                 expect(cmd).toInclude("docker buildx build");
                 expect(cmd).toInclude("--push");
-                expect(cmd).toInclude("--tag acme/demo:abc123");
+                expect(cmd).toInclude("--tag 'acme/demo:abc123'");
             });
 
             it("pull() pulls the versioned image", () => {
                 var cmd = new cli.lucli.services.deploy.commands.BuilderCommands(variables.cfg)
                     .pull("v2");
-                expect(cmd).toBe("docker pull acme/demo:v2");
+                expect(cmd).toBe("docker pull 'acme/demo:v2'");
             });
 
             it("tag() creates an alias", () => {
@@ -55,7 +55,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     .dev();
                 expect(cmd).toInclude("docker buildx build");
                 expect(cmd).toInclude("--load");
-                expect(cmd).toInclude("--tag acme/demo:dirty");
+                expect(cmd).toInclude("--tag 'acme/demo:dirty'");
                 expect(cmd).notToInclude("--push");
             });
 

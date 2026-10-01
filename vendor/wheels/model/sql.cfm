@@ -974,7 +974,142 @@
 	/**
 	 * Internal function.
 	 */
+	/**
+	 * Replace every single-quoted string literal in a WHERE string with a
+	 * masked placeholder whose content is a sentinel prefix plus the literal's
+	 * hex-encoded, un-escaped value. Masked literals contain no quote, comma
+	 * or parenthesis, so the downstream WHERE regex can never mistake a quote,
+	 * a `)` or a `,` inside a value for a clause boundary, an IN separator or
+	 * the close of an IN list. This is the linear tokenizer that makes finder,
+	 * key, query-builder and IN-list values bind as single parameters
+	 * (GHSA-96rm). It is a plain character loop, so it cannot backtrack or
+	 * overflow on a long value or a large IN list, and the value is restored
+	 * from the placeholder only where a bound parameter is produced
+	 * ($unmaskParameterValue on the adapter). An unbalanced quote is rejected.
+	 */
+	public string function $maskWhereLiterals(required string where) {
+		if (Find("'", arguments.where) == 0) {
+			return arguments.where;
+		}
+		local.sentinel = $whereLiteralSentinel();
+		local.out = CreateObject("java", "java.lang.StringBuilder").init();
+		local.n = Len(arguments.where);
+		local.i = 1;
+		while (local.i <= local.n) {
+			local.ch = Mid(arguments.where, local.i, 1);
+			if (local.ch != "'") {
+				local.out.append(local.ch);
+				local.i += 1;
+				continue;
+			}
+			// A string literal: consume to its closing quote, treating a
+			// doubled quote ('') as one escaped quote that stays in the value.
+			local.value = CreateObject("java", "java.lang.StringBuilder").init();
+			local.i += 1;
+			local.closed = false;
+			while (local.i <= local.n) {
+				local.c = Mid(arguments.where, local.i, 1);
+				if (local.c == "'") {
+					if (local.i < local.n && Mid(arguments.where, local.i + 1, 1) == "'") {
+						local.value.append("'");
+						local.i += 2;
+					} else {
+						local.i += 1;
+						local.closed = true;
+						break;
+					}
+				} else {
+					local.value.append(local.c);
+					local.i += 1;
+				}
+			}
+			if (!local.closed) {
+				Throw(
+					type = "Wheels.InvalidWhereClause",
+					message = "The where clause contains an unbalanced quote.",
+					extendedInfo = "A string literal in the `where` argument was opened with a single quote that is never closed. Escape a literal quote by doubling it ('')."
+				);
+			}
+			local.literalValue = local.value.toString();
+			// The IN-list binder joins decoded elements with Chr(7); a value
+			// carrying Chr(7) (or the Chr(2) sentinel) would re-split or be
+			// mis-decoded, so reject those control characters outright — they
+			// are never part of legitimate SQL string data (GHSA-96rm).
+			if (Find(Chr(7), local.literalValue) > 0 || Find(Chr(2), local.literalValue) > 0) {
+				Throw(
+					type = "Wheels.InvalidWhereClause",
+					message = "A where-clause value contains a control character that cannot be bound safely.",
+					extendedInfo = "Remove the Chr(2)/Chr(7) control character from the value, or bind it through a parameter."
+				);
+			}
+			if (!Len(local.literalValue)) {
+				// An empty string literal carries nothing to mask; leaving it as
+				// `''` keeps the runner's existing empty-string / NULL handling.
+				local.out.append("''");
+			} else {
+				local.out.append("'");
+				local.out.append(local.sentinel);
+				local.out.append(LCase(BinaryEncode(CharsetDecode(local.literalValue, "utf-8"), "hex")));
+				local.out.append("'");
+			}
+		}
+		return local.out.toString();
+	}
+
+	/**
+	 * The sentinel that marks a masked literal's content, so a bound value is
+	 * decoded only from a placeholder this model produced, never from text
+	 * that merely looks like hex. Shared with the adapter's decode.
+	 */
+	public string function $whereLiteralSentinel() {
+		return Chr(2) & "wmask" & Chr(2);
+	}
+
+	/**
+	 * Restore any masked literal still present in a piece of SQL to a proper
+	 * escaped SQL literal (GHSA-96rm). $maskWhereLiterals masks every string
+	 * literal, but only the literals the WHERE parser turns into bound
+	 * parameters are decoded at bind time. A literal the parser does not bind
+	 * — a BETWEEN bound, a function argument, a LIKE ... ESCAPE clause — stays
+	 * in the SQL text and must be written back as its original value with the
+	 * quotes doubled, so no sentinel ever reaches the database and the clause
+	 * compares against the real value. Linear scan, no regex.
+	 */
+	public string function $restoreMaskedLiterals(required string sql) {
+		local.marker = "'" & $whereLiteralSentinel();
+		if (Find(local.marker, arguments.sql) == 0) {
+			return arguments.sql;
+		}
+		local.mlen = Len(local.marker);
+		local.out = CreateObject("java", "java.lang.StringBuilder").init();
+		local.n = Len(arguments.sql);
+		local.pos = 1;
+		while (local.pos <= local.n) {
+			local.idx = Find(local.marker, arguments.sql, local.pos);
+			if (local.idx == 0) {
+				local.out.append(Mid(arguments.sql, local.pos, local.n - local.pos + 1));
+				break;
+			}
+			local.out.append(Mid(arguments.sql, local.pos, local.idx - local.pos));
+			local.hexStart = local.idx + local.mlen;
+			local.closeIdx = Find("'", arguments.sql, local.hexStart);
+			if (local.closeIdx == 0) {
+				// No closing quote: leave the rest untouched rather than loop.
+				local.out.append(Mid(arguments.sql, local.idx, local.n - local.idx + 1));
+				break;
+			}
+			local.hex = Mid(arguments.sql, local.hexStart, local.closeIdx - local.hexStart);
+			local.value = Len(local.hex) ? CharsetEncode(BinaryDecode(local.hex, "hex"), "utf-8") : "";
+			local.out.append("'");
+			local.out.append(Replace(local.value, "'", "''", "all"));
+			local.out.append("'");
+			local.pos = local.closeIdx + 1;
+		}
+		return local.out.toString();
+	}
+
 	public array function $whereClause(required string where, string include = "", boolean includeSoftDeletes = "false", sql = "", boolean softDelete = "true", useIndex = {}) {
+		arguments.where = $maskWhereLiterals(arguments.where);
 		local.rv = [];
 		// hoisted: the soft-delete section at the bottom of this function also reads the dialect
 		local.dialect = $dialectName();
@@ -1188,6 +1323,15 @@
 				}
 			}
 		}
+		// Restore any literal the parser left masked (an unbound BETWEEN bound,
+		// function argument or LIKE ... ESCAPE clause) to its escaped form, so
+		// no sentinel reaches the SQL text (GHSA-96rm).
+		local.iEnd = ArrayLen(local.rv);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			if (IsSimpleValue(local.rv[local.i])) {
+				local.rv[local.i] = $restoreMaskedLiterals(local.rv[local.i]);
+			}
+		}
 		return local.rv;
 	}
 
@@ -1195,6 +1339,7 @@
 	 * Internal function.
 	 */
 	public array function $addWhereClauseParameters(required array sql, required string where) {
+		arguments.where = $maskWhereLiterals(arguments.where);
 		if (Len(arguments.where)) {
 			local.start = 1;
 			local.originalValues = [];
@@ -1260,6 +1405,13 @@
 			local.iEnd = ArrayLen(arguments.sql);
 			for (local.i = local.iEnd; local.i > 0; local.i--) {
 				if (IsStruct(arguments.sql[local.i]) && local.pos > 0) {
+					// Decode a masked single value back to its original here, so
+					// the NULL detection, the parameterize=false raw path and the
+					// cfqueryparam path all see the real value (GHSA-96rm). An IN
+					// list stays masked until $cleanInStatementValue splits it.
+					if (!(StructKeyExists(arguments.sql[local.i], "list") && arguments.sql[local.i].list)) {
+						local.originalValues[local.pos] = variables.wheels.class.adapter.$unmaskParameterValue(local.originalValues[local.pos]);
+					}
 					if (structKeyExists(arguments.sql[local.i], 'property') && local.originalValues[local.pos] != 'null'){
 						structDelete(arguments.sql[local.i], 'property');
 					}
@@ -1302,7 +1454,7 @@
 			}
 			if (Len(local.fields)) {
 				local.rv = Replace(local.rv, local.match, local.fields, "all");
-			} else if (application.wheels.showErrorInformation) {
+			} else if ($get("showErrorInformation")) {
 				Throw(
 					type = "Wheels.ModelNotFound",
 					message = "Wheels looked for the model mapped to table name `#local.tableName#` but couldn't find it.",
@@ -1507,7 +1659,7 @@
 			local.classAssociations = local.class.$classData().associations;
 
 			// throw an error if the association was not found
-			if (application.wheels.showErrorInformation && !StructKeyExists(local.classAssociations, local.name)) {
+			if ($get("showErrorInformation") && !StructKeyExists(local.classAssociations, local.name)) {
 				Throw(
 					type = "Wheels.AssociationNotFound",
 					message = "An association named `#local.name#` could not be found on the `#ListLast(local.levels)#` model.",
@@ -1641,7 +1793,7 @@
 						// here instead, while both candidate shapes are still in hand (#3337). Runs inside
 						// the memo so the success path costs one check per application lifetime, and only
 						// for defaults derived here — an explicit `foreignKey=` is the developer's call.
-						if (application.wheels.showErrorInformation) {
+						if ($get("showErrorInformation")) {
 							$assertDerivedForeignKeyResolves(
 								associationName = arguments.associationName,
 								foreignKey = arguments.association.foreignKey,

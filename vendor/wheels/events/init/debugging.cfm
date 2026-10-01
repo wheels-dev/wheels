@@ -11,15 +11,9 @@
 		application.$wheels.errorEmailToAddress = "";
 		application.$wheels.errorEmailFromAddress = "";
 		application.$wheels.includeErrorInEmailSubject = true;
-		// ListLen, not Find: a Host such as "example." has a dot but one label.
-		if (ListLen(request.cgi.server_name, ".") >= 2) {
-			application.$wheels.errorEmailAddress = "webmaster@"
-			& Reverse(ListGetAt(Reverse(request.cgi.server_name), 2, "."))
-			& "."
-			& Reverse(ListGetAt(Reverse(request.cgi.server_name), 1, "."));
-		} else {
-			application.$wheels.errorEmailAddress = "";
-		}
+		// No default recipient. Error emails carry request and session data, so
+		// the address must come from configuration, never from the request.
+		application.$wheels.errorEmailAddress = "";
 		// Error lifecycle hooks — callbacks invoked when an error occurs.
 		// Packages and app code can register via registerOnError(callback).
 		application.$wheels.onErrorCallbacks = [];

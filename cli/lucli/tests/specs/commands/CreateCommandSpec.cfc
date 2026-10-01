@@ -22,9 +22,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("wheels create", () => {
 
-			it("shows help when called with no arguments", () => {
-				mod.create();
-				expect(true).toBeTrue();
+			it("shows help and exits non-zero when called with no arguments", () => {
+				// 4.1.2: usage on missing arguments is a failure (non-zero exit, MCP isError).
+				expect(() => mod.create()).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 			it("throws Wheels.InvalidArguments for an unknown create type", () => {

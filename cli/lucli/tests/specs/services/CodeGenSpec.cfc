@@ -137,9 +137,28 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).toInclude('"status": "open"');
 					expect(content).toInclude('"email": "user@example.com"');
 					expect(content).toInclude('"count": 1');
-					expect(content).toInclude('"active": true');
+					expect(content).toInclude('"active": 1');
 					expect(content).notToInclude("{status = ");
 					expect(content).notToInclude('"status" = ');
+				});
+
+				it("boolean sample is 1, which every supported database accepts", () => {
+					// A migration's boolean column is INTEGER on SQLite (TINYINT(1)
+					// on MySQL/H2, NUMBER(1) on Oracle). The model reads it as an
+					// integer column, and the automatic numericality validation
+					// rejects `true` ("Published is not a number"), so the
+					// generated specs failed on SQLite. 1 passes that validation
+					// and binds as true on BIT/BOOLEAN columns; it is also what the
+					// generated checkBox() submits (checkedValue = 1).
+					codegen.generateTest(
+						type = "model",
+						name = "Post",
+						properties = [{name: "title", type: "string"}, {name: "published", type: "boolean"}],
+						force = true
+					);
+					var modelSpec = fileRead(tempRoot & "/tests/specs/models/PostSpec.cfc");
+					expect(modelSpec).toInclude('new(properties = {"title": "MyString", "published": 1})');
+					expect(modelSpec).notToInclude('"published": true');
 				});
 
 				it("api spec asserts 201/204 and count deltas with created record keys", () => {
@@ -447,23 +466,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result.actions).toBeEmpty();
 				});
 
-				it("S2 PROVE: packagePath from listFirst is unvalidated so ../X writes outside app/controllers/", () => {
-					// Current hole: listFirst("../S2Escape","/") is ".." and is
-					// joined as packagePath without validateName. Destination
-					// becomes app/controllers/../S2Escape.cfc → app/S2Escape.cfc.
-					var result = codegen.generateController(
-						name = "../S2Escape",
-						actions = [],
-						force = true
-					);
-					var escapedPath = tempRoot & "/app/S2Escape.cfc";
-					var controllersPath = tempRoot & "/app/controllers/S2Escape.cfc";
-					expect(result.success).toBeTrue();
-					expect(fileExists(escapedPath)).toBeTrue();
-					expect(fileExists(controllersPath)).toBeFalse();
-					if (fileExists(escapedPath)) {
-						fileDelete(escapedPath);
+				it("refuses a package path with a parent-directory segment", () => {
+					var errorType = "";
+					try {
+						codegen.generateController(name = "../S2Escape", actions = [], force = true);
+					} catch (any e) {
+						errorType = e.type;
 					}
+					expect(errorType).toBe("Wheels.Generate.InvalidName");
+					expect(fileExists(tempRoot & "/app/S2Escape.cfc")).toBeFalse();
+					expect(fileExists(tempRoot & "/app/controllers/S2Escape.cfc")).toBeFalse();
 				});
 
 			});
@@ -589,7 +601,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result.valid).toBeTrue();
 				});
 
-				it("S2 PROVE: validateName rejects ../X but generateController never consults it", () => {
+				it("validateName rejects a parent-directory name", () => {
 					var result = codegen.validateName("../X", "controller");
 					expect(result.valid).toBeFalse();
 				});

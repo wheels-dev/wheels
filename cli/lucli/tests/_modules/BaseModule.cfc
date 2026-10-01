@@ -24,7 +24,12 @@ component {
 		return this;
 	}
 
-	void function out(any message, string colour = "", string style = "") {}
+	// Records what reaches LuCLI's out() (message, colour, style) so specs can
+	// check what a module passes up; prints nothing.
+	void function out(any message, string colour = "", string style = "") {
+		if (!structKeyExists(this, "$outLog")) this.$outLog = [];
+		arrayAppend(this.$outLog, {message: arguments.message, colour: arguments.colour, style: arguments.style});
+	}
 	void function err(any message) {}
 
 	function getEnv(string envKeyName, string defaultValue = "") {

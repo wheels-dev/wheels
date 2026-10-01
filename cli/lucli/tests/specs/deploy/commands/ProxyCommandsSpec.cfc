@@ -21,7 +21,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     .deploy(variables.cfg.roles()[1], "demo-web-v1:3000");
                 expect(cmd).toInclude("docker exec kamal-proxy");
                 expect(cmd).toInclude("kamal-proxy deploy demo");
-                expect(cmd).toInclude("--target demo-web-v1:3000");
+                expect(cmd).toInclude("--target 'demo-web-v1:3000'");
                 expect(cmd).toInclude("--health-check-path /up");
             });
 

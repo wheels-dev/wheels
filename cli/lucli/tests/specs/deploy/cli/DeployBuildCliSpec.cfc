@@ -24,7 +24,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 var cli = new cli.lucli.services.deploy.cli.DeployBuildCli(fake);
                 cli.pull({configPath: variables.fixture, version: "v1", dryRun: true});
                 var out = arrayToList(cli.dryRunOutput(), chr(10));
-                expect(out).toInclude("[1.2.3.4] docker pull acme/demo:v1");
+                expect(out).toInclude("[1.2.3.4] docker pull 'acme/demo:v1'");
             });
 
             it("deliver combines push and pull", () => {
@@ -33,7 +33,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 cli.deliver({configPath: variables.fixture, version: "v1", dryRun: true});
                 var out = arrayToList(cli.dryRunOutput(), chr(10));
                 expect(out).toInclude("docker buildx build");
-                expect(out).toInclude("docker pull acme/demo:v1");
+                expect(out).toInclude("docker pull 'acme/demo:v1'");
             });
 
             it("create emits buildx create with the service-scoped builder name", () => {

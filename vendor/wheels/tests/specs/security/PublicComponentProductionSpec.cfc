@@ -195,7 +195,9 @@ component extends="wheels.WheelsTest" {
 					// sibling BareCfabortGuardSpec.cfc structurally forbids
 					// any regression to the bare form.
 					var source = FileRead(ExpandPath("/wheels/Dispatch.cfc"));
-					var gateIndex = Find("!application.wheels.enablePublicComponent", source);
+					// Read through $get() so an IP-based debug access grant applies
+					// to its own request only (never application.wheels).
+					var gateIndex = Find('!$get("enablePublicComponent")', source);
 					expect(gateIndex > 0).toBeTrue("Dispatch.cfc must still have the enablePublicComponent gate.");
 
 					// Look for statuscode=404 or statuscode="404" within ~800 chars

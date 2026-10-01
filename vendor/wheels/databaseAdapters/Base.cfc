@@ -46,7 +46,11 @@ component output=false extends="wheels.Global"{
 							// No inner parentheses here — the outer pair above / below
 							// already wraps the list ("IN ((1,2,3))" is a row-constructor
 							// syntax error on every supported database).
-							writeOutput(preserveSingleQuotes(part.value));
+							// Adobe CF only accepts a simple variable as preserveSingleQuotes'
+							// argument ("Complex constructs are not supported"), so hoist the
+							// restored list into a local before passing it.
+							local.restoredList = $restoreMaskedInStatement(part.value);
+							writeOutput(preserveSingleQuotes(local.restoredList));
 						}
 						writeOutput(")");
 					}
@@ -132,6 +136,28 @@ component output=false extends="wheels.Global"{
 	 */
 	public void function $setSharedModel(required boolean flag) {
 		variables.$sharedModel = arguments.flag;
+	}
+
+	/**
+	 * Internal function.
+	 *
+	 * The datasource a query with this `dataSource` argument actually runs against. Multi-tenant
+	 * override: when a tenant is active and this model is not shared, a query on the model's
+	 * default datasource is routed to the tenant's datasource. $performQuery() uses this, and the
+	 * per-request query cache keys on it, so both always agree on the datasource (#3844).
+	 */
+	public string function $effectiveDataSource(string dataSource = variables.dataSource) {
+		// Use IsDefined() for safe nested scope traversal — StructKeyExists on
+		// the request scope can throw during app startup when request.wheels is absent.
+		if (
+			!variables.$sharedModel
+			&& arguments.dataSource == variables.dataSource
+			&& IsDefined("request.wheels.tenant.dataSource")
+			&& Len(request.wheels.tenant.dataSource)
+		) {
+			return request.wheels.tenant.dataSource;
+		}
+		return arguments.dataSource;
 	}
 
 	/**
@@ -525,6 +551,65 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Decode a value that $maskWhereLiterals masked (GHSA-96rm). A masked
+	 * literal's content is a sentinel prefix plus the hex of the original
+	 * value; only a sentinel-prefixed value is decoded, so text that merely
+	 * looks like hex is never treated as a masked value. The sentinel must
+	 * match wheels.Model::$whereLiteralSentinel().
+	 */
+	public string function $unmaskParameterValue(required string value) {
+		local.sentinel = Chr(2) & "wmask" & Chr(2);
+		local.slen = Len(local.sentinel);
+		if (Len(arguments.value) >= local.slen && Left(arguments.value, local.slen) == local.sentinel) {
+			local.hex = Mid(arguments.value, local.slen + 1, Len(arguments.value) - local.slen);
+			if (!Len(local.hex)) {
+				return "";
+			}
+			return CharsetEncode(BinaryDecode(local.hex, "hex"), "utf-8");
+		}
+		return arguments.value;
+	}
+
+	/**
+	 * Restore every masked literal in a piece of SQL to an escaped SQL literal
+	 * (GHSA-96rm), for the parameterize=false path where a masked IN list would
+	 * otherwise be written to the SQL verbatim. Mirrors
+	 * wheels.Model::$restoreMaskedLiterals; the sentinel must match
+	 * $whereLiteralSentinel().
+	 */
+	public string function $restoreMaskedInStatement(required string statement) {
+		local.marker = "'" & Chr(2) & "wmask" & Chr(2);
+		if (Find(local.marker, arguments.statement) == 0) {
+			return arguments.statement;
+		}
+		local.mlen = Len(local.marker);
+		local.out = CreateObject("java", "java.lang.StringBuilder").init();
+		local.n = Len(arguments.statement);
+		local.pos = 1;
+		while (local.pos <= local.n) {
+			local.idx = Find(local.marker, arguments.statement, local.pos);
+			if (local.idx == 0) {
+				local.out.append(Mid(arguments.statement, local.pos, local.n - local.pos + 1));
+				break;
+			}
+			local.out.append(Mid(arguments.statement, local.pos, local.idx - local.pos));
+			local.hexStart = local.idx + local.mlen;
+			local.closeIdx = Find("'", arguments.statement, local.hexStart);
+			if (local.closeIdx == 0) {
+				local.out.append(Mid(arguments.statement, local.idx, local.n - local.idx + 1));
+				break;
+			}
+			local.hex = Mid(arguments.statement, local.hexStart, local.closeIdx - local.hexStart);
+			local.value = Len(local.hex) ? CharsetEncode(BinaryDecode(local.hex, "hex"), "utf-8") : "";
+			local.out.append("'");
+			local.out.append(Replace(local.value, "'", "''", "all"));
+			local.out.append("'");
+			local.pos = local.closeIdx + 1;
+		}
+		return local.out.toString();
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public string function $cleanInStatementValue(required string statement) {
@@ -536,7 +621,14 @@ component output=false extends="wheels.Global"{
 			local.rv = Reverse(RemoveChars(Reverse(local.rv), 1, 1));
 			local.rv = Replace(local.rv, "''", "'", "all");
 		}
-		return ReplaceNoCase(local.rv, local.delim, Chr(7), "all");
+		local.joined = ReplaceNoCase(local.rv, local.delim, Chr(7), "all");
+		// Decode each masked element back to its original value (GHSA-96rm).
+		local.parts = ListToArray(local.joined, Chr(7), true);
+		local.iEnd = ArrayLen(local.parts);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.parts[local.i] = $unmaskParameterValue(local.parts[local.i]);
+		}
+		return ArrayToList(local.parts, Chr(7));
 	}
 
 	/**
@@ -642,12 +734,12 @@ component output=false extends="wheels.Global"{
 	public void function $validateValueShape(required string str, required string type) {
 		switch (arguments.type) {
 			case "integer":
-				if (!ReFind("^-?[0-9]+$", arguments.str)) {
+				if (!ReFind("^-?[0-9]+$", arguments.str) || ReFind("[^0-9-]", arguments.str)) {
 					$throwInvalidValue(arguments.str, "integer");
 				}
 				break;
 			case "float":
-				if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", arguments.str)) {
+				if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", arguments.str) || ReFind("[^0-9.-]", arguments.str)) {
 					$throwInvalidValue(arguments.str, "float");
 				}
 				break;
@@ -877,18 +969,7 @@ component output=false extends="wheels.Global"{
 		string $debugName = "query",
 		boolean $captureResult = true
 	) {
-		// Multi-tenant datasource override: if a tenant is active and this model
-		// is not shared, route the query to the tenant's datasource.
-		// Use IsDefined() for safe nested scope traversal — StructKeyExists on
-		// the request scope can throw during app startup when request.wheels is absent.
-		if (
-			!variables.$sharedModel
-			&& arguments.dataSource == variables.dataSource
-			&& IsDefined("request.wheels.tenant.dataSource")
-			&& Len(request.wheels.tenant.dataSource)
-		) {
-			arguments.dataSource = request.wheels.tenant.dataSource;
-		}
+		arguments.dataSource = $effectiveDataSource(arguments.dataSource);
 
 		local.queryAttributes = {};
 		local.queryAttributes.dataSource = arguments.dataSource;

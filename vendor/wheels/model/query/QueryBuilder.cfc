@@ -627,12 +627,12 @@ component output="false" {
 		}
 		switch (arguments.type) {
 			case "integer":
-				if (!ReFind("^-?[0-9]+$", arguments.value)) {
+				if (!ReFind("^-?[0-9]+$", arguments.value) || ReFind("[^0-9-]", arguments.value)) {
 					$throwInvalidValue(arguments.property, arguments.value, "integer");
 				}
 				break;
 			case "float":
-				if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", arguments.value)) {
+				if (!ReFind("^-?[0-9]+(\.[0-9]+)?$", arguments.value) || ReFind("[^0-9.-]", arguments.value)) {
 					$throwInvalidValue(arguments.property, arguments.value, "float");
 				}
 				break;

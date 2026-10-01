@@ -152,6 +152,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(compare(shipped, bundled)).toBe(0);
 				// And the shipped copy must actually carry the guard.
 				expect(shipped).toInclude('filters(through="requireRecord"');
+				expect(shipped).toInclude("$throwErrorOrShow404Page(");
 			});
 
 		});

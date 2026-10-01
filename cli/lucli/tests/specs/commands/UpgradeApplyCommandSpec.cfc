@@ -146,17 +146,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 				it("prints usage steering at check/apply without mutating vendor/wheels/", () => {
 					seedVendorWheels();
-					var result = mod.upgrade();
-					expect(result).toInclude("wheels upgrade check");
-					expect(result).toInclude("wheels upgrade apply");
+					// 4.1.2: exits non-zero (MCP isError) with the usage as the message.
+					expect(() => mod.upgrade()).toThrow(type = "Wheels.InvalidArguments", regex = "wheels upgrade check");
+					expect(() => mod.upgrade()).toThrow(regex = "wheels upgrade apply");
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 					expect(arrayLen(listBackups())).toBe(0);
 				});
 
 				it("steers to usage even when apply flags are present without the verb", () => {
 					seedVendorWheels();
-					var result = mod.upgrade(nobackup = true);
-					expect(result).toInclude("wheels upgrade apply");
+					expect(() => mod.upgrade(nobackup = true)).toThrow(type = "Wheels.InvalidArguments", regex = "wheels upgrade apply");
 					expect(seededVersion()).toBe("4.0.0-SNAPSHOT+1687");
 					expect(arrayLen(listBackups())).toBe(0);
 				});
@@ -283,7 +282,9 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(result).toInclude('/vendor/wheels" && mv "');
 					// And it precedes the post-swap summary in the output.
 					expect(find("Backing up vendor/wheels", result)).toBeGT(0);
-					expect(find("Framework upgraded:", result)).toBeGT(find("Backing up vendor/wheels", result));
+					// (The summary verb depends on the version direction; this
+					// checkout's bundled "@build.version@" has none, so "replaced".)
+					expect(reFind("Framework (upgraded|replaced):", result)).toBeGT(find("Backing up vendor/wheels", result));
 					// The restore one-liner also reached the PRINTED output
 					// (the refusal specs pin its absence; this pins presence
 					// on the one path where the backup really is made).
@@ -318,6 +319,73 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					seedVendorWheels(version = "0.0.1-spec-fixture");
 					mod.upgrade(subcommand = "apply");
 					expect(seededVersion()).toBe(variables.bundledVersion);
+				});
+			});
+
+			describe("wheels upgrade apply — version direction", () => {
+
+				// Pin the bundled version with a spec-controlled source dir so
+				// the direction is known. Plain release versions only.
+				beforeEach(() => {
+					variables.mod = new cli.lucli.tests._fixtures.commands.ModuleBundledSource(cwd = variables.tempRoot);
+					variables.bundledDir = variables.tempRoot & "/_bundled/wheels";
+					directoryCreate(variables.bundledDir, true, true);
+					fileWrite(variables.bundledDir & "/wheels.json", '{"name":"wheels","version":"4.1.1"}');
+					fileWrite(variables.bundledDir & "/marker.txt", "bundled-framework");
+					variables.mod.setBundledFrameworkSource(variables.bundledDir);
+				});
+
+				it("refuses when the bundled framework is older than vendor/wheels/ and changes nothing", () => {
+					seedVendorWheels(version = "4.1.2");
+					fileWrite(variables.tempRoot & "/vendor/wheels/marker.txt", "installed-framework");
+
+					expect(() => mod.upgrade(arg1 = "apply")).toThrow(type = "Wheels.UpgradeApplyFailed", regex = "4\.1\.2.*4\.1\.1");
+
+					expect(seededVersion()).toBe("4.1.2");
+					expect(fileRead(variables.tempRoot & "/vendor/wheels/marker.txt")).toBe("installed-framework");
+					expect(arrayLen(listBackups())).toBe(0);
+					var printed = mod.capturedOutput();
+					expect(printed).toInclude("--allow-downgrade");
+					expect(printed).toInclude("brew upgrade wheels");
+					expect(printed).notToInclude("rm -rf");
+					expect(printed).notToInclude("Backing up vendor/wheels");
+				});
+
+				it("refuses the downgrade with --nobackup too", () => {
+					seedVendorWheels(version = "4.1.2");
+					expect(() => mod.upgrade(arg1 = "apply", nobackup = true)).toThrow(type = "Wheels.UpgradeApplyFailed");
+					expect(seededVersion()).toBe("4.1.2");
+				});
+
+				it("downgrades with --allow-downgrade and says so", () => {
+					seedVendorWheels(version = "4.1.2");
+					var result = mod.upgrade(argumentCollection = {"arg1": "apply", "allow-downgrade": true});
+
+					expect(seededVersion()).toBe("4.1.1");
+					expect(arrayLen(listBackups())).toBe(1);
+					expect(result).toInclude("Downgrading framework (--allow-downgrade): 4.1.2 -> 4.1.1");
+					expect(result).toInclude("Framework downgraded: 4.1.2 -> 4.1.1");
+					expect(result).notToInclude("upgraded");
+				});
+
+				it("upgrades when the bundled framework is newer and says upgraded", () => {
+					seedVendorWheels(version = "4.1.0");
+					var result = mod.upgrade(arg1 = "apply");
+
+					expect(seededVersion()).toBe("4.1.1");
+					expect(arrayLen(listBackups())).toBe(1);
+					expect(result).toInclude("Upgrading framework: 4.1.0 -> 4.1.1");
+					expect(result).toInclude("Framework upgraded: 4.1.0 -> 4.1.1");
+				});
+
+				it("reinstalls when vendor/wheels/ is already at the bundled version", () => {
+					seedVendorWheels(version = "4.1.1");
+					fileWrite(variables.tempRoot & "/vendor/wheels/marker.txt", "installed-framework");
+					var result = mod.upgrade(arg1 = "apply");
+
+					expect(fileRead(variables.tempRoot & "/vendor/wheels/marker.txt")).toBe("bundled-framework");
+					expect(result).toInclude("Framework reinstalled: 4.1.1 -> 4.1.1");
+					expect(result).notToInclude("upgraded");
 				});
 			});
 

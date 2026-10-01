@@ -325,6 +325,90 @@ component extends="wheels.WheelsTest" {
 				expect(r.mime).toBe("image/png")
 				expect(r.name.right(15)).toBe("wheels-logo.png")
 			})
+
+			describe("a relative file in a subfolder of the files folder (##3852)", () => {
+
+				beforeEach(() => {
+					// <web root on disk>/<filePath>/sub3852/2026/report.txt, created one level at a
+					// time (Adobe's DirectoryCreate takes a single argument).
+					fx = {created = [], rootPath = application.wheels.rootPath, webPath = application.wheels.webPath}
+					fx.filesDir = Replace(GetDirectoryFromPath(GetBaseTemplatePath()), "\", "/", "all") & application.wheels.filePath
+					local.path = ""
+					for (local.segment in [fx.filesDir, "sub3852", "2026"]) {
+						local.path = Len(local.path) ? local.path & "/" & local.segment : local.segment
+						if (!DirectoryExists(local.path)) {
+							DirectoryCreate(local.path)
+							ArrayPrepend(fx.created, local.path)
+						}
+					}
+					fx.target = local.path & "/report.txt"
+					FileWrite(fx.target, "report")
+				})
+
+				afterEach(() => {
+					application.wheels.rootPath = fx.rootPath
+					application.wheels.webPath = fx.webPath
+					if (FileExists(fx.target)) {
+						FileDelete(fx.target)
+					}
+					for (local.dir in fx.created) {
+						if (DirectoryExists(local.dir)) {
+							DirectoryDelete(local.dir, true)
+						}
+					}
+				})
+
+				it("finds it in the web root's files folder", () => {
+					args.file = "sub3852/2026/report.txt"
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(Replace(r.file, "\", "/", "all")).toBe(Replace(fx.target, "\", "/", "all"))
+					expect(r.name).toBe("report.txt")
+				})
+
+				it("still finds it when the app's URL path is a subdirectory that rewrites fold /public/ out of", () => {
+					// A subdirectory install: the app answers at /admin/ while its web root on disk
+					// is <site>/admin/public/. rootPath is the URL path, so it must not decide
+					// where the files folder is on disk.
+					application.wheels.rootPath = "/admin/"
+					application.wheels.webPath = "/admin/"
+					args.file = "sub3852/2026/report.txt"
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(Replace(r.file, "\", "/", "all")).toBe(Replace(fx.target, "\", "/", "all"))
+				})
+
+				it("finds it without its extension, like any other sendFile() lookup", () => {
+					args.file = "sub3852/2026/report"
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(r.name).toBe("report.txt")
+				})
+
+				it("uses the on-disk name when the extension-less name differs only in case", () => {
+					args.file = "sub3852/2026/REPORT"
+					r = _controller.sendFile(argumentCollection = args)
+
+					// toBeWithCase: toBe compares strings case-insensitively.
+					expect(r.name).toBeWithCase("report.txt")
+					expect(ListLast(Replace(r.file, "\", "/", "all"), "/")).toBeWithCase("report.txt")
+				})
+
+				it("reports the files folder on disk when the file is missing", () => {
+					args.file = "sub3852/2026/missing.pdf"
+					expect(() => {
+						_controller.sendFile(argumentCollection = args)
+					}).toThrow("Wheels.FileNotFound")
+				})
+
+				it("keeps the documented workaround (directory relative to the web root) working", () => {
+					args.file = "report.txt"
+					args.directory = application.wheels.filePath & "/sub3852/2026"
+					r = _controller.sendFile(argumentCollection = args)
+
+					expect(r.name).toBe("report.txt")
+				})
+			})
 		})
 
 		describe("Tests that sendmail", () => {
@@ -452,6 +536,47 @@ component extends="wheels.WheelsTest" {
 				expect(result.mailparams[1].file).toInclude("wheels-logo.png")
 				expect(result.mailparams[2].file).toInclude("http://www.example.com/test.txt")
 				expect(result.mailparams[3].file).toInclude("c:\inetpub\wwwroot\cfwheels\something.pdf")
+			})
+
+			describe("an attachment in a subfolder of the files folder (##3852)", () => {
+
+				it("resolves a bare name in the files folder, as before", () => {
+					args.template = "plainEmailTemplate"
+					args.file = "wheels-logo.png"
+					result = _controller.sendEmail(argumentCollection = args)
+
+					expect(result.mailparams[1].file).toBe(ExpandPath(application.wheels.filePath) & "/wheels-logo.png")
+				})
+
+				it("resolves a relative path with a subfolder in the files folder", () => {
+					args.template = "plainEmailTemplate"
+					args.file = "reports/q3.txt"
+					result = _controller.sendEmail(argumentCollection = args)
+
+					expect(result.mailparams[1].file).toBe(ExpandPath(application.wheels.filePath) & "/reports/q3.txt")
+				})
+
+				it("resolves it in the web root's files folder on disk when filePath is relative", () => {
+					application.wheels.filePath = "files"
+					args.template = "plainEmailTemplate"
+					args.file = "reports/q3.txt,top.txt"
+					result = _controller.sendEmail(argumentCollection = args)
+
+					local.filesDir = Replace(GetDirectoryFromPath(GetBaseTemplatePath()), "\", "/", "all") & "files"
+					expect(Replace(result.mailparams[1].file, "\", "/", "all")).toBe(local.filesDir & "/reports/q3.txt")
+					expect(Replace(result.mailparams[2].file, "\", "/", "all")).toBe(local.filesDir & "/top.txt")
+				})
+
+				it("leaves absolute paths and URLs as they are", () => {
+					args.template = "plainEmailTemplate"
+					args.file = "/var/app/pdfs/invoice.pdf,c:\reports\q3.txt,\\server\share\q3.txt,https://example.com/q3.txt"
+					result = _controller.sendEmail(argumentCollection = args)
+
+					expect(result.mailparams[1].file).toBe("/var/app/pdfs/invoice.pdf")
+					expect(result.mailparams[2].file).toBe("c:\reports\q3.txt")
+					expect(result.mailparams[3].file).toBe("\\server\share\q3.txt")
+					expect(result.mailparams[4].file).toBe("https://example.com/q3.txt")
+				})
 			})
 
 			it("sends mail with custom argument", () => {

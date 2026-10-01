@@ -73,12 +73,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
             it("inline run with opts.raise=true names the host, exit code, and command summary", () => {
                 var p = new cli.lucli.services.deploy.lib.FakeSshPool();
-                p.expect("host-a.example.com", "docker pull acme/demo:v1", {
+                p.expect("host-a.example.com", "docker pull 'acme/demo:v1'", {
                     exitCode: 125, stdout: "", stderr: "denied: requested access is denied"
                 });
                 try {
                     p.onEach(["host-a.example.com"], function(ssh, host) {
-                        ssh.run("docker pull acme/demo:v1", {raise: true});
+                        ssh.run("docker pull 'acme/demo:v1'", {raise: true});
                     });
                     fail("expected onEach to throw");
                 } catch (any e) {
@@ -249,12 +249,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             it("leaves a command with no secrets unchanged", () => {
                 var p = new cli.lucli.services.deploy.lib.FakeSshPool();
                 p.$setSecretValues(["a-secret-never-present"]);
-                p.expect("h1", "docker pull acme/demo:v1", {exitCode: 125, stdout: "", stderr: "denied"});
+                p.expect("h1", "docker pull 'acme/demo:v1'", {exitCode: 125, stdout: "", stderr: "denied"});
                 try {
-                    p.onEach(["h1"], function(ssh, host) { ssh.run("docker pull acme/demo:v1", {raise: true}); });
+                    p.onEach(["h1"], function(ssh, host) { ssh.run("docker pull 'acme/demo:v1'", {raise: true}); });
                     fail("expected throw");
                 } catch (any e) {
-                    expect(e.message).toInclude("docker pull acme/demo:v1");
+                    expect(e.message).toInclude("docker pull 'acme/demo:v1'");
                     expect(e.message).notToInclude("[REDACTED]");
                 }
             });

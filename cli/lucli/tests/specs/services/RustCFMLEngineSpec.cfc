@@ -1,8 +1,9 @@
 /**
  * Coverage for the RustCFML engine backend's pure helpers (platform→asset
  * mapping, project-key hashing, state path) and the source-level shape of
- * the process plumbing. The process-bound methods (install/start/stop)
- * shell out to curl/kill and are exercised end-to-end manually, not here.
+ * the process plumbing. install()'s download verification is covered by
+ * RustCFMLEngineInstallSpec; start/stop shell out to kill and are exercised
+ * end-to-end manually, not here.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -13,6 +14,67 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	function run() {
+
+		describe("RustCFMLEngine with a stale state file", () => {
+
+			// After a crash the state file outlives the server, and its pid can be
+			// reused by an unrelated process. status/start/stop must not treat that
+			// process as this project's server, and stop must never kill it.
+			it("a live foreign pid is not running, is not killed by stop, and stays findable by pid", () => {
+				if (findNoCase("win", createObject("java", "java.lang.System").getProperty("os.name"))) {
+					return;
+				}
+				var engine = new cli.lucli.services.rustcfml.RustCFMLEngine();
+				var root = getTempDirectory() & "rust-stale-" & createUUID();
+				directoryCreate(root);
+				var foreign = createObject("java", "java.lang.ProcessBuilder").init(["sleep", "60"]).start();
+				var statePath = engine.$statePath(root);
+				try {
+					directoryCreate(getDirectoryFromPath(statePath), true, true);
+					fileWrite(statePath, serializeJSON({pid: foreign.pid(), port: 8513, projectRoot: root}));
+					var st = engine.status(root);
+					expect(st.running).toBeFalse("a reused pid was reported as this project's server");
+					expect(st.staleReason).toBe("pid-not-server");
+					expect(st.message).toInclude("pid " & foreign.pid());
+					// Kept, so the pid can still be found (e.g. a server an older CLI started).
+					expect(fileExists(statePath)).toBeTrue("the state of a live, unrecognised pid was dropped");
+
+					expect(engine.stop(root)).toBeFalse();
+					sleep(200);
+					expect(foreign.isAlive()).toBeTrue("stop() killed an unrelated process");
+					expect(fileExists(statePath)).toBeTrue();
+				} finally {
+					foreign.destroy();
+					if (fileExists(statePath)) fileDelete(statePath);
+					directoryDelete(root, true);
+				}
+			});
+
+			it("a dead recorded pid is not running and its state is removed", () => {
+				var engine = new cli.lucli.services.rustcfml.RustCFMLEngine();
+				var root = getTempDirectory() & "rust-dead-" & createUUID();
+				directoryCreate(root);
+				var statePath = engine.$statePath(root);
+				try {
+					directoryCreate(getDirectoryFromPath(statePath), true, true);
+					fileWrite(statePath, serializeJSON({pid: 2147480000, port: 8513, projectRoot: root}));
+					expect(engine.status(root).running).toBeFalse();
+					expect(fileExists(statePath)).toBeFalse();
+				} finally {
+					if (fileExists(statePath)) fileDelete(statePath);
+					directoryDelete(root, true);
+				}
+			});
+
+			it("start()'s AlreadyRunning check and stop()'s kill go through the ownership check", () => {
+				var src = fileRead(expandPath("/cli/lucli/services/rustcfml/RustCFMLEngine.cfc"));
+				expect(src).toInclude("if ($ownsRecordedPid(state, arguments.projectRoot)) {");
+				expect(src).toInclude("state.staleReason = ""pid-not-server"";");
+				expect(src).toInclude("running = $ownsRecordedPid(state, arguments.projectRoot);");
+				expect(src).toInclude("&& isProjectServerProcess(arguments.state.pid, arguments.projectRoot);");
+			});
+
+		});
 
 		describe("RustCFMLEngine", () => {
 

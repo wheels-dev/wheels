@@ -11,7 +11,7 @@ component {
         return this;
     }
 
-    public array function dryRunOutput() { return variables.dryRunBuffer; }
+    public array function dryRunOutput() { return new modules.wheels.services.deploy.lib.SecretRedaction().redactAll(variables.dryRunBuffer); }
 
     public string function all(required struct opts)        { return $runOnAllHosts(arguments.opts, "all",        "Pruned all (images + containers)"); }
     public string function images(required struct opts)     { return $runOnAllHosts(arguments.opts, "images",     "Pruned images"); }
@@ -44,9 +44,9 @@ component {
 
     private string function $renderResult(required struct opts, required string summary) {
         if (arguments.opts.dryRun ?: false) {
-            return arrayToList(variables.dryRunBuffer, chr(10));
+            return new modules.wheels.services.deploy.lib.SecretRedaction().render(arrayToList(variables.dryRunBuffer, chr(10)));
         }
-        return arguments.summary;
+        return new modules.wheels.services.deploy.lib.SecretRedaction().render(arguments.summary);
     }
 
     private array function $allHosts(required any cfg) {

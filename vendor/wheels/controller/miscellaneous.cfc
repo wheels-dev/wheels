@@ -12,7 +12,7 @@ component {
 	 * @to List of email addresses to send the email to.
 	 * @subject The subject line of the email.
 	 * @layout Layout(s) to wrap the email template in. This argument is also aliased as `layouts`.
-	 * @file A list of the names of the files to attach to the email. This will reference files stored in the `files` folder (or a path relative to it). This argument is also aliased as `files`.
+	 * @file A list of the files to attach to the email. A relative path is relative to the `filePath` folder on disk (`public/files` by default; subfolders such as `reports/q3.txt` are fine). Absolute paths and URLs are passed to `cfmailparam` as they are. This argument is also aliased as `files`.
 	 * @detectMultipart When set to `true` and multiple values are provided for the `template` argument, Wheels will detect which of the templates is text and which one is HTML (by counting the `<` characters).
 	 * @deliver When set to `false`, the email will not be sent.
 	 * @writeToFile Path that receives the rendered text and/or HTML body. This is a debug dump of the body content, not a MIME `.eml` — no `From`/`To`/`Subject`/`Content-Type` headers are written. A `.eml` extension will not open as a rendered message in Outlook; use `.html`/`.txt` and open the file in a browser or editor.
@@ -149,8 +149,17 @@ component {
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.item = local.fileArray[local.i];
 				arguments.mailparams[local.i] = {};
-				if (!ReFindNoCase("\\|/", local.item)) {
-					// no directory delimiter is present so append the path
+				// A relative attachment, with or without subfolders, lives in the `filePath`
+				// folder (#3852). Absolute paths and URLs go to cfmailparam as they are.
+				if ($sendFileUsesFilesFolder(file = local.item, directory = "")) {
+					// Same on-disk folder as sendFile(): the web root's folder plus filePath.
+					local.folder = Replace($get("filePath"), "\", "/", "all");
+					if (Right(local.folder, 1) == "/") {
+						local.folder = Left(local.folder, Len(local.folder) - 1);
+					}
+					local.item = $sendFileWebrootDirectory() & local.folder & "/" & Replace(local.item, "\", "/", "all");
+				} else if ($isRelativeFilePath(local.item)) {
+					// filePath is a root-anchored or mapping path.
 					local.item = ExpandPath($get("filePath")) & "/" & local.item;
 				}
 				arguments.mailparams[local.i].file = local.item;
@@ -214,12 +223,75 @@ component {
 	}
 
 	/**
+	 * Internal function. True when sendFile() should resolve `file` inside the
+	 * `filePath` folder on disk (#3852): no `directory`, a relative `filePath`
+	 * setting, and a plain relative `file`. Root-anchored or mapping paths
+	 * ("/wheels/..."), drive-letter or UNC paths, and URLs keep the legacy handling.
+	 */
+	public boolean function $sendFileUsesFilesFolder(required string file, required string directory) {
+		return !Len(arguments.directory) && $isRelativeFilePath(arguments.file) && $isRelativeFilePath($get("filePath"));
+	}
+
+	/**
+	 * Internal function. True for a non-empty relative path ("q3.txt", "reports/q3.txt").
+	 * False for a root-anchored or mapping path ("/wheels/..."), a drive-letter or UNC
+	 * path, and a URL. Used by sendFile() and sendEmail() to decide whether a file
+	 * lives in the `filePath` folder (#3852).
+	 */
+	public boolean function $isRelativeFilePath(required string path) {
+		local.path = Replace(arguments.path, "\", "/", "all");
+		return Len(local.path)
+			&& Left(local.path, 1) != "/"
+			&& !REFind("^[A-Za-z]:", local.path)
+			&& !Find("://", local.path);
+	}
+
+	/**
+	 * Internal function. Names in `directory` that are `file` plus an extension
+	 * ("report" matches "report.txt"), for sendFile()'s extension-less lookup.
+	 * Matched here rather than with a cfdirectory `filter="report.*"`, which
+	 * BoxLang and RustCFML don't apply the way Lucee and Adobe do (#3852).
+	 */
+	public array function $sendFileExtensionMatches(required string directory, required string file) {
+		local.rv = [];
+		if (!Len(arguments.file) || !DirectoryExists(arguments.directory)) {
+			return local.rv;
+		}
+		local.prefix = arguments.file & ".";
+		local.prefixLength = Len(local.prefix);
+		for (local.entry in DirectoryList(arguments.directory, false, "name")) {
+			if (
+				Len(local.entry) > local.prefixLength
+				&& CompareNoCase(Left(local.entry, local.prefixLength), local.prefix) == 0
+				&& FileExists(arguments.directory & "/" & local.entry)
+			) {
+				ArrayAppend(local.rv, local.entry);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The web root's folder on disk, with a trailing slash: the
+	 * folder of the request's entry template (public/index.cfm in a standard app).
+	 * Unlike `rootPath`, which is a URL path, this is right however URL rewrites or
+	 * `set(subpath=...)` map the app's URL onto disk.
+	 */
+	public string function $sendFileWebrootDirectory() {
+		local.rv = Replace(GetDirectoryFromPath(GetBaseTemplatePath()), "\", "/", "all");
+		if (Right(local.rv, 1) != "/") {
+			local.rv &= "/";
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Sends a file to the user (from the `files` folder or a path relative to it by default).
 	 *
 	 * [section: Controller]
 	 * [category: Miscellaneous Functions]
 	 *
-	 * @file The file to send to the user. Values containing the `..` character sequence anywhere (even as part of a legitimate file name) are rejected to prevent path traversal.
+	 * @file The file to send to the user, relative to the `filePath` folder on disk (`public/files` by default; subfolders such as `reports/2026/q1.zip` are fine). Values containing the `..` character sequence anywhere (even as part of a legitimate file name) are rejected to prevent path traversal.
 	 * @name The file name to show in the browser download dialog box.
 	 * @type The HTTP content type to deliver the file as.
 	 * @disposition Set to `inline` to have the browser handle the opening of the file (possibly inline in the browser) or set to `attachment` to force a download dialog box.
@@ -289,6 +361,26 @@ component {
 				local.directory = local.normalizedDir;
 				local.file = arguments.file;
 				local.fullPath = local.directory & "/" & local.file;
+			} else if ($sendFileUsesFilesFolder(file = arguments.file, directory = arguments.directory)) {
+				// https://github.com/wheels-dev/wheels/issues/3852 — a plain relative `file`
+				// (e.g. "reports/2026/q1.zip") is relative to the `filePath` folder (public/files)
+				// on disk. Build that from the web root's physical folder, not from `rootPath`:
+				// rootPath is the app's URL path, and under a subdirectory install whose rewrites
+				// fold /public/ out of the URL (or set(subpath=...)) it points one level above
+				// public/, so ExpandPath(rootPath & filePath) looked in <app>/files instead.
+				local.fullPath = $sendFileWebrootDirectory() & $get("filePath") & "/" & Replace(arguments.file, "\", "/", "all");
+				local.fullPath = Replace(local.fullPath, "//", "/", "all");
+				if (Left(Replace(GetDirectoryFromPath(GetBaseTemplatePath()), "\", "/", "all"), 2) == "//") {
+					// Keep a UNC path's leading double slash.
+					local.fullPath = "/" & local.fullPath;
+				}
+				local.file = ListLast(local.fullPath, "/");
+				// GetDirectoryFromPath, not Reverse(ListRest(Reverse(...))): BoxLang's ListRest
+				// drops the leading "/", which turned the folder into a relative path there.
+				local.directory = GetDirectoryFromPath(local.fullPath);
+				if (Len(local.directory) > 1 && Right(local.directory, 1) == "/") {
+					local.directory = Left(local.directory, Len(local.directory) - 1);
+				}
 			} else {
 				if (Left(local.folder, Len(local.root)) == local.root) {
 					local.folder = RemoveChars(local.folder, 1, Len(local.root));
@@ -324,11 +416,13 @@ component {
 
 			// If the file is not found, try searching for it.
 			if (!FileExists(local.fullPath)) {
-				local.match = $directory(action = "list", directory = local.directory, filter = "#local.file#.*");
+				local.matches = $sendFileExtensionMatches(directory = local.directory, file = local.file);
 
 				// Only extract the extension if we find a single match.
-				if (local.match.recordCount == 1) {
-					local.file &= "." & ListLast(local.match.name, ".");
+				if (ArrayLen(local.matches) == 1) {
+					// The on-disk name: the match is case-insensitive, and "Report" & ".pdf"
+					// would not exist on a case-sensitive filesystem.
+					local.file = local.matches[1];
 					local.fullPath = local.directory & "/" & local.file;
 				} else {
 					Throw(

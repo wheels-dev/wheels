@@ -32,15 +32,19 @@ component {
 	 * caller to print) and skipped. Creates the parent directory on the
 	 * real path.
 	 */
+	/** Creates dir inside the project only; an existing symlinked parent pointing outside is refused. */
+	private void function $ensureDir(required string dir) {
+		new modules.wheels.services.GeneratorPaths().ensureDirectoryInside(variables.projectRoot, arguments.dir);
+	}
+
 	private string function $write(required string path, required string content) {
+		new modules.wheels.services.GeneratorPaths().assertInside(variables.projectRoot, arguments.path);
 		if (request.$wheelsGenerateDryRun ?: false) {
 			arrayAppend(request.$wheelsDryRunPaths, arguments.path);
 			return arguments.path;
 		}
 		var dir = getDirectoryFromPath(arguments.path);
-		if (!directoryExists(dir)) {
-			directoryCreate(dir, true);
-		}
+		$ensureDir(dir);
 		FileWrite(arguments.path, arguments.content);
 		return arguments.path;
 	}
@@ -65,6 +69,8 @@ component {
 		var pluralName = variables.helpers.pluralize(arguments.name);
 
 		try {
+			// Inside the try: an invalid name is reported in results.errors, like every other failure here.
+			new modules.wheels.services.GeneratorPaths().identifier(arguments.name, "model");
 			// Add foreign key columns for belongsTo relationships
 			var props = $addForeignKeyColumns(arguments.properties, arguments.belongsTo);
 
@@ -498,9 +504,7 @@ component {
 		var fileName = timestamp & "_" & className & ".cfc";
 		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
 
-		if (!directoryExists(migrationDir)) {
-			directoryCreate(migrationDir, true);
-		}
+		$ensureDir(migrationDir);
 
 		var content = generateMigrationContent(className, tableName, arguments.properties, arguments.primaryKey);
 		var migrationPath = migrationDir & "/" & fileName;
@@ -513,6 +517,8 @@ component {
 	 * Update routes.cfm with a new resource route
 	 */
 	public boolean function updateRoutes(required string name) {
+		// Outside the try: an invalid name must fail, not read as "no insertion point".
+		new modules.wheels.services.GeneratorPaths().token(arguments.name, "route");
 		try {
 			var routesPath = variables.projectRoot & "/config/routes.cfm";
 			if (!fileExists(routesPath)) return false;
@@ -589,6 +595,8 @@ component {
 		var pluralName = variables.helpers.pluralize(arguments.name);
 
 		try {
+			// Inside the try: an invalid name is reported in results.errors, like every other failure here.
+			new modules.wheels.services.GeneratorPaths().identifier(arguments.name, "model");
 			// Add foreign key columns for belongsTo relationships
 			var props = $addForeignKeyColumns(arguments.properties, arguments.belongsTo);
 
@@ -801,6 +809,7 @@ component {
 		var results = {success: true, generated: [], skipped: [], errors: [], rollback: []};
 		var nl = chr(10);
 		var t = chr(9);
+		new modules.wheels.services.GeneratorPaths().identifier(arguments.model, "auth model");
 
 		var strategyName = lCase(trim(arguments.strategy));
 		if (!listFindNoCase("session,token,jwt", strategyName)) {
@@ -855,9 +864,7 @@ component {
 			// already-applied migration would desync the tracking table.
 			if (!migrationAlreadyExists(modelName)) {
 				var migrationDir = variables.projectRoot & "/app/migrator/migrations";
-				if (!directoryExists(migrationDir)) {
-					directoryCreate(migrationDir, true);
-				}
+				$ensureDir(migrationDir);
 				var migrationPath = migrationDir & "/" & variables.helpers.generateMigrationTimestamp()
 					& "_create_" & tableName & "_table.cfc";
 				$write(migrationPath, $renderAuthTemplate("migration", ctx));
@@ -1050,9 +1057,7 @@ component {
 			return false;
 		}
 		var dir = getDirectoryFromPath(absPath);
-		if (!directoryExists(dir)) {
-			directoryCreate(dir, true);
-		}
+		$ensureDir(dir);
 		$write(absPath, arguments.content);
 		arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 		if (!existed) {
@@ -1091,9 +1096,7 @@ component {
 		if (!fileExists(absPath)) {
 			if (arguments.anchorMode == "cfscript") {
 				var dir = getDirectoryFromPath(absPath);
-				if (!directoryExists(dir)) {
-					directoryCreate(dir, true);
-				}
+				$ensureDir(dir);
 				$write(absPath, scriptOpenTag & nl & $indentBlock(blockText, t) & nl & scriptCloseTag & nl);
 				arrayAppend(arguments.results.generated, {type: arguments.label, path: absPath});
 				arrayAppend(arguments.results.rollback, absPath);

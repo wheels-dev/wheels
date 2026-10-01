@@ -13,19 +13,22 @@
  *                challenge), then the connection closes
  * Any other request gets `200 ok`, Connection: close.
  *
+ * Listens on 127.0.0.1 (or `bindAddress`) only, without SO_REUSEADDR, so no
+ * other socket can share its port (see TestSockets).
+ *
  * Runs in this JVM, so the "server pid" is this JVM's pid. Callers MUST
  * stop() it in `finally` (see StubHttpServer).
  */
 component {
 
 	public any function init(required string mode, required string token, string bindAddress = "") {
+		// An exact bind without SO_REUSEADDR: a wildcard listener lets another
+		// socket bind 127.0.0.1:<same port> on macOS/BSD and take the loopback
+		// connection, which the peer check then (rightly) refuses (#3834).
+		var sockets = new cli.lucli.tests.TestSockets();
 		variables.serverSocket = len(arguments.bindAddress)
-			? createObject("java", "java.net.ServerSocket").init(
-				javacast("int", 0),
-				javacast("int", 50),
-				createObject("java", "java.net.InetAddress").getByName(arguments.bindAddress)
-			)
-			: createObject("java", "java.net.ServerSocket").init(javacast("int", 0));
+			? sockets.exclusiveListener(arguments.bindAddress)
+			: sockets.exclusiveLoopbackListener();
 		variables.threadName = "stub-challenge-" & createUUID();
 		variables.requestHeads = createObject("java", "java.util.concurrent.ConcurrentLinkedQueue").init();
 		variables.connections = createObject("java", "java.util.concurrent.atomic.AtomicInteger").init(0);

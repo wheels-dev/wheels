@@ -146,6 +146,23 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(content).toInclude('registerStrategy(name="session"');
 			});
 
+			it("logs out only on a POST (form with _method=delete) or a real DELETE, never on a GET or HEAD", () => {
+				// The default wildcard route also maps GET /sessions/delete; a GET or HEAD
+				// must not end the session.
+				var content = fileRead(fixtures.session.root & "/app/controllers/Sessions.cfc");
+				var deletePos = findNoCase("function delete()", content);
+				expect(deletePos > 0).toBeTrue("Sessions.cfc should define delete()");
+				var body = mid(content, deletePos, len(content));
+				var guardPos = reFindNoCase("if\s*\(\s*!isPost\(\)\s*&&\s*!isDelete\(\)\s*\)", body);
+				var logoutPos = findNoCase(".logout()", body);
+				expect(guardPos > 0 && logoutPos > 0 && guardPos < logoutPos).toBeTrue(
+					"Sessions.delete() must refuse anything but POST/DELETE before calling logout()."
+				);
+				expect(reFindNoCase("!isDelete\(\)\s*\)\s*\{\s*redirectTo\([^)]*\);\s*return;", body) > 0).toBeTrue(
+					"The refusal must redirect and return without logging out."
+				);
+			});
+
 			it("calls super.config() first in every generated controller (##2960)", () => {
 				for (var name in ["Sessions", "Passwords", "Registrations"]) {
 					var stripped = $strippedFile(fixtures.session.root & "/app/controllers/" & name & ".cfc");

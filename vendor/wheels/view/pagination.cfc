@@ -455,7 +455,7 @@ component {
 		// Validate before the totalPages early-return so the check fires on
 		// single-page (or empty) result sets too. Gated on showErrorInformation
 		// so production skips both the $findRoute lookup and the throw entirely.
-		if (Len(local.unknownArgs) && application.wheels.showErrorInformation) {
+		if (Len(local.unknownArgs) && $get("showErrorInformation")) {
 			// Named-route segment variables (e.g. userId in route "userTimeline") are
 			// forwarded by $paginationLinkToArgs at link-build time but are not in the
 			// static allowlist. Filter them out before throwing — otherwise

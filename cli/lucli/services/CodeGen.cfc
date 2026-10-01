@@ -33,6 +33,14 @@ component {
 		string tableName = "",
 		boolean force = false
 	) {
+		var names = new modules.wheels.services.GeneratorPaths();
+		names.componentName(arguments.name, "model");
+		if (len(arguments.tableName)) {
+			names.identifier(arguments.tableName, "table");
+		}
+		for (var prop in arguments.properties) {
+			names.identifier(isStruct(prop) && structKeyExists(prop, "name") ? prop.name : "", "property");
+		}
 		var modelName = variables.helpers.capitalize(arguments.name);
 		var filePath = variables.projectRoot & "/app/models/#modelName#.cfc";
 
@@ -147,6 +155,7 @@ component {
 		string description = "",
 		boolean force = false
 	) {
+		new modules.wheels.services.GeneratorPaths().componentName(arguments.name, "controller");
 		// Support package-prefixed names like "api/Products"
 		var packagePath = "";
 		var baseName = arguments.name;
@@ -230,9 +239,15 @@ component {
 	 */
 	private array function normalizeActions(required array actions) {
 		var normalized = [];
+		var names = new modules.wheels.services.GeneratorPaths();
 		for (var token in arguments.actions) {
 			for (var part in listToArray(token, ",")) {
 				var trimmed = trim(part);
+				// Each action becomes `function <name>()` in the controller: only a plain
+				// identifier, checked on the exact value emitted, before anything is written.
+				if (len(trimmed)) {
+					names.identifier(trimmed, "action");
+				}
 				if (len(trimmed) && !arrayFindNoCase(normalized, trimmed)) {
 					arrayAppend(normalized, trimmed);
 				}
@@ -261,6 +276,8 @@ component {
 		boolean force = false,
 		boolean crud = false
 	) {
+		new modules.wheels.services.GeneratorPaths().componentName(arguments.name, "controller");
+		new modules.wheels.services.GeneratorPaths().viewAction(arguments.action);
 		var controllerName = variables.helpers.capitalize(arguments.name);
 		var viewDir = variables.projectRoot & "/app/views/#lCase(controllerName)#";
 		var fileName = arguments.action & ".cfm";
@@ -317,6 +334,7 @@ component {
 		string belongsTo = "",
 		boolean force = false
 	) {
+		$validateTestNames(argumentCollection = arguments);
 		var meta = $testFileMeta(arguments.type, arguments.name);
 		var testName = meta.testName;
 		var testDir = meta.testDir;
@@ -328,9 +346,7 @@ component {
 			return {success: false, error: "Test already exists: #testDir##fileName# (pass --force to overwrite)", path: existingPath};
 		}
 		var destDir = variables.projectRoot & "/" & testDir;
-		if (!directoryExists(destDir)) {
-			directoryCreate(destDir, true);
-		}
+		new modules.wheels.services.GeneratorPaths().ensureDirectoryInside(variables.projectRoot, destDir);
 
 		var template = "tests/#arguments.type#.txt";
 		var context = $buildTestContext(
@@ -370,12 +386,33 @@ component {
 				arrayAppend(request.$wheelsDryRunPaths, filePath);
 				result = {success: true, path: filePath, message: "Dry run — not written", dryRun: true};
 			} else {
+				new modules.wheels.services.GeneratorPaths().assertInside(variables.projectRoot, filePath);
 				fileWrite(filePath, content);
 				result = {success: true, path: filePath, message: "Generated from inline template"};
 			}
 		}
 
 		return result;
+	}
+
+	/** Every name generateTest() writes into the spec, checked before anything is written. */
+	private void function $validateTestNames(
+		required string name,
+		string modelName = "",
+		string belongsTo = "",
+		array properties = []
+	) {
+		var names = new modules.wheels.services.GeneratorPaths();
+		names.componentName(arguments.name, "test");
+		if (len(arguments.modelName)) {
+			names.identifier(arguments.modelName, "model");
+		}
+		for (var assoc in listToArray(arguments.belongsTo)) {
+			names.identifier(trim(assoc), "belongsTo association");
+		}
+		for (var prop in arguments.properties) {
+			names.identifier(isStruct(prop) && structKeyExists(prop, "name") ? prop.name : "", "property");
+		}
 	}
 
 	/**
@@ -568,7 +605,10 @@ component {
 			return "9.99";
 		}
 		if (listFindNoCase("boolean,bool", propType)) {
-			return "true";
+			// 1, not true: a boolean column is INTEGER on SQLite, so the model's
+			// automatic numericality validation rejects true. 1 also binds as
+			// true on BIT/BOOLEAN columns, and checkBox() submits it.
+			return "1";
 		}
 		if (listFindNoCase("datetime,timestamp,date,time", propType)) {
 			return "Now()";
@@ -611,6 +651,13 @@ component {
 		string description = "",
 		boolean force = false
 	) {
+		// The helper name becomes the file/component name and each function name a
+		// `function <name>(...)` declaration: plain identifiers only, before any write.
+		var names = new modules.wheels.services.GeneratorPaths();
+		names.identifier(arguments.name, "helper");
+		for (var fn in arguments.functions) {
+			names.identifier(isSimpleValue(fn) ? fn : "", "helper function");
+		}
 		var helperName = variables.helpers.capitalize(arguments.name);
 		if (!reFindNoCase("Helper$", helperName)) {
 			helperName &= "Helper";
@@ -651,6 +698,7 @@ component {
 		string description = "",
 		boolean force = false
 	) {
+		new modules.wheels.services.GeneratorPaths().identifier(arguments.name, "policy");
 		var modelName = variables.helpers.capitalize(arguments.name);
 		// Accept both "Post" and "PostPolicy" — normalize to the model name.
 		if (reFindNoCase("Policy$", modelName) && len(modelName) > 6) {
@@ -701,7 +749,8 @@ component {
 			arrayAppend(errors, "Name cannot be empty");
 		}
 
-		if (!reFindNoCase("^[a-zA-Z][a-zA-Z0-9_]*$", arguments.name)) {
+		// Not ^...$: CFML's $ also matches before a trailing line feed.
+		if (!new modules.wheels.services.GeneratorPaths().isIdentifier(arguments.name)) {
 			arrayAppend(errors, "Name must start with a letter and contain only letters, numbers, and underscores");
 		}
 
