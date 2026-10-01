@@ -10,6 +10,84 @@ component extends="wheels.WheelsTest" {
 	}
 
 	/*
+	 * Sizes and growth bound for the binding-linearity specs. `large` is
+	 * `factor` times `small`. A linear binder's time grows about `factor` times
+	 * between them; a quadratic one grows faster. The small size is chosen so
+	 * the small call takes well over 10ms on Lucee 7, above the ~1ms timer
+	 * resolution, so taking the fastest run does not inflate the growth.
+	 * Lucee 7 measurements with factor 10 (fastest of three runs):
+	 *   current binder              plain 9.6-10.1x, run of quotes 9.1-10.9x
+	 *                               (small call 26-28ms)
+	 *   scanner that copies the rest of the string for every character
+	 *   (quadratic)                 plain 40-42x, run of quotes 41-50x
+	 * so 25 leaves more than 2x headroom above a linear binder and still
+	 * fails a quadratic one.
+	 *
+	 * RustCFML and BoxLang: the WHERE literal scanner is super-linear on these
+	 * engines whatever the framework does. On RustCFML Mid() costs O(index) (it
+	 * walks the string to reach a character), so the scan is quadratic (about
+	 * 70x for factor 10). BoxLang measured 29-42x for factor 10 in CI. These
+	 * engines get a "no worse than quadratic" bound instead: a quadratic
+	 * binder grows about 100x for factor 10, and 250 adds 2.5x for timer and
+	 * machine noise. That is not "anything goes": a cubic or backtracking
+	 * regression grows 1000x or more and still fails. The sizes are smaller to
+	 * keep the run short. Tightening this is tracked separately.
+	 */
+	private struct function linearityPlan(required string kind) {
+		var adapter = application.wheels.engineAdapter;
+		var superLinear = adapter.isRustCFML() || adapter.isBoxLang();
+		var plan = {factor = 10, maxGrowth = superLinear ? 250 : 25};
+		if (arguments.kind == "plain") {
+			plan.small = superLinear ? 3000 : 50000;
+		} else {
+			plan.small = superLinear ? 1500 : 30000;
+		}
+		plan.large = plan.small * plan.factor;
+		return plan;
+	}
+
+	// Milliseconds to turn a WHERE string holding one value of the given size
+	// into SQL and bound parameters, the same two steps a finder runs before it
+	// queries. No query is executed, so the time measures the binder only and
+	// does not depend on the database (Oracle, for one, refuses to bind a string
+	// over 4000 characters). The quotes value is escaped the way a dynamic finder
+	// escapes it, so `size` quote characters become 2 * `size` in the string.
+	private numeric function bindingTime(required string kind, required numeric size) {
+		var author = model("author");
+		var whereString = arguments.kind == "plain"
+			? "lastName = '" & RepeatString("z", arguments.size) & "'"
+			: "firstName = '" & RepeatString("''", arguments.size) & "'";
+		var t0 = GetTickCount();
+		var sqlParts = author.$addWhereClause(sql = ["SELECT 1"], where = whereString, include = "", includeSoftDeletes = false);
+		author.$addWhereClauseParameters(sql = sqlParts, where = whereString);
+		return GetTickCount() - t0;
+	}
+
+	// Fastest of three runs at each size (the caller has already warmed the
+	// path up), and the growth from the small size to the large one.
+	private struct function bindingGrowth(required string kind, required struct plan) {
+		var rv = {small = 0, large = 0};
+		var sizeKeys = ["small", "large"];
+		var sizeKey = "";
+		var best = 0;
+		var t = 0;
+		var i = 0;
+		for (sizeKey in sizeKeys) {
+			best = -1;
+			for (i = 1; i <= 3; i++) {
+				t = bindingTime(arguments.kind, arguments.plan[sizeKey]);
+				if (best < 0 || t < best) {
+					best = t;
+				}
+			}
+			rv[sizeKey] = best;
+		}
+		rv.growth = Round(rv.large / Max(rv.small, 1) * 10) / 10;
+		rv.summary = "#arguments.plan.small# chars took #rv.small#ms, #arguments.plan.large# chars took #rv.large#ms, growth #rv.growth#x (limit #arguments.plan.maxGrowth#x)";
+		return rv;
+	}
+
+	/*
 	 * Regression spec: values passed to dynamic finders, key finders, the
 	 * chainable query builder, and uniqueness validation must be bound as a
 	 * single parameter, so a quote character in the value cannot change the
@@ -121,22 +199,30 @@ component extends="wheels.WheelsTest" {
 				expect(state.threw || state.rows == 0).toBeTrue("returned #state.rows# rows without throwing");
 			});
 
-			it("binds a long plain value quickly and matches nothing", () => {
-				var big = RepeatString("z", 100000);
-				var t0 = GetTickCount();
-				var q = model("author").findAllByLastName(value = big, returnAs = "query");
-				var elapsed = GetTickCount() - t0;
-				expect(q.recordCount).toBe(0);
-				expect(elapsed).toBeLT(5000, "100k value took #elapsed#ms");
+			// The two specs below guard that binding a value stays roughly linear in
+			// its length. They compare the binder's time at two sizes instead of using
+			// a fixed wall-clock budget, which depends on the engine and the machine.
+			// Each first runs a real finder with a 3000-character value, which every
+			// supported database can bind, then warms the binder up before timing.
+			// See linearityPlan() and bindingTime().
+			it("binds a long plain value in time that scales linearly and matches nothing", () => {
+				expect(model("author").findAllByLastName(value = RepeatString("z", 3000), returnAs = "query").recordCount).toBe(0);
+				var plan = linearityPlan("plain");
+				bindingTime("plain", plan.large);
+				var ratio = bindingGrowth("plain", plan);
+				// Recorded on passing runs too, so the margin is visible in every leg's result JSON.
+				debug(var = "plain value: #ratio.summary#", label = "binding linearity");
+				expect(ratio.growth).toBeLT(plan.maxGrowth, "plain value: #ratio.summary#");
 			});
 
-			it("binds a value with a long run of quotes quickly instead of crashing", () => {
-				var payload = RepeatString("'", 20000);
-				var t0 = GetTickCount();
-				var q = model("author").findAllByFirstName(value = payload, returnAs = "query");
-				var elapsed = GetTickCount() - t0;
-				expect(q.recordCount).toBe(0);
-				expect(elapsed).toBeLT(5000, "took #elapsed#ms");
+			it("binds a value with a long run of quotes in linear time instead of crashing", () => {
+				expect(model("author").findAllByFirstName(value = RepeatString("'", 3000), returnAs = "query").recordCount).toBe(0);
+				var plan = linearityPlan("quotes");
+				bindingTime("quotes", plan.large);
+				var ratio = bindingGrowth("quotes", plan);
+				// Recorded on passing runs too, so the margin is visible in every leg's result JSON.
+				debug(var = "run of quotes: #ratio.summary#", label = "binding linearity");
+				expect(ratio.growth).toBeLT(plan.maxGrowth, "run of quotes: #ratio.summary#");
 			});
 
 			it("uniqueness validation is not defeated by a quote in the value", () => {

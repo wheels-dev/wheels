@@ -1,0 +1,1 @@
+- Package tarballs built on macOS, which carry `._*` AppleDouble metadata files, now install with `wheels packages add`. Those metadata files are skipped and never copied into `vendor/` (#3875)
