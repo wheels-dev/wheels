@@ -95,6 +95,10 @@
 	/**
 	* Guard: abort with a 404 when the key matches no record.
 	*
+	* A key that can't be a key for this model (`abc` for an integer primary
+	* key) makes findByKey() throw Wheels.InvalidValue. No record can have that
+	* key, so it gets the same 404. Any other error is rethrown.
+	*
 	* $throwErrorOrShow404Page() sets the 404 status, then shows the error page
 	* in development or the onmissingtemplate.cfm page in production. Throwing
 	* Wheels.RecordNotFound directly would reach production users as a 500.
@@ -105,7 +109,15 @@
 	* off `include=` wiring for every `--belongsTo` child of this model.
 	**/
 	private function requireRecord() {
-		if (!IsObject(model("|ObjectNameSingularC|").findByKey(key=params.key))) {
+		var found = false;
+		try {
+			found = IsObject(model("|ObjectNameSingularC|").findByKey(key=params.key));
+		} catch (any e) {
+			if (e.type != "Wheels.InvalidValue") {
+				rethrow;
+			}
+		}
+		if (!found) {
 			$throwErrorOrShow404Page(
 				type = "Wheels.RecordNotFound",
 				message = "|ObjectNameSingularC| not found for the requested key."

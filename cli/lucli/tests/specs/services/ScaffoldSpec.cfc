@@ -119,6 +119,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(scanned.valid).toBeTrue(scanned.reason);
 				});
 
+				it("treats a key the model cannot use as a missing record", () => {
+					// GET /notefiles/abc: findByKey("abc") on an integer primary
+					// key throws Wheels.InvalidValue from the typed-value guard,
+					// which served a 500. No record can have that key, so the
+					// guard must answer 404 like any other missing record, and
+					// must not swallow any other error type.
+					var result = scaffold.generateScaffold(
+						name = "Notefile",
+						properties = [{name = "title", type = "string"}],
+						force = true
+					);
+					expect(result.success).toBeTrue();
+					var content = fileRead(tempRoot & "/app/controllers/Notefiles.cfc");
+					// requireRecord() is the controller's last function.
+					var guardAt = Find("private function requireRecord()", content);
+					expect(guardAt).toBeGT(0);
+					var guard = Mid(content, guardAt, Len(content));
+					expect(guard).toInclude('"Wheels.InvalidValue"');
+					expect(guard).toInclude("rethrow;");
+					expect(guard).toInclude("$throwErrorOrShow404Page(");
+
+					var scanned = new cli.lucli.services.ScaffoldSource().scan(content);
+					expect(scanned.valid).toBeTrue(scanned.reason);
+				});
+
 				it("emits a full CRUD controller spec with model().create() test data", () => {
 					var result = scaffold.generateScaffold(
 						name = "Chronicle",
