@@ -19,6 +19,7 @@ excerpt: >-
   Upgrading is recommended; a few generated-app files need small edits.
 coverImage: '/blog-images/4-1/wheels-4-1-2-released.png'
 announcement:
+  discussionUrl: 'https://github.com/wheels-dev/wheels/discussions/3917'
   title: 'Wheels 4.1.2 is out'
   body: |
     **[Wheels 4.1.2 is released](https://blog.wheels.dev/blog/wheels-4-1-2-released)**, a patch release on the 4.1.x line.
