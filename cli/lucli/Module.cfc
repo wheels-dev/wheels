@@ -815,7 +815,7 @@ component extends="modules.BaseModule" {
 
 		if (!arrayLen(args)) {
 			$printGenerateUsage();
-			return "";
+			$refuse("wheels generate: a generator type is required. Usage: wheels generate <type> <name> [options], where <type> is one of: app, model, controller, view, migration, scaffold, api-resource, route, test, property, helper, policy, snippets, admin, auth.");
 		}
 
 		// Reset dry-run state first: the stdio MCP server reuses the request
@@ -1098,6 +1098,51 @@ component extends="modules.BaseModule" {
 			variables.$mcpServerProcess = found;
 		}
 		return variables.$mcpServerProcess;
+	}
+
+	/**
+	 * Fail a command: print any guidance lines, then throw so the CLI exits
+	 * non-zero and an MCP client gets isError. The message itself is printed
+	 * once, by the thrown error, not as a separate red line as well.
+	 */
+	private void function $refuse(required string message, string type = "Wheels.InvalidArguments", array hints = []) {
+		for (var hint in arguments.hints) {
+			out(hint, "yellow");
+		}
+		throw(type = arguments.type, message = arguments.message);
+	}
+
+	/**
+	 * Whether any item in a destroy preview exists: a listed file or folder
+	 * under the project, or the listed resource route in config/routes.cfm.
+	 * The drop-table migration line is not evidence on its own.
+	 */
+	private boolean function $destroyFindsSomething(required array preview) {
+		for (var item in arguments.preview) {
+			if (left(item, 7) == "Invalid" || left(item, 10) == "Migration:") {
+				continue;
+			}
+			if (left(item, 6) == "Route:") {
+				// The resource name between the quotes of `.resources("name")`, matched
+				// exactly (positional or name=) rather than as a substring.
+				var routeName = reReplace(item, '^Route: \.resources\("([^"]*)"\).*$', "\1");
+				var routesPath = variables.projectRoot & "/config/routes.cfm";
+				// Escape regex metacharacters: the name comes from user input.
+				routeName = reReplace(routeName, "([.^$|()\[\]{}*+?\\])", "\\\1", "all");
+				if (
+					len(routeName) && routeName != item && fileExists(routesPath)
+					&& reFindNoCase("\.resources\(\s*(name\s*=\s*)?[""']" & routeName & "[""']\s*[,)]", fileRead(routesPath))
+				) {
+					return true;
+				}
+				continue;
+			}
+			var path = variables.projectRoot & "/" & item;
+			if (fileExists(path) || directoryExists(path)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -1581,8 +1626,7 @@ component extends="modules.BaseModule" {
 			case "status":
 				return docsStatus();
 			default:
-				out("Unknown docs action: #action#. Try: fetch, status", "red");
-				return "";
+				$refuse("Unknown docs action: #action#. Try: fetch, status");
 		}
 	}
 
@@ -1728,7 +1772,8 @@ component extends="modules.BaseModule" {
 	 * fetch` exits non-zero instead of reporting success after a failure.
 	 */
 	private void function $docsFetchFail(required string message, array hints = []) {
-		out(arguments.message, "red");
+		// The thrown error prints the message; printing it here as well showed
+		// every docs fetch failure twice.
 		for (var hint in arguments.hints) {
 			out(hint);
 		}
@@ -1883,8 +1928,7 @@ component extends="modules.BaseModule" {
 		var version = $docsFrameworkVersion();
 		var home = $resolveLucliHome();
 		if (!len(version) || !len(home)) {
-			out("Could not determine the framework version or the CLI home.", "red");
-			return "";
+			$refuse("Could not determine the framework version or the CLI home: run wheels docs status from a Wheels project.", "Wheels.DocsStatusFailed");
 		}
 		var target = home & "/docs/" & version;
 		if (!directoryExists(target)) {
@@ -2625,7 +2669,7 @@ component extends="modules.BaseModule" {
 			out("Examples:", "bold");
 			out("  wheels create app myapp");
 			out("  wheels create app myapp --port=3000 --setup-h2");
-			return "";
+			$refuse("wheels create: missing required arguments. Usage: wheels create <type> <name> [options]");
 		}
 
 		switch (type) {
@@ -3765,8 +3809,7 @@ component extends="modules.BaseModule" {
 		var target = opts.target;
 
 		if (!opts.hasTarget && !directoryExists(variables.projectRoot & "/app")) {
-			out("No app/ directory found. Are you in a Wheels project?", "red");
-			return "";
+			$refuse("No app/ directory found: run wheels analyze from a Wheels project root.");
 		}
 
 		out("Analyzing code...", "cyan");
@@ -3992,7 +4035,7 @@ component extends="modules.BaseModule" {
 			out("  wheels destroy controller Products    (remove just the Products controller)");
 			out("  wheels destroy model Product          (remove just the Product model)");
 			out("  wheels destroy view products/index    (remove a single view)");
-			return "";
+			$refuse("wheels destroy: missing required arguments. Usage: wheels destroy <type> <name>");
 		}
 
 		var name = opts.name;
@@ -4010,9 +4053,16 @@ component extends="modules.BaseModule" {
 
 		// Show preview and confirm
 		var preview = svc.previewDestroy(name, type);
-		if (!arrayLen(preview)) {
-			out("Nothing to destroy.", "yellow");
-			return "";
+		// Nothing found is a failure, not a success: without this a destroy of
+		// a name that never existed "succeeded" and still wrote a migration
+		// dropping a table that was never created.
+		if (!arrayLen(preview) || !$destroyFindsSomething(preview)) {
+			$refuse(
+				arrayLen(preview) && left(preview[1], 7) == "Invalid"
+					? "wheels destroy: #preview[1]#"
+					: "wheels destroy: nothing named '#name#' was found to destroy.",
+				"Wheels.NothingToDestroy"
+			);
 		}
 
 		out("The following will be deleted:", "yellow");
@@ -4173,6 +4223,13 @@ component extends="modules.BaseModule" {
 			for (var rec in results.recommendations) {
 				out("  * #rec#", "cyan");
 			}
+		}
+
+		// CRITICAL means real issues: exit non-zero so CI and agents can gate on
+		// the health check. WARNING still exits 0.
+		if (results.status == "CRITICAL") {
+			// Self-contained: an MCP client receives only this message, not the report printed above.
+			$refuse("wheels doctor: status CRITICAL with #arrayLen(results.issues)# issue(s): " & arrayToList(results.issues, "; "), "Wheels.DoctorCritical");
 		}
 
 		return "";
@@ -4902,7 +4959,7 @@ component extends="modules.BaseModule" {
 			out("  wheels db status");
 			out("  wheels db status --pending");
 			out("  wheels db version --detailed");
-			return "";
+			$refuse("wheels db: missing required arguments. Usage: wheels db <command>");
 		}
 
 		var subcommand = lCase(trim(opts.subcommand));
@@ -5310,13 +5367,13 @@ component extends="modules.BaseModule" {
 		}
 
 		// Bare `wheels upgrade` (no verb) is deliberately inert: print the
-		// usage steer and exit 0. Destructive commands deserve an explicit
-		// verb, and MCP clients calling wheels_upgrade with {} must never
-		// mutate vendor/wheels/ — requiring `apply` fixes that transport-
-		// independently (#3039 review). Exit 0 matches the pre-apply-mode
-		// bare behavior, so no CI surprise.
+		// usage steer and change nothing. Destructive commands deserve an
+		// explicit verb, and MCP clients calling wheels_upgrade with {} must
+		// never mutate vendor/wheels/ — requiring `apply` fixes that transport-
+		// independently (#3039 review). It exits non-zero (an MCP client gets
+		// isError): a missing subcommand is a usage error, not a success.
 		if (!len(opts.subcommand)) {
-			return $printUpgradeUsageSteer();
+			$refuse($printUpgradeUsageSteer());
 		}
 
 		// ── Apply verb. Every refusal below fires before any file mutation.
@@ -5433,7 +5490,8 @@ component extends="modules.BaseModule" {
 			& "      (backs up to vendor/wheels.bak-<timestamp>/ first)." & nl
 			& nl
 			& "Run `wheels upgrade help` for full usage." & nl;
-		out(usage, "yellow");
+		// Returned for the caller to throw: the thrown error prints it once and
+		// an MCP client gets it as the isError text.
 		return usage;
 	}
 
@@ -5499,7 +5557,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate model <Name> [properties...]", "yellow");
 			out("  Example: wheels generate model User name email:string active:boolean");
-			return "";
+			$refuse("wheels generate model: missing required arguments. Usage: wheels generate model <Name> [properties...]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5512,8 +5570,7 @@ component extends="modules.BaseModule" {
 		var codegen = getService("codegen");
 		var validation = codegen.validateName(modelName, "model");
 		if (!validation.valid) {
-			out("Invalid model name: #arrayToList(validation.errors, '; ')#", "red");
-			return "";
+			$refuse("Invalid model name: #arrayToList(validation.errors, '; ')#", "Wheels.Generate.InvalidName");
 		}
 
 		// Add a foreign-key column per --belongsTo parent (unless the user
@@ -5534,8 +5591,7 @@ component extends="modules.BaseModule" {
 		if (result.success) {
 			printCreated("app/models/#modelName#.cfc");
 		} else {
-			out(result.error, "red");
-			return "";
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 
 		// Also generate migration if properties (or belongsTo FK columns) exist
@@ -5552,7 +5608,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate controller <Name> [actions...]", "yellow");
 			out("  Example: wheels generate controller Users index show create");
-			return "";
+			$refuse("wheels generate controller: missing required arguments. Usage: wheels generate controller <Name> [actions...]");
 		}
 
 		var controllerName = capitalize(args[1]);
@@ -5564,8 +5620,7 @@ component extends="modules.BaseModule" {
 		if (result.success) {
 			printCreated("app/controllers/#controllerName#.cfc");
 		} else {
-			out(result.error, "red");
-			return "";
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 
 		// Use the normalized action list from the generator (comma-joined tokens like
@@ -5598,7 +5653,7 @@ component extends="modules.BaseModule" {
 	private string function generateView(required array args) {
 		if (arrayLen(args) < 2) {
 			out("Usage: wheels generate view <controller> <action>", "yellow");
-			return "";
+			$refuse("wheels generate view: missing required arguments. Usage: wheels generate view <controller> <action>");
 		}
 
 		var controllerName = args[1];
@@ -5610,7 +5665,7 @@ component extends="modules.BaseModule" {
 		if (result.success) {
 			printCreated("app/views/#lCase(controllerName)#/#actionName#.cfm");
 		} else {
-			out(result.error, "red");
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 		return "";
 	}
@@ -5619,7 +5674,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate migration <Name>", "yellow");
 			out("  Example: wheels generate migration AddEmailToUsers");
-			return "";
+			$refuse("wheels generate migration: missing required arguments. Usage: wheels generate migration <Name>");
 		}
 
 		var migrationName = args[1];
@@ -5647,7 +5702,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate scaffold <Name> [properties...] [--force]", "yellow");
 			out("  Example: wheels generate scaffold Post title body:text publishedAt:datetime");
-			return "";
+			$refuse("wheels generate scaffold: missing required arguments. Usage: wheels generate scaffold <Name> [properties...] [--force]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5716,10 +5771,7 @@ component extends="modules.BaseModule" {
 				out("  2. Start server: wheels start");
 			}
 		} else {
-			out("Scaffold failed:", "red");
-			for (var err in results.errors) {
-				out("  #err#", "red");
-			}
+			$refuse("Scaffold failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -5729,31 +5781,28 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate route <name>", "yellow");
 			out("  Example: wheels generate route posts");
-			return "";
+			$refuse("wheels generate route: missing required arguments. Usage: wheels generate route <name>");
 		}
 
 		var routeName = lCase(args[1]);
 		var routesPath = variables.projectRoot & "/config/routes.cfm";
 
 		if (!fileExists(routesPath)) {
-			out("config/routes.cfm not found.", "red");
-			return "";
+			$refuse("config/routes.cfm not found.", "Wheels.Generate.Refused");
 		}
 
 		// Check for duplicate before delegating
 		var content = fileRead(routesPath);
 		var resourceRoute = '.resources("' & routeName & '")';
 		if (findNoCase(resourceRoute, content)) {
-			out("Route already exists: #resourceRoute#", "yellow");
-			return "";
+			$refuse("Route already exists: #resourceRoute#", "Wheels.Generate.Refused");
 		}
 		// Also detect the named-arg form (e.g. .resources(name="posts", only="...")),
 		// which updateRoutes() treats as a duplicate. Without this, an existing
 		// named-arg route was misreported as "Could not find insertion point". M5.
 		var namedArgPattern = "\.resources\s*\([^)]*name\s*=\s*[""']" & routeName & "[""']";
 		if (reFindNoCase(namedArgPattern, content)) {
-			out("Route already exists: .resources(name=""#routeName#"", ...)", "yellow");
-			return "";
+			$refuse("Route already exists: .resources(name=""#routeName#"", ...)", "Wheels.Generate.Refused");
 		}
 
 		// Delegate to Scaffold service for the actual route insertion
@@ -5763,8 +5812,7 @@ component extends="modules.BaseModule" {
 		if (inserted) {
 			out("  route   #resourceRoute# added to config/routes.cfm", "green");
 		} else {
-			out("Could not find insertion point in routes.cfm. Add manually:", "yellow");
-			out("  #resourceRoute#");
+			$refuse("Could not find an insertion point in config/routes.cfm; add the route manually: #resourceRoute#", "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -5780,15 +5828,14 @@ component extends="modules.BaseModule" {
 			out("Usage: wheels generate test <type> <Name> [--force]", "yellow");
 			out("  Types: model, controller");
 			out("  Example: wheels generate test model User");
-			return "";
+			$refuse("wheels generate test: missing required arguments. Usage: wheels generate test <type> <Name> [--force]");
 		}
 
 		var testType = lCase(pos[1]);
 		var testName = capitalize(pos[2]);
 
 		if (!listFindNoCase("model,controller", testType)) {
-			out("Unknown test type: #testType#. Use 'model' or 'controller'.", "red");
-			return "";
+			$refuse("Unknown test type: #testType#. Use 'model' or 'controller'.");
 		}
 
 		var codegen = getService("codegen");
@@ -5798,7 +5845,7 @@ component extends="modules.BaseModule" {
 			var relPath = listLast(result.path, "/\");
 			printCreated(relPath);
 		} else {
-			out(result.error, "red");
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -5808,7 +5855,7 @@ component extends="modules.BaseModule" {
 		if (arrayLen(args) < 2) {
 			out("Usage: wheels generate property <ModelName> <property:type>", "yellow");
 			out("  Example: wheels generate property User email:string");
-			return "";
+			$refuse("wheels generate property: missing required arguments. Usage: wheels generate property <ModelName> <property:type>");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5866,7 +5913,7 @@ component extends="modules.BaseModule" {
 			out("  Tests:      tests/specs/models/<Name>Spec.cfc");
 			out("              tests/specs/controllers/Api<Names>ControllerSpec.cfc");
 			out("  Routes:     .namespace(""api"").resources(name=""<names>"", except=""new,edit"")");
-			return "";
+			$refuse("wheels generate api-resource: missing required arguments. Usage: wheels generate api-resource <Name> [properties...]");
 		}
 
 		var modelName = capitalize(args[1]);
@@ -5900,10 +5947,7 @@ component extends="modules.BaseModule" {
 			out("  2. Start server: wheels start");
 			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
 		} else {
-			out("API resource generation failed:", "red");
-			for (var err in results.errors) {
-				out("  #err#", "red");
-			}
+			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -5913,7 +5957,7 @@ component extends="modules.BaseModule" {
 		if (!arrayLen(args)) {
 			out("Usage: wheels generate helper <name> [functions...]", "yellow");
 			out("  Example: wheels generate helper formatting truncateText formatCurrency");
-			return "";
+			$refuse("wheels generate helper: missing required arguments. Usage: wheels generate helper <name> [functions...]");
 		}
 
 		var helperName = capitalize(args[1]);
@@ -5933,8 +5977,7 @@ component extends="modules.BaseModule" {
 		var codegen = getService("codegen");
 		var validation = codegen.validateName(helperName, "helper");
 		if (!validation.valid) {
-			out("Invalid helper name: #arrayToList(validation.errors, '; ')#", "red");
-			return "";
+			$refuse("Invalid helper name: #arrayToList(validation.errors, '; ')#", "Wheels.Generate.InvalidName");
 		}
 
 		var result = codegen.generateHelper(
@@ -5948,8 +5991,7 @@ component extends="modules.BaseModule" {
 			var fileName = listLast(result.path, "/\");
 			printCreated("app/helpers/#fileName#");
 		} else {
-			out(result.error, "red");
-			return "";
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 
 		out("");
@@ -5977,14 +6019,13 @@ component extends="modules.BaseModule" {
 			out("");
 			out("Writes app/policies/<ModelName>Policy.cfc — default-deny, one method per action.");
 			out("Enforce with authorize()/can()/policyScope() in your controllers and views.");
-			return "";
+			$refuse("wheels generate policy: missing required arguments. Usage: wheels generate policy <ModelName> [--force]");
 		}
 
 		var codegen = getService("codegen");
 		var validation = codegen.validateName(positional[1], "policy");
 		if (!validation.valid) {
-			out("Invalid policy name: #arrayToList(validation.errors, '; ')#", "red");
-			return "";
+			$refuse("Invalid policy name: #arrayToList(validation.errors, '; ')#", "Wheels.Generate.InvalidName");
 		}
 
 		var result = codegen.generatePolicy(name = positional[1], force = force);
@@ -6004,7 +6045,7 @@ component extends="modules.BaseModule" {
 			out("  3. Check in views without throwing: can('update', post)");
 			out("  4. Narrow index collections: policyScope(model('#reReplace(fileName, 'Policy\.cfc$', '')#')).findAll()");
 		} else {
-			out(result.error, "red");
+			$refuse(result.error, "Wheels.Generate.Refused");
 		}
 		return "";
 	}
@@ -6069,7 +6110,7 @@ component extends="modules.BaseModule" {
 			out("");
 			out("Generates an admin controller and views by introspecting an existing model.");
 			out("Requires a running server.");
-			return "";
+			$refuse("wheels generate admin: missing required arguments. Usage: wheels generate admin <modelName> [--force] [--no-routes]");
 		}
 
 		var modelName = capitalize(arguments.args[1]);
@@ -6099,8 +6140,7 @@ component extends="modules.BaseModule" {
 			// issue #2315.
 			var modelData = parseCliResponse(response, "Model introspection");
 		} catch (any e) {
-			out("Error introspecting model: #e.message#", "red");
-			return "";
+			$refuse("Error introspecting model: #e.message#", "Wheels.Generate.Refused");
 		}
 
 		// Generate admin files
@@ -6116,9 +6156,7 @@ component extends="modules.BaseModule" {
 			var adminPath = lCase(getService("helpers").pluralize(modelName));
 			out("Visit /admin/#adminPath# after reloading.", "cyan");
 		} else {
-			for (var err in result.errors) {
-				out(err, "red");
-			}
+			$refuse(arrayToList(result.errors, "; "), "Wheels.Generate.Refused");
 		}
 
 		return "";
@@ -6637,10 +6675,7 @@ component extends="modules.BaseModule" {
 		var verb = arguments.command == "forgetVersion" ? "forget" : "pretend";
 
 		if (!Len(version)) {
-			out("Missing required argument: <version>", "red");
-			out("Usage:");
-			out("  wheels migrate #verb# <version> --yes");
-			return "";
+			$refuse("Missing required argument: <version>", "Wheels.InvalidArguments", ["Usage:", "  wheels migrate #verb# <version> --yes"]);
 		}
 
 		if (!yes) {

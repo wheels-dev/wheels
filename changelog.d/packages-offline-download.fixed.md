@@ -1,0 +1,1 @@
+- `wheels packages add --offline` (and `WHEELS_OFFLINE=1`) no longer downloads the package tarball. Offline mode already refused the registry index and manifest fetches, but with a cached manifest the install still went to the network; it now fails with the offline message before any download
