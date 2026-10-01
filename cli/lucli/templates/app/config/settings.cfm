@@ -7,10 +7,11 @@
 	*/
 
 	/*
-		Set data source name. By default uses the app name.
+		Set data source name: WHEELS_DATASOURCE from .env or the process
+		environment, otherwise the app name.
 		Uncomment username/password if your datasource requires them.
 	*/
-	set(dataSourceName="{{datasourceName}}");
+	set(dataSourceName=env("WHEELS_DATASOURCE", "{{datasourceName}}"));
 	// set(dataSourceUserName="");
 	// set(dataSourcePassword="");
 

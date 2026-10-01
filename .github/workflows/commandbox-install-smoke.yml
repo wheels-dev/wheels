@@ -238,35 +238,36 @@ jobs:
 
       # --- Production journey: the non-dev reload-gate / no-trace probes. ------
       # Reuse tools/ci/smoke-env.sh (the same harness the Smoke workflow drives)
-      # against a production boot. environment.cfm hardcodes set(environment=...),
-      # so flip it to production before boot (the app cold-boots into it). The
-      # reload password is read from env("WHEELS_RELOAD_PASSWORD") in settings.cfm
-      # and commandbox-dotenv loads .env at boot, so the password must live in
-      # .env (a container -e var is overridden by .env on this path) for probe 6
-      # (authorized reload must 302) to be meaningful.
+      # against a production boot. The generated environment.cfm reads
+      # env("WHEELS_ENV") (#3946); like a wheels deploy init image (Dockerfile
+      # ENV, .env left out), this boot gets WHEELS_ENV=production from the
+      # server's process environment only, without touching environment.cfm, so
+      # the probes fail if the generated config stops honouring it. A WHEELS_ENV
+      # line in .env would win over the process value, so it is removed. The reload
+      # password is read from env("WHEELS_RELOAD_PASSWORD") in settings.cfm and
+      # commandbox-dotenv loads .env at boot, so it must live in .env (a container
+      # -e var is overridden by .env on this path) for probe 6 (authorized reload
+      # must 302) to be meaningful.
       - name: Switch app to production
         run: |
           set -e
           cd "$APP_DIR"
-          sed -i 's/set(environment="[a-z]*")/set(environment="production")/' config/environment.cfm
-          grep -qF 'set(environment="production")' config/environment.cfm || {
-            echo "::error::environment.cfm substitution failed — pattern drift?"; exit 1; }
-          # Reload password into .env so settings.cfm's env() read + the smoke
-          # probe agree. (commandbox-dotenv wins over container env on this path.)
-          if [ -f .env ]; then
-            sed -i 's/^WHEELS_RELOAD_PASSWORD=.*/WHEELS_RELOAD_PASSWORD='"${SMOKE_RELOAD_PASSWORD}"'/' .env
-            grep -q '^WHEELS_RELOAD_PASSWORD=' .env || echo "WHEELS_RELOAD_PASSWORD=${SMOKE_RELOAD_PASSWORD}" >> .env
-          else
-            printf 'WHEELS_RELOAD_PASSWORD=%s\n' "${SMOKE_RELOAD_PASSWORD}" > .env
-          fi
-          grep -n 'set(environment' config/environment.cfm
+          grep -qF 'env("WHEELS_ENV", "")' config/environment.cfm || {
+            echo "::error::config/environment.cfm no longer reads WHEELS_ENV"; exit 1; }
+          touch .env
+          sed -i '/^WHEELS_ENV=/d; /^WHEELS_RELOAD_PASSWORD=/d' .env
+          echo "WHEELS_RELOAD_PASSWORD=${SMOKE_RELOAD_PASSWORD}" >> .env
+          grep -n 'WHEELS_ENV' config/environment.cfm
+          if grep -q '^WHEELS_ENV=' .env; then
+            echo "::error::.env still sets WHEELS_ENV"; exit 1; fi
           grep -n '^WHEELS_RELOAD_PASSWORD' .env
 
       - name: Start CommandBox server (production)
         run: |
           set -e
           cd "$APP_DIR"
-          box server start port=8080 host=0.0.0.0 openbrowser=false || true
+          # The process environment is the only source of WHEELS_ENV here (see above).
+          WHEELS_ENV=production box server start port=8080 host=0.0.0.0 openbrowser=false || true
           curl -s -o /dev/null --retry 40 --retry-delay 3 --retry-all-errors \
             --retry-connrefused --max-time 10 "http://localhost:8080/" \
             || { echo "::error::server did not bind in production"; box server log || true; exit 1; }

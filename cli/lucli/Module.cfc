@@ -2917,9 +2917,9 @@ component extends="modules.BaseModule" {
 			if (fileExists(settingsFile)) {
 				try {
 					var sContent = stripCfmlComments(fileRead(settingsFile));
-					var dsMatch = reFindNoCase('\bdataSourceName\s*=\s*"([^"]+)"', sContent, 1, true);
-					if (arrayLen(dsMatch.match) > 1) {
-						out("Database: #dsMatch.match[2]#");
+					var dsName = $settingsDataSourceName(sContent);
+					if (len(dsName)) {
+						out("Database: #dsName#");
 					}
 				} catch (any e) { /* skip */ }
 			}
@@ -11008,10 +11008,7 @@ component extends="modules.BaseModule" {
 			var settingsFile = variables.projectRoot & "/config/settings.cfm";
 			if (fileExists(settingsFile)) {
 				var settingsContent = stripCfmlComments(fileRead(settingsFile));
-				var settingsMatch = reFindNoCase('\bdataSourceName\b\s*=\s*"([^"]*)"', settingsContent, 1, true);
-				if (arrayLen(settingsMatch.match) > 1 && len(trim(settingsMatch.match[2]))) {
-					base = trim(settingsMatch.match[2]);
-				}
+				base = $settingsDataSourceName(settingsContent);
 			}
 		}
 
@@ -11027,6 +11024,44 @@ component extends="modules.BaseModule" {
 		// preamble is more confusing than helpful — the runner's own
 		// fallback would print the same `myapp_test` we'd return here.
 		return reFindNoCase("_test$", base) ? base : base & "_test";
+	}
+
+	/**
+	 * The datasource name a (comment-stripped) config/settings.cfm sets, or "".
+	 * Reads both `set(dataSourceName="name")` and the generated
+	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`; for the env() form the
+	 * variable's value in .env wins over the default, as it does at runtime. The
+	 * process environment is not consulted: it can differ from the app server's.
+	 */
+	public string function $settingsDataSourceName(required string settingsContent) {
+		// Two patterns rather than one with an optional env( group: every group in
+		// each always takes part in the match, so the subexpression arrays line up.
+		var m = reFindNoCase('\bdataSourceName\b\s*=\s*env\s*\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*,\s*"([^"]*)"', arguments.settingsContent, 1, true);
+		if (m.pos[1] > 0) {
+			var name = trim(m.match[3]);
+			var envFile = variables.projectRoot & "/.env";
+			if (fileExists(envFile)) {
+				// Read the value the way the app's Application.cfc loadEnvFile() does:
+				// skip blank and # lines, split on the first "=", strip one pair of
+				// matching quotes, and let the last line for the key win.
+				for (var line in listToArray(fileRead(envFile), chr(10))) {
+					line = trim(line);
+					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), m.match[2]) != 0) {
+						continue;
+					}
+					var value = trim(listRest(line, "="));
+					if (len(value) >= 2 && ((left(value, 1) == '"' && right(value, 1) == '"') || (left(value, 1) == "'" && right(value, 1) == "'"))) {
+						value = mid(value, 2, len(value) - 2);
+					}
+					if (len(value)) {
+						name = value;
+					}
+				}
+			}
+			return name;
+		}
+		m = reFindNoCase('\bdataSourceName\b\s*=\s*"([^"]*)"', arguments.settingsContent, 1, true);
+		return m.pos[1] > 0 ? trim(m.match[2]) : "";
 	}
 
 	/**
