@@ -13,7 +13,7 @@ component extends="wheels.WheelsTest" {
 	 * Sizes and growth bound for the binding-linearity specs. `large` is
 	 * `factor` times `small`. A linear binder's time grows about `factor` times
 	 * between them; a quadratic one grows faster. The small size is chosen so
-	 * the small call takes about 25ms on Lucee 7, well above the ~1ms timer
+	 * the small call takes well over 10ms on Lucee 7, above the ~1ms timer
 	 * resolution, so taking the fastest run does not inflate the growth.
 	 * Lucee 7 measurements with factor 10 (fastest of three runs):
 	 *   current binder              plain 9.6-10.1x, run of quotes 9.1-10.9x
@@ -23,34 +23,43 @@ component extends="wheels.WheelsTest" {
 	 * so 25 leaves more than 2x headroom above a linear binder and still
 	 * fails a quadratic one.
 	 *
-	 * RustCFML: Mid() costs O(index) there (it walks the string to reach a
-	 * character), so any character-by-character scan, including the WHERE
-	 * literal scanner, grows quadratically on that engine whatever the
-	 * framework does (about 70x for factor 10). The bound there is "no worse
-	 * than quadratic" (factor 10, limit 250), which still catches a cubic or
-	 * backtracking regression, and the sizes are smaller to keep the run short.
+	 * RustCFML and BoxLang: the WHERE literal scanner is super-linear on these
+	 * engines whatever the framework does. On RustCFML Mid() costs O(index) (it
+	 * walks the string to reach a character), so the scan is quadratic (about
+	 * 70x for factor 10). BoxLang measured 29-42x for factor 10 in CI. These
+	 * engines get a "no worse than quadratic" bound instead: a quadratic
+	 * binder grows about 100x for factor 10, and 250 adds 2.5x for timer and
+	 * machine noise. That is not "anything goes": a cubic or backtracking
+	 * regression grows 1000x or more and still fails. The sizes are smaller to
+	 * keep the run short. Tightening this is tracked separately.
 	 */
 	private struct function linearityPlan(required string kind) {
-		var rust = application.wheels.engineAdapter.isRustCFML();
-		var plan = {factor = 10, maxGrowth = rust ? 250 : 25};
+		var adapter = application.wheels.engineAdapter;
+		var superLinear = adapter.isRustCFML() || adapter.isBoxLang();
+		var plan = {factor = 10, maxGrowth = superLinear ? 250 : 25};
 		if (arguments.kind == "plain") {
-			plan.small = rust ? 3000 : 50000;
+			plan.small = superLinear ? 3000 : 50000;
 		} else {
-			plan.small = rust ? 1500 : 30000;
+			plan.small = superLinear ? 1500 : 30000;
 		}
 		plan.large = plan.small * plan.factor;
 		return plan;
 	}
 
-	// Milliseconds for one finder call binding a value of the given size.
+	// Milliseconds to turn a WHERE string holding one value of the given size
+	// into SQL and bound parameters, the same two steps a finder runs before it
+	// queries. No query is executed, so the time measures the binder only and
+	// does not depend on the database (Oracle, for one, refuses to bind a string
+	// over 4000 characters). The quotes value is escaped the way a dynamic finder
+	// escapes it, so `size` quote characters become 2 * `size` in the string.
 	private numeric function bindingTime(required string kind, required numeric size) {
-		var value = arguments.kind == "plain" ? RepeatString("z", arguments.size) : RepeatString("'", arguments.size);
+		var author = model("author");
+		var whereString = arguments.kind == "plain"
+			? "lastName = '" & RepeatString("z", arguments.size) & "'"
+			: "firstName = '" & RepeatString("''", arguments.size) & "'";
 		var t0 = GetTickCount();
-		if (arguments.kind == "plain") {
-			model("author").findAllByLastName(value = value, returnAs = "query");
-		} else {
-			model("author").findAllByFirstName(value = value, returnAs = "query");
-		}
+		var sqlParts = author.$addWhereClause(sql = ["SELECT 1"], where = whereString, include = "", includeSoftDeletes = false);
+		author.$addWhereClauseParameters(sql = sqlParts, where = whereString);
 		return GetTickCount() - t0;
 	}
 
@@ -191,20 +200,28 @@ component extends="wheels.WheelsTest" {
 			});
 
 			// The two specs below guard that binding a value stays roughly linear in
-			// its length. They compare the time at two sizes instead of using a fixed
-			// wall-clock budget, which depends on the engine and the machine. The
-			// large call also warms the path up before timing. See linearityPlan().
+			// its length. They compare the binder's time at two sizes instead of using
+			// a fixed wall-clock budget, which depends on the engine and the machine.
+			// Each first runs a real finder with a 3000-character value, which every
+			// supported database can bind, then warms the binder up before timing.
+			// See linearityPlan() and bindingTime().
 			it("binds a long plain value in time that scales linearly and matches nothing", () => {
+				expect(model("author").findAllByLastName(value = RepeatString("z", 3000), returnAs = "query").recordCount).toBe(0);
 				var plan = linearityPlan("plain");
-				expect(model("author").findAllByLastName(value = RepeatString("z", plan.large), returnAs = "query").recordCount).toBe(0);
+				bindingTime("plain", plan.large);
 				var ratio = bindingGrowth("plain", plan);
+				// Recorded on passing runs too, so the margin is visible in every leg's result JSON.
+				debug(var = "plain value: #ratio.summary#", label = "binding linearity");
 				expect(ratio.growth).toBeLT(plan.maxGrowth, "plain value: #ratio.summary#");
 			});
 
 			it("binds a value with a long run of quotes in linear time instead of crashing", () => {
+				expect(model("author").findAllByFirstName(value = RepeatString("'", 3000), returnAs = "query").recordCount).toBe(0);
 				var plan = linearityPlan("quotes");
-				expect(model("author").findAllByFirstName(value = RepeatString("'", plan.large), returnAs = "query").recordCount).toBe(0);
+				bindingTime("quotes", plan.large);
 				var ratio = bindingGrowth("quotes", plan);
+				// Recorded on passing runs too, so the margin is visible in every leg's result JSON.
+				debug(var = "run of quotes: #ratio.summary#", label = "binding linearity");
 				expect(ratio.growth).toBeLT(plan.maxGrowth, "run of quotes: #ratio.summary#");
 			});
 
