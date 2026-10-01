@@ -58,14 +58,14 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
-		describe("S5 HOLD — wheels start refuse paths return empty string", () => {
+		describe("S5 — wheels start refusals exit non-zero (4.1.2: a refusal that exits 0 hides the failure from scripts and CI)", () => {
 
-			it("start() not-a-project and name-collision refuses return empty string", () => {
+			it("start() not-a-project and name-collision refusals throw after printing guidance", () => {
 				var body = $sliceFn(moduleSrc, "(?m)^[ \t]*public\s+string\s+function\s+start\s*\(", 8000);
 				expect(body).toInclude("$isWheelsProjectDir");
 				expect(body).toInclude("!reg.ours");
-				expect(body).toInclude("return """"");
-				expect(findNoCase("throw(", body)).toBe(0);
+				expect(body).toInclude("Wheels.NotAWheelsProject");
+				expect(body).toInclude("Wheels.ServerNameConflict");
 			});
 
 		});

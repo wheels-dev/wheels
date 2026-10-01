@@ -2000,7 +2000,8 @@ component extends="modules.BaseModule" {
 			out("");
 			out("Tip: cd into your project directory, or run `wheels new <appname>`", "cyan");
 			out("     to scaffold one.", "cyan");
-			return "";
+			// Non-zero exit: printing guidance and returning "" reported success.
+			throw(type = "Wheels.NotAWheelsProject", message = "wheels start: this directory is not a Wheels project (no config/settings.cfm).");
 		}
 
 		// Detect a stale `<lucliHome>/servers/<basename>/` registration before
@@ -2070,7 +2071,11 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		if (reg.exists && !reg.ours && !force) {
+		// A dead registration that names no project is a leftover (a failed
+		// start leaves only LuCLI's config file behind), not another project's
+		// server: it falls through to the clean-up below instead of being
+		// reported as "registered to a different project: <unknown>".
+		if (reg.exists && !reg.ours && len(reg.registeredPath) && !force) {
 			out("");
 			out("Server name '" & serverName & "' is registered to a different project:", "yellow");
 			out("  registered: " & (len(reg.registeredPath) ? reg.registeredPath : "<unknown>"), "yellow");
@@ -2081,7 +2086,7 @@ component extends="modules.BaseModule" {
 			out("      wheels start --force", "cyan");
 			out("  - Or give this project a unique 'name' in lucee.json (or, without one,");
 			out("    rename the project directory) so it gets a unique server name.");
-			return "";
+			throw(type = "Wheels.ServerNameConflict", message = "wheels start: server name '#serverName#' is registered to another project (#reg.registeredPath#). Use --force or a unique name.");
 		}
 
 		// Stale-but-ours, or --force was passed: wipe the dead registration so
