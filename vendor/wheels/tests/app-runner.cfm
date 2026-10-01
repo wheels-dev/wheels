@@ -42,6 +42,15 @@
         if (StructKeyExists(GetFunctionList(), "pagePoolClear")) {
             pagePoolClear();
         }
+        // Wheels runs each controller's and model's config() once and caches the
+        // class, so on a warm server config() never ran during the suite and its
+        // counters stayed at zero. Drop the class caches so they are rebuilt from
+        // the instrumented code; the app rebuilds them lazily on the next use.
+        for (local.classCache in ["controllers", "models"]) {
+            if (StructKeyExists(application.wheels, local.classCache) && IsStruct(application.wheels[local.classCache])) {
+                StructClear(application.wheels[local.classCache]);
+            }
+        }
     }
 
     // Resolve the target datasource. When url.useTestDB=true and a

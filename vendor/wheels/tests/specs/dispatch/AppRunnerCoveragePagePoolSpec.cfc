@@ -22,6 +22,13 @@ component extends="wheels.WheelsTest" {
 				expect(Find("pagePoolClear();", block)).toBeGT(Find("StructKeyExists(GetFunctionList(), ""pagePoolClear"")", block));
 			});
 
+			it("also drops the cached controller and model classes so every config() runs again", () => {
+				var src = FileRead(ExpandPath("/wheels/tests/app-runner.cfm"));
+				var block = Mid(src, Find("StructKeyExists(url, ""coverage"") && url.coverage", src), 1800);
+				expect(block).toInclude("[""controllers"", ""models""]");
+				expect(block).toInclude("StructClear(application.wheels[local.classCache]);");
+			});
+
 			it("the engine guard evaluates on this engine", () => {
 				expect(IsBoolean(StructKeyExists(GetFunctionList(), "pagePoolClear"))).toBeTrue();
 			});

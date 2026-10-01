@@ -1,0 +1,1 @@
+- `wheels coverage` on a warm dev server now also counts controller and model `config()` methods. Wheels runs `config()` once per class and caches the result, so on a server that had already loaded them those methods never ran during the coverage run. Coverage mode now drops the cached classes so they are rebuilt from the instrumented code.
