@@ -316,7 +316,9 @@ assert_http() {
 echo ""
 echo "==> HTTP surface"
 assert_http "/posts" 200 "GET /posts"
-assert_http "/posts.json" 200 "GET /posts.json (format suffix)"
+# The scaffold only provides html, so an explicit .json is 406 Not Acceptable
+# (#3866). A 406, not a 404, still proves the suffix route matched.
+assert_http "/posts.json" 406 "GET /posts.json (format suffix routes; html-only scaffold answers 406)"
 POSTS_BODY="$(curl -s --connect-timeout 2 --max-time 15 "http://localhost:$PORT/posts" 2>/dev/null || true)"
 # Avoid `printf | grep -q` under `set -o pipefail`: grep -q closes the pipe
 # as soon as it matches, printf then SIGPIPEs, and the pipeline is treated
