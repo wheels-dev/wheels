@@ -1,0 +1,1 @@
+- `whereBetween()` on a date column no longer fails on Oracle (ORA-01843); each bound is now handled like a `where()` comparison, typed by the column.

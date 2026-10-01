@@ -380,13 +380,40 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("whereBetween on a date column returns rows", () => {
-				// Oracle rejects the ISO date string format here under its NLS date
-				// settings (ORA-01843). That predates this spec and is tracked
-				// separately.
-				if (FindNoCase("Oracle", application.wo.get("adapterName"))) {
-					skip("Oracle rejects the ISO date string format here (NLS); tracked separately.");
-				}
 				expect(model("sqltype").whereBetween("dateTimeType", "1900-01-01", "2100-01-01").get().recordCount).toBeGT(0);
+			});
+
+			it("whereBetween applies each bound as a typed comparison, like where()", () => {
+				var where = model("author").whereBetween("firstName", "A", "z").$buildFinderArgs().where;
+				var m = model("author");
+				var frags = m.$addWhereClauseParameters(sql = m.$whereClause(where = where, include = "", sql = ["SELECT 1"]), where = where);
+				var bound = [];
+				var inline = [];
+				for (var f in frags) {
+					if (IsStruct(f)) {
+						ArrayAppend(bound, f.value);
+					} else if (Find("'", f) > 0) {
+						ArrayAppend(inline, f);
+					}
+				}
+				expect(ArrayToList(bound, "|")).toBeWithCase("A|z", "bound=#ArrayToList(bound, '|')#");
+				expect(ArrayLen(inline)).toBe(0, "inline=#ArrayToList(inline, ' ~ ')#");
+			});
+
+			it("whereBetween keeps its range grouped next to orWhere", () => {
+				var built = model("author").whereBetween("firstName", "C", "K").orWhere("lastName", "Djurner").get();
+				var handWritten = model("author").findAll(where = "firstName BETWEEN 'C' AND 'K' OR lastName = 'Djurner'", returnAs = "query");
+				expect(handWritten.recordCount).toBeGT(1);
+				expect(built.recordCount).toBe(handWritten.recordCount);
+			});
+
+			it("whereBetween matches bounds that contain an apostrophe", () => {
+				transaction {
+					model("author").create(firstName = "Range", lastName = "O'Brien");
+					var q = model("author").whereBetween("lastName", "O'A", "O'Z").get();
+					transaction action = "rollback";
+				}
+				expect(q.recordCount).toBe(1, "rows=" & q.recordCount);
 			});
 
 			it("a hand-written BETWEEN returns rows", () => {
