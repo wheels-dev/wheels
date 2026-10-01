@@ -21,6 +21,7 @@ component {
         variables.dryRunBuffer = [];
         // Injectable so the permission-failure path can be specified.
         variables.fileModes = arguments.opts.fileModes ?: new modules.wheels.services.deploy.lib.FileModes();
+        variables.localRunner = arguments.opts.localRunner ?: new modules.wheels.services.deploy.lib.LocalRunner();
         return this;
     }
 
@@ -130,6 +131,13 @@ component {
                 // completed) and are dispatched allowFail — observability
                 // must never fail a deploy.
                 $dispatch(hosts, auditor.record("started deploy of version " & ver), dryRun, true);
+                // Kamal order: registry login (here and on every host), build
+                // and push the image, then pull it on the hosts. skipPush is
+                // for pipelines that already pushed this version.
+                $registryLogin(cfg, hosts, dryRun);
+                if (!(arguments.opts.skipPush ?: false)) {
+                    $runLocal(builder.push(ver), dryRun);
+                }
                 $dispatch(hosts, builder.pull(ver), dryRun);
                 // Fresh-host bootstrap (#2957 DEP-5c): every `docker run`
                 // below joins --network kamal, so the network must exist
@@ -248,11 +256,17 @@ component {
         for (var role in cfg.roles()) {
             for (var host in role.hosts()) {
                 $dispatch([host], app.start(role, arguments.opts.version), dryRun);
-                $dispatch(
-                    [host],
-                    proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":" & appPort),
-                    dryRun
-                );
+                // Only proxy roles have kamal-proxy; worker hosts don't.
+                if (role.runningProxy()) {
+                    $dispatch(
+                        [host],
+                        proxy.deploy(role, app.container_name(role, arguments.opts.version) & ":" & appPort),
+                        dryRun
+                    );
+                }
+                // Stop every other version, so old and restored containers
+                // (e.g. two job workers) never run side by side.
+                $dispatch([host], app.stop_old_versions(role, arguments.opts.version), dryRun, true);
                 arrayAppend(hostList, host);
             }
         }
@@ -690,6 +704,87 @@ component {
         variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
             ssh.run(c, {raise: doRaise});
         });
+    }
+
+    /**
+     * `docker login --password-stdin` locally (for the push) and on every
+     * host (for the pull) when the registry has a username. The password
+     * comes from the first registry.password key in .kamal/secrets and only
+     * ever travels on stdin, never in a command line or dry-run output.
+     */
+    private void function $registryLogin(required any cfg, required array hosts, required boolean dryRun) {
+        if (!len(arguments.cfg.registry().username())) {
+            return;
+        }
+        var cmd = new modules.wheels.services.deploy.commands.RegistryCommands(arguments.cfg).login();
+        // Locally: argv, no shell, so registry fields such as robot$ci are literal.
+        var localArgv = ["docker", "login", arguments.cfg.registry().server(), "-u", arguments.cfg.registry().username(), "--password-stdin"];
+        var password = "";
+        var keys = arguments.cfg.registry().password();
+        var resolver = variables.loader.secretResolver();
+        if (arrayLen(keys) && isObject(resolver) && resolver.has(keys[1])) {
+            password = resolver.get(keys[1]);
+            new modules.wheels.services.deploy.lib.SecretRedaction().register(password);
+        }
+        if (!len(password)) {
+            // Hosts may already be logged in (a credential helper, or a
+            // manual `wheels deploy registry login`), so this is a warning:
+            // a pull that needs credentials then fails visibly.
+            new modules.wheels.services.deploy.lib.SecretRedaction().addWarning(
+                "registry.username is set but no registry.password key resolves from .kamal/secrets, so docker login was skipped. "
+                & "The build push and the pulls need the hosts and this machine to be logged in already."
+            );
+            return;
+        }
+        $runLocal(localArgv, arguments.dryRun, password);
+        if (arguments.dryRun) {
+            for (var h in arguments.hosts) {
+                arrayAppend(variables.dryRunBuffer, "[" & h & "] " & cmd);
+            }
+            return;
+        }
+        var c = cmd;
+        var sin = password;
+        $registerSecretsForRedaction();
+        variables.sshPool.onEach(arguments.hosts, function(ssh, host) {
+            ssh.run(c, {raise: true, stdin: sin});
+        });
+    }
+
+    /**
+     * Run a command on this machine: an argv array (no shell), or a shell
+     * string whose dynamic parts are already shellEscape()d (the build).
+     * Dry-run records "[local] <command>". `stdinData` goes to stdin only.
+     */
+    private void function $runLocal(required any command, required boolean dryRun, string stdinData = "") {
+        var argv = isArray(arguments.command) ? arguments.command : ["bash", "-c", arguments.command];
+        var shown = isArray(arguments.command) ? $displayArgv(arguments.command) : arguments.command;
+        if (arguments.dryRun) {
+            arrayAppend(variables.dryRunBuffer, "[local] " & shown);
+            return;
+        }
+        // A pool that runs local commands itself (the spec fake) keeps tests
+        // from executing docker on the machine running them.
+        var result = (isObject(variables.sshPool) && structKeyExists(variables.sshPool, "runLocal"))
+            ? variables.sshPool.runLocal(argv, arguments.stdinData)
+            : variables.localRunner.run(argv, arguments.stdinData);
+        if ((result.exitCode ?: 0) != 0) {
+            var redaction = new modules.wheels.services.deploy.lib.SecretRedaction();
+            throw(
+                type = "DeployMainCli.LocalCommandFailed",
+                message = redaction.redact("Local command failed (exit " & result.exitCode & "): " & shown),
+                detail = redaction.redact(result.outputTail ?: "")
+            );
+        }
+    }
+
+    /** argv as one readable line, quoting only the arguments that need it. */
+    private string function $displayArgv(required array argv) {
+        var parts = [];
+        for (var a in arguments.argv) {
+            arrayAppend(parts, (len(a) && !reFind("[^A-Za-z0-9._/:@=,+-]", a)) ? a : "'" & replace(a, "'", "'\''", "all") & "'");
+        }
+        return arrayToList(parts, " ");
     }
 
     /**

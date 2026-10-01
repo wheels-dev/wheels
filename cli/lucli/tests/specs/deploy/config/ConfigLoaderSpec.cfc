@@ -93,6 +93,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 				var yml = tmpRoot & "/config/deploy.yml";
 				fileWrite(yml, "service: demo#chr(10)#image: acme/${DEST_SECRET_VAR}#chr(10)#servers: [1.2.3.4]#chr(10)#registry: {username: u, password: [X]}");
+				// A destination needs its own deploy.<destination>.yml (it may override nothing).
+				fileWrite(tmpRoot & "/config/deploy.production.yml", "service: demo#chr(10)#");
 
 				var cfg = new cli.lucli.services.deploy.config.ConfigLoader().load(yml, {destination: "production"});
 				expect(cfg.image()).toBe("acme/fromProductionOverlay");

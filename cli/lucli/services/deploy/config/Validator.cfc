@@ -48,6 +48,14 @@ component {
 		// validated rather than quoted (##2956).
 		$validateName(arguments.parsed.service, "service", arguments.filePath);
 		$validateImage(arguments.parsed.image, "image", arguments.filePath);
+		// kamal-proxy's --tls needs a host to request a certificate for.
+		if (
+			structKeyExists(arguments.parsed, "proxy") && isStruct(arguments.parsed.proxy)
+			&& isBoolean(arguments.parsed.proxy.ssl ?: false) && (arguments.parsed.proxy.ssl ?: false)
+			&& !len(trim(arguments.parsed.proxy.host ?: ""))
+		) {
+			$raise(arguments.filePath, "proxy.ssl requires proxy.host (the host name TLS is issued for)");
+		}
 		$validateServers(arguments.parsed.servers, arguments.filePath);
 		$validateBoot(arguments.parsed, arguments.filePath);
 		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {

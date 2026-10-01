@@ -13,7 +13,9 @@
  *      reproducible sha256, but Lucee 7 cannot compile CFCs whose mtime is
  *      epoch-0. Without `-m` the package "extracts cleanly" but every helper
  *      call 500s with a misleading "invalid component definition" error.
- *   5. Clean up the temp file.
+ *   5. Swap the verified tree into vendor/<name>/. An existing copy is
+ *      renamed aside first and restored if the move fails.
+ *   6. Clean up the temp file and the staging dir.
  *
  * Tarball extraction shells out to `tar`. All target platforms (macOS,
  * Linux, Windows 10+) ship it. If Windows Server compat becomes a real
@@ -117,11 +119,10 @@ component {
 			if (!DirectoryExists(local.vendorDir)) {
 				DirectoryCreate(local.vendorDir, true);
 			}
-			// The previous install is replaced only once the new one is verified.
-			if (DirectoryExists(local.target)) {
-				DirectoryDelete(local.target, true);
-			}
-			$moveInto(local.stageDir & arguments.name, local.target);
+			// The previous install is replaced only once the new one is verified,
+			// and kept beside it until the new copy is in place. The leading dot
+			// keeps PackageLoader from loading the backup.
+			$swapInto(local.stageDir & arguments.name, local.target, local.vendorDir & ".wheels-pkg-previous-" & local.token);
 		} finally {
 			if (FileExists(local.tmpFile)) {
 				FileDelete(local.tmpFile);
@@ -172,6 +173,37 @@ component {
 	}
 
 	// ── Private ─────────────────────────────────────────────
+
+	/**
+	 * Moves a verified staged tree to target. An existing target is renamed
+	 * aside first (same directory, so a plain rename) and renamed back if the
+	 * move fails, so a failed swap never leaves the app without the package.
+	 */
+	private void function $swapInto(required string src, required string target, required string backupDir) {
+		local.hadOld = DirectoryExists(arguments.target);
+		if (local.hadOld) {
+			DirectoryRename(arguments.target, arguments.backupDir);
+		}
+		try {
+			$moveInto(arguments.src, arguments.target);
+		} catch (any e) {
+			if (local.hadOld) {
+				// A cross-volume copy can stop part way; drop what it wrote.
+				if (DirectoryExists(arguments.target)) {
+					DirectoryDelete(arguments.target, true);
+				}
+				DirectoryRename(arguments.backupDir, arguments.target);
+			}
+			rethrow;
+		}
+		if (local.hadOld) {
+			// Best-effort: the new copy is in place; a leftover backup is only clutter.
+			try {
+				DirectoryDelete(arguments.backupDir, true);
+			} catch (any e) {
+			}
+		}
+	}
 
 	/** Moves a staged tree into place; falls back to copy+delete across volumes. */
 	private void function $moveInto(required string src, required string dest) {
