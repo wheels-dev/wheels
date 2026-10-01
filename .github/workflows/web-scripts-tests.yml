@@ -1,0 +1,38 @@
+name: Web Scripts Tests
+
+# Runs the node:test suites under web/scripts/ (for example the blog
+# announcement helper). The web workspace's vitest config only picks up
+# sites/*/src/**/*.test.ts, so these never ran in CI, and a dedupe query that
+# matched nothing passed its mocked tests for weeks. This job runs them on every
+# PR that touches the scripts or the blog workflows that call them.
+
+on:
+  pull_request:
+    paths:
+      - 'web/scripts/**'
+      - '.github/workflows/blog-*.yml'
+      - '.github/scripts/blog-*.sh'
+      - '.github/workflows/web-scripts-tests.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'web/scripts/**'
+      - '.github/workflows/web-scripts-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  node-tests:
+    name: web/scripts node tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      # Node 22 expands the quoted glob itself (a bare directory argument is
+      # treated as one file and fails).
+      - name: Run node tests
+        run: node --test 'web/scripts/**/*.test.mjs'
