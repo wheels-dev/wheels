@@ -150,12 +150,39 @@
 		$registerAssociation(argumentCollection = arguments);
 	}
 
+	/**
+	 * Internal function. Maps an association's `joinType` to "inner" or "outer".
+	 * "left" and "left outer" are accepted as aliases of "outer" (all emit
+	 * `LEFT OUTER JOIN`); any other value throws. "left" used to be passed through
+	 * as `LEFT JOIN`, which the nested-include grouping does not recognise, so a
+	 * nested join under it was silently dropped.
+	 */
+	public string function $normalizeJoinType(required string joinType, required string associationName) {
+		local.value = LCase(Trim(REReplace(arguments.joinType, "\s+", " ", "all")));
+		if (local.value == "inner") {
+			return "inner";
+		}
+		if (ListFindNoCase("outer|left|left outer", local.value, "|")) {
+			return "outer";
+		}
+		Throw(
+			type = "Wheels.InvalidJoinType",
+			message = "Invalid joinType `#arguments.joinType#` on the `#arguments.associationName#` association.",
+			extendedInfo = "Use `inner` (INNER JOIN) or `outer` (LEFT OUTER JOIN); `left` and `left outer` are accepted as aliases of `outer`."
+		);
+	}
+
 	/*
 	 * Registers the association info in the model object on the application scope.
 	 */
 	public void function $registerAssociation() {
 		// Assign the name for the association.
 		local.associationName = arguments.name;
+
+		// Normalise the join type once, so everything downstream sees "inner" or "outer".
+		if (StructKeyExists(arguments, "joinType")) {
+			arguments.joinType = $normalizeJoinType(arguments.joinType, local.associationName);
+		}
 
 		// Default our nesting to false and set other nesting properties.
 		arguments.nested = {};
