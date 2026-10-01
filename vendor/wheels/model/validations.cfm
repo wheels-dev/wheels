@@ -1394,8 +1394,33 @@
 	 */
 	public any function $evaluateLogicalExpression(required string condition) {
 		local.tokens = ListToArray(arguments.condition, " ");
-		if (ArrayLen(local.tokens) < 3) {
-			return false;
+		// A lone boolean literal means what it says (it used to evaluate to false).
+		if (ArrayLen(local.tokens) == 1 && ListFindNoCase("true,false", local.tokens[1])) {
+			return CompareNoCase(local.tokens[1], "true") == 0; // not ==, which coerces boolean-ish strings on BoxLang
+		}
+		// Fail closed: anything other than exactly `left op right` used to return
+		// false silently (fewer tokens) or ignore the rest (more tokens), and false
+		// from a `condition` skips the validation.
+		if (ArrayLen(local.tokens) != 3) {
+			throw(
+				"Could not parse `#arguments.condition#`: expected a reference such as `this.property` or `this.method()`, or a comparison of the form `left operator right`."
+			);
+		}
+		// Operands here are literals only. A bare word used to be compared as its
+		// own text (`status neq 'draft'` compared the word "status"), so it never
+		// read the property the author meant.
+		for (local.operand in [local.tokens[1], local.tokens[3]]) {
+			if (
+				!IsNumeric(local.operand)
+				&& !ListFindNoCase("true,false", local.operand)
+				&& !REFind("^'[^']*'$", local.operand)
+				&& !REFind('^"[^"]*"$', local.operand)
+			) {
+				throw(
+					"Unsupported operand `#local.operand#` in `#arguments.condition#`. Comparison operands must be numbers, quoted strings or booleans; a bare name is not resolved. "
+					& (Left(local.operand, 5) == "this." ? "Put the `this.` reference on the left side of the comparison." : "Use `this.#local.operand#`.")
+				);
+			}
 		}
 		local.leftOperand = IsNumeric(local.tokens[1]) ? JavaCast("double", local.tokens[1]) : local.tokens[1];
 		local.rightOperand = IsNumeric(local.tokens[3]) ? JavaCast("double", local.tokens[3]) : local.tokens[3];

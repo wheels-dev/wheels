@@ -387,6 +387,73 @@ component extends="wheels.WheelsTest" {
 				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
 			})
 
+			// A condition that is neither a reference nor a full "a op b" comparison
+			// used to evaluate to false silently, which skipped the validation.
+			it("fails closed for a single bare word condition instead of skipping the validation", () => {
+				args.condition = "isActive"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
+			it("fails closed for a single bare word unless", () => {
+				args.unless = "isActive"
+				user.validatesLengthOf(argumentCollection = args)
+				var callValid = () => {
+					user.valid()
+				}
+				expect(callValid).toThrow("Wheels.InvalidValidationCondition")
+			})
+
+			it("fails closed for an incomplete comparison", () => {
+				var callShort = () => {
+					user.$evaluateConditionString("1 eq")
+				}
+				expect(callShort).toThrow()
+			})
+
+			it("fails closed for a comparison with trailing tokens", () => {
+				var callLong = () => {
+					user.$evaluateConditionString("1 eq 1 2")
+				}
+				expect(callLong).toThrow()
+			})
+
+			it("fails closed for a bare word operand instead of comparing the literal word", () => {
+				var callBare = () => {
+					user.$evaluateConditionString("status neq 'draft'")
+				}
+				expect(callBare).toThrow()
+			})
+
+			it("evaluates the guide's this.status != 'draft' example", () => {
+				user.status = "draft"
+				expect(user.$evaluateConditionString("this.status != 'draft'")).toBeFalse()
+				user.status = "published"
+				expect(user.$evaluateConditionString("this.status != 'draft'")).toBeTrue()
+			})
+
+			it("evaluates a lone boolean literal as its value", () => {
+				expect(user.$evaluateConditionString("true")).toBeTrue()
+				expect(user.$evaluateConditionString("false")).toBeFalse()
+			})
+
+			it("fails closed for a this. reference on the right of a comparison", () => {
+				var callRight = () => {
+					user.$evaluateConditionString("'weekly' eq this.frequency")
+				}
+				expect(callRight).toThrow()
+			})
+
+			it("still evaluates literal comparisons of numbers, quoted strings and booleans", () => {
+				expect(user.$evaluateConditionString("1 eq 1")).toBeTrue()
+				expect(user.$evaluateConditionString("5 gt 3")).toBeTrue()
+				expect(user.$evaluateConditionString("'a' eq 'b'")).toBeFalse()
+				expect(user.$evaluateConditionString("true eq true")).toBeTrue()
+			})
+
 			it("runs a validation whose compound condition is true (##3634)", () => {
 				user.requestFor = "Engine Part"
 				args.condition = "StructKeyExists(this, 'requestFor') && this.requestFor eq 'Engine Part'"
