@@ -1734,6 +1734,7 @@ component extends="modules.BaseModule" {
 				return;
 			}
 			if (compare(fileRead(mountManifest), fileRead(sourceManifest)) == 0) {
+				$docsMirrorGitignore(mount);
 				out("  The webroot mirror at #mount# is current.", "green");
 				out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
 				return;
@@ -1745,6 +1746,7 @@ component extends="modules.BaseModule" {
 		var old = webroot & "/.wheels-docs-old." & runId;
 		try {
 			directoryCopy(arguments.source, tmp, true);
+			$docsMirrorGitignore(tmp);
 		} catch (any e) {
 			if (directoryExists(tmp)) {
 				try { directoryDelete(tmp, true); } catch (any ignored) {}
@@ -1787,6 +1789,18 @@ component extends="modules.BaseModule" {
 		}
 		out("  Mounted at #mount#", "green");
 		out("  Read them at /wheels-docs/guides/ and /wheels-docs/api/ while the dev server runs.");
+	}
+
+	/**
+	 * Keeps the docs mirror out of git: a `.gitignore` of `*` inside it, so apps
+	 * created before the template listed public/wheels-docs/ don't commit the
+	 * ~300 MB mirror. Written only when missing.
+	 */
+	private void function $docsMirrorGitignore(required string dir) {
+		var path = arguments.dir & "/.gitignore";
+		if (!fileExists(path)) {
+			fileWrite(path, "## The Wheels docs mirror (wheels docs fetch); not part of the app." & chr(10) & "*" & chr(10));
+		}
 	}
 
 	/**

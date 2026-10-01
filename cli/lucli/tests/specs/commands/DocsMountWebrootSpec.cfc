@@ -96,6 +96,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(fileRead(fx.cache & "/guides/index.html")).toBe("<h1>Guides 1</h1>");
 			});
 
+			it("keeps the mirror out of git: a .gitignore of * inside it, written on mount and on an existing mirror", () => {
+				var fx = newFixture();
+				mountModule(fx).$docsMountIntoWebroot(fx.cache);
+				expect(fileExists(fx.mount & "/.gitignore")).toBeTrue("the new mirror has no .gitignore");
+				expect(listToArray(fileRead(fx.mount & "/.gitignore"), chr(10))).toInclude("*");
+				expect(fileExists(fx.cache & "/.gitignore")).toBeFalse("the shared cache was changed");
+				// An up-to-date mirror made by an older CLI (no .gitignore) gets one.
+				fileDelete(fx.mount & "/.gitignore");
+				mountModule(fx).$docsMountIntoWebroot(fx.cache);
+				expect(fileExists(fx.mount & "/.gitignore")).toBeTrue("an existing mirror was not given a .gitignore");
+			});
+
+			it("lists the docs mirror in the generated app's .gitignore and the deploy .dockerignore", () => {
+				var gitignore = fileRead(expandPath("/cli/lucli/templates/app/_gitignore"));
+				var dockerignore = fileRead(expandPath("/cli/lucli/templates/deploy/init/dockerignore.mustache"));
+				expect(listToArray(gitignore, chr(10))).toInclude("/public/wheels-docs/");
+				expect(listToArray(dockerignore, chr(10))).toInclude("public/wheels-docs");
+			});
+
 			it("leaves an up-to-date mirror as it is", () => {
 				var fx = newFixture();
 				mountModule(fx).$docsMountIntoWebroot(fx.cache);
