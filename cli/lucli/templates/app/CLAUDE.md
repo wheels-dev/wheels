@@ -50,6 +50,19 @@ component extends="Model" {
 
         // Callbacks
         beforeSave("sanitizeInput");
+        // afterCommit/afterRollback run AFTER the transaction resolves — use these
+        // for side effects that must not happen on a rollback (jobs, mail, caches,
+        // external calls). Optional on="create,update,delete" filter; nested writes
+        // and invokeWithTransaction() blocks fire once together on the outermost
+        // commit; with transactionMode="none" afterCommit fires immediately per op.
+        // IMPORTANT: afterCommit/afterRollback are only reliable inside a Wheels-managed
+        // transaction — transaction() / invokeWithTransaction(). A write placed inside a
+        // raw CFML `transaction {}` block is SKIPPED (with a one-time wheels.log warning)
+        // on Lucee and BoxLang, and is NOT detectable on Adobe CF or RustCFML — there the
+        // behaviour inside a raw transaction{} is left to the engine and is not guaranteed.
+        // Always use the Wheels-managed transaction for these callbacks.
+        afterCommit("enqueueSearchIndex", on="create,update");
+        afterRollback("releaseReservation");
 
         // Calculated SQL properties — select=false keeps them off the default SELECT (hot path)
         property(name="fullName", sql="firstName || ' ' || lastName", select=false);
