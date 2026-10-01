@@ -1,0 +1,1 @@
+- `wheels coverage` no longer reports 0% when the dev server has already served the app. With Lucee's default `inspectTemplate=once` the server kept running the code it had compiled before coverage instrumented `app/`, so no counter ever ran. Coverage mode now clears Lucee's compiled-page pool before the suite runs.

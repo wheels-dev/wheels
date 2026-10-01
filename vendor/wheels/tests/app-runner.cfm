@@ -33,6 +33,15 @@
     // so the dump at the end of this request reflects only THIS run.
     if (StructKeyExists(url, "coverage") && url.coverage) {
         server.__wheels_cov = {};
+        // `wheels coverage` instruments app/ just before this request. Under
+        // Lucee's inspectTemplate=once a template already compiled is never
+        // re-read, so a server that had served the app kept running the
+        // uninstrumented code and reported 0% (deleting cfclasses on disk does
+        // not drop the compiled pages held in memory). Clear them so this run
+        // compiles the instrumented source. Lucee-only function, hence the guard.
+        if (StructKeyExists(GetFunctionList(), "pagePoolClear")) {
+            pagePoolClear();
+        }
     }
 
     // Resolve the target datasource. When url.useTestDB=true and a
