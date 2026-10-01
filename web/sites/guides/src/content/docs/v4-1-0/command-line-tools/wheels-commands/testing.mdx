@@ -62,6 +62,7 @@ A bare positional argument is treated as the filter directory — `wheels test m
 | `--ci` | CI mode: emits one GitHub Actions `::error` workflow-command annotation per failed or errored spec, so failures surface inline in CI logs and PR-check panels. Exit code is non-zero on failure regardless. |
 | `--core` | Run framework self-tests (`vendor/wheels/tests/specs/`) instead of your app suite. App tests are the default; `--core` is the explicit opt-in. |
 | `--no-test-db` | Disable the auto-swap to `<datasource>_test`. App tests run against your dev datasource, with whatever data is already in it. |
+| `--test-timeout=<seconds>` | How long to wait for the suite to finish, in seconds (default 900). Also settable with `WHEELS_TEST_TIMEOUT`; the flag wins over the variable. A value that is not a positive number prints a warning and falls back to the default. Use this rather than `--timeout`, which the LuCLI runtime itself takes on builds without the module-timeout fix ([#3678](https://github.com/wheels-dev/wheels/issues/3678)). |
 | `--base-path=<path>` | URL prefix the app is mounted under (e.g. `/myapp`). Auto-derived from `WHEELS_SUBPATH` or `set(subpath=...)` in `config/settings.cfm` when omitted. Leave unset for root-mounted apps (the default). |
 
 #### `--db` is for `--core` runs only
