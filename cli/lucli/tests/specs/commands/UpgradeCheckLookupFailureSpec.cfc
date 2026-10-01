@@ -6,8 +6,12 @@
  * green and --strict was bypassed. These specs pin the non-zero exit (the
  * throw) in text and JSON mode, and that an explicit --to= skips the lookup.
  *
- * The GitHub call is stubbed by mocking makeHttpRequest on an
+ * The GitHub call is stubbed by mocking $latestReleaseResponse on an
  * output-capturing Module, so the specs never touch the network.
+ *
+ * The lookup must not use makeHttpRequest(): that rides $httpExchange, the
+ * raw-socket plain-HTTP transport reserved for the local dev server, which
+ * cannot reach https://api.github.com (every lookup failed on 4.1.2-dev).
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -23,7 +27,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 	private any function offlineModule() {
 		var m = newModule();
-		m.$("makeHttpRequest").$throws(
+		m.$("$latestReleaseResponse").$throws(
 			type = "java.net.UnknownHostException",
 			message = "api.github.com"
 		);
@@ -33,8 +37,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	private any function rateLimitedModule() {
 		var m = newModule();
 		m.$(
-			"makeHttpRequest",
-			'{"message":"API rate limit exceeded for 203.0.113.7.","documentation_url":"https://docs.github.com/rest"}'
+			"$latestReleaseResponse",
+			{status: 403, body: '{"message":"API rate limit exceeded for 203.0.113.7.","documentation_url":"https://docs.github.com/rest"}'}
 		);
 		return m;
 	}
@@ -105,23 +109,57 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 			it("uses the looked-up release when the lookup succeeds", () => {
 				var m = newModule();
-				m.$("makeHttpRequest", '{"tag_name":"v3.0.0"}');
+				m.$("$latestReleaseResponse", {status: 200, body: '{"tag_name":"v3.0.0"}'});
 				m.upgrade(arg1 = "check");
-				expect(m.$count("makeHttpRequest")).toBe(1);
+				expect(m.$count("$latestReleaseResponse")).toBe(1);
 				expect(m.capturedOutput()).toInclude("Target version:  3.0.0");
 			});
 
 			it("skips the lookup entirely when --to is given", () => {
 				var m = offlineModule();
 				m.upgrade(arg1 = "check", to = "3.0.0");
+				expect(m.$count("$latestReleaseResponse")).toBe(0);
+				expect(m.capturedOutput()).toInclude("Target version:  3.0.0");
+			});
+
+			it("never sends the GitHub lookup through the dev-server transport", () => {
+				var m = newModule();
+				m.$("$latestReleaseResponse", {status: 200, body: '{"tag_name":"v3.0.0"}'});
+				m.$("makeHttpRequest").$throws(type = "Spec.WrongTransport", message = "makeHttpRequest must not be used for GitHub");
+				m.upgrade(arg1 = "check");
 				expect(m.$count("makeHttpRequest")).toBe(0);
 				expect(m.capturedOutput()).toInclude("Target version:  3.0.0");
+			});
+
+			it("fails with the HTTP status when GitHub answers with an empty body", () => {
+				var m = newModule();
+				m.$("$latestReleaseResponse", {status: 301, body: ""});
+				expect(() => m.upgrade(arg1 = "check")).toThrow(type = "Wheels.UpgradeCheckFailed", regex = "HTTP 301");
+			});
+
+			it("looks the release up over HTTPS with the cfhttp-based client, not the raw-socket one", () => {
+				var source = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				var start = find("private struct function $latestReleaseResponse(", source);
+				expect(start).toBeGT(0);
+				var body = mid(source, start, find(chr(10) & chr(9) & "}", source, start) - start);
+				expect(body).toInclude("new services.packages.HttpClient(");
+				expect(body).toInclude("https://api.github.com/repos/wheels-dev/wheels/releases/latest");
+				expect(body).notToInclude("makeHttpRequest");
+				expect(body).notToInclude("$httpExchange");
+			});
+
+			it("keeps loopback dev-server calls on $httpExchange", () => {
+				var m = newModule();
+				m.$("$httpExchange", {statusCode: 200, body: "ok", headers: {}});
+				makePublic(m, "makeHttpRequest");
+				expect(m.makeHttpRequest("http://127.0.0.1:65530/wheels/cli/status")).toBe("ok");
+				expect(m.$count("$httpExchange")).toBe(1);
 			});
 
 			it("skips the lookup in JSON mode when --to is given", () => {
 				var m = offlineModule();
 				m.upgrade(arg1 = "check", to = "3.0.0", format = "json");
-				expect(m.$count("makeHttpRequest")).toBe(0);
+				expect(m.$count("$latestReleaseResponse")).toBe(0);
 				var doc = lastJsonDocument(m.capturedOutput());
 				expect(doc.targetVersion).toBe("3.0.0");
 				expect(doc).notToHaveKey("error");

@@ -7445,14 +7445,17 @@ component extends="modules.BaseModule" {
 		}
 		var reason = "";
 		try {
-			var apiUrl = "https://api.github.com/repos/wheels-dev/wheels/releases/latest";
-			var releaseData = deserializeJSON(makeHttpRequest(apiUrl));
+			var response = $latestReleaseResponse();
+			var releaseData = len(response.body) ? deserializeJSON(response.body) : {};
 			if (isStruct(releaseData) && structKeyExists(releaseData, "tag_name") && isSimpleValue(releaseData.tag_name)) {
 				target = trim(replace(releaseData.tag_name, "v", ""));
 			}
 			// GitHub error bodies (rate limit, not found) carry a `message`.
 			if (!len(target) && isStruct(releaseData) && structKeyExists(releaseData, "message") && isSimpleValue(releaseData.message)) {
 				reason = releaseData.message;
+			}
+			if (!len(target) && !len(reason)) {
+				reason = "HTTP #response.status#";
 			}
 		} catch (any e) {
 			reason = e.message;
@@ -7476,6 +7479,26 @@ component extends="modules.BaseModule" {
 		// throw maps to non-zero exit; return "" would let a CI gate pass
 		// without scanning anything (and bypass --strict).
 		throw(type = "Wheels.UpgradeCheckFailed", message = fetchMsg);
+	}
+
+	/**
+	 * GET the latest Wheels release from the GitHub API: `{status, body}`.
+	 *
+	 * An external HTTPS URL, so it goes through the cfhttp-based HttpClient
+	 * (TLS, redirects), not makeHttpRequest(): that one rides $httpExchange,
+	 * the raw-socket transport reserved for the local dev server, which
+	 * speaks plain HTTP and cannot reach https://api.github.com.
+	 */
+	private struct function $latestReleaseResponse() {
+		var response = new services.packages.HttpClient(timeoutSeconds = 15).get(
+			"https://api.github.com/repos/wheels-dev/wheels/releases/latest",
+			{"Accept": "application/vnd.github+json"}
+		);
+		if (isBinary(response.body)) {
+			response.body = charsetEncode(response.body, "utf-8");
+		}
+		response.body = trim(response.body);
+		return response;
 	}
 
 	/**
