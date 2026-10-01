@@ -58,6 +58,10 @@ jobs:
         with:
           node-version: 22
 
+      # Fail closed: never announce with a dedupe that doesn't pass its own tests.
+      - name: Test the announcement helper
+        run: node --test web/scripts/blog-announce-discussion.test.mjs
+
       - name: Announce and write back discussion URLs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
