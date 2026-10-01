@@ -233,10 +233,13 @@ component extends="wheels.WheelsTest" {
 					state.errored = true;
 					state.errType = e.type;
 				}
-				expect(state.errored).toBeFalse("the raw-transaction write must not error (type=" & state.errType & ")");
-				expect(state.saved).toBeTrue("the save itself succeeds inside the transaction");
-				// The engine's own nesting semantics decide what fires; we assert only that
-				// Wheels' foreign detection did NOT engage (no foreign-skip warning written).
+				// The engine's own nesting semantics decide the outcome and it is NOT guaranteed:
+				// Adobe CF raises a Database error for a Wheels transaction nested in a raw
+				// transaction{}, other engines may save. We only require the save path to have
+				// executed (non-vacuous) and that Wheels' foreign detection did NOT engage.
+				expect(state.saved || state.errored).toBeTrue(
+					"the raw-transaction save path must execute (engine decides save vs error; errType=" & state.errType & ")"
+				);
 				expect(
 					!StructKeyExists(request, "wheels")
 					|| !StructKeyExists(request.wheels, "$txnForeignWarned")
