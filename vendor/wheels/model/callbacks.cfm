@@ -360,4 +360,305 @@
 	public any function $coerceOracleTimestamp(required any value) {
 		return $engineAdapter().coerceOracleObject(arguments.value);
 	}
+
+	/**
+	 * Registers method(s) to run AFTER the database transaction commits (v4.2.0).
+	 * They run only when the OUTERMOST transaction commits; a rollback discards
+	 * them. With no transaction (transactionMode="none"/"false") they fire
+	 * immediately after the write, since it is already committed.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Callback Functions]
+	 *
+	 * @methods [see:afterNew].
+	 * @on Restrict to one or more operations: create, update, delete (comma-delimited; blank = all).
+	 */
+	public void function afterCommit(string methods = "", string on = "") {
+		$registerTransactionCallback(type = "afterCommit", methods = arguments.methods, on = arguments.on);
+	}
+
+	/**
+	 * Registers method(s) to run AFTER the database transaction rolls back (v4.2.0).
+	 *
+	 * [section: Model Configuration]
+	 * [category: Callback Functions]
+	 *
+	 * @methods [see:afterNew].
+	 * @on Restrict to one or more operations: create, update, delete (comma-delimited; blank = all).
+	 */
+	public void function afterRollback(string methods = "", string on = "") {
+		$registerTransactionCallback(type = "afterRollback", methods = arguments.methods, on = arguments.on);
+	}
+
+	/**
+	 * Internal. Stores afterCommit/afterRollback entries as {method, on} structs
+	 * so the optional operation filter rides with each method.
+	 */
+	public void function $registerTransactionCallback(required string type, required string methods, string on = "") {
+		if (!StructKeyExists(variables.wheels.class.callbacks, arguments.type)) {
+			variables.wheels.class.callbacks[arguments.type] = [];
+		}
+		local.cleanMethods = $listClean(arguments.methods);
+		local.cleanOn = $listClean(LCase(arguments.on));
+		local.iEnd = ListLen(local.cleanMethods);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			ArrayAppend(
+				variables.wheels.class.callbacks[arguments.type],
+				{method = ListGetAt(local.cleanMethods, local.i), on = local.cleanOn}
+			);
+		}
+	}
+
+	/**
+	 * Internal. True when this model has any afterCommit/afterRollback callback.
+	 */
+	public boolean function $hasTransactionCallbacks() {
+		return (
+			(StructKeyExists(variables.wheels.class.callbacks, "afterCommit") && !ArrayIsEmpty(variables.wheels.class.callbacks.afterCommit))
+			|| (StructKeyExists(variables.wheels.class.callbacks, "afterRollback") && !ArrayIsEmpty(variables.wheels.class.callbacks.afterRollback))
+		);
+	}
+
+	/**
+	 * Internal. Called by $save / $delete after their in-transaction after*
+	 * callbacks succeed. Enqueues this instance for the outermost transaction to
+	 * fire; or, with no real transaction (none/false mode), fires afterCommit now
+	 * because the write is already committed (decision B1). Inside a foreign raw
+	 * transaction{} (detectable engines only) it skips both callbacks and warns once.
+	 */
+	public void function $enqueueTransactionCallbacks(required string operation) {
+		if (!$hasTransactionCallbacks()) {
+			return;
+		}
+		local.conn = this.$hashedConnectionArgs();
+		// #3934 R1: a write inside a foreign, non-Wheels transaction{} — Wheels cannot
+		// observe the outer commit/rollback, so skip BOTH afterCommit and afterRollback
+		// and warn once (per request + model). Only reachable where IsWithinTransaction()
+		// is available (Lucee/BoxLang); on Adobe/RustCFML the flag is never set.
+		if (this.$transactionForeign(local.conn)) {
+			this.$warnForeignTransactionCallbacksOnce();
+			return;
+		}
+		if (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "$txnCallbacks")
+			&& StructKeyExists(request.wheels.$txnCallbacks, local.conn)
+			&& request.wheels.$txnCallbacks[local.conn].real
+		) {
+			ArrayAppend(
+				request.wheels.$txnCallbacks[local.conn].queue,
+				{object = this, operation = arguments.operation}
+			);
+		} else {
+			this.$runTransactionCallbacks(type = "afterCommit", operation = arguments.operation);
+		}
+	}
+
+	/**
+	 * Internal. True if the engine provides IsWithinTransaction() (used to spot a raw,
+	 * non-Wheels transaction we are nested in). Probed once, cached per application.
+	 * Lucee 6/7 and BoxLang have it; Adobe CF and RustCFML do not — there, foreign-
+	 * transaction detection is unavailable and callbacks fall back to the inner close.
+	 * Probe by capability, never by engine name (RustCFML reports as Lucee but lacks it).
+	 */
+	public boolean function $supportsForeignTransactionCheck() {
+		if (!StructKeyExists(application, "wheels")) {
+			return false;
+		}
+		if (!StructKeyExists(application.wheels, "$supportsIsWithinTransaction")) {
+			local.supported = false;
+			try {
+				IsWithinTransaction();
+				local.supported = true;
+			} catch (any e) {
+				// Engine lacks the function (Adobe CF, RustCFML) — leave false.
+			}
+			application.wheels.$supportsIsWithinTransaction = local.supported;
+		}
+		return application.wheels.$supportsIsWithinTransaction;
+	}
+
+	/**
+	 * Internal. True when a transaction Wheels did not open is already active — i.e. a
+	 * raw transaction{} block we are nested inside. MUST be called BEFORE Wheels opens
+	 * its own transaction (after which IsWithinTransaction() reports Wheels' own).
+	 */
+	public boolean function $withinForeignTransaction() {
+		if (!$supportsForeignTransactionCheck()) {
+			return false;
+		}
+		try {
+			return IsWithinTransaction();
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Internal. True when the per-connection store marks this connection as being
+	 * inside a foreign (raw, non-Wheels) transaction.
+	 */
+	public boolean function $transactionForeign(required string connection) {
+		return (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "$txnCallbacks")
+			&& StructKeyExists(request.wheels.$txnCallbacks, arguments.connection)
+			&& StructKeyExists(request.wheels.$txnCallbacks[arguments.connection], "foreign")
+			&& request.wheels.$txnCallbacks[arguments.connection].foreign
+		);
+	}
+
+	/**
+	 * Internal. Record a foreign (raw, non-Wheels) transaction marker for this connection
+	 * when one is active. MUST be called by the transaction owner BEFORE opening Wheels'
+	 * own transaction (IsWithinTransaction() then still reflects only the outer block).
+	 */
+	public void function $markForeignTransaction(required string connection) {
+		if ($withinForeignTransaction()) {
+			request.wheels.$txnCallbacks[arguments.connection] = {real = false, foreign = true, queue = []};
+		}
+	}
+
+	/**
+	 * Internal. Set up the owner's real afterCommit/afterRollback queue — unless this
+	 * connection is inside a foreign transaction, where the foreign marker stays in place
+	 * and the callbacks are skipped instead.
+	 */
+	public void function $prepareTransactionCallbackStore(required string connection, required boolean closeTransaction) {
+		if (arguments.closeTransaction && !$transactionForeign(arguments.connection)) {
+			request.wheels.$txnCallbacks[arguments.connection] = {real = true, queue = []};
+		}
+	}
+
+	/**
+	 * Internal. Drop a foreign-transaction marker set for none/false mode (the commit/
+	 * rollback branch clears its own store when it resolves).
+	 */
+	public void function $clearForeignTransaction(required string connection) {
+		if ($transactionForeign(arguments.connection)) {
+			StructDelete(request.wheels.$txnCallbacks, arguments.connection);
+		}
+	}
+
+	/**
+	 * Internal. One wheels.log warning per request + model when afterCommit/afterRollback
+	 * are skipped because the write ran inside an unmanaged raw transaction{} block.
+	 * Guarded so a bulk import inside a raw transaction logs one line, not one per write.
+	 */
+	public void function $warnForeignTransactionCallbacksOnce() {
+		if (!StructKeyExists(request, "wheels")) {
+			return;
+		}
+		if (!StructKeyExists(request.wheels, "$txnForeignWarned")) {
+			request.wheels.$txnForeignWarned = {};
+		}
+		local.modelName = variables.wheels.class.modelName;
+		if (StructKeyExists(request.wheels.$txnForeignWarned, local.modelName)) {
+			return;
+		}
+		request.wheels.$txnForeignWarned[local.modelName] = true;
+		try {
+			writeLog(
+				file = "wheels",
+				type = "warning",
+				text = "afterCommit/afterRollback callbacks on model `" & local.modelName
+					& "` were skipped: the write ran inside a raw transaction{} block that Wheels does not "
+					& "manage, so the commit/rollback outcome is not observable. Use the Wheels-managed "
+					& "transaction (transaction() / invokeWithTransaction) for these callbacks to fire."
+			);
+		} catch (any e) {
+		}
+	}
+
+	/**
+	 * Internal. Runs this instance's registered callbacks of `type`, filtered by
+	 * `operation` (an entry's `on`; blank = all). A throwing callback is logged to
+	 * wheels.log (model + method); the database change is NOT rolled back (decision C).
+	 * With `propagateErrors` (the default) the exception propagates and stops the rest.
+	 * On the exception-unwinding path the caller passes `propagateErrors=false` so a
+	 * throwing afterRollback is logged + swallowed and does NOT mask the original
+	 * transaction exception the caller is about to rethrow (#3934 R2).
+	 */
+	public void function $runTransactionCallbacks(required string type, required string operation, boolean propagateErrors = true) {
+		if (!StructKeyExists(variables.wheels.class.callbacks, arguments.type)) {
+			return;
+		}
+		local.entries = variables.wheels.class.callbacks[arguments.type];
+		local.iEnd = ArrayLen(local.entries);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.entry = local.entries[local.i];
+			local.method = IsStruct(local.entry) ? local.entry.method : local.entry;
+			local.on = IsStruct(local.entry) ? (local.entry.on ?: "") : "";
+			if (Len(local.on) && !ListFindNoCase(local.on, arguments.operation)) {
+				continue;
+			}
+			try {
+				$invoke(method = local.method);
+			} catch (any e) {
+				try {
+					writeLog(
+						file = "wheels",
+						type = "error",
+						text = "A `" & arguments.type & "` callback failed after the transaction resolved on model `"
+							& variables.wheels.class.modelName & "`, method `" & local.method & "`: " & e.message
+							& (arguments.propagateErrors
+								? " - the database change is NOT rolled back; the exception is propagating."
+								: " - suppressed so it does not mask the original transaction exception.")
+					);
+				} catch (any logErr) {
+				}
+				if (arguments.propagateErrors) {
+					rethrow;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Internal. The per-connection queue array, or an empty array if none.
+	 */
+	public array function $transactionCallbackQueue(required string connection) {
+		if (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "$txnCallbacks")
+			&& StructKeyExists(request.wheels.$txnCallbacks, arguments.connection)
+		) {
+			return request.wheels.$txnCallbacks[arguments.connection].queue;
+		}
+		return [];
+	}
+
+	/**
+	 * Internal. Fire `type` (afterCommit | afterRollback) across a CAPTURED queue
+	 * of {object, operation} entries, FIFO; registration order within each
+	 * instance. The caller captures the queue and clears both the open-transaction
+	 * marker and the context BEFORE calling this, so a throwing callback can never
+	 * leave a stuck transaction marker or a leaked queue.
+	 */
+	public void function $runQueueCallbacks(required array queue, required string type, boolean propagateErrors = true) {
+		local.iEnd = ArrayLen(arguments.queue);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.entry = arguments.queue[local.i];
+			local.entry.object.$runTransactionCallbacks(
+				type = arguments.type,
+				operation = local.entry.operation,
+				propagateErrors = arguments.propagateErrors
+			);
+		}
+	}
+
+	/**
+	 * Internal. Capture the per-connection queue, CLEAR the context, then fire
+	 * `type`. One method so callers (incl. exception catch blocks) do no local-scope
+	 * writes in a catch (BoxLang-safe) and so a throwing callback cannot leave the
+	 * queue behind. The caller must have already reset the open-transaction marker.
+	 */
+	public void function $resolveTransactionCallbacks(required string connection, required string type, boolean propagateErrors = true) {
+		local.queue = $transactionCallbackQueue(arguments.connection);
+		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$txnCallbacks")) {
+			StructDelete(request.wheels.$txnCallbacks, arguments.connection);
+		}
+		$runQueueCallbacks(queue = local.queue, type = arguments.type, propagateErrors = arguments.propagateErrors);
+	}
+
 </cfscript>

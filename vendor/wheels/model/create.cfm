@@ -176,6 +176,9 @@
 							this.reload();
 						}
 						local.rv = true;
+						// v4.2.0: queue afterCommit/afterRollback (fires at the outermost
+						// transaction resolve, or immediately in none/false mode).
+						$enqueueTransactionCallbacks(operation = "create");
 					} else if (local.rollback) {
 						$resetToNew();
 					}
@@ -202,6 +205,8 @@
 							this.reload();
 						}
 						local.rv = true;
+						// v4.2.0: queue afterCommit/afterRollback (see create branch).
+						$enqueueTransactionCallbacks(operation = "update");
 					}
 				} else {
 					$validateAssociations(callbacks = arguments.callbacks);
