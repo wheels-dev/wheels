@@ -95,6 +95,10 @@
 	/**
 	* Guard: abort with a 404 when the key matches no record.
 	*
+	* $throwErrorOrShow404Page() sets the 404 status, then shows the error page
+	* in development or the onmissingtemplate.cfm page in production. Throwing
+	* Wheels.RecordNotFound directly would reach production users as a 500.
+	*
 	* The message is a plain string on purpose. The scaffold's parent wiring
 	* scans this file with ScaffoldSource, which refuses interpolated strings
 	* (`##...##`) wholesale — a single `##params.key##` here would silently turn
@@ -102,7 +106,7 @@
 	**/
 	private function requireRecord() {
 		if (!IsObject(model("|ObjectNameSingularC|").findByKey(key=params.key))) {
-			Throw(
+			$throwErrorOrShow404Page(
 				type = "Wheels.RecordNotFound",
 				message = "|ObjectNameSingularC| not found for the requested key."
 			);

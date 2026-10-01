@@ -93,8 +93,16 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					// A BEFORE filter covering all four key-loading actions.
 					expect(content).toInclude('filters(through="requireRecord", only="show,edit,update,delete")');
 					expect(content).toInclude("private function requireRecord()");
-					expect(content).toInclude('if (!IsObject(model("Notefile").findByKey(key=params.key))) {');
+					expect(content).toInclude('IsObject(model("Notefile").findByKey(key=params.key))');
 					expect(content).toInclude('type = "Wheels.RecordNotFound"');
+
+					// The 404 must hold in production too. A bare Throw() only
+					// becomes a 404 on the development error page; production
+					// serves the generic 500. $throwErrorOrShow404Page() sets 404
+					// and throws (development) or renders onmissingtemplate.cfm
+					// (production).
+					expect(content).toInclude("$throwErrorOrShow404Page(");
+					expect(content).notToInclude("Throw(");
 
 					// The guard must NOT live inside show(): ScaffoldSource only
 					// rewrites show() when its finder is the whole body, so an
