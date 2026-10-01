@@ -22,6 +22,10 @@ component extends="wheels.WheelsTest" {
 
 			it("finds rows with an unquoted {ts} date", () => {
 				var since = CreateDateTime(2000, 1, 1, 0, 0, 0)
+				if (Left("#since#", 4) != "{ts ") {
+					// RustCFML renders a date as plain "2000-01-01 00:00:00", so unquoted it is not a literal at all.
+					skip("This engine renders dates without the {ts} escape.")
+				}
 				var total = g.model("post").count()
 				expect(g.model("post").findAll(where = "createdAt >= #since#", returnAs = "query").recordCount).toBe(total)
 			})
@@ -45,18 +49,17 @@ component extends="wheels.WheelsTest" {
 		describe("dates in positions that aren't bound (BETWEEN, function arguments)", () => {
 
 			// Unbound positions get the date back as the JDBC escape the author wrote, so
-			// databases that won't convert a plain string to a date (Oracle) still work.
+			// databases that won't convert a plain string to a date (Oracle) still work. The
+			// escapes are written out rather than interpolated: not every engine renders a date
+			// in {ts} form (RustCFML gives "2000-01-01 00:00:00").
 			it("writes {ts} back for BETWEEN bounds", () => {
-				var a = CreateDateTime(2000, 1, 1, 0, 0, 0)
-				var b = CreateDateTime(2999, 12, 31, 0, 0, 0)
-				var sql = ArrayToList(g.model("post").$whereClause(where = "createdAt BETWEEN #a# AND #b#", include = "", sql = ["SELECT 1"]).filter((f) => IsSimpleValue(f)), " ")
+				var sql = ArrayToList(g.model("post").$whereClause(where = "createdAt BETWEEN {ts '2000-01-01 00:00:00'} AND {ts '2999-12-31 00:00:00'}", include = "", sql = ["SELECT 1"]).filter((f) => IsSimpleValue(f)), " ")
 				expect(Find("{ts '2000-01-01 00:00:00'}", sql)).toBeGT(0, sql)
 				expect(Find("{ts '2999-12-31 00:00:00'}", sql)).toBeGT(0, sql)
 			})
 
 			it("writes {ts} back for a function argument", () => {
-				var a = CreateDateTime(2000, 1, 1, 0, 0, 0)
-				var sql = ArrayToList(g.model("post").$whereClause(where = "createdAt >= COALESCE(#a#, createdAt)", include = "", sql = ["SELECT 1"]).filter((f) => IsSimpleValue(f)), " ")
+				var sql = ArrayToList(g.model("post").$whereClause(where = "createdAt >= COALESCE({ts '2000-01-01 00:00:00'}, createdAt)", include = "", sql = ["SELECT 1"]).filter((f) => IsSimpleValue(f)), " ")
 				expect(Find("{ts '2000-01-01 00:00:00'}", sql)).toBeGT(0, sql)
 			})
 
