@@ -1028,6 +1028,79 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * LuCLI's out() wraps the text in ANSI colour codes. Those belong on a
+	 * terminal only: under the stdio MCP server (`wheels mcp wheels`) the output
+	 * is captured into the tool result, where escapes like \x1b[36m... are noise
+	 * to the client, and the same goes for piped or redirected output. Colour is
+	 * dropped there and whenever NO_COLOR is set (https://no-color.org).
+	 */
+	private void function out(any message, string colour = "", string style = "") {
+		if (!$useColour()) {
+			super.out(arguments.message);
+			return;
+		}
+		super.out(argumentCollection = arguments);
+	}
+
+	/** True when output goes to an interactive terminal and NO_COLOR is unset. */
+	private boolean function $useColour() {
+		try {
+			var env = createObject("java", "java.lang.System").getenv();
+			if (!isNull(env.get("NO_COLOR")) && len(env.get("NO_COLOR"))) {
+				return false;
+			}
+			// The stdio MCP server captures every out() into a tool result, and a
+			// console can still look present there, so check for it explicitly.
+			if ($isMcpServerProcess()) {
+				return false;
+			}
+			var console = createObject("java", "java.lang.System").console();
+			if (isNull(console)) {
+				return false;
+			}
+			// JDK 22+ returns a Console even when the streams are redirected;
+			// isTerminal() (22+) tells the two apart. Java 21 has no isTerminal().
+			try {
+				return console.isTerminal();
+			} catch (any noIsTerminal) {
+				return true;
+			}
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Whether this process is the stdio MCP server (`wheels mcp <module>`):
+	 * LuCLI reserves the `mcp` token, so its presence among the process
+	 * arguments means MCP mode. Process-constant, so cached.
+	 */
+	private boolean function $isMcpServerProcess() {
+		if (!structKeyExists(variables, "$mcpServerProcess")) {
+			var args = [];
+			try {
+				var info = createObject("java", "java.lang.ProcessHandle").current().info();
+				if (info.arguments().isPresent()) {
+					args = info.arguments().get();
+				}
+			} catch (any e) {}
+			var found = false;
+			for (var a in args) {
+				if (a == "mcp") {
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				var command = createObject("java", "java.lang.System").getProperty("sun.java.command");
+				found = !isNull(command) && listFind(command, "mcp", " ") > 0;
+			}
+			variables.$mcpServerProcess = found;
+		}
+		return variables.$mcpServerProcess;
+	}
+
+	/**
 	 * Normalize a generator type (or its single-letter alias) to its canonical
 	 * handler key so $generateDispatch can switch over the 15 real generators
 	 * instead of 25 type+alias labels.

@@ -1,0 +1,1 @@
+- The MCP tools (`wheels mcp wheels`) no longer return ANSI colour codes in their text. CLI colour now appears only on an interactive terminal: it is dropped under the MCP server, when output is piped or redirected, and when `NO_COLOR` is set.
