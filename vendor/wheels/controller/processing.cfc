@@ -65,6 +65,10 @@ component {
 				// callers — including the B5 specs — still see the type.
 				// `var` (not local.) so the catch write survives on BoxLang.
 				var viewNotFound = {hit = false, message = "", extendedInfo = ""};
+				// Same shape for a requested format the action does not provide:
+				// $callAction throws typed Wheels.FormatNotAcceptable (status 406
+				// already set) and it is presented below.
+				var notAcceptable = {hit = false, message = "", extendedInfo = ""};
 				try {
 					// Get content from the cache if it exists there and set it to the request scope. If not, the $callActionAndAddToCache function will run, calling the controller action (which in turn sets the content to the request scope).
 					if (local.cache) {
@@ -114,12 +118,24 @@ component {
 					if (!$performedRender()) {
 						$callAction(action = variables.params.action);
 					}
+				} catch (Wheels.FormatNotAcceptable e) {
+					notAcceptable.hit = true;
+					notAcceptable.message = e.message;
+					if (StructKeyExists(e, "extendedInfo")) {
+						notAcceptable.extendedInfo = e.extendedInfo;
+					}
 				} catch (Wheels.ViewNotFound e) {
 					viewNotFound.hit = true;
 					viewNotFound.message = e.message;
 					if (StructKeyExists(e, "extendedInfo")) {
 						viewNotFound.extendedInfo = e.extendedInfo;
 					}
+				}
+				if (notAcceptable.hit) {
+					$throwErrorOrRenderNotAcceptable(
+						message = notAcceptable.message,
+						extendedInfo = notAcceptable.extendedInfo
+					);
 				}
 				if (viewNotFound.hit) {
 					$throwErrorOrShow404Page(
@@ -193,9 +209,23 @@ component {
 			local.shouldRenderView = true;
 			
 			if (local.contentType != "html") {
-				// For non-HTML formats, check if we should skip view rendering
+				// For non-HTML formats, check if we should skip view rendering.
+				// An explicit format param (the route's `.[format]` segment or
+				// `?format=`) is a hard request for that representation. When the
+				// action cannot answer it, respond 406 Not Acceptable instead of an
+				// empty 200. A format derived from the Accept header keeps the old
+				// behavior (no render).
+				local.explicitFormat = StructKeyExists(variables.params, "format") && Len(variables.params.format);
 				if (!ListFindNoCase(local.acceptableFormats, local.contentType)) {
 					// Format not acceptable for this action
+					if (local.explicitFormat) {
+						$header(statusCode = 406);
+						Throw(
+							type = "Wheels.FormatNotAcceptable",
+							message = "The `#local.contentType#` format is not available for the `#arguments.action#` action in the `#variables.$class.name#` controller.",
+							extendedInfo = "This action provides: #local.acceptableFormats#. Request one of those formats, or add `#local.contentType#` with provides() (or onlyProvides() for this action) and render it with renderWith()."
+						);
+					}
 					local.shouldRenderView = false;
 				} else if (ListFindNoCase("json,xml", local.contentType)) {
 					// JSON and XML can be auto-generated, so check if a template exists
@@ -206,7 +236,17 @@ component {
 						contentType = local.contentType
 					);
 					if (!$formatTemplatePathExists($name = local.templateName)) {
-						// No template exists and these formats can be auto-generated
+						// No template exists and these formats can be auto-generated,
+						// but only renderWith() generates them and the action did not
+						// call it, so nothing would be rendered.
+						if (local.explicitFormat) {
+							$header(statusCode = 406);
+							Throw(
+								type = "Wheels.FormatNotAcceptable",
+								message = "No `#local.contentType#` response was rendered for the `#arguments.action#` action in the `#variables.$class.name#` controller.",
+								extendedInfo = "The controller provides `#local.contentType#`, but the action did not render it. Call renderWith() in the action to render `#local.contentType#`."
+							);
+						}
 						local.shouldRenderView = false;
 					}
 				}
@@ -249,6 +289,22 @@ component {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Internal function. Presents a request for a format the action does not
+	 * provide. Development (showErrorInformation on) throws the typed error;
+	 * otherwise it renders a short plain-text 406 Not Acceptable response.
+	 * The 406 status is set here, before the throw, the same way
+	 * $throwErrorOrShow404Page sets 404.
+	 */
+	public void function $throwErrorOrRenderNotAcceptable(required string message, string extendedInfo = "") {
+		$header(statusCode = 406);
+		if ($get("showErrorInformation")) {
+			Throw(type = "Wheels.FormatNotAcceptable", message = arguments.message, extendedInfo = arguments.extendedInfo);
+		}
+		$header(name = "content-type", value = "text/plain; charset=utf-8", charset = "utf-8");
+		renderText(text = "406 Not Acceptable", status = 406);
 	}
 
 	/**

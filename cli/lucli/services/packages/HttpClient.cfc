@@ -17,6 +17,12 @@ component {
 	 * @return struct { status: numeric, body: string }
 	 */
 	public struct function get(required string url, struct headers = {}) {
+		if (request.$wheelsOffline ?: false) {
+			Throw(
+				type = "Wheels.Packages.Offline",
+				message = "Offline mode is enabled by --offline or WHEELS_OFFLINE=1; #arguments.url# needs network access."
+			);
+		}
 		cfhttp(
 			url = arguments.url,
 			method = "GET",
@@ -41,6 +47,15 @@ component {
 	 * Returns the destination path on success, throws on non-200.
 	 */
 	public string function download(required string url, required string destPath) {
+		// --offline / WHEELS_OFFLINE=1 keeps `wheels packages` off the network:
+		// the registry index and manifests are gated in Registry, and package
+		// tarballs are never cached, so a download is refused here too.
+		if (request.$wheelsOffline ?: false) {
+			Throw(
+				type = "Wheels.Packages.Offline",
+				message = "Offline mode is enabled (--offline / WHEELS_OFFLINE=1) — downloading the package tarball requires network access. Run again without --offline to install."
+			);
+		}
 		cfhttp(
 			url = arguments.url,
 			method = "GET",

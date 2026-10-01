@@ -30,10 +30,10 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		describe("wheels db", () => {
 
-			it("shows help when called with no arguments", () => {
+			it("shows help and exits non-zero when called with no arguments", () => {
+				// 4.1.2: usage on missing arguments is a failure (non-zero exit, MCP isError).
 				mod.__arguments = [];
-				mod.db();
-				expect(true).toBeTrue();
+				expect(() => mod.db()).toThrow(type = "Wheels.InvalidArguments");
 			});
 
 			it("throws Wheels.InvalidArguments on an unknown subcommand", () => {

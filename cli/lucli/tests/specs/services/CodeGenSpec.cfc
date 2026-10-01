@@ -137,9 +137,28 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).toInclude('"status": "open"');
 					expect(content).toInclude('"email": "user@example.com"');
 					expect(content).toInclude('"count": 1');
-					expect(content).toInclude('"active": true');
+					expect(content).toInclude('"active": 1');
 					expect(content).notToInclude("{status = ");
 					expect(content).notToInclude('"status" = ');
+				});
+
+				it("boolean sample is 1, which every supported database accepts", () => {
+					// A migration's boolean column is INTEGER on SQLite (TINYINT(1)
+					// on MySQL/H2, NUMBER(1) on Oracle). The model reads it as an
+					// integer column, and the automatic numericality validation
+					// rejects `true` ("Published is not a number"), so the
+					// generated specs failed on SQLite. 1 passes that validation
+					// and binds as true on BIT/BOOLEAN columns; it is also what the
+					// generated checkBox() submits (checkedValue = 1).
+					codegen.generateTest(
+						type = "model",
+						name = "Post",
+						properties = [{name: "title", type: "string"}, {name: "published", type: "boolean"}],
+						force = true
+					);
+					var modelSpec = fileRead(tempRoot & "/tests/specs/models/PostSpec.cfc");
+					expect(modelSpec).toInclude('new(properties = {"title": "MyString", "published": 1})');
+					expect(modelSpec).notToInclude('"published": true');
 				});
 
 				it("api spec asserts 201/204 and count deltas with created record keys", () => {

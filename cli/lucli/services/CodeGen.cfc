@@ -568,7 +568,10 @@ component {
 			return "9.99";
 		}
 		if (listFindNoCase("boolean,bool", propType)) {
-			return "true";
+			// 1, not true: a boolean column is INTEGER on SQLite, so the model's
+			// automatic numericality validation rejects true. 1 also binds as
+			// true on BIT/BOOLEAN columns, and checkBox() submits it.
+			return "1";
 		}
 		if (listFindNoCase("datetime,timestamp,date,time", propType)) {
 			return "Now()";

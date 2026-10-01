@@ -29,28 +29,36 @@ component extends="wheels.WheelsTest" {
 				application.wheels.showErrorInformation = _savedShowError;
 			});
 
-			it("EventMethods.$wheelsErrorStatusCode holds the frozen 404/403/500 map", () => {
+			it("EventMethods.$wheelsErrorStatusCode holds the frozen 404-allow-list map", () => {
 				// The status map is the single source of truth $runOnErrorRenderWheelsError
 				// (the live path) and onerrorSpec both call.
 				var body = $functionBody("EventMethods.cfc", "$wheelsErrorStatusCode");
-				expect(Find('ReFindNoCase("^Wheels\.([A-Za-z]*NotFound|ActionNotAllowed)$"', body)).toBeGT(
+				// 404 is a client-triggerable ALLOW-list, not "any *NotFound".
+				expect(Find('ReFindNoCase("^Wheels\.(Route|Record|View|File)NotFound$"', body)).toBeGT(
 					0,
-					"status map no longer matches Wheels.*NotFound / ActionNotAllowed via the frozen regex"
+					"404 branch must allow-list the client-triggerable not-found types"
 				);
-				// Server-side schema/config misses are carved out of the 404 branch (A-F4).
-				expect(Find('ReFindNoCase("^Wheels\.(Table|DataSource|Column)NotFound$"', body)).toBeGT(
-					0,
-					"server-side *NotFound (Table/DataSource/Column) must be excluded from the 404 branch"
-				);
-				// NotAuthorized and InvalidAuthenticityToken (A-F7) are the 403 set.
+				expect(Find('"Wheels.ActionNotAllowed"', body)).toBeGT(0, "ActionNotAllowed stays 404");
+				expect(Find('"Wheels.ActionParameterMissing"', body)).toBeGT(0, "ActionParameterMissing stays 404");
+				// 403 set.
 				expect(Find('ReFindNoCase("^Wheels\.(NotAuthorized|InvalidAuthenticityToken)$"', body)).toBeGT(
 					0,
 					"status map no longer maps NotAuthorized / InvalidAuthenticityToken to 403"
 				);
+				// 406 for FormatNotAcceptable (#3866).
+				expect(Find('"Wheels.FormatNotAcceptable"', body)).toBeGT(0, "FormatNotAcceptable maps to 406");
 				expect(Find("return 404", body)).toBeGT(0);
 				expect(Find("return 403", body)).toBeGT(0);
+				expect(Find("return 406", body)).toBeGT(0);
 				expect(Find("return 500", body)).toBeGT(0);
 				expect(Find("return 403", body)).toBeGT(Find("return 404", body), "403 branch follows the 404 branch");
+				expect(Find("return 500", body)).toBeGT(Find("return 406", body), "500 default follows the 406 branch");
+			});
+
+			it("maps Wheels.FileNotFound (sendFile, a client-addressed download) to 404 through live $runOnError", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.FileNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
 			});
 
 			it("maps Wheels.RouteNotFound to 404 through live $runOnError", () => {
@@ -63,6 +71,22 @@ component extends="wheels.WheelsTest" {
 				var em = $onErrorDouble();
 				em.$runOnError(exception = $wheelsTypedException("Wheels.ActionNotAllowed"), eventName = "onRequest");
 				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+			// Allow-list member: a /wheels/ GUI URL that names no action is
+			// client-triggerable "no such page" -> 404, not a 500.
+			it("maps Wheels.ActionParameterMissing to 404 through live $runOnError", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.ActionParameterMissing"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(404);
+			});
+
+			// Allow-list default: a *NotFound that is NOT a client-triggerable
+			// miss (a missing package is a server-side config/code fault) is 500.
+			it("maps Wheels.PackageNotFound to 500 through live $runOnError (server-side default)", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.PackageNotFound"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(500);
 			});
 
 			it("maps Wheels.NotAuthorized to 403 through live $runOnError", () => {
@@ -101,6 +125,13 @@ component extends="wheels.WheelsTest" {
 				var em = $onErrorDouble();
 				em.$runOnError(exception = $wheelsTypedException("Wheels.InvalidAuthenticityToken"), eventName = "onRequest");
 				expect(em.$lastStatusCode()).toBe(403);
+			});
+
+			// #3866: an unsupported requested format is 406 Not Acceptable.
+			it("maps Wheels.FormatNotAcceptable to 406 through live $runOnError", () => {
+				var em = $onErrorDouble();
+				em.$runOnError(exception = $wheelsTypedException("Wheels.FormatNotAcceptable"), eventName = "onRequest");
+				expect(em.$lastStatusCode()).toBe(406);
 			});
 
 		});

@@ -57,6 +57,11 @@ component {
 	}
 
 	public void function $validateServers(required any servers, required string filePath) {
+		// No hosts means nothing to deploy to: a dry run "succeeded" with no
+		// output and a real deploy did nothing, both with exit 0.
+		if ($serverHostCount(arguments.servers) == 0) {
+			$raise(arguments.filePath, "servers lists no hosts; add at least one host to deploy to");
+		}
 		if (isArray(arguments.servers)) {
 			for (var host in arguments.servers) $validateHost(host, arguments.filePath);
 		} else if (isStruct(arguments.servers)) {
@@ -70,6 +75,25 @@ component {
 				}
 			}
 		}
+	}
+
+	/** Hosts listed under servers:, as a list or by role (role: [hosts] or role: {hosts: [...]}). */
+	public numeric function $serverHostCount(required any servers) {
+		var count = 0;
+		if (isArray(arguments.servers)) {
+			return arrayLen(arguments.servers);
+		}
+		if (isStruct(arguments.servers)) {
+			for (var role in arguments.servers) {
+				var entry = arguments.servers[role];
+				if (isArray(entry)) {
+					count += arrayLen(entry);
+				} else if (isStruct(entry) && structKeyExists(entry, "hosts") && isArray(entry.hosts)) {
+					count += arrayLen(entry.hosts);
+				}
+			}
+		}
+		return count;
 	}
 
 	/**
