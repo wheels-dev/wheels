@@ -42,6 +42,43 @@ component extends="wheels.WheelsTest" {
 			})
 		})
 
+		describe("dates in positions that aren't bound (BETWEEN, function arguments)", () => {
+
+			// Unbound positions get the date back as the JDBC escape the author wrote, so
+			// databases that won't convert a plain string to a date (Oracle) still work.
+			it("writes {ts} back for BETWEEN bounds", () => {
+				var a = CreateDateTime(2000, 1, 1, 0, 0, 0)
+				var b = CreateDateTime(2999, 12, 31, 0, 0, 0)
+				var sql = ArrayToList(g.model("post").$whereClause(where = "createdAt BETWEEN #a# AND #b#", include = "", sql = ["SELECT 1"]).filter((f) => IsSimpleValue(f)), " ")
+				expect(Find("{ts '2000-01-01 00:00:00'}", sql)).toBeGT(0, sql)
+				expect(Find("{ts '2999-12-31 00:00:00'}", sql)).toBeGT(0, sql)
+			})
+
+			it("writes {ts} back for a function argument", () => {
+				var a = CreateDateTime(2000, 1, 1, 0, 0, 0)
+				var sql = ArrayToList(g.model("post").$whereClause(where = "createdAt >= COALESCE(#a#, createdAt)", include = "", sql = ["SELECT 1"]).filter((f) => IsSimpleValue(f)), " ")
+				expect(Find("{ts '2000-01-01 00:00:00'}", sql)).toBeGT(0, sql)
+			})
+
+			it("unmasks a bound ODBC date to its plain value", () => {
+				var masked = g.model("post").$maskWhereLiterals("x = {d '2020-01-02'}")
+				var inner = ListGetAt(masked, 2, "'")
+				var adapter = g.model("post").$classData().adapter
+				expect(adapter.$unmaskParameterValue(inner)).toBe("2020-01-02")
+			})
+
+			it("finds rows with dates in BETWEEN and in a function argument", () => {
+				if (FindNoCase("SQLite", g.get("adapterName"))) {
+					skip("The SQLite JDBC driver does not process {ts} escapes.")
+				}
+				var a = CreateDateTime(2000, 1, 1, 0, 0, 0)
+				var b = CreateDateTime(2999, 12, 31, 0, 0, 0)
+				var total = g.model("post").count()
+				expect(g.model("post").findAll(where = "createdAt BETWEEN #a# AND #b#", returnAs = "query").recordCount).toBe(total)
+				expect(g.model("post").findAll(where = "createdAt >= COALESCE(#a#, createdAt)", returnAs = "query").recordCount).toBe(total)
+			})
+		})
+
 		describe("text that only resembles a {ts} date", () => {
 
 			// Each of these is not exactly an ODBC date form, so it gets the ordinary
