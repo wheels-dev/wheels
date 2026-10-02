@@ -14,7 +14,14 @@
 component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 
 	/**
-	 * @config Disk config: { root (required), urlPrefix="", signingKey="" }.
+	 * @config Disk config: { root (required), urlPrefix="", signingKey="", resolveSymlinks=false }.
+	 *
+	 * `resolveSymlinks` (default false) adds an opt-in, stricter containment layer
+	 * on top of the always-on lexical guard (#3912): when true, `$resolve()` also
+	 * canonicalises paths through the filesystem so a symlink planted under the
+	 * root that targets outside is REJECTED rather than followed (#4020). It is
+	 * off by default because the lexical guard already blocks traversal and a
+	 * symlink under the root can only be created by someone with filesystem access.
 	 */
 	public LocalDisk function init(required struct config) {
 		if (!StructKeyExists(arguments.config, "root") || !Len(arguments.config.root)) {
@@ -26,6 +33,13 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		variables.root = $normalizeDir(arguments.config.root);
 		variables.urlPrefix = StructKeyExists(arguments.config, "urlPrefix") ? arguments.config.urlPrefix : "";
 		variables.signingKey = StructKeyExists(arguments.config, "signingKey") ? arguments.config.signingKey : "";
+		variables.resolveSymlinks = StructKeyExists(arguments.config, "resolveSymlinks") && arguments.config.resolveSymlinks;
+		// Fail closed, at init (not per request): if the app opted into symlink
+		// resolution but this runtime can't actually resolve symbolic links, refuse
+		// to construct rather than silently run an ineffective strict mode.
+		if (variables.resolveSymlinks) {
+			$assertSymlinkResolutionAvailable();
+		}
 		return this;
 	}
 
@@ -211,7 +225,117 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 			);
 		}
 
+		// 4. Opt-in strict containment (#4020): additionally resolve the path through
+		// the filesystem (symlinks included) and re-check. init() has already proven,
+		// via a behavioural probe, that this runtime resolves symlinks — so a symlink
+		// planted under the root that targets outside is now REJECTED, not followed.
+		if (variables.resolveSymlinks) {
+			$assertCanonicalWithin(key = arguments.key, resolved = local.resolved);
+		}
+
 		return local.resolved;
+	}
+
+	/**
+	 * Strict containment re-check for the opt-in resolveSymlinks mode (#4020):
+	 * canonicalise both the root and the resolved path through the filesystem and
+	 * confirm the target stays inside the root. getCanonicalPath() resolves
+	 * symlinks in the existing path prefix; a not-yet-created leaf (put()) is
+	 * appended lexically, so a symlink DIRECTORY under the root is still caught.
+	 */
+	private void function $assertCanonicalWithin(required string key, required string resolved) {
+		if (!$pathWithin(root = $canonicalPath(variables.root), candidate = $canonicalPath(arguments.resolved))) {
+			throw(
+				type = "Wheels.Storage.InvalidKey",
+				message = "Storage key [#arguments.key#] resolves through a symlink outside the storage root."
+			);
+		}
+	}
+
+	/**
+	 * Behavioural capability probe for the opt-in resolveSymlinks mode (#4020).
+	 * Creates a throwaway symlink under GetTempDirectory() that points OUT of its
+	 * own parent directory, canonicalises it, and requires the canonical path to
+	 * land inside the target — i.e. the runtime genuinely resolved the symlink.
+	 * It is a capability check, never an engine-name check: RustCFML exposes
+	 * java.io.File.getCanonicalPath() but it is a lexical no-op that does not
+	 * resolve symlinks, so a "does the call exist" probe would pass there and leave
+	 * strict mode silently ineffective. Throws Wheels.Storage.InvalidConfiguration
+	 * when the symlink can't be created (e.g. Windows without symlink privilege) or
+	 * is not resolved (e.g. RustCFML). Runs once per disk instance, at init.
+	 *
+	 * `probe` is a bare `var` struct written without a `local.` prefix so the value
+	 * set inside the catch survives on BoxLang (cross-engine invariant 11); the
+	 * finally calls a helper rather than looping, since a loop in a finally block
+	 * miscompiles on Lucee 7 (invariant 12).
+	 */
+	private void function $assertSymlinkResolutionAvailable() {
+		var probe = {dir = "", resolved = false};
+		probe.dir = $normalizeDir(GetTempDirectory()) & "/wheels-localdisk-symlinkprobe-" & CreateUUID();
+		try {
+			local.insideDir = probe.dir & "/inside";
+			local.outsideDir = probe.dir & "/outside";
+			CreateObject("java", "java.io.File").init(local.insideDir).mkdirs();
+			CreateObject("java", "java.io.File").init(local.outsideDir).mkdirs();
+			local.linkFile = local.insideDir & "/lnk";
+			$createProbeSymlink(target = local.outsideDir, link = local.linkFile);
+			// Resolved iff canonicalising the link lands inside the (sibling) target.
+			probe.resolved = $pathWithin(
+				root = $canonicalPath(local.outsideDir),
+				candidate = $canonicalPath(local.linkFile)
+			);
+		} catch (any e) {
+			probe.resolved = false;
+		} finally {
+			$deleteDirQuietly(probe.dir);
+		}
+		if (!probe.resolved) {
+			throw(
+				type = "Wheels.Storage.InvalidConfiguration",
+				message = "Local disk resolveSymlinks=true requires a runtime that resolves symbolic links through the filesystem (java.io.File.getCanonicalPath). This runtime does not (e.g. RustCFML, or an OS/account without symlink support). Remove resolveSymlinks, or run on a JVM engine with symlink support."
+			);
+		}
+	}
+
+	/**
+	 * Absolute, symlink-resolved path with forward separators, via
+	 * java.io.File.getCanonicalPath(). Only ever called once init()'s probe has
+	 * confirmed this runtime resolves symlinks, so it never runs where
+	 * getCanonicalPath() would be a lexical no-op.
+	 */
+	private string function $canonicalPath(required string path) {
+		return Replace(CreateObject("java", "java.io.File").init(arguments.path).getCanonicalPath(), "\", "/", "all");
+	}
+
+	/**
+	 * Create a symbolic link via `ln -s` — the same cross-engine-portable mechanism
+	 * the storage spec uses (ProcessBuilder, not Files.createSymbolicLink, which
+	 * RustCFML does not shim). Throws when the link can't be created, which the
+	 * probe treats as "cannot resolve symlinks here" and fails closed on.
+	 */
+	private void function $createProbeSymlink(required string target, required string link) {
+		local.pb = CreateObject("java", "java.lang.ProcessBuilder").init(["ln", "-s", arguments.target, arguments.link]);
+		local.proc = local.pb.start();
+		local.proc.waitFor();
+		if (local.proc.exitValue() != 0) {
+			throw(type = "Wheels.Storage.SymlinkProbeFailed", message = "Probe could not create a symbolic link.");
+		}
+	}
+
+	/**
+	 * Best-effort recursive delete of the probe's temp directory. The probe's
+	 * symlink target lives INSIDE this directory, so the delete is self-contained
+	 * and never reaches outside it. Swallows errors so cleanup never masks the
+	 * probe result; contains no loop (invariant 12).
+	 */
+	private void function $deleteDirQuietly(required string dir) {
+		try {
+			if (Len(arguments.dir) && DirectoryExists(arguments.dir)) {
+				DirectoryDelete(arguments.dir, true);
+			}
+		} catch (any e) {
+			// ignore — cleanup is best-effort
+		}
 	}
 
 	/**

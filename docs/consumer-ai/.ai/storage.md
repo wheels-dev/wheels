@@ -27,3 +27,5 @@ url = service("storage").disk("s3").signedUrl(key="reports/q3.pdf", expiresIn=90
 ```
 
 `disk()` returns the default disk; `disk("name")` a named one. `get()` returns binary; `put()` round-trips bytes exactly. Errors: `Wheels.Storage.NotFound`, `.UnknownDisk`, `.UnknownDriver`, `.InvalidKey`, `.InvalidExpiresIn` (`expiresIn` must be `1..604800`), `.MissingSigningKey` (local `signedUrl()` without a `signingKey`).
+
+`LocalDisk` keys are relative to `root`; traversal (`../`), dot/space-only segments, and drive-letter/UNC prefixes are rejected with `.InvalidKey` (lexical check, all engines). For a hardened deployment, add `resolveSymlinks=true` to the local disk config to also reject a symlink under `root` that escapes it; it fails closed with `.InvalidConfiguration` at construction on runtimes that can't resolve symlinks (RustCFML, Windows without symlink privilege).

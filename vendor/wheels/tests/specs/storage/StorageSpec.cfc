@@ -210,6 +210,98 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it(
+					"opt-in resolveSymlinks rejects a symlink escaping root (##4020), or fails closed at init where the runtime can't resolve symlinks",
+					function() {
+						var strictRoot = $tempPath("wheels-storage-strict-" & CreateUUID());
+						if (!DirectoryExists(strictRoot)) {
+							DirectoryCreate(strictRoot);
+						}
+						// Constructing the disk runs the behavioural capability probe. On a runtime
+						// that resolves symlinks (a real JVM) it succeeds; on one that does not
+						// (RustCFML, or Windows without symlink privilege) init fails closed with
+						// Wheels.Storage.InvalidConfiguration rather than silently enabling an
+						// ineffective strict mode. A bare `var` struct field (not a `local.`-scoped
+						// one) is the only shape that persists a value written inside a catch on
+						// BoxLang (cross-engine invariant 11).
+						var guard = {failedClosed = false, type = ""};
+						var strictDisk = "";
+						try {
+							strictDisk = new wheels.storage.drivers.LocalDisk(config = {
+								root = strictRoot,
+								urlPrefix = "/uploads",
+								signingKey = "a-test-signing-key-padded-to-32-bytes!!",
+								resolveSymlinks = true
+							});
+						} catch (any e) {
+							guard.failedClosed = true;
+							guard.type = e.type;
+						}
+						if (guard.failedClosed) {
+							expect(guard.type).toBe("Wheels.Storage.InvalidConfiguration");
+							if (DirectoryExists(strictRoot)) {
+								DirectoryDelete(strictRoot, true);
+							}
+							return;
+						}
+						// Resolving runtime: a symlink planted under root that targets outside is
+						// now REJECTED, not followed (contrast the default-mode spec above).
+						var outside = $tempPath("wheels-storage-strict-outside-" & CreateUUID());
+						var linkPath = strictRoot & "/link";
+						DirectoryCreate(outside);
+						FileWrite(outside & "/secret.txt", CharsetDecode("outside-secret", "utf-8"));
+						$createSymlink(outside, linkPath);
+						try {
+							expect(function() {
+								strictDisk.exists("link/secret.txt");
+							}).toThrow("Wheels.Storage.InvalidKey");
+							expect(function() {
+								strictDisk.get("link/secret.txt");
+							}).toThrow("Wheels.Storage.InvalidKey");
+						} finally {
+							$deleteSymlink(linkPath);
+							if (DirectoryExists(outside)) {
+								DirectoryDelete(outside, true);
+							}
+							if (DirectoryExists(strictRoot)) {
+								DirectoryDelete(strictRoot, true);
+							}
+						}
+					}
+				);
+
+				it("opt-in resolveSymlinks still stores and serves a legitimate file (##4020)", function() {
+					var strictRoot = $tempPath("wheels-storage-strict-ok-" & CreateUUID());
+					if (!DirectoryExists(strictRoot)) {
+						DirectoryCreate(strictRoot);
+					}
+					var guard = {failedClosed = false};
+					var strictDisk = "";
+					try {
+						strictDisk = new wheels.storage.drivers.LocalDisk(config = {
+							root = strictRoot,
+							signingKey = "a-test-signing-key-padded-to-32-bytes!!",
+							resolveSymlinks = true
+						});
+					} catch (any e) {
+						guard.failedClosed = true;
+					}
+					try {
+						// On a non-resolving runtime the fail-closed init is covered by the spec
+						// above; here we only assert the happy path on a resolving one.
+						if (guard.failedClosed) {
+							return;
+						}
+						strictDisk.put(key = "docs/report.txt", content = "ok");
+						expect(strictDisk.exists("docs/report.txt")).toBeTrue();
+						expect(ToString(strictDisk.get("docs/report.txt"))).toBe("ok");
+					} finally {
+						if (DirectoryExists(strictRoot)) {
+							DirectoryDelete(strictRoot, true);
+						}
+					}
+					});
+
 				it("accepts a key whose segment merely contains '..' (##3912)", function() {
 					// Two dots INSIDE a segment are not traversal; the name keeps real chars.
 					disk.put(key = "reports/q3..final.pdf", content = "report");
