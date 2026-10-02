@@ -225,6 +225,10 @@ component {
 	) {
 		local.id = CreateUUID();
 
+		// Work on a copy so the internal keys below are never added to the caller's
+		// struct — CFML passes structs by reference, so mutating arguments.data would
+		// mutate what the caller passed to enqueue() / enqueueIn() / enqueueAt() (#3887).
+		arguments.data = Duplicate(arguments.data);
 		arguments.data["$wheelsJobTimeout"] = this.timeout;
 
 		// Capture tenant context so jobs run against the correct tenant datasource.
