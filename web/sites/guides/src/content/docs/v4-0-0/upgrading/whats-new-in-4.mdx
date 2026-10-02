@@ -41,7 +41,6 @@ The 4.0.x line kept shipping. The highlights you'll actually reach for:
 - **Authorization policies.** `wheels.Policy` with `authorize()` / `can()` / `policyScope()` and a `wheels generate policy` generator. → [Authorization Policies](/v4-0-0/digging-deeper/authorization-policies/)
 - **`enableSession()`.** One-line session-auth wiring in `config/services.cfm`. → [Authentication Patterns](/v4-0-0/digging-deeper/authentication-patterns/)
 - **Route binding on any column.** `bindBy="slug"` resolves a resource's `:key` segment through the dynamic finder. → [Route Model Binding](/v4-0-0/digging-deeper/route-model-binding/)
-- **`toFactory()`.** Register a DI binding with a closure that builds the instance. → [Dependency Injection Usage](/v4-0-0/digging-deeper/dependency-injection-usage/)
 - **A sharper CLI.** `wheels migrate diff`, `wheels generate --dry-run`, a global `--offline` flag, and `wheels coverage` for CRAP-ranked change risk. → [Database](/v4-0-0/command-line-tools/wheels-commands/database/), [Code Quality](/v4-0-0/command-line-tools/wheels-commands/code-quality/)
 - **Fail-closed mass assignment.** `set(massAssignmentStrict=true)` rejects posted properties a model didn't explicitly allow. → [Security Hardening](/v4-0-0/deployment/security-hardening/)
 
