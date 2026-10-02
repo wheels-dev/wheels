@@ -118,9 +118,41 @@ component extends="modules.BaseModule" {
 		__arguments = [];
 		structDelete(this, "__arguments");
 		if (!structIsEmpty(arguments.callerArgs)) {
-			return arguments.callerArgs;
+			// LuCLI (wheels-dev/LuCLI#17) adds a runtime-owned
+			// __lucliMcpCall=true to every MCP tools/call and never to a
+			// terminal call. Record it for this command and take it out, so no
+			// command sees it as an argument of its own. Only LuCLI's own
+			// hand-off reaches this branch; internal delegation (generate ->
+			// new) arrives empty and keeps the outer call's answer (#3980).
+			variables.$wheelsMcpCall = structKeyExists(arguments.callerArgs, "__lucliMcpCall");
+			structDelete(arguments.callerArgs, "__lucliMcpCall");
+			if (!structIsEmpty(arguments.callerArgs)) {
+				return arguments.callerArgs;
+			}
 		}
 		return argvToCollection(isArray(raw) ? raw : []);
+	}
+
+	/**
+	 * Throws Wheels.InvalidArguments for an MCP tools/call that would create an
+	 * application: that scaffolds into the MCP server's working directory, so it
+	 * stays a terminal command.
+	 */
+	private void function $refuseAppCreationOverMcp(required string command) {
+		if ($isMcpCall()) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "#arguments.command# isn't available over MCP: creating an application writes into the MCP server's working directory. Run `wheels new <name>` in a terminal instead."
+			);
+		}
+	}
+
+	/**
+	 * True while running a command that LuCLI invoked for an MCP tools/call
+	 * (see structuredArgs()). A terminal call is never one.
+	 */
+	public boolean function $isMcpCall() {
+		return variables.$wheelsMcpCall ?: false;
 	}
 
 	/**
@@ -1020,6 +1052,11 @@ component extends="modules.BaseModule" {
 		// resolveProjectRoot() falls back to the cwd when no vendor/wheels is
 		// found, so without this check any directory got app files (#3909).
 		if (canonical != "app") $requireWheelsProject("wheels generate");
+
+		// Creating an application is CLI-only (#3910). Hiding `new`/`create` and
+		// dropping `app` from the advertised type enum only stops clients that
+		// validate against the schema, so refuse it here too (#3980).
+		if (canonical == "app") $refuseAppCreationOverMcp("wheels generate app");
 
 		switch (canonical) {
 			case "app":
@@ -2858,6 +2895,7 @@ component extends="modules.BaseModule" {
 
 		switch (type) {
 			case "app":
+				$refuseAppCreationOverMcp("wheels create app");
 				__arguments = remaining;
 				return new();
 			default:
