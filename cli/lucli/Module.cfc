@@ -3280,7 +3280,7 @@ component extends="modules.BaseModule" {
 		out('  (or add by hand: {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}})');
 		out("");
 		out("For OpenCode, Cursor, and other AI IDEs, see:");
-		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
+		out("  " & new services.GuidesLink().link("command-line-tools/mcp-integration", $docsFrameworkVersion()));
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
 		out("Tool names match the command names: generate, migrate, etc. (unprefixed");
@@ -7820,8 +7820,10 @@ component extends="modules.BaseModule" {
 
 		// The version-appropriate guide + the soft-landing adapter, surfaced
 		// whenever breaking findings are reported (and always in JSON output).
-		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
-			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
+		var guideUrl = new services.GuidesLink().link(
+			"upgrading/" & (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/",
+			target
+		);
 
 		// `success` must reflect every condition that produces a non-zero
 		// exit, otherwise `jq .success` and `$?` disagree when --strict is
@@ -8240,7 +8242,7 @@ component extends="modules.BaseModule" {
 				checkType: "grep",
 				scanDir: "tests",
 				extensions: "cfc",
-				fix: 'Keep extends="wheels.Test" until these tests are converted. RocketUnit tests (test_ methods, assert()) do not run under wheels.WheelsTest, which is BDD (describe/it/expect): convert a file, then switch its base class. See https://guides.wheels.dev/v4-1-0/upgrading/3x-to-4x/'
+				fix: 'Keep extends="wheels.Test" until these tests are converted. RocketUnit tests (test_ methods, assert()) do not run under wheels.WheelsTest, which is BDD (describe/it/expect): convert a file, then switch its base class. See ' & new services.GuidesLink().link("upgrading/3x-to-4x/")
 			});
 		}
 
@@ -10000,7 +10002,7 @@ component extends="modules.BaseModule" {
 		out("       unzip wheels-core-<version>.zip -d ~/.wheels/modules/wheels/vendor/");
 		out("       wheels new #appName#");
 		out("");
-		out("See: https://guides.wheels.dev/v4-0-0/start-here/installing/");
+		out("See: " & new services.GuidesLink().link("start-here/installing/"));
 
 		throw(
 			type="Wheels.FrameworkNotFound",

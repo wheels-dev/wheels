@@ -32,10 +32,11 @@ component extends="wheels.WheelsTest" {
 					& "page is guides.wheels.dev/v4-0-0/digging-deeper/packages/ "
 					& "(upgrade-docs:2)."
 				);
-				// Positive guard: at least one live versioned guide URL remains.
-				expect(FindNoCase("https://guides.wheels.dev/v4-0-0/", source) GT 0).toBeTrue(
+				// Positive guard: the deprecation messages link versioned guide
+				// pages, built from the running version by wheels.GuidesLink (#3931).
+				expect(FindNoCase("wheels.GuidesLink().link(", source) GT 0).toBeTrue(
 					"Plugins.cfc deprecation messages must point at live versioned "
-					& "guide URLs (upgrade-docs:2)."
+					& "guide URLs, built with wheels.GuidesLink (upgrade-docs:2)."
 				);
 			});
 
