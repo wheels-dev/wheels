@@ -184,17 +184,44 @@ component extends="wheels.WheelsTest" {
 						// URLs and server logs. The header is mapped onto url.password (an
 						// explicit url.password wins) BEFORE the reload gate, so the gate,
 						// the cold-start path and the soft-reload skip see one value.
-						var mapIdx = find("url.password = ToString(cgi.http_x_wheels_reload_password)", content);
+						var mapIdx = find("url.password = local.reloadPasswordHeader", content);
 						expect(mapIdx).toBeGT(
 							0,
 							relPath & " must map the X-Wheels-Reload-Password header onto url.password."
 						);
 						expect(
-							reFind("!StructKeyExists\(url,\s*""password""\)\s*&&\s*IsDefined\(""cgi\.http_x_wheels_reload_password""\)", content) > 0
+							reFind('StructKeyExists\(url,\s*"reload"\)\s*&&\s*!StructKeyExists\(url,\s*"password"\)', content) > 0
 						).toBeTrue(relPath & " must let an explicit ?password= win over the header.");
+						expect(content contains 'IsDefined("cgi.http_x_wheels_reload_password")').toBeTrue(
+							relPath & " must read the header from cgi.http_x_wheels_reload_password first."
+						);
 						var gateIdx = find("application.wo.$secureCompare(url.password, application.wheels.reloadPassword)", content);
 						expect(gateIdx > mapIdx).toBeTrue(
 							relPath & " must map the header before the reload gate compares url.password."
+						);
+					});
+
+					it("falls back to the raw request headers when cgi lost the reload header in " & relPath, () => {
+						var absolute = repoRoot & "/" & relPath;
+						var content = fileRead(absolute);
+
+						// ##3913: on RustCFML, once onApplicationStart has run inside the
+						// request (the first request after a reload restart), the
+						// cgi.http_* entries are gone while GetHttpRequestData() still
+						// carries the header, so every other `wheels reload` was refused.
+						// The fallback stays header-only: it never reads the password
+						// from the form scope.
+						expect(content contains "GetHttpRequestData(false).headers").toBeTrue(
+							relPath & " must fall back to GetHttpRequestData().headers for the reload header."
+						);
+						expect(content contains 'CompareNoCase(local.headerName, "X-Wheels-Reload-Password") == 0').toBeTrue(
+							relPath & " must match the header name case-insensitively in the fallback."
+						);
+						expect(find("GetHttpRequestData(false).headers", content) < find("url.password = local.reloadPasswordHeader", content)).toBeTrue(
+							relPath & " must resolve the fallback before mapping onto url.password."
+						);
+						expect(content contains "form.password").toBeFalse(
+							relPath & " must keep the reload password header-only (no form fallback)."
 						);
 					});
 
