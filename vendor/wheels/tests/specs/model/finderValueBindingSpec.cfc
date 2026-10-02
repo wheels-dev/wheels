@@ -13,34 +13,34 @@ component extends="wheels.WheelsTest" {
 	 * Sizes and growth bound for the binding-linearity specs. `large` is
 	 * `factor` times `small`. A linear binder's time grows about `factor` times
 	 * between them; a quadratic one grows faster. The small size is chosen so
-	 * the small call takes well over 10ms on Lucee 7, above the ~1ms timer
-	 * resolution, so taking the fastest run does not inflate the growth.
-	 * Lucee 7 measurements with factor 10 (fastest of three runs):
-	 *   current binder              plain 9.6-10.1x, run of quotes 9.1-10.9x
-	 *                               (small call 26-28ms)
-	 *   scanner that copies the rest of the string for every character
-	 *   (quadratic)                 plain 40-42x, run of quotes 41-50x
-	 * so 25 leaves more than 2x headroom above a linear binder and still
-	 * fails a quadratic one. The IN list kind counts values, not characters:
-	 * 5000 values bound in about 70ms and 50000 in about 740ms on Lucee 7
-	 * (10.6x), so 2000 values keeps the small call well above 10ms.
+	 * the small call takes well over 10ms, above the ~1ms timer resolution, so
+	 * taking the fastest run does not inflate the growth. With factor 10, 25
+	 * leaves more than 2x headroom above a linear binder and still fails a
+	 * quadratic one (a scanner that copies the rest of the string for every
+	 * character measured 40-50x).
 	 *
-	 * RustCFML and BoxLang: the WHERE literal scanner is super-linear on these
-	 * engines whatever the framework does. On RustCFML Mid() costs O(index) (it
-	 * walks the string to reach a character), so the scan is quadratic (about
-	 * 70x for factor 10). BoxLang measured 29-42x for factor 10 in CI. These
-	 * engines get a "no worse than quadratic" bound instead: a quadratic
-	 * binder grows about 100x for factor 10, and 250 adds 2.5x for timer and
-	 * machine noise. That is not "anything goes": a cubic or backtracking
-	 * regression grows 1000x or more and still fails. The sizes are smaller to
-	 * keep the run short. Tightening this is tracked separately.
+	 * The WHERE literal scanner jumps between quotes instead of reading one
+	 * character at a time (#3903), so a plain value is cheap: 200000 characters
+	 * bind in about 16ms on Lucee 7 and 44ms on Adobe 2023. Measured with factor
+	 * 10 (fastest of three runs): Lucee 7 plain 8.3x, run of quotes 9.9x, IN list
+	 * 10.1x; Adobe 2023 9.6x, 10.2x, 10.3x; BoxLang 8.5x, 4.6x, 10.7x. The IN
+	 * list kind counts values, not characters.
+	 *
+	 * RustCFML: Mid() and Find() cost O(index) there (they walk the string to
+	 * reach a position), so a plain value is now linear but a long run of
+	 * doubled quotes or a large IN list, which have a boundary at every few
+	 * characters, still grows about 85x for factor 10. RustCFML gets a "no worse
+	 * than quadratic" bound instead: a quadratic binder grows about 100x, and 250
+	 * adds 2.5x for timer and machine noise. That is not "anything goes": a cubic
+	 * or backtracking regression grows 1000x or more and still fails. The sizes
+	 * are smaller to keep the run short.
 	 */
 	private struct function linearityPlan(required string kind) {
 		var adapter = application.wheels.engineAdapter;
-		var superLinear = adapter.isRustCFML() || adapter.isBoxLang();
+		var superLinear = adapter.isRustCFML();
 		var plan = {factor = 10, maxGrowth = superLinear ? 250 : 25};
 		if (arguments.kind == "plain") {
-			plan.small = superLinear ? 3000 : 50000;
+			plan.small = superLinear ? 3000 : 200000;
 		} else if (arguments.kind == "inList") {
 			plan.small = superLinear ? 600 : 2000;
 		} else {
