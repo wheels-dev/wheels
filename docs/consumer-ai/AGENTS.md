@@ -6,11 +6,14 @@ Claude Code also reads the more detailed `CLAUDE.md` next to this file.
 
 ## Workflow
 
-1. **Prefer the Wheels MCP server when `.mcp.json` is configured.**
+1. **Prefer the Wheels MCP tools when your client exposes them.**
    `wheels` MCP tools (`generate`, `migrate`, `routes`, `test`, `seed`,
    `doctor`, `validate`, …) run against THIS project with correct
    conventions — prefer them over raw `wheels` CLI invocations and over
-   hand-writing framework plumbing.
+   hand-writing framework plumbing. A new app has no MCP config yet: run
+   `wheels setup agents` to write `.mcp.json` and `.opencode.json`, or add
+   `{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}`
+   to your client's config yourself. Until then, use the `wheels` CLI.
 2. **Load context on demand.** Read the relevant section of `CLAUDE.md`
    (models, routing, views, middleware, migrations, jobs) for the task at
    hand instead of guessing at conventions.
