@@ -3346,6 +3346,14 @@ component extends="modules.BaseModule" {
 			// Handle REPL commands; unhandled input falls through to evaluation.
 			var verdict = $consoleHandleCommand(line, evalUrl, password, serverPort, System);
 			if (verdict == "exit") {
+				// A bare `exit`/`quit` usually ends a piped session, so it must
+				// not hide an earlier failed expression: fail like EOF does.
+				if ($consoleExitFailsSession(line, hadError)) {
+					throw(
+						type = "Wheels.ConsoleFailed",
+						message = "One or more console expressions failed"
+					);
+				}
 				running = false;
 				continue;
 			}
@@ -3498,6 +3506,15 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Does ending the console on `line` fail the session? A bare `exit`/`quit`
+	 * after a failed expression does, like EOF, so `bad expr; exit` piped in
+	 * exits non-zero (#3892). `/exit` keeps returning 0, as documented above.
+	 */
+	private boolean function $consoleExitFailsSession(required string line, required boolean hadError) {
+		return arguments.hadError && listFindNoCase("exit,quit", trim(arguments.line)) > 0;
+	}
+
+	/**
 	 * Handle one REPL command line. Returns "exit" to end the loop, "handled"
 	 * when the line was a slash command, "error" when a slash command's eval
 	 * failed, or "" when it should be evaluated as an expression by the caller.
@@ -3507,6 +3524,11 @@ component extends="modules.BaseModule" {
 			case "/exit":
 			case "/quit":
 			case "/q":
+			// Bare words too: they used to be evaluated as CFML and fail with
+			// "variable [EXIT] doesn't exist", so a piped session ending in
+			// `exit` exited 1 (#3892).
+			case "exit":
+			case "quit":
 				out("Bye!", "cyan");
 				return "exit";
 
@@ -3817,7 +3839,7 @@ component extends="modules.BaseModule" {
 		out("  /ds, /datasource Show current datasource");
 		out("  /reload         Reload the application");
 		out("  /clear          Clear the screen");
-		out("  /exit, /quit, /q Exit the console");
+		out("  /exit, /quit, /q Exit the console (bare exit and quit work too)");
 		out("");
 		out("Expression Examples:", "bold");
 		out('  model("User").findAll()                      Query all users');
