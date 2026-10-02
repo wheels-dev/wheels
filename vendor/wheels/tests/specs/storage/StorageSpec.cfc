@@ -302,6 +302,72 @@ component extends="wheels.WheelsTest" {
 					}
 					});
 
+				it("rejects a non-boolean resolveSymlinks config with InvalidConfiguration (##4020)", function() {
+					var strictRoot = $tempPath("wheels-storage-nonbool-" & CreateUUID());
+					if (!DirectoryExists(strictRoot)) {
+						DirectoryCreate(strictRoot);
+					}
+					try {
+						expect(function() {
+							new wheels.storage.drivers.LocalDisk(config = {root = strictRoot, resolveSymlinks = "maybe"});
+						}).toThrow("Wheels.Storage.InvalidConfiguration");
+					} finally {
+						if (DirectoryExists(strictRoot)) {
+							DirectoryDelete(strictRoot, true);
+						}
+					}
+				});
+
+				it(
+					"opt-in resolveSymlinks rejects a symlink to a case-distinct sibling on a case-sensitive filesystem (##4020)",
+					function() {
+						// Only an escape where the filesystem is case-SENSITIVE: there Store and store
+						// are different directories, so a symlink to the lower-cased sibling leaves the
+						// root. getCanonicalPath reports real on-disk case, so the containment compare
+						// must be exact. Detect case sensitivity behaviourally, never by OS name.
+						var base = $tempPath("wheels-storage-case-" & CreateUUID());
+						DirectoryCreate(base);
+						try {
+							DirectoryCreate(base & "/CASEPROBE");
+							if (DirectoryExists(base & "/caseprobe")) {
+								return; // case-insensitive FS: the sibling is the same dir, not an escape
+							}
+							var strictRoot = base & "/Store";
+							var outside = base & "/store";
+							DirectoryCreate(strictRoot);
+							DirectoryCreate(outside);
+							FileWrite(outside & "/secret.txt", CharsetDecode("outside-secret", "utf-8"));
+							var guard = {failedClosed = false};
+							var strictDisk = "";
+							try {
+								strictDisk = new wheels.storage.drivers.LocalDisk(config = {
+									root = strictRoot,
+									signingKey = "a-test-signing-key-padded-to-32-bytes!!",
+									resolveSymlinks = true
+								});
+							} catch (any e) {
+								guard.failedClosed = true;
+							}
+							if (guard.failedClosed) {
+								return; // non-resolving runtime: covered by the fail-closed spec
+							}
+							var linkPath = strictRoot & "/link";
+							$createSymlink(outside, linkPath);
+							try {
+								expect(function() {
+									strictDisk.exists("link/secret.txt");
+								}).toThrow("Wheels.Storage.InvalidKey");
+							} finally {
+								$deleteSymlink(linkPath);
+							}
+						} finally {
+							if (DirectoryExists(base)) {
+								DirectoryDelete(base, true);
+							}
+						}
+					}
+				);
+
 				it("accepts a key whose segment merely contains '..' (##3912)", function() {
 					// Two dots INSIDE a segment are not traversal; the name keeps real chars.
 					disk.put(key = "reports/q3..final.pdf", content = "report");

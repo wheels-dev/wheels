@@ -33,7 +33,17 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		variables.root = $normalizeDir(arguments.config.root);
 		variables.urlPrefix = StructKeyExists(arguments.config, "urlPrefix") ? arguments.config.urlPrefix : "";
 		variables.signingKey = StructKeyExists(arguments.config, "signingKey") ? arguments.config.signingKey : "";
-		variables.resolveSymlinks = StructKeyExists(arguments.config, "resolveSymlinks") && arguments.config.resolveSymlinks;
+		if (StructKeyExists(arguments.config, "resolveSymlinks")) {
+			if (!IsBoolean(arguments.config.resolveSymlinks)) {
+				throw(
+					type = "Wheels.Storage.InvalidConfiguration",
+					message = "Local disk 'resolveSymlinks' must be a boolean (true or false)."
+				);
+			}
+			variables.resolveSymlinks = arguments.config.resolveSymlinks ? true : false;
+		} else {
+			variables.resolveSymlinks = false;
+		}
 		// Fail closed, at init (not per request): if the app opted into symlink
 		// resolution but this runtime can't actually resolve symbolic links, refuse
 		// to construct rather than silently run an ineffective strict mode.
@@ -244,7 +254,12 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	 * appended lexically, so a symlink DIRECTORY under the root is still caught.
 	 */
 	private void function $assertCanonicalWithin(required string key, required string resolved) {
-		if (!$pathWithin(root = $canonicalPath(variables.root), candidate = $canonicalPath(arguments.resolved))) {
+		// Compare the two canonical paths EXACTLY (case-sensitively): getCanonicalPath()
+		// reports each path in its real on-disk case, so an exact compare is right on
+		// both case-sensitive and case-insensitive filesystems. $pathWithin's CFML `==`
+		// is case-insensitive, which would treat a case-distinct sibling directory as
+		// inside the root once a symlink redirects there.
+		if (!$pathWithinExact(root = $canonicalPath(variables.root), candidate = $canonicalPath(arguments.resolved))) {
 			throw(
 				type = "Wheels.Storage.InvalidKey",
 				message = "Storage key [#arguments.key#] resolves through a symlink outside the storage root."
@@ -280,7 +295,8 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 			local.linkFile = local.insideDir & "/lnk";
 			$createProbeSymlink(target = local.outsideDir, link = local.linkFile);
 			// Resolved iff canonicalising the link lands inside the (sibling) target.
-			probe.resolved = $pathWithin(
+			// Exact (case-sensitive) compare, like the strict check it gates.
+			probe.resolved = $pathWithinExact(
 				root = $canonicalPath(local.outsideDir),
 				candidate = $canonicalPath(local.linkFile)
 			);
@@ -308,18 +324,60 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	}
 
 	/**
-	 * Create a symbolic link via `ln -s` — the same cross-engine-portable mechanism
-	 * the storage spec uses (ProcessBuilder, not Files.createSymbolicLink, which
-	 * RustCFML does not shim). Throws when the link can't be created, which the
-	 * probe treats as "cannot resolve symlinks here" and fails closed on.
+	 * Create a symbolic link for the probe. Prefers the platform-native NIO call
+	 * (`java.nio.file.Files.createSymbolicLink`) so the probe works on JVM engines
+	 * without a POSIX `ln` on PATH — notably Windows with symlink privilege. Falls
+	 * back to `ln -s` where the NIO call is unavailable (RustCFML does not shim
+	 * `createSymbolicLink`, and some sandboxes block it). If neither can create the
+	 * link the error propagates, and the init probe fails closed.
 	 */
 	private void function $createProbeSymlink(required string target, required string link) {
+		if ($tryCreateSymbolicLinkNio(target = arguments.target, link = arguments.link)) {
+			return;
+		}
 		local.pb = CreateObject("java", "java.lang.ProcessBuilder").init(["ln", "-s", arguments.target, arguments.link]);
 		local.proc = local.pb.start();
 		local.proc.waitFor();
 		if (local.proc.exitValue() != 0) {
-			throw(type = "Wheels.Storage.SymlinkProbeFailed", message = "Probe could not create a symbolic link.");
+			throw(type = "Wheels.Storage.SymlinkProbeFailed", message = "Probe could not create a symbolic link (neither NIO createSymbolicLink nor `ln -s` succeeded).");
 		}
+	}
+
+	/**
+	 * Try to create the symlink through java.nio. Returns true on success, false if
+	 * the call is unavailable or fails, so the caller can fall back. `created` is a
+	 * bare `var` struct field (no `local.` prefix) so the value set in the catch
+	 * survives on BoxLang (cross-engine invariant 11).
+	 */
+	private boolean function $tryCreateSymbolicLinkNio(required string target, required string link) {
+		var created = {ok = false};
+		try {
+			local.linkPath = CreateObject("java", "java.io.File").init(arguments.link).toPath();
+			local.targetPath = CreateObject("java", "java.io.File").init(arguments.target).toPath();
+			CreateObject("java", "java.nio.file.Files").createSymbolicLink(local.linkPath, local.targetPath);
+			created.ok = true;
+		} catch (any e) {
+			created.ok = false;
+		}
+		return created.ok;
+	}
+
+	/**
+	 * Case-SENSITIVE containment, for comparing two already-canonicalised paths
+	 * (#4020). getCanonicalPath() reports each path in its real on-disk case, so an
+	 * exact compare is correct on both case-sensitive and case-insensitive
+	 * filesystems — unlike $pathWithin's CFML `==`, which is case-insensitive and
+	 * would treat a case-distinct sibling directory as inside the root once a
+	 * symlink redirects there. `Compare() == 0` is case-sensitive string equality
+	 * on every engine (cross-engine invariant 20).
+	 */
+	private boolean function $pathWithinExact(required string root, required string candidate) {
+		local.base = REReplace(arguments.root, "/+$", "");
+		if (Compare(arguments.candidate, local.base) == 0) {
+			return true;
+		}
+		return Len(arguments.candidate) > Len(local.base)
+			&& Compare(Left(arguments.candidate, Len(local.base) + 1), local.base & "/") == 0;
 	}
 
 	/**

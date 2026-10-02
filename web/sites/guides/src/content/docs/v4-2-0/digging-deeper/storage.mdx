@@ -134,7 +134,11 @@ The always-on lexical check does **not** resolve symbolic links. By default, a s
 
 #### Opt in to symlink-resolving containment (`resolveSymlinks`)
 
-For a hardened deployment — for example, `root` on a shared volume where a symlink escape is part of your threat model — set `resolveSymlinks = true` on the disk. On top of the lexical check, `$resolve()` then canonicalises each path through the filesystem, so a symlink under `root` that targets outside it is **rejected** with `Wheels.Storage.InvalidKey` instead of followed. The lexical check from the default mode stays on underneath; this only adds a stronger layer.
+For a hardened deployment — for example, `root` on a shared volume where a symlink escape is part of your threat model — set `resolveSymlinks = true` on the disk. On top of the lexical check, `$resolve()` then canonicalises each path through the filesystem and compares the resolved paths **exactly**, so a symlink under `root` that targets outside it is **rejected** with `Wheels.Storage.InvalidKey` instead of followed. The lexical check from the default mode stays on underneath; this only adds a stronger layer.
+
+<Aside type="caution" title="The check is point-in-time">
+The containment check runs when a key is resolved and then returns the resolved path for the subsequent `FileRead` / `FileWrite` / `FileDelete`. It validates the filesystem state at that moment — it is **not** a defence against an attacker who can swap a symlink under `root` concurrently, between the check and the file operation. The trust boundary is unchanged from the default mode: keep `root` writable only by your app and never point it at a directory untrusted users can write to. `resolveSymlinks` hardens against a symlink that is already in place when the key is resolved; it does not make `root` safe for untrusted concurrent writers.
+</Aside>
 
 ```cfm {test:compile} title="config/settings.cfm — strict containment"
 <cfscript>
