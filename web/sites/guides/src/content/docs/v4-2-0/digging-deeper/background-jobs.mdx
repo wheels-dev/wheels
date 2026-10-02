@@ -177,6 +177,10 @@ A worker claims a job by flipping its row to `processing`, then runs it. If that
 
 Recovery is scoped to the queues the poll serves and the requeue is an atomic, guarded `UPDATE`, so running several workers is safe: a worker never reaps a live job on a queue it doesn't process, and two workers reaping the same queue can't requeue or re-count the same job twice. Because the reap window comes from the *claiming* worker's recorded timeout rather than the poller's, workers with **different `timeout` values can share a queue** — a short-timeout worker won't reap a job that a longer-timeout worker is still legitimately running. (A row claimed before this was added, or on a database where the `claimTimeout` column can't be added, simply falls back to the polling worker's timeout.) Because a reaped job may have partly run before its worker died, **recovery is at-least-once** — the same reason `perform()` must be idempotent.
 
+<Aside type="note" title="Restricted database users">
+The `claimTimeout` column is added automatically on an existing `wheels_jobs` table. If the application's database user lacks `ALTER` privilege, the framework backs off (it does not retry the `ALTER` on every poll) and the reaper falls back to the polling worker's timeout. To enable per-worker reap timeouts in that case, have a DBA add the column once: `ALTER TABLE wheels_jobs ADD claimTimeout INT` (SQL Server omits `COLUMN`; Oracle uses `ADD (claimTimeout NUMBER(10))`).
+</Aside>
+
 To kick failed jobs back into the queue — after you've fixed the bug, say — call `retryFailed()`:
 
 ```cfm {test:compile} title="retry failed jobs"
