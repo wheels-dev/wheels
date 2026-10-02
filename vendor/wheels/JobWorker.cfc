@@ -101,7 +101,7 @@ component {
 		for (local.row in local.candidates) {
 			try {
 				local.claimFn = this["$claimJob"];
-				local.claimed = local.claimFn(local.row.id);
+				local.claimed = local.claimFn(local.row.id, arguments.timeout);
 			} catch (any e) {
 				// Persist/claim errors are contained — they must not look like an idle skip.
 				local.result.skipped = false;
@@ -164,14 +164,17 @@ component {
 			local.timeout = 300;
 		}
 
-		// Grace margin: only reap rows idle for longer than the poller's own timeout
-		// PLUS a cushion, so a worker with a different (longer) timeout polling the same
-		// queue never reaps a job that is still legitimately running (#3888). Workers that
-		// share a queue should configure the same timeout; the cushion absorbs clock skew.
-		local.graceSeconds = local.timeout + Max(60, local.timeout);
-		local.cutoff = DateAdd("s", -local.graceSeconds, $now());
+		// Grace margin: a row is only reapable once it has been idle past
+		// claimTimeout + max(60s, claimTimeout), where claimTimeout is the timeout the
+		// OWNING worker recorded when it claimed the job (#3989) — so a worker with a short
+		// timeout can't reap a job still running under a longer-timeout worker, even across
+		// queues. The real per-row grace is applied in the loop; here we bound the scan with
+		// a floor cutoff of 60s, since max(60s, …) makes the smallest possible grace ~60s so
+		// a row idle 60s or less can never be reapable. Rows with no claimTimeout (pre-#3989
+		// or an ALTER-blocked table) fall back to this poller's own timeout.
+		local.floorCutoff = DateAdd("s", -60, $now());
 
-		local.params = {cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}};
+		local.params = {cutoff = {value = local.floorCutoff, cfsqltype = "cf_sql_timestamp"}};
 
 		// Scope the reap to the queues this poll serves. A blank "queues" reaps across all
 		// queues (the standalone jobsMonitor path); processNext passes its own queue set so
@@ -188,35 +191,43 @@ component {
 			local.queueFilter = " AND queue IN (" & ArrayToList(local.placeholders) & ")";
 		}
 
-		// Find timed-out jobs
+		// Find candidate rows idle past the floor; the SELECT prefers claimTimeout and falls
+		// back without it when the column is absent.
+		local.whereClause = "WHERE status = 'processing' AND updatedAt < :cutoff" & local.queueFilter;
 		try {
-			local.timedOut = queryExecute(
-				"SELECT id, jobClass, attempts, maxRetries
-				FROM wheels_jobs
-				WHERE status = 'processing' AND updatedAt < :cutoff" & local.queueFilter,
-				local.params,
-				{datasource = variables.$datasource}
-			);
+			local.timedOut = $selectStaleCandidates(whereClause = local.whereClause, params = local.params);
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
 		}
 
+		local.now = $now();
 		local.recovered = 0;
 		for (local.row in local.timedOut) {
+			// Per-row reap window from the OWNER's recorded timeout (claimTimeout), falling back
+			// to this poller's timeout when the row has none. rowCutoff is the "idle past its own
+			// grace" boundary; the staleness test itself runs SQL-side inside the requeue UPDATE
+			// (AND updatedAt < :staleCutoff), so we never diff a query timestamp in CFML (#3989).
+			local.rowTimeout = local.timeout;
+			if (StructKeyExists(local.row, "claimTimeout") && IsNumeric(local.row.claimTimeout) && Val(local.row.claimTimeout) > 0) {
+				local.rowTimeout = Val(local.row.claimTimeout);
+			}
+			local.grace = local.rowTimeout + Max(60, local.rowTimeout);
+			local.rowCutoff = DateAdd("s", -local.grace, local.now);
+
 			local.currentAttempts = Val(local.row.attempts);
 			local.maxRetries = Val(local.row.maxRetries);
 
-			// Optimistic requeue guarded by the attempts value we just read: every $claimJob
-			// bumps attempts, so if the real worker finished or re-claimed between this SELECT
-			// and the UPDATE, the guard matches 0 rows and we don't double-requeue or
-			// double-count. Two concurrent reapers race on the same guard; exactly one wins.
+			// Optimistic requeue guarded by (a) the attempts value we just read — every $claimJob
+			// bumps attempts, so a finish or re-claim between SELECT and UPDATE matches 0 rows —
+			// and (b) the per-row staleness cutoff, so a row still inside its own window is left
+			// alone. Two concurrent reapers race on the same guard; exactly one wins.
 			if (local.currentAttempts <= local.maxRetries) {
 				// Reschedule for retry
-				local.won = $scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #local.timeout# seconds", local.currentAttempts);
+				local.won = $scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #local.rowTimeout# seconds", local.currentAttempts, local.rowCutoff);
 			} else {
 				// Exhausted retries
-				local.won = $markFailed(local.row.id, local.row.jobClass, local.maxRetries, "Job timed out after #local.timeout# seconds (max retries exhausted)", local.currentAttempts);
+				local.won = $markFailed(local.row.id, local.row.jobClass, local.maxRetries, "Job timed out after #local.rowTimeout# seconds (max retries exhausted)", local.currentAttempts, local.rowCutoff);
 			}
 			if (local.won > 0) {
 				local.recovered++;
@@ -224,6 +235,29 @@ component {
 		}
 
 		return local.recovered;
+	}
+
+	/**
+	 * SELECT the stale-processing candidates, preferring the claimTimeout column and retrying
+	 * without it when the column is absent (an ALTER-blocked or pre-#3989 table). On the
+	 * fallback path the rows carry no claimTimeout, so checkTimeouts uses the poller's timeout.
+	 */
+	private query function $selectStaleCandidates(required string whereClause, required struct params) {
+		try {
+			return queryExecute(
+				"SELECT id, jobClass, attempts, maxRetries, updatedAt, claimTimeout
+				FROM wheels_jobs " & arguments.whereClause,
+				arguments.params,
+				{datasource = variables.$datasource}
+			);
+		} catch (any e) {
+			return queryExecute(
+				"SELECT id, jobClass, attempts, maxRetries, updatedAt
+				FROM wheels_jobs " & arguments.whereClause,
+				arguments.params,
+				{datasource = variables.$datasource}
+			);
+		}
 	}
 
 	/**
@@ -532,29 +566,54 @@ component {
 	 * race — it throws Wheels.JobClaimFailed so processNext can contain it
 	 * without disguising the failure as an idle skip.
 	 */
-	public boolean function $claimJob(required string jobId) {
-		try {
-			// Use the result option to get affected-row count from the same connection
-			// that executed the UPDATE. A separate verification SELECT can fail on
-			// BoxLang + PostgreSQL when the connection pool hands out a different
-			// connection that cannot see the uncommitted UPDATE.
-			queryExecute(
-				"UPDATE wheels_jobs
-				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
-				WHERE id = :id AND status = 'pending'",
-				{
-					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-					id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
-				},
-				{datasource = variables.$datasource, result = "local.updateResult"}
-			);
-			return (local.updateResult.recordCount ?: 0) > 0;
-		} catch (any e) {
-			throw(
-				type = "Wheels.JobClaimFailed",
-				message = "Failed to claim job #arguments.jobId#: #e.message#"
-			);
+	public boolean function $claimJob(required string jobId, numeric timeout = 300) {
+		// Record the claiming worker's timeout on the row so the stale-job reaper can reap on
+		// THIS worker's timeout rather than the polling worker's (#3989). Normalise a
+		// blank/<=0 timeout to the default exactly as checkTimeouts/$executeJob do.
+		local.claimTimeout = Val(arguments.timeout);
+		if (local.claimTimeout <= 0) {
+			local.claimTimeout = 300;
 		}
+		try {
+			return $claimJobUpdate(jobId = arguments.jobId, claimTimeout = local.claimTimeout, withClaimTimeout = true);
+		} catch (any e) {
+			// The claimTimeout column may be absent (its ALTER was blocked). Claiming must not
+			// break: retry without the column — the reaper then falls back to the poller's
+			// timeout for this row. A genuine claim failure rethrows from the retry.
+			try {
+				return $claimJobUpdate(jobId = arguments.jobId, claimTimeout = local.claimTimeout, withClaimTimeout = false);
+			} catch (any e2) {
+				throw(
+					type = "Wheels.JobClaimFailed",
+					message = "Failed to claim job #arguments.jobId#: #e2.message#"
+				);
+			}
+		}
+	}
+
+	/**
+	 * The claim UPDATE, optionally writing claimTimeout. Split out so $claimJob can retry
+	 * without the column when it is missing. Uses the result option to read the affected-row
+	 * count from the same connection (a separate SELECT can miss the uncommitted UPDATE on
+	 * BoxLang + PostgreSQL).
+	 */
+	private boolean function $claimJobUpdate(required string jobId, required numeric claimTimeout, required boolean withClaimTimeout) {
+		local.setClaim = arguments.withClaimTimeout ? ", claimTimeout = :claimTimeout" : "";
+		local.params = {
+			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
+		};
+		if (arguments.withClaimTimeout) {
+			local.params.claimTimeout = {value = arguments.claimTimeout, cfsqltype = "cf_sql_integer"};
+		}
+		queryExecute(
+			"UPDATE wheels_jobs
+			SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt" & local.setClaim & "
+			WHERE id = :id AND status = 'pending'",
+			local.params,
+			{datasource = variables.$datasource, result = "local.updateResult"}
+		);
+		return (local.updateResult.recordCount ?: 0) > 0;
 	}
 
 	/**
@@ -639,7 +698,8 @@ component {
 		required string jobClass,
 		required numeric maxRetries,
 		required string errorMessage,
-		numeric expectedAttempts = -1
+		numeric expectedAttempts = -1,
+		any staleCutoff = ""
 	) {
 		local.baseDelay = 2;
 		local.maxDelay = 3600;
@@ -676,13 +736,22 @@ component {
 			local.attemptsGuard = " AND attempts = :expectedAttempts";
 			local.params.expectedAttempts = {value = arguments.expectedAttempts, cfsqltype = "cf_sql_integer"};
 		}
+		// Per-row staleness guard (#3989): the reaper passes the cutoff built from THIS row's
+		// own claimTimeout, and the DB compares the timestamp — keeping all timestamp
+		// comparison SQL-side (a query's updatedAt is an epoch number on BoxLang / mishandled
+		// on Adobe when diffed in CFML). A row still inside its own window matches 0 rows.
+		local.staleGuard = "";
+		if (IsDate(arguments.staleCutoff)) {
+			local.staleGuard = " AND updatedAt < :staleCutoff";
+			local.params.staleCutoff = {value = arguments.staleCutoff, cfsqltype = "cf_sql_timestamp"};
+		}
 		queryExecute(
 			"UPDATE wheels_jobs
 			SET status = 'pending',
 				lastError = :lastError,
 				runAt = :runAt,
 				updatedAt = :updatedAt
-			WHERE id = :id AND status = 'processing'" & local.attemptsGuard,
+			WHERE id = :id AND status = 'processing'" & local.attemptsGuard & local.staleGuard,
 			local.params,
 			{datasource = variables.$datasource, result = "local.updateResult"}
 		);
@@ -703,7 +772,8 @@ component {
 		required string jobClass,
 		required numeric maxRetries,
 		required string errorMessage,
-		numeric expectedAttempts = -1
+		numeric expectedAttempts = -1,
+		any staleCutoff = ""
 	) {
 		local.params = {
 			failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
@@ -717,13 +787,19 @@ component {
 			local.attemptsGuard = " AND attempts = :expectedAttempts";
 			local.params.expectedAttempts = {value = arguments.expectedAttempts, cfsqltype = "cf_sql_integer"};
 		}
+		// Per-row staleness guard built from the row's own claimTimeout, compared SQL-side (#3989).
+		local.staleGuard = "";
+		if (IsDate(arguments.staleCutoff)) {
+			local.staleGuard = " AND updatedAt < :staleCutoff";
+			local.params.staleCutoff = {value = arguments.staleCutoff, cfsqltype = "cf_sql_timestamp"};
+		}
 		queryExecute(
 			"UPDATE wheels_jobs
 			SET status = 'failed',
 				failedAt = :failedAt,
 				lastError = :lastError,
 				updatedAt = :updatedAt
-			WHERE id = :id AND status = 'processing'" & local.attemptsGuard,
+			WHERE id = :id AND status = 'processing'" & local.attemptsGuard & local.staleGuard,
 			local.params,
 			{datasource = variables.$datasource, result = "local.updateResult"}
 		);
