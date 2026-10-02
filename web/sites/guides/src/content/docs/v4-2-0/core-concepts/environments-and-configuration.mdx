@@ -88,7 +88,7 @@ An unset or empty `WHEELS_ENV` means `development`, so a new app runs locally wi
 
 The `wheels` CLI doesn't read the variable, and `WHEELS_ENV` also selects which `.env.<name>` overlay file loads at boot.
 
-<Aside type="caution" title="Apps generated before 4.1.3">
+<Aside type="caution" title="Apps generated before Wheels 4.2">
   Earlier scaffolds and the `wheels-base-template` download hardcode `set(environment = "development");`, so exporting `WHEELS_ENV` changes nothing, and a production server runs in development mode, with full error details, until you change it. Replace `config/environment.cfm` with the generated version above (it rejects unknown values), or hardcode `set(environment = "production");` on production servers.
 </Aside>
 

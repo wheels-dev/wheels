@@ -51,12 +51,6 @@ The handlers are guarded against a torn-down application scope during `applicati
 
 **Fails safe on Lucee and BoxLang; does not on Adobe CF 2023/2025**, where an unguarded handler can turn a reload or idle-timeout teardown into an HTTP 500 for the whole site. See the Aside in [Manual upgrades](/v4-1-0/upgrading/manual-upgrades/).
 
-### `onError` running-app message (4.1.3)
-
-The `onError` minimal fallback now distinguishes an error raised once the application is already running (for example a request timeout after startup) from a genuine startup failure, and extends the request timeout before logging so the `wheels.log` entry it points at is actually written ([#3965](https://github.com/wheels-dev/wheels/issues/3965)).
-
-**Fails safe** — the previous behaviour renders a misleading "Wheels failed to initialize" page and may not write the log entry, but the app is otherwise unaffected. Copy the updated `onError`, `$renderMinimalError` and `$logStartupFailure` functions from the template.
-
 ### jBCrypt load path (4.1.0)
 
 A block puts the bundled jBCrypt jar on the application's Java load paths ([#3571](https://github.com/wheels-dev/wheels/issues/3571)) so `bcryptHash()` / `bcryptVerify()` run in native Java. The exact block is in the Aside in [Manual upgrades](/v4-1-0/upgrading/manual-upgrades/).
