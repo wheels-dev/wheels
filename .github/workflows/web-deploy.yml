@@ -265,6 +265,11 @@ jobs:
 
       - name: Build all sites
         working-directory: web
+        env:
+          # Same reason as the build job: sites/packages enumerates the package
+          # registry through the GitHub REST API at build time, and the
+          # unauthenticated 60/hour cap returns 403 under busy CI.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm build
 
       # The blog index page is content-driven — new articles appear on it
