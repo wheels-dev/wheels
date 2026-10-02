@@ -38,6 +38,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 				expect(message).toInclude("not a Wheels project");
 				expect(message).toInclude("config/settings.cfm");
+				expect(message).toInclude("wheels new");
 			});
 
 			it("generate app is not blocked by the guard", () => {

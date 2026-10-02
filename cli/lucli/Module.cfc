@@ -9792,6 +9792,8 @@ component extends="modules.BaseModule" {
 	/**
 	 * Refuse a project-scoped command outside a Wheels project: print the same
 	 * guidance `wheels start` gives, then throw so the command exits non-zero.
+	 * The tip is repeated in the message because an MCP client sees only the
+	 * error, not the out() lines (#3863).
 	 */
 	private void function $requireWheelsProject(required string command) {
 		if ($isWheelsProjectDir(variables.projectRoot)) return;
@@ -9800,7 +9802,7 @@ component extends="modules.BaseModule" {
 		out("");
 		out("Tip: cd into your project directory, or run `wheels new <appname>`", "cyan");
 		out("     to scaffold one.", "cyan");
-		throw(type = "Wheels.NotAWheelsProject", message = "#arguments.command#: this directory is not a Wheels project (no config/settings.cfm).");
+		throw(type = "Wheels.NotAWheelsProject", message = "#arguments.command#: this directory is not a Wheels project (no config/settings.cfm). cd into your project directory, or run `wheels new <appname>` to scaffold one.");
 	}
 
 	/**
