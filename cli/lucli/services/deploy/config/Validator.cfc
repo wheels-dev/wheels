@@ -89,6 +89,9 @@ component {
 					if (structKeyExists(acc, "image")) {
 						$validateImage(acc.image, "accessory #accName# image", arguments.filePath);
 					}
+					if (structKeyExists(acc, "port")) {
+						$validateAccessoryPort(acc.port, accName, arguments.filePath);
+					}
 					for (var volKey in ["volumes", "directories"]) {
 						if (structKeyExists(acc, volKey) && isArray(acc[volKey])) {
 							var volIndex = 0;
@@ -151,6 +154,56 @@ component {
 				"#arguments.label# needs an absolute host path: '#arguments.entry#' starts with '#firstChar#', which is not expanded (write /home/<user>/... instead)"
 			);
 		}
+	}
+
+	/**
+	 * An accessory `port:` goes to `docker run --publish` as written, so it
+	 * must name a bind address (#4067), as Kamal main requires since
+	 * basecamp/kamal@00cb4cf1d: "<ipv4>:<host>:<container>" or
+	 * "[<ipv6>]:<host>:<container>", optionally with "/tcp" or "/udp". A bare
+	 * "5432" published on a random host port, and "5432:5432" on every
+	 * interface, without any warning.
+	 */
+	public void function $validateAccessoryPort(required any port, required string accName, required string filePath) {
+		if (!isSimpleValue(arguments.port)) {
+			$raise(arguments.filePath, "accessory #arguments.accName#: port must be a string such as ""127.0.0.1:5432:5432""");
+		}
+		var value = trim(toString(arguments.port));
+		if (!len(value)) return;
+		var hostPart = listFirst(value, "/");
+		// The ports and optional protocol after the bind address: a port or
+		// range on each side, e.g. ":5432:5432", ":8000-8010:8000-8010/udp".
+		var portsPattern = ":[0-9]+(-[0-9]+)?:[0-9]+(-[0-9]+)?(/(tcp|udp|sctp))?$";
+		var bound = false;
+		if (left(hostPart, 1) == "[") {
+			var close = find("]", hostPart);
+			if (close > 2) {
+				var ipv6 = mid(hostPart, 2, close - 2);
+				bound = reFind("^[0-9A-Fa-f:.]+$", ipv6) && find(":", ipv6)
+					&& reFind("^" & portsPattern, mid(value, close + 1, len(value)));
+			}
+		} else if (listLen(hostPart, ":", true) >= 3) {
+			var ipv4 = listFirst(hostPart, ":");
+			bound = $isIPv4(ipv4) && reFind("^" & portsPattern, mid(value, len(ipv4) + 1, len(value)));
+		}
+		if (!bound) {
+			var containerPort = listLast(hostPart, ":");
+			if (!reFind("^[0-9]+$", containerPort)) containerPort = "PORT";
+			$raise(
+				arguments.filePath,
+				"accessory #arguments.accName#: port ""#value#"" must name a bind address, e.g. ""127.0.0.1:#containerPort#:#containerPort#"" to keep it on that host, "
+					& """10.0.0.20:#containerPort#:#containerPort#"" for a private network address, or ""0.0.0.0:#containerPort#:#containerPort#"" to publish it on every interface"
+			);
+		}
+	}
+
+	/** Four dot-separated decimal octets, each 0-255. */
+	public boolean function $isIPv4(required string value) {
+		if (!reFind("^[0-9]{1,3}(\.[0-9]{1,3}){3}$", arguments.value)) return false;
+		for (var octet in listToArray(arguments.value, ".")) {
+			if (val(octet) > 255) return false;
+		}
+		return true;
 	}
 
 	public void function $validateServers(required any servers, required string filePath) {

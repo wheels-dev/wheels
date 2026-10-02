@@ -10,7 +10,7 @@ accessories:
   db:
     image: postgres:16
     host: 1.2.3.5
-    port: "5432:5432"
+    port: "127.0.0.1:5432:5432"
     env:
       clear:
         POSTGRES_USER: demo
@@ -19,4 +19,4 @@ accessories:
   redis:
     image: redis:7
     host: 1.2.3.5
-    port: "6379:6379"
+    port: "127.0.0.1:6379:6379"
