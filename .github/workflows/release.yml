@@ -234,8 +234,11 @@ jobs:
             echo "  Version: $VERSION"
 
             # Check that version matches expected version
+            # Fatal: a mismatched manifest still publishes, under the wrong
+            # version (the starter app shipped as 1.0.0 on every release, #3908).
             if [[ "$VERSION" != "${{ env.WHEELS_VERSION }}" ]]; then
-              echo "  WARNING: Version mismatch! Expected ${{ env.WHEELS_VERSION }}, got $VERSION"
+              echo "  ERROR: Version mismatch! Expected ${{ env.WHEELS_VERSION }}, got $VERSION"
+              exit 1
             fi
 
             # Count files

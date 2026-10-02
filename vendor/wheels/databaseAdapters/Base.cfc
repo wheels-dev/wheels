@@ -729,6 +729,11 @@ component output=false extends="wheels.Global"{
 		} else {
 			$validateValueShape(arguments.str, arguments.type);
 			local.rv = arguments.str;
+			// The WHERE parser binds a bare number but not a bare true / false,
+			// so write a boolean as 1 / 0 (#3896).
+			if (arguments.type == "boolean") {
+				local.rv = (CompareNoCase(arguments.str, "true") == 0 || Compare(arguments.str, "1") == 0) ? "1" : "0";
+			}
 		}
 		return local.rv;
 	}

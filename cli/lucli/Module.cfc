@@ -209,6 +209,7 @@ component extends="modules.BaseModule" {
 			// home — a side-effecting install step, not a query
 			"docs",
 			"mcpToolSpecs", // per-tool inputSchema registry read by LuCLI — not itself a tool
+			"onMissingMethod", // unknown-command handler (#3890) — a CFML hook, not a tool
 			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
 			// unit-test them directly (the cli/CLAUDE.md "public for specs"
 			// carve-out) — they are not commands and must never surface as MCP
@@ -595,7 +596,7 @@ component extends="modules.BaseModule" {
 	 */
 	public string function version() {
 		var nl = chr(10);
-		var moduleVersion = super.version();
+		var moduleVersion = $displayVersion();
 		var channel = new services.ReleaseChannel().classify(moduleVersion);
 		var channelTag = len(channel) ? " (" & channel & ")" : "";
 
@@ -612,6 +613,39 @@ component extends="modules.BaseModule" {
 		}
 
 		return arrayToList(lines, nl);
+	}
+
+	/**
+	 * The CLI version to show a person. A source checkout's module.json carries
+	 * the unstamped `@build.version@` token, which used to be printed as is
+	 * (#3891). An unstamped module run from inside the monorepo reports the root
+	 * wheels.json version with `-dev`, the derivation FrameworkInstaller uses for
+	 * the framework; anywhere else it reports BuildInfo's `0.0.0-dev` sentinel.
+	 * Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public string function $displayVersion(string rawVersion, string moduleDir) {
+		var v = structKeyExists(arguments, "rawVersion") ? arguments.rawVersion : super.version();
+		if (!(left(v, 7) == "@build." && right(v, 1) == "@")) return v;
+		var dir = structKeyExists(arguments, "moduleDir") ? arguments.moduleDir : getDirectoryFromPath(getCurrentTemplatePath());
+		try {
+			var File = createObject("java", "java.io.File");
+			var root = File.init(dir & "/../..").getCanonicalPath();
+			for (var name in ["wheels.json", "box.json"]) {
+				var manifestPath = root & "/" & name;
+				if (!fileExists(manifestPath)) continue;
+				var manifest = deserializeJSON(fileRead(manifestPath));
+				var isMonorepo = isStruct(manifest) && (
+					(structKeyExists(manifest, "name") && manifest.name == "Wheels.fw")
+					|| (structKeyExists(manifest, "slug") && manifest.slug == "wheels")
+				);
+				if (isMonorepo && structKeyExists(manifest, "version") && len(manifest.version) && left(manifest.version, 7) != "@build.") {
+					return manifest.version & "-dev";
+				}
+			}
+		} catch (any e) {
+			// Unreadable manifest: fall through to the sentinel.
+		}
+		return "0.0.0-dev";
 	}
 
 	private string function $detectLucliVersion() {
@@ -705,7 +739,7 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		var v = super.version();
+		var v = $displayVersion();
 		var help = "Wheels CLI " & v & nl;
 		help &= "  CFML MVC framework — code generation, migrations, testing, server management" & nl & nl;
 		help &= "Usage:" & nl;
@@ -1629,7 +1663,15 @@ component extends="modules.BaseModule" {
 	 */
 	public string function docs() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
-		var action = arrayLen(args) ? lCase(args[1]) : "fetch";
+		// The first non-flag token, so a bare `wheels docs --offline` (or
+		// `--force`) runs the default fetch instead of being read as an action.
+		var action = "fetch";
+		for (var token in args) {
+			if (left(token, 2) != "--") {
+				action = lCase(token);
+				break;
+			}
+		}
 		// Resolve --force HERE, in the command that actually receives the parsed
 		// argv. docsFetch() takes no arguments, so a helper reading its
 		// `arguments` scope always saw an empty struct and the flag was
@@ -1640,6 +1682,9 @@ component extends="modules.BaseModule" {
 				force = true;
 			}
 		}
+		// --offline / WHEELS_OFFLINE=1: sets request.$wheelsOffline, which
+		// docsFetch() and the HttpClient download gate both honour.
+		$consumeOfflineFlag(args);
 		switch (action) {
 			case "fetch":
 				return docsFetch(force = force);
@@ -1677,7 +1722,16 @@ component extends="modules.BaseModule" {
 			out("Documentation for #version# is already installed.", "green");
 			out("  #target#");
 			out("  Re-run with --force to replace it.");
+			// The bundle cache is per CLI home and shared by every app, so a
+			// second app finds it installed and still needs its own mirror.
+			$docsMountIntoWebroot(target);
 			return "";
+		}
+		if ($isOffline()) {
+			$docsFetchFail(
+				"Offline mode is enabled (--offline / WHEELS_OFFLINE=1): downloading the docs bundle for #version# requires network access.",
+				["  Run again without --offline to download it."]
+			);
 		}
 
 		// Not `url` — a variable named after a reserved CFML scope shadows it,
@@ -1740,28 +1794,10 @@ component extends="modules.BaseModule" {
 			directoryCreate(staging, true);
 			// The bundle is zipped with its contents at the root (manifest.json,
 			// guides/, api/), so unpack straight into the staging directory.
-			// Shell out to `unzip` rather than Lucee's extract(): `extract` is
-			// shadowed in this module's scope and resolves to a helper with a
-			// different arity. Same approach Installer::$extract() takes with
-			// `tar`, for the same reason.
-			var unzipResult = {};
 			try {
-				cfexecute(
-					name = "unzip",
-					arguments = "-o -q #tmp# -d #staging#",
-					timeout = 300,
-					variable = "local.unzipOut",
-					errorVariable = "local.unzipErr",
-					result = "unzipResult"
-				);
+				$docsUnzip(tmp, staging);
 			} catch (any e) {
 				$docsFetchFail("Could not unpack the bundle: #e.message#");
-			}
-			if (unzipResult.exitCode != 0) {
-				$docsFetchFail(
-					"Could not unpack the bundle (unzip exit #unzipResult.exitCode#).",
-					["  #local.unzipErr ?: ''#"]
-				);
 			}
 
 			try {
@@ -1785,6 +1821,51 @@ component extends="modules.BaseModule" {
 		out("  #target#");
 		$docsMountIntoWebroot(target);
 		return "";
+	}
+
+	/**
+	 * Unpacks a zip with java.util.zip rather than a shell `unzip`: an
+	 * argument string broke on paths with spaces, and Windows has no `unzip`.
+	 * Lucee's extract() is not an option either: `extract` is shadowed in
+	 * this module's scope by a helper with a different arity. An entry that
+	 * would land outside destDir (`../x`, an absolute path) throws instead of
+	 * being skipped, so a hostile bundle installs nothing.
+	 */
+	private void function $docsUnzip(required string zipPath, required string destDir) {
+		var root = createObject("java", "java.io.File").init(arguments.destDir).getCanonicalFile();
+		var rootPath = root.toPath();
+		var zip = createObject("java", "java.util.zip.ZipFile").init(arguments.zipPath);
+		try {
+			var entries = zip.entries();
+			while (entries.hasMoreElements()) {
+				var entry = entries.nextElement();
+				var outFile = createObject("java", "java.io.File").init(root, entry.getName()).getCanonicalFile();
+				// A `./` directory entry is the root itself: nothing to create.
+				if (entry.isDirectory() && outFile.equals(root)) {
+					continue;
+				}
+				if (!outFile.toPath().startsWith(rootPath) || outFile.equals(root)) {
+					throw(type = "Wheels.DocsFetchFailed", message = "the archive entry '#entry.getName()#' points outside the docs directory");
+				}
+				if (entry.isDirectory()) {
+					outFile.mkdirs();
+					continue;
+				}
+				outFile.getParentFile().mkdirs();
+				var input = zip.getInputStream(entry);
+				try {
+					createObject("java", "java.nio.file.Files").copy(
+						input,
+						outFile.toPath(),
+						[createObject("java", "java.nio.file.StandardCopyOption").REPLACE_EXISTING]
+					);
+				} finally {
+					input.close();
+				}
+			}
+		} finally {
+			zip.close();
+		}
 	}
 
 	/**
@@ -2138,7 +2219,13 @@ component extends="modules.BaseModule" {
 	 * hint: Start the Wheels development server via LuCLI
 	 */
 	public string function start() {
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		// `--port 8931` (space form) arrives as port="true" plus a positional;
+		// without re-binding it, toArgv() reordered it to "8931 --port" and
+		// the port was silently dropped (#3895).
+		// Both may arrive that way at once; they bind by value shape.
+		var args = new services.ArgSpec().toArgv(
+			new services.ArgSpec().bindSpaceFormValues(structuredArgs(arguments), {port = "^[0-9]+$", engine = "^[A-Za-z][A-Za-z0-9_-]*$"})
+		);
 
 		// Refuse to start from a non-Wheels-project directory. LuCLI's
 		// `server start` derives the server name from the cwd basename and
@@ -2169,17 +2256,28 @@ component extends="modules.BaseModule" {
 			if (a == "--force") {
 				force = true;
 			} else if (a == "--engine") {
-				if (i < arrayLen(args)) { engine = lCase(args[i + 1]); i++; }
+				engine = lCase($startFlagValue(args, i, "engine"));
+				i++;
 			} else if (left(a, 9) == "--engine=") {
 				engine = lCase(mid(a, 10, len(a) - 9));
 			} else if (a == "--port") {
-				if (i < arrayLen(args)) { enginePort = val(args[i + 1]); i++; }
+				enginePort = val($startFlagValue(args, i, "port"));
+				i++;
 			} else if (left(a, 7) == "--port=") {
 				enginePort = val(mid(a, 8, len(a) - 7));
 			} else {
 				arrayAppend(passThrough, a);
 			}
 		}
+
+		// An unknown engine used to fall through to Lucee silently (#3895).
+		if (!listFind("lucee,rustcfml", engine)) {
+			throw(type = "Wheels.InvalidArguments", message = "Unknown engine '#engine#' for wheels start. Supported: lucee (the default), rustcfml.");
+		}
+
+		// One engine per project (#3913): a second engine on another port made
+		// the CLI's server detection pick one of them silently.
+		$refuseOtherEngine(engine);
 
 		// Port resolution. Two projects whose defaults overlap clash on the
 		// SHUTDOWN port, and LuCLI reports that as "port conflicts detected:"
@@ -2201,6 +2299,7 @@ component extends="modules.BaseModule" {
 		if (engine == "rustcfml") {
 			var rustSvc = $rustcfmlEngine();
 			try {
+				$announceRustcfmlDownload(rustSvc);
 				var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
 			} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 				$reportUnsupportedRustPlatform(e);
@@ -2432,21 +2531,21 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// RustCFML backend — if a recorded RustCFML server is alive, stop it
-		// before touching LuCLI's registry. Auto-detected, so `wheels stop`
-		// works regardless of which engine was started.
-		var rustSvc = new services.rustcfml.RustCFMLEngine();
+		// RustCFML backend — if a recorded RustCFML server is alive, stop it,
+		// then go on to the project's Lucee server: `wheels stop` stops
+		// whatever runs for the project, whichever engine started it (#3913).
+		var rustSvc = $rustcfmlEngine();
 		var rustStatus = rustSvc.status(variables.projectRoot);
+		var rustStopped = false;
 		if (rustStatus.running) {
 			rustSvc.stop(variables.projectRoot);
 			out("RustCFML server stopped.", "cyan");
-			return "";
-		}
-		if ((rustStatus.staleReason ?: "") == "pid-not-server") {
+			rustStopped = true;
+		} else if ((rustStatus.staleReason ?: "") == "pid-not-server") {
 			out(rustStatus.message, "yellow");
 		}
 
-		out("Stopping Wheels server...", "cyan");
+		if (!rustStopped) out("Stopping Wheels server...", "cyan");
 
 		// If LuCLI's stop won't find a registered server for this directory
 		// (cwd doesn't match any `.project-path`), enumerate the user's
@@ -2456,6 +2555,8 @@ component extends="modules.BaseModule" {
 		// orphan Java processes the user has to chase with `lsof`+`kill`.
 		// See GH #2316.
 		var match = $findServerForProject(variables.projectRoot);
+		// Only RustCFML was running: it is stopped, and there is nothing to report.
+		if (!len(match) && rustStopped) return "";
 		if (!len(match)) {
 			var orphans = $listRunningWheelsServers();
 			if (arrayLen(orphans)) {
@@ -2503,6 +2604,7 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		if (rustStopped) out("Stopping Wheels server...", "cyan");
 		executeCommand("server", ["stop"], variables.projectRoot);
 		getService("serverRegistry").deleteStartToken(match);
 		return "";
@@ -2519,8 +2621,10 @@ component extends="modules.BaseModule" {
 	 * registry. Hidden from MCP like the other stateful server commands.
 	 */
 	public string function engines() {
-		var coll = structuredArgs(arguments);
-		var opts = new services.ArgSpec()
+		var spec = new services.ArgSpec();
+		// `--port 8931` (space form), as `wheels start` accepts (#3895).
+		var coll = spec.bindSpaceFormValue(structuredArgs(arguments), "port");
+		var opts = spec
 			.positional(name = "engine", default = "", description = "Engine name: rustcfml")
 			.positional(name = "action", default = "", description = "Action: install, start, stop, status")
 			.option(name = "port", default = "8513", description = "Port for `start` (default 8513)")
@@ -2529,10 +2633,13 @@ component extends="modules.BaseModule" {
 		var engine = lCase(trim(opts.engine));
 		var action = lCase(trim(opts.action));
 
-		if (engine != "rustcfml") {
-			out("Unknown engine '#opts.engine#'. Supported: rustcfml", "yellow");
+		if (!len(engine)) {
 			out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
 			return "";
+		}
+		if (engine != "rustcfml") {
+			out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+			throw(type = "Wheels.InvalidArguments", message = "Unknown engine '#opts.engine#'. Supported: rustcfml");
 		}
 
 		var svc = $rustcfmlEngine();
@@ -2540,6 +2647,7 @@ component extends="modules.BaseModule" {
 			case "install":
 				out("Installing RustCFML...", "cyan");
 				try {
+					$announceRustcfmlDownload(svc);
 					out("Installed: " & svc.install(), "green");
 				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 					$reportUnsupportedRustPlatform(e);
@@ -2547,7 +2655,9 @@ component extends="modules.BaseModule" {
 				}
 				break;
 			case "start":
+				$refuseOtherEngine("rustcfml");
 				try {
+					$announceRustcfmlDownload(svc);
 					var st = svc.start(variables.projectRoot, val(opts.port));
 				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 					$reportUnsupportedRustPlatform(e);
@@ -2576,10 +2686,42 @@ component extends="modules.BaseModule" {
 					out("No RustCFML server running for this project.", "yellow");
 				}
 				break;
+			case "":
+				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+				break;
 			default:
-				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "yellow");
+				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown action '#opts.action#' for wheels engines rustcfml. Try: install, start, stop, status");
 		}
 		return "";
+	}
+
+	/**
+	 * The value after a bare `--<name>` in start()'s argv. Refuses a missing
+	 * value or another flag, which the loop used to take as the value (so
+	 * `--port --engine` booted Lucee on the default port).
+	 */
+	private string function $startFlagValue(required array args, required numeric i, required string name) {
+		if (arguments.i >= arrayLen(arguments.args) || left(arguments.args[arguments.i + 1], 2) == "--") {
+			throw(type = "Wheels.InvalidArguments", message = "--#arguments.name# needs a value, e.g. --#arguments.name#=<value>.");
+		}
+		return arguments.args[arguments.i + 1];
+	}
+
+	/**
+	 * The pinned RustCFML binary is a ~57 MB download on first use. It used to
+	 * happen silently inside `wheels start`; announce it and how long it took.
+	 * The download itself runs in a child process whose output is not shown,
+	 * so this prints before and after rather than a live progress bar.
+	 */
+	private void function $announceRustcfmlDownload(required any svc) {
+		if (arguments.svc.isInstalled()) {
+			return;
+		}
+		out("Downloading RustCFML #arguments.svc.getEngineVersion()# (about 57 MB, first run only)...", "cyan");
+		var began = getTickCount();
+		arguments.svc.install();
+		out("  Downloaded and verified in #numberFormat((getTickCount() - began) / 1000, '0.0')#s.", "cyan");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2883,7 +3025,7 @@ component extends="modules.BaseModule" {
 	public string function info() {
 		// Takes no arguments; enforce the schema's additionalProperties:false (#2963).
 		new services.ArgSpec().parse(structuredArgs(arguments));
-		out("Wheels CLI v#super.version()#", "bold");
+		out("Wheels CLI v#$displayVersion()#", "bold");
 		out("");
 
 		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
@@ -2911,8 +3053,19 @@ component extends="modules.BaseModule" {
 				} catch (any e) { /* skip */ }
 			}
 
-			// CFML engine
-			out("Engine:   Lucee (LuCLI module)");
+			// CFML engine: the one serving this project. It was always reported
+			// as Lucee, even while RustCFML served (#3895).
+			var engineLine = "Lucee (LuCLI module)";
+			try {
+				var rustSvc = $rustcfmlEngine();
+				var rustStatus = rustSvc.status(variables.projectRoot);
+				if (rustStatus.running ?: false) {
+					engineLine = "RustCFML #rustSvc.getEngineVersion()# (running at http://127.0.0.1:#rustStatus.port#)";
+				}
+			} catch (any e) {
+				// No RustCFML state to read; Lucee is the default.
+			}
+			out("Engine:   #engineLine#");
 
 			// Datasource. Strip CFML/cfscript comments first so commented-out
 			// `set(...)` calls don't get parsed as live config, and use a
@@ -3295,7 +3448,7 @@ component extends="modules.BaseModule" {
 
 		// Banner
 		out("", "");
-		out("Wheels Console v#super.version()#", "bold");
+		out("Wheels Console v#$displayVersion()#", "bold");
 		out("Connected to #$serverHostPort(serverPort)# (#wheelsEnv#) — Wheels #wheelsVersion#", "cyan");
 		out("Type expressions to evaluate in your app context. /help for commands.", "");
 		out("", "");
@@ -3337,6 +3490,14 @@ component extends="modules.BaseModule" {
 			// Handle REPL commands; unhandled input falls through to evaluation.
 			var verdict = $consoleHandleCommand(line, evalUrl, password, serverPort, System);
 			if (verdict == "exit") {
+				// A bare `exit`/`quit` usually ends a piped session, so it must
+				// not hide an earlier failed expression: fail like EOF does.
+				if ($consoleExitFailsSession(line, hadError)) {
+					throw(
+						type = "Wheels.ConsoleFailed",
+						message = "One or more console expressions failed"
+					);
+				}
 				running = false;
 				continue;
 			}
@@ -3489,6 +3650,15 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Does ending the console on `line` fail the session? A bare `exit`/`quit`
+	 * after a failed expression does, like EOF, so `bad expr; exit` piped in
+	 * exits non-zero (#3892). `/exit` keeps returning 0, as documented above.
+	 */
+	private boolean function $consoleExitFailsSession(required string line, required boolean hadError) {
+		return arguments.hadError && listFindNoCase("exit,quit", trim(arguments.line)) > 0;
+	}
+
+	/**
 	 * Handle one REPL command line. Returns "exit" to end the loop, "handled"
 	 * when the line was a slash command, "error" when a slash command's eval
 	 * failed, or "" when it should be evaluated as an expression by the caller.
@@ -3498,6 +3668,11 @@ component extends="modules.BaseModule" {
 			case "/exit":
 			case "/quit":
 			case "/q":
+			// Bare words too: they used to be evaluated as CFML and fail with
+			// "variable [EXIT] doesn't exist", so a piped session ending in
+			// `exit` exited 1 (#3892).
+			case "exit":
+			case "quit":
 				out("Bye!", "cyan");
 				return "exit";
 
@@ -3808,7 +3983,7 @@ component extends="modules.BaseModule" {
 		out("  /ds, /datasource Show current datasource");
 		out("  /reload         Reload the application");
 		out("  /clear          Clear the screen");
-		out("  /exit, /quit, /q Exit the console");
+		out("  /exit, /quit, /q Exit the console (bare exit and quit work too)");
 		out("");
 		out("Expression Examples:", "bold");
 		out('  model("User").findAll()                      Query all users');
@@ -4734,6 +4909,16 @@ component extends="modules.BaseModule" {
 			return $packagesHelp();
 		}
 
+		// A package update killed mid-swap leaves the package only as a hidden
+		// backup; any packages command puts it back first (#3902).
+		try {
+			for (var note in new modules.wheels.services.packages.Installer().recoverInterruptedSwaps()) {
+				out(note, "yellow");
+			}
+		} catch (any e) {
+			out("Could not check vendor/ for an interrupted package update: #e.message#", "yellow");
+		}
+
 		return $dispatchPackages(sub, positional, opts);
 	}
 
@@ -4786,7 +4971,7 @@ component extends="modules.BaseModule" {
 	 * Return a fresh PackagesMainCli for a single subcommand dispatch.
 	 */
 	private any function $packagesMainCli() {
-		return new modules.wheels.services.packages.PackagesMainCli();
+		return new modules.wheels.services.packages.PackagesMainCli(projectRoot = variables.projectRoot);
 	}
 
 	/**
@@ -5824,7 +6009,7 @@ component extends="modules.BaseModule" {
 				out("");
 				out("Scaffold complete! Next steps:", "green");
 				out("  1. Run migrations: wheels migrate latest");
-				out("  2. Start server: wheels start");
+				out("  2. " & $serverNextStep());
 			}
 		} else {
 			$refuse("Scaffold failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
@@ -6001,8 +6186,10 @@ component extends="modules.BaseModule" {
 			out("");
 			out("API resource complete! Next steps:", "green");
 			out("  1. Run migrations: wheels migrate latest");
-			out("  2. Start server: wheels start");
-			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
+			out("  2. " & $serverNextStep());
+			// The project's pinned port (lucee.json), not a hardcoded 8080.
+			var apiPort = $readPinnedPort(variables.projectRoot);
+			out("  3. Test: curl http://localhost:#apiPort > 0 ? apiPort : 8080#/api/#lCase(controllerName)#.json");
 		} else {
 			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}
@@ -6270,7 +6457,8 @@ component extends="modules.BaseModule" {
 			strategy = strategy,
 			registration = registration,
 			force = force,
-			cliVersion = super.version()
+			// Written into the generated files' header comments: never the raw build token (#3891).
+			cliVersion = $displayVersion()
 		);
 
 		if (results.success) {
@@ -10406,6 +10594,43 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * `wheels <name>` dispatches to the Module function of that name, so an
+	 * unknown command lands here instead of Lucee's raw "has no function with
+	 * name" error (#3890). Print the friendly message (and a "did you mean"
+	 * for a near miss), then throw so the exit stays non-zero. MCP never gets
+	 * here: tools/call only reaches listed tools.
+	 */
+	public any function onMissingMethod(required string missingMethodName, struct missingMethodArguments = {}) {
+		var name = arguments.missingMethodName;
+		var message = "Unknown command: #name#. Run 'wheels --help' for the commands.";
+		var hint = $closestFlag(name, $commandNames());
+		if (len(hint)) message &= " Did you mean: wheels #hint#?";
+		out(message, "red");
+		throw(type = "Wheels.UnknownCommand", message = message);
+	}
+
+	/** Public command names a user can type: no $-helpers, hooks or MCP registries. */
+	private array function $commandNames() {
+		var names = [];
+		var internal = "init,main,onMissingMethod,mcpHiddenTools,mcpToolSpecs";
+		try {
+			for (var fn in getMetaData(this).functions) {
+				if (
+					structKeyExists(fn, "access") && fn.access == "public"
+					&& left(fn.name, 1) != "$"
+					&& !listFindNoCase(internal, fn.name)
+					&& len(fn.name) > 2
+				) {
+					arrayAppend(names, fn.name);
+				}
+			}
+		} catch (any e) {
+			// No metadata: no suggestion, the message still names the command.
+		}
+		return names;
+	}
+
+	/**
 	 * Nearest known flag for a "did you mean" hint. A typo is almost always
 	 * within two edits of what was intended (--belogsTo -> --belongsTo is
 	 * one); anything further is not a useful suggestion, so return "".
@@ -10955,6 +11180,60 @@ component extends="modules.BaseModule" {
 		out(arguments.error.message, "red");
 		if (len(arguments.error.detail)) {
 			out(arguments.error.detail, "yellow");
+		}
+	}
+
+	/**
+	 * Is a Lucee server running for this project, under any of its LuCLI
+	 * registrations (not only the current lucee.json name)? A seam for specs.
+	 */
+	private boolean function $luceeServerAlive() {
+		return len(getService("serverRegistry").aliveRegistrationFor(variables.projectRoot)) > 0;
+	}
+
+	/**
+	 * Refuse to start `engine` while the project's other engine is running
+	 * (#3913). Two servers for one project on different ports left the CLI's
+	 * HTTP commands targeting whichever one port detection picked.
+	 */
+	private void function $refuseOtherEngine(required string engine) {
+		var other = "";
+		if (arguments.engine == "rustcfml") {
+			if ($luceeServerAlive()) other = "Lucee";
+		} else if ($rustcfmlEngine().status(variables.projectRoot).running) {
+			other = "RustCFML";
+		}
+		if (!len(other)) return;
+		out("A #other# server is already running for this project.", "yellow");
+		out("Stop it first: wheels stop", "cyan");
+		throw(
+			type = "Wheels.EngineConflict",
+			message = "A #other# server is already running for this project; run `wheels stop` before starting another engine."
+		);
+	}
+
+	/**
+	 * The "server" line of generate's Next steps. A server already running for
+	 * the project only picks up new routes and models after a reload; telling
+	 * people to start it sent them to a 404 on the new route (#3883).
+	 */
+	private string function $serverNextStep() {
+		return $serverRunningForProject()
+			? "Reload the running server so it picks up the new routes: wheels reload"
+			: "Start server: wheels start";
+	}
+
+	/**
+	 * Is a dev server (Lucee or RustCFML) running for this project? Local state
+	 * only, no network: a project-owned live registration, or a running
+	 * RustCFML server. A seam for specs.
+	 */
+	private boolean function $serverRunningForProject() {
+		try {
+			if (len(getService("serverRegistry").aliveRegistrationFor(variables.projectRoot))) return true;
+			return $rustcfmlEngine().status(variables.projectRoot).running;
+		} catch (any e) {
+			return false;
 		}
 	}
 

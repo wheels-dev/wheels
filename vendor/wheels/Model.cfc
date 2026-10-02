@@ -119,8 +119,11 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		}
 
 		variables.wheels.class.RESQLAs = "[[:space:]]AS[[:space:]][A-Za-z1-9]+";
-		variables.wheels.class.RESQLOperators = "((?:\s+(?:NOT\s+)?LIKE)|(?:\s+(?:NOT\s+)?IN)|(?:\s+IS(?:\s+NOT)?)|(?:<>)|(?:<=)|(?:>=)|(?:!=)|(?:!<)|(?:!>)|=|<|>)";
-		variables.wheels.class.RESQLWhere = "\s*(#variables.wheels.class.RESQLOperators#)\s*(\('.+?'\)|\(((?:\+|-)?[0-9\.],?)+\)|'.+?'()|''|((?:\+|-)?[0-9\.]+)()|NULL)((\s*$|\s*\)|\s+(AND|OR)))";
+		// IS / IS NOT followed by TRUE or FALSE isn't an operator here, so the
+		// predicate stays a SQL literal: "col IS ?" is a syntax error on most
+		// databases (#3896).
+		variables.wheels.class.RESQLOperators = "((?:\s+(?:NOT\s+)?LIKE)|(?:\s+(?:NOT\s+)?IN)|(?:\s+IS(?:\s+NOT)?(?!(?:\s+NOT)?\s+(?:[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])(?![A-Za-z0-9_])))|(?:<>)|(?:<=)|(?:>=)|(?:!=)|(?:!<)|(?:!>)|=|<|>)";
+		variables.wheels.class.RESQLWhere = "\s*(#variables.wheels.class.RESQLOperators#)\s*(\('.+?'\)|\(((?:\+|-)?[0-9\.],?)+\)|'.+?'()|''|((?:\+|-)?[0-9\.]+)()|NULL|[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])((\s*$|\s*\)|\s+(AND|OR)))";
 		variables.wheels.class.mapping = {};
 		variables.wheels.class.properties = {};
 		variables.wheels.class.accessibleProperties = {};

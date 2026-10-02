@@ -729,7 +729,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					);
 					expect(result.success).toBeTrue();
 					var content = fileRead(tempRoot & "/app/controllers/api/Memos.cfc");
-					expect(content).toInclude('findAll(include="author")');
+					expect(content).toInclude('findAll(returnAs="objects", include="author")');
 					expect(content).toInclude('findByKey(key=params.key, include="author")');
 					expect(content).notToInclude('findByKey(params.key, include=');
 				});
