@@ -66,6 +66,20 @@ component extends="wheels.WheelsTest" {
 				expect(g.model("sqltype").findAllByBooleanType(value = false, returnAs = "query").recordCount).toBe(f);
 			})
 
+			it("leaves TRUE and FALSE after IS or IS NOT as SQL literals", () => {
+				// SQL Server has no IS TRUE predicate; Oracle's support depends on the release.
+				if (ListFindNoCase("MicrosoftSQLServerModel,OracleModel", g.get("adapterName"))) {
+					skip("IS TRUE is not portable to #g.get('adapterName')#");
+				}
+				var total = g.model("sqltype").count(where = "booleanType IS NOT NULL");
+				var isTrue = g.model("sqltype").count(where = "booleanType IS TRUE");
+				var isFalse = g.model("sqltype").count(where = "booleanType IS FALSE");
+				expect(isTrue).toBe(g.model("sqltype").count(where = "booleanType = 1"));
+				expect(isFalse).toBe(g.model("sqltype").count(where = "booleanType = 0"));
+				expect(isTrue + isFalse).toBe(total);
+				expect(g.model("sqltype").count(where = "booleanType IS NOT FALSE AND booleanType IS NOT NULL")).toBe(isTrue);
+			})
+
 		});
 
 	}
