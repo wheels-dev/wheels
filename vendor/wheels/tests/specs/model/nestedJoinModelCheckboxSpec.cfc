@@ -126,6 +126,43 @@ component extends="wheels.WheelsTest" {
 
 		})
 
+		describe("composite-key join model without a belongsTo for its other key", () => {
+
+			it("refuses a new join row with a clear error instead of a NOT NULL failure", () => {
+				transaction {
+					var post = g.model("postWithTagCheckboxes").create(authorid = 1, title = "join-bare-new", body = "b")
+					var edit = g.model("postWithTagCheckboxes").findByKey(post.id)
+					var posted = {}
+					posted["#post.id#,7"] = {_delete = 0}
+					var state = {type = "", message = ""}
+					try {
+						edit.update(bareTagAssignments = posted)
+					} catch (any e) {
+						state.type = e.type
+						state.message = e.message & " " & e.extendedInfo
+					}
+					expect(state.type).toBe("Wheels.InvalidNestedKey")
+					expect(state.message).toInclude("belongsTo")
+					expect(g.model("tagAssignment").count(where = "postid = #post.id#")).toBe(0)
+					transaction action="rollback";
+				}
+			})
+
+			it("still deletes an existing join row named by its key", () => {
+				transaction {
+					var post = g.model("postWithTagCheckboxes").create(authorid = 1, title = "join-bare-del", body = "b")
+					g.model("tagAssignment").create(postid = post.id, tagid = 7)
+					var edit = g.model("postWithTagCheckboxes").findByKey(post.id)
+					var posted = {}
+					posted["#post.id#,7"] = {_delete = 1}
+					edit.update(bareTagAssignments = posted)
+					expect(g.model("tagAssignment").count(where = "postid = #post.id#")).toBe(0)
+					transaction action="rollback";
+				}
+			})
+
+		})
+
 		describe("hasManyCheckBox nested keys that fit no join shape", () => {
 
 			it("throws instead of reading a partial key as the primary key", () => {

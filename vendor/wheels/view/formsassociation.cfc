@@ -65,7 +65,7 @@ component {
 	 *
 	 * @objectName Name of the variable containing the parent object to represent with this form field.
 	 * @association Name of the association set in the parent object to represent with this form field.
-	 * @keys Keys of the join row for this form field: the parent key, then the other key (for example a post key and a tag id). For a composite-key join model, list them in the order of its primary key columns. A surrogate-`id` join model works too: the keys are matched on its `belongsTo` foreign keys.
+	 * @keys Keys of the join row for this form field: the parent key, then the other key (for example a post key and a tag id). For a composite-key join model, list them in the order of its primary key columns. A surrogate-`id` join model works too: the keys are matched on its `belongsTo` foreign keys. Either way, declare a `belongsTo` association on the join model for each key column.
 	 * @id Optional. Explicit ID for the generated checkbox input. If not provided, an ID will be generated automatically.
 	 * @label The label text to use in the form control.
 	 * @labelPlacement Whether to place the label before, after, or wrapped around the form control. Label text placement can be controlled using `aroundLeft` or `aroundRight`.

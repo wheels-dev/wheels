@@ -252,6 +252,8 @@ component extends="Model" {
 }
 ```
 
+Nested forms rely on them too. When `nestedProperties()` (for example through `hasManyCheckBox()`) saves join rows, Wheels takes a new row's key columns from the form only when each one is the link to the parent or the foreign key of a `belongsTo` on the join model. That applies whether the join model's primary key is a surrogate `id` or composite (`userid, roleid`). Without `belongsTo(name="role")`, adding a role through a nested form raises `Wheels.InvalidNestedKey`, which names the column to declare.
+
 And the Role side mirrors the User side:
 
 ```cfm {test:compile}

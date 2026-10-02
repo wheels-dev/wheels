@@ -331,17 +331,16 @@ component extends="wheels.WheelsTest" {
 
 			describe("hasMany with a composite primary key that is not all foreign keys", () => {
 
-				it("does not keep a posted slotnumber on a new child", () => {
-					// Checked on the built child, without saving: a blank slotnumber would be
-					// refused by the database, which aborts the transaction on PostgreSQL.
+				it("refuses a posted slotnumber on a new child with a clear error", () => {
+					// slotnumber is a primary-key column but not a foreign key, so a nested form
+					// can't set it on a new row: a configuration error, not a NOT NULL from the
+					// database (and the posted value is never stored).
 					var fx = {a = g.model("postWithTagCheckboxes").findOne(order = "id")}
 					var posted = {}
 					posted["#fx.a.id#,42"] = {label = "posted"}
-					fx.a.setProperties(postSlots = posted)
-					expect(fx.a.postSlots).toHaveLength(1)
-					expect(fx.a.postSlots[1].isNew()).toBeTrue()
-					expect(StructKeyExists(fx.a.postSlots[1], "slotnumber") ? fx.a.postSlots[1].slotnumber : "").toBe("")
-					expect(fx.a.postSlots[1].label).toBe("posted")
+					expect(() => {
+						fx.a.setProperties(postSlots = posted)
+					}).toThrow(type = "Wheels.InvalidNestedKey")
 				})
 
 			})

@@ -7,7 +7,8 @@ component extends="Model" {
 		hasMany(name = "tagAssignments", foreignKey = "postid");
 		hasMany(name = "classifications", foreignKey = "postid");
 		hasMany(name = "postSlots", foreignKey = "postid");
-		nestedProperties(associations = "tagAssignments,classifications,postSlots", allowDelete = true);
+		hasMany(name = "bareTagAssignments", modelName = "bareTagAssignment", foreignKey = "postid");
+		nestedProperties(associations = "tagAssignments,classifications,postSlots,bareTagAssignments", allowDelete = true);
 	}
 
 }

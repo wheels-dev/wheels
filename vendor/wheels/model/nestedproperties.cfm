@@ -216,7 +216,7 @@
 						Throw(
 							type = "Wheels.InvalidNestedKey",
 							message = "The nested `#arguments.property#` key `#local.item#` has #ArrayLen(local.itemArray)# value(s), but the `#arguments.association.modelName#` primary key is `#local.model.primaryKey()#`.",
-							extendedInfo = "For a join model, pass hasManyCheckBox keys as the parent key followed by the other key (for example `keys=""##post.key()##,##tag.id##""`). The join model needs a composite primary key over those two columns, or a `belongsTo` association for each of them."
+							extendedInfo = "For a join model, pass hasManyCheckBox keys as the parent key followed by the other key (for example `keys=""##post.key()##,##tag.id##""`). The join model needs a `belongsTo` association for each of those key columns, whether its primary key is composite or a surrogate `id`."
 						);
 					}
 					local.iEnd = ListLen(local.keys);
@@ -362,10 +362,14 @@
 			if (!IsObject(local.object) && !local.delete) {
 				// Key was not a persisted PK of this parent's child: do not stamp it onto a new
 				// child. Only the join identity (the foreign keys) survives.
-				$clearNestedPrimaryKeys(
+				local.clearable = $nestedClearablePrimaryKeys(association = arguments.property, model = local.model);
+				$assertNestedCompositeKeyIsJoinIdentity(
+					association = arguments.property,
+					model = local.model,
 					value = arguments.value,
-					keys = $nestedClearablePrimaryKeys(association = arguments.property, model = local.model)
+					clearable = local.clearable
 				);
+				$clearNestedPrimaryKeys(value = arguments.value, keys = local.clearable);
 				StructDelete(local.args, "key");
 				return $invoke(componentReference = local.model, method = "new", invokeArgs = local.args);
 			} else if (IsObject(local.object) && local.delete && arguments.association.nested.delete && arguments.delete) {
@@ -530,6 +534,46 @@
 			return local.properties[arguments.column].validationtype;
 		}
 		return "string";
+	}
+
+	/**
+	 * Internal function. A new child of a composite-primary-key model can only take its key
+	 * columns from the form when they are its join identity: the foreign key to this object or
+	 * the foreign key of one of its own `belongsTo` associations. A composite key column that is
+	 * neither (an undeclared foreign key, or a non-foreign-key part such as a position) would be
+	 * dropped, and the insert would then fail in the database with a NOT NULL error, so fail
+	 * here instead with what to declare.
+	 */
+	public void function $assertNestedCompositeKeyIsJoinIdentity(
+		required string association,
+		required any model,
+		required struct value,
+		required string clearable
+	) {
+		if (ListLen(arguments.model.primaryKey()) < 2) {
+			return;
+		}
+		local.posted = "";
+		local.iEnd = ListLen(arguments.clearable);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.column = ListGetAt(arguments.clearable, local.i);
+			if (
+				StructKeyExists(arguments.value, local.column)
+				&& IsSimpleValue(arguments.value[local.column])
+				&& Len(arguments.value[local.column])
+			) {
+				local.posted = ListAppend(local.posted, local.column);
+			}
+		}
+		if (!Len(local.posted)) {
+			return;
+		}
+		local.modelName = arguments.model.$classData().modelName;
+		Throw(
+			type = "Wheels.InvalidNestedKey",
+			message = "A new `#arguments.association#` row can't take its `#local.posted#` key column(s) from the form: the `#local.modelName#` primary key is `#arguments.model.primaryKey()#`, and `#local.posted#` isn't the foreign key of a `belongsTo` association on it.",
+			extendedInfo = "Nested properties only set a new row's primary-key columns that are its join identity. Declare a `belongsTo` association for each join key column on the `#local.modelName#` model (for example `belongsTo(""tag"")` for `tagid`)."
+		);
 	}
 
 	/**
