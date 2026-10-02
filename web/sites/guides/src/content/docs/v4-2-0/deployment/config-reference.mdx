@@ -240,7 +240,7 @@ accessories:
       - config/init.sql:/docker-entrypoint-initdb.d/init.sql
 ```
 
-`port:` is passed to `docker run --publish` as written: give it a bind address (`"<address>:<host port>:<container port>"`, a private interface rather than `0.0.0.0`). A bare `port: 5432` publishes on a random host port.
+`port:` must name a bind address: `"<address>:<host port>:<container port>"` (IPv4, or bracketed IPv6), optionally ending in `/tcp`, `/udp` or `/sctp`. Prefer a private interface over `0.0.0.0`. A bare `port: 5432` or `"5432:5432"` fails validation with `accessory <name>: port "5432" must name a bind address`. Kamal's `main` branch (not yet released) applies the same rule.
 
 Two caveats on the example shapes: `files:` is accepted but **never uploaded** — no copy step or docker flag is emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)) — and accessory `env.secret` entries follow the same delivery rules as the top-level [`env`](#env) key: delivered via a host-side env file on 4.0.4+ builds, silently dropped on the released 4.0.3 ([#2957](https://github.com/wheels-dev/wheels/issues/2957)).
 

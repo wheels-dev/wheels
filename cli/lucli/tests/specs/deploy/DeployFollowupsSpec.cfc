@@ -171,7 +171,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     & "env: {clear: {DB_HOST: db.internal}, secret: [APP_SECRET]}#chr(10)#"
                     & "ssh: {user: deploy}#chr(10)#"
                     & "builder: {arch: amd64}#chr(10)#"
-                    & "accessories: {db: {image: 'postgres:16', host: 1.2.3.5, port: 5432}}",
+                    & "accessories: {db: {image: 'postgres:16', host: 1.2.3.5, port: '127.0.0.1:5432:5432'}}",
                     "REGISTRY_PASSWORD=pw#chr(10)#APP_SECRET=s"
                 );
                 var out = new cli.lucli.services.deploy.cli.DeployMainCli(new cli.lucli.services.deploy.lib.FakeSshPool()).config({configPath: cfg});

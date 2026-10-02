@@ -10,7 +10,7 @@ application deploy. They are booted once (or on demand) and left alone.
       redis:
         image: redis:7
         host: 1.2.3.5
-        port: 6379
+        port: "127.0.0.1:6379:6379"
 
 ## Postgres with volume and env
 
@@ -18,7 +18,7 @@ application deploy. They are booted once (or on demand) and left alone.
       db:
         image: postgres:16
         host: 1.2.3.5
-        port: 5432
+        port: "127.0.0.1:5432:5432"
         env:
           clear:
             POSTGRES_USER: app
@@ -28,6 +28,14 @@ application deploy. They are booted once (or on demand) and left alone.
           - /data/pg:/var/lib/postgresql/data
         files:
           - config/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+`port:` must name a bind address: "<address>:<host port>:<container
+port>" (IPv4, or bracketed IPv6), optionally ending in /tcp, /udp or
+/sctp. Use 127.0.0.1 for the host only, a private address such as
+10.0.0.20 for other hosts on a private network, or 0.0.0.0 to publish
+it on every interface. A bare `port: 5432` fails validation. App
+containers on the same host don't need `port:`: they reach the
+accessory as `<service>-<name>` over the kamal network.
 
 ## Named containers
 
