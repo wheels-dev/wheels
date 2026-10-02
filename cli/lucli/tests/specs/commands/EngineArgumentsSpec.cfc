@@ -66,6 +66,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(structKeyExists(coll, "arg3")).toBeFalse();
 			});
 
+			it("binds two bare options by value shape", () => {
+				var coll = new cli.lucli.services.ArgSpec().bindSpaceFormValues(
+					{engine: "true", arg2: "rustcfml", port: "true", arg4: "8931"},
+					{port: "^[0-9]+$", engine: "^[A-Za-z][A-Za-z0-9_-]*$"}
+				);
+				expect(coll.engine).toBe("rustcfml");
+				expect(coll.port).toBe("8931");
+				expect(structKeyExists(coll, "arg2") || structKeyExists(coll, "arg4")).toBeFalse();
+			});
+
+			it("binds nothing when the shapes don't separate the values", () => {
+				var coll = new cli.lucli.services.ArgSpec().bindSpaceFormValues(
+					{engine: "true", arg2: "8080", port: "true", arg4: "8931"},
+					{port: "^[0-9]+$", engine: "^[A-Za-z][A-Za-z0-9_-]*$"}
+				);
+				expect(coll.engine).toBe("true");
+				expect(coll.port).toBe("true");
+			});
+
 			it("does nothing when the positional cannot be tied to the option", () => {
 				// --force rustcfml --port 8931: two gaps, each followed by a positional.
 				var coll = new cli.lucli.services.ArgSpec().bindSpaceFormValue({force: "true", arg2: "rustcfml", port: "true", arg4: "8931"}, "port");
@@ -90,6 +109,32 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				m.start(engine = "rustcfml", port = "true", arg3 = "8931");
 				expect(rust.calls.start).toBe(1);
 				expect(rust.lastPort).toBe(8931);
+			});
+
+			it("start --engine rustcfml --port 8931 (both space form) starts RustCFML on 8931", () => {
+				var rust = new cli.lucli.tests.RecordingRustEngineStub();
+				var m = moduleWith(rust);
+				m.start(engine = "true", arg2 = "rustcfml", port = "true", arg4 = "8931");
+				expect(rust.calls.start).toBe(1);
+				expect(rust.lastPort).toBe(8931);
+				expect(m.$count("executeCommand")).toBe(0);
+			});
+
+			it("start --port 8931 --engine rustcfml (both space form) starts RustCFML on 8931", () => {
+				var rust = new cli.lucli.tests.RecordingRustEngineStub();
+				var m = moduleWith(rust);
+				m.start(port = "true", arg2 = "8931", engine = "true", arg4 = "rustcfml");
+				expect(rust.calls.start).toBe(1);
+				expect(rust.lastPort).toBe(8931);
+				expect(m.$count("executeCommand")).toBe(0);
+			});
+
+			it("start refuses a flag where a value belongs", () => {
+				var rust = new cli.lucli.tests.RecordingRustEngineStub();
+				var m = moduleWith(rust);
+				expect(() => m.start(arg1 = "--port", arg2 = "--engine=rustcfml")).toThrow("Wheels.InvalidArguments");
+				expect(rust.calls.start).toBe(0);
+				expect(m.$count("executeCommand")).toBe(0);
 			});
 
 			it("start --engine=bogus refuses instead of booting Lucee", () => {

@@ -2142,8 +2142,10 @@ component extends="modules.BaseModule" {
 		// `--port 8931` (space form) arrives as port="true" plus a positional;
 		// without re-binding it, toArgv() reordered it to "8931 --port" and
 		// the port was silently dropped (#3895).
-		var argSpec = new services.ArgSpec();
-		var args = argSpec.toArgv(argSpec.bindSpaceFormValue(argSpec.bindSpaceFormValue(structuredArgs(arguments), "port"), "engine"));
+		// Both may arrive that way at once; they bind by value shape.
+		var args = new services.ArgSpec().toArgv(
+			new services.ArgSpec().bindSpaceFormValues(structuredArgs(arguments), {port = "^[0-9]+$", engine = "^[A-Za-z][A-Za-z0-9_-]*$"})
+		);
 
 		// Refuse to start from a non-Wheels-project directory. LuCLI's
 		// `server start` derives the server name from the cwd basename and
@@ -2174,11 +2176,13 @@ component extends="modules.BaseModule" {
 			if (a == "--force") {
 				force = true;
 			} else if (a == "--engine") {
-				if (i < arrayLen(args)) { engine = lCase(args[i + 1]); i++; }
+				engine = lCase($startFlagValue(args, i, "engine"));
+				i++;
 			} else if (left(a, 9) == "--engine=") {
 				engine = lCase(mid(a, 10, len(a) - 9));
 			} else if (a == "--port") {
-				if (i < arrayLen(args)) { enginePort = val(args[i + 1]); i++; }
+				enginePort = val($startFlagValue(args, i, "port"));
+				i++;
 			} else if (left(a, 7) == "--port=") {
 				enginePort = val(mid(a, 8, len(a) - 7));
 			} else {
@@ -2610,6 +2614,18 @@ component extends="modules.BaseModule" {
 				throw(type = "Wheels.InvalidArguments", message = "Unknown action '#opts.action#' for wheels engines rustcfml. Try: install, start, stop, status");
 		}
 		return "";
+	}
+
+	/**
+	 * The value after a bare `--<name>` in start()'s argv. Refuses a missing
+	 * value or another flag, which the loop used to take as the value (so
+	 * `--port --engine` booted Lucee on the default port).
+	 */
+	private string function $startFlagValue(required array args, required numeric i, required string name) {
+		if (arguments.i >= arrayLen(arguments.args) || left(arguments.args[arguments.i + 1], 2) == "--") {
+			throw(type = "Wheels.InvalidArguments", message = "--#arguments.name# needs a value, e.g. --#arguments.name#=<value>.");
+		}
+		return arguments.args[arguments.i + 1];
 	}
 
 	/**

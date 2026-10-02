@@ -67,17 +67,6 @@ component {
 	// Public lifecycle
 	// -------------------------------------------------------------------------
 
-	/**
-	 * Download (if needed) and cache the RustCFML binary for this platform.
-	 * Returns the absolute path to the executable.
-	 *
-	 * The binary is only ever used after its sha256 matches the pin for its
-	 * release asset. A cached binary that doesn't match is discarded and
-	 * downloaded again. A download goes to a temp file next to the final path,
-	 * is verified, made executable, and only then renamed into place; on any
-	 * failure the temp file is deleted and Wheels.RustCFML.InstallFailed (or
-	 * Wheels.RustCFML.ChecksumMismatch for a mismatched download) is thrown.
-	 */
 	/** True when the pinned binary is already on disk and matches its sha256. */
 	public boolean function isInstalled() {
 		var binPath = variables.wheelsHome & "/rustcfml/bin/rustcfml-" & variables.engineVersion;
@@ -89,6 +78,17 @@ component {
 		return $sha256File(binPath) == $expectedSha256(assetName());
 	}
 
+	/**
+	 * Download (if needed) and cache the RustCFML binary for this platform.
+	 * Returns the absolute path to the executable.
+	 *
+	 * The binary is only ever used after its sha256 matches the pin for its
+	 * release asset. A cached binary that doesn't match is discarded and
+	 * downloaded again. A download goes to a temp file next to the final path,
+	 * is verified, made executable, and only then renamed into place; on any
+	 * failure the temp file is deleted and Wheels.RustCFML.InstallFailed (or
+	 * Wheels.RustCFML.ChecksumMismatch for a mismatched download) is thrown.
+	 */
 	public string function install() {
 		var asset = assetName();
 		var expected = $expectedSha256(asset);
