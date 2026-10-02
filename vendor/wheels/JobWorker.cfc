@@ -156,11 +156,19 @@ component {
 	 * @timeout Seconds after which a processing job is considered timed out. Default 300.
 	 */
 	public numeric function checkTimeouts(numeric timeout = 300, string queues = "") {
+		// Normalise a blank/<=0 timeout to the default exactly as $executeJob does, so a
+		// bridge call with timeout=0 (or blank) doesn't collapse the grace window to 60s
+		// and reap jobs that are still legitimately running (#3984 review).
+		local.timeout = Val(arguments.timeout);
+		if (local.timeout <= 0) {
+			local.timeout = 300;
+		}
+
 		// Grace margin: only reap rows idle for longer than the poller's own timeout
 		// PLUS a cushion, so a worker with a different (longer) timeout polling the same
 		// queue never reaps a job that is still legitimately running (#3888). Workers that
 		// share a queue should configure the same timeout; the cushion absorbs clock skew.
-		local.graceSeconds = arguments.timeout + Max(60, arguments.timeout);
+		local.graceSeconds = local.timeout + Max(60, local.timeout);
 		local.cutoff = DateAdd("s", -local.graceSeconds, $now());
 
 		local.params = {cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}};
@@ -205,10 +213,10 @@ component {
 			// double-count. Two concurrent reapers race on the same guard; exactly one wins.
 			if (local.currentAttempts <= local.maxRetries) {
 				// Reschedule for retry
-				local.won = $scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #arguments.timeout# seconds", local.currentAttempts);
+				local.won = $scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #local.timeout# seconds", local.currentAttempts);
 			} else {
 				// Exhausted retries
-				local.won = $markFailed(local.row.id, local.row.jobClass, local.maxRetries, "Job timed out after #arguments.timeout# seconds (max retries exhausted)", local.currentAttempts);
+				local.won = $markFailed(local.row.id, local.row.jobClass, local.maxRetries, "Job timed out after #local.timeout# seconds (max retries exhausted)", local.currentAttempts);
 			}
 			if (local.won > 0) {
 				local.recovered++;

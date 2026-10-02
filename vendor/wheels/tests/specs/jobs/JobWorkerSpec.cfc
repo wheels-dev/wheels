@@ -314,6 +314,44 @@ component extends="wheels.WheelsTest" {
 					{datasource = application.wheels.dataSourceName}
 				);
 			});
+
+			it("normalises a blank/zero timeout so it does not reap a recently-active job (##3984)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				// A job claimed ~90s ago is still well within the default 300s execution
+				// window. A bridge call with timeout=0 must normalise to 300 (grace 600s),
+				// not collapse the grace window to 60s and reap this live job.
+				local.id = CreateUUID();
+				local.recentTime = DateAdd("s", -90, Now());
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'reap_zero_3984', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				local.recovered = local.worker.checkTimeouts(timeout = 0, queues = "reap_zero_3984");
+
+				local.row = queryExecute(
+					"SELECT status FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.row.status).toBe("processing", "timeout=0 must normalise to 300s, not reap a 90s-old live job");
+
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+			});
 		});
 
 		describe("getStats", function() {
