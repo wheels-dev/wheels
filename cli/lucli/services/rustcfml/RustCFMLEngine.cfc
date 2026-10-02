@@ -513,9 +513,18 @@ component {
 		return $runSync(["kill", "-0", pidStr]) == 0;
 	}
 
+	/**
+	 * The LuCLI home this engine keeps its binaries and state under. The
+	 * -Dlucli.home system property outranks $LUCLI_HOME, as in
+	 * Module.$resolveLucliHome() (#3733): reading only the env var put the
+	 * state in ~/.wheels under a launcher that passes the property, so
+	 * `engines rustcfml status` missed a running server (#3913).
+	 */
 	private string function $resolveWheelsHome() {
 		try {
 			var sys = createObject("java", "java.lang.System");
+			var homeProp = sys.getProperty("lucli.home");
+			if (!isNull(homeProp) && len(trim(homeProp))) return homeProp;
 			var home = sys.getenv("LUCLI_HOME");
 			if (isNull(home) || !len(trim(home))) {
 				home = sys.getProperty("user.home") & "/.wheels";

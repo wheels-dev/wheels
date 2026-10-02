@@ -32,7 +32,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 			it("returns a populated object schema for every ArgSpec-backed tool", () => {
 				var specs = probe.mcpToolSpecs();
 				expect(specs).toBeStruct();
-				for (var toolName in ["test", "seed", "analyze", "destroy", "notes", "upgrade", "doctor", "stats", "generate", "create", "db", "packages", "reload"]) {
+				for (var toolName in ["test", "seed", "analyze", "destroy", "notes", "upgrade", "doctor", "stats", "generate", "db", "packages", "reload"]) {
 					expect(specs).toHaveKey(toolName, "Expected an inputSchema entry for the `#toolName#` tool.");
 					expect(specs[toolName].type).toBe("object");
 					expect(structCount(specs[toolName].properties)).toBeGT(

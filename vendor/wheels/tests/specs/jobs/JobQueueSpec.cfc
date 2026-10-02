@@ -57,6 +57,19 @@ component extends="wheels.WheelsTest" {
 				expect(StructCount(local.payload)).toBe(1, "the caller's struct must be unchanged (only its own keys)");
 			});
 
+			it("leaves the caller's nested structs untouched — only top-level keys are added (##3887)", function() {
+				// $enqueueJob only ADDS top-level keys, so a shallow copy is correct: the
+				// caller's nested structs may be shared by reference but are never mutated.
+				local.job = new wheels.Job();
+				prepareMock(local.job);
+				local.payload = {id: 1, meta: {name: "a"}};
+				local.job.enqueue(data = local.payload);
+				expect(StructKeyExists(local.payload, "$wheelsJobTimeout")).toBeFalse("no internal key on the caller's top level");
+				expect(StructCount(local.payload)).toBe(2, "only the caller's own top-level keys (id, meta)");
+				expect(StructCount(local.payload.meta)).toBe(1, "the nested struct is untouched");
+				expect(local.payload.meta.name).toBe("a");
+			});
+
 			it("enqueue accepts custom queue name", function() {
 				local.job = new wheels.Job();
 				prepareMock(local.job);

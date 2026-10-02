@@ -30,6 +30,17 @@ shopt -s dotglob
 cp -r examples/starter-app/* "${BUILD_DIR}/"
 shopt -u dotglob
 
+# Stamp the release version, as prepare-base.sh and prepare-core.sh do. The
+# source box.json keeps a fixed placeholder version, so without this every
+# release published the starter app to ForgeBox as that version (#3908).
+echo "Stamping box.json version ${VERSION}..."
+jq --arg version "${VERSION}" '.version = $version' "${BUILD_DIR}/box.json" > "${BUILD_DIR}/box.json.tmp"
+mv "${BUILD_DIR}/box.json.tmp" "${BUILD_DIR}/box.json"
+if [ "$(jq -r '.version' "${BUILD_DIR}/box.json")" != "${VERSION}" ]; then
+    echo "ERROR: could not stamp ${BUILD_DIR}/box.json with version ${VERSION}" >&2
+    exit 1
+fi
+
 # Apache 2.0 §4(a) requires LICENSE in every distributed artifact and §4(d)
 # requires NOTICE to propagate to derivatives.
 cp LICENSE "${BUILD_DIR}/"

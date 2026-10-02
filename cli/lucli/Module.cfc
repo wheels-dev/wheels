@@ -196,6 +196,7 @@ component extends="modules.BaseModule" {
 			"g",        // alias for generate
 			"dbmigrate", // alias for migrate — a duplicate tool with no inputSchema otherwise
 			"new",      // scaffolds a whole new Wheels project
+			"create",   // `create app` runs new() — same reason (#3910)
 			"console",  // interactive CFML REPL — not usable over stdio
 			"deploy",   // SSH/pushes/restarts on remote hosts — side effects off-machine (#2963)
 			"start",    // dev server lifecycle (stateful)
@@ -267,7 +268,6 @@ component extends="modules.BaseModule" {
 	public struct function mcpToolSpecs() {
 		return {
 			"analyze" = analyzeArgSpec().toInputSchema(),
-			"create"  = createArgSpec().toInputSchema(),
 			"db"      = dbArgSpec().toInputSchema(),
 			"destroy" = destroyArgSpec().toInputSchema(),
 			"doctor"  = verboseFlagSpec().toInputSchema(),
@@ -348,10 +348,10 @@ component extends="modules.BaseModule" {
 	 * Bind `wheels create`'s <type> and <name> the way ArgSpec.parse() does (a
 	 * typed token, else the named key an MCP tools/call sends, #2963) and
 	 * collect what to forward to new(): the name, any further tokens, then the
-	 * remaining named keys as flags. createArgSpec() marks both positionals
-	 * required for the MCP schema; this binding stays lenient so an unknown
+	 * remaining named keys as flags. The binding stays lenient so an unknown
 	 * type still reports "Unknown create type" and `create app` with no name
-	 * still reaches new()'s own handling. Public for specs.
+	 * still reaches new()'s own handling. `create` is CLI-only (hidden from
+	 * MCP, #3910), so it advertises no schema. Public for specs.
 	 */
 	public struct function $createArgs(required struct coll) {
 		// Non-strict on purpose: create forwards every other key to new(), whose
@@ -495,18 +495,17 @@ component extends="modules.BaseModule" {
 			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
 	}
 
+	// Feeds only the MCP inputSchema (mcpToolSpecs). `app` is no longer
+	// advertised as a type choice (#3910), since `new` and `create` are hidden
+	// from MCP. This does not stop a client that ignores the schema; refusing
+	// type=app server-side is #3980. `wheels generate app <name>` on the
+	// command line is unchanged.
 	private any function generateArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "type", required = true, choices = "model,controller,view,scaffold,migration,api-resource,route,test,property,helper,policy,snippets,admin,auth,app", description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, auth, or app")
-			.positional(name = "name", description = "Artifact name (model/controller/resource name, or the app name for `generate app`)")
+			.positional(name = "type", required = true, choices = "model,controller,view,scaffold,migration,api-resource,route,test,property,helper,policy,snippets,admin,auth", description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, or auth")
+			.positional(name = "name", description = "Artifact name (model, controller or resource name)")
 			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text')")
 			.flag(name = "dry-run", default = false, description = "Print the would-be paths and write nothing");
-	}
-
-	private any function createArgSpec() {
-		return new services.ArgSpec()
-			.positional(name = "type", required = true, choices = "app", description = "What to create: app")
-			.positional(name = "name", required = true, description = "Application name");
 	}
 
 	private any function verboseFlagSpec() {
@@ -2182,6 +2181,10 @@ component extends="modules.BaseModule" {
 			}
 		}
 
+		// One engine per project (#3913): a second engine on another port made
+		// the CLI's server detection pick one of them silently.
+		$refuseOtherEngine(engine);
+
 		// Port resolution. Two projects whose defaults overlap clash on the
 		// SHUTDOWN port, and LuCLI reports that as "port conflicts detected:"
 		// followed by an empty list — an error that names nothing. So the
@@ -2433,21 +2436,21 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// RustCFML backend — if a recorded RustCFML server is alive, stop it
-		// before touching LuCLI's registry. Auto-detected, so `wheels stop`
-		// works regardless of which engine was started.
-		var rustSvc = new services.rustcfml.RustCFMLEngine();
+		// RustCFML backend — if a recorded RustCFML server is alive, stop it,
+		// then go on to the project's Lucee server: `wheels stop` stops
+		// whatever runs for the project, whichever engine started it (#3913).
+		var rustSvc = $rustcfmlEngine();
 		var rustStatus = rustSvc.status(variables.projectRoot);
+		var rustStopped = false;
 		if (rustStatus.running) {
 			rustSvc.stop(variables.projectRoot);
 			out("RustCFML server stopped.", "cyan");
-			return "";
-		}
-		if ((rustStatus.staleReason ?: "") == "pid-not-server") {
+			rustStopped = true;
+		} else if ((rustStatus.staleReason ?: "") == "pid-not-server") {
 			out(rustStatus.message, "yellow");
 		}
 
-		out("Stopping Wheels server...", "cyan");
+		if (!rustStopped) out("Stopping Wheels server...", "cyan");
 
 		// If LuCLI's stop won't find a registered server for this directory
 		// (cwd doesn't match any `.project-path`), enumerate the user's
@@ -2457,6 +2460,8 @@ component extends="modules.BaseModule" {
 		// orphan Java processes the user has to chase with `lsof`+`kill`.
 		// See GH #2316.
 		var match = $findServerForProject(variables.projectRoot);
+		// Only RustCFML was running: it is stopped, and there is nothing to report.
+		if (!len(match) && rustStopped) return "";
 		if (!len(match)) {
 			var orphans = $listRunningWheelsServers();
 			if (arrayLen(orphans)) {
@@ -2504,6 +2509,7 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		if (rustStopped) out("Stopping Wheels server...", "cyan");
 		executeCommand("server", ["stop"], variables.projectRoot);
 		getService("serverRegistry").deleteStartToken(match);
 		return "";
@@ -2548,6 +2554,7 @@ component extends="modules.BaseModule" {
 				}
 				break;
 			case "start":
+				$refuseOtherEngine("rustcfml");
 				try {
 					var st = svc.start(variables.projectRoot, val(opts.port));
 				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
@@ -10955,6 +10962,35 @@ component extends="modules.BaseModule" {
 		if (len(arguments.error.detail)) {
 			out(arguments.error.detail, "yellow");
 		}
+	}
+
+	/**
+	 * Is a Lucee server running for this project, under any of its LuCLI
+	 * registrations (not only the current lucee.json name)? A seam for specs.
+	 */
+	private boolean function $luceeServerAlive() {
+		return len(getService("serverRegistry").aliveRegistrationFor(variables.projectRoot)) > 0;
+	}
+
+	/**
+	 * Refuse to start `engine` while the project's other engine is running
+	 * (#3913). Two servers for one project on different ports left the CLI's
+	 * HTTP commands targeting whichever one port detection picked.
+	 */
+	private void function $refuseOtherEngine(required string engine) {
+		var other = "";
+		if (arguments.engine == "rustcfml") {
+			if ($luceeServerAlive()) other = "Lucee";
+		} else if ($rustcfmlEngine().status(variables.projectRoot).running) {
+			other = "RustCFML";
+		}
+		if (!len(other)) return;
+		out("A #other# server is already running for this project.", "yellow");
+		out("Stop it first: wheels stop", "cyan");
+		throw(
+			type = "Wheels.EngineConflict",
+			message = "A #other# server is already running for this project; run `wheels stop` before starting another engine."
+		);
 	}
 
 	/** The RustCFML engine backend (a seam for specs). */

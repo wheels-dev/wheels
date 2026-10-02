@@ -118,11 +118,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(parsed.remaining).toBe([]);
 			});
 
-			it("matches the positional names create advertises over MCP", () => {
-				// $createArgs binds by these names, so the schema must use them.
-				var props = mod.mcpToolSpecs().create.properties;
-				expect(props).toHaveKey("type");
-				expect(props).toHaveKey("name");
+			it("advertises no MCP schema: create is CLI-only (##3910)", () => {
+				expect(mod.mcpToolSpecs()).notToHaveKey("create");
 			});
 
 		});
