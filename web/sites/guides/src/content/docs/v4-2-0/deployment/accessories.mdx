@@ -44,10 +44,14 @@ accessories:
   redis:
     image: redis:7
     host: 192.0.2.20
-    port: 6379
+    port: "10.0.0.20:6379:6379"   # bind address : host port : container port
 ```
 
-`wheels deploy accessory boot redis` on first deploy. Produces a container named `<service>-redis` on the named host, published on 6379. From the app side, connect to `redis://192.0.2.20:6379`.
+`wheels deploy accessory boot redis` on first deploy. Produces a container named `<service>-redis` on the named host. An app container on the same host reaches it at `redis://<service>-redis:6379`. An app container on another host connects to the published address, `redis://10.0.0.20:6379`.
+
+<Aside type="caution" title="Give port: a bind address">
+  `port:` is passed to `docker run --publish` as written. A bare `port: 6379` publishes the container port on a **random** host port, so other hosts can't find it. Write `"<address>:<host port>:<container port>"`, and bind a private interface (`10.0.0.20`, or `127.0.0.1` for same-host use only) rather than `0.0.0.0`, so a database or cache isn't reachable from the internet.
+</Aside>
 
 ## Postgres with volume and env
 
@@ -56,7 +60,7 @@ accessories:
   db:
     image: postgres:16
     host: 192.0.2.20
-    port: 5432
+    port: "10.0.0.20:5432:5432"
     env:
       clear:
         POSTGRES_USER: app
@@ -88,7 +92,7 @@ accessories:
   db:
     image: postgres:16
     host: 192.0.2.20
-    port: 5432
+    port: "10.0.0.20:5432:5432"   # private interface only
     env:
       clear:
         POSTGRES_USER: app
@@ -101,7 +105,7 @@ accessories:
 
 Put `POSTGRES_PASSWORD` in `.kamal/secrets`. Listing it under both the accessory's and the app's `env.secret` delivers it to both containers.
 
-**2. Point the production datasource at the accessory.** Each host has its own `kamal` Docker network. An app container on the **same host** as the accessory reaches it at the hostname **`<service>-<name>`** (`myapp-db` above). An app container on **another host** connects to the accessory host's address and the published `port:` (`192.0.2.20:5432` above), so make sure that port is reachable only from your app hosts. Define the datasource in `config/app.cfm`, for production only, so local development keeps its SQLite datasource of the same name:
+**2. Point the production datasource at the accessory.** Each host has its own `kamal` Docker network. An app container on the **same host** as the accessory reaches it at the hostname **`<service>-<name>`** (`myapp-db` above). An app container on **another host** connects to the address `port:` binds (`10.0.0.20:5432` above, a private interface the app hosts can reach); see the caution under the Redis example. Define the datasource in `config/app.cfm`, for production only, so local development keeps its SQLite datasource of the same name:
 
 ```cfm title="config/app.cfm (illustrative — do not type)"
 // Production: the `db` accessory. currentEnv is set by public/Application.cfc
@@ -110,7 +114,7 @@ if ((variables.currentEnv ?: "") == "production") {
     this.datasources["myapp"] = {
         class: "org.postgresql.Driver",
         bundleName: "org.postgresql.jdbc",
-        // Same host as the accessory: myapp-db. Other hosts: 192.0.2.20.
+        // Same host as the accessory: myapp-db. Other hosts: 10.0.0.20.
         connectionString: "jdbc:postgresql://myapp-db:5432/myapp",
         username: "app",
         password: server.system.environment.POSTGRES_PASSWORD ?: ""
