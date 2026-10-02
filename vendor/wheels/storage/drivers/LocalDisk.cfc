@@ -303,6 +303,10 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		} catch (any e) {
 			probe.resolved = false;
 		} finally {
+			// Delete the probe's symlink BEFORE the recursive temp-dir delete: a recursive
+			// DirectoryDelete over a directory that still contains a symlink errors on Adobe
+			// (and is swallowed), which would leak the probe's temp dir on every init.
+			$deleteSymlinkQuietly(probe.dir & "/inside/lnk");
 			$deleteDirQuietly(probe.dir);
 		}
 		if (!probe.resolved) {
@@ -348,13 +352,23 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	 * the call is unavailable or fails, so the caller can fall back. `created` is a
 	 * bare `var` struct field (no `local.` prefix) so the value set in the catch
 	 * survives on BoxLang (cross-engine invariant 11).
+	 *
+	 * `createSymbolicLink(Path, Path, FileAttribute...)` is varargs; the two-argument
+	 * form does NOT bind through CFML's Java interop ("No matching method ...") on
+	 * Lucee, so it would always throw and fall back to `ln`, defeating the point on a
+	 * host without `ln` on PATH (e.g. Windows with symlink privilege). Pass an
+	 * explicit empty `FileAttribute[]` so the varargs method binds; the element type
+	 * comes from `Class.forName` (#4070). Public with a `$` prefix (like `$resolve`)
+	 * so the binding is covered by a spec.
 	 */
-	private boolean function $tryCreateSymbolicLinkNio(required string target, required string link) {
+	public boolean function $tryCreateSymbolicLinkNio(required string target, required string link) {
 		var created = {ok = false};
 		try {
 			local.linkPath = CreateObject("java", "java.io.File").init(arguments.link).toPath();
 			local.targetPath = CreateObject("java", "java.io.File").init(arguments.target).toPath();
-			CreateObject("java", "java.nio.file.Files").createSymbolicLink(local.linkPath, local.targetPath);
+			local.faType = CreateObject("java", "java.lang.Class").forName("java.nio.file.attribute.FileAttribute");
+			local.noAttrs = CreateObject("java", "java.lang.reflect.Array").newInstance(local.faType, 0);
+			CreateObject("java", "java.nio.file.Files").createSymbolicLink(local.linkPath, local.targetPath, local.noAttrs);
 			created.ok = true;
 		} catch (any e) {
 			created.ok = false;
@@ -378,6 +392,22 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		}
 		return Len(arguments.candidate) > Len(local.base)
 			&& Compare(Left(arguments.candidate, Len(local.base) + 1), local.base & "/") == 0;
+	}
+
+	/**
+	 * Best-effort delete of the probe's symbolic LINK (never its target) via NIO, run
+	 * before the recursive temp-dir delete so the latter doesn't have to remove a dir
+	 * that still holds a symlink (which errors on Adobe). deleteIfExists no-ops when the
+	 * link is absent; errors are swallowed so cleanup never masks the probe result.
+	 */
+	private void function $deleteSymlinkQuietly(required string path) {
+		try {
+			CreateObject("java", "java.nio.file.Files").deleteIfExists(
+				CreateObject("java", "java.io.File").init(arguments.path).toPath()
+			);
+		} catch (any e) {
+			// best-effort
+		}
 	}
 
 	/**
