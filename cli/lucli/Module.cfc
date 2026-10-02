@@ -8827,7 +8827,11 @@ component extends="modules.BaseModule" {
 	 * sweep. bundlesDiscovered is read with structKeyExists — Lucee's
 	 * Elvis treats 0 as empty, which would hide the exact 0-bundle case.
 	 */
-	public boolean function $cliTestResultFailed(required struct result, numeric specsFailedToLoad = 0) {
+	public boolean function $cliTestResultFailed(
+		required struct result,
+		numeric specsFailedToLoad = 0,
+		boolean defaultScope = false
+	) {
 		// The runner's failure envelope (app-runner.cfm: a failed test-db
 		// populate, a missing runner) is {success: false, error, message} with
 		// no test counts at all. A result document never carries `success`.
@@ -8853,13 +8857,34 @@ component extends="modules.BaseModule" {
 		if (structKeyExists(arguments.result, "directoryRejected") && arguments.result.directoryRejected) {
 			return true;
 		}
-		if (structKeyExists(arguments.result, "bundlesDiscovered") && arguments.result.bundlesDiscovered == 0) {
+		// No bundles is a failure for a scope the user asked for, but not for the
+		// default scope of an app that has no specs yet (issue 3921).
+		if (
+			structKeyExists(arguments.result, "bundlesDiscovered")
+			&& arguments.result.bundlesDiscovered == 0
+			&& !arguments.defaultScope
+		) {
 			return true;
 		}
 		if (arguments.specsFailedToLoad > 0) {
 			return true;
 		}
 		return ((arguments.result.totalFail ?: 0) + (arguments.result.totalError ?: 0)) > 0;
+	}
+
+	/**
+	 * True when a run of the DEFAULT scope (no --filter / --directory / path)
+	 * discovered no spec bundles and nothing else went wrong: an app with no
+	 * specs yet, such as a fresh `wheels new` app (issue 3921). Reported as a
+	 * notice with exit 0. Public for specs; hidden from MCP via the $-prefix sweep.
+	 */
+	public boolean function $isEmptyDefaultRun(required any result, boolean defaultScope = false) {
+		return arguments.defaultScope
+			&& isStruct(arguments.result)
+			&& structKeyExists(arguments.result, "bundlesDiscovered")
+			&& isNumeric(arguments.result.bundlesDiscovered)
+			&& arguments.result.bundlesDiscovered == 0
+			&& !$cliTestResultFailed(result = arguments.result, defaultScope = true);
 	}
 
 	/**
@@ -8877,11 +8902,16 @@ component extends="modules.BaseModule" {
 	 * flushes. Composes $cliTestResultFailed. Public for specs; hidden
 	 * from MCP via the structural $-prefix sweep.
 	 */
-	public void function $throwIfCliTestsFailed(required struct result, numeric specsFailedToLoad = 0) {
+	public void function $throwIfCliTestsFailed(
+		required struct result,
+		numeric specsFailedToLoad = 0,
+		boolean defaultScope = false
+	) {
 		if (
 			$cliTestResultFailed(
 				result = arguments.result,
-				specsFailedToLoad = arguments.specsFailedToLoad
+				specsFailedToLoad = arguments.specsFailedToLoad,
+				defaultScope = arguments.defaultScope
 			)
 		) {
 			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
@@ -9054,7 +9084,7 @@ component extends="modules.BaseModule" {
 							break;
 						case "simple":
 						default:
-							displayTestResults(result, verboseOutput, resolvedDir, ciMode);
+							displayTestResults(result, verboseOutput, resolvedDir, ciMode, !len(filter));
 					}
 				}
 
@@ -9106,7 +9136,8 @@ component extends="modules.BaseModule" {
 		if (runState.hasResult) {
 			$throwIfCliTestsFailed(
 				result = runState.result,
-				specsFailedToLoad = runState.specsFailedToLoad
+				specsFailedToLoad = runState.specsFailedToLoad,
+				defaultScope = !len(arguments.filter)
 			);
 		}
 		// A crash during the HTTP/parse phase printed red but exited 0 — the
@@ -9251,7 +9282,8 @@ component extends="modules.BaseModule" {
 		required any result,
 		boolean verboseOutput = false,
 		string testDirectory = "",
-		boolean ciMode = false
+		boolean ciMode = false,
+		boolean defaultScope = false
 	) {
 		if (!isStruct(result)) {
 			out(serializeJSON(result));
@@ -9276,7 +9308,8 @@ component extends="modules.BaseModule" {
 
 		if (specsFailedToLoad > 0) {
 			$printFailedToLoadWarning(specsFailedToLoad, unloadedSpecPaths, result);
-		} else {
+		} else if (!$isEmptyDefaultRun(result, arguments.defaultScope)) {
+			// An app with no specs yet gets the summary notice, not the runner warnings.
 			$printTestResultDiagnostics(result);
 		}
 
@@ -9287,7 +9320,7 @@ component extends="modules.BaseModule" {
 
 		// Summary line
 		var duration = totalDuration > 0 ? " (#numberFormat(totalDuration / 1000, '0.00')#s)" : "";
-		$printTestSummaryAndDetails(result, arguments.verboseOutput, totalPass, totalFail, totalError, duration, specsFailedToLoad);
+		$printTestSummaryAndDetails(result, arguments.verboseOutput, totalPass, totalFail, totalError, duration, specsFailedToLoad, arguments.defaultScope);
 
 		// CI mode (--ci): emit GitHub Actions-style error annotations so each
 		// failure/error surfaces inline in CI logs and PR-check annotations.
@@ -9447,7 +9480,8 @@ component extends="modules.BaseModule" {
 		required numeric totalFail,
 		required numeric totalError,
 		required string duration,
-		required numeric specsFailedToLoad
+		required numeric specsFailedToLoad,
+		boolean defaultScope = false
 	) {
 		var summary = $testSummaryLine(
 			result = arguments.result,
@@ -9455,7 +9489,8 @@ component extends="modules.BaseModule" {
 			totalFail = arguments.totalFail,
 			totalError = arguments.totalError,
 			duration = arguments.duration,
-			specsFailedToLoad = arguments.specsFailedToLoad
+			specsFailedToLoad = arguments.specsFailedToLoad,
+			defaultScope = arguments.defaultScope
 		);
 		out(summary.text, summary.color);
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
@@ -9496,7 +9531,8 @@ component extends="modules.BaseModule" {
 		required numeric totalFail,
 		required numeric totalError,
 		required string duration,
-		required numeric specsFailedToLoad
+		required numeric specsFailedToLoad,
+		boolean defaultScope = false
 	) {
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
@@ -9508,6 +9544,12 @@ component extends="modules.BaseModule" {
 		if (arguments.specsFailedToLoad > 0) {
 			return {
 				text = "#arguments.totalPass# passed, #arguments.specsFailedToLoad# failed to load#arguments.duration#",
+				color = "yellow"
+			};
+		}
+		if ($isEmptyDefaultRun(arguments.result, arguments.defaultScope)) {
+			return {
+				text = "No specs yet: tests/specs has no spec files, so there was nothing to run. Add one with: wheels generate test model <Name>",
 				color = "yellow"
 			};
 		}
