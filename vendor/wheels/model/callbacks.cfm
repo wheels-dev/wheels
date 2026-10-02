@@ -433,8 +433,9 @@
 		local.conn = this.$hashedConnectionArgs();
 		// #3934 R1: a write inside a foreign, non-Wheels transaction{} — Wheels cannot
 		// observe the outer commit/rollback, so skip BOTH afterCommit and afterRollback
-		// and warn once (per request + model). Only reachable where IsWithinTransaction()
-		// is available (Lucee/BoxLang); on Adobe/RustCFML the flag is never set.
+		// and warn once (per request + model). The flag is set where IsWithinTransaction()
+		// is available (Lucee/BoxLang), and on Adobe when its nested-isolation mismatch
+		// proves a raw outer block (#4045, $beginTransaction); otherwise it is never set.
 		if (this.$transactionForeign(local.conn)) {
 			this.$warnForeignTransactionCallbacksOnce();
 			return;
