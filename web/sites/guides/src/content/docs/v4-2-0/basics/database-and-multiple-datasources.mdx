@@ -197,7 +197,7 @@ component extends="Controller" {
 ```
 
 <Aside type="caution" title="afterCommit and afterRollback inside a raw transaction">
-Model `afterCommit` and `afterRollback` callbacks don't fire reliably for writes inside a raw `transaction {}` block. Lucee and BoxLang skip them with a warning. Adobe CF does the same only for a block whose first database work is the model write, and on RustCFML the outcome is up to the engine. Use `invokeWithTransaction()` for writes that rely on them. See [After the transaction](/v4-2-0/basics/models-and-the-orm/#after-the-transaction-aftercommit-and-afterrollback).
+Model `afterCommit` and `afterRollback` callbacks don't fire reliably for writes inside a raw `transaction {}` block. Lucee, BoxLang and Adobe CF skip them with a warning; on RustCFML the outcome is up to the engine. Use `invokeWithTransaction()` for writes that rely on them. See [After the transaction](/v4-2-0/basics/models-and-the-orm/#after-the-transaction-aftercommit-and-afterrollback).
 </Aside>
 
 Transactions commit when the block exits cleanly and roll back on any thrown exception. All statements in a transaction must run against the same datasource — cross-database transactions aren't a thing the engine can give you. Adobe ColdFusion enforces this with an error (`Datasource names for all the database tags within the cftransaction tag must be the same.`); Lucee 7 does not — it runs the statements against both datasources but provides no cross-database atomicity, so the failure mode is silent.
@@ -227,7 +227,7 @@ Called as `model("Shipment").invokeWithTransaction(method="importBatch")`, the b
 - **Callbacks:** records written inside a unit that rolls back get their `afterRollback` callbacks right away, and never `afterCommit`. Records written outside the unit follow the outer transaction's outcome.
 - **Each unit runs one extra query first:** a primary-key read on the model's table. Lucee silently drops a savepoint set before the transaction's first query, and the read makes sure the connection is active.
 - **Same datasource:** a unit nests in the transaction open on its own model's datasource. Run units through models that use the outer transaction's datasource, as with any transaction.
-- **Raw `transaction {}` blocks:** a savepoint unit only detects a raw outer `transaction {}` on Lucee and BoxLang. On Adobe ColdFusion the unit can't see the raw block, and it joins it like `commit`. To nest units portably, open the outer transaction with `invokeWithTransaction()`.
+- **Raw `transaction {}` blocks:** a savepoint unit detects a raw outer `transaction {}` on Lucee, BoxLang and Adobe ColdFusion. On RustCFML the unit can't see the raw block, and it joins it like `commit`. To nest units portably, open the outer transaction with `invokeWithTransaction()`.
 
 If you write raw savepoint code yourself, the same Lucee rule applies: run a query in the transaction before `transaction action="setsavepoint"`. Otherwise the savepoint is silently dropped, and the later `transaction action="rollback" savepoint="..."` throws `There are no savepoint with name [...] set`.
 

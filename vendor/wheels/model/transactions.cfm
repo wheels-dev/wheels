@@ -222,7 +222,7 @@
 			// A nested-isolation mismatch can only come from a raw transaction {} around this
 			// write (a Wheels-owned outer transaction takes the "alreadyopen" path and never
 			// opens a nested begin). So record the same foreign marker $markForeignTransaction()
-			// sets where IsWithinTransaction() exists: afterCommit/afterRollback are skipped
+			// sets when the engine reports the raw block: afterCommit/afterRollback are skipped
 			// with the usual warning instead of firing at this inner close, before the outer
 			// block's own commit or rollback.
 			request.wheels.$txnCallbacks[arguments.ctx.connectionArgs] = {real = false, foreign = true, queue = []};
