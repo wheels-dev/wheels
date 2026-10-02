@@ -21,6 +21,28 @@ component extends="wheels.databaseAdapters.Abstract" {
     variables.sqlTypes['timestamp']  = {name = 'TIMESTAMP'};
     variables.sqlTypes['uuid']       = {name = 'RAW', limit = 16};
 
+    // Oracle 23ai+ has a native BOOLEAN type, which the model maps to cf_sql_bit.
+    // Earlier releases keep NUMBER(1), which reaches the model as an integer (#3897).
+    // Set by Migration.init() from the server version.
+    variables.nativeBoolean = false;
+
+    public void function $setNativeBoolean(required boolean supported) {
+        variables.nativeBoolean = arguments.supported;
+    }
+
+    /**
+     * Column options, with a native BOOLEAN default written as TRUE / FALSE
+     * rather than the 1 / 0 the shared implementation emits.
+     */
+    public string function addColumnOptions(required string sql, struct options = "#StructNew()#") {
+        local.rv = super.addColumnOptions(argumentCollection = arguments);
+        if (variables.nativeBoolean && StructKeyExists(arguments.options, "type") && arguments.options.type == "boolean") {
+            local.rv = ReReplace(local.rv, " DEFAULT 1( |$)", " DEFAULT TRUE\1");
+            local.rv = ReReplace(local.rv, " DEFAULT 0( |$)", " DEFAULT FALSE\1");
+        }
+        return local.rv;
+    }
+
     /**
      * Name of database adapter
      */
@@ -292,6 +314,9 @@ component extends="wheels.databaseAdapters.Abstract" {
         required string type,
         struct options = {}
     ) {
+        if (arguments.type == "boolean" && variables.nativeBoolean) {
+            return "BOOLEAN";
+        }
         local.base = variables.sqlTypes[arguments.type];
 
         // VARCHAR2 length

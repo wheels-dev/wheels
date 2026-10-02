@@ -11,7 +11,10 @@
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
-		variables.adapter = createObject("component", "wheels.migrator.Migration").init().adapter;
+		var migration = createObject("component", "wheels.migrator.Migration").init();
+		variables.adapter = migration.adapter;
+		// Oracle 23ai+ gets a native BOOLEAN column, whose default is TRUE / FALSE (#3897).
+		variables.isNativeBooleanOracle = variables.adapter.adapterName() == "Oracle" && migration.$oracleSupportsNativeBoolean();
 		var name = variables.adapter.adapterName();
 		variables.isPostgresFamily = (name == "PostgreSQL" || name == "CockroachDB");
 	}
@@ -89,6 +92,8 @@ component extends="wheels.WheelsTest" {
 				var sql = buildOptions(type = "boolean", default = true);
 				if (variables.isPostgresFamily) {
 					expect(sql).toInclude("DEFAULT true");
+				} else if (variables.isNativeBooleanOracle) {
+					expect(sql).toInclude("DEFAULT TRUE");
 				} else {
 					expect(sql).toInclude("DEFAULT 1");
 				}

@@ -102,6 +102,42 @@ component extends="wheels.Global"{
 		return local.adapterName;
 	}
 
+	/**
+	 * True when the migrator's Oracle datasource is Oracle 23ai or later, which
+	 * has a native BOOLEAN type (#3897). Read from the server version once per
+	 * datasource and memoized like $getDBType. Any failure reads as "no" (the
+	 * NUMBER(1) DDL every Oracle release accepts).
+	 */
+	public boolean function $oracleSupportsNativeBoolean(string dataSource = "") {
+		local.appKey = $appKey();
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : $migratorDataSource();
+		if (!StructKeyExists(application[local.appKey], "$oracleNativeBoolean")) {
+			application[local.appKey].$oracleNativeBoolean = {};
+		}
+		if (!StructKeyExists(application[local.appKey].$oracleNativeBoolean, local.dsName)) {
+			local.supported = false;
+			try {
+				local.creds = $migratorDataSourceCredentials();
+				local.info = $dbinfo(
+					type = "version",
+					datasource = local.dsName,
+					username = local.creds.username,
+					password = local.creds.password
+				);
+				// e.g. "Oracle AI Database 26ai Free Release 23.26.1.0.0 - ..." or
+				// "Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - ...".
+				local.match = ReFind("([0-9]+)\.[0-9]+", local.info.database_version, 1, true);
+				if (ArrayLen(local.match.pos) > 1 && local.match.pos[2] > 0) {
+					local.supported = Val(Mid(local.info.database_version, local.match.pos[2], local.match.len[2])) >= 23;
+				}
+			} catch (any e) {
+				local.supported = false;
+			}
+			application[local.appKey].$oracleNativeBoolean[local.dsName] = local.supported;
+		}
+		return application[local.appKey].$oracleNativeBoolean[local.dsName];
+	}
+
 	private string function $getForeignKeys(required string table) {
 		local.appKey = $appKey();
 		local.foreignKeyList = "";

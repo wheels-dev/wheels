@@ -10,6 +10,9 @@ component extends="Base" {
 			);
 		} else {
 			this.adapter = CreateObject("component", "wheels.databaseAdapters.#dbType#.#dbType#Migrator");
+			if (dbType == "Oracle") {
+				this.adapter.$setNativeBoolean($oracleSupportsNativeBoolean());
+			}
 		}
 		return this;
 	}
