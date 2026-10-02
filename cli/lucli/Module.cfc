@@ -4795,7 +4795,7 @@ component extends="modules.BaseModule" {
 	 * Return a fresh PackagesMainCli for a single subcommand dispatch.
 	 */
 	private any function $packagesMainCli() {
-		return new modules.wheels.services.packages.PackagesMainCli();
+		return new modules.wheels.services.packages.PackagesMainCli(projectRoot = variables.projectRoot);
 	}
 
 	/**

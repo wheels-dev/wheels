@@ -20,6 +20,8 @@
  * The runtime compatibility gate compares the framework version without
  * its pre-release label, so a snapshot build such as "4.1.2-snapshot.500"
  * satisfies ">=4.1.2" just like the "4.1.2" release it was cut from.
+ * A dev runtime (base version 0.0.0, e.g. the "0.0.0-dev" sentinel a source
+ * checkout reports) skips the gate: it is permissive, not incompatible.
  */
 component {
 
@@ -55,6 +57,7 @@ component {
 		}
 
 		local.runtimeBase = $runtimeBase(arguments.runtime);
+		local.devRuntime = local.runtimeBase == "0.0.0";
 		local.allowPreRelease = $pinNamesPreRelease(arguments.pin);
 		local.candidates = [];
 		for (local.entry in arguments.manifest.versions) {
@@ -70,7 +73,7 @@ component {
 			local.constraint = StructKeyExists(local.entry, "wheelsVersion")
 				? Trim(local.entry.wheelsVersion)
 				: "";
-			if (Len(local.constraint)
+			if (Len(local.constraint) && !local.devRuntime
 				&& !variables.semver.satisfiesAll(local.runtimeBase, local.constraint)) {
 				continue;
 			}
@@ -122,6 +125,7 @@ component {
 			return local.compatible;
 		}
 		local.runtimeBase = $runtimeBase(arguments.runtime);
+		local.devRuntime = local.runtimeBase == "0.0.0";
 		for (local.entry in arguments.manifest.versions) {
 			if (!StructKeyExists(local.entry, "version") || !Len(local.entry.version)) {
 				continue;
@@ -129,7 +133,7 @@ component {
 			local.constraint = StructKeyExists(local.entry, "wheelsVersion")
 				? Trim(local.entry.wheelsVersion)
 				: "";
-			if (Len(local.constraint)
+			if (Len(local.constraint) && !local.devRuntime
 				&& !variables.semver.satisfiesAll(local.runtimeBase, local.constraint)) {
 				continue;
 			}

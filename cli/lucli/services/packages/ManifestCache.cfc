@@ -11,13 +11,20 @@
  *
  * `refresh()` nukes the whole dir. Explicit, no partial invalidation —
  * keeps the mental model simple.
+ *
+ * The default root is <CLI home>/cache/packages (the CLI home is
+ * -Dlucli.home or LUCLI_HOME, else ~/.wheels), which for a normal install is
+ * ~/.wheels/cache/packages: the root vendor/wheels' copy of this cache uses,
+ * so the debug panel and the CLI share the default registry's data. Any
+ * other registry passes a registryKey and gets its own registries/<hash>/
+ * subdirectory, so switching registries never serves another one's data.
  */
 component {
 
 	variables.DEFAULT_TTL_SECONDS = 86400;  // 24h
 
-	public ManifestCache function init(string root = "", numeric ttlSeconds = 0) {
-		variables.root = Len(arguments.root) ? arguments.root : $defaultRoot();
+	public ManifestCache function init(string root = "", numeric ttlSeconds = 0, string registryKey = "") {
+		variables.root = Len(arguments.root) ? arguments.root : $defaultRoot(arguments.registryKey);
 		variables.ttl = arguments.ttlSeconds > 0 ? arguments.ttlSeconds : variables.DEFAULT_TTL_SECONDS;
 		return this;
 	}
@@ -30,6 +37,11 @@ component {
 
 	public boolean function hasFreshIndex() {
 		return $freshFile($indexPath());
+	}
+
+	/** True when an index was ever written, fresh or not. */
+	public boolean function hasIndex() {
+		return FileExists($indexPath());
 	}
 
 	public array function readIndex() {
@@ -50,6 +62,11 @@ component {
 
 	public boolean function hasFreshManifest(required string name) {
 		return $freshFile($manifestPath(arguments.name));
+	}
+
+	/** True when this package's manifest was ever written, fresh or not. */
+	public boolean function hasManifest(required string name) {
+		return FileExists($manifestPath(arguments.name));
 	}
 
 	public struct function readManifest(required string name) {
@@ -132,9 +149,25 @@ component {
 		}
 	}
 
-	private string function $defaultRoot() {
+	private string function $defaultRoot(string registryKey = "") {
+		local.root = $cliHome() & "/cache/packages";
+		if (Len(arguments.registryKey)) {
+			local.root &= "/registries/" & Left(LCase(Hash(arguments.registryKey, "SHA-256")), 16);
+		}
+		return local.root;
+	}
+
+	/**
+	 * The CLI home, resolved like LuCLI: the lucli.home system property, then
+	 * LUCLI_HOME, then ~/.wheels (the brew wrapper's home and the cache's
+	 * historical location).
+	 */
+	private string function $cliHome() {
 		local.sys = CreateObject("java", "java.lang.System");
-		local.home = local.sys.getProperty("user.home");
-		return local.home & "/.wheels/cache/packages";
+		local.prop = local.sys.getProperty("lucli.home");
+		if (!IsNull(local.prop) && Len(local.prop)) return local.prop;
+		local.env = local.sys.getenv("LUCLI_HOME");
+		if (!IsNull(local.env) && Len(local.env)) return local.env;
+		return local.sys.getProperty("user.home") & "/.wheels";
 	}
 }
