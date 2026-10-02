@@ -10,16 +10,16 @@
 #
 # nfpm stays the source of truth: everything the rebuilt package carries is read
 # back from the nfpm rpm (payload, file modes and owners, requires, recommends,
-# metadata), so nfpm-wheels*.yaml remains the only place to change the package.
+# conflicts, obsoletes, provides, metadata), so nfpm-wheels*.yaml remains the only place to change the package.
 # The rebuild runs in a rockylinux:9 container (rpm 4.16, where rpm2cpio reads
 # the nfpm payload cleanly). The result is then checked:
-#   - same files, modes, owners, sizes and digests, same requires/recommends and
-#     metadata as the nfpm rpm (anything else fails the build);
+#   - same files, modes, owners, sizes and digests, same dependencies (requires,
+#     recommends, conflicts, obsoletes, provides) and metadata as the nfpm rpm (anything else fails the build);
 #   - ARCHIVESIZE equals the cpio stream length;
 #   - rpm2cpio | cpio -t exits 0 on Rocky 10 (rpm 4.19) and Rocky 9 (rpm 4.16).
 #
-# Needs docker. Unsupported nfpm features (install scripts, conflicts, obsoletes,
-# config files) fail loudly rather than being dropped.
+# Needs docker. Unsupported nfpm features (install scripts, config files) fail
+# loudly rather than being dropped.
 
 set -euo pipefail
 
@@ -44,9 +44,6 @@ q() { rpm -qp --qf "$1" "${IN}"; }
 
 # Refuse what this rewrap does not reproduce.
 if [ -n "$(rpm -qp --scripts "${IN}")" ]; then echo "rpm-rewrap: install scripts are not supported" >&2; exit 1; fi
-for tag in CONFLICTNAME OBSOLETENAME; do
-  if [ "$(q "[%{${tag}}\n]" | grep -v '^(none)$' | grep -c . || true)" != "0" ]; then echo "rpm-rewrap: ${tag} is not supported" >&2; exit 1; fi
-done
 if q '[%{FILEFLAGS:fflags}\n]' | grep -q 'c'; then echo "rpm-rewrap: %config files are not supported" >&2; exit 1; fi
 # A rebuild drops any package signature; refuse a signed input rather than ship it unsigned.
 for tag in RSAHEADER DSAHEADER SIGPGP SIGGPG; do
@@ -75,6 +72,11 @@ SPEC=/w/rewrap.spec
   echo "AutoReqProv: no"
   rpm -qp --requires "${IN}" | grep -v '^rpmlib(' | sed 's/^/Requires: /' || true
   rpm -qp --recommends "${IN}" | sed 's/^/Recommends: /' || true
+  # wheels-be conflicts with wheels: carry these over rather than drop them.
+  rpm -qp --conflicts "${IN}" | sed 's/^/Conflicts: /' || true
+  rpm -qp --obsoletes "${IN}" | sed 's/^/Obsoletes: /' || true
+  # rpmbuild adds the package's own "NAME = VERSION-RELEASE"; copy the rest.
+  rpm -qp --provides "${IN}" | grep -vxF "$(q '%{NAME} = %{VERSION}-%{RELEASE}')" | sed 's/^/Provides: /' || true
   # Payload the same way nfpm does (gzip), so the package still installs on older rpm.
   echo "%define _binary_payload w9.gzdio"
   echo "%define __os_install_post %{nil}"
@@ -105,7 +107,12 @@ OUTRPM="$(ls /w/rpmbuild/RPMS/*/*.rpm)"
 # rpmbuild what the build root reports), so it is not compared.
 fp() { rpm -qp --qf '[%{FILEMODES:perms} %{FILEMODES:octal} %{FILEUSERNAME} %{FILEGROUPNAME} %{FILESIZES} %{FILEDIGESTS} %{FILENAMES}\n]' "$1" | awk '{ if (substr($1, 1, 1) == "d") $5 = "-"; print }' | sort; }
 meta() { rpm -qp --qf '%{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SUMMARY}|%{LICENSE}|%{URL}|%{GROUP}|%{VENDOR}\n' "$1"; }
-deps() { { rpm -qp --requires "$1" | grep -v '^rpmlib(' || true; rpm -qp --recommends "$1" | sed 's/^/recommends: /'; } | sort; }
+deps() {
+  {
+    rpm -qp --requires "$1" | grep -v '^rpmlib(' || true
+    for kind in recommends conflicts obsoletes provides; do rpm -qp "--${kind}" "$1" | sed "s/^/${kind}: /"; done
+  } | sort -u
+}
 for f in fp meta deps; do
   if ! diff <("${f}" "${IN}") <("${f}" "${OUTRPM}") >/w/diff.txt; then
     echo "rpm-rewrap: rebuilt package differs from the nfpm one (${f}):" >&2; head -20 /w/diff.txt >&2; exit 1
