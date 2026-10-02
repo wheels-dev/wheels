@@ -39,8 +39,10 @@ component extends="wheels.WheelsTest" {
 				// what sent BoxLang's serializer into a StackOverflowError.
 				var report = $report(error = $databaseError());
 				var err = report.bundleStats[1].suiteStats[1].specStats[1].error;
-				expect(IsSimpleValue(err.type)).toBeTrue();
-				expect(Len(err.message)).toBeGT(0);
+				// BoxLang raises a message-less java.lang.NullPointerException here,
+				// so only the type is guaranteed (its class name when there is no CFML type).
+				expect(Len(err.type)).toBeGT(0);
+				expect(IsSimpleValue(err.message)).toBeTrue();
 				for (var key in err) {
 					expect(ListFindNoCase("type,message,detail,extendedInfo,errorCode,stackTrace,tagContext", key)).toBeGT(0, "unexpected error key #key#");
 				}

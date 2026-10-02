@@ -142,6 +142,11 @@ component extends="BaseReporter" {
 		if ( !len( out.message ) ) {
 			out.message = $javaMessage( arguments.error );
 		}
+		// A bare Java exception has no CFML type (BoxLang can raise a message-less
+		// NullPointerException for a failed query): report its class instead.
+		if ( !len( out.type ) ) {
+			out.type = $javaClassName( arguments.error );
+		}
 		var trace      = $plainField( arguments.error, "stackTrace" );
 		out[ "stackTrace" ] = len( trace ) > 4000 ? left( trace, 4000 ) & "..." : trace;
 		out.tagContext = $plainFrames( $rawField( arguments.error, "tagContext" ) );
@@ -304,6 +309,22 @@ component extends="BaseReporter" {
 		if ( state.found ) {
 			return state.value;
 		}
+	}
+
+	/**
+	 * The Java class name of an exception object, or "".
+	 */
+	public string function $javaClassName( any error ){
+		var state = { "name" : "" };
+		try {
+			var name = arguments.error.getClass().getName();
+			if ( !isNull( name ) && isSimpleValue( name ) ) {
+				state.name = name;
+			}
+		} catch ( any e ) {
+			// Not a Java object.
+		}
+		return state.name;
 	}
 
 	/**
