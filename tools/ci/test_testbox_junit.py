@@ -91,6 +91,28 @@ class ConvertTests(unittest.TestCase):
         (classname, _), = identities(tj.convert(r, "rustcfml/sqlite"))
         self.assertTrue(classname.startswith("rustcfml/sqlite :: "))
 
+    def test_xml_invalid_control_characters_are_dropped(self):
+        r = result(bundle("specs.CtrlSpec", suite("s", [
+            spec("bad\x01name", "Failed", failMessage="msg\x08here", failDetail="tab\tok\x1b"),
+        ])))
+        from xml.etree.ElementTree import tostring, fromstring
+        root = fromstring(tostring(tj.convert(r, "lucee7/sqlite")))
+        tc = next(root.iter("testcase"))
+        self.assertEqual(tc.get("name"), "badname")
+        self.assertEqual(tc.find("failure").get("message"), "msghere")
+        self.assertEqual(tc.find("failure").text, "tab\tok")
+
+    def test_result_with_raw_control_characters_still_converts(self):
+        import json, tempfile
+        raw = json.dumps(result(bundle("specs.RawSpec", suite("s", [spec("one")]))))
+        raw = raw.replace('"one"', '"o\tne"').replace("\\t", "\t")
+        with tempfile.TemporaryDirectory() as d:
+            src, out = os.path.join(d, "r.json"), os.path.join(d, "j.xml")
+            with open(src, "w") as fh:
+                fh.write(raw)
+            self.assertEqual(tj.main([src, out, "lucee7/sqlite"]), 0)
+            self.assertTrue(os.path.exists(out))
+
     def test_unreadable_result_file_writes_nothing_and_exits_zero(self):
         out = os.path.join(HERE, "_missing_junit_test.xml")
         self.assertEqual(tj.main([os.path.join(HERE, "no-such-result.json"), out, "x/y"]), 0)
