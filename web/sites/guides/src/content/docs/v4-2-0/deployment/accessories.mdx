@@ -50,7 +50,7 @@ accessories:
 `wheels deploy accessory boot redis` on first deploy. Produces a container named `<service>-redis` on the named host. An app container on the same host reaches it at `redis://<service>-redis:6379`. An app container on another host connects to the published address, `redis://10.0.0.20:6379`.
 
 <Aside type="caution" title="Give port: a bind address">
-  `port:` is passed to `docker run --publish` as written. A bare `port: 6379` publishes the container port on a **random** host port, so other hosts can't find it. Write `"<address>:<host port>:<container port>"`, and bind a private interface (`10.0.0.20`, or `127.0.0.1` for same-host use only) rather than `0.0.0.0`, so a database or cache isn't reachable from the internet.
+  `port:` is passed to `docker run --publish` as written. A bare `port: 6379` publishes the container port on a **random** host port, so other hosts can't find it. Write `"<address>:<host port>:<container port>"`, and bind a private interface rather than `0.0.0.0`, so a database or cache isn't reachable from the internet. In these examples `10.0.0.20` is the private-network address of the same machine as `host: 192.0.2.20`; use `127.0.0.1` when only containers on that host need it.
 </Aside>
 
 ## Postgres with volume and env
