@@ -2176,6 +2176,10 @@ component extends="modules.BaseModule" {
 			}
 		}
 
+		// One engine per project (#3913): a second engine on another port made
+		// the CLI's server detection pick one of them silently.
+		$refuseOtherEngine(engine);
+
 		// Port resolution. Two projects whose defaults overlap clash on the
 		// SHUTDOWN port, and LuCLI reports that as "port conflicts detected:"
 		// followed by an empty list — an error that names nothing. So the
@@ -2187,10 +2191,6 @@ component extends="modules.BaseModule" {
 		// the warning emitted further down. `--port` used to be parsed and then
 		// dropped for Lucee projects — only the RustCFML branch consumed it — so
 		// `wheels start --port=8090` silently booted on the lucee.json port.
-		// One engine per project (#3913): a second engine on another port made
-		// the CLI's server detection pick one of them silently.
-		$refuseOtherEngine(engine);
-
 		if (engine != "rustcfml") {
 			$resolveStartPorts(enginePort);
 		}
@@ -10939,11 +10939,12 @@ component extends="modules.BaseModule" {
 		}
 	}
 
-	/** Is this project's Lucee server (its LuCLI registration) running? A seam for specs. */
+	/**
+	 * Is a Lucee server running for this project, under any of its LuCLI
+	 * registrations (not only the current lucee.json name)? A seam for specs.
+	 */
 	private boolean function $luceeServerAlive() {
-		var registry = getService("serverRegistry");
-		var reg = registry.inspect(registry.serverNameFor(variables.projectRoot), variables.projectRoot);
-		return reg.alive && reg.ours;
+		return len(getService("serverRegistry").aliveRegistrationFor(variables.projectRoot)) > 0;
 	}
 
 	/**
