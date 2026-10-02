@@ -155,7 +155,7 @@ application.storage.disk("s3").put(
 `url()` returns the object's public URL; `signedUrl()` returns a presigned, expiring GET URL computed locally by `S3Signer` — no round-trip to AWS required:
 
 ```cfm {test:compile} title="presigned download URL"
-local.url = application.storage.disk("s3").signedUrl(
+local.fileUrl = application.storage.disk("s3").signedUrl(
     key = "reports/q3.pdf",
     expiresIn = 900,
     contentDisposition = "attachment; filename=q3.pdf"
