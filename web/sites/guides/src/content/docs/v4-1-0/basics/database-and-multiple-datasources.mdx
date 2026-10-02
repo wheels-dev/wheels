@@ -78,7 +78,7 @@ If the app connects but models and the migrator act as if your tables don't exis
 </Aside>
 
 <Aside type="note" title="Adobe ColdFusion 2025: install graphqlclient">
-Install the `graphqlclient` package (`cfpm install graphqlclient`). Without it, Adobe ColdFusion 2025 raises `The graphqlclient package is not installed.` while loading your application's datasources at startup, and the error log records it after every restart, even though the app never uses GraphQL. Installing the package stops the notice and the log noise.
+Install the `graphqlclient` package (`cfpm install graphqlclient`). Without it, Adobe ColdFusion 2025 raises `The graphqlclient package is not installed.` while loading your application's datasources at startup, and the error log records it after every restart, even though the app never uses GraphQL. Installing the package stops the notice and the log noise. Wheels itself also needs the `image`, `mail`, `zip` and `caching` packages, and a MySQL datasource needs the Connector/J jar in `cfusion/lib`; see [Manual Installation](/v4-1-0/start-here/manual-installation/#adobe-coldfusion-2025).
 </Aside>
 
 ## Per-environment datasource
