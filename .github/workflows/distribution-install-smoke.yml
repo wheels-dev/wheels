@@ -72,13 +72,6 @@ jobs:
         with:
           sparse-checkout: tools/lucli.json
           sparse-checkout-cone-mode: false
-      - name: Read the LuCLI runtime pin every channel must ship
-        id: pin
-        run: |
-          set -euo pipefail
-          LUCLI=$(jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))' tools/lucli.json)
-          echo "lucli=$LUCLI" >> "$GITHUB_OUTPUT"
-          echo "Every channel must ship LuCLI $LUCLI (tools/lucli.json)"
       - name: Determine the GA version each channel must serve
         id: v
         env:
@@ -102,6 +95,28 @@ jobs:
           fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "All channels must serve wheels $VER"
+      # The channels install the GA, so they must ship the LuCLI that GA was
+      # built with: read the pin from the GA's tag, not from this checkout
+      # (develop's pin moves ahead of the release between cuts, #4038).
+      - name: Read the LuCLI runtime pin the GA was built with
+        id: pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          VER: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          if PINFILE="$(gh api "repos/${REPO}/contents/tools/lucli.json?ref=v${VER}" --jq .content 2>/dev/null | base64 -d 2>/dev/null)" && [ -n "${PINFILE}" ]; then
+            SOURCE="tools/lucli.json at v${VER}"
+          else
+            # Releases older than tools/lucli.json: fall back to this checkout.
+            PINFILE="$(cat tools/lucli.json)"
+            SOURCE="tools/lucli.json in this checkout (v${VER} has none)"
+            echo "::notice::v${VER} has no tools/lucli.json; using the checked-out pin"
+          fi
+          LUCLI=$(printf '%s' "${PINFILE}" | jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))')
+          echo "lucli=$LUCLI" >> "$GITHUB_OUTPUT"
+          echo "Every channel must ship LuCLI $LUCLI (${SOURCE})"
 
   index-integrity:
     needs: resolve
