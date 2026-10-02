@@ -162,8 +162,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         var httpClient = new wheels.wheelstest.TestClient(baseUrl = $getTestBaseUrl());
         if (arguments.testContext) {
             var ctx = new wheels.events.TestContext();
-            httpClient.withHeader(ctx.headerName(), "1");
-            httpClient.withCookie(ctx.cookieName(), "1");
+            // Send the per-process runner secret (not a fixed "1").
+            // TestClient requests originate from loopback, so the framework gate
+            // binds the isolated application only for this trusted runner.
+            var testSecret = ctx.testSecret();
+            httpClient.withHeader(ctx.headerName(), testSecret);
+            httpClient.withCookie(ctx.cookieName(), testSecret);
         }
         return httpClient;
     }

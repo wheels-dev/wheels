@@ -16,11 +16,11 @@
     seed data you add here runs on every test run, so it must be
     idempotent.
 
-    The framework only includes this file when:
-    - the request was made with ?useTestDB=true (set automatically by
-      `wheels test`; opt out with --no-test-db)
-    - a `<dataSourceName>_test` datasource is registered (created
-      automatically by `wheels new` when you accept the SQLite default)
+    The framework only includes this file when the run uses the test database
+    (the default — `wheels test` runs against `<dataSourceName>_test` unless you
+    pass --no-test-db) AND a `<dataSourceName>_test` datasource is registered
+    (created automatically by `wheels new` when you accept the SQLite default).
+    It is NOT included for a --no-test-db run against the primary datasource.
 
     To force a fresh schema, stop the server first (`wheels stop`) and then
     delete `db/test.sqlite` — deleting it while the server is running causes

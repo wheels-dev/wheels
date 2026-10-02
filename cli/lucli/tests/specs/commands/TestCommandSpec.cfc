@@ -405,6 +405,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(moduleSource).toInclude("$reloadTestApplication(serverPort, testPath);");
 			});
 
+			// The app runner now defaults an OMITTED useTestDB to true,
+			// so `wheels test --no-test-db` must send useTestDB=false explicitly or
+			// it would be reinterpreted as the test database.
+			it("appends useTestDB explicitly for every app run (never omits it on --no-test-db)", () => {
+				var moduleSource = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				expect(moduleSource).toInclude('testUrl &= "&useTestDB=" & (useTestDB ? "true" : "false");');
+				// the old conditional-append (only when true) omitted useTestDB=false
+				expect(Find('if (!coreTests && useTestDB) {', moduleSource)).toBe(
+					0,
+					"the only-when-true append must be gone (it omits useTestDB=false on --no-test-db)"
+				);
+			});
+
 			it("returns true and treats the reload redirect (302) as a successful restart", () => {
 				var sandbox = $scaffold(envBody = "WHEELS_RELOAD_PASSWORD=secret");
 				var stubServer = new cli.lucli.tests.StubHttpServer(302);

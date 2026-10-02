@@ -992,4 +992,27 @@
 		local.norm = ReReplace(local.norm, "^\.", "", "one");
 		return local.norm;
 	}
+
+/**
+ * True when the engine can open the named datasource. The app test
+ * runner checks this before refusing a missing `<datasource>_test`, because a
+ * datasource registered at server level (the Lucee admin, `lucee.json`
+ * `configuration.datasources`, the CF Administrator, CommandBox cfconfig) is
+ * not listed in GetApplicationMetaData().datasources. Any failure, including
+ * an engine whose cfdbinfo can't answer, means "not reachable", so the runner
+ * still fails closed. Only the named datasource is touched.
+ */
+public boolean function $dataSourceIsReachable(required string name) {
+	var state = {reachable = false};
+	if (!Len(Trim(arguments.name))) {
+		return false;
+	}
+	try {
+		$dbinfo(type = "version", datasource = arguments.name);
+		state.reachable = true;
+	} catch (any e) {
+		state.reachable = false;
+	}
+	return state.reachable;
+}
 </cfscript>

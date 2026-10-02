@@ -51,6 +51,13 @@ RESULT_FILE="${WHEELS_TEST_RESULT_FILE:-/tmp/wheels-local-test-results-$(echo "$
 # the ${VAR:-default} preserves the CI override.
 export WHEELS_BROWSER_TEST_BASE_URL="${WHEELS_BROWSER_TEST_BASE_URL:-http://localhost:${PORT}}"
 
+# The constructor test-context gate (events/testcontext.cfm) honours
+# WHEELS_ENV, the only environment signal readable before the app starts. The
+# core suite runs in development (config/environment.cfm), so declare it here or
+# the isolated `_wheelsTest` binding fails closed and specs run against the live
+# application scope. ${VAR:-default} preserves any explicit override.
+export WHEELS_ENV="${WHEELS_ENV:-development}"
+
 # Playwright Java runs `node driver/cli.js install` (a full browser
 # download/check) on first launch unless this is set; on a machine where that
 # subprocess stalls, the launch blocks forever and wedges the entire test run
