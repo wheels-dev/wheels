@@ -8242,7 +8242,7 @@ component extends="modules.BaseModule" {
 				checkType: "grep",
 				scanDir: "tests",
 				extensions: "cfc",
-				fix: 'Keep extends="wheels.Test" until these tests are converted. RocketUnit tests (test_ methods, assert()) do not run under wheels.WheelsTest, which is BDD (describe/it/expect): convert a file, then switch its base class. See https://guides.wheels.dev/v4-1-0/upgrading/3x-to-4x/'
+				fix: 'Keep extends="wheels.Test" until these tests are converted. RocketUnit tests (test_ methods, assert()) do not run under wheels.WheelsTest, which is BDD (describe/it/expect): convert a file, then switch its base class. See ' & new services.GuidesLink().link("upgrading/3x-to-4x/")
 			});
 		}
 
