@@ -1,3 +1,4 @@
+<cfsilent>
 <cfscript>
     // Place code here that should be executed on the "onApplicationStart" event.
     // Wrapping this in a try / catch and skipping the error, as otherwise you can't get to the migrations
@@ -10,6 +11,7 @@
         application.encryptionKey = "7NNEID99l07DySzq1LJnEA==";
         createApplicationSettings();
     } catch (any e) {
-        WriteOutput("Error: " & e.message);
+        writeLog(text = "onApplicationStart error: " & e.message, type = "error", file = "application");
     }
 </cfscript>
+</cfsilent>

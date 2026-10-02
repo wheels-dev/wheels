@@ -1,0 +1,4 @@
+- MCP tool polish:
+  - `wheels notes` refuses an annotation marker that isn't a word (a `.` used to match every character);
+  - `wheels seed` advertises the `models` and `count` options its own "Pass models=…" message refers to, forwards them to the server, and refuses an unknown `environment` instead of silently running only the main seeds;
+  - the `routes` tool now has a description, and `reload`'s is no longer cut off mid-sentence (#3893)

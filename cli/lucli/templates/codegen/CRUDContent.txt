@@ -99,7 +99,7 @@
 	* key) makes findByKey() throw Wheels.InvalidValue. No record can have that
 	* key, so it gets the same 404. Any other error is rethrown.
 	*
-	* $throwErrorOrShow404Page() sets the 404 status, then shows the error page
+	* renderNotFound() sets the 404 status, then shows the error page
 	* in development or the onmissingtemplate.cfm page in production. Throwing
 	* Wheels.RecordNotFound directly would reach production users as a 500.
 	*
@@ -118,8 +118,7 @@
 			}
 		}
 		if (!found) {
-			$throwErrorOrShow404Page(
-				type = "Wheels.RecordNotFound",
+			renderNotFound(
 				message = "|ObjectNameSingularC| not found for the requested key."
 			);
 		}

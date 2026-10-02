@@ -16,3 +16,10 @@ indent_style = space
 
 [{index.cfm,rewrite.cfm,root.cfm,wheels/index.cfm}]
 insert_final_newline = false
+
+# Per-request/lifecycle event templates emit zero output: they are $include'd into
+# the response buffer, so a trailing newline after </cfsilent> leaks as whitespace
+# before renderText output and breaks XML. Keep them newline-free (demo app/events
+# and the CLI generator templates). See #3882.
+[**/events/{onabort,onapplicationend,onapplicationstart,onrequestend,onrequeststart,onsessionend,onsessionstart}.cfm]
+insert_final_newline = false
