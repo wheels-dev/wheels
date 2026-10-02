@@ -89,6 +89,10 @@ The single-record finders didn't work with the old shape and now do: `findOne(re
 
 To find affected code, search `app/` and `tests/` for `returnAs="structs"`, `returnAs="struct"` and `returnAs = "struct`. For code that must run on both 4.1 and 4.2, `returnAs="array"` already returned an array of structs in 4.1 and is unchanged.
 
+### `X-Forwarded-Proto` needs `trustProxyHeaders`
+
+In 4.1, `urlFor(onlyPath=false)` and asset URLs took `https://` from an `X-Forwarded-Proto: https` request header even without the opt-in. In 4.2 that header sets the URL scheme only when `set(trustProxyHeaders=true)` is on; a real TLS connection always counts as `https` ([#3836](https://github.com/wheels-dev/wheels/issues/3836)). **Apps behind a trusted TLS-terminating reverse proxy must set `set(trustProxyHeaders=true)` before upgrading,** or their absolute URLs come out as `http://`. The one-time warning added for this in 4.1 ([#3835](https://github.com/wheels-dev/wheels/issues/3835)) is gone.
+
 ### Validation `condition` / `unless`: bare names are resolved
 
 A bare property or method name in a `condition` or `unless` expression now means `this.<name>` when the record has it ([#3928](https://github.com/wheels-dev/wheels/issues/3928)). That holds both alone (`condition="isActive"`) and on the left of a comparison (`condition="status != 'draft'"`). In 4.1, a lone name evaluated to `false`, so the rule was **skipped**. A left-hand name was compared as its own text, so the rule **always ran**. A validation your app relied on being skipped may now run, so search your models for `condition=` and `unless=` and run your model specs.
@@ -148,7 +152,8 @@ From [#3914](https://github.com/wheels-dev/wheels/issues/3914):
 1. Reload (`?reload=true&password=…`) and confirm the app starts clean; check `wheels.log` for warnings.
 2. Run your suite (`/wheels/app/tests`), including the model specs that cover conditional validations.
 3. On a production server, confirm the app runs in production mode: an error must not show a stack trace.
-4. If you render XML or other byte-exact responses, confirm nothing comes before the first byte.
+4. Behind a reverse proxy, confirm absolute URLs (for example in emails or redirects) still start with `https://`.
+5. If you render XML or other byte-exact responses, confirm nothing comes before the first byte.
 
 </Steps>
 
