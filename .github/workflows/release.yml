@@ -178,7 +178,10 @@ jobs:
       - name: Install CommandBox
         if: github.ref == 'refs/heads/main'
         run: |
-          curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
+          # Download to a file first: a retry after partial output would corrupt
+          # what gpg reads if curl piped straight into it.
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "${RUNNER_TEMP}/ortussolutions.gpg.asc" https://downloads.ortussolutions.com/debs/gpg
+          sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg "${RUNNER_TEMP}/ortussolutions.gpg.asc"
           echo "deb [signed-by=/usr/share/keyrings/ortussolutions.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/ortussolutions.list
           sudo apt-get update && sudo apt-get install -y commandbox
 
@@ -377,7 +380,7 @@ jobs:
           # From the release's checksums.txt; bump together with NFPM_VERSION.
           NFPM_SHA256="535962c4771db671352884b5591254481f851822557ad8476605c1e77a12504c"
           NFPM_TGZ="${RUNNER_TEMP}/nfpm.tar.gz"
-          curl -fsSL -o "${NFPM_TGZ}" \
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "${NFPM_TGZ}" \
             "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
           echo "${NFPM_SHA256}  ${NFPM_TGZ}" | sha256sum -c -
           sudo tar -xzf "${NFPM_TGZ}" -C /usr/local/bin nfpm
