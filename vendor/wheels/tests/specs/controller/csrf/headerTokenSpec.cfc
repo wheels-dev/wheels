@@ -112,6 +112,36 @@ component extends="wheels.WheelsTest" {
 				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
+			it("rejects the valid token with its letter case changed (same length), as a form field", () => {
+				var caseSwapped = "";
+				for (var i = 1; i <= Len(csrfToken); i++) {
+					var ch = Mid(csrfToken, i, 1);
+					caseSwapped &= Compare(ch, UCase(ch)) == 0 ? LCase(ch) : UCase(ch);
+				}
+				expect(Compare(caseSwapped, csrfToken) != 0).toBeTrue("the token has no letters to change");
+				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = caseSwapped}
+				_controller = application.wo.controller("csrfProtectedExcept", params)
+				var state = {type = ""}
+				try {
+					_controller.processAction("update", params)
+				} catch (any e) {
+					state.type = e.Type
+				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
+			})
+
+			it("rejects the valid token truncated by one character, as a form field", () => {
+				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = Left(csrfToken, Len(csrfToken) - 1)}
+				_controller = application.wo.controller("csrfProtectedExcept", params)
+				var state = {type = ""}
+				try {
+					_controller.processAction("update", params)
+				} catch (any e) {
+					state.type = e.Type
+				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
+			})
+
 			it("rejects with neither a field nor a header", () => {
 				params = {controller = "csrfProtectedExcept", action = "update"}
 				_controller = application.wo.controller("csrfProtectedExcept", params)

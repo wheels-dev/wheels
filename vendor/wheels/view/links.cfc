@@ -181,12 +181,13 @@ component {
 	) {
 		local.method = "post";
 		$args(name = "buttonTo", args = arguments);
-		// authenticityToken = false leaves the hidden token field out (#3959): for a
-		// form inside a cached fragment, where a stored field would hold the token of
-		// the session that warmed the cache. The token then has to come at request
-		// time, in the X-CSRF-Token header (Turbo sends it from csrfMetaTags()) or via
-		// a small script that copies the meta tag into the form on submit. Removed
-		// from arguments so it never reaches URLFor() or the element's attributes.
+		// authenticityToken = false leaves the hidden token field out (#3959). Use it for
+		// every form in cached markup that other visitors receive: a stored field would
+		// hand them the token of the session that warmed the cache. The token then comes
+		// at request time, in the X-CSRF-Token header (Turbo sends it from
+		// csrfMetaTags(); a fetch() must set it) or via a script that copies the meta tag
+		// into the form on submit. Removed from arguments so it never reaches URLFor()
+		// or the element's attributes.
 		local.includeToken = arguments.authenticityToken;
 		StructDelete(arguments, "authenticityToken");
 		local.content = "";

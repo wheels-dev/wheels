@@ -116,12 +116,28 @@ component extends="Controller" {
 
 ### Forms inside a cached fragment
 
-A form rendered with `startFormTag()` or `buttonTo()` carries the current session's authenticity token in a hidden field. Once that markup is cached, every visitor gets the copy whose field holds the token of the session that warmed the cache. Without a token supplied at request time, everyone else's submit fails with `Wheels.InvalidAuthenticityToken` (a 403).
+A form rendered with `startFormTag()` or `buttonTo()` carries the current session's authenticity token in a hidden field. **Never cache that markup where other visitors receive it.** Every visitor would get the copy holding the token of the session that warmed the cache. That leaks the token, which someone could then use to forge requests against that session. It also makes everyone else's submit fail with `Wheels.InvalidAuthenticityToken` (a 403).
 
-From Wheels 4.2 the request passes if **either** the form field **or** the `X-CSRF-Token` header carries a valid token, and the header counts on any non-GET request, not only with `X-Requested-With`. So supply the current page's token at request time:
+So in any cached markup that more than one visitor sees:
 
-- **With Turbo (or any `fetch`-based submit)**, nothing else is needed. Turbo sends the token from `csrfMetaTags()` in the `X-CSRF-Token` header, and that header is valid even when the cached hidden field is stale.
-- **With plain HTML forms**, leave the token out of the cached markup and fill it in on submit from the `csrf-token` meta tag that `csrfMetaTags()` writes into the layout:
+1. **Leave the token out of the form** with `authenticityToken=false`. This applies to every form in shared cached content, Turbo or not.
+2. **Keep `csrfMetaTags()` out of the cached content.** It belongs in the uncached layout, where it is rendered for each visitor.
+3. **Supply the token at request time**, from that meta tag.
+
+From Wheels 4.2 the request passes if **either** the form field **or** the `X-CSRF-Token` header carries a valid token, and the header counts on any non-GET request, not only with `X-Requested-With`. Ways to send it:
+
+- **Turbo** sends the `csrf-token` meta tag's value in `X-CSRF-Token` on every non-GET submit, so a Turbo-submitted form needs nothing more than step 1.
+- **Your own `fetch()`** does not add the header by itself. Set it explicitly:
+
+```js
+fetch(url, {
+    method: "POST",
+    headers: { "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content },
+    body: new FormData(form)
+});
+```
+
+- **Plain HTML form posts** can't set headers. Fill the hidden field in on submit from the meta tag:
 
 ```cfm title="app/views/posts/_post.cfm (rendered with cache=...)"
 <cfoutput>
@@ -129,7 +145,7 @@ From Wheels 4.2 the request passes if **either** the form field **or** the `X-CS
 </cfoutput>
 ```
 
-```html title="layout: add once, after csrfMetaTags()"
+```html title="layout (uncached): add once, after csrfMetaTags()"
 <script>
 document.addEventListener("submit", function (event) {
     var form = event.target;
@@ -148,7 +164,7 @@ document.addEventListener("submit", function (event) {
 </script>
 ```
 
-`startFormTag()` takes the same `authenticityToken=false` argument. Rule of thumb: don't cache markup that contains a form token unless the token is supplied at request time, by the header or by a script like the one above. Caching per user (see [Per-user keys](#per-user-keys)) also works, but it gives up the shared fragment.
+`startFormTag()` takes the same `authenticityToken=false` argument. Caching per user (see [Per-user keys](#per-user-keys)) avoids the problem too, but it gives up the shared fragment.
 
 ## Cache a query
 

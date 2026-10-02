@@ -111,10 +111,11 @@ component {
 		// The X-CSRF-Token header counts on any non-GET request, not only with
 		// X-Requested-With (#3959). The token value is the protection: a cross-site
 		// page can't read it, and X-Requested-With is itself a custom header with the
-		// same CORS preflight. fetch()-based clients (Turbo, plain fetch) send the
-		// page's current token in this header without X-Requested-With, which is what
-		// lets a form inside a cached fragment (whose hidden field holds the token of
-		// the session that warmed the cache) still submit.
+		// same CORS preflight. Clients that send the page's current token in this
+		// header (Turbo, or a fetch() that sets it) don't send X-Requested-With. With
+		// startFormTag/buttonTo(authenticityToken = false), this is how a form in
+		// shared cached markup (which must not carry a token) takes the token at
+		// request time.
 		//
 		// Rule when both are present: the request passes if EITHER the form field or
 		// the header holds a valid token (Rails' behaviour). The header is consulted
@@ -139,11 +140,13 @@ component {
 	public boolean function $isAnyAuthenticityTokenValid() {
 		if ($isRequestProtectedFromForgery() && StructKeyExists(params, "authenticityToken")) {
 			if (application.wheels.csrfStore == "session") {
-				// Compared exactly on every engine: the value must be the whole session
-				// token and nothing more, so the length is checked as well as the token.
-				local.isValid = IsSimpleValue(params.authenticityToken)
-					&& Len(params.authenticityToken) == Len(CsrfGenerateToken())
-					&& CsrfVerifyToken(params.authenticityToken);
+				// Exact, case-sensitive and constant-time on every engine, the same way the
+				// cookie store compares: the value must equal the session token
+				// (CsrfGenerateToken() returns the current one; the form field uses it too).
+				local.sessionToken = CsrfGenerateToken();
+				local.isValid = Len(local.sessionToken)
+					&& IsSimpleValue(params.authenticityToken)
+					&& $secureCompare(local.sessionToken, params.authenticityToken);
 			} else {
 				local.isValid = $isCookieAuthenticityTokenValid();
 			}
