@@ -94,14 +94,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					expect(content).toInclude('filters(through="requireRecord", only="show,edit,update,delete")');
 					expect(content).toInclude("private function requireRecord()");
 					expect(content).toInclude('IsObject(model("Notefile").findByKey(key=params.key))');
-					expect(content).toInclude('type = "Wheels.RecordNotFound"');
 
 					// The 404 must hold in production too. A bare Throw() only
 					// becomes a 404 on the development error page; production
-					// serves the generic 500. $throwErrorOrShow404Page() sets 404
-					// and throws (development) or renders onmissingtemplate.cfm
-					// (production).
-					expect(content).toInclude("$throwErrorOrShow404Page(");
+					// serves the generic 500. renderNotFound() (the public helper,
+					// #3900) sets 404 and throws Wheels.RecordNotFound (development)
+					// or renders onmissingtemplate.cfm (production); the scaffold no
+					// longer depends on the internal $throwErrorOrShow404Page.
+					expect(content).toInclude("renderNotFound(");
+					expect(content).notToInclude("$throwErrorOrShow404Page(");
 					expect(content).notToInclude("Throw(");
 
 					// The guard must NOT live inside show(): ScaffoldSource only
@@ -138,7 +139,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					var guard = Mid(content, guardAt, Len(content));
 					expect(guard).toInclude('"Wheels.InvalidValue"');
 					expect(guard).toInclude("rethrow;");
-					expect(guard).toInclude("$throwErrorOrShow404Page(");
+					expect(guard).toInclude("renderNotFound(");
 
 					var scanned = new cli.lucli.services.ScaffoldSource().scan(content);
 					expect(scanned.valid).toBeTrue(scanned.reason);
