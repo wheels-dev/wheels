@@ -484,65 +484,8 @@ jobs:
           # request which would re-run the entire test suite — runner.cfm
           # does not cache results between requests)
           if [ -f "$RESULT_FILE" ]; then
-            ENGINE="${{ matrix.cfengine }}" DB="${DB}" \
-            RESULT_FILE="$RESULT_FILE" JUNIT_FILE="$JUNIT_FILE" \
-            python3 -c "
-          import json, sys, os
-          from xml.etree.ElementTree import Element, SubElement, tostring
-
-          engine = os.environ['ENGINE']
-          db = os.environ['DB']
-          prefix = f'{engine}/{db}'
-
-          try:
-            d = json.load(open(os.environ['RESULT_FILE']))
-          except:
-            sys.exit(0)
-
-          def safe_str(val, default=''):
-            \"\"\"Coerce None/null JSON values to string for XML serialization.\"\"\"
-            return str(val) if val is not None else default
-
-          def process_suite(parent_el, suite):
-            \"\"\"Recursively process suites (TestBox suites can be nested).\"\"\"
-            for sp in suite.get('specStats', []):
-                tc = SubElement(parent_el, 'testcase',
-                    name=safe_str(sp.get('name')),
-                    classname=f\"{prefix} :: {safe_str(suite.get('name'))}\",
-                    time=str(sp.get('totalDuration', 0) / 1000))
-                if sp.get('status') == 'Failed':
-                    f = SubElement(tc, 'failure', message=safe_str(sp.get('failMessage')))
-                    f.text = safe_str(sp.get('failDetail'))
-                elif sp.get('status') == 'Error':
-                    e = SubElement(tc, 'error', message=safe_str(sp.get('failMessage')))
-                    e.text = safe_str(sp.get('failDetail'))
-                elif sp.get('status') == 'Skipped':
-                    SubElement(tc, 'skipped')
-            # Recurse into child suites
-            for child in suite.get('suiteStats', []):
-                process_suite(parent_el, child)
-
-          root = Element('testsuites',
-            name=prefix,
-            tests=str(int(d.get('totalSpecs', 0))),
-            failures=str(int(d.get('totalFail', 0))),
-            errors=str(int(d.get('totalError', 0))),
-            time=str(d.get('totalDuration', 0) / 1000))
-
-          for b in d.get('bundleStats', []):
-            ts = SubElement(root, 'testsuite',
-                name=f\"{prefix} :: {b.get('name', '')}\",
-                tests=str(int(b.get('totalSpecs', 0))),
-                failures=str(int(b.get('totalFail', 0))),
-                errors=str(int(b.get('totalError', 0))),
-                time=str(b.get('totalDuration', 0) / 1000))
-            for s in b.get('suiteStats', []):
-                process_suite(ts, s)
-
-          with open(os.environ['JUNIT_FILE'], 'wb') as f:
-            f.write(b'<?xml version=\"1.0\" encoding=\"UTF-8\"?>')
-            f.write(tostring(root))
-          " || { echo "JUnit conversion failed for ${DB} (non-fatal)"; rm -f "$JUNIT_FILE"; }
+            python3 tools/ci/testbox_junit.py "$RESULT_FILE" "$JUNIT_FILE" "${{ matrix.cfengine }}/${DB}" \
+              || { echo "JUnit conversion failed for ${DB} (non-fatal)"; rm -f "$JUNIT_FILE"; }
           fi
 
           # Zero-test guard (#3302): MIN_SPECS (workflow env) is the floor.
