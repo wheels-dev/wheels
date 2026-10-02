@@ -41,6 +41,12 @@ services:
       context: ./
       dockerfile: ./tools/docker/lucee5/Dockerfile
     image: wheels-test-lucee5:v1.0.2
+    environment:
+      # The constructor test-context gate honours WHEELS_ENV;
+      # the core suite runs in development (config/environment.cfm). Default to
+      # development so the isolated _wheelsTest binding stays on; smoke-env
+      # overrides this per leg.
+      - "WHEELS_ENV=${WHEELS_ENV:-development}"
     volumes:
       - ./:/wheels-test-suite
       - type: bind
@@ -65,6 +71,12 @@ services:
       context: ./
       dockerfile: ./tools/docker/lucee6/Dockerfile
     image: wheels-test-lucee6:v1.0.2
+    environment:
+      # The constructor test-context gate honours WHEELS_ENV;
+      # the core suite runs in development (config/environment.cfm). Default to
+      # development so the isolated _wheelsTest binding stays on; smoke-env
+      # overrides this per leg.
+      - "WHEELS_ENV=${WHEELS_ENV:-development}"
     volumes:
       - ./:/wheels-test-suite
       - type: bind
@@ -95,6 +107,12 @@ services:
       context: ./
       dockerfile: ./tools/docker/lucee7/Dockerfile
     image: wheels-test-lucee7:v1.0.0
+    environment:
+      # The constructor test-context gate honours WHEELS_ENV;
+      # the core suite runs in development (config/environment.cfm). Default to
+      # development so the isolated _wheelsTest binding stays on; smoke-env
+      # overrides this per leg.
+      - "WHEELS_ENV=${WHEELS_ENV:-development}"
     volumes:
       - ./:/wheels-test-suite
       - type: bind
@@ -119,6 +137,12 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2018/Dockerfile
     image: wheels-test-adobe2018:v1.0.2
+    environment:
+      # The constructor test-context gate honours WHEELS_ENV;
+      # the core suite runs in development (config/environment.cfm). Default to
+      # development so the isolated _wheelsTest binding stays on; smoke-env
+      # overrides this per leg.
+      - "WHEELS_ENV=${WHEELS_ENV:-development}"
     tty: true          
     stdin_open: true
     volumes:
@@ -145,6 +169,12 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2021/Dockerfile
     image: wheels-test-adobe2021:v1.0.2
+    environment:
+      # The constructor test-context gate honours WHEELS_ENV;
+      # the core suite runs in development (config/environment.cfm). Default to
+      # development so the isolated _wheelsTest binding stays on; smoke-env
+      # overrides this per leg.
+      - "WHEELS_ENV=${WHEELS_ENV:-development}"
     tty: true          
     stdin_open: true
     volumes:
@@ -177,6 +207,12 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2023/Dockerfile
     image: wheels-test-adobe2023:v1.0.1
+    environment:
+      # The constructor test-context gate honours WHEELS_ENV;
+      # the core suite runs in development (config/environment.cfm). Default to
+      # development so the isolated _wheelsTest binding stays on; smoke-env
+      # overrides this per leg.
+      - "WHEELS_ENV=${WHEELS_ENV:-development}"
     tty: true
     stdin_open: true
     volumes:
@@ -218,6 +254,12 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2025/Dockerfile
     image: wheels-test-adobe2025:v1.0.0
+    environment:
+      # The constructor test-context gate honours WHEELS_ENV;
+      # the core suite runs in development (config/environment.cfm). Default to
+      # development so the isolated _wheelsTest binding stays on; smoke-env
+      # overrides this per leg.
+      - "WHEELS_ENV=${WHEELS_ENV:-development}"
     tty: true
     stdin_open: true
     volumes:
@@ -254,6 +296,12 @@ services:
       context: ./
       dockerfile: ./tools/docker/boxlang/Dockerfile
     image: wheels-test-boxlang:v1.0.0
+    environment:
+      # The constructor test-context gate honours WHEELS_ENV;
+      # the core suite runs in development (config/environment.cfm). Default to
+      # development so the isolated _wheelsTest binding stays on; smoke-env
+      # overrides this per leg.
+      - "WHEELS_ENV=${WHEELS_ENV:-development}"
     tty: true
     stdin_open: true
     volumes:

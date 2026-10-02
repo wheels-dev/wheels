@@ -246,6 +246,33 @@ component {
 			application.$wheels.environment = local.oldEnvironment;
 		}
 
+		// Test-context start backstop. The test-context switch binds a
+		// second application `<name>_wheelsTest`. It must NEVER fully start outside
+		// development / testing: onApplicationStart re-runs the app's own start-up
+		// side effects (scheduler re-registration, autoMigrate, job registration)
+		// and a fresh scope ignores runtime maintenance mode. The constructor gate
+		// (events/testcontext.cfm) runs on WHEELS_ENV, which is not a trustworthy
+		// production signal, so refuse HERE on the config-resolved environment —
+		// before the config/settings include, the migrator, and the app's own
+		// onapplicationstart.cfm below. Clear the scope so a second request
+		// re-enters onApplicationStart and is refused again, never served from a
+		// half-initialised application. Response is a minimal 403 with no detail
+		// (production-safe on Adobe and BoxLang: literal cfheader args, no
+		// attributeCollection; script `abort`, never a bare cfabort).
+		if (
+			Len(application.applicationName) >= 11
+			&& Right(application.applicationName, 11) == "_wheelsTest"
+			&& application.$wheels.environment != "development"
+			&& application.$wheels.environment != "testing"
+		) {
+			StructDelete(application, "wheels");
+			StructDelete(application, "$wheels");
+			cfheader(statuscode = 403);
+			cfheader(name = "Content-Type", value = "text/plain; charset=utf-8");
+			writeOutput("Forbidden");
+			abort;
+		}
+
 		// Rewrite settings based on web server rewrite capabilites.
 		application.$wheels.rewriteFile = "index.cfm";
 		if (Right(request.cgi.script_name, 12) == "/" & application.$wheels.rewriteFile) {
@@ -295,6 +322,16 @@ component {
 		if (!StructKeyExists(application.$wheels, "docsBundlePath")) {
 			application.$wheels.docsBundlePath = "";
 		}
+
+		// Compatibility opt-out for the app test runner. When
+		// `<datasource>_test` is absent, /wheels/app/tests refuses by default
+		// (never silently runs specs against the primary datasource). An app that
+		// deliberately has no separate test database can set this true in
+		// config/settings.cfm; an OMITTED useTestDB (e.g. an older CLI that cannot
+		// send useTestDB=false) then runs against the primary datasource with a
+		// warning instead of being refused. An explicit useTestDB=true still
+		// requires the test database regardless of this setting.
+		application.$wheels.allowTestsAgainstPrimaryDatasource = false;
 
 		// Create migrations object and set default settings.
 		application.$wheels.autoMigrateDatabase = false;

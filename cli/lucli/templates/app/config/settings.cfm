@@ -62,5 +62,17 @@
 		labelPlacement="before"
 	);
 
+	/*
+		App tests (/wheels/app/tests, `wheels test`) default to the
+		`<datasource>_test` database and refuse to run if it is absent, so test
+		writes never reach your real database. A default SQLite app
+		already has a `<name>_test` datasource. If your app deliberately has no
+		separate test database, uncomment the line below: an omitted useTestDB
+		(e.g. an older CLI) then runs tests against the primary datasource with a
+		warning instead of being refused. `wheels test --no-test-db` and an
+		explicit useTestDB=true are unaffected by this setting.
+	*/
+	// set(allowTestsAgainstPrimaryDatasource=true);
+
 	// CLI-Appends-Here
 </cfscript>

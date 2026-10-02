@@ -9011,8 +9011,13 @@ component extends="modules.BaseModule" {
 			// datasource so chapter-6-style manual signups in the dev DB
 			// don't bleed into chapter-7 specs. Core tests already pick
 			// datasources from url.db so leave them alone.
-			if (!coreTests && useTestDB) {
-				testUrl &= "&useTestDB=true";
+			// Send useTestDB EXPLICITLY for every app run. The app
+			// runner now defaults an omitted flag to true (test DB), so omitting
+			// the parameter on --no-test-db would be reinterpreted as true and
+			// defeat the advertised opt-out. Core tests pick datasources from
+			// url.db, so they never carry useTestDB.
+			if (!coreTests) {
+				testUrl &= "&useTestDB=" & (useTestDB ? "true" : "false");
 			}
 			if (len(filter)) {
 				testUrl &= "&directory=#filter#";
