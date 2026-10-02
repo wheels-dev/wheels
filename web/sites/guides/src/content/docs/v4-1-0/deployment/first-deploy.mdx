@@ -153,7 +153,7 @@ Three quick checks before running anything:
    wheels deploy app containers
    ```
 
-   Prints `docker ps` output filtered by your service label, for every host. You should see one running container per host per role. (`wheels deploy details` gives the wider view — app, proxy, and accessories. `wheels deploy app details` lists each role's containers, or with `--release=<version>` reports that container's `docker inspect` status.)
+   Prints `docker ps` output filtered by your service label, for every host. You should see one running container per host per role. (`wheels deploy details` gives the wider view — app, proxy, and accessories. `wheels deploy app details` is a different verb: it requires `--release=<version>` and reports a single container's `docker inspect` status.)
 
 8. **Make a change and redeploy.**
 

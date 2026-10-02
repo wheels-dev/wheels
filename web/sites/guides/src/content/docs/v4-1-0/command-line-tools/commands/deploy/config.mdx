@@ -24,9 +24,9 @@ wheels deploy config [--destination=<name>] [--config=<path>]
 
 ## Output
 
-Prints the resolved config as YAML: `service`, `image`, `servers` (hosts per role), `registry`, `proxy`, `env`, `accessories`, `ssh` and `builder`. Secret values never appear: `env.secret` and `registry.password` list only the key names `.kamal/secrets` supplies, and a value resolved from `.kamal/secrets` into `env.clear` is redacted.
+Prints a YAML dump with four keys that matter at deploy time:
 
-```yaml title="example output (abridged)"
+```yaml title="example output"
 service: myapp
 image: myorg/myapp
 servers:
@@ -35,20 +35,9 @@ servers:
 registry:
   server: ghcr.io
   username: myorg
-  password:
-    - REGISTRY_PASSWORD
-proxy:
-  host: app.example.com
-  ssl: true
-  app_port: 8888
-env:
-  clear:
-    DB_HOST: db.internal
-  secret:
-    - WHEELS_RELOAD_PASSWORD
 ```
 
-Per-role options are not emitted.
+Full per-role options, env merging, and accessory blocks are not emitted in Phase 1 — `wheels deploy config` is a deliberate subset focused on what most users want to verify (which hosts, which image, which registry).
 
 ## When to use
 
