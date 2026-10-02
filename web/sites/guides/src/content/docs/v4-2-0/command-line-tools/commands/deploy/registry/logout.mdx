@@ -1,0 +1,33 @@
+---
+title: "wheels deploy registry logout"
+description: docker logout on every host.
+type: reference
+sidebar:
+  label: "logout"
+  order: 3
+---
+
+`docker logout <server>` on every host. Clears cached credentials.
+
+## Synopsis
+
+```txt title="Synopsis"
+wheels deploy registry logout [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Behavior
+
+`wheels deploy remove --confirm` calls logout automatically during its teardown flow. Call it directly if you want to clear credentials without tearing down the service.
+
+## Example
+
+```bash title="Example"
+wheels deploy registry logout
+```

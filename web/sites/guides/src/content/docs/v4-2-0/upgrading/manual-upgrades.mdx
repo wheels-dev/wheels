@@ -1,0 +1,101 @@
+---
+title: Upgrading Without the CLI
+description: Upgrade a Wheels app by swapping vendor/wheels from a release zip — patch bumps and the 3.x-to-4.0 jump, no CLI required.
+type: howto
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+The framework is a folder: `vendor/wheels/`. Upgrading is replacing that folder with a newer release's copy — which is exactly what `wheels upgrade apply` automates (it swaps `vendor/wheels/` and keeps a backup). This page is the same operation by hand, plus the manual counterpart to each CLI verification step the version guides mention.
+
+<Aside type="note" title="Still on 2.x?">
+Do the 2.x→3.x hop first, via the [frozen v3 guides](/v3-0-0/) and [Upgrading from 2.x to 3.x](/v4-2-0/upgrading/2x-to-3x/) — that upgrade is fully manual by nature (it predates the CLI) and reorganizes your app into the `app/`–`config/`–`public/`–`vendor/` layout everything below assumes. Then return here.
+</Aside>
+
+## What "the new version" physically is
+
+One file: `wheels-core-<version>.zip` from the [GitHub releases page](https://github.com/wheels-dev/wheels/releases). It contains a single `wheels/` folder — the complete framework, version already stamped into `wheels.json`. There are no additional dependencies to fetch on any 4.x release.
+
+## Patch and minor upgrades (4.0.x → 4.0.y)
+
+<Steps>
+
+1. **Back up the current framework.** Move — don't delete — `vendor/wheels/` aside (e.g. `vendor/wheels-4.0.4.bak/`, outside version control). If anything goes wrong, moving it back is the whole rollback.
+
+2. **Extract the new core zip into `vendor/`** so it becomes `vendor/wheels/` again. Extract fresh rather than overwriting in place — releases delete files as well as add them, and copy-over-the-top leaves stale orphans behind.
+
+3. **Read the release notes** for the versions you're crossing ([Reading the Changelog](/v4-2-0/upgrading/changelog/)). Patch releases avoid breaking changes, but deprecation warnings land continuously.
+
+4. **Reload and verify.** Hit any app URL with `?reload=true&password=<your-reload-password>`, then confirm the new version in the debug bar's Environment panel (development) or by outputting `application.$wheels.version`. Run your test suite — `/wheels/app/tests` in development does what `wheels test` does.
+
+</Steps>
+
+If you deploy from git and `vendor/wheels/` is committed (common for deliberate-workflow teams), do the swap on a branch and let your normal review/deploy pipeline carry it out — the framework upgrades like any other code change.
+
+<Aside type="caution" title="Upgrading to 4.1.0 on Adobe ColdFusion?">
+4.1.0 hardens `public/Application.cfc`'s `onError` and `onSessionEnd` handlers against a torn-down application scope during `applicationStop()` and session reaping ([#3379](https://github.com/wheels-dev/wheels/issues/3379)). The `vendor/wheels/` swap above does **not** update this app-owned file. On Adobe CF 2023/2025, diff your `public/Application.cfc` against the 4.1.0 base template and adopt the guarded handlers — or run `wheels upgrade check`, which flags the drift automatically.
+</Aside>
+
+<Aside type="caution" title="Upgrading to 4.1.0? Add the jBCrypt load path">
+4.1.0 added a block to `public/Application.cfc` that puts the bundled jBCrypt jar on the application's Java load paths ([#3571](https://github.com/wheels-dev/wheels/issues/3571)), so `bcryptHash()` / `bcryptVerify()` run in native Java instead of the slow pure-CFML Blowfish fallback. The `vendor/wheels/` swap does **not** update this app-owned file. Without the block the jar isn't loaded: on Lucee 7, `bcryptHash()` at the default cost can exceed the request timeout, so **any app that logs in with `bcryptVerify()`** (as `wheels generate auth` sets up) is affected. Copy this block into your `public/Application.cfc`, alongside the other `javaSettings.LoadPaths` setup:
+
+```cfm title="public/Application.cfc"
+// Framework Java resources — the bundled jBCrypt jar used by the global
+// bcryptHash()/bcryptVerify() helpers. LoadPaths are read at app init.
+if (DirectoryExists(this.wheelsDir & "resources/java")) {
+	if (!StructKeyExists(this, "javaSettings")) {
+		this.javaSettings = {};
+	}
+	if (!StructKeyExists(this.javaSettings, "LoadPaths")) {
+		this.javaSettings.LoadPaths = [];
+	}
+	if (!ArrayFind(this.javaSettings.LoadPaths, this.wheelsDir & "resources/java")) {
+		ArrayAppend(this.javaSettings.LoadPaths, this.wheelsDir & "resources/java");
+	}
+}
+```
+</Aside>
+
+<Aside type="note" title="Model overrides and `super` in 4.1">
+4.1.0 moved the model mixins to compile-time includes ([#3213](https://github.com/wheels-dev/wheels/issues/3213), [#3462](https://github.com/wheels-dev/wheels/pull/3462)). Existing model overrides keep working without changes: a model that overrides a framework method can delegate with `superDelete()`, `variables.superdelete()` or `super.delete()` (likewise for `findAll()`, `updateAll()` and so on). All three forms were checked on Lucee 7, Adobe CF 2025 and BoxLang. Controller and view helper overrides delegate with `super<name>()` ([#3325](https://github.com/wheels-dev/wheels/issues/3325)); see [Overriding core methods](/v4-2-0/digging-deeper/overriding-core-methods/).
+</Aside>
+
+<Aside type="caution" title="Upgrading to 4.1.1? Patch the `.env` boolean parser">
+4.1.1 stops coercing a `.env` value of numeric 1 (such as `1.0`) to the boolean `true` ([#3641](https://github.com/wheels-dev/wheels/issues/3641)). The parser lives in the app-owned `public/Application.cfc`, so the `vendor/wheels/` swap does **not** deliver the fix. In your copy, find the `.env` type-casting block that compares with `==`:
+
+```cfm title="before — public/Application.cfc"
+if (local.value == "true" || local.value == "false") {
+	local.value = (local.value == "true");
+```
+
+and replace those two lines with the template's string comparison:
+
+```cfm title="after — public/Application.cfc (4.1.1 template)"
+if (Compare(lCase(local.value), "true") == 0 || Compare(lCase(local.value), "false") == 0) {
+	local.value = (Compare(lCase(local.value), "true") == 0);
+```
+</Aside>
+
+## The 3.x → 4.0 upgrade
+
+The mechanics are the same swap, but 4.0 changes framework behavior and some app-side files, so there's required reading and a few extra steps:
+
+<Steps>
+
+1. **Read [Upgrading from 3.x to 4.0](/v4-2-0/upgrading/3x-to-4x/) first.** It enumerates all eleven breaking changes with remediations. Where it says `wheels reload`, use `?reload=true&password=…`; where it says `wheels test`, use `/wheels/app/tests`.
+
+2. **Swap the framework**: back up `vendor/wheels/`, extract `wheels-core-4.0.x.zip` into `vendor/`. Your 3.x vendor folder likely also contains `wirebox/` and `testbox/` — Wheels 4 needs neither (DI and testing are built in). Leave them if other code uses them; delete them if they existed only for Wheels.
+
+3. **Diff the app shims against the 4.0 base template.** Download `wheels-base-template-4.0.x.zip` and compare its `public/Application.cfc`, `public/index.cfm`, `public/urlrewrite.xml`, and `config/` files against yours — the 4.0 `Application.cfc` adds `.env` loading and updated mappings. Adopt the changes while keeping your local customizations. This diff-the-template step is the one piece of the upgrade that's genuinely easier with the CLI, so it earns your attention here.
+
+4. **Apply the code-level renames from the guide** — the big ones are `application.wirebox` → `application.wheelsdi`, `wheels.Test` → `wheels.WheelsTest` in spec files, and `tests/specs/functions/` → `tests/specs/functional/`. The guide's per-change sections have exact search-and-replace instructions.
+
+5. **Optional soft landing:** the [`wheels-legacy-adapter`](https://github.com/wheels-dev/wheels-legacy-adapter) package ships shims and deprecation logging for 3.x patterns. Without the CLI, install it like any package: download its release, extract into `vendor/wheels-legacy-adapter/`, reload — packages are auto-discovered from `vendor/*/package.json`. (Note the adapter does *not* cover the `application.wirebox` rename — that one is always manual.)
+
+6. **Reload, run your suite, and read the log.** Deprecation warnings (`paginationLinks()`, legacy plugins) land in `wheels.log` — they're your roadmap for cleanup before 5.0.
+
+</Steps>
+
+<Aside type="tip" title="About `wheels upgrade check`">
+The one CLI convenience with no in-app equivalent is `wheels upgrade check` — a source scanner that greps your app for the breaking patterns. If you're open to running the CLI *once on a workstation* (your servers never see it), the scan is genuinely useful and touches nothing. If not, the 3x-to-4x guide's eleven sections each state exactly what to search your codebase for — the checklist is the same, done by hand. Note the released 4.0.3 scanner has two known false spots: it recommends the inert `csrfEncryptionKey` setting name ([#3115](https://github.com/wheels-dev/wheels/issues/3115)) and misses `extends="wheels.Testbox"` — the guide text is the authority where they disagree.
+</Aside>
