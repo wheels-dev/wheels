@@ -26,14 +26,14 @@ Three keys are required. Omitting any of them stops the loader with `<path to de
 
 ## All allowed top-level keys
 
-The loader rejects any top-level key not on this list. Case-insensitive. The allowlist contains only keys the runtime actually reads (except [`boot`](#boot), which is accepted but not applied yet) — Kamal keys that `wheels deploy` has not implemented yet are **rejected** rather than accepted-and-ignored (see [Rejected Kamal keys](#rejected-kamal-keys) below).
+The loader rejects any top-level key not on this list. Case-insensitive. The allowlist contains only keys the runtime actually reads — Kamal keys that `wheels deploy` has not implemented yet are **rejected** rather than accepted-and-ignored (see [Rejected Kamal keys](#rejected-kamal-keys) below).
 
 ```text title="Allowed top-level keys (illustrative — do not type)"
 service, image, servers, registry, builder, env, ssh, proxy, boot, accessories
 ```
 
 <Aside type="caution" title="Some sub-keys are still parsed but ignored">
-Within the allowed blocks, several **sub-keys** are parsed and then never read by the runtime: `builder.arch` / `builder.args` / `builder.remote`, `ssh.proxy` / `ssh.keys_only`, `proxy.forward_headers` / `proxy.buffering`, role-map `options:` / `labels:` / `env:`, accessory `files:`, and the whole [`boot`](#boot) block. Setting them has no effect today. Each one is flagged in its section below; the umbrella issue is [#3088](https://github.com/wheels-dev/wheels/issues/3088).
+Within the allowed blocks, several **sub-keys** are parsed and then never read by the runtime: `builder.arch` / `builder.args` / `builder.remote`, `ssh.proxy` / `ssh.keys_only`, `proxy.forward_headers` / `proxy.buffering`, role-map `options:` / `labels:` / `env:`, and accessory `files:`. Setting them has no effect today. Each one is flagged in its section below; the umbrella issue is [#3088](https://github.com/wheels-dev/wheels/issues/3088).
 </Aside>
 
 ## `service`
@@ -246,12 +246,14 @@ See [Accessories](/v4-1-0/deployment/accessories/) for the full walk-through.
 
 ## `boot`
 
-Kamal's rolling-boot settings. Since 4.1.0 the `boot:` block is **accepted and validated**, so a Kamal config that carries it loads without the `unknown top-level key` error. It is **not applied yet**: `wheels deploy` still boots hosts one at a time, in order, with no pause between them (orchestration work is tracked under [#2957](https://github.com/wheels-dev/wheels/issues/2957)).
+Kamal's rolling-boot settings. When `deploy.yml` has a `boot:` block, `wheels deploy` boots each role's hosts in batches of `limit` hosts and waits `wait` seconds between batches. A percentage `limit` is that share of the role's hosts, rounded up, and a batch is never smaller than one host. Without a `boot:` block, hosts boot back to back with no pause.
+
+Hosts within a batch boot one after another. Kamal boots them in parallel, so a batch takes longer here, but the pacing between batches is the same. `--dry-run` prints a `[boot] wait <n>s before the next batch` line where the pause falls. Before 4.2.0 the block was validated but not applied.
 
 ```yaml title="config/deploy.yml"
 boot:
   limit: 10   # hosts to boot at a time, or a percentage such as "25%" (Kamal default 10)
-  wait: 5     # seconds between host boots (Kamal default 5)
+  wait: 5     # seconds to wait between batches (Kamal default 5)
 ```
 
 Both values must be a non-negative number (`limit` also accepts a percentage string). Anything else fails validation with `invalid boot.limit: '<value>' (must be a non-negative number or percentage)`.
