@@ -1,0 +1,1 @@
+- The Linux `.rpm` now unpacks cleanly with `rpm2cpio` on rpm 4.19 (Rocky Linux 10). It is rebuilt with `rpmbuild`, because nfpm wrote an archive-size header that rpm 4.19's `rpm2cpio` rejects (exit 1), which broke `rpm2cpio | cpio` installs in user space. The package contents and dependencies are unchanged (#3975)

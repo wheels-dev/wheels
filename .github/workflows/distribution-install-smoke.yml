@@ -467,6 +467,60 @@ jobs:
             echo "::error::${CHANNEL}: wheels info did not reach the Wheels module through LuCLI"; exit 1
           fi
 
+  rpm-payload:
+    needs: resolve
+    name: "rpm payload (${{ matrix.label }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The GA .rpm must unpack with rpm2cpio on every rpm we support and install
+    # with dnf (#3975). rpm 4.19 (Rocky 10) exits 1 on a package whose archive-
+    # size header doesn't match its cpio stream, which nfpm-only builds (4.1.3
+    # and earlier) have; rpm 4.16 (Rocky 9) doesn't check.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: "rocky 10, rpm 4.19"
+            image: rockylinux/rockylinux:10
+          - label: "rocky 9, rpm 4.16"
+            image: rockylinux/rockylinux:9
+    container:
+      image: ${{ matrix.image }}
+    env:
+      EXPECTED: ${{ needs.resolve.outputs.version }}
+    steps:
+      - name: Download the GA .rpm
+        run: |
+          set -euo pipefail
+          dnf -y -q install cpio >/dev/null
+          curl -fsSLo /tmp/wheels.rpm \
+            "https://github.com/wheels-dev/wheels/releases/download/v${EXPECTED}/wheels-${EXPECTED}.noarch.rpm"
+          rpm --version
+          rpm -K /tmp/wheels.rpm
+      - name: rpm2cpio | cpio -t exits 0
+        run: |
+          set -uo pipefail
+          # 4.1.3 and earlier were built by nfpm alone; their header is known to
+          # fail rpm 4.19's check. Report it, but gate only on later releases.
+          KNOWN_BAD=0
+          if [ "$(printf '%s\n' "${EXPECTED}" "4.1.3" | sort -V | tail -1)" = "4.1.3" ]; then KNOWN_BAD=1; fi
+          if rpm2cpio /tmp/wheels.rpm | cpio -t --quiet > /tmp/entries; then
+            echo "rpm2cpio | cpio -t OK ($(wc -l < /tmp/entries) entries)"
+          elif [ "${KNOWN_BAD}" = 1 ]; then
+            echo "::notice::wheels ${EXPECTED} predates the rpmbuild re-wrap (#3975): rpm2cpio | cpio -t fails on $(rpm --version); not gating"
+          else
+            echo "::error::rpm2cpio | cpio -t failed on $(rpm --version) for wheels ${EXPECTED}"
+            echo "archive-size header: $(rpm -qp --qf '%{LONGARCHIVESIZE}' /tmp/wheels.rpm), stream: $(rpm2cpio /tmp/wheels.rpm | wc -c)"
+            exit 1
+          fi
+      - name: dnf install the downloaded .rpm and run it
+        run: |
+          set -euo pipefail
+          dnf -y install /tmp/wheels.rpm
+          GOT="$(wheels --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          echo "wheels --version => '${GOT}' (expected '${EXPECTED}')"
+          [ "${GOT}" = "${EXPECTED}" ] || { echo "::error::installed wheels reports '${GOT}', expected '${EXPECTED}'"; exit 1; }
+
   yum:
     needs: resolve
     name: "yum (rocky 9)"
