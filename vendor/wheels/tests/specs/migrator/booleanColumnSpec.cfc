@@ -12,16 +12,20 @@
  * Both models (BooleanFlag, BooleanFlagConverted) turn automatic validations on
  * for themselves only; the runner's global setting is left alone.
  *
- * Scoped to SQLite and H2, the adapters this fix changes. MySQL (TINYINT(1),
- * driver-dependent BIT reporting) and Oracle (NUMBER(1)) map booleans
- * differently and are not covered here.
+ * MySQL used to emit TINYINT(1), which reaches the model as an integer
+ * whenever the DSN sets `tinyInt1isBit=false` (cfdbinfo then reports it exactly
+ * like TINYINT(4)). It now emits BIT(1), which every driver setting reports as
+ * BIT (#3897). Its legacy TINYINT(1) column is converted with changeColumn too.
+ *
+ * Scoped to SQLite, H2 and MySQL, the adapters this fix changes. Oracle
+ * (NUMBER(1)) maps booleans differently and is not covered here.
  */
 component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		variables.migration = CreateObject("component", "wheels.migrator.Migration").init();
 		variables.adapterName = variables.migration.adapter.adapterName();
-		variables.applies = ListFindNoCase("SQLite,H2", variables.adapterName) > 0;
+		variables.applies = ListFindNoCase("SQLite,H2,MySQL", variables.adapterName) > 0;
 		variables.newTable = "c_o_r_e_booleanflags";
 		variables.convertedTable = "c_o_r_e_booleanflagsconverted";
 	}
@@ -50,16 +54,32 @@ component extends="wheels.WheelsTest" {
 
 			it("introspects as a boolean property", () => {
 				if (!variables.applies) {
-					skip("Boolean column mapping is pinned for SQLite and H2 only, not `#variables.adapterName#`.");
+					skip("Boolean column mapping is pinned for SQLite, H2 and MySQL only, not `#variables.adapterName#`.");
 				}
 				var prop = model("BooleanFlag").$classData().properties.flag;
 				expect(prop.validationtype).toBe("boolean");
 				expect(prop.type).toBe("cf_sql_bit");
 			});
 
+			// The DDL itself, not the driver's report of it: with the driver default
+			// (tinyInt1isBit=true) a TINYINT(1) column also introspects as BIT, so only
+			// the declared type shows the column works under every DSN setting.
+			it("is declared as BIT(1) on MySQL", () => {
+				if (variables.adapterName != "MySQL") {
+					skip("The BIT(1) declaration is MySQL-only, not `#variables.adapterName#`.");
+				}
+				var declared = QueryExecute(
+					"SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '#variables.newTable#' AND COLUMN_NAME = 'flag'",
+					[],
+					{datasource = application.wo.get("dataSourceName")}
+				);
+				expect(declared.recordCount).toBe(1);
+				expect(LCase(declared.COLUMN_TYPE)).toBe("bit(1)");
+			});
+
 			it("passes automatic validation for true and the strings true / false", () => {
 				if (!variables.applies) {
-					skip("Boolean column mapping is pinned for SQLite and H2 only, not `#variables.adapterName#`.");
+					skip("Boolean column mapping is pinned for SQLite, H2 and MySQL only, not `#variables.adapterName#`.");
 				}
 				expect(model("BooleanFlag").new(label = "a", flag = true).valid()).toBeTrue();
 				expect(model("BooleanFlag").new(label = "b", flag = "true").valid()).toBeTrue();
@@ -68,7 +88,7 @@ component extends="wheels.WheelsTest" {
 
 			it("saves true with validation on and reads it back as true", () => {
 				if (!variables.applies) {
-					skip("Boolean column mapping is pinned for SQLite and H2 only, not `#variables.adapterName#`.");
+					skip("Boolean column mapping is pinned for SQLite, H2 and MySQL only, not `#variables.adapterName#`.");
 				}
 				var obj = model("BooleanFlag").new(label = "d", flag = true);
 				expect(obj.save()).toBeTrue();
@@ -85,7 +105,7 @@ component extends="wheels.WheelsTest" {
 					return;
 				}
 				// The type each adapter used to emit for t.boolean().
-				var legacyType = variables.adapterName == "H2" ? "TINYINT(1)" : "INTEGER";
+				var legacyType = ListFindNoCase("H2,MySQL", variables.adapterName) ? "TINYINT(1)" : "INTEGER";
 				variables.migration.dropTable(variables.convertedTable);
 				variables.migration.execute(
 					"CREATE TABLE #variables.convertedTable# (id INTEGER PRIMARY KEY, label VARCHAR(20), flag #legacyType#)"
@@ -98,7 +118,7 @@ component extends="wheels.WheelsTest" {
 
 			it("introspects as a boolean property after the conversion", () => {
 				if (!variables.applies) {
-					skip("Boolean column mapping is pinned for SQLite and H2 only, not `#variables.adapterName#`.");
+					skip("Boolean column mapping is pinned for SQLite, H2 and MySQL only, not `#variables.adapterName#`.");
 				}
 				var prop = model("BooleanFlagConverted").$classData().properties.flag;
 				expect(prop.validationtype).toBe("boolean");
@@ -107,7 +127,7 @@ component extends="wheels.WheelsTest" {
 
 			it("keeps the stored 1 / 0 values", () => {
 				if (!variables.applies) {
-					skip("Boolean column mapping is pinned for SQLite and H2 only, not `#variables.adapterName#`.");
+					skip("Boolean column mapping is pinned for SQLite, H2 and MySQL only, not `#variables.adapterName#`.");
 				}
 				var rows = model("BooleanFlagConverted").findAll(order = "id");
 				expect(rows.recordCount).toBe(2);
@@ -117,7 +137,7 @@ component extends="wheels.WheelsTest" {
 
 			it("passes automatic validation for true and saves it", () => {
 				if (!variables.applies) {
-					skip("Boolean column mapping is pinned for SQLite and H2 only, not `#variables.adapterName#`.");
+					skip("Boolean column mapping is pinned for SQLite, H2 and MySQL only, not `#variables.adapterName#`.");
 				}
 				var obj = model("BooleanFlagConverted").new(id = 3, label = "new", flag = true);
 				expect(obj.valid()).toBeTrue();

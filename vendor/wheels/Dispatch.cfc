@@ -753,7 +753,7 @@ component output="false" extends="wheels.Global"{
 			} else {
 				return local.rv;
 			}
-			local.modelName = capitalize(singularize(local.controllerName));
+			local.modelName = $routeBindingModelName(local.controllerName);
 		}
 
 		// Negative cache: a conventional binding that previously failed to resolve is skipped
@@ -880,7 +880,12 @@ component output="false" extends="wheels.Global"{
 			application.$wheelsRouteBindingWarnings[local.dedupKey] = true;
 
 			// Derive the singular name binding would use (matches $resolveRouteModelBinding logic).
-			local.modelName = capitalize(singularize(local.controller));
+			// No hint when there is no such model: binding could not load anything, so the
+			// hint would only name a model that does not exist (#3940).
+			local.modelName = $routeBindingModelName(local.controller);
+			if (!$routeBindingModelExists(local.modelName)) {
+				return false;
+			}
 			local.singular = LCase(Left(local.modelName, 1)) & Mid(local.modelName, 2, Len(local.modelName) - 1);
 			local.routeName = StructKeyExists(arguments.route, "name") ? arguments.route.name : "";
 
@@ -897,6 +902,30 @@ component output="false" extends="wheels.Global"{
 			return true;
 		} catch (any ignored) {
 			// Warning emission is best-effort; never block dispatch.
+			return false;
+		}
+	}
+
+	/**
+	 * Internal function. The model name route model binding derives from a controller
+	 * name: the last segment of a namespaced controller, singularized and capitalized,
+	 * so `admin.users` binds the `User` model, not `Admin.user` (#3940). A model in a
+	 * subfolder needs an explicit `binding="admin/User"` on the resource.
+	 */
+	public string function $routeBindingModelName(required string controllerName) {
+		return capitalize(singularize(ListLast(arguments.controllerName, "./")));
+	}
+
+	/**
+	 * Internal function. True when `model(name)` resolves. Only the binding hint calls
+	 * this, at most once per controller and action, so a missing model costs one failed
+	 * lookup per reload.
+	 */
+	public boolean function $routeBindingModelExists(required string modelName) {
+		try {
+			model(arguments.modelName);
+			return true;
+		} catch (any e) {
 			return false;
 		}
 	}

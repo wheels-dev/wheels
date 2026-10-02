@@ -210,6 +210,71 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it("accepts a key whose segment merely contains '..' (##3912)", function() {
+					// Two dots INSIDE a segment are not traversal; the name keeps real chars.
+					disk.put(key = "reports/q3..final.pdf", content = "report");
+					expect(disk.exists("reports/q3..final.pdf")).toBeTrue();
+					expect(ToString(disk.get("reports/q3..final.pdf"))).toBe("report");
+
+					disk.put(key = "a..b.txt", content = "ab");
+					expect(ToString(disk.get("a..b.txt"))).toBe("ab");
+
+					disk.put(key = "v1..2/notes.txt", content = "v");
+					expect(ToString(disk.get("v1..2/notes.txt"))).toBe("v");
+				});
+
+				it("normalises leading, trailing, double and UNC slashes to a key relative to root (##3912)", function() {
+					// Every key is relative to the root, so slash runs carry no meaning.
+					expect(disk.$resolve("/avatars/1.png")).toBe(disk.$resolve("avatars/1.png"));
+					expect(disk.$resolve("a//b.txt")).toBe(disk.$resolve("a/b.txt"));
+					expect(disk.$resolve("dir/x/")).toBe(disk.$resolve("dir/x"));
+					// UNC / network prefixes normalise to a relative key under root, never escape it.
+					expect(disk.$resolve("//server/share/x.txt")).toBe(disk.$resolve("server/share/x.txt"));
+					expect(disk.$resolve("\\server\share\x.txt")).toBe(disk.$resolve("server/share/x.txt"));
+					// Mixed separators resolve the same as all-forward-slash.
+					expect(disk.$resolve("a\b/c.txt")).toBe(disk.$resolve("a/b/c.txt"));
+					// Everything stays under the configured root.
+					expect(disk.$resolve("/avatars/1.png")).toInclude(ctx.root);
+
+					// "/avatars/1.png" and "avatars/1.png" address the same object.
+					disk.put(key = "/avatars/1.png", content = "pixels");
+					expect(ToString(disk.get("avatars/1.png"))).toBe("pixels");
+				});
+
+				it("treats percent-encoded traversal as a literal segment, never decoding it (##3912)", function() {
+					// $resolve does not url-decode, so "%2e%2e%2f" can never become "../".
+					var resolved = disk.$resolve("files/%2e%2e%2fsecret");
+					expect(resolved).toInclude("%2e%2e%2fsecret");
+					expect(resolved).toInclude(ctx.root);
+					disk.put(key = "files/%2e%2e%2fsecret", content = "literal");
+					expect(ToString(disk.get("files/%2e%2e%2fsecret"))).toBe("literal");
+				});
+
+				it("rejects traversal, dot/space-only segments and drive-letter keys (##3912)", function() {
+					// cfformat-ignore-start
+					var rejected = [
+						"../escape.txt",         // parent traversal
+						"..\escape.txt",         // Windows-style backslash traversal
+						"a/../b.txt",            // mid-path traversal
+						"foo/../../etc/passwd",  // deep traversal
+						"/../x.txt",             // leading-slash traversal
+						"reports/.. /x.txt",     // ".. " — Windows strips the trailing space to ".."
+						"reports/ ../x.txt",     // " .." — leading space
+						"foo/. ./bar.txt",       // ". ." — dots and spaces only
+						"foo/.../bar.txt",       // "..." — dots only
+						"foo/   /bar.txt",       // whitespace-only segment
+						"C:/Windows/System32",   // drive-letter prefix
+						"/C:/x.txt",             // drive letter after a leading slash
+						"C:evil.txt"             // drive-relative prefix
+					];
+					// cfformat-ignore-end
+					for (var badKey in rejected) {
+						expect(function() {
+							disk.$resolve(badKey);
+						}).toThrow(type = "Wheels.Storage.InvalidKey", message = "[#badKey#] must be rejected as an invalid key");
+					}
+				});
+
 				it("builds a public url from the urlPrefix", function() {
 					expect(disk.url("a/b.png")).toBe("/uploads/a/b.png");
 				});

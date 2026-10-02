@@ -948,7 +948,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 		// Step 2: Remove single-line comments: // ... until end of line
 		local.cleaned = REReplace(local.cleaned, "//.*", "", "all");
 
-		// Step 3: Match set(dataSourceName="...") or, in apps generated since 4.1.3,
+		// Step 3: Match set(dataSourceName="...") or, in apps generated since 4.2.0,
 		// set(dataSourceName=env("WHEELS_DATASOURCE", "...")), whose default is used
 		// (a .env or process value isn't visible here)
 		for (local.pattern in [
