@@ -137,12 +137,13 @@ The stdio MCP server (`wheels mcp wheels`) no longer offers `create`, and refuse
 
 ### `wheels deploy` changes
 
-From [#3914](https://github.com/wheels-dev/wheels/issues/3914):
+From [#3914](https://github.com/wheels-dev/wheels/issues/3914) and [#3925](https://github.com/wheels-dev/wheels/issues/3925):
 
 - **Images ship an empty `db/`.** The `wheels deploy init` Dockerfile no longer copies local SQLite files (`db/*.sqlite`, `*.sqlite3`, `*.db` and their journal files) into the image, and its `.dockerignore` excludes them. Migrations ship with `app/migrator/migrations` as before. A SQLite app therefore starts production with an empty database inside the container, and `deploy init` now says so for a SQLite app: run migrations on boot with `set(autoMigrateDatabase=true)` in `config/production/settings.cfm`. `deploy init` keeps an existing `.dockerignore`, so for an app scaffolded earlier the Dockerfile's builder stage removes those files instead. To adopt the new `.dockerignore` and Dockerfile, run `wheels deploy init` in a scratch directory and copy the changes over. Don't run `--force` in your app: it also overwrites your `config/deploy.yml`.
 - **`proxy:` keys are checked.** Only `host`, `ssl`, `app_port`, `healthcheck`, `forward_headers` and `buffering` are accepted, and `proxy.ssl` must be `true` or `false`. A config with a misspelled proxy key, or `ssl: yes`, now fails validation instead of being ignored.
 - **`deploy registry login` needs `registry.username`,** and a missing or empty `config/deploy.yml` now says so instead of a file-read error.
 - **`deploy app details`, `app live` and `app maintenance` no longer need `--release`.** Without it, `app details` lists the role's containers.
+- **The `boot:` block is applied** ([#3925](https://github.com/wheels-dev/wheels/issues/3925)). With a `boot:` block, each role's hosts boot in batches of `limit` (a count, or a percentage of the role's hosts) with `wait` seconds between batches. In 4.1 it was validated but ignored, so a config that carries one now deploys more slowly by design. Without a `boot:` block, hosts boot back to back as before.
 - **`deploy config` prints the whole resolved config** (proxy, env, accessories, ssh, builder). A `registry.password` entry is shown only when it names a key in `.kamal/secrets`.
 
 ## Verify
