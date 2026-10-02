@@ -74,7 +74,7 @@ jobs:
             SHA=$(echo "$row" | jq -r '.sha256')
 
             echo "Downloading ${FILE}..."
-            curl -sL "$URL" -o ~/.wheels/browser/lib/"$FILE"
+            curl -sL --retry 3 --retry-delay 2 --retry-all-errors "$URL" -o ~/.wheels/browser/lib/"$FILE"
 
             ACTUAL=$(sha256sum ~/.wheels/browser/lib/"$FILE" | cut -d' ' -f1)
             if [ "$ACTUAL" != "$SHA" ]; then
@@ -89,7 +89,7 @@ jobs:
 
       - name: Download SQLite JDBC driver
         run: |
-          curl -sL "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar" \
+          curl -sL --retry 3 --retry-delay 2 --retry-all-errors "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar" \
             -o /tmp/sqlite-jdbc.jar
 
       - name: Start Lucee server

@@ -30,7 +30,7 @@ runs:
         mkdir -p "$install_dir"
         # Installed as plain `lucli`: a versioned file name would be taken
         # for a module alias.
-        curl --fail --location --retry 3 \
+        curl --fail --location --retry 3 --retry-delay 2 --retry-all-errors \
           "https://github.com/${LUCLI_REPO}/releases/download/v${LUCLI_VERSION}/lucli-${LUCLI_VERSION}-${suffix}" \
           --output "$install_dir/lucli"
         if command -v sha256sum >/dev/null 2>&1; then
