@@ -54,6 +54,17 @@ component extends="wheels.WheelsTest" {
 					expect(result.key).toBe(post.key());
 				});
 
+				it("binds the model named by the last segment of a namespaced controller (##3940)", function() {
+					var post = g.model("Post").findOne(order="id");
+					var params = {controller = "admin.posts", action = "show", key = post.key()};
+					var route = {binding = true};
+
+					var result = _dispatch.$resolveRouteModelBinding(params = params, route = route);
+
+					expect(result).toHaveKey("post");
+					expect(result.post.key()).toBe(post.key());
+				});
+
 				it("throws RecordNotFound when record does not exist", function() {
 					var params = {controller = "posts", action = "show", key = "999999"};
 					var route = {binding = true};

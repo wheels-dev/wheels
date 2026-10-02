@@ -149,24 +149,115 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		return local.diff == 0;
 	}
 
+	/**
+	 * Resolve a storage key to an absolute path inside the root, rejecting path
+	 * traversal. A name that merely CONTAINS two dots inside a segment ("a..b.txt",
+	 * "v1..2") is legitimate and allowed; only genuine traversal is rejected (#3912).
+	 *
+	 * The containment guard is LEXICAL (string) canonicalisation — it resolves "./",
+	 * "../" and "//" syntactically and compares paths, which is uniform on every
+	 * engine including the JVM-free RustCFML. It does NOT resolve symlinks: a symlink
+	 * planted under the root that points outside is FOLLOWED and trusted, because it
+	 * can only be created by someone who already has filesystem access to the root,
+	 * never through the storage API. (A symlink's target is pinned by StorageSpec's
+	 * "follows a symlink under root" test; an opt-in symlink-resolving check for JVM
+	 * engines is tracked in #4020.)
+	 */
 	public string function $resolve(required string key) {
-		// Reject traversal — a key must stay inside root.
+		// 1. Normalise separators (\ -> /) so a Windows or mixed-separator key is one form.
 		local.clean = Replace(arguments.key, "\", "/", "all");
-		if (Find("..", local.clean)) {
-			throw(
-				type = "Wheels.Storage.InvalidKey",
-				message = "Storage key [#arguments.key#] must not contain '..'."
-			);
-		}
-		// Empty or slash-only keys resolve to root itself. Throw rather than
-		// let put() write the disk root or get() treat the directory as NotFound.
-		if (!Len(REReplace(local.clean, "/", "", "all"))) {
+
+		// 2. Every key is relative to the root, so slash runs carry no meaning: a
+		// leading "/", a trailing "/", "//" runs and a UNC/network prefix
+		// ("//server/share", "\\server\share") are NORMALISED away by dropping empty
+		// segments — the remainder is appended under the root. We do NOT url-decode, so
+		// "%2e%2e%2f" stays a literal segment and can never turn into "../".
+		local.segments = ListToArray(local.clean, "/", false);
+		if (!ArrayLen(local.segments)) {
 			throw(
 				type = "Wheels.Storage.InvalidKey",
 				message = "Storage key [#arguments.key#] must not be empty or slash-only."
 			);
 		}
-		return variables.root & "/" & local.clean;
+		// Reject any surviving segment that, after trimming whitespace and removing
+		// every dot, is empty: ".", "..", "...", ". .", and — because Windows strips a
+		// segment's trailing dots and spaces — ".. ". An exact "==" check for ".." is
+		// not enough. A drive-letter prefix (C:, C:foo) must never resolve outside root.
+		for (local.segment in local.segments) {
+			if (Len(Trim(Replace(Trim(local.segment), ".", "", "all"))) == 0) {
+				throw(
+					type = "Wheels.Storage.InvalidKey",
+					message = "Storage key [#arguments.key#] has a dot/space-only path segment."
+				);
+			}
+			if (ReFind("^[A-Za-z]:", local.segment)) {
+				throw(
+					type = "Wheels.Storage.InvalidKey",
+					message = "Storage key [#arguments.key#] must not contain a drive-letter prefix."
+				);
+			}
+		}
+
+		local.resolved = variables.root & "/" & ArrayToList(local.segments, "/");
+
+		// 3. Defence in depth: lexically canonicalise the resolved path and confirm
+		// it stays inside the root. After the segment guard there is no ".." left, so
+		// this only ever fires if that guard is weakened; the trailing-separator
+		// compare keeps "/root-evil" from passing as inside "/root".
+		if (!$pathWithin(root = $lexicalCanonical(variables.root), candidate = $lexicalCanonical(local.resolved))) {
+			throw(
+				type = "Wheels.Storage.InvalidKey",
+				message = "Storage key [#arguments.key#] resolves outside the storage root."
+			);
+		}
+
+		return local.resolved;
+	}
+
+	/**
+	 * Lexically canonicalise a path: normalise separators, resolve "." and ".."
+	 * segments and collapse "//", preserving a leading "/" or a "C:" drive prefix.
+	 * Pure string work (no filesystem, no JVM) so it behaves identically on every
+	 * engine; it does not resolve symlinks.
+	 */
+	private string function $lexicalCanonical(required string path) {
+		local.p = Replace(arguments.path, "\", "/", "all");
+		local.prefix = "";
+		if (ReFind("^[A-Za-z]:/", local.p)) {
+			local.prefix = Left(local.p, 2);
+			local.p = Mid(local.p, 3, Len(local.p));
+		}
+		local.isAbsolute = Left(local.p, 1) == "/";
+		local.out = [];
+		for (local.seg in ListToArray(local.p, "/", false)) {
+			if (local.seg == ".") {
+				continue;
+			}
+			if (local.seg == "..") {
+				if (ArrayLen(local.out)) {
+					ArrayDeleteAt(local.out, ArrayLen(local.out));
+				}
+				continue;
+			}
+			ArrayAppend(local.out, local.seg);
+		}
+		local.result = ArrayToList(local.out, "/");
+		if (local.isAbsolute) {
+			local.result = "/" & local.result;
+		}
+		return local.prefix & local.result;
+	}
+
+	/**
+	 * True when `candidate` is the root itself or lives inside it. Compares with a
+	 * trailing separator so "/root-evil" does not pass as inside "/root".
+	 */
+	private boolean function $pathWithin(required string root, required string candidate) {
+		local.base = REReplace(arguments.root, "/+$", "");
+		if (arguments.candidate == local.base) {
+			return true;
+		}
+		return Left(arguments.candidate, Len(local.base) + 1) == (local.base & "/");
 	}
 
 	private string function $normalizeDir(required string dir) {

@@ -118,9 +118,41 @@ component extends="modules.BaseModule" {
 		__arguments = [];
 		structDelete(this, "__arguments");
 		if (!structIsEmpty(arguments.callerArgs)) {
-			return arguments.callerArgs;
+			// LuCLI (wheels-dev/LuCLI#17) adds a runtime-owned
+			// __lucliMcpCall=true to every MCP tools/call and never to a
+			// terminal call. Record it for this command and take it out, so no
+			// command sees it as an argument of its own. Only LuCLI's own
+			// hand-off reaches this branch; internal delegation (generate ->
+			// new) arrives empty and keeps the outer call's answer (#3980).
+			variables.$wheelsMcpCall = structKeyExists(arguments.callerArgs, "__lucliMcpCall");
+			structDelete(arguments.callerArgs, "__lucliMcpCall");
+			if (!structIsEmpty(arguments.callerArgs)) {
+				return arguments.callerArgs;
+			}
 		}
 		return argvToCollection(isArray(raw) ? raw : []);
+	}
+
+	/**
+	 * Throws Wheels.InvalidArguments for an MCP tools/call that would create an
+	 * application: that scaffolds into the MCP server's working directory, so it
+	 * stays a terminal command.
+	 */
+	private void function $refuseAppCreationOverMcp(required string command) {
+		if ($isMcpCall()) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "#arguments.command# isn't available over MCP: creating an application writes into the MCP server's working directory. Run `wheels new <name>` in a terminal instead."
+			);
+		}
+	}
+
+	/**
+	 * True while running a command that LuCLI invoked for an MCP tools/call
+	 * (see structuredArgs()). A terminal call is never one.
+	 */
+	public boolean function $isMcpCall() {
+		return variables.$wheelsMcpCall ?: false;
 	}
 
 	/**
@@ -461,7 +493,9 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.option(name = "environment", default = "", description = "Environment whose seed files run (defaults to the app's current environment)")
 			.option(name = "mode", default = "auto", choices = "auto,convention,generate", description = "Seeding mode: auto (detect), convention (app/db/seeds.cfm), or generate (random test data)")
-			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate");
+			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate")
+			.option(name = "models", default = "", description = "generate mode: comma-delimited model names to generate seed data for (default: every model under app/models)")
+			.option(name = "count", default = "", description = "generate mode: records to create per model (default 10)");
 	}
 
 	private any function testArgSpec() {
@@ -1021,6 +1055,11 @@ component extends="modules.BaseModule" {
 		// found, so without this check any directory got app files (#3909).
 		if (canonical != "app") $requireWheelsProject("wheels generate");
 
+		// Creating an application is CLI-only (#3910). Hiding `new`/`create` and
+		// dropping `app` from the advertised type enum only stops clients that
+		// validate against the schema, so refuse it here too (#3980).
+		if (canonical == "app") $refuseAppCreationOverMcp("wheels generate app");
+
 		switch (canonical) {
 			case "app":
 				// Delegate to wheels new — pass remaining args as __arguments.
@@ -1294,10 +1333,35 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseSeedArgs(required struct coll) {
 		var parsed = seedArgSpec().parse(arguments.coll);
+		if (len(trim(parsed.count)) && !reFind("^[0-9]+$", trim(parsed.count))) {
+			throw(type = "Wheels.InvalidArguments", message = "wheels seed: count must be a whole number, got '#parsed.count#'.");
+		}
 		return {
 			environment = parsed.environment,
-			mode = parsed.generate ? "generate" : parsed.mode
+			mode = parsed.generate ? "generate" : parsed.mode,
+			models = trim(parsed.models),
+			count = trim(parsed.count)
 		};
+	}
+
+	/**
+	 * Refuse a seed environment this project doesn't know (#3893): the server
+	 * runs app/db/seeds.cfm plus seeds/<env>.cfm when that file exists, so a
+	 * typo silently ran the main seeds only. Known: Wheels' four environments,
+	 * or any name with a config/<env>/ directory or an app/db/seeds/<env>.cfm.
+	 */
+	private void function $assertKnownSeedEnvironment(required string environment) {
+		var env = trim(arguments.environment);
+		if (!len(env)) return;
+		if (reFind("^[A-Za-z0-9_-]+$", env)) {
+			if (listFindNoCase("development,testing,maintenance,production", env)) return;
+			if (directoryExists(variables.projectRoot & "/config/" & env)) return;
+			if (fileExists(variables.projectRoot & "/app/db/seeds/" & env & ".cfm")) return;
+		}
+		throw(
+			type = "Wheels.InvalidArguments",
+			message = "wheels seed: unknown environment '#env#'. Use development, testing, maintenance or production, or an environment with a config/#env#/ directory or app/db/seeds/#env#.cfm."
+		);
 	}
 
 	/**
@@ -1305,7 +1369,8 @@ component extends="modules.BaseModule" {
 	 */
 	public string function seed() {
 		var opts = parseSeedArgs(structuredArgs(arguments));
-		return runSeed(opts.mode, opts.environment);
+		$assertKnownSeedEnvironment(opts.environment);
+		return runSeed(opts.mode, opts.environment, opts.models, opts.count);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2095,7 +2160,9 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Reload the running Wheels application. The reload password
+	 * hint: Reload the running Wheels application (the CLI forwards the reload password from .env or config/settings.cfm).
+	 *
+	 * The reload password
 	 * gates the HTTP `?reload=true` endpoint against remote attackers;
 	 * the CLI reads it from `.env` or `config/settings.cfm` and forwards
 	 * it because it runs locally with filesystem access. This matches
@@ -2554,7 +2621,12 @@ component extends="modules.BaseModule" {
 		// unrelated dir, or after the project was moved/deleted — leaving
 		// orphan Java processes the user has to chase with `lsof`+`kill`.
 		// See GH #2316.
-		var match = $findServerForProject(variables.projectRoot);
+		// Prefer the project's RUNNING registration: after a lucee.json `name`
+		// change the server can still run under its old name, and the first
+		// .project-path match may be a stale registration (#3994).
+		var registry = getService("serverRegistry");
+		var liveName = registry.aliveRegistrationFor(variables.projectRoot);
+		var match = len(liveName) ? liveName : $findServerForProject(variables.projectRoot);
 		// Only RustCFML was running: it is stopped, and there is nothing to report.
 		if (!len(match) && rustStopped) return "";
 		if (!len(match)) {
@@ -2605,8 +2677,14 @@ component extends="modules.BaseModule" {
 		}
 
 		if (rustStopped) out("Stopping Wheels server...", "cyan");
-		executeCommand("server", ["stop"], variables.projectRoot);
-		getService("serverRegistry").deleteStartToken(match);
+		// A bare `server stop` resolves the name in the current lucee.json, so
+		// a live server under another registration name is named explicitly.
+		var stopArgs = ["stop"];
+		if (len(liveName) && liveName != registry.serverNameFor(variables.projectRoot)) {
+			arrayAppend(stopArgs, "--name=" & liveName);
+		}
+		executeCommand("server", stopArgs, variables.projectRoot);
+		registry.deleteStartToken(match);
 		return "";
 	}
 
@@ -2858,6 +2936,7 @@ component extends="modules.BaseModule" {
 
 		switch (type) {
 			case "app":
+				$refuseAppCreationOverMcp("wheels create app");
 				__arguments = remaining;
 				return new();
 			default:
@@ -2871,15 +2950,15 @@ component extends="modules.BaseModule" {
 	//  routes — List application routes
 	// ─────────────────────────────────────────────────
 
-	/**
-	 * hint: List all configured routes with method, path, and controller action
-	 */
 	private any function routesArgSpec() {
 		return new services.ArgSpec()
 			.option(name = "filter", default = "", description = "Show only routes whose name, pattern or controller##action contains this text (case-insensitive)")
 			.option(name = "format", default = "text", choices = "text,json", description = "Output format: text (aligned table) or json");
 	}
 
+	/**
+	 * hint: List all configured routes with method, path, and controller action
+	 */
 	public string function routes() {
 		// Both flags were advertised in the wrapper's help for as long as the
 		// command has existed, and neither was ever read — the command fetched
@@ -4909,6 +4988,16 @@ component extends="modules.BaseModule" {
 			return $packagesHelp();
 		}
 
+		// A package update killed mid-swap leaves the package only as a hidden
+		// backup; any packages command puts it back first (#3902).
+		try {
+			for (var note in new modules.wheels.services.packages.Installer().recoverInterruptedSwaps()) {
+				out(note, "yellow");
+			}
+		} catch (any e) {
+			out("Could not check vendor/ for an interrupted package update: #e.message#", "yellow");
+		}
+
 		return $dispatchPackages(sub, positional, opts);
 	}
 
@@ -4961,7 +5050,7 @@ component extends="modules.BaseModule" {
 	 * Return a fresh PackagesMainCli for a single subcommand dispatch.
 	 */
 	private any function $packagesMainCli() {
-		return new modules.wheels.services.packages.PackagesMainCli();
+		return new modules.wheels.services.packages.PackagesMainCli(projectRoot = variables.projectRoot);
 	}
 
 	/**
@@ -5116,6 +5205,16 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseNotesArgs(required struct coll) {
 		var parsed = notesArgSpec().parse(arguments.coll);
+		// Markers are matched as words in a regex, so a marker that isn't a word
+		// ("." matched every character) is refused rather than escaped (#3893).
+		for (var marker in listToArray(parsed.annotations & "," & parsed.custom)) {
+			if (!reFind("^[A-Za-z][A-Za-z0-9_-]*$", trim(marker))) {
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "wheels notes: annotation marker '#trim(marker)#' is not a word. Markers are letters, digits, '_' and '-' (e.g. TODO,FIXME,HACK)."
+				);
+			}
+		}
 		return { annotations = parsed.annotations, custom = parsed.custom };
 	}
 
@@ -6177,7 +6276,9 @@ component extends="modules.BaseModule" {
 			out("API resource complete! Next steps:", "green");
 			out("  1. Run migrations: wheels migrate latest");
 			out("  2. " & $serverNextStep());
-			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
+			// The project's pinned port (lucee.json), not a hardcoded 8080.
+			var apiPort = $readPinnedPort(variables.projectRoot);
+			out("  3. Test: curl http://localhost:#apiPort > 0 ? apiPort : 8080#/api/#lCase(controllerName)#.json");
 		} else {
 			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}
@@ -7488,7 +7589,7 @@ component extends="modules.BaseModule" {
 
 	// ── Seed Execution ──────────────────────────────
 
-	private string function runSeed(string mode = "auto", string environment = "") {
+	private string function runSeed(string mode = "auto", string environment = "", string models = "", string count = "") {
 		var serverPort = $requireOwnRunningServer([
 			"Seeding requires a running server bound to this project.",
 			"Start this project's own server with: wheels start (it registers the server as this project's)"
@@ -7499,6 +7600,12 @@ component extends="modules.BaseModule" {
 		var seedUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
 		if (len(environment)) {
 			seedUrl &= "&environment=#environment#";
+		}
+		if (len(arguments.models)) {
+			seedUrl &= "&models=#urlEncodedFormat(arguments.models)#";
+		}
+		if (len(arguments.count)) {
+			seedUrl &= "&count=#arguments.count#";
 		}
 
 		// dbSeed writes data — POST + reload password.
@@ -11404,16 +11511,21 @@ component extends="modules.BaseModule" {
 	/**
 	 * The datasource name a (comment-stripped) config/settings.cfm sets, or "".
 	 * Reads both `set(dataSourceName="name")` and the generated
-	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`; for the env() form the
+	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`, with single or double
+	 * quotes as CFML allows (each value's quotes must match, #3952); for the env() form the
 	 * variable's value in .env wins over the default, as it does at runtime. The
 	 * process environment is not consulted: it can differ from the app server's.
 	 */
 	public string function $settingsDataSourceName(required string settingsContent) {
 		// Two patterns rather than one with an optional env( group: every group in
 		// each always takes part in the match, so the subexpression arrays line up.
-		var m = reFindNoCase('\bdataSourceName\b\s*=\s*env\s*\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*,\s*"([^"]*)"', arguments.settingsContent, 1, true);
+		// Capture groups: \1 and \3 are the quotes (backreferenced so each pair
+		// matches). In m.match (whole match first) the variable name is [3] and
+		// the default is [5].
+		var m = reFindNoCase("\bdataSourceName\b\s*=\s*env\s*\(\s*([""'])([A-Za-z_][A-Za-z0-9_]*)\1\s*,\s*([""'])([^""']*)\3", arguments.settingsContent, 1, true);
 		if (m.pos[1] > 0) {
-			var name = trim(m.match[3]);
+			var envKey = m.match[3];
+			var name = trim(m.match[5]);
 			var envFile = variables.projectRoot & "/.env";
 			if (fileExists(envFile)) {
 				// Read the value the way the app's Application.cfc loadEnvFile() does:
@@ -11421,7 +11533,7 @@ component extends="modules.BaseModule" {
 				// matching quotes, and let the last line for the key win.
 				for (var line in listToArray(fileRead(envFile), chr(10))) {
 					line = trim(line);
-					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), m.match[2]) != 0) {
+					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), envKey) != 0) {
 						continue;
 					}
 					var value = trim(listRest(line, "="));
@@ -11435,8 +11547,8 @@ component extends="modules.BaseModule" {
 			}
 			return name;
 		}
-		m = reFindNoCase('\bdataSourceName\b\s*=\s*"([^"]*)"', arguments.settingsContent, 1, true);
-		return m.pos[1] > 0 ? trim(m.match[2]) : "";
+		m = reFindNoCase("\bdataSourceName\b\s*=\s*([""'])([^""']*)\1", arguments.settingsContent, 1, true);
+		return m.pos[1] > 0 ? trim(m.match[3]) : "";
 	}
 
 	/**
