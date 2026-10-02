@@ -23,6 +23,25 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
         });
 
+        describe("deploy init keeps local SQLite data out of the image", () => {
+
+            it("ignores db/ SQLite files and removes any that reach the build", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-followups-" & createUUID();
+                directoryCreate(tmpCwd, true, true);
+                new cli.lucli.services.deploy.cli.DeployMainCli(new cli.lucli.services.deploy.lib.FakeSshPool())
+                    .init_stub({cwd: tmpCwd, service: "myapp", image: "acme/myapp"});
+                var di = fileRead(tmpCwd & "/.dockerignore");
+                var df = fileRead(tmpCwd & "/Dockerfile");
+                directoryDelete(tmpCwd, true);
+                for (var pattern in ["db/*.sqlite", "db/*.sqlite3", "db/*.db", "db/*-wal"]) {
+                    expect(di).toInclude(pattern);
+                }
+                expect(df).toInclude("rm -f db/*.sqlite db/*.sqlite3 db/*.db");
+                // The rm runs in the builder, before the runtime stage copies db/.
+                expect(find("rm -f db/*.sqlite", df)).toBeLT(find("COPY --from=builder /build/db", df));
+            });
+        });
+
         describe("deploy registry login", () => {
 
             it("refuses without registry.username instead of running docker login -u ''", () => {
@@ -138,6 +157,18 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("postgres:16");
                 expect(out).toInclude("deploy");
                 expect(out).toInclude("amd64");
+                expect(out).toInclude("REGISTRY_PASSWORD");
+            });
+
+            it("never prints a literal registry.password value", () => {
+                var cfg = $writeConfig(
+                    "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                    & "registry: {username: u, password: ['hunter2!pass']}"
+                );
+                var out = new cli.lucli.services.deploy.cli.DeployMainCli(new cli.lucli.services.deploy.lib.FakeSshPool()).config({configPath: cfg});
+                expect(out).notToInclude("hunter2!pass");
+                expect(out).toInclude("literal value hidden");
+                expect(out).toInclude("not a secret name");
             });
         });
     }

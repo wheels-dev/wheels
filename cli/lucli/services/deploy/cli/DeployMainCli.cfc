@@ -69,7 +69,7 @@ component {
             "registry": {
                 "server": cfg.registry().server(),
                 "username": cfg.registry().username(),
-                "password": cfg.registry().password()
+                "password": $registryPasswordKeys(cfg)
             },
             "proxy": {
                 "host": proxy.host(),
@@ -92,6 +92,32 @@ component {
                 "dockerfile": builder.dockerfile()
             }
         }));
+    }
+
+    /**
+     * registry.password as config() prints it. Entries are meant to be the
+     * NAMES of secrets in .kamal/secrets (REGISTRY_PASSWORD); an entry that
+     * isn't shaped like one is probably the password itself, so it is masked
+     * and a warning says to move it into a secret.
+     */
+    private array function $registryPasswordKeys(required any cfg) {
+        var shown = [];
+        var masked = false;
+        for (var entry in arguments.cfg.registry().password()) {
+            if (isSimpleValue(entry) && reFind("^[A-Za-z_][A-Za-z0-9_]*$", entry)) {
+                arrayAppend(shown, entry);
+            } else {
+                arrayAppend(shown, "<literal value hidden: use a secret>");
+                masked = true;
+            }
+        }
+        if (masked) {
+            new modules.wheels.services.deploy.lib.SecretRedaction().addWarning(
+                "registry.password holds a value that is not a secret name; it is hidden here. "
+                & "List the NAME of a key in .kamal/secrets (e.g. REGISTRY_PASSWORD) and put the password there."
+            );
+        }
+        return shown;
     }
 
     public string function deploy(required struct opts) {

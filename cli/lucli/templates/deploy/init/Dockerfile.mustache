@@ -28,9 +28,11 @@ COPY . .
 
 RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
 
-# db/ holds migrations (and a SQLite database, if the app uses one). Older
-# apps may not have it; create it so the runtime COPY below never fails.
-RUN mkdir -p db
+# db/ holds migrations. Older apps may not have it; create it so the runtime
+# COPY below never fails. Local SQLite files never ship: .dockerignore keeps
+# them out of the context, and this removes any an older .dockerignore let in.
+RUN mkdir -p db \
+    && rm -f db/*.sqlite db/*.sqlite3 db/*.db db/*-journal db/*-wal db/*-shm
 
 # Skip silently if there is no build script defined.
 RUN if [ -f package.json ] && node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.build ? 0 : 1)"; then \
