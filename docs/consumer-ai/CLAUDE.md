@@ -28,6 +28,7 @@ ships to consumers.
 - **Controller filters are `private`** — a public method is a routable action. Action names can't reuse framework helper names (`redirectTo`, `linkTo`, …).
 - **`cfparam` every variable a view reads.**
 - **Never name a parameter or local variable after a CFML scope** (`url`, `form`, `request`, `session`, `application`, …) — the scope can win over the argument.
+- **Structs and arrays aren't booleans**: `!x` and `x ? a : b` throw on a struct or array ("Can't cast Complex Object Type Struct to a boolean value"). Test the shape you mean: `IsBoolean(x) && x`, `IsSimpleValue(x) && Len(x)`, `IsStruct(x) && !StructIsEmpty(x)`, `IsArray(x) && ArrayLen(x)`.
 - **`timestamps()` adds `createdAt`, `updatedAt` and `deletedAt`**; migration seed data goes through `execute("…SQL…")` (no `parameters` argument), with `CURRENT_TIMESTAMP` rather than `NOW()`, which fails on SQLite and SQL Server.
 
 ## Model Quick Reference
@@ -193,6 +194,12 @@ Requires a paginated query: `findAll(page=params.page, perPage=25)`. Recommended
 `viewStyle` accepts `"plain"` (default), `"bootstrap5"`, `"bootstrap4"`, `"tailwind"`. Bootstrap presets emit `<li class="page-item active" aria-current="page"><span class="page-link">N</span></li>`. Non-plain presets ignore manual-composition args.
 
 In development, `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` for unknown sub-helper args. `windowSize` is consumed by `paginationNav` itself (not forwarded). Accepted pass-through: `format, text, name, class, disabledClass, showDisabled, pageNumberAsParam, classForCurrent, linkToCurrentPage, prependToPage, appendToPage, addActiveClassToPrependedParent, route, controller, action, key, anchor, onlyPath, host, protocol, port, params`. Named route segment variables are auto-exempted from the check.
+
+## Partial Caching
+
+`includePartial(partial="sidebar", cache=60)` caches the rendered output for 60 minutes. The cache key is a hash of **the arguments passed to the partial call** plus the request host, nothing else. Anything the partial reads that isn't an argument (the current user, their permissions, session data) is not part of the key, so one user's cached output is served to the next. Pass viewer-dependent state as an argument (`includePartial(partial="sidebar", cache=60, userId=currentUser.id)`), or don't cache that partial.
+
+`cachePartials` (like `cacheActions`, `cachePages` and `cacheQueries`) is **off in development and testing**, so a partial's caching only shows up in production unless a spec turns it on (see Test-specific gotchas).
 
 ## Middleware Quick Reference
 
@@ -518,6 +525,13 @@ The runner compiles every CFC under the spec directory, so one compilation error
 
 - **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files the test runner includes, such as `tests/populate.cfm`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
+- **Changing a setting in a spec**: read and write `application.wheels.<setting>` and restore it afterwards. Never write `application.$wheels.<setting>`: `$wheels` only exists while `onApplicationStart` runs, and because the framework reads from `$wheels` whenever that key exists, the write creates a one-key struct that every later request reads (errors like `key [MIXINS] doesn't exist`) until the test application is restarted.
+  ```cfm
+  var original = application.wheels.cachePartials;
+  application.wheels.cachePartials = true;
+  try { /* exercise it */ } finally { application.wheels.cachePartials = original; }
+  ```
+  To test partial caching, turn `cachePartials` on this way and call `application.wo.$clearCache("partial")` before and after, so cached output doesn't leak between specs.
 - **`$clearRoutes()` in test specs**: not inherited from `wheels.WheelsTest`. A spec that manipulates routes defines its own:
   `public void function $clearRoutes() { application.wheels.routes = []; application.wheels.staticRoutes = {}; application.wheels.namedRoutePositions = {}; }`
 
