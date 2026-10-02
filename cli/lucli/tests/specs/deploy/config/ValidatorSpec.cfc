@@ -101,7 +101,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             it("rejects allowlisted-but-unimplemented top-level keys", () => {
                 var v = new cli.lucli.services.deploy.config.Validator();
                 var deadKeys = [
-                    "healthcheck", "hooks", "volumes", "labels", "logging",
+                    "healthcheck", "hooks", "labels", "logging",
                     "retain_containers", "minimum_version", "asset_path",
                     "require_destination", "allow_empty_roles", "run_directory",
                     "readiness_delay"

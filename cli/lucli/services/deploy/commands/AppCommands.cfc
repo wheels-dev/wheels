@@ -23,6 +23,7 @@ component extends="Base" {
             "--name " & shellEscape(container_name(arguments.role, arguments.version)),
             "--network kamal",
             $labelArgs(arguments.role, arguments.version),
+            $volumeArgs(),
             $envArgs(arguments.role),
             shellEscape(variables.config.absoluteImage(arguments.version)),
             arguments.role.cmd()
@@ -120,6 +121,16 @@ component extends="Base" {
             docker("stop", shellEscape(container_name(arguments.role, arguments.version))),
             docker("rm", shellEscape(container_name(arguments.role, arguments.version)))
         ]);
+    }
+
+    /** Top-level `volumes:`, quoted like every other docker argument (#4018). */
+    private array function $volumeArgs() {
+        var parts = [];
+        for (var v in variables.config.volumes()) {
+            arrayAppend(parts, "--volume");
+            arrayAppend(parts, shellEscape(v));
+        }
+        return parts;
     }
 
     private array function $labelArgs(required any role, required string version) {

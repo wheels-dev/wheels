@@ -17,7 +17,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(cmd).toInclude("--label service=demo-db");
                 expect(cmd).toInclude("--label role=db");
                 expect(cmd).toInclude("--publish 5432:5432");
-                expect(cmd).toInclude("--volume data:/var/lib/postgresql/data");
+                expect(cmd).toInclude("--volume 'data:/var/lib/postgresql/data'");
                 expect(cmd).toInclude("-e 'POSTGRES_USER=demo'");
                 expect(cmd).toInclude("postgres:16");
             });
