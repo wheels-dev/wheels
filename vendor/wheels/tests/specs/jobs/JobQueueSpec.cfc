@@ -46,6 +46,17 @@ component extends="wheels.WheelsTest" {
 				expect(local.result.status).toBe("pending");
 			});
 
+			it("does not mutate the caller's data struct (##3887)", function() {
+				local.job = new wheels.Job();
+				prepareMock(local.job);
+				local.payload = {id: 1};
+				local.job.enqueue(data = local.payload);
+				expect(StructKeyExists(local.payload, "$wheelsJobTimeout")).toBeFalse(
+					"enqueue() must not add internal keys to the caller's struct"
+				);
+				expect(StructCount(local.payload)).toBe(1, "the caller's struct must be unchanged (only its own keys)");
+			});
+
 			it("enqueue accepts custom queue name", function() {
 				local.job = new wheels.Job();
 				prepareMock(local.job);
