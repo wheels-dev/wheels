@@ -209,6 +209,7 @@ component extends="modules.BaseModule" {
 			// home — a side-effecting install step, not a query
 			"docs",
 			"mcpToolSpecs", // per-tool inputSchema registry read by LuCLI — not itself a tool
+			"onMissingMethod", // unknown-command handler (#3890) — a CFML hook, not a tool
 			// $-prefixed internal helpers. Public ONLY so TestCommandSpec can
 			// unit-test them directly (the cli/CLAUDE.md "public for specs"
 			// carve-out) — they are not commands and must never surface as MCP
@@ -10401,6 +10402,43 @@ component extends="modules.BaseModule" {
 		}
 
 		return result;
+	}
+
+	/**
+	 * `wheels <name>` dispatches to the Module function of that name, so an
+	 * unknown command lands here instead of Lucee's raw "has no function with
+	 * name" error (#3890). Print the friendly message (and a "did you mean"
+	 * for a near miss), then throw so the exit stays non-zero. MCP never gets
+	 * here: tools/call only reaches listed tools.
+	 */
+	public any function onMissingMethod(required string missingMethodName, struct missingMethodArguments = {}) {
+		var name = arguments.missingMethodName;
+		var message = "Unknown command: #name#. Run 'wheels --help' for the commands.";
+		var hint = $closestFlag(name, $commandNames());
+		if (len(hint)) message &= " Did you mean: wheels #hint#?";
+		out(message, "red");
+		throw(type = "Wheels.UnknownCommand", message = message);
+	}
+
+	/** Public command names a user can type: no $-helpers, hooks or MCP registries. */
+	private array function $commandNames() {
+		var names = [];
+		var internal = "init,main,onMissingMethod,mcpHiddenTools,mcpToolSpecs";
+		try {
+			for (var fn in getMetaData(this).functions) {
+				if (
+					structKeyExists(fn, "access") && fn.access == "public"
+					&& left(fn.name, 1) != "$"
+					&& !listFindNoCase(internal, fn.name)
+					&& len(fn.name) > 2
+				) {
+					arrayAppend(names, fn.name);
+				}
+			}
+		} catch (any e) {
+			// No metadata: no suggestion, the message still names the command.
+		}
+		return names;
 	}
 
 	/**
