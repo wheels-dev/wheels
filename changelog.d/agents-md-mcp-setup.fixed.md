@@ -1,0 +1,1 @@
+- The `AGENTS.md` that `wheels new` ships no longer tells assistants to prefer MCP only "when `.mcp.json` is configured", a file a new app doesn't have. It now says to prefer the Wheels MCP tools when the client exposes them, and how to enable them (`wheels setup agents`, or the config snippet by hand), with the `wheels` CLI until then (#3971)

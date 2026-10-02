@@ -1,0 +1,1 @@
+- A long integer `IN` list (`whereIn("id", keys)` or `where="id IN (1,2,...)"` with a few thousand values) no longer throws `java.lang.StackOverflowError` while the `where` string is parsed (#3907)
