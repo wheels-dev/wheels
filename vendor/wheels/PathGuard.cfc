@@ -36,13 +36,41 @@ component output="false" {
 	 * @candidate The canonical path to test for containment under root.
 	 */
 	public boolean function pathWithinExact(required string root, required string candidate) {
-		local.cand = Replace(arguments.candidate, "\", "/", "all");
-		local.base = REReplace(Replace(arguments.root, "\", "/", "all"), "/+$", "");
+		// Normalise ONLY the platform's native separator. A backslash is a legal filename
+		// byte on POSIX, so converting it there would merge a distinct sibling ("App\x")
+		// into the root ("App/x"); only Windows uses "\" as a path separator.
+		local.windows = ($nativeSeparator() == "\");
+		local.cand = local.windows ? Replace(arguments.candidate, "\", "/", "all") : arguments.candidate;
+		local.baseInput = local.windows ? Replace(arguments.root, "\", "/", "all") : arguments.root;
+		local.base = REReplace(local.baseInput, "/+$", "");
 		if (Compare(local.cand, local.base) == 0) {
 			return true;
 		}
 		return Len(local.cand) > Len(local.base)
 			&& Compare(Left(local.cand, Len(local.base) + 1), local.base & "/") == 0;
+	}
+
+	/**
+	 * The platform's native path separator. Prefers java.io.File.separator (JVM); falls
+	 * back to the OS name when no JVM is present (the JVM-free RustCFML); defaults to the
+	 * POSIX "/". It is NEVER inferred from seeing a backslash in a path — a backslash is a
+	 * legal filename byte on POSIX, not evidence of a Windows separator.
+	 */
+	private string function $nativeSeparator() {
+		try {
+			local.sep = CreateObject("java", "java.io.File").separator;
+			if (local.sep == "\" || local.sep == "/") {
+				return local.sep;
+			}
+		} catch (any e) {
+		}
+		try {
+			if (StructKeyExists(server, "os") && StructKeyExists(server.os, "name") && FindNoCase("windows", server.os.name)) {
+				return "\";
+			}
+		} catch (any e) {
+		}
+		return "/";
 	}
 
 }

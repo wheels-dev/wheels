@@ -696,7 +696,10 @@
 	 * instead).
 	 */
 	public string function $normalizeZipPath(required string path) {
-		local.norm = Replace(Replace(arguments.path, "\", "/", "all"), "//", "/", "all");
+		// Fold only the platform's native separator into "/"; a backslash is a legal
+		// filename byte on POSIX, so converting it there would merge distinct paths.
+		local.input = ($nativePathSeparator() == "\") ? Replace(arguments.path, "\", "/", "all") : arguments.path;
+		local.norm = Replace(local.input, "//", "/", "all");
 		local.parts = [];
 		for (local.part in ListToArray(local.norm, "/")) {
 			if (local.part == ".." && ArrayLen(local.parts)) {

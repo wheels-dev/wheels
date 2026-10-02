@@ -572,8 +572,10 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		// shim does not canonicalize traversal (RustCFML). Both sides are
 		// normalized the same way, so the check is equivalent on JVM engines
 		// (whose getCanonicalPath() already produced canonical paths).
-		local.normalizedTarget = $normalizeZipPath(Replace(local.canonicalTarget, "\", "/", "all"));
-		local.normalizedRoot = $normalizeZipPath(Replace(local.canonicalRoot, "\", "/", "all"));
+		// $normalizeZipPath folds only the native separator, so a backslash that is a POSIX
+		// filename byte is preserved (not turned into a path separator) before the exact check.
+		local.normalizedTarget = $normalizeZipPath(local.canonicalTarget);
+		local.normalizedRoot = $normalizeZipPath(local.canonicalRoot);
 		if (Right(local.normalizedRoot, 1) != "/") {
 			local.normalizedRoot &= "/";
 		}

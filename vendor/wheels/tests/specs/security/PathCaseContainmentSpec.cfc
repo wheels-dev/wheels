@@ -42,7 +42,7 @@ component extends="wheels.WheelsTest" {
 					expect(ctx.ctrl.$isResolvedPathInside(root & "/data/x.txt", root)).toBeTrue();
 				});
 
-				it("rejects a case-distinct sibling (crafted, all engines)", function() {
+				it("rejects a case-distinct sibling (synthetic, all engines)", function() {
 					var base = GetTempDirectory() & "pc-case-" & CreateUUID();
 					expect(ctx.ctrl.$isResolvedPathInside(base & "/app/secret", base & "/App")).toBeFalse();
 				});
@@ -53,7 +53,8 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("rejects an existing symlink into a case-distinct sibling (case-sensitive FS)", function() {
-					if (g.$engineAdapter().isRustCFML() || !$caseSensitiveFS()) { return; }
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML does not resolve symlinks"); }
+					if (!$caseSensitiveFS()) { skip("needs a case-sensitive filesystem"); }
 					var base = GetTempDirectory() & "pc-sym-" & CreateUUID();
 					var parent = base & "/App";
 					var outside = base & "/app";
@@ -72,7 +73,8 @@ component extends="wheels.WheelsTest" {
 					// Skip on a case-sensitive FS (a wrong-case root IS a different dir there) and on
 					// RustCFML (its getCanonicalPath is lexical and cannot map a wrong-case root to its
 					// real on-disk spelling; in practice its paths are built lexically-consistent).
-					if ($caseSensitiveFS() || g.$engineAdapter().isRustCFML()) { return; }
+					if ($caseSensitiveFS()) { skip("only meaningful on a case-insensitive filesystem"); }
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML getCanonicalPath is lexical; cannot map a wrong-case root"); }
 					var base = GetTempDirectory() & "pc-wrong-" & CreateUUID();
 					var real = base & "/App";
 					try {
@@ -81,6 +83,28 @@ component extends="wheels.WheelsTest" {
 						// Root passed in the 'wrong' case; canonicalising the root maps it to the
 						// real on-disk case, so its own descendant is still admitted.
 						expect(ctx.ctrl.$isResolvedPathInside(real & "/file.txt", base & "/app")).toBeTrue();
+					} finally {
+						$removeTree(base);
+					}
+				});
+
+				it("rejects a symlink into a sibling whose name contains a backslash (POSIX filename byte)", function() {
+					// A backslash is a legal filename byte on POSIX, not a separator. A distinct
+					// sibling dir named "App\outside" must not be folded into the root "App". Skip
+					// on Windows (backslash IS the separator there) and RustCFML (no symlinks).
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML does not resolve symlinks"); }
+					if (CreateObject("java", "java.io.File").separator == "\") { skip("backslash is the native separator on Windows"); }
+					var base = GetTempDirectory() & "pc-bs-" & CreateUUID();
+					var parent = base & "/App";
+					var outside = base & "/App\outside";
+					try {
+						// Create dirs via java.io.File (CFML FileWrite mangles a backslash path on
+						// Lucee). The leaf file need not exist: getCanonicalPath resolves the symlink
+						// directory and appends the non-existent leaf lexically.
+						CreateObject("java", "java.io.File").init(parent).mkdirs();
+						CreateObject("java", "java.io.File").init(outside).mkdirs();
+						$createSymlink(outside, parent & "/link");
+						expect(ctx.ctrl.$isResolvedPathInside(parent & "/link/secret.txt", parent)).toBeFalse();
 					} finally {
 						$removeTree(base);
 					}
@@ -95,14 +119,15 @@ component extends="wheels.WheelsTest" {
 					expect(loader.$mappingPathEscapesPackage(pkg, pkg & "/sub/file.cfc")).toBeFalse();
 				});
 
-				it("flags a case-distinct sibling as escaping (crafted, all engines)", function() {
+				it("flags a case-distinct sibling as escaping (synthetic, all engines)", function() {
 					var loader = new wheels.PackageLoader(vendorPath = GetTempDirectory(), componentPrefix = "vendor");
 					var base = GetTempDirectory() & "pc-pkgcase-" & CreateUUID();
 					expect(loader.$mappingPathEscapesPackage(base & "/Pkg", base & "/pkg/evil.cfc")).toBeTrue();
 				});
 
 				it("flags an existing symlink into a case-distinct sibling (case-sensitive FS)", function() {
-					if (g.$engineAdapter().isRustCFML() || !$caseSensitiveFS()) { return; }
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML does not resolve symlinks"); }
+					if (!$caseSensitiveFS()) { skip("needs a case-sensitive filesystem"); }
 					var base = GetTempDirectory() & "pc-pkgsym-" & CreateUUID();
 					var pkg = base & "/Pkg";
 					var outside = base & "/pkg";
@@ -132,7 +157,8 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("flags an entry resolving through a symlink into a case-distinct sibling (case-sensitive FS)", function() {
-					if (g.$engineAdapter().isRustCFML() || !$caseSensitiveFS()) { return; }
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML does not resolve symlinks"); }
+					if (!$caseSensitiveFS()) { skip("needs a case-sensitive filesystem"); }
 					var base = GetTempDirectory() & "pc-zipsym-" & CreateUUID();
 					var dest = base & "/Dest";
 					var outside = base & "/dest";
@@ -150,15 +176,17 @@ component extends="wheels.WheelsTest" {
 			// ---- guard: Public.cfc fixed-root resolvers (symlink escape) --------
 			describe("Fixed-root Public.cfc guards (existing-symlink escape, case-sensitive FS)", function() {
 				it("$resolveDevAssetPath rejects a symlink into a case-distinct sibling of the assets root", function() {
-					if (g.$engineAdapter().isRustCFML()) { return; }
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML does not resolve symlinks"); }
 					var made = {dirs = [], links = []};
 					try {
 						var publicCfc = createObject("component", "wheels.Public").$init();
 						var root = $canon(ExpandPath("/wheels/public/assets/"));
-						if (!DirectoryExists(root) || !$caseSensitiveAt($parentDir(root))) { return; }
+						if (!DirectoryExists(root)) { skip("root directory not present on disk"); }
+						if (!$caseSensitiveAt($parentDir(root))) { skip("root is on a case-insensitive filesystem"); }
 						var sibling = $caseVariantSibling(root);
 						var linkPath = root & "/pcdevasset.css";
-						if (!Len(sibling) || DirectoryExists(sibling) || FileExists(linkPath)) { return; }
+						if (!Len(sibling)) { skip("root basename is caseless — no case-distinct sibling"); }
+						if (DirectoryExists(sibling) || FileExists(linkPath)) { skip("fixture sibling/link path already exists — refusing to touch it"); }
 						DirectoryCreate(sibling);
 						ArrayAppend(made.dirs, sibling);
 						FileWrite(sibling & "/secret.css", CharsetDecode("x", "utf-8"));
@@ -171,20 +199,22 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("$resolveGuideImagePath rejects a symlink into a case-distinct sibling of the gitbook assets root", function() {
-					if (g.$engineAdapter().isRustCFML()) { return; }
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML does not resolve symlinks"); }
 					var made = {dirs = [], links = []};
 					try {
 						var publicCfc = createObject("component", "wheels.Public").$init();
 						var rootRaw = ExpandPath("/wheels/docs/src/.gitbook/assets/");
 						var anchor = $nearestExistingAncestor(rootRaw);
-						if (!Len(anchor) || !$caseSensitiveAt(anchor)) { return; }
+						if (!Len(anchor)) { skip("no existing ancestor to anchor the fixture"); }
+						if (!$caseSensitiveAt(anchor)) { skip("root is on a case-insensitive filesystem"); }
 						var firstMissing = $firstMissingAncestor(rootRaw);
 						$mkdirs(rootRaw);
 						if (Len(firstMissing)) { ArrayAppend(made.dirs, firstMissing); }
 						var root = $canon(rootRaw);
 						var sibling = $caseVariantSibling(root);
 						var linkPath = root & "/pcguide.png";
-						if (!Len(sibling) || DirectoryExists(sibling) || FileExists(linkPath)) { return; }
+						if (!Len(sibling)) { skip("root basename is caseless — no case-distinct sibling"); }
+						if (DirectoryExists(sibling) || FileExists(linkPath)) { skip("fixture sibling/link path already exists — refusing to touch it"); }
 						DirectoryCreate(sibling);
 						ArrayAppend(made.dirs, sibling);
 						FileWrite(sibling & "/secret.png", CharsetDecode("x", "utf-8"));
@@ -197,20 +227,20 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("$resolveGuideImagePath rejects a symlink into a same-case prefix sibling (assets vs assets-extra)", function() {
-					if (g.$engineAdapter().isRustCFML()) { return; } // symlink needed; not a case issue
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML does not resolve symlinks"); } // symlink needed; not a case issue
 					var made = {dirs = [], links = []};
 					try {
 						var publicCfc = createObject("component", "wheels.Public").$init();
 						var rootRaw = ExpandPath("/wheels/docs/src/.gitbook/assets/");
 						var anchor = $nearestExistingAncestor(rootRaw);
-						if (!Len(anchor)) { return; }
+						if (!Len(anchor)) { skip("no existing ancestor to anchor the fixture"); }
 						var firstMissing = $firstMissingAncestor(rootRaw);
 						$mkdirs(rootRaw);
 						if (Len(firstMissing)) { ArrayAppend(made.dirs, firstMissing); }
 						var root = REReplace(Replace($canon(rootRaw), "\", "/", "all"), "/+$", "");
 						var sibling = root & "-extra";
 						var linkPath = root & "/pcprefix.png";
-						if (DirectoryExists(sibling) || FileExists(linkPath)) { return; }
+						if (DirectoryExists(sibling) || FileExists(linkPath)) { skip("fixture sibling/link path already exists — refusing to touch it"); }
 						DirectoryCreate(sibling);
 						ArrayAppend(made.dirs, sibling);
 						FileWrite(sibling & "/secret.png", CharsetDecode("x", "utf-8"));
@@ -227,7 +257,8 @@ component extends="wheels.WheelsTest" {
 					// self-owned temp bundle under GetTempDirectory() (case-sensitive in the
 					// container), so this runs everywhere — no real docs bundle required, and
 					// no mutation of the framework tree. Config is restored in the finally.
-					if (g.$engineAdapter().isRustCFML() || !$caseSensitiveFS()) { return; }
+					if (g.$engineAdapter().isRustCFML()) { skip("RustCFML does not resolve symlinks"); }
+					if (!$caseSensitiveFS()) { skip("needs a case-sensitive filesystem"); }
 					var made = {dirs = [], links = []};
 					var hadKey = StructKeyExists(application.wheels, "docsBundlePath");
 					var oldVal = hadKey ? application.wheels.docsBundlePath : "";
@@ -266,7 +297,7 @@ component extends="wheels.WheelsTest" {
 					var publicCfc = createObject("component", "wheels.Public").$init();
 					var rootCanon = Replace(CreateObject("java", "java.io.File").init(ExpandPath("/")).getCanonicalPath(), "\", "/", "all");
 					var baseName = ListLast(rootCanon, "/");
-					if (!Len(baseName)) { return; }
+					if (!Len(baseName)) { skip("web root has no basename"); }
 					// Pick a case-DISTINCT spelling with Compare() (case-sensitive): CFML `==`
 					// is case-insensitive, so `baseName == UCase(baseName)` is always true.
 					var variant = "";
@@ -275,7 +306,7 @@ component extends="wheels.WheelsTest" {
 					} else if (Compare(baseName, LCase(baseName)) != 0) {
 						variant = LCase(baseName);
 					} else {
-						return; // caseless basename — not a case-fold scenario
+						skip("web root basename is caseless — no case-distinct scenario");
 					}
 					expect(publicCfc.$cliResolveDumpPath("../" & variant & "/dump.sql")).toBe("");
 				});

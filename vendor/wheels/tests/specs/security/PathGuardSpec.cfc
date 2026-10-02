@@ -44,10 +44,20 @@ component extends="wheels.WheelsTest" {
 				expect(guard.pathWithinExact(root = "/srv/app", candidate = "/srv/application")).toBeFalse();
 			});
 
-			it("normalises backslash separators before comparing", function() {
+			it("treats a backslash as a separator only on the platform where it is one", function() {
 				var guard = new wheels.PathGuard();
-				expect(guard.pathWithinExact(root = "C:\app", candidate = "C:\app\data\x")).toBeTrue();
-				expect(guard.pathWithinExact(root = "C:\App", candidate = "C:\app\data\x")).toBeFalse();
+				var sep = CreateObject("java", "java.io.File").separator;
+				if (sep == "\") {
+					// Windows: backslash is the native separator, normalised like "/".
+					expect(guard.pathWithinExact(root = "C:\app", candidate = "C:\app\data\x")).toBeTrue();
+					expect(guard.pathWithinExact(root = "C:\App", candidate = "C:\app\data\x")).toBeFalse();
+				} else {
+					// POSIX: a backslash is a legal FILENAME byte, not a separator — a sibling
+					// directory whose name contains a backslash must NOT be treated as nested
+					// under the root (the unconditional \->/ rewrite wrongly admitted it).
+					expect(guard.pathWithinExact(root = "/srv/App", candidate = "/srv/App\outside/file")).toBeFalse();
+					expect(guard.pathWithinExact(root = "/srv/app", candidate = "/srv/app/data/x")).toBeTrue();
+				}
 			});
 
 			it("treats '/' as a root that contains any absolute path", function() {
