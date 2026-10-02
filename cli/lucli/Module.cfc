@@ -6311,7 +6311,8 @@ component extends="modules.BaseModule" {
 			strategy = strategy,
 			registration = registration,
 			force = force,
-			cliVersion = super.version()
+			// Written into the generated files' header comments: never the raw build token (#3891).
+			cliVersion = $displayVersion()
 		);
 
 		if (results.success) {

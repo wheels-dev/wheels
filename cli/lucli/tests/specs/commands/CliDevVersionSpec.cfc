@@ -40,6 +40,15 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 			});
 
+			it("generate auth stamps generated files with the display version, not the raw token", () => {
+				var src = fileRead(variables.moduleDir & "Module.cfc");
+				var at = find("scaffold.generateAuth(", src);
+				expect(at).toBeGT(0);
+				var call = mid(src, at, find(");", src, at) - at);
+				expect(call).toInclude("cliVersion = $displayVersion()");
+				expect(call).notToInclude("super.version()");
+			});
+
 			it("shows a stamped release version unchanged", () => {
 				expect(mod.$displayVersion("4.1.2", variables.moduleDir)).toBe("4.1.2");
 			});
