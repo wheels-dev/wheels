@@ -1,0 +1,1 @@
+- The `wheels.Test` (RocketUnit) deprecation message now links the `v4-1-0` testing guides instead of the stale `v4-0-0` path. ([#3968](https://github.com/wheels-dev/wheels/issues/3968))
