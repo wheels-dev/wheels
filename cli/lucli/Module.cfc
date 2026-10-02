@@ -2181,6 +2181,10 @@ component extends="modules.BaseModule" {
 			}
 		}
 
+		// One engine per project (#3913): a second engine on another port made
+		// the CLI's server detection pick one of them silently.
+		$refuseOtherEngine(engine);
+
 		// Port resolution. Two projects whose defaults overlap clash on the
 		// SHUTDOWN port, and LuCLI reports that as "port conflicts detected:"
 		// followed by an empty list — an error that names nothing. So the
@@ -2432,21 +2436,21 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		// RustCFML backend — if a recorded RustCFML server is alive, stop it
-		// before touching LuCLI's registry. Auto-detected, so `wheels stop`
-		// works regardless of which engine was started.
-		var rustSvc = new services.rustcfml.RustCFMLEngine();
+		// RustCFML backend — if a recorded RustCFML server is alive, stop it,
+		// then go on to the project's Lucee server: `wheels stop` stops
+		// whatever runs for the project, whichever engine started it (#3913).
+		var rustSvc = $rustcfmlEngine();
 		var rustStatus = rustSvc.status(variables.projectRoot);
+		var rustStopped = false;
 		if (rustStatus.running) {
 			rustSvc.stop(variables.projectRoot);
 			out("RustCFML server stopped.", "cyan");
-			return "";
-		}
-		if ((rustStatus.staleReason ?: "") == "pid-not-server") {
+			rustStopped = true;
+		} else if ((rustStatus.staleReason ?: "") == "pid-not-server") {
 			out(rustStatus.message, "yellow");
 		}
 
-		out("Stopping Wheels server...", "cyan");
+		if (!rustStopped) out("Stopping Wheels server...", "cyan");
 
 		// If LuCLI's stop won't find a registered server for this directory
 		// (cwd doesn't match any `.project-path`), enumerate the user's
@@ -2456,6 +2460,8 @@ component extends="modules.BaseModule" {
 		// orphan Java processes the user has to chase with `lsof`+`kill`.
 		// See GH #2316.
 		var match = $findServerForProject(variables.projectRoot);
+		// Only RustCFML was running: it is stopped, and there is nothing to report.
+		if (!len(match) && rustStopped) return "";
 		if (!len(match)) {
 			var orphans = $listRunningWheelsServers();
 			if (arrayLen(orphans)) {
@@ -2503,6 +2509,7 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		if (rustStopped) out("Stopping Wheels server...", "cyan");
 		executeCommand("server", ["stop"], variables.projectRoot);
 		getService("serverRegistry").deleteStartToken(match);
 		return "";
@@ -2547,6 +2554,7 @@ component extends="modules.BaseModule" {
 				}
 				break;
 			case "start":
+				$refuseOtherEngine("rustcfml");
 				try {
 					var st = svc.start(variables.projectRoot, val(opts.port));
 				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
@@ -10954,6 +10962,35 @@ component extends="modules.BaseModule" {
 		if (len(arguments.error.detail)) {
 			out(arguments.error.detail, "yellow");
 		}
+	}
+
+	/**
+	 * Is a Lucee server running for this project, under any of its LuCLI
+	 * registrations (not only the current lucee.json name)? A seam for specs.
+	 */
+	private boolean function $luceeServerAlive() {
+		return len(getService("serverRegistry").aliveRegistrationFor(variables.projectRoot)) > 0;
+	}
+
+	/**
+	 * Refuse to start `engine` while the project's other engine is running
+	 * (#3913). Two servers for one project on different ports left the CLI's
+	 * HTTP commands targeting whichever one port detection picked.
+	 */
+	private void function $refuseOtherEngine(required string engine) {
+		var other = "";
+		if (arguments.engine == "rustcfml") {
+			if ($luceeServerAlive()) other = "Lucee";
+		} else if ($rustcfmlEngine().status(variables.projectRoot).running) {
+			other = "RustCFML";
+		}
+		if (!len(other)) return;
+		out("A #other# server is already running for this project.", "yellow");
+		out("Stop it first: wheels stop", "cyan");
+		throw(
+			type = "Wheels.EngineConflict",
+			message = "A #other# server is already running for this project; run `wheels stop` before starting another engine."
+		);
 	}
 
 	/** The RustCFML engine backend (a seam for specs). */

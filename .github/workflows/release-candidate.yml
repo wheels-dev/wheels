@@ -145,8 +145,11 @@ jobs:
             local VERSION=$(jq -r '.version' "$MANIFEST")
             echo "  Version: $VERSION"
 
+            # Fatal: a mismatched manifest still publishes, under the wrong
+            # version (the starter app shipped as 1.0.0 on every release, #3908).
             if [[ "$VERSION" != "${{ env.WHEELS_VERSION }}" ]]; then
-              echo "  WARNING: Version mismatch! Expected ${{ env.WHEELS_VERSION }}, got $VERSION"
+              echo "  ERROR: Version mismatch! Expected ${{ env.WHEELS_VERSION }}, got $VERSION"
+              exit 1
             fi
 
             local FILE_COUNT=$(find "$PACKAGE_DIR" -type f | wc -l)
