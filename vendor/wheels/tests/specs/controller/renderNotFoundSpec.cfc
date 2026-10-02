@@ -5,10 +5,12 @@
  * error in development (showErrorInformation on) and the onmissingtemplate.cfm page
  * in production. (#3900)
  *
- * Because it is a public controller helper it also joins the protected controller
- * method surface — an app action literally named renderNotFound would start getting
- * Wheels.ActionNotAllowed. That is the intended guard (a helper can't be an action);
- * the name does not collide with anything in the shipped examples or guides.
+ * It is defined as a controller mixin (controller/rendering.cfc), not a wheels.Global
+ * helper, so it is scoped to controllers and NOT mixed onto models. Because it is a
+ * public controller helper it also joins the protected controller method surface — an
+ * app action literally named renderNotFound would get Wheels.ActionNotAllowed. That is
+ * the intended guard; the name does not collide with anything in the shipped examples
+ * or guides.
  */
 component extends="wheels.WheelsTest" {
 
@@ -19,12 +21,21 @@ component extends="wheels.WheelsTest" {
 				expect(StructKeyExists(application.wheels.protectedControllerMethodsLookup, "renderNotFound")).toBeTrue();
 			});
 
+			it("is a controller method, not mixed onto models", () => {
+				var c = application.wo.controller("dummy", {controller = "dummy", action = "dummy"});
+				expect(StructKeyExists(c, "renderNotFound")).toBeTrue("controllers must have renderNotFound");
+
+				var m = application.wo.model("Author");
+				expect(StructKeyExists(m, "renderNotFound")).toBeFalse("models must NOT have renderNotFound");
+			});
+
 			it("sets a 404 and throws the typed error in development", () => {
+				var c = application.wo.controller("dummy", {controller = "dummy", action = "dummy"});
 				var priorSetting = application.wo.$get("showErrorInformation");
 				application.wo.$set(showErrorInformation = true);
 				try {
 					expect(() => {
-						application.wo.renderNotFound(message = "Widget not found for the requested key.");
+						c.renderNotFound(message = "Widget not found for the requested key.");
 					}).toThrow("Wheels.RecordNotFound");
 				} finally {
 					application.wo.$set(showErrorInformation = priorSetting);
@@ -32,11 +43,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("honours a custom error type", () => {
+				var c = application.wo.controller("dummy", {controller = "dummy", action = "dummy"});
 				var priorSetting = application.wo.$get("showErrorInformation");
 				application.wo.$set(showErrorInformation = true);
 				try {
 					expect(() => {
-						application.wo.renderNotFound(message = "nope", type = "Wheels.CustomNotFound");
+						c.renderNotFound(message = "nope", type = "Wheels.CustomNotFound");
 					}).toThrow("Wheels.CustomNotFound");
 				} finally {
 					application.wo.$set(showErrorInformation = priorSetting);
