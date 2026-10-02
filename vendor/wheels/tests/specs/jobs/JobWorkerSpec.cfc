@@ -156,6 +156,38 @@ component extends="wheels.WheelsTest" {
 				);
 				expect(ListFindNoCase("pending,failed", local.job.status)).toBeGT(0);
 			});
+
+			it("processNext recovers a job stuck in 'processing' by a crashed worker (##3888)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				local.id = CreateUUID();
+				local.oldTime = DateAdd("s", -600, Now());
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'test_reaper_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				// A normal poll must recover the crashed-worker job, not leave it stuck:
+				// processNext only ever SELECTed status='pending', so without recovery the
+				// row stayed 'processing' forever (#3888).
+				local.worker.processNext(queues = "test_reaper_3888", timeout = 300);
+
+				local.job = queryExecute(
+					"SELECT status FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.job.status).notToBe("processing", "a stale 'processing' job must be recovered by a poll, not left stuck");
+			});
 		});
 
 		describe("getStats", function() {

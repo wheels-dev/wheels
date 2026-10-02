@@ -33,6 +33,14 @@ component {
 	public struct function processNext(string queues = "", numeric timeout = 300) {
 		local.result = {success = false, jobId = "", jobClass = "", error = "", skipped = false};
 
+		// Recover jobs left in 'processing' by a crashed/killed worker before claiming:
+		// the candidate SELECT below only ever considers status='pending', so without
+		// this a row stuck in 'processing' would never be picked up again (#3888). A job
+		// processing longer than `timeout` is either a crashed worker or one that blew its
+		// execution timeout; checkTimeouts requeues it for retry (counting the attempt) or
+		// marks it failed when retries are exhausted. Cheap when nothing is stuck.
+		this.checkTimeouts(timeout = arguments.timeout);
+
 		// Find the next candidate job
 		local.params = {
 			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
