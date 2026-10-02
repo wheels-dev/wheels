@@ -1,0 +1,1 @@
+- An unknown command (`wheels status`, `wheels bogus`) now prints `Unknown command: <name>. Run 'wheels --help' for the commands.`, with a "did you mean" for near misses (`wheels generat` suggests `wheels generate`), and exits non-zero with `Wheels.UnknownCommand`. It used to print Lucee's raw "Component [modules.wheels.Module] has no function with name [status]" (#3890)
