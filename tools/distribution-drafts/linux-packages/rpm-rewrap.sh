@@ -48,6 +48,10 @@ for tag in CONFLICTNAME OBSOLETENAME; do
   if [ "$(q "[%{${tag}}\n]" | grep -v '^(none)$' | grep -c . || true)" != "0" ]; then echo "rpm-rewrap: ${tag} is not supported" >&2; exit 1; fi
 done
 if q '[%{FILEFLAGS:fflags}\n]' | grep -q 'c'; then echo "rpm-rewrap: %config files are not supported" >&2; exit 1; fi
+# A rebuild drops any package signature; refuse a signed input rather than ship it unsigned.
+for tag in RSAHEADER DSAHEADER SIGPGP SIGGPG; do
+  if [ "$(q "%{${tag}}")" != "(none)" ]; then echo "rpm-rewrap: the input is signed (${tag}); sign after rewrapping instead" >&2; exit 1; fi
+done
 
 ROOT=/w/root
 mkdir -p "${ROOT}"
@@ -59,7 +63,8 @@ SPEC=/w/rewrap.spec
   echo "Name: $(q '%{NAME}')"
   echo "Version: $(q '%{VERSION}')"
   echo "Release: $(q '%{RELEASE}')"
-  echo "Summary: $(q '%{SUMMARY}')"
+  # A literal % in spec text starts a macro; double it.
+  echo "Summary: $(q '%{SUMMARY}' | sed 's/%/%%/g')"
   echo "License: $(q '%{LICENSE}')"
   [ "$(q '%{URL}')" = "(none)" ] || echo "URL: $(q '%{URL}')"
   [ "$(q '%{GROUP}')" = "(none)" ] || echo "Group: $(q '%{GROUP}')"
@@ -76,7 +81,7 @@ SPEC=/w/rewrap.spec
   echo "%define __jar_repack 0"
   echo "%define _build_id_links none"
   echo "%description"
-  q '%{DESCRIPTION}'; echo
+  q '%{DESCRIPTION}' | sed 's/%/%%/g'; echo
   echo "%install"
   echo "mkdir -p %{buildroot}"
   echo "cp -a ${ROOT}/. %{buildroot}/"
