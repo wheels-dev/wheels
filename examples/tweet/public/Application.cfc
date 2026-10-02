@@ -442,7 +442,7 @@ component output="false" {
 		// already lost — fall back to a minimal HTML response rather than
 		// cascading into "The key [WO] does not exist." (issue ##2773).
 		if (!StructKeyExists(application, "wo")) {
-			$renderMinimalError(arguments.Exception, arguments.EventName ?: "");
+			$renderMinimalError(arguments.Exception, arguments.EventName ?: "", true);
 			return;
 		}
 
@@ -476,7 +476,7 @@ component output="false" {
 			// reclaimed before the dereferences below run, so degrade to the
 			// minimal fallback rather than cascade the torn-down-scope error
 			// over the real one.
-			$renderMinimalError(arguments.Exception, arguments.EventName ?: "");
+			$renderMinimalError(arguments.Exception, arguments.EventName ?: "", !StructKeyExists(application, "wheels"));
 		}
 	}
 
@@ -484,11 +484,23 @@ component output="false" {
 	// Wheels global never came up (issue ##2773), and the application scope
 	// being torn down mid-onError (issue ##3379). Kept in one place so both
 	// paths render identically.
-	private void function $renderMinimalError( required any Exception, string eventName = "" ) {
-		setting requestTimeout=30;
+	private void function $renderMinimalError( required any Exception, string eventName = "", boolean startupPhase = true ) {
+		// Extend the request timeout before logging so WriteLog can run even when
+		// the error is a request timeout — the non-fallback path above does the
+		// same with onErrorRequestTimeout (issue ##3965). Otherwise a stuck
+		// request swallows the wheels.log entry this page points the operator at.
+		try {
+			local.fallbackTimeout = 30;
+			if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "onErrorRequestTimeout")) {
+				local.fallbackTimeout = application.wheels.onErrorRequestTimeout;
+			}
+			setting requestTimeout=local.fallbackTimeout;
+		} catch (any timeoutErr) {
+			// setting may itself fail on a fully torn-down request; keep going.
+		}
 		// Write the real failure to wheels.log first, so the page's "check
 		// the server log" points at an entry that exists (issue ##3671).
-		$logStartupFailure(arguments.Exception, arguments.eventName);
+		$logStartupFailure(arguments.Exception, arguments.eventName, arguments.startupPhase);
 		// Surface a real 5xx so monitoring tools and CDNs don't cache this
 		// failure as a successful response. Use a plain struct for
 		// attributeCollection — Adobe CF 2023/2025 reject the `arguments`
@@ -500,7 +512,11 @@ component output="false" {
 			// Header may already have been written; the body still renders.
 		}
 		WriteOutput("<h1>Application Error</h1>");
-		WriteOutput("<p>Wheels failed to initialize. Check the server log (wheels.log) for details.</p>");
+		if (arguments.startupPhase) {
+			WriteOutput("<p>Wheels failed to initialize. Check the server log (wheels.log) for details.</p>");
+		} else {
+			WriteOutput("<p>The application could not complete this request. Check the server log (wheels.log) for details.</p>");
+		}
 		// How much to show follows the app's showErrorInformation setting
 		// (false in production by default) once startup got far enough to set
 		// it: the root cause in full, or nothing beyond the log pointer. Before
@@ -582,11 +598,11 @@ component output="false" {
 	// detail and first tag-context frame, plus the wrapper. Runs on the
 	// last-ditch error path: it must never throw, and it only logs (the
 	// rendered page stays minimal).
-	private void function $logStartupFailure( required any Exception, string eventName = "" ) {
+	private void function $logStartupFailure( required any Exception, string eventName = "", boolean startupPhase = true ) {
 		try {
 			local.root = $startupFailureRoot(arguments.Exception);
 
-			local.text = "Wheels failed to initialize";
+			local.text = arguments.startupPhase ? "Wheels failed to initialize" : "Wheels could not complete the request";
 			if (Len(arguments.eventName)) {
 				local.text &= " in " & arguments.eventName;
 			}
