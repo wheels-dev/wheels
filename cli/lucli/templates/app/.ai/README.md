@@ -8,6 +8,7 @@ APPLICATION on Wheels — nothing about framework internals.
 - `../CLAUDE.md` — application-developer quick reference (models, routing,
   views, middleware, DI, packages, CLI, testing, migrations, jobs, SSE).
 - `../AGENTS.md` — cross-tool workflow guidance (MCP-first, conventions).
+- `testing.md` — changing framework settings inside a spec, and testing partial caching.
 
 ## Deeper content
 
