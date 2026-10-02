@@ -44,10 +44,14 @@ accessories:
   redis:
     image: redis:7
     host: 192.0.2.20
-    port: 6379
+    port: "10.0.0.20:6379:6379"   # bind address : host port : container port
 ```
 
-`wheels deploy accessory boot redis` on first deploy. Produces a container named `<service>-redis` on the named host, published on 6379. From the app side, connect to `redis://192.0.2.20:6379`.
+`wheels deploy accessory boot redis` on first deploy. Produces a container named `<service>-redis` on the named host. An app container on the same host reaches it at `redis://<service>-redis:6379`. An app container on another host connects to the published address, `redis://10.0.0.20:6379`.
+
+<Aside type="caution" title="Give port: a bind address">
+  `port:` is passed to `docker run --publish` as written. A bare `port: 6379` publishes the container port on a **random** host port, so other hosts can't find it. Write `"<address>:<host port>:<container port>"`, and bind a private interface rather than `0.0.0.0`, so a database or cache isn't reachable from the internet. In these examples `10.0.0.20` is the private-network address of the same machine as `host: 192.0.2.20`; use `127.0.0.1` when only containers on that host need it.
+</Aside>
 
 ## Postgres with volume and env
 
@@ -56,7 +60,7 @@ accessories:
   db:
     image: postgres:16
     host: 192.0.2.20
-    port: 5432
+    port: "10.0.0.20:5432:5432"
     env:
       clear:
         POSTGRES_USER: app
@@ -72,6 +76,59 @@ accessories:
   - `env.secret:` — on CLIs built from `develop` (4.0.4+), secret values from `.kamal/secrets` are delivered to accessory containers via a host-side env file (`.kamal/apps/<service>/env/accessories/<name>.env`, `600` permissions, referenced by `--env-file`) when the accessory is booted or rebooted ([#2957](https://github.com/wheels-dev/wheels/issues/2957)). On the released 4.0.3 CLI these entries are silently dropped — provision values like `POSTGRES_PASSWORD` another way there (e.g. a host-managed env file or volume).
   - `files:` — Kamal's "upload local paths into the container filesystem" mechanism is accepted by the config validator but no upload ever happens ([#3088](https://github.com/wheels-dev/wheels/issues/3088)). Initialization scripts and certs need to be placed on the host yourself and mounted via `volumes:`.
 </Aside>
+
+## Connecting your Wheels app to a database accessory
+
+A database accessory gives a multi-host app one shared database (a SQLite file is per container, or per host with an app [`volumes:`](/v4-2-0/deployment/config-reference/#volumes) mount). Four pieces connect the app to it.
+
+**1. Declare the accessory, with its password as a secret:**
+
+```yaml title="config/deploy.yml (illustrative — do not type)"
+service: myapp
+env:
+  secret:
+    - POSTGRES_PASSWORD        # the app needs it too
+accessories:
+  db:
+    image: postgres:16
+    host: 192.0.2.20
+    port: "10.0.0.20:5432:5432"   # private interface only
+    env:
+      clear:
+        POSTGRES_USER: app
+        POSTGRES_DB: myapp
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - /data/pg:/var/lib/postgresql/data
+```
+
+Put `POSTGRES_PASSWORD` in `.kamal/secrets`. Listing it under both the accessory's and the app's `env.secret` delivers it to both containers.
+
+**2. Point the production datasource at the accessory.** Each host has its own `kamal` Docker network. An app container on the **same host** as the accessory reaches it at the hostname **`<service>-<name>`** (`myapp-db` above). An app container on **another host** connects to the address `port:` binds (`10.0.0.20:5432` above, a private interface the app hosts can reach); see the caution under the Redis example. Define the datasource in `config/app.cfm`, for production only, so local development keeps its SQLite datasource of the same name:
+
+```cfm title="config/app.cfm (illustrative — do not type)"
+// Production: the `db` accessory. currentEnv is set by public/Application.cfc
+// from WHEELS_ENV before this file runs.
+if ((variables.currentEnv ?: "") == "production") {
+    this.datasources["myapp"] = {
+        class: "org.postgresql.Driver",
+        bundleName: "org.postgresql.jdbc",
+        // Same host as the accessory: myapp-db. Other hosts: 10.0.0.20.
+        connectionString: "jdbc:postgresql://myapp-db:5432/myapp",
+        username: "app",
+        password: server.system.environment.POSTGRES_PASSWORD ?: ""
+    };
+}
+```
+
+Read the password from `server.system.environment`: in the container it arrives as a process environment variable, not through a `.env` file. The datasource name must match `dataSourceName` in `config/settings.cfm` (the app's name by default, or `WHEELS_DATASOURCE`).
+
+**3. No driver step.** The `lucee/lucee` 7.1 image that `wheels deploy init` uses already contains the PostgreSQL (42.7.9), MySQL (9.6.0) and SQL Server (13.2.1) JDBC drivers, so nothing has to be installed at boot. For MySQL, use `class: "com.mysql.cj.jdbc.Driver"`, `bundleName: "com.mysql.cj"` and a `jdbc:mysql://myapp-db:3306/myapp` URL.
+
+**4. Migrations.** `set(autoMigrateDatabase=true)` in `config/production/settings.cfm` runs pending migrations when the app starts. That is safe for **one app host only**: with several hosts sharing the database, every host migrates at boot at the same time. With more than one host, run migrations once yourself after the rollout, for example from one host, until a one-shot migrate step exists ([#4063](https://github.com/wheels-dev/wheels/issues/4063)).
+
+Boot the accessory before the first deploy (`wheels deploy accessory boot db`, or `wheels deploy setup`, which boots every accessory first).
 
 ## Named containers and labels
 

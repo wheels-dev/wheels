@@ -197,7 +197,7 @@ Configuration for `kamal-proxy`, the singleton reverse proxy on every host.
 ```yaml title="config/deploy.yml (illustrative — do not type)"
 proxy:
   host: app.example.com
-  app_port: 8080
+  app_port: 8888
   ssl: true
   healthcheck:
     path: /up
@@ -209,7 +209,7 @@ proxy:
 ```
 
 - `host:` — the public hostname. Used for TLS SNI and Let's Encrypt issuance.
-- `app_port:` — port the app listens on inside the container; `wheels deploy` and `wheels deploy rollback` route traffic to it via the kamal-proxy target (`--target <container>:<app_port>`). The config default is `80` (matching Kamal), and `wheels deploy init` scaffolds `8080` to match its generated Dockerfile.
+- `app_port:` — port the app listens on inside the container; `wheels deploy` and `wheels deploy rollback` route traffic to it via the kamal-proxy target (`--target <container>:<app_port>`). The config default is `80` (matching Kamal), and `wheels deploy init` scaffolds `8888` to match its generated Dockerfile.
 - `ssl:` — if true, `kamal-proxy` requests a Let's Encrypt cert for `host` on first boot. Set false if you terminate TLS in front of the proxy.
 - `healthcheck:` — new container must return 2xx at `healthcheck.path` within `healthcheck.timeout` seconds (defaults: `/up`, 30) or the proxy refuses to cut traffic over.
 - `forward_headers:` — parsed but **currently ignored**; not forwarded to the proxy ([#3088](https://github.com/wheels-dev/wheels/issues/3088)).
@@ -224,11 +224,11 @@ accessories:
   redis:
     image: redis:7
     host: 192.0.2.20
-    port: 6379
+    port: "10.0.0.20:6379:6379"
   db:
     image: postgres:16
     host: 192.0.2.20
-    port: 5432
+    port: "10.0.0.20:5432:5432"
     env:
       clear:
         POSTGRES_USER: app
@@ -239,6 +239,8 @@ accessories:
     files:
       - config/init.sql:/docker-entrypoint-initdb.d/init.sql
 ```
+
+`port:` is passed to `docker run --publish` as written: give it a bind address (`"<address>:<host port>:<container port>"`, a private interface rather than `0.0.0.0`). A bare `port: 5432` publishes on a random host port.
 
 Two caveats on the example shapes: `files:` is accepted but **never uploaded** — no copy step or docker flag is emitted ([#3088](https://github.com/wheels-dev/wheels/issues/3088)) — and accessory `env.secret` entries follow the same delivery rules as the top-level [`env`](#env) key: delivered via a host-side env file on 4.0.4+ builds, silently dropped on the released 4.0.3 ([#2957](https://github.com/wheels-dev/wheels/issues/2957)).
 
