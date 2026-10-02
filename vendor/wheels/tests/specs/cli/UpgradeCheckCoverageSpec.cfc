@@ -119,9 +119,15 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("covers wheels.Testbox and single-quoted extends forms in the test base class grep", () => {
-				expect(findNoCase("wheels\.Test(box)?", block) > 0).toBeTrue(
+				// Two checks since #3939: wheels.Testbox (an alias of
+				// wheels.WheelsTest) and the RocketUnit wheels.Test base, each
+				// matching both quote styles through a quote character class.
+				expect(findNoCase("[""'']wheels\.Testbox[""'']", block) > 0).toBeTrue(
 					"The test base class grep should match wheels.Testbox (the silent WheelsTest alias, removal target 5.0) "
-					& "and both quote styles via a quote character class, not a hardcoded double quote."
+					& "with both quote styles via a quote character class, not a hardcoded double quote."
+				);
+				expect(findNoCase("[""'']wheels\.Test[""'']", block) > 0).toBeTrue(
+					"The test base class grep should match the RocketUnit wheels.Test base with both quote styles."
 				);
 			});
 
