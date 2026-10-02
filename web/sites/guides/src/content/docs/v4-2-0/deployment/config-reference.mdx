@@ -257,6 +257,8 @@ volumes:
 
 Each entry is `host:container` or `host:container:ro|rw`. The container path must be absolute, and the host side is a path on the server or a named volume. The same mounts apply to every role and every host, so create the host directories first (for example with `wheels deploy exec "mkdir -p /var/lib/myapp/db"`). A `wheels new` app's SQLite file lives in `db/`, which is `/var/www/db` in the `deploy init` image (its `WORKDIR` is `/var/www`), so the first example keeps it on the host. Anything else fails validation with `volumes[<n>] must be host:container or host:container:ro|rw with an absolute container path`.
 
+Host paths are passed to Docker as written, for app `volumes:` and accessory `volumes:` / `directories:` alike: `~` and `$VAR` are not expanded on the server, so write absolute paths (`/home/deploy/data`, not `~/data`). Before 4.2, accessory volume arguments went through the remote shell unquoted, so `~` and `$VAR` happened to expand there.
+
 With several hosts, each host has its own copy of a host-path mount, so a SQLite database is still per host. For a database shared across hosts, use a server database [accessory](/v4-2-0/deployment/accessories/).
 
 ## `boot`
