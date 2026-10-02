@@ -78,7 +78,7 @@ jobs:
           #   vendor/wheels/migrator/, Seeder.cfc, JobWorker.cfc  what CliBridge calls
           # Wider framework boot breakage is caught by the core suite, which is
           # required on its own.
-          PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fallback_port_sentinel\.py$|tools/ci/test_fallback_port_sentinel\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$|\.github/actions/setup-lucli/|tools/lucli\.json$|lucee\.json$|public/|config/|app/(events|global|migrator)/|vendor/wheels/(public/|Public\.cfc$|events/|wheelstest/|migrator/|Seeder\.cfc$|JobWorker\.cfc$))'
+          PATTERN='^(cli/lucli/|tools/test-cli-local\.sh$|tools/ci/testbox_results\.py$|tools/ci/test_testbox_results\.py$|tools/ci/fallback_port_sentinel\.py$|tools/ci/test_fallback_port_sentinel\.py$|tools/ci/testbox_junit\.py$|tools/ci/test_testbox_junit\.py$|tools/ci/fixtures/testbox/|tools/deploy-[^/]*\.sh$|tools/deploy-dry-run-normalize\.py$|\.github/workflows/deploy-ci\.yml$|\.github/actions/setup-lucli/|tools/lucli\.json$|lucee\.json$|public/|config/|app/(events|global|migrator)/|vendor/wheels/(public/|Public\.cfc$|events/|wheelstest/|migrator/|Seeder\.cfc$|JobWorker\.cfc$))'
           if [ "$EVENT_NAME" = "pull_request" ]; then
             # fetch-depth: 0 already holds the base commit; fetch it (with full
             # history, never --depth) only if it is somehow missing.
@@ -143,6 +143,12 @@ jobs:
 
       - name: Test the fallback-port sentinel
         run: python3 tools/ci/test_fallback_port_sentinel.py
+
+      - name: Test the matrix JUnit converter
+        # tools/ci/testbox_junit.py feeds the compatibility matrix's PR comment;
+        # each spec must keep a unique classname + name or the publisher merges
+        # them and undercounts (#3901).
+        run: python3 tools/ci/test_testbox_junit.py
 
       - name: Run CLI test suite
         env:
