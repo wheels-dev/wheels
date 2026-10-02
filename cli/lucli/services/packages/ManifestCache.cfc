@@ -15,7 +15,8 @@
  * The default root is <CLI home>/cache/packages (the CLI home is
  * -Dlucli.home or LUCLI_HOME, else ~/.wheels), which for a normal install is
  * ~/.wheels/cache/packages: the root vendor/wheels' copy of this cache uses,
- * so the debug panel and the CLI share the default registry's data. Any
+ * so on a normal install the debug panel and the CLI share the default
+ * registry's data (a custom LUCLI_HOME deliberately separates them). Any
  * other registry passes a registryKey and gets its own registries/<hash>/
  * subdirectory, so switching registries never serves another one's data.
  */

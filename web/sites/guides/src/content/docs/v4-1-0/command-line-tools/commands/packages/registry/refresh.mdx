@@ -7,7 +7,7 @@ sidebar:
   order: 1
 ---
 
-Removes the current registry's manifest cache (`~/.wheels/cache/packages/` on a normal install) entirely. The next registry-touching command repopulates it.
+Removes the current registry's manifest cache entirely: `~/.wheels/cache/packages/` on a normal install, which for the default registry also clears every other registry's cache under it. The next registry-touching command repopulates it.
 
 ## Synopsis
 
