@@ -2554,7 +2554,12 @@ component extends="modules.BaseModule" {
 		// unrelated dir, or after the project was moved/deleted — leaving
 		// orphan Java processes the user has to chase with `lsof`+`kill`.
 		// See GH #2316.
-		var match = $findServerForProject(variables.projectRoot);
+		// Prefer the project's RUNNING registration: after a lucee.json `name`
+		// change the server can still run under its old name, and the first
+		// .project-path match may be a stale registration (#3994).
+		var registry = getService("serverRegistry");
+		var liveName = registry.aliveRegistrationFor(variables.projectRoot);
+		var match = len(liveName) ? liveName : $findServerForProject(variables.projectRoot);
 		// Only RustCFML was running: it is stopped, and there is nothing to report.
 		if (!len(match) && rustStopped) return "";
 		if (!len(match)) {
@@ -2605,8 +2610,14 @@ component extends="modules.BaseModule" {
 		}
 
 		if (rustStopped) out("Stopping Wheels server...", "cyan");
-		executeCommand("server", ["stop"], variables.projectRoot);
-		getService("serverRegistry").deleteStartToken(match);
+		// A bare `server stop` resolves the name in the current lucee.json, so
+		// a live server under another registration name is named explicitly.
+		var stopArgs = ["stop"];
+		if (len(liveName) && liveName != registry.serverNameFor(variables.projectRoot)) {
+			arrayAppend(stopArgs, "--name=" & liveName);
+		}
+		executeCommand("server", stopArgs, variables.projectRoot);
+		registry.deleteStartToken(match);
 		return "";
 	}
 
