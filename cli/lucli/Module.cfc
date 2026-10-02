@@ -4909,6 +4909,16 @@ component extends="modules.BaseModule" {
 			return $packagesHelp();
 		}
 
+		// A package update killed mid-swap leaves the package only as a hidden
+		// backup; any packages command puts it back first (#3902).
+		try {
+			for (var note in new modules.wheels.services.packages.Installer().recoverInterruptedSwaps()) {
+				out(note, "yellow");
+			}
+		} catch (any e) {
+			out("Could not check vendor/ for an interrupted package update: #e.message#", "yellow");
+		}
+
 		return $dispatchPackages(sub, positional, opts);
 	}
 
