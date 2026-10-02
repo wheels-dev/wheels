@@ -142,6 +142,94 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		describe("$pathWithinExact", () => {
+
+			it("accepts the root itself and its descendants", () => {
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/App/tests/specs", "/")).toBeTrue();
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/App/tests/specs/models/UserSpec.cfc", "/")).toBeTrue();
+				expect(mod.$pathWithinExact("/srv/App/tests/specs/", "/srv/App/tests/specs/UserSpec.cfc", "/")).toBeTrue();
+			});
+
+			it("compares exactly", () => {
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/App/tests/Specs/UserSpec.cfc", "/")).toBeFalse();
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/app/tests/specs/UserSpec.cfc", "/")).toBeFalse();
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/App/tests/SPECS", "/")).toBeFalse();
+			});
+
+			it("requires a separator boundary after the root", () => {
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/App/tests/specsOld/OrphanSpec.cfc", "/")).toBeFalse();
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/App/tests/spec", "/")).toBeFalse();
+			});
+
+			it("treats a backslash as a filename character where the separator is /", () => {
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/App/tests/specs\deep/UserSpec.cfc", "/")).toBeFalse();
+				expect(mod.$pathWithinExact("/srv/App/tests/specs", "/srv/App/tests/specs\UserSpec.cfc", "/")).toBeFalse();
+				expect(mod.$pathWithinExact("/srv/App/tests/specs\", "/srv/App/tests/specs\/UserSpec.cfc", "/")).toBeTrue();
+			});
+
+			it("treats a backslash as a separator where the separator is \", () => {
+				expect(mod.$pathWithinExact("C:\App\tests\specs", "C:\App\tests\specs", "\")).toBeTrue();
+				expect(mod.$pathWithinExact("C:\App\tests\specs", "C:\App\tests\specs\models\UserSpec.cfc", "\")).toBeTrue();
+				expect(mod.$pathWithinExact("C:\App\tests\specs\", "C:\App\tests\specs\UserSpec.cfc", "\")).toBeTrue();
+				expect(mod.$pathWithinExact("C:\App\tests\specs", "C:\App\tests\Specs\UserSpec.cfc", "\")).toBeFalse();
+				expect(mod.$pathWithinExact("C:\App\tests\specs", "C:\App\tests\specsOld\UserSpec.cfc", "\")).toBeFalse();
+			});
+
+			it("defaults to the platform separator", () => {
+				expect(mod.$nativeSeparator()).toBe(createObject("java", "java.io.File").separator);
+				expect(mod.$pathWithinExact(variables.tempRoot, variables.tempRoot & "/tests/specs")).toBeTrue();
+			});
+
+		});
+
+		describe("$resolveTestFilter and a sibling of the spec root", () => {
+
+			beforeEach(() => {
+				variables.siblingRoot = getTempDirectory() & "wheels-cli-spec-sibling-" & createUUID();
+				directoryCreate(variables.siblingRoot & "/config", true, true);
+				directoryCreate(variables.siblingRoot & "/tests/specs/favorites", true, true);
+				fileWrite(variables.siblingRoot & "/config/settings.cfm", "<cfscript>" & chr(10) & "</cfscript>" & chr(10));
+				fileWrite(variables.siblingRoot & "/tests/specs/favorites/PageFavoritesToggleSpec.cfc", "component {}" & chr(10));
+				variables.siblingReason = "";
+				// tests/Specs is a separate directory only on a case-sensitive filesystem.
+				if (directoryExists(variables.siblingRoot & "/tests/Specs")) {
+					variables.siblingReason = "needs a case-sensitive filesystem (tests/Specs and tests/specs are one directory here)";
+				} else {
+					directoryCreate(variables.siblingRoot & "/tests/Specs/deep", true, true);
+					fileWrite(variables.siblingRoot & "/tests/Specs/deep/SiblingSpec.cfc", "component {}" & chr(10));
+					try {
+						symlink(variables.siblingRoot & "/tests/specs/linked", variables.siblingRoot & "/tests/Specs");
+					} catch (any e) {
+						variables.siblingReason = "needs symbolic link support";
+					}
+				}
+				variables.siblingMod = new cli.lucli.Module(cwd = variables.siblingRoot);
+			});
+
+			afterEach(() => {
+				try {
+					createObject("java", "java.nio.file.Files").deleteIfExists(pathOf(variables.siblingRoot & "/tests/specs/linked"));
+				} catch (any e) {
+				}
+				if (Len(variables.siblingRoot) > 10 && directoryExists(variables.siblingRoot)) {
+					directoryDelete(variables.siblingRoot, true);
+				}
+			});
+
+			it("does not treat a linked sibling folder of the spec root as inside it", () => {
+				if (Len(variables.siblingReason)) {
+					skip(variables.siblingReason);
+				}
+				// Treated as inside, it would resolve to "tests.specs.deep.SiblingSpec".
+				expect(siblingMod.$resolveTestFilter("SiblingSpec")).toBe("tests.specs.SiblingSpec");
+			});
+
+			it("still resolves spec files inside the spec root", () => {
+				expect(siblingMod.$resolveTestFilter("PageFavoritesToggleSpec")).toBe("tests.specs.favorites.PageFavoritesToggleSpec");
+			});
+
+		});
+
 		describe("$testSummaryLine (issue 3759)", () => {
 
 			it("never prints a green summary when no test bundles ran", () => {

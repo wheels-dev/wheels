@@ -1,0 +1,1 @@
+- `wheels test --filter=<SpecName>` now decides whether a spec file is under the spec root (`tests/specs`, or `vendor/wheels/tests/specs` with `--core`) with an exact, separator-qualified comparison of canonical paths, the same rule as the framework path guards.
