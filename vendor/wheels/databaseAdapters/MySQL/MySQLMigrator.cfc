@@ -3,7 +3,9 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes = {};
 	variables.sqlTypes['biginteger'] = {name = 'BIGINT UNSIGNED'};
 	variables.sqlTypes['binary'] = {name = 'BLOB'};
-	variables.sqlTypes['boolean'] = {name = 'TINYINT', limit = 1};
+	// BIT(1), not TINYINT(1): a DSN with tinyInt1isBit=false reports TINYINT(1) as a
+	// plain integer, so the model validated booleans as numbers (#3897).
+	variables.sqlTypes['boolean'] = {name = 'BIT', limit = 1};
 	variables.sqlTypes['date'] = {name = 'DATE'};
 	variables.sqlTypes['datetime'] = {name = 'DATETIME'};
 	variables.sqlTypes['decimal'] = {name = 'DECIMAL'};
