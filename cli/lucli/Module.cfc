@@ -1630,7 +1630,15 @@ component extends="modules.BaseModule" {
 	 */
 	public string function docs() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
-		var action = arrayLen(args) ? lCase(args[1]) : "fetch";
+		// The first non-flag token, so a bare `wheels docs --offline` (or
+		// `--force`) runs the default fetch instead of being read as an action.
+		var action = "fetch";
+		for (var token in args) {
+			if (left(token, 2) != "--") {
+				action = lCase(token);
+				break;
+			}
+		}
 		// Resolve --force HERE, in the command that actually receives the parsed
 		// argv. docsFetch() takes no arguments, so a helper reading its
 		// `arguments` scope always saw an empty struct and the flag was
@@ -1799,6 +1807,10 @@ component extends="modules.BaseModule" {
 			while (entries.hasMoreElements()) {
 				var entry = entries.nextElement();
 				var outFile = createObject("java", "java.io.File").init(root, entry.getName()).getCanonicalFile();
+				// A `./` directory entry is the root itself: nothing to create.
+				if (entry.isDirectory() && outFile.equals(root)) {
+					continue;
+				}
 				if (!outFile.toPath().startsWith(rootPath) || outFile.equals(root)) {
 					throw(type = "Wheels.DocsFetchFailed", message = "the archive entry '#entry.getName()#' points outside the docs directory");
 				}

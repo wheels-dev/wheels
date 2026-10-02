@@ -266,6 +266,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(strayEntries(home)).toBeEmpty();
 			});
 
+			it("installs a bundle whose archive has a ./ root directory entry", () => {
+				var home = newHome();
+				var dotZip = variables.workDir & "/dot-" & createUUID() & ".zip";
+				var zos = createObject("java", "java.util.zip.ZipOutputStream").init(
+					createObject("java", "java.io.FileOutputStream").init(dotZip)
+				);
+				zos.putNextEntry(createObject("java", "java.util.zip.ZipEntry").init("./"));
+				zos.closeEntry();
+				zos.putNextEntry(createObject("java", "java.util.zip.ZipEntry").init("manifest.json"));
+				zos.write(charsetDecode(serializeJSON({docsVersion: variables.version}), "utf-8"));
+				zos.closeEntry();
+				zos.close();
+				var dotBytes = fileReadBinary(dotZip);
+				var stub = startStub({
+					"/#zipName#": dotBytes,
+					"/#zipName#.sha512": checksumFile(lCase(hash(dotBytes, "SHA-512")))
+				});
+				try {
+					expect(runDocs(fetchModule(stub, home))).toBe("");
+				} finally {
+					stub.stop();
+				}
+				expect(fileExists(home & "/docs/#version#/manifest.json")).toBeTrue();
+			});
+
 			it("fails when the framework version cannot be determined", () => {
 				var bareRoot = variables.workDir & "/not-a-project-" & createUUID();
 				directoryCreate(bareRoot, true);
@@ -336,6 +361,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				}
 				expect(m.$count("$docsMountIntoWebroot")).toBe(1);
 				expect(requested).toBeEmpty();
+			});
+
+			it("runs the default fetch for a bare `wheels docs --offline`", () => {
+				var home = newHome();
+				directoryCreate(home & "/docs/#version#", true);
+				var stub = startStub({});
+				try {
+					var m = fetchModule(stub, home);
+					expect(runDocs(m, ["--offline"])).toBe("");
+				} finally {
+					stub.stop();
+				}
+				expect(m.$count("$docsMountIntoWebroot")).toBe(1);
 			});
 
 			it("refuses a --force re-fetch with --offline and keeps the installed bundle", () => {
