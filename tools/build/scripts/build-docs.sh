@@ -15,20 +15,21 @@ set -e
 # app webroot Tomcat serves the assets directly and only the extension-less
 # page paths go through the framework.
 #
-# The bundle deliberately carries ONE docs version (the newest slug), not every
-# version the sites publish: the full API site is ~1.3 GB across nine versions
+# The bundle deliberately carries ONE docs version per site (each site's newest
+# slug), not every version the sites publish: the full API site is ~1.3 GB across nine versions
 # because Starlight server-renders its whole sidebar into each of 2,739 pages.
 # One version compresses to ~20 MB, which is the size the Homebrew formula can
 # reasonably fetch on install. Links to other versions will not resolve offline;
 # the version switcher is a known limitation of the current-only bundle.
 #
-# Usage: ./build-docs.sh <framework_version> [docs_version]
+# Usage: ./build-docs.sh <framework_version> [guides_version] [api_version]
 
 VERSION=$1
 DOCS_VERSION=${2:-}
+API_DOCS_VERSION=${3:-}
 
 if [ -z "$VERSION" ]; then
-	echo "Usage: $0 <framework_version> [docs_version]" >&2
+	echo "Usage: $0 <framework_version> [guides_version] [api_version]" >&2
 	exit 1
 fi
 
@@ -39,26 +40,30 @@ STAGE_DIR="${ARTIFACTS_DIR}/docs-stage"
 
 echo "Building Wheels docs bundle for framework v${VERSION}"
 
-# ── Resolve the docs version ────────────────────────────────────────────────
-# The newest slug in the shared version metadata is the current docs line. Kept
-# in one place (web/packages/ui/src/data/versions.ts) so the bundle, the sites,
-# and the version switcher cannot drift.
-if [ -z "$DOCS_VERSION" ]; then
-	DOCS_VERSION=$(node -e "
+# ── Resolve the docs versions ───────────────────────────────────────────────
+# The newest slug in each site's list in the shared version metadata is that
+# site's current docs line. Kept in one place (web/packages/ui/src/data/versions.ts)
+# so the bundle, the sites, and the version switcher cannot drift. The two lists
+# move separately: a new guides tree can exist before its API tree (#4025).
+newest_slug() {
+	node -e "
 		const fs = require('fs');
 		const src = fs.readFileSync('${WEB_DIR}/packages/ui/src/data/versions.ts', 'utf8');
-		const block = src.match(/GUIDES_VERSIONS[\s\S]*?=\s*\[([\s\S]*?)\];/);
+		const block = src.match(/$1[\s\S]*?=\s*\[([\s\S]*?)\];/);
 		const slugs = (block ? block[1].match(/slug:\s*'([^']+)'/g) : []) || [];
 		const first = slugs[0] ? slugs[0].replace(/.*'([^']+)'.*/, '\$1') : '';
 		process.stdout.write(first);
-	")
-fi
+	"
+}
+[ -n "$DOCS_VERSION" ] || DOCS_VERSION=$(newest_slug GUIDES_VERSIONS)
+[ -n "$API_DOCS_VERSION" ] || API_DOCS_VERSION=$(newest_slug API_VERSIONS)
 
-if [ -z "$DOCS_VERSION" ]; then
-	echo "Could not resolve the docs version; pass it explicitly." >&2
+if [ -z "$DOCS_VERSION" ] || [ -z "$API_DOCS_VERSION" ]; then
+	echo "Could not resolve the docs versions; pass them explicitly." >&2
 	exit 1
 fi
-echo "  docs version: ${DOCS_VERSION}"
+echo "  guides version: ${DOCS_VERSION}"
+echo "  api version:    ${API_DOCS_VERSION}"
 
 # ── Build both sites under their served sub-paths ───────────────────────────
 if [ ! -d "${WEB_DIR}/node_modules" ]; then
@@ -103,7 +108,7 @@ rsync -a --exclude='v[0-9]*-[0-9]*-[0-9]*/' "${WEB_DIR}/sites/guides/dist/" "${S
 rsync -a --exclude='v[0-9]*-[0-9]*-[0-9]*/' "${WEB_DIR}/sites/api/dist/" "${STAGE_DIR}/api/"
 
 cp -R "${WEB_DIR}/sites/guides/dist/${DOCS_VERSION}" "${STAGE_DIR}/guides/${DOCS_VERSION}"
-cp -R "${WEB_DIR}/sites/api/dist/${DOCS_VERSION}" "${STAGE_DIR}/api/${DOCS_VERSION}"
+cp -R "${WEB_DIR}/sites/api/dist/${API_DOCS_VERSION}" "${STAGE_DIR}/api/${API_DOCS_VERSION}"
 
 # Manifest — the serving code reads this to fail loudly rather than serve a
 # half-built bundle, and `wheels docs fetch` uses docsVersion to warn when the
@@ -113,6 +118,7 @@ node -e "
 	fs.writeFileSync('${STAGE_DIR}/manifest.json', JSON.stringify({
 		frameworkVersion: '${VERSION}',
 		docsVersion: '${DOCS_VERSION}',
+		apiDocsVersion: '${API_DOCS_VERSION}',
 		builtAt: new Date().toISOString(),
 		sites: ['guides', 'api']
 	}, null, 2) + '\n');
@@ -125,4 +131,4 @@ rm -f "${ZIP}"
 (cd "${STAGE_DIR}" && zip -q -r -9 "${ZIP}" .)
 
 echo "  wrote $(basename "${ZIP}") ($(du -h "${ZIP}" | cut -f1))"
-echo "  docs version bundled: ${DOCS_VERSION}"
+echo "  docs versions bundled: guides ${DOCS_VERSION}, api ${API_DOCS_VERSION}"
