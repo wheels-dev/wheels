@@ -18,6 +18,10 @@ This page shows you how to read and write files through the `wheels.storage` abs
 - How signed (presigned) URLs work on both drivers
 - What the failure contract is (`Wheels.Storage.*` errors)
 
+<Aside type="caution" title="Wheels 4.0.6 and later">
+  `wheels.storage` ships from Wheels 4.0.6. Releases 4.0.0 to 4.0.5 don't include it; upgrade before following this page.
+</Aside>
+
 <Aside type="note">
   You should already know the DI container basics (see [The Dependency Injection Container](/v4-0-0/core-concepts/dependency-injection/)) and have multipart uploads working (see [File Uploads & Downloads](/v4-0-0/digging-deeper/file-uploads-and-downloads/)). This page covers where the uploaded bytes go.
 </Aside>
@@ -49,32 +53,33 @@ set(storage = {
 </cfscript>
 ```
 
-Register the manager as a singleton in `config/services.cfm`. Because its `init()` takes the storage config struct — which isn't a registered service — wrap construction in `toFactory()`:
+Create the manager once, when the application starts. `StorageManager`'s `init()` takes the storage config struct, and the 4.0 DI container can't pass a constructor argument that isn't a registered service, so build it in `app/events/onapplicationstart.cfm` and keep it in the application scope. Settings are loaded by the time this file runs, so `get("storage")` returns the struct above:
 
-```cfm {test:compile} title="config/services.cfm"
+```cfm {test:compile} title="app/events/onapplicationstart.cfm"
 <cfscript>
-local.di = injector();
-local.di.map("storage").toFactory(function() {
-    return new wheels.storage.StorageManager(config = get("storage"));
-});
+application.storage = new wheels.storage.StorageManager(config = get("storage"));
 </cfscript>
 ```
+
+A reload (`?reload=true`) runs the file again, so a changed `storage` setting takes effect on the next reload.
 
 `StorageManager.disk()` returns the default disk when you pass no name, and throws `Wheels.Storage.UnknownDisk` for a name you didn't configure:
 
 ```cfm {test:compile} title="resolving a disk"
-local.uploads = service("storage").disk();          // "local" (the default)
-local.assets  = service("storage").disk("s3");      // "s3"
+local.uploads = application.storage.disk();          // "local" (the default)
+local.assets  = application.storage.disk("s3");      // "s3"
 ```
 
-If you aren't using the container, instantiate the manager directly — `new wheels.storage.StorageManager(config = get("storage"))` — and keep it in a scope you control.
+<Aside type="note" title="Wheels 4.1 and later">
+  From 4.1 the container has `toFactory()`, so you can register the manager as a singleton service instead and resolve it with `service("storage")`. See the [4.1 Storage page](/v4-1-0/digging-deeper/storage/).
+</Aside>
 
 ## Storing and reading objects
 
 Every disk exposes the same six methods. Keys are forward-slash-delimited path strings; `put()` creates intermediate directories for you.
 
 ```cfm {test:compile} title="basic put/get/exists/delete"
-local.disk = service("storage").disk();
+local.disk = application.storage.disk();
 
 local.disk.put("avatars/42.png", local.binary, contentType = "image/png", visibility = "public");
 // -> "avatars/42.png"
@@ -139,7 +144,7 @@ The S3 driver speaks to S3 (and S3-compatible endpoints) over plain `cfhttp`, si
 | `timeout` | no | `60` | HTTP timeout in seconds. |
 
 ```cfm {test:compile} title="putting an object to S3"
-service("storage").disk("s3").put(
+application.storage.disk("s3").put(
     key = "reports/q3.pdf",
     content = local.pdfBytes,
     contentType = "application/pdf",
@@ -150,7 +155,7 @@ service("storage").disk("s3").put(
 `url()` returns the object's public URL; `signedUrl()` returns a presigned, expiring GET URL computed locally by `S3Signer` — no round-trip to AWS required:
 
 ```cfm {test:compile} title="presigned download URL"
-local.url = service("storage").disk("s3").signedUrl(
+local.url = application.storage.disk("s3").signedUrl(
     key = "reports/q3.pdf",
     expiresIn = 900,
     contentDisposition = "attachment; filename=q3.pdf"
@@ -182,6 +187,6 @@ Storage errors are typed so you can rescue them precisely:
 
 <CardGrid>
   <LinkCard title="File Uploads & Downloads" href="/v4-0-0/digging-deeper/file-uploads-and-downloads/" description="Multipart uploads, validation, and serving downloads safely." />
-  <LinkCard title="The Dependency Injection Container" href="/v4-0-0/core-concepts/dependency-injection/" description="Why services.cfm, and how toFactory() fits construction with config." />
+  <LinkCard title="The Dependency Injection Container" href="/v4-0-0/core-concepts/dependency-injection/" description="What the 4.0 container registers, and when to build an object yourself." />
   <LinkCard title="Deployment: Secrets" href="/v4-0-0/deployment/secrets/" description="Keep accessKeyId / secretAccessKey out of source." />
 </CardGrid>
