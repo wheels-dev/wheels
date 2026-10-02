@@ -34,6 +34,25 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			it("reports a database driver exception as plain values", () => {
+				// The issue's trigger: a JDBC exception, whose Java object graph is
+				// what sent BoxLang's serializer into a StackOverflowError.
+				var report = $report(error = $databaseError());
+				var err = report.bundleStats[1].suiteStats[1].specStats[1].error;
+				expect(IsSimpleValue(err.type)).toBeTrue();
+				expect(Len(err.message)).toBeGT(0);
+				for (var key in err) {
+					expect(ListFindNoCase("type,message,detail,extendedInfo,errorCode,stackTrace,tagContext", key)).toBeGT(0, "unexpected error key #key#");
+				}
+			});
+
+			it("keeps line numbers on stack frames", () => {
+				var report = $report(error = $caught("Custom.Probe", "boom", ""));
+				var frames = report.bundleStats[1].suiteStats[1].specStats[1].failOrigin;
+				expect(ArrayLen(frames)).toBeGT(0);
+				expect(Val(frames[1].line)).toBeGT(0);
+			});
+
 			it("reports a bundle-level exception as plain values too", () => {
 				var report = $report(globalException = $caught("Custom.BundleProbe", "before all failed", ""));
 				expect(report.bundleStats[1].globalException.type).toBe("Custom.BundleProbe");
@@ -57,6 +76,15 @@ component extends="wheels.WheelsTest" {
 		} catch (any e) {
 			return e;
 		}
+	}
+
+	private any function $databaseError() {
+		try {
+			QueryExecute("SELECT * FROM wheels_no_such_table_3905", {}, {datasource = application.wheels.dataSourceName});
+		} catch (any e) {
+			return e;
+		}
+		throw(type = "Wheels.Test", message = "expected the query against a missing table to fail");
 	}
 
 	// Builds a one-bundle, one-suite, one-spec TestResult with the given error,
