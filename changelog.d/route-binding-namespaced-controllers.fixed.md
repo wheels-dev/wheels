@@ -1,0 +1,1 @@
+- Route model binding now derives the model from the last segment of a namespaced controller, so `binding=true` on `admin.users` loads `User` instead of silently skipping a nonexistent `Admin.user` model. The development "Route Binding Hint" log line names that model too, and stays quiet when the controller has no model to bind (#3940)

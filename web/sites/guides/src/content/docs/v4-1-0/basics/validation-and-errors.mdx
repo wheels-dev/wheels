@@ -170,15 +170,14 @@ component extends="Model" {
 - `condition` — an expression evaluated against the record. The rule runs only when it returns `true`.
 - `unless` — inverse of `condition`; the rule runs only when the expression returns `false`.
 
-`condition` and `unless` are not evaluated as CFML. Wheels parses a small expression language and **fails closed**: anything it can't parse throws `Wheels.InvalidValidationCondition` when the record is validated, instead of silently skipping the rule. Supported forms:
+`condition` and `unless` are not evaluated as CFML. Wheels parses a small expression language. Many strings it can't parse throw `Wheels.InvalidValidationCondition` when the record is validated, but some give a wrong answer without an error, so stay within the supported forms:
 
 - `this.property` or `this.method()` (named `key='val'` or positional `'val'` arguments), optionally compared: `this.status != 'draft'`, `this.score >= 10`.
 - A bare method call such as `isNew()` or `!isNew()`.
 - Whitelisted functions: `StructKeyExists`, `IsNull`, `IsNumeric`, `IsSimpleValue`, `IsStruct`, `IsArray`, `IsBoolean`, `IsDate`, `Len`, `ListFind`, `ListFindNoCase`, `ListContains`, `ListContainsNoCase`, for example `StructKeyExists(this, 'requestFor')` or `ListFind('24,32,63', this.countryId)`.
 - Comparisons using `eq neq lt lte gt gte` or `== != < <= > >=`, compound `&&` / `||` (`&&` binds tighter), `!` and parentheses.
-- A lone `true` or `false`.
 
-Prefer referencing properties through `this.`. A bare name on its own or on the left of a comparison (`isActive`, `status != 'draft'`) is also accepted and resolved as `this.isActive` / `this.status` when the record has that property or method; a name it doesn't have throws. On the right of a comparison, a bare word is a string literal (`this.status neq draft` compares with the text `draft`), and a `this.` reference there throws: put it on the left (`this.frequency eq 'weekly'`, not `'weekly' eq this.frequency`). For anything more complex, move the logic into a model method and use `condition="this.needsCheck()"`.
+Put `this.` on every property. A bare name is not read as the property: on its own (`isActive`) it evaluates to `false`, and on the left of a comparison (`status != 'draft'`) the word itself is compared, so that rule always runs. On the right of a comparison, a bare word is a string literal (`this.status neq draft` compares with the text `draft`). Keep `this.` references on the left (`this.frequency eq 'weekly'`, not `'weekly' eq this.frequency`), and use `&&`, `||`, `!` and `eq` rather than `and`, `or`, `not` and `is`: `not` throws, and the other three can give a wrong answer without an error. For anything more complex, move the logic into a model method and use `condition="this.needsCheck()"`.
 
 <Aside type="tip">
   Validations on associations — like requiring child records to be valid before the parent saves — happen through nested properties: when a parent saves children via `nestedProperties()`, each child runs its own validations and an invalid child blocks the save. See the [associations guide](/v4-1-0/basics/associations/) for the setup. (There is no `validatesAssociated` helper in Wheels.)

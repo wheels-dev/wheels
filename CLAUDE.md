@@ -438,7 +438,9 @@ Specs extend `wheels.wheelstest.BrowserTest`. Install Playwright once: `wheels b
 The user-facing quick references — Model, Routing, Pagination helpers,
 Middleware, DI container, Package system + CLI, Migrations & Seeding,
 Background Jobs, SSE, and app testing — live in
-`docs/consumer-ai/CLAUDE.md`, which ships in every distributed artifact
+`docs/consumer-ai/CLAUDE.md` (conventions, common mistakes, testing and a
+topic index, kept under 8 KB) and `docs/consumer-ai/.ai/<topic>.md`
+(the reference topics), which ship in every distributed artifact
 (ForgeBox core, starter app, `wheels new` scaffolds) and is what AI tools
 inside USER apps auto-load. Keep both files in sync: when a quick
 reference changes here, update the consumer copy (or run

@@ -99,7 +99,7 @@ The verb surface mirrors Kamal's. Most invocations are identical save the leadin
 
 | Ruby Kamal | `wheels deploy` |
 |------------|-----------------|
-| `kamal setup` | `wheels deploy setup` — *currently an alias for `wheels deploy`; unlike Kamal it doesn't boot the proxy or accessories yet ([#2957](https://github.com/wheels-dev/wheels/issues/2957)) — run `wheels deploy proxy boot` and `wheels deploy accessory boot all` yourself* |
+| `kamal setup` | `wheels deploy setup` — boots the accessories, then deploys (which starts or boots `kamal-proxy`). Unlike Kamal it doesn't install Docker: run `wheels deploy bootstrap` first on a fresh host |
 | `kamal deploy` | `wheels deploy` |
 | `kamal redeploy` | `wheels deploy redeploy` |
 | `kamal rollback VERSION` | `wheels deploy rollback VERSION` |

@@ -149,6 +149,13 @@ component {
 	public struct function parse(required struct coll, boolean strict = true) {
 		var result = {};
 
+		// LuCLI's runtime-owned MCP marker (wheels-dev/LuCLI#17) is never a
+		// command argument; Module.structuredArgs() normally removes it first.
+		if (structKeyExists(arguments.coll, "__lucliMcpCall")) {
+			arguments.coll = structCopy(arguments.coll);
+			structDelete(arguments.coll, "__lucliMcpCall");
+		}
+
 		// 1. Seed named defaults so every declared option is present in the result.
 		for (var optName in variables.named) {
 			result[optName] = variables.named[optName]["default"];
@@ -384,7 +391,8 @@ component {
 		// argCollections may carry native booleans, which toString() renders
 		// as "true"/"false" — both shapes match the exact compare.
 		for (var key in arguments.coll) {
-			if (reFindNoCase("^arg\d+$", key)) {
+			// The runtime-owned MCP marker is never forwarded as a flag (#3980).
+			if (reFindNoCase("^arg\d+$", key) || compareNoCase(key, "__lucliMcpCall") == 0) {
 				continue;
 			}
 			if (isNull(arguments.coll[key])) {

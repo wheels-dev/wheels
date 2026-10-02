@@ -10,8 +10,8 @@
 # health check probes `/up` — the same path `kamal-proxy` polls per the
 # generated `config/deploy.yml`. Add a lightweight `/up` route that
 # returns 200 without touching slow dependencies. See:
-#   /v4-0-1-snapshot/deployment/docker-deployment/
-#   /v4-0-1-snapshot/deployment/first-deploy/
+#   https://guides.wheels.dev/v4-1-0/deployment/docker-deployment/
+#   https://guides.wheels.dev/v4-1-0/deployment/first-deploy/
 
 # --- Stage 1: builder ---------------------------------------------------------
 # Compile front-end assets and prune anything the runtime doesn't need.
@@ -27,6 +27,19 @@ WORKDIR /build
 COPY . .
 
 RUN if [ -f package.json ]; then npm ci --no-audit --no-fund; fi
+
+# db/ is where a SQLite app's database lives (migrations ship with app/, in
+# app/migrator/migrations). The image gets an EMPTY db/: local SQLite files
+# hold development data and never ship. .dockerignore keeps them out of the
+# context, and this removes any that an older .dockerignore let in. Older
+# apps may have no db/ at all; create it so the runtime COPY never fails.
+#
+# A SQLite app therefore starts with an empty database, and the file lives
+# inside the container, so it is lost on every redeploy. Run migrations on
+# boot with set(autoMigrateDatabase=true) in config/production/settings.cfm,
+# and keep real data in a server database (see `wheels deploy docs accessories`).
+RUN mkdir -p db \
+    && rm -f db/*.sqlite db/*.sqlite3 db/*.db db/*-journal db/*-wal db/*-shm
 
 # Skip silently if there is no build script defined.
 RUN if [ -f package.json ] && node -e "process.exit(require('./package.json').scripts && require('./package.json').scripts.build ? 0 : 1)"; then \
@@ -48,8 +61,11 @@ LABEL org.opencontainers.image.title="{{service_name}}"
 # The bundled secrets template exposes `WHEELS_RELOAD_PASSWORD`; wire your
 # `config/settings.cfm` reloadPassword to `getenv("WHEELS_RELOAD_PASSWORD")`
 # to pick it up.
+#
+# The datasource name is not set here: config/settings.cfm reads
+# WHEELS_DATASOURCE and falls back to the name `wheels new` gave the app.
+# Set it under env.clear in config/deploy.yml to use a different one.
 ENV WHEELS_ENV=production \
-    WHEELS_DATASOURCE=app \
     CATALINA_OPTS="-Xms256m -Xmx1g -XX:MaxMetaspaceSize=256m"
 
 WORKDIR /var/www
@@ -82,6 +98,7 @@ RUN apt-get update \
 # deprecated `plugins/` directory, add `COPY --from=builder /build/plugins ./plugins`.
 COPY --from=builder /build/app            ./app
 COPY --from=builder /build/config         ./config
+COPY --from=builder /build/db             ./db
 COPY --from=builder /build/public         ./public
 COPY --from=builder /build/vendor         ./vendor
 

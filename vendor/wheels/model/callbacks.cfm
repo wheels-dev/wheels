@@ -661,4 +661,47 @@
 		$runQueueCallbacks(queue = local.queue, type = arguments.type, propagateErrors = arguments.propagateErrors);
 	}
 
+	/**
+	 * Internal. Length of the owner's real callback queue when a savepoint unit
+	 * starts, or -1 when there is no real queue (none/false mode, or a foreign raw
+	 * transaction where callbacks are skipped). $rollbackSavepointCallbacks takes
+	 * this mark to find the writes made inside the unit.
+	 */
+	public numeric function $savepointCallbackMark(required string connection) {
+		if (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "$txnCallbacks")
+			&& StructKeyExists(request.wheels.$txnCallbacks, arguments.connection)
+			&& request.wheels.$txnCallbacks[arguments.connection].real
+		) {
+			return ArrayLen(request.wheels.$txnCallbacks[arguments.connection].queue);
+		}
+		return -1;
+	}
+
+	/**
+	 * Internal. A savepoint unit rolled back: take the queue entries it added
+	 * (after `mark`) out of the owner's queue, so they never get afterCommit, and
+	 * fire afterRollback for them now (#3958). The rebuilt queue is written back
+	 * through the request store, not a returned copy: Adobe CF passes arrays by value.
+	 */
+	public void function $rollbackSavepointCallbacks(required string connection, required numeric mark, boolean propagateErrors = true) {
+		if (arguments.mark < 0 || $savepointCallbackMark(arguments.connection) <= arguments.mark) {
+			return;
+		}
+		local.store = request.wheels.$txnCallbacks[arguments.connection];
+		local.kept = [];
+		local.rolledBack = [];
+		local.iEnd = ArrayLen(local.store.queue);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			if (local.i <= arguments.mark) {
+				ArrayAppend(local.kept, local.store.queue[local.i]);
+			} else {
+				ArrayAppend(local.rolledBack, local.store.queue[local.i]);
+			}
+		}
+		request.wheels.$txnCallbacks[arguments.connection].queue = local.kept;
+		$runQueueCallbacks(queue = local.rolledBack, type = "afterRollback", propagateErrors = arguments.propagateErrors);
+	}
+
 </cfscript>

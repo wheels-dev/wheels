@@ -862,7 +862,7 @@ component extends="wheels.WheelsTest" {
 			it("function findAll returns correct type when returnAs is struct when no records", () => {
 				q = user.findAll(where = "id = 0", returnas = "structs")
 
-				expect(q).toBeStruct()
+				expect(q).toBeArray()
 				expect(q).toBeEmpty()
 			})
 

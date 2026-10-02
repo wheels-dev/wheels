@@ -59,7 +59,7 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
-			it("does not let tenant config override live csrf, proxy, CORS, error, or datasource keys", function() {
+			it("does not let tenant config override live csrf, proxy, CORS, debug, error, or datasource keys", function() {
 				request.wheels.tenant = {
 					id = "evil",
 					dataSource = "ds1",
@@ -75,6 +75,13 @@ component extends="wheels.WheelsTest" {
 						accessControlAllowCredentials = true,
 						accessControlAllowHeaders = "HACK",
 						showErrorInformation = "HACK-ERR",
+						// The debug trio must be non-overridable per-tenant: switching these
+						// on for a tenant's requests would expose debug output / the public
+						// component surface for that tenant (#3880). showErrorInformation was
+						// already guarded; showDebugInformation and enablePublicComponent were
+						// in the same sensitive set everywhere else but missing here.
+						showDebugInformation = "HACK-DBG",
+						enablePublicComponent = "HACK-PUB",
 						dataSourceName = "hacked_ds"
 					}
 				};
@@ -89,6 +96,8 @@ component extends="wheels.WheelsTest" {
 				expect(g.$get("accessControlAllowCredentials")).toBeFalse();
 				expect(g.$get("accessControlAllowHeaders")).notToBe("HACK");
 				expect(g.$get("showErrorInformation")).notToBe("HACK-ERR");
+				expect(g.$get("showDebugInformation")).notToBe("HACK-DBG");
+				expect(g.$get("enablePublicComponent")).notToBe("HACK-PUB");
 				expect(g.$get("dataSourceName")).toBe(application.wheels.dataSourceName);
 			});
 

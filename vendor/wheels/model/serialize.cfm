@@ -15,20 +15,16 @@
 	}
 
 	/**
-	 * Internal function.
+	 * Internal function. `returnAs="structs"`: an array of structs, one per record, as
+	 * `findAll()` documents. Through 4.1 it was a struct keyed by row number (#4003).
 	 */
-	public any function $serializeQueryToStructs(
+	public array function $serializeQueryToStructs(
 		required query query,
 		required string include,
 		required string callbacks,
 		required string returnIncluded
 	) {
-		local.rv = {};
-		local.serialized = $serializeQueryToArray(argumentCollection = arguments);
-		for (local.i = 1; local.i <= arrayLen(local.serialized); local.i++) {
-			local.rv[local.i] = local.serialized[local.i];
-		}
-		return local.rv;
+		return $serializeQueryToArray(argumentCollection = arguments);
 	}
 
 	/**

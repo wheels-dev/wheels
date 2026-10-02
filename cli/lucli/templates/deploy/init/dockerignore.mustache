@@ -12,6 +12,15 @@
 .kamal/secrets
 .kamal/secrets.*
 
+# Local SQLite databases (development/test data, possibly real records).
+# The image gets an empty db/, never a local database file.
+db/*.sqlite
+db/*.sqlite3
+db/*.db
+db/*-journal
+db/*-wal
+db/*-shm
+
 # Local-only artifacts
 node_modules
 .CommandBox

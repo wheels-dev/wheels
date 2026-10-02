@@ -72,13 +72,6 @@ jobs:
         with:
           sparse-checkout: tools/lucli.json
           sparse-checkout-cone-mode: false
-      - name: Read the LuCLI runtime pin every channel must ship
-        id: pin
-        run: |
-          set -euo pipefail
-          LUCLI=$(jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))' tools/lucli.json)
-          echo "lucli=$LUCLI" >> "$GITHUB_OUTPUT"
-          echo "Every channel must ship LuCLI $LUCLI (tools/lucli.json)"
       - name: Determine the GA version each channel must serve
         id: v
         env:
@@ -102,6 +95,35 @@ jobs:
           fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "All channels must serve wheels $VER"
+      # The channels install the GA, so they must ship the LuCLI that GA was
+      # built with: read the pin from the GA's tag, not from this checkout
+      # (develop's pin moves ahead of the release between cuts, #4038).
+      - name: Read the LuCLI runtime pin the GA was built with
+        id: pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          VER: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Only a 404 (a release older than tools/lucli.json) may fall back to
+          # this checkout; any other API error (rate limit, 5xx, auth) fails the
+          # job, or it would silently compare against develop's pin again.
+          ERR="$(mktemp)"
+          if CONTENT="$(gh api "repos/${REPO}/contents/tools/lucli.json?ref=v${VER}" --jq .content 2>"${ERR}")"; then
+            PINFILE="$(printf '%s' "${CONTENT}" | base64 -d)"
+            SOURCE="tools/lucli.json at v${VER}"
+          elif grep -q 'HTTP 404' "${ERR}"; then
+            PINFILE="$(cat tools/lucli.json)"
+            SOURCE="tools/lucli.json in this checkout (v${VER} has none)"
+            echo "::notice::v${VER} has no tools/lucli.json; using the checked-out pin"
+          else
+            echo "::error::Could not read tools/lucli.json at v${VER}: $(cat "${ERR}")"
+            exit 1
+          fi
+          LUCLI=$(printf '%s' "${PINFILE}" | jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))')
+          echo "lucli=$LUCLI" >> "$GITHUB_OUTPUT"
+          echo "Every channel must ship LuCLI $LUCLI (${SOURCE})"
 
   index-integrity:
     needs: resolve
@@ -466,6 +488,60 @@ jobs:
           if ! grep -q "Wheels CLI" <<<"$OUT"; then
             echo "::error::${CHANNEL}: wheels info did not reach the Wheels module through LuCLI"; exit 1
           fi
+
+  rpm-payload:
+    needs: resolve
+    name: "rpm payload (${{ matrix.label }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The GA .rpm must unpack with rpm2cpio on every rpm we support and install
+    # with dnf (#3975). rpm 4.19 (Rocky 10) exits 1 on a package whose archive-
+    # size header doesn't match its cpio stream, which nfpm-only builds (4.1.2
+    # and earlier) have; rpm 4.16 (Rocky 9) doesn't check.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: "rocky 10, rpm 4.19"
+            image: rockylinux/rockylinux:10
+          - label: "rocky 9, rpm 4.16"
+            image: rockylinux/rockylinux:9
+    container:
+      image: ${{ matrix.image }}
+    env:
+      EXPECTED: ${{ needs.resolve.outputs.version }}
+    steps:
+      - name: Download the GA .rpm
+        run: |
+          set -euo pipefail
+          dnf -y -q install cpio >/dev/null
+          curl -fsSLo /tmp/wheels.rpm \
+            "https://github.com/wheels-dev/wheels/releases/download/v${EXPECTED}/wheels-${EXPECTED}.noarch.rpm"
+          rpm --version
+          rpm -K /tmp/wheels.rpm
+      - name: rpm2cpio | cpio -t exits 0
+        run: |
+          set -uo pipefail
+          # 4.1.2 and earlier were built by nfpm alone; their header is known to
+          # fail rpm 4.19's check. Report it, but gate only on later releases.
+          KNOWN_BAD=0
+          if [ "$(printf '%s\n' "${EXPECTED}" "4.1.2" | sort -V | tail -1)" = "4.1.2" ]; then KNOWN_BAD=1; fi
+          if rpm2cpio /tmp/wheels.rpm | cpio -t --quiet > /tmp/entries; then
+            echo "rpm2cpio | cpio -t OK ($(wc -l < /tmp/entries) entries)"
+          elif [ "${KNOWN_BAD}" = 1 ]; then
+            echo "::notice::wheels ${EXPECTED} predates the rpmbuild re-wrap (#3975): rpm2cpio | cpio -t fails on $(rpm --version); not gating"
+          else
+            echo "::error::rpm2cpio | cpio -t failed on $(rpm --version) for wheels ${EXPECTED}"
+            echo "archive-size header: $(rpm -qp --qf '%{LONGARCHIVESIZE}' /tmp/wheels.rpm), stream: $(rpm2cpio /tmp/wheels.rpm | wc -c)"
+            exit 1
+          fi
+      - name: dnf install the downloaded .rpm and run it
+        run: |
+          set -euo pipefail
+          dnf -y install /tmp/wheels.rpm
+          GOT="$(wheels --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          echo "wheels --version => '${GOT}' (expected '${EXPECTED}')"
+          [ "${GOT}" = "${EXPECTED}" ] || { echo "::error::installed wheels reports '${GOT}', expected '${EXPECTED}'"; exit 1; }
 
   yum:
     needs: resolve

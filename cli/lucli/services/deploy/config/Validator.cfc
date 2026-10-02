@@ -19,13 +19,21 @@ component {
 		// accepted-and-ignored (##3088).
 		variables.allowedKeys = [
 			"service", "image", "servers", "registry", "builder", "env",
-			"ssh", "proxy", "boot", "accessories"
+			"ssh", "proxy", "boot", "accessories", "volumes"
 		];
 		// Pre-build a case-insensitive struct lookup so the hot path doesn't
 		// depend on arrayContainsNoCase (not available on every engine).
 		variables.allowedLookup = {};
 		for (var k in variables.allowedKeys) {
 			variables.allowedLookup[lCase(k)] = true;
+		}
+		// proxy: sub-keys. forward_headers and buffering are accepted for
+		// Kamal compatibility but not applied yet (config-reference documents
+		// that); anything else is a typo that would silently do nothing.
+		variables.proxyKeys = ["host", "ssl", "app_port", "appPort", "healthcheck", "forward_headers", "buffering"];
+		variables.proxyLookup = {};
+		for (var pk in variables.proxyKeys) {
+			variables.proxyLookup[lCase(pk)] = true;
 		}
 		return this;
 	}
@@ -48,6 +56,20 @@ component {
 		// validated rather than quoted (##2956).
 		$validateName(arguments.parsed.service, "service", arguments.filePath);
 		$validateImage(arguments.parsed.image, "image", arguments.filePath);
+		if (structKeyExists(arguments.parsed, "proxy") && isStruct(arguments.parsed.proxy)) {
+			for (var proxyKey in arguments.parsed.proxy) {
+				if (!structKeyExists(variables.proxyLookup, lCase(proxyKey))) {
+					$raise(
+						arguments.filePath,
+						"unknown key: 'proxy.#proxyKey#' (allowed proxy keys: #arrayToList(variables.proxyKeys, ', ')#)"
+					);
+				}
+			}
+			// Proxy.ssl() treats a non-boolean as false, so a typo turned TLS off.
+			if (structKeyExists(arguments.parsed.proxy, "ssl") && !isBoolean(arguments.parsed.proxy.ssl)) {
+				$raise(arguments.filePath, "proxy.ssl must be true or false (got '#arguments.parsed.proxy.ssl#')");
+			}
+		}
 		// kamal-proxy's --tls needs a host to request a certificate for.
 		if (
 			structKeyExists(arguments.parsed, "proxy") && isStruct(arguments.parsed.proxy)
@@ -57,6 +79,7 @@ component {
 			$raise(arguments.filePath, "proxy.ssl requires proxy.host (the host name TLS is issued for)");
 		}
 		$validateServers(arguments.parsed.servers, arguments.filePath);
+		$validateVolumes(arguments.parsed, arguments.filePath);
 		$validateBoot(arguments.parsed, arguments.filePath);
 		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {
 			for (var accName in arguments.parsed.accessories) {
@@ -74,6 +97,31 @@ component {
 						}
 					}
 				}
+			}
+		}
+	}
+
+	/**
+	 * Top-level `volumes:` (Kamal): a list of `host:container` or
+	 * `host:container:ro|rw` mounts for every app container, where host is a
+	 * path or a named volume and container is an absolute path (#4018).
+	 */
+	public void function $validateVolumes(required struct parsed, required string filePath) {
+		if (!structKeyExists(arguments.parsed, "volumes")) return;
+		if (!isArray(arguments.parsed.volumes)) {
+			$raise(arguments.filePath, "volumes must be a list of host:container mounts, e.g. - /var/lib/myapp/db:/var/www/db");
+		}
+		var i = 0;
+		for (var entry in arguments.parsed.volumes) {
+			i++;
+			var parts = isSimpleValue(entry) ? listToArray(entry, ":", true) : [];
+			var shapeOk = (arrayLen(parts) == 2 || (arrayLen(parts) == 3 && listFind("ro,rw", lCase(parts[3]))))
+				&& len(trim(parts[1])) && left(parts[2], 1) == "/";
+			if (!shapeOk) {
+				$raise(
+					arguments.filePath,
+					"volumes[#i#] must be host:container or host:container:ro|rw with an absolute container path (got '#isSimpleValue(entry) ? entry : "a non-string value"#')"
+				);
 			}
 		}
 	}

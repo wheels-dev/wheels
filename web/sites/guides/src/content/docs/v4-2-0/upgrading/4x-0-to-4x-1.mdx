@@ -1,0 +1,99 @@
+---
+title: Upgrading from 4.0 to 4.1
+description: The 4.0 → 4.1 upgrade is a framework swap plus a handful of hand edits to the app-owned public/Application.cfc — this is the checklist, with each edit's version and whether skipping it fails safe.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Within the 4.x line there are **no breaking framework changes** — upgrading from any 4.0.x to 4.1.x is the same `vendor/wheels/` swap as a patch upgrade (see [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/)). The work that the swap does **not** do for you is a short list of edits to the **app-owned `public/Application.cfc`**: that file is created once from the template and is yours, so framework updates never reach it. This page collects every one of those edits in one place, with the version it landed in and whether skipping it fails safe.
+
+<Aside type="tip" title="The fastest way to do all of this">
+Run `wheels upgrade check` once on a workstation — it scans your app for the drift and tells you exactly what to change. If you'd rather not run the CLI, diff your `public/Application.cfc` against the template that ships in `vendor/wheels/` (or a fresh `wheels new` app) and adopt the changes below, keeping your local customizations. The template `public/Application.cfc` is the authority.
+</Aside>
+
+## Swap the framework
+
+<Steps>
+
+1. **Back up the current framework.** Move — don't delete — `vendor/wheels/` aside (e.g. `vendor/wheels-4.0.x.bak/`, outside version control). Moving it back is the whole rollback.
+
+2. **Install 4.1.x.** Extract the 4.1 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework).
+
+3. **Reload and run your suite.** Use `?reload=true&password=…` and `/wheels/app/tests`. Then apply the `public/Application.cfc` edits below.
+
+</Steps>
+
+## The `public/Application.cfc` edits
+
+Each edit is app-owned, so it is yours to apply. "Fails safe if skipped" means the app keeps working correctly without it; where it does **not**, the consequence is stated.
+
+### Session cookie `Secure` flag (since 4.0.4; corrected 4.1.2)
+
+The `this.sessionCookie` block (`httpOnly`, `sameSite`, `secure`) has been in the template since **4.0.4** ([#2927](https://github.com/wheels-dev/wheels/pull/2927)). 4.1.2 then made the `secure` flag follow the actual request scheme, not just `WHEELS_ENV=production` ([#3830](https://github.com/wheels-dev/wheels/issues/3830)).
+
+- Apps created with **4.0.4–4.1.1** have the block and should update `this.sessionCookie.secure` to the form in the [CHANGELOG #3830 entry](/v4-2-0/upgrading/changelog/) (or set `this.sessionCookie.secure = true;` in `config/app.cfm` when the site is HTTPS-only).
+- Apps created with **4.0.0–4.0.3** have no `this.sessionCookie` block at all and should add the whole block from the template.
+
+**Does not fail safe:** an app switched to production through `config/environment.cfm` can issue its session cookie without `Secure` over HTTPS until this is applied.
+
+### DI container guard in `onError` (since 4.0.4)
+
+`onError` now only rebuilds the DI container when it never came up, instead of on every error page ([#3061](https://github.com/wheels-dev/wheels/issues/3061)). Added to the template in 4.0.4, so apps created on 4.0.0-4.0.3 are missing it. Without the guard, an error page can replace the live container and wipe your `config/services.cfm` registrations and cached singletons.
+
+**Does not fail safe:** adopt it.
+
+### Adobe teardown guards in `onError` / `onSessionEnd` (staged 4.0.4-4.1.0)
+
+The handlers are guarded against a torn-down application scope during `applicationStop()` and session reaping ([#3379](https://github.com/wheels-dev/wheels/issues/3379)). These guards were staged into the template across 4.0.4 to 4.1.0, so a copy created on an older 4.0.x may have only part of them — diff the whole `onError` / `onSessionEnd` against the 4.1 template.
+
+**Fails safe on Lucee and BoxLang; does not on Adobe CF 2023/2025**, where an unguarded handler can turn a reload or idle-timeout teardown into an HTTP 500 for the whole site. See the Aside in [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/).
+
+### `onError` running-app message (4.2.0)
+
+The `onError` minimal fallback now distinguishes an error raised once the application is already running (for example a request timeout after startup) from a genuine startup failure, and extends the request timeout before logging so the `wheels.log` entry it points at is actually written ([#3965](https://github.com/wheels-dev/wheels/issues/3965)).
+
+**Fails safe** — the previous behaviour renders a misleading "Wheels failed to initialize" page and may not write the log entry, but the app is otherwise unaffected. Copy the updated `onError`, `$renderMinimalError` and `$logStartupFailure` functions from the template.
+
+### jBCrypt load path (4.1.0)
+
+A block puts the bundled jBCrypt jar on the application's Java load paths ([#3571](https://github.com/wheels-dev/wheels/issues/3571)) so `bcryptHash()` / `bcryptVerify()` run in native Java. The exact block is in the Aside in [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/).
+
+**Does not fail safe for auth apps:** without it, `bcryptHash()` at the default cost can exceed the request timeout on Lucee 7. Any app that logs in with `bcryptVerify()` (as `wheels generate auth` sets up) is affected.
+
+### `.env` boolean parser (4.1.1)
+
+The `.env` parser stops coercing a numeric `1` (such as `1.0`) to the boolean `true` ([#3641](https://github.com/wheels-dev/wheels/issues/3641)). The before/after is in the Aside in [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/).
+
+**Fails safe** unless you store a boolean-looking numeric in `.env` and read it as a flag.
+
+### Isolated test-application include (since 4.0.6)
+
+The template includes `vendor/wheels/events/testcontext.cfm` after `config/app.cfm` so both the app and core test runners bind a separate CFML application scope instead of the live one ([#3374](https://github.com/wheels-dev/wheels/issues/3374)). Added to the template in 4.0.6, so apps created on 4.0.0-4.0.5 are missing it.
+
+**Fails safe for production;** without it, the test suites run against your live application scope rather than an isolated one. Adopt the include if you run the framework or app suite against your app.
+
+### Reload-password handoff
+
+The `?reload=true` **gate itself is framework code** (in `onapplicationstart`) and has failed closed since 4.0.4 — it does not live in your `public/Application.cfc`, so there is no risk of an app leaving the reload endpoint open. What `public/Application.cfc` carries is only the reload-**password** handoff that passes the supplied password through to the framework gate.
+
+**Fails safe:** the gate rejects an unauthorised reload regardless. If your copy predates the current template, diff the password handoff so it matches; `wheels upgrade check` flags the drift.
+
+## Verify
+
+<Steps>
+
+1. Reload (`?reload=true&password=…`) and confirm the app starts clean — check `wheels.log` for warnings.
+2. Run your suite (`/wheels/app/tests`).
+3. If you use authentication, time a login — `bcryptVerify()` should be fast (native Java), not seconds.
+4. Over HTTPS, confirm the session cookie carries `Secure`.
+
+</Steps>
+
+## Related guides
+
+- [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/) — the swap mechanics and the exact `public/Application.cfc` code blocks.
+- [Upgrading from 3.x to 4.0](/v4-2-0/upgrading/3x-to-4x/) — the breaking-change map for 3.x apps.
+- [Changelog](/v4-2-0/upgrading/changelog/) — the full per-version entry list.

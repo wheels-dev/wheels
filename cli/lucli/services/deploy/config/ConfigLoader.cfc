@@ -36,7 +36,22 @@ component {
 	 *              <path>.<destination>.yml is deep-merged on top.
 	 */
 	public any function load(required string path, struct opts = {destination: ""}) {
-		var raw = variables.yaml.parse(fileRead(arguments.path));
+		if (!fileExists(arguments.path)) {
+			variables.validator.$raise(
+				arguments.path,
+				"no deploy config found at #arguments.path#; run `wheels deploy init` to create config/deploy.yml"
+			);
+		}
+		var content = fileRead(arguments.path);
+		// Blank or comment-only: the YAML parser has nothing to return.
+		var hasContent = reFind("(?m)^[ \t]*[^##\s]", content) > 0;
+		var raw = hasContent ? variables.yaml.parse(content) : {};
+		if (isNull(raw) || !isStruct(raw) || structIsEmpty(raw)) {
+			variables.validator.$raise(
+				arguments.path,
+				"the deploy config is empty; it needs at least service:, image: and servers: (see `wheels deploy init`)"
+			);
+		}
 		var dest = arguments.opts.destination ?: "";
 
 		if (len(dest)) {
