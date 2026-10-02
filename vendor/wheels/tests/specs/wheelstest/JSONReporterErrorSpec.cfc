@@ -70,7 +70,7 @@ component extends="wheels.WheelsTest" {
 		});
 	}
 
-	private struct function $caught(required string type, required string message, required string detail) {
+	private any function $caught(required string type, required string message, required string detail) {
 		try {
 			throw(type = arguments.type, message = arguments.message, detail = arguments.detail);
 		} catch (any e) {

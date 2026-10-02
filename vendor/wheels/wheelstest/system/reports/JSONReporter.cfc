@@ -137,6 +137,11 @@ component extends="BaseReporter" {
 		for ( var field in [ "type", "message", "detail", "extendedInfo", "errorCode" ] ) {
 			out[ field ] = $plainField( arguments.error, field );
 		}
+		// Some engines wrap driver exceptions in objects that don't expose their
+		// fields as struct keys (BoxLang): fall back to the Java message.
+		if ( !len( out.message ) ) {
+			out.message = $javaMessage( arguments.error );
+		}
 		var trace      = $plainField( arguments.error, "stackTrace" );
 		out[ "stackTrace" ] = len( trace ) > 4000 ? left( trace, 4000 ) & "..." : trace;
 		out.tagContext = $plainFrames( $rawField( arguments.error, "tagContext" ) );
@@ -277,20 +282,44 @@ component extends="BaseReporter" {
 	 */
 	public any function $rawField( any container, required string name ){
 		var state = { "found" : false, "value" : "" };
+		if ( isNull( arguments.container ) || isSimpleValue( arguments.container ) ) {
+			return;
+		}
 		try {
-			if ( !isNull( arguments.container ) && structKeyExists( arguments.container, arguments.name ) ) {
-				var value = arguments.container[ arguments.name ];
-				if ( !isNull( value ) ) {
-					state.value = value;
-					state.found = true;
-				}
+			if ( structKeyExists( arguments.container, arguments.name ) ) {
+				state.value = arguments.container[ arguments.name ];
+				state.found = !isNull( state.value );
 			}
 		} catch ( any e ) {
-			// Unreadable on this engine: treat as missing.
+			// Not a struct on this engine: try the key directly below.
+		}
+		if ( !state.found ) {
+			try {
+				state.value = arguments.container[ arguments.name ];
+				state.found = !isNull( state.value );
+			} catch ( any e ) {
+				// Unreadable on this engine: treat as missing.
+			}
 		}
 		if ( state.found ) {
 			return state.value;
 		}
+	}
+
+	/**
+	 * The message of a Java exception object, or "".
+	 */
+	public string function $javaMessage( any error ){
+		var state = { "message" : "" };
+		try {
+			var message = arguments.error.getMessage();
+			if ( !isNull( message ) && isSimpleValue( message ) ) {
+				state.message = message;
+			}
+		} catch ( any e ) {
+			// Not a Java exception.
+		}
+		return state.message;
 	}
 
 }
