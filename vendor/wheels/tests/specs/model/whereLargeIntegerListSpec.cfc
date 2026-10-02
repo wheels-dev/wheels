@@ -19,7 +19,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			// The parser runs before any query, so this holds on every database,
-			// including SQL Server, which caps a query at 2100 bound parameters.
+			// including SQL Server and Oracle, which cap how many values a query binds.
 			it("parses a 5000-key IN list into one bound list parameter", () => {
 				var where = "id IN (#ArrayToList(keys)#)";
 				var parts = g.model("author").$whereClause(where = where);
@@ -35,25 +35,34 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("parses a 5000-key whereIn", () => {
-				// Running the query needs one bound parameter per key; SQL Server allows 2100.
+				// Running the query binds one parameter per key: SQL Server allows 2100 per
+				// statement and Oracle 1000 per IN list (ORA-01795). Chunking is #3906.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					skip("SQL Server caps a query at 2100 bound parameters");
+					skip("SQL Server caps a query at 2100 bound parameters (##3906)");
+				} else if (g.get("adapterName") == "OracleModel") {
+					skip("Oracle caps an IN list at 1000 values, ORA-01795 (##3906)");
 				}
 				expect(g.model("author").whereIn("id", keys).count()).toBe(g.model("author").count());
 			})
 
 			it("parses a 5000-key whereNotIn", () => {
-				// Running the query needs one bound parameter per key; SQL Server allows 2100.
+				// Running the query binds one parameter per key: SQL Server allows 2100 per
+				// statement and Oracle 1000 per IN list (ORA-01795). Chunking is #3906.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					skip("SQL Server caps a query at 2100 bound parameters");
+					skip("SQL Server caps a query at 2100 bound parameters (##3906)");
+				} else if (g.get("adapterName") == "OracleModel") {
+					skip("Oracle caps an IN list at 1000 values, ORA-01795 (##3906)");
 				}
 				expect(g.model("author").whereNotIn("id", keys).count()).toBe(0);
 			})
 
 			it("parses a 5000-key IN list in a hand-written where string", () => {
-				// Running the query needs one bound parameter per key; SQL Server allows 2100.
+				// Running the query binds one parameter per key: SQL Server allows 2100 per
+				// statement and Oracle 1000 per IN list (ORA-01795). Chunking is #3906.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					skip("SQL Server caps a query at 2100 bound parameters");
+					skip("SQL Server caps a query at 2100 bound parameters (##3906)");
+				} else if (g.get("adapterName") == "OracleModel") {
+					skip("Oracle caps an IN list at 1000 values, ORA-01795 (##3906)");
 				}
 				var rows = g.model("author").findAll(where = "id IN (#ArrayToList(keys)#)", returnAs = "query");
 				expect(rows.recordCount).toBe(g.model("author").count());
