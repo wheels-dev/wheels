@@ -108,7 +108,18 @@ component {
 	 * Internal function.
 	 */
 	public function $setAuthenticityToken() {
-		if (!$isVerifiedRequest() && isAjax()) {
+		// The X-CSRF-Token header counts on any non-GET request, not only with
+		// X-Requested-With (#3959). The token value is the protection: a cross-site
+		// page can't read it, and X-Requested-With is itself a custom header with the
+		// same CORS preflight. fetch()-based clients (Turbo, plain fetch) send the
+		// page's current token in this header without X-Requested-With, which is what
+		// lets a form inside a cached fragment (whose hidden field holds the token of
+		// the session that warmed the cache) still submit.
+		//
+		// Rule when both are present: the request passes if EITHER the form field or
+		// the header holds a valid token (Rails' behaviour). The header is consulted
+		// only when the field didn't verify.
+		if (!$isVerifiedRequest()) {
 			if (StructKeyExists(request.$wheelsHeaders, "X-CSRF-Token")) {
 				params.authenticityToken = request.$wheelsHeaders["X-CSRF-Token"];
 			}

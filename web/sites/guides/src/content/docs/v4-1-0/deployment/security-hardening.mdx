@@ -127,9 +127,9 @@ component extends="wheels.Controller" {
 ### The enforcement path
 
 1. **View** — add a hidden token field to any `POST`/`PUT`/`PATCH`/`DELETE` form with `authenticityTokenField()`. Form helpers like `startFormTag()` insert it automatically for non-GET forms.
-2. **View (AJAX)** — add `csrfMetaTags()` to your layout `<head>`. It emits two `<meta>` tags your JavaScript reads to send the token as an `X-CSRF-Token` header.
+2. **View (JavaScript)** — add `csrfMetaTags()` to your layout `<head>`. It emits two `<meta>` tags your JavaScript reads to send the token as an `X-CSRF-Token` header. From Wheels 4.2 the header counts on any non-GET request. Earlier versions also required `X-Requested-With: XMLHttpRequest`, which `fetch()` and Turbo don't send.
 3. **Controller pipeline** — before each action runs, the framework's CSRF pipeline checks the `only`/`except` filters, verifies the token, and throws, aborts, or ignores per the `with` setting.
-4. **Verification** — verification short-circuits on GET/HEAD/OPTIONS; otherwise it matches `params.authenticityToken` against the session-stored token or the cookie-stored token depending on the `csrfStore` setting (session by default).
+4. **Verification** — verification short-circuits on GET/HEAD/OPTIONS. Otherwise it matches `params.authenticityToken` against the session-stored or cookie-stored token, depending on the `csrfStore` setting (session by default). If that doesn't verify, it tries the `X-CSRF-Token` header. The request passes when **either** one is valid, so a stale hidden field in a cached form is rescued by a current header token. See [forms inside a cached fragment](/v4-1-0/digging-deeper/caching/#forms-inside-a-cached-fragment).
 
 ### Disable per-action for API endpoints
 

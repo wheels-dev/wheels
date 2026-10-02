@@ -44,6 +44,7 @@ component {
 	 * @prepend String to prepend to the form control. Useful to wrap the form control with HTML tags.
 	 * @append String to append to the form control. Useful to wrap the form control with HTML tags.
 	 * @encode [see:styleSheetLinkTag].
+	 * @authenticityToken Set to `false` to leave out the hidden authenticity token field, for a form inside a cached fragment. Supply the token at request time instead: the `X-CSRF-Token` header (sent by Turbo from `csrfMetaTags()`), or a script that copies the `csrf-token` meta tag into the form on submit.
 	 */
 	public string function startFormTag(
 		string method,
@@ -60,9 +61,18 @@ component {
 		numeric port,
 		string prepend,
 		string append,
-		any encode
+		any encode,
+		boolean authenticityToken = true
 	) {
 		$args(name = "startFormTag", args = arguments);
+		// authenticityToken = false leaves the hidden token field out (#3959): for a
+		// form inside a cached fragment, where a stored field would hold the token of
+		// the session that warmed the cache. The token then has to come at request
+		// time, in the X-CSRF-Token header (Turbo sends it from csrfMetaTags()) or via
+		// a small script that copies the meta tag into the form on submit. Removed
+		// from arguments so it never reaches URLFor() or the element's attributes.
+		local.includeToken = arguments.authenticityToken;
+		StructDelete(arguments, "authenticityToken");
 
 		// Encode all prepend / append type arguments if specified.
 		$encodeArgsForHtml(args = arguments, keys = "prepend,append");
@@ -134,6 +144,7 @@ component {
 			$isRequestProtectedFromForgery()
 			&& ListFindNoCase("post,put,patch,delete", arguments.method)
 			&& !local.skipCsrf
+			&& local.includeToken
 		) {
 			local.rv &= authenticityTokenField();
 		}

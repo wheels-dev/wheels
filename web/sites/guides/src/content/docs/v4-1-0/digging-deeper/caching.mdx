@@ -114,6 +114,42 @@ component extends="Controller" {
 }
 ```
 
+### Forms inside a cached fragment
+
+A form rendered with `startFormTag()` or `buttonTo()` carries the current session's authenticity token in a hidden field. Once that markup is cached, every visitor gets the copy whose field holds the token of the session that warmed the cache. Without a token supplied at request time, everyone else's submit fails with `Wheels.InvalidAuthenticityToken` (a 403).
+
+From Wheels 4.2 the request passes if **either** the form field **or** the `X-CSRF-Token` header carries a valid token, and the header counts on any non-GET request, not only with `X-Requested-With`. So supply the current page's token at request time:
+
+- **With Turbo (or any `fetch`-based submit)**, nothing else is needed. Turbo sends the token from `csrfMetaTags()` in the `X-CSRF-Token` header, and that header is valid even when the cached hidden field is stale.
+- **With plain HTML forms**, leave the token out of the cached markup and fill it in on submit from the `csrf-token` meta tag that `csrfMetaTags()` writes into the layout:
+
+```cfm title="app/views/posts/_post.cfm (rendered with cache=...)"
+<cfoutput>
+    #buttonTo(text="Delete", route="post", key=arguments.id, method="delete", authenticityToken=false, class="js-fresh-token")#
+</cfoutput>
+```
+
+```html title="layout: add once, after csrfMetaTags()"
+<script>
+document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form.classList.contains("js-fresh-token")) return;
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (!meta) return;
+    var field = form.querySelector('input[name="authenticityToken"]');
+    if (!field) {
+        field = document.createElement("input");
+        field.type = "hidden";
+        field.name = "authenticityToken";
+        form.appendChild(field);
+    }
+    field.value = meta.content;
+});
+</script>
+```
+
+`startFormTag()` takes the same `authenticityToken=false` argument. Rule of thumb: don't cache markup that contains a form token unless the token is supplied at request time, by the header or by a script like the one above. Caching per user (see [Per-user keys](#per-user-keys)) also works, but it gives up the shared fragment.
+
 ## Cache a query
 
 Most slow actions aren't slow because of rendering — they're slow because of one expensive query. Cache the query directly and leave the view alone:
