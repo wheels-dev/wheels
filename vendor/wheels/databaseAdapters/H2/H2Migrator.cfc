@@ -4,6 +4,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['biginteger'] = {name = 'BIGINT'};
 	variables.sqlTypes['binary'] = {name = 'BLOB'};
 	variables.sqlTypes['boolean'] = {name = 'BOOLEAN'};
+	variables.sqlTypes['char'] = {name = 'CHAR', limit = 1};
 	variables.sqlTypes['date'] = {name = 'DATE'};
 	variables.sqlTypes['datetime'] = {name = 'TIMESTAMP'};
 	variables.sqlTypes['decimal'] = {name = 'DECIMAL'};

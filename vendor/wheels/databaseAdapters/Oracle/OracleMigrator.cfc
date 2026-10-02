@@ -10,6 +10,7 @@ component extends="wheels.databaseAdapters.Abstract" {
     variables.sqlTypes['biginteger'] = {name = 'NUMBER', precision = 19};
     variables.sqlTypes['binary']     = {name = 'BLOB'};
     variables.sqlTypes['boolean']    = {name = 'NUMBER', precision = 1};
+    variables.sqlTypes['char']       = {name = 'CHAR', limit = 1};
     variables.sqlTypes['date']       = {name = 'DATE'};
     variables.sqlTypes['datetime']   = {name = 'TIMESTAMP'};
     variables.sqlTypes['decimal']    = {name = 'NUMBER'}; // precision/scale picked up from options
