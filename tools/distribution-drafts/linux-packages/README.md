@@ -153,3 +153,18 @@ esac
 
 Hosted from a Worker on the same wheels.dev CF zone — five-minute setup once
 Phase 2 is in place.
+
+## Why the `.rpm` is rebuilt with rpmbuild (#3975)
+
+nfpm writes the rpm `ARCHIVESIZE` / `LONGARCHIVESIZE` header as the sum of the file contents. The value should be the size of the cpio archive, which also counts the cpio headers and padding. rpm 4.19's `rpm2cpio` (Rocky 10) checks the bytes it wrote against that header and exits 1 on a mismatch, while rpm 4.16 (Rocky 9) doesn't check. A newer nfpm doesn't change this (2.40.0 and 2.47.0 both do it, with any payload compression).
+
+`build-linux-packages.sh` therefore:
+1. builds the `.rpm` with nfpm, as before;
+2. hands it to `rpm-rewrap.sh`, which rebuilds it with `rpmbuild` in a `rockylinux:9` container.
+
+`nfpm-wheels*.yaml` stays the only place to change the package. The rebuild reads everything back from the nfpm rpm: payload, file modes and owners, requires and recommends, and metadata. It then refuses the result unless:
+- the files, modes, owners, sizes, digests, dependencies and metadata are identical to the nfpm package;
+- `ARCHIVESIZE` equals the cpio stream;
+- `rpm2cpio` exits 0 on Rocky 10 and Rocky 9.
+
+The re-wrap needs docker. The `.deb` is still built by nfpm alone. `distribution-install-smoke.yml` checks the published GA `.rpm` with `rpm -K`, `rpm2cpio | cpio -t` (exit code checked) and `dnf install` on Rocky 10 and Rocky 9.
