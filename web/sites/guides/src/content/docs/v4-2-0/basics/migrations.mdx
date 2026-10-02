@@ -136,7 +136,7 @@ These are the column-builder methods defined on `TableDefinition`. Every one tak
 | `t.char(columnNames=, limit=)` | CHAR | fixed-width string |
 | `t.text(columnNames=, size=)` | TEXT / MEDIUMTEXT / LONGTEXT | `size` is MySQL-only |
 | `t.integer(columnNames=, limit=, allowNull=, default=)` | INT | `limit` is a display width, not a size bump — for BIGINT use `t.bigInteger()` |
-| `t.bigInteger(columnNames=)` | BIGINT | |
+| `t.bigInteger(columnNames=)` | BIGINT | On SQLite the column is created as `INTEGER`, which Wheels binds as a 32-bit integer: Adobe ColdFusion then rejects values above 2,147,483,647. Lucee, BoxLang and RustCFML are unaffected. For 64-bit values on Adobe + SQLite, declare the column `BIGINT` in raw SQL (`execute("ALTER TABLE ...")` or a `CREATE TABLE` statement). |
 | `t.float(columnNames=)` | FLOAT | |
 | `t.decimal(columnNames=, precision=, scale=)` | DECIMAL | use for money |
 | `t.boolean(columnNames=, default=)` | BOOLEAN / BIT | `BIT(1)` on MySQL, `BOOLEAN` on Oracle 23ai+ (from Wheels 4.2), see below |

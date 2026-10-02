@@ -5,9 +5,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $getType(required string type, string scale, string details) {
 		switch (LCase(arguments.type)) {
+			// A column declared BIGINT / INT8 holds 64-bit values, so bind it as one (#4086).
+			// Wheels' own migrator declares biginteger columns as INTEGER, which stays
+			// cf_sql_integer here: SQLite reports only the declared type.
+			case "bigint":
+			case "int8":
+				local.rv = "cf_sql_bigint";
+				break;
+
 			case "integer":
 			case "int":
-			case "bigint":
 			case "mediumint":
 			case "smallint":
 			case "tinyint":
