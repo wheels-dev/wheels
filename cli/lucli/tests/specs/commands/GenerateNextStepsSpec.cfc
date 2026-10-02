@@ -42,6 +42,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(text).notToInclude("Start server: wheels start");
 			});
 
+			it("api-resource's curl hint uses the project's pinned port, not a hardcoded 8080", () => {
+				fileWrite(variables.tempRoot & "/lucee.json", '{"name":"nextsteps","port":8123}');
+				var text = $nextSteps(running = false, type = "api-resource");
+				expect(text).toInclude("curl http://localhost:8123/api/widgets.json");
+				expect(text).notToInclude("localhost:8080");
+			});
+
 			it("api-resource still says wheels start when no server is running", () => {
 				var text = $nextSteps(running = false, type = "api-resource");
 				expect(text).toInclude("Start server: wheels start");
