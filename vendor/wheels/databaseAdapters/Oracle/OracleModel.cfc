@@ -14,7 +14,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	/**
 	 * Internal function. The cf_sql type for an Oracle NUMBER column. NUMBER(11..19, 0) holds
-	 * 64-bit integers (the migrator's biginteger is NUMBER(19)), so it binds as BIGINT (#4086).
+	 * 64-bit integers, so it binds as BIGINT (#4086).
 	 * NUMBER(10) and an unknown precision stay INTEGER, and so does NUMBER(38) (Oracle's
 	 * INTEGER, used for identity ids), so existing integer columns keep their binding.
 	 */
