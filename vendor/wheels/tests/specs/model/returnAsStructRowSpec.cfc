@@ -53,6 +53,31 @@ component extends="wheels.WheelsTest" {
 				expect(StructIsEmpty(row)).toBeTrue()
 			})
 
+			it("query builder findOne with offset returns the row struct", () => {
+				var authors = g.model("author").findAll(order = "id", returnAs = "query")
+				var row = g.model("author").orderBy("id").offset(1).findOne(returnAs = "struct")
+				expect(row).toBeStruct()
+				expect(row.id).toBe(authors.id[2])
+			})
+
+			it("query builder findOne with offset returns an empty struct when nothing matches", () => {
+				var row = g.model("author").where("lastName", "zz-no-such-author").offset(1).findOne(returnAs = "struct")
+				expect(row).toBeStruct()
+				expect(StructIsEmpty(row)).toBeTrue()
+			})
+
+			it("query builder findOne with an offset past the end returns an empty struct", () => {
+				var total = g.model("author").count()
+				var row = g.model("author").orderBy("id").offset(total + 5).findOne(returnAs = "struct")
+				expect(row).toBeStruct()
+				expect(StructIsEmpty(row)).toBeTrue()
+			})
+
+			it("query builder findOne with an offset past the end still returns false for objects", () => {
+				var total = g.model("author").count()
+				expect(g.model("author").orderBy("id").offset(total + 5).findOne()).toBeFalse()
+			})
+
 			it("findEach passes each row to the callback in order", () => {
 				var seen = {ids = [], allStructs = true}
 				var visit = function(row) {
