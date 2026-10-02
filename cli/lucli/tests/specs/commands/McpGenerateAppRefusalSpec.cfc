@@ -14,6 +14,12 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		variables.testHelper = new cli.lucli.tests.TestHelper();
 		variables.tempRoot = testHelper.scaffoldTempProject(expandPath("/"));
 		directoryCreate(tempRoot & "/vendor/wheels", true, true);
+		// info() ends with detectServerPort(): without this it reads the
+		// inherited lucee.json (port 8080) and probes the common fallback
+		// ports, reaching servers the suite doesn't own (the CI fallback-port
+		// sentinel catches it). Same isolation as InfoCommandSpec (##3717).
+		if (fileExists(tempRoot & "/lucee.json")) fileDelete(tempRoot & "/lucee.json");
+		fileWrite(tempRoot & "/.env", "WHEELS_SERVER_FALLBACK=false" & chr(10));
 		createObject("java", "java.io.File").init(expandPath("/testbox/system/stubs")).mkdirs();
 	}
 
