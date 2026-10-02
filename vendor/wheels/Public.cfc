@@ -126,12 +126,13 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 				error = "This command changes state and must be sent as a POST request with the reload password. Upgrade the wheels CLI if it still sends GET."
 			};
 		}
-		if (!$isLoopbackAddress(arguments.remoteAddr)) {
+		if (!$isLoopbackLiteral($normalizeIpLiteral($stripZoneId(arguments.remoteAddr)))) {
 			return {allowed = false, statusCode = 403, error = "State-changing CLI commands are restricted to localhost."};
 		}
 		if (Len(Trim(arguments.forwardedFor))) {
 			for (local.ip in ListToArray(arguments.forwardedFor)) {
-				if (!$isLoopbackAddress(Trim(local.ip))) {
+				// Only an IP literal counts as loopback: a host name is never resolved.
+				if (!$isLoopbackLiteral($normalizeIpLiteral(Trim(local.ip)))) {
 					return {allowed = false, statusCode = 403, error = "State-changing CLI commands are restricted to localhost."};
 				}
 			}
@@ -227,39 +228,307 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 
 	/**
 	 * Network-origin gate for the password-less /wheels dev endpoints, applied at
-	 * the public-component dispatch chokepoint. Requires the request's Host header
-	 * to name the local machine and rejects a non-loopback X-Forwarded-For hop.
-	 *
-	 * It deliberately does NOT check the socket REMOTE_ADDR. The dev server is
-	 * commonly reached through a Docker port mapping where the socket source is
-	 * the bridge gateway (not loopback), so a socket check here would 403 the test
-	 * runners on every CI engine leg and break every Docker-hosted developer with
-	 * a browser on the host. The mutating endpoints (migrator command/create,
-	 * consoleeval, the CLI mutation bridge) keep their own loopback-socket + CSRF /
-	 * password checks on top of this Host-level gate.
+	 * the public-component dispatch chokepoint. A thin wrapper: the decision is
+	 * $devToolAccessCheck(), which takes plain strings so it is unit-testable.
+	 * The mutating endpoints (migrator command/create, consoleeval, the CLI
+	 * mutation bridge) keep their own loopback-socket + CSRF / password checks on
+	 * top of this gate.
 	 */
 	public void function $enforceDevToolLocalAccess() {
-		local.forwardedFor = StructKeyExists(cgi, "HTTP_X_FORWARDED_FOR") ? cgi.HTTP_X_FORWARDED_FOR : "";
-		if (Len(Trim(local.forwardedFor))) {
-			for (local.ip in ListToArray(local.forwardedFor)) {
-				if (!$isLoopbackAddress(Trim(local.ip))) {
-					$denyDevToolAccess();
-				}
-			}
-		}
-		local.hostHeader = StructKeyExists(cgi, "HTTP_HOST") ? cgi.HTTP_HOST : "";
-		if (!$wheelsHostIsLocal(hostHeader = local.hostHeader)) {
-			$denyDevToolAccess();
+		local.result = $devToolAccessCheck(
+			remoteAddr = StructKeyExists(cgi, "REMOTE_ADDR") ? cgi.REMOTE_ADDR : "",
+			hostHeader = StructKeyExists(cgi, "HTTP_HOST") ? cgi.HTTP_HOST : "",
+			forwardedFor = StructKeyExists(cgi, "HTTP_X_FORWARDED_FOR") ? cgi.HTTP_X_FORWARDED_FOR : "",
+			allowedRemoteAddresses = $devToolSetting("devToolsAllowedRemoteAddresses"),
+			environment = $devToolSetting("environment")
+		);
+		if (!local.result.allowed) {
+			$denyDevToolAccess(statusCode = local.result.statusCode, message = local.result.error);
 		}
 	}
 
-	private void function $denyDevToolAccess() {
-		cfheader(statuscode = 403);
-		cfcontent(type = "text/plain", reset = true);
-		writeOutput(
-			"Wheels dev tools only accept requests addressed to a local host name (localhost, *.localhost, 127.0.0.1, or [::1])."
-			& " For a custom local hostname, add it with set(devToolsAllowedHosts=""my.host"")."
+	/**
+	 * Decides whether a request may reach the password-less /wheels dev tools.
+	 * Returns {allowed, statusCode, error}. Every rule must pass:
+	 * - the environment is not production (refused outright, 404);
+	 * - no X-Forwarded-For hop is non-loopback;
+	 * - the Host header names the local machine (the DNS-rebinding defence);
+	 * - the socket peer is loopback, or, in development and testing only, is
+	 *   listed in devToolsAllowedRemoteAddresses. The list is matched against the
+	 *   socket peer and never against a forwarded header.
+	 */
+	public struct function $devToolAccessCheck(
+		required string remoteAddr,
+		required string hostHeader,
+		string forwardedFor = "",
+		string allowedRemoteAddresses = "",
+		string environment = "development"
+	) {
+		if (arguments.environment == "production") {
+			$logDevToolNoticeOnce(
+				key = "production",
+				text = "Refused a /wheels dev-tools request: the dev tools never answer in the production environment."
+			);
+			return {allowed = false, statusCode = 404, error = "Not Found"};
+		}
+		if (Len(Trim(arguments.forwardedFor))) {
+			for (local.ip in ListToArray(arguments.forwardedFor)) {
+				// Only an IP literal counts as loopback: a host name is never resolved.
+				if (!$isLoopbackLiteral($normalizeIpLiteral(Trim(local.ip)))) {
+					return {
+						allowed = false,
+						statusCode = 403,
+						error = "Wheels dev tools only accept requests made directly from this machine; this request was forwarded for another address."
+					};
+				}
+			}
+		}
+		if (!$wheelsHostIsLocal(hostHeader = arguments.hostHeader)) {
+			return {
+				allowed = false,
+				statusCode = 403,
+				error = "Wheels dev tools only accept requests addressed to a local host name (localhost, *.localhost, 127.0.0.1, or [::1])."
+					& " For a custom local hostname, add it with set(devToolsAllowedHosts=""my.host"")."
+			};
+		}
+		if ($isLoopbackLiteral($normalizeIpLiteral($stripZoneId(arguments.remoteAddr)))) {
+			return {allowed = true, statusCode = 200, error = ""};
+		}
+		if (
+			ListFindNoCase("development,testing", arguments.environment)
+			&& $remoteAddressListed(remoteAddr = arguments.remoteAddr, allowedRemoteAddresses = arguments.allowedRemoteAddresses)
+		) {
+			return {allowed = true, statusCode = 200, error = ""};
+		}
+		return {
+			allowed = false,
+			statusCode = 403,
+			error = "Wheels dev tools only accept requests from this machine; this request came from #arguments.remoteAddr#."
+				& " If you reach the dev server through Docker port publishing, publish the port on 127.0.0.1 only"
+				& " (for example -p 127.0.0.1:8080:8080) and add the Docker gateway address with"
+				& " set(devToolsAllowedRemoteAddresses=""172.17.0.1"") in config/development/settings.cfm."
+				& " On a port published on 0.0.0.0, every LAN client also arrives from the gateway address."
+		};
+	}
+
+	/**
+	 * True when remoteAddr (an IP literal) matches an entry of the comma-delimited
+	 * allowedRemoteAddresses list: an exact IPv4 or IPv6 address, or an IPv4 CIDR
+	 * range (prefix 1-32, base not 0.0.0.0; IPv6 entries match exactly). IPv4-mapped IPv6 peers
+	 * (::ffff:a.b.c.d) are compared as IPv4. Entries that do not parse, wildcards,
+	 * /0 ranges and the unspecified addresses (0.0.0.0, ::) match nothing and are
+	 * logged once. Never resolves a host name.
+	 */
+	public boolean function $remoteAddressListed(required string remoteAddr, required string allowedRemoteAddresses) {
+		local.peer = $normalizeIpLiteral($stripZoneId(arguments.remoteAddr));
+		if (!Len(local.peer)) {
+			return false;
+		}
+		for (local.rawEntry in ListToArray(arguments.allowedRemoteAddresses)) {
+			local.entry = Trim(local.rawEntry);
+			if (!Len(local.entry)) {
+				continue;
+			}
+			if (Find("/", local.entry)) {
+				// Keep empty fields: "a//12" or "/a/12" must not read as "a/12".
+				local.parts = ListToArray(local.entry, "/", true);
+				local.base = ArrayLen(local.parts) == 2 ? $ipv4Number($normalizeIpLiteral(local.parts[1])) : -1;
+				local.prefix = ArrayLen(local.parts) == 2 ? local.parts[2] : "";
+				if (
+					ArrayLen(local.parts) != 2
+					|| local.base <= 0
+					|| ReFind("^[0-9]{1,2}$", local.prefix) == 0
+					|| Val(local.prefix) < 1
+					|| Val(local.prefix) > 32
+				) {
+					$warnBadRemoteAddressEntry(local.entry);
+					continue;
+				}
+				local.peerNumber = $ipv4Number(local.peer);
+				local.blockSize = 2 ^ (32 - Val(local.prefix));
+				if (local.peerNumber >= 0 && Int(local.peerNumber / local.blockSize) == Int(local.base / local.blockSize)) {
+					return true;
+				}
+				continue;
+			}
+			local.exact = $normalizeIpLiteral(local.entry);
+			if (!Len(local.exact) || local.exact == "0.0.0.0" || local.exact == "0:0:0:0:0:0:0:0") {
+				$warnBadRemoteAddressEntry(local.entry);
+				continue;
+			}
+			if (local.exact == local.peer) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The canonical text form of an IPv4 or IPv6 literal, or "" when the input is
+	 * not one. IPv6 comes back as eight lower-case hex groups without leading
+	 * zeros ("fd00:0:0:0:0:0:0:5"); IPv4-mapped IPv6 (::ffff:a.b.c.d) comes back
+	 * as IPv4. Parsed in plain CFML, so the result is the same on every engine
+	 * (including JVM-free ones) and no DNS lookup can happen.
+	 */
+	public string function $normalizeIpLiteral(required string address) {
+		local.value = LCase(Trim(arguments.address));
+		if (!Find(":", local.value)) {
+			return $normalizeIpv4Literal(local.value);
+		}
+		if (ReFind("^[0-9a-f:.]+$", local.value) == 0 || Find(":::", local.value)) {
+			return "";
+		}
+		// A dotted IPv4 tail ("::ffff:10.1.2.3") becomes its two hex groups.
+		if (Find(".", local.value)) {
+			local.colon = ReFind(":[^:]*$", local.value);
+			local.tail = $ipv4Number($normalizeIpv4Literal(Mid(local.value, local.colon + 1, Len(local.value))));
+			if (local.tail < 0) {
+				return "";
+			}
+			local.high = Int(local.tail / 65536);
+			local.value = Left(local.value, local.colon) & FormatBaseN(local.high, 16) & ":" & FormatBaseN(local.tail - local.high * 65536, 16);
+		}
+		local.groups = [];
+		local.gap = Find("::", local.value);
+		if (local.gap) {
+			if (Find("::", local.value, local.gap + 1)) {
+				return "";
+			}
+			local.head = local.gap > 1 ? $ipv6Groups(Left(local.value, local.gap - 1)) : [];
+			local.rest = $ipv6Groups(Mid(local.value, local.gap + 2, Len(local.value)));
+			if ((local.gap > 1 && !ArrayLen(local.head)) || (local.gap + 1 < Len(local.value) && !ArrayLen(local.rest))) {
+				return "";
+			}
+			local.missing = 8 - ArrayLen(local.head) - ArrayLen(local.rest);
+			if (local.missing < 1) {
+				return "";
+			}
+			for (local.group in local.head) {
+				ArrayAppend(local.groups, local.group);
+			}
+			for (local.i = 1; local.i <= local.missing; local.i++) {
+				ArrayAppend(local.groups, 0);
+			}
+			for (local.group in local.rest) {
+				ArrayAppend(local.groups, local.group);
+			}
+		} else {
+			local.groups = $ipv6Groups(local.value);
+		}
+		if (ArrayLen(local.groups) != 8) {
+			return "";
+		}
+		if (
+			local.groups[1] == 0 && local.groups[2] == 0 && local.groups[3] == 0 && local.groups[4] == 0
+			&& local.groups[5] == 0 && local.groups[6] == 65535
+		) {
+			return Int(local.groups[7] / 256) & "." & (local.groups[7] mod 256) & "." & Int(local.groups[8] / 256) & "." & (local.groups[8] mod 256);
+		}
+		local.text = [];
+		for (local.group in local.groups) {
+			ArrayAppend(local.text, LCase(FormatBaseN(local.group, 16)));
+		}
+		return ArrayToList(local.text, ":");
+	}
+
+	/**
+	 * The numeric values of colon-separated IPv6 hex groups, or [] when any group
+	 * is empty or not 1-4 hex digits.
+	 */
+	public array function $ipv6Groups(required string text) {
+		local.rv = [];
+		for (local.group in ListToArray(arguments.text, ":", true)) {
+			if (ReFind("^[0-9a-f]{1,4}$", local.group) == 0) {
+				return [];
+			}
+			ArrayAppend(local.rv, InputBaseN(local.group, 16));
+		}
+		return local.rv;
+	}
+
+	/**
+	 * A dotted IPv4 literal with each octet in decimal ("" when the input is not
+	 * one). Octets with leading zeros are refused rather than guessed at.
+	 */
+	public string function $normalizeIpv4Literal(required string address) {
+		if (ReFind("^[0-9]{1,3}(\.[0-9]{1,3}){3}$", arguments.address) == 0) {
+			return "";
+		}
+		for (local.octet in ListToArray(arguments.address, ".")) {
+			if ((Len(local.octet) > 1 && Left(local.octet, 1) == "0") || Val(local.octet) > 255) {
+				return "";
+			}
+		}
+		return arguments.address;
+	}
+
+	/**
+	 * A socket address without its IPv6 zone id ("::1%lo0" -> "::1"). Used only for
+	 * the socket peer, which the servlet container may report with a scope; the
+	 * zone of a client-supplied value is never trusted.
+	 */
+	public string function $stripZoneId(required string address) {
+		local.mark = Find("%", arguments.address);
+		return local.mark > 1 ? Left(arguments.address, local.mark - 1) : arguments.address;
+	}
+
+	/**
+	 * True for a normalized loopback literal: 127.0.0.0/8 or ::1.
+	 */
+	public boolean function $isLoopbackLiteral(required string normalized) {
+		if (!Len(arguments.normalized)) {
+			return false;
+		}
+		if (Find(":", arguments.normalized)) {
+			return arguments.normalized == "0:0:0:0:0:0:0:1";
+		}
+		return ListFirst(arguments.normalized, ".") == "127";
+	}
+
+	/**
+	 * A dotted IPv4 literal as a number, or -1 when the input is not one.
+	 */
+	public numeric function $ipv4Number(required string address) {
+		if (ReFind("^[0-9]{1,3}(\.[0-9]{1,3}){3}$", arguments.address) == 0) {
+			return -1;
+		}
+		local.octets = ListToArray(arguments.address, ".");
+		return ((Val(local.octets[1]) * 256 + Val(local.octets[2])) * 256 + Val(local.octets[3])) * 256 + Val(local.octets[4]);
+	}
+
+	public void function $warnBadRemoteAddressEntry(required string entry) {
+		$logDevToolNoticeOnce(
+			key = "entry:" & arguments.entry,
+			text = "Ignored devToolsAllowedRemoteAddresses entry '#arguments.entry#': use an exact IPv4 or IPv6 address, or an IPv4 CIDR range with a prefix from 1 to 32."
 		);
+	}
+
+	/**
+	 * Writes a wheels.log warning the first time a given notice key is seen by this
+	 * (application-lifetime) component instance.
+	 */
+	public void function $logDevToolNoticeOnce(required string key, required string text) {
+		if (!StructKeyExists(variables, "$devToolNotices")) {
+			variables.$devToolNotices = {};
+		}
+		if (StructKeyExists(variables.$devToolNotices, arguments.key)) {
+			return;
+		}
+		variables.$devToolNotices[arguments.key] = true;
+		WriteLog(type = "warning", text = "[Wheels] " & arguments.text, file = "wheels");
+	}
+
+	public string function $devToolSetting(required string name) {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, arguments.name)) {
+			return application.wheels[arguments.name];
+		}
+		return "";
+	}
+
+	private void function $denyDevToolAccess(required numeric statusCode, required string message) {
+		cfheader(statuscode = arguments.statusCode);
+		cfcontent(type = "text/plain", reset = true);
+		writeOutput(arguments.message);
 		abort;
 	}
 
