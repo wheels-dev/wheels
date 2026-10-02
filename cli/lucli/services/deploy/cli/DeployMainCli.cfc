@@ -48,13 +48,48 @@ component {
         var rolesMap = $roleHosts(cfg);
         // Same output path as every other deploy verb: config warnings first,
         // and any value resolved from .kamal/secrets redacted.
+        // Secret VALUES never appear: env.secret and registry.password list
+        // only the key names that .kamal/secrets supplies.
+        var accessories = {};
+        for (var acc in cfg.accessories()) {
+            accessories[acc.name()] = {
+                "image": acc.image(),
+                "hosts": acc.hosts(),
+                "port": acc.port(),
+                "volumes": acc.volumes()
+            };
+        }
+        var proxy = cfg.proxy();
+        var ssh = cfg.ssh();
+        var builder = cfg.builder();
         return new modules.wheels.services.deploy.lib.SecretRedaction().render(yaml.dump({
-            service: cfg.service(),
-            image: cfg.image(),
-            servers: rolesMap,
-            registry: {
-                server: cfg.registry().server(),
-                username: cfg.registry().username()
+            "service": cfg.service(),
+            "image": cfg.image(),
+            "servers": rolesMap,
+            "registry": {
+                "server": cfg.registry().server(),
+                "username": cfg.registry().username(),
+                "password": cfg.registry().password()
+            },
+            "proxy": {
+                "host": proxy.host(),
+                "ssl": proxy.ssl(),
+                "app_port": proxy.appPort(),
+                "healthcheck": proxy.healthcheck()
+            },
+            "env": {
+                "clear": cfg.env().clear(),
+                "secret": cfg.env().secret()
+            },
+            "accessories": accessories,
+            "ssh": {
+                "user": ssh.user(),
+                "port": ssh.port()
+            },
+            "builder": {
+                "arch": builder.arch(),
+                "context": builder.context(),
+                "dockerfile": builder.dockerfile()
             }
         }));
     }
