@@ -1,0 +1,1 @@
+- `wheels deploy` now applies the `boot:` block (Kamal's rolling boot) instead of only validating it: with `boot:` present, each role's hosts boot in batches of `limit` (a count, or a percentage of the role's hosts) with `wait` seconds between batches, and `--dry-run` shows where each pause falls. Configs without `boot:` deploy as before (#3925)

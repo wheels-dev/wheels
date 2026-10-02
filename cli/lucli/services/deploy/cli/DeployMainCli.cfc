@@ -225,8 +225,20 @@ component {
                     $dispatch(proxyHosts, proxy.start_or_run(), dryRun);
                 }
 
+                // Kamal's rolling boot (#3925): with a boot: block, each
+                // role's hosts boot in batches of boot.limit, boot.wait
+                // seconds apart. Without one, hosts boot back to back.
+                var bootConfigured = structKeyExists(cfg.raw(), "boot");
+                var boot = cfg.boot();
                 for (var role in cfg.roles()) {
-                    for (var host in role.hosts()) {
+                    var roleHosts = role.hosts();
+                    var batchSize = bootConfigured ? boot.batchSize(arrayLen(roleHosts)) : arrayLen(roleHosts);
+                    var hostNumber = 0;
+                    for (var host in roleHosts) {
+                        hostNumber++;
+                        if (bootConfigured && hostNumber > 1 && (hostNumber - 1) % batchSize == 0) {
+                            $bootPause(boot.wait(), dryRun, batchSize);
+                        }
                         // A same-version redeploy would hit a guaranteed
                         // docker run --name conflict otherwise (#2957 DEP-11a).
                         $dispatch([host], app.remove_conflicting(role, ver), dryRun);
@@ -299,6 +311,23 @@ component {
             "Deployed " & cfg.service() & " version " & ver
                 & " to " & arrayLen(hosts) & " host(s): " & arrayToList(hosts, ", ")
         );
+    }
+
+    /**
+     * The boot.wait pause between two batches of hosts. A dry run records it
+     * instead of sleeping. Its own method so specs can stub the sleep.
+     */
+    private void function $bootPause(required numeric seconds, required boolean dryRun, required numeric batchSize) {
+        if (arguments.dryRun) {
+            arrayAppend(
+                variables.dryRunBuffer,
+                "[boot] wait " & arguments.seconds & "s before the next batch (boot.limit: " & arguments.batchSize & " host(s) per batch)"
+            );
+            return;
+        }
+        if (arguments.seconds > 0) {
+            sleep(arguments.seconds * 1000);
+        }
     }
 
     public string function redeploy(required struct opts) {
