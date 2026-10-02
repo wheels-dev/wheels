@@ -663,6 +663,7 @@
 				return true;
 			}
 		}
+		local.guard = new wheels.PathGuard();
 		if ($engineAdapter().isRustCFML()) {
 			// JVM-free engine: java.io.File shims are unreliable for canonical
 			// paths. Lexical containment is the correct check there — `..`
@@ -671,25 +672,17 @@
 			// contained (RustCFML has no symlink resolution to bypass).
 			local.normDestination = $normalizeZipPath(arguments.destination);
 			local.normJoined = $normalizeZipPath(arguments.destination & "/" & local.entry);
-			if (Len(local.normJoined) == Len(local.normDestination)) {
-				return false;
-			}
-			return CompareNoCase(Left(local.normJoined, Len(local.normDestination)), local.normDestination) != 0;
+			// Exact, separator-qualified compare (handles the equal-length root case too).
+			return !local.guard.pathWithinExact(root = local.normDestination, candidate = local.normJoined);
 		}
 		try {
 			local.destFile = CreateObject("java", "java.io.File").init(arguments.destination);
 			local.destCanon = local.destFile.getCanonicalPath();
-			local.sep = CreateObject("java", "java.io.File").separator;
-			local.destPrefix = local.destCanon;
-			if (Right(local.destPrefix, 1) != local.sep) {
-				local.destPrefix = local.destPrefix & local.sep;
-			}
 			local.target = CreateObject("java", "java.io.File").init(local.destFile, local.entry);
 			local.targetCanon = local.target.getCanonicalPath();
-			if (local.targetCanon == local.destCanon) {
-				return false;
-			}
-			return CompareNoCase(Left(local.targetCanon, Len(local.destPrefix)), local.destPrefix) != 0;
+			// Exact, separator-qualified containment of two canonical paths. The old
+			// `==` / CompareNoCase folded a case-distinct sibling into the destination.
+			return !local.guard.pathWithinExact(root = local.destCanon, candidate = local.targetCanon);
 		} catch (any e) {
 			// Canonical resolution failing means "cannot verify" — fail closed.
 			return true;
