@@ -29,6 +29,20 @@ component extends="wheels.WheelsTest" {
 						isTestable = false;
 					}
 				}
+				// The alternate datasource is optional: only some test setups register
+				// it. Skip instead of erroring in db_setup() when it isn't there (#3886).
+				// (A struct, not a plain assignment in the catch: see the BoxLang catch-scope invariant.)
+				if(isTestable) {
+					var probe = {available = true};
+					try {
+						g.$dbinfo(datasource = altDatasource, type = "version");
+					} catch (any e) {
+						probe.available = false;
+					}
+					if(!probe.available) {
+						isTestable = false;
+					}
+				}
 			})
 
 			// Commenting this test temporarily to make the github actions work as it is not working in testbox
@@ -44,7 +58,7 @@ component extends="wheels.WheelsTest" {
 			// })
 
 			it("findall with datasource argument", () => {
-				if (!isTestable) return;
+				if (!isTestable) skip("needs the wheelstestdb_h2 datasource on Lucee with an H2-compatible primary adapter");
 				transaction {
 					this.db_setup()
 					defaultDBRows = g.model("Author").findAll(where = "firstName = '#firstName#'")
@@ -57,7 +71,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("findone with datasource argument", () => {
-				if (!isTestable) return;
+				if (!isTestable) skip("needs the wheelstestdb_h2 datasource on Lucee with an H2-compatible primary adapter");
 				transaction {
 					this.db_setup()
 					actual = g.model("Author").findOne(argumentCollection = finderArgs)
@@ -67,7 +81,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("findfirst with datasource argument", () => {
-				if (!isTestable) return;
+				if (!isTestable) skip("needs the wheelstestdb_h2 datasource on Lucee with an H2-compatible primary adapter");
 				transaction {
 					this.db_setup()
 					actual = g.model("Author").findFirst(argumentCollection = finderArgs)
@@ -77,7 +91,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("findLastOne with datasource argument", () => {
-				if (!isTestable) return;
+				if (!isTestable) skip("needs the wheelstestdb_h2 datasource on Lucee with an H2-compatible primary adapter");
 				transaction {
 					this.db_setup()
 					actual = g.model("Author").findLastOne(argumentCollection = finderArgs)
@@ -87,7 +101,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("count with datasource argument", () => {
-				if (!isTestable) return;
+				if (!isTestable) skip("needs the wheelstestdb_h2 datasource on Lucee with an H2-compatible primary adapter");
 				transaction {
 					this.db_setup()
 					actual = g.model("Author").count(argumentCollection = finderArgs)
@@ -97,7 +111,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("exists with datasource argument", () => {
-				if (!isTestable) return;
+				if (!isTestable) skip("needs the wheelstestdb_h2 datasource on Lucee with an H2-compatible primary adapter");
 				transaction {
 					this.db_setup()
 					actual = g.model("Author").exists(argumentCollection = finderArgs)
