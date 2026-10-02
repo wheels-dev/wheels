@@ -13,6 +13,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryCreate(variables.tempRoot & "/" & dir, true, true);
 				}
 				fileWrite(variables.tempRoot & "/config/routes.cfm", 'mapper().wildcard().end();');
+				// The project marker generate() requires (#3909).
+				fileWrite(variables.tempRoot & "/config/settings.cfm", "");
 				variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 			});
 
@@ -114,6 +116,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 					directoryCreate(variables.tempRoot & "/" & dir, true, true);
 				}
 				fileWrite(variables.tempRoot & "/config/routes.cfm", 'mapper().wildcard().end();');
+				// The project marker generate() requires (#3909).
+				fileWrite(variables.tempRoot & "/config/settings.cfm", "");
 				variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 			});
 
