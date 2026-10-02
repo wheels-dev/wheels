@@ -19,7 +19,7 @@ component {
 		// accepted-and-ignored (##3088).
 		variables.allowedKeys = [
 			"service", "image", "servers", "registry", "builder", "env",
-			"ssh", "proxy", "boot", "accessories"
+			"ssh", "proxy", "boot", "accessories", "volumes"
 		];
 		// Pre-build a case-insensitive struct lookup so the hot path doesn't
 		// depend on arrayContainsNoCase (not available on every engine).
@@ -79,6 +79,7 @@ component {
 			$raise(arguments.filePath, "proxy.ssl requires proxy.host (the host name TLS is issued for)");
 		}
 		$validateServers(arguments.parsed.servers, arguments.filePath);
+		$validateVolumes(arguments.parsed, arguments.filePath);
 		$validateBoot(arguments.parsed, arguments.filePath);
 		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {
 			for (var accName in arguments.parsed.accessories) {
@@ -96,6 +97,31 @@ component {
 						}
 					}
 				}
+			}
+		}
+	}
+
+	/**
+	 * Top-level `volumes:` (Kamal): a list of `host:container` or
+	 * `host:container:ro|rw` mounts for every app container, where host is a
+	 * path or a named volume and container is an absolute path (#4018).
+	 */
+	public void function $validateVolumes(required struct parsed, required string filePath) {
+		if (!structKeyExists(arguments.parsed, "volumes")) return;
+		if (!isArray(arguments.parsed.volumes)) {
+			$raise(arguments.filePath, "volumes must be a list of host:container mounts, e.g. - /var/lib/myapp/db:/var/www/db");
+		}
+		var i = 0;
+		for (var entry in arguments.parsed.volumes) {
+			i++;
+			var parts = isSimpleValue(entry) ? listToArray(entry, ":", true) : [];
+			var shapeOk = (arrayLen(parts) == 2 || (arrayLen(parts) == 3 && listFind("ro,rw", lCase(parts[3]))))
+				&& len(trim(parts[1])) && left(parts[2], 1) == "/";
+			if (!shapeOk) {
+				$raise(
+					arguments.filePath,
+					"volumes[#i#] must be host:container or host:container:ro|rw with an absolute container path (got '#isSimpleValue(entry) ? entry : "a non-string value"#')"
+				);
 			}
 		}
 	}

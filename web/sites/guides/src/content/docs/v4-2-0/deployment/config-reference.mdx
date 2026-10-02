@@ -244,6 +244,23 @@ Two caveats on the example shapes: `files:` is accepted but **never uploaded** �
 
 See [Accessories](/v4-2-0/deployment/accessories/) for the full walk-through.
 
+## `volumes`
+
+Host directories or named Docker volumes mounted on every app container, in Kamal's format ([#4018](https://github.com/wheels-dev/wheels/issues/4018)). The main use is keeping a SQLite database on the host, so it survives a redeploy instead of living inside the container:
+
+```yaml title="config/deploy.yml"
+volumes:
+  - /var/lib/myapp/db:/var/www/db              # host path : container path
+  - myapp_uploads:/var/www/public/uploads      # named Docker volume
+  - /etc/myapp/extra.json:/var/www/config/extra.json:ro
+```
+
+Each entry is `host:container` or `host:container:ro|rw`. The container path must be absolute, and the host side is a path on the server or a named volume. The same mounts apply to every role and every host, so create the host directories first (for example with `wheels deploy exec "mkdir -p /var/lib/myapp/db"`). A `wheels new` app's SQLite file lives in `db/`, which is `/var/www/db` in the `deploy init` image (its `WORKDIR` is `/var/www`), so the first example keeps it on the host. Anything else fails validation with `volumes[<n>] must be host:container or host:container:ro|rw with an absolute container path`.
+
+Host paths are passed to Docker as written, for app `volumes:` and accessory `volumes:` / `directories:` alike: `~` and `$VAR` are not expanded on the server, so write absolute paths (`/home/deploy/data`, not `~/data`). Before 4.2, accessory volume arguments went through the remote shell unquoted, so `~` and `$VAR` happened to expand there.
+
+With several hosts, each host has its own copy of a host-path mount, so a SQLite database is still per host. For a database shared across hosts, use a server database [accessory](/v4-2-0/deployment/accessories/).
+
 ## `boot`
 
 Kamal's rolling-boot settings. Since 4.1.0 the `boot:` block is **accepted and validated**, so a Kamal config that carries it loads without the `unknown top-level key` error. It is **not applied yet**: `wheels deploy` still boots hosts one at a time, in order, with no pause between them (orchestration work is tracked under [#2957](https://github.com/wheels-dev/wheels/issues/2957)).
@@ -264,7 +281,7 @@ Kamal accepts a number of additional top-level keys that `wheels deploy` has not
 |-----|-----------------------|---------------------------|
 | `healthcheck` | Legacy pre-kamal-proxy top-level health check | Rejected — configure [`proxy.healthcheck:`](#proxy) instead |
 | `hooks` | Path override for the hooks directory | Rejected — hook scripts are always loaded from `.kamal/hooks/` (see [Hooks](/v4-2-0/deployment/hooks/); the feature works, only the path override key does not exist) |
-| `volumes`, `labels` | App-container volume mounts / extra labels | Rejected — containers only get the four labels Wheels adds (`service`, `role`, `destination`, `version`); only accessory `volumes:`/`directories:` are mounted |
+| `labels` | Extra app-container labels | Rejected — containers only get the four labels Wheels adds (`service`, `role`, `destination`, `version`) |
 | `logging` | `docker run --log-driver` / `--log-opt` passthrough | Rejected — no logging flags are ever emitted |
 | `retain_containers` | Old-container keep count for rollback | Rejected — `wheels deploy prune all` always keeps the 5 most recent unless you pass `--keep=<n>` on the command line |
 | `minimum_version` | Fail-fast CLI version gate | Rejected — no version gate runs |
