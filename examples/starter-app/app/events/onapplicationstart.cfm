@@ -11,7 +11,7 @@
         application.encryptionKey = "7NNEID99l07DySzq1LJnEA==";
         createApplicationSettings();
     } catch (any e) {
-        WriteOutput("Error: " & e.message);
+        writeLog(text = "onApplicationStart error: " & e.message, type = "error", file = "application");
     }
 </cfscript>
 </cfsilent>
