@@ -923,12 +923,36 @@
 			return true;
 		}
 
+		// Fail closed on word-form logical/comparison operators (#3964). On the this.
+		// path these were swallowed silently — a `this.` reference that fails to resolve
+		// returns false, so `this.a is 'x'` and `this.a eq 1 and this.b eq 2` skipped the
+		// rule with no error. No deprecation shim: name the symbolic replacement. The
+		// split is quote- and paren-aware, so a quoted literal that happens to contain
+		// these words (e.g. 'slow and steady') is left intact.
+		if (ArrayLen($splitTopLevelCondition(local.normalized, " and ")) > 1) {
+			Throw(message = "Unsupported operator `and` in `#local.normalized#`: use `&&` instead.");
+		}
+		if (ArrayLen($splitTopLevelCondition(local.normalized, " or ")) > 1) {
+			Throw(message = "Unsupported operator `or` in `#local.normalized#`: use `||` instead.");
+		}
+		if (ArrayLen($splitTopLevelCondition(local.normalized, " is ")) > 1) {
+			Throw(message = "Unsupported operator `is` in `#local.normalized#`: use `eq` (or `==`) instead.");
+		}
+
 		local.split = $splitConditionOnOperator(local.normalized);
 
 		// this.method() or this.property references
 		if (Left(local.split.expression, 5) == "this.") {
 			local.result = $resolveThisReference(Mid(local.split.expression, 6, Len(local.split.expression)));
 			if (StructKeyExists(local.split, "operator") && StructKeyExists(local.result, "value")) {
+				// A this. reference on the RIGHT would be compared as a literal string,
+				// so fail closed and point the author to the supported form (#3964) —
+				// the same rule the bare path already enforces (#3929).
+				if (Left(local.split.rightOperand, 5) == "this.") {
+					Throw(
+						message = "Unsupported operand `#local.split.rightOperand#` in `#arguments.condition#`: put the `this.` reference on the left side of the comparison."
+					);
+				}
 				return $resolveOperator(local.result.value, $unquoteConditionValue(local.split.rightOperand), local.split.operator);
 			}
 			return StructKeyExists(local.result, "value") ? local.result.value : false;

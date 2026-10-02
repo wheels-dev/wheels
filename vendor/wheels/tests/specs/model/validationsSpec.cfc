@@ -470,6 +470,46 @@ component extends="wheels.WheelsTest" {
 				expect(callRight).toThrow()
 			})
 
+			it("fails closed for a this. reference on the right of a this.-left comparison (##3964)", () => {
+				user.total = 50
+				user.limit = 10
+				var callRightThis = () => {
+					user.$evaluateConditionString("this.total gt this.limit")
+				}
+				expect(callRightThis).toThrow()
+			})
+
+			it("fails closed for the word-form `is` operator on the this. path (##3964)", () => {
+				user.status = "draft"
+				var callIs = () => {
+					user.$evaluateConditionString("this.status is 'draft'")
+				}
+				expect(callIs).toThrow()
+			})
+
+			it("fails closed for word-form `and` on the this. path (##3964)", () => {
+				user.kind = "b2b"
+				user.country = "SE"
+				var callAnd = () => {
+					user.$evaluateConditionString("this.kind eq 'b2b' and this.country eq 'SE'")
+				}
+				expect(callAnd).toThrow()
+			})
+
+			it("fails closed for word-form `or` on the this. path (##3964)", () => {
+				user.kind = "b2c"
+				user.country = "SE"
+				var callOr = () => {
+					user.$evaluateConditionString("this.kind eq 'b2b' or this.country eq 'SE'")
+				}
+				expect(callOr).toThrow()
+			})
+
+			it("still accepts a quoted literal containing is/and/or words (##3964)", () => {
+				user.motto = "slow is smooth and smooth is fast or so they say"
+				expect(user.$evaluateConditionString("this.motto eq 'slow is smooth and smooth is fast or so they say'")).toBeTrue()
+			})
+
 			it("evaluates the guide's this.status != 'draft' example", () => {
 				user.status = "draft"
 				expect(user.$evaluateConditionString("this.status != 'draft'")).toBeFalse()
