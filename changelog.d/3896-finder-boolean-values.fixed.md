@@ -1,0 +1,1 @@
+- A bare `true` or `false` in a finder `where` string (`where="isActive = true"`) is now bound as `1` / `0` instead of failing with "cfqueryparam cannot be determined", and the query builder and dynamic finders (`where("isActive", true)`, `findAllByIsActive(true)`) now work against native boolean columns such as PostgreSQL's `boolean` (#3896)
