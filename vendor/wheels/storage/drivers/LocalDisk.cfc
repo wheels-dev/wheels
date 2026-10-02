@@ -164,27 +164,30 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 	 * engines is tracked in #4020.)
 	 */
 	public string function $resolve(required string key) {
-		// 1. Normalise Windows separators so the segment checks see one form.
+		// 1. Normalise separators (\ -> /) so a Windows or mixed-separator key is one form.
 		local.clean = Replace(arguments.key, "\", "/", "all");
 
-		// 2. Split on "/", keeping empty fields so leading/trailing/double slashes
-		// surface as empty segments. Reject any segment that, after trimming
-		// whitespace and removing every dot, is empty: "", ".", "..", "...", ". .",
-		// ".. ", "   ". Windows strips trailing dots and spaces from a segment, so
-		// ".. " would collapse to ".." — an exact "==" check for ".." is not enough.
-		// A drive-letter prefix (C:, C:foo) must never resolve outside the root.
-		local.segments = ListToArray(local.clean, "/", true);
+		// 2. Every key is relative to the root, so slash runs carry no meaning: a
+		// leading "/", a trailing "/", "//" runs and a UNC/network prefix
+		// ("//server/share", "\\server\share") are NORMALISED away by dropping empty
+		// segments — the remainder is appended under the root. We do NOT url-decode, so
+		// "%2e%2e%2f" stays a literal segment and can never turn into "../".
+		local.segments = ListToArray(local.clean, "/", false);
 		if (!ArrayLen(local.segments)) {
 			throw(
 				type = "Wheels.Storage.InvalidKey",
 				message = "Storage key [#arguments.key#] must not be empty or slash-only."
 			);
 		}
+		// Reject any surviving segment that, after trimming whitespace and removing
+		// every dot, is empty: ".", "..", "...", ". .", and — because Windows strips a
+		// segment's trailing dots and spaces — ".. ". An exact "==" check for ".." is
+		// not enough. A drive-letter prefix (C:, C:foo) must never resolve outside root.
 		for (local.segment in local.segments) {
 			if (Len(Trim(Replace(Trim(local.segment), ".", "", "all"))) == 0) {
 				throw(
 					type = "Wheels.Storage.InvalidKey",
-					message = "Storage key [#arguments.key#] has an empty or dot/space-only path segment."
+					message = "Storage key [#arguments.key#] has a dot/space-only path segment."
 				);
 			}
 			if (ReFind("^[A-Za-z]:", local.segment)) {
