@@ -114,6 +114,13 @@ component {
 		return prefix & image() & ":" & new DeployToken().assert(arguments.version, "version");
 	}
 
+	/** Top-level `volumes:` mounted on every app container (#4018). */
+	public array function volumes() {
+		return (structKeyExists(variables.raw, "volumes") && isArray(variables.raw.volumes))
+			? variables.raw.volumes
+			: [];
+	}
+
 	public array function accessories() {
 		var out = [];
 		var raw = (structKeyExists(variables.raw, "accessories") && isStruct(variables.raw.accessories))

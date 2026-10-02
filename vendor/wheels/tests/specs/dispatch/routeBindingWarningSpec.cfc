@@ -132,13 +132,37 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("fires via $resolveRouteModelBinding when binding is off and route is a candidate", () => {
-				params = {controller = "widgetsnonexistent", action = "show", key = "42"}
-				route = {controller = "widgetsnonexistent", action = "show"}
+				params = {controller = "posts", action = "show", key = "42"}
+				route = {controller = "posts", action = "show"}
 				// binding not set on route, global routeModelBinding defaults false
 				dispatch.$resolveRouteModelBinding(params = params, route = route)
 				hasDedup = StructKeyExists(application, "$wheelsRouteBindingWarnings")
-					&& StructKeyExists(application.$wheelsRouteBindingWarnings, "widgetsnonexistent##show")
+					&& StructKeyExists(application.$wheelsRouteBindingWarnings, "posts##show")
 				expect(hasDedup).toBeTrue()
+			})
+
+			it("does not warn when the controller has no model to bind (##3940)", () => {
+				params = {controller = "widgetsnonexistent", action = "show", key = "42"}
+				route = {controller = "widgetsnonexistent", action = "show"}
+				expect(dispatch.$maybeWarnRouteBinding(params = params, route = route)).toBeFalse()
+			})
+
+			it("names the model from the last segment of a namespaced controller (##3940)", () => {
+				expect(dispatch.$routeBindingModelName("admin.users")).toBe("User")
+				expect(dispatch.$routeBindingModelName("admin.reports.posts")).toBe("Post")
+				expect(dispatch.$routeBindingModelName("posts")).toBe("Post")
+			})
+
+			it("warns for a namespaced controller whose model exists (##3940)", () => {
+				params = {controller = "admin.posts", action = "edit", key = "42"}
+				route = {controller = "admin.posts", action = "edit"}
+				expect(dispatch.$maybeWarnRouteBinding(params = params, route = route)).toBeTrue()
+			})
+
+			it("does not warn for a namespaced controller with no matching model (##3940)", () => {
+				params = {controller = "admin.dashboards", action = "show", key = "42"}
+				route = {controller = "admin.dashboards", action = "show"}
+				expect(dispatch.$maybeWarnRouteBinding(params = params, route = route)).toBeFalse()
 			})
 		})
 	}

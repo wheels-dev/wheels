@@ -743,6 +743,9 @@ component {
 		try {
 			// Check if table already exists by querying it
 			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			// Table exists — make sure the claimTimeout column exists too (#3989). Probed on
+			// every call and never cached: a shared or rebuilt dev DB can lose it (see #2780).
+			$ensureClaimTimeoutColumn();
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
@@ -783,6 +786,7 @@ component {
 					status #local.varcharType#(20) DEFAULT 'pending' NOT NULL,
 					attempts INT DEFAULT 0 NOT NULL,
 					maxRetries INT DEFAULT 3 NOT NULL,
+					claimTimeout INT,
 					lastError #local.textType#,
 					runAt #local.datetimeType#,
 					completedAt #local.datetimeType#,
@@ -806,6 +810,123 @@ component {
 		} catch (any createError) {
 			writeLog(text = "Failed to auto-create wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
 			return false;
+		}
+	}
+
+	/**
+	 * Add the claimTimeout column to an existing wheels_jobs table when it is missing, so a
+	 * table created before #3989 is upgraded in place. Probed every call (no cached flag);
+	 * if the ALTER can't run (permissions, race, unsupported) it logs once and the reaper
+	 * falls back to the poller's timeout — a missing/NULL claimTimeout is always tolerated.
+	 */
+	public void function $ensureClaimTimeoutColumn() {
+		if ($jobTableHasClaimTimeout()) {
+			// Column present (possibly added out of band): forget any past ALTER failure.
+			$clearClaimTimeoutAlterMemo();
+			return;
+		}
+		// CliBridge builds a fresh JobWorker per poll, so the per-instance ensure runs every
+		// poll. A DB user without ALTER privilege would otherwise re-fire the failing DDL each
+		// poll. After a failed ALTER, back off for a bounded window before re-attempting. This
+		// is TIME-BOUNDED, never a permanent "gave up" flag: the probe above still runs every
+		// call, and the ALTER is retried once the window elapses (a later GRANT or manual ALTER
+		// is then picked up) — consistent with #2780's re-probe rule (#4071).
+		if ($claimTimeoutAlterInBackoff()) {
+			return;
+		}
+		try {
+			queryExecute($claimTimeoutAlterSql(), {}, {datasource = variables.$datasource});
+			$clearClaimTimeoutAlterMemo();
+		} catch (any e) {
+			$recordClaimTimeoutAlterFailure();
+			$warnClaimTimeoutAlterFailedOnce(e.message);
+		}
+	}
+
+	/**
+	 * Seconds to wait before retrying a failed claimTimeout ALTER. Bounded on purpose so a
+	 * DB user without ALTER privilege re-attempts periodically instead of firing the DDL on
+	 * every poll.
+	 */
+	public numeric function $claimTimeoutAlterBackoffWindow() {
+		return 300;
+	}
+
+	/**
+	 * True when a claimTimeout ALTER failed within the back-off window. App-scoped (shared
+	 * across the per-poll JobWorker instances) and TIME-BOUNDED — never a permanent flag.
+	 */
+	public boolean function $claimTimeoutAlterInBackoff() {
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")) {
+			return false;
+		}
+		return DateDiff("s", application.wheels.$claimTimeoutAlterFailedAt, $now()) < $claimTimeoutAlterBackoffWindow();
+	}
+
+	/**
+	 * Record that the claimTimeout ALTER just failed, so the next polls back off rather than
+	 * re-firing the DDL. Safe to call from a catch (writes the application scope, not local).
+	 */
+	public void function $recordClaimTimeoutAlterFailure() {
+		if (StructKeyExists(application, "wheels")) {
+			application.wheels.$claimTimeoutAlterFailedAt = $now();
+		}
+	}
+
+	/**
+	 * Forget any recorded claimTimeout ALTER failure (the column now exists, or the ALTER
+	 * just succeeded), so a later missing-column situation is re-attempted immediately.
+	 */
+	public void function $clearClaimTimeoutAlterMemo() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")) {
+			StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
+		}
+	}
+
+	/**
+	 * True when wheels_jobs already has a claimTimeout column. A zero-row SELECT of the
+	 * column is the most portable probe: it succeeds when the column exists and throws
+	 * otherwise, with no dependency on cfdbinfo column-metadata shapes across engines.
+	 */
+	public boolean function $jobTableHasClaimTimeout() {
+		try {
+			queryExecute("SELECT claimTimeout FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * The per-database "ADD claimTimeout column" DDL. SQL Server has no COLUMN keyword and
+	 * Oracle takes a parenthesised column list; everything else accepts ADD COLUMN.
+	 */
+	public string function $claimTimeoutAlterSql() {
+		local.dbType = $detectDatabaseType();
+		if (local.dbType == "oracle") {
+			return "ALTER TABLE wheels_jobs ADD (claimTimeout NUMBER(10))";
+		}
+		if (local.dbType == "sqlserver") {
+			return "ALTER TABLE wheels_jobs ADD claimTimeout INT";
+		}
+		return "ALTER TABLE wheels_jobs ADD COLUMN claimTimeout INT";
+	}
+
+	/**
+	 * Log the claimTimeout ALTER failure once per application so the log isn't spammed by the
+	 * every-call probe. This throttles only the log line; the ALTER decision itself is never
+	 * cached (it is re-probed every ensure call).
+	 */
+	public void function $warnClaimTimeoutAlterFailedOnce(required string reason) {
+		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$claimTimeoutAlterWarned")) {
+			application.wheels.$claimTimeoutAlterWarned = true;
+			writeLog(
+				text = "Could not add the wheels_jobs.claimTimeout column (#arguments.reason#). The stale-job "
+					& "reaper will fall back to the polling worker's timeout. Add the column manually "
+					& "(ALTER TABLE wheels_jobs ADD claimTimeout INT) to enable per-worker reap timeouts.",
+				type = "warning",
+				file = "wheels_jobs"
+			);
 		}
 	}
 

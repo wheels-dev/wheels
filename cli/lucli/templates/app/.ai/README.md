@@ -8,6 +8,18 @@ APPLICATION on Wheels — nothing about framework internals.
 - `../CLAUDE.md` — application-developer quick reference (models, routing,
   views, middleware, DI, packages, CLI, testing, migrations, jobs, SSE).
 - `../AGENTS.md` — cross-tool workflow guidance (MCP-first, conventions).
+- `models.md` — models: finders, associations, validations, callbacks, scopes.
+- `routing.md` — routing and route model binding.
+- `views.md` — pagination helpers and the development error page.
+- `caching.md` — partial caching.
+- `middleware.md` — middleware and rate limiting.
+- `di.md` — the DI container.
+- `auth.md` — authentication and authorization.
+- `storage.md` — storage disks.
+- `packages.md` — the package system.
+- `migrations.md` — migrations and seeding.
+- `jobs.md` — background jobs.
+- `sse.md` — server-sent events.
 - `testing.md` — changing framework settings inside a spec, and testing partial caching.
 
 ## Deeper content
@@ -21,3 +33,11 @@ For deeper application-side material use:
 - `/wheels/ai` on a running app — JSON docs optimized for AI consumption:
   `GET /wheels/ai?mode=manifest`, `?mode=chunk&id=<models|controllers|views|
   migrations|routing|testing|cli|patterns>`, `?context=<area>`.
+
+## Where to go deeper
+
+- Human guides: https://guides.wheels.dev (start-here, core-concepts, testing, deployment)
+- Framework API reference: `/wheels/ai` endpoints on any running app
+  — JSON docs optimized for AI consumption.
+- MCP: run `wheels setup agents` to write `.mcp.json` and `.opencode.json` (or add `{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}` by hand)
+  and prefer `mcp__wheels__*` tools over CLI commands.

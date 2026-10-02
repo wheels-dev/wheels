@@ -210,6 +210,303 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it(
+					"opt-in resolveSymlinks rejects a symlink escaping root (##4020), or fails closed at init where the runtime can't resolve symlinks",
+					function() {
+						var strictRoot = $tempPath("wheels-storage-strict-" & CreateUUID());
+						if (!DirectoryExists(strictRoot)) {
+							DirectoryCreate(strictRoot);
+						}
+						// Constructing the disk runs the behavioural capability probe. On a runtime
+						// that resolves symlinks (a real JVM) it succeeds; on one that does not
+						// (RustCFML, or Windows without symlink privilege) init fails closed with
+						// Wheels.Storage.InvalidConfiguration rather than silently enabling an
+						// ineffective strict mode. A bare `var` struct field (not a `local.`-scoped
+						// one) is the only shape that persists a value written inside a catch on
+						// BoxLang (cross-engine invariant 11).
+						var guard = {failedClosed = false, type = ""};
+						var strictDisk = "";
+						try {
+							strictDisk = new wheels.storage.drivers.LocalDisk(config = {
+								root = strictRoot,
+								urlPrefix = "/uploads",
+								signingKey = "a-test-signing-key-padded-to-32-bytes!!",
+								resolveSymlinks = true
+							});
+						} catch (any e) {
+							guard.failedClosed = true;
+							guard.type = e.type;
+						}
+						if (guard.failedClosed) {
+							expect(guard.type).toBe("Wheels.Storage.InvalidConfiguration");
+							if (DirectoryExists(strictRoot)) {
+								DirectoryDelete(strictRoot, true);
+							}
+							return;
+						}
+						// Resolving runtime: a symlink planted under root that targets outside is
+						// now REJECTED, not followed (contrast the default-mode spec above).
+						var outside = $tempPath("wheels-storage-strict-outside-" & CreateUUID());
+						var linkPath = strictRoot & "/link";
+						DirectoryCreate(outside);
+						FileWrite(outside & "/secret.txt", CharsetDecode("outside-secret", "utf-8"));
+						$createSymlink(outside, linkPath);
+						try {
+							expect(function() {
+								strictDisk.exists("link/secret.txt");
+							}).toThrow("Wheels.Storage.InvalidKey");
+							expect(function() {
+								strictDisk.get("link/secret.txt");
+							}).toThrow("Wheels.Storage.InvalidKey");
+						} finally {
+							$deleteSymlink(linkPath);
+							if (DirectoryExists(outside)) {
+								DirectoryDelete(outside, true);
+							}
+							if (DirectoryExists(strictRoot)) {
+								DirectoryDelete(strictRoot, true);
+							}
+						}
+					}
+				);
+
+				it("opt-in resolveSymlinks still stores and serves a legitimate file (##4020)", function() {
+					var strictRoot = $tempPath("wheels-storage-strict-ok-" & CreateUUID());
+					if (!DirectoryExists(strictRoot)) {
+						DirectoryCreate(strictRoot);
+					}
+					var guard = {failedClosed = false};
+					var strictDisk = "";
+					try {
+						strictDisk = new wheels.storage.drivers.LocalDisk(config = {
+							root = strictRoot,
+							signingKey = "a-test-signing-key-padded-to-32-bytes!!",
+							resolveSymlinks = true
+						});
+					} catch (any e) {
+						guard.failedClosed = true;
+					}
+					try {
+						// On a non-resolving runtime the fail-closed init is covered by the spec
+						// above; here we only assert the happy path on a resolving one.
+						if (guard.failedClosed) {
+							return;
+						}
+						strictDisk.put(key = "docs/report.txt", content = "ok");
+						expect(strictDisk.exists("docs/report.txt")).toBeTrue();
+						expect(ToString(strictDisk.get("docs/report.txt"))).toBe("ok");
+					} finally {
+						if (DirectoryExists(strictRoot)) {
+							DirectoryDelete(strictRoot, true);
+						}
+					}
+					});
+
+				it("rejects a non-boolean resolveSymlinks config with InvalidConfiguration (##4020)", function() {
+					var strictRoot = $tempPath("wheels-storage-nonbool-" & CreateUUID());
+					if (!DirectoryExists(strictRoot)) {
+						DirectoryCreate(strictRoot);
+					}
+					try {
+						expect(function() {
+							new wheels.storage.drivers.LocalDisk(config = {root = strictRoot, resolveSymlinks = "maybe"});
+						}).toThrow("Wheels.Storage.InvalidConfiguration");
+					} finally {
+						if (DirectoryExists(strictRoot)) {
+							DirectoryDelete(strictRoot, true);
+						}
+					}
+				});
+
+				it(
+					"opt-in resolveSymlinks rejects a symlink to a case-distinct sibling on a case-sensitive filesystem (##4020)",
+					function() {
+						// Only an escape where the filesystem is case-SENSITIVE: there Store and store
+						// are different directories, so a symlink to the lower-cased sibling leaves the
+						// root. getCanonicalPath reports real on-disk case, so the containment compare
+						// must be exact. Detect case sensitivity behaviourally, never by OS name.
+						var base = $tempPath("wheels-storage-case-" & CreateUUID());
+						DirectoryCreate(base);
+						try {
+							DirectoryCreate(base & "/CASEPROBE");
+							if (DirectoryExists(base & "/caseprobe")) {
+								return; // case-insensitive FS: the sibling is the same dir, not an escape
+							}
+							var strictRoot = base & "/Store";
+							var outside = base & "/store";
+							DirectoryCreate(strictRoot);
+							DirectoryCreate(outside);
+							FileWrite(outside & "/secret.txt", CharsetDecode("outside-secret", "utf-8"));
+							var guard = {failedClosed = false};
+							var strictDisk = "";
+							try {
+								strictDisk = new wheels.storage.drivers.LocalDisk(config = {
+									root = strictRoot,
+									signingKey = "a-test-signing-key-padded-to-32-bytes!!",
+									resolveSymlinks = true
+								});
+							} catch (any e) {
+								guard.failedClosed = true;
+							}
+							if (guard.failedClosed) {
+								return; // non-resolving runtime: covered by the fail-closed spec
+							}
+							var linkPath = strictRoot & "/link";
+							$createSymlink(outside, linkPath);
+							try {
+								expect(function() {
+									strictDisk.exists("link/secret.txt");
+								}).toThrow("Wheels.Storage.InvalidKey");
+							} finally {
+								$deleteSymlink(linkPath);
+							}
+						} finally {
+							if (DirectoryExists(base)) {
+								DirectoryDelete(base, true);
+							}
+						}
+					}
+				);
+
+				it("creates the probe symlink through java.nio (not ln) where the runtime provides it (##4070)", function() {
+					var base = $tempPath("wheels-storage-nio-" & CreateUUID());
+					DirectoryCreate(base);
+					try {
+						CreateObject("java", "java.io.File").init(base & "/target").mkdirs();
+						// Does this runtime provide Files.createSymbolicLink? RustCFML does not shim it.
+						// Probe with the explicit empty FileAttribute[] — the same form LocalDisk uses.
+						var nio = {available = false};
+						try {
+							var faType = CreateObject("java", "java.lang.Class").forName("java.nio.file.attribute.FileAttribute");
+							var noAttrs = CreateObject("java", "java.lang.reflect.Array").newInstance(faType, 0);
+							CreateObject("java", "java.nio.file.Files").createSymbolicLink(
+								CreateObject("java", "java.io.File").init(base & "/probe").toPath(),
+								CreateObject("java", "java.io.File").init(base & "/target").toPath(),
+								noAttrs
+							);
+							nio.available = true;
+						} catch (any e) {
+							nio.available = false;
+						}
+						if (nio.available) {
+							// Where the runtime provides createSymbolicLink, the driver must bind it through
+							// java.nio and NOT silently fall back to `ln` (which may be absent, e.g. Windows).
+							var disk = new wheels.storage.drivers.LocalDisk(config = {
+								root = base,
+								signingKey = "a-test-signing-key-padded-to-32-bytes!!"
+							});
+							expect(disk.$tryCreateSymbolicLinkNio(target = base & "/target", link = base & "/lnk")).toBeTrue(
+								"the probe must create the symlink via java.nio where the runtime provides it, not fall back to ln"
+							);
+						}
+					} finally {
+						// Remove the symlinks explicitly first: a recursive DirectoryDelete over a
+						// directory that contains symlinks errors on Adobe. ($deleteSymlink no-ops
+						// when the path isn't a symlink, so unconditional calls are safe.)
+						$deleteSymlink(base & "/probe");
+						$deleteSymlink(base & "/lnk");
+						if (DirectoryExists(base)) {
+							DirectoryDelete(base, true);
+						}
+					}
+				});
+
+				it("cleans up its symlink-resolution probe temp dir, no leak (##4070)", function() {
+					// The probe creates GetTempDirectory()/wheels-localdisk-symlinkprobe-<uuid> and must
+					// remove it. On Adobe a recursive delete over that dir while it still holds the probe
+					// symlink errors (and is swallowed), leaking the dir — so bracket one init and assert
+					// the probe-dir count does not grow. Only meaningful on a resolving runtime; on a
+					// non-resolving one init fails closed and creates no probe dir.
+					var tmp = GetTempDirectory();
+					var before = $countProbeDirs(tmp);
+					var guard = {failedClosed = false};
+					var okRoot = $tempPath("wheels-storage-leak-" & CreateUUID());
+					DirectoryCreate(okRoot);
+					try {
+						try {
+							var disk = new wheels.storage.drivers.LocalDisk(config = {
+								root = okRoot,
+								signingKey = "a-test-signing-key-padded-to-32-bytes!!",
+								resolveSymlinks = true
+							});
+						} catch (any e) {
+							guard.failedClosed = true;
+						}
+						if (!guard.failedClosed) {
+							expect($countProbeDirs(tmp) <= before).toBeTrue("the resolveSymlinks probe must not leak its temp dir");
+						}
+					} finally {
+						if (DirectoryExists(okRoot)) {
+							DirectoryDelete(okRoot, true);
+						}
+					}
+				});
+
+				it("accepts a key whose segment merely contains '..' (##3912)", function() {
+					// Two dots INSIDE a segment are not traversal; the name keeps real chars.
+					disk.put(key = "reports/q3..final.pdf", content = "report");
+					expect(disk.exists("reports/q3..final.pdf")).toBeTrue();
+					expect(ToString(disk.get("reports/q3..final.pdf"))).toBe("report");
+
+					disk.put(key = "a..b.txt", content = "ab");
+					expect(ToString(disk.get("a..b.txt"))).toBe("ab");
+
+					disk.put(key = "v1..2/notes.txt", content = "v");
+					expect(ToString(disk.get("v1..2/notes.txt"))).toBe("v");
+				});
+
+				it("normalises leading, trailing, double and UNC slashes to a key relative to root (##3912)", function() {
+					// Every key is relative to the root, so slash runs carry no meaning.
+					expect(disk.$resolve("/avatars/1.png")).toBe(disk.$resolve("avatars/1.png"));
+					expect(disk.$resolve("a//b.txt")).toBe(disk.$resolve("a/b.txt"));
+					expect(disk.$resolve("dir/x/")).toBe(disk.$resolve("dir/x"));
+					// UNC / network prefixes normalise to a relative key under root, never escape it.
+					expect(disk.$resolve("//server/share/x.txt")).toBe(disk.$resolve("server/share/x.txt"));
+					expect(disk.$resolve("\\server\share\x.txt")).toBe(disk.$resolve("server/share/x.txt"));
+					// Mixed separators resolve the same as all-forward-slash.
+					expect(disk.$resolve("a\b/c.txt")).toBe(disk.$resolve("a/b/c.txt"));
+					// Everything stays under the configured root.
+					expect(disk.$resolve("/avatars/1.png")).toInclude(ctx.root);
+
+					// "/avatars/1.png" and "avatars/1.png" address the same object.
+					disk.put(key = "/avatars/1.png", content = "pixels");
+					expect(ToString(disk.get("avatars/1.png"))).toBe("pixels");
+				});
+
+				it("treats percent-encoded traversal as a literal segment, never decoding it (##3912)", function() {
+					// $resolve does not url-decode, so "%2e%2e%2f" can never become "../".
+					var resolved = disk.$resolve("files/%2e%2e%2fsecret");
+					expect(resolved).toInclude("%2e%2e%2fsecret");
+					expect(resolved).toInclude(ctx.root);
+					disk.put(key = "files/%2e%2e%2fsecret", content = "literal");
+					expect(ToString(disk.get("files/%2e%2e%2fsecret"))).toBe("literal");
+				});
+
+				it("rejects traversal, dot/space-only segments and drive-letter keys (##3912)", function() {
+					// cfformat-ignore-start
+					var rejected = [
+						"../escape.txt",         // parent traversal
+						"..\escape.txt",         // Windows-style backslash traversal
+						"a/../b.txt",            // mid-path traversal
+						"foo/../../etc/passwd",  // deep traversal
+						"/../x.txt",             // leading-slash traversal
+						"reports/.. /x.txt",     // ".. " — Windows strips the trailing space to ".."
+						"reports/ ../x.txt",     // " .." — leading space
+						"foo/. ./bar.txt",       // ". ." — dots and spaces only
+						"foo/.../bar.txt",       // "..." — dots only
+						"foo/   /bar.txt",       // whitespace-only segment
+						"C:/Windows/System32",   // drive-letter prefix
+						"/C:/x.txt",             // drive letter after a leading slash
+						"C:evil.txt"             // drive-relative prefix
+					];
+					// cfformat-ignore-end
+					for (var badKey in rejected) {
+						expect(function() {
+							disk.$resolve(badKey);
+						}).toThrow(type = "Wheels.Storage.InvalidKey", message = "[#badKey#] must be rejected as an invalid key");
+					}
+				});
+
 				it("builds a public url from the urlPrefix", function() {
 					expect(disk.url("a/b.png")).toBe("/uploads/a/b.png");
 				});
@@ -526,6 +823,20 @@ component extends="wheels.WheelsTest" {
 
 	function $toPath(required string filePath) {
 		return CreateObject("java", "java.io.File").init(arguments.filePath).toPath();
+	}
+
+	function $countProbeDirs(required string dir) {
+		var n = 0;
+		var prefix = "wheels-localdisk-symlinkprobe-";
+		try {
+			for (var entry in DirectoryList(path = arguments.dir, recurse = false, listInfo = "name", type = "dir")) {
+				if (Len(entry) >= Len(prefix) && Left(entry, Len(prefix)) == prefix) {
+					n++;
+				}
+			}
+		} catch (any e) {
+		}
+		return n;
 	}
 
 	function $createSymlink(required string target, required string link) {

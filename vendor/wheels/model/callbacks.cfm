@@ -433,8 +433,10 @@
 		local.conn = this.$hashedConnectionArgs();
 		// #3934 R1: a write inside a foreign, non-Wheels transaction{} — Wheels cannot
 		// observe the outer commit/rollback, so skip BOTH afterCommit and afterRollback
-		// and warn once (per request + model). Only reachable where IsWithinTransaction()
-		// is available (Lucee/BoxLang); on Adobe/RustCFML the flag is never set.
+		// and warn once (per request + model). The flag is set where the engine reports an
+		// open transaction ($foreignTransactionCheckMode: Lucee/BoxLang IsWithinTransaction(),
+		// Adobe's TransactionTag, #4068), and on Adobe when its nested-isolation mismatch proves
+		// a raw outer block (#4045, $beginTransaction). On RustCFML it is never set.
 		if (this.$transactionForeign(local.conn)) {
 			this.$warnForeignTransactionCallbacksOnce();
 			return;
@@ -455,42 +457,104 @@
 	}
 
 	/**
-	 * Internal. True if the engine provides IsWithinTransaction() (used to spot a raw,
-	 * non-Wheels transaction we are nested in). Probed once, cached per application.
-	 * Lucee 6/7 and BoxLang have it; Adobe CF and RustCFML do not — there, foreign-
-	 * transaction detection is unavailable and callbacks fall back to the inner close.
-	 * Probe by capability, never by engine name (RustCFML reports as Lucee but lacks it).
+	 * Internal. True if the engine can tell that a transaction Wheels did not open is
+	 * active, i.e. a raw, non-Wheels transaction we are nested in. Probed once and cached
+	 * per application; see $foreignTransactionCheckMode() for the capabilities used.
 	 */
 	public boolean function $supportsForeignTransactionCheck() {
+		return Len($foreignTransactionCheckMode()) > 0;
+	}
+
+	/**
+	 * Internal. How this engine reports an open transaction, probed by capability (never
+	 * by engine name) and cached per application:
+	 * - "isWithinTransaction": the IsWithinTransaction() function exists (Lucee, BoxLang).
+	 * - "transactionTag": Adobe CF's static coldfusion.tagext.sql.TransactionTag.getCurrent()
+	 *   resolves and returns null when no transaction is open (#4068). It returns the
+	 *   enclosing cftransaction tag for the current thread, so one request never sees
+	 *   another's transaction (probed with concurrent requests on Adobe 2023 and 2025). It is
+	 *   an Adobe internal, so it is called reflectively through the exported Method object
+	 *   (cross-engine invariant 14) and anything unexpected disables it.
+	 * - "": neither (RustCFML, or an Adobe release without the class): not detectable.
+	 * A getCurrent() that is not null at probe time proves nothing either way (the probe may
+	 * be running inside a raw transaction {}), so that result is not cached.
+	 */
+	public string function $foreignTransactionCheckMode() {
 		if (!StructKeyExists(application, "wheels")) {
-			return false;
+			return "";
 		}
-		if (!StructKeyExists(application.wheels, "$supportsIsWithinTransaction")) {
-			local.supported = false;
+		if (!StructKeyExists(application.wheels, "$foreignTransactionCheckMode")) {
+			local.mode = "";
 			try {
 				IsWithinTransaction();
-				local.supported = true;
+				local.mode = "isWithinTransaction";
 			} catch (any e) {
-				// Engine lacks the function (Adobe CF, RustCFML) — leave false.
+				// Engine lacks the function (Adobe CF, RustCFML).
 			}
-			application.wheels.$supportsIsWithinTransaction = local.supported;
+			if (!Len(local.mode)) {
+				local.probe = $probeTransactionTagCurrent();
+				if (local.probe == "inconclusive") {
+					return "";
+				}
+				local.mode = local.probe;
+			}
+			application.wheels.$foreignTransactionCheckMode = local.mode;
 		}
-		return application.wheels.$supportsIsWithinTransaction;
+		return application.wheels.$foreignTransactionCheckMode;
+	}
+
+	/**
+	 * Internal. Probes Adobe CF's TransactionTag.getCurrent(): "transactionTag" when it
+	 * resolves and is null now, "inconclusive" when it returns a tag (a transaction may be
+	 * open around this probe), "" when it is missing or throws. The resolved Method object is
+	 * kept in the application scope for $transactionTagIsOpen().
+	 */
+	public string function $probeTransactionTagCurrent() {
+		try {
+			local.method = CreateObject("java", "java.lang.Class")
+				.forName("coldfusion.tagext.sql.TransactionTag")
+				.getMethod("getCurrent", JavaCast("null", ""));
+			local.current = local.method.invoke(JavaCast("null", ""), JavaCast("null", ""));
+			if (!IsNull(local.current)) {
+				return "inconclusive";
+			}
+			application.wheels.$transactionTagGetCurrent = local.method;
+			return "transactionTag";
+		} catch (any e) {
+			return "";
+		}
+	}
+
+	/**
+	 * Internal. True when Adobe CF's TransactionTag.getCurrent() reports an open
+	 * cftransaction on this thread. Any failure reads as "not open", which is today's
+	 * behaviour on an engine that can't detect one.
+	 */
+	public boolean function $transactionTagIsOpen() {
+		try {
+			return !IsNull(application.wheels.$transactionTagGetCurrent.invoke(JavaCast("null", ""), JavaCast("null", "")));
+		} catch (any e) {
+			return false;
+		}
 	}
 
 	/**
 	 * Internal. True when a transaction Wheels did not open is already active — i.e. a
 	 * raw transaction{} block we are nested inside. MUST be called BEFORE Wheels opens
-	 * its own transaction (after which IsWithinTransaction() reports Wheels' own).
+	 * its own transaction (after which the engine reports Wheels' own).
 	 */
 	public boolean function $withinForeignTransaction() {
-		if (!$supportsForeignTransactionCheck()) {
-			return false;
-		}
-		try {
-			return IsWithinTransaction();
-		} catch (any e) {
-			return false;
+		switch ($foreignTransactionCheckMode()) {
+			case "isWithinTransaction":
+				try {
+					return IsWithinTransaction();
+				} catch (any e) {
+					return false;
+				}
+			case "transactionTag":
+				return $transactionTagIsOpen();
+			default:
+				return false;
 		}
 	}
 
@@ -659,6 +723,49 @@
 			StructDelete(request.wheels.$txnCallbacks, arguments.connection);
 		}
 		$runQueueCallbacks(queue = local.queue, type = arguments.type, propagateErrors = arguments.propagateErrors);
+	}
+
+	/**
+	 * Internal. Length of the owner's real callback queue when a savepoint unit
+	 * starts, or -1 when there is no real queue (none/false mode, or a foreign raw
+	 * transaction where callbacks are skipped). $rollbackSavepointCallbacks takes
+	 * this mark to find the writes made inside the unit.
+	 */
+	public numeric function $savepointCallbackMark(required string connection) {
+		if (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "$txnCallbacks")
+			&& StructKeyExists(request.wheels.$txnCallbacks, arguments.connection)
+			&& request.wheels.$txnCallbacks[arguments.connection].real
+		) {
+			return ArrayLen(request.wheels.$txnCallbacks[arguments.connection].queue);
+		}
+		return -1;
+	}
+
+	/**
+	 * Internal. A savepoint unit rolled back: take the queue entries it added
+	 * (after `mark`) out of the owner's queue, so they never get afterCommit, and
+	 * fire afterRollback for them now (#3958). The rebuilt queue is written back
+	 * through the request store, not a returned copy: Adobe CF passes arrays by value.
+	 */
+	public void function $rollbackSavepointCallbacks(required string connection, required numeric mark, boolean propagateErrors = true) {
+		if (arguments.mark < 0 || $savepointCallbackMark(arguments.connection) <= arguments.mark) {
+			return;
+		}
+		local.store = request.wheels.$txnCallbacks[arguments.connection];
+		local.kept = [];
+		local.rolledBack = [];
+		local.iEnd = ArrayLen(local.store.queue);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			if (local.i <= arguments.mark) {
+				ArrayAppend(local.kept, local.store.queue[local.i]);
+			} else {
+				ArrayAppend(local.rolledBack, local.store.queue[local.i]);
+			}
+		}
+		request.wheels.$txnCallbacks[arguments.connection].queue = local.kept;
+		$runQueueCallbacks(queue = local.rolledBack, type = "afterRollback", propagateErrors = arguments.propagateErrors);
 	}
 
 </cfscript>

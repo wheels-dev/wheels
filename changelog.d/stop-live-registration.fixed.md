@@ -1,0 +1,1 @@
+- `wheels stop` now stops the project's running server even when it runs under an older registration name (after a `lucee.json` `name` change), instead of stopping only the current name and leaving the old-name server running, and it deletes the live server's start token rather than a stale registration's (#3994)

@@ -26,22 +26,17 @@ myapp/
     jobs/                 Background jobs (extend wheels.Job)
     lib/                  Plain CFCs: services, value objects, API clients
     mailers/              Mailers
-    middleware/           Your middleware components
+    plugins/              Legacy plugin folder (deprecated; use packages)
     migrator/migrations/  Database migration CFCs
     policies/Policy.cfc   Base class for authorization policies
-    snippets/dbmigrate/   Templates the development migrator UI writes migrations from
+    snippets/             Templates the generators write code from
   config/                 Configuration, loaded at application start
     app.cfm               Application.cfc-level settings (this.name, datasources, …)
     environment.cfm       Which environment this deployment runs as
     settings.cfm          Shared settings: datasource, reload password, URL rewriting, …
     routes.cfm            Your routes (mapper() … .end())
     services.cfm          Dependency-injection registrations
-    development/          Per-environment overrides: settings.cfm in each,
-    testing/                read after config/settings.cfm, only in that environment
-    production/
-    maintenance/
   db/                     SQLite database files (development.sqlite, test.sqlite)
-  plugins/                Legacy 3.x plugin drop-in (deprecated; use packages)
   public/                 THE WEB ROOT: the only folder a browser can reach
     Application.cfc       Bootstraps the app: defines mappings, loads .env
     index.cfm             Single entry point; hands every request to the dispatcher
@@ -55,14 +50,13 @@ myapp/
     wheels/               THE FRAMEWORK ITSELF
     <package>/            Packages added with `wheels packages add`
   .env                    Environment variables and secrets (never commit)
-  .env.example            The same keys with blank values (commit this)
   .gitignore
   lucee.json              Server configuration for `wheels start`
   rewrite.config          URL-rewrite rules for `wheels start`
   AGENTS.md, CLAUDE.md, .ai/   Docs for AI coding agents working in this app
 ```
 
-`vendor/` is committed, framework included, so a clone, a CI run or an image build has everything it needs.
+The generated `.gitignore` excludes `vendor/`. Per-environment overrides go in `config/<environment>/settings.cfm`; `wheels new` doesn't create those folders, so add one when you need it.
 
 <Aside type="note" title="Apps installed with CommandBox">
 An app installed with CommandBox (`box install wheels-base-template`) has the same `app/`, `config/`, `public/`, `tests/` and `vendor/` layout, plus `box.json` (its ForgeBox manifest) and `server.json` (its CommandBox server config) in place of `lucee.json` and `rewrite.config`.
@@ -92,10 +86,9 @@ Mental mapping: your old root-level `wheels/` folder is now `vendor/wheels/`; yo
 - **`app/`** — everything you write. Controllers extend `Controller`, models extend `Model`, views execute in the controller's variable scope. Conventions (naming, pluralization) are covered in [Conventions over Configuration](/v4-1-0/core-concepts/conventions-over-configuration/).
 - **`config/`** — read once at application start. Changing anything here requires a reload (restart the app, or `?reload=true&password=…` — see [Working Without the CLI](/v4-1-0/start-here/working-without-the-cli/)).
 - **`public/`** — the web root and *only* the web root. Static assets are served directly; everything else routes through `index.cfm` to the dispatcher.
-- **`vendor/`** — the framework plus any installed [packages](/v4-1-0/digging-deeper/packages/). Commit it. Treat it as read-only: upgrades replace `vendor/wheels/` wholesale, so local edits there are lost by design.
+- **`vendor/`** — the framework plus any installed [packages](/v4-1-0/digging-deeper/packages/). Treat it as read-only: upgrades replace `vendor/wheels/` wholesale, so local edits there are lost by design.
 - **`tests/`** — your app's test suite, run via `wheels test`, or without the CLI at `/wheels/app/tests` in development. See [Testing](/v4-1-0/testing/).
 - **`db/`** — only meaningful for SQLite setups; other databases live wherever your server keeps them. The `.sqlite` files are gitignored.
-- **`plugins/`** — where 3.x plugins still load from. Deprecated: new code goes in `app/lib/` or a package.
 - **`lucee.json` / `rewrite.config`** — the server and rewrite config `wheels start` uses. Another server setup ignores them.
 
 ## Framework internals worth knowing about

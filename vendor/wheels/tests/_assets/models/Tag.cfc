@@ -95,6 +95,80 @@ component extends="Model" {
 		Throw(type = "Wheels.TestNestedBoom", message = "nested write then throw");
 	}
 
+	// Records the MySQL session isolation level seen inside the transaction (#4059).
+	function txnRecordIsolation() {
+		request.$isolationSeen = QueryExecute(
+			"SELECT @@transaction_isolation AS iso",
+			[],
+			{datasource = application.wo.get("dataSourceName")}
+		).iso;
+		return true;
+	}
+
+	// Savepoint-unit fixtures (#3958). A unit runs via
+	// invokeWithTransaction(transaction="savepoint") inside an outer transaction.
+	function txnUnitCreateThenFalse() {
+		model("tag").create(name = "sp-unit");
+		return false;
+	}
+
+	function txnUnitCreateOk() {
+		model("tag").create(name = "sp-unit-ok");
+		return true;
+	}
+
+	function txnUnitCreateThenThrow() {
+		model("tag").create(name = "sp-unit-throw");
+		Throw(type = "Wheels.TestSavepointBoom", message = "savepoint unit write then throw");
+	}
+
+	function txnOuterThenFailingUnit() {
+		model("tag").create(name = "sp-outer1");
+		invokeWithTransaction(method = "txnUnitCreateThenFalse", transaction = "savepoint");
+		model("tag").create(name = "sp-outer2");
+		return true;
+	}
+
+	// The unit is the first database work in the outer transaction (the Lucee case).
+	function txnFailingUnitFirst() {
+		invokeWithTransaction(method = "txnUnitCreateThenFalse", transaction = "savepoint");
+		model("tag").create(name = "sp-after");
+		return true;
+	}
+
+	function txnOuterCatchesThrowingUnit() {
+		model("tag").create(name = "sp-outer1");
+		try {
+			invokeWithTransaction(method = "txnUnitCreateThenThrow", transaction = "savepoint");
+		} catch (Wheels.TestSavepointBoom e) {
+			request.$spCaught = true;
+		}
+		return true;
+	}
+
+	function txnSiblingUnits() {
+		invokeWithTransaction(method = "txnUnitCreateThenFalse", transaction = "savepoint");
+		invokeWithTransaction(method = "txnUnitCreateOk", transaction = "savepoint");
+		return true;
+	}
+
+	function txnUnitWithFailingInnerUnit() {
+		model("tag").create(name = "sp-level1");
+		invokeWithTransaction(method = "txnUnitCreateThenFalse", transaction = "savepoint");
+		return true;
+	}
+
+	function txnNestedUnits() {
+		invokeWithTransaction(method = "txnUnitWithFailingInnerUnit", transaction = "savepoint");
+		return true;
+	}
+
+	// transaction="savepoint" passed straight through a CRUD method.
+	function txnOuterWithSavepointCreate() {
+		model("tag").create(name = "sp-crud", transaction = "savepoint");
+		return true;
+	}
+
 	// Writes a row then returns a NON-boolean value (invalid for invokeWithTransaction).
 	// The non-boolean return must roll the write back BEFORE the post-transaction
 	// boolean check throws — never commit-then-error (#3944). A defined non-boolean

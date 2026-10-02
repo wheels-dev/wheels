@@ -76,4 +76,13 @@
 		// dev tools under another name, e.g. a *.test hostname. This one setting and
 		// parser is shared by the dispatch-level gate and the migrator's guard.
 		application.$wheels.devToolsAllowedHosts = "";
+
+		// The same endpoints also require the request's socket peer (REMOTE_ADDR,
+		// never a forwarded header) to be loopback. Non-loopback peers can be
+		// listed here (comma-delimited exact IPv4 / IPv6 addresses, or IPv4 CIDR
+		// ranges such as 172.16.0.0/12) for a dev server reached through Docker
+		// port publishing. Honoured in development and testing only. Publish the
+		// port on 127.0.0.1 when you use it: with a port published on 0.0.0.0,
+		// every LAN client also arrives from the Docker gateway address.
+		application.$wheels.devToolsAllowedRemoteAddresses = "";
 </cfscript>

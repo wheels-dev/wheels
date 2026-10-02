@@ -118,9 +118,41 @@ component extends="modules.BaseModule" {
 		__arguments = [];
 		structDelete(this, "__arguments");
 		if (!structIsEmpty(arguments.callerArgs)) {
-			return arguments.callerArgs;
+			// LuCLI (wheels-dev/LuCLI#17) adds a runtime-owned
+			// __lucliMcpCall=true to every MCP tools/call and never to a
+			// terminal call. Record it for this command and take it out, so no
+			// command sees it as an argument of its own. Only LuCLI's own
+			// hand-off reaches this branch; internal delegation (generate ->
+			// new) arrives empty and keeps the outer call's answer (#3980).
+			variables.$wheelsMcpCall = structKeyExists(arguments.callerArgs, "__lucliMcpCall");
+			structDelete(arguments.callerArgs, "__lucliMcpCall");
+			if (!structIsEmpty(arguments.callerArgs)) {
+				return arguments.callerArgs;
+			}
 		}
 		return argvToCollection(isArray(raw) ? raw : []);
+	}
+
+	/**
+	 * Throws Wheels.InvalidArguments for an MCP tools/call that would create an
+	 * application: that scaffolds into the MCP server's working directory, so it
+	 * stays a terminal command.
+	 */
+	private void function $refuseAppCreationOverMcp(required string command) {
+		if ($isMcpCall()) {
+			throw(
+				type = "Wheels.InvalidArguments",
+				message = "#arguments.command# isn't available over MCP: creating an application writes into the MCP server's working directory. Run `wheels new <name>` in a terminal instead."
+			);
+		}
+	}
+
+	/**
+	 * True while running a command that LuCLI invoked for an MCP tools/call
+	 * (see structuredArgs()). A terminal call is never one.
+	 */
+	public boolean function $isMcpCall() {
+		return variables.$wheelsMcpCall ?: false;
 	}
 
 	/**
@@ -461,7 +493,9 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.option(name = "environment", default = "", description = "Environment whose seed files run (defaults to the app's current environment)")
 			.option(name = "mode", default = "auto", choices = "auto,convention,generate", description = "Seeding mode: auto (detect), convention (app/db/seeds.cfm), or generate (random test data)")
-			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate");
+			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate")
+			.option(name = "models", default = "", description = "generate mode: comma-delimited model names to generate seed data for (default: every model under app/models)")
+			.option(name = "count", default = "", description = "generate mode: records to create per model (default 10)");
 	}
 
 	private any function testArgSpec() {
@@ -1021,6 +1055,11 @@ component extends="modules.BaseModule" {
 		// found, so without this check any directory got app files (#3909).
 		if (canonical != "app") $requireWheelsProject("wheels generate");
 
+		// Creating an application is CLI-only (#3910). Hiding `new`/`create` and
+		// dropping `app` from the advertised type enum only stops clients that
+		// validate against the schema, so refuse it here too (#3980).
+		if (canonical == "app") $refuseAppCreationOverMcp("wheels generate app");
+
 		switch (canonical) {
 			case "app":
 				// Delegate to wheels new — pass remaining args as __arguments.
@@ -1294,10 +1333,35 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseSeedArgs(required struct coll) {
 		var parsed = seedArgSpec().parse(arguments.coll);
+		if (len(trim(parsed.count)) && !reFind("^[0-9]+$", trim(parsed.count))) {
+			throw(type = "Wheels.InvalidArguments", message = "wheels seed: count must be a whole number, got '#parsed.count#'.");
+		}
 		return {
 			environment = parsed.environment,
-			mode = parsed.generate ? "generate" : parsed.mode
+			mode = parsed.generate ? "generate" : parsed.mode,
+			models = trim(parsed.models),
+			count = trim(parsed.count)
 		};
+	}
+
+	/**
+	 * Refuse a seed environment this project doesn't know (#3893): the server
+	 * runs app/db/seeds.cfm plus seeds/<env>.cfm when that file exists, so a
+	 * typo silently ran the main seeds only. Known: Wheels' four environments,
+	 * or any name with a config/<env>/ directory or an app/db/seeds/<env>.cfm.
+	 */
+	private void function $assertKnownSeedEnvironment(required string environment) {
+		var env = trim(arguments.environment);
+		if (!len(env)) return;
+		if (reFind("^[A-Za-z0-9_-]+$", env)) {
+			if (listFindNoCase("development,testing,maintenance,production", env)) return;
+			if (directoryExists(variables.projectRoot & "/config/" & env)) return;
+			if (fileExists(variables.projectRoot & "/app/db/seeds/" & env & ".cfm")) return;
+		}
+		throw(
+			type = "Wheels.InvalidArguments",
+			message = "wheels seed: unknown environment '#env#'. Use development, testing, maintenance or production, or an environment with a config/#env#/ directory or app/db/seeds/#env#.cfm."
+		);
 	}
 
 	/**
@@ -1305,7 +1369,8 @@ component extends="modules.BaseModule" {
 	 */
 	public string function seed() {
 		var opts = parseSeedArgs(structuredArgs(arguments));
-		return runSeed(opts.mode, opts.environment);
+		$assertKnownSeedEnvironment(opts.environment);
+		return runSeed(opts.mode, opts.environment, opts.models, opts.count);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2095,7 +2160,9 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Reload the running Wheels application. The reload password
+	 * hint: Reload the running Wheels application (the CLI forwards the reload password from .env or config/settings.cfm).
+	 *
+	 * The reload password
 	 * gates the HTTP `?reload=true` endpoint against remote attackers;
 	 * the CLI reads it from `.env` or `config/settings.cfm` and forwards
 	 * it because it runs locally with filesystem access. This matches
@@ -2554,7 +2621,12 @@ component extends="modules.BaseModule" {
 		// unrelated dir, or after the project was moved/deleted — leaving
 		// orphan Java processes the user has to chase with `lsof`+`kill`.
 		// See GH #2316.
-		var match = $findServerForProject(variables.projectRoot);
+		// Prefer the project's RUNNING registration: after a lucee.json `name`
+		// change the server can still run under its old name, and the first
+		// .project-path match may be a stale registration (#3994).
+		var registry = getService("serverRegistry");
+		var liveName = registry.aliveRegistrationFor(variables.projectRoot);
+		var match = len(liveName) ? liveName : $findServerForProject(variables.projectRoot);
 		// Only RustCFML was running: it is stopped, and there is nothing to report.
 		if (!len(match) && rustStopped) return "";
 		if (!len(match)) {
@@ -2605,8 +2677,14 @@ component extends="modules.BaseModule" {
 		}
 
 		if (rustStopped) out("Stopping Wheels server...", "cyan");
-		executeCommand("server", ["stop"], variables.projectRoot);
-		getService("serverRegistry").deleteStartToken(match);
+		// A bare `server stop` resolves the name in the current lucee.json, so
+		// a live server under another registration name is named explicitly.
+		var stopArgs = ["stop"];
+		if (len(liveName) && liveName != registry.serverNameFor(variables.projectRoot)) {
+			arrayAppend(stopArgs, "--name=" & liveName);
+		}
+		executeCommand("server", stopArgs, variables.projectRoot);
+		registry.deleteStartToken(match);
 		return "";
 	}
 
@@ -2858,6 +2936,7 @@ component extends="modules.BaseModule" {
 
 		switch (type) {
 			case "app":
+				$refuseAppCreationOverMcp("wheels create app");
 				__arguments = remaining;
 				return new();
 			default:
@@ -2871,15 +2950,15 @@ component extends="modules.BaseModule" {
 	//  routes — List application routes
 	// ─────────────────────────────────────────────────
 
-	/**
-	 * hint: List all configured routes with method, path, and controller action
-	 */
 	private any function routesArgSpec() {
 		return new services.ArgSpec()
 			.option(name = "filter", default = "", description = "Show only routes whose name, pattern or controller##action contains this text (case-insensitive)")
 			.option(name = "format", default = "text", choices = "text,json", description = "Output format: text (aligned table) or json");
 	}
 
+	/**
+	 * hint: List all configured routes with method, path, and controller action
+	 */
 	public string function routes() {
 		// Both flags were advertised in the wrapper's help for as long as the
 		// command has existed, and neither was ever read — the command fetched
@@ -3201,7 +3280,7 @@ component extends="modules.BaseModule" {
 		out('  (or add by hand: {"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}})');
 		out("");
 		out("For OpenCode, Cursor, and other AI IDEs, see:");
-		out("  https://guides.wheels.dev/v4-0-0/command-line-tools/mcp-integration");
+		out("  " & new services.GuidesLink().link("command-line-tools/mcp-integration", $docsFrameworkVersion()));
 		out("");
 		out("All public commands in this module are auto-discovered as MCP tools.");
 		out("Tool names match the command names: generate, migrate, etc. (unprefixed");
@@ -5126,6 +5205,16 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseNotesArgs(required struct coll) {
 		var parsed = notesArgSpec().parse(arguments.coll);
+		// Markers are matched as words in a regex, so a marker that isn't a word
+		// ("." matched every character) is refused rather than escaped (#3893).
+		for (var marker in listToArray(parsed.annotations & "," & parsed.custom)) {
+			if (!reFind("^[A-Za-z][A-Za-z0-9_-]*$", trim(marker))) {
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "wheels notes: annotation marker '#trim(marker)#' is not a word. Markers are letters, digits, '_' and '-' (e.g. TODO,FIXME,HACK)."
+				);
+			}
+		}
 		return { annotations = parsed.annotations, custom = parsed.custom };
 	}
 
@@ -7500,7 +7589,7 @@ component extends="modules.BaseModule" {
 
 	// ── Seed Execution ──────────────────────────────
 
-	private string function runSeed(string mode = "auto", string environment = "") {
+	private string function runSeed(string mode = "auto", string environment = "", string models = "", string count = "") {
 		var serverPort = $requireOwnRunningServer([
 			"Seeding requires a running server bound to this project.",
 			"Start this project's own server with: wheels start (it registers the server as this project's)"
@@ -7511,6 +7600,12 @@ component extends="modules.BaseModule" {
 		var seedUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
 		if (len(environment)) {
 			seedUrl &= "&environment=#environment#";
+		}
+		if (len(arguments.models)) {
+			seedUrl &= "&models=#urlEncodedFormat(arguments.models)#";
+		}
+		if (len(arguments.count)) {
+			seedUrl &= "&count=#arguments.count#";
 		}
 
 		// dbSeed writes data — POST + reload password.
@@ -7707,8 +7802,10 @@ component extends="modules.BaseModule" {
 		var sameMajor = (currentMajor == targetMajor);
 
 		if (sameMajor && !jsonMode) {
-			out("Same major version — no known breaking changes.", "green");
-			out("Scanning for opt-in recommendations...", "green");
+			out("Same major version — no new breaking changes in this upgrade.", "green");
+			out(currentMajor >= 4
+				? "Scanning for code left over from 3.x and for opt-in recommendations..."
+				: "Scanning for opt-in recommendations...", "green");
 			out("");
 		}
 
@@ -7723,8 +7820,10 @@ component extends="modules.BaseModule" {
 
 		// The version-appropriate guide + the soft-landing adapter, surfaced
 		// whenever breaking findings are reported (and always in JSON output).
-		var guideUrl = "https://guides.wheels.dev/v4-0-0/upgrading/"
-			& (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/";
+		var guideUrl = new services.GuidesLink().link(
+			"upgrading/" & (targetMajor >= 4 ? "3x-to-4x" : "2x-to-3x") & "/",
+			target
+		);
 
 		// `success` must reflect every condition that produces a non-zero
 		// exit, otherwise `jq .success` and `$?` disagree when --strict is
@@ -7792,6 +7891,30 @@ component extends="modules.BaseModule" {
 				var manifestData = deserializeJSON(fileRead(manifestPath));
 				currentVersion = manifestData.version ?: "unknown";
 			} catch (any e) {}
+		}
+		// 3.0 GA's vendor/wheels/box.json carries no version, and there is no
+		// wheels.json: the version only lives in the framework's own
+		// onapplicationstart (`application.$wheels.version = "3.0.0"`). 2.x
+		// kept the framework at the webroot's wheels/ (#3939).
+		if (!len(currentVersion) || currentVersion == "unknown" || find("@", currentVersion)) {
+			for (var startFile in [
+				"/vendor/wheels/events/onapplicationstart.cfc",
+				"/vendor/wheels/events/onapplicationstart.cfm",
+				"/wheels/events/onapplicationstart.cfm"
+			]) {
+				if (!fileExists(variables.projectRoot & startFile)) continue;
+				try {
+					var hit = reFind(
+						'application\.\$wheels\.version\s*=\s*["'']([0-9][^"'']*)["'']',
+						fileRead(variables.projectRoot & startFile),
+						1,
+						true
+					);
+					if (hit.pos[1] && arrayLen(hit.pos) > 1) {
+						return mid(fileRead(variables.projectRoot & startFile), hit.pos[2], hit.len[2]);
+					}
+				} catch (any e) {}
+			}
 		}
 		return currentVersion;
 	}
@@ -7897,35 +8020,26 @@ component extends="modules.BaseModule" {
 					fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
 				});
 			}
-			arrayAppend(checks, {
-				description: "Old test base class (wheels.Test / wheels.Testbox)",
-				pattern: 'extends\s*=\s*["'']wheels\.Test(box)?["'']',
-				checkType: "grep",
-				scanDir: "tests",
-				extensions: "cfc",
-				fix: 'Change to extends="wheels.WheelsTest"'
-			});
 		}
 
-		// 3.x -> 4.x
-		if (arguments.currentMajor <= 3 && arguments.targetMajor >= 4) {
+		// 3.x -> 4.x. Checks for code that 4.x removed or deprecated also run
+		// on an app already on 4.x: they only match leftover code, and an app
+		// that swapped the framework before checking would otherwise hear
+		// "no known breaking changes" with 3.x code still in place (#3939).
+		// Checks for defaults that changed in 4.0, and for things that are only
+		// deprecated (plugins/, paginationLinks(): still working on 4.x, and
+		// `wheels new` itself scaffolds plugins/), are jumpOnly: they apply to
+		// an app actually coming from 3.x and are dropped below otherwise.
+		var jump34 = arguments.currentMajor <= 3 && arguments.targetMajor >= 4;
+		var on4 = arguments.currentMajor >= 4 && arguments.targetMajor >= 4;
+		if (jump34 || on4) {
 			arrayAppend(checks, {
 				description: "Legacy plugin directory (deprecated as of 4.0, removed in 5.0)",
+				jumpOnly: true,
 				pattern: "",
 				checkType: "directory",
 				path: "plugins",
 				fix: "Migrate plugins to packages installed under vendor/ (wheels packages add <name>)"
-			});
-			// Matches both quote styles and the silent wheels.Testbox shim
-			// (deprecated alias of wheels.WheelsTest, removal target 5.0) —
-			// the previous double-quote-only wheels.Test pattern missed both.
-			arrayAppend(checks, {
-				description: "Old test base class (wheels.Test / wheels.Testbox)",
-				pattern: 'extends\s*=\s*["'']wheels\.Test(box)?["'']',
-				checkType: "grep",
-				scanDir: "tests",
-				extensions: "cfc",
-				fix: 'Change to extends="wheels.WheelsTest"'
 			});
 			// application.wirebox → application.wheelsdi (guide item 10). The
 			// hardest real-world case is a root Application.cfc bootstrap that
@@ -7960,6 +8074,7 @@ component extends="modules.BaseModule" {
 			// header now emits by default.
 			arrayAppend(checks, {
 				description: "SecurityHeaders middleware — HSTS defaults on in production in 4.0 (advisory)",
+				jumpOnly: true,
 				severity: "advisory",
 				pattern: "new\s+wheels\.middleware\.SecurityHeaders",
 				checkType: "grep",
@@ -7972,6 +8087,7 @@ component extends="modules.BaseModule" {
 			// but cross-site POSTs from third-party frames will break.
 			arrayAppend(checks, {
 				description: "CSRF cookie sets SameSite in 4.0 (advisory: review cross-site POST flows)",
+				jumpOnly: true,
 				severity: "advisory",
 				pattern: "protectsFromForgery",
 				checkType: "grep",
@@ -7983,6 +8099,7 @@ component extends="modules.BaseModule" {
 			// `new wheels.middleware.Cors()` accepts no requests in 4.0.
 			arrayAppend(checks, {
 				description: "CORS middleware without allowOrigins (deny-all default in 4.0)",
+				jumpOnly: true,
 				pattern: "new\s+wheels\.middleware\.Cors\s*\(\s*\)",
 				checkType: "grep",
 				scanDir: "config",
@@ -7997,6 +8114,7 @@ component extends="modules.BaseModule" {
 			// reminder to re-verify, not a false positive.
 			arrayAppend(checks, {
 				description: "RateLimiter middleware — defaults changed in 4.0 (advisory: review config)",
+				jumpOnly: true,
 				severity: "advisory",
 				pattern: "new\s+wheels\.middleware\.RateLimiter",
 				checkType: "grep",
@@ -8008,6 +8126,7 @@ component extends="modules.BaseModule" {
 			// (#2076). Explicit `true` is now a security concern.
 			arrayAppend(checks, {
 				description: "allowEnvironmentSwitchViaUrl=true (default flipped to false in production)",
+				jumpOnly: true,
 				pattern: "allowEnvironmentSwitchViaUrl\s*=\s*true",
 				checkType: "grep",
 				scanDir: "config",
@@ -8021,15 +8140,22 @@ component extends="modules.BaseModule" {
 			// when csrfStore="cookie" (default store is "session"), and
 			// production throws Wheels.Security.MissingCsrfKey rather than
 			// auto-generating an ephemeral key.
-			arrayAppend(checks, {
-				description: "Missing csrfCookieEncryptionSecretKey (CSRF cookies rotate on every deploy when csrfStore=""cookie"")",
-				pattern: "csrfCookieEncryptionSecretKey",
-				checkType: "grep",
-				scanDir: "config",
-				extensions: "cfm,cfc",
-				absent: true,
-				fix: 'Set a stable key: set(csrfCookieEncryptionSecretKey = env("WHEELS_CSRF_KEY")).'
-			});
+			// Only for apps that use the cookie store: the default (and an
+			// explicit csrfStore="session") never reads the key (#3939). Not
+			// jumpOnly: a 4.x app on the cookie store with no key throws
+			// Wheels.Security.MissingCsrfKey in production, so an app that
+			// swapped the framework first still needs to hear it.
+			if ($upgradeConfigMatches('csrfStore\s*=\s*["'']cookie["'']')) {
+				arrayAppend(checks, {
+					description: "Missing csrfCookieEncryptionSecretKey (CSRF cookies rotate on every deploy when csrfStore=""cookie"")",
+					pattern: "csrfCookieEncryptionSecretKey",
+					checkType: "grep",
+					scanDir: "config",
+					extensions: "cfm,cfc",
+					absent: true,
+					fix: 'Set a stable key: set(csrfCookieEncryptionSecretKey = env("WHEELS_CSRF_KEY")).'
+				});
+			}
 			// `wheels snippets` → `wheels generate snippets` rename (#1852).
 			// Scan build / CI scripts; the CLI command is invoked from
 			// outside the app's own .cfm/.cfc files.
@@ -8053,6 +8179,7 @@ component extends="modules.BaseModule" {
 			// would silently false-positive on every scanned file otherwise.
 			arrayAppend(checks, {
 				description: "Legacy tests/specs/functions/ directory (renamed to functional/)",
+				jumpOnly: true,
 				pattern: "",
 				checkType: "directory",
 				path: "tests/specs/functions",
@@ -8064,6 +8191,7 @@ component extends="modules.BaseModule" {
 			// user knows the default has flipped.
 			arrayAppend(checks, {
 				description: "Vite asset helpers (viteStrictManifest defaults to true in 4.0)",
+				jumpOnly: true,
 				pattern: "viteScriptTag|viteStyleTag|vitePreloadTag",
 				checkType: "grep",
 				scanDir: "app/views",
@@ -8073,11 +8201,48 @@ component extends="modules.BaseModule" {
 			// paginationLinks() deprecation grep (#2714, replacement: paginationNav() per #1930).
 			arrayAppend(checks, {
 				description: "Deprecated paginationLinks() helper (renamed to paginationNav() in 4.0)",
+				jumpOnly: true,
 				pattern: "paginationLinks\s*\(",
 				checkType: "grep",
 				scanDir: "app/views",
 				extensions: "cfm,cfc",
 				fix: "Replace paginationLinks() with paginationNav() (the all-in-one nav helper) or compose firstPageLink/previousPageLink/pageNumberLinks/nextPageLink/lastPageLink directly. See https://github.com/wheels-dev/wheels/issues/1930."
+			});
+		}
+
+		if (!jump34) {
+			var kept = [];
+			for (var c in checks) {
+				if (!(c.jumpOnly ?: false)) arrayAppend(kept, c);
+			}
+			checks = kept;
+		}
+
+		// Test base classes from before 4.0, for any upgrade into 3.x or later
+		// and for 4.x apps that still have them. Added once: the 2.x and 3.x
+		// blocks used to add the same check, so a 3.0 app whose version read
+		// as unknown saw it twice. Both are advisory: wheels.Testbox is an
+		// alias of wheels.WheelsTest, and RocketUnit (wheels.Test) still runs
+		// on 4.x; switching a RocketUnit suite's base class without
+		// converting its tests breaks every test in it.
+		if (arguments.targetMajor >= 3) {
+			arrayAppend(checks, {
+				description: "Deprecated test base class wheels.Testbox (an alias of wheels.WheelsTest, removed in 5.0)",
+				severity: "advisory",
+				pattern: 'extends\s*=\s*["'']wheels\.Testbox["'']',
+				checkType: "grep",
+				scanDir: "tests",
+				extensions: "cfc",
+				fix: 'Change to extends="wheels.WheelsTest". wheels.Testbox is an alias of it, so nothing else changes.'
+			});
+			arrayAppend(checks, {
+				description: "RocketUnit test base class wheels.Test (deprecated; still runs on 4.x)",
+				severity: "advisory",
+				pattern: 'extends\s*=\s*["'']wheels\.Test["'']',
+				checkType: "grep",
+				scanDir: "tests",
+				extensions: "cfc",
+				fix: 'Keep extends="wheels.Test" until these tests are converted. RocketUnit tests (test_ methods, assert()) do not run under wheels.WheelsTest, which is BDD (describe/it/expect): convert a file, then switch its base class. See ' & new services.GuidesLink().link("upgrading/3x-to-4x/")
 			});
 		}
 
@@ -8167,6 +8332,21 @@ component extends="modules.BaseModule" {
 		});
 
 		return checks;
+	}
+
+	/**
+	 * True when `pattern` matches anywhere in config/ (.cfm/.cfc, recursive),
+	 * with CFML comments stripped first so a commented-out setting doesn't count.
+	 */
+	private boolean function $upgradeConfigMatches(required string pattern) {
+		var configDir = variables.projectRoot & "/config";
+		if (!directoryExists(configDir)) return false;
+		for (var ext in ["cfm", "cfc"]) {
+			for (var f in directoryList(configDir, true, "path", "*." & ext)) {
+				if (reFindNoCase(arguments.pattern, stripCfmlComments(fileRead(f))) > 0) return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -8831,8 +9011,13 @@ component extends="modules.BaseModule" {
 			// datasource so chapter-6-style manual signups in the dev DB
 			// don't bleed into chapter-7 specs. Core tests already pick
 			// datasources from url.db so leave them alone.
-			if (!coreTests && useTestDB) {
-				testUrl &= "&useTestDB=true";
+			// Send useTestDB EXPLICITLY for every app run. The app
+			// runner now defaults an omitted flag to true (test DB), so omitting
+			// the parameter on --no-test-db would be reinterpreted as true and
+			// defeat the advertised opt-out. Core tests pick datasources from
+			// url.db, so they never carry useTestDB.
+			if (!coreTests) {
+				testUrl &= "&useTestDB=" & (useTestDB ? "true" : "false");
 			}
 			if (len(filter)) {
 				testUrl &= "&directory=#filter#";
@@ -9822,7 +10007,7 @@ component extends="modules.BaseModule" {
 		out("       unzip wheels-core-<version>.zip -d ~/.wheels/modules/wheels/vendor/");
 		out("       wheels new #appName#");
 		out("");
-		out("See: https://guides.wheels.dev/v4-0-0/start-here/installing/");
+		out("See: " & new services.GuidesLink().link("start-here/installing/"));
 
 		throw(
 			type="Wheels.FrameworkNotFound",
@@ -11333,16 +11518,21 @@ component extends="modules.BaseModule" {
 	/**
 	 * The datasource name a (comment-stripped) config/settings.cfm sets, or "".
 	 * Reads both `set(dataSourceName="name")` and the generated
-	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`; for the env() form the
+	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`, with single or double
+	 * quotes as CFML allows (each value's quotes must match, #3952); for the env() form the
 	 * variable's value in .env wins over the default, as it does at runtime. The
 	 * process environment is not consulted: it can differ from the app server's.
 	 */
 	public string function $settingsDataSourceName(required string settingsContent) {
 		// Two patterns rather than one with an optional env( group: every group in
 		// each always takes part in the match, so the subexpression arrays line up.
-		var m = reFindNoCase('\bdataSourceName\b\s*=\s*env\s*\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*,\s*"([^"]*)"', arguments.settingsContent, 1, true);
+		// Capture groups: \1 and \3 are the quotes (backreferenced so each pair
+		// matches). In m.match (whole match first) the variable name is [3] and
+		// the default is [5].
+		var m = reFindNoCase("\bdataSourceName\b\s*=\s*env\s*\(\s*([""'])([A-Za-z_][A-Za-z0-9_]*)\1\s*,\s*([""'])([^""']*)\3", arguments.settingsContent, 1, true);
 		if (m.pos[1] > 0) {
-			var name = trim(m.match[3]);
+			var envKey = m.match[3];
+			var name = trim(m.match[5]);
 			var envFile = variables.projectRoot & "/.env";
 			if (fileExists(envFile)) {
 				// Read the value the way the app's Application.cfc loadEnvFile() does:
@@ -11350,7 +11540,7 @@ component extends="modules.BaseModule" {
 				// matching quotes, and let the last line for the key win.
 				for (var line in listToArray(fileRead(envFile), chr(10))) {
 					line = trim(line);
-					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), m.match[2]) != 0) {
+					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), envKey) != 0) {
 						continue;
 					}
 					var value = trim(listRest(line, "="));
@@ -11364,8 +11554,8 @@ component extends="modules.BaseModule" {
 			}
 			return name;
 		}
-		m = reFindNoCase('\bdataSourceName\b\s*=\s*"([^"]*)"', arguments.settingsContent, 1, true);
-		return m.pos[1] > 0 ? trim(m.match[2]) : "";
+		m = reFindNoCase("\bdataSourceName\b\s*=\s*([""'])([^""']*)\1", arguments.settingsContent, 1, true);
+		return m.pos[1] > 0 ? trim(m.match[3]) : "";
 	}
 
 	/**

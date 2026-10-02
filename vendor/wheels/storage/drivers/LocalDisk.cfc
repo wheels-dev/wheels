@@ -14,7 +14,14 @@
 component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 
 	/**
-	 * @config Disk config: { root (required), urlPrefix="", signingKey="" }.
+	 * @config Disk config: { root (required), urlPrefix="", signingKey="", resolveSymlinks=false }.
+	 *
+	 * `resolveSymlinks` (default false) adds an opt-in, stricter containment layer
+	 * on top of the always-on lexical guard (#3912): when true, `$resolve()` also
+	 * canonicalises paths through the filesystem so a symlink planted under the
+	 * root that targets outside is REJECTED rather than followed (#4020). It is
+	 * off by default because the lexical guard already blocks traversal and a
+	 * symlink under the root can only be created by someone with filesystem access.
 	 */
 	public LocalDisk function init(required struct config) {
 		if (!StructKeyExists(arguments.config, "root") || !Len(arguments.config.root)) {
@@ -26,6 +33,23 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		variables.root = $normalizeDir(arguments.config.root);
 		variables.urlPrefix = StructKeyExists(arguments.config, "urlPrefix") ? arguments.config.urlPrefix : "";
 		variables.signingKey = StructKeyExists(arguments.config, "signingKey") ? arguments.config.signingKey : "";
+		if (StructKeyExists(arguments.config, "resolveSymlinks")) {
+			if (!IsBoolean(arguments.config.resolveSymlinks)) {
+				throw(
+					type = "Wheels.Storage.InvalidConfiguration",
+					message = "Local disk 'resolveSymlinks' must be a boolean (true or false)."
+				);
+			}
+			variables.resolveSymlinks = arguments.config.resolveSymlinks ? true : false;
+		} else {
+			variables.resolveSymlinks = false;
+		}
+		// Fail closed, at init (not per request): if the app opted into symlink
+		// resolution but this runtime can't actually resolve symbolic links, refuse
+		// to construct rather than silently run an ineffective strict mode.
+		if (variables.resolveSymlinks) {
+			$assertSymlinkResolutionAvailable();
+		}
 		return this;
 	}
 
@@ -149,24 +173,303 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		return local.diff == 0;
 	}
 
+	/**
+	 * Resolve a storage key to an absolute path inside the root, rejecting path
+	 * traversal. A name that merely CONTAINS two dots inside a segment ("a..b.txt",
+	 * "v1..2") is legitimate and allowed; only genuine traversal is rejected (#3912).
+	 *
+	 * The containment guard is LEXICAL (string) canonicalisation — it resolves "./",
+	 * "../" and "//" syntactically and compares paths, which is uniform on every
+	 * engine including the JVM-free RustCFML. It does NOT resolve symlinks: a symlink
+	 * planted under the root that points outside is FOLLOWED and trusted, because it
+	 * can only be created by someone who already has filesystem access to the root,
+	 * never through the storage API. (A symlink's target is pinned by StorageSpec's
+	 * "follows a symlink under root" test; an opt-in symlink-resolving check for JVM
+	 * engines is tracked in #4020.)
+	 */
 	public string function $resolve(required string key) {
-		// Reject traversal — a key must stay inside root.
+		// 1. Normalise separators (\ -> /) so a Windows or mixed-separator key is one form.
 		local.clean = Replace(arguments.key, "\", "/", "all");
-		if (Find("..", local.clean)) {
-			throw(
-				type = "Wheels.Storage.InvalidKey",
-				message = "Storage key [#arguments.key#] must not contain '..'."
-			);
-		}
-		// Empty or slash-only keys resolve to root itself. Throw rather than
-		// let put() write the disk root or get() treat the directory as NotFound.
-		if (!Len(REReplace(local.clean, "/", "", "all"))) {
+
+		// 2. Every key is relative to the root, so slash runs carry no meaning: a
+		// leading "/", a trailing "/", "//" runs and a UNC/network prefix
+		// ("//server/share", "\\server\share") are NORMALISED away by dropping empty
+		// segments — the remainder is appended under the root. We do NOT url-decode, so
+		// "%2e%2e%2f" stays a literal segment and can never turn into "../".
+		local.segments = ListToArray(local.clean, "/", false);
+		if (!ArrayLen(local.segments)) {
 			throw(
 				type = "Wheels.Storage.InvalidKey",
 				message = "Storage key [#arguments.key#] must not be empty or slash-only."
 			);
 		}
-		return variables.root & "/" & local.clean;
+		// Reject any surviving segment that, after trimming whitespace and removing
+		// every dot, is empty: ".", "..", "...", ". .", and — because Windows strips a
+		// segment's trailing dots and spaces — ".. ". An exact "==" check for ".." is
+		// not enough. A drive-letter prefix (C:, C:foo) must never resolve outside root.
+		for (local.segment in local.segments) {
+			if (Len(Trim(Replace(Trim(local.segment), ".", "", "all"))) == 0) {
+				throw(
+					type = "Wheels.Storage.InvalidKey",
+					message = "Storage key [#arguments.key#] has a dot/space-only path segment."
+				);
+			}
+			if (ReFind("^[A-Za-z]:", local.segment)) {
+				throw(
+					type = "Wheels.Storage.InvalidKey",
+					message = "Storage key [#arguments.key#] must not contain a drive-letter prefix."
+				);
+			}
+		}
+
+		local.resolved = variables.root & "/" & ArrayToList(local.segments, "/");
+
+		// 3. Defence in depth: lexically canonicalise the resolved path and confirm
+		// it stays inside the root. After the segment guard there is no ".." left, so
+		// this only ever fires if that guard is weakened; the trailing-separator
+		// compare keeps "/root-evil" from passing as inside "/root".
+		if (!$pathWithin(root = $lexicalCanonical(variables.root), candidate = $lexicalCanonical(local.resolved))) {
+			throw(
+				type = "Wheels.Storage.InvalidKey",
+				message = "Storage key [#arguments.key#] resolves outside the storage root."
+			);
+		}
+
+		// 4. Opt-in strict containment (#4020): additionally resolve the path through
+		// the filesystem (symlinks included) and re-check. init() has already proven,
+		// via a behavioural probe, that this runtime resolves symlinks — so a symlink
+		// planted under the root that targets outside is now REJECTED, not followed.
+		if (variables.resolveSymlinks) {
+			$assertCanonicalWithin(key = arguments.key, resolved = local.resolved);
+		}
+
+		return local.resolved;
+	}
+
+	/**
+	 * Strict containment re-check for the opt-in resolveSymlinks mode (#4020):
+	 * canonicalise both the root and the resolved path through the filesystem and
+	 * confirm the target stays inside the root. getCanonicalPath() resolves
+	 * symlinks in the existing path prefix; a not-yet-created leaf (put()) is
+	 * appended lexically, so a symlink DIRECTORY under the root is still caught.
+	 */
+	private void function $assertCanonicalWithin(required string key, required string resolved) {
+		// Compare the two canonical paths EXACTLY (case-sensitively): getCanonicalPath()
+		// reports each path in its real on-disk case, so an exact compare is right on
+		// both case-sensitive and case-insensitive filesystems. $pathWithin's CFML `==`
+		// is case-insensitive, which would treat a case-distinct sibling directory as
+		// inside the root once a symlink redirects there.
+		if (!$pathWithinExact(root = $canonicalPath(variables.root), candidate = $canonicalPath(arguments.resolved))) {
+			throw(
+				type = "Wheels.Storage.InvalidKey",
+				message = "Storage key [#arguments.key#] resolves through a symlink outside the storage root."
+			);
+		}
+	}
+
+	/**
+	 * Behavioural capability probe for the opt-in resolveSymlinks mode (#4020).
+	 * Creates a throwaway symlink under GetTempDirectory() that points OUT of its
+	 * own parent directory, canonicalises it, and requires the canonical path to
+	 * land inside the target — i.e. the runtime genuinely resolved the symlink.
+	 * It is a capability check, never an engine-name check: RustCFML exposes
+	 * java.io.File.getCanonicalPath() but it is a lexical no-op that does not
+	 * resolve symlinks, so a "does the call exist" probe would pass there and leave
+	 * strict mode silently ineffective. Throws Wheels.Storage.InvalidConfiguration
+	 * when the symlink can't be created (e.g. Windows without symlink privilege) or
+	 * is not resolved (e.g. RustCFML). Runs once per disk instance, at init.
+	 *
+	 * `probe` is a bare `var` struct written without a `local.` prefix so the value
+	 * set inside the catch survives on BoxLang (cross-engine invariant 11); the
+	 * finally calls a helper rather than looping, since a loop in a finally block
+	 * miscompiles on Lucee 7 (invariant 12).
+	 */
+	private void function $assertSymlinkResolutionAvailable() {
+		var probe = {dir = "", resolved = false};
+		probe.dir = $normalizeDir(GetTempDirectory()) & "/wheels-localdisk-symlinkprobe-" & CreateUUID();
+		try {
+			local.insideDir = probe.dir & "/inside";
+			local.outsideDir = probe.dir & "/outside";
+			CreateObject("java", "java.io.File").init(local.insideDir).mkdirs();
+			CreateObject("java", "java.io.File").init(local.outsideDir).mkdirs();
+			local.linkFile = local.insideDir & "/lnk";
+			$createProbeSymlink(target = local.outsideDir, link = local.linkFile);
+			// Resolved iff canonicalising the link lands inside the (sibling) target.
+			// Exact (case-sensitive) compare, like the strict check it gates.
+			probe.resolved = $pathWithinExact(
+				root = $canonicalPath(local.outsideDir),
+				candidate = $canonicalPath(local.linkFile)
+			);
+		} catch (any e) {
+			probe.resolved = false;
+		} finally {
+			// Delete the probe's symlink BEFORE the recursive temp-dir delete: a recursive
+			// DirectoryDelete over a directory that still contains a symlink errors on Adobe
+			// (and is swallowed), which would leak the probe's temp dir on every init.
+			$deleteSymlinkQuietly(probe.dir & "/inside/lnk");
+			$deleteDirQuietly(probe.dir);
+		}
+		if (!probe.resolved) {
+			throw(
+				type = "Wheels.Storage.InvalidConfiguration",
+				message = "Local disk resolveSymlinks=true requires a runtime that resolves symbolic links through the filesystem (java.io.File.getCanonicalPath). This runtime does not (e.g. RustCFML, or an OS/account without symlink support). Remove resolveSymlinks, or run on a JVM engine with symlink support."
+			);
+		}
+	}
+
+	/**
+	 * Absolute, symlink-resolved path with forward separators, via
+	 * java.io.File.getCanonicalPath(). Only ever called once init()'s probe has
+	 * confirmed this runtime resolves symlinks, so it never runs where
+	 * getCanonicalPath() would be a lexical no-op.
+	 */
+	private string function $canonicalPath(required string path) {
+		return Replace(CreateObject("java", "java.io.File").init(arguments.path).getCanonicalPath(), "\", "/", "all");
+	}
+
+	/**
+	 * Create a symbolic link for the probe. Prefers the platform-native NIO call
+	 * (`java.nio.file.Files.createSymbolicLink`) so the probe works on JVM engines
+	 * without a POSIX `ln` on PATH — notably Windows with symlink privilege. Falls
+	 * back to `ln -s` where the NIO call is unavailable (RustCFML does not shim
+	 * `createSymbolicLink`, and some sandboxes block it). If neither can create the
+	 * link the error propagates, and the init probe fails closed.
+	 */
+	private void function $createProbeSymlink(required string target, required string link) {
+		if ($tryCreateSymbolicLinkNio(target = arguments.target, link = arguments.link)) {
+			return;
+		}
+		local.pb = CreateObject("java", "java.lang.ProcessBuilder").init(["ln", "-s", arguments.target, arguments.link]);
+		local.proc = local.pb.start();
+		local.proc.waitFor();
+		if (local.proc.exitValue() != 0) {
+			throw(type = "Wheels.Storage.SymlinkProbeFailed", message = "Probe could not create a symbolic link (neither NIO createSymbolicLink nor `ln -s` succeeded).");
+		}
+	}
+
+	/**
+	 * Try to create the symlink through java.nio. Returns true on success, false if
+	 * the call is unavailable or fails, so the caller can fall back. `created` is a
+	 * bare `var` struct field (no `local.` prefix) so the value set in the catch
+	 * survives on BoxLang (cross-engine invariant 11).
+	 *
+	 * `createSymbolicLink(Path, Path, FileAttribute...)` is varargs; the two-argument
+	 * form does NOT bind through CFML's Java interop ("No matching method ...") on
+	 * Lucee, so it would always throw and fall back to `ln`, defeating the point on a
+	 * host without `ln` on PATH (e.g. Windows with symlink privilege). Pass an
+	 * explicit empty `FileAttribute[]` so the varargs method binds; the element type
+	 * comes from `Class.forName` (#4070). Public with a `$` prefix (like `$resolve`)
+	 * so the binding is covered by a spec.
+	 */
+	public boolean function $tryCreateSymbolicLinkNio(required string target, required string link) {
+		var created = {ok = false};
+		try {
+			local.linkPath = CreateObject("java", "java.io.File").init(arguments.link).toPath();
+			local.targetPath = CreateObject("java", "java.io.File").init(arguments.target).toPath();
+			local.faType = CreateObject("java", "java.lang.Class").forName("java.nio.file.attribute.FileAttribute");
+			local.noAttrs = CreateObject("java", "java.lang.reflect.Array").newInstance(local.faType, 0);
+			CreateObject("java", "java.nio.file.Files").createSymbolicLink(local.linkPath, local.targetPath, local.noAttrs);
+			created.ok = true;
+		} catch (any e) {
+			created.ok = false;
+		}
+		return created.ok;
+	}
+
+	/**
+	 * Case-SENSITIVE containment, for comparing two already-canonicalised paths
+	 * (#4020). getCanonicalPath() reports each path in its real on-disk case, so an
+	 * exact compare is correct on both case-sensitive and case-insensitive
+	 * filesystems — unlike $pathWithin's CFML `==`, which is case-insensitive and
+	 * would treat a case-distinct sibling directory as inside the root once a
+	 * symlink redirects there. `Compare() == 0` is case-sensitive string equality
+	 * on every engine (cross-engine invariant 20).
+	 */
+	private boolean function $pathWithinExact(required string root, required string candidate) {
+		local.base = REReplace(arguments.root, "/+$", "");
+		if (Compare(arguments.candidate, local.base) == 0) {
+			return true;
+		}
+		return Len(arguments.candidate) > Len(local.base)
+			&& Compare(Left(arguments.candidate, Len(local.base) + 1), local.base & "/") == 0;
+	}
+
+	/**
+	 * Best-effort delete of the probe's symbolic LINK (never its target) via NIO, run
+	 * before the recursive temp-dir delete so the latter doesn't have to remove a dir
+	 * that still holds a symlink (which errors on Adobe). deleteIfExists no-ops when the
+	 * link is absent; errors are swallowed so cleanup never masks the probe result.
+	 */
+	private void function $deleteSymlinkQuietly(required string path) {
+		try {
+			CreateObject("java", "java.nio.file.Files").deleteIfExists(
+				CreateObject("java", "java.io.File").init(arguments.path).toPath()
+			);
+		} catch (any e) {
+			// best-effort
+		}
+	}
+
+	/**
+	 * Best-effort recursive delete of the probe's temp directory. The probe's
+	 * symlink target lives INSIDE this directory, so the delete is self-contained
+	 * and never reaches outside it. Swallows errors so cleanup never masks the
+	 * probe result; contains no loop (invariant 12).
+	 */
+	private void function $deleteDirQuietly(required string dir) {
+		try {
+			if (Len(arguments.dir) && DirectoryExists(arguments.dir)) {
+				DirectoryDelete(arguments.dir, true);
+			}
+		} catch (any e) {
+			// ignore — cleanup is best-effort
+		}
+	}
+
+	/**
+	 * Lexically canonicalise a path: normalise separators, resolve "." and ".."
+	 * segments and collapse "//", preserving a leading "/" or a "C:" drive prefix.
+	 * Pure string work (no filesystem, no JVM) so it behaves identically on every
+	 * engine; it does not resolve symlinks.
+	 */
+	private string function $lexicalCanonical(required string path) {
+		local.p = Replace(arguments.path, "\", "/", "all");
+		local.prefix = "";
+		if (ReFind("^[A-Za-z]:/", local.p)) {
+			local.prefix = Left(local.p, 2);
+			local.p = Mid(local.p, 3, Len(local.p));
+		}
+		local.isAbsolute = Left(local.p, 1) == "/";
+		local.out = [];
+		for (local.seg in ListToArray(local.p, "/", false)) {
+			if (local.seg == ".") {
+				continue;
+			}
+			if (local.seg == "..") {
+				if (ArrayLen(local.out)) {
+					ArrayDeleteAt(local.out, ArrayLen(local.out));
+				}
+				continue;
+			}
+			ArrayAppend(local.out, local.seg);
+		}
+		local.result = ArrayToList(local.out, "/");
+		if (local.isAbsolute) {
+			local.result = "/" & local.result;
+		}
+		return local.prefix & local.result;
+	}
+
+	/**
+	 * True when `candidate` is the root itself or lives inside it. Compares with a
+	 * trailing separator so "/root-evil" does not pass as inside "/root".
+	 */
+	private boolean function $pathWithin(required string root, required string candidate) {
+		local.base = REReplace(arguments.root, "/+$", "");
+		if (arguments.candidate == local.base) {
+			return true;
+		}
+		return Left(arguments.candidate, Len(local.base) + 1) == (local.base & "/");
 	}
 
 	private string function $normalizeDir(required string dir) {

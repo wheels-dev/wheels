@@ -2,6 +2,8 @@
 		application.$wheels.dataSourceUserName = "";
 		application.$wheels.dataSourcePassword = "";
 		application.$wheels.transactionMode = "commit";
+		// Default isolation for model transactions; "" sends no isolation attribute (#4059).
+		application.$wheels.transactionIsolation = "read_committed";
 
 		// Miscellaneous settings.
 		application.$wheels.encodeURLs = true;

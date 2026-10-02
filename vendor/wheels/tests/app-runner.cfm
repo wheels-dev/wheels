@@ -25,6 +25,58 @@
     // resolveScope() additionally records whether a present-but-rejected
     // directory was silently swapped for the default, so a green total from
     // the wrong scope is detectable in the JSON payload (issue #3083).
+    // Hard-refuse the app test runner in production,
+    // independent of enablePublicComponent. Running specs in production can hit
+    // the real database and re-run app start-up side effects. The onApplicationStart
+    // backstop already refuses an isolated start outside dev/testing; this is the
+    // belt-and-suspenders at the runner itself. Minimal 403, no detail.
+    if (
+        StructKeyExists(application, "wheels")
+        && StructKeyExists(application.wheels, "environment")
+        && application.wheels.environment == "production"
+    ) {
+        cfheader(statuscode = 403);
+        cfheader(name = "Content-Type", value = "text/plain; charset=utf-8");
+        writeOutput("Forbidden");
+        abort;
+    }
+
+    // Warn when test-context isolation is OFF (the request bound the
+    // live application scope instead of <name>_wheelsTest) — specs then mutate
+    // live application settings. Set WHEELS_ENV=development or testing so
+    // events/testcontext.cfm binds the isolated application.
+    if (!(Len(application.applicationName) >= 11 && Right(application.applicationName, 11) == "_wheelsTest")) {
+        cfheader(name = "X-Wheels-Test-Isolation", value = "off");
+        try {
+            writeLog(
+                file = "wheels",
+                type = "warning",
+                text = "Test runner isolation is OFF: application '" & application.applicationName & "' is not the isolated _wheelsTest scope, so specs run against (and mutate) the live application. Set WHEELS_ENV=development or testing."
+            );
+        } catch (any e) {}
+    }
+
+    // Default app runs to the test database. Three states:
+    //   - explicit useTestDB=false  -> run against the primary datasource (opt out).
+    //   - explicit useTestDB=true   -> require <ds>_test; fail closed if absent
+    //                                  (the compatibility setting cannot weaken this).
+    //   - OMITTED                   -> default to the test DB, so an older CLI that
+    //                                  cannot send the parameter is still protected;
+    //                                  if <ds>_test is absent, the per-app
+    //                                  allowTestsAgainstPrimaryDatasource setting
+    //                                  decides refuse vs run-against-primary.
+    //   - PRESENT-BUT-INVALID       -> a supplied-but-not-a-boolean value is an
+    //                                  explicit intent, NOT an omission: it keeps the
+    //                                  test-DB requirement (swap if <ds>_test exists,
+    //                                  else refuse) and can never use the compat
+    //                                  fallback. Only a truly ABSENT parameter does.
+    local.testDBParamPresent = StructKeyExists(url, "useTestDB");
+    local.testDBValidBool = local.testDBParamPresent && IsBoolean(url.useTestDB);
+    local.testDBOmitted = !local.testDBParamPresent;
+    local.testDBExplicitTrue = local.testDBValidBool && url.useTestDB;
+    // Attempt the test DB unless an explicit, VALID useTestDB=false was supplied.
+    local.useTestDB = !(local.testDBValidBool && !url.useTestDB);
+
     local.dirResolver = new wheels.tests._assets.dispatch.TestDirectoryResolver();
     local.testScope = local.dirResolver.resolveScope(url);
     local.testDirectory = local.testScope.resolved;
@@ -118,16 +170,70 @@
                 // Record the pre-swap datasource as the ownership marker so
                 // re-entrant sub-requests skip the swap and the shared lock.
                 application.$$$appTestOriginalDataSource = local.originalDataSource;
-                if (StructKeyExists(url, "useTestDB") && url.useTestDB) {
+                if (local.useTestDB) {
                     local.candidate = local.originalDataSource & "_test";
-                    local.registered = GetApplicationMetaData().datasources;
-                    if (StructKeyExists(local.registered, local.candidate)) {
+                    local.appMetaData = GetApplicationMetaData();
+                    local.registered = (StructKeyExists(local.appMetaData, "datasources") && IsStruct(local.appMetaData.datasources))
+                        ? local.appMetaData.datasources
+                        : {};
+                    // A `_test` datasource registered at server level (Lucee admin,
+                    // lucee.json configuration, CF Administrator, cfconfig) is not in
+                    // the application metadata; probe it by name before refusing.
+                    // Only the candidate is probed, never the primary.
+                    local.candidateRegistered = StructKeyExists(local.registered, local.candidate)
+                        || application.wo.$dataSourceIsReachable(name = local.candidate);
+                    if (local.candidateRegistered) {
                         local.targetDataSource = local.candidate;
                         local.dbResolver.applyDataSource(
                             wheelsScope = application.wheels,
                             name = local.candidate
                         );
                         local.swappedDataSource = true;
+                    } else {
+                        // `<datasource>_test` is not registered. Decide
+                        // refuse vs run-against-primary with strict precedence:
+                        //   - explicit useTestDB=true: ALWAYS fail closed (the
+                        //     compatibility setting cannot weaken an explicit request).
+                        //   - OMITTED (e.g. an older CLI that cannot send
+                        //     useTestDB=false): honour the per-app opt-out setting
+                        //     allowTestsAgainstPrimaryDatasource — when true, run
+                        //     against the primary datasource with a loud warning
+                        //     instead of refusing; otherwise fail closed.
+                        // (explicit useTestDB=false never reaches here.)
+                        local.allowPrimary = StructKeyExists(application.wheels, "allowTestsAgainstPrimaryDatasource")
+                            && IsBoolean(application.wheels.allowTestsAgainstPrimaryDatasource)
+                            && application.wheels.allowTestsAgainstPrimaryDatasource;
+                        if (local.testDBOmitted && local.allowPrimary) {
+                            // Omitted + opt-out: run against the primary datasource
+                            // (no swap; populate is gated on swappedDataSource so the
+                            // real DB is not seeded). Warn that writes hit the real DB.
+                            cfheader(name = "X-Wheels-Test-Database", value = "primary");
+                            try {
+                                writeLog(
+                                    file = "wheels",
+                                    type = "warning",
+                                    text = "App tests are running against the PRIMARY datasource '" & local.originalDataSource & "' because allowTestsAgainstPrimaryDatasource=true and '" & local.candidate & "' is not registered. Test writes reach the real database."
+                                );
+                            } catch (any e) {}
+                        } else {
+                            // Explicit useTestDB=true, OR omitted with the setting
+                            // off/default: fail closed. Never silently run specs
+                            // (which may write) against the primary datasource. Clean
+                            // up the ownership markers set above (no run happened)
+                            // before aborting; the lock releases on request end.
+                            StructDelete(application, "$$$appTestRunToken");
+                            StructDelete(application, "$$$appTestOriginalDataSource");
+                            cfheader(statuscode = 409);
+                            cfcontent(type = "application/json");
+                            writeOutput(SerializeJSON({
+                                success: false,
+                                error: "Test database not available",
+                                message: "App tests default to the '" & local.candidate & "' datasource, which is not registered. Create it; or run against '" & local.originalDataSource & "' intentionally with `wheels test --no-test-db` (URL: useTestDB=false); or, for older CLIs that cannot send useTestDB=false, set(allowTestsAgainstPrimaryDatasource=true) in config/settings.cfm.",
+                                datasource: local.originalDataSource,
+                                candidate: local.candidate
+                            }));
+                            abort;
+                        }
                     }
                 }
             }

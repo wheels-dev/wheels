@@ -29,5 +29,12 @@
 	// the SMOKE_RELOAD_PASSWORD the CI workflows use.
 	set(reloadPassword="wheels-dev");
 
+	// The harness reaches the dev tools (/wheels/core/tests, ...) from the host
+	// through Docker port publishing, so requests arrive from the Docker gateway,
+	// not loopback. Allow the Docker bridge (Linux CI) and Docker Desktop ranges.
+	// compose.yml publishes the engine ports on 127.0.0.1 only, so LAN clients
+	// cannot use this path. Test infrastructure only: never copy this into an app.
+	set(devToolsAllowedRemoteAddresses="172.16.0.0/12,192.168.65.0/24");
+
 	// CLI-Appends-Here
 </cfscript>

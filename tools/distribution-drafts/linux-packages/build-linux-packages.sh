@@ -22,6 +22,8 @@ set -euo pipefail
 WHEELS_VERSION="${WHEELS_VERSION:?WHEELS_VERSION must be set}"
 CHANNEL="${CHANNEL:-stable}"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-artifacts/wheels/${WHEELS_VERSION}}"
+# Absolute, resolved before the script cd's into the build dir.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # The runtime pin shared with CI and the Homebrew/Scoop updaters.
 LUCLI_PIN="$(cd "$(dirname "$0")/../.." && pwd)/lucli.json"
 LUCLI_REPO=$(jq -er '.LUCLI_REPO | select(test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"))' "$LUCLI_PIN")
@@ -388,10 +390,23 @@ PKG_ARCH=all WHEELS_VERSION="${DEB_RPM_VERSION}" nfpm pkg \
   --packager deb \
   --target "${NFPM_OUT}/${PKG_NAME}_${DEB_RPM_VERSION}_all.deb"
 
+# The .rpm is built by nfpm, then rebuilt with rpmbuild (#3975): nfpm writes
+# the archive-size header as the sum of the file contents, and rpm 4.19's
+# rpm2cpio (Rocky 10) exits 1 on that. rpm-rewrap.sh reproduces the nfpm
+# package exactly (files, modes, deps, metadata — checked) with a correct
+# header, and checks rpm2cpio on Rocky 10 and Rocky 9. It needs docker.
+NFPM_RPM="$(mktemp -d)/${PKG_NAME}-${DEB_RPM_VERSION}.nfpm.noarch.rpm"
 PKG_ARCH=noarch WHEELS_VERSION="${DEB_RPM_VERSION}" nfpm pkg \
   --config "../${NFPM_CONFIG}" \
   --packager rpm \
-  --target "${NFPM_OUT}/${PKG_NAME}-${DEB_RPM_VERSION}.noarch.rpm"
+  --target "${NFPM_RPM}"
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker not found: it is needed to rebuild the .rpm with rpmbuild (see rpm-rewrap.sh, #3975)" >&2
+  exit 1
+fi
+bash "${SCRIPT_DIR}/rpm-rewrap.sh" \
+  "${NFPM_RPM}" "${NFPM_OUT}/${PKG_NAME}-${DEB_RPM_VERSION}.noarch.rpm"
+rm -f "${NFPM_RPM}"
 
 echo "── Done ──"
 ls -la "${NFPM_OUT}/" | grep -E "${PKG_NAME}_|${PKG_NAME}-"

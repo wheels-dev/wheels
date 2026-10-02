@@ -48,9 +48,11 @@ component {
     }
 
     public string function details(required struct opts) {
+        // Kamal's app details needs no version: without one, list every
+        // container of the role; with one, inspect that container.
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
-            return cmds.status(role, version);
-        }, {collect: true});
+            return len(version) ? cmds.status(role, version) : cmds.role_containers(role);
+        }, {versionOptional: true, collect: true});
         return $renderResult(arguments.opts, "Collected app details on " & n & " host(s)");
     }
 
@@ -83,14 +85,14 @@ component {
     public string function live(required struct opts) {
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
             return cmds.live(role, version);
-        });
+        }, {versionOptional: true});
         return $renderResult(arguments.opts, "Marked app live on " & n & " host(s)");
     }
 
     public string function maintenance(required struct opts) {
         var n = $forEachHost(arguments.opts, function(cmds, role, version) {
             return cmds.maintenance(role, version);
-        });
+        }, {versionOptional: true});
         return $renderResult(arguments.opts, "Put app into maintenance mode on " & n & " host(s)");
     }
 
@@ -120,7 +122,7 @@ component {
         var versionOptional = arguments.flags.versionOptional ?: false;
         if (!versionOptional && !len(version)) {
             throw(type="DeployAppCli.MissingVersion",
-                  message="This verb requires --version (e.g. --version=v1.2.3). On older wrappers that pre-date the picocli rewrite, pass --release instead.");
+                  message="This verb needs the release to act on: pass --release=<version> (e.g. --release=v1.2.3). The CLI runtime keeps --version for itself.");
         }
         var dryRun = arguments.opts.dryRun ?: false;
         // collect=true marks a read verb: remote stdout is gathered into

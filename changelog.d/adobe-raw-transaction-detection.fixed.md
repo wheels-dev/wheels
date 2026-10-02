@@ -1,0 +1,1 @@
+- On Adobe ColdFusion, Wheels now detects every model write inside a raw `transaction {}` block, not only one that is the block's first database work. `afterCommit`/`afterRollback` are skipped for those writes with the usual warning (instead of `afterCommit` firing for a write the block then rolls back). RustCFML still can't see a raw block (#4068)

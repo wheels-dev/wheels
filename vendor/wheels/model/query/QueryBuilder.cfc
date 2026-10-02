@@ -383,7 +383,15 @@ component output="false" {
 				local.rv = $emptyResult(local.args.returnAs);
 			}
 			if (IsArray(local.rv) && local.args.returnAs != "array") {
-				local.rv = ArrayLen(local.rv) ? local.rv[1] : false;
+				if (ArrayLen(local.rv)) {
+					local.rv = local.rv[1];
+				} else if (ListFindNoCase("struct,structs", local.args.returnAs)) {
+					// Same as Model.findOne(): no match is an empty struct for returnAs="struct",
+					// whether the offset is past the end or the query matched nothing.
+					local.rv = {};
+				} else {
+					local.rv = false;
+				}
 			}
 			return local.rv;
 		}

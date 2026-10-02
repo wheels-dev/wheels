@@ -1121,9 +1121,10 @@
 	 * literal, but only the literals the WHERE parser turns into bound
 	 * parameters are decoded at bind time. A literal the parser does not bind
 	 * — a BETWEEN bound, a function argument, a LIKE ... ESCAPE clause — stays
-	 * in the SQL text and must be written back as its original value with the
-	 * quotes doubled, so no sentinel ever reaches the database and the clause
-	 * compares against the real value. Linear scan, no regex.
+	 * in the SQL text and must be written back as its original value through
+	 * the adapter's $inlineStringLiteral, so no sentinel ever reaches the
+	 * database and the clause compares against the real value. Linear scan,
+	 * no regex.
 	 */
 	public string function $restoreMaskedLiterals(required string sql) {
 		local.marker = "'" & $whereLiteralSentinel();
@@ -1158,12 +1159,49 @@
 				continue;
 			}
 			local.value = Len(local.hex) ? CharsetEncode(BinaryDecode(local.hex, "hex"), "utf-8") : "";
-			local.out.append("'");
-			local.out.append(Replace(local.value, "'", "''", "all"));
-			local.out.append("'");
+			if ($followsEscapeKeyword(arguments.sql, local.idx)) {
+				local.literal = variables.wheels.class.adapter.$inlineEscapeCharacter(local.value);
+			} else {
+				local.literal = variables.wheels.class.adapter.$inlineStringLiteral(local.value);
+			}
+			// An adapter may write the value with a character-set introducer
+			// (MySQL's _utf8mb4 X'..'); that replaces an N'...' prefix, which
+			// would otherwise run into it as N_utf8mb4.
+			if (Left(local.literal, 1) != "'" && $hasNationalPrefix(arguments.sql, local.idx)) {
+				local.out.setLength(JavaCast("int", local.out.length() - 1));
+			}
+			local.out.append(local.literal);
 			local.pos = local.closeIdx + 1;
 		}
 		return local.out.toString();
+	}
+
+	/**
+	 * True when the literal that starts at `idx` is the operand of a
+	 * LIKE ... ESCAPE clause (the keyword ESCAPE, then only whitespace).
+	 */
+	public boolean function $followsEscapeKeyword(required string sql, required numeric idx) {
+		// Step back over any whitespace, then expect the keyword itself.
+		local.i = arguments.idx - 1;
+		while (local.i >= 1 && ReFind("\s", Mid(arguments.sql, local.i, 1))) {
+			local.i--;
+		}
+		if (local.i < 6 || CompareNoCase(Mid(arguments.sql, local.i - 5, 6), "ESCAPE") != 0) {
+			return false;
+		}
+		return local.i == 6 || !ReFind("[A-Za-z0-9_$]", Mid(arguments.sql, local.i - 6, 1));
+	}
+
+	/**
+	 * True when the literal that starts at `idx` carries a national-character
+	 * prefix (N'...'): an N or n right before the quote that is not the end of
+	 * a longer identifier.
+	 */
+	public boolean function $hasNationalPrefix(required string sql, required numeric idx) {
+		if (arguments.idx < 2 || CompareNoCase(Mid(arguments.sql, arguments.idx - 1, 1), "N") != 0) {
+			return false;
+		}
+		return arguments.idx == 2 || !ReFind("[A-Za-z0-9_$]", Mid(arguments.sql, arguments.idx - 2, 1));
 	}
 
 	public array function $whereClause(required string where, string include = "", boolean includeSoftDeletes = "false", sql = "", boolean softDelete = "true", useIndex = {}) {

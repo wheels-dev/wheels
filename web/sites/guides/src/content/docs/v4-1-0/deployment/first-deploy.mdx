@@ -137,15 +137,9 @@ Three quick checks before running anything:
    wheels deploy setup
    ```
 
-   `setup` is the first-run verb. In the current Phase 1 CLI it is an alias for `wheels deploy` — it does **not** yet boot `kamal-proxy` or any accessories you've declared (full first-run orchestration is tracked in [#2957](https://github.com/wheels-dev/wheels/issues/2957)). Boot those explicitly before (or right after) your first deploy:
+   `setup` is the first-run verb: it boots every accessory you've declared, then runs a full `wheels deploy`, which logs in to the registry, builds and pushes the image, starts `kamal-proxy` on every proxy-fronted host (or boots it if it isn't there yet), and rolls the app out.
 
-   ```bash title="First-run orchestration (run explicitly for now)"
-   wheels deploy proxy boot
-   wheels deploy accessory boot all
-   wheels deploy setup
-   ```
-
-   On subsequent deploys you use `wheels deploy` — the proxy and accessories are already running.
+   On subsequent deploys you use `wheels deploy`: the accessories are already running.
 
    Expect a few minutes on the first run — Docker pulls the base images for `kamal-proxy`, any accessories, and your app. Output is prefixed with `[host]` so you can see what each server is doing in parallel.
 

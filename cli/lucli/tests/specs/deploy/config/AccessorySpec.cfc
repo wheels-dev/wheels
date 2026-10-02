@@ -46,8 +46,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
 
             it("port() returns the port mapping string", () => {
-                expect(variables.cfg.accessory("db").port()).toBe("5432:5432");
-                expect(variables.cfg.accessory("redis").port()).toBe("6379:6379");
+                expect(variables.cfg.accessory("db").port()).toBe("127.0.0.1:5432:5432");
+                expect(variables.cfg.accessory("redis").port()).toBe("127.0.0.1:6379:6379");
             });
 
             it("volumes() accepts directories: as canonical accessory form", () => {

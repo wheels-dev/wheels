@@ -19,13 +19,21 @@ component {
 		// accepted-and-ignored (##3088).
 		variables.allowedKeys = [
 			"service", "image", "servers", "registry", "builder", "env",
-			"ssh", "proxy", "boot", "accessories"
+			"ssh", "proxy", "boot", "accessories", "volumes"
 		];
 		// Pre-build a case-insensitive struct lookup so the hot path doesn't
 		// depend on arrayContainsNoCase (not available on every engine).
 		variables.allowedLookup = {};
 		for (var k in variables.allowedKeys) {
 			variables.allowedLookup[lCase(k)] = true;
+		}
+		// proxy: sub-keys. forward_headers and buffering are accepted for
+		// Kamal compatibility but not applied yet (config-reference documents
+		// that); anything else is a typo that would silently do nothing.
+		variables.proxyKeys = ["host", "ssl", "app_port", "appPort", "healthcheck", "forward_headers", "buffering"];
+		variables.proxyLookup = {};
+		for (var pk in variables.proxyKeys) {
+			variables.proxyLookup[lCase(pk)] = true;
 		}
 		return this;
 	}
@@ -48,6 +56,20 @@ component {
 		// validated rather than quoted (##2956).
 		$validateName(arguments.parsed.service, "service", arguments.filePath);
 		$validateImage(arguments.parsed.image, "image", arguments.filePath);
+		if (structKeyExists(arguments.parsed, "proxy") && isStruct(arguments.parsed.proxy)) {
+			for (var proxyKey in arguments.parsed.proxy) {
+				if (!structKeyExists(variables.proxyLookup, lCase(proxyKey))) {
+					$raise(
+						arguments.filePath,
+						"unknown key: 'proxy.#proxyKey#' (allowed proxy keys: #arrayToList(variables.proxyKeys, ', ')#)"
+					);
+				}
+			}
+			// Proxy.ssl() treats a non-boolean as false, so a typo turned TLS off.
+			if (structKeyExists(arguments.parsed.proxy, "ssl") && !isBoolean(arguments.parsed.proxy.ssl)) {
+				$raise(arguments.filePath, "proxy.ssl must be true or false (got '#arguments.parsed.proxy.ssl#')");
+			}
+		}
 		// kamal-proxy's --tls needs a host to request a certificate for.
 		if (
 			structKeyExists(arguments.parsed, "proxy") && isStruct(arguments.parsed.proxy)
@@ -57,25 +79,139 @@ component {
 			$raise(arguments.filePath, "proxy.ssl requires proxy.host (the host name TLS is issued for)");
 		}
 		$validateServers(arguments.parsed.servers, arguments.filePath);
+		$validateVolumes(arguments.parsed, arguments.filePath);
 		$validateBoot(arguments.parsed, arguments.filePath);
 		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {
 			for (var accName in arguments.parsed.accessories) {
-				$validateName(accName, "accessory", arguments.filePath);
-				var acc = arguments.parsed.accessories[accName];
-				if (isStruct(acc)) {
-					if (structKeyExists(acc, "image")) {
-						$validateImage(acc.image, "accessory #accName# image", arguments.filePath);
-					}
-					for (var hostKey in ["host", "hosts"]) {
-						if (structKeyExists(acc, hostKey)) {
-							for (var accHost in (isArray(acc[hostKey]) ? acc[hostKey] : [acc[hostKey]])) {
-								$validateHost(accHost, arguments.filePath);
-							}
-						}
-					}
+				$validateAccessory(arguments.parsed.accessories[accName], accName, arguments.filePath);
+			}
+		}
+	}
+
+	/**
+	 * One accessory's checks: its name, image, port bind address, volume
+	 * host paths and hosts. Kept out of validate() so that function stays
+	 * under the complexity gate.
+	 */
+	public void function $validateAccessory(required any acc, required string accName, required string filePath) {
+		$validateName(arguments.accName, "accessory", arguments.filePath);
+		if (!isStruct(arguments.acc)) return;
+		if (structKeyExists(arguments.acc, "image")) {
+			$validateImage(arguments.acc.image, "accessory #arguments.accName# image", arguments.filePath);
+		}
+		if (structKeyExists(arguments.acc, "port")) {
+			$validateAccessoryPort(arguments.acc.port, arguments.accName, arguments.filePath);
+		}
+		for (var volKey in ["volumes", "directories"]) {
+			if (structKeyExists(arguments.acc, volKey) && isArray(arguments.acc[volKey])) {
+				var volIndex = 0;
+				for (var vol in arguments.acc[volKey]) {
+					volIndex++;
+					$validateVolumeHost(vol, "accessory #arguments.accName# #volKey#[#volIndex#]", arguments.filePath);
 				}
 			}
 		}
+		for (var hostKey in ["host", "hosts"]) {
+			if (structKeyExists(arguments.acc, hostKey)) {
+				for (var accHost in (isArray(arguments.acc[hostKey]) ? arguments.acc[hostKey] : [arguments.acc[hostKey]])) {
+					$validateHost(accHost, arguments.filePath);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Top-level `volumes:` (Kamal): a list of `host:container` or
+	 * `host:container:ro|rw` mounts for every app container, where host is a
+	 * path or a named volume and container is an absolute path (#4018).
+	 */
+	public void function $validateVolumes(required struct parsed, required string filePath) {
+		if (!structKeyExists(arguments.parsed, "volumes")) return;
+		if (!isArray(arguments.parsed.volumes)) {
+			$raise(arguments.filePath, "volumes must be a list of host:container mounts, e.g. - /var/lib/myapp/db:/var/www/db");
+		}
+		var i = 0;
+		for (var entry in arguments.parsed.volumes) {
+			i++;
+			var parts = isSimpleValue(entry) ? listToArray(entry, ":", true) : [];
+			var shapeOk = (arrayLen(parts) == 2 || (arrayLen(parts) == 3 && listFind("ro,rw", lCase(parts[3]))))
+				&& len(trim(parts[1])) && left(parts[2], 1) == "/";
+			if (!shapeOk) {
+				$raise(
+					arguments.filePath,
+					"volumes[#i#] must be host:container or host:container:ro|rw with an absolute container path (got '#isSimpleValue(entry) ? entry : "a non-string value"#')"
+				);
+			}
+			$validateVolumeHost(entry, "volumes[#i#]", arguments.filePath);
+		}
+	}
+
+	/**
+	 * Volume entries reach Docker as written (they are quoted), so a host
+	 * path starting with `~` or `$` (which a shell used to expand) would be
+	 * taken literally; refuse it with a clear message. A `$` later in the
+	 * path is a literal character and is fine.
+	 */
+	public void function $validateVolumeHost(required any entry, required string label, required string filePath) {
+		if (!isSimpleValue(arguments.entry)) return;
+		var firstChar = left(trim(arguments.entry), 1);
+		if (firstChar == "~" || firstChar == "$") {
+			$raise(
+				arguments.filePath,
+				"#arguments.label# needs an absolute host path: '#arguments.entry#' starts with '#firstChar#', which is not expanded (write /home/<user>/... instead)"
+			);
+		}
+	}
+
+	/**
+	 * An accessory `port:` goes to `docker run --publish` as written, so it
+	 * must name a bind address (#4067), as Kamal main (unreleased) requires
+	 * since basecamp/kamal@00cb4cf1d: "<ipv4>:<host>:<container>" or
+	 * "[<ipv6>]:<host>:<container>", optionally with "/tcp", "/udp" or
+	 * "/sctp". A bare
+	 * "5432" published on a random host port, and "5432:5432" on every
+	 * interface, without any warning.
+	 */
+	public void function $validateAccessoryPort(required any port, required string accName, required string filePath) {
+		if (!isSimpleValue(arguments.port)) {
+			$raise(arguments.filePath, "accessory #arguments.accName#: port must be a string such as ""127.0.0.1:5432:5432""");
+		}
+		var value = trim(toString(arguments.port));
+		if (!len(value)) return;
+		var hostPart = listFirst(value, "/");
+		// The ports and optional protocol after the bind address: a port or
+		// range on each side, e.g. ":5432:5432", ":8000-8010:8000-8010/udp".
+		var portsPattern = ":[0-9]+(-[0-9]+)?:[0-9]+(-[0-9]+)?(/(tcp|udp|sctp))?$";
+		var bound = false;
+		if (left(hostPart, 1) == "[") {
+			var close = find("]", hostPart);
+			if (close > 2) {
+				var ipv6 = mid(hostPart, 2, close - 2);
+				bound = reFind("^[0-9A-Fa-f:.]+$", ipv6) && find(":", ipv6)
+					&& reFind("^" & portsPattern, mid(value, close + 1, len(value)));
+			}
+		} else if (listLen(hostPart, ":", true) >= 3) {
+			var ipv4 = listFirst(hostPart, ":");
+			bound = $isIPv4(ipv4) && reFind("^" & portsPattern, mid(value, len(ipv4) + 1, len(value)));
+		}
+		if (!bound) {
+			var containerPort = listLast(hostPart, ":");
+			if (!reFind("^[0-9]+$", containerPort)) containerPort = "PORT";
+			$raise(
+				arguments.filePath,
+				"accessory #arguments.accName#: port ""#value#"" must name a bind address, e.g. ""127.0.0.1:#containerPort#:#containerPort#"" to keep it on that host, "
+					& """10.0.0.20:#containerPort#:#containerPort#"" for a private network address, or ""0.0.0.0:#containerPort#:#containerPort#"" to publish it on every interface"
+			);
+		}
+	}
+
+	/** Four dot-separated decimal octets, each 0-255. */
+	public boolean function $isIPv4(required string value) {
+		if (!reFind("^[0-9]{1,3}(\.[0-9]{1,3}){3}$", arguments.value)) return false;
+		for (var octet in listToArray(arguments.value, ".")) {
+			if (val(octet) > 255) return false;
+		}
+		return true;
 	}
 
 	public void function $validateServers(required any servers, required string filePath) {

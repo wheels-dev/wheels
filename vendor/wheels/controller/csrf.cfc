@@ -108,7 +108,19 @@ component {
 	 * Internal function.
 	 */
 	public function $setAuthenticityToken() {
-		if (!$isVerifiedRequest() && isAjax()) {
+		// The X-CSRF-Token header counts on any non-GET request, not only with
+		// X-Requested-With (#3959). The token value is the protection: a cross-site
+		// page can't read it, and X-Requested-With is itself a custom header with the
+		// same CORS preflight. Clients that send the page's current token in this
+		// header (Turbo, or a fetch() that sets it) don't send X-Requested-With. With
+		// startFormTag/buttonTo(authenticityToken = false), this is how a form in
+		// shared cached markup (which must not carry a token) takes the token at
+		// request time.
+		//
+		// Rule when both are present: the request passes if EITHER the form field or
+		// the header holds a valid token (Rails' behaviour). The header is consulted
+		// only when the field didn't verify.
+		if (!$isVerifiedRequest()) {
 			if (StructKeyExists(request.$wheelsHeaders, "X-CSRF-Token")) {
 				params.authenticityToken = request.$wheelsHeaders["X-CSRF-Token"];
 			}
@@ -128,7 +140,13 @@ component {
 	public boolean function $isAnyAuthenticityTokenValid() {
 		if ($isRequestProtectedFromForgery() && StructKeyExists(params, "authenticityToken")) {
 			if (application.wheels.csrfStore == "session") {
-				local.isValid = CsrfVerifyToken(params.authenticityToken);
+				// Exact, case-sensitive and constant-time on every engine, the same way the
+				// cookie store compares: the value must equal the session token
+				// (CsrfGenerateToken() returns the current one; the form field uses it too).
+				local.sessionToken = CsrfGenerateToken();
+				local.isValid = Len(local.sessionToken)
+					&& IsSimpleValue(params.authenticityToken)
+					&& $secureCompare(local.sessionToken, params.authenticityToken);
 			} else {
 				local.isValid = $isCookieAuthenticityTokenValid();
 			}

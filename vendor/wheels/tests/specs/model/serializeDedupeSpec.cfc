@@ -16,7 +16,7 @@ component extends="wheels.WheelsTest" {
 						returnAs = "structs",
 						reload = true
 					);
-					expect(StructCount(authors)).toBe(2);
+					expect(ArrayLen(authors)).toBe(2);
 				} finally {
 					model("author").deleteAll(where = "lastName = 'SerializeDedupeSpec'");
 				}
@@ -32,7 +32,7 @@ component extends="wheels.WheelsTest" {
 					returnAs = "structs",
 					reload = true
 				);
-				expect(StructCount(authors)).toBe(1);
+				expect(ArrayLen(authors)).toBe(1);
 			})
 
 		})

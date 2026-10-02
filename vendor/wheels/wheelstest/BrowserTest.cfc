@@ -225,7 +225,11 @@ component extends="wheels.WheelsTest" {
         if (Len(variables.$baseUrl ?: "")) {
             try {
                 var ctx = new wheels.events.TestContext();
-                this.browser.setCookie(name = ctx.cookieName(), value = "1", url = variables.$baseUrl);
+                // The cookie backup must carry the per-process runner
+                // secret too. If the extraHTTPHeaders context fell back above, this
+                // loopback cookie is the only isolation marker left, and the gate
+                // now rejects a bare "1".
+                this.browser.setCookie(name = ctx.cookieName(), value = ctx.testSecret(), url = variables.$baseUrl);
             } catch (any cookieErr) {
                 // Best-effort: header may already be on the context.
             }
@@ -412,7 +416,10 @@ component extends="wheels.WheelsTest" {
     private any function $buildContextOptions() {
         var ctx = new wheels.events.TestContext();
         var headerMap = CreateObject("java", "java.util.LinkedHashMap").init();
-        headerMap.put(ctx.headerName(), "1");
+        // Send the per-process runner secret (not a fixed "1").
+        // Playwright requests originate from loopback, so the framework gate
+        // binds the isolated application only for this trusted runner.
+        headerMap.put(ctx.headerName(), ctx.testSecret());
         var setterMap = {setExtraHTTPHeaders: headerMap};
 
         if (StructKeyExists(this, "browserViewport") && Len(this.browserViewport ?: "")) {

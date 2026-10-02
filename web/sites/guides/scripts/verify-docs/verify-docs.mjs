@@ -11,10 +11,11 @@ import { runCompile } from './drivers/compile.mjs';
 import { TutorialSession } from './drivers/tutorial.mjs';
 import { enrichWithSidebarOrder, partitionAndOrder } from './lib/orchestrator.mjs';
 
-// Verify the current guides line by default. Bump this whenever a new
-// version is added to GUIDES_VERSIONS (web/packages/ui/src/data/versions.ts),
-// otherwise bare `pnpm verify:docs` silently validates an archived tree.
-const DEFAULT_TARGET = 'src/content/docs/v4-1-0';
+// Verify the newest guides line by default (the one new docs land in, even
+// while it is marked 'snapshot'). Bump this whenever a new version is added to
+// GUIDES_VERSIONS (web/packages/ui/src/data/versions.ts), otherwise bare
+// `pnpm verify:docs` silently validates an older tree.
+const DEFAULT_TARGET = 'src/content/docs/v4-2-0';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ALLOWLIST = join(HERE, 'expected-failures.json');
 

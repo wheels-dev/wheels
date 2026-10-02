@@ -75,14 +75,16 @@ component extends="Base" {
 
     private array function $portArgs(required any accessory) {
         if (!len(arguments.accessory.port())) return [];
-        return ["--publish", arguments.accessory.port()];
+        return ["--publish", shellEscape(arguments.accessory.port())];
     }
 
     private array function $volumeArgs(required any accessory) {
         var parts = [];
+        // Quoted like every other docker argument, so a path with spaces or
+        // special characters is passed through as one value.
         for (var v in arguments.accessory.volumes()) {
             arrayAppend(parts, "--volume");
-            arrayAppend(parts, v);
+            arrayAppend(parts, shellEscape(v));
         }
         return parts;
     }

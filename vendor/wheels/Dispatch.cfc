@@ -417,12 +417,13 @@ component output="false" extends="wheels.Global"{
 				}
 
 				// Dev-tools network-origin gate: the password-less /wheels GUI
-				// endpoints only answer requests addressed to a local host name
-				// (Host header + no non-loopback X-Forwarded-For; not the socket, so
-				// Docker port-mapped access keeps working). Mutating endpoints add
-				// their own loopback-socket + CSRF / password checks on top. Guarded
-				// so a test double swapped in for the public component (which need not
-				// implement the gate) still dispatches.
+				// endpoints only answer a loopback socket peer (or one listed in
+				// devToolsAllowedRemoteAddresses, development/testing only) that
+				// addresses a local host name with no non-loopback X-Forwarded-For
+				// hop, and never in production. See Public.$devToolAccessCheck().
+				// Mutating endpoints add their own CSRF / password checks on top.
+				// Guarded so a test double swapped in for the public component
+				// (which need not implement the gate) still dispatches.
 				if (StructKeyExists(application.wheels.public, "$enforceDevToolLocalAccess")) {
 					application.wheels.public.$enforceDevToolLocalAccess();
 				}
@@ -753,7 +754,7 @@ component output="false" extends="wheels.Global"{
 			} else {
 				return local.rv;
 			}
-			local.modelName = capitalize(singularize(local.controllerName));
+			local.modelName = $routeBindingModelName(local.controllerName);
 		}
 
 		// Negative cache: a conventional binding that previously failed to resolve is skipped
@@ -880,7 +881,12 @@ component output="false" extends="wheels.Global"{
 			application.$wheelsRouteBindingWarnings[local.dedupKey] = true;
 
 			// Derive the singular name binding would use (matches $resolveRouteModelBinding logic).
-			local.modelName = capitalize(singularize(local.controller));
+			// No hint when there is no such model: binding could not load anything, so the
+			// hint would only name a model that does not exist (#3940).
+			local.modelName = $routeBindingModelName(local.controller);
+			if (!$routeBindingModelExists(local.modelName)) {
+				return false;
+			}
 			local.singular = LCase(Left(local.modelName, 1)) & Mid(local.modelName, 2, Len(local.modelName) - 1);
 			local.routeName = StructKeyExists(arguments.route, "name") ? arguments.route.name : "";
 
@@ -897,6 +903,30 @@ component output="false" extends="wheels.Global"{
 			return true;
 		} catch (any ignored) {
 			// Warning emission is best-effort; never block dispatch.
+			return false;
+		}
+	}
+
+	/**
+	 * Internal function. The model name route model binding derives from a controller
+	 * name: the last segment of a namespaced controller, singularized and capitalized,
+	 * so `admin.users` binds the `User` model, not `Admin.user` (#3940). A model in a
+	 * subfolder needs an explicit `binding="admin/User"` on the resource.
+	 */
+	public string function $routeBindingModelName(required string controllerName) {
+		return capitalize(singularize(ListLast(arguments.controllerName, "./")));
+	}
+
+	/**
+	 * Internal function. True when `model(name)` resolves. Only the binding hint calls
+	 * this, at most once per controller and action, so a missing model costs one failed
+	 * lookup per reload.
+	 */
+	public boolean function $routeBindingModelExists(required string modelName) {
+		try {
+			model(arguments.modelName);
+			return true;
+		} catch (any e) {
 			return false;
 		}
 	}

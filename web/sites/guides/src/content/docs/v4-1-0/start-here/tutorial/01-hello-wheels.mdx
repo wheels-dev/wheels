@@ -96,29 +96,20 @@ It exists so a fresh app boots to something useful instead of a blank page. It i
     - jobs
     - lib
     - mailers
-    - middleware
     - migrator
       - migrations
     - models
       - Model.cfc
+    - plugins
     - policies
       - Policy.cfc
     - snippets
-      - dbmigrate
     - views
       - helpers.cfm
       - layout.cfm
       - main
         - index.cfm
   - config
-    - development
-      - settings.cfm
-    - maintenance
-      - settings.cfm
-    - production
-      - settings.cfm
-    - testing
-      - settings.cfm
     - app.cfm
     - environment.cfm
     - routes.cfm
@@ -127,7 +118,6 @@ It exists so a fresh app boots to something useful instead of a blank page. It i
   - db
     - development.sqlite
     - test.sqlite
-  - plugins
   - public
     - Application.cfc
     - index.cfm
@@ -149,7 +139,6 @@ It exists so a fresh app boots to something useful instead of a blank page. It i
   - vendor
     - wheels
   - .env
-  - .env.example
   - .gitignore
   - AGENTS.md
   - CLAUDE.md
@@ -165,7 +154,7 @@ Three directories matter right now:
 
 `vendor/wheels/` is the framework itself, copied into your app. You generally don't touch it.
 
-The other top-level `app/` directories (`events/`, `global/`, `jobs/`, `lib/`, `mailers/`, `middleware/`, `migrator/`, `models/`, `policies/`, `snippets/`) are scaffolding for features you'll meet later — background jobs, mailers, application events, model definitions, generator templates. Leave them alone for now. The remaining root-level files are framework configuration: `lucee.json` configures the Lucee runtime, `.env` holds environment variables (the dev server's reload password lives here), and `config/app.cfm` plus the rest of `config/` configure the framework itself. `AGENTS.md`, `CLAUDE.md`, and `.ai/` are reference notes for AI coding assistants.
+The other top-level `app/` directories (`events/`, `global/`, `jobs/`, `lib/`, `mailers/`, `migrator/`, `models/`, `plugins/`, `policies/`, `snippets/`) are scaffolding for features you'll meet later — background jobs, mailers, application events, model definitions, generator templates. Leave them alone for now. The remaining root-level files are framework configuration: `lucee.json` configures the Lucee runtime, `.env` holds environment variables (the dev server's reload password lives here), and `config/app.cfm` plus the rest of `config/` configure the framework itself. `AGENTS.md`, `CLAUDE.md`, and `.ai/` are reference notes for AI coding assistants.
 
 <Aside type="tip">
   **On styling:** the generated `app/views/layout.cfm` loads [simple.css](https://simplecss.org/) and `wheels.css` with `#styleSheetLinkTag(sources="simple,wheels")#`, serving both from `public/stylesheets/`. simple.css is a classless stylesheet that gives semantic HTML a clean, modern look without any markup changes. Wheels' form helpers (`#textField()#`, `#startFormTag()#`, etc.) already emit the right tags, so your scaffolded views render polished from the very first page. Remove that `styleSheetLinkTag()` call (and the two files) if you're bringing your own CSS. For a fuller component kit with proper buttons, cards, and form helpers, see the [optional bonus chapter](/v4-1-0/start-here/tutorial/08-bonus-basecoat/) at the end of the tutorial — it walks through installing `wheels-basecoat`.

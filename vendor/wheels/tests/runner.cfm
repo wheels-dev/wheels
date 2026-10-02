@@ -28,6 +28,35 @@
     // Define helper functions as variables-scoped closures to avoid Adobe CF's
     // DuplicateFunctionDefinitionException (this file can be included from multiple
     // CFC methods via different include paths)
+    // Hard-refuse the core test runner in production,
+    // independent of enablePublicComponent. The onApplicationStart backstop
+    // already refuses an isolated start outside dev/testing; this is the
+    // belt-and-suspenders at the runner itself. Minimal 403, no detail.
+    if (
+        StructKeyExists(application, "wheels")
+        && StructKeyExists(application.wheels, "environment")
+        && application.wheels.environment == "production"
+    ) {
+        cfheader(statuscode = 403);
+        cfheader(name = "Content-Type", value = "text/plain; charset=utf-8");
+        writeOutput("Forbidden");
+        abort;
+    }
+
+    // Warn when test-context isolation is OFF (the request bound the
+    // live application scope instead of <name>_wheelsTest). Set WHEELS_ENV=
+    // development or testing so events/testcontext.cfm binds the isolated app.
+    if (!(Len(application.applicationName) >= 11 && Right(application.applicationName, 11) == "_wheelsTest")) {
+        cfheader(name = "X-Wheels-Test-Isolation", value = "off");
+        try {
+            writeLog(
+                file = "wheels",
+                type = "warning",
+                text = "Test runner isolation is OFF: application '" & application.applicationName & "' is not the isolated _wheelsTest scope. Set WHEELS_ENV=development or testing."
+            );
+        } catch (any e) {}
+    }
+
     variables.$_duplicateWheelsEnv = function(required struct original) {
         var backup = {}
         for (var key in arguments.original) {
