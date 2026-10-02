@@ -43,15 +43,25 @@ component extends="wheels.WheelsTest" {
 				expect(DirectoryExists(docsRoot & latestSegment)).toBeTrue("missing guides tree " & latestSegment);
 			});
 
-			it("is not behind the newest guide tree", () => {
-				// When a version's guides are cut, bump variables.latest in
+			it("is not behind the newest released guide tree", () => {
+				// When a version's guides are released, bump variables.latest in
 				// vendor/wheels/GuidesLink.cfc and cli/lucli/services/GuidesLink.cfc.
-				for (var dir in DirectoryList(docsRoot, false, "name")) {
-					var m = ReFind("^v([0-9]+)-([0-9]+)-0$", dir, 1, true);
-					if (m.pos[1] > 0) {
-						var tree = Mid(dir, m.pos[2], m.len[2]) & "." & Mid(dir, m.pos[3], m.len[3]);
-						expect(guides.$compareMinor(tree, guides.latestVersion())).toBeLTE(0, "guides tree #dir# is newer than GuidesLink's latest (#guides.latestVersion()#)");
-					}
+				// A tree marked status 'snapshot' in versions.ts (in development) is
+				// allowed to be newer: links don't point at unreleased guides.
+				var ahead = $treesAheadOfLatest(DirectoryList(docsRoot, false, "name"), $snapshotSlugs(), guides);
+				expect(ArrayLen(ahead)).toBe(0, "released guide tree(s) newer than GuidesLink's latest (#guides.latestVersion()#): #ArrayToList(ahead)#");
+			});
+
+			it("lets a newer snapshot tree pass and still fails a newer released tree", () => {
+				var next = "v" & ListFirst(guides.latestVersion(), ".") & "-" & (ListLast(guides.latestVersion(), ".") + 1) & "-0";
+				expect(ArrayLen($treesAheadOfLatest([next], [next], guides))).toBe(0);
+				expect($treesAheadOfLatest([next], [], guides)).toBe([next]);
+			});
+
+			it("reads the snapshot status from versions.ts", () => {
+				var source = FileRead(ExpandPath("/wheels/../..") & "/web/packages/ui/src/data/versions.ts");
+				for (var slug in $snapshotSlugs()) {
+					expect(ReFind("slug: '#slug#'[^}]*status: 'snapshot'", source)).toBeGT(0);
 				}
 			});
 
@@ -61,7 +71,8 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("links only to pages that exist in every tree it can resolve to", () => {
-				var pages = ["upgrading/3x-to-4x", "upgrading/2x-to-3x", "digging-deeper/packages", "command-line-tools/mcp-integration", "testing", "start-here/installing"];
+				var pages = $linkedPages();
+				expect(ArrayLen(pages)).toBeGT(5, "the source scan found too few GuidesLink calls");
 				for (var tree in ["v4-0-0", latestSegment]) {
 					for (var page in pages) {
 						var base = docsRoot & tree & "/" & page;
@@ -70,6 +81,63 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 		});
+	}
+
+	// Guide trees (vN-M-0 directory names) newer than GuidesLink's latest that
+	// are not marked 'snapshot'.
+	private array function $treesAheadOfLatest(required array dirs, required array snapshotSlugs, required any guides) {
+		var ahead = [];
+		for (var dir in arguments.dirs) {
+			var m = ReFind("^v([0-9]+)-([0-9]+)-0$", dir, 1, true);
+			if (m.pos[1] > 0 && !ArrayFindNoCase(arguments.snapshotSlugs, dir)) {
+				var tree = Mid(dir, m.pos[2], m.len[2]) & "." & Mid(dir, m.pos[3], m.len[3]);
+				if (arguments.guides.$compareMinor(tree, arguments.guides.latestVersion()) > 0) {
+					ArrayAppend(ahead, dir);
+				}
+			}
+		}
+		return ahead;
+	}
+
+	// Slugs that versions.ts lists in GUIDES_VERSIONS with status 'snapshot'.
+	private array function $snapshotSlugs() {
+		var source = FileRead(ExpandPath("/wheels/../..") & "/web/packages/ui/src/data/versions.ts");
+		var start = Find("GUIDES_VERSIONS", source);
+		var block = Mid(source, start, Find("];", source, start) - start);
+		var slugs = [];
+		for (var entry in ReMatch("\{[^}]*\}", block)) {
+			if (Find("status: 'snapshot'", entry)) {
+				var m = ReFind("slug: '([^']+)'", entry, 1, true);
+				if (m.pos[1] > 0) {
+					ArrayAppend(slugs, Mid(entry, m.pos[2], m.len[2]));
+				}
+			}
+		}
+		return slugs;
+	}
+
+	// Every guides path passed to GuidesLink.link() as a literal in the files
+	// that build guide links, plus the upgrade check's computed path.
+	private array function $linkedPages() {
+		var root = ExpandPath("/wheels/../..") & "/";
+		var files = [
+			"vendor/wheels/Plugins.cfc",
+			"vendor/wheels/Test.cfc",
+			"vendor/wheels/public/mcp/McpServer.cfc",
+			"vendor/wheels/public/views/mcp.cfm",
+			"cli/lucli/Module.cfc",
+			"cli/lucli/services/Doctor.cfc"
+		];
+		var pages = ["upgrading/3x-to-4x", "upgrading/2x-to-3x"];
+		for (var file in files) {
+			for (var call in ReMatch('link\(\s*"[a-z0-9/_-]+"', FileRead(root & file))) {
+				var page = ReReplace(ReReplace(call, '^link\(\s*"', ""), '/?"$', "");
+				if (!ArrayFindNoCase(pages, page)) {
+					ArrayAppend(pages, page);
+				}
+			}
+		}
+		return pages;
 	}
 
 }
