@@ -135,6 +135,22 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect($allText($check($app(files)))).notToInclude("csrfCookieEncryptionSecretKey");
 			});
 
+			it("flags a 4.x cookie-store app with no key (production throws MissingCsrfKey)", () => {
+				var files = {
+					"vendor/wheels/wheels.json": serializeJSON({name: "wheels-core", version: "4.1.2"}),
+					"config/settings.cfm": 'set(csrfStore="cookie");'
+				};
+				expect($allText($check($app(files)))).toInclude("csrfCookieEncryptionSecretKey");
+			});
+
+			it("doesn't flag a 4.x cookie-store app that sets the key", () => {
+				var files = {
+					"vendor/wheels/wheels.json": serializeJSON({name: "wheels-core", version: "4.1.2"}),
+					"config/settings.cfm": 'set(csrfStore="cookie");#chr(10)#set(csrfCookieEncryptionSecretKey=env("WHEELS_CSRF_KEY"));'
+				};
+				expect($allText($check($app(files)))).notToInclude("csrfCookieEncryptionSecretKey");
+			});
+
 			it("flags a cookie-store app with no key", () => {
 				var files = $wheels30();
 				files["config/settings.cfm"] = 'set(csrfStore="cookie");';

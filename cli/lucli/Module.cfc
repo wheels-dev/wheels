@@ -8032,11 +8032,13 @@ component extends="modules.BaseModule" {
 			// production throws Wheels.Security.MissingCsrfKey rather than
 			// auto-generating an ephemeral key.
 			// Only for apps that use the cookie store: the default (and an
-			// explicit csrfStore="session") never reads the key (#3939).
+			// explicit csrfStore="session") never reads the key (#3939). Not
+			// jumpOnly: a 4.x app on the cookie store with no key throws
+			// Wheels.Security.MissingCsrfKey in production, so an app that
+			// swapped the framework first still needs to hear it.
 			if ($upgradeConfigMatches('csrfStore\s*=\s*["'']cookie["'']')) {
 				arrayAppend(checks, {
 					description: "Missing csrfCookieEncryptionSecretKey (CSRF cookies rotate on every deploy when csrfStore=""cookie"")",
-					jumpOnly: true,
 					pattern: "csrfCookieEncryptionSecretKey",
 					checkType: "grep",
 					scanDir: "config",
