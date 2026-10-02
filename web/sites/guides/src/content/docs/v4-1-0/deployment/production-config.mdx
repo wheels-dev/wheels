@@ -25,7 +25,13 @@ This page shows you what to set, what to override, and what to verify before a W
 
 `config/environment.cfm` selects the active environment. The scaffold ships with `development` hardcoded:
 
-The generated `config/environment.cfm` reads `WHEELS_ENV` (from `.env`, then the process environment), so the same artifact boots dev, staging, and prod. Unset or empty means `development`; any value other than `development`, `testing`, `maintenance` or `production` stops the app from starting. Apps generated before 4.1.3 hardcode `set(environment="development")`; change that file before deploying (see [Environment detection](/v4-1-0/core-concepts/environments-and-configuration/#environment-detection)). If you'd rather an unset variable mean production, default to it:
+```cfm {test:compile} title="config/environment.cfm (scaffold default)"
+<cfscript>
+    set(environment="development");
+</cfscript>
+```
+
+In production, read `WHEELS_ENV` from the process instead so the same artifact can boot dev, staging, and prod:
 
 ```cfm {test:compile} title="config/environment.cfm"
 <cfscript>
@@ -49,7 +55,7 @@ You do not set any of those manually. Setting `environment` to `production` is t
 
 ## Configure `config/production/settings.cfm`
 
-Edit `config/production/settings.cfm`. `wheels new` creates it as a commented stub; in an app generated before 4.1.3, create it. This file is read only when the active environment is `production`:
+Create `config/production/settings.cfm`. This file is read only when the active environment is `production`:
 
 ```cfm {test:compile} title="config/production/settings.cfm"
 <cfscript>
