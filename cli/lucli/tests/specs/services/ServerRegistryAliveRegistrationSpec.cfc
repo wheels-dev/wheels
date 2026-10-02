@@ -9,9 +9,11 @@
 component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function run() {
+		// The specs start `sleep`/`true` processes and read POSIX pids: skipped on Windows.
+		var onWindows = findNoCase("win", createObject("java", "java.lang.System").getProperty("os.name")) > 0;
+
 		describe("ServerRegistry.aliveRegistrationFor", () => {
 			beforeEach(() => {
-				variables.isWindows = findNoCase("win", createObject("java", "java.lang.System").getProperty("os.name")) > 0;
 				variables.home = getTempDirectory() & "alive-reg-home-" & createUUID();
 				variables.project = getTempDirectory() & "alive-reg-proj-" & createUUID();
 				directoryCreate(home & "/servers", true, true);
@@ -31,36 +33,31 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				if (directoryExists(project)) directoryDelete(project, true);
 			});
 
-			it("finds a live registration under an older name whose project-path is this project", () => {
-				if (isWindows) return;
+			it(title = "finds a live registration under an older name whose project-path is this project", skip = onWindows, body = () => {
 				$register("old-name", $livePid());
 				expect(registry.serverNameFor(project)).toBe("current-name");
 				expect(registry.aliveRegistrationFor(project)).toBe("old-name");
 			});
 
-			it("skips a stale current-name registration and finds the live alternate", () => {
-				if (isWindows) return;
+			it(title = "skips a stale current-name registration and finds the live alternate", skip = onWindows, body = () => {
 				$register("current-name", $deadPid());
 				$register("old-name", $livePid());
 				expect(registry.aliveRegistrationFor(project)).toBe("old-name");
 			});
 
-			it("prefers the current name when it is live", () => {
-				if (isWindows) return;
+			it(title = "prefers the current name when it is live", skip = onWindows, body = () => {
 				$register("current-name", $livePid());
 				$register("old-name", $livePid());
 				expect(registry.aliveRegistrationFor(project)).toBe("current-name");
 			});
 
-			it("returns empty when only stale registrations point at the project", () => {
-				if (isWindows) return;
+			it(title = "returns empty when only stale registrations point at the project", skip = onWindows, body = () => {
 				$register("current-name", $deadPid());
 				$register("old-name", $deadPid());
 				expect(registry.aliveRegistrationFor(project)).toBe("");
 			});
 
-			it("ignores a live registration that belongs to another project", () => {
-				if (isWindows) return;
+			it(title = "ignores a live registration that belongs to another project", skip = onWindows, body = () => {
 				$register("other-app", $livePid(), getTempDirectory() & "some-other-project");
 				expect(registry.aliveRegistrationFor(project)).toBe("");
 			});

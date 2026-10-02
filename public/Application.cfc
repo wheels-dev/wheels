@@ -256,13 +256,34 @@ component output="false" {
 		// the cold-start path and the soft-reload skip all see one value.
 		// ?reload=true&password=... from a browser keeps working unchanged, and
 		// an explicit url.password wins over the header.
-		if (
-			StructKeyExists(url, "reload")
-			&& !StructKeyExists(url, "password")
-			&& IsDefined("cgi.http_x_wheels_reload_password")
-			&& Len(ToString(cgi.http_x_wheels_reload_password))
-		) {
-			url.password = ToString(cgi.http_x_wheels_reload_password);
+		//
+		// On the first request after a reload restart, onApplicationStart runs
+		// inside the request and the framework sets request.cgi. RustCFML then
+		// resolves IsDefined("cgi.<key>") against request.cgi, which holds no
+		// http_x_wheels_reload_password, so the header looked absent.
+		// GetHttpRequestData() still has it, so it is the fallback (#3913). Still
+		// header-only: the password is never read from the form scope.
+		if (StructKeyExists(url, "reload") && !StructKeyExists(url, "password")) {
+			local.reloadPasswordHeader = "";
+			if (IsDefined("cgi.http_x_wheels_reload_password")) {
+				local.reloadPasswordHeader = ToString(cgi.http_x_wheels_reload_password);
+			}
+			if (!Len(local.reloadPasswordHeader)) {
+				try {
+					local.requestHeaders = GetHttpRequestData(false).headers;
+					for (local.headerName in local.requestHeaders) {
+						if (CompareNoCase(local.headerName, "X-Wheels-Reload-Password") == 0) {
+							local.reloadPasswordHeader = ToString(local.requestHeaders[local.headerName]);
+							break;
+						}
+					}
+				} catch (any e) {
+					// No readable raw headers on this engine: nothing to map.
+				}
+			}
+			if (Len(local.reloadPasswordHeader)) {
+				url.password = local.reloadPasswordHeader;
+			}
 		}
 
 		local.lockName = "reloadLock" & this.name;
