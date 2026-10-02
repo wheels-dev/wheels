@@ -6,7 +6,7 @@
 	 * [category: Miscellaneous Functions]
 	 *
 	 * @method Model method to run.
-	 * @transaction [see:save].
+	 * @transaction [see:save]. `savepoint` runs the method as a nested unit: inside an open transaction it rolls back only its own writes when the method returns `false` or throws (the outer transaction carries on); with no open transaction it behaves like `commit`.
 	 * @isolation Isolation level to be passed through to the cftransaction tag. See your CFML engine's documentation for more details about cftransaction's isolation attribute.
 	 */
 	public any function invokeWithTransaction(
@@ -14,28 +14,10 @@
 		string transaction = "commit",
 		string isolation = "read_committed"
 	) {
-		// Validate before any state changes: RustCFML (and permissive engines)
-		// accept unknown isolation levels instead of failing the begin tag.
-		// Fail here so an invalid level throws uniformly on every engine and
-		// the open-transaction marker is never set for a transaction that
-		// cannot begin (TransactionMarkerResetSpec).
-		if (!ListFindNoCase("read_uncommitted,read_committed,repeatable_read,serializable", arguments.isolation)) {
-			Throw(
-				type = "Wheels.InvalidTransactionIsolation",
-				message = "The transaction isolation level `#arguments.isolation#` is not supported.",
-				extendedInfo = "Valid isolation levels are read_uncommitted, read_committed, repeatable_read, and serializable."
-			);
-		}
-		// Validate the mode here too, before the open-transaction marker is touched:
-		// rejected only in the switch's default branch, an invalid mode left the
-		// marker set, and every later call in the request silently ran as
-		// "alreadyopen" with no transaction.
-		if (!ListFindNoCase("commit,rollback,false,none,alreadyopen", arguments.transaction)) {
-			Throw(
-				type = "Wheels",
-				message = "Invalid transaction type",
-				extendedInfo = "The transaction type of `#arguments.transaction#` is invalid. Please use `commit`, `rollback` or `false`."
-			);
+		$assertTransactionArgs(transaction = arguments.transaction, isolation = arguments.isolation);
+		// A savepoint unit nests inside an open transaction instead of joining it (#3958).
+		if (arguments.transaction == "savepoint") {
+			return $invokeWithSavepoint(argumentCollection = arguments);
 		}
 		local.methodArgs = $setProperties(
 			argumentCollection = arguments,
@@ -207,6 +189,138 @@
 		}
 
 		return local.rv;
+	}
+
+	/**
+	 * Internal. Validate the isolation level and transaction mode before any state
+	 * changes.
+	 */
+	public void function $assertTransactionArgs(required string transaction, required string isolation) {
+		// Validate before any state changes: RustCFML (and permissive engines)
+		// accept unknown isolation levels instead of failing the begin tag.
+		// Fail here so an invalid level throws uniformly on every engine and
+		// the open-transaction marker is never set for a transaction that
+		// cannot begin (TransactionMarkerResetSpec).
+		if (!ListFindNoCase("read_uncommitted,read_committed,repeatable_read,serializable", arguments.isolation)) {
+			Throw(
+				type = "Wheels.InvalidTransactionIsolation",
+				message = "The transaction isolation level `#arguments.isolation#` is not supported.",
+				extendedInfo = "Valid isolation levels are read_uncommitted, read_committed, repeatable_read, and serializable."
+			);
+		}
+		// Validate the mode here too, before the open-transaction marker is touched:
+		// rejected only in the switch's default branch, an invalid mode left the
+		// marker set, and every later call in the request silently ran as
+		// "alreadyopen" with no transaction.
+		if (!ListFindNoCase("commit,rollback,false,none,alreadyopen,savepoint", arguments.transaction)) {
+			Throw(
+				type = "Wheels",
+				message = "Invalid transaction type",
+				extendedInfo = "The transaction type of `#arguments.transaction#` is invalid. Please use `commit`, `rollback`, `savepoint` or `false`."
+			);
+		}
+	}
+
+	/**
+	 * Internal. Runs `method` as a nested unit for transaction="savepoint" (#3958).
+	 * With no open transaction it is a plain `commit` call. Inside one it sets a
+	 * savepoint, runs the method, and on a `false` / invalid return or a throw rolls
+	 * back to the savepoint only, so the outer transaction keeps its earlier writes
+	 * and resolves on its own outcome. A throw is rethrown after the rollback. The
+	 * open-transaction marker belongs to the outer owner and is never touched here.
+	 */
+	public any function $invokeWithSavepoint(required string method, string transaction, string isolation = "read_committed") {
+		local.connectionArgs = this.$hashedConnectionArgs();
+		if (!$transactionIsOpen(local.connectionArgs)) {
+			arguments.transaction = "commit";
+			return invokeWithTransaction(argumentCollection = arguments);
+		}
+		if (!StructKeyExists(variables, arguments.method)) {
+			Throw(
+				type = "Wheels",
+				message = "Model method not found",
+				extendedInfo = "The method `#arguments.method#` does not exist in this model."
+			);
+		}
+		local.methodArgs = $setProperties(
+			argumentCollection = arguments,
+			properties = {},
+			filterList = "method,transaction,isolation",
+			setOnModel = false,
+			$useFilterLists = false
+		);
+		local.savepoint = $setSavepoint();
+		local.mark = $savepointCallbackMark(local.connectionArgs);
+		try {
+			local.rv = $invoke(method = arguments.method, componentReference = this, invokeArgs = local.methodArgs);
+		} catch (any e) {
+			$rollbackToSavepoint(name = local.savepoint, connection = local.connectionArgs, mark = local.mark, propagateErrors = false);
+			rethrow;
+		}
+		// Same failure test as the commit branch: a numeric count (0-row bulk op) is not a failure.
+		if (!IsBoolean(local.rv) || (!IsNumeric(local.rv) && !local.rv)) {
+			$rollbackToSavepoint(name = local.savepoint, connection = local.connectionArgs, mark = local.mark);
+		}
+		if (!IsBoolean(local.rv)) {
+			Throw(
+				type = "Wheels",
+				message = "Invalid return type",
+				extendedInfo = "Methods invoked using `invokeWithTransaction` must return a boolean value."
+			);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal. True when a transaction is open on this connection: one Wheels
+	 * opened, an outer owner such as the migrator, or a raw transaction{} block on
+	 * engines that can detect one (Lucee, BoxLang).
+	 */
+	public boolean function $transactionIsOpen(required string connection) {
+		if (
+			StructKeyExists(request, "wheels")
+			&& StructKeyExists(request.wheels, "transactions")
+			&& StructKeyExists(request.wheels.transactions, arguments.connection)
+			&& request.wheels.transactions[arguments.connection]
+		) {
+			return true;
+		}
+		if (
+			StructKeyExists(request, "$wheelsTransactionWrapper")
+			&& IsBoolean(request.$wheelsTransactionWrapper)
+			&& request.$wheelsTransactionWrapper
+		) {
+			return true;
+		}
+		return $withinForeignTransaction();
+	}
+
+	/**
+	 * Internal. Sets a uniquely named savepoint and returns its name. A read on this
+	 * model's table runs first: Lucee silently drops a savepoint set before the
+	 * transaction's first query, and the later rollback then throws "There are no
+	 * savepoint with name ...". The read is done on every engine (one primary-key
+	 * select per unit) rather than keyed on an engine name.
+	 */
+	public string function $setSavepoint() {
+		this.findOne(select = this.primaryKeys(), callbacks = false, reload = true);
+		if (!StructKeyExists(request.wheels, "$savepointSeq")) {
+			request.wheels.$savepointSeq = 0;
+		}
+		request.wheels.$savepointSeq++;
+		local.name = "wsp_" & request.wheels.$savepointSeq;
+		transaction action="setsavepoint" savepoint=local.name;
+		return local.name;
+	}
+
+	/**
+	 * Internal. Rolls back to a savepoint unit's savepoint and fires afterRollback for
+	 * the records written inside it. Kept free of local-scope writes so callers can
+	 * use it from a catch block (BoxLang).
+	 */
+	public void function $rollbackToSavepoint(required string name, required string connection, required numeric mark, boolean propagateErrors = true) {
+		transaction action="rollback" savepoint=arguments.name;
+		$rollbackSavepointCallbacks(connection = arguments.connection, mark = arguments.mark, propagateErrors = arguments.propagateErrors);
 	}
 
 	/**
