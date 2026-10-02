@@ -596,7 +596,7 @@ component extends="modules.BaseModule" {
 	 */
 	public string function version() {
 		var nl = chr(10);
-		var moduleVersion = super.version();
+		var moduleVersion = $displayVersion();
 		var channel = new services.ReleaseChannel().classify(moduleVersion);
 		var channelTag = len(channel) ? " (" & channel & ")" : "";
 
@@ -613,6 +613,39 @@ component extends="modules.BaseModule" {
 		}
 
 		return arrayToList(lines, nl);
+	}
+
+	/**
+	 * The CLI version to show a person. A source checkout's module.json carries
+	 * the unstamped `@build.version@` token, which used to be printed as is
+	 * (#3891). An unstamped module run from inside the monorepo reports the root
+	 * wheels.json version with `-dev`, the derivation FrameworkInstaller uses for
+	 * the framework; anywhere else it reports BuildInfo's `0.0.0-dev` sentinel.
+	 * Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public string function $displayVersion(string rawVersion, string moduleDir) {
+		var v = structKeyExists(arguments, "rawVersion") ? arguments.rawVersion : super.version();
+		if (!(left(v, 7) == "@build." && right(v, 1) == "@")) return v;
+		var dir = structKeyExists(arguments, "moduleDir") ? arguments.moduleDir : getDirectoryFromPath(getCurrentTemplatePath());
+		try {
+			var File = createObject("java", "java.io.File");
+			var root = File.init(dir & "/../..").getCanonicalPath();
+			for (var name in ["wheels.json", "box.json"]) {
+				var manifestPath = root & "/" & name;
+				if (!fileExists(manifestPath)) continue;
+				var manifest = deserializeJSON(fileRead(manifestPath));
+				var isMonorepo = isStruct(manifest) && (
+					(structKeyExists(manifest, "name") && manifest.name == "Wheels.fw")
+					|| (structKeyExists(manifest, "slug") && manifest.slug == "wheels")
+				);
+				if (isMonorepo && structKeyExists(manifest, "version") && len(manifest.version) && left(manifest.version, 7) != "@build.") {
+					return manifest.version & "-dev";
+				}
+			}
+		} catch (any e) {
+			// Unreadable manifest: fall through to the sentinel.
+		}
+		return "0.0.0-dev";
 	}
 
 	private string function $detectLucliVersion() {
@@ -706,7 +739,7 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		var v = super.version();
+		var v = $displayVersion();
 		var help = "Wheels CLI " & v & nl;
 		help &= "  CFML MVC framework — code generation, migrations, testing, server management" & nl & nl;
 		help &= "Usage:" & nl;
@@ -2892,7 +2925,7 @@ component extends="modules.BaseModule" {
 	public string function info() {
 		// Takes no arguments; enforce the schema's additionalProperties:false (#2963).
 		new services.ArgSpec().parse(structuredArgs(arguments));
-		out("Wheels CLI v#super.version()#", "bold");
+		out("Wheels CLI v#$displayVersion()#", "bold");
 		out("");
 
 		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
@@ -3304,7 +3337,7 @@ component extends="modules.BaseModule" {
 
 		// Banner
 		out("", "");
-		out("Wheels Console v#super.version()#", "bold");
+		out("Wheels Console v#$displayVersion()#", "bold");
 		out("Connected to #$serverHostPort(serverPort)# (#wheelsEnv#) — Wheels #wheelsVersion#", "cyan");
 		out("Type expressions to evaluate in your app context. /help for commands.", "");
 		out("", "");
@@ -6301,7 +6334,8 @@ component extends="modules.BaseModule" {
 			strategy = strategy,
 			registration = registration,
 			force = force,
-			cliVersion = super.version()
+			// Written into the generated files' header comments: never the raw build token (#3891).
+			cliVersion = $displayVersion()
 		);
 
 		if (results.success) {
