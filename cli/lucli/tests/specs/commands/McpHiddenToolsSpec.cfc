@@ -44,7 +44,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				// idiomatic prefix tests (left, mid, find/findNoCase at position 1).
 				var startIdx = reFindNoCase("(?m)^[ \t]*public\s+array\s+function\s+mcpHiddenTools\s*\(", variables.moduleSource);
 				expect(startIdx).toBeGT(0);
-				var body = mid(variables.moduleSource, startIdx, 2500);
+				// Window sized to the whole function: the hidden-name list grows.
+				var body = mid(variables.moduleSource, startIdx, 4000);
 				// One of these prefix tests must appear inside the function
 				// body. Loose match so an equivalent rewrite still passes.
 				var hasLeftPrefix = reFindNoCase("left\s*\(\s*[a-zA-Z_]+\.name\s*,\s*1\s*\)\s*==\s*""\$""", body) > 0;

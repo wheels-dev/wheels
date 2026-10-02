@@ -55,7 +55,7 @@ That runs a single MCP method and exits — useful for smoke-testing without ope
 
 ## Tools exposed
 
-Every public function in the Wheels Module is auto-discovered as an MCP tool. Names in `tools/list` are the bare function names — 17 tools (4.1.0 and earlier also list `deploy`; see below):
+Every public function in the Wheels Module is auto-discovered as an MCP tool. Names in `tools/list` are the bare function names — 16 tools (4.1.2 and earlier also list `create`, and 4.1.0 and earlier `deploy`; see below):
 
 | Tool | Purpose |
 |---|---|
@@ -73,7 +73,6 @@ Every public function in the Wheels Module is auto-discovered as an MCP tool. Na
 | `doctor` | Diagnose install, project, and runtime issues. |
 | `stats` | Count models, controllers, routes, tests, migrations. |
 | `notes` | Surface `TODO`, `FIXME`, `HACK`, `OPTIMIZE` annotations from the codebase. |
-| `create` | Create an application (currently only `wheels create app <name>`; forwards to `wheels new`). |
 | `upgrade` | Scan the project for breaking changes (`check`, read-only) or swap `vendor/wheels/` to a newer release (`apply`, writes with a backup). |
 | `packages` | Search, show, add, update, and remove Wheels packages; manage the registry cache. |
 
@@ -84,6 +83,7 @@ A handful of public CLI commands are excluded from MCP discovery via `mcpHiddenT
 - `start`, `stop` — dev server lifecycle. Stateful, long-lived processes don't fit the single-call MCP model.
 - `console` — interactive CFML REPL. Requires a live stdin/stdout loop, which the MCP transport owns.
 - `new` — scaffolds an entire new project. Destructive and requires interactive prompts for project context.
+- `create` — `create app` forwards to `new`, so it is hidden for the same reason. For the same reason `generate` does not advertise `app` as a `type` over MCP. Both stay available in a terminal. (4.1.2 and earlier list `create` as a tool.)
 - `browser` — multi-step browser testing flow with its own subcommand tree.
 - `jobs` — `jobs work` is a long-lived worker poll loop with no single-call MCP semantics.
 - `deploy` — Kamal-style production deploys. It reaches remote hosts over SSH, pushes images, and restarts containers, so its side effects land outside your machine. Run it from a terminal. (4.1.0 and earlier still list it as a tool.)
