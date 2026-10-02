@@ -51,7 +51,7 @@ A few flags apply to every command, anywhere on the command line:
 
 | Flag | Env var | Effect |
 |---|---|---|
-| `--offline` | `WHEELS_OFFLINE=1` | Skips the CLI update check and fails fast on any registry network call, instead of waiting on a timeout. Useful for CI and air-gapped machines. |
+| `--offline` | `WHEELS_OFFLINE=1` | Skips the CLI update check and fails fast on any registry network call or docs-bundle download (`wheels docs fetch` still mounts an already-installed bundle), instead of waiting on a timeout. Useful for CI and air-gapped machines. |
 
 ```bash title="example"
 wheels generate model User --offline

@@ -1641,6 +1641,9 @@ component extends="modules.BaseModule" {
 				force = true;
 			}
 		}
+		// --offline / WHEELS_OFFLINE=1: sets request.$wheelsOffline, which
+		// docsFetch() and the HttpClient download gate both honour.
+		$consumeOfflineFlag(args);
 		switch (action) {
 			case "fetch":
 				return docsFetch(force = force);
@@ -1678,7 +1681,16 @@ component extends="modules.BaseModule" {
 			out("Documentation for #version# is already installed.", "green");
 			out("  #target#");
 			out("  Re-run with --force to replace it.");
+			// The bundle cache is per CLI home and shared by every app, so a
+			// second app finds it installed and still needs its own mirror.
+			$docsMountIntoWebroot(target);
 			return "";
+		}
+		if ($isOffline()) {
+			$docsFetchFail(
+				"Offline mode is enabled (--offline / WHEELS_OFFLINE=1): downloading the docs bundle for #version# requires network access.",
+				["  Run again without --offline to download it."]
+			);
 		}
 
 		// Not `url` — a variable named after a reserved CFML scope shadows it,
@@ -1741,28 +1753,10 @@ component extends="modules.BaseModule" {
 			directoryCreate(staging, true);
 			// The bundle is zipped with its contents at the root (manifest.json,
 			// guides/, api/), so unpack straight into the staging directory.
-			// Shell out to `unzip` rather than Lucee's extract(): `extract` is
-			// shadowed in this module's scope and resolves to a helper with a
-			// different arity. Same approach Installer::$extract() takes with
-			// `tar`, for the same reason.
-			var unzipResult = {};
 			try {
-				cfexecute(
-					name = "unzip",
-					arguments = "-o -q #tmp# -d #staging#",
-					timeout = 300,
-					variable = "local.unzipOut",
-					errorVariable = "local.unzipErr",
-					result = "unzipResult"
-				);
+				$docsUnzip(tmp, staging);
 			} catch (any e) {
 				$docsFetchFail("Could not unpack the bundle: #e.message#");
-			}
-			if (unzipResult.exitCode != 0) {
-				$docsFetchFail(
-					"Could not unpack the bundle (unzip exit #unzipResult.exitCode#).",
-					["  #local.unzipErr ?: ''#"]
-				);
 			}
 
 			try {
@@ -1786,6 +1780,47 @@ component extends="modules.BaseModule" {
 		out("  #target#");
 		$docsMountIntoWebroot(target);
 		return "";
+	}
+
+	/**
+	 * Unpacks a zip with java.util.zip rather than a shell `unzip`: an
+	 * argument string broke on paths with spaces, and Windows has no `unzip`.
+	 * Lucee's extract() is not an option either: `extract` is shadowed in
+	 * this module's scope by a helper with a different arity. An entry that
+	 * would land outside destDir (`../x`, an absolute path) throws instead of
+	 * being skipped, so a hostile bundle installs nothing.
+	 */
+	private void function $docsUnzip(required string zipPath, required string destDir) {
+		var root = createObject("java", "java.io.File").init(arguments.destDir).getCanonicalFile();
+		var rootPath = root.toPath();
+		var zip = createObject("java", "java.util.zip.ZipFile").init(arguments.zipPath);
+		try {
+			var entries = zip.entries();
+			while (entries.hasMoreElements()) {
+				var entry = entries.nextElement();
+				var outFile = createObject("java", "java.io.File").init(root, entry.getName()).getCanonicalFile();
+				if (!outFile.toPath().startsWith(rootPath) || outFile.equals(root)) {
+					throw(type = "Wheels.DocsFetchFailed", message = "the archive entry '#entry.getName()#' points outside the docs directory");
+				}
+				if (entry.isDirectory()) {
+					outFile.mkdirs();
+					continue;
+				}
+				outFile.getParentFile().mkdirs();
+				var input = zip.getInputStream(entry);
+				try {
+					createObject("java", "java.nio.file.Files").copy(
+						input,
+						outFile.toPath(),
+						[createObject("java", "java.nio.file.StandardCopyOption").REPLACE_EXISTING]
+					);
+				} finally {
+					input.close();
+				}
+			}
+		} finally {
+			zip.close();
+		}
 	}
 
 	/**
