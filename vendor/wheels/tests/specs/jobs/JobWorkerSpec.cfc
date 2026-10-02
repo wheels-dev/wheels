@@ -352,6 +352,158 @@ component extends="wheels.WheelsTest" {
 					{datasource = application.wheels.dataSourceName}
 				);
 			});
+
+			it("records the claiming worker's timeout as claimTimeout (##3989)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				local.id = CreateUUID();
+				local.t = Now();
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'claimts_3989', '{}', 0, 'pending', 0, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.t, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.t, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.t, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				expect(local.worker.$claimJob(jobId = local.id, timeout = 450)).toBeTrue();
+
+				local.row = queryExecute(
+					"SELECT claimTimeout FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(Val(local.row.claimTimeout)).toBe(450, "the claiming worker's timeout must be recorded on the row");
+
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+			});
+
+			it("does not reap a row whose own claimTimeout exceeds the poller's timeout (##3989)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				// Owned by a long-timeout worker (claimTimeout 600 -> grace 1200s), idle only 300s.
+				// A short poller (timeout 60 -> grace 120s) would reap it under the old #3888 rule,
+				// but must honour the OWNER's recorded timeout and leave it running.
+				local.id = CreateUUID();
+				local.idle = DateAdd("s", -300, Now());
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, claimTimeout, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'claimlong_3989', '{}', 0, 'processing', 1, 3, 600, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				local.worker.checkTimeouts(timeout = 60, queues = "claimlong_3989");
+
+				local.row = queryExecute(
+					"SELECT status FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.row.status).toBe("processing", "a short poller must not reap a job owned by a longer-timeout worker");
+
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+			});
+
+			it("reaps a row with no claimTimeout using the poller's timeout (##3989)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				// A pre-#3989 / column-less row (claimTimeout NULL), idle 1800s. The reaper must
+				// fall back to the poller's timeout (300 -> grace 600s) and recover it.
+				local.id = CreateUUID();
+				local.idle = DateAdd("s", -1800, Now());
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'claimnull_3989', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.idle, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				local.worker.checkTimeouts(timeout = 300, queues = "claimnull_3989");
+
+				local.row = queryExecute(
+					"SELECT status FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.row.status).notToBe("processing", "a NULL-claimTimeout stale row must be recovered via the poller's timeout");
+
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+			});
+
+			it("adds the claimTimeout column to a table that lacks it (##3989)", function() {
+				local.job = new wheels.Job();
+				local.job.$ensureJobTable();
+				expect(local.job.$jobTableHasClaimTimeout()).toBeTrue("the column should exist after $ensureJobTable");
+
+				// Simulate a pre-#3989 table by dropping the column, then re-ensuring it. DROP
+				// COLUMN isn't supported everywhere, so degrade gracefully where it isn't.
+				local.dropped = false;
+				try {
+					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					local.dropped = true;
+				} catch (any e) {
+					// engine/DB without DROP COLUMN support — skip the round-trip
+				}
+				if (local.dropped) {
+					expect(local.job.$jobTableHasClaimTimeout()).toBeFalse("column should be gone after DROP");
+					local.job.$ensureClaimTimeoutColumn();
+					expect(local.job.$jobTableHasClaimTimeout()).toBeTrue("column should be re-added by $ensureClaimTimeoutColumn");
+				}
+			});
+
+			it("adds the claimTimeout column through the normal worker path, not just $ensureJobTable (##3989)", function() {
+				local.probe = new wheels.Job();
+				local.probe.$ensureJobTable();
+
+				// Simulate a pre-#3989 install by dropping the column, then let a fresh worker's
+				// normal poll add it back — without calling $ensureJobTable directly.
+				local.dropped = false;
+				try {
+					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					local.dropped = true;
+				} catch (any e) {
+					// engine/DB without DROP COLUMN support — skip
+				}
+				if (local.dropped) {
+					expect(local.probe.$jobTableHasClaimTimeout()).toBeFalse("column should be gone after DROP");
+					local.worker = new wheels.JobWorker();
+					local.worker.processNext(queues = "no_such_queue_3989", timeout = 300);
+					expect(local.probe.$jobTableHasClaimTimeout()).toBeTrue("processNext must add the column on an existing table");
+				}
+			});
 		});
 
 		describe("getStats", function() {

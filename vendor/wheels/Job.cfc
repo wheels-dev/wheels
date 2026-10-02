@@ -743,6 +743,9 @@ component {
 		try {
 			// Check if table already exists by querying it
 			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			// Table exists — make sure the claimTimeout column exists too (#3989). Probed on
+			// every call and never cached: a shared or rebuilt dev DB can lose it (see #2780).
+			$ensureClaimTimeoutColumn();
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
@@ -783,6 +786,7 @@ component {
 					status #local.varcharType#(20) DEFAULT 'pending' NOT NULL,
 					attempts INT DEFAULT 0 NOT NULL,
 					maxRetries INT DEFAULT 3 NOT NULL,
+					claimTimeout INT,
 					lastError #local.textType#,
 					runAt #local.datetimeType#,
 					completedAt #local.datetimeType#,
@@ -806,6 +810,70 @@ component {
 		} catch (any createError) {
 			writeLog(text = "Failed to auto-create wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
 			return false;
+		}
+	}
+
+	/**
+	 * Add the claimTimeout column to an existing wheels_jobs table when it is missing, so a
+	 * table created before #3989 is upgraded in place. Probed every call (no cached flag);
+	 * if the ALTER can't run (permissions, race, unsupported) it logs once and the reaper
+	 * falls back to the poller's timeout — a missing/NULL claimTimeout is always tolerated.
+	 */
+	public void function $ensureClaimTimeoutColumn() {
+		if ($jobTableHasClaimTimeout()) {
+			return;
+		}
+		try {
+			queryExecute($claimTimeoutAlterSql(), {}, {datasource = variables.$datasource});
+		} catch (any e) {
+			$warnClaimTimeoutAlterFailedOnce(e.message);
+		}
+	}
+
+	/**
+	 * True when wheels_jobs already has a claimTimeout column. A zero-row SELECT of the
+	 * column is the most portable probe: it succeeds when the column exists and throws
+	 * otherwise, with no dependency on cfdbinfo column-metadata shapes across engines.
+	 */
+	public boolean function $jobTableHasClaimTimeout() {
+		try {
+			queryExecute("SELECT claimTimeout FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * The per-database "ADD claimTimeout column" DDL. SQL Server has no COLUMN keyword and
+	 * Oracle takes a parenthesised column list; everything else accepts ADD COLUMN.
+	 */
+	public string function $claimTimeoutAlterSql() {
+		local.dbType = $detectDatabaseType();
+		if (local.dbType == "oracle") {
+			return "ALTER TABLE wheels_jobs ADD (claimTimeout NUMBER(10))";
+		}
+		if (local.dbType == "sqlserver") {
+			return "ALTER TABLE wheels_jobs ADD claimTimeout INT";
+		}
+		return "ALTER TABLE wheels_jobs ADD COLUMN claimTimeout INT";
+	}
+
+	/**
+	 * Log the claimTimeout ALTER failure once per application so the log isn't spammed by the
+	 * every-call probe. This throttles only the log line; the ALTER decision itself is never
+	 * cached (it is re-probed every ensure call).
+	 */
+	public void function $warnClaimTimeoutAlterFailedOnce(required string reason) {
+		if (StructKeyExists(application, "wheels") && !StructKeyExists(application.wheels, "$claimTimeoutAlterWarned")) {
+			application.wheels.$claimTimeoutAlterWarned = true;
+			writeLog(
+				text = "Could not add the wheels_jobs.claimTimeout column (#arguments.reason#). The stale-job "
+					& "reaper will fall back to the polling worker's timeout. Add the column manually "
+					& "(ALTER TABLE wheels_jobs ADD claimTimeout INT) to enable per-worker reap timeouts.",
+				type = "warning",
+				file = "wheels_jobs"
+			);
 		}
 	}
 
