@@ -38,6 +38,10 @@ cp "${IN_ABS}" "${WORK}/in.rpm"
 cat > "${WORK}/rewrap-inside.sh" <<'INSIDE_EOF'
 #!/bin/bash
 set -euo pipefail
+# The container runs as root (it installs rpm-build), so everything it writes to
+# the bind mount is root-owned on a Linux host. Hand it back to the caller on any
+# exit, or the caller's cleanup of WORK fails with Permission denied.
+trap 'chown -R "${HOST_UID}:${HOST_GID}" /w' EXIT
 dnf -q -y install rpm-build cpio >/dev/null
 IN=/w/in.rpm
 q() { rpm -qp --qf "$1" "${IN}"; }
@@ -125,7 +129,7 @@ cp "${OUTRPM}" /w/out.rpm
 echo "rpm-rewrap: rebuilt $(basename "${OUTRPM}") (archive ${ARCHIVE} bytes = stream)"
 INSIDE_EOF
 
-docker run --rm -v "${WORK}:/w" "${BUILD_IMAGE}" bash /w/rewrap-inside.sh
+docker run --rm -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -v "${WORK}:/w" "${BUILD_IMAGE}" bash /w/rewrap-inside.sh
 
 # rpm2cpio | cpio -t must exit 0 on each target rpm version.
 for image in ${CHECK_IMAGES}; do
