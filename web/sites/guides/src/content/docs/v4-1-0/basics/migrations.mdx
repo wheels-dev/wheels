@@ -139,7 +139,7 @@ These are the column-builder methods defined on `TableDefinition`. Every one tak
 | `t.bigInteger(columnNames=)` | BIGINT | |
 | `t.float(columnNames=)` | FLOAT | |
 | `t.decimal(columnNames=, precision=, scale=)` | DECIMAL | use for money |
-| `t.boolean(columnNames=, default=)` | BOOLEAN / BIT | `BIT(1)` on MySQL (from Wheels 4.2), see below |
+| `t.boolean(columnNames=, default=)` | BOOLEAN / BIT | |
 | `t.date(columnNames=)` | DATE | |
 | `t.datetime(columnNames=)` | DATETIME / TIMESTAMP | |
 | `t.time(columnNames=)` | TIME | |
@@ -149,8 +149,6 @@ These are the column-builder methods defined on `TableDefinition`. Every one tak
 | `t.references(columnNames=, foreignKey=, onDelete=)` | INT + FK | creates `<name>id` (or `<name>_id`, see below) and a FK constraint |
 | `t.primaryKey(columnNames=, type=, autoIncrement=)` | PK column | `type` defaults to `integer`; call multiple times for composite PKs (no comma-list — `columnNames="a,b"` is treated as a single literal column name) |
 | `t.timestamps()` | creates `createdAt`, `updatedAt`, `deletedAt` | no arguments |
-
-**Boolean columns on MySQL (from Wheels 4.2).** `t.boolean()` creates a `BIT(1)` column. Earlier releases created `TINYINT(1)`. When a MySQL DSN sets the driver option `tinyInt1isBit=false`, the driver reports a `TINYINT(1)` column as a plain integer, so the model validated it as a number and rejected `true` ("is not a number"). `BIT(1)` is reported as a boolean under every driver setting. Existing `TINYINT(1)` columns aren't changed. For those, either remove `tinyInt1isBit=false` from the DSN, or convert them in a migration with `changeColumn(table="posts", columnName="published", columnType="boolean")`, which keeps the stored `1` / `0` values. A `BIT(1)` value reads back as `1` on Lucee and Adobe CF and as `true` on BoxLang; both are truthy and compare equal in CFML.
 
 `t.references(columnNames="user")` is the shortcut for the common case of a foreign key: it adds an integer column plus a FK constraint pointing at `users.id`. The legacy argument name `referenceNames` is still accepted; `columnNames` is the preferred modern form so the call site reads the same as every other column helper. Pass `polymorphic=true` to also create a type column for [polymorphic associations](/v4-1-0/basics/associations/#polymorphic-associations). Pass `foreignKey=false` to skip the constraint and leave only the column — useful when the referenced table lives in another datasource.
 
