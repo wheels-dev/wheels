@@ -91,7 +91,7 @@ To find affected code, search `app/` and `tests/` for `returnAs="structs"`, `ret
 
 ### `X-Forwarded-Proto` needs `trustProxyHeaders`
 
-In 4.1, `urlFor(onlyPath=false)` and asset URLs took `https://` from an `X-Forwarded-Proto: https` request header even without the opt-in. In 4.2 that header sets the URL scheme only when `set(trustProxyHeaders=true)` is on; a real TLS connection always counts as `https` ([#3836](https://github.com/wheels-dev/wheels/issues/3836)). **Apps behind a trusted TLS-terminating reverse proxy must set `set(trustProxyHeaders=true)` before upgrading,** or their absolute URLs come out as `http://`. The one-time warning added for this in 4.1 ([#3835](https://github.com/wheels-dev/wheels/issues/3835)) is gone.
+In 4.1, `urlFor(onlyPath=false)` and asset URLs took `https://` from an `X-Forwarded-Proto: https` request header even without the opt-in. In 4.2 that header sets the URL scheme only when `set(trustProxyHeaders=true)` is on; a real TLS connection always counts as `https` ([#3836](https://github.com/wheels-dev/wheels/issues/3836)). **Apps behind a trusted TLS-terminating reverse proxy must set `set(trustProxyHeaders=true)` before upgrading,** or their absolute URLs come out as `http://`. The one-time warning added for this in 4.1 ([#3835](https://github.com/wheels-dev/wheels/pull/3835)) is gone.
 
 ### Validation `condition` / `unless`: bare names are resolved
 
@@ -137,14 +137,16 @@ The stdio MCP server (`wheels mcp wheels`) no longer offers `create`, and refuse
 
 ### `wheels deploy` changes
 
-From [#3914](https://github.com/wheels-dev/wheels/issues/3914) and [#3925](https://github.com/wheels-dev/wheels/issues/3925):
+From [#3914](https://github.com/wheels-dev/wheels/issues/3914), [#3925](https://github.com/wheels-dev/wheels/issues/3925) and [#4018](https://github.com/wheels-dev/wheels/issues/4018):
 
 - **Images ship an empty `db/`.** The `wheels deploy init` Dockerfile no longer copies local SQLite files (`db/*.sqlite`, `*.sqlite3`, `*.db` and their journal files) into the image, and its `.dockerignore` excludes them. Migrations ship with `app/migrator/migrations` as before. A SQLite app therefore starts production with an empty database inside the container, and `deploy init` now says so for a SQLite app: run migrations on boot with `set(autoMigrateDatabase=true)` in `config/production/settings.cfm`. `deploy init` keeps an existing `.dockerignore`, so for an app scaffolded earlier the Dockerfile's builder stage removes those files instead. To adopt the new `.dockerignore` and Dockerfile, run `wheels deploy init` in a scratch directory and copy the changes over. Don't run `--force` in your app: it also overwrites your `config/deploy.yml`.
 - **`proxy:` keys are checked.** Only `host`, `ssl`, `app_port`, `healthcheck`, `forward_headers` and `buffering` are accepted, and `proxy.ssl` must be `true` or `false`. A config with a misspelled proxy key, or `ssl: yes`, now fails validation instead of being ignored.
 - **`deploy registry login` needs `registry.username`,** and a missing or empty `config/deploy.yml` now says so instead of a file-read error.
 - **`deploy app details`, `app live` and `app maintenance` no longer need `--release`.** Without it, `app details` lists the role's containers.
 - **The `boot:` block is applied** ([#3925](https://github.com/wheels-dev/wheels/issues/3925)). With a `boot:` block, each role's hosts boot in batches of `limit` (a count, or a percentage of the role's hosts) with `wait` seconds between batches. In 4.1 it was validated but ignored, so a config that carries one now deploys more slowly by design. Without a `boot:` block, hosts boot back to back as before.
-- **`deploy config` prints the whole resolved config** (proxy, env, accessories, ssh, builder). A `registry.password` entry is shown only when it names a key in `.kamal/secrets`.
+- **App containers can mount `volumes:`.** A top-level `volumes:` list (Kamal's `host:container` or `host:container:ro|rw` format) is mounted on every app container. For a SQLite app, mounting `db/` from the host (`/var/lib/<service>/db:/var/www/db`) keeps the database across redeploys, and `deploy init` now shows that entry. See the [config reference](/v4-2-0/deployment/config-reference/#volumes).
+- **Volume host paths are passed as written.** Accessory `volumes:` / `directories:` arguments are now quoted like the other docker arguments, so paths with spaces or special characters work. In 4.1 they went through the remote shell unquoted, so a `~` or `$VAR` at the start of a host path happened to expand there. It isn't expanded any more, and a host path starting with `~` or `$` now fails validation with `… needs an absolute host path`. Write absolute paths: `/home/deploy/data:/data`, not `~/data:/data`.
+- **`deploy config` prints the whole resolved config** (proxy, env, volumes, accessories, ssh, builder). A `registry.password` entry is shown only when it names a key in `.kamal/secrets`.
 
 ## Verify
 
