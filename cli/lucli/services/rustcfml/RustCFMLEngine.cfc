@@ -78,6 +78,17 @@ component {
 	 * failure the temp file is deleted and Wheels.RustCFML.InstallFailed (or
 	 * Wheels.RustCFML.ChecksumMismatch for a mismatched download) is thrown.
 	 */
+	/** True when the pinned binary is already on disk and matches its sha256. */
+	public boolean function isInstalled() {
+		var binPath = variables.wheelsHome & "/rustcfml/bin/rustcfml-" & variables.engineVersion;
+		if (!fileExists(binPath)) {
+			return false;
+		}
+		// assetName() throws Wheels.RustCFML.UnsupportedPlatform: let it reach
+		// the caller's platform report instead of announcing a download.
+		return $sha256File(binPath) == $expectedSha256(assetName());
+	}
+
 	public string function install() {
 		var asset = assetName();
 		var expected = $expectedSha256(asset);

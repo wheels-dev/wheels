@@ -286,6 +286,43 @@ component {
 	 * arm re-emits `--no-X` so downstream literal-token matchers (e.g.
 	 * `--no-routes`, `--no-migration`) still see the user's negation (#2856).
 	 */
+	/**
+	 * Re-binds a space-form option value (`--port 8931`). LuCLI hands that over
+	 * as port="true" plus a positional one index past the gap the flag left
+	 * (arg3 missing, arg4="8931"), so a value parser sees a bare flag. When
+	 * exactly one gap is followed by a positional, that positional is the
+	 * value: it is moved into `key` and dropped from the positionals. With no
+	 * such gap, or more than one, the collection is returned unchanged.
+	 */
+	public struct function bindSpaceFormValue(required struct coll, required string key) {
+		if (
+			!structKeyExists(arguments.coll, arguments.key)
+			|| !isSimpleValue(arguments.coll[arguments.key])
+			|| compareNoCase(trim(toString(arguments.coll[arguments.key])), "true") != 0
+		) {
+			return arguments.coll;
+		}
+		var maxIndex = 0;
+		for (var k in arguments.coll) {
+			if (reFindNoCase("^arg\d+$", k)) {
+				maxIndex = max(maxIndex, val(mid(k, 4, len(k) - 3)));
+			}
+		}
+		var valueIndices = [];
+		for (var i = 1; i < maxIndex; i++) {
+			if (!structKeyExists(arguments.coll, "arg" & i) && structKeyExists(arguments.coll, "arg" & (i + 1))) {
+				arrayAppend(valueIndices, i + 1);
+			}
+		}
+		if (arrayLen(valueIndices) != 1) {
+			return arguments.coll;
+		}
+		var result = duplicate(arguments.coll);
+		result[arguments.key] = result["arg" & valueIndices[1]];
+		structDelete(result, "arg" & valueIndices[1]);
+		return result;
+	}
+
 	public array function toArgv(required struct coll) {
 		var result = [];
 
