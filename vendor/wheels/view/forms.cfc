@@ -44,6 +44,7 @@ component {
 	 * @prepend String to prepend to the form control. Useful to wrap the form control with HTML tags.
 	 * @append String to append to the form control. Useful to wrap the form control with HTML tags.
 	 * @encode [see:styleSheetLinkTag].
+	 * @authenticityToken Set to `false` to leave out the hidden authenticity token field. Do this for every form in cached markup that other visitors receive, so the cache never holds a session's token. Supply the token at request time instead: the `X-CSRF-Token` header (Turbo sends it from `csrfMetaTags()`; a `fetch()` must set it), or a script that copies the `csrf-token` meta tag into the form on submit.
 	 */
 	public string function startFormTag(
 		string method,
@@ -60,9 +61,19 @@ component {
 		numeric port,
 		string prepend,
 		string append,
-		any encode
+		any encode,
+		boolean authenticityToken = true
 	) {
 		$args(name = "startFormTag", args = arguments);
+		// authenticityToken = false leaves the hidden token field out (#3959). Use it for
+		// every form in cached markup that other visitors receive: a stored field would
+		// hand them the token of the session that warmed the cache. The token then comes
+		// at request time, in the X-CSRF-Token header (Turbo sends it from
+		// csrfMetaTags(); a fetch() must set it) or via a script that copies the meta tag
+		// into the form on submit. Removed from arguments so it never reaches URLFor()
+		// or the element's attributes.
+		local.includeToken = arguments.authenticityToken;
+		StructDelete(arguments, "authenticityToken");
 
 		// Encode all prepend / append type arguments if specified.
 		$encodeArgsForHtml(args = arguments, keys = "prepend,append");
@@ -134,6 +145,7 @@ component {
 			$isRequestProtectedFromForgery()
 			&& ListFindNoCase("post,put,patch,delete", arguments.method)
 			&& !local.skipCsrf
+			&& local.includeToken
 		) {
 			local.rv &= authenticityTokenField();
 		}
