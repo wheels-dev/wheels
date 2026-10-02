@@ -99,7 +99,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "c_o_r_e_memberteams,c_o_r_e_members,c_o_r_e_teams,c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation,c_o_r_e_uuidrecords,c_o_r_e_refchildren,c_o_r_e_refparents">
+<cfset local.tables = "c_o_r_e_memberteams,c_o_r_e_members,c_o_r_e_teams,c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tagassignments,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation,c_o_r_e_uuidrecords,c_o_r_e_refchildren,c_o_r_e_refparents">
 <!---
 	On Oracle, append CASCADE CONSTRAINTS so the drop removes incoming FK
 	references along with the table. PURGE skips the recycle bin so the
@@ -205,6 +205,15 @@ CREATE TABLE c_o_r_e_combikeys
 	,id2 int NOT NULL
 	,userId int NOT NULL
 	,PRIMARY KEY(id1,id2)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_tagassignments
+(
+	postid int NOT NULL
+	,tagid int NOT NULL
+	,PRIMARY KEY(postid,tagid)
 ) #local.storageEngine#
 </cfquery>
 

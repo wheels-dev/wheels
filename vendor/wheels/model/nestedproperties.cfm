@@ -194,13 +194,24 @@
 		}
 		if (IsStruct(arguments.value)) {
 			for (local.item in arguments.value) {
+				local.lookupColumns = "";
 				if (!$isNewNestedCollectionKey(collectionKey = local.item, value = arguments.value[local.item])) {
-					// Existing-row key: copy the struct key into the primary key fields.
-					local.keys = local.model.primaryKey();
+					// Existing-row key: copy the struct key into the columns it names.
 					local.itemArray = ListToArray(local.item, ",", true);
+					local.keys = $nestedCollectionKeyColumns(association = arguments.property, keyCount = ArrayLen(local.itemArray));
+					if (!Len(local.keys)) {
+						Throw(
+							type = "Wheels.InvalidNestedKey",
+							message = "The nested `#arguments.property#` key `#local.item#` has #ArrayLen(local.itemArray)# value(s), but the `#arguments.association.modelName#` primary key is `#local.model.primaryKey()#`.",
+							extendedInfo = "For a join model, pass hasManyCheckBox keys as the parent key followed by the other key (for example `keys=""##post.key()##,##tag.id##""`). The join model needs a composite primary key over those two columns, or a `belongsTo` association for each of them."
+						);
+					}
 					local.iEnd = ListLen(local.keys);
 					for (local.i = 1; local.i <= local.iEnd; local.i++) {
 						arguments.value[local.item][ListGetAt(local.keys, local.i)] = local.itemArray[local.i];
+					}
+					if (local.keys != local.model.primaryKey()) {
+						local.lookupColumns = local.keys;
 					}
 				}
 
@@ -210,7 +221,8 @@
 						property = arguments.property,
 						value = arguments.value[local.item],
 						association = arguments.association,
-						delete = arguments.delete
+						delete = arguments.delete,
+						lookupColumns = local.lookupColumns
 					)
 				);
 				$updateCollectionObject(property = arguments.property, value = arguments.value[local.item]);
@@ -289,7 +301,8 @@
 		required string property,
 		required struct value,
 		required struct association,
-		required boolean delete
+		required boolean delete,
+		string lookupColumns = ""
 	) {
 		local.object = false;
 		local.delete = false;
@@ -302,8 +315,14 @@
 			local.args.key = $createPrimaryKeyList(params = arguments.value, keys = local.model.primaryKey());
 			if (IsObject(arguments.value)) {
 				local.object = arguments.value;
-			} else 			if (Len(local.args.key)) {
+			} else if (Len(local.args.key)) {
 				local.object = local.model.findByKey(argumentCollection = local.args);
+			} else if (Len(arguments.lookupColumns)) {
+				// Surrogate-key join row: find it by the foreign keys the form posted.
+				local.object = $findNestedJoinRow(model = local.model, value = arguments.value, columns = arguments.lookupColumns);
+				if (IsObject(local.object)) {
+					local.args.key = local.object.key();
+				}
 			}
 
 			if (
@@ -312,8 +331,12 @@
 				local.delete = true;
 			}
 			if (!IsObject(local.object) && !local.delete) {
-				// Key was not a persisted PK — do not stamp it onto a new child.
-				$clearNestedPrimaryKeys(value = arguments.value, keys = local.model.primaryKey());
+				// Key was not a persisted PK — do not stamp it onto a new child. A composite
+				// primary key is the join row's own identity (the two foreign keys), so a new
+				// join row keeps it.
+				if (ListLen(local.model.primaryKey()) == 1) {
+					$clearNestedPrimaryKeys(value = arguments.value, keys = local.model.primaryKey());
+				}
 				StructDelete(local.args, "key");
 				return $invoke(componentReference = local.model, method = "new", invokeArgs = local.args);
 			} else if (Len(local.args.key) && local.delete && arguments.association.nested.delete && arguments.delete) {
@@ -349,6 +372,91 @@
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Columns that a hasMany nested-properties struct key maps onto. The key is
+	 * the comma list hasManyCheckBox posts: the parent key, then the other key.
+	 * When the child's primary key has that many columns, the key is the primary
+	 * key (a composite-key join model, #3884). Otherwise, for a surrogate-key join
+	 * model, it is the parent foreign key followed by the child's other
+	 * `belongsTo` foreign keys (#3885). Returns "" when neither shape fits.
+	 */
+	public string function $nestedCollectionKeyColumns(required string association, required numeric keyCount) {
+		if (!StructKeyExists(variables.wheels.class.associations, arguments.association)) {
+			return "";
+		}
+		local.cacheKey = arguments.association & ":" & arguments.keyCount;
+		if (!StructKeyExists(variables.wheels.class, "nestedKeyColumns")) {
+			variables.wheels.class.nestedKeyColumns = {};
+		}
+		if (!StructKeyExists(variables.wheels.class.nestedKeyColumns, local.cacheKey)) {
+			variables.wheels.class.nestedKeyColumns[local.cacheKey] = $deriveNestedCollectionKeyColumns(
+				association = arguments.association,
+				keyCount = arguments.keyCount
+			);
+		}
+		return variables.wheels.class.nestedKeyColumns[local.cacheKey];
+	}
+
+	/**
+	 * Internal function. Uncached body of `$nestedCollectionKeyColumns()`.
+	 */
+	public string function $deriveNestedCollectionKeyColumns(required string association, required numeric keyCount) {
+		local.association = variables.wheels.class.associations[arguments.association];
+		local.model = model(local.association.modelName);
+		local.keys = local.model.primaryKey();
+		if (ListLen(local.keys) == arguments.keyCount) {
+			return local.keys;
+		}
+		if (local.association.type != "hasMany" || arguments.keyCount < 2) {
+			return "";
+		}
+		local.parentKey = $expandedAssociations(include = arguments.association)[1].foreignKey;
+		if (ListLen(local.parentKey) != 1) {
+			return "";
+		}
+		local.otherKeys = "";
+		local.childAssociations = local.model.associationInfo();
+		for (local.name in local.childAssociations) {
+			local.childAssociation = local.childAssociations[local.name];
+			if (
+				local.childAssociation.type != "belongsTo"
+				|| (StructKeyExists(local.childAssociation, "polymorphic") && local.childAssociation.polymorphic)
+			) {
+				continue;
+			}
+			local.foreignKey = local.model.$expandedAssociations(include = local.name)[1].foreignKey;
+			if (
+				ListLen(local.foreignKey) == 1
+				&& CompareNoCase(local.foreignKey, local.parentKey) != 0
+				&& !ListFindNoCase(local.otherKeys, local.foreignKey)
+			) {
+				local.otherKeys = ListAppend(local.otherKeys, local.foreignKey);
+			}
+		}
+		if (ListLen(local.otherKeys) != arguments.keyCount - 1) {
+			return "";
+		}
+		return ListPrepend(local.otherKeys, local.parentKey);
+	}
+
+	/**
+	 * Finds an existing surrogate-key join row by the foreign-key columns a
+	 * nested-properties struct key named. Returns false when any value is blank
+	 * (a new parent) or no row matches.
+	 */
+	public any function $findNestedJoinRow(required any model, required struct value, required string columns) {
+		local.query = new wheels.model.query.QueryBuilder(modelReference = arguments.model);
+		local.iEnd = ListLen(arguments.columns);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.column = ListGetAt(arguments.columns, local.i);
+			if (!StructKeyExists(arguments.value, local.column) || !Len(Trim(arguments.value[local.column]))) {
+				return false;
+			}
+			local.query.where(local.column, Trim(arguments.value[local.column]));
+		}
+		return local.query.findOne();
 	}
 
 	/**
