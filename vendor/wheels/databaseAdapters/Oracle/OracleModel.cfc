@@ -18,6 +18,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			case "bfile":
 				local.rv = "cf_sql_binary";
 				break;
+			// Native BOOLEAN (Oracle 23ai+), which the migrator emits for t.boolean() (#3897).
+			case "boolean":
+				local.rv = "cf_sql_bit";
+				break;
 			case "char":
 			case "nchar":
 				local.rv = "cf_sql_char";
