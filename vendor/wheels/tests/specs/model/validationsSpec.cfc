@@ -470,6 +470,67 @@ component extends="wheels.WheelsTest" {
 				expect(callRight).toThrow()
 			})
 
+			it("fails closed for a this. reference on the right of a this.-left comparison (##3964)", () => {
+				user.total = 50
+				user.limit = 10
+				var callRightThis = () => {
+					user.$evaluateConditionString("this.total gt this.limit")
+				}
+				expect(callRightThis).toThrow()
+			})
+
+			it("fails closed for the word-form `is` operator on the this. path (##3964)", () => {
+				user.status = "draft"
+				var callIs = () => {
+					user.$evaluateConditionString("this.status is 'draft'")
+				}
+				expect(callIs).toThrow()
+			})
+
+			it("fails closed for word-form `and` on the this. path (##3964)", () => {
+				user.kind = "b2b"
+				user.country = "SE"
+				var callAnd = () => {
+					user.$evaluateConditionString("this.kind eq 'b2b' and this.country eq 'SE'")
+				}
+				expect(callAnd).toThrow()
+			})
+
+			it("fails closed for word-form `or` on the this. path (##3964)", () => {
+				user.kind = "b2c"
+				user.country = "SE"
+				var callOr = () => {
+					user.$evaluateConditionString("this.kind eq 'b2b' or this.country eq 'SE'")
+				}
+				expect(callOr).toThrow()
+			})
+
+			it("still accepts a quoted literal containing is/and/or words (##3964)", () => {
+				user.motto = "slow is smooth and smooth is fast or so they say"
+				expect(user.$evaluateConditionString("this.motto eq 'slow is smooth and smooth is fast or so they say'")).toBeTrue()
+			})
+
+			it("fails closed for UPPERCASE word-form operators too (##3964)", () => {
+				// The guard relies on CFML `==` being case-insensitive inside
+				// $splitTopLevelCondition; pin it so a switch to a case-sensitive
+				// compare cannot silently let `AND`/`OR`/`IS` through.
+				user.kind = "b2b"
+				user.country = "SE"
+				user.status = "draft"
+				var callUAnd = () => {
+					user.$evaluateConditionString("this.kind eq 'b2b' AND this.country eq 'SE'")
+				}
+				var callUOr = () => {
+					user.$evaluateConditionString("this.kind eq 'b2b' OR this.country eq 'SE'")
+				}
+				var callUIs = () => {
+					user.$evaluateConditionString("this.status IS 'draft'")
+				}
+				expect(callUAnd).toThrow()
+				expect(callUOr).toThrow()
+				expect(callUIs).toThrow()
+			})
+
 			it("evaluates the guide's this.status != 'draft' example", () => {
 				user.status = "draft"
 				expect(user.$evaluateConditionString("this.status != 'draft'")).toBeFalse()
