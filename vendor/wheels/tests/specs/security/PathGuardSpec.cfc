@@ -46,7 +46,10 @@ component extends="wheels.WheelsTest" {
 
 			it("treats a backslash as a separator only on the platform where it is one", function() {
 				var guard = new wheels.PathGuard();
-				var sep = CreateObject("java", "java.io.File").separator;
+				// Default POSIX; the JVM lookup is inside the try so a JVM-free engine
+				// (RustCFML) keeps "/" instead of erroring on CreateObject("java",...).
+				var sep = "/";
+				try { sep = CreateObject("java", "java.io.File").separator; } catch (any e) {}
 				if (sep == "\") {
 					// Windows: backslash is the native separator, normalised like "/".
 					expect(guard.pathWithinExact(root = "C:\app", candidate = "C:\app\data\x")).toBeTrue();
