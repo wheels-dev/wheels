@@ -13,6 +13,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 		variables.mod = new cli.lucli.Module(cwd = variables.tempRoot);
 		prepareMock(variables.mod);
 		makePublic(variables.mod, "$consoleHandleCommand", "consoleVerdictFor");
+		makePublic(variables.mod, "$consoleExitFailsSession", "consoleExitFails");
 		variables.javaSystem = createObject("java", "java.lang.System");
 	}
 
@@ -36,6 +37,27 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				for (var word in ["/exit", "/quit", "/q"]) {
 					expect(verdict(word)).toBe("exit");
 				}
+			});
+
+			it("a bare exit or quit after a failed expression fails the session, like EOF", () => {
+				expect(variables.mod.consoleExitFails("exit", true)).toBeTrue();
+				expect(variables.mod.consoleExitFails("QUIT", true)).toBeTrue();
+			});
+
+			it("a bare exit or quit with no failed expression ends cleanly", () => {
+				expect(variables.mod.consoleExitFails("exit", false)).toBeFalse();
+				expect(variables.mod.consoleExitFails("quit", false)).toBeFalse();
+			});
+
+			it("/exit keeps returning 0 after a failure (interactive typo safety)", () => {
+				expect(variables.mod.consoleExitFails("/exit", true)).toBeFalse();
+			});
+
+			it("the REPL loop throws Wheels.ConsoleFailed on that exit path", () => {
+				var src = fileRead(expandPath("/cli/lucli/Module.cfc"));
+				var at = find("if ($consoleExitFailsSession(line, hadError)) {", src);
+				expect(at).toBeGT(0);
+				expect(mid(src, at, 300)).toInclude("Wheels.ConsoleFailed");
 			});
 
 			it("still evaluates expressions that merely contain the word", () => {

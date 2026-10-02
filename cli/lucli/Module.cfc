@@ -3337,6 +3337,14 @@ component extends="modules.BaseModule" {
 			// Handle REPL commands; unhandled input falls through to evaluation.
 			var verdict = $consoleHandleCommand(line, evalUrl, password, serverPort, System);
 			if (verdict == "exit") {
+				// A bare `exit`/`quit` usually ends a piped session, so it must
+				// not hide an earlier failed expression: fail like EOF does.
+				if ($consoleExitFailsSession(line, hadError)) {
+					throw(
+						type = "Wheels.ConsoleFailed",
+						message = "One or more console expressions failed"
+					);
+				}
 				running = false;
 				continue;
 			}
@@ -3486,6 +3494,15 @@ component extends="modules.BaseModule" {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Does ending the console on `line` fail the session? A bare `exit`/`quit`
+	 * after a failed expression does, like EOF, so `bad expr; exit` piped in
+	 * exits non-zero (#3892). `/exit` keeps returning 0, as documented above.
+	 */
+	private boolean function $consoleExitFailsSession(required string line, required boolean hadError) {
+		return arguments.hadError && listFindNoCase("exit,quit", trim(arguments.line)) > 0;
 	}
 
 	/**
