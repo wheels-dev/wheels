@@ -107,7 +107,7 @@
 	) {
 		$args(name = "deleteByKey", args = arguments);
 		$keyLengthCheck(arguments.key);
-		local.where = $keyWhereString(values = arguments.key);
+		local.where = $keyWhereWithScope(key = arguments.key, where = StructKeyExists(arguments, "where") ? arguments.where : "");
 		return deleteOne(
 			callbacks = arguments.callbacks,
 			includeSoftDeletes = arguments.includeSoftDeletes,

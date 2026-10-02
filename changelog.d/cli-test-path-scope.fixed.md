@@ -1,0 +1,3 @@
+- `wheels test` accepts a file or folder path as its scope: `tests/specs/models`, `tests/specs/models/BookSpec.cfc`, a trailing slash, a leading `./`, a path relative to `tests/specs`, or `BookSpec.cfc`. Each resolves to the dotted scope the runner takes.
+- `wheels test` refuses a scope that names no folder or spec file, or that the runner would reject (including the MCP `test` tool's `directory`). It prints one message naming the scope and the accepted forms, before anything runs. Previously it ran the full suite and then reported that no test bundles ran (#3963, #3893).
+- The `AGENTS.md` / `CLAUDE.md` that `wheels new` writes now show `wheels test tests.specs.<area>` and `--filter=<SpecName>`.

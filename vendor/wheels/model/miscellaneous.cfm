@@ -128,9 +128,9 @@
 	 */
 	public boolean function exists(any key, string where, boolean reload, any parameterize, boolean includeSoftDeletes) {
 		$args(name = "exists", args = arguments);
-		if ($get("showErrorInformation") && StructKeyExists(arguments, "key") && StructKeyExists(arguments, "where")) {
-			Throw(type = "Wheels.IncorrectArguments", message = "You cannot pass in both `key` and `where`.");
-		}
+		// With both `key` and `where` (for example through a scope chain or the
+		// query builder), findByKey narrows the where by the key, the same in
+		// every environment.
 		arguments.select = primaryKey();
 		arguments.returnAs = "query";
 		arguments.callbacks = false;
@@ -206,7 +206,7 @@
 	 * Calling `tableName()` with an argument has always been a silent no-op (CFML
 	 * accepts the extra argument and the model keeps its convention table), a trap
 	 * some 4.0-era docs taught as a setter. When error information is shown
-	 * (development / testing — the same gate `exists()` uses above) it now fails
+	 * (development / testing, i.e. `showErrorInformation`) it now fails
 	 * loud; in production it stays a no-op so an upgrade never breaks a running
 	 * app. See issue #3079.
 	 *

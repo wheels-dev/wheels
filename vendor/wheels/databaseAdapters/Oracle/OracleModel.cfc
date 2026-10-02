@@ -12,7 +12,23 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	/**
 	 * Map database types to the ones used in CFML.
 	 */
-	public string function $getType(required string type, string scale, string details) {
+	/**
+	 * Internal function. The cf_sql type for an Oracle NUMBER column. NUMBER(11..19, 0) holds
+	 * 64-bit integers, so it binds as BIGINT (#4086).
+	 * NUMBER(10) and an unknown precision stay INTEGER, and so does NUMBER(38) (Oracle's
+	 * INTEGER, used for identity ids), so existing integer columns keep their binding.
+	 */
+	public string function $numberType(string scale = "", string precision = "") {
+		if (arguments.scale NEQ 0) {
+			return "cf_sql_numeric";
+		}
+		if (IsNumeric(arguments.precision) && arguments.precision > 10 && arguments.precision <= 19) {
+			return "cf_sql_bigint";
+		}
+		return "cf_sql_integer";
+	}
+
+	public string function $getType(required string type, string scale, string details, string precision = "") {
 		switch (arguments.type) {
 			case "blob":
 			case "bfile":
@@ -43,11 +59,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				local.rv = "cf_sql_numeric";
 				break;
 			case "number":
-				if (arguments.scale EQ 0) {
-					local.rv = "cf_sql_integer";
-				} else {
-					local.rv = "cf_sql_numeric";
-				}
+				local.rv = $numberType(scale = arguments.scale, precision = arguments.precision);
 				break;
 			case "real":
 			case "binary_float":

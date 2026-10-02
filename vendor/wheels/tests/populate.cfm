@@ -272,6 +272,7 @@ CREATE TABLE c_o_r_e_bigkeyposts
 (
 	id #local.bigintColumnType# NOT NULL
 	,title varchar(100) NULL
+	,viewcount #local.bigintColumnType# NULL
 	,PRIMARY KEY(id)
 ) #local.storageEngine#
 </cfquery>
