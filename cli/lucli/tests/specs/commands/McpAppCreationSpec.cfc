@@ -1,10 +1,12 @@
 /**
- * App creation is CLI-only (#3910). `new` was hidden from the stdio MCP server,
- * but an MCP client could still scaffold a whole application into the server's
- * working directory through the `create` tool or `generate` with type=app.
- * `create` is now hidden too, so it has no MCP schema (its advertised
- * type+name schema never matched the new() options it forwards), and `app` is
- * no longer an advertised choice for generate's type. CLI usage is unchanged.
+ * #3910: `new` was hidden from the stdio MCP server, but an MCP client could
+ * still scaffold a whole application into the server's working directory
+ * through the `create` tool or `generate` with type=app. `create` is now hidden
+ * too (LuCLI refuses a call to an unlisted tool), so it has no MCP schema; its
+ * advertised type+name schema never matched the new() options it forwards.
+ * `app` is no longer an advertised choice for generate's type, but a client
+ * that ignores the schema can still send it: server-side refusal is #3980.
+ * CLI usage is unchanged.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -20,7 +22,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	function run() {
-		describe("app creation is not reachable over MCP", () => {
+		describe("create is hidden from MCP and generate no longer advertises app", () => {
 
 			it("hides create alongside new", () => {
 				var hidden = mod.mcpHiddenTools();

@@ -495,9 +495,11 @@ component extends="modules.BaseModule" {
 			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
 	}
 
-	// Feeds only the MCP inputSchema (mcpToolSpecs). `app` is left out of the
-	// type choices because app creation is CLI-only, like `new` and `create`
-	// (#3910); `wheels generate app <name>` on the command line is unchanged.
+	// Feeds only the MCP inputSchema (mcpToolSpecs). `app` is no longer
+	// advertised as a type choice (#3910), since `new` and `create` are hidden
+	// from MCP. This does not stop a client that ignores the schema; refusing
+	// type=app server-side is #3980. `wheels generate app <name>` on the
+	// command line is unchanged.
 	private any function generateArgSpec() {
 		return new services.ArgSpec()
 			.positional(name = "type", required = true, choices = "model,controller,view,scaffold,migration,api-resource,route,test,property,helper,policy,snippets,admin,auth", description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, or auth")
