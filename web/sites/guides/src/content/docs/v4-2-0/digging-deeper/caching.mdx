@@ -114,6 +114,58 @@ component extends="Controller" {
 }
 ```
 
+### Forms inside a cached fragment
+
+A form rendered with `startFormTag()` or `buttonTo()` carries the current session's authenticity token in a hidden field. **Never cache that markup where other visitors receive it.** Every visitor would get the copy holding the token of the session that warmed the cache. That leaks the token, which someone could then use to forge requests against that session. It also makes everyone else's submit fail with `Wheels.InvalidAuthenticityToken` (a 403).
+
+So in any cached markup that more than one visitor sees:
+
+1. **Leave the token out of the form** with `authenticityToken=false`. This applies to every form in shared cached content, Turbo or not.
+2. **Keep `csrfMetaTags()` out of the cached content.** It belongs in the uncached layout, where it is rendered for each visitor.
+3. **Supply the token at request time**, from that meta tag.
+
+From Wheels 4.2 the request passes if **either** the form field **or** the `X-CSRF-Token` header carries a valid token, and the header counts on any non-GET request, not only with `X-Requested-With`. Ways to send it:
+
+- **Turbo** sends the `csrf-token` meta tag's value in `X-CSRF-Token` on every non-GET submit, so a Turbo-submitted form needs nothing more than step 1.
+- **Your own `fetch()`** does not add the header by itself. Set it explicitly:
+
+```js
+fetch(url, {
+    method: "POST",
+    headers: { "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content },
+    body: new FormData(form)
+});
+```
+
+- **Plain HTML form posts** can't set headers. Fill the hidden field in on submit from the meta tag:
+
+```cfm title="app/views/posts/_post.cfm (rendered with cache=...)"
+<cfoutput>
+    #buttonTo(text="Delete", route="post", key=arguments.id, method="delete", authenticityToken=false, class="js-fresh-token")#
+</cfoutput>
+```
+
+```html title="layout (uncached): add once, after csrfMetaTags()"
+<script>
+document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form.classList.contains("js-fresh-token")) return;
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (!meta) return;
+    var field = form.querySelector('input[name="authenticityToken"]');
+    if (!field) {
+        field = document.createElement("input");
+        field.type = "hidden";
+        field.name = "authenticityToken";
+        form.appendChild(field);
+    }
+    field.value = meta.content;
+});
+</script>
+```
+
+`startFormTag()` takes the same `authenticityToken=false` argument. Caching per user (see [Per-user keys](#per-user-keys)) avoids the problem too, but it gives up the shared fragment.
+
 ## Cache a query
 
 Most slow actions aren't slow because of rendering — they're slow because of one expensive query. Cache the query directly and leave the view alone:
