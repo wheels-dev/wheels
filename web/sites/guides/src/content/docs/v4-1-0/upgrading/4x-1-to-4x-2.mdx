@@ -1,0 +1,31 @@
+---
+title: Upgrading from 4.1 to 4.2
+description: Behaviour changes in Wheels 4.2 that can need an edit in your app, each with what to look for and how to change it.
+type: howto
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="From Wheels 4.2">
+This page lists 4.2 behaviour. Wheels 4.1.x is unaffected.
+</Aside>
+
+The 4.1 → 4.2 upgrade is the usual `vendor/wheels/` swap (see [Manual upgrades](/v4-1-0/upgrading/manual-upgrades/)). The changes below can need an edit in your app.
+
+## `findAll(returnAs="structs")` returns an array
+
+`findAll()` has always documented `returnAs="structs"` (and `"struct"`) as an array of structs. Through 4.1 it actually returned a struct keyed by row number, `{1: {...}, 2: {...}}`. From 4.2 it returns the documented array. `findInBatches(returnAs="structs")` hands its callback the same array.
+
+**What keeps working:** indexing rows by position (`rows[1].name`).
+
+**What changes:**
+
+- `ArrayLen(rows)` and other array functions now work, and the result serializes to a JSON array (`[{...}]`, not `{"1": {...}}`), so a `renderWith(data=rows)` API response changes shape.
+- `StructCount()`, `StructKeyList()`, `StructKeyArray()` and `StructIsEmpty()` on the result throw. Use `ArrayLen()` and `ArrayIsEmpty()`.
+- Loops over the keys, `for (key in rows) { row = rows[key]; }`, now hand you each row struct as `key`. Loop over the rows directly: `for (row in rows) { ... }`.
+
+The single-record finders did not work with the old shape and now do: `findOne(returnAs="struct")` and `findByKey(returnAs="struct")` return the record's struct, not a `{1: {...}}` wrapper, and `findEach(returnAs="struct")` calls its callback for each record. When nothing matches, they still return an empty struct.
+
+To find affected code, search for `returnAs="structs"`, `returnAs="struct"` and `returnAs = "struct` across `app/` and `tests/`.

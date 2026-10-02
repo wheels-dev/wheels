@@ -232,7 +232,7 @@ component extends="Model" {
 }
 ```
 
-`findInBatches` defaults to `batchSize=500` and yields a query per invocation by default. Pass `returnAs="objects"` or `returnAs="structs"` if you'd rather receive an array.
+`findInBatches` defaults to `batchSize=500` and yields a query per invocation by default. Pass `returnAs="objects"` or `returnAs="structs"` if you'd rather receive an array. (From Wheels 4.2. Through 4.1, `returnAs="structs"` passed a struct keyed by row number; use `returnAs="array"` there.)
 
 Both methods accept the same filter arguments as `findAll` — `where`, `order`, `include`, `select`. And both compose with scopes: `model("User").active().findEach(batchSize=500, callback=function(user) { ... })` streams only the active users.
 
