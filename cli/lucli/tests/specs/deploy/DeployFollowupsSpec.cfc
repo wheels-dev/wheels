@@ -42,6 +42,30 @@ component extends="wheels.wheelstest.system.BaseSpec" {
             });
         });
 
+        describe("deploy init on a SQLite app", () => {
+
+            it("says the production database starts empty and how to migrate it", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-followups-" & createUUID();
+                directoryCreate(tmpCwd & "/config", true, true);
+                fileWrite(tmpCwd & "/config/app.cfm", "this.datasources[""app""] = {class: ""org.sqlite.JDBC""};");
+                var out = new cli.lucli.services.deploy.cli.DeployMainCli(new cli.lucli.services.deploy.lib.FakeSshPool())
+                    .init_stub({cwd: tmpCwd, service: "myapp", image: "acme/myapp"});
+                directoryDelete(tmpCwd, true);
+                expect(out).toInclude("uses SQLite");
+                expect(out).toInclude("autoMigrateDatabase=true");
+            });
+
+            it("says nothing about SQLite for another database", () => {
+                var tmpCwd = getTempDirectory() & "/wheels-deploy-followups-" & createUUID();
+                directoryCreate(tmpCwd & "/config", true, true);
+                fileWrite(tmpCwd & "/config/app.cfm", "this.name = ""x"";");
+                var out = new cli.lucli.services.deploy.cli.DeployMainCli(new cli.lucli.services.deploy.lib.FakeSshPool())
+                    .init_stub({cwd: tmpCwd, service: "myapp", image: "acme/myapp"});
+                directoryDelete(tmpCwd, true);
+                expect(out).notToInclude("uses SQLite");
+            });
+        });
+
         describe("deploy registry login", () => {
 
             it("refuses without registry.username instead of running docker login -u ''", () => {
@@ -147,7 +171,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                     & "env: {clear: {DB_HOST: db.internal}, secret: [APP_SECRET]}#chr(10)#"
                     & "ssh: {user: deploy}#chr(10)#"
                     & "builder: {arch: amd64}#chr(10)#"
-                    & "accessories: {db: {image: 'postgres:16', host: 1.2.3.5, port: 5432}}"
+                    & "accessories: {db: {image: 'postgres:16', host: 1.2.3.5, port: 5432}}",
+                    "REGISTRY_PASSWORD=pw#chr(10)#APP_SECRET=s"
                 );
                 var out = new cli.lucli.services.deploy.cli.DeployMainCli(new cli.lucli.services.deploy.lib.FakeSshPool()).config({configPath: cfg});
                 expect(out).toInclude("app.example.com");
@@ -160,23 +185,43 @@ component extends="wheels.wheelstest.system.BaseSpec" {
                 expect(out).toInclude("REGISTRY_PASSWORD");
             });
 
-            it("never prints a literal registry.password value", () => {
+            it("never prints a registry.password entry that isn't a key in .kamal/secrets", () => {
+                // A punctuated password, a GitHub PAT and an alphanumeric password: the
+                // last two look exactly like secret names, so only membership tells them apart.
+                for (var literal in ["hunter2!pass", "ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8", "Hunter2Password"]) {
+                    var cfg = $writeConfig(
+                        "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
+                        & "registry: {username: u, password: ['#literal#']}",
+                        "REGISTRY_PASSWORD=real-pw"
+                    );
+                    var out = new cli.lucli.services.deploy.cli.DeployMainCli(new cli.lucli.services.deploy.lib.FakeSshPool()).config({configPath: cfg});
+                    expect(out).notToInclude(literal);
+                    expect(out).toInclude("literal value hidden");
+                }
+            });
+
+            it("shows a registry.password entry that names a key in .kamal/secrets", () => {
                 var cfg = $writeConfig(
                     "service: demo#chr(10)#image: acme/demo#chr(10)#servers: [1.2.3.4]#chr(10)#"
-                    & "registry: {username: u, password: ['hunter2!pass']}"
+                    & "registry: {username: u, password: [REGISTRY_PASSWORD]}",
+                    "REGISTRY_PASSWORD=real-pw-value"
                 );
                 var out = new cli.lucli.services.deploy.cli.DeployMainCli(new cli.lucli.services.deploy.lib.FakeSshPool()).config({configPath: cfg});
-                expect(out).notToInclude("hunter2!pass");
-                expect(out).toInclude("literal value hidden");
-                expect(out).toInclude("not a secret name");
+                expect(out).toInclude("REGISTRY_PASSWORD");
+                expect(out).notToInclude("literal value hidden");
+                expect(out).notToInclude("real-pw-value");
             });
         });
     }
 
-    private string function $writeConfig(required string yaml) {
+    private string function $writeConfig(required string yaml, string secrets = "") {
         var root = getTempDirectory() & "/wheels-deploy-followups-" & createUUID();
         directoryCreate(root & "/config", true, true);
         fileWrite(root & "/config/deploy.yml", arguments.yaml);
+        if (len(arguments.secrets)) {
+            directoryCreate(root & "/.kamal", true, true);
+            fileWrite(root & "/.kamal/secrets", arguments.secrets);
+        }
         return root & "/config/deploy.yml";
     }
 
