@@ -21,7 +21,7 @@
 	 * @cache If you want to cache the query, you can do so by specifying the number of minutes you want to cache the query for here. If you set it to `true`, the default cache time will be used (60 minutes).
 	 * @reload Set to `true` to force Wheels to query the database even though an identical query for this model may have been run in the same request. (The default in Wheels is to get the second query from the model's request-level cache.)
 	 * @parameterize Set to `true` to use `cfqueryparam` on all columns, or pass in a list of property names to use `cfqueryparam` on those only.
-	 * @returnAs Set to `objects` to return an array of objects, set to `structs` to return an array of structs, set to `query` to return a query result set, or set to 'sql' to return the executed SQL query as a string.
+	 * @returnAs Set to `objects` to return an array of objects, set to `structs` (or its alias `array`) to return an array of structs, set to `query` to return a query result set, or set to 'sql' to return the executed SQL query as a string.
 	 * @returnIncluded When `returnAs` is set to `objects`, you can set this argument to `false` to prevent returning objects fetched from associations specified in the `include` argument. This is useful when you only need to include associations for use in the `WHERE` clause only and want to avoid the performance hit that comes with object creation.
 	 * @callbacks Set to `false` to disable callbacks for this method.
 	 * @includeSoftDeletes Set to `true` to include soft-deleted records in the queries that this method runs.
@@ -516,6 +516,9 @@
 		if (IsArray(local.rv) && arguments.returnAs != 'array') {
 			if (ArrayLen(local.rv)) {
 				local.rv = local.rv[1];
+			} else if (ListFindNoCase("struct,structs", arguments.returnAs)) {
+				// No match returns an empty struct for returnAs="struct", as it always has.
+				local.rv = {};
 			} else {
 				local.rv = false;
 			}
