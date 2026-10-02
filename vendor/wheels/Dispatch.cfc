@@ -417,12 +417,13 @@ component output="false" extends="wheels.Global"{
 				}
 
 				// Dev-tools network-origin gate: the password-less /wheels GUI
-				// endpoints only answer requests addressed to a local host name
-				// (Host header + no non-loopback X-Forwarded-For; not the socket, so
-				// Docker port-mapped access keeps working). Mutating endpoints add
-				// their own loopback-socket + CSRF / password checks on top. Guarded
-				// so a test double swapped in for the public component (which need not
-				// implement the gate) still dispatches.
+				// endpoints only answer a loopback socket peer (or one listed in
+				// devToolsAllowedRemoteAddresses, development/testing only) that
+				// addresses a local host name with no non-loopback X-Forwarded-For
+				// hop, and never in production. See Public.$devToolAccessCheck().
+				// Mutating endpoints add their own CSRF / password checks on top.
+				// Guarded so a test double swapped in for the public component
+				// (which need not implement the gate) still dispatches.
 				if (StructKeyExists(application.wheels.public, "$enforceDevToolLocalAccess")) {
 					application.wheels.public.$enforceDevToolLocalAccess();
 				}

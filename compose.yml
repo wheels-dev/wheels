@@ -56,7 +56,7 @@ services:
         source: ./tools/docker/lucee5/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
     ports:
-      - "60005:60005"
+      - "127.0.0.1:60005:60005"
     networks:
       - wheels-network
 
@@ -80,7 +80,7 @@ services:
         source: ./tools/docker/lucee6/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
     ports:
-      - "60006:60006"
+      - "127.0.0.1:60006:60006"
     networks:
       - wheels-network
     healthcheck:
@@ -110,7 +110,7 @@ services:
         source: ./tools/docker/lucee7/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
     ports:
-      - "60007:60007"
+      - "127.0.0.1:60007:60007"
     networks:
       - wheels-network
 
@@ -136,7 +136,7 @@ services:
         source: ./tools/docker/adobe2018/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
     ports:
-      - "62018:62018"
+      - "127.0.0.1:62018:62018"
     networks:
       - wheels-network
 
@@ -163,7 +163,7 @@ services:
         source: ./tools/docker/adobe2021/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
     ports:
-      - "62021:62021"
+      - "127.0.0.1:62021:62021"
     networks:
       - wheels-network
 
@@ -195,7 +195,7 @@ services:
         source: ./tools/docker/adobe2023/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
     ports:
-      - "62023:62023"
+      - "127.0.0.1:62023:62023"
     deploy:
       resources:
         limits:
@@ -236,7 +236,7 @@ services:
         source: ./tools/docker/adobe2025/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
     ports:
-      - "62025:62025"
+      - "127.0.0.1:62025:62025"
     deploy:
       resources:
         limits:
@@ -271,7 +271,7 @@ services:
         source: ./tools/docker/boxlang/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
     ports:
-      - "60001:60001"
+      - "127.0.0.1:60001:60001"
     networks:
       - wheels-network
 
