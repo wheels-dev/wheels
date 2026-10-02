@@ -26,6 +26,11 @@ component {
 
 	variables.BACKUP_PREFIX = ".wheels-pkg-previous-";
 	variables.INCOMING_PREFIX = ".wheels-pkg-incoming-";
+	// Held in vendor/ across a swap so a second packages command doesn't
+	// mistake a live swap for crash leftovers. A lock older than this is
+	// itself a leftover of a crash.
+	variables.LOCK_FILE = ".wheels-pkg-lock";
+	variables.LOCK_STALE_SECONDS = 600;
 
 	public Installer function init(
 		any httpClient = "",
@@ -129,7 +134,15 @@ component {
 			// and kept beside it until the new copy is in place. The leading dot
 			// keeps PackageLoader from loading the backup; the name in it lets
 			// recoverInterruptedSwaps() restore it after a crash.
-			$swapInto(local.stageDir & arguments.name, local.target, local.vendorDir & variables.BACKUP_PREFIX & arguments.name & "-" & local.token);
+			local.lockPath = local.vendorDir & variables.LOCK_FILE;
+			FileWrite(local.lockPath, arguments.name & " " & DateTimeFormat(Now(), "iso"));
+			try {
+				$swapInto(local.stageDir & arguments.name, local.target, local.vendorDir & variables.BACKUP_PREFIX & arguments.name & "-" & local.token);
+			} finally {
+				if (FileExists(local.lockPath)) {
+					FileDelete(local.lockPath);
+				}
+			}
 		} finally {
 			if (FileExists(local.tmpFile)) {
 				FileDelete(local.tmpFile);
@@ -191,6 +204,15 @@ component {
 	 *   - a half-copied .wheels-pkg-incoming-* dir: deleted.
 	 * A backup whose package cannot be told (no name in the directory, no
 	 * package.json) is left alone, with a message saying how to restore it.
+	 *
+	 * A backup made before the name was recorded (.wheels-pkg-previous-<uuid>)
+	 * is attributed by the `name` in its own package.json, which is trusted
+	 * as-is. Those older CLIs copied across volumes straight into
+	 * vendor/<name>/, so a vendor/<name>/ beside such a backup may be a
+	 * half-copy even with a package.json: the backup is restored only when
+	 * vendor/<name>/ is missing, and otherwise kept with a message.
+	 *
+	 * Nothing is touched while another packages command holds the swap lock.
 	 * Returns one message per action taken, for the caller to print.
 	 */
 	public array function recoverInterruptedSwaps() {
@@ -198,6 +220,14 @@ component {
 		local.vendorDir = variables.projectRoot & "vendor/";
 		if (!DirectoryExists(local.vendorDir)) {
 			return local.messages;
+		}
+		local.lockPath = local.vendorDir & variables.LOCK_FILE;
+		if (FileExists(local.lockPath)) {
+			if (DateDiff("s", GetFileInfo(local.lockPath).lastmodified, Now()) < variables.LOCK_STALE_SECONDS) {
+				ArrayAppend(local.messages, "Another wheels packages command is updating vendor/ (vendor/#variables.LOCK_FILE#); not checking for interrupted updates.");
+				return local.messages;
+			}
+			FileDelete(local.lockPath);
 		}
 		for (local.entry in DirectoryList(local.vendorDir, false, "name")) {
 			if (Left(local.entry, Len(variables.INCOMING_PREFIX)) == variables.INCOMING_PREFIX) {
@@ -212,7 +242,8 @@ component {
 				continue;
 			}
 			local.backup = local.vendorDir & local.entry;
-			local.name = $backupPackageName(local.entry, local.backup);
+			local.attribution = $backupPackageName(local.entry, local.backup);
+			local.name = local.attribution.name;
 			if (!Len(local.name)) {
 				ArrayAppend(
 					local.messages,
@@ -222,6 +253,15 @@ component {
 				continue;
 			}
 			local.target = new modules.wheels.services.packages.PackageName().childOf(local.vendorDir, local.name);
+			if (local.attribution.legacy && DirectoryExists(local.target)) {
+				ArrayAppend(
+					local.messages,
+					"Found vendor/#local.entry#, a backup of #local.name# left by an interrupted package update from an older CLI. "
+						& "vendor/#local.name#/ exists but may be incomplete; if #local.name# misbehaves, restore the backup: "
+						& "rm -rf vendor/#local.name# && mv vendor/#local.entry# vendor/#local.name#"
+				);
+				continue;
+			}
 			if (FileExists(local.target & "/package.json")) {
 				DirectoryDelete(local.backup, true);
 				ArrayAppend(local.messages, "Removed a leftover backup of vendor/#local.name#/ from an interrupted package update.");
@@ -241,10 +281,11 @@ component {
 	/**
 	 * The package a backup belongs to: from its directory name
 	 * (.wheels-pkg-previous-<name>-<uuid>), else, for backups made before the
-	 * name was recorded, the name in its package.json. "" when neither is a
-	 * valid package name.
+	 * name was recorded, the name in its package.json. Returns {name, legacy}:
+	 * name is "" when neither is a valid package name; legacy is true when it
+	 * came from package.json.
 	 */
-	private string function $backupPackageName(required string dirName, required string path) {
+	private struct function $backupPackageName(required string dirName, required string path) {
 		local.matched = REFind(
 			"^\.wheels-pkg-previous-(.+)-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{16}$",
 			arguments.dirName,
@@ -253,13 +294,13 @@ component {
 		);
 		local.candidates = [];
 		if (local.matched.pos[1] && ArrayLen(local.matched.pos) > 1) {
-			ArrayAppend(local.candidates, Mid(arguments.dirName, local.matched.pos[2], local.matched.len[2]));
+			ArrayAppend(local.candidates, {name: Mid(arguments.dirName, local.matched.pos[2], local.matched.len[2]), legacy: false});
 		}
 		if (FileExists(arguments.path & "/package.json")) {
 			try {
 				local.parsed = DeserializeJSON(FileRead(arguments.path & "/package.json"));
 				if (IsStruct(local.parsed) && IsSimpleValue(local.parsed.name ?: "")) {
-					ArrayAppend(local.candidates, local.parsed.name ?: "");
+					ArrayAppend(local.candidates, {name: local.parsed.name ?: "", legacy: true});
 				}
 			} catch (any e) {
 			}
@@ -267,11 +308,11 @@ component {
 		local.validator = new modules.wheels.services.packages.PackageName();
 		for (local.candidate in local.candidates) {
 			try {
-				return local.validator.assert(local.candidate);
+				return {name: local.validator.assert(local.candidate.name), legacy: local.candidate.legacy};
 			} catch (any e) {
 			}
 		}
-		return "";
+		return {name: "", legacy: false};
 	}
 
 	/**

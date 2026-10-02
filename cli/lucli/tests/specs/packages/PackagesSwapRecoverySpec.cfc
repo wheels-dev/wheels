@@ -72,6 +72,43 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				DirectoryDelete(proj, true);
 			});
 
+			it("keeps an older CLI's backup when vendor/<name>/ exists, even with a package.json", () => {
+				var proj = $project();
+				var backup = ".wheels-pkg-previous-" & CreateUUID();
+				$package(proj & "vendor/" & backup, "wheels-fake", "1.0.0");
+				FileWrite(proj & "vendor/" & backup & "/Plugin.cfc", "component {}");
+				// An old-CLI cross-volume copy killed after package.json landed.
+				$package(proj & "vendor/wheels-fake", "wheels-fake", "2.0.0");
+				var messages = new cli.lucli.services.packages.Installer(projectRoot = proj).recoverInterruptedSwaps();
+				expect(FileExists(proj & "vendor/" & backup & "/Plugin.cfc")).toBeTrue();
+				expect(DeserializeJSON(FileRead(proj & "vendor/wheels-fake/package.json")).version).toBe("2.0.0");
+				expect(ArrayToList(messages, " ")).toInclude("mv vendor/#backup# vendor/wheels-fake");
+				DirectoryDelete(proj, true);
+			});
+
+			it("touches nothing while another packages command holds the swap lock", () => {
+				var proj = $project();
+				var backup = ".wheels-pkg-previous-wheels-fake-" & CreateUUID();
+				$package(proj & "vendor/" & backup, "wheels-fake", "1.0.0");
+				FileWrite(proj & "vendor/.wheels-pkg-lock", "wheels-fake now");
+				var messages = new cli.lucli.services.packages.Installer(projectRoot = proj).recoverInterruptedSwaps();
+				expect(DirectoryExists(proj & "vendor/" & backup)).toBeTrue();
+				expect(DirectoryExists(proj & "vendor/wheels-fake")).toBeFalse();
+				expect(ArrayToList(messages, " ")).toInclude("Another wheels packages command");
+				DirectoryDelete(proj, true);
+			});
+
+			it("treats a stale swap lock as a crash leftover", () => {
+				var proj = $project();
+				$package(proj & "vendor/.wheels-pkg-previous-wheels-fake-" & CreateUUID(), "wheels-fake", "1.0.0");
+				FileWrite(proj & "vendor/.wheels-pkg-lock", "wheels-fake long ago");
+				FileSetLastModified(proj & "vendor/.wheels-pkg-lock", DateAdd("n", -30, Now()));
+				new cli.lucli.services.packages.Installer(projectRoot = proj).recoverInterruptedSwaps();
+				expect(FileExists(proj & "vendor/wheels-fake/package.json")).toBeTrue();
+				expect($hidden(proj)).toBeEmpty();
+				DirectoryDelete(proj, true);
+			});
+
 			it("leaves a backup it cannot attribute and says how to restore it", () => {
 				var proj = $project();
 				var backup = ".wheels-pkg-previous-" & CreateUUID();
