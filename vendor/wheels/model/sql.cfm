@@ -1407,6 +1407,11 @@
 				if (ArrayLen(local.temp.len) > 1) {
 					local.start = local.temp.pos[4] + local.temp.len[4];
 					local.extractedValue = Mid(arguments.where, local.temp.pos[4], local.temp.len[4]);
+					// A bare true / false binds as 1 / 0, which boolean and integer
+					// flag columns both accept on every database (#3896).
+					if (ReFindNoCase("^(true|false)$", local.extractedValue)) {
+						local.extractedValue = (CompareNoCase(local.extractedValue, "true") == 0) ? "1" : "0";
+					}
 					// Unquoted SQL keyword NULL (from `IS NULL` / `IS NOT NULL`) is a
 					// missing value. The quoted literal `'null'` is a bound string.
 					local.isSqlNullKeyword = (ReFindNoCase("^NULL$", Trim(local.extractedValue)) == 1);

@@ -29,8 +29,10 @@ component {
 		any registry = "",
 		any installer = "",
 		any resolver = "",
-		string runtimeVersion = ""
+		string runtimeVersion = "",
+		string projectRoot = ""
 	) {
+		variables.projectRoot = Len(arguments.projectRoot) ? arguments.projectRoot : ExpandPath("./");
 		variables.registry = IsObject(arguments.registry)
 			? arguments.registry
 			: new modules.wheels.services.packages.Registry();
@@ -45,6 +47,13 @@ component {
 			? arguments.runtimeVersion
 			: $detectRuntime();
 		return this;
+	}
+
+	/**
+	 * The framework version package compatibility is checked against.
+	 */
+	public string function runtimeVersion() {
+		return variables.runtime;
 	}
 
 	// ── Verbs ───────────────────────────────────────────────
@@ -335,6 +344,13 @@ component {
 	}
 
 	private string function $detectRuntime() {
+		// Tier 0 — the app's own framework (#3911). Packages install into
+		// this project and run on its vendor/wheels, so that is the version
+		// a package's wheelsVersion range has to match; the CLI's version
+		// only stands in outside a project.
+		local.projectVersion = $projectFrameworkVersion();
+		if (Len(local.projectVersion)) return local.projectVersion;
+
 		// Three-tier fallback. The original implementation tried to
 		// instantiate `wheels.Global` and call `$readFrameworkVersion()`,
 		// but in the LuCLI context the only registered mapping for the
@@ -373,9 +389,29 @@ component {
 			// BuildInfo unreachable; fall through.
 		}
 
-		// Tier 3 — sentinel. Matches "*" against any wheelsVersion
-		// constraint via the SemVer comparator (treated as a
-		// permissive dev build).
+		// Tier 3 — sentinel. VersionResolver treats it as a permissive dev
+		// build that satisfies every wheelsVersion constraint.
 		return "0.0.0-dev";
+	}
+
+	/**
+	 * The version in the project's vendor/wheels/wheels.json (box.json for
+	 * older apps), or "" when there is none or it is an unstamped build token.
+	 */
+	private string function $projectFrameworkVersion() {
+		local.dir = variables.projectRoot;
+		if (Right(local.dir, 1) != "/") local.dir &= "/";
+		for (local.file in ["wheels.json", "box.json"]) {
+			local.path = local.dir & "vendor/wheels/" & local.file;
+			if (!FileExists(local.path)) continue;
+			try {
+				local.data = DeserializeJSON(FileRead(local.path));
+				local.v = IsStruct(local.data) && IsSimpleValue(local.data.version ?: "") ? Trim(local.data.version ?: "") : "";
+				if (Len(local.v) && !Find("@", local.v)) return local.v;
+			} catch (any e) {
+				// Unreadable manifest; try the next one, then the CLI tiers.
+			}
+		}
+		return "";
 	}
 }

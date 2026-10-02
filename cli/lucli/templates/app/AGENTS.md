@@ -14,9 +14,11 @@ Claude Code also reads the more detailed `CLAUDE.md` next to this file.
    `wheels setup agents` to write `.mcp.json` and `.opencode.json`, or add
    `{"mcpServers":{"wheels":{"command":"wheels","args":["mcp","wheels"]}}}`
    to your client's config yourself. Until then, use the `wheels` CLI.
-2. **Load context on demand.** Read the relevant section of `CLAUDE.md`
-   (models, routing, views, middleware, migrations, jobs) for the task at
-   hand instead of guessing at conventions.
+2. **Load context on demand.** `CLAUDE.md` is short: conventions, common
+   mistakes, testing, and a topic index. When the task reaches a topic
+   (models, routing, views, middleware, migrations, jobs, …), open its file
+   from the index, e.g. `cat .ai/models.md`, instead of guessing at
+   conventions. Don't read every topic file up front.
 3. **Follow the conventions table** — `config()` for associations and
    filters, singular PascalCase models, plural controllers/tables,
    `params.key` accessors, migrations for schema changes.
@@ -35,7 +37,7 @@ Claude Code also reads the more detailed `CLAUDE.md` next to this file.
 
 ## Where to look for more
 
-- `CLAUDE.md` — the full application-developer quick reference shipped with the framework.
-- `.ai/README.md` — index of the bundled reference subset.
+- `CLAUDE.md` — conventions, common mistakes, testing, and the topic index.
+- `.ai/<topic>.md` — the per-topic quick references; `.ai/README.md` lists them.
 - https://guides.wheels.dev — the human documentation site (start-here, core-concepts, testing, deployment).
 - `/wheels/ai` — JSON documentation endpoints on a running app.

@@ -103,6 +103,31 @@ check() {
         done
     fi
 
+    # CLAUDE.md is read in full by agent harnesses that cap or elide long files,
+    # so it stays small; the reference material lives in .ai/<topic>.md (#3960).
+    local budget=8192
+    local size
+    size=$(wc -c < "$CONSUMER_DIR/CLAUDE.md" | tr -d ' ')
+    if [ "$size" -gt "$budget" ]; then
+        echo "ERROR: docs/consumer-ai/CLAUDE.md is $size bytes, over the $budget-byte budget (move reference material to .ai/<topic>.md)" >&2
+        failures=$((failures + 1))
+    fi
+
+    # Every .ai/ topic file is reachable from the CLAUDE.md topic index, and
+    # every .ai/ file the index names exists.
+    for f in $(cd "$CONSUMER_DIR" && find .ai -type f -name '*.md' | sort); do
+        if ! grep -qF "\`$f\`" "$CONSUMER_DIR/CLAUDE.md"; then
+            echo "ERROR: docs/consumer-ai/$f is not linked from the CLAUDE.md topic index" >&2
+            failures=$((failures + 1))
+        fi
+    done
+    for f in $(grep -oE '`\.ai/[A-Za-z0-9_./-]+\.md`' "$CONSUMER_DIR/CLAUDE.md" | tr -d '`' | sort -u); do
+        if [ ! -f "$CONSUMER_DIR/$f" ]; then
+            echo "ERROR: the CLAUDE.md topic index links $f, which doesn't exist" >&2
+            failures=$((failures + 1))
+        fi
+    done
+
     # The consumer tier must not accidentally grow maintainer content.
     if grep -Rq "test-local.sh\|compat-matrix.yml\|onboarding-harness" "$CONSUMER_DIR" 2>/dev/null; then
         echo "ERROR: maintainer-only content detected under docs/consumer-ai/" >&2

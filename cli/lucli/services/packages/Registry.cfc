@@ -19,13 +19,15 @@ component {
 		variables.http = IsObject(arguments.httpClient)
 		 ? arguments.httpClient
 		 : new modules.wheels.services.packages.HttpClient();
-		variables.cache = IsObject(arguments.cache)
-		 ? arguments.cache
-		 : new modules.wheels.services.packages.ManifestCache();
 		variables.registryRepo = Len(arguments.registryRepo)
 		 ? arguments.registryRepo
 		 : $resolveRepo();
 		variables.branch = Len(arguments.branch) ? arguments.branch : variables.DEFAULT_BRANCH;
+		// Keyed by registry so a switched registry never serves the previous
+		// one's cached data; the default registry keeps the shared root.
+		variables.cache = IsObject(arguments.cache)
+		 ? arguments.cache
+		 : new modules.wheels.services.packages.ManifestCache(registryKey = $cacheKey());
 		return this;
 	}
 
@@ -40,17 +42,30 @@ component {
 	}
 
 
+	/** "" for the default registry, else "<repo>@<branch>". */
+	private string function $cacheKey() {
+		if (variables.registryRepo == variables.DEFAULT_REPO && variables.branch == variables.DEFAULT_BRANCH) {
+			return "";
+		}
+		return variables.registryRepo & "@" & variables.branch;
+	}
+
+	private boolean function $isOffline() {
+		return request.$wheelsOffline ?: false;
+	}
+
 	/**
 	 * Offline gate for network paths. `wheels packages` sets
-	 * request.$wheelsOffline when --offline / WHEELS_OFFLINE=1 is active;
-	 * cached reads still work, fresh fetches fail fast with a clear
-	 * message instead of hanging on a blocked request.
+	 * request.$wheelsOffline when --offline / WHEELS_OFFLINE=1 is active.
+	 * Callers serve cached data first, even expired data; this runs only
+	 * when nothing is cached, so it says so instead of hanging on a blocked
+	 * request.
 	 */
 	private void function $rejectWhenOffline(required string verb) {
-		if (request.$wheelsOffline ?: false) {
+		if ($isOffline()) {
 			Throw(
 				type = "Wheels.Packages.Offline",
-				message = "Offline mode is enabled (--offline / WHEELS_OFFLINE=1) — the package registry requires network access. Cached registry data is still available."
+				message = "Offline mode is enabled (--offline / WHEELS_OFFLINE=1). No cached registry data exists for '#variables.registryRepo#' yet, so this command needs network access once; run it again without --offline."
 			);
 		}
 	}
@@ -60,7 +75,7 @@ component {
 	 * data if fresh; otherwise hits the GitHub contents API.
 	 */
 	public array function listPackageNames() {
-		if (variables.cache.hasFreshIndex()) {
+		if (variables.cache.hasFreshIndex() || ($isOffline() && variables.cache.hasIndex())) {
 			return variables.cache.readIndex();
 		}
 		$rejectWhenOffline("list");
@@ -98,7 +113,8 @@ component {
 	 */
 	public struct function fetchManifest(required string name) {
 		new modules.wheels.services.packages.PackageName().assert(arguments.name);
-		if (variables.cache.hasFreshManifest(arguments.name)) {
+		if (variables.cache.hasFreshManifest(arguments.name)
+			|| ($isOffline() && variables.cache.hasManifest(arguments.name))) {
 			local.cached = variables.cache.readManifest(arguments.name);
 			$validateManifest(arguments.name, local.cached);
 			return local.cached;

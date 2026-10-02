@@ -461,7 +461,9 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.option(name = "environment", default = "", description = "Environment whose seed files run (defaults to the app's current environment)")
 			.option(name = "mode", default = "auto", choices = "auto,convention,generate", description = "Seeding mode: auto (detect), convention (app/db/seeds.cfm), or generate (random test data)")
-			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate");
+			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate")
+			.option(name = "models", default = "", description = "generate mode: comma-delimited model names to generate seed data for (default: every model under app/models)")
+			.option(name = "count", default = "", description = "generate mode: records to create per model (default 10)");
 	}
 
 	private any function testArgSpec() {
@@ -1294,10 +1296,35 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseSeedArgs(required struct coll) {
 		var parsed = seedArgSpec().parse(arguments.coll);
+		if (len(trim(parsed.count)) && !reFind("^[0-9]+$", trim(parsed.count))) {
+			throw(type = "Wheels.InvalidArguments", message = "wheels seed: count must be a whole number, got '#parsed.count#'.");
+		}
 		return {
 			environment = parsed.environment,
-			mode = parsed.generate ? "generate" : parsed.mode
+			mode = parsed.generate ? "generate" : parsed.mode,
+			models = trim(parsed.models),
+			count = trim(parsed.count)
 		};
+	}
+
+	/**
+	 * Refuse a seed environment this project doesn't know (#3893): the server
+	 * runs app/db/seeds.cfm plus seeds/<env>.cfm when that file exists, so a
+	 * typo silently ran the main seeds only. Known: Wheels' four environments,
+	 * or any name with a config/<env>/ directory or an app/db/seeds/<env>.cfm.
+	 */
+	private void function $assertKnownSeedEnvironment(required string environment) {
+		var env = trim(arguments.environment);
+		if (!len(env)) return;
+		if (reFind("^[A-Za-z0-9_-]+$", env)) {
+			if (listFindNoCase("development,testing,maintenance,production", env)) return;
+			if (directoryExists(variables.projectRoot & "/config/" & env)) return;
+			if (fileExists(variables.projectRoot & "/app/db/seeds/" & env & ".cfm")) return;
+		}
+		throw(
+			type = "Wheels.InvalidArguments",
+			message = "wheels seed: unknown environment '#env#'. Use development, testing, maintenance or production, or an environment with a config/#env#/ directory or app/db/seeds/#env#.cfm."
+		);
 	}
 
 	/**
@@ -1305,7 +1332,8 @@ component extends="modules.BaseModule" {
 	 */
 	public string function seed() {
 		var opts = parseSeedArgs(structuredArgs(arguments));
-		return runSeed(opts.mode, opts.environment);
+		$assertKnownSeedEnvironment(opts.environment);
+		return runSeed(opts.mode, opts.environment, opts.models, opts.count);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -1663,7 +1691,15 @@ component extends="modules.BaseModule" {
 	 */
 	public string function docs() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
-		var action = arrayLen(args) ? lCase(args[1]) : "fetch";
+		// The first non-flag token, so a bare `wheels docs --offline` (or
+		// `--force`) runs the default fetch instead of being read as an action.
+		var action = "fetch";
+		for (var token in args) {
+			if (left(token, 2) != "--") {
+				action = lCase(token);
+				break;
+			}
+		}
 		// Resolve --force HERE, in the command that actually receives the parsed
 		// argv. docsFetch() takes no arguments, so a helper reading its
 		// `arguments` scope always saw an empty struct and the flag was
@@ -1674,6 +1710,9 @@ component extends="modules.BaseModule" {
 				force = true;
 			}
 		}
+		// --offline / WHEELS_OFFLINE=1: sets request.$wheelsOffline, which
+		// docsFetch() and the HttpClient download gate both honour.
+		$consumeOfflineFlag(args);
 		switch (action) {
 			case "fetch":
 				return docsFetch(force = force);
@@ -1711,7 +1750,16 @@ component extends="modules.BaseModule" {
 			out("Documentation for #version# is already installed.", "green");
 			out("  #target#");
 			out("  Re-run with --force to replace it.");
+			// The bundle cache is per CLI home and shared by every app, so a
+			// second app finds it installed and still needs its own mirror.
+			$docsMountIntoWebroot(target);
 			return "";
+		}
+		if ($isOffline()) {
+			$docsFetchFail(
+				"Offline mode is enabled (--offline / WHEELS_OFFLINE=1): downloading the docs bundle for #version# requires network access.",
+				["  Run again without --offline to download it."]
+			);
 		}
 
 		// Not `url` — a variable named after a reserved CFML scope shadows it,
@@ -1774,28 +1822,10 @@ component extends="modules.BaseModule" {
 			directoryCreate(staging, true);
 			// The bundle is zipped with its contents at the root (manifest.json,
 			// guides/, api/), so unpack straight into the staging directory.
-			// Shell out to `unzip` rather than Lucee's extract(): `extract` is
-			// shadowed in this module's scope and resolves to a helper with a
-			// different arity. Same approach Installer::$extract() takes with
-			// `tar`, for the same reason.
-			var unzipResult = {};
 			try {
-				cfexecute(
-					name = "unzip",
-					arguments = "-o -q #tmp# -d #staging#",
-					timeout = 300,
-					variable = "local.unzipOut",
-					errorVariable = "local.unzipErr",
-					result = "unzipResult"
-				);
+				$docsUnzip(tmp, staging);
 			} catch (any e) {
 				$docsFetchFail("Could not unpack the bundle: #e.message#");
-			}
-			if (unzipResult.exitCode != 0) {
-				$docsFetchFail(
-					"Could not unpack the bundle (unzip exit #unzipResult.exitCode#).",
-					["  #local.unzipErr ?: ''#"]
-				);
 			}
 
 			try {
@@ -1819,6 +1849,51 @@ component extends="modules.BaseModule" {
 		out("  #target#");
 		$docsMountIntoWebroot(target);
 		return "";
+	}
+
+	/**
+	 * Unpacks a zip with java.util.zip rather than a shell `unzip`: an
+	 * argument string broke on paths with spaces, and Windows has no `unzip`.
+	 * Lucee's extract() is not an option either: `extract` is shadowed in
+	 * this module's scope by a helper with a different arity. An entry that
+	 * would land outside destDir (`../x`, an absolute path) throws instead of
+	 * being skipped, so a hostile bundle installs nothing.
+	 */
+	private void function $docsUnzip(required string zipPath, required string destDir) {
+		var root = createObject("java", "java.io.File").init(arguments.destDir).getCanonicalFile();
+		var rootPath = root.toPath();
+		var zip = createObject("java", "java.util.zip.ZipFile").init(arguments.zipPath);
+		try {
+			var entries = zip.entries();
+			while (entries.hasMoreElements()) {
+				var entry = entries.nextElement();
+				var outFile = createObject("java", "java.io.File").init(root, entry.getName()).getCanonicalFile();
+				// A `./` directory entry is the root itself: nothing to create.
+				if (entry.isDirectory() && outFile.equals(root)) {
+					continue;
+				}
+				if (!outFile.toPath().startsWith(rootPath) || outFile.equals(root)) {
+					throw(type = "Wheels.DocsFetchFailed", message = "the archive entry '#entry.getName()#' points outside the docs directory");
+				}
+				if (entry.isDirectory()) {
+					outFile.mkdirs();
+					continue;
+				}
+				outFile.getParentFile().mkdirs();
+				var input = zip.getInputStream(entry);
+				try {
+					createObject("java", "java.nio.file.Files").copy(
+						input,
+						outFile.toPath(),
+						[createObject("java", "java.nio.file.StandardCopyOption").REPLACE_EXISTING]
+					);
+				} finally {
+					input.close();
+				}
+			}
+		} finally {
+			zip.close();
+		}
 	}
 
 	/**
@@ -2048,7 +2123,9 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Reload the running Wheels application. The reload password
+	 * hint: Reload the running Wheels application (the CLI forwards the reload password from .env or config/settings.cfm).
+	 *
+	 * The reload password
 	 * gates the HTTP `?reload=true` endpoint against remote attackers;
 	 * the CLI reads it from `.env` or `config/settings.cfm` and forwards
 	 * it because it runs locally with filesystem access. This matches
@@ -2172,7 +2249,13 @@ component extends="modules.BaseModule" {
 	 * hint: Start the Wheels development server via LuCLI
 	 */
 	public string function start() {
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		// `--port 8931` (space form) arrives as port="true" plus a positional;
+		// without re-binding it, toArgv() reordered it to "8931 --port" and
+		// the port was silently dropped (#3895).
+		// Both may arrive that way at once; they bind by value shape.
+		var args = new services.ArgSpec().toArgv(
+			new services.ArgSpec().bindSpaceFormValues(structuredArgs(arguments), {port = "^[0-9]+$", engine = "^[A-Za-z][A-Za-z0-9_-]*$"})
+		);
 
 		// Refuse to start from a non-Wheels-project directory. LuCLI's
 		// `server start` derives the server name from the cwd basename and
@@ -2203,16 +2286,23 @@ component extends="modules.BaseModule" {
 			if (a == "--force") {
 				force = true;
 			} else if (a == "--engine") {
-				if (i < arrayLen(args)) { engine = lCase(args[i + 1]); i++; }
+				engine = lCase($startFlagValue(args, i, "engine"));
+				i++;
 			} else if (left(a, 9) == "--engine=") {
 				engine = lCase(mid(a, 10, len(a) - 9));
 			} else if (a == "--port") {
-				if (i < arrayLen(args)) { enginePort = val(args[i + 1]); i++; }
+				enginePort = val($startFlagValue(args, i, "port"));
+				i++;
 			} else if (left(a, 7) == "--port=") {
 				enginePort = val(mid(a, 8, len(a) - 7));
 			} else {
 				arrayAppend(passThrough, a);
 			}
+		}
+
+		// An unknown engine used to fall through to Lucee silently (#3895).
+		if (!listFind("lucee,rustcfml", engine)) {
+			throw(type = "Wheels.InvalidArguments", message = "Unknown engine '#engine#' for wheels start. Supported: lucee (the default), rustcfml.");
 		}
 
 		// One engine per project (#3913): a second engine on another port made
@@ -2239,6 +2329,7 @@ component extends="modules.BaseModule" {
 		if (engine == "rustcfml") {
 			var rustSvc = $rustcfmlEngine();
 			try {
+				$announceRustcfmlDownload(rustSvc);
 				var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
 			} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 				$reportUnsupportedRustPlatform(e);
@@ -2560,8 +2651,10 @@ component extends="modules.BaseModule" {
 	 * registry. Hidden from MCP like the other stateful server commands.
 	 */
 	public string function engines() {
-		var coll = structuredArgs(arguments);
-		var opts = new services.ArgSpec()
+		var spec = new services.ArgSpec();
+		// `--port 8931` (space form), as `wheels start` accepts (#3895).
+		var coll = spec.bindSpaceFormValue(structuredArgs(arguments), "port");
+		var opts = spec
 			.positional(name = "engine", default = "", description = "Engine name: rustcfml")
 			.positional(name = "action", default = "", description = "Action: install, start, stop, status")
 			.option(name = "port", default = "8513", description = "Port for `start` (default 8513)")
@@ -2570,10 +2663,13 @@ component extends="modules.BaseModule" {
 		var engine = lCase(trim(opts.engine));
 		var action = lCase(trim(opts.action));
 
-		if (engine != "rustcfml") {
-			out("Unknown engine '#opts.engine#'. Supported: rustcfml", "yellow");
+		if (!len(engine)) {
 			out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
 			return "";
+		}
+		if (engine != "rustcfml") {
+			out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+			throw(type = "Wheels.InvalidArguments", message = "Unknown engine '#opts.engine#'. Supported: rustcfml");
 		}
 
 		var svc = $rustcfmlEngine();
@@ -2581,6 +2677,7 @@ component extends="modules.BaseModule" {
 			case "install":
 				out("Installing RustCFML...", "cyan");
 				try {
+					$announceRustcfmlDownload(svc);
 					out("Installed: " & svc.install(), "green");
 				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 					$reportUnsupportedRustPlatform(e);
@@ -2590,6 +2687,7 @@ component extends="modules.BaseModule" {
 			case "start":
 				$refuseOtherEngine("rustcfml");
 				try {
+					$announceRustcfmlDownload(svc);
 					var st = svc.start(variables.projectRoot, val(opts.port));
 				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 					$reportUnsupportedRustPlatform(e);
@@ -2618,10 +2716,42 @@ component extends="modules.BaseModule" {
 					out("No RustCFML server running for this project.", "yellow");
 				}
 				break;
+			case "":
+				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+				break;
 			default:
-				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "yellow");
+				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown action '#opts.action#' for wheels engines rustcfml. Try: install, start, stop, status");
 		}
 		return "";
+	}
+
+	/**
+	 * The value after a bare `--<name>` in start()'s argv. Refuses a missing
+	 * value or another flag, which the loop used to take as the value (so
+	 * `--port --engine` booted Lucee on the default port).
+	 */
+	private string function $startFlagValue(required array args, required numeric i, required string name) {
+		if (arguments.i >= arrayLen(arguments.args) || left(arguments.args[arguments.i + 1], 2) == "--") {
+			throw(type = "Wheels.InvalidArguments", message = "--#arguments.name# needs a value, e.g. --#arguments.name#=<value>.");
+		}
+		return arguments.args[arguments.i + 1];
+	}
+
+	/**
+	 * The pinned RustCFML binary is a ~57 MB download on first use. It used to
+	 * happen silently inside `wheels start`; announce it and how long it took.
+	 * The download itself runs in a child process whose output is not shown,
+	 * so this prints before and after rather than a live progress bar.
+	 */
+	private void function $announceRustcfmlDownload(required any svc) {
+		if (arguments.svc.isInstalled()) {
+			return;
+		}
+		out("Downloading RustCFML #arguments.svc.getEngineVersion()# (about 57 MB, first run only)...", "cyan");
+		var began = getTickCount();
+		arguments.svc.install();
+		out("  Downloaded and verified in #numberFormat((getTickCount() - began) / 1000, '0.0')#s.", "cyan");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2771,15 +2901,15 @@ component extends="modules.BaseModule" {
 	//  routes — List application routes
 	// ─────────────────────────────────────────────────
 
-	/**
-	 * hint: List all configured routes with method, path, and controller action
-	 */
 	private any function routesArgSpec() {
 		return new services.ArgSpec()
 			.option(name = "filter", default = "", description = "Show only routes whose name, pattern or controller##action contains this text (case-insensitive)")
 			.option(name = "format", default = "text", choices = "text,json", description = "Output format: text (aligned table) or json");
 	}
 
+	/**
+	 * hint: List all configured routes with method, path, and controller action
+	 */
 	public string function routes() {
 		// Both flags were advertised in the wrapper's help for as long as the
 		// command has existed, and neither was ever read — the command fetched
@@ -2953,8 +3083,19 @@ component extends="modules.BaseModule" {
 				} catch (any e) { /* skip */ }
 			}
 
-			// CFML engine
-			out("Engine:   Lucee (LuCLI module)");
+			// CFML engine: the one serving this project. It was always reported
+			// as Lucee, even while RustCFML served (#3895).
+			var engineLine = "Lucee (LuCLI module)";
+			try {
+				var rustSvc = $rustcfmlEngine();
+				var rustStatus = rustSvc.status(variables.projectRoot);
+				if (rustStatus.running ?: false) {
+					engineLine = "RustCFML #rustSvc.getEngineVersion()# (running at http://127.0.0.1:#rustStatus.port#)";
+				}
+			} catch (any e) {
+				// No RustCFML state to read; Lucee is the default.
+			}
+			out("Engine:   #engineLine#");
 
 			// Datasource. Strip CFML/cfscript comments first so commented-out
 			// `set(...)` calls don't get parsed as live config, and use a
@@ -4798,6 +4939,16 @@ component extends="modules.BaseModule" {
 			return $packagesHelp();
 		}
 
+		// A package update killed mid-swap leaves the package only as a hidden
+		// backup; any packages command puts it back first (#3902).
+		try {
+			for (var note in new modules.wheels.services.packages.Installer().recoverInterruptedSwaps()) {
+				out(note, "yellow");
+			}
+		} catch (any e) {
+			out("Could not check vendor/ for an interrupted package update: #e.message#", "yellow");
+		}
+
 		return $dispatchPackages(sub, positional, opts);
 	}
 
@@ -4850,7 +5001,7 @@ component extends="modules.BaseModule" {
 	 * Return a fresh PackagesMainCli for a single subcommand dispatch.
 	 */
 	private any function $packagesMainCli() {
-		return new modules.wheels.services.packages.PackagesMainCli();
+		return new modules.wheels.services.packages.PackagesMainCli(projectRoot = variables.projectRoot);
 	}
 
 	/**
@@ -5005,6 +5156,16 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseNotesArgs(required struct coll) {
 		var parsed = notesArgSpec().parse(arguments.coll);
+		// Markers are matched as words in a regex, so a marker that isn't a word
+		// ("." matched every character) is refused rather than escaped (#3893).
+		for (var marker in listToArray(parsed.annotations & "," & parsed.custom)) {
+			if (!reFind("^[A-Za-z][A-Za-z0-9_-]*$", trim(marker))) {
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "wheels notes: annotation marker '#trim(marker)#' is not a word. Markers are letters, digits, '_' and '-' (e.g. TODO,FIXME,HACK)."
+				);
+			}
+		}
 		return { annotations = parsed.annotations, custom = parsed.custom };
 	}
 
@@ -6066,7 +6227,9 @@ component extends="modules.BaseModule" {
 			out("API resource complete! Next steps:", "green");
 			out("  1. Run migrations: wheels migrate latest");
 			out("  2. " & $serverNextStep());
-			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
+			// The project's pinned port (lucee.json), not a hardcoded 8080.
+			var apiPort = $readPinnedPort(variables.projectRoot);
+			out("  3. Test: curl http://localhost:#apiPort > 0 ? apiPort : 8080#/api/#lCase(controllerName)#.json");
 		} else {
 			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}
@@ -7377,7 +7540,7 @@ component extends="modules.BaseModule" {
 
 	// ── Seed Execution ──────────────────────────────
 
-	private string function runSeed(string mode = "auto", string environment = "") {
+	private string function runSeed(string mode = "auto", string environment = "", string models = "", string count = "") {
 		var serverPort = $requireOwnRunningServer([
 			"Seeding requires a running server bound to this project.",
 			"Start this project's own server with: wheels start (it registers the server as this project's)"
@@ -7388,6 +7551,12 @@ component extends="modules.BaseModule" {
 		var seedUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
 		if (len(environment)) {
 			seedUrl &= "&environment=#environment#";
+		}
+		if (len(arguments.models)) {
+			seedUrl &= "&models=#urlEncodedFormat(arguments.models)#";
+		}
+		if (len(arguments.count)) {
+			seedUrl &= "&count=#arguments.count#";
 		}
 
 		// dbSeed writes data — POST + reload password.
@@ -11210,16 +11379,21 @@ component extends="modules.BaseModule" {
 	/**
 	 * The datasource name a (comment-stripped) config/settings.cfm sets, or "".
 	 * Reads both `set(dataSourceName="name")` and the generated
-	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`; for the env() form the
+	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`, with single or double
+	 * quotes as CFML allows (each value's quotes must match, #3952); for the env() form the
 	 * variable's value in .env wins over the default, as it does at runtime. The
 	 * process environment is not consulted: it can differ from the app server's.
 	 */
 	public string function $settingsDataSourceName(required string settingsContent) {
 		// Two patterns rather than one with an optional env( group: every group in
 		// each always takes part in the match, so the subexpression arrays line up.
-		var m = reFindNoCase('\bdataSourceName\b\s*=\s*env\s*\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*,\s*"([^"]*)"', arguments.settingsContent, 1, true);
+		// Capture groups: \1 and \3 are the quotes (backreferenced so each pair
+		// matches). In m.match (whole match first) the variable name is [3] and
+		// the default is [5].
+		var m = reFindNoCase("\bdataSourceName\b\s*=\s*env\s*\(\s*([""'])([A-Za-z_][A-Za-z0-9_]*)\1\s*,\s*([""'])([^""']*)\3", arguments.settingsContent, 1, true);
 		if (m.pos[1] > 0) {
-			var name = trim(m.match[3]);
+			var envKey = m.match[3];
+			var name = trim(m.match[5]);
 			var envFile = variables.projectRoot & "/.env";
 			if (fileExists(envFile)) {
 				// Read the value the way the app's Application.cfc loadEnvFile() does:
@@ -11227,7 +11401,7 @@ component extends="modules.BaseModule" {
 				// matching quotes, and let the last line for the key win.
 				for (var line in listToArray(fileRead(envFile), chr(10))) {
 					line = trim(line);
-					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), m.match[2]) != 0) {
+					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), envKey) != 0) {
 						continue;
 					}
 					var value = trim(listRest(line, "="));
@@ -11241,8 +11415,8 @@ component extends="modules.BaseModule" {
 			}
 			return name;
 		}
-		m = reFindNoCase('\bdataSourceName\b\s*=\s*"([^"]*)"', arguments.settingsContent, 1, true);
-		return m.pos[1] > 0 ? trim(m.match[2]) : "";
+		m = reFindNoCase("\bdataSourceName\b\s*=\s*([""'])([^""']*)\1", arguments.settingsContent, 1, true);
+		return m.pos[1] > 0 ? trim(m.match[3]) : "";
 	}
 
 	/**
