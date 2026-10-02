@@ -49,14 +49,14 @@ set(storage = {
 </cfscript>
 ```
 
-Register the manager as a singleton in `config/services.cfm`. Because its `init()` takes the storage config struct — which isn't a registered service — wrap construction in `toFactory()`:
+Register the manager as a singleton in `config/services.cfm`. Because its `init()` takes the storage config struct — which isn't a registered service — wrap construction in `toFactory()`, and end with `.asSingleton()` (a factory mapping is transient otherwise, so every `service("storage")` call would build a new manager):
 
 ```cfm {test:compile} title="config/services.cfm"
 <cfscript>
 local.di = injector();
 local.di.map("storage").toFactory(function() {
     return new wheels.storage.StorageManager(config = get("storage"));
-});
+}).asSingleton();
 </cfscript>
 ```
 
