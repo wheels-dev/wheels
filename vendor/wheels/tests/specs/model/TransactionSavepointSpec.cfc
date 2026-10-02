@@ -101,6 +101,25 @@ component extends="wheels.WheelsTest" {
 				expect(g.model("tag").count(where = "name = 'sp-unit'")).toBe(0);
 			});
 
+			it("does not let a failing savepoint rollback replace the original exception", () => {
+				// The quiet rollback is what the throw path calls; a rollback to a
+				// savepoint that does not exist fails, and must not throw.
+				var state = {threw = false};
+				transaction {
+					try {
+						g.model("tag").$rollbackToSavepointQuietly(
+							name = "wsp_does_not_exist",
+							connection = g.model("tag").$hashedConnectionArgs(),
+							mark = -1
+						);
+					} catch (any e) {
+						state.threw = true;
+					}
+					transaction action="rollback";
+				}
+				expect(state.threw).toBeFalse();
+			});
+
 			it("still rejects an unknown transaction mode", () => {
 				var state = {type = ""};
 				try {

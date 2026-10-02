@@ -254,7 +254,9 @@
 		try {
 			local.rv = $invoke(method = arguments.method, componentReference = this, invokeArgs = local.methodArgs);
 		} catch (any e) {
-			$rollbackToSavepoint(name = local.savepoint, connection = local.connectionArgs, mark = local.mark, propagateErrors = false);
+			// A rollback that itself fails is logged, never allowed to replace the
+			// method's exception, which is what the caller needs to see.
+			$rollbackToSavepointQuietly(name = local.savepoint, connection = local.connectionArgs, mark = local.mark);
 			rethrow;
 		}
 		// Same failure test as the commit branch: a numeric count (0-row bulk op) is not a failure.
@@ -321,6 +323,26 @@
 	public void function $rollbackToSavepoint(required string name, required string connection, required numeric mark, boolean propagateErrors = true) {
 		transaction action="rollback" savepoint=arguments.name;
 		$rollbackSavepointCallbacks(connection = arguments.connection, mark = arguments.mark, propagateErrors = arguments.propagateErrors);
+	}
+
+	/**
+	 * Internal. $rollbackToSavepoint for the exception path: a failure of the
+	 * rollback itself (or of an afterRollback callback) is logged to wheels.log
+	 * and swallowed, so the caller rethrows the method's original exception.
+	 */
+	public void function $rollbackToSavepointQuietly(required string name, required string connection, required numeric mark) {
+		try {
+			$rollbackToSavepoint(name = arguments.name, connection = arguments.connection, mark = arguments.mark, propagateErrors = false);
+		} catch (any e) {
+			try {
+				writeLog(
+					file = "wheels",
+					type = "error",
+					text = "Rolling back savepoint `" & arguments.name & "` failed after the unit threw: " & e.message
+				);
+			} catch (any logError) {
+			}
+		}
 	}
 
 	/**
