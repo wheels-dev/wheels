@@ -1,1 +1,0 @@
-- On Adobe ColdFusion, a `transaction="savepoint"` unit inside a raw `transaction {}` block now nests as a real savepoint (rolling back only its own writes when it returns `false` or throws), as on Lucee and BoxLang. It used to join the raw block like `commit`, so a failed unit's writes stayed in the outer transaction. RustCFML still joins like `commit` (#4068)
