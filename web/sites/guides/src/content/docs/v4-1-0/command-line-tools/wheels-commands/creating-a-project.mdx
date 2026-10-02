@@ -117,13 +117,11 @@ myblog/
     jobs/
     lib/
     mailers/
-    middleware/
+    plugins/
     policies/             # Policy.cfc base
-    snippets/             # dbmigrate/ generator templates
+    snippets/             # generator snippet templates
   config/                 # app.cfm, environment.cfm, routes.cfm, services.cfm, settings.cfm
-    <env>/settings.cfm    # development, testing, production, maintenance
   db/                     # development.sqlite (or db/h2/ with --setup-h2)
-  plugins/                # legacy plugin drop-in (deprecated)
   public/                 # images/, javascripts/, stylesheets/, files/, miscellaneous/
   tests/
     populate.cfm
@@ -135,7 +133,6 @@ myblog/
   vendor/
     wheels/               # framework installed by the scaffolder
   .env
-  .env.example
   .gitignore
   AGENTS.md
   CLAUDE.md

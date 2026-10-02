@@ -55,7 +55,7 @@ You do not set any of those manually. Setting `environment` to `production` is t
 
 ## Configure `config/production/settings.cfm`
 
-Edit `config/production/settings.cfm`. `wheels new` creates it as a commented stub; in an app generated before 4.1.3, create it. This file is read only when the active environment is `production`:
+Create `config/production/settings.cfm`. This file is read only when the active environment is `production`:
 
 ```cfm {test:compile} title="config/production/settings.cfm"
 <cfscript>
