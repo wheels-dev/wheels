@@ -1002,7 +1002,35 @@
 		local.out = CreateObject("java", "java.lang.StringBuilder").init();
 		local.n = Len(arguments.where);
 		local.i = 1;
+		// Only a quote or a brace can start something to mask. The scan jumps from one
+		// to the next with Find() and copies the text between them in one piece, rather
+		// than reading the string a character at a time: on an engine where Mid() has
+		// to walk the string to reach an index, a per-character loop is quadratic
+		// (#3903). The next quote and the next brace are each remembered and only
+		// searched again once the scan has passed them (0 means there is none left), so
+		// a long run of one never makes the scan search the rest of the string for the
+		// other again.
+		local.nextQuote = Find("'", arguments.where, 1);
+		local.nextBrace = Find("{", arguments.where, 1);
 		while (local.i <= local.n) {
+			if (local.nextQuote > 0 && local.nextQuote < local.i) {
+				local.nextQuote = Find("'", arguments.where, local.i);
+			}
+			if (local.nextBrace > 0 && local.nextBrace < local.i) {
+				local.nextBrace = Find("{", arguments.where, local.i);
+			}
+			local.next = local.nextQuote;
+			if (local.nextBrace > 0 && (local.next == 0 || local.nextBrace < local.next)) {
+				local.next = local.nextBrace;
+			}
+			if (local.next == 0) {
+				local.out.append(Mid(arguments.where, local.i, local.n - local.i + 1));
+				break;
+			}
+			if (local.next > local.i) {
+				local.out.append(Mid(arguments.where, local.i, local.next - local.i));
+				local.i = local.next;
+			}
 			local.ch = Mid(arguments.where, local.i, 1);
 			// A CFML date interpolated into the string renders as an ODBC escape,
 			// {ts '2020-01-01 00:00:00'} (or {d '...'} / {t '...'}), either bare or
@@ -1011,45 +1039,46 @@
 			// (digits, - : . and spaces) is recognised; it is masked as one literal
 			// holding the inner value. Anything else falls through to the ordinary
 			// handling below.
-			if (local.ch == "'" || local.ch == "{") {
-				local.odbc = $matchOdbcDateLiteral(arguments.where, local.i, local.ch == "'");
-				if (local.odbc.matched) {
-					local.out.append("'");
-					local.out.append(local.sentinel);
-					// The escape kind rides in front of the hex ("ts:", "d:", "t:"), so a
-					// position that isn't bound can write the escape back (see
-					// $restoreMaskedLiterals); a bound position takes the plain value.
-					local.out.append(local.odbc.kind & ":");
-					local.out.append(LCase(BinaryEncode(CharsetDecode(local.odbc.value, "utf-8"), "hex")));
-					local.out.append("'");
-					local.i += local.odbc.length;
-					continue;
-				}
+			local.odbc = $matchOdbcDateLiteral(arguments.where, local.i, local.ch == "'");
+			if (local.odbc.matched) {
+				local.out.append("'");
+				local.out.append(local.sentinel);
+				// The escape kind rides in front of the hex ("ts:", "d:", "t:"), so a
+				// position that isn't bound can write the escape back (see
+				// $restoreMaskedLiterals); a bound position takes the plain value.
+				local.out.append(local.odbc.kind & ":");
+				local.out.append(LCase(BinaryEncode(CharsetDecode(local.odbc.value, "utf-8"), "hex")));
+				local.out.append("'");
+				local.i += local.odbc.length;
+				continue;
 			}
 			if (local.ch != "'") {
+				// A brace that doesn't start an ODBC date is ordinary text.
 				local.out.append(local.ch);
 				local.i += 1;
 				continue;
 			}
-			// A string literal: consume to its closing quote, treating a
-			// doubled quote ('') as one escaped quote that stays in the value.
+			// A string literal: consume to its closing quote, treating a doubled
+			// quote ('') as one escaped quote that stays in the value. The text up to
+			// each quote is copied in one piece.
 			local.value = CreateObject("java", "java.lang.StringBuilder").init();
 			local.i += 1;
 			local.closed = false;
 			while (local.i <= local.n) {
-				local.c = Mid(arguments.where, local.i, 1);
-				if (local.c == "'") {
-					if (local.i < local.n && Mid(arguments.where, local.i + 1, 1) == "'") {
-						local.value.append("'");
-						local.i += 2;
-					} else {
-						local.i += 1;
-						local.closed = true;
-						break;
-					}
+				local.q = Find("'", arguments.where, local.i);
+				if (local.q == 0) {
+					break;
+				}
+				if (local.q > local.i) {
+					local.value.append(Mid(arguments.where, local.i, local.q - local.i));
+				}
+				if (local.q < local.n && Mid(arguments.where, local.q + 1, 1) == "'") {
+					local.value.append("'");
+					local.i = local.q + 2;
 				} else {
-					local.value.append(local.c);
-					local.i += 1;
+					local.i = local.q + 1;
+					local.closed = true;
+					break;
 				}
 			}
 			if (!local.closed) {
