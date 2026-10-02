@@ -13,7 +13,7 @@
  * and the demo app's config all linked 404s. All were repointed at live
  * `guides.wheels.dev/v4-0-0/...` pages.
  *
- * Round 3 (4.1.3): the template's links moved to the current `v4-1-0` guides, and
+ * Round 3 (4.2.0): the template's links moved to the current `v4-1-0` guides, and
  * `wheels new` no longer ships an app/snippets/ConfigRoutes.txt copy.
  *
  * This spec pins the canonical routing URL in the routes templates AND scans
