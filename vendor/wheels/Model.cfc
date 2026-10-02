@@ -323,7 +323,8 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		variables.wheels.class.properties[local.property].type = variables.wheels.class.adapter.$getType(
 			local.type,
 			local.columns["decimal_digits"][local.i],
-			local.details
+			local.details,
+			ListFindNoCase(local.columns.columnList, "column_size") ? local.columns["column_size"][local.i] : ""
 		);
 		variables.wheels.class.properties[local.property].column = local.columnName;
 		variables.wheels.class.properties[local.property].scale = local.columns["decimal_digits"][local.i];
