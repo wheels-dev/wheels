@@ -11,10 +11,21 @@ component extends="wheels.WheelsTest" {
 
 		describe("Large integer IN lists", () => {
 
+			// 5000 keys: every real author id, padded with negative numbers that can never
+			// match an id. The ids come from the table rather than 1..5000, because
+			// CockroachDB's SERIAL ids are large and non-sequential (unique_rowid()).
 			beforeEach(() => {
+				realIds = [];
+				var authors = g.model("author").findAll(select = "id", order = "id", returnAs = "query");
+				for (var r = 1; r <= authors.recordCount; r++) {
+					ArrayAppend(realIds, authors.id[r]);
+				}
 				keys = [];
-				for (var i = 1; i <= 5000; i++) {
-					ArrayAppend(keys, i);
+				for (var id in realIds) {
+					ArrayAppend(keys, id);
+				}
+				for (var i = 1; ArrayLen(keys) < 5000; i++) {
+					ArrayAppend(keys, -i);
 				}
 			})
 
@@ -69,8 +80,10 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("still binds a short signed list next to other conditions", () => {
-				var rows = g.model("author").findAll(where = "id IN (-1,1,2) AND lastName <> ''", returnAs = "query");
-				var expected = g.model("author").findAll(where = "id IN (1,2) AND lastName <> ''", returnAs = "query");
+				var pair = "#realIds[1]#,#realIds[2]#";
+				var rows = g.model("author").findAll(where = "id IN (-1,#pair#) AND lastName IS NOT NULL", returnAs = "query");
+				var expected = g.model("author").findAll(where = "id IN (#pair#) AND lastName IS NOT NULL", returnAs = "query");
+				expect(expected.recordCount).toBe(2);
 				expect(rows.recordCount).toBe(expected.recordCount);
 			})
 
