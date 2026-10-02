@@ -461,7 +461,9 @@ component extends="modules.BaseModule" {
 		return new services.ArgSpec()
 			.option(name = "environment", default = "", description = "Environment whose seed files run (defaults to the app's current environment)")
 			.option(name = "mode", default = "auto", choices = "auto,convention,generate", description = "Seeding mode: auto (detect), convention (app/db/seeds.cfm), or generate (random test data)")
-			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate");
+			.flag(name = "generate", default = false, description = "Shorthand for --mode=generate")
+			.option(name = "models", default = "", description = "generate mode: comma-delimited model names to generate seed data for (default: every model under app/models)")
+			.option(name = "count", default = "", description = "generate mode: records to create per model (default 10)");
 	}
 
 	private any function testArgSpec() {
@@ -1294,10 +1296,35 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseSeedArgs(required struct coll) {
 		var parsed = seedArgSpec().parse(arguments.coll);
+		if (len(trim(parsed.count)) && !reFind("^[0-9]+$", trim(parsed.count))) {
+			throw(type = "Wheels.InvalidArguments", message = "wheels seed: count must be a whole number, got '#parsed.count#'.");
+		}
 		return {
 			environment = parsed.environment,
-			mode = parsed.generate ? "generate" : parsed.mode
+			mode = parsed.generate ? "generate" : parsed.mode,
+			models = trim(parsed.models),
+			count = trim(parsed.count)
 		};
+	}
+
+	/**
+	 * Refuse a seed environment this project doesn't know (#3893): the server
+	 * runs app/db/seeds.cfm plus seeds/<env>.cfm when that file exists, so a
+	 * typo silently ran the main seeds only. Known: Wheels' four environments,
+	 * or any name with a config/<env>/ directory or an app/db/seeds/<env>.cfm.
+	 */
+	private void function $assertKnownSeedEnvironment(required string environment) {
+		var env = trim(arguments.environment);
+		if (!len(env)) return;
+		if (reFind("^[A-Za-z0-9_-]+$", env)) {
+			if (listFindNoCase("development,testing,maintenance,production", env)) return;
+			if (directoryExists(variables.projectRoot & "/config/" & env)) return;
+			if (fileExists(variables.projectRoot & "/app/db/seeds/" & env & ".cfm")) return;
+		}
+		throw(
+			type = "Wheels.InvalidArguments",
+			message = "wheels seed: unknown environment '#env#'. Use development, testing, maintenance or production, or an environment with a config/#env#/ directory or app/db/seeds/#env#.cfm."
+		);
 	}
 
 	/**
@@ -1305,7 +1332,8 @@ component extends="modules.BaseModule" {
 	 */
 	public string function seed() {
 		var opts = parseSeedArgs(structuredArgs(arguments));
-		return runSeed(opts.mode, opts.environment);
+		$assertKnownSeedEnvironment(opts.environment);
+		return runSeed(opts.mode, opts.environment, opts.models, opts.count);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -2095,7 +2123,9 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: Reload the running Wheels application. The reload password
+	 * hint: Reload the running Wheels application (the CLI forwards the reload password from .env or config/settings.cfm).
+	 *
+	 * The reload password
 	 * gates the HTTP `?reload=true` endpoint against remote attackers;
 	 * the CLI reads it from `.env` or `config/settings.cfm` and forwards
 	 * it because it runs locally with filesystem access. This matches
@@ -2871,15 +2901,15 @@ component extends="modules.BaseModule" {
 	//  routes — List application routes
 	// ─────────────────────────────────────────────────
 
-	/**
-	 * hint: List all configured routes with method, path, and controller action
-	 */
 	private any function routesArgSpec() {
 		return new services.ArgSpec()
 			.option(name = "filter", default = "", description = "Show only routes whose name, pattern or controller##action contains this text (case-insensitive)")
 			.option(name = "format", default = "text", choices = "text,json", description = "Output format: text (aligned table) or json");
 	}
 
+	/**
+	 * hint: List all configured routes with method, path, and controller action
+	 */
 	public string function routes() {
 		// Both flags were advertised in the wrapper's help for as long as the
 		// command has existed, and neither was ever read — the command fetched
@@ -5126,6 +5156,16 @@ component extends="modules.BaseModule" {
 	 */
 	private struct function parseNotesArgs(required struct coll) {
 		var parsed = notesArgSpec().parse(arguments.coll);
+		// Markers are matched as words in a regex, so a marker that isn't a word
+		// ("." matched every character) is refused rather than escaped (#3893).
+		for (var marker in listToArray(parsed.annotations & "," & parsed.custom)) {
+			if (!reFind("^[A-Za-z][A-Za-z0-9_-]*$", trim(marker))) {
+				throw(
+					type = "Wheels.InvalidArguments",
+					message = "wheels notes: annotation marker '#trim(marker)#' is not a word. Markers are letters, digits, '_' and '-' (e.g. TODO,FIXME,HACK)."
+				);
+			}
+		}
 		return { annotations = parsed.annotations, custom = parsed.custom };
 	}
 
@@ -7500,7 +7540,7 @@ component extends="modules.BaseModule" {
 
 	// ── Seed Execution ──────────────────────────────
 
-	private string function runSeed(string mode = "auto", string environment = "") {
+	private string function runSeed(string mode = "auto", string environment = "", string models = "", string count = "") {
 		var serverPort = $requireOwnRunningServer([
 			"Seeding requires a running server bound to this project.",
 			"Start this project's own server with: wheels start (it registers the server as this project's)"
@@ -7511,6 +7551,12 @@ component extends="modules.BaseModule" {
 		var seedUrl = "#$serverUrlBase(serverPort)#/wheels/cli?command=dbSeed&format=json&mode=#mode#";
 		if (len(environment)) {
 			seedUrl &= "&environment=#environment#";
+		}
+		if (len(arguments.models)) {
+			seedUrl &= "&models=#urlEncodedFormat(arguments.models)#";
+		}
+		if (len(arguments.count)) {
+			seedUrl &= "&count=#arguments.count#";
 		}
 
 		// dbSeed writes data — POST + reload password.
