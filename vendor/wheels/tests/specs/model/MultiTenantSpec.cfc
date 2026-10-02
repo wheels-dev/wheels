@@ -115,15 +115,18 @@ component extends="wheels.WheelsTest" {
 			describe("$get() tenant config override", () => {
 
 				it("returns tenant config value when set", () => {
+					// Use a benign, non-sensitive setting: showDebugInformation is now one of
+					// the debug flags that cannot be overridden per-tenant (#3880), so it no
+					// longer demonstrates generic override behaviour.
 					request.wheels.tenant = {
 						id = "t1",
 						dataSource = "ds1",
-						config = {showDebugInformation = false}
+						config = {tableNamePrefix = "tenant_t1_"}
 					};
 
-					var val = g.$get("showDebugInformation");
+					var val = g.$get("tableNamePrefix");
 
-					expect(val).toBeFalse();
+					expect(val).toBe("tenant_t1_");
 				});
 
 				it("returns application value when tenant has no override for that key", () => {
