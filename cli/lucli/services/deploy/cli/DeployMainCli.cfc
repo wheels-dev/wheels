@@ -81,6 +81,7 @@ component {
                 "clear": cfg.env().clear(),
                 "secret": cfg.env().secret()
             },
+            "volumes": cfg.volumes(),
             "accessories": accessories,
             "ssh": {
                 "user": ssh.user(),
@@ -668,9 +669,13 @@ component {
         if ($usesSqlite(cwd)) {
             steps &= chr(10) & chr(10)
                 & "This app uses SQLite. The image ships an empty db/ (your local db/*.sqlite files stay out of it), "
-                & "so production starts with an empty database inside the container, and it is lost on every redeploy." & chr(10)
+                & "so production starts with an empty database inside the container." & chr(10)
+                & "  - Keep it across redeploys by mounting db/ from the host in config/deploy.yml:" & chr(10)
+                & "      volumes:" & chr(10)
+                & "        - /var/lib/" & serviceName & "/db:/var/www/db" & chr(10)
+                & "    and create that directory on each host first: wheels deploy exec ""mkdir -p /var/lib/" & serviceName & "/db""" & chr(10)
                 & "  - Run migrations on boot: set(autoMigrateDatabase=true) in config/production/settings.cfm." & chr(10)
-                & "  - Keep real data in a server database: wheels deploy docs accessories.";
+                & "  - For a database shared across several hosts, use a server database: wheels deploy docs accessories.";
         }
         return steps;
     }
