@@ -83,31 +83,38 @@ component {
 		$validateBoot(arguments.parsed, arguments.filePath);
 		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {
 			for (var accName in arguments.parsed.accessories) {
-				$validateName(accName, "accessory", arguments.filePath);
-				var acc = arguments.parsed.accessories[accName];
-				if (isStruct(acc)) {
-					if (structKeyExists(acc, "image")) {
-						$validateImage(acc.image, "accessory #accName# image", arguments.filePath);
-					}
-					if (structKeyExists(acc, "port")) {
-						$validateAccessoryPort(acc.port, accName, arguments.filePath);
-					}
-					for (var volKey in ["volumes", "directories"]) {
-						if (structKeyExists(acc, volKey) && isArray(acc[volKey])) {
-							var volIndex = 0;
-							for (var vol in acc[volKey]) {
-								volIndex++;
-								$validateVolumeHost(vol, "accessory #accName# #volKey#[#volIndex#]", arguments.filePath);
-							}
-						}
-					}
-					for (var hostKey in ["host", "hosts"]) {
-						if (structKeyExists(acc, hostKey)) {
-							for (var accHost in (isArray(acc[hostKey]) ? acc[hostKey] : [acc[hostKey]])) {
-								$validateHost(accHost, arguments.filePath);
-							}
-						}
-					}
+				$validateAccessory(arguments.parsed.accessories[accName], accName, arguments.filePath);
+			}
+		}
+	}
+
+	/**
+	 * One accessory's checks: its name, image, port bind address, volume
+	 * host paths and hosts. Kept out of validate() so that function stays
+	 * under the complexity gate.
+	 */
+	public void function $validateAccessory(required any acc, required string accName, required string filePath) {
+		$validateName(arguments.accName, "accessory", arguments.filePath);
+		if (!isStruct(arguments.acc)) return;
+		if (structKeyExists(arguments.acc, "image")) {
+			$validateImage(arguments.acc.image, "accessory #arguments.accName# image", arguments.filePath);
+		}
+		if (structKeyExists(arguments.acc, "port")) {
+			$validateAccessoryPort(arguments.acc.port, arguments.accName, arguments.filePath);
+		}
+		for (var volKey in ["volumes", "directories"]) {
+			if (structKeyExists(arguments.acc, volKey) && isArray(arguments.acc[volKey])) {
+				var volIndex = 0;
+				for (var vol in arguments.acc[volKey]) {
+					volIndex++;
+					$validateVolumeHost(vol, "accessory #arguments.accName# #volKey#[#volIndex#]", arguments.filePath);
+				}
+			}
+		}
+		for (var hostKey in ["host", "hosts"]) {
+			if (structKeyExists(arguments.acc, hostKey)) {
+				for (var accHost in (isArray(arguments.acc[hostKey]) ? arguments.acc[hostKey] : [arguments.acc[hostKey]])) {
+					$validateHost(accHost, arguments.filePath);
 				}
 			}
 		}
@@ -158,9 +165,10 @@ component {
 
 	/**
 	 * An accessory `port:` goes to `docker run --publish` as written, so it
-	 * must name a bind address (#4067), as Kamal main requires since
-	 * basecamp/kamal@00cb4cf1d: "<ipv4>:<host>:<container>" or
-	 * "[<ipv6>]:<host>:<container>", optionally with "/tcp" or "/udp". A bare
+	 * must name a bind address (#4067), as Kamal main (unreleased) requires
+	 * since basecamp/kamal@00cb4cf1d: "<ipv4>:<host>:<container>" or
+	 * "[<ipv6>]:<host>:<container>", optionally with "/tcp", "/udp" or
+	 * "/sctp". A bare
 	 * "5432" published on a random host port, and "5432:5432" on every
 	 * interface, without any warning.
 	 */
