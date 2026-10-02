@@ -3498,6 +3498,11 @@ component extends="modules.BaseModule" {
 			case "/exit":
 			case "/quit":
 			case "/q":
+			// Bare words too: they used to be evaluated as CFML and fail with
+			// "variable [EXIT] doesn't exist", so a piped session ending in
+			// `exit` exited 1 (#3892).
+			case "exit":
+			case "quit":
 				out("Bye!", "cyan");
 				return "exit";
 
@@ -3808,7 +3813,7 @@ component extends="modules.BaseModule" {
 		out("  /ds, /datasource Show current datasource");
 		out("  /reload         Reload the application");
 		out("  /clear          Clear the screen");
-		out("  /exit, /quit, /q Exit the console");
+		out("  /exit, /quit, /q Exit the console (bare exit and quit work too)");
 		out("");
 		out("Expression Examples:", "bold");
 		out('  model("User").findAll()                      Query all users');

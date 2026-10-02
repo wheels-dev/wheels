@@ -1,0 +1,1 @@
+- `wheels console`: bare `exit` and `quit` now end the session like `/exit`, with exit 0. They used to be evaluated as CFML and fail with "variable [EXIT] doesn't exist", so a piped session that ended in `exit` exited 1 (#3892)
