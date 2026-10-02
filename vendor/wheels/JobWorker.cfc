@@ -33,6 +33,16 @@ component {
 	public struct function processNext(string queues = "", numeric timeout = 300) {
 		local.result = {success = false, jobId = "", jobClass = "", error = "", skipped = false};
 
+		// Recover jobs left in 'processing' by a crashed/killed worker before claiming:
+		// the candidate SELECT below only ever considers status='pending', so without
+		// this a row stuck in 'processing' would never be picked up again (#3888). A job
+		// idle past the grace window is either a crashed worker or one that blew its
+		// execution timeout; checkTimeouts requeues it for retry (counting the attempt) or
+		// marks it failed when retries are exhausted. Scoped to the queues this poll serves
+		// so we never reap another worker's live job on a queue we don't process. Cheap when
+		// nothing is stuck.
+		this.checkTimeouts(timeout = arguments.timeout, queues = arguments.queues);
+
 		// Find the next candidate job
 		local.params = {
 			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
@@ -145,16 +155,46 @@ component {
 	 * Recover jobs stuck in 'processing' status that have exceeded their timeout.
 	 * @timeout Seconds after which a processing job is considered timed out. Default 300.
 	 */
-	public numeric function checkTimeouts(numeric timeout = 300) {
-		local.cutoff = DateAdd("s", -arguments.timeout, $now());
+	public numeric function checkTimeouts(numeric timeout = 300, string queues = "") {
+		// Normalise a blank/<=0 timeout to the default exactly as $executeJob does, so a
+		// bridge call with timeout=0 (or blank) doesn't collapse the grace window to 60s
+		// and reap jobs that are still legitimately running (#3984 review).
+		local.timeout = Val(arguments.timeout);
+		if (local.timeout <= 0) {
+			local.timeout = 300;
+		}
+
+		// Grace margin: only reap rows idle for longer than the poller's own timeout
+		// PLUS a cushion, so a worker with a different (longer) timeout polling the same
+		// queue never reaps a job that is still legitimately running (#3888). Workers that
+		// share a queue should configure the same timeout; the cushion absorbs clock skew.
+		local.graceSeconds = local.timeout + Max(60, local.timeout);
+		local.cutoff = DateAdd("s", -local.graceSeconds, $now());
+
+		local.params = {cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}};
+
+		// Scope the reap to the queues this poll serves. A blank "queues" reaps across all
+		// queues (the standalone jobsMonitor path); processNext passes its own queue set so
+		// one worker can't reap another worker's live jobs on a queue it doesn't serve.
+		local.queueFilter = "";
+		if (Len(Trim(arguments.queues))) {
+			local.queueList = ListToArray(arguments.queues);
+			local.placeholders = [];
+			for (local.qi = 1; local.qi <= ArrayLen(local.queueList); local.qi++) {
+				local.pName = "reapQueue#local.qi#";
+				ArrayAppend(local.placeholders, ":" & local.pName);
+				local.params[local.pName] = {value = Trim(local.queueList[local.qi]), cfsqltype = "cf_sql_varchar"};
+			}
+			local.queueFilter = " AND queue IN (" & ArrayToList(local.placeholders) & ")";
+		}
 
 		// Find timed-out jobs
 		try {
 			local.timedOut = queryExecute(
 				"SELECT id, jobClass, attempts, maxRetries
 				FROM wheels_jobs
-				WHERE status = 'processing' AND updatedAt < :cutoff",
-				{cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}},
+				WHERE status = 'processing' AND updatedAt < :cutoff" & local.queueFilter,
+				local.params,
 				{datasource = variables.$datasource}
 			);
 		} catch (any e) {
@@ -167,13 +207,18 @@ component {
 			local.currentAttempts = Val(local.row.attempts);
 			local.maxRetries = Val(local.row.maxRetries);
 
+			// Optimistic requeue guarded by the attempts value we just read: every $claimJob
+			// bumps attempts, so if the real worker finished or re-claimed between this SELECT
+			// and the UPDATE, the guard matches 0 rows and we don't double-requeue or
+			// double-count. Two concurrent reapers race on the same guard; exactly one wins.
 			if (local.currentAttempts <= local.maxRetries) {
 				// Reschedule for retry
-				$scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #arguments.timeout# seconds");
-				local.recovered++;
+				local.won = $scheduleRetry(local.row.id, local.currentAttempts, local.row.jobClass, local.maxRetries, "Job timed out after #local.timeout# seconds", local.currentAttempts);
 			} else {
 				// Exhausted retries
-				$markFailed(local.row.id, local.row.jobClass, local.maxRetries, "Job timed out after #arguments.timeout# seconds (max retries exhausted)");
+				local.won = $markFailed(local.row.id, local.row.jobClass, local.maxRetries, "Job timed out after #local.timeout# seconds (max retries exhausted)", local.currentAttempts);
+			}
+			if (local.won > 0) {
 				local.recovered++;
 			}
 		}
@@ -588,12 +633,13 @@ component {
 	/**
 	 * Schedule a failed job for retry with configurable exponential backoff.
 	 */
-	private void function $scheduleRetry(
+	private numeric function $scheduleRetry(
 		required string jobId,
 		required numeric currentAttempts,
 		required string jobClass,
 		required numeric maxRetries,
-		required string errorMessage
+		required string errorMessage,
+		numeric expectedAttempts = -1
 	) {
 		local.baseDelay = 2;
 		local.maxDelay = 3600;
@@ -616,20 +662,29 @@ component {
 		);
 		local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
+		local.params = {
+			lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
+			runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
+		};
+		// Optimistic version token: when the reaper passes the attempts it read,
+		// only this row-state wins the requeue, so two concurrent reapers (or a
+		// re-claim, which bumps attempts) can't double-requeue the same job (#3888).
+		local.attemptsGuard = "";
+		if (arguments.expectedAttempts >= 0) {
+			local.attemptsGuard = " AND attempts = :expectedAttempts";
+			local.params.expectedAttempts = {value = arguments.expectedAttempts, cfsqltype = "cf_sql_integer"};
+		}
 		queryExecute(
 			"UPDATE wheels_jobs
 			SET status = 'pending',
 				lastError = :lastError,
 				runAt = :runAt,
 				updatedAt = :updatedAt
-			WHERE id = :id AND status = 'processing'",
-			{
-				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
-				runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-				id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
-			},
-			{datasource = variables.$datasource}
+			WHERE id = :id AND status = 'processing'" & local.attemptsGuard,
+			local.params,
+			{datasource = variables.$datasource, result = "local.updateResult"}
 		);
 
 		writeLog(
@@ -637,31 +692,40 @@ component {
 			type = "warning",
 			file = "wheels_jobs"
 		);
+		return StructKeyExists(local, "updateResult") ? Val(local.updateResult.recordCount) : 0;
 	}
 
 	/**
 	 * Mark a job as permanently failed.
 	 */
-	private void function $markFailed(
+	private numeric function $markFailed(
 		required string jobId,
 		required string jobClass,
 		required numeric maxRetries,
-		required string errorMessage
+		required string errorMessage,
+		numeric expectedAttempts = -1
 	) {
+		local.params = {
+			failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
+			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
+		};
+		// Same optimistic version token as $scheduleRetry: only this attempts-value wins (#3888).
+		local.attemptsGuard = "";
+		if (arguments.expectedAttempts >= 0) {
+			local.attemptsGuard = " AND attempts = :expectedAttempts";
+			local.params.expectedAttempts = {value = arguments.expectedAttempts, cfsqltype = "cf_sql_integer"};
+		}
 		queryExecute(
 			"UPDATE wheels_jobs
 			SET status = 'failed',
 				failedAt = :failedAt,
 				lastError = :lastError,
 				updatedAt = :updatedAt
-			WHERE id = :id AND status = 'processing'",
-			{
-				failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
-				updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-				id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
-			},
-			{datasource = variables.$datasource}
+			WHERE id = :id AND status = 'processing'" & local.attemptsGuard,
+			local.params,
+			{datasource = variables.$datasource, result = "local.updateResult"}
 		);
 
 		writeLog(
@@ -669,6 +733,7 @@ component {
 			type = "error",
 			file = "wheels_jobs"
 		);
+		return StructKeyExists(local, "updateResult") ? Val(local.updateResult.recordCount) : 0;
 	}
 
 	/**
