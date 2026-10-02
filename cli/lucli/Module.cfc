@@ -1684,14 +1684,15 @@ component extends="modules.BaseModule" {
 		}
 		var prefix = arguments.coreTests ? "wheels.tests.specs" : "tests.specs";
 		var rootPath = createObject("java", "java.io.File").init(specRoot).getCanonicalPath();
-		// The separator is part of the prefix: without it a sibling such as
-		// tests/specsOld, reached through a symlink, looks inside (issue 3800).
+		// Containment goes through $pathWithinExact(), an exact comparison with
+		// a separator boundary, so a sibling such as tests/specsOld reached
+		// through a symlink is outside (issue 3800).
 		var rootPrefix = rootPath & createObject("java", "java.io.File").separator;
 		var matches = [];
 		for (var path in directoryList(specRoot, true, "path", "*.cfc")) {
 			var filePath = createObject("java", "java.io.File").init(path).getCanonicalPath();
 			var fileName = listLast(replace(filePath, "\", "/", "all"), "/");
-			if (compareNoCase(fileName, raw & ".cfc") != 0 || left(filePath, len(rootPrefix)) != rootPrefix) {
+			if (compareNoCase(fileName, raw & ".cfc") != 0 || !$pathWithinExact(rootPath, filePath)) {
 				continue;
 			}
 			var rel = replace(mid(filePath, len(rootPrefix) + 1, len(filePath)), "\", "/", "all");
@@ -1715,6 +1716,58 @@ component extends="modules.BaseModule" {
 			);
 		}
 		return normalized;
+	}
+
+	/**
+	 * True when `candidate` is `root` itself or a descendant of it. Both must
+	 * already be canonical. The comparison is exact (Compare) and qualified by
+	 * a separator boundary, so `/srv/App-extra` is not inside `/srv/App`.
+	 * Mirrors wheels.PathGuard.pathWithinExact(), which the CLI does not load.
+	 * Public for specs; $-prefixed, so hidden from MCP.
+	 *
+	 * @separator The platform separator; empty means $nativeSeparator(). Specs
+	 *            pass it to cover Windows behaviour on any host.
+	 */
+	public boolean function $pathWithinExact(
+		required string root,
+		required string candidate,
+		string separator = ""
+	) {
+		// Normalise ONLY the platform's native separator. A backslash is a legal filename
+		// byte on POSIX, so converting it there would merge a distinct sibling ("App\x")
+		// into the root ("App/x"); only Windows uses "\" as a path separator.
+		var windows = (len(arguments.separator) ? arguments.separator : $nativeSeparator()) == "\";
+		var cand = windows ? replace(arguments.candidate, "\", "/", "all") : arguments.candidate;
+		var baseInput = windows ? replace(arguments.root, "\", "/", "all") : arguments.root;
+		var base = reReplace(baseInput, "/+$", "");
+		if (compare(cand, base) == 0) {
+			return true;
+		}
+		return len(cand) > len(base)
+			&& compare(left(cand, len(base) + 1), base & "/") == 0;
+	}
+
+	/**
+	 * The platform's native path separator. Prefers java.io.File.separator; falls
+	 * back to the OS name; defaults to the POSIX "/". It is never inferred from
+	 * seeing a backslash in a path. Mirrors wheels.PathGuard.$nativeSeparator().
+	 * Public for specs.
+	 */
+	public string function $nativeSeparator() {
+		try {
+			var sep = createObject("java", "java.io.File").separator;
+			if (sep == "\" || sep == "/") {
+				return sep;
+			}
+		} catch (any e) {
+		}
+		try {
+			if (structKeyExists(server, "os") && structKeyExists(server.os, "name") && findNoCase("windows", server.os.name)) {
+				return "\";
+			}
+		} catch (any e) {
+		}
+		return "/";
 	}
 
 
