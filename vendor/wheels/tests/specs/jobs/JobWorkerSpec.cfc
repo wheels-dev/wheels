@@ -483,6 +483,27 @@ component extends="wheels.WheelsTest" {
 					expect(local.job.$jobTableHasClaimTimeout()).toBeTrue("column should be re-added by $ensureClaimTimeoutColumn");
 				}
 			});
+
+			it("adds the claimTimeout column through the normal worker path, not just $ensureJobTable (##3989)", function() {
+				local.probe = new wheels.Job();
+				local.probe.$ensureJobTable();
+
+				// Simulate a pre-#3989 install by dropping the column, then let a fresh worker's
+				// normal poll add it back — without calling $ensureJobTable directly.
+				local.dropped = false;
+				try {
+					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					local.dropped = true;
+				} catch (any e) {
+					// engine/DB without DROP COLUMN support — skip
+				}
+				if (local.dropped) {
+					expect(local.probe.$jobTableHasClaimTimeout()).toBeFalse("column should be gone after DROP");
+					local.worker = new wheels.JobWorker();
+					local.worker.processNext(queues = "no_such_queue_3989", timeout = 300);
+					expect(local.probe.$jobTableHasClaimTimeout()).toBeTrue("processNext must add the column on an existing table");
+				}
+			});
 		});
 
 		describe("getStats", function() {

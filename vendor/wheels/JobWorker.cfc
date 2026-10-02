@@ -33,6 +33,12 @@ component {
 	public struct function processNext(string queues = "", numeric timeout = 300) {
 		local.result = {success = false, jobId = "", jobClass = "", error = "", skipped = false};
 
+		// Ensure the table (and the claimTimeout column) on the normal path, so an existing
+		// install gets the column once per worker rather than only when a query happens to
+		// fail. The per-instance $tableVerified cache makes this run the probe+ALTER exactly
+		// once per worker — re-run by each new worker, so it's not a persisted flag (#2780).
+		$ensureJobTable();
+
 		// Recover jobs left in 'processing' by a crashed/killed worker before claiming:
 		// the candidate SELECT below only ever considers status='pending', so without
 		// this a row stuck in 'processing' would never be picked up again (#3888). A job
@@ -243,21 +249,26 @@ component {
 	 * fallback path the rows carry no claimTimeout, so checkTimeouts uses the poller's timeout.
 	 */
 	private query function $selectStaleCandidates(required string whereClause, required struct params) {
-		try {
-			return queryExecute(
-				"SELECT id, jobClass, attempts, maxRetries, updatedAt, claimTimeout
-				FROM wheels_jobs " & arguments.whereClause,
-				arguments.params,
-				{datasource = variables.$datasource}
-			);
-		} catch (any e) {
-			return queryExecute(
-				"SELECT id, jobClass, attempts, maxRetries, updatedAt
-				FROM wheels_jobs " & arguments.whereClause,
-				arguments.params,
-				{datasource = variables.$datasource}
-			);
+		// Pick the SELECT variant from the per-worker memo so a column-less install doesn't pay
+		// a failing SELECT every poll; the catch is a safety net if the memo is stale.
+		if ($claimTimeoutColumnAvailable()) {
+			try {
+				return queryExecute(
+					"SELECT id, jobClass, attempts, maxRetries, updatedAt, claimTimeout
+					FROM wheels_jobs " & arguments.whereClause,
+					arguments.params,
+					{datasource = variables.$datasource}
+				);
+			} catch (any e) {
+				variables.$claimTimeoutColumnPresent = false;
+			}
 		}
+		return queryExecute(
+			"SELECT id, jobClass, attempts, maxRetries, updatedAt
+			FROM wheels_jobs " & arguments.whereClause,
+			arguments.params,
+			{datasource = variables.$datasource}
+		);
 	}
 
 	/**
@@ -574,14 +585,17 @@ component {
 		if (local.claimTimeout <= 0) {
 			local.claimTimeout = 300;
 		}
+		// Pick the query variant from the per-worker memo so a column-less install doesn't pay
+		// a failing UPDATE on every claim; keep a flip-and-retry only as a safety net.
+		local.withColumn = $claimTimeoutColumnAvailable();
 		try {
-			return $claimJobUpdate(jobId = arguments.jobId, claimTimeout = local.claimTimeout, withClaimTimeout = true);
+			return $claimJobUpdate(jobId = arguments.jobId, claimTimeout = local.claimTimeout, withClaimTimeout = local.withColumn);
 		} catch (any e) {
-			// The claimTimeout column may be absent (its ALTER was blocked). Claiming must not
-			// break: retry without the column — the reaper then falls back to the poller's
-			// timeout for this row. A genuine claim failure rethrows from the retry.
+			// The memo was wrong (e.g. the column was added or dropped mid-worker). Flip it and
+			// retry the other way so claiming never breaks; a genuine failure rethrows.
 			try {
-				return $claimJobUpdate(jobId = arguments.jobId, claimTimeout = local.claimTimeout, withClaimTimeout = false);
+				variables.$claimTimeoutColumnPresent = !local.withColumn;
+				return $claimJobUpdate(jobId = arguments.jobId, claimTimeout = local.claimTimeout, withClaimTimeout = !local.withColumn);
 			} catch (any e2) {
 				throw(
 					type = "Wheels.JobClaimFailed",
@@ -834,12 +848,34 @@ component {
 		try {
 			if ($jobBridge().$ensureJobTable()) {
 				variables.$tableVerified = true;
+				// Memoise whether claimTimeout is present AFTER the ensure (which may have just
+				// added it), so claims/reaps pick the right query up front instead of letting a
+				// missing column throw. A blocked ALTER leaves this false: one attempt per
+				// worker, then straight to the no-column path (#3989 review).
+				variables.$claimTimeoutColumnPresent = $jobBridge().$jobTableHasClaimTimeout();
 				return true;
 			}
 			return false;
 		} catch (any e) {
 			return false;
 		}
+	}
+
+	/**
+	 * Whether the wheels_jobs.claimTimeout column is available to this worker. Memoised per
+	 * worker instance — set when $ensureJobTable runs, or probed lazily the first time a
+	 * claim/reap needs it (so a direct checkTimeouts call still gets a correct answer). Re-run
+	 * by each new worker, so it is not a persisted flag (#2780).
+	 */
+	private boolean function $claimTimeoutColumnAvailable() {
+		if (!StructKeyExists(variables, "$claimTimeoutColumnPresent")) {
+			try {
+				variables.$claimTimeoutColumnPresent = $jobBridge().$jobTableHasClaimTimeout();
+			} catch (any e) {
+				variables.$claimTimeoutColumnPresent = false;
+			}
+		}
+		return variables.$claimTimeoutColumnPresent;
 	}
 
 	/**
