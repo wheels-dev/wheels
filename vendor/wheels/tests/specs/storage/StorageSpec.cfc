@@ -210,6 +210,43 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it("accepts a key whose segment merely contains '..' (##3912)", function() {
+					// Two dots INSIDE a segment are not traversal; the name keeps real chars.
+					disk.put(key = "reports/q3..final.pdf", content = "report");
+					expect(disk.exists("reports/q3..final.pdf")).toBeTrue();
+					expect(ToString(disk.get("reports/q3..final.pdf"))).toBe("report");
+
+					disk.put(key = "a..b.txt", content = "ab");
+					expect(ToString(disk.get("a..b.txt"))).toBe("ab");
+
+					disk.put(key = "v1..2/notes.txt", content = "v");
+					expect(ToString(disk.get("v1..2/notes.txt"))).toBe("v");
+				});
+
+				it("rejects traversal, dot/space-only segments, absolute and drive-letter keys (##3912)", function() {
+					// cfformat-ignore-start
+					var rejected = [
+						"../escape.txt",         // parent traversal
+						"..\escape.txt",         // Windows-style backslash traversal
+						"a/../b.txt",            // mid-path traversal
+						"foo/../../etc/passwd",  // deep traversal
+						"reports/.. /x.txt",     // ".. " — Windows strips the trailing space to ".."
+						"reports/ ../x.txt",     // " .." — leading space
+						"foo/. ./bar.txt",       // ". ." — dots and spaces only
+						"foo/.../bar.txt",       // "..." — dots only
+						"foo/   /bar.txt",       // whitespace-only segment
+						"/etc/passwd",           // absolute key (empty leading segment)
+						"C:/Windows/System32",   // drive-letter prefix
+						"C:evil.txt"             // drive-relative prefix
+					];
+					// cfformat-ignore-end
+					for (var badKey in rejected) {
+						expect(function() {
+							disk.$resolve(badKey);
+						}).toThrow(type = "Wheels.Storage.InvalidKey", message = "[#badKey#] must be rejected as an invalid key");
+					}
+				});
+
 				it("builds a public url from the urlPrefix", function() {
 					expect(disk.url("a/b.png")).toBe("/uploads/a/b.png");
 				});
