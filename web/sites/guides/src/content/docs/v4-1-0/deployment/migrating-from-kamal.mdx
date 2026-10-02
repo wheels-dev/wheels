@@ -99,7 +99,7 @@ The verb surface mirrors Kamal's. Most invocations are identical save the leadin
 
 | Ruby Kamal | `wheels deploy` |
 |------------|-----------------|
-| `kamal setup` | `wheels deploy setup` — *currently an alias for `wheels deploy`; unlike Kamal it doesn't boot the proxy or accessories yet ([#2957](https://github.com/wheels-dev/wheels/issues/2957)) — run `wheels deploy proxy boot` and `wheels deploy accessory boot all` yourself* |
+| `kamal setup` | `wheels deploy setup` — boots the accessories, then deploys (which starts or boots `kamal-proxy`). Unlike Kamal it doesn't install Docker: run `wheels deploy bootstrap` first on a fresh host |
 | `kamal deploy` | `wheels deploy` |
 | `kamal redeploy` | `wheels deploy redeploy` |
 | `kamal rollback VERSION` | `wheels deploy rollback VERSION` |
@@ -120,7 +120,7 @@ Two CLI-level differences worth flagging:
 Because on-server state is byte-identical *for app containers*, you can run both tools against the same host during a transition:
 
 - Deploy with `kamal deploy` on Tuesday, `wheels deploy` on Wednesday, `kamal deploy` on Thursday. App containers, locks, hooks, and secrets are interchangeable.
-- Run `kamal config` and `wheels deploy config` side-by-side to compare resolved output. The wheels output is a subset of the Kamal output — it names fewer keys, but every key it names matches.
+- Run `kamal config` and `wheels deploy config` side-by-side to compare resolved output. The wheels output is a subset of the Kamal output (no per-role options), but every key it names matches.
 - Locks and the `kamal-proxy` container are single-owner on the server; whichever tool holds the lock has it until release.
 
 One live caveat while [#2957](https://github.com/wheels-dev/wheels/issues/2957) is open: the **proxy** state is not yet interchangeable — `wheels deploy` bind-mounts the proxy config from a host path where Ruby Kamal uses a named Docker volume, it doesn't create the `kamal` network on a fresh host, and it doesn't write the audit log. On a host whose proxy Kamal booted, prefer letting Kamal keep owning `proxy` verbs until that issue closes.
@@ -135,7 +135,7 @@ Before removing `kamal` from your ecosystem:
 2. **Remove rejected top-level keys.** Delete any key outside the accepted list (or move `healthcheck` under `proxy:`) — see [Divergence 2](#divergence-2-rejected-top-level-keys). `wheels deploy config` fails loudly on the first offender, so it doubles as the checker.
 3. **Review `.kamal/secrets` for shell compatibility.** `wheels deploy` evaluates the file through `bash`; if you relied on `sh`-only behavior, nothing changes, but confirm.
 4. **Install the Wheels CLI on every control machine that runs deploys.** See [installing the CLI](/v4-1-0/command-line-tools/installation/).
-5. **Run `wheels deploy config` and diff against `kamal config`.** Every field wheels emits should match kamal's. The reverse isn't true — wheels emits a subset during Phase 1. Multi-destination caveat: `wheels deploy config` currently ignores `--destination` ([#3085](https://github.com/wheels-dev/wheels/issues/3085)), so diff each destination against the base file's resolution, not the overlay's.
+5. **Run `wheels deploy config` and diff against `kamal config`.** Every field wheels emits should match kamal's. The reverse isn't true: wheels omits per-role options. Multi-destination caveat: `wheels deploy config` currently ignores `--destination` ([#3085](https://github.com/wheels-dev/wheels/issues/3085)), so diff each destination against the base file's resolution, not the overlay's.
 6. **Run `wheels deploy --dry-run`.** Every command it would run, printed with host prefixes. Confirm it matches what you expect.
 7. **Deploy a non-critical environment first.** Staging before production. Verify logs, health checks, rollback.
 8. **Update CI.** Replace any `bundle exec kamal ...` or `gem install kamal` lines with your Wheels CLI install command plus `wheels deploy ...`.

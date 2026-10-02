@@ -48,15 +48,88 @@ component {
         var rolesMap = $roleHosts(cfg);
         // Same output path as every other deploy verb: config warnings first,
         // and any value resolved from .kamal/secrets redacted.
+        // Secret VALUES never appear: env.secret and registry.password list
+        // only the key names that .kamal/secrets supplies.
+        var accessories = {};
+        for (var acc in cfg.accessories()) {
+            accessories[acc.name()] = {
+                "image": acc.image(),
+                "hosts": acc.hosts(),
+                "port": acc.port(),
+                "volumes": acc.volumes()
+            };
+        }
+        var proxy = cfg.proxy();
+        var ssh = cfg.ssh();
+        var builder = cfg.builder();
         return new modules.wheels.services.deploy.lib.SecretRedaction().render(yaml.dump({
-            service: cfg.service(),
-            image: cfg.image(),
-            servers: rolesMap,
-            registry: {
-                server: cfg.registry().server(),
-                username: cfg.registry().username()
+            "service": cfg.service(),
+            "image": cfg.image(),
+            "servers": rolesMap,
+            "registry": {
+                "server": cfg.registry().server(),
+                "username": cfg.registry().username(),
+                "password": $registryPasswordKeys(cfg)
+            },
+            "proxy": {
+                "host": proxy.host(),
+                "ssl": proxy.ssl(),
+                "app_port": proxy.appPort(),
+                "healthcheck": proxy.healthcheck()
+            },
+            "env": {
+                "clear": cfg.env().clear(),
+                "secret": cfg.env().secret()
+            },
+            "accessories": accessories,
+            "ssh": {
+                "user": ssh.user(),
+                "port": ssh.port()
+            },
+            "builder": {
+                "arch": builder.arch(),
+                "context": builder.context(),
+                "dockerfile": builder.dockerfile()
             }
         }));
+    }
+
+    /**
+     * registry.password as config() prints it. Entries are meant to be the
+     * NAMES of keys in .kamal/secrets (REGISTRY_PASSWORD). An entry is shown
+     * only when .kamal/secrets defines that key; anything else is probably
+     * the password itself (a ghp_… token or a plain password look like names
+     * too), so it is masked and a warning says to move it into a secret.
+     * Without a resolver, only a strict UPPER_SNAKE name that isn't shaped
+     * like a GitHub token is shown.
+     */
+    private array function $registryPasswordKeys(required any cfg) {
+        var shown = [];
+        var masked = false;
+        var resolver = variables.loader.secretResolver();
+        for (var entry in arguments.cfg.registry().password()) {
+            var isKey = false;
+            if (isSimpleValue(entry) && len(entry)) {
+                if (isObject(resolver)) {
+                    isKey = reFind("^[A-Za-z_][A-Za-z0-9_]*$", entry) && resolver.has(entry);
+                } else {
+                    isKey = reFind("^[A-Z_][A-Z0-9_]*$", entry) && !reFindNoCase("^(ghp|gho|ghu|ghs|ghr|github_pat)_", entry);
+                }
+            }
+            if (isKey) {
+                arrayAppend(shown, entry);
+            } else {
+                arrayAppend(shown, "<literal value hidden: use a secret>");
+                masked = true;
+            }
+        }
+        if (masked) {
+            new modules.wheels.services.deploy.lib.SecretRedaction().addWarning(
+                "registry.password lists a value that is not a key in .kamal/secrets; it is hidden here. "
+                & "List the NAME of a key in .kamal/secrets (e.g. REGISTRY_PASSWORD) and put the password there."
+            );
+        }
+        return shown;
     }
 
     public string function deploy(required struct opts) {
@@ -557,12 +630,30 @@ component {
             summary &= chr(10) & "WARNING: .kamal/secrets is already tracked by git, and .gitignore does not untrack it. "
                 & "Run git rm --cached .kamal/secrets, commit, and rotate every secret the file has ever held.";
         }
-        return summary & chr(10)
+        var steps = summary & chr(10)
              & "Next steps:" & chr(10)
              & "  1. Edit config/deploy.yml — update servers, proxy host, registry username." & chr(10)
              & "  2. Review the generated Dockerfile — adjust COPY paths and the Lucee/CFML base if your app needs it." & chr(10)
              & "  3. Populate .kamal/secrets with real values (or $(cmd) substitutions)." & chr(10)
              & "  4. wheels deploy setup";
+        if ($usesSqlite(cwd)) {
+            steps &= chr(10) & chr(10)
+                & "This app uses SQLite. The image ships an empty db/ (your local db/*.sqlite files stay out of it), "
+                & "so production starts with an empty database inside the container, and it is lost on every redeploy." & chr(10)
+                & "  - Run migrations on boot: set(autoMigrateDatabase=true) in config/production/settings.cfm." & chr(10)
+                & "  - Keep real data in a server database: wheels deploy docs accessories.";
+        }
+        return steps;
+    }
+
+    /** True when config/app.cfm defines a SQLite datasource (the `wheels new` default). */
+    private boolean function $usesSqlite(required string cwd) {
+        var appCfm = arguments.cwd & "config/app.cfm";
+        try {
+            return fileExists(appCfm) && findNoCase("org.sqlite.JDBC", fileRead(appCfm)) > 0;
+        } catch (any e) {
+            return false;
+        }
     }
 
     /**

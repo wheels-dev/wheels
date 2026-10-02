@@ -27,6 +27,14 @@ component {
 		for (var k in variables.allowedKeys) {
 			variables.allowedLookup[lCase(k)] = true;
 		}
+		// proxy: sub-keys. forward_headers and buffering are accepted for
+		// Kamal compatibility but not applied yet (config-reference documents
+		// that); anything else is a typo that would silently do nothing.
+		variables.proxyKeys = ["host", "ssl", "app_port", "appPort", "healthcheck", "forward_headers", "buffering"];
+		variables.proxyLookup = {};
+		for (var pk in variables.proxyKeys) {
+			variables.proxyLookup[lCase(pk)] = true;
+		}
 		return this;
 	}
 
@@ -48,6 +56,20 @@ component {
 		// validated rather than quoted (##2956).
 		$validateName(arguments.parsed.service, "service", arguments.filePath);
 		$validateImage(arguments.parsed.image, "image", arguments.filePath);
+		if (structKeyExists(arguments.parsed, "proxy") && isStruct(arguments.parsed.proxy)) {
+			for (var proxyKey in arguments.parsed.proxy) {
+				if (!structKeyExists(variables.proxyLookup, lCase(proxyKey))) {
+					$raise(
+						arguments.filePath,
+						"unknown key: 'proxy.#proxyKey#' (allowed proxy keys: #arrayToList(variables.proxyKeys, ', ')#)"
+					);
+				}
+			}
+			// Proxy.ssl() treats a non-boolean as false, so a typo turned TLS off.
+			if (structKeyExists(arguments.parsed.proxy, "ssl") && !isBoolean(arguments.parsed.proxy.ssl)) {
+				$raise(arguments.filePath, "proxy.ssl must be true or false (got '#arguments.parsed.proxy.ssl#')");
+			}
+		}
 		// kamal-proxy's --tls needs a host to request a certificate for.
 		if (
 			structKeyExists(arguments.parsed, "proxy") && isStruct(arguments.parsed.proxy)

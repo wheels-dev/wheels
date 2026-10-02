@@ -14,9 +14,9 @@ host that serves a `web` role, and it is booted once at deploy time.
 
     proxy:
       host: myapp.example.com
-      app_port: 8080           # port the app listens on inside the
+      app_port: 8888           # port the app listens on inside the
                                # container (default 80; `wheels deploy init`
-                               # scaffolds 8080 to match its Dockerfile)
+                               # scaffolds 8888 to match its Dockerfile)
       healthcheck:
         path: /up
         timeout: 30

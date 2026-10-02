@@ -79,6 +79,13 @@ component extends="Base" {
                       shellEscape(container_name(arguments.role, arguments.version)));
     }
 
+    /** Every container of one role, any version (`app details` without --release). */
+    public string function role_containers(required any role) {
+        return docker("ps", "-a",
+                      "--filter", shellEscape("label=service=" & variables.config.service()),
+                      "--filter", shellEscape("label=role=" & arguments.role.name()));
+    }
+
     public string function containers() {
         return docker("ps", "--filter", shellEscape("label=service=" & variables.config.service()));
     }

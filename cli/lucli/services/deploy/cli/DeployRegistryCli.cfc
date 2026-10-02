@@ -42,6 +42,15 @@ component {
         // stdin, so dry-run output, exception summaries, and remote argv
         // stay clean.
         var pw = "";
+        // The deploy path skips login without a username; an explicit login
+        // ran `docker login -u ''` and failed with an unrelated registry error.
+        if (arguments.isLogin && !len(trim(cfg.registry().username()))) {
+            throw(
+                type = "DeployRegistryCli.MissingUsername",
+                message = "registry.username is required to log in to " & cfg.registry().server()
+                    & ": set it under registry: in config/deploy.yml."
+            );
+        }
         if (arguments.isLogin) {
             pw = arguments.opts.password ?: $resolvePassword(cfg);
             if (!len(pw) && !dryRun) {
