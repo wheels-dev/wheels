@@ -171,6 +171,12 @@ The backoff formula is `Min(this.baseDelay * 2^attempt, this.maxDelay)`, where `
 
 Because retries are automatic, your `perform()` must be **idempotent**. If the first attempt charged the card but failed to record the success, the second attempt must notice and skip. Store an idempotency key on the model and check it at the top of `perform()`.
 
+### Crashed workers and the `timeout`
+
+A worker claims a job by flipping its row to `processing`, then runs it. If that worker is killed — OOM, a `kill -9`, a lost host — mid-run, the row is stranded in `processing`: no worker owns it, but the pending-job scan skips it. Each job's `timeout` (seconds, default `300`, set in `config()`) bounds this. On every poll, before claiming new work, a worker reaps rows that have sat in `processing` past a grace margin — `timeout + max(60s, timeout)` — requeuing them for retry (the attempt counts against `maxRetries`) or marking them `failed` once retries are exhausted.
+
+Recovery is scoped to the queues the poll serves and the requeue is an atomic, guarded `UPDATE`, so running several workers is safe: a worker never reaps a live job on a queue it doesn't process, and two workers reaping the same queue can't requeue or re-count the same job twice. Because a reaped job may have partly run before its worker died, **recovery is at-least-once** — the same reason `perform()` must be idempotent. Workers that share a queue should configure the **same `timeout`** so one isn't reaping another's still-running jobs.
+
 To kick failed jobs back into the queue — after you've fixed the bug, say — call `retryFailed()`:
 
 ```cfm {test:compile} title="retry failed jobs"

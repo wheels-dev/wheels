@@ -132,7 +132,7 @@ component extends="wheels.WheelsTest" {
 				local.bootstrap.$ensureJobTable();
 
 				local.id = CreateUUID();
-				local.oldTime = DateAdd("s", -600, Now());
+				local.oldTime = DateAdd("s", -1800, Now());  // well past the grace window (timeout + max(60,timeout))
 				queryExecute(
 					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 					VALUES (:id, 'wheels.Job', 'test_timeout', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
@@ -155,6 +155,202 @@ component extends="wheels.WheelsTest" {
 					{datasource = application.wheels.dataSourceName}
 				);
 				expect(ListFindNoCase("pending,failed", local.job.status)).toBeGT(0);
+			});
+
+			it("processNext recovers a job stuck in 'processing' by a crashed worker (##3888)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				local.id = CreateUUID();
+				local.oldTime = DateAdd("s", -1800, Now());  // well past the grace window (timeout + max(60,timeout))
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'test_reaper_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				// A normal poll must recover the crashed-worker job, not leave it stuck:
+				// processNext only ever SELECTed status='pending', so without recovery the
+				// row stayed 'processing' forever (#3888).
+				local.worker.processNext(queues = "test_reaper_3888", timeout = 300);
+
+				local.job = queryExecute(
+					"SELECT status FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.job.status).notToBe("processing", "a stale 'processing' job must be recovered by a poll, not left stuck");
+			});
+
+			it("does not reap a stale job on a queue the poll does not serve (##3888)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				// A worker on queue Y owns this job. Even though it is old enough that a
+				// blanket reap would catch it, a poll scoped to queue X must leave it alone —
+				// otherwise a short-timeout worker reaps another worker's live job (#3888).
+				local.idY = CreateUUID();
+				local.oldTime = DateAdd("s", -1800, Now());
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'reap_scope_Y_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.idY, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				local.worker.checkTimeouts(timeout = 300, queues = "reap_scope_X_3888");
+
+				local.row = queryExecute(
+					"SELECT status FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.idY, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.row.status).toBe("processing", "a reap scoped to queue X must not touch queue Y's live job");
+
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.idY, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+			});
+
+			it("a second reaper reading the same attempts value cannot double-requeue (##3888)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				// Both reapers SELECTed this row as processing/attempts=1. The guarded requeue
+				// (status='processing' AND attempts=1) lets exactly one win; the loser matches
+				// 0 rows, so attempts is bumped once, not twice, and the count stays honest.
+				local.id = CreateUUID();
+				local.oldTime = DateAdd("s", -1800, Now());
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'reap_race_3888', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				makePublic(local.worker, "$scheduleRetry");
+
+				local.firstWon = local.worker.$scheduleRetry(local.id, 1, "wheels.Job", 3, "stale", 1);
+				expect(local.firstWon).toBe(1, "the first reaper's guarded requeue must win");
+
+				local.secondWon = local.worker.$scheduleRetry(local.id, 1, "wheels.Job", 3, "stale", 1);
+				expect(local.secondWon).toBe(0, "the second reaper must not double-requeue the now-pending row");
+
+				local.row = queryExecute(
+					"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.row.status).toBe("pending");
+				expect(Val(local.row.attempts)).toBe(1, "attempts must not be bumped twice by concurrent reapers");
+
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+			});
+
+			it("a reaper holding a stale attempts value loses to a re-claim (##3888)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				// The real worker re-claimed the job after this reaper read it, bumping
+				// attempts to 2. The reaper still holds attempts=1, so its guard rejects the
+				// requeue and the live claim is left untouched — this is why attempts (bumped
+				// on every claim) is a safer version token than a round-tripped timestamp.
+				local.id = CreateUUID();
+				local.oldTime = DateAdd("s", -1800, Now());
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'reap_token_3888', '{}', 0, 'processing', 2, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				makePublic(local.worker, "$scheduleRetry");
+
+				local.won = local.worker.$scheduleRetry(local.id, 1, "wheels.Job", 3, "stale", 1);
+				expect(local.won).toBe(0, "a stale attempts read must not win against a re-claim");
+
+				local.row = queryExecute(
+					"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.row.status).toBe("processing", "the live re-claim must be left untouched");
+				expect(Val(local.row.attempts)).toBe(2);
+
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+			});
+
+			it("normalises a blank/zero timeout so it does not reap a recently-active job (##3984)", function() {
+				local.bootstrap = new wheels.Job();
+				local.bootstrap.$ensureJobTable();
+
+				// A job claimed ~90s ago is still well within the default 300s execution
+				// window. A bridge call with timeout=0 must normalise to 300 (grace 600s),
+				// not collapse the grace window to 60s and reap this live job.
+				local.id = CreateUUID();
+				local.recentTime = DateAdd("s", -90, Now());
+				queryExecute(
+					"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+					VALUES (:id, 'wheels.Job', 'reap_zero_3984', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
+					{
+						id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+						runAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"},
+						createdAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = local.recentTime, cfsqltype = "cf_sql_timestamp"}
+					},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				local.worker = new wheels.JobWorker();
+				local.recovered = local.worker.checkTimeouts(timeout = 0, queues = "reap_zero_3984");
+
+				local.row = queryExecute(
+					"SELECT status FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+				expect(local.row.status).toBe("processing", "timeout=0 must normalise to 300s, not reap a 90s-old live job");
+
+				queryExecute(
+					"DELETE FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
 			});
 		});
 

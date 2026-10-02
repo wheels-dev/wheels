@@ -596,7 +596,7 @@ component extends="modules.BaseModule" {
 	 */
 	public string function version() {
 		var nl = chr(10);
-		var moduleVersion = super.version();
+		var moduleVersion = $displayVersion();
 		var channel = new services.ReleaseChannel().classify(moduleVersion);
 		var channelTag = len(channel) ? " (" & channel & ")" : "";
 
@@ -613,6 +613,39 @@ component extends="modules.BaseModule" {
 		}
 
 		return arrayToList(lines, nl);
+	}
+
+	/**
+	 * The CLI version to show a person. A source checkout's module.json carries
+	 * the unstamped `@build.version@` token, which used to be printed as is
+	 * (#3891). An unstamped module run from inside the monorepo reports the root
+	 * wheels.json version with `-dev`, the derivation FrameworkInstaller uses for
+	 * the framework; anywhere else it reports BuildInfo's `0.0.0-dev` sentinel.
+	 * Public for specs ($-prefixed, so hidden from MCP).
+	 */
+	public string function $displayVersion(string rawVersion, string moduleDir) {
+		var v = structKeyExists(arguments, "rawVersion") ? arguments.rawVersion : super.version();
+		if (!(left(v, 7) == "@build." && right(v, 1) == "@")) return v;
+		var dir = structKeyExists(arguments, "moduleDir") ? arguments.moduleDir : getDirectoryFromPath(getCurrentTemplatePath());
+		try {
+			var File = createObject("java", "java.io.File");
+			var root = File.init(dir & "/../..").getCanonicalPath();
+			for (var name in ["wheels.json", "box.json"]) {
+				var manifestPath = root & "/" & name;
+				if (!fileExists(manifestPath)) continue;
+				var manifest = deserializeJSON(fileRead(manifestPath));
+				var isMonorepo = isStruct(manifest) && (
+					(structKeyExists(manifest, "name") && manifest.name == "Wheels.fw")
+					|| (structKeyExists(manifest, "slug") && manifest.slug == "wheels")
+				);
+				if (isMonorepo && structKeyExists(manifest, "version") && len(manifest.version) && left(manifest.version, 7) != "@build.") {
+					return manifest.version & "-dev";
+				}
+			}
+		} catch (any e) {
+			// Unreadable manifest: fall through to the sentinel.
+		}
+		return "0.0.0-dev";
 	}
 
 	private string function $detectLucliVersion() {
@@ -706,7 +739,7 @@ component extends="modules.BaseModule" {
 			}
 		}
 
-		var v = super.version();
+		var v = $displayVersion();
 		var help = "Wheels CLI " & v & nl;
 		help &= "  CFML MVC framework — code generation, migrations, testing, server management" & nl & nl;
 		help &= "Usage:" & nl;
@@ -1630,7 +1663,15 @@ component extends="modules.BaseModule" {
 	 */
 	public string function docs() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
-		var action = arrayLen(args) ? lCase(args[1]) : "fetch";
+		// The first non-flag token, so a bare `wheels docs --offline` (or
+		// `--force`) runs the default fetch instead of being read as an action.
+		var action = "fetch";
+		for (var token in args) {
+			if (left(token, 2) != "--") {
+				action = lCase(token);
+				break;
+			}
+		}
 		// Resolve --force HERE, in the command that actually receives the parsed
 		// argv. docsFetch() takes no arguments, so a helper reading its
 		// `arguments` scope always saw an empty struct and the flag was
@@ -1641,6 +1682,9 @@ component extends="modules.BaseModule" {
 				force = true;
 			}
 		}
+		// --offline / WHEELS_OFFLINE=1: sets request.$wheelsOffline, which
+		// docsFetch() and the HttpClient download gate both honour.
+		$consumeOfflineFlag(args);
 		switch (action) {
 			case "fetch":
 				return docsFetch(force = force);
@@ -1678,7 +1722,16 @@ component extends="modules.BaseModule" {
 			out("Documentation for #version# is already installed.", "green");
 			out("  #target#");
 			out("  Re-run with --force to replace it.");
+			// The bundle cache is per CLI home and shared by every app, so a
+			// second app finds it installed and still needs its own mirror.
+			$docsMountIntoWebroot(target);
 			return "";
+		}
+		if ($isOffline()) {
+			$docsFetchFail(
+				"Offline mode is enabled (--offline / WHEELS_OFFLINE=1): downloading the docs bundle for #version# requires network access.",
+				["  Run again without --offline to download it."]
+			);
 		}
 
 		// Not `url` — a variable named after a reserved CFML scope shadows it,
@@ -1741,28 +1794,10 @@ component extends="modules.BaseModule" {
 			directoryCreate(staging, true);
 			// The bundle is zipped with its contents at the root (manifest.json,
 			// guides/, api/), so unpack straight into the staging directory.
-			// Shell out to `unzip` rather than Lucee's extract(): `extract` is
-			// shadowed in this module's scope and resolves to a helper with a
-			// different arity. Same approach Installer::$extract() takes with
-			// `tar`, for the same reason.
-			var unzipResult = {};
 			try {
-				cfexecute(
-					name = "unzip",
-					arguments = "-o -q #tmp# -d #staging#",
-					timeout = 300,
-					variable = "local.unzipOut",
-					errorVariable = "local.unzipErr",
-					result = "unzipResult"
-				);
+				$docsUnzip(tmp, staging);
 			} catch (any e) {
 				$docsFetchFail("Could not unpack the bundle: #e.message#");
-			}
-			if (unzipResult.exitCode != 0) {
-				$docsFetchFail(
-					"Could not unpack the bundle (unzip exit #unzipResult.exitCode#).",
-					["  #local.unzipErr ?: ''#"]
-				);
 			}
 
 			try {
@@ -1786,6 +1821,51 @@ component extends="modules.BaseModule" {
 		out("  #target#");
 		$docsMountIntoWebroot(target);
 		return "";
+	}
+
+	/**
+	 * Unpacks a zip with java.util.zip rather than a shell `unzip`: an
+	 * argument string broke on paths with spaces, and Windows has no `unzip`.
+	 * Lucee's extract() is not an option either: `extract` is shadowed in
+	 * this module's scope by a helper with a different arity. An entry that
+	 * would land outside destDir (`../x`, an absolute path) throws instead of
+	 * being skipped, so a hostile bundle installs nothing.
+	 */
+	private void function $docsUnzip(required string zipPath, required string destDir) {
+		var root = createObject("java", "java.io.File").init(arguments.destDir).getCanonicalFile();
+		var rootPath = root.toPath();
+		var zip = createObject("java", "java.util.zip.ZipFile").init(arguments.zipPath);
+		try {
+			var entries = zip.entries();
+			while (entries.hasMoreElements()) {
+				var entry = entries.nextElement();
+				var outFile = createObject("java", "java.io.File").init(root, entry.getName()).getCanonicalFile();
+				// A `./` directory entry is the root itself: nothing to create.
+				if (entry.isDirectory() && outFile.equals(root)) {
+					continue;
+				}
+				if (!outFile.toPath().startsWith(rootPath) || outFile.equals(root)) {
+					throw(type = "Wheels.DocsFetchFailed", message = "the archive entry '#entry.getName()#' points outside the docs directory");
+				}
+				if (entry.isDirectory()) {
+					outFile.mkdirs();
+					continue;
+				}
+				outFile.getParentFile().mkdirs();
+				var input = zip.getInputStream(entry);
+				try {
+					createObject("java", "java.nio.file.Files").copy(
+						input,
+						outFile.toPath(),
+						[createObject("java", "java.nio.file.StandardCopyOption").REPLACE_EXISTING]
+					);
+				} finally {
+					input.close();
+				}
+			}
+		} finally {
+			zip.close();
+		}
 	}
 
 	/**
@@ -2892,7 +2972,7 @@ component extends="modules.BaseModule" {
 	public string function info() {
 		// Takes no arguments; enforce the schema's additionalProperties:false (#2963).
 		new services.ArgSpec().parse(structuredArgs(arguments));
-		out("Wheels CLI v#super.version()#", "bold");
+		out("Wheels CLI v#$displayVersion()#", "bold");
 		out("");
 
 		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
@@ -3304,7 +3384,7 @@ component extends="modules.BaseModule" {
 
 		// Banner
 		out("", "");
-		out("Wheels Console v#super.version()#", "bold");
+		out("Wheels Console v#$displayVersion()#", "bold");
 		out("Connected to #$serverHostPort(serverPort)# (#wheelsEnv#) — Wheels #wheelsVersion#", "cyan");
 		out("Type expressions to evaluate in your app context. /help for commands.", "");
 		out("", "");
@@ -5855,7 +5935,7 @@ component extends="modules.BaseModule" {
 				out("");
 				out("Scaffold complete! Next steps:", "green");
 				out("  1. Run migrations: wheels migrate latest");
-				out("  2. Start server: wheels start");
+				out("  2. " & $serverNextStep());
 			}
 		} else {
 			$refuse("Scaffold failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
@@ -6032,7 +6112,7 @@ component extends="modules.BaseModule" {
 			out("");
 			out("API resource complete! Next steps:", "green");
 			out("  1. Run migrations: wheels migrate latest");
-			out("  2. Start server: wheels start");
+			out("  2. " & $serverNextStep());
 			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
 		} else {
 			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
@@ -6301,7 +6381,8 @@ component extends="modules.BaseModule" {
 			strategy = strategy,
 			registration = registration,
 			force = force,
-			cliVersion = super.version()
+			// Written into the generated files' header comments: never the raw build token (#3891).
+			cliVersion = $displayVersion()
 		);
 
 		if (results.success) {
@@ -11051,6 +11132,31 @@ component extends="modules.BaseModule" {
 			type = "Wheels.EngineConflict",
 			message = "A #other# server is already running for this project; run `wheels stop` before starting another engine."
 		);
+	}
+
+	/**
+	 * The "server" line of generate's Next steps. A server already running for
+	 * the project only picks up new routes and models after a reload; telling
+	 * people to start it sent them to a 404 on the new route (#3883).
+	 */
+	private string function $serverNextStep() {
+		return $serverRunningForProject()
+			? "Reload the running server so it picks up the new routes: wheels reload"
+			: "Start server: wheels start";
+	}
+
+	/**
+	 * Is a dev server (Lucee or RustCFML) running for this project? Local state
+	 * only, no network: a project-owned live registration, or a running
+	 * RustCFML server. A seam for specs.
+	 */
+	private boolean function $serverRunningForProject() {
+		try {
+			if (len(getService("serverRegistry").aliveRegistrationFor(variables.projectRoot))) return true;
+			return $rustcfmlEngine().status(variables.projectRoot).running;
+		} catch (any e) {
+			return false;
+		}
 	}
 
 	/** The RustCFML engine backend (a seam for specs). */

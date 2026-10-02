@@ -127,6 +127,114 @@ component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Override Base adapter's function.
+	 * Since 10.2.7, MariaDB reports column defaults as SQL expressions: a nullable
+	 * column without a default comes back as the text NULL and a string default as
+	 * a quoted literal ('draft'). Normalize those to what MySQL reports, so a
+	 * missing default isn't read as a real one (#3927). MySQL is unchanged.
+	 */
+	public query function $getColumnInfo(
+		required string table,
+		required string datasource,
+		required string username,
+		required string password
+	) {
+		local.rv = super.$getColumnInfo(argumentCollection = arguments);
+		if ($usesExpressionDefaults(arguments.datasource, arguments.username, arguments.password)) {
+			for (local.column in ["column_default_value", "column_default", "default_value", "COLUMN_DEF"]) {
+				if (ListFindNoCase(local.rv.columnList, local.column)) {
+					for (local.i = 1; local.i <= local.rv.recordCount; local.i++) {
+						local.value = local.rv[local.column][local.i];
+						if (!IsNull(local.value) && IsSimpleValue(local.value)) {
+							QuerySetCell(local.rv, local.column, $normalizeMariaDBColumnDefault(local.value), local.i);
+						}
+					}
+				}
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 * Whether the server reports column defaults as SQL expressions (MariaDB
+	 * 10.2.7+), checked once per datasource.
+	 */
+	public boolean function $usesExpressionDefaults(
+		required string datasource,
+		string username = "",
+		string password = ""
+	) {
+		if (!StructKeyExists(variables, "$expressionDefaultsByDataSource")) {
+			variables.$expressionDefaultsByDataSource = {};
+		}
+		if (!StructKeyExists(variables.$expressionDefaultsByDataSource, arguments.datasource)) {
+			local.state = {result = false, probed = false};
+			try {
+				local.info = $dbinfo(
+					type = "version",
+					datasource = arguments.datasource,
+					username = arguments.username,
+					password = arguments.password
+				);
+				local.state.result = $isExpressionDefaultMariaDB(
+					local.info["database_productname"][1],
+					local.info["database_version"][1]
+				);
+				local.state.probed = true;
+			} catch (any e) {
+				// Can't tell this time: keep MySQL's reading, and don't cache it so
+				// the next column read probes again.
+			}
+			if (!local.state.probed) {
+				return false;
+			}
+			variables.$expressionDefaultsByDataSource[arguments.datasource] = local.state.result;
+		}
+		return variables.$expressionDefaultsByDataSource[arguments.datasource];
+	}
+
+	/**
+	 * Internal function.
+	 * True for MariaDB 10.2.7 and later. Through the MySQL driver MariaDB reports
+	 * itself in the version string, before 11.0 with a 5.5.5- prefix.
+	 */
+	public boolean function $isExpressionDefaultMariaDB(required string productName, required string version) {
+		if (!FindNoCase("MariaDB", arguments.productName & " " & arguments.version)) {
+			return false;
+		}
+		local.version = ReReplace(arguments.version, "^5\.5\.5-", "");
+		local.match = ReMatch("^[0-9]+\.[0-9]+\.[0-9]+", local.version);
+		if (!ArrayLen(local.match)) {
+			return false;
+		}
+		local.parts = ListToArray(local.match[1], ".");
+		local.number = local.parts[1] * 1000000 + local.parts[2] * 1000 + local.parts[3];
+		return local.number >= 10002007;
+	}
+
+	/**
+	 * Internal function.
+	 * A MariaDB expression-style column default as MySQL reports it: the text
+	 * NULL (no default) becomes "", a quoted string literal is unquoted (a
+	 * literal 'NULL' stays the text NULL), and anything else (numbers,
+	 * current_timestamp(), b'0') is left as it is.
+	 */
+	public string function $normalizeMariaDBColumnDefault(required string value) {
+		if (Compare(arguments.value, "NULL") == 0) {
+			return "";
+		}
+		if (
+			Len(arguments.value) >= 2
+			&& Compare(Left(arguments.value, 1), "'") == 0
+			&& Compare(Right(arguments.value, 1), "'") == 0
+		) {
+			return Replace(Mid(arguments.value, 2, Len(arguments.value) - 2), "''", "'", "all");
+		}
+		return arguments.value;
+	}
+
+	/**
+	 * Override Base adapter's function.
 	 * MySQL uses backticks to quote identifiers.
 	 */
 	public string function $quoteIdentifier(required string name) {
