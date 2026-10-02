@@ -81,19 +81,23 @@
     local.testScope = local.dirResolver.resolveScope(url);
     local.testDirectory = local.testScope.resolved;
 
+    // Drop the compiled pages held in memory so this run compiles what is on
+    // disk now. Lucee's default inspectTemplate ("auto") re-checks templates
+    // only on a background sweep, so a run started just after a spec was
+    // edited could still run the previous version (#3962). Coverage relies on
+    // this too: `wheels coverage` instruments app/ just before this request,
+    // and under inspectTemplate=once a server that had served the app kept
+    // running the uninstrumented code and reported 0% (deleting cfclasses on
+    // disk does not drop the pages held in memory). Lucee-only function, hence
+    // the guard.
+    if (StructKeyExists(GetFunctionList(), "pagePoolClear")) {
+        pagePoolClear();
+    }
+
     // Coverage mode (`wheels coverage`): reset the function-level counter map
     // so the dump at the end of this request reflects only THIS run.
     if (StructKeyExists(url, "coverage") && url.coverage) {
         server.__wheels_cov = {};
-        // `wheels coverage` instruments app/ just before this request. Under
-        // Lucee's inspectTemplate=once a template already compiled is never
-        // re-read, so a server that had served the app kept running the
-        // uninstrumented code and reported 0% (deleting cfclasses on disk does
-        // not drop the compiled pages held in memory). Clear them so this run
-        // compiles the instrumented source. Lucee-only function, hence the guard.
-        if (StructKeyExists(GetFunctionList(), "pagePoolClear")) {
-            pagePoolClear();
-        }
         // Wheels runs each controller's and model's config() once and caches the
         // class, so on a warm server config() never ran during the suite and its
         // counters stayed at zero. Drop the class caches so they are rebuilt from

@@ -1,25 +1,29 @@
 /**
- * `wheels coverage` instruments app/ and then asks the app runner to run the
- * suite with ?coverage=true. Under Lucee's inspectTemplate=once a server that
- * had already compiled the app kept running the uninstrumented code and
- * reported 0% coverage, so coverage mode must clear the compiled-page pool
- * first. pagePoolClear() is Lucee-only, so the call must be guarded.
+ * The app runner clears Lucee's compiled-page pool before EVERY run (#3962):
+ * under the default inspectTemplate ("auto") a run started just after a spec
+ * was edited could still run the previous version. `wheels coverage` relies
+ * on the same clear: it instruments app/ and then asks the runner for
+ * ?coverage=true, and under inspectTemplate=once a server that had already
+ * compiled the app kept running the uninstrumented code and reported 0%.
+ * pagePoolClear() is Lucee-only, so the call must be guarded.
  */
 component extends="wheels.WheelsTest" {
 
 	function run() {
 
-		describe("app runner coverage mode", () => {
+		describe("app runner page-pool clear", () => {
 
-			it("clears the compiled-page pool before the run, guarded for engines without pagePoolClear", () => {
+			it("clears the compiled-page pool before every run, ahead of the coverage branch, guarded for engines without pagePoolClear", () => {
 				var src = FileRead(ExpandPath("/wheels/tests/app-runner.cfm"));
-				var start = Find("StructKeyExists(url, ""coverage"") && url.coverage", src);
-				expect(start).toBeGT(0, "the coverage block is missing");
-				var block = Mid(src, start, 900);
-				expect(block).toInclude("server.__wheels_cov = {};");
-				expect(block).toInclude("StructKeyExists(GetFunctionList(), ""pagePoolClear"")");
-				expect(block).toInclude("pagePoolClear();");
-				expect(Find("pagePoolClear();", block)).toBeGT(Find("StructKeyExists(GetFunctionList(), ""pagePoolClear"")", block));
+				var coverageAt = Find("StructKeyExists(url, ""coverage"") && url.coverage", src);
+				expect(coverageAt).toBeGT(0, "the coverage block is missing");
+				var guardAt = Find("StructKeyExists(GetFunctionList(), ""pagePoolClear"")", src);
+				var clearAt = Find("pagePoolClear();", src);
+				expect(guardAt).toBeGT(0, "the pagePoolClear engine guard is missing");
+				expect(clearAt).toBeGT(guardAt, "pagePoolClear() must sit inside its engine guard");
+				expect(clearAt).toBeLT(coverageAt, "pagePoolClear() must run for every run, not only inside the coverage branch");
+				var coverageBlock = Mid(src, coverageAt, 900);
+				expect(coverageBlock).toInclude("server.__wheels_cov = {};");
 			});
 
 			it("also drops the cached controller and model classes so every config() runs again", () => {
