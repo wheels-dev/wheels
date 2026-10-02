@@ -4,12 +4,32 @@
  * A fresh `wheels new` app ships tests/specs with only .gitkeep files, so the
  * default run discovers no bundles. For the DEFAULT scope that is a notice and
  * exit 0; for a scope the user asked for (--filter, --directory, a path) it
- * stays a failure, and so does anything else that went wrong.
+ * stays a failure, and so does anything else that went wrong. A default run
+ * that discovers no bundles while spec files DO exist on disk (the runner
+ * cannot see them, e.g. a broken mapping) also stays a failure.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
 	function beforeAll() {
-		variables.mod = new cli.lucli.Module(cwd = getTempDirectory());
+		// A fresh app: tests/specs holds only .gitkeep files.
+		variables.emptyRoot = getTempDirectory() & "wheels-cli-no-specs-" & createUUID();
+		directoryCreate(variables.emptyRoot & "/tests/specs/models", true, true);
+		fileWrite(variables.emptyRoot & "/tests/specs/models/.gitkeep", "");
+		variables.mod = new cli.lucli.Module(cwd = variables.emptyRoot);
+
+		// An app whose spec files exist on disk but that the runner did not discover.
+		variables.specsRoot = getTempDirectory() & "wheels-cli-unseen-specs-" & createUUID();
+		directoryCreate(variables.specsRoot & "/tests/specs/models", true, true);
+		fileWrite(variables.specsRoot & "/tests/specs/models/BookSpec.cfc", "component {}" & chr(10));
+		variables.unseenMod = new cli.lucli.Module(cwd = variables.specsRoot);
+	}
+
+	function afterAll() {
+		for (var root in [variables.emptyRoot, variables.specsRoot]) {
+			if (Len(root) > 10 && directoryExists(root)) {
+				directoryDelete(root, true);
+			}
+		}
 	}
 
 	private struct function emptyRun() {
@@ -17,6 +37,37 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 	}
 
 	function run() {
+
+		describe("a default run that discovers no bundles while spec files exist on disk", () => {
+
+			it("is not an empty default run", () => {
+				expect(unseenMod.$isEmptyDefaultRun(emptyRun(), true)).toBeFalse();
+			});
+
+			it("still fails", () => {
+				expect(unseenMod.$cliTestResultFailed(result = emptyRun(), defaultScope = true)).toBeTrue();
+			});
+
+			it("keeps the red no-bundles summary", () => {
+				var line = unseenMod.$testSummaryLine(
+					result = emptyRun(), totalPass = 0, totalFail = 0, totalError = 0,
+					duration = "", specsFailedToLoad = 0, defaultScope = true
+				);
+				expect(line.color).toBe("red");
+				expect(line.text).toInclude("no test bundles ran");
+			});
+
+			it("throws Wheels.TestsFailed", () => {
+				var state = {type = ""};
+				try {
+					unseenMod.$throwIfCliTestsFailed(result = emptyRun(), defaultScope = true);
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.TestsFailed");
+			});
+
+		});
 
 		describe("$cliTestResultFailed and the default scope", () => {
 
