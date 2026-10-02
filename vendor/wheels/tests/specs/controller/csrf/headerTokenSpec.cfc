@@ -25,6 +25,9 @@ component extends="wheels.WheelsTest" {
 				request.cgi.request_method = "PATCH"
 				request.cgi.http_x_requested_with = ""
 				csrfToken = CsrfGenerateToken()
+				// Invalid tokens: the valid one with its last character changed.
+				badToken = Left(csrfToken, Len(csrfToken) - 1) & (Right(csrfToken, 1) == "A" ? "B" : "A")
+				otherBadToken = Left(csrfToken, Len(csrfToken) - 1) & (Right(csrfToken, 1) == "C" ? "D" : "C")
 			})
 
 			afterEach(() => {
@@ -43,7 +46,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("rejects an invalid header with no form field", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				params = {controller = "csrfProtectedExcept", action = "update"}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
 				var state = {type = ""}
@@ -64,7 +67,7 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("accepts a valid form field even when the header is invalid (either one is enough)", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = csrfToken}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
 				_controller.processAction("update", params)
@@ -72,8 +75,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("rejects when both the field and the header are invalid", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
-				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = "#csrfToken#2"}
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
+				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = otherBadToken}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
 				var state = {type = ""}
 				try {
