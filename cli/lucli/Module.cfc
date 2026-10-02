@@ -2219,7 +2219,13 @@ component extends="modules.BaseModule" {
 	 * hint: Start the Wheels development server via LuCLI
 	 */
 	public string function start() {
-		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
+		// `--port 8931` (space form) arrives as port="true" plus a positional;
+		// without re-binding it, toArgv() reordered it to "8931 --port" and
+		// the port was silently dropped (#3895).
+		// Both may arrive that way at once; they bind by value shape.
+		var args = new services.ArgSpec().toArgv(
+			new services.ArgSpec().bindSpaceFormValues(structuredArgs(arguments), {port = "^[0-9]+$", engine = "^[A-Za-z][A-Za-z0-9_-]*$"})
+		);
 
 		// Refuse to start from a non-Wheels-project directory. LuCLI's
 		// `server start` derives the server name from the cwd basename and
@@ -2250,16 +2256,23 @@ component extends="modules.BaseModule" {
 			if (a == "--force") {
 				force = true;
 			} else if (a == "--engine") {
-				if (i < arrayLen(args)) { engine = lCase(args[i + 1]); i++; }
+				engine = lCase($startFlagValue(args, i, "engine"));
+				i++;
 			} else if (left(a, 9) == "--engine=") {
 				engine = lCase(mid(a, 10, len(a) - 9));
 			} else if (a == "--port") {
-				if (i < arrayLen(args)) { enginePort = val(args[i + 1]); i++; }
+				enginePort = val($startFlagValue(args, i, "port"));
+				i++;
 			} else if (left(a, 7) == "--port=") {
 				enginePort = val(mid(a, 8, len(a) - 7));
 			} else {
 				arrayAppend(passThrough, a);
 			}
+		}
+
+		// An unknown engine used to fall through to Lucee silently (#3895).
+		if (!listFind("lucee,rustcfml", engine)) {
+			throw(type = "Wheels.InvalidArguments", message = "Unknown engine '#engine#' for wheels start. Supported: lucee (the default), rustcfml.");
 		}
 
 		// One engine per project (#3913): a second engine on another port made
@@ -2286,6 +2299,7 @@ component extends="modules.BaseModule" {
 		if (engine == "rustcfml") {
 			var rustSvc = $rustcfmlEngine();
 			try {
+				$announceRustcfmlDownload(rustSvc);
 				var rustState = rustSvc.start(variables.projectRoot, enginePort > 0 ? enginePort : 8513);
 			} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 				$reportUnsupportedRustPlatform(e);
@@ -2607,8 +2621,10 @@ component extends="modules.BaseModule" {
 	 * registry. Hidden from MCP like the other stateful server commands.
 	 */
 	public string function engines() {
-		var coll = structuredArgs(arguments);
-		var opts = new services.ArgSpec()
+		var spec = new services.ArgSpec();
+		// `--port 8931` (space form), as `wheels start` accepts (#3895).
+		var coll = spec.bindSpaceFormValue(structuredArgs(arguments), "port");
+		var opts = spec
 			.positional(name = "engine", default = "", description = "Engine name: rustcfml")
 			.positional(name = "action", default = "", description = "Action: install, start, stop, status")
 			.option(name = "port", default = "8513", description = "Port for `start` (default 8513)")
@@ -2617,10 +2633,13 @@ component extends="modules.BaseModule" {
 		var engine = lCase(trim(opts.engine));
 		var action = lCase(trim(opts.action));
 
-		if (engine != "rustcfml") {
-			out("Unknown engine '#opts.engine#'. Supported: rustcfml", "yellow");
+		if (!len(engine)) {
 			out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
 			return "";
+		}
+		if (engine != "rustcfml") {
+			out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+			throw(type = "Wheels.InvalidArguments", message = "Unknown engine '#opts.engine#'. Supported: rustcfml");
 		}
 
 		var svc = $rustcfmlEngine();
@@ -2628,6 +2647,7 @@ component extends="modules.BaseModule" {
 			case "install":
 				out("Installing RustCFML...", "cyan");
 				try {
+					$announceRustcfmlDownload(svc);
 					out("Installed: " & svc.install(), "green");
 				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 					$reportUnsupportedRustPlatform(e);
@@ -2637,6 +2657,7 @@ component extends="modules.BaseModule" {
 			case "start":
 				$refuseOtherEngine("rustcfml");
 				try {
+					$announceRustcfmlDownload(svc);
 					var st = svc.start(variables.projectRoot, val(opts.port));
 				} catch (Wheels.RustCFML.UnsupportedPlatform e) {
 					$reportUnsupportedRustPlatform(e);
@@ -2665,10 +2686,42 @@ component extends="modules.BaseModule" {
 					out("No RustCFML server running for this project.", "yellow");
 				}
 				break;
+			case "":
+				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+				break;
 			default:
-				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "yellow");
+				out("Usage: wheels engines rustcfml install|start|stop|status [--port N]", "cyan");
+				throw(type = "Wheels.InvalidArguments", message = "Unknown action '#opts.action#' for wheels engines rustcfml. Try: install, start, stop, status");
 		}
 		return "";
+	}
+
+	/**
+	 * The value after a bare `--<name>` in start()'s argv. Refuses a missing
+	 * value or another flag, which the loop used to take as the value (so
+	 * `--port --engine` booted Lucee on the default port).
+	 */
+	private string function $startFlagValue(required array args, required numeric i, required string name) {
+		if (arguments.i >= arrayLen(arguments.args) || left(arguments.args[arguments.i + 1], 2) == "--") {
+			throw(type = "Wheels.InvalidArguments", message = "--#arguments.name# needs a value, e.g. --#arguments.name#=<value>.");
+		}
+		return arguments.args[arguments.i + 1];
+	}
+
+	/**
+	 * The pinned RustCFML binary is a ~57 MB download on first use. It used to
+	 * happen silently inside `wheels start`; announce it and how long it took.
+	 * The download itself runs in a child process whose output is not shown,
+	 * so this prints before and after rather than a live progress bar.
+	 */
+	private void function $announceRustcfmlDownload(required any svc) {
+		if (arguments.svc.isInstalled()) {
+			return;
+		}
+		out("Downloading RustCFML #arguments.svc.getEngineVersion()# (about 57 MB, first run only)...", "cyan");
+		var began = getTickCount();
+		arguments.svc.install();
+		out("  Downloaded and verified in #numberFormat((getTickCount() - began) / 1000, '0.0')#s.", "cyan");
 	}
 
 	// ─────────────────────────────────────────────────
@@ -3000,8 +3053,19 @@ component extends="modules.BaseModule" {
 				} catch (any e) { /* skip */ }
 			}
 
-			// CFML engine
-			out("Engine:   Lucee (LuCLI module)");
+			// CFML engine: the one serving this project. It was always reported
+			// as Lucee, even while RustCFML served (#3895).
+			var engineLine = "Lucee (LuCLI module)";
+			try {
+				var rustSvc = $rustcfmlEngine();
+				var rustStatus = rustSvc.status(variables.projectRoot);
+				if (rustStatus.running ?: false) {
+					engineLine = "RustCFML #rustSvc.getEngineVersion()# (running at http://127.0.0.1:#rustStatus.port#)";
+				}
+			} catch (any e) {
+				// No RustCFML state to read; Lucee is the default.
+			}
+			out("Engine:   #engineLine#");
 
 			// Datasource. Strip CFML/cfscript comments first so commented-out
 			// `set(...)` calls don't get parsed as live config, and use a
@@ -4845,6 +4909,16 @@ component extends="modules.BaseModule" {
 			return $packagesHelp();
 		}
 
+		// A package update killed mid-swap leaves the package only as a hidden
+		// backup; any packages command puts it back first (#3902).
+		try {
+			for (var note in new modules.wheels.services.packages.Installer().recoverInterruptedSwaps()) {
+				out(note, "yellow");
+			}
+		} catch (any e) {
+			out("Could not check vendor/ for an interrupted package update: #e.message#", "yellow");
+		}
+
 		return $dispatchPackages(sub, positional, opts);
 	}
 
@@ -4897,7 +4971,7 @@ component extends="modules.BaseModule" {
 	 * Return a fresh PackagesMainCli for a single subcommand dispatch.
 	 */
 	private any function $packagesMainCli() {
-		return new modules.wheels.services.packages.PackagesMainCli();
+		return new modules.wheels.services.packages.PackagesMainCli(projectRoot = variables.projectRoot);
 	}
 
 	/**
@@ -6113,7 +6187,9 @@ component extends="modules.BaseModule" {
 			out("API resource complete! Next steps:", "green");
 			out("  1. Run migrations: wheels migrate latest");
 			out("  2. " & $serverNextStep());
-			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
+			// The project's pinned port (lucee.json), not a hardcoded 8080.
+			var apiPort = $readPinnedPort(variables.projectRoot);
+			out("  3. Test: curl http://localhost:#apiPort > 0 ? apiPort : 8080#/api/#lCase(controllerName)#.json");
 		} else {
 			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}

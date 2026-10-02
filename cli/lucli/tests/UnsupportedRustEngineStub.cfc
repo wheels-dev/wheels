@@ -1,9 +1,17 @@
 /**
  * A RustCFML engine backend for a platform RustCFML publishes no build for:
- * install() and start() throw what RustCFMLEngine.$assetFor() throws on an
+ * isInstalled(), install() and start() throw what RustCFMLEngine.$assetFor() throws on an
  * Intel Mac. Used to pin the CLI's exit status for that case (#3815).
  */
 component {
+
+	public boolean function isInstalled() {
+		$refuse();
+	}
+
+	public string function getEngineVersion() {
+		return "0.0.0-stub";
+	}
 
 	public string function install() {
 		$refuse();
