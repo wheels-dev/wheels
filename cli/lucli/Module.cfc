@@ -5888,7 +5888,7 @@ component extends="modules.BaseModule" {
 				out("");
 				out("Scaffold complete! Next steps:", "green");
 				out("  1. Run migrations: wheels migrate latest");
-				out("  2. Start server: wheels start");
+				out("  2. " & $serverNextStep());
 			}
 		} else {
 			$refuse("Scaffold failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
@@ -6065,7 +6065,7 @@ component extends="modules.BaseModule" {
 			out("");
 			out("API resource complete! Next steps:", "green");
 			out("  1. Run migrations: wheels migrate latest");
-			out("  2. Start server: wheels start");
+			out("  2. " & $serverNextStep());
 			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
 		} else {
 			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
@@ -11085,6 +11085,31 @@ component extends="modules.BaseModule" {
 			type = "Wheels.EngineConflict",
 			message = "A #other# server is already running for this project; run `wheels stop` before starting another engine."
 		);
+	}
+
+	/**
+	 * The "server" line of generate's Next steps. A server already running for
+	 * the project only picks up new routes and models after a reload; telling
+	 * people to start it sent them to a 404 on the new route (#3883).
+	 */
+	private string function $serverNextStep() {
+		return $serverRunningForProject()
+			? "Reload the running server so it picks up the new routes: wheels reload"
+			: "Start server: wheels start";
+	}
+
+	/**
+	 * Is a dev server (Lucee or RustCFML) running for this project? Local state
+	 * only, no network: a project-owned live registration, or a running
+	 * RustCFML server. A seam for specs.
+	 */
+	private boolean function $serverRunningForProject() {
+		try {
+			if (len(getService("serverRegistry").aliveRegistrationFor(variables.projectRoot))) return true;
+			return $rustcfmlEngine().status(variables.projectRoot).running;
+		} catch (any e) {
+			return false;
+		}
 	}
 
 	/** The RustCFML engine backend (a seam for specs). */
