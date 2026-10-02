@@ -1,0 +1,41 @@
+---
+title: "wheels deploy server bootstrap"
+description: Install Docker on a fresh host. Idempotent — safe to re-run.
+type: reference
+sidebar:
+  label: "bootstrap"
+  order: 2
+---
+
+Install Docker on every host. Idempotent — re-runs on already-installed hosts are no-ops.
+
+Invoke it through the **flat alias** `wheels deploy bootstrap`. The nested `wheels deploy server bootstrap` form is shadowed at the shell — the CLI's picocli root owns a top-level `server` command for Lucee instance management and prints its help instead ([#2677](https://github.com/wheels-dev/wheels/issues/2677), fixed by the flat alias in [#2690](https://github.com/wheels-dev/wheels/pull/2690)). The nested form remains only for direct callers that bypass the shell, such as MCP.
+
+## Synopsis
+
+```txt title="synopsis"
+wheels deploy bootstrap [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print the commands without executing. |
+
+## Behavior
+
+Per host:
+
+```sh title="per-host behavior"
+which docker >/dev/null 2>&1 || curl -fsSL https://get.docker.com | sh
+```
+
+The convenience script runs as root (or via `sudo`). For production hardening, install Docker through your usual config management instead — this is a fast-start verb, not a production setup.
+
+## Example
+
+```bash title="example"
+wheels deploy bootstrap
+```
