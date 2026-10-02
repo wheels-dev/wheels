@@ -1,0 +1,6 @@
+- Apps running under a subfolder (`/app1` as an IIS virtual directory or Tomcat context pointing at `public/`) no longer lose the subfolder in five places (#3948):
+  - `/app1/index.cfm` with an empty `PATH_INFO` now routes to the root instead of an `App1` controller.
+  - `?reload=true` redirects back under `/app1`.
+  - `tests/runner.cfm` falls back to the `/wheels` mapping when `/app1/wheels/...` does not exist.
+  - The debug bar's environment-switch links keep `index.cfm` in Partial URL rewriting.
+  - The debug bar's offline-docs links point under the subfolder.
