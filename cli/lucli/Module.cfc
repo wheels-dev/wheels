@@ -6113,7 +6113,9 @@ component extends="modules.BaseModule" {
 			out("API resource complete! Next steps:", "green");
 			out("  1. Run migrations: wheels migrate latest");
 			out("  2. " & $serverNextStep());
-			out("  3. Test: curl http://localhost:8080/api/#lCase(controllerName)#.json");
+			// The project's pinned port (lucee.json), not a hardcoded 8080.
+			var apiPort = $readPinnedPort(variables.projectRoot);
+			out("  3. Test: curl http://localhost:#apiPort > 0 ? apiPort : 8080#/api/#lCase(controllerName)#.json");
 		} else {
 			$refuse("API resource generation failed: " & arrayToList(results.errors, "; "), "Wheels.Generate.Refused");
 		}
