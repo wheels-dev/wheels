@@ -257,10 +257,11 @@ component output="false" {
 		// ?reload=true&password=... from a browser keeps working unchanged, and
 		// an explicit url.password wins over the header.
 		//
-		// RustCFML drops the cgi.http_* entries once onApplicationStart has run
-		// inside the request — the first request after a reload restart — so the
-		// cgi copy can be missing while the request still carries the header.
-		// GetHttpRequestData() keeps it, so it is the fallback (#3913). Still
+		// On the first request after a reload restart, onApplicationStart runs
+		// inside the request and the framework sets request.cgi. RustCFML then
+		// resolves IsDefined("cgi.<key>") against request.cgi, which holds no
+		// http_x_wheels_reload_password, so the header looked absent.
+		// GetHttpRequestData() still has it, so it is the fallback (#3913). Still
 		// header-only: the password is never read from the form scope.
 		if (StructKeyExists(url, "reload") && !StructKeyExists(url, "password")) {
 			local.reloadPasswordHeader = "";

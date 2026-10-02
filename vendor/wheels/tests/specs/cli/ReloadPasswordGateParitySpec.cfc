@@ -205,10 +205,11 @@ component extends="wheels.WheelsTest" {
 						var absolute = repoRoot & "/" & relPath;
 						var content = fileRead(absolute);
 
-						// ##3913: on RustCFML, once onApplicationStart has run inside the
-						// request (the first request after a reload restart), the
-						// cgi.http_* entries are gone while GetHttpRequestData() still
-						// carries the header, so every other `wheels reload` was refused.
+						// ##3913: on the first request after a reload restart the framework
+						// sets request.cgi before onRequestStart, and RustCFML resolves
+						// IsDefined("cgi.<key>") against request.cgi, so the header looked
+						// absent and every other `wheels reload` was refused.
+						// GetHttpRequestData() still carries it.
 						// The fallback stays header-only: it never reads the password
 						// from the form scope.
 						expect(content contains "GetHttpRequestData(false).headers").toBeTrue(
