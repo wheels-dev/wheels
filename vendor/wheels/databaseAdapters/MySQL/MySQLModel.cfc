@@ -168,7 +168,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			variables.$expressionDefaultsByDataSource = {};
 		}
 		if (!StructKeyExists(variables.$expressionDefaultsByDataSource, arguments.datasource)) {
-			local.state = {result = false};
+			local.state = {result = false, probed = false};
 			try {
 				local.info = $dbinfo(
 					type = "version",
@@ -180,8 +180,13 @@ component extends="wheels.databaseAdapters.Base" output=false {
 					local.info["database_productname"][1],
 					local.info["database_version"][1]
 				);
+				local.state.probed = true;
 			} catch (any e) {
-				// Can't tell: keep MySQL's reading.
+				// Can't tell this time: keep MySQL's reading, and don't cache it so
+				// the next column read probes again.
+			}
+			if (!local.state.probed) {
+				return false;
 			}
 			variables.$expressionDefaultsByDataSource[arguments.datasource] = local.state.result;
 		}
