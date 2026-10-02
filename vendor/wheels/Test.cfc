@@ -849,7 +849,7 @@ component output="false" displayName="Test" extends="wheels.Global"{
 		$deprecated(
 			feature = "rocketunit-test-base",
 			message = "wheels.Test (RocketUnit) is deprecated and will be removed in Wheels 5.0. Migrate test components to extend=""wheels.WheelsTest"" and use the BDD syntax (describe/it/expect).",
-			docUrl = "https://guides.wheels.dev/v4-1-0/testing/"
+			docUrl = new wheels.GuidesLink().link("testing/")
 		);
 	}
 

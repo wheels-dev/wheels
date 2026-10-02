@@ -265,7 +265,7 @@ component output="false" extends="wheels.Global"{
 					$deprecated(
 						feature = "plugins:mixin-only:#local.pluginKey#",
 						message = local.warning,
-						docUrl = "https://guides.wheels.dev/v4-0-0/upgrading/3x-to-4x/"
+						docUrl = new wheels.GuidesLink().link("upgrading/3x-to-4x/")
 					);
 				}
 				if ($isVersionMismatch(local.compatVersion, local.wheelsVersion)) {
@@ -334,9 +334,10 @@ component output="false" extends="wheels.Global"{
 			} else {
 				// No plugin.json found — plugin uses legacy init()-based metadata extraction.
 				// Log an info-level suggestion so authors know about the new manifest option.
+				local.packagesGuide = new wheels.GuidesLink().link("digging-deeper/packages/");
 				WriteLog(
 					type = "information",
-					text = "[Wheels] Plugin '#local.plugin#' does not have a plugin.json manifest. Consider adding one for declarative metadata, dependency management, and middleware registration — or migrate the plugin to a package installed under vendor/. See: https://guides.wheels.dev/v4-0-0/digging-deeper/packages/"
+					text = "[Wheels] Plugin '#local.plugin#' does not have a plugin.json manifest. Consider adding one for declarative metadata, dependency management, and middleware registration — or migrate the plugin to a package installed under vendor/. See: #local.packagesGuide#"
 				);
 			}
 		}
@@ -731,7 +732,7 @@ component output="false" extends="wheels.Global"{
 			$deprecated(
 				feature = "plugins-directory",
 				message = "The plugins/ directory is deprecated as of Wheels 4.0 and will be removed in Wheels 5.0. Plugins found: #local.pluginList#. Migrate each one to a package installed under vendor/ (`wheels packages add <name>` for published packages).",
-				docUrl = "https://guides.wheels.dev/v4-0-0/digging-deeper/packages/"
+				docUrl = new wheels.GuidesLink().link("digging-deeper/packages/")
 			);
 		}
 	}

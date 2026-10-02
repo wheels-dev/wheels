@@ -39,9 +39,13 @@ component extends="wheels.WheelsTest" {
 
 						var content = fileRead(absolute);
 
-						expect(content contains canonical).toBeTrue(
+						// Framework files build the link from the running version
+						// (wheels.GuidesLink, #3931); the frozen CommandBox CLI keeps the literal.
+						var linked = content contains canonical
+							|| content contains 'GuidesLink().link("command-line-tools/mcp-integration")';
+						expect(linked).toBeTrue(
 							relPath & " should reference " & canonical
-							& " — the URL ##2888 standardized on for the deprecated /wheels/mcp transport."
+							& " (or build it with wheels.GuidesLink) — the guide ##2888 standardized on for the deprecated /wheels/mcp transport."
 						);
 
 						expect(content contains phantomPath).toBeFalse(
