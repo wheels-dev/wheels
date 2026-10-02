@@ -801,7 +801,7 @@ component {
 		processed = replace(processed, '=model("|ObjectNameSingularC|").findByKey(params.key);', '=model("|ObjectNameSingularC|").findByKey(key=params.key, #includeParam#);', 'all');
 		// API controller template (ApiControllerContent.txt) assigns into the
 		// `local.` scope with spaces around `=` and the lowercase placeholder.
-		processed = replace(processed, 'local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll();', 'local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll(#includeParam#);', 'all');
+		processed = replace(processed, 'local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll(returnAs="objects");', 'local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll(returnAs="objects", #includeParam#);', 'all');
 		processed = replace(processed, 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);', 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(key=params.key, #includeParam#);', 'all');
 
 		return processed;

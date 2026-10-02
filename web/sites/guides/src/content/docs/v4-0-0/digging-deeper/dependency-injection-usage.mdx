@@ -109,29 +109,45 @@ Same instance inside filters, actions, views, and any service called during the 
 
 ## Factory registration
 
-When construction needs logic — reading env vars, composing from other services, branching on environment — use `toFactory()`. It binds a name to a closure that builds the instance, receives the container, and honors the lifecycle flag you chain:
+The 4.0 container builds a service from a component path (`to("app.lib.X")`), auto-wiring `init()` parameters by registered name (below). It has no closure factory: `toFactory()` arrives in Wheels 4.1. When construction needs logic in 4.0 (reading env vars, passing a config struct, composing objects the container doesn't know), register a small provider component and let it build the real object.
 
-```cfm {test:compile} title="config/services.cfm — toFactory()"
-local.di = injector();
-local.di.map("jwtStrategy").toFactory(function(container) {
-    return new wheels.auth.JwtStrategy(
-        jwtService = new wheels.auth.JwtService(
-            secretKey = env("JWT_SECRET"),
-            issuer = "my-app"
-        )
-    );
-});
+```cfm {test:compile} title="app/lib/JwtStrategyProvider.cfc"
+component {
+    public any function init() {
+        return this;
+    }
+
+    // Builds the strategy on first use and keeps it: the provider itself is a singleton.
+    public any function get() {
+        if (!StructKeyExists(variables, "strategy")) {
+            variables.strategy = new wheels.auth.JwtStrategy(
+                jwtService = new wheels.auth.JwtService(
+                    secretKey = application.wo.env("JWT_SECRET"),
+                    issuer = "my-app"
+                )
+            );
+        }
+        return variables.strategy;
+    }
+}
 ```
 
-Consumers resolve the result directly — the factory's return value *is* the binding, so there's no `.build()` indirection:
+```cfm {test:compile} title="config/services.cfm"
+local.di = injector();
+local.di.map("jwtProvider").to("app.lib.JwtStrategyProvider").asSingleton();
+```
+
+Consumers ask the provider for the object:
 
 ```cfm {test:compile}
-var jwt = service("jwtStrategy");
+var jwt = service("jwtProvider").get();
 ```
 
-Chain a lifecycle as usual: `.asSingleton()` builds once and caches the result, `.asRequestScoped()` rebuilds once per request, and the default is transient (a fresh instance per `service()` call). The closure receives the `Injector` as its argument, so you can resolve other registered names with `container.getInstance("name")` while composing. Calling `to()` after `toFactory()` replaces the factory binding entirely, and vice versa.
+For an object that is built once from settings, creating it in `app/events/onapplicationstart.cfm` and keeping it in the application scope works too; the [Storage](/v4-0-0/digging-deeper/storage/) page does that for `StorageManager`.
 
-If you prefer an explicit CFC over a closure, the older wrapper pattern still works — a singleton CFC whose `build()` method returns the real instance. `toFactory()` removes that indirection for the common case.
+<Aside type="note" title="Wheels 4.1 and later">
+  From 4.1, `toFactory()` binds a name to a closure that builds the instance, so the provider isn't needed: `local.di.map("jwtStrategy").toFactory(function(container) { ... }).asSingleton();` and `service("jwtStrategy")`. See the [4.1 page](/v4-1-0/digging-deeper/dependency-injection-usage/).
+</Aside>
 
 ## Auto-wiring `init()` parameters
 

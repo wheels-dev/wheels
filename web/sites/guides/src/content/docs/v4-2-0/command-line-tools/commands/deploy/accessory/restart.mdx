@@ -1,0 +1,30 @@
+---
+title: "wheels deploy accessory restart"
+description: docker restart the named accessory container.
+type: reference
+sidebar:
+  label: "restart"
+  order: 5
+---
+
+`docker restart <service>-<name>`. Briefly interrupts the accessory.
+
+## Synopsis
+
+```txt title="
+wheels deploy accessory restart <name|all> [--destination=<name>] [--dry-run]
+```
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `<name>` | **Required positional.** Accessory name, or `all` to fan out. |
+| `--destination=<name>` | Overlay destination config. |
+| `--dry-run` | Print commands without executing. |
+
+## Example
+
+```bash title="example"
+wheels deploy accessory restart redis
+```

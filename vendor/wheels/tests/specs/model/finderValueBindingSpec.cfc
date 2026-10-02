@@ -21,7 +21,9 @@ component extends="wheels.WheelsTest" {
 	 *   scanner that copies the rest of the string for every character
 	 *   (quadratic)                 plain 40-42x, run of quotes 41-50x
 	 * so 25 leaves more than 2x headroom above a linear binder and still
-	 * fails a quadratic one.
+	 * fails a quadratic one. The IN list kind counts values, not characters:
+	 * 5000 values bound in about 70ms and 50000 in about 740ms on Lucee 7
+	 * (10.6x), so 2000 values keeps the small call well above 10ms.
 	 *
 	 * RustCFML and BoxLang: the WHERE literal scanner is super-linear on these
 	 * engines whatever the framework does. On RustCFML Mid() costs O(index) (it
@@ -39,6 +41,8 @@ component extends="wheels.WheelsTest" {
 		var plan = {factor = 10, maxGrowth = superLinear ? 250 : 25};
 		if (arguments.kind == "plain") {
 			plan.small = superLinear ? 3000 : 50000;
+		} else if (arguments.kind == "inList") {
+			plan.small = superLinear ? 600 : 2000;
 		} else {
 			plan.small = superLinear ? 1500 : 30000;
 		}
@@ -51,16 +55,32 @@ component extends="wheels.WheelsTest" {
 	// queries. No query is executed, so the time measures the binder only and
 	// does not depend on the database (Oracle, for one, refuses to bind a string
 	// over 4000 characters). The quotes value is escaped the way a dynamic finder
-	// escapes it, so `size` quote characters become 2 * `size` in the string.
+	// escapes it, so `size` quote characters become 2 * `size` in the string. For
+	// `inList`, `size` is the number of values in an IN list shaped the way
+	// whereIn() writes it, each value bound as its own parameter.
 	private numeric function bindingTime(required string kind, required numeric size) {
 		var author = model("author");
-		var whereString = arguments.kind == "plain"
-			? "lastName = '" & RepeatString("z", arguments.size) & "'"
-			: "firstName = '" & RepeatString("''", arguments.size) & "'";
+		var whereString = "";
+		if (arguments.kind == "plain") {
+			whereString = "lastName = '" & RepeatString("z", arguments.size) & "'";
+		} else if (arguments.kind == "inList") {
+			whereString = "firstName IN (" & inListValues(arguments.size) & ")";
+		} else {
+			whereString = "firstName = '" & RepeatString("''", arguments.size) & "'";
+		}
 		var t0 = GetTickCount();
 		var sqlParts = author.$addWhereClause(sql = ["SELECT 1"], where = whereString, include = "", includeSoftDeletes = false);
 		author.$addWhereClauseParameters(sql = sqlParts, where = whereString);
 		return GetTickCount() - t0;
+	}
+
+	// "'v1','v2',...,'v<count>'", the quoted list whereIn() builds for string values.
+	private string function inListValues(required numeric count) {
+		var parts = [];
+		for (var i = 1; i <= arguments.count; i++) {
+			ArrayAppend(parts, "'v#i#'");
+		}
+		return ArrayToList(parts);
 	}
 
 	// Fastest of three runs at each size (the caller has already warmed the
@@ -83,7 +103,8 @@ component extends="wheels.WheelsTest" {
 			rv[sizeKey] = best;
 		}
 		rv.growth = Round(rv.large / Max(rv.small, 1) * 10) / 10;
-		rv.summary = "#arguments.plan.small# chars took #rv.small#ms, #arguments.plan.large# chars took #rv.large#ms, growth #rv.growth#x (limit #arguments.plan.maxGrowth#x)";
+		var unit = arguments.kind == "inList" ? "values" : "chars";
+		rv.summary = "#arguments.plan.small# #unit# took #rv.small#ms, #arguments.plan.large# #unit# took #rv.large#ms, growth #rv.growth#x (limit #arguments.plan.maxGrowth#x)";
 		return rv;
 	}
 
@@ -311,7 +332,7 @@ component extends="wheels.WheelsTest" {
 				expect(ib.threw).toBe("Wheels.InvalidValue", "type=#ib.threw#");
 			});
 
-			it("binds a large IN list (a batch of keys) quickly instead of crashing", () => {
+			it("binds a large IN list (a batch of keys) in linear time instead of crashing", () => {
 				// Each IN value binds as its own parameter, and SQL Server accepts at
 				// most 2100 parameters per statement, so it gets a batch under that
 				// limit. Every other database takes the full 6000.
@@ -320,11 +341,14 @@ component extends="wheels.WheelsTest" {
 				for (var i = 1; i <= batchSize; i++) {
 					ArrayAppend(values, "v#i#");
 				}
-				var t0 = GetTickCount();
 				var q = model("author").whereIn("firstName", values).get();
-				var elapsed = GetTickCount() - t0;
 				expect(q.recordCount).toBe(0, "returned #q.recordCount# rows");
-				expect(elapsed).toBeLT(5000, "took #elapsed#ms");
+				// Growth between two list sizes, not a wall-clock budget: see linearityPlan().
+				var plan = linearityPlan("inList");
+				bindingTime("inList", plan.large);
+				var ratio = bindingGrowth("inList", plan);
+				debug(var = "IN list: #ratio.summary#", label = "binding linearity");
+				expect(ratio.growth).toBeLT(plan.maxGrowth, "IN list: #ratio.summary#");
 			});
 
 			it("binds a batch of 1000 UUID keys without a cap", () => {

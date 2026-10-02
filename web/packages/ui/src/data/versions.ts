@@ -45,6 +45,7 @@ export interface VersionMeta {
 
 /** Wheels Guides — the narrative docs at guides.wheels.dev. */
 export const GUIDES_VERSIONS: VersionMeta[] = [
+	{ slug: 'v4-2-0', label: 'v4.2', sidebarLabel: 'v4.2 (in development)', collapsed: true, status: 'snapshot' },
 	{ slug: 'v4-1-0', label: 'v4.1', sidebarLabel: 'v4.1 (current)', collapsed: false, status: 'current' },
 	{ slug: 'v4-0-0', label: 'v4.0', sidebarLabel: 'v4.0', collapsed: true, status: 'archived' },
 	{ slug: 'v3-0-0', label: 'v3.0.0', collapsed: true, status: 'archived' },
