@@ -1,0 +1,1 @@
+- The `wheels-starter-app` package is published to ForgeBox under the release version. Its `box.json` carried a fixed `1.0.0`, which the build never replaced, so every release overwrote ForgeBox's `1.0.0` entry and no 4.x starter app was listed under its own version. The release build's package check now fails on a version mismatch instead of printing a warning. (#3908)
