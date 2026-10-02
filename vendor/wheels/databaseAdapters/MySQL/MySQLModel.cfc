@@ -119,6 +119,35 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * MySQL and MariaDB treat a backslash inside a quoted string as an escape
+	 * character unless sql_mode includes NO_BACKSLASH_ESCAPES, so doubling the
+	 * quotes is not enough to write such a value as a literal. A value that
+	 * contains a backslash is written as a utf8mb4 hex literal instead, which
+	 * reads back as the same string whatever the sql_mode. Other values keep
+	 * the plain quoted form.
+	 */
+	public string function $inlineStringLiteral(required string str) {
+		if (Find("\", arguments.str) == 0) {
+			return super.$inlineStringLiteral(arguments.str);
+		}
+		return "_utf8mb4 X'" & UCase(BinaryEncode(CharsetDecode(arguments.str, "utf-8"), "hex")) & "'";
+	}
+
+	/**
+	 * MySQL code writes a backslash escape character as ESCAPE '\\', the
+	 * escaped spelling under the default sql_mode, so a doubled backslash here
+	 * means one backslash, as MySQL reads it. It is written as a single
+	 * character, so ESCAPE '\\' and the portable ESCAPE '\' both work in every
+	 * sql_mode.
+	 */
+	public string function $inlineEscapeCharacter(required string str) {
+		if (Compare(arguments.str, "\\") == 0) {
+			return $inlineStringLiteral("\");
+		}
+		return $inlineStringLiteral(arguments.str);
+	}
+
+	/**
 	 * Override Base adapter's function.
 	 */
 	public string function $defaultValues() {
