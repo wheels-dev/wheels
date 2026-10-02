@@ -2149,6 +2149,20 @@
 	}
 
 	/**
+	 * The WHERE clause for a primary-key lookup, ANDed with any incoming `where`
+	 * so the key narrows the set that `where` (a scope chain, a query builder or
+	 * a direct argument) describes instead of replacing it. Used by findByKey,
+	 * exists(key=), updateByKey and deleteByKey.
+	 */
+	public string function $keyWhereWithScope(required any key, string where = "") {
+		local.keyWhere = $keyWhereString(values = arguments.key);
+		if (Len(Trim(arguments.where))) {
+			return "(#arguments.where#) AND (#local.keyWhere#)";
+		}
+		return local.keyWhere;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public string function $keyWhereString(any properties = primaryKeys(), any values = "", any keys = "") {

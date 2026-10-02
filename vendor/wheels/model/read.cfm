@@ -449,8 +449,10 @@
 			return false;
 		}
 
-		// Convert primary key column name(s) / value(s) to a WHERE clause.
-		arguments.where = $keyWhereString(values = arguments.key);
+		// Convert primary key column name(s) / value(s) to a WHERE clause that
+		// narrows any incoming `where` (a scope chain, a query builder or a
+		// direct argument) rather than replacing it.
+		arguments.where = $keyWhereWithScope(key = arguments.key, where = StructKeyExists(arguments, "where") ? arguments.where : "");
 		StructDelete(arguments, "key");
 
 		return findOne(argumentCollection = arguments);

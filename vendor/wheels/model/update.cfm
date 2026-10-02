@@ -167,7 +167,7 @@
 	) {
 		$args(name = "updateByKey", args = arguments);
 		$keyLengthCheck(arguments.key);
-		arguments.where = $keyWhereString(values = arguments.key);
+		arguments.where = $keyWhereWithScope(key = arguments.key, where = StructKeyExists(arguments, "where") ? arguments.where : "");
 		StructDelete(arguments, "key");
 		return updateOne(argumentCollection = arguments);
 	}
