@@ -60,7 +60,11 @@ component extends="Policy" {
 	 * override to widen, e.g.:
 	 *
 	 * public any function scope(required any collection) {
-	 * 	return arguments.collection.where("userId", variables.user.id);
+	 * 	// variables.user is an empty string for a guest: keep the base's "no rows".
+	 * 	if (IsStruct(variables.user) && StructKeyExists(variables.user, "id")) {
+	 * 		return arguments.collection.where("userId", variables.user.id);
+	 * 	}
+	 * 	return super.scope(arguments.collection);
 	 * }
 	 */
 
