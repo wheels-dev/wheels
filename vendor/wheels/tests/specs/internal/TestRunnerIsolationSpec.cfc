@@ -46,10 +46,10 @@ component extends="wheels.WheelsTest" {
 					expect(
 						ctx.requestIsTestContext(cgiScope = {path_info = "/wheels/core/tests"}, environment = "production")
 					).toBeFalse("the env gate must fail closed in production");
-					// anchored: a runner path in the query string must not trigger
+					// anchored: a runner path outside the request path is not a test context
 					expect(
 						ctx.requestIsTestContext(cgiScope = {path_info = "/", script_name = "/index.cfm", query_string = "x=/wheels/core/tests"}, environment = "development")
-					).toBeFalse("a query-string runner path is not a test context");
+					).toBeFalse("a runner path outside the request path is not a test context");
 					expect(
 						ctx.requestIsTestContext(cgiScope = {path_info = "/", script_name = "/index.cfm"}, environment = "development")
 					).toBeFalse();
@@ -241,9 +241,8 @@ component extends="wheels.WheelsTest" {
 					);
 				});
 
-				// Behaviour proof (RED on the earlier code, where any non-empty
-				// header bound the isolated app): a non-secret X-Wheels-Test-Context value
-				// (not the per-process runner secret) must bind the LIVE application.
+				// Behaviour proof: a non-secret X-Wheels-Test-Context value (not the
+				// per-process runner secret) must bind the LIVE application.
 				it("a non-secret X-Wheels-Test-Context value binds the live application, not the isolated one", () => {
 					var ctx = new wheels.events.TestContext();
 					var nonSecret = $testClient(testContext = false);
@@ -257,20 +256,18 @@ component extends="wheels.WheelsTest" {
 					);
 				});
 
-				// Behaviour proof (RED on the earlier code, where the haystack included
-				// the query string): the runner path smuggled through the query string
-				// must NOT bind the isolated application (the trigger is path-anchored).
-				it("a runner path in the query string binds the live application, not the isolated one", () => {
+				// Behaviour proof: a runner path outside the request path binds the
+				// live application (the trigger is path-anchored).
+				it("a runner path outside the request path binds the live application, not the isolated one", () => {
 					var ctx = new wheels.events.TestContext();
 					var live = $testClient(testContext = false);
-					// Raw in the URL so the slashes reach cgi.query_string un-encoded
-					// (the runner path appears only in the query string).
+					// Raw in the URL so the slashes arrive un-encoded.
 					live.get(path = "/wheels/info?format=json&x=/wheels/app/tests");
 					expect(live.statusCode()).toBe(200, "live /wheels/info must be reachable");
 					var payload = live.json();
 					expect(StructKeyExists(payload, "application") && StructKeyExists(payload.application, "name")).toBeTrue();
 					expect(ctx.isIsolatedApplicationName(payload.application.name)).toBeFalse(
-						"a `/wheels/app/tests` runner path in the QUERY STRING must bind the LIVE app, not `<name>_wheelsTest` — saw `#payload.application.name#`"
+						"a `/wheels/app/tests` runner path outside the request path must bind the LIVE app, not `<name>_wheelsTest` — saw `#payload.application.name#`"
 					);
 				});
 

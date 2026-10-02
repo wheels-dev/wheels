@@ -14,8 +14,7 @@
 	// The switch is gated three ways (defense in depth):
 	//   1. environment: only development / testing (resolved from WHEELS_ENV,
 	//      the one env signal readable in the constructor); fail closed otherwise.
-	//   2. the runner path is matched against path_info / script_name ONLY,
-	//      never the query parameters or the full request URL.
+	//   2. the runner path is matched against path_info / script_name.
 	//   3. the header / cookie must equal the per-process runner secret
 	//      (server.$wheelsTestContextSecret, constant-time compare) AND arrive
 	//      from a loopback socket peer (cgi.remote_addr, never a forwarded header).

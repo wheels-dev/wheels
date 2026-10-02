@@ -24,7 +24,7 @@ component extends="wheels.WheelsTest" {
 
 			// The path trigger is env-gated (development/testing only) AND
 			// anchored to the request PATH (path_info/script_name) — a runner path
-			// smuggled through the query string or request_url must NOT trigger.
+			// outside the request path is not treated as the runner.
 			it("path trigger: honours /wheels/core|app/tests only under development/testing, anchored to the path", () => {
 				var ctx = new wheels.events.TestContext();
 				expect(
@@ -40,13 +40,13 @@ component extends="wheels.WheelsTest" {
 				expect(
 					ctx.requestIsTestContext(cgiScope = {path_info = "/wheels/core/tests"}, environment = "")
 				).toBeFalse("an unknown environment must fail closed");
-				// anchored: the runner path in the query string / request_url must NOT trigger
+				// anchored: a runner path outside the request path is not treated as the runner
 				expect(
 					ctx.requestIsTestContext(cgiScope = {path_info = "/", script_name = "/index.cfm", query_string = "x=/wheels/core/tests"}, environment = "development")
-				).toBeFalse("a query-string runner path must not trigger");
+				).toBeFalse("a runner path outside the request path must not trigger");
 				expect(
 					ctx.requestIsTestContext(cgiScope = {path_info = "/", script_name = "/index.cfm", request_url = "http://h/app?x=/wheels/app/tests"}, environment = "development")
-				).toBeFalse("a request_url runner path must not trigger");
+				).toBeFalse("a runner path outside the request path (full URL) must not trigger");
 				expect(
 					ctx.requestIsTestContext(cgiScope = {path_info = "/", script_name = "/index.cfm"}, environment = "development")
 				).toBeFalse();
@@ -142,7 +142,7 @@ component extends="wheels.WheelsTest" {
 				expect(FindNoCase("/wheels/core/tests", includeSource) > 0).toBeTrue();
 				expect(FindNoCase("/wheels/app/tests", includeSource) > 0).toBeTrue();
 				// Gate parity: the include must loopback-check the peer and compare the server secret,
-				// and must NOT match the runner path against the query string / request_url.
+				// and must read the runner path from path_info / script_name.
 				expect(FindNoCase("remote_addr", includeSource) > 0).toBeTrue(
 					"testcontext.cfm must read cgi.remote_addr for the loopback peer check"
 				);
@@ -154,11 +154,11 @@ component extends="wheels.WheelsTest" {
 				);
 				expect(FindNoCase("query_string", includeSource)).toBe(
 					0,
-					"testcontext.cfm must not match the runner path against the query string"
+					"testcontext.cfm must read the runner path from path_info / script_name"
 				);
 				expect(FindNoCase("request_url", includeSource)).toBe(
 					0,
-					"testcontext.cfm must not match the runner path against request_url"
+					"testcontext.cfm must read the runner path from the request path fields"
 				);
 			});
 

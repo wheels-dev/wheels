@@ -209,10 +209,8 @@ component {
 	}
 
 	/**
-	 * Concatenate the CGI fields that carry the runner PATH. Anchored to
-	 * path_info / script_name only — never query_string / request_url /
-	 * http_url, so a client cannot smuggle the runner path through a query
-	 * parameter to force the isolated application.
+	 * Concatenate the CGI fields that carry the runner PATH: path_info and
+	 * script_name.
 	 */
 	public string function $cgiHaystack(required struct cgiScope) {
 		var haystack = "";
