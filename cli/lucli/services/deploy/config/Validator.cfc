@@ -89,6 +89,15 @@ component {
 					if (structKeyExists(acc, "image")) {
 						$validateImage(acc.image, "accessory #accName# image", arguments.filePath);
 					}
+					for (var volKey in ["volumes", "directories"]) {
+						if (structKeyExists(acc, volKey) && isArray(acc[volKey])) {
+							var volIndex = 0;
+							for (var vol in acc[volKey]) {
+								volIndex++;
+								$validateVolumeHost(vol, "accessory #accName# #volKey#[#volIndex#]", arguments.filePath);
+							}
+						}
+					}
 					for (var hostKey in ["host", "hosts"]) {
 						if (structKeyExists(acc, hostKey)) {
 							for (var accHost in (isArray(acc[hostKey]) ? acc[hostKey] : [acc[hostKey]])) {
@@ -123,6 +132,24 @@ component {
 					"volumes[#i#] must be host:container or host:container:ro|rw with an absolute container path (got '#isSimpleValue(entry) ? entry : "a non-string value"#')"
 				);
 			}
+			$validateVolumeHost(entry, "volumes[#i#]", arguments.filePath);
+		}
+	}
+
+	/**
+	 * Volume entries reach Docker as written (they are quoted), so a host
+	 * path starting with `~` or `$` (which a shell used to expand) would be
+	 * taken literally; refuse it with a clear message. A `$` later in the
+	 * path is a literal character and is fine.
+	 */
+	public void function $validateVolumeHost(required any entry, required string label, required string filePath) {
+		if (!isSimpleValue(arguments.entry)) return;
+		var firstChar = left(trim(arguments.entry), 1);
+		if (firstChar == "~" || firstChar == "$") {
+			$raise(
+				arguments.filePath,
+				"#arguments.label# needs an absolute host path: '#arguments.entry#' starts with '#firstChar#', which is not expanded (write /home/<user>/... instead)"
+			);
 		}
 	}
 
