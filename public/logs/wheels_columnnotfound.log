@@ -1,0 +1,3 @@
+"Severity","ThreadID","Date","Time","Context","Application","Message"
+"WARN","tokio-rt-worker","10/02/2026","02:07:11","http://127.0.0.1:8513","wheels-dev_wheelsTest","ColumnNotFound: column mapped to `nonexistentcolumn` not found in database table (select clause). Set throwOnColumnNotFound=true to throw an exception."
+"WARN","tokio-rt-worker","10/02/2026","02:07:12","http://127.0.0.1:8513","wheels-dev_wheelsTest","ColumnNotFound: column mapped to `nonexistentcolumn` not found in database table (select clause). Set throwOnColumnNotFound=true to throw an exception."

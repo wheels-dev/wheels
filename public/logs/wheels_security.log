@@ -1,0 +1,5 @@
+"Severity","ThreadID","Date","Time","Context","Application","Message"
+"WARN","tokio-rt-worker","10/02/2026","02:07:14","http://127.0.0.1:8513","wheels-dev_wheelsTest","Wheels WARNING: csrfCookieEncryptionSecretKey was empty — auto-generated a temporary AES key. Set this in config/settings.cfm for persistence across restarts."
+"WARN","tokio-rt-worker","10/02/2026","02:07:14","http://127.0.0.1:8513","wheels-dev_wheelsTest","Wheels WARNING: csrfCookieEncryptionSecretKey was empty — auto-generated a temporary AES key. Set this in config/settings.cfm for persistence across restarts."
+"WARN","tokio-rt-worker","10/02/2026","02:07:14","http://127.0.0.1:8513","wheels-dev_wheelsTest","Wheels WARNING: csrfCookieEncryptionSecretKey was empty — auto-generated a temporary AES key. Set this in config/settings.cfm for persistence across restarts."
+"WARN","tokio-rt-worker","10/02/2026","02:07:14","http://127.0.0.1:8513","wheels-dev_wheelsTest","Wheels WARNING: csrfCookieEncryptionSecretKey was empty — auto-generated a temporary AES key. Set this in config/settings.cfm for persistence across restarts."

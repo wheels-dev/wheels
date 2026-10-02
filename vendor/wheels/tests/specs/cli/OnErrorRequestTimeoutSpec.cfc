@@ -42,8 +42,8 @@ component extends="wheels.WheelsTest" {
 						// catch after the main handler), so a request timeout after startup
 						// is not reported as "failed to initialize".
 						var onError = $functionBody(content, "onError", relPath);
-						expect(reFindNoCase("\$renderMinimalError\s*\([^)]*false", onError) > 0).toBeTrue(
-							relPath & " onError() must call $renderMinimalError(..., false) on the running-app (post-startup) path."
+						expect(reFindNoCase("\$renderMinimalError\s*\([^)]*!StructKeyExists\(application", onError) > 0).toBeTrue(
+							relPath & " onError() must call $renderMinimalError(..., !StructKeyExists(application, 'wheels')) on the running-app path, so a wo-set-but-wheels-incomplete failure still reads as a startup phase."
 						);
 
 						// The fallback must extend the request timeout (via onErrorRequestTimeout,

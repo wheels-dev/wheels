@@ -558,7 +558,7 @@ component output="false" {
 			// reclaimed before the dereferences below run, so degrade to the
 			// minimal fallback rather than cascade the torn-down-scope error
 			// over the real one.
-			$renderMinimalError(arguments.Exception, arguments.EventName ?: "", false);
+			$renderMinimalError(arguments.Exception, arguments.EventName ?: "", !StructKeyExists(application, "wheels"));
 		}
 	}
 
