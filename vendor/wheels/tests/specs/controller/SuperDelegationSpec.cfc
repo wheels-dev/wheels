@@ -7,10 +7,11 @@ component extends="wheels.WheelsTest" {
 		// can't drift. Model mixins are compile-time includes (#3462), so a model override
 		// can delegate three ways — the bare super<name> alias, super.<name>, and
 		// variables.super<name> — and all three RUN (the override executes) on every
-		// engine. On Lucee, Adobe and BoxLang they also return the framework finder's
-		// query; RustCFML runs the super.<name>/variables.super<name> delegation but drops
-		// the return value (returns null), so the specs assert the returned recordCount
-		// only where the engine propagates it. Controller and view helpers are integrated as mixins
+		// engine. On Lucee, Adobe and BoxLang all three also RETURN the framework finder's
+		// query. RustCFML returns from the bare super<name> alias and from
+		// variables.super<name>, but runs the dotted super.<name>() delegation WITHOUT
+		// returning its value (returns null) — so only the super.<name>() spec pins
+		// returnedQuery per engine (false on RustCFML, true plus recordCount elsewhere). Controller and view helpers are integrated as mixins
 		// (Controller.cfc $integrateFunctions), NOT methods on the super (wheels.Controller)
 		// inheritance chain, so only the super<name> alias reaches the original;
 		// super.<name> fails on Lucee, Adobe and BoxLang (RustCFML happens to resolve it). (The existing SuperOverrideSpec already pins
@@ -23,10 +24,14 @@ component extends="wheels.WheelsTest" {
 				var m = g.model("SuperFindDot")
 				m.findAll()
 				expect(m.wasDelegated()).toBeTrue("super.findAll() must reach the framework original")
-				// Where the engine propagates the delegated return, the framework query comes
-				// back with every post. RustCFML's super.<name>/variables.super<name> delegation
-				// runs but returns null, so returnedQuery() is false there — pinned, not failed.
-				if (m.returnedQuery()) {
+				// super.<name> is the one form RustCFML runs but does NOT return from (it returns
+				// null); every other engine propagates the framework query. Pin both explicitly via
+				// engineAdapter.isRustCFML() — a known engine bug (see the upstream note), not a
+				// capability probe — so a JVM regression to null would fail here.
+				if (g.$engineAdapter().isRustCFML()) {
+					expect(m.returnedQuery()).toBeFalse("RustCFML drops the super.<name>() return value")
+				} else {
+					expect(m.returnedQuery()).toBeTrue("super.findAll() must return the framework query")
 					expect(m.delegatedCount()).toBe(expected, "delegated super.findAll() must return every post")
 				}
 			})
@@ -35,24 +40,16 @@ component extends="wheels.WheelsTest" {
 				var m = g.model("SuperFindVar")
 				m.findAll()
 				expect(m.wasDelegated()).toBeTrue("variables.superFindAll() must reach the framework original")
-				// Where the engine propagates the delegated return, the framework query comes
-				// back with every post. RustCFML's super.<name>/variables.super<name> delegation
-				// runs but returns null, so returnedQuery() is false there — pinned, not failed.
-				if (m.returnedQuery()) {
-					expect(m.delegatedCount()).toBe(expected, "delegated variables.superFindAll() must return every post")
-				}
+				expect(m.returnedQuery()).toBeTrue("variables.superFindAll() must return the framework query on every engine")
+				expect(m.delegatedCount()).toBe(expected, "delegated variables.superFindAll() must return every post")
 			})
 
 			it("delegates a finder via the bare super<name>() alias — superFindAll()", () => {
 				var m = g.model("SuperFindBare")
 				m.findAll()
 				expect(m.wasDelegated()).toBeTrue("superFindAll() must reach the framework original")
-				// Where the engine propagates the delegated return, the framework query comes
-				// back with every post. RustCFML's super.<name>/variables.super<name> delegation
-				// runs but returns null, so returnedQuery() is false there — pinned, not failed.
-				if (m.returnedQuery()) {
-					expect(m.delegatedCount()).toBe(expected, "delegated superFindAll() must return every post")
-				}
+				expect(m.returnedQuery()).toBeTrue("superFindAll() must return the framework query on every engine")
+				expect(m.delegatedCount()).toBe(expected, "delegated superFindAll() must return every post")
 			})
 		})
 
