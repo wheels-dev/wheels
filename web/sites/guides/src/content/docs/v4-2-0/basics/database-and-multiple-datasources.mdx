@@ -196,6 +196,35 @@ component extends="Controller" {
 
 Transactions commit when the block exits cleanly and roll back on any thrown exception. All statements in a transaction must run against the same datasource — cross-database transactions aren't a thing the engine can give you. Adobe ColdFusion enforces this with an error (`Datasource names for all the database tags within the cftransaction tag must be the same.`); Lucee 7 does not — it runs the statements against both datasources but provides no cross-database atomicity, so the failure mode is silent.
 
+### Nested units with savepoints
+
+A persistence call or `invokeWithTransaction()` made while a transaction is already open **joins** that transaction. A joined call can't undo only its own writes: returning `false` from it, or throwing, doesn't roll back just its part.
+
+`transaction="savepoint"` runs the call as a nested unit instead. Inside an open transaction, Wheels sets a savepoint and runs the method. If the method returns `false` or throws, Wheels rolls back to the savepoint, which undoes only the unit's writes. A throw is then rethrown. The outer transaction keeps its earlier writes and commits or rolls back on its own outcome. With no transaction open, `savepoint` behaves exactly like `commit`. It works through every persistence method's `transaction` argument too, for example `create(..., transaction="savepoint")`.
+
+```cfm {test:compile}
+component extends="Model" {
+    // Imports each manifest as its own all-or-nothing unit. A bad manifest is
+    // rolled back on its own; the good ones commit with the batch.
+    function importBatch() {
+        for (var manifest in variables.manifests) {
+            variables.current = manifest;
+            invokeWithTransaction(method="importCurrentManifest", transaction="savepoint");
+        }
+        return true;
+    }
+}
+```
+
+Called as `model("Shipment").invokeWithTransaction(method="importBatch")`, the batch is one transaction and each manifest is a savepoint inside it.
+
+- **Callbacks:** records written inside a unit that rolls back get their `afterRollback` callbacks right away, and never `afterCommit`. Records written outside the unit follow the outer transaction's outcome.
+- **Each unit runs one extra query first:** a primary-key read on the model's table. Lucee silently drops a savepoint set before the transaction's first query, and the read makes sure the connection is active.
+- **Same datasource:** a unit nests in the transaction open on its own model's datasource. Run units through models that use the outer transaction's datasource, as with any transaction.
+- **Raw `transaction {}` blocks:** a savepoint unit only detects a raw outer `transaction {}` on Lucee and BoxLang. On Adobe ColdFusion the unit can't see the raw block, and it joins it like `commit`. To nest units portably, open the outer transaction with `invokeWithTransaction()`.
+
+If you write raw savepoint code yourself, the same Lucee rule applies: run a query in the transaction before `transaction action="setsavepoint"`. Otherwise the savepoint is silently dropped, and the later `transaction action="rollback" savepoint="..."` throws `There are no savepoint with name [...] set`.
+
 ## Raw queries
 
 For the rare query the ORM can't express cleanly — a reporting aggregate, a window function, a vendor-specific feature — drop through to native CFML `queryExecute()`. Point it at the app's configured datasource with the `datasource` option (don't hardcode an environment-specific name — that undoes the per-environment configuration above) and use positional parameters for any user input.
