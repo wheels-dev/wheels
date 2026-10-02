@@ -87,6 +87,31 @@ component extends="wheels.WheelsTest" {
 				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
+			it("rejects a valid token with extra characters appended, as a form field", () => {
+				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = csrfToken & "x"}
+				_controller = application.wo.controller("csrfProtectedExcept", params)
+				var state = {type = ""}
+				try {
+					_controller.processAction("update", params)
+				} catch (any e) {
+					state.type = e.Type
+				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
+			})
+
+			it("rejects a valid token with extra characters appended, as a header", () => {
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = csrfToken & "x"
+				params = {controller = "csrfProtectedExcept", action = "update"}
+				_controller = application.wo.controller("csrfProtectedExcept", params)
+				var state = {type = ""}
+				try {
+					_controller.processAction("update", params)
+				} catch (any e) {
+					state.type = e.Type
+				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
+			})
+
 			it("rejects with neither a field nor a header", () => {
 				params = {controller = "csrfProtectedExcept", action = "update"}
 				_controller = application.wo.controller("csrfProtectedExcept", params)

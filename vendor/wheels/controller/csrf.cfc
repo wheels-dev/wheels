@@ -139,7 +139,11 @@ component {
 	public boolean function $isAnyAuthenticityTokenValid() {
 		if ($isRequestProtectedFromForgery() && StructKeyExists(params, "authenticityToken")) {
 			if (application.wheels.csrfStore == "session") {
-				local.isValid = CsrfVerifyToken(params.authenticityToken);
+				// Compared exactly on every engine: the value must be the whole session
+				// token and nothing more, so the length is checked as well as the token.
+				local.isValid = IsSimpleValue(params.authenticityToken)
+					&& Len(params.authenticityToken) == Len(CsrfGenerateToken())
+					&& CsrfVerifyToken(params.authenticityToken);
 			} else {
 				local.isValid = $isCookieAuthenticityTokenValid();
 			}

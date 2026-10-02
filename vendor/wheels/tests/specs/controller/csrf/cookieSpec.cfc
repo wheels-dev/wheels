@@ -11,6 +11,8 @@ component extends="wheels.WheelsTest" {
 				application.wheels.csrfStore = "cookie"
 				request.cgi.request_method = "PATCH"
 				csrfToken = application.wo.controller("dummy").$readAuthenticityTokenFromCookie()
+				// Invalid: the valid token with its last character changed.
+				badToken = Left(csrfToken, Len(csrfToken) - 1) & (Right(csrfToken, 1) == "A" ? "B" : "A")
 			})
 
 			afterEach(() => {
@@ -34,26 +36,26 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "csrfProtectedExcept", action = "update"}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("update", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 			
 			it("performs csrf protection with invalid authenticityToken", () => {
-				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = "#csrfToken#1"}
+				params = {controller = "csrfProtectedExcept", action = "update", authenticityToken = badToken}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("update", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 			
 			it("rejects the cookie token with its letter case changed", () => {
@@ -90,28 +92,28 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "csrfProtectedExcept", action = "update"}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("update", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 			
 			it("performs csrf protection on ajax with invalid x csrf token header", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"
 				params = {controller = "csrfProtectedExcept", action = "update"}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("update", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 			
 			it("skips csrf protection with valid authenticityToken", () => {
@@ -131,7 +133,7 @@ component extends="wheels.WheelsTest" {
 			})
 			
 			it("skips csrf protection with invalid authenticityToken", () => {
-				params = {controller = "csrfProtectedExcept", action = "show", authenticityToken = "#csrfToken#1"}
+				params = {controller = "csrfProtectedExcept", action = "show", authenticityToken = badToken}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
 
 				_controller.processAction("update", params)
@@ -158,7 +160,7 @@ component extends="wheels.WheelsTest" {
 			})
 			
 			it("skips csrf protection on ajax with invalid x csrf token header", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"
 				params = {controller = "csrfProtectedExcept", action = "show"}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
@@ -177,6 +179,8 @@ component extends="wheels.WheelsTest" {
 				application.wheels.csrfStore = "cookie"
 				request.cgi.request_method = "POST"
 				csrfToken = application.wo.controller("dummy").$readAuthenticityTokenFromCookie()
+				// Invalid: the valid token with its last character changed.
+				badToken = Left(csrfToken, Len(csrfToken) - 1) & (Right(csrfToken, 1) == "A" ? "B" : "A")
 			})
 
 			afterEach(() => {
@@ -200,26 +204,26 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "CsrfProtectedOnly", action = "create"}
 				_controller = application.wo.controller("CsrfProtectedOnly", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("create", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 			
 			it("performs csrf protection with invalid authenticityToken", () => {
-				params = {controller = "CsrfProtectedOnly", action = "create", authenticityToken = "#csrfToken#1"}
+				params = {controller = "CsrfProtectedOnly", action = "create", authenticityToken = badToken}
 				_controller = application.wo.controller("CsrfProtectedOnly", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("create", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 			
 			it("performs csrf protection on ajax with valid x csrf token header", () => {
@@ -237,28 +241,28 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "CsrfProtectedOnly", action = "create"}
 				_controller = application.wo.controller("CsrfProtectedOnly", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("create", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 			
 			it("performs csrf protection on ajax with invalid x csrf token header", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"
 				params = {controller = "CsrfProtectedOnly", action = "create"}
 				_controller = application.wo.controller("CsrfProtectedOnly", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("create", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 			
 			it("skips csrf protection with valid authenticityToken", () => {
@@ -278,7 +282,7 @@ component extends="wheels.WheelsTest" {
 			})
 			
 			it("skips csrf protection with invalid authenticityToken", () => {
-				params = {controller = "CsrfProtectedOnly", action = "index", authenticityToken = "#csrfToken#1"}
+				params = {controller = "CsrfProtectedOnly", action = "index", authenticityToken = badToken}
 				_controller = application.wo.controller("CsrfProtectedOnly", params)
 
 				_controller.processAction("create", params)
@@ -305,7 +309,7 @@ component extends="wheels.WheelsTest" {
 			})
 			
 			it("skips csrf protection on ajax with invalid x csrf token header", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"
 				params = {controller = "CsrfProtectedOnly", action = "index"}
 				_controller = application.wo.controller("CsrfProtectedOnly", params)
@@ -323,6 +327,8 @@ component extends="wheels.WheelsTest" {
 				$oldHttpXRequestedWith = request.cgi.http_x_requested_with
 				application.wheels.csrfStore = "cookie"
 				csrfToken = application.wo.controller("dummy").$readAuthenticityTokenFromCookie()
+				// Invalid: the valid token with its last character changed.
+				badToken = Left(csrfToken, Len(csrfToken) - 1) & (Right(csrfToken, 1) == "A" ? "B" : "A")
 			})
 
 			afterEach(() => {
@@ -401,27 +407,27 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "csrfProtectedWithException", action = "create"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("create", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on POST request with invalid authenticityToken", () => {
 				request.cgi.request_method = "POST"
-				params = {controller = "csrfProtectedWithException", action = "create", authenticityToken = "#csrfToken#1"}
+				params = {controller = "csrfProtectedWithException", action = "create", authenticityToken = badToken}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("create", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on PATCH request with valid authenticityToken", () => {
@@ -438,27 +444,27 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "csrfProtectedWithException", action = "update"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("update", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on PATCH request with invalid authenticityToken", () => {
 				request.cgi.request_method = "PATCH"
-				params = {controller = "csrfProtectedWithException", action = "update", authenticityToken = "#csrfToken#1"}
+				params = {controller = "csrfProtectedWithException", action = "update", authenticityToken = badToken}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("update", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on DELETE request with valid authenticityToken", () => {
@@ -475,27 +481,27 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "csrfProtectedWithException", action = "delete"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("delete", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on DELETE request with invalid authenticityToken", () => {
 				request.cgi.request_method = "DELETE"
-				params = {controller = "csrfProtectedWithException", action = "delete", authenticityToken = "#csrfToken#1"}
+				params = {controller = "csrfProtectedWithException", action = "delete", authenticityToken = badToken}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("delete", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on ajax POST request with valid x csrf token header", () => {
@@ -515,29 +521,29 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "csrfProtectedWithException", action = "create"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("create", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on ajax POST request with invalid x csrf token header", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				request.cgi.request_method = "POST"
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"
 				params = {controller = "csrfProtectedWithException", action = "create"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("create", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on ajax PATCH request with valid x csrf token header", () => {
@@ -557,29 +563,29 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "csrfProtectedWithException", action = "update"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("update", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on ajax PATCH request with invalid x csrf token header", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				request.cgi.request_method = "PATCH"
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"
 				params = {controller = "csrfProtectedWithException", action = "update"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("update", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on ajax DELETE request with valid x csrf token header", () => {
@@ -599,29 +605,29 @@ component extends="wheels.WheelsTest" {
 				params = {controller = "csrfProtectedWithException", action = "delete"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("delete", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
 			it("performs csrf protection on ajax DELETE request with invalid x csrf token header", () => {
-				request.$wheelsHeaders["X-CSRF-TOKEN"] = "#csrfToken#1"
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = badToken
 				request.cgi.request_method = "DELETE"
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"
 				params = {controller = "csrfProtectedWithException", action = "delete"}
 				_controller = application.wo.controller("csrfProtectedWithException", params)
 
+				var state = {type = ""}
 				try {
 					_controller.processAction("delete", params)
-					$assert.fail("Wheels.InvalidAuthenticityToken error did not occur.")
 				} catch (any e) {
-					type = e.Type
-					expect(type).toBe("Wheels.InvalidAuthenticityToken")
+					state.type = e.Type
 				}
+				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 		})
 	}
