@@ -95,6 +95,16 @@ component extends="Model" {
 		Throw(type = "Wheels.TestNestedBoom", message = "nested write then throw");
 	}
 
+	// Records the MySQL session isolation level seen inside the transaction (#4059).
+	function txnRecordIsolation() {
+		request.$isolationSeen = QueryExecute(
+			"SELECT @@transaction_isolation AS iso",
+			[],
+			{datasource = application.wo.get("dataSourceName")}
+		).iso;
+		return true;
+	}
+
 	// Savepoint-unit fixtures (#3958). A unit runs via
 	// invokeWithTransaction(transaction="savepoint") inside an outer transaction.
 	function txnUnitCreateThenFalse() {

@@ -180,7 +180,7 @@ The invoked method must return a boolean — `invokeWithTransaction()` throws `M
 
 **Multiple statements, multiple models.** Use a native CFML `transaction` block. Everything inside runs against the same connection and commits or rolls back as a unit. An uncaught exception inside rolls back automatically; an explicit rollback uses `transaction action="rollback"`.
 
-Model writes inside the block join it on every engine, whatever isolation level the block uses. Add `isolation="..."` to the block only to choose that level; without it the block runs at your database's default (MySQL's InnoDB defaults to `REPEATABLE READ`). If you pass `isolation` to a model method inside the block yourself, it must match the block's: Adobe ColdFusion can't nest a different level, so Wheels raises `Wheels.TransactionIsolationMismatch` there rather than silently dropping the level you asked for.
+Model writes inside the block join it on every engine, whatever isolation level the block uses. Add `isolation="..."` to the block only to choose that level. Without it, the block runs at the engine's or driver's default, which isn't always the database's: on MySQL it's `REPEATABLE READ` under Lucee and BoxLang, but `READ COMMITTED` through Adobe ColdFusion's MySQL datasource. If you pass `isolation` to a model method inside the block yourself, it must match the block's: Adobe ColdFusion can't nest a different level, so Wheels raises `Wheels.TransactionIsolationMismatch` there rather than silently dropping the level you asked for.
 
 ```cfm {test:compile}
 component extends="Controller" {
@@ -201,6 +201,19 @@ Model `afterCommit` and `afterRollback` callbacks don't fire reliably for writes
 </Aside>
 
 Transactions commit when the block exits cleanly and roll back on any thrown exception. All statements in a transaction must run against the same datasource — cross-database transactions aren't a thing the engine can give you. Adobe ColdFusion enforces this with an error (`Datasource names for all the database tags within the cftransaction tag must be the same.`); Lucee 7 does not — it runs the statements against both datasources but provides no cross-database atomicity, so the failure mode is silent.
+
+### Isolation level
+
+Transactions that Wheels opens for model writes and `invokeWithTransaction()` use the `read_committed` isolation level unless the call passes `isolation`. The `transactionIsolation` setting changes that default for the whole app:
+
+```cfm {test:compile}
+// config/settings.cfm
+set(transactionIsolation = "repeatable_read");
+```
+
+It accepts `read_uncommitted`, `read_committed` (the default), `repeatable_read` and `serializable`. It also accepts `""`, which sends no isolation attribute at all, so the transaction uses the engine's or driver's default. The same per-engine difference as raw `transaction` blocks applies to `""`. On MySQL it's `REPEATABLE READ` under Lucee and BoxLang and `READ COMMITTED` through Adobe ColdFusion's MySQL datasource. To get one level everywhere, name it rather than using `""`.
+
+An `isolation` argument on the call always wins over the setting. A model write inside a raw `transaction` block joins it whatever the setting is.
 
 ### Nested units with savepoints
 
