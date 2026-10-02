@@ -12,21 +12,21 @@ sidebar:
 ## Synopsis
 
 ```txt title="
-wheels deploy app details [--release=<v>] [--role=<name>] [--destination=<name>] [--dry-run]
+wheels deploy app details --release=<v> [--role=<name>] [--destination=<name>] [--dry-run]
 ```
 
 ## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--release=<v>` | Inspect that release's container. Without it, every container of the role is listed. |
+| `--release=<v>` | **Required.** |
 | `--role=<name>` | Limit to one role. |
 | `--destination=<name>` | Overlay destination config. |
 | `--dry-run` | Print the commands without executing. |
 
 ## Behavior
 
-Without `--release`, emits `docker ps -a --filter label=service=<service> --filter label=role=<role>` per host per role. With `--release=<v>`, emits `docker inspect --format={{.State.Status}} <service>-<role>-<v>` instead. Output is prefixed by host.
+Emits `docker inspect --format={{.State.Status}} <service>-<role>-<version>` per host per role. Output is prefixed by host.
 
 For a broader sweep that shows every service-labelled container regardless of version, use [`app containers`](/v4-1-0/command-line-tools/commands/deploy/app/containers/) instead.
 

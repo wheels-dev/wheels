@@ -114,7 +114,7 @@ wheels deploy accessory boot all
 wheels deploy accessory stop all
 ```
 
-`wheels deploy setup` does **not** boot accessories in the current Phase 1 CLI — it's an alias for `wheels deploy`, and full first-run orchestration is tracked in [#2957](https://github.com/wheels-dev/wheels/issues/2957). Run `wheels deploy accessory boot all` explicitly as part of first-run. `wheels deploy remove` does tear them down.
+`wheels deploy setup` boots every declared accessory before it deploys the app, so a first run needs no separate `wheels deploy accessory boot all`. A plain `wheels deploy` does not boot accessories. `wheels deploy remove` tears them down.
 
 ## Accessories and `wheels deploy`
 

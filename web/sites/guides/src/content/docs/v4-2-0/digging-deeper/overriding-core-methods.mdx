@@ -27,6 +27,10 @@ Instead, when your component defines a method whose name collides with a framewo
 
 The alias is only created when you actually override something. A controller or model that overrides nothing gains no extra `super*` keys.
 
+<Aside type="tip" title="Which delegation form to use">
+**Always reach the original with the `super<name>` alias** — `superFindAll()`, `superLinkTo()`, and so on. It works for model, controller and view-helper overrides on every engine (Lucee, Adobe, BoxLang, RustCFML). The dotted `super.<name>()` form (for example `super.findAll()`) works **only for model methods**, where the mixins are compile-time includes; for controller and view helpers it is not portable and must not be used. *(From Wheels 4.2 this contract is pinned by the framework test suite on every engine.)*
+</Aside>
+
 <Aside type="note" title="Model-only in 3.x, symmetric in 4.0.x">
 In Wheels 3.x this convention worked for **model** methods only. Controller and view helper parity arrived in the 4.0.x patch release carrying the fix for [#3325](https://github.com/wheels-dev/wheels/issues/3325) — see [the version callout below](#version-notes-and-the-pre-fix-workaround) if you're on an earlier 4.0.x build.
 </Aside>
