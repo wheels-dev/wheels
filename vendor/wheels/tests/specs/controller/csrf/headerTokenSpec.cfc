@@ -142,6 +142,20 @@ component extends="wheels.WheelsTest" {
 				expect(state.type).toBe("Wheels.InvalidAuthenticityToken")
 			})
 
+			it("verifying a token does not rotate it: two requests with the same token both pass", () => {
+				var before = CsrfGenerateToken()
+				var first = {controller = "csrfProtectedExcept", action = "update", authenticityToken = csrfToken}
+				var c1 = application.wo.controller("csrfProtectedExcept", first)
+				c1.processAction("update", first)
+				expect(c1.response()).toBe("Update ran.")
+				request.$wheelsHeaders["X-CSRF-TOKEN"] = csrfToken
+				var second = {controller = "csrfProtectedExcept", action = "update"}
+				var c2 = application.wo.controller("csrfProtectedExcept", second)
+				c2.processAction("update", second)
+				expect(c2.response()).toBe("Update ran.")
+				expect(Compare(CsrfGenerateToken(), before)).toBe(0, "the session token changed after verification")
+			})
+
 			it("rejects with neither a field nor a header", () => {
 				params = {controller = "csrfProtectedExcept", action = "update"}
 				_controller = application.wo.controller("csrfProtectedExcept", params)
