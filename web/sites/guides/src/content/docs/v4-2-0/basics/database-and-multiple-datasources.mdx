@@ -197,7 +197,7 @@ component extends="Controller" {
 ```
 
 <Aside type="caution" title="afterCommit and afterRollback inside a raw transaction">
-Model `afterCommit` and `afterRollback` callbacks don't fire reliably for writes inside a raw `transaction {}` block. Lucee and BoxLang skip them with a warning, and on Adobe CF and RustCFML the outcome is up to the engine. Use `invokeWithTransaction()` for writes that rely on them. See [After the transaction](/v4-2-0/basics/models-and-the-orm/#after-the-transaction-aftercommit-and-afterrollback).
+Model `afterCommit` and `afterRollback` callbacks don't fire reliably for writes inside a raw `transaction {}` block. Lucee and BoxLang skip them with a warning. Adobe CF does the same only for a block whose first database work is the model write, and on RustCFML the outcome is up to the engine. Use `invokeWithTransaction()` for writes that rely on them. See [After the transaction](/v4-2-0/basics/models-and-the-orm/#after-the-transaction-aftercommit-and-afterrollback).
 </Aside>
 
 Transactions commit when the block exits cleanly and roll back on any thrown exception. All statements in a transaction must run against the same datasource — cross-database transactions aren't a thing the engine can give you. Adobe ColdFusion enforces this with an error (`Datasource names for all the database tags within the cftransaction tag must be the same.`); Lucee 7 does not — it runs the statements against both datasources but provides no cross-database atomicity, so the failure mode is silent.
