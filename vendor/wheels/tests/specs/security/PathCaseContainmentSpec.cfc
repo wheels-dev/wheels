@@ -8,7 +8,7 @@
  *
  * Techniques:
  *  - Guards whose containment argument is passed directly (dump output, package mapping
- *    path, resolved child path) are tested with CRAFTED non-existent case-distinct
+ *    path, resolved child path) are tested with SYNTHETIC non-existent case-distinct
  *    paths. getCanonicalPath() is lexical for a non-existent path, so it never folds
  *    case — these run on every engine, no filesystem fixtures.
  *  - Guards reachable only through an existing symlink (zip extraction, asset/docs
