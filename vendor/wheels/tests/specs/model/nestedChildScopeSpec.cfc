@@ -172,10 +172,11 @@ component extends="wheels.WheelsTest" {
 
 			describe("nested struct keys above 2^31", () => {
 
-				// The 19-digit end-to-end specs need an adapter that reports BIGINT as
-				// cf_sql_bigint. SQLite and Oracle report it as cf_sql_integer (a separate
-				// adapter limitation), so there the key is still read as a new row (fail
-				// closed) and binding a 19-digit fixture id as an integer is refused by Adobe.
+				// The 19-digit end-to-end specs need the fixture's BIGINT key column to report
+				// cf_sql_bigint, which every adapter does since #4086. The guard stays for a
+				// column that reports cf_sql_integer, such as an INTEGER column on SQLite: there
+				// the key is still read as a new row (fail closed) and binding a 19-digit id
+				// as an integer is refused by Adobe.
 				var bigintAware = g.model("bigKeyPost").$nestedKeyColumnSqlType(model = g.model("bigKeyPost"), column = "id") == "cf_sql_bigint"
 
 				it(title = "updates the parent's own join rows through a 19-digit composite key", skip = !bigintAware, body = () => {
