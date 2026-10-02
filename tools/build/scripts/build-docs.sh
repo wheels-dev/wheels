@@ -29,7 +29,7 @@ DOCS_VERSION=${2:-}
 API_DOCS_VERSION=${3:-}
 
 if [ -z "$VERSION" ]; then
-	echo "Usage: $0 <framework_version> [docs_version]" >&2
+	echo "Usage: $0 <framework_version> [guides_version] [api_version]" >&2
 	exit 1
 fi
 
