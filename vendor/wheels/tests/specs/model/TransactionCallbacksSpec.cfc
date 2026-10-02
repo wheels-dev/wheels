@@ -11,6 +11,19 @@ component extends="wheels.WheelsTest" {
 		// Capability decided once: foreign raw-transaction detection needs IsWithinTransaction()
 		// (Lucee/BoxLang). On Adobe CF / RustCFML it is unavailable — those specs skip-with-reason.
 		var _foreignDetectable = g.model("tag").$supportsForeignTransactionCheck();
+		// Capability probe (#4045): engines that reject a nested read_committed begin inside a
+		// raw transaction {} (Adobe CF) reveal the raw block through that mismatch, so a
+		// block's FIRST model write is detected as foreign there too.
+		var _mismatchProbe = {rejects = false};
+		try {
+			transaction {
+				transaction action="begin" isolation="read_committed" {
+				}
+			}
+		} catch (any e) {
+			_mismatchProbe.rejects = g.model("tag").$isNestedIsolationMismatch(e);
+		}
+		var _firstWriteDetectable = _foreignDetectable || _mismatchProbe.rejects;
 
 		describe("afterCommit / afterRollback", () => {
 
@@ -193,7 +206,7 @@ component extends="wheels.WheelsTest" {
 
 			// --- R1: foreign raw transaction{} detection (capability-guarded) ---
 
-			it("does NOT fire afterCommit for a write inside a raw transaction{} that rolls back [IsWithinTransaction engines]", () => {
+			it("does NOT fire afterCommit for a write inside a raw transaction{} that rolls back [first-write detectable engines]", () => {
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
 				// var struct (not local.) so writes survive the catch on BoxLang (invariant 11).
 				var state = {saved = false, errored = false, errType = ""};
@@ -214,17 +227,19 @@ component extends="wheels.WheelsTest" {
 					0,
 					"afterCommit must not fire for a write rolled back inside a raw transaction{}"
 				);
-			}, "", !_foreignDetectable);
+			}, "", !_firstWriteDetectable);
 
 			it("does not engage foreign-transaction detection where IsWithinTransaction is unavailable [Adobe/RustCFML]", () => {
-				// On engines without IsWithinTransaction, Wheels cannot see a raw transaction{},
-				// so it never suppresses the callbacks or writes the foreign-skip warning — the
-				// engine's own transaction-nesting semantics decide what fires (not guaranteed,
-				// which is why the docs direct users to the Wheels-managed transaction).
+				// On engines without IsWithinTransaction, Wheels cannot see a raw transaction{}
+				// unless the engine rejects the nested isolation (#4045). A raw block that already
+				// uses read_committed raises no mismatch, so nothing reveals it: Wheels never
+				// suppresses the callbacks or writes the foreign-skip warning, and the engine's own
+				// transaction-nesting semantics decide what fires (not guaranteed, which is why the
+				// docs direct users to the Wheels-managed transaction).
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
 				var state = {saved = false, errored = false, errType = ""};
 				try {
-					transaction {
+					transaction isolation="read_committed" {
 						var t = g.model("tag").new(name = "txncb-foreign-fb");
 						state.saved = t.save(transaction = "commit");
 						transaction action="rollback";
@@ -233,13 +248,12 @@ component extends="wheels.WheelsTest" {
 					state.errored = true;
 					state.errType = e.type;
 				}
-				// The engine's own nesting semantics decide the outcome and it is NOT guaranteed:
-				// Adobe CF raises a Database error for a Wheels transaction nested in a raw
-				// transaction{}, other engines may save. We only require the save path to have
-				// executed (non-vacuous) and that Wheels' foreign detection did NOT engage.
-				expect(state.saved || state.errored).toBeTrue(
-					"the raw-transaction save path must execute (engine decides save vs error; errType=" & state.errType & ")"
-				);
+				// The save succeeds on every engine: Adobe CF used to reject the nested begin's
+				// isolation level here, and now joins the raw transaction{} instead (#4045). Which
+				// callbacks fire is still the engine's nesting semantics, so only the save and the
+				// absence of foreign detection are asserted.
+				expect(state.errored).toBeFalse("the raw-transaction write must not error (type=" & state.errType & ")");
+				expect(state.saved).toBeTrue("the save itself succeeds inside the transaction");
 				expect(
 					!StructKeyExists(request, "wheels")
 					|| !StructKeyExists(request.wheels, "$txnForeignWarned")
@@ -247,7 +261,7 @@ component extends="wheels.WheelsTest" {
 				).toBeTrue("foreign-skip detection must not engage on engines without IsWithinTransaction");
 			}, "", _foreignDetectable);
 
-			it("suppresses BOTH afterCommit and afterRollback inside a raw transaction{} [IsWithinTransaction engines]", () => {
+			it("suppresses BOTH afterCommit and afterRollback inside a raw transaction{} [first-write detectable engines]", () => {
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
 				g.model("tag").$registerCallback(type = "afterRollback", methods = "recordAfterRollback");
 				var state = {saved = false, errored = false, errType = ""};
@@ -268,7 +282,7 @@ component extends="wheels.WheelsTest" {
 					0,
 					"neither transaction callback fires when Wheels can't observe the outer outcome"
 				);
-			}, "", !_foreignDetectable);
+			}, "", !_firstWriteDetectable);
 
 			it("warns once per request+model for writes inside a raw transaction{}, not once per write [IsWithinTransaction engines]", () => {
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
