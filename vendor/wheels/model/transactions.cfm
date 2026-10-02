@@ -7,7 +7,7 @@
 	 *
 	 * @method Model method to run.
 	 * @transaction [see:save]. `savepoint` runs the method as a nested unit: inside an open transaction it rolls back only its own writes when the method returns `false` or throws (the outer transaction carries on); with no open transaction it behaves like `commit`.
-	 * @isolation Isolation level to be passed through to the cftransaction tag. See your CFML engine's documentation for more details about cftransaction's isolation attribute.
+	 * @isolation Isolation level to be passed through to the cftransaction tag. Defaults to the `transactionIsolation` setting (`read_committed` unless the app changes it). An empty string sends no isolation attribute, so the transaction uses the engine's or driver's default. See your CFML engine's documentation for more details about cftransaction's isolation attribute.
 	 */
 	public any function invokeWithTransaction(
 		required string method,
@@ -18,7 +18,7 @@
 		// (#4045), so remember whether the caller chose one.
 		local.explicitIsolation = StructKeyExists(arguments, "isolation");
 		if (!local.explicitIsolation) {
-			arguments.isolation = "read_committed";
+			arguments.isolation = $get("transactionIsolation");
 		}
 		$assertTransactionArgs(transaction = arguments.transaction, isolation = arguments.isolation);
 		// A savepoint unit nests inside an open transaction instead of joining it (#3958).
@@ -200,6 +200,15 @@
 	 * isolation is never silently dropped; it fails with Wheels.TransactionIsolationMismatch.
 	 */
 	public void function $beginTransaction(required string isolation, required boolean explicitIsolation, required struct ctx) {
+		// No isolation (transactionIsolation="", #4059): send no attribute, so the engine's or
+		// driver's default applies. A nested begin then inherits its parent's level, so the
+		// mismatch retry below is never needed.
+		if (!Len(arguments.isolation)) {
+			transaction action="begin" {
+				$transactionBody(arguments.ctx);
+			}
+			return;
+		}
 		var retry = {needed = false};
 		try {
 			transaction action="begin" isolation=arguments.isolation {
@@ -324,11 +333,12 @@
 		// Fail here so an invalid level throws uniformly on every engine and
 		// the open-transaction marker is never set for a transaction that
 		// cannot begin (TransactionMarkerResetSpec).
-		if (!ListFindNoCase("read_uncommitted,read_committed,repeatable_read,serializable", arguments.isolation)) {
+		// An empty string means "send no isolation attribute" (#4059).
+		if (Len(arguments.isolation) && !ListFindNoCase("read_uncommitted,read_committed,repeatable_read,serializable", arguments.isolation)) {
 			Throw(
 				type = "Wheels.InvalidTransactionIsolation",
 				message = "The transaction isolation level `#arguments.isolation#` is not supported.",
-				extendedInfo = "Valid isolation levels are read_uncommitted, read_committed, repeatable_read, and serializable."
+				extendedInfo = "Valid isolation levels are read_uncommitted, read_committed, repeatable_read, and serializable, or an empty string to use the engine's default."
 			);
 		}
 		// Validate the mode here too, before the open-transaction marker is touched:
