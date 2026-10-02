@@ -104,6 +104,7 @@ The local driver stores objects under a configured `root` and exposes them throu
 | `root` | yes | — | Directory objects are written under. |
 | `urlPrefix` | no | `""` | Public URL path the app serves the files from. |
 | `signingKey` | no | `""` | HMAC secret for `signedUrl()`; required only if you call it. |
+| `resolveSymlinks` | no | `false` | Opt into a stricter containment check that resolves symlinks too (see [Symlinks under root](#key-validation-and-path-safety)). |
 
 ```cfm {test:compile} title="config/settings.cfm — local disk"
 <cfscript>
@@ -127,8 +128,36 @@ set(storage = {
 
 `LocalDisk` treats every key as relative to `root` and rejects anything that could escape it with `Wheels.Storage.InvalidKey`: a path-traversal segment (`../`, `..\`), a segment made only of dots and/or whitespace (`.`, `..`, `...`, `. .`, and — because Windows strips trailing dots and spaces — `.. `), and a drive-letter prefix (`C:/…`, `C:foo`). Because every key is relative to `root`, slash runs carry no meaning: a leading `/`, a trailing `/`, doubled `//` and a UNC/network prefix (`//server/share`, `\\server\share`) are normalised to a relative key under `root`, and keys are never URL-decoded, so `%2e%2e%2f` stays a literal segment. A name that merely *contains* two dots inside a segment, such as `reports/q3..final.pdf` or `a..b.txt`, is a normal name and is allowed. The containment check is lexical (it resolves `./`, `../` and `//` as text), so it behaves identically on every engine, including the JVM-free RustCFML.
 
-<Aside type="caution" title="Symlinks under root are followed">
-The lexical check does **not** resolve symbolic links. A symlink planted *inside* `root` that points outside it will be followed and its target read. That is treated as trusted: a symlink can only be created by someone who already has filesystem access to `root`, never through the storage API. Keep `root` writable only by your app, and don't point it at a directory users can drop symlinks into.
+<Aside type="caution" title="Symlinks under root are followed by default">
+The always-on lexical check does **not** resolve symbolic links. By default, a symlink planted *inside* `root` that points outside it is followed and its target read. That is treated as trusted: a symlink can only be created by someone who already has filesystem access to `root`, never through the storage API. Keep `root` writable only by your app, and don't point it at a directory users can drop symlinks into.
+</Aside>
+
+#### Opt in to symlink-resolving containment (`resolveSymlinks`)
+
+For a hardened deployment — for example, `root` on a shared volume where a symlink escape is part of your threat model — set `resolveSymlinks = true` on the disk. On top of the lexical check, `$resolve()` then canonicalises each path through the filesystem and compares the resolved paths **exactly**, so a symlink under `root` that targets outside it is **rejected** with `Wheels.Storage.InvalidKey` instead of followed. The lexical check from the default mode stays on underneath; this only adds a stronger layer.
+
+<Aside type="caution" title="The check is point-in-time">
+The containment check runs when a key is resolved and then returns the resolved path for the subsequent `FileRead` / `FileWrite` / `FileDelete`. It validates the filesystem state at that moment — it is **not** a defence against an attacker who can swap a symlink under `root` concurrently, between the check and the file operation. The trust boundary is unchanged from the default mode: keep `root` writable only by your app and never point it at a directory untrusted users can write to. `resolveSymlinks` hardens against a symlink that is already in place when the key is resolved; it does not make `root` safe for untrusted concurrent writers.
+</Aside>
+
+```cfm {test:compile} title="config/settings.cfm — strict containment"
+<cfscript>
+set(storage = {
+    default = "local",
+    disks = {
+        local = {
+            driver = "local",
+            root = ExpandPath("../storage/uploads"),
+            urlPrefix = "/uploads",
+            resolveSymlinks = true
+        }
+    }
+});
+</cfscript>
+```
+
+<Aside type="caution" title="resolveSymlinks requires a runtime that resolves symlinks">
+When you set `resolveSymlinks = true`, the disk runs a one-time capability probe **when it is constructed** (not per request) and **fails closed** if the runtime can't resolve symbolic links through the filesystem: it throws `Wheels.Storage.InvalidConfiguration` rather than silently enabling an ineffective strict mode. Two cases hit this: the **JVM-free RustCFML** engine (its `getCanonicalPath` is a lexical no-op that does not follow symlinks), and **Windows without symlink privilege** (the probe can't create its test symlink). On those runtimes, either leave `resolveSymlinks` off — the always-on lexical guard still blocks traversal — or run on a JVM engine with symlink support. The detection is a behavioural capability probe, never an engine-name check.
 </Aside>
 
 ## S3Disk
