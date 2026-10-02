@@ -180,7 +180,7 @@ The invoked method must return a boolean — `invokeWithTransaction()` throws `M
 
 **Multiple statements, multiple models.** Use a native CFML `transaction` block with `isolation="read_committed"`. Everything inside runs against the same connection and commits or rolls back as a unit. An uncaught exception inside rolls back automatically; an explicit rollback uses `transaction action="rollback"`.
 
-Keep the `isolation` attribute. Each model write opens its own nested transaction at `read_committed`, and Adobe ColdFusion rejects a nested transaction whose isolation level differs from the block around it. Without the attribute, a write inside the block can fail on Adobe with `Nested cftransaction tag should specify same isolation level as the parent` ([#4045](https://github.com/wheels-dev/wheels/issues/4045)). Lucee and BoxLang accept either form.
+Keep the `isolation` attribute. Each model write asks for a transaction at `read_committed`. On Lucee and BoxLang a write inside the block joins it, but Adobe ColdFusion treats it as a nested transaction and rejects it when its isolation level differs from the block's. Without the attribute, a write inside the block can fail on Adobe with `Nested cftransaction tag should specify same isolation level as the parent` ([#4045](https://github.com/wheels-dev/wheels/issues/4045)). The attribute also sets the isolation level for the whole block, which can differ from your database's default (MySQL's InnoDB defaults to `REPEATABLE READ`).
 
 ```cfm {test:compile}
 component extends="Controller" {
