@@ -98,36 +98,39 @@ component extends="wheels.WheelsTest" {
 			})
 
 			// One restore pass that writes an ODBC date escape verbatim and a backslash
-			// literal through the adapter, with parameterize=false.
-			it("restores an ODBC date escape and a backslash literal in one where string", () => {
+			// literal through the adapter, with parameterize=false, in both MySQL sql_modes.
+			// MySQL only: a {ts} escape in the SQL text fails on Oracle whatever this
+			// restore does with backslashes (#4084).
+			it("restores an ODBC date escape and a backslash literal in one where string on MySQL", () => {
 				var adapterName = g.get("adapterName");
-				if (!FindNoCase("MySQL", adapterName) && adapterName != "OracleModel") {
-					skip("Pinned for MySQL (both sql_modes) and Oracle, not `#adapterName#`.");
+				if (!FindNoCase("MySQL", adapterName)) {
+					skip("MySQL/MariaDB sql_mode behaviour, not `#adapterName#` (Oracle: ##4084).");
 				}
 				var ds = g.get("dataSourceName");
-				var state = {counts = {}, savedMode = ""};
+				var state = {counts = {}, modes = {}, savedMode = ""};
 				var since = "createdAt > {ts '2000-01-01 00:00:00'} AND title = UPPER('q\odbc')";
 				var future = "createdAt > {ts '2999-01-01 00:00:00'} AND title = UPPER('q\odbc')";
 				transaction {
-					g.model("post").create(title = "Q\ODBC", body = "inline literal restore");
-					state.counts.since = g.model("post").count(where = since, parameterize = false);
-					state.counts.future = g.model("post").count(where = future, parameterize = false);
-					if (FindNoCase("MySQL", adapterName)) {
-						state.savedMode = queryExecute("SELECT @@SESSION.sql_mode AS m", [], {datasource = ds}).m;
-						try {
-							queryExecute("SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES')", [], {datasource = ds});
-							state.counts.noBackslashEscapes = g.model("post").count(where = since, parameterize = false);
-						} finally {
-							queryExecute("SET SESSION sql_mode = ?", [state.savedMode], {datasource = ds});
-						}
+					state.savedMode = queryExecute("SELECT @@SESSION.sql_mode AS m", [], {datasource = ds}).m;
+					try {
+						g.model("post").create(title = "Q\ODBC", body = "inline literal restore");
+						queryExecute("SET SESSION sql_mode = REPLACE(@@SESSION.sql_mode, 'NO_BACKSLASH_ESCAPES', '')", [], {datasource = ds});
+						state.modes.off = queryExecute("SELECT @@SESSION.sql_mode AS m", [], {datasource = ds}).m;
+						state.counts.off = g.model("post").count(where = since, parameterize = false);
+						state.counts.futureOff = g.model("post").count(where = future, parameterize = false);
+						queryExecute("SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',NO_BACKSLASH_ESCAPES')", [], {datasource = ds});
+						state.modes.on = queryExecute("SELECT @@SESSION.sql_mode AS m", [], {datasource = ds}).m;
+						state.counts.on = g.model("post").count(where = since, parameterize = false);
+					} finally {
+						queryExecute("SET SESSION sql_mode = ?", [state.savedMode], {datasource = ds});
 					}
 					transaction action = "rollback";
 				}
-				expect(state.counts.since).toBe(1, "past {ts} date + backslash literal");
-				expect(state.counts.future).toBe(0, "future {ts} date excludes the row");
-				if (StructKeyExists(state.counts, "noBackslashEscapes")) {
-					expect(state.counts.noBackslashEscapes).toBe(1, "NO_BACKSLASH_ESCAPES");
-				}
+				expect(FindNoCase("NO_BACKSLASH_ESCAPES", state.modes.off)).toBe(0, "first run without NO_BACKSLASH_ESCAPES: [#state.modes.off#]");
+				expect(FindNoCase("NO_BACKSLASH_ESCAPES", state.modes.on)).toBeGT(0, "second run with NO_BACKSLASH_ESCAPES: [#state.modes.on#]");
+				expect(state.counts.off).toBe(1, "past {ts} date + backslash literal, default sql_mode");
+				expect(state.counts.futureOff).toBe(0, "future {ts} date excludes the row");
+				expect(state.counts.on).toBe(1, "past {ts} date + backslash literal, NO_BACKSLASH_ESCAPES");
 			})
 
 			it("matches a literal underscore with LIKE UPPER(...) ESCAPE '\'", () => {
