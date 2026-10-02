@@ -364,6 +364,28 @@ component {
 	}
 
 	/**
+	 * Name of a RUNNING registration that belongs to this project, checking the
+	 * name serverNameFor() derives first and then every other registration
+	 * whose `.project-path` is this project. After a lucee.json `name` change
+	 * the server can still run under its old name. "" when none is alive.
+	 */
+	public string function aliveRegistrationFor(required string projectRoot) {
+		var name = serverNameFor(arguments.projectRoot);
+		if (len(name)) {
+			var primary = inspect(name, arguments.projectRoot);
+			if (primary.ours && primary.alive) return name;
+		}
+		var serversDir = variables.lucliHome & "/servers";
+		if (!len(variables.lucliHome) || !directoryExists(serversDir)) return "";
+		for (var entry in directoryList(serversDir, false, "name")) {
+			if (entry == name) continue;
+			var reg = inspect(entry, arguments.projectRoot);
+			if (reg.ours && reg.alive) return entry;
+		}
+		return "";
+	}
+
+	/**
 	 * Linux and macOS only; the servers dir and the registration dir are
 	 * private to this user. On Linux the mode bits are the whole story (a
 	 * POSIX ACL's mask shows in the group bits); macOS ACLs don't show there,
