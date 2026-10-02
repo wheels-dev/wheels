@@ -44,7 +44,8 @@ wheels packages registry info
 - **Explicit updates only.** `update` is never implicit. There is no auto-pull on reload, no background upgrade. This is the only defense against malicious version-bump attacks — the user reviews every bump.
 - **Registry-hosted tarballs.** `tarball` URLs always point at `wheels-dev/wheels-packages` releases, never at the author's repo. GitHub's source-archive URLs drift; release assets don't.
 - **sha256 is mandatory.** Installation aborts on mismatch. There is no `--skip-checksum` flag.
-- **24h manifest cache.** `~/.wheels/cache/packages/`. Respects GitHub's 60 req/hr unauthenticated limit. `registry refresh` busts it.
+- **24h manifest cache.** `<CLI home>/cache/packages/` (`~/.wheels/cache/packages/` on a normal install; `LUCLI_HOME` moves it). A registry other than the default (`WHEELS_PACKAGES_REGISTRY`) caches under its own `registries/<hash>/` subdirectory. Respects GitHub's 60 req/hr unauthenticated limit. `registry refresh` busts it. With `--offline`, cached data is used even after it expires.
+- **Compatibility is checked against the app's framework.** Inside a project, a version's `wheelsVersion` range is matched against `vendor/wheels`; outside one, against the CLI's own version. A dev build of the CLI (`0.0.0-dev`) treats every range as compatible.
 
 ## Configuration
 
