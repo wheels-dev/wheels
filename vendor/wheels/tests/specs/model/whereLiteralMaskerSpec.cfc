@@ -68,6 +68,20 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+
+			// A long run of braces that do not start an ODBC date, before a distant quote
+			// or after the last literal, must not make each brace search the rest of the
+			// string again for the next quote (review of #3903).
+			it("scans a long brace run in linear time", () => {
+				var superLinear = application.wheels.engineAdapter.isRustCFML();
+				var plan = {small = superLinear ? 2000 : 20000, factor = 10, maxGrowth = superLinear ? 250 : 25};
+				for (var shape in ["leading", "trailing"]) {
+					var ratio = maskGrowth(shape, plan);
+					debug(var = "#shape# brace run: #ratio.summary#", label = "masker linearity");
+					expect(ratio.growth).toBeLT(plan.maxGrowth, "#shape# brace run: #ratio.summary#");
+				}
+			});
+
 		});
 
 	}
@@ -78,6 +92,33 @@ component extends="wheels.WheelsTest" {
 	private numeric function nextRandom(required struct rng) {
 		arguments.rng.seed = (arguments.rng.seed * 75 + 74) % 65537;
 		return arguments.rng.seed;
+	}
+
+	private string function braceRun(required string shape, required numeric size) {
+		return arguments.shape == "leading"
+			? RepeatString("{", arguments.size) & " x = 'v'"
+			: "x = 'v' " & RepeatString("{", arguments.size);
+	}
+
+	// Fastest of three runs of $maskWhereLiterals at each size, after one warm-up.
+	private struct function maskGrowth(required string shape, required struct plan) {
+		var rv = {};
+		var large = arguments.plan.small * arguments.plan.factor;
+		variables.ref.$maskWhereLiterals(braceRun(arguments.shape, large));
+		for (var sizeKey in ["small", "large"]) {
+			var w = braceRun(arguments.shape, sizeKey == "small" ? arguments.plan.small : large);
+			var best = 0;
+			for (var run = 1; run <= 3; run++) {
+				var t0 = GetTickCount();
+				variables.ref.$maskWhereLiterals(w);
+				var took = GetTickCount() - t0;
+				best = (run == 1 || took < best) ? took : best;
+			}
+			rv[sizeKey] = best;
+		}
+		rv.growth = Round(rv.large / Max(rv.small, 1) * 10) / 10;
+		rv.summary = "#arguments.plan.small# braces took #rv.small#ms, #large# took #rv.large#ms, growth #rv.growth#x (limit #arguments.plan.maxGrowth#x)";
+		return rv;
 	}
 
 	private struct function compareMaskers(required string where) {

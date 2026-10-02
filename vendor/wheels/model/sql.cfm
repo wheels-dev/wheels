@@ -1006,14 +1006,20 @@
 		// to the next with Find() and copies the text between them in one piece, rather
 		// than reading the string a character at a time: on an engine where Mid() has
 		// to walk the string to reach an index, a per-character loop is quadratic
-		// (#3903). The next brace is remembered and only searched again once the scan
-		// has passed it, so a string without one is searched once.
+		// (#3903). The next quote and the next brace are each remembered and only
+		// searched again once the scan has passed them (0 means there is none left), so
+		// a long run of one never makes the scan search the rest of the string for the
+		// other again.
+		local.nextQuote = Find("'", arguments.where, 1);
 		local.nextBrace = Find("{", arguments.where, 1);
 		while (local.i <= local.n) {
+			if (local.nextQuote > 0 && local.nextQuote < local.i) {
+				local.nextQuote = Find("'", arguments.where, local.i);
+			}
 			if (local.nextBrace > 0 && local.nextBrace < local.i) {
 				local.nextBrace = Find("{", arguments.where, local.i);
 			}
-			local.next = Find("'", arguments.where, local.i);
+			local.next = local.nextQuote;
 			if (local.nextBrace > 0 && (local.next == 0 || local.nextBrace < local.next)) {
 				local.next = local.nextBrace;
 			}
