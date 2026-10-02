@@ -271,7 +271,8 @@ component extends="Model" {
 `afterCommit` and `afterRollback` need a transaction Wheels opens: the one around each `save()`, `create()`, `update()` or `delete()`, or an `invokeWithTransaction()` block. Wheels can't see the outcome of a raw CFML `transaction {}` block around a write:
 
 - On Lucee and BoxLang, Wheels detects the raw block. It skips both callbacks for writes inside it and writes a warning to `wheels.log` (once per request for each model).
-- On Adobe ColdFusion and RustCFML, the raw block can't be detected, so what fires is up to the engine and isn't guaranteed. Adobe CF can also raise a `Database` error for a Wheels write nested in a raw `transaction {}`.
+- On Adobe ColdFusion, Wheels detects the raw block only when a model write is the first database work inside it: it skips both callbacks for that write and logs the same warning. Once anything else has run in the block (a finder, a raw query, an earlier write), later writes can't be detected, so their `afterCommit` can fire even if the block then rolls back ([#4068](https://github.com/wheels-dev/wheels/issues/4068)).
+- On RustCFML, the raw block can't be detected, so what fires is up to the engine and isn't guaranteed.
 
 Keep writes that have these callbacks out of raw `transaction {}` blocks.
 </Aside>
