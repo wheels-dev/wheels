@@ -411,6 +411,37 @@ component extends="wheels.WheelsTest" {
 					}
 				});
 
+				it("cleans up its symlink-resolution probe temp dir, no leak (##4070)", function() {
+					// The probe creates GetTempDirectory()/wheels-localdisk-symlinkprobe-<uuid> and must
+					// remove it. On Adobe a recursive delete over that dir while it still holds the probe
+					// symlink errors (and is swallowed), leaking the dir — so bracket one init and assert
+					// the probe-dir count does not grow. Only meaningful on a resolving runtime; on a
+					// non-resolving one init fails closed and creates no probe dir.
+					var tmp = GetTempDirectory();
+					var before = $countProbeDirs(tmp);
+					var guard = {failedClosed = false};
+					var okRoot = $tempPath("wheels-storage-leak-" & CreateUUID());
+					DirectoryCreate(okRoot);
+					try {
+						try {
+							var disk = new wheels.storage.drivers.LocalDisk(config = {
+								root = okRoot,
+								signingKey = "a-test-signing-key-padded-to-32-bytes!!",
+								resolveSymlinks = true
+							});
+						} catch (any e) {
+							guard.failedClosed = true;
+						}
+						if (!guard.failedClosed) {
+							expect($countProbeDirs(tmp) <= before).toBeTrue("the resolveSymlinks probe must not leak its temp dir");
+						}
+					} finally {
+						if (DirectoryExists(okRoot)) {
+							DirectoryDelete(okRoot, true);
+						}
+					}
+				});
+
 				it("accepts a key whose segment merely contains '..' (##3912)", function() {
 					// Two dots INSIDE a segment are not traversal; the name keeps real chars.
 					disk.put(key = "reports/q3..final.pdf", content = "report");
@@ -792,6 +823,20 @@ component extends="wheels.WheelsTest" {
 
 	function $toPath(required string filePath) {
 		return CreateObject("java", "java.io.File").init(arguments.filePath).toPath();
+	}
+
+	function $countProbeDirs(required string dir) {
+		var n = 0;
+		var prefix = "wheels-localdisk-symlinkprobe-";
+		try {
+			for (var entry in DirectoryList(path = arguments.dir, recurse = false, listInfo = "name", type = "dir")) {
+				if (Len(entry) >= Len(prefix) && Left(entry, Len(prefix)) == prefix) {
+					n++;
+				}
+			}
+		} catch (any e) {
+		}
+		return n;
 	}
 
 	function $createSymlink(required string target, required string link) {

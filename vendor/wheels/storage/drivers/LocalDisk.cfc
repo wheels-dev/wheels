@@ -303,6 +303,10 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		} catch (any e) {
 			probe.resolved = false;
 		} finally {
+			// Delete the probe's symlink BEFORE the recursive temp-dir delete: a recursive
+			// DirectoryDelete over a directory that still contains a symlink errors on Adobe
+			// (and is swallowed), which would leak the probe's temp dir on every init.
+			$deleteSymlinkQuietly(probe.dir & "/inside/lnk");
 			$deleteDirQuietly(probe.dir);
 		}
 		if (!probe.resolved) {
@@ -388,6 +392,22 @@ component implements="wheels.interfaces.StorageDiskInterface" output="false" {
 		}
 		return Len(arguments.candidate) > Len(local.base)
 			&& Compare(Left(arguments.candidate, Len(local.base) + 1), local.base & "/") == 0;
+	}
+
+	/**
+	 * Best-effort delete of the probe's symbolic LINK (never its target) via NIO, run
+	 * before the recursive temp-dir delete so the latter doesn't have to remove a dir
+	 * that still holds a symlink (which errors on Adobe). deleteIfExists no-ops when the
+	 * link is absent; errors are swallowed so cleanup never masks the probe result.
+	 */
+	private void function $deleteSymlinkQuietly(required string path) {
+		try {
+			CreateObject("java", "java.nio.file.Files").deleteIfExists(
+				CreateObject("java", "java.io.File").init(arguments.path).toPath()
+			);
+		} catch (any e) {
+			// best-effort
+		}
 	}
 
 	/**
