@@ -1,3 +1,4 @@
+<cfsilent>
 <cfscript>
     // Place code here that should be executed on the "onRequestStart" event.
     /*
@@ -8,3 +9,4 @@
     	cfheader(name="Cache-Control", value="no-store, must-revalidate");
     }
 </cfscript>
+</cfsilent>
