@@ -41,7 +41,7 @@ component extends="Controller" {
 }
 ```
 
-The two-argument form of `where` means equality. The three-argument form takes an operator in the middle — `>`, `<`, `>=`, `<=`, `!=`, `LIKE`, and so on. Stack multiple `.where(...)` calls and they AND together. A single-argument `where("status = 'published'")` is a raw-SQL passthrough for trusted clauses only — it is not quoted or parameterized. Use the 2- or 3-argument forms for values that came from the request.
+The two-argument form of `where` means equality. The three-argument form takes an operator in the middle — `>`, `<`, `>=`, `<=`, `!=`, `LIKE`, and so on. Stack multiple `.where(...)` calls and they AND together. A single-argument `where("status = 'published'")` passes the clause through as you wrote it. Literals right after a comparison operator are still bound (see [Which values are bound](#which-values-are-bound)), but the rest is your SQL, so keep it to trusted clauses. Use the 2- or 3-argument forms for values that came from the request.
 
 ### Builder methods
 
@@ -105,6 +105,27 @@ component extends="Controller" {
 
 <Aside type="tip">
   Values in builder calls are auto-parameterized through the model's database adapter. That's the point. Use the builder whenever user input flows into a query value — you get the readability of a fluent API and the safety of parameter binding in one call.
+</Aside>
+
+### Which values are bound
+
+In any `where` string, whether you wrote it or a builder method or dynamic finder built it, Wheels binds a quoted or numeric literal as a query parameter when it comes right after a comparison operator: `=`, `<>`, `!=`, `<`, `>`, `<=`, `>=`, `LIKE`, `NOT LIKE`, `IN (...)`, `NOT IN (...)`, `IS` or `IS NOT`.
+
+A literal anywhere else stays in the SQL text, escaped for your database:
+
+- a function argument: `lastName = UPPER('smith')`
+- a hand-written range: `price BETWEEN 10 AND 100` (`whereBetween()` binds both bounds)
+- the character in `LIKE '...' ESCAPE '!'`
+- every value, when you pass `parameterize=false`
+
+Escaped is not the same as bound. Don't build those positions from request input: compare with an operator instead, or use the builder.
+
+<Aside type="note" title="Backslashes on MySQL and MariaDB">
+  A backslash in a `where` value is an ordinary character, whether the value is bound or written into the SQL text. `'C:\temp'` matches `C:\temp`, and `'C:\\temp'` matches two backslashes, on MySQL just as on every other database. Before 4.2, values written into the SQL text (every value with `parameterize=false`, and function arguments) went through MySQL's own backslash escapes. If you wrote `\\` there to mean one backslash, write `\` now.
+
+  The one exception is the escape character of `LIKE ... ESCAPE`: both `ESCAPE '\'` and the MySQL spelling `ESCAPE '\\'` mean a single backslash, in any `sql_mode`.
+
+  A value containing a backslash is written as a `_utf8mb4` hex literal. Comparing it with a column of any character set or collation works as usual. Combining it with another literal (for example `CONCAT('a', ...)`) can raise `Illegal mix of collations` when the connection's collation differs from utf8mb4's default. Put the whole value in one literal, or bind it.
 </Aside>
 
 ## Scopes — reusable query fragments

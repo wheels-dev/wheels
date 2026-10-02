@@ -59,7 +59,11 @@ component output=false extends="wheels.Global"{
 						if (args.parameterize) {
 							cfqueryParam(attributeCollection = qp);
 						} else {
-							writeOutput($quoteValue(str = part.value, sqlType = part.type));
+							// preserveSingleQuotes keeps BoxLang from escaping the quotes of a
+							// literal that doesn't start with one (MySQL's _utf8mb4 X'..');
+							// Adobe CF needs its argument to be a simple variable.
+							local.inlinedValue = $inlineValue(str = part.value, sqlType = part.type);
+							writeOutput(preserveSingleQuotes(local.inlinedValue));
 						}
 					}
 				}
@@ -576,9 +580,9 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
-	 * Restore every masked literal in a piece of SQL to an escaped SQL literal
-	 * (GHSA-96rm), for the parameterize=false path where a masked IN list would
-	 * otherwise be written to the SQL verbatim. Mirrors
+	 * Restore every masked literal in a piece of SQL to a SQL literal written
+	 * by $inlineStringLiteral (GHSA-96rm), for the parameterize=false path where
+	 * a masked IN list would otherwise be written to the SQL verbatim. Mirrors
 	 * wheels.Model::$restoreMaskedLiterals; the sentinel must match
 	 * $whereLiteralSentinel().
 	 */
@@ -613,12 +617,43 @@ component output=false extends="wheels.Global"{
 				continue;
 			}
 			local.value = Len(local.hex) ? CharsetEncode(BinaryDecode(local.hex, "hex"), "utf-8") : "";
-			local.out.append("'");
-			local.out.append(Replace(local.value, "'", "''", "all"));
-			local.out.append("'");
+			local.out.append($inlineStringLiteral(local.value));
 			local.pos = local.closeIdx + 1;
 		}
 		return local.out.toString();
+	}
+
+	/**
+	 * Write a string value as a SQL string literal for the paths that put a
+	 * value in the SQL text instead of binding it: parameterize=false, and the
+	 * literals the WHERE parser leaves in place (function arguments, ESCAPE
+	 * clauses). Single quotes are doubled. An adapter whose database gives
+	 * other characters a meaning inside a string literal overrides this.
+	 */
+	public string function $inlineStringLiteral(required string str) {
+		return "'" & Replace(arguments.str, "'", "''", "all") & "'";
+	}
+
+	/**
+	 * Write the escape character of a LIKE ... ESCAPE clause that the WHERE
+	 * parser left in the SQL text. Adapters override this when their database
+	 * spells some escape characters differently.
+	 */
+	public string function $inlineEscapeCharacter(required string str) {
+		return $inlineStringLiteral(arguments.str);
+	}
+
+	/**
+	 * Write a value for the SQL text with its column type: numeric and boolean
+	 * values pass through as $quoteValue writes them, every other value goes
+	 * through $inlineStringLiteral.
+	 */
+	public string function $inlineValue(required string str, string sqlType = "CF_SQL_VARCHAR") {
+		local.rv = $quoteValue(str = arguments.str, sqlType = arguments.sqlType);
+		if (Left(local.rv, 1) == "'") {
+			return $inlineStringLiteral(arguments.str);
+		}
+		return local.rv;
 	}
 
 	/**
