@@ -1,0 +1,1 @@
+- `wheels info` and the `wheels test` preamble now read a single-quoted datasource in `config/settings.cfm` (`set(dataSourceName='name')` and `env('WHEELS_DATASOURCE', 'name')`), which CFML accepts; only double quotes were read (#3952)

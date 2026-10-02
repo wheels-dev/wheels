@@ -11185,16 +11185,21 @@ component extends="modules.BaseModule" {
 	/**
 	 * The datasource name a (comment-stripped) config/settings.cfm sets, or "".
 	 * Reads both `set(dataSourceName="name")` and the generated
-	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`; for the env() form the
+	 * `set(dataSourceName=env("WHEELS_DATASOURCE", "name"))`, with single or double
+	 * quotes as CFML allows (each value's quotes must match, #3952); for the env() form the
 	 * variable's value in .env wins over the default, as it does at runtime. The
 	 * process environment is not consulted: it can differ from the app server's.
 	 */
 	public string function $settingsDataSourceName(required string settingsContent) {
 		// Two patterns rather than one with an optional env( group: every group in
 		// each always takes part in the match, so the subexpression arrays line up.
-		var m = reFindNoCase('\bdataSourceName\b\s*=\s*env\s*\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*,\s*"([^"]*)"', arguments.settingsContent, 1, true);
+		// Capture groups: \1 and \3 are the quotes (backreferenced so each pair
+		// matches). In m.match (whole match first) the variable name is [3] and
+		// the default is [5].
+		var m = reFindNoCase("\bdataSourceName\b\s*=\s*env\s*\(\s*([""'])([A-Za-z_][A-Za-z0-9_]*)\1\s*,\s*([""'])([^""']*)\3", arguments.settingsContent, 1, true);
 		if (m.pos[1] > 0) {
-			var name = trim(m.match[3]);
+			var envKey = m.match[3];
+			var name = trim(m.match[5]);
 			var envFile = variables.projectRoot & "/.env";
 			if (fileExists(envFile)) {
 				// Read the value the way the app's Application.cfc loadEnvFile() does:
@@ -11202,7 +11207,7 @@ component extends="modules.BaseModule" {
 				// matching quotes, and let the last line for the key win.
 				for (var line in listToArray(fileRead(envFile), chr(10))) {
 					line = trim(line);
-					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), m.match[2]) != 0) {
+					if (!len(line) || left(line, 1) == "##" || !find("=", line) || compareNoCase(trim(listFirst(line, "=")), envKey) != 0) {
 						continue;
 					}
 					var value = trim(listRest(line, "="));
@@ -11216,8 +11221,8 @@ component extends="modules.BaseModule" {
 			}
 			return name;
 		}
-		m = reFindNoCase('\bdataSourceName\b\s*=\s*"([^"]*)"', arguments.settingsContent, 1, true);
-		return m.pos[1] > 0 ? trim(m.match[2]) : "";
+		m = reFindNoCase("\bdataSourceName\b\s*=\s*([""'])([^""']*)\1", arguments.settingsContent, 1, true);
+		return m.pos[1] > 0 ? trim(m.match[3]) : "";
 	}
 
 	/**
