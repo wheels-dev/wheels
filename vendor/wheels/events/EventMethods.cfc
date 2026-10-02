@@ -292,7 +292,8 @@ component extends="wheels.Global" implements="wheels.interfaces.events.EventHand
 		// has been persisted, so aborting here is safe. Runs first on purpose:
 		// nothing else in this event matters for a request being redirected.
 		if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "redirectAfterReloadUrl")) {
-			local.redirectAfterReloadUrl = request.wheels.redirectAfterReloadUrl;
+			// The URL is built from the app-relative path_info; put the subfolder back (#3948).
+			local.redirectAfterReloadUrl = $prefixWebPath(path = request.wheels.redirectAfterReloadUrl);
 			StructDelete(request.wheels, "redirectAfterReloadUrl");
 			$location(url = local.redirectAfterReloadUrl, addToken = false);
 		}
