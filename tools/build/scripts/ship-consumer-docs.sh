@@ -31,9 +31,9 @@
 #       under docs/consumer-ai/. Exits 1 with a message on failure.
 #
 #   ship-consumer-docs.sh verify <artifact-root>
-#       Validate a BUILT package: its CLAUDE.md, AGENTS.md and .ai/README.md
-#       are byte-identical to the consumer tier, .ai/ holds nothing else, and
-#       no maintainer-only path is present. Exits 1 with a message on failure.
+#       Validate a BUILT package: its CLAUDE.md, AGENTS.md and every .ai/*.md
+#       file are byte-identical to the consumer tier, .ai/ holds nothing else,
+#       and no maintainer-only path is present. Exits 1 with a message on failure.
 #
 # Keep in sync with:
 #   - tools/build/scripts/prepare-core.sh        (calls `ship`)
@@ -59,6 +59,14 @@ MAINTAINER_PATTERNS=(
     "docs/plans"
 )
 
+# The consumer tier's files, relative to docs/consumer-ai/: CLAUDE.md, AGENTS.md
+# and every .ai/*.md topic file (README.md plus any topic files).
+consumer_files() {
+    echo "CLAUDE.md"
+    echo "AGENTS.md"
+    (cd "$CONSUMER_DIR" && find .ai -type f -name '*.md' | sort)
+}
+
 check() {
     local failures=0
 
@@ -79,12 +87,21 @@ check() {
     # `wheels new` scaffolds ship a committed copy of the consumer tier;
     # it must stay byte-identical to the source.
     local tpl="$REPO_ROOT/cli/lucli/templates/app"
-    for f in CLAUDE.md AGENTS.md .ai/README.md; do
+    for f in $(consumer_files); do
         if ! cmp -s "$CONSUMER_DIR/$f" "$tpl/$f"; then
             echo "ERROR: cli/lucli/templates/app/$f differs from docs/consumer-ai/$f (cp to resync)" >&2
             failures=$((failures + 1))
         fi
     done
+    # ...and the template must not carry .ai/ files the consumer tier doesn't have.
+    if [ -d "$tpl/.ai" ]; then
+        for f in $(cd "$tpl" && find .ai -type f | sort); do
+            if [ ! -f "$CONSUMER_DIR/$f" ]; then
+                echo "ERROR: cli/lucli/templates/app/$f has no docs/consumer-ai/$f counterpart" >&2
+                failures=$((failures + 1))
+            fi
+        done
+    fi
 
     # The consumer tier must not accidentally grow maintainer content.
     if grep -Rq "test-local.sh\|compat-matrix.yml\|onboarding-harness" "$CONSUMER_DIR" 2>/dev/null; then
@@ -120,22 +137,28 @@ ship() {
     cp "$CONSUMER_DIR/CLAUDE.md" "$dest/CLAUDE.md"
     cp "$CONSUMER_DIR/AGENTS.md" "$dest/AGENTS.md"
     mkdir -p "$dest/.ai"
-    cp "$CONSUMER_DIR/.ai/README.md" "$dest/.ai/README.md"
+    for f in $(cd "$CONSUMER_DIR" && find .ai -type f -name '*.md' | sort); do
+        cp "$CONSUMER_DIR/$f" "$dest/$f"
+    done
     echo "Shipped consumer AI docs -> $dest"
 }
 
 verify() {
     local root="${1:?artifact root required}"
     local failures=0
-    for f in CLAUDE.md AGENTS.md .ai/README.md; do
+    for f in $(consumer_files); do
         if ! cmp -s "$CONSUMER_DIR/$f" "$root/$f"; then
             echo "ERROR: $root/$f is missing or differs from docs/consumer-ai/$f" >&2
             failures=$((failures + 1))
         fi
     done
-    if [ -d "$root/.ai" ] && [ "$(find "$root/.ai" -type f | wc -l | tr -d ' ')" != "1" ]; then
-        echo "ERROR: $root/.ai holds more than the consumer README" >&2
-        failures=$((failures + 1))
+    if [ -d "$root/.ai" ]; then
+        for f in $(cd "$root" && find .ai -type f | sort); do
+            if [ ! -f "$CONSUMER_DIR/$f" ]; then
+                echo "ERROR: $root/$f is not part of the consumer AI docs" >&2
+                failures=$((failures + 1))
+            fi
+        done
     fi
     for pattern in "${MAINTAINER_PATTERNS[@]}"; do
         [ "$pattern" = ".ai" ] && continue

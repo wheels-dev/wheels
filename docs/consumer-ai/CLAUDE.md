@@ -199,7 +199,7 @@ In development, `paginationNav()` throws `Wheels.PaginationNav.InvalidArgument` 
 
 `includePartial(partial="sidebar", cache=60)` caches the rendered output for 60 minutes. The cache key is a hash of **the arguments passed to the partial call** plus the request host, nothing else. Anything the partial reads that isn't an argument (the current user, their permissions, session data) is not part of the key, so one user's cached output is served to the next. Pass viewer-dependent state as an argument (`includePartial(partial="sidebar", cache=60, userId=currentUser.id)`), or don't cache that partial.
 
-`cachePartials` (like `cacheActions`, `cachePages` and `cacheQueries`) is **off in development and testing**, so a partial's caching only shows up in production unless a spec turns it on (see Test-specific gotchas).
+`cachePartials` (like `cacheActions`, `cachePages` and `cacheQueries`) is **off in development and testing**, so a partial's caching only shows up in production unless a spec turns it on: see `.ai/testing.md` for changing settings in specs and testing partial caching.
 
 ## Middleware Quick Reference
 
@@ -525,13 +525,6 @@ The runner compiles every CFC under the spec directory, so one compilation error
 
 - **Test infra scope**: Wheels internals (`$dbinfo`, `model()`, etc.) aren't available as bare calls in `.cfm` files the test runner includes, such as `tests/populate.cfm`. Use `application.wo.model()` or native CFML tags (`cfdbinfo`).
 - **`#` escape**: HTML entities like `&#111;` contain `#` which CFML interprets as expression delimiter. In string literals, escape: `&##111;`. Comments (`//`) are fine. Unescaped `#` in strings crashes the **entire** test suite, not just that file.
-- **Changing a setting in a spec**: read and write `application.wheels.<setting>` and restore it afterwards. Never write `application.$wheels.<setting>`: `$wheels` only exists while `onApplicationStart` runs, and because the framework reads from `$wheels` whenever that key exists, the write creates a one-key struct that every later request reads (errors like `key [MIXINS] doesn't exist`) until the test application is restarted.
-  ```cfm
-  var original = application.wheels.cachePartials;
-  application.wheels.cachePartials = true;
-  try { /* exercise it */ } finally { application.wheels.cachePartials = original; }
-  ```
-  To test partial caching, turn `cachePartials` on this way and call `application.wo.$clearCache("partial")` before and after, so cached output doesn't leak between specs.
 - **`$clearRoutes()` in test specs**: not inherited from `wheels.WheelsTest`. A spec that manipulates routes defines its own:
   `public void function $clearRoutes() { application.wheels.routes = []; application.wheels.staticRoutes = {}; application.wheels.namedRoutePositions = {}; }`
 
