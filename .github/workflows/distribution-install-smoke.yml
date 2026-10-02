@@ -106,13 +106,20 @@ jobs:
           VER: ${{ steps.v.outputs.version }}
         run: |
           set -euo pipefail
-          if PINFILE="$(gh api "repos/${REPO}/contents/tools/lucli.json?ref=v${VER}" --jq .content 2>/dev/null | base64 -d 2>/dev/null)" && [ -n "${PINFILE}" ]; then
+          # Only a 404 (a release older than tools/lucli.json) may fall back to
+          # this checkout; any other API error (rate limit, 5xx, auth) fails the
+          # job, or it would silently compare against develop's pin again.
+          ERR="$(mktemp)"
+          if CONTENT="$(gh api "repos/${REPO}/contents/tools/lucli.json?ref=v${VER}" --jq .content 2>"${ERR}")"; then
+            PINFILE="$(printf '%s' "${CONTENT}" | base64 -d)"
             SOURCE="tools/lucli.json at v${VER}"
-          else
-            # Releases older than tools/lucli.json: fall back to this checkout.
+          elif grep -q 'HTTP 404' "${ERR}"; then
             PINFILE="$(cat tools/lucli.json)"
             SOURCE="tools/lucli.json in this checkout (v${VER} has none)"
             echo "::notice::v${VER} has no tools/lucli.json; using the checked-out pin"
+          else
+            echo "::error::Could not read tools/lucli.json at v${VER}: $(cat "${ERR}")"
+            exit 1
           fi
           LUCLI=$(printf '%s' "${PINFILE}" | jq -er '.LUCLI_VERSION | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$"))')
           echo "lucli=$LUCLI" >> "$GITHUB_OUTPUT"
