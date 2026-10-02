@@ -18,7 +18,6 @@ component extends="wheels.WheelsTest" {
 		variables.migration = CreateObject("component", "wheels.migrator.Migration").init();
 		variables.table = "c_o_r_e_autovalidatedtypes";
 		variables.adapterName = variables.migration.adapter.adapterName();
-		variables.isAdobe = application.wo.$engineAdapter().isAdobe();
 		var t = variables.migration.createTable(name = variables.table, force = true);
 		t.string(columnNames = "requiredName", limit = 20, allowNull = false);
 		// No t.char() column yet: it creates an untyped column on SQLite, H2, MySQL and Oracle (#4092).
@@ -111,9 +110,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("stores a value above the 32-bit range in a bigInteger column", () => {
-				if (variables.isAdobe && variables.adapterName == "SQLite") {
-					skip("SQLite BIGINT columns bind as CF_SQL_INTEGER, which Adobe rejects above 2147483647 (##4086).");
-				}
 				var props = $validProperties();
 				props.bigCount = 9000000000;
 				var rec = model("AutoValidatedType").new(props);
