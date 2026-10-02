@@ -1,5 +1,12 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	/**
+	 * SQL Server accepts at most 2100 parameters in one statement (#3906).
+	 */
+	public numeric function $maxBoundParameters() {
+		return 2100;
+	}
+
 	variables.mssqlTypeMap = {
 		"bigint": "cf_sql_bigint",
 		"binary": "cf_sql_binary",

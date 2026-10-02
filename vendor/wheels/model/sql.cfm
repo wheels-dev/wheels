@@ -1558,7 +1558,76 @@
 				}
 			}
 		}
-		return arguments.sql;
+		return $splitLongInLists(arguments.sql);
+	}
+
+	/**
+	 * Splits an IN list longer than the adapter's $maxInListSize() (Oracle: 1000,
+	 * ORA-01795) into groups, so `col IN (...)` becomes `(col IN (...) OR col IN (...))`
+	 * and `col NOT IN (...)` becomes `(col NOT IN (...) AND col NOT IN (...))`. Every
+	 * value stays bound, the parentheses keep the group's precedence inside the rest
+	 * of the where, and the result matches a single list for NULL values too (#3906).
+	 * A list value is still in its masked form here: quoted elements ('a','b') or
+	 * numbers (1,2), neither containing a comma inside an element.
+	 */
+	public array function $splitLongInLists(required array sql) {
+		local.limit = variables.wheels.class.adapter.$maxInListSize();
+		if (local.limit <= 0) {
+			return arguments.sql;
+		}
+		local.rv = [];
+		for (local.part in arguments.sql) {
+			if (
+				!IsStruct(local.part)
+				|| !StructKeyExists(local.part, "list")
+				|| !local.part.list
+				|| !StructKeyExists(local.part, "value")
+				|| !ArrayLen(local.rv)
+				|| !IsSimpleValue(local.rv[ArrayLen(local.rv)])
+				|| ListLen(local.part.value, ",") <= local.limit
+			) {
+				ArrayAppend(local.rv, local.part);
+				continue;
+			}
+			// The element before an IN-list parameter is its "<column> IN" or
+			// "<column> NOT IN" text ($whereClause).
+			local.lead = local.rv[ArrayLen(local.rv)];
+			local.joiner = ReFindNoCase("\sNOT\s+IN\s*$", local.lead) ? " AND " : " OR ";
+			local.groups = $inListGroups(value = local.part.value, size = local.limit);
+			local.rv[ArrayLen(local.rv)] = "(" & local.lead;
+			local.iEnd = ArrayLen(local.groups);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				if (local.i > 1) {
+					ArrayAppend(local.rv, local.joiner & local.lead);
+				}
+				local.groupPart = Duplicate(local.part);
+				local.groupPart.value = local.groups[local.i];
+				ArrayAppend(local.rv, local.groupPart);
+			}
+			ArrayAppend(local.rv, ")");
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal. Splits a masked IN-list value into groups of at most `size` elements,
+	 * each written back in the same form.
+	 */
+	public array function $inListGroups(required string value, required numeric size) {
+		local.elements = ListToArray(arguments.value, ",");
+		local.rv = [];
+		local.group = [];
+		for (local.element in local.elements) {
+			ArrayAppend(local.group, local.element);
+			if (ArrayLen(local.group) == arguments.size) {
+				ArrayAppend(local.rv, ArrayToList(local.group, ","));
+				local.group = [];
+			}
+		}
+		if (ArrayLen(local.group)) {
+			ArrayAppend(local.rv, ArrayToList(local.group, ","));
+		}
+		return local.rv;
 	}
 
 	/**

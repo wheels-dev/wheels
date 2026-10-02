@@ -1,6 +1,15 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
+	 * Oracle 19c and earlier accept at most 1000 expressions in one IN list
+	 * (ORA-01795). Oracle 23ai has no such limit, but splitting there returns the
+	 * same rows, so lists are split at 1000 on every release (#3906).
+	 */
+	public numeric function $maxInListSize() {
+		return 1000;
+	}
+
+	/**
 	 * Oracle reports unquoted identifiers in uppercase, so lowercase
 	 * auto-derived property names — otherwise models expose `FIRSTNAME`
 	 * instead of `firstname`. See Base.$lowerCaseColumnNames().
