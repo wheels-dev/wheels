@@ -24,6 +24,9 @@
  */
 component {
 
+	variables.BACKUP_PREFIX = ".wheels-pkg-previous-";
+	variables.INCOMING_PREFIX = ".wheels-pkg-incoming-";
+
 	public Installer function init(
 		any httpClient = "",
 		string projectRoot = ""
@@ -69,6 +72,9 @@ component {
 		}
 
 		local.vendorDir = variables.projectRoot & "vendor/";
+		// An earlier update killed mid-swap may have left a package only as a
+		// hidden backup; put it back before deciding what is installed.
+		recoverInterruptedSwaps();
 		// Validates the name and pins the target to a direct child of vendor/
 		// before anything below deletes, downloads or extracts.
 		local.target = new modules.wheels.services.packages.PackageName().childOf(local.vendorDir, arguments.name);
@@ -121,8 +127,9 @@ component {
 			}
 			// The previous install is replaced only once the new one is verified,
 			// and kept beside it until the new copy is in place. The leading dot
-			// keeps PackageLoader from loading the backup.
-			$swapInto(local.stageDir & arguments.name, local.target, local.vendorDir & ".wheels-pkg-previous-" & local.token);
+			// keeps PackageLoader from loading the backup; the name in it lets
+			// recoverInterruptedSwaps() restore it after a crash.
+			$swapInto(local.stageDir & arguments.name, local.target, local.vendorDir & variables.BACKUP_PREFIX & arguments.name & "-" & local.token);
 		} finally {
 			if (FileExists(local.tmpFile)) {
 				FileDelete(local.tmpFile);
@@ -172,7 +179,100 @@ component {
 		}
 	}
 
+	/**
+	 * Repairs vendor/ after an install or update that was killed mid-swap
+	 * (#3902). $swapInto() renames vendor/<name>/ to a hidden backup, then
+	 * renames the new copy into place, so a crash can leave:
+	 *   - a backup and no vendor/<name>/ (or one without package.json, from
+	 *     an older CLI's interrupted cross-volume copy): the backup is
+	 *     renamed back;
+	 *   - a backup and a complete vendor/<name>/: the swap finished, so the
+	 *     backup is deleted;
+	 *   - a half-copied .wheels-pkg-incoming-* dir: deleted.
+	 * A backup whose package cannot be told (no name in the directory, no
+	 * package.json) is left alone, with a message saying how to restore it.
+	 * Returns one message per action taken, for the caller to print.
+	 */
+	public array function recoverInterruptedSwaps() {
+		local.messages = [];
+		local.vendorDir = variables.projectRoot & "vendor/";
+		if (!DirectoryExists(local.vendorDir)) {
+			return local.messages;
+		}
+		for (local.entry in DirectoryList(local.vendorDir, false, "name")) {
+			if (Left(local.entry, Len(variables.INCOMING_PREFIX)) == variables.INCOMING_PREFIX) {
+				try {
+					DirectoryDelete(local.vendorDir & local.entry, true);
+					ArrayAppend(local.messages, "Removed vendor/#local.entry# left by an interrupted package install.");
+				} catch (any e) {
+				}
+				continue;
+			}
+			if (Left(local.entry, Len(variables.BACKUP_PREFIX)) != variables.BACKUP_PREFIX) {
+				continue;
+			}
+			local.backup = local.vendorDir & local.entry;
+			local.name = $backupPackageName(local.entry, local.backup);
+			if (!Len(local.name)) {
+				ArrayAppend(
+					local.messages,
+					"Found vendor/#local.entry#, a backup left by an interrupted package update, but could not tell which package it is. "
+						& "If a package is missing, rename it back: mv vendor/#local.entry# vendor/<name>"
+				);
+				continue;
+			}
+			local.target = new modules.wheels.services.packages.PackageName().childOf(local.vendorDir, local.name);
+			if (FileExists(local.target & "/package.json")) {
+				DirectoryDelete(local.backup, true);
+				ArrayAppend(local.messages, "Removed a leftover backup of vendor/#local.name#/ from an interrupted package update.");
+				continue;
+			}
+			if (DirectoryExists(local.target)) {
+				DirectoryDelete(local.target, true);
+			}
+			DirectoryRename(local.backup, local.target);
+			ArrayAppend(local.messages, "Restored vendor/#local.name#/ from the backup an interrupted package update left at vendor/#local.entry#.");
+		}
+		return local.messages;
+	}
+
 	// ── Private ─────────────────────────────────────────────
+
+	/**
+	 * The package a backup belongs to: from its directory name
+	 * (.wheels-pkg-previous-<name>-<uuid>), else, for backups made before the
+	 * name was recorded, the name in its package.json. "" when neither is a
+	 * valid package name.
+	 */
+	private string function $backupPackageName(required string dirName, required string path) {
+		local.matched = REFind(
+			"^\.wheels-pkg-previous-(.+)-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{16}$",
+			arguments.dirName,
+			1,
+			true
+		);
+		local.candidates = [];
+		if (local.matched.pos[1] && ArrayLen(local.matched.pos) > 1) {
+			ArrayAppend(local.candidates, Mid(arguments.dirName, local.matched.pos[2], local.matched.len[2]));
+		}
+		if (FileExists(arguments.path & "/package.json")) {
+			try {
+				local.parsed = DeserializeJSON(FileRead(arguments.path & "/package.json"));
+				if (IsStruct(local.parsed) && IsSimpleValue(local.parsed.name ?: "")) {
+					ArrayAppend(local.candidates, local.parsed.name ?: "");
+				}
+			} catch (any e) {
+			}
+		}
+		local.validator = new modules.wheels.services.packages.PackageName();
+		for (local.candidate in local.candidates) {
+			try {
+				return local.validator.assert(local.candidate);
+			} catch (any e) {
+			}
+		}
+		return "";
+	}
 
 	/**
 	 * Moves a verified staged tree to target. An existing target is renamed
@@ -205,12 +305,26 @@ component {
 		}
 	}
 
-	/** Moves a staged tree into place; falls back to copy+delete across volumes. */
+	/**
+	 * Moves a staged tree into place. Across volumes (the temp dir elsewhere)
+	 * the copy goes to a hidden sibling of dest first and is renamed in only
+	 * when complete, so dest is never half-written, even after a crash.
+	 */
 	private void function $moveInto(required string src, required string dest) {
 		try {
 			DirectoryRename(arguments.src, arguments.dest);
 		} catch (any e) {
-			DirectoryCopy(arguments.src, arguments.dest, true);
+			local.destFile = CreateObject("java", "java.io.File").init(arguments.dest);
+			local.incoming = local.destFile.getParent() & "/" & variables.INCOMING_PREFIX & local.destFile.getName() & "-" & CreateUUID();
+			try {
+				DirectoryCopy(arguments.src, local.incoming, true);
+				DirectoryRename(local.incoming, arguments.dest);
+			} catch (any copyError) {
+				if (DirectoryExists(local.incoming)) {
+					DirectoryDelete(local.incoming, true);
+				}
+				rethrow;
+			}
 			DirectoryDelete(arguments.src, true);
 		}
 	}
