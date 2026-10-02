@@ -52,8 +52,13 @@ Four rules, in order:
 
 <CardGrid>
   <LinkCard
+    title="4.1 to 4.2"
+    description="A framework swap plus edits to app-owned files (config/environment.cfm reading WHEELS_ENV, public/Application.cfc's onError and reload header, event templates, committed vendor/), then the behaviour changes to check: findAll(returnAs='structs') returning an array, X-Forwarded-Proto needing trustProxyHeaders, validation bare names, joinType, renderNotFound, MySQL BIT(1) booleans, and the CLI and wheels deploy changes."
+    href="/v4-2-0/upgrading/4x-1-to-4x-2/"
+  />
+  <LinkCard
     title="4.0 to 4.1"
-    description="A framework swap plus a short checklist of hand edits to the app-owned public/Application.cfc (session cookie, DI guard, Adobe teardown, jBCrypt, .env parser, onError, testcontext) — each with its version and whether skipping it fails safe."
+    description="A framework swap plus a short checklist of hand edits to the app-owned public/Application.cfc (session cookie, DI guard, Adobe teardown, jBCrypt, .env parser, testcontext) — each with its version and whether skipping it fails safe."
     href="/v4-2-0/upgrading/4x-0-to-4x-1/"
   />
   <LinkCard

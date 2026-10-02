@@ -1,0 +1,165 @@
+---
+title: Upgrading from 4.1 to 4.2
+description: The 4.1 → 4.2 upgrade is a framework swap plus a few edits to app-owned files (public/Application.cfc, config/environment.cfm, app/events); this is the checklist, with each change's issue and whether skipping it fails safe, and the behaviour changes to check.
+type: howto
+sidebar:
+  order: 1
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Upgrading from any 4.1.x to 4.2 is the same `vendor/wheels/` swap as a patch upgrade (see [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/)). What the swap does **not** do for you is update the files `wheels new` created once and then handed to you: `public/Application.cfc`, `config/environment.cfm`, `config/settings.cfm` and the `app/events/*.cfm` templates. Framework updates never reach them. This page lists each of those edits with the issue it came from and whether skipping it fails safe, then the behaviour changes worth checking in your code.
+
+<Aside type="tip" title="The fastest way to find the drift">
+Run `wheels upgrade check --to=4.2.0` on a workstation. It diffs `public/Application.cfc` and `public/index.cfm` against the bundled template and flags known code patterns. For the other app-owned files, compare against a fresh `wheels new` app. The template is the authority; keep your local customizations.
+</Aside>
+
+## Swap the framework
+
+<Steps>
+
+1. **Back up the current framework.** Move (don't delete) `vendor/wheels/` aside, e.g. to `vendor/wheels-4.1.x.bak/` outside version control. Moving it back is the whole rollback.
+
+2. **Install 4.2.x.** Extract the 4.2 `vendor/wheels/` in its place (or `git checkout` the tag if you vendor the framework).
+
+3. **Reload and run your suite.** Use `?reload=true&password=…` and `/wheels/app/tests`. Then apply the edits below.
+
+</Steps>
+
+## Edits to app-owned files
+
+"Fails safe if skipped" means the app keeps working correctly without the edit. Where it does **not**, the consequence is stated.
+
+### `config/environment.cfm` reads `WHEELS_ENV` (4.2.0)
+
+Apps generated before 4.2 hardcode the environment: `config/environment.cfm` contains `set(environment="development")`, so a `WHEELS_ENV=production` set by a Docker image, systemd unit or host has no effect ([#3946](https://github.com/wheels-dev/wheels/issues/3946)). The 4.2 template reads `WHEELS_ENV` through `env()` (`.env` first, then the process environment). Unset or empty means `development`. Any value other than `development`, `testing`, `maintenance` or `production` stops the app at startup with `Wheels.InvalidEnvironment`, because Wheels shows error details in any environment that isn't `production`. The template's `config/settings.cfm` likewise reads `set(dataSourceName=env("WHEELS_DATASOURCE", "<app name>"))`.
+
+Replace `config/environment.cfm` with the one from a fresh `wheels new` app (see [Environments and Configuration](/v4-2-0/core-concepts/environments-and-configuration/)), or keep yours and hardcode `set(environment="production");` on production servers. A `WHEELS_ENV` line in `.env` wins over the process environment, so make sure a production server's `.env` doesn't say `development`.
+
+**Does not fail safe:** an app deployed with only `WHEELS_ENV=production` set keeps running in development mode, with full error details shown to visitors.
+
+### `onError` running-app message (4.2.0)
+
+The `onError` minimal fallback now tells an error raised once the application is already running (for example a request timeout after startup) apart from a genuine startup failure, and extends the request timeout before logging, so the `wheels.log` entry it points at is actually written ([#3965](https://github.com/wheels-dev/wheels/issues/3965)).
+
+**Fails safe:** the old version shows a misleading "Wheels failed to initialize" page and may not write the log entry, but the app is otherwise unaffected. Copy the updated `onError`, `$renderMinimalError` and `$logStartupFailure` functions from the template into your `public/Application.cfc`, replacing the existing versions.
+
+### Reload-password header fallback (4.2.0)
+
+`public/Application.cfc` now falls back to the raw request headers (`GetHttpRequestData()`) when the `cgi` copy of `X-Wheels-Reload-Password` is missing, which happens on RustCFML for the first request after a restart ([#3913](https://github.com/wheels-dev/wheels/issues/3913)). The password stays header-only, and the reload gate, its rate limit and its constant-time comparison are framework code and unchanged.
+
+**Fails safe:** without it, `wheels reload` against a RustCFML server fails every other run; Lucee, Adobe CF and BoxLang are unaffected. Copy the header-mapping block from the template.
+
+### Event templates without leading whitespace (4.2.0)
+
+The `app/events/*.cfm` templates (`onrequeststart.cfm`, `onrequestend.cfm`, `onsessionstart.cfm` and their siblings) are included straight into the response buffer, where a bare `cfscript` block and a trailing newline put blank lines before every response ([#3882](https://github.com/wheels-dev/wheels/issues/3882)). New apps wrap them in `cfsilent` with no trailing newline.
+
+**Fails safe** for HTML pages. It does not for byte-exact responses: a `renderText()` of an XML document is ill-formed when blank lines come before `<?xml …?>`. Wrap each `app/events/*.cfm` file in `<cfsilent>…</cfsilent>` with no trailing newline, or delete the empty placeholders you don't use. `cfsilent` suppresses only output, so event code (including `cfheader`) still runs.
+
+### Commit `vendor/` (4.2.0)
+
+`wheels new` apps now commit `vendor/`: the generated `.gitignore` no longer ignores it, so a clone, CI run or image build has the framework and every package added with `wheels packages add`.
+
+**Fails safe** on the machine that has `vendor/`. A fresh clone of an app that ignores it has no framework and nothing to restore it from. Remove the `/vendor/` line from `.gitignore` and commit `vendor/`.
+
+### AI coding docs (optional)
+
+The `CLAUDE.md` that ships with apps is now under 8 KB, with its reference topics in `.ai/<topic>.md` and an `AGENTS.md` that points agents at them ([#3960](https://github.com/wheels-dev/wheels/issues/3960)). Apps installed from the 4.x `wheels-base-template` download also got the framework maintainers' docs instead of the application-developer ones ([#3947](https://github.com/wheels-dev/wheels/issues/3947)).
+
+**Fails safe.** If you use AI coding tools, copy `CLAUDE.md`, `AGENTS.md` and `.ai/` from a fresh `wheels new` app, and delete a `.claude/` folder that came from the base template.
+
+## Behaviour changes to check
+
+These need no file edits, but code that relied on the old behaviour changes.
+
+### `findAll(returnAs="structs")` returns an array
+
+`findAll()` has always documented `returnAs="structs"` (and `"struct"`) as an array of structs, but through 4.1 it returned a struct keyed by row number: `{1: {...}, 2: {...}}`. From 4.2 it returns the documented array ([#4035](https://github.com/wheels-dev/wheels/pull/4035)). `findInBatches(returnAs="structs")` hands its callback the same array.
+
+**What keeps working:** indexing rows by position (`rows[1].name`).
+
+**What changes:**
+
+- `ArrayLen(rows)` and the other array functions now work, and the result serializes to a JSON array (`[{...}]`, not `{"1": {...}}`), so a `renderWith(data=rows)` API response changes shape.
+- `StructCount()`, `StructKeyList()`, `StructKeyArray()` and `StructIsEmpty()` on the result now throw. Use `ArrayLen()` and `ArrayIsEmpty()`.
+- Every `for (... in rows)` loop changes meaning. On the 4.1 struct, `for (key in rows)` iterated the keys (`"1"`, `"2"`); now it hands you each row struct. Loop over the rows directly, `for (row in rows) { ... }`, and drop any `rows[key]` lookup inside the loop.
+- With no match, `findAll(returnAs="structs")` returns `[]` instead of `{}`.
+
+The single-record finders didn't work with the old shape and now do: `findOne(returnAs="struct")` and `findByKey(returnAs="struct")` return the record's struct rather than a `{1: {...}}` wrapper, and `findEach(returnAs="struct")` calls its callback once per record. With no match, they still return an empty struct `{}`. The query builder's `findOne(returnAs="struct")` after `offset()` now returns `{}` on no match too (including an offset past the last row), where it used to return `false`.
+
+To find affected code, search `app/` and `tests/` for `returnAs="structs"`, `returnAs="struct"` and `returnAs = "struct`. For code that must run on both 4.1 and 4.2, `returnAs="array"` already returned an array of structs in 4.1 and is unchanged.
+
+### `X-Forwarded-Proto` needs `trustProxyHeaders`
+
+In 4.1, `urlFor(onlyPath=false)` and asset URLs took `https://` from an `X-Forwarded-Proto: https` request header even without the opt-in. In 4.2 that header sets the URL scheme only when `set(trustProxyHeaders=true)` is on; a real TLS connection always counts as `https` ([#3836](https://github.com/wheels-dev/wheels/issues/3836)). **Apps behind a trusted TLS-terminating reverse proxy must set `set(trustProxyHeaders=true)` before upgrading,** or their absolute URLs come out as `http://`. The one-time warning added for this in 4.1 ([#3835](https://github.com/wheels-dev/wheels/issues/3835)) is gone.
+
+### Validation `condition` / `unless`: bare names are resolved
+
+A bare property or method name in a `condition` or `unless` expression now means `this.<name>` when the record has it ([#3928](https://github.com/wheels-dev/wheels/issues/3928)). That holds both alone (`condition="isActive"`) and on the left of a comparison (`condition="status != 'draft'"`). In 4.1, a lone name evaluated to `false`, so the rule was **skipped**. A left-hand name was compared as its own text, so the rule **always ran**. A validation your app relied on being skipped may now run, so search your models for `condition=` and `unless=` and run your model specs.
+
+4.1 already threw `Wheels.InvalidValidationCondition` for expressions it couldn't parse. 4.2 adds the shapes it used to mis-run silently: a bare name the record doesn't have, an expression that isn't one value or one complete `left operator right` comparison, a `this.` reference on the **right** of a comparison, and the word operators `is`, `and` and `or` on the `this.` path ([#3964](https://github.com/wheels-dev/wheels/issues/3964)). Replace `is` with `eq` (or `==`), `and` with `&&`, `or` with `||`, and put any `this.` reference on the left.
+
+### Association `joinType` values are checked
+
+`joinType` accepts `inner`, `outer`, `left` and `left outer` (the last three all emit `LEFT OUTER JOIN`). Any other value throws `Wheels.InvalidJoinType` when the association is registered, at application start ([#3936](https://github.com/wheels-dev/wheels/issues/3936)). Before, `joinType="left"` emitted a `LEFT JOIN` that the nested-include grouping didn't recognise, so a nested include under it was silently dropped.
+
+### `renderNotFound` is a framework helper
+
+`renderNotFound(message, type, extendedInfo)` is a new public controller helper that produces a 404 from app code ([#3900](https://github.com/wheels-dev/wheels/issues/3900)). Because it is public, it is now a reserved action name: an existing controller **action** literally named `renderNotFound` gets `Wheels.ActionNotAllowed` instead of dispatching. Rename such an action. A controller that already defines its own `renderNotFound` helper overrides the framework one, and that keeps working.
+
+### MySQL boolean columns are `BIT(1)`
+
+On MySQL, `t.boolean()` and `addColumn(columnType="boolean")` now create `BIT(1)` instead of `TINYINT(1)` ([#3897](https://github.com/wheels-dev/wheels/issues/3897)). Existing columns are unchanged. If your DSN sets `tinyInt1isBit=false`, existing `TINYINT(1)` booleans read as plain integers and fail validation as "is not a number": drop that DSN option, or convert the column with `changeColumn(columnType="boolean")`. `BIT(1)` values read back as `1` on Lucee and Adobe CF and as `true` on BoxLang; both are truthy and compare equal in CFML.
+
+### `LocalDisk` storage keys are checked per segment
+
+`LocalDisk` now validates an object key one path segment at a time ([#3912](https://github.com/wheels-dev/wheels/issues/3912)):
+
+- **Now accepted:** names with two dots inside a segment, such as `reports/q3..final.pdf` or `a..b.txt`. These used to be rejected because the key contained `..`.
+- **Now rejected** with `Wheels.Storage.InvalidKey`: a segment made only of dots and/or whitespace (`.`, `..`, `...`, `. .`, `.. `) and a drive-letter prefix (`C:/…`, `C:foo`).
+- **Normalised:** a leading `/`, a trailing `/`, a doubled `//` and a network-share prefix now become a relative key under the disk's root. Keys are never URL-decoded.
+
+If your app builds storage keys from user input or file names, check that none of them depend on the old behaviour.
+
+## CLI and deployment changes
+
+### Dev servers listen on `127.0.0.1`
+
+`wheels start` and `wheels server run` (LuCLI 0.6.2.2) listen on `127.0.0.1`, so a dev server is reachable only from your own machine. To reach it from a phone, a VM or another computer, start it with `--host 0.0.0.0` or set `"bindAddress": "0.0.0.0"` in `lucee.json`. Clients that resolve `localhost` only to `::1` need `http://127.0.0.1:<port>/`.
+
+### `wheels generate` and `wheels destroy` need a project
+
+Both refuse to run outside a Wheels project (`Wheels.NotAWheelsProject`, non-zero exit) instead of writing or deleting files in the current directory ([#3909](https://github.com/wheels-dev/wheels/issues/3909)). `wheels generate app` still works anywhere.
+
+### App creation is CLI-only over MCP
+
+The stdio MCP server (`wheels mcp wheels`) no longer offers `create`, and refuses `generate` with `type=app` ([#3910](https://github.com/wheels-dev/wheels/issues/3910), [#3980](https://github.com/wheels-dev/wheels/issues/3980)). Run `wheels new <name>` in a terminal.
+
+### `wheels deploy` changes
+
+From [#3914](https://github.com/wheels-dev/wheels/issues/3914) and [#3925](https://github.com/wheels-dev/wheels/issues/3925):
+
+- **Images ship an empty `db/`.** The `wheels deploy init` Dockerfile no longer copies local SQLite files (`db/*.sqlite`, `*.sqlite3`, `*.db` and their journal files) into the image, and its `.dockerignore` excludes them. Migrations ship with `app/migrator/migrations` as before. A SQLite app therefore starts production with an empty database inside the container, and `deploy init` now says so for a SQLite app: run migrations on boot with `set(autoMigrateDatabase=true)` in `config/production/settings.cfm`. `deploy init` keeps an existing `.dockerignore`, so for an app scaffolded earlier the Dockerfile's builder stage removes those files instead. To adopt the new `.dockerignore` and Dockerfile, run `wheels deploy init` in a scratch directory and copy the changes over. Don't run `--force` in your app: it also overwrites your `config/deploy.yml`.
+- **`proxy:` keys are checked.** Only `host`, `ssl`, `app_port`, `healthcheck`, `forward_headers` and `buffering` are accepted, and `proxy.ssl` must be `true` or `false`. A config with a misspelled proxy key, or `ssl: yes`, now fails validation instead of being ignored.
+- **`deploy registry login` needs `registry.username`,** and a missing or empty `config/deploy.yml` now says so instead of a file-read error.
+- **`deploy app details`, `app live` and `app maintenance` no longer need `--release`.** Without it, `app details` lists the role's containers.
+- **The `boot:` block is applied** ([#3925](https://github.com/wheels-dev/wheels/issues/3925)). With a `boot:` block, each role's hosts boot in batches of `limit` (a count, or a percentage of the role's hosts) with `wait` seconds between batches. In 4.1 it was validated but ignored, so a config that carries one now deploys more slowly by design. Without a `boot:` block, hosts boot back to back as before.
+- **`deploy config` prints the whole resolved config** (proxy, env, accessories, ssh, builder). A `registry.password` entry is shown only when it names a key in `.kamal/secrets`.
+
+## Verify
+
+<Steps>
+
+1. Reload (`?reload=true&password=…`) and confirm the app starts clean; check `wheels.log` for warnings.
+2. Run your suite (`/wheels/app/tests`), including the model specs that cover conditional validations.
+3. On a production server, confirm the app runs in production mode: an error must not show a stack trace.
+4. Behind a reverse proxy, confirm absolute URLs (for example in emails or redirects) still start with `https://`.
+5. If you render XML or other byte-exact responses, confirm nothing comes before the first byte.
+
+</Steps>
+
+## Related guides
+
+- [Manual upgrades](/v4-2-0/upgrading/manual-upgrades/) — the swap mechanics.
+- [Upgrading from 4.0 to 4.1](/v4-2-0/upgrading/4x-0-to-4x-1/) — the earlier `public/Application.cfc` edits, if you are coming from 4.0.
+- [Changelog](/v4-2-0/upgrading/changelog/) — the full per-version entry list.
