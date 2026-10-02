@@ -229,7 +229,42 @@ component extends="wheels.WheelsTest" {
 				);
 			}, "", !_firstWriteDetectable);
 
-			it("does not engage foreign-transaction detection where IsWithinTransaction is unavailable [Adobe/RustCFML]", () => {
+			it("never treats a Wheels-owned transaction as foreign", () => {
+				// The foreign check runs before Wheels opens its own begin, so the transaction
+				// Wheels owns (and the writes nested in it) is never mistaken for a raw block.
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				g.model("tag").invokeWithTransaction(method = "txnCreateTwoTags", transaction = "commit");
+				expect(ListFind(ArrayToList(request.$acLog), "commit:txncb-nest1")).toBeGT(0, ArrayToList(request.$acLog));
+				expect(ListFind(ArrayToList(request.$acLog), "commit:txncb-nest2")).toBeGT(0, ArrayToList(request.$acLog));
+				expect(
+					!StructKeyExists(request.wheels, "$txnForeignWarned")
+					|| StructCount(request.wheels.$txnForeignWarned) == 0
+				).toBeTrue("a Wheels-owned transaction must not trigger the foreign-transaction warning");
+			})
+
+			it("detects a write made after other database work in a raw transaction{} [detecting engines]", () => {
+				// ##4068: on Adobe CF a raw block's first statement gives it a known isolation, so
+				// only the transaction itself (not an isolation mismatch) can reveal it here.
+				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				var state = {saved = false, errored = false, errType = ""};
+				try {
+					transaction {
+						g.model("tag").findOne(order = "id");
+						var t = g.model("tag").new(name = "txncb-foreign-late");
+						state.saved = t.save(transaction = "commit");
+						transaction action="rollback";
+					}
+				} catch (any e) {
+					state.errored = true;
+					state.errType = e.type;
+				}
+				expect(state.errored).toBeFalse("the raw-transaction write must not error (type=" & state.errType & ")");
+				expect(state.saved).toBeTrue();
+				expect(g.model("tag").count(where = "name = 'txncb-foreign-late'")).toBe(0, "the raw block rolled the write back");
+				expect(ArrayLen(request.$acLog)).toBe(0, "afterCommit must not fire for a write the raw block rolled back");
+			}, "", !_foreignDetectable);
+
+			it("does not engage foreign-transaction detection on engines that cannot see a raw transaction{} [RustCFML]", () => {
 				// On engines without IsWithinTransaction, Wheels cannot see a raw transaction{}
 				// unless the engine rejects the nested isolation (#4045). A raw block that already
 				// uses read_committed raises no mismatch, so nothing reveals it: Wheels never
@@ -284,7 +319,7 @@ component extends="wheels.WheelsTest" {
 				);
 			}, "", !_firstWriteDetectable);
 
-			it("warns once per request+model for writes inside a raw transaction{}, not once per write [IsWithinTransaction engines]", () => {
+			it("warns once per request+model for writes inside a raw transaction{}, not once per write [detecting engines]", () => {
 				g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
 				var state = {saved = 0, errored = false, errType = ""};
 				try {

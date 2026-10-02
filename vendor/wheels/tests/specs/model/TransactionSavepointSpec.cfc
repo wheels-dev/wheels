@@ -91,7 +91,7 @@ component extends="wheels.WheelsTest" {
 
 			it("nests inside a raw transaction block on engines that can detect one", () => {
 				if (!g.model("tag").$supportsForeignTransactionCheck()) {
-					skip("A raw transaction{} block is only detectable where IsWithinTransaction() exists (Lucee, BoxLang).");
+					skip("A raw transaction{} block is not detectable on this engine (RustCFML).");
 				}
 				transaction {
 					g.model("tag").create(name = "sp-outer1", transaction = "none");
