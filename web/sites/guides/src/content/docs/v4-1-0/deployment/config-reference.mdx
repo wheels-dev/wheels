@@ -248,7 +248,7 @@ See [Accessories](/v4-1-0/deployment/accessories/) for the full walk-through.
 
 Kamal's rolling-boot settings. When `deploy.yml` has a `boot:` block, `wheels deploy` boots each role's hosts in batches of `limit` hosts and waits `wait` seconds between batches. A percentage `limit` is that share of the role's hosts, rounded up, and a batch is never smaller than one host. Without a `boot:` block, hosts boot back to back with no pause.
 
-Hosts within a batch boot one after another. Kamal boots them in parallel, so a batch takes longer here, but the pacing between batches is the same. `--dry-run` prints a `[boot] wait <n>s before the next batch` line where the pause falls. Before 4.1.3 the block was validated but not applied.
+Hosts within a batch boot one after another. Kamal boots them in parallel, so a batch takes longer here, but the pacing between batches is the same. `--dry-run` prints a `[boot] wait <n>s before the next batch` line where the pause falls. Before 4.2.0 the block was validated but not applied.
 
 ```yaml title="config/deploy.yml"
 boot:
