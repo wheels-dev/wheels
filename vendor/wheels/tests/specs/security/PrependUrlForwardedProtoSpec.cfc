@@ -6,7 +6,6 @@ component extends="wheels.WheelsTest" {
 		if (variables.$$hadTPH) {
 			variables.$$origTPH = application.wheels.trustProxyHeaders;
 		}
-		variables.$$hadWarned = StructKeyExists(application.wheels, "$forwardedProtoTrustWarned");
 	}
 
 	function afterAll() {
@@ -16,13 +15,10 @@ component extends="wheels.WheelsTest" {
 		} else {
 			StructDelete(application.wheels, "trustProxyHeaders");
 		}
-		if (!variables.$$hadWarned) {
-			StructDelete(application.wheels, "$forwardedProtoTrustWarned");
-		}
 	}
 
 	function run() {
-		describe("$prependUrl scheme from X-Forwarded-Proto", () => {
+		describe("$prependUrl scheme from X-Forwarded-Proto (##3836)", () => {
 
 			beforeEach(() => {
 				request.cgi.server_port = 80;
@@ -31,34 +27,31 @@ component extends="wheels.WheelsTest" {
 				request.cgi.http_x_forwarded_proto = "https";
 			});
 
-			it("still honours X-Forwarded-Proto for the scheme when trustProxyHeaders is off (4.1 behaviour)", () => {
+			it("ignores X-Forwarded-Proto for the scheme when trustProxyHeaders is off", () => {
+				// 4.2: the client-controlled header no longer selects https:// without the
+				// opt-in, so a spoofed header can't induce https:// absolute URLs (#3836).
 				application.wheels.trustProxyHeaders = false;
-				expect(Left(application.wo.$prependUrl(path = "/x"), 8)).toBe("https://");
+				expect(Left(application.wo.$prependUrl(path = "/x"), 7)).toBe("http://");
 			});
 
-			it("warns once when the scheme comes from an untrusted X-Forwarded-Proto", () => {
-				application.wheels.trustProxyHeaders = false;
-				StructDelete(application.wheels, "$forwardedProtoTrustWarned");
-				application.wo.$prependUrl(path = "/x");
-				expect(StructKeyExists(application.wheels, "$forwardedProtoTrustWarned")).toBeTrue();
-			});
-
-			it("does not warn when trustProxyHeaders is on", () => {
+			it("honours X-Forwarded-Proto for the scheme when trustProxyHeaders is on", () => {
 				application.wheels.trustProxyHeaders = true;
-				StructDelete(application.wheels, "$forwardedProtoTrustWarned");
 				expect(Left(application.wo.$prependUrl(path = "/x"), 8)).toBe("https://");
-				expect(StructKeyExists(application.wheels, "$forwardedProtoTrustWarned")).toBeFalse();
 			});
 
-			it("does not warn when the request is really on TLS", () => {
+			it("always honours the real socket TLS state regardless of trustProxyHeaders", () => {
 				application.wheels.trustProxyHeaders = false;
 				request.cgi.http_x_forwarded_proto = "";
 				request.cgi.server_port_secure = "true";
-				StructDelete(application.wheels, "$forwardedProtoTrustWarned");
 				expect(Left(application.wo.$prependUrl(path = "/x"), 8)).toBe("https://");
-				expect(StructKeyExists(application.wheels, "$forwardedProtoTrustWarned")).toBeFalse();
 			});
 
+			it("falls back to http:// when neither the socket nor a trusted header is https", () => {
+				application.wheels.trustProxyHeaders = false;
+				request.cgi.http_x_forwarded_proto = "";
+				request.cgi.server_port_secure = "false";
+				expect(Left(application.wo.$prependUrl(path = "/x"), 7)).toBe("http://");
+			});
 		});
 	}
 }

@@ -8,7 +8,6 @@ component extends="wheels.WheelsTest" {
 		}
 		variables.$$origEnvironment = application.wheels.environment;
 		variables.$$hadUnsetWarned = StructKeyExists(application.wheels, "$baseUrlUnsetWarned");
-		variables.$$hadProtoWarned = StructKeyExists(application.wheels, "$forwardedProtoTrustWarned");
 	}
 
 	function afterAll() {
@@ -21,9 +20,6 @@ component extends="wheels.WheelsTest" {
 		application.wheels.environment = variables.$$origEnvironment;
 		if (!variables.$$hadUnsetWarned) {
 			StructDelete(application.wheels, "$baseUrlUnsetWarned");
-		}
-		if (!variables.$$hadProtoWarned) {
-			StructDelete(application.wheels, "$forwardedProtoTrustWarned");
 		}
 	}
 
@@ -39,7 +35,6 @@ component extends="wheels.WheelsTest" {
 				application.wheels.baseUrl = "";
 				application.wheels.environment = "development";
 				StructDelete(application.wheels, "$baseUrlUnsetWarned");
-				StructDelete(application.wheels, "$forwardedProtoTrustWarned");
 			});
 
 			it("uses the configured scheme and host and drops the request port", () => {
@@ -78,12 +73,11 @@ component extends="wheels.WheelsTest" {
 				expect(application.wo.$prependUrl(path = "/x", protocol = "http")).toBe("http://example.com/x");
 			});
 
-			it("does not consult X-Forwarded-Proto (no warning) when baseUrl supplies the scheme", () => {
+			it("does not consult X-Forwarded-Proto when baseUrl supplies the scheme", () => {
 				request.cgi.http_x_forwarded_proto = "https";
 				application.wheels.trustProxyHeaders = false;
 				application.wheels.baseUrl = "https://example.com";
-				application.wo.$prependUrl(path = "/x");
-				expect(StructKeyExists(application.wheels, "$forwardedProtoTrustWarned")).toBeFalse();
+				expect(application.wo.$prependUrl(path = "/x")).toBe("https://example.com/x");
 			});
 
 			it("throws Wheels.IncorrectConfiguration on a baseUrl with no scheme", () => {
