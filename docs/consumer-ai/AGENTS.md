@@ -23,7 +23,8 @@ Claude Code also reads the more detailed `CLAUDE.md` next to this file.
    filters, singular PascalCase models, plural controllers/tables,
    `params.key` accessors, migrations for schema changes.
 4. **Verify with tests.** After changes, run the affected specs:
-   `wheels test tests/specs/<area>`.
+   `wheels test tests.specs.<area>` (a folder) or
+   `wheels test --filter=<SpecName>` (one spec file).
 
 ## Conventions (summary)
 

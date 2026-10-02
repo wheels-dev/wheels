@@ -90,7 +90,8 @@ The runner compiles every CFC under the spec directory, so one compilation error
 
 ```bash
 wheels test                      # run the app's tests/specs/ (WheelsTest)
-wheels test tests/specs/models   # a subdirectory of specs
+wheels test tests.specs.models   # a subdirectory of specs
+wheels test --filter=UserSpec    # one spec file, by name
 ```
 
 The CLI boots the app on an isolated port and runs the suite over HTTP,

@@ -1532,7 +1532,14 @@ component extends="modules.BaseModule" {
 		// CLI normalizes here so `--filter=browser` does what the user
 		// expects. Onboarding finding #2. A bare spec name resolves to the one
 		// spec file it names, so it runs as a single bundle (issue 3759).
+		var requested = filter;
 		filter = $resolveTestFilter(filter, coreTests);
+		// Refuse a scope that would not run as asked, before anything runs
+		// (issues 3963, 3893): no full-suite fallback, no "0 bundles" afterwards.
+		var scopeProblem = $testScopeProblem(filter, coreTests, requested);
+		if (len(scopeProblem)) {
+			throw(type = "Wheels.TestScopeNotFound", message = scopeProblem);
+		}
 
 		return runTests(
 			filter, reporter, format, verboseOutput, coreTests,
@@ -1614,6 +1621,86 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Why a resolved test scope cannot run, or "" when it can (issues 3963,
+	 * 3893). The default scope (empty) always can. Otherwise the scope must
+	 * be a form the runner accepts AND name a folder or spec file that exists
+	 * in this project: the runner falls back to the full default suite for a
+	 * scope it rejects, and reports "no test bundles ran" for one that matches
+	 * nothing, so both are refused here, before anything runs. The message is
+	 * self-contained because MCP clients see only the exception message.
+	 */
+	public string function $testScopeProblem(
+		required string scope,
+		boolean coreTests = false,
+		string requested = ""
+	) {
+		var s = trim(arguments.scope);
+		if (!len(s)) {
+			return "";
+		}
+		var shown = len(trim(arguments.requested)) ? trim(arguments.requested) : s;
+		var accepted = arguments.coreTests
+			? "Pass a folder or spec file under vendor/wheels/tests/specs as a path (model, model/FooSpec.cfc) or dotted path (wheels.tests.specs.model), or a spec name (--filter=FooSpec)."
+			: "Pass a folder or spec file under tests/specs as a path (tests/specs/models, tests/specs/models/BookSpec.cfc) or dotted path (tests.specs.models), or a spec name (--filter=BookSpec).";
+		var pattern = arguments.coreTests
+			? "^(wheels\.tests|vendor\.[a-z0-9][a-z0-9\-]*\.tests)(\.[a-zA-Z0-9_]+)*$"
+			: "^tests(\.[a-zA-Z0-9_]+)*$";
+		if (!reFindNoCase(pattern, s)) {
+			return "'#shown#' is not a test scope wheels test can run (resolved to '#s#'). #accepted# Nothing was run.";
+		}
+		var rel = replace(s, ".", "/", "all");
+		if (arguments.coreTests && reFindNoCase("^wheels/", rel)) {
+			rel = "vendor/" & rel;
+		}
+		var target = variables.projectRoot & "/" & rel;
+		if (directoryExists(target) || fileExists(target & ".cfc")) {
+			return "";
+		}
+		return "No test folder or spec file matches '#shown#' (looked for #rel#/ and #rel#.cfc). #accepted# Nothing was run.";
+	}
+
+	/**
+	 * Turn a filesystem-style test scope into the dotted form the runner takes
+	 * (issue 3963). Input that is not path-like (no `/` or `\`, no `.cfc`
+	 * suffix) is returned unchanged. A leading `./`, trailing slashes and a
+	 * `.cfc` suffix are dropped; a path under the project root may be absolute.
+	 *
+	 * App mode: `tests/...` maps as written; anything else is taken relative
+	 * to tests/specs (`models/BookSpec.cfc` → `tests.specs.models.BookSpec`).
+	 * Core mode: `vendor/wheels/tests/...` → `wheels.tests...`,
+	 * `vendor/<pkg>/tests/...` → `vendor.<pkg>.tests...`; anything else is
+	 * taken relative to vendor/wheels/tests/specs.
+	 */
+	public string function $testPathToScope(required string filter, boolean coreTests = false) {
+		var f = trim(arguments.filter);
+		if (!len(f) || !reFind("[/\\]|\.[cC][fF][cC]$", f)) {
+			return f;
+		}
+		f = replace(f, "\", "/", "all");
+		var root = reReplace(replace(variables.projectRoot, "\", "/", "all"), "/+$", "");
+		if (len(root) && len(f) > len(root) && compare(left(f, len(root) + 1), root & "/") == 0) {
+			f = mid(f, len(root) + 2, len(f));
+		}
+		f = reReplace(f, "^(\./)+", "");
+		f = reReplace(f, "/+$", "");
+		f = reReplace(f, "\.[cC][fF][cC]$", "");
+		f = reReplace(f, "/{2,}", "/", "all");
+		if (!len(f)) {
+			return "";
+		}
+		if (arguments.coreTests) {
+			if (reFind("^vendor/wheels/tests(/|$)", f)) {
+				f = mid(f, len("vendor/") + 1, len(f));
+			} else if (!reFind("^(wheels/tests|vendor/[a-z0-9][a-z0-9\-]*/tests)(/|$)", f)) {
+				f = "wheels/tests/specs/" & f;
+			}
+		} else if (!reFind("^tests(/|$)", f)) {
+			f = "tests/specs/" & f;
+		}
+		return replace(f, "/", ".", "all");
+	}
+
+	/**
 	 * Normalize a short filter name to a path the test runner's directory
 	 * regex will accept. App mode prepends `tests.specs.`; core mode
 	 * prepends `wheels.tests.specs.`. Already-qualified inputs pass through
@@ -1626,12 +1713,13 @@ component extends="modules.BaseModule" {
 	 *   "tests.specs.browser" → "tests.specs.browser"
 	 *   "wheels.tests.specs.model" → "wheels.tests.specs.model"
 	 *   "vendor.wheels-sentry.tests" → "vendor.wheels-sentry.tests"
+	 *   "tests/specs/models/BookSpec.cfc" → "tests.specs.models.BookSpec" (a path, issue 3963)
 	 */
 	public string function $normalizeTestFilter(
 		required string filter,
 		boolean coreTests = false
 	) {
-		var f = trim(arguments.filter);
+		var f = $testPathToScope(trim(arguments.filter), arguments.coreTests);
 		if (!len(f)) return "";
 
 		if (arguments.coreTests) {
@@ -1670,8 +1758,12 @@ component extends="modules.BaseModule" {
 		boolean coreTests = false
 	) {
 		var raw = trim(arguments.filter);
+		// A bare spec file name ("BookSpec.cfc") is looked up like "BookSpec".
+		if (reFind("^[^/\\]+\.[cC][fF][cC]$", raw)) {
+			raw = left(raw, len(raw) - 4);
+		}
 		var normalized = $normalizeTestFilter(raw, arguments.coreTests);
-		if (!len(raw) || find(".", raw)) {
+		if (!len(raw) || reFind("[./\\]", raw)) {
 			return normalized;
 		}
 		var specRoot = variables.projectRoot & (arguments.coreTests ? "/vendor/wheels/tests/specs" : "/tests/specs");
