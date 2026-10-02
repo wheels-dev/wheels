@@ -65,7 +65,7 @@ component {
 	 *
 	 * @objectName Name of the variable containing the parent object to represent with this form field.
 	 * @association Name of the association set in the parent object to represent with this form field.
-	 * @keys Primary keys associated with this form field. Note that these keys should be listed in the order that they appear in the database table.
+	 * @keys Keys of the join row for this form field: the parent key, then the other key (for example a post key and a tag id). For a composite-key join model, list them in the order of its primary key columns. A surrogate-`id` join model works too: the keys are matched on its `belongsTo` foreign keys. Either way, declare a `belongsTo` association on the join model for each key column.
 	 * @id Optional. Explicit ID for the generated checkbox input. If not provided, an ID will be generated automatically.
 	 * @label The label text to use in the form control.
 	 * @labelPlacement Whether to place the label before, after, or wrapped around the form control. Label text placement can be controlled using `aroundLeft` or `aroundRight`.
@@ -102,7 +102,7 @@ component {
 			local.checked = false;
 		}
 		arguments.objectName = ListLast(arguments.objectName, ".");
-		local.tagId = (len(trim(arguments.id))) ? arguments.id : "#arguments.objectName#-#arguments.association#-#Replace(arguments.keys, ",", "-", "all")#-_delete";
+		local.tagId = (StructKeyExists(arguments, "id") && Len(Trim(arguments.id))) ? arguments.id : "#arguments.objectName#-#arguments.association#-#Replace(arguments.keys, ",", "-", "all")#-_delete";
 		local.tagName = "#arguments.objectName#[#arguments.association#][#arguments.keys#][_delete]";
 		StructDelete(arguments, "keys");
 		StructDelete(arguments, "objectName");
@@ -131,6 +131,7 @@ component {
 	public boolean function includedInObject(required string objectName, required string association, required string keys) {
 		local.rv = false;
 		local.object = $getObject(arguments.objectName);
+		local.postedKeys = arguments.keys;
 
 		// clean up our key argument if there is a comma on the beginning or end
 		arguments.keys = ReReplace(arguments.keys, "^,|,$", "", "all");
@@ -144,7 +145,15 @@ component {
 		local.iEnd = ArrayLen(local.object[arguments.association]);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.assoc = local.object[arguments.association][local.i];
-			if (IsObject(local.assoc) && local.assoc.key() == arguments.keys) {
+			if (
+				IsObject(local.assoc)
+				&& $nestedCollectionKeyMatches(
+					parent = local.object,
+					association = arguments.association,
+					child = local.assoc,
+					keys = local.postedKeys
+				)
+			) {
 				local.rv = local.i;
 				break;
 			}
@@ -172,11 +181,51 @@ component {
 		local.iEnd = ArrayLen(local.object[arguments.association]);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.assoc = local.object[arguments.association][local.i];
-			if (IsObject(local.assoc) && local.assoc.key() == arguments.keys && StructKeyExists(local.assoc, arguments.property)) {
+			if (
+				IsObject(local.assoc)
+				&& $nestedCollectionKeyMatches(
+					parent = local.object,
+					association = arguments.association,
+					child = local.assoc,
+					keys = arguments.keys
+				)
+				&& StructKeyExists(local.assoc, arguments.property)
+			) {
 				local.rv = local.assoc[arguments.property];
 				break;
 			}
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when a child object in a hasMany association is the
+	 * row named by `keys`, the comma list the association form helpers post. The
+	 * values are compared with the columns the parent maps that list onto (the
+	 * child's primary key, or for a surrogate-key join model its foreign keys).
+	 */
+	public boolean function $nestedCollectionKeyMatches(
+		required any parent,
+		required string association,
+		required any child,
+		required string keys
+	) {
+		local.values = ListToArray(arguments.keys, ",", true);
+		local.columns = arguments.parent.$nestedCollectionKeyColumns(
+			association = arguments.association,
+			keyCount = ArrayLen(local.values)
+		);
+		if (!Len(local.columns)) {
+			return arguments.child.key() == ReReplace(arguments.keys, "^,|,$", "", "all");
+		}
+		local.iEnd = ListLen(local.columns);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.column = ListGetAt(local.columns, local.i);
+			local.childValue = StructKeyExists(arguments.child, local.column) ? arguments.child[local.column] : "";
+			if (!IsSimpleValue(local.childValue) || CompareNoCase(Trim(local.childValue), Trim(local.values[local.i])) != 0) {
+				return false;
+			}
+		}
+		return true;
 	}
 }
