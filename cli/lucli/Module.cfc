@@ -982,6 +982,12 @@ component extends="modules.BaseModule" {
 	private any function $generateDispatch(required string type, required array remaining) {
 		var canonical = $canonicalGeneratorType(lCase(arguments.type));
 
+		// `generate app` creates a project, so it is the one generator that
+		// runs outside one. Every other generator writes under app/, and
+		// resolveProjectRoot() falls back to the cwd when no vendor/wheels is
+		// found, so without this check any directory got app files (#3909).
+		if (canonical != "app") $requireWheelsProject("wheels generate");
+
 		switch (canonical) {
 			case "app":
 				// Delegate to wheels new — pass remaining args as __arguments.
@@ -4085,6 +4091,10 @@ component extends="modules.BaseModule" {
 			// Non-zero exit: printing red and returning "" reported success (#2963).
 			throw(type = "Wheels.InvalidArguments", message = "Unknown destroy type: #type#. Valid types: #arrayToList(validTypes, ', ')#.");
 		}
+
+		// Hardening: a stray app/models/X.cfc outside a project must not be
+		// deleted just because the name matches (#3909).
+		$requireWheelsProject("wheels destroy");
 
 		var svc = getService("destroy");
 
@@ -9777,6 +9787,22 @@ component extends="modules.BaseModule" {
 	private boolean function $isWheelsProjectDir(required string path) {
 		if (!len(arguments.path)) return false;
 		return fileExists(arguments.path & "/config/settings.cfm");
+	}
+
+	/**
+	 * Refuse a project-scoped command outside a Wheels project: print the same
+	 * guidance `wheels start` gives, then throw so the command exits non-zero.
+	 * The tip is repeated in the message because an MCP client sees only the
+	 * error, not the out() lines (#3863).
+	 */
+	private void function $requireWheelsProject(required string command) {
+		if ($isWheelsProjectDir(variables.projectRoot)) return;
+		out("This directory does not look like a Wheels project.", "yellow");
+		out("  Expected: config/settings.cfm under the current directory.", "yellow");
+		out("");
+		out("Tip: cd into your project directory, or run `wheels new <appname>`", "cyan");
+		out("     to scaffold one.", "cyan");
+		throw(type = "Wheels.NotAWheelsProject", message = "#arguments.command#: this directory is not a Wheels project (no config/settings.cfm). cd into your project directory, or run `wheels new <appname>` to scaffold one.");
 	}
 
 	/**
