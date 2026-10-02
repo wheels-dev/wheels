@@ -821,12 +821,65 @@ component {
 	 */
 	public void function $ensureClaimTimeoutColumn() {
 		if ($jobTableHasClaimTimeout()) {
+			// Column present (possibly added out of band): forget any past ALTER failure.
+			$clearClaimTimeoutAlterMemo();
+			return;
+		}
+		// CliBridge builds a fresh JobWorker per poll, so the per-instance ensure runs every
+		// poll. A DB user without ALTER privilege would otherwise re-fire the failing DDL each
+		// poll. After a failed ALTER, back off for a bounded window before re-attempting. This
+		// is TIME-BOUNDED, never a permanent "gave up" flag: the probe above still runs every
+		// call, and the ALTER is retried once the window elapses (a later GRANT or manual ALTER
+		// is then picked up) — consistent with #2780's re-probe rule (#4071).
+		if ($claimTimeoutAlterInBackoff()) {
 			return;
 		}
 		try {
 			queryExecute($claimTimeoutAlterSql(), {}, {datasource = variables.$datasource});
+			$clearClaimTimeoutAlterMemo();
 		} catch (any e) {
+			$recordClaimTimeoutAlterFailure();
 			$warnClaimTimeoutAlterFailedOnce(e.message);
+		}
+	}
+
+	/**
+	 * Seconds to wait before retrying a failed claimTimeout ALTER. Bounded on purpose so a
+	 * DB user without ALTER privilege re-attempts periodically instead of firing the DDL on
+	 * every poll.
+	 */
+	public numeric function $claimTimeoutAlterBackoffWindow() {
+		return 300;
+	}
+
+	/**
+	 * True when a claimTimeout ALTER failed within the back-off window. App-scoped (shared
+	 * across the per-poll JobWorker instances) and TIME-BOUNDED — never a permanent flag.
+	 */
+	public boolean function $claimTimeoutAlterInBackoff() {
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")) {
+			return false;
+		}
+		return DateDiff("s", application.wheels.$claimTimeoutAlterFailedAt, $now()) < $claimTimeoutAlterBackoffWindow();
+	}
+
+	/**
+	 * Record that the claimTimeout ALTER just failed, so the next polls back off rather than
+	 * re-firing the DDL. Safe to call from a catch (writes the application scope, not local).
+	 */
+	public void function $recordClaimTimeoutAlterFailure() {
+		if (StructKeyExists(application, "wheels")) {
+			application.wheels.$claimTimeoutAlterFailedAt = $now();
+		}
+	}
+
+	/**
+	 * Forget any recorded claimTimeout ALTER failure (the column now exists, or the ALTER
+	 * just succeeded), so a later missing-column situation is re-attempted immediately.
+	 */
+	public void function $clearClaimTimeoutAlterMemo() {
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")) {
+			StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
 		}
 	}
 

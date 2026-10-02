@@ -504,6 +504,68 @@ component extends="wheels.WheelsTest" {
 					expect(local.probe.$jobTableHasClaimTimeout()).toBeTrue("processNext must add the column on an existing table");
 				}
 			});
+
+			it("does not retry the claimTimeout ALTER while a recent failure is memoized (##4071)", function() {
+				local.job = new wheels.Job();
+				local.job.$ensureJobTable();
+				local.dropped = false;
+				try {
+					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					local.dropped = true;
+				} catch (any e) {
+					// engine/DB without DROP COLUMN support — skip
+				}
+				if (local.dropped) {
+					try {
+						// Memoise a just-now ALTER failure; CliBridge builds a fresh JobWorker per poll,
+						// so without a back-off the DDL would re-run every poll. During the window the
+						// ALTER must be skipped, leaving the column absent even though the DB would allow it.
+						application.wheels.$claimTimeoutAlterFailedAt = Now();
+						local.job.$ensureClaimTimeoutColumn();
+						expect(local.job.$jobTableHasClaimTimeout()).toBeFalse("ALTER must be skipped during the back-off window");
+						// Clearing the memo lets the next ensure() re-attempt and add the column.
+						StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
+						local.job.$ensureClaimTimeoutColumn();
+						expect(local.job.$jobTableHasClaimTimeout()).toBeTrue("ALTER must run again after the memo is cleared");
+					} finally {
+						StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
+					}
+				}
+			});
+
+			it("re-attempts the claimTimeout ALTER once the back-off window has elapsed (##4071)", function() {
+				local.job = new wheels.Job();
+				local.job.$ensureJobTable();
+				local.dropped = false;
+				try {
+					queryExecute("ALTER TABLE wheels_jobs DROP COLUMN claimTimeout", {}, {datasource = application.wheels.dataSourceName});
+					local.dropped = true;
+				} catch (any e) {
+					// engine/DB without DROP COLUMN support — skip
+				}
+				if (local.dropped) {
+					try {
+						// A failure older than any reasonable window must not suppress a retry.
+						application.wheels.$claimTimeoutAlterFailedAt = DateAdd("s", -3600, Now());
+						local.job.$ensureClaimTimeoutColumn();
+						expect(local.job.$jobTableHasClaimTimeout()).toBeTrue("a stale failure memo must not block the retry");
+					} finally {
+						StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
+					}
+				}
+			});
+
+			it("clears the claimTimeout ALTER-failure memo once the column exists (##4071)", function() {
+				local.job = new wheels.Job();
+				local.job.$ensureJobTable();
+				try {
+					application.wheels.$claimTimeoutAlterFailedAt = Now();
+					local.job.$ensureClaimTimeoutColumn();
+					expect(StructKeyExists(application.wheels, "$claimTimeoutAlterFailedAt")).toBeFalse("a present column must clear any stale failure memo");
+				} finally {
+					StructDelete(application.wheels, "$claimTimeoutAlterFailedAt");
+				}
+			});
 		});
 
 		describe("getStats", function() {
