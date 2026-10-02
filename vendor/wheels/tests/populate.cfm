@@ -24,6 +24,7 @@
 <cfset local.binaryColumnType = "blob">
 <cfset local.textColumnType = "text">
 <cfset local.intColumnType = "int">
+<cfset local.bigintColumnType = "BIGINT">
 <cfset local.floatColumnType = "float">
 <cfset local.decimalColumnType = "decimal(10,2)">
 <cfset local.identityColumnType = "">
@@ -63,6 +64,7 @@
 	<cfset local.bitColumnType      = "NUMBER(1)">
 	<cfset local.bitColumnDefault   = "0">
 	<cfset local.intColumnType = "NUMBER(10)">
+	<cfset local.bigintColumnType = "NUMBER(19)">
 	<cfset local.decimalColumnType = "NUMBER(10,2)">
 	<cfset local.textColumnType = "VARCHAR2(255)">
 	<cfset local.dateTimeDefault = "TIMESTAMP '2000-01-01 18:26:08.490'">
@@ -99,7 +101,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "c_o_r_e_memberteams,c_o_r_e_members,c_o_r_e_teams,c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation,c_o_r_e_uuidrecords,c_o_r_e_refchildren,c_o_r_e_refparents">
+<cfset local.tables = "c_o_r_e_memberteams,c_o_r_e_members,c_o_r_e_teams,c_o_r_e_polycomments,c_o_r_e_polyarticles,c_o_r_e_polyphotos,c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tagassignments,c_o_r_e_postslots,c_o_r_e_codechildren,c_o_r_e_codeparents,c_o_r_e_jkchildren,c_o_r_e_jkparents,c_o_r_e_bigtagassignments,c_o_r_e_bigkeyposts,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES,c_o_r_e_bulkitems,c_o_r_e_casepreservation,c_o_r_e_uuidrecords,c_o_r_e_refchildren,c_o_r_e_refparents">
 <!---
 	On Oracle, append CASCADE CONSTRAINTS so the drop removes incoming FK
 	references along with the table. PURGE skips the recycle bin so the
@@ -205,6 +207,81 @@ CREATE TABLE c_o_r_e_combikeys
 	,id2 int NOT NULL
 	,userId int NOT NULL
 	,PRIMARY KEY(id1,id2)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_tagassignments
+(
+	postid int NOT NULL
+	,tagid int NOT NULL
+	,PRIMARY KEY(postid,tagid)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_postslots
+(
+	postid int NOT NULL
+	,slotnumber int NOT NULL
+	,label varchar(100) NULL
+	,PRIMARY KEY(postid,slotnumber)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_codeparents
+(
+	code varchar(20) NOT NULL
+	,name varchar(100) NULL
+	,PRIMARY KEY(code)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_codechildren
+(
+	id #local.identityColumnType#
+	,parentcode varchar(20) NOT NULL
+	,label varchar(100) NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_jkparents
+(
+	id #local.identityColumnType#
+	,code #local.intColumnType# NOT NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_jkchildren
+(
+	id #local.identityColumnType#
+	,parentcode #local.intColumnType# NOT NULL
+	,label varchar(100) NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_bigkeyposts
+(
+	id #local.bigintColumnType# NOT NULL
+	,title varchar(100) NULL
+	,PRIMARY KEY(id)
+) #local.storageEngine#
+</cfquery>
+
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE c_o_r_e_bigtagassignments
+(
+	postid #local.bigintColumnType# NOT NULL
+	,tagid #local.intColumnType# NOT NULL
+	,PRIMARY KEY(postid,tagid)
 ) #local.storageEngine#
 </cfquery>
 

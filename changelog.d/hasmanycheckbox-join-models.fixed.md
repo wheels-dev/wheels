@@ -1,0 +1,3 @@
+- `hasManyCheckBox()` nested saves now set both keys on a new composite-key join row. Before, only the parent key was set and the insert failed with a NOT NULL error (#3884)
+- `hasManyCheckBox()` now works with a surrogate-`id` join model (the shape `wheels generate model` creates). The posted keys are matched on the join model's foreign keys, so checking a box adds the row, unchecking removes it, and the box shows as checked for an existing row. Before, the first key was read as the join row's `id`, so unchecking a box could delete an unrelated join row (#3885)
+- `hasManyCheckBox()` no longer throws `Element ID is undefined in ARGUMENTS` on Adobe ColdFusion when it's called without an `id`
