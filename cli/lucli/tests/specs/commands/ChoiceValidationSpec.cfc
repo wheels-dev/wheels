@@ -34,7 +34,6 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var specs = mod.mcpToolSpecs();
 				var expected = {
 					"analyze": "target",
-					"create": "type",
 					"db": "subcommand",
 					"destroy": "type",
 					"generate": "type",
@@ -177,9 +176,8 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				arrayAppend(tools, ["info", "validate"], true);
 				for (var tool in tools) {
 					var callArgs = {"bogus_key": "y"};
-					// create and generate need a valid call shape so the unknown key
+					// generate and destroy need a valid call shape so the unknown key
 					// is the only thing wrong with it.
-					if (tool == "create") callArgs = {"type": "app", "name": "specapp", "bogus_key": "y"};
 					if (tool == "generate") callArgs = {"type": "model", "name": "SpecWidget", "bogus_key": "y"};
 					if (tool == "destroy") callArgs = {"type": "model", "name": "SpecWidget", "bogus_key": "y"};
 					var state = {message: "", threw: false};

@@ -196,6 +196,7 @@ component extends="modules.BaseModule" {
 			"g",        // alias for generate
 			"dbmigrate", // alias for migrate — a duplicate tool with no inputSchema otherwise
 			"new",      // scaffolds a whole new Wheels project
+			"create",   // `create app` runs new() — same reason (#3910)
 			"console",  // interactive CFML REPL — not usable over stdio
 			"deploy",   // SSH/pushes/restarts on remote hosts — side effects off-machine (#2963)
 			"start",    // dev server lifecycle (stateful)
@@ -267,7 +268,6 @@ component extends="modules.BaseModule" {
 	public struct function mcpToolSpecs() {
 		return {
 			"analyze" = analyzeArgSpec().toInputSchema(),
-			"create"  = createArgSpec().toInputSchema(),
 			"db"      = dbArgSpec().toInputSchema(),
 			"destroy" = destroyArgSpec().toInputSchema(),
 			"doctor"  = verboseFlagSpec().toInputSchema(),
@@ -348,10 +348,10 @@ component extends="modules.BaseModule" {
 	 * Bind `wheels create`'s <type> and <name> the way ArgSpec.parse() does (a
 	 * typed token, else the named key an MCP tools/call sends, #2963) and
 	 * collect what to forward to new(): the name, any further tokens, then the
-	 * remaining named keys as flags. createArgSpec() marks both positionals
-	 * required for the MCP schema; this binding stays lenient so an unknown
+	 * remaining named keys as flags. The binding stays lenient so an unknown
 	 * type still reports "Unknown create type" and `create app` with no name
-	 * still reaches new()'s own handling. Public for specs.
+	 * still reaches new()'s own handling. `create` is CLI-only (hidden from
+	 * MCP, #3910), so it advertises no schema. Public for specs.
 	 */
 	public struct function $createArgs(required struct coll) {
 		// Non-strict on purpose: create forwards every other key to new(), whose
@@ -495,18 +495,15 @@ component extends="modules.BaseModule" {
 			.flag(name = "force", default = false, description = "Skip the confirmation prompt");
 	}
 
+	// Feeds only the MCP inputSchema (mcpToolSpecs). `app` is left out of the
+	// type choices because app creation is CLI-only, like `new` and `create`
+	// (#3910); `wheels generate app <name>` on the command line is unchanged.
 	private any function generateArgSpec() {
 		return new services.ArgSpec()
-			.positional(name = "type", required = true, choices = "model,controller,view,scaffold,migration,api-resource,route,test,property,helper,policy,snippets,admin,auth,app", description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, auth, or app")
-			.positional(name = "name", description = "Artifact name (model/controller/resource name, or the app name for `generate app`)")
+			.positional(name = "type", required = true, choices = "model,controller,view,scaffold,migration,api-resource,route,test,property,helper,policy,snippets,admin,auth", description = "What to generate: model, controller, view, scaffold, migration, api-resource, route, test, property, helper, policy, snippets, admin, or auth")
+			.positional(name = "name", description = "Artifact name (model, controller or resource name)")
 			.positional(name = "attributes", description = "Column definitions for model/scaffold (space- or comma-delimited name:type pairs, e.g. 'title:string body:text')")
 			.flag(name = "dry-run", default = false, description = "Print the would-be paths and write nothing");
-	}
-
-	private any function createArgSpec() {
-		return new services.ArgSpec()
-			.positional(name = "type", required = true, choices = "app", description = "What to create: app")
-			.positional(name = "name", required = true, description = "Application name");
 	}
 
 	private any function verboseFlagSpec() {

@@ -1,0 +1,1 @@
+- App creation is CLI-only over MCP, as `new` already was: the stdio MCP server no longer lists the `create` tool, and `generate` no longer advertises `app` as a `type` choice. `create`'s advertised type+name schema also never matched the `new` options it forwards (such as `port`). `wheels create app` and `wheels generate app` on the command line are unchanged (#3910)
