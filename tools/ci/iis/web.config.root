@@ -51,8 +51,8 @@
         <!-- 3. Format suffix (/posts.json). This translates the Tuckey "Convert dot to format
                 parameter" rule and is DISABLED on purpose. Rule 4 alone is enough: the Wheels
                 router reads the .json/.xml suffix from PATH_INFO itself. /widgets.json returned
-                JSON on ACF 2025 without this rule. The shipped Tuckey regex
-                (^/(.*)\\.(\\w+)$) double-escapes its backslashes, so it never matches a normal URL.
+                JSON on ACF 2025 without this rule. The Tuckey rule it translated never matched
+                (its regex was double-escaped) and was removed from urlrewrite.xml (#4132).
                 Enable this only if you have a reason to send ?format= explicitly. Real files
                 with an extension are already handled by rule 1. -->
         <rule name="Wheels: format suffix to ?format=" enabled="false" stopProcessing="true">
