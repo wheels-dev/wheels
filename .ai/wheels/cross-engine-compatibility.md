@@ -104,7 +104,9 @@ var result = fn();
 
 A named argument whose *name* is a quoted string literal — `obj.method("name" = value)` — is a **compile error on Adobe CF 2023 only** (`MissingNameException: Invalid construct: Either argument or name is missing` / "each parameter must have a name"). Lucee 6/7, BoxLang, **and Adobe CF 2025** all accept it. This is the inverse footprint of the related invariants: the parenthesized-`new` receiver (invariant 16a) fails on both Adobe engines, the zero-arg `application`-scope call (16b/16b-ext) is Adobe 2025 only, and this one is the lone **Adobe 2023-only** shape — so an Adobe 2025 smoke, or Lucee-only local verification, does **not** cover it.
 
-You only reach for a quoted argument name when the name is otherwise illegal as a bare token — a `$`-prefixed or hyphenated argument. Verified boundaries (do **not** "fix" these):
+**Context-independent (unlike the closure-sensitive 16b-ext).** Probe-verified on adobe2023/62023, the quoted named-arg call fails identically in every call context tested — a single-expression arrow (`(x) => obj.method("n" = x)`), a block-bodied arrow, a regular `function()` closure, and a plain statement in a non-closure method body all throw the same `MissingNameException`. There is no "safe" context; only changing the call shape (below) helps.
+
+You only reach for a quoted argument name when the name is otherwise illegal as a bare token — a `$`-prefixed or hyphenated argument. Measured boundaries that compile on adobe2023 (do **not** "fix" these):
 - an *unquoted* named argument, `obj.method(name = value)`, compiles on every engine;
 - a quoted key in a *struct literal*, `{"$x" = 1}`, compiles everywhere — it is a struct key, not a function-argument name;
 - passing the same `$`-prefixed value via `argumentCollection` compiles everywhere.
