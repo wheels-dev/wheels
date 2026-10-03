@@ -137,10 +137,14 @@ component {
 			// returning nothing. The "id" fallback dialect has no monotonic key, so it
 			// keeps the timestamp-based resume.
 			if (local.hasSeq) {
+				// IS NOT NULL so a reference row whose seq hasn't been populated yet (a row
+				// that slipped in during a staged upgrade's no-default window) is treated as
+				// "no usable cursor" and falls through to the since window below, rather than
+				// producing `seq > NULL`, which matches nothing and would return empty forever.
 				local.ref = queryExecute(
 					"SELECT #local.orderCol# AS ord
 					FROM wheels_events
-					WHERE id = :lastEventId AND channel = :channel",
+					WHERE id = :lastEventId AND channel = :channel AND #local.orderCol# IS NOT NULL",
 					{
 						lastEventId: {value: arguments.lastEventId, cfsqltype: "cf_sql_varchar"},
 						channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"}
@@ -462,21 +466,23 @@ component {
 		if (!Len(local.seqDDL)) {
 			return "id";
 		}
-		if ($seqColumnExists()) {
+		// "Ready" means more than "the column exists": on the pg-family staged path the
+		// column is briefly present with no default, and treating that as done would let a
+		// concurrent publish insert a NULL seq. $seqColumnReady() requires a default/identity
+		// there, so a half-finished upgrade is re-entered and completed below.
+		if ($seqColumnReady(arguments.dbType)) {
 			return "seq";
 		}
 
-		// The upgrade is capability-based, not engine-name-based: $detectDatabaseType()
-		// reports CockroachDB as "postgresql" (pg wire), so rather than sniff the version
-		// string we just try each ADD shape and keep whichever actually produces the
-		// column. Each attempt's outcome is NOT trusted on its own — concurrent instances
-		// race the ALTER and a loser throws "column already exists" though seq now exists,
-		// so a re-probe after each attempt is authoritative (also prevents a race loser
-		// sticking on the id fallback until restart).
+		// Capability-based, not engine-name-based: $detectDatabaseType() reports CockroachDB
+		// as "postgresql" (pg wire), so rather than sniff the version we try each ADD shape
+		// and keep whichever produces a READY column. The re-check after each attempt is
+		// authoritative over the ALTER's own result (concurrent instances race the add).
 		var errs = {identity = "", sequence = ""};
 
-		// Attempt 1: the standard identity ALTER. Works on SQL Server, MySQL, Oracle, H2
-		// and real PostgreSQL. Oracle spells ADD with the column def in parentheses.
+		// Attempt 1: the standard identity ALTER (atomic — column + identity together).
+		// Works on SQL Server, MySQL, Oracle, H2 and real PostgreSQL. Oracle spells ADD
+		// with the column def in parentheses.
 		local.alter = (arguments.dbType == "oracle")
 			? "ALTER TABLE wheels_events ADD (#local.seqDDL#)"
 			: "ALTER TABLE wheels_events ADD #local.seqDDL#";
@@ -485,7 +491,7 @@ component {
 		} catch (any identityError) {
 			errs.identity = identityError.message;
 		}
-		if ($seqColumnExists()) {
+		if ($seqColumnReady(arguments.dbType)) {
 			return "seq";
 		}
 
@@ -493,18 +499,19 @@ component {
 		// implements sequences but NOT ALTER ADD ... GENERATED AS IDENTITY on an existing
 		// table (CockroachDB). CockroachDB also cannot ADD a column whose DEFAULT is a
 		// sequence to a POPULATED table in one step — nextval() can't be evaluated during a
-		// schema backfill (crdb #42508) — so build it in stages that each avoid a
-		// backfill-time sequence call:
+		// schema backfill (crdb #42508) — so build it in idempotent stages, each of which
+		// completes a partial prior run and avoids a backfill-time sequence call:
 		//   1. create the sequence (default CACHE 1 -> monotonic across nodes),
-		//   2. add the column nullable (no DEFAULT -> no backfill expression),
-		//   3. point its DEFAULT at the sequence (new rows now get values),
-		//   4. backfill existing rows with a plain UPDATE (DML, not a schema backfill).
-		// The DEFAULT is set (3) BEFORE the backfill (4), so new publishes are covered even
-		// if the backfill is interrupted; steps are idempotent (IF NOT EXISTS /
-		// WHERE seq IS NULL) so a concurrent or retried run converges. Gated to the
-		// postgresql family because nextval('name') is pg-specific. Fresh CockroachDB
-		// CREATE already succeeds with GENERATED AS IDENTITY (no rows to backfill); both
-		// yield a monotonic INT8 seq, so fresh and upgraded tables order identically.
+		//   2. add the column nullable, ONLY if a prior run didn't already add it,
+		//   3. point its DEFAULT at the sequence — this is what makes the column READY, so a
+		//      concurrent probe never treats a default-less column as done,
+		//   4. backfill existing rows in createdAt,id order with a plain UPDATE (DML, not a
+		//      schema backfill), touching only WHERE seq IS NULL.
+		// Step 3 precedes step 4 so new publishes are covered before the backfill runs.
+		// Gated to the postgresql family because nextval('name') is pg-specific. Fresh
+		// CockroachDB CREATE already succeeds with GENERATED AS IDENTITY (no rows to
+		// backfill); both yield a monotonic INT8 seq, so fresh and upgraded tables order
+		// identically.
 		if (arguments.dbType == "postgresql") {
 			try {
 				queryExecute(
@@ -512,25 +519,35 @@ component {
 					{},
 					{datasource: variables.$datasource}
 				);
-				queryExecute(
-					"ALTER TABLE wheels_events ADD COLUMN seq INT8",
-					{},
-					{datasource: variables.$datasource}
-				);
+				if (!$seqColumnExists()) {
+					queryExecute(
+						"ALTER TABLE wheels_events ADD COLUMN seq INT8",
+						{},
+						{datasource: variables.$datasource}
+					);
+				}
 				queryExecute(
 					"ALTER TABLE wheels_events ALTER COLUMN seq SET DEFAULT nextval('wheels_events_seq')",
 					{},
 					{datasource: variables.$datasource}
 				);
 				queryExecute(
-					"UPDATE wheels_events SET seq = nextval('wheels_events_seq') WHERE seq IS NULL",
+					"UPDATE wheels_events AS w
+					SET seq = s.rn
+					FROM (
+						SELECT id, nextval('wheels_events_seq') AS rn
+						FROM (
+							SELECT id FROM wheels_events WHERE seq IS NULL ORDER BY createdAt ASC, id ASC
+						) AS ordered
+					) AS s
+					WHERE w.id = s.id",
 					{},
 					{datasource: variables.$datasource}
 				);
 			} catch (any sequenceError) {
 				errs.sequence = sequenceError.message;
 			}
-			if ($seqColumnExists()) {
+			if ($seqColumnReady(arguments.dbType)) {
 				return "seq";
 			}
 		}
@@ -540,7 +557,7 @@ component {
 		local.identityReason = Len(errs.identity) ? errs.identity : "n/a";
 		local.sequenceReason = Len(errs.sequence) ? errs.sequence : "n/a";
 		writeLog(
-			text="Could not add a seq column to wheels_events on #arguments.dbType# (identity ALTER: #local.identityReason#; sequence ALTER: #local.sequenceReason#); ordering falls back to createdAt+id, so events sharing a timestamp tick may order arbitrarily.",
+			text="Could not add a usable seq column to wheels_events on #arguments.dbType# (identity ALTER: #local.identityReason#; sequence ALTER: #local.sequenceReason#); ordering falls back to createdAt+id, so events sharing a timestamp tick may order arbitrarily.",
 			type="warning",
 			file="wheels_channels"
 		);
@@ -549,15 +566,47 @@ component {
 
 	/**
 	 * True when the wheels_events table currently has a seq column. A cheap WHERE 1=0
-	 * probe used to decide whether the monotonic column needs adding and, after each
-	 * ALTER attempt, whether it now exists (authoritative over the ALTER's own result,
-	 * which is unreliable when instances race the add).
+	 * probe used to decide whether the monotonic column needs adding and, after an ALTER,
+	 * whether the column now exists at all.
 	 */
 	private boolean function $seqColumnExists() {
 		try {
 			queryExecute("SELECT seq FROM wheels_events WHERE 1=0", {}, {datasource: variables.$datasource});
 			return true;
 		} catch (any e) {
+			return false;
+		}
+	}
+
+	/**
+	 * True when wheels_events has a seq column that is actually USABLE for ordering, not
+	 * merely present. On engines whose identity ALTER is atomic (SQL Server, MySQL, Oracle,
+	 * H2, real PostgreSQL) column existence is enough. On the postgresql family the column
+	 * is built in stages and is briefly present with no default; there, "ready" also
+	 * requires a column default or identity — so a concurrent probe never treats a
+	 * default-less column as done (which would let new rows insert a NULL seq and silently
+	 * break the seq-based resume), and a half-finished upgrade is re-entered and completed.
+	 */
+	private boolean function $seqColumnReady(required string dbType) {
+		if (!$seqColumnExists()) {
+			return false;
+		}
+		if (arguments.dbType != "postgresql") {
+			return true;
+		}
+		try {
+			local.q = queryExecute(
+				"SELECT 1 AS ready
+				FROM information_schema.columns
+				WHERE table_name = 'wheels_events'
+				AND column_name = 'seq'
+				AND (column_default IS NOT NULL OR is_identity = 'YES')",
+				{},
+				{datasource: variables.$datasource}
+			);
+			return local.q.recordCount GT 0;
+		} catch (any e) {
+			// Can't introspect — treat as not ready so the idempotent staged steps run.
 			return false;
 		}
 	}

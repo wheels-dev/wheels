@@ -292,6 +292,88 @@ component extends="wheels.WheelsTest" {
 				expect(events.data[2]).toBe('{"n":2}');
 			});
 
+			it("heals a half-upgraded seq column (present, no default) and resumes past a NULL seq", function() {
+				// Reproduces a wheels_events table left mid-upgrade: the seq column exists but
+				// has no default (the staged SET DEFAULT never ran), so rows can be inserted
+				// with a NULL seq. A fresh adapter must (a) finish the upgrade — SET DEFAULT +
+				// ordered backfill — and (b) resume safely past a NULL-seq row instead of
+				// returning nothing. Only the postgresql family has this staged state.
+				var probe = new wheels.channel.DatabaseAdapter();
+				var dbType = probe.$detectDatabaseType();
+				if (dbType != "postgresql") {
+					skip("the staged half-upgrade state only occurs on the postgresql family");
+				}
+
+				// Warm (creates the table), then force the half-upgraded shape: drop seq and
+				// re-add it nullable with NO default.
+				probe.publish(channel = "test.half.warm", event = "e", data = "warm");
+				var dropState = {ok = false};
+				try {
+					queryExecute(
+						"ALTER TABLE wheels_events DROP COLUMN seq",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					dropState.ok = true;
+				} catch (any e) {
+					// Can't simulate the state here.
+				}
+				if (!dropState.ok) {
+					skip("cannot drop seq to simulate the half-upgraded table on [#dbType#]");
+				}
+				queryExecute(
+					"ALTER TABLE wheels_events ADD COLUMN seq INT8",
+					{},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				var channelName = "test.half.#Replace(CreateUUID(), '-', '', 'all')#";
+				var slippedId = "evt-half-slip-#Replace(CreateUUID(), '-', '', 'all')#";
+				// A row that slipped in during the no-default window: explicit NULL seq.
+				queryExecute(
+					"INSERT INTO wheels_events (id, channel, event, data, createdAt, seq) VALUES (:id, :ch, 'e', 'slipped', :ts, NULL)",
+					{
+						id: {value: slippedId, cfsqltype: "cf_sql_varchar"},
+						ch: {value: channelName, cfsqltype: "cf_sql_varchar"},
+						ts: {value: Now(), cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				// (a) A fresh adapter detects the column is not READY (no default) and finishes
+				// the upgrade; its publish then gets a real seq and the slipped row backfills.
+				sleep(20);
+				var laterId = "evt-half-later-#Replace(CreateUUID(), '-', '', 'all')#";
+				var healer = new wheels.channel.DatabaseAdapter();
+				healer.publish(channel = channelName, event = "e", data = "later", id = laterId);
+
+				var healed = queryExecute(
+					"SELECT COUNT(*) AS c FROM wheels_events WHERE (id = :a OR id = :b) AND seq IS NOT NULL",
+					{
+						a: {value: slippedId, cfsqltype: "cf_sql_varchar"},
+						b: {value: laterId, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+				expect(healed.c[1]).toBe(2);
+
+				// (b) Resume safety: force another row with an explicit NULL seq AFTER the column
+				// is ready (the ready path does not backfill), then resume from it — poll must
+				// fall back to the since window and still return the later event, not nothing.
+				var nullCursorId = "evt-half-nullcur-#Replace(CreateUUID(), '-', '', 'all')#";
+				queryExecute(
+					"INSERT INTO wheels_events (id, channel, event, data, createdAt, seq) VALUES (:id, :ch, 'e', 'nullcur', :ts, NULL)",
+					{
+						id: {value: nullCursorId, cfsqltype: "cf_sql_varchar"},
+						ch: {value: channelName, cfsqltype: "cf_sql_varchar"},
+						ts: {value: DateAdd("n", -2, Now()), cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+				var resumed = healer.poll(channel = channelName, lastEventId = nullCursorId, since = DateAdd("n", -5, Now()));
+				expect(ListFindNoCase(ValueList(resumed.id), laterId) > 0).toBeTrue();
+			});
+
 			it("cleanup removes old events", function() {
 				adapter.poll(channel = "test.cleanup", since = DateAdd("n", -1, Now()));
 				var eventId = "old-event-cleanup-#Replace(CreateUUID(), '-', '', 'all')#";
