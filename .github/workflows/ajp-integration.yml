@@ -6,6 +6,9 @@ name: TestClient works behind an AJP front end
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   ajp:
     runs-on: ubuntu-latest

@@ -24,11 +24,20 @@ if ! up_log=$(dc up -d lucee7 httpd 2>&1); then
   echo "compose up failed:"; echo "$up_log" | tail -5; exit 1
 fi
 echo "waiting for Lucee through httpd/AJP on :$PORT ..."
+ready=0
 for _ in $(seq 1 120); do
   code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' -H 'Host: localhost' "http://127.0.0.1:$PORT/" || true)
-  [ "$code" = 200 ] || [ "$code" = 302 ] || [ "$code" = 404 ] && break
+  if [ "$code" = 200 ] || [ "$code" = 302 ] || [ "$code" = 404 ]; then
+    ready=1
+    break
+  fi
   sleep 5
 done
+if [ "$ready" != 1 ]; then
+  echo "::error::front end never answered through httpd/AJP on :$PORT (last HTTP code: ${code:-none})"
+  dc logs --tail 20 lucee7 httpd 2>&1 | tail -40
+  exit 1
+fi
 echo "front end answered: $code"
 
 curl -s -m 1800 -H 'Host: localhost' \
