@@ -28,10 +28,7 @@ component {
 	/**
 	 * Initialize the test client with a base URL.
 	 *
-	 * @baseUrl The base URL for all requests (e.g. "http://localhost:8080")
-	 */
-	/**
-	 * @baseUrl     Origin the requests go to.
+	 * @baseUrl     The base URL for all requests (e.g. "http://localhost:8080").
 	 * @testContext Send the test context (header and cookie) with every request
 	 *              when the client is created inside a test-runner request and
 	 *              baseUrl points at the test server (see $isTestHost()), so the

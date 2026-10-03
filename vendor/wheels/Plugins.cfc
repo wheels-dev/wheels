@@ -832,11 +832,6 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
-	 * Invokes the onPluginLoad lifecycle hook if defined on the plugin.
-	 * Builds a context struct (not the application scope directly) to work
-	 * around Adobe CF's limitation on function members in the application scope.
-	 */
-	/**
 	 * Isolated hook context for onPluginLoad / onPluginActivate.
 	 * Never the live application scope and never a StructCopy of it
 	 * (sync-back would plant attacker keys). registerMiddleware writes
@@ -851,6 +846,11 @@ component output="false" extends="wheels.Global"{
 		return local.context;
 	}
 
+	/**
+	 * Invokes the onPluginLoad lifecycle hook if defined on the plugin.
+	 * Builds a context struct (not the application scope directly) to work
+	 * around Adobe CF's limitation on function members in the application scope.
+	 */
 	private void function $invokeOnPluginLoad(required string pluginKey, required any plugin) {
 		if (!StructKeyExists(arguments.plugin, "onPluginLoad") || !IsCustomFunction(arguments.plugin.onPluginLoad)) {
 			return;
