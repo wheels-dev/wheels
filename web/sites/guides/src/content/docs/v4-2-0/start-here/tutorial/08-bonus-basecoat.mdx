@@ -50,8 +50,8 @@ You'll swap out the simple.css stylesheet tag, add the basecoat asset, and rewri
 
 The canonical way to install a Wheels package is `wheels packages add <name>`. The CLI talks to the [`wheels-dev/wheels-packages`](https://github.com/wheels-dev/wheels-packages) registry, downloads a verified tarball, checks the SHA-256, and extracts to `vendor/<name>/`. From that moment on, the package is active — the framework's `PackageLoader` auto-discovers it on the next app start.
 
-<Aside type="caution">
-  The verb is `add`, not `install`. Typing `wheels packages install <name>` reaches LuCLI's built-in extension installer instead of the Wheels package handler — you'll get a confusing `[INFO] No git or extension dependencies to install` and nothing actually installs. See [`wheels packages` CLI reference](/v4-2-0/digging-deeper/packages/) for why.
+<Aside type="note">
+  `wheels packages install <name>` works too: `install` is an alias of `add`. This tutorial uses `add` because it works on every 4.x CLI; see the [`wheels packages` CLI reference](/v4-2-0/digging-deeper/packages/).
 </Aside>
 
 <Steps>
