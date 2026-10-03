@@ -29,9 +29,9 @@ component extends="wheels.WheelsTest" {
 				}
 			})
 
-			// The parser runs before any query, so this holds on every database,
-			// including SQL Server and Oracle, which cap how many values a query binds.
-			it("parses a 5000-key IN list into one bound list parameter", () => {
+			// The parser runs before any query, so this holds on every database. On Oracle
+			// the list comes back split into groups of at most 1000 (#3906).
+			it("parses a 5000-key IN list into bound list parameters", () => {
 				var where = "id IN (#ArrayToList(keys)#)";
 				var parts = g.model("author").$whereClause(where = where);
 				parts = g.model("author").$addWhereClauseParameters(sql = parts, where = where);
@@ -41,39 +41,51 @@ component extends="wheels.WheelsTest" {
 						ArrayAppend(lists, part);
 					}
 				}
-				expect(ArrayLen(lists)).toBe(1);
-				expect(ListLen(lists[1].value)).toBe(5000);
+				var maxSize = g.model("author").$classData().adapter.$maxInListSize();
+				expect(ArrayLen(lists)).toBe(maxSize > 0 ? Ceiling(5000 / maxSize) : 1);
+				var total = 0;
+				for (var list in lists) {
+					expect(ListLen(list.value)).toBeLTE(maxSize > 0 ? maxSize : 5000);
+					total += ListLen(list.value);
+				}
+				expect(total).toBe(5000);
 			})
 
 			it("parses a 5000-key whereIn", () => {
-				// Running the query binds one parameter per key: SQL Server allows 2100 per
-				// statement and Oracle 1000 per IN list (ORA-01795). Chunking is #3906.
+				// SQL Server binds at most about 2100 parameters per statement, so the query
+				// is refused with a clear error before it runs (#3906). Oracle splits the list
+				// into groups of 1000 and runs it.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					skip("SQL Server caps a query at 2100 bound parameters (##3906)");
-				} else if (g.get("adapterName") == "OracleModel") {
-					skip("Oracle caps an IN list at 1000 values, ORA-01795 (##3906)");
+					expectTooManyParameters(() => {
+						g.model("author").whereIn("id", keys).count();
+					});
+					return;
 				}
 				expect(g.model("author").whereIn("id", keys).count()).toBe(g.model("author").count());
 			})
 
 			it("parses a 5000-key whereNotIn", () => {
-				// Running the query binds one parameter per key: SQL Server allows 2100 per
-				// statement and Oracle 1000 per IN list (ORA-01795). Chunking is #3906.
+				// SQL Server binds at most about 2100 parameters per statement, so the query
+				// is refused with a clear error before it runs (#3906). Oracle splits the list
+				// into groups of 1000 and runs it.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					skip("SQL Server caps a query at 2100 bound parameters (##3906)");
-				} else if (g.get("adapterName") == "OracleModel") {
-					skip("Oracle caps an IN list at 1000 values, ORA-01795 (##3906)");
+					expectTooManyParameters(() => {
+						g.model("author").whereNotIn("id", keys).count();
+					});
+					return;
 				}
 				expect(g.model("author").whereNotIn("id", keys).count()).toBe(0);
 			})
 
 			it("parses a 5000-key IN list in a hand-written where string", () => {
-				// Running the query binds one parameter per key: SQL Server allows 2100 per
-				// statement and Oracle 1000 per IN list (ORA-01795). Chunking is #3906.
+				// SQL Server binds at most about 2100 parameters per statement, so the query
+				// is refused with a clear error before it runs (#3906). Oracle splits the list
+				// into groups of 1000 and runs it.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					skip("SQL Server caps a query at 2100 bound parameters (##3906)");
-				} else if (g.get("adapterName") == "OracleModel") {
-					skip("Oracle caps an IN list at 1000 values, ORA-01795 (##3906)");
+					expectTooManyParameters(() => {
+						g.model("author").findAll(where = "id IN (#ArrayToList(keys)#)", returnAs = "query");
+					});
+					return;
 				}
 				var rows = g.model("author").findAll(where = "id IN (#ArrayToList(keys)#)", returnAs = "query");
 				expect(rows.recordCount).toBe(g.model("author").count());
@@ -89,6 +101,21 @@ component extends="wheels.WheelsTest" {
 
 		});
 
+	}
+
+	// Runs the call and expects Wheels.TooManyParameters, with the limit and the count named.
+	private void function expectTooManyParameters(required any callback) {
+		var state = {type = "", message = ""};
+		try {
+			arguments.callback();
+		} catch (any e) {
+			state.type = e.type;
+			state.message = e.message;
+		}
+		expect(state.type).toBe("Wheels.TooManyParameters");
+		var adapter = g.model("author").$classData().adapter;
+		expect(state.message).toInclude("#adapter.$maxBoundParameters()#");
+		expect(state.message).toInclude("5000");
 	}
 
 }

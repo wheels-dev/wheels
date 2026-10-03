@@ -19,6 +19,10 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['time'] = {name = 'TIME'};
 	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
 	variables.sqlTypes['uuid'] = {name = 'VARBINARY', limit = 16};
+	variables.sqlTypes['uniqueidentifier'] = {name = 'CHAR', limit = 36};
+	// An expression default needs MySQL 8.0.13+ (MariaDB 10.2+); Migration.init() turns it
+	// off for older servers (#4094).
+	variables.uuidDefaultSQL = '(UUID())';
 
 	/**
 	 * name of database adapter

@@ -99,12 +99,12 @@ component extends="wheels.WheelsTest" {
 
 			// One restore pass that writes an ODBC date escape verbatim and a backslash
 			// literal through the adapter, with parameterize=false, in both MySQL sql_modes.
-			// MySQL only: a {ts} escape in the SQL text fails on Oracle whatever this
-			// restore does with backslashes (#4084).
+			// MySQL only: backslash handling depends on MySQL's sql_mode, which no other
+			// database has. Inline dates on Oracle are covered by inlineDateLiteralSpec.
 			it("restores an ODBC date escape and a backslash literal in one where string on MySQL", () => {
 				var adapterName = g.get("adapterName");
 				if (!FindNoCase("MySQL", adapterName)) {
-					skip("MySQL/MariaDB sql_mode behaviour, not `#adapterName#` (Oracle: ##4084).");
+					skip("MySQL/MariaDB sql_mode behaviour, not `#adapterName#`.");
 				}
 				var ds = g.get("dataSourceName");
 				var state = {counts = {}, modes = {}, savedMode = ""};

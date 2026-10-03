@@ -129,7 +129,7 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: ./.github/actions/setup-wheels-test-env
         with:
-          port: '60007'
+          port: '30007'
           install-playwright: 'false'
 
       - name: Run Address Review

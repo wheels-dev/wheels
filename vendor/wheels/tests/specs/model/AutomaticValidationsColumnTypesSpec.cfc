@@ -80,9 +80,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects a string longer than its column", () => {
-				if (variables.adapterName == "CockroachDB") {
-					skip("CockroachDB automatic validations do not enforce the string length (##4101).");
-				}
 				var props = $validProperties();
 				props.requiredName = RepeatString("x", 21);
 				$expectRejectedOn(props, "requiredName");
@@ -102,9 +99,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects a fraction in an integer column", () => {
-				if (variables.adapterName == "Oracle") {
-					skip("Oracle migrator integer columns are a bare NUMBER, which the model treats as a float (##4097).");
-				}
 				var props = $validProperties();
 				props.quantity = "1.5";
 				$expectRejectedOn(props, "quantity");

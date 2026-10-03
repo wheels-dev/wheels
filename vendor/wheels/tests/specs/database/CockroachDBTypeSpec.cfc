@@ -75,7 +75,7 @@ component extends="wheels.WheelsTest" {
 					expect(intType).toBe("INT");
 
 					var stringType = migrator.typeToSQL(type = "string");
-					expect(stringType).toInclude("STRING");
+					expect(stringType).toBe("VARCHAR(255)");
 
 					var boolType = migrator.typeToSQL(type = "boolean");
 					expect(boolType).toBe("BOOL");

@@ -93,6 +93,8 @@ done
 | Adobe 2025 | `adobe2025` | 62025 |
 | BoxLang | `boxlang` | 60001 |
 
+`compose.yml` publishes every engine port on `127.0.0.1` only. From Wheels 4.2 the `/wheels/*` dev tools (the test runner included) answer only a loopback socket peer, and a request through Docker port publishing arrives from the gateway of the compose project's network instead. So each engine's `tools/docker/<engine>/settings.cfm` sets `devToolsAllowedRemoteAddresses` to the private ranges Docker draws networks from: `172.16.0.0/12`, `192.168.0.0/16` (Docker Desktop moves on to `192.168.x` once the `172.x` pools are in use) and `10.0.0.0/8` (a customised `default-address-pools`). A `403` saying "Wheels dev tools only accept requests from this machine" means the network came from a range that isn't on that list. This allowlist is test infrastructure only: don't copy it into an app.
+
 <Aside type="tip">
   At minimum, run one Lucee and one Adobe before pushing — their runtimes diverge in ways pure-Lucee tests don't catch. Do not iterate on Adobe failures through CI; reproduce locally (round-tripping GitHub Actions burns ~20 minutes per attempt).
 </Aside>

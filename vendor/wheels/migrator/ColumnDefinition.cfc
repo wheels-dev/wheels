@@ -56,6 +56,16 @@ component extends="Base" {
 				local.options[local.argumentName] = this[local.argumentName];
 			}
 		}
+		// `newid()` is SQL Server's UUID generator; use the adapter's own (#4094).
+		if (
+			StructKeyExists(local.options, "type") && local.options.type == "uniqueidentifier"
+			&& StructKeyExists(local.options, "default") && local.options.default == "newid()"
+		) {
+			local.options.default = this.adapter.$uuidDefaultSQL();
+			if (!Len(local.options.default)) {
+				StructDelete(local.options, "default");
+			}
+		}
 		arguments.sql = this.adapter.addColumnOptions(sql = arguments.sql, options = local.options);
 		return arguments.sql;
 	}

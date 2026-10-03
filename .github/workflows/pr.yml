@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       WHEELS_CI: "true"
-      WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
+      WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:30007"
       WHEELS_BROWSER_CI_ENABLE: "true"
     steps:
       - uses: actions/checkout@v5
@@ -97,12 +97,12 @@ jobs:
           cp tools/ci/lucee.ci.json lucee.json
 
           # Start server (downloads Lucee Express on first run)
-          nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
+          nohup lucli server run --port=30007 > /tmp/lucli-server.log 2>&1 &
           echo $! > /tmp/lucli-server.pid
 
           echo "Waiting for Lucee to start..."
           for i in $(seq 1 120); do
-            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:30007/" 2>/dev/null; then
               echo "Lucee is up (attempt ${i})"
               break
             fi
@@ -135,21 +135,21 @@ jobs:
           lucli server stop 2>/dev/null || true
           # Wait for port to be freed
           for i in $(seq 1 15); do
-            if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:60007/" 2>/dev/null; then
+            if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:30007/" 2>/dev/null; then
               break
             fi
             sleep 1
           done
           # Also kill any lingering java processes on the port
-          fuser -k 60007/tcp 2>/dev/null || true
+          fuser -k 30007/tcp 2>/dev/null || true
           sleep 2
 
-          nohup lucli server run --port=60007 --force > /tmp/lucli-server.log 2>&1 &
+          nohup lucli server run --port=30007 --force > /tmp/lucli-server.log 2>&1 &
           echo $! > /tmp/lucli-server.pid
 
           echo "Waiting for Lucee to restart..."
           for i in $(seq 1 60); do
-            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:30007/" 2>/dev/null; then
               echo "Lucee restarted with SQLite JDBC"
               break
             fi
@@ -159,7 +159,7 @@ jobs:
       - name: Run tests
         run: |
           mkdir -p /tmp/test-results /tmp/junit-results
-          PORT=60007 \
+          PORT=30007 \
           RESULT_DIR=/tmp/test-results \
           JUNIT_DIR=/tmp/junit-results \
           bash tools/ci/run-tests.sh

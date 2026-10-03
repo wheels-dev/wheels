@@ -24,6 +24,9 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['time'] = { name = 'TEXT' };
 	variables.sqlTypes['timestamp'] = { name = 'TEXT' };
 	variables.sqlTypes['uuid'] = { name = 'TEXT', limit = 36 };
+	variables.sqlTypes['uniqueidentifier'] = { name = 'CHAR', limit = 36 };
+	// SQLite has no UUID function; this builds a version 4 UUID from random bytes (#4094).
+	variables.uuidDefaultSQL = '(lower(hex(randomblob(4)) || ''-'' || hex(randomblob(2)) || ''-4'' || substr(hex(randomblob(2)), 2) || ''-'' || substr(''89ab'', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || ''-'' || hex(randomblob(6))))';
 
 	/**
 	 * name of database adapter

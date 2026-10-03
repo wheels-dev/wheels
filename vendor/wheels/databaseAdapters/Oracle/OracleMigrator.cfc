@@ -21,6 +21,10 @@ component extends="wheels.databaseAdapters.Abstract" {
     variables.sqlTypes['time']       = {name = 'TIMESTAMP'};
     variables.sqlTypes['timestamp']  = {name = 'TIMESTAMP'};
     variables.sqlTypes['uuid']       = {name = 'RAW', limit = 16};
+    variables.sqlTypes['uniqueidentifier'] = {name = 'CHAR', limit = 36};
+    // SYS_GUID() is RAW(16); format it as a 36-character 8-4-4-4-12 string. It is unique
+    // but not a version 4 (random) UUID (#4094).
+    variables.uuidDefaultSQL = 'LOWER(REGEXP_REPLACE(RAWTOHEX(SYS_GUID()), ''(.{8})(.{4})(.{4})(.{4})(.{12})'', ''\1-\2-\3-\4-\5''))';
 
     // Oracle 23ai+ has a native BOOLEAN type, which the model maps to cf_sql_bit.
     // Earlier releases keep NUMBER(1), which reaches the model as an integer (#3897).
@@ -288,7 +292,61 @@ component extends="wheels.databaseAdapters.Abstract" {
         required string name,
         required any column
     ) {
+        // Without an explicit precision, a NUMBER column keeps the precision it has now
+        // (#4097): a bare NUMBER from an earlier version stays bare, because Oracle cannot
+        // narrow a populated column (ORA-01440), and a NUMBER(10) stays NUMBER(10) instead
+        // of falling back to the type map's default. changeColumn() is how a migration
+        // changes a default or allowNull, so it must not re-type the column.
+        if (!StructKeyExists(arguments.column, "precision") && $isNumberColumnType(arguments.column.type)) {
+            local.current = $currentNumberPrecision(tableName = arguments.name, columnName = arguments.column.name);
+            arguments.column.precision = local.current.precision;
+            if (local.current.precision > 0 && local.current.scale > 0 && !StructKeyExists(arguments.column, "scale")) {
+                arguments.column.scale = local.current.scale;
+            }
+        }
         return "ALTER TABLE #quoteTableName(arguments.name)# MODIFY #arguments.column.toSQL()#";
+    }
+
+    /**
+     * Internal function. True when a logical column type is declared as an Oracle NUMBER.
+     */
+    public boolean function $isNumberColumnType(required string type) {
+        if (arguments.type == "boolean" && variables.nativeBoolean) {
+            return false;
+        }
+        return StructKeyExists(variables.sqlTypes, arguments.type) && variables.sqlTypes[arguments.type].name == "NUMBER";
+    }
+
+    /**
+     * Internal function. The current precision and scale of an existing NUMBER column, read
+     * from USER_TAB_COLUMNS. A bare NUMBER, a missing column or an unreadable catalog give
+     * precision 0, which typeToSQL() renders as a bare NUMBER.
+     */
+    public struct function $currentNumberPrecision(required string tableName, required string columnName) {
+        var rv = {precision = 0, scale = 0};
+        try {
+            local.creds = $migratorDataSourceCredentials();
+            local.queryOptions = {datasource = $migratorDataSource()};
+            if (Len(local.creds.username)) {
+                local.queryOptions.username = local.creds.username;
+                local.queryOptions.password = local.creds.password;
+            }
+            local.info = QueryExecute(
+                "SELECT data_precision, data_scale FROM user_tab_columns WHERE UPPER(table_name) = UPPER(:tableName) AND UPPER(column_name) = UPPER(:columnName)",
+                {
+                    tableName = {value = arguments.tableName, cfsqltype = "cf_sql_varchar"},
+                    columnName = {value = arguments.columnName, cfsqltype = "cf_sql_varchar"}
+                },
+                local.queryOptions
+            );
+            if (local.info.recordCount && IsNumeric(local.info.data_precision)) {
+                rv.precision = local.info.data_precision;
+                rv.scale = IsNumeric(local.info.data_scale) ? local.info.data_scale : 0;
+            }
+        } catch (any e) {
+            rv.precision = 0;
+        }
+        return rv;
     }
 
     /**
@@ -323,6 +381,13 @@ component extends="wheels.databaseAdapters.Abstract" {
         // VARCHAR2 length
         if (StructKeyExists(local.base, "limit") && (!structKeyExists(arguments.options, "limit") || arguments.options.limit EQ 0)) {
             arguments.options.limit = local.base.limit;
+        }
+
+        // NUMBER precision, so integer columns are NUMBER(10) / NUMBER(19) / NUMBER(1)
+        // instead of a bare NUMBER that binds as numeric (#4097). A passed precision wins,
+        // including the 0 that changeColumnInTable() uses to keep a bare NUMBER.
+        if (StructKeyExists(local.base, "precision") && !StructKeyExists(arguments.options, "precision")) {
+            arguments.options.precision = local.base.precision;
         }
 
         switch (local.base.name) {

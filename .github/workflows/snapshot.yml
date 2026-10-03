@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       WHEELS_CI: "true"
-      WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:60007"
+      WHEELS_BROWSER_TEST_BASE_URL: "http://localhost:30007"
       WHEELS_BROWSER_CI_ENABLE: "true"
     steps:
       - uses: actions/checkout@v5
@@ -87,11 +87,11 @@ jobs:
       - name: Start Lucee server
         run: |
           cp tools/ci/lucee.ci.json lucee.json
-          nohup lucli server run --port=60007 > /tmp/lucli-server.log 2>&1 &
+          nohup lucli server run --port=30007 > /tmp/lucli-server.log 2>&1 &
           echo $! > /tmp/lucli-server.pid
           echo "Waiting for Lucee to start..."
           for i in $(seq 1 120); do
-            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:30007/" 2>/dev/null; then
               echo "Lucee is up (attempt ${i})"
               break
             fi
@@ -119,18 +119,18 @@ jobs:
           kill $(cat /tmp/lucli-server.pid) 2>/dev/null || true
           lucli server stop 2>/dev/null || true
           for i in $(seq 1 15); do
-            if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:60007/" 2>/dev/null; then
+            if ! curl -s -o /dev/null --connect-timeout 1 "http://localhost:30007/" 2>/dev/null; then
               break
             fi
             sleep 1
           done
-          fuser -k 60007/tcp 2>/dev/null || true
+          fuser -k 30007/tcp 2>/dev/null || true
           sleep 2
-          nohup lucli server run --port=60007 --force > /tmp/lucli-server.log 2>&1 &
+          nohup lucli server run --port=30007 --force > /tmp/lucli-server.log 2>&1 &
           echo $! > /tmp/lucli-server.pid
           echo "Waiting for Lucee to restart..."
           for i in $(seq 1 60); do
-            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:60007/" 2>/dev/null; then
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 3 "http://localhost:30007/" 2>/dev/null; then
               echo "Lucee restarted with SQLite JDBC"
               break
             fi
@@ -140,7 +140,7 @@ jobs:
       - name: Run tests
         run: |
           mkdir -p /tmp/test-results /tmp/junit-results
-          PORT=60007 \
+          PORT=30007 \
           RESULT_DIR=/tmp/test-results \
           JUNIT_DIR=/tmp/junit-results \
           bash tools/ci/run-tests.sh
@@ -169,7 +169,7 @@ jobs:
           # web/scripts/generate-api-docs.mjs (version.replace(/\./g, '-')).
           SNAPSHOT_FILE="docs/api/v${VERSION}-snapshot.json"
           curl -sf --max-time 60 \
-            "http://localhost:60007/wheels/api?format=json&type=core" \
+            "http://localhost:30007/wheels/api?format=json&type=core" \
             -o "$SNAPSHOT_FILE"
           if ! jq -e '.functions and .sections' "$SNAPSHOT_FILE" > /dev/null 2>&1; then
             echo "::error::API docs JSON invalid or empty"

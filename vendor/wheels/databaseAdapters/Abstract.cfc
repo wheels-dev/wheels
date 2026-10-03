@@ -45,6 +45,45 @@ component extends="wheels.migrator.Base"{
 	}
 
 	/**
+	 * Internal function. The SQL default expression that generates a UUID for a
+	 * uniqueidentifier column whose default is SQL Server's `newid()` (#4094). Each
+	 * adapter sets `variables.uuidDefaultSQL`; SQL Server keeps `newid()`. Returns ""
+	 * when the server is too old to generate one in a default, so the column is
+	 * created without a default instead of with DDL the server rejects.
+	 */
+	public string function $uuidDefaultSQL() {
+		if (StructKeyExists(variables, "uuidDefaultSupported") && !variables.uuidDefaultSupported) {
+			$warnUuidDefaultOmitted();
+			return "";
+		}
+		return StructKeyExists(variables, "uuidDefaultSQL") ? variables.uuidDefaultSQL : "newid()";
+	}
+
+	/**
+	 * Internal function. Set by Migration.init() from the server version.
+	 */
+	public void function $setUuidDefaultSupported(required boolean supported) {
+		variables.uuidDefaultSupported = arguments.supported;
+	}
+
+	/**
+	 * Internal function. One-time note that a uniqueidentifier column was created
+	 * without a database default, so the app must set its value.
+	 */
+	public void function $warnUuidDefaultOmitted() {
+		local.appKey = $appKey();
+		if (StructKeyExists(application[local.appKey], "$uuidDefaultOmittedWarned")) {
+			return;
+		}
+		application[local.appKey].$uuidDefaultOmittedWarned = true;
+		local.text = "This #adapterName()# server cannot generate a UUID in a column default "
+			& "(PostgreSQL 13+ and MySQL 8.0.13+ can), so uniqueidentifier columns are created "
+			& "without one. Set the value when you create a record, e.g. with generateUUID(). (##4094)";
+		announce(local.text);
+		cflog(type = "warning", file = "wheels", text = local.text);
+	}
+
+	/**
 	 * throw an exception for adapters without its own addPrimaryKeyOptions implementation
 	 */
 	public string function addPrimaryKeyOptions() {

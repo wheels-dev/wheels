@@ -1,6 +1,15 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
+	 * Oracle 19c and earlier accept at most 1000 expressions in one IN list
+	 * (ORA-01795). Oracle 23ai has no such limit, but splitting there returns the
+	 * same rows, so lists are split at 1000 on every release (#3906).
+	 */
+	public numeric function $maxInListSize() {
+		return 1000;
+	}
+
+	/**
 	 * Oracle reports unquoted identifiers in uppercase, so lowercase
 	 * auto-derived property names — otherwise models expose `FIRSTNAME`
 	 * instead of `firstname`. See Base.$lowerCaseColumnNames().
@@ -295,6 +304,26 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		} catch (any e) {
 			return "";
 		}
+	}
+
+	/**
+	 * Oracle compares a date or timestamp column with a quoted string by parsing the
+	 * string with the session's NLS date format, so '2000-01-01 00:00:00' written into
+	 * the SQL text (parameterize=false, including a {ts} date in a where string) fails
+	 * with ORA-01843 under the default format. A value in ISO form is written as an ANSI
+	 * DATE or TIMESTAMP literal instead, which reads the same under any session
+	 * format (#4084). Anything else is written as before.
+	 */
+	public string function $inlineValue(required string str, string sqlType = "CF_SQL_VARCHAR") {
+		if (ListFindNoCase("cf_sql_timestamp,cf_sql_date", arguments.sqlType)) {
+			if (ReFind("^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?$", arguments.str)) {
+				return "TIMESTAMP '" & arguments.str & "'";
+			}
+			if (ReFind("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", arguments.str)) {
+				return "DATE '" & arguments.str & "'";
+			}
+		}
+		return super.$inlineValue(argumentCollection = arguments);
 	}
 
 	/**
