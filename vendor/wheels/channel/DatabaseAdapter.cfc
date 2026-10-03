@@ -21,6 +21,11 @@ component {
 			variables.$datasource = application.wheels.dataSourceName;
 		}
 		variables.tableVerified = false;
+		// The column poll() orders by to break createdAt ties, resolved per database
+		// by $ensureEventsTable(): a DB-native monotonic "seq" identity column where
+		// one can be created, SQLite's built-in "rowid", or "id" (UUID — stable
+		// within a run but not time-ordered) as a last resort.
+		variables.$orderColumn = "id";
 		// Start the throttle clock at instance creation so a fresh instance does
 		// not run a retention sweep on its very first publish()
 		variables.lastCleanup = GetTickCount() / 1000;
@@ -105,30 +110,64 @@ component {
 	) {
 		$assertChannelName(arguments.channel);
 		$ensureEventsTable();
+		local.orderCol = variables.$orderColumn;
 
-		// If lastEventId is provided, find its timestamp and get events at or after it,
-		// excluding the event itself. Uses >= instead of > because MySQL and Oracle
-		// DATETIME/TIMESTAMP have only second-level precision — events within the same
-		// second would be missed with a strict > comparison.
 		if (Len(arguments.lastEventId)) {
-			return queryExecute(
-				"SELECT e.id, e.channel, e.event, e.data, e.createdAt
-				FROM wheels_events e
-				WHERE e.channel = :channel
-				AND e.id != :lastEventId
-				AND e.createdAt >= (
-					SELECT COALESCE(MAX(r.createdAt), :fallback)
-					FROM wheels_events r
-					WHERE r.id = :lastEventId
-				)
-				ORDER BY e.createdAt ASC",
-				{
-					channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
-					lastEventId: {value: arguments.lastEventId, cfsqltype: "cf_sql_varchar"},
-					fallback: {value: arguments.since, cfsqltype: "cf_sql_timestamp"}
-				},
-				{datasource: variables.$datasource}
-			);
+			// Resume strictly AFTER the referenced event by the monotonic order column
+			// (seq / rowid), so no event is missed and a same-tick event published
+			// BEFORE lastEventId is never re-delivered. If the referenced row is gone
+			// (already cleaned up), degrade to the since window below rather than
+			// returning nothing. The "id" fallback dialect has no monotonic key, so it
+			// keeps the timestamp-based resume.
+			if (local.orderCol != "id") {
+				local.ref = queryExecute(
+					"SELECT #local.orderCol# AS ord
+					FROM wheels_events
+					WHERE id = :lastEventId AND channel = :channel",
+					{
+						lastEventId: {value: arguments.lastEventId, cfsqltype: "cf_sql_varchar"},
+						channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: variables.$datasource}
+				);
+				if (local.ref.recordCount) {
+					return queryExecute(
+						"SELECT id, channel, event, data, createdAt
+						FROM wheels_events
+						WHERE channel = :channel
+						AND #local.orderCol# > :ord
+						ORDER BY createdAt ASC, #local.orderCol# ASC",
+						{
+							channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
+							ord: {value: local.ref.ord[1], cfsqltype: "cf_sql_bigint"}
+						},
+						{datasource: variables.$datasource}
+					);
+				}
+				// Referenced row gone — fall through to the since window below.
+			} else {
+				// No monotonic key available (unknown dialect): resume by timestamp.
+				// >= (not >) because the fallback dialect's createdAt may be
+				// second-precision; id != excludes the event itself.
+				return queryExecute(
+					"SELECT e.id, e.channel, e.event, e.data, e.createdAt
+					FROM wheels_events e
+					WHERE e.channel = :channel
+					AND e.id != :lastEventId
+					AND e.createdAt >= (
+						SELECT COALESCE(MAX(r.createdAt), :fallback)
+						FROM wheels_events r
+						WHERE r.id = :lastEventId
+					)
+					ORDER BY e.createdAt ASC, e.id ASC",
+					{
+						channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
+						lastEventId: {value: arguments.lastEventId, cfsqltype: "cf_sql_varchar"},
+						fallback: {value: arguments.since, cfsqltype: "cf_sql_timestamp"}
+					},
+					{datasource: variables.$datasource}
+				);
+			}
 		}
 
 		return queryExecute(
@@ -136,7 +175,7 @@ component {
 			FROM wheels_events
 			WHERE channel = :channel
 			AND createdAt > :since
-			ORDER BY createdAt ASC",
+			ORDER BY createdAt ASC, #local.orderCol# ASC",
 			{
 				channel: {value: arguments.channel, cfsqltype: "cf_sql_varchar"},
 				since: {value: arguments.since, cfsqltype: "cf_sql_timestamp"}
@@ -261,85 +300,185 @@ component {
 			return true;
 		}
 
+		local.dbType = $detectDatabaseType();
+
+		// Probe for the table. Any SELECT error is treated as "missing" and falls
+		// through to the CREATE below — the catch must not return or throw (hardened,
+		// ChannelHardenerSpec S3). A catch body cannot persist a local. write on
+		// BoxLang (cross-engine invariant), so the existence flag lives in a bare
+		// struct read and written WITHOUT the local. prefix.
+		var probe = {tableExists = true};
 		try {
 			queryExecute(
 				"SELECT COUNT(*) AS cnt FROM wheels_events WHERE 1=0",
 				{},
 				{datasource: variables.$datasource}
 			);
-			variables.tableVerified = true;
-			return true;
 		} catch (any e) {
-			// Table doesn't exist — create it
+			probe.tableExists = false;
 		}
 
-		try {
-			local.dbType = $detectDatabaseType();
-
-			if (local.dbType == "oracle") {
-				local.varcharType = "VARCHAR2";
-				local.textType = "CLOB";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "postgresql") {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "h2") {
-				local.varcharType = "VARCHAR";
-				local.textType = "CLOB";
-				local.datetimeType = "TIMESTAMP";
-			} else if (local.dbType == "sqlserver") {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				local.datetimeType = "DATETIME2";
-			} else {
-				local.varcharType = "VARCHAR";
-				local.textType = "TEXT";
-				// DATETIME(6): sub-second precision so poll() can order events
-				// by createdAt deterministically. Plain DATETIME keeps only
-				// second precision — two publishes within the same second tie,
-				// and the (channel, createdAt) index then falls back to
-				// primary-key (UUID) order, which is arbitrary (BoxLang legs
-				// observed the reversal; Lucee/Adobe were just lucky).
-				local.datetimeType = "DATETIME(6)";
-			}
-
-			queryExecute("
-				CREATE TABLE wheels_events (
-					id #local.varcharType#(255) NOT NULL PRIMARY KEY,
-					channel #local.varcharType#(255) NOT NULL,
-					event #local.varcharType#(255) NOT NULL,
-					data #local.textType#,
-					createdAt #local.datetimeType# NOT NULL
-				)
-			", {}, {datasource: variables.$datasource});
-
+		if (!probe.tableExists) {
 			try {
-				queryExecute(
-					"CREATE INDEX idx_wevents_channel ON wheels_events (channel, createdAt)",
-					{},
-					{datasource: variables.$datasource}
-				);
-				queryExecute(
-					"CREATE INDEX idx_wevents_cleanup ON wheels_events (createdAt)",
-					{},
-					{datasource: variables.$datasource}
-				);
-			} catch (any indexError) {
-				// Indexes are optional
-			}
+				if (local.dbType == "oracle") {
+					local.varcharType = "VARCHAR2";
+					local.textType = "CLOB";
+					local.datetimeType = "TIMESTAMP";
+				} else if (local.dbType == "postgresql") {
+					local.varcharType = "VARCHAR";
+					local.textType = "TEXT";
+					local.datetimeType = "TIMESTAMP";
+				} else if (local.dbType == "h2") {
+					local.varcharType = "VARCHAR";
+					local.textType = "CLOB";
+					local.datetimeType = "TIMESTAMP";
+				} else if (local.dbType == "sqlserver") {
+					local.varcharType = "VARCHAR";
+					local.textType = "TEXT";
+					local.datetimeType = "DATETIME2";
+				} else {
+					local.varcharType = "VARCHAR";
+					local.textType = "TEXT";
+					// DATETIME(6): sub-second precision narrows how often two publishes
+					// tie. The seq tiebreaker is what guarantees order within a tie.
+					local.datetimeType = "DATETIME(6)";
+				}
 
-			writeLog(text="Auto-created wheels_events table", type="information", file="wheels_channels");
-			variables.tableVerified = true;
-			return true;
-		} catch (any createError) {
+				// Monotonic identity column where the dialect can declare one inline.
+				// SQLite (rowid) and unknown dialects (id) get none here and are
+				// resolved by $ensureOrderColumn().
+				local.seqDDL = $seqColumnDDL(local.dbType);
+				local.seqLine = Len(local.seqDDL) ? (local.seqDDL & ",") : "";
+
+				queryExecute("
+					CREATE TABLE wheels_events (
+						#local.seqLine#
+						id #local.varcharType#(255) NOT NULL PRIMARY KEY,
+						channel #local.varcharType#(255) NOT NULL,
+						event #local.varcharType#(255) NOT NULL,
+						data #local.textType#,
+						createdAt #local.datetimeType# NOT NULL
+					)
+				", {}, {datasource: variables.$datasource});
+
+				try {
+					queryExecute(
+						"CREATE INDEX idx_wevents_channel ON wheels_events (channel, createdAt)",
+						{},
+						{datasource: variables.$datasource}
+					);
+					queryExecute(
+						"CREATE INDEX idx_wevents_cleanup ON wheels_events (createdAt)",
+						{},
+						{datasource: variables.$datasource}
+					);
+				} catch (any indexError) {
+					// Indexes are optional
+				}
+
+				writeLog(text="Auto-created wheels_events table", type="information", file="wheels_channels");
+			} catch (any createError) {
+				writeLog(
+					text="Failed to auto-create wheels_events table: #createError.message#",
+					type="error",
+					file="wheels_channels"
+				);
+				return false;
+			}
+		}
+
+		// Resolve (and, for a pre-existing table, upgrade to) the monotonic order
+		// column. Re-probed on every fresh instance rather than trusting a permanent
+		// did-this flag, so a table created before this column existed still gains it.
+		variables.$orderColumn = $ensureOrderColumn(local.dbType);
+		variables.tableVerified = true;
+		return true;
+	}
+
+	/**
+	 * The DB-native identity column definition used to break createdAt ties, or ""
+	 * when the dialect has no inline-declarable identity column (SQLite — uses rowid —
+	 * and any unknown dialect — falls back to id). There is no portable identity
+	 * syntax, so each engine spells it differently. CockroachDB reports as PostgreSQL
+	 * over the pg wire, so it shares that branch; its SERIAL default is unique_rowid()
+	 * (NOT monotonic), which is exactly why this uses GENERATED AS IDENTITY — a real
+	 * sequence — rather than SERIAL.
+	 */
+	private string function $seqColumnDDL(required string dbType) {
+		switch (arguments.dbType) {
+			case "sqlserver":
+				return "seq BIGINT IDENTITY(1,1) NOT NULL";
+			case "mysql":
+				// AUTO_INCREMENT must be a key; id holds the PK, so make seq UNIQUE.
+				return "seq BIGINT NOT NULL AUTO_INCREMENT UNIQUE";
+			case "postgresql":
+				return "seq BIGINT GENERATED BY DEFAULT AS IDENTITY";
+			case "oracle":
+				return "seq NUMBER GENERATED BY DEFAULT AS IDENTITY";
+			case "h2":
+				return "seq BIGINT AUTO_INCREMENT";
+			default:
+				return "";
+		}
+	}
+
+	/**
+	 * Resolve the column poll() orders by to break createdAt ties, upgrading a
+	 * pre-existing table in place when necessary:
+	 *   - sqlite -> "rowid" (built-in, insertion-monotonic; no schema change). NOTE:
+	 *     without AUTOINCREMENT, SQLite may REUSE the highest rowid after the newest
+	 *     row is deleted, and restarts numbering if the table empties. poll() guards
+	 *     the resume path against a vanished lastEventId, and events are retained only
+	 *     briefly, so a reused rowid can only ever affect ordering within one createdAt
+	 *     tick — never cross-tick order.
+	 *   - seq dialects -> "seq", adding the column to an existing table via ALTER when
+	 *     missing (existing rows back-fill in physical order and are <= the retention
+	 *     window old). If the ALTER is rejected, log clearly and fall back to "id"
+	 *     rather than leave poll() ordering by a column that does not exist.
+	 *   - unknown dialect -> "id" (stable within a run, not time-ordered).
+	 */
+	private string function $ensureOrderColumn(required string dbType) {
+		if (arguments.dbType == "sqlite") {
+			return "rowid";
+		}
+		local.seqDDL = $seqColumnDDL(arguments.dbType);
+		if (!Len(local.seqDDL)) {
+			return "id";
+		}
+
+		var probe = {hasSeq = false};
+		try {
+			queryExecute("SELECT seq FROM wheels_events WHERE 1=0", {}, {datasource: variables.$datasource});
+			probe.hasSeq = true;
+		} catch (any e) {
+			// Column missing — add it below.
+		}
+		if (probe.hasSeq) {
+			return "seq";
+		}
+
+		// Oracle spells ADD with the column def in parentheses; the others take it bare.
+		local.alter = (arguments.dbType == "oracle")
+			? "ALTER TABLE wheels_events ADD (#local.seqDDL#)"
+			: "ALTER TABLE wheels_events ADD #local.seqDDL#";
+		var added = {ok = false};
+		try {
+			queryExecute(local.alter, {}, {datasource: variables.$datasource});
+			queryExecute("SELECT seq FROM wheels_events WHERE 1=0", {}, {datasource: variables.$datasource});
+			added.ok = true;
 			writeLog(
-				text="Failed to auto-create wheels_events table: #createError.message#",
-				type="error",
+				text="Added monotonic seq column to wheels_events (#arguments.dbType#)",
+				type="information",
 				file="wheels_channels"
 			);
-			return false;
+		} catch (any e) {
+			writeLog(
+				text="Could not add a seq column to wheels_events on #arguments.dbType# (#e.message#); ordering falls back to createdAt+id, so events sharing a timestamp tick may order arbitrarily.",
+				type="warning",
+				file="wheels_channels"
+			);
 		}
+		return added.ok ? "seq" : "id";
 	}
 
 	/**

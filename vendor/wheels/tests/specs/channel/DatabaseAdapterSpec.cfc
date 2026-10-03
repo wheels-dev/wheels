@@ -134,6 +134,145 @@ component extends="wheels.WheelsTest" {
 				expect(events.data[1]).toBe("second");
 			});
 
+			it("poll returns events in publish order when createdAt ties", function() {
+				// Force an exact createdAt tie so ordering must rely on the monotonic
+				// tiebreak (seq / rowid), deterministically on every database rather
+				// than only when SQL Server's ~3.33ms DATETIME rounding collides.
+				var channelName = "test.tieorder.#Replace(CreateUUID(), '-', '', 'all')#";
+				var firstId = "evt-tie-a-#Replace(CreateUUID(), '-', '', 'all')#";
+				var secondId = "evt-tie-b-#Replace(CreateUUID(), '-', '', 'all')#";
+				adapter.publish(channel = channelName, event = "e", data = '{"n":1}', id = firstId);
+				adapter.publish(channel = channelName, event = "e", data = '{"n":2}', id = secondId);
+				var tieTime = Now();
+				queryExecute(
+					"UPDATE wheels_events SET createdAt = :ts WHERE id = :a OR id = :b",
+					{
+						ts: {value: tieTime, cfsqltype: "cf_sql_timestamp"},
+						a: {value: firstId, cfsqltype: "cf_sql_varchar"},
+						b: {value: secondId, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				var events = adapter.poll(channel = channelName, since = DateAdd("n", -1, Now()));
+
+				expect(events.recordCount).toBe(2);
+				expect(events.data[1]).toBe('{"n":1}');
+				expect(events.data[2]).toBe('{"n":2}');
+			});
+
+			it("poll resumes by sequence and does not re-deliver same-tick earlier events", function() {
+				// A and B share a createdAt tick. Resuming from B must NOT re-deliver A
+				// (published before B in the same tick). The old createdAt >= logic
+				// returned A; a strict monotonic seq/rowid resume excludes it.
+				var channelName = "test.tieresume.#Replace(CreateUUID(), '-', '', 'all')#";
+				var idA = "evt-ra-#Replace(CreateUUID(), '-', '', 'all')#";
+				var idB = "evt-rb-#Replace(CreateUUID(), '-', '', 'all')#";
+				var idC = "evt-rc-#Replace(CreateUUID(), '-', '', 'all')#";
+				adapter.publish(channel = channelName, event = "e", data = "A", id = idA);
+				adapter.publish(channel = channelName, event = "e", data = "B", id = idB);
+				var tieTime = Now();
+				queryExecute(
+					"UPDATE wheels_events SET createdAt = :ts WHERE id = :a OR id = :b",
+					{
+						ts: {value: tieTime, cfsqltype: "cf_sql_timestamp"},
+						a: {value: idA, cfsqltype: "cf_sql_varchar"},
+						b: {value: idB, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+				sleep(20);
+				adapter.publish(channel = channelName, event = "e", data = "C", id = idC);
+
+				var events = adapter.poll(channel = channelName, lastEventId = idB);
+				var ids = ValueList(events.id);
+
+				expect(ListFindNoCase(ids, idA) == 0).toBeTrue();
+				expect(ListFindNoCase(ids, idC) > 0).toBeTrue();
+				expect(ListFindNoCase(ids, idB) == 0).toBeTrue();
+			});
+
+			it("poll falls back to since when the lastEventId row no longer exists", function() {
+				// If the referenced event was already cleaned up, resume must degrade to
+				// the since window — returning later events, never silently empty.
+				var channelName = "test.goneresume.#Replace(CreateUUID(), '-', '', 'all')#";
+				var goneId = "evt-gone-#Replace(CreateUUID(), '-', '', 'all')#";
+				var laterId = "evt-later-#Replace(CreateUUID(), '-', '', 'all')#";
+				adapter.publish(channel = channelName, event = "e", data = "gone", id = goneId);
+				queryExecute(
+					"DELETE FROM wheels_events WHERE id = :id",
+					{id: {value: goneId, cfsqltype: "cf_sql_varchar"}},
+					{datasource: application.wheels.dataSourceName}
+				);
+				sleep(20);
+				adapter.publish(channel = channelName, event = "e", data = "later", id = laterId);
+
+				var events = adapter.poll(
+					channel = channelName,
+					lastEventId = goneId,
+					since = DateAdd("n", -1, Now())
+				);
+				var ids = ValueList(events.id);
+
+				expect(ListFindNoCase(ids, laterId) > 0).toBeTrue();
+			});
+
+			it("adds the seq column to a pre-existing table that lacks it", function() {
+				// Simulates an app whose wheels_events table predates the monotonic
+				// column: create it with seq (via ensure), drop seq to mimic the old
+				// schema, then let a fresh adapter re-probe and ALTER it back — the
+				// "ADD IDENTITY to a populated table" path that a fresh CREATE never hits.
+				var probe = new wheels.channel.DatabaseAdapter();
+				var dbType = probe.$detectDatabaseType();
+				// Only the seq dialects have a column to drop/re-add. SQLite uses rowid
+				// and unknown dialects use id — neither has a seq column.
+				if (dbType == "sqlite" || dbType == "default") {
+					skip("dialect [#dbType#] uses rowid/id, not a seq column");
+				}
+
+				// Warm the table (creates it with seq), leave a row behind so the ALTER
+				// must add the identity column to a POPULATED table.
+				probe.publish(channel = "test.upgrade.warm", event = "e", data = "warm");
+				var dropState = {ok = false};
+				try {
+					queryExecute(
+						"ALTER TABLE wheels_events DROP COLUMN seq",
+						{},
+						{datasource: application.wheels.dataSourceName}
+					);
+					dropState.ok = true;
+				} catch (any e) {
+					// Engine won't let the column be dropped — can't simulate the old
+					// schema here, so there is nothing to assert.
+				}
+				if (!dropState.ok) {
+					skip("cannot drop seq to simulate a pre-fix table on [#dbType#]");
+				}
+
+				var channelName = "test.upgrade.#Replace(CreateUUID(), '-', '', 'all')#";
+				var firstId = "evt-up-a-#Replace(CreateUUID(), '-', '', 'all')#";
+				var secondId = "evt-up-b-#Replace(CreateUUID(), '-', '', 'all')#";
+				var upgraded = new wheels.channel.DatabaseAdapter();
+				upgraded.publish(channel = channelName, event = "e", data = '{"n":1}', id = firstId);
+				upgraded.publish(channel = channelName, event = "e", data = '{"n":2}', id = secondId);
+				var tieTime = Now();
+				queryExecute(
+					"UPDATE wheels_events SET createdAt = :ts WHERE id = :a OR id = :b",
+					{
+						ts: {value: tieTime, cfsqltype: "cf_sql_timestamp"},
+						a: {value: firstId, cfsqltype: "cf_sql_varchar"},
+						b: {value: secondId, cfsqltype: "cf_sql_varchar"}
+					},
+					{datasource: application.wheels.dataSourceName}
+				);
+
+				var events = upgraded.poll(channel = channelName, since = DateAdd("n", -1, Now()));
+
+				expect(events.recordCount).toBe(2);
+				expect(events.data[1]).toBe('{"n":1}');
+				expect(events.data[2]).toBe('{"n":2}');
+			});
+
 			it("cleanup removes old events", function() {
 				adapter.poll(channel = "test.cleanup", since = DateAdd("n", -1, Now()));
 				var eventId = "old-event-cleanup-#Replace(CreateUUID(), '-', '', 'all')#";
