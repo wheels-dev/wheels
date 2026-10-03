@@ -299,6 +299,10 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("takes no lock, and warns once, when createMigratorTable is off and the table is missing", () => {
+				// Clear any earlier run's flag, or a second run in the same application passes vacuously.
+				if (StructKeyExists(application.wheels, "$migrationLockWarned")) {
+					StructDelete(application.wheels["$migrationLockWarned"], variables.ds);
+				}
 				var saved = {table = application.wheels.migratorLockTableName, create = application.wheels.createMigratorTable};
 				application.wheels.migratorLockTableName = "wheels_spec_absent_locks";
 				application.wheels.createMigratorTable = false;
