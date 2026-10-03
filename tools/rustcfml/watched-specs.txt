@@ -1,0 +1,7 @@
+# Specs whose result (pass or fail) run-suite.sh prints, because the RustCFML
+# lane uploads no per-spec artifact and otherwise lists only failures.
+# One "<bundle> :: <spec name>" substring per line.
+
+# #4063: wheels deploy relies on reading WHEELS_MIGRATE_ON_BOOT from the process
+# environment on every engine.
+wheels.tests.specs.events.BootMigrationSpec :: reads a real process environment variable on this engine
