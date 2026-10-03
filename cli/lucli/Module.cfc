@@ -1491,6 +1491,20 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * The one-line warning for a timeout (--test-timeout / timeout) that $resolveTestTimeout() had to
+	 * ignore, or "" when it was valid or absent. A mistyped timeout still must
+	 * not stop the run, but the fallback may not be silent (maintainer
+	 * decision on #2963). Public for specs; hidden from MCP by the $-prefix.
+	 */
+	public string function $testTimeoutWarning(string parsedTimeout = "", required numeric resolvedSeconds) {
+		var raw = trim(arguments.parsedTimeout);
+		if (!len(raw) || (isNumeric(raw) && val(raw) > 0)) {
+			return "";
+		}
+		return 'Warning: ignoring invalid timeout "#raw#"; using #arguments.resolvedSeconds#s';
+	}
+
+	/**
 	 * Seconds to wait for the test-runner response. An explicit value wins
 	 * (`--test-timeout` on the terminal, or `--timeout` on LuCLI builds with
 	 * the module-timeout fix (LuCLI #130); `timeout` over MCP), then
@@ -1508,20 +1522,6 @@ component extends="modules.BaseModule" {
 	 * Non-numeric or non-positive input falls back to the default rather than
 	 * throwing: a mistyped timeout should not be the thing that stops a test run.
 	 */
-	/**
-	 * The one-line warning for a timeout (--test-timeout / timeout) that $resolveTestTimeout() had to
-	 * ignore, or "" when it was valid or absent. A mistyped timeout still must
-	 * not stop the run, but the fallback may not be silent (maintainer
-	 * decision on #2963). Public for specs; hidden from MCP by the $-prefix.
-	 */
-	public string function $testTimeoutWarning(string parsedTimeout = "", required numeric resolvedSeconds) {
-		var raw = trim(arguments.parsedTimeout);
-		if (!len(raw) || (isNumeric(raw) && val(raw) > 0)) {
-			return "";
-		}
-		return 'Warning: ignoring invalid timeout "#raw#"; using #arguments.resolvedSeconds#s';
-	}
-
 	public numeric function $resolveTestTimeout(string parsedTimeout = "") {
 		if (
 			len(trim(arguments.parsedTimeout))
@@ -3419,16 +3419,6 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * hint: `wheels setup agents` — write .mcp.json and .opencode.json for AI assistants
-	 *
-	 * `setup agents`, and the target is deliberately NOT spelled `mcp`: LuCLI
-	 * intercepts that literal token in ANY argument position — not just
-	 * argv[1] — so `wheels setup mcp` (and even `wheels info mcp`) is routed to
-	 * the runtime's module runner and answers "mcp: missing module name".
-	 * `ai` is reserved the same way. Verified live, both. `setup` and
-	 * `configure` are free top-level verbs (`init` is not — BaseModule has it).
-	 */
-	/**
 	 * hint: Deprecated spelling — `wheels map setup` forwards to `setup agents`
 	 *
 	 * `map setup` shipped in snapshot 2499 before we learned that the literal
@@ -3443,6 +3433,16 @@ component extends="modules.BaseModule" {
 		return setup();
 	}
 
+	// `setup agents`, and the target is deliberately NOT spelled `mcp`: LuCLI
+	// intercepts that literal token in ANY argument position — not just
+	// argv[1] — so `wheels setup mcp` (and even `wheels info mcp`) is routed to
+	// the runtime's module runner and answers "mcp: missing module name".
+	// `ai` is reserved the same way. Verified live, both. `setup` and
+	// `configure` are free top-level verbs (`init` is not — BaseModule has it).
+	// Kept out of the docblock below: `wheels setup --help` prints its hint.
+	/**
+	 * hint: `wheels setup agents` — write .mcp.json and .opencode.json for AI assistants
+	 */
 	public string function setup() {
 		var args = new services.ArgSpec().toArgv(structuredArgs(arguments));
 		var subcommand = arrayLen(args) ? lCase(args[1]) : "";
@@ -11164,14 +11164,6 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Parse one generator property token into a name/type struct, plus
-	 * optional Rails-style brace modifiers (`string{50}`, `decimal{10,2}`)
-	 * and colon-delimited enum values (`status:enum:draft,published`).
-	 *
-	 * Brace modifiers attach to the type token only, so they never steal
-	 * the value list from `name:enum:a,b`.
-	 */
-	/**
 	 * A hyphen can't appear in a CFC or property name, and people do type
 	 * `create-users-table` or `display-name`, so hyphens in those names become
 	 * underscores (with a note) before the name is validated.
@@ -11185,6 +11177,14 @@ component extends="modules.BaseModule" {
 		return normalized;
 	}
 
+	/**
+	 * Parse one generator property token into a name/type struct, plus
+	 * optional Rails-style brace modifiers (`string{50}`, `decimal{10,2}`)
+	 * and colon-delimited enum values (`status:enum:draft,published`).
+	 *
+	 * Brace modifiers attach to the type token only, so they never steal
+	 * the value list from `name:enum:a,b`.
+	 */
 	private struct function $parsePropertyArg(required string arg) {
 		// Split on the FIRST two colons only — any additional colons
 		// (e.g. inside the comma-separated value list) belong in the
@@ -11327,6 +11327,29 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * True when WHEELS_SERVER_FALLBACK is set to false (false/0/no) in the
+	 * process environment or in the project's `.env`.
+	 */
+	private boolean function $serverFallbackDisabled() {
+		var raw = "";
+		try {
+			raw = server.system.environment.WHEELS_SERVER_FALLBACK ?: "";
+		} catch (any e) {
+		}
+		if (!len(trim(raw))) {
+			var envFile = variables.projectRoot & "/.env";
+			if (fileExists(envFile)) {
+				// Anchor on start-of-file or a newline (portable across regex engines).
+				var hit = reFindNoCase("(^|[\r\n])[ \t]*WHEELS_SERVER_FALLBACK[ \t]*=[ \t]*[""']?([A-Za-z0-9]+)", fileRead(envFile), 1, true);
+				if (arrayLen(hit.match) > 2) {
+					raw = hit.match[3];
+				}
+			}
+		}
+		return listFindNoCase("false,0,no", trim(raw)) > 0;
+	}
+
+	/**
 	 * Detect the port of a running Wheels dev server.
 	 *
 	 * Resolves in priority order: lucee.json `port` field, `.env` PORT
@@ -11351,29 +11374,6 @@ component extends="modules.BaseModule" {
 	 * spec reaches it through TestBox `makePublic()` — see
 	 * cli/lucli/tests/specs/services/ServerDetectionSpec.cfc (#2878 review).
 	 */
-	/**
-	 * True when WHEELS_SERVER_FALLBACK is set to false (false/0/no) in the
-	 * process environment or in the project's `.env`.
-	 */
-	private boolean function $serverFallbackDisabled() {
-		var raw = "";
-		try {
-			raw = server.system.environment.WHEELS_SERVER_FALLBACK ?: "";
-		} catch (any e) {
-		}
-		if (!len(trim(raw))) {
-			var envFile = variables.projectRoot & "/.env";
-			if (fileExists(envFile)) {
-				// Anchor on start-of-file or a newline (portable across regex engines).
-				var hit = reFindNoCase("(^|[\r\n])[ \t]*WHEELS_SERVER_FALLBACK[ \t]*=[ \t]*[""']?([A-Za-z0-9]+)", fileRead(envFile), 1, true);
-				if (arrayLen(hit.match) > 2) {
-					raw = hit.match[3];
-				}
-			}
-		}
-		return listFindNoCase("false,0,no", trim(raw)) > 0;
-	}
-
 	private any function detectServerPort(
 		boolean requireProjectConfig = false,
 		array commonPorts = [8080, 60000, 3000, 8500]
@@ -12055,9 +12055,6 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Make an HTTP GET request and return the response body
-	 */
-	/**
 	 * Parse a /wheels/cli? JSON response and surface framework errors.
 	 *
 	 * The framework's `vendor/wheels/public/views/cli.cfm` endpoint returns
@@ -12590,14 +12587,14 @@ component extends="modules.BaseModule" {
 		return variables.services[name];
 	}
 
-	/**
-	 * Ensure a directory exists, creating it if necessary
-	 */
 	/** ensureDirectory() for generator output: refuses a directory that resolves outside the project. */
 	private void function $ensureProjectDirectory(required string path) {
 		new services.GeneratorPaths().ensureDirectoryInside(variables.projectRoot, arguments.path);
 	}
 
+	/**
+	 * Ensure a directory exists, creating it if necessary
+	 */
 	private void function ensureDirectory(required string path) {
 		if (!directoryExists(path)) {
 			directoryCreate(path, true);
