@@ -30,13 +30,11 @@ component extends="wheels.WheelsTest" {
             beforeEach(() => {
 				config = {path = "wheels", fileName = "Mapper", method = "$init"}
         		_params = {controller = "test", action = "index"}
-		        _originalRoutes = Duplicate(application.wheels.routes)
-				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
+		        _routeSnapshot = $snapshotRoutes()
 			})
 
             afterEach(() => {
-                application.wheels.routes = _originalRoutes
-                application.wheels.staticRoutes = _originalStaticRoutes
+                $restoreRoutes(_routeSnapshot)
             })
 
 			it("Exposes all public API legacy functions", function(){
@@ -82,11 +80,6 @@ component extends="wheels.WheelsTest" {
 
     public struct function $inspect() {
 		return variables
-	}
-
-	public void function $clearRoutes() {
-		application.wheels.routes = []
-		application.wheels.staticRoutes = {}
 	}
 
 }
