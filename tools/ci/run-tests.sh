@@ -3,7 +3,7 @@
 # Used by pr.yml and snapshot.yml
 set -euo pipefail
 
-PORT="${PORT:-60007}"
+PORT="${PORT:-30007}"
 MAX_WAIT="${MAX_WAIT:-60}"
 BASE_URL="http://localhost:${PORT}"
 TEST_URL="${BASE_URL}/wheels/core/tests?db=sqlite&format=json"
