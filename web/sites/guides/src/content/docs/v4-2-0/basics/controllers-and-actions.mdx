@@ -228,9 +228,10 @@ Any extra argument that isn't a known `redirectTo` parameter (like `success` abo
 component extends="Controller" {
     function create() {
         // ... sign the user in ...
-        if (Len(params.return_to ?: "")) {
+        var returnTo = params.return_to ?: "";
+        if (IsSimpleValue(returnTo) && Len(returnTo)) {
             try {
-                redirectTo(url = params.return_to);
+                redirectTo(url = returnTo);
                 return;
             } catch (Wheels.UnsafeRedirect e) {
                 // Another host: ignore it and land on the default page.
@@ -241,6 +242,7 @@ component extends="Controller" {
 }
 ```
 
+- Check the shape before `Len()`: a request such as `?return_to[x]=1` turns the parameter into a struct, and `Len()` on a struct throws.
 - Catch `Wheels.UnsafeRedirect` rather than `any`, so other errors still surface.
 - Keep the `return`. With delayed redirects (`delay=true`, which test runs use), the action would otherwise go on to call `redirectTo` a second time.
 - Don't set `allowExternalRedirects=true` to make a return-to link work: it turns the check off for every redirect in the app.
