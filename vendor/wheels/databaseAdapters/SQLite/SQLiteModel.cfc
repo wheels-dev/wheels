@@ -70,6 +70,53 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	/**
 	 * Prepare query arguments before execution (SQLite has simpler syntax).
 	 */
+	/**
+	 * Internal function. A cf_sql_bigint param whose values all fit in 32 bits binds as
+	 * cf_sql_integer (#4089). BoxLang binds cf_sql_bigint to SQLite as TEXT
+	 * (https://github.com/ortus-boxlang/BoxLang/issues/642), and SQLite only
+	 * converts text back to a number when it is compared with a column, so `HAVING SUM(col) > ?`
+	 * and other expression comparisons went wrong. Small values bind exactly as before; a value
+	 * outside the 32-bit range keeps cf_sql_bigint, and one out-of-range element keeps a whole
+	 * IN list cf_sql_bigint. Nulls and non-integer values are left unchanged.
+	 */
+	public struct function $queryParams(required struct settings) {
+		local.rv = super.$queryParams(argumentCollection = arguments);
+		if (
+			local.rv.cfsqltype == "cf_sql_bigint"
+			&& !(StructKeyExists(local.rv, "null") && local.rv.null)
+			&& $valuesFitIntegerRange(local.rv)
+		) {
+			local.rv.cfsqltype = "cf_sql_integer";
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when every value of a query param (one value, or each element of
+	 * an IN list) is an integer literal within the cf_sql_integer range. Compared as digit
+	 * strings, never through a double.
+	 */
+	public boolean function $valuesFitIntegerRange(required struct param) {
+		local.range = $integerKeyRange(sqlType = "cf_sql_integer");
+		local.values = StructKeyExists(arguments.param, "list") && arguments.param.list
+			? ListToArray(arguments.param.value, arguments.param.separator)
+			: [arguments.param.value];
+		if (!ArrayLen(local.values)) {
+			return false;
+		}
+		for (local.value in local.values) {
+			local.digits = IsSimpleValue(local.value) ? $canonicalIntegerString(local.value) : "";
+			if (
+				!Len(local.digits)
+				|| $compareIntegerStrings(local.digits, local.range.min) < 0
+				|| $compareIntegerStrings(local.digits, local.range.max) > 0
+			) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	public struct function $querySetup(
 		required array sql,
 		numeric limit = 0,

@@ -28,6 +28,11 @@ component extends="wheels.WheelsTest" {
 				expect(sqlite.$getType(type = "int")).toBe("cf_sql_integer")
 			})
 
+			it("maps the portable bigint name on Oracle, as a calculated property's dataType", () => {
+				expect(oracle.$getType(type = "bigint")).toBe("cf_sql_bigint")
+				expect(oracle.$getType(type = "int8")).toBe("cf_sql_bigint")
+			})
+
 			it("maps Oracle NUMBER(11..19, 0) to cf_sql_bigint", () => {
 				expect(oracle.$getType(type = "number", scale = 0, details = "", precision = 19)).toBe("cf_sql_bigint")
 				expect(oracle.$getType(type = "number", scale = 0, details = "", precision = 11)).toBe("cf_sql_bigint")

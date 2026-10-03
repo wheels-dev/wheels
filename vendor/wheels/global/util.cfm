@@ -935,6 +935,46 @@
 	}
 
 
+	// Integer-literal helpers shared by models (nested-property keys, #4128) and database
+	// adapters (SQLite bind width, #4089): compared as digit strings, never through a double.
+
+	/**
+	 * Internal function. "<sign><digits>" with no leading zeros for an integer literal, or ""
+	 * when the value is not one.
+	 */
+	public string function $canonicalIntegerString(required string value) {
+		local.value = Trim(arguments.value);
+		if (!ReFind("^[+-]?[0-9]+$", local.value)) {
+			return "";
+		}
+		local.sign = Left(local.value, 1) == "-" ? "-" : "";
+		local.digits = ReReplace(local.value, "^[+-]?0*", "");
+		if (!Len(local.digits)) {
+			return "0";
+		}
+		return local.sign & local.digits;
+	}
+
+	/**
+	 * Internal function. -1, 0 or 1 as canonical integer string a is below, equal to or above b,
+	 * compared by sign, then length, then digits.
+	 */
+	public numeric function $compareIntegerStrings(required string a, required string b) {
+		local.aNegative = Left(arguments.a, 1) == "-";
+		local.bNegative = Left(arguments.b, 1) == "-";
+		if (local.aNegative != local.bNegative) {
+			return local.aNegative ? -1 : 1;
+		}
+		local.aDigits = ReReplace(arguments.a, "^-", "");
+		local.bDigits = ReReplace(arguments.b, "^-", "");
+		if (Len(local.aDigits) != Len(local.bDigits)) {
+			local.rv = Len(local.aDigits) > Len(local.bDigits) ? 1 : -1;
+		} else {
+			local.rv = Sgn(Compare(local.aDigits, local.bDigits));
+		}
+		return local.aNegative ? -local.rv : local.rv;
+	}
+
 	/**
 	 * Generates a 36-character UUID compatible with SQL Server's uniqueidentifier.
 	 *
