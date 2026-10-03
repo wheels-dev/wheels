@@ -288,6 +288,12 @@ component extends="wheels.databaseAdapters.Abstract" {
         required string name,
         required any column
     ) {
+        // Without an explicit precision, keep emitting a bare NUMBER: Oracle cannot narrow a
+        // populated column (ORA-01440), and changeColumn() is how a migration changes a
+        // default or allowNull on a column created by an earlier version (#4097).
+        if (!StructKeyExists(arguments.column, "precision")) {
+            arguments.column.precision = 0;
+        }
         return "ALTER TABLE #quoteTableName(arguments.name)# MODIFY #arguments.column.toSQL()#";
     }
 
@@ -323,6 +329,13 @@ component extends="wheels.databaseAdapters.Abstract" {
         // VARCHAR2 length
         if (StructKeyExists(local.base, "limit") && (!structKeyExists(arguments.options, "limit") || arguments.options.limit EQ 0)) {
             arguments.options.limit = local.base.limit;
+        }
+
+        // NUMBER precision, so integer columns are NUMBER(10) / NUMBER(19) / NUMBER(1)
+        // instead of a bare NUMBER that binds as numeric (#4097). A passed precision wins,
+        // including the 0 that changeColumnInTable() uses to keep a bare NUMBER.
+        if (StructKeyExists(local.base, "precision") && !StructKeyExists(arguments.options, "precision")) {
+            arguments.options.precision = local.base.precision;
         }
 
         switch (local.base.name) {
