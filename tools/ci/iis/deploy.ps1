@@ -33,3 +33,5 @@ foreach ($name in 'root', 'app1') {
 	}
 }
 Write-Host 'Apps deployed to C:\wheels-iis\root and C:\wheels-iis\app1'
+# robocopy returns 1 for "files copied"; don't let that become the step's exit code.
+exit 0
