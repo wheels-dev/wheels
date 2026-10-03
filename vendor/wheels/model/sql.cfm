@@ -1546,7 +1546,13 @@
 						structDelete(arguments.sql[local.i], 'property');
 					}
 					arguments.sql[local.i].value = local.originalValues[local.pos];
-					if (local.originalValues[local.pos] == "" || local.sqlNullFlags[local.pos]) {
+					if (
+						$whereValueBindsNull(
+							value = local.originalValues[local.pos],
+							nullKeyword = local.sqlNullFlags[local.pos],
+							type = StructKeyExists(arguments.sql[local.i], "type") ? arguments.sql[local.i].type : ""
+						)
+					) {
 						arguments.sql[local.i].null = true;
 						// Dummy value so integer cfqueryparam does not try to cast
 						// the keyword string "NULL" / "[NULL]" to a number.
@@ -1628,6 +1634,22 @@
 			ArrayAppend(local.rv, ArrayToList(local.group, ","));
 		}
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. True when a `where` value binds as SQL NULL: the unquoted NULL
+	 * keyword, or an empty value for a column that can't hold an empty string (a number,
+	 * date or boolean). An empty value for a string column binds as a real '' (#4055),
+	 * which Oracle stores and compares as NULL anyway.
+	 */
+	public boolean function $whereValueBindsNull(required string value, required boolean nullKeyword, string type = "") {
+		if (arguments.nullKeyword) {
+			return true;
+		}
+		if (Len(arguments.value)) {
+			return false;
+		}
+		return !ListFindNoCase("string,text", variables.wheels.class.adapter.$getValidationType(UCase(arguments.type)));
 	}
 
 	/**

@@ -127,6 +127,25 @@ t.bigInteger(columnNames = "accountId", unsigned = true);
 
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
 
+### An empty string in `where` matches empty strings
+
+An empty-string value in a `where` condition now binds as a real `''` ([#4055](https://github.com/wheels-dev/wheels/issues/4055)). Through 4.1 it bound as SQL NULL after your operator, so `col = ''`, `col <> ''` and `col != ''` all compared against NULL and matched no rows.
+
+**What changes:**
+
+- `count(where="brand = ''")` and `findAll(where="brand = ''")` return the rows that store an empty string.
+- `col <> ''` and `col != ''` return every row whose value is neither empty nor NULL.
+- The same applies to an interpolated value that happens to be empty: `where="col = '#x#'"` with `x = ""`.
+- It applies everywhere a `where` string is used: the finders and `count()`, dynamic finders such as `findOneByBrand("")`, the query builder's `where("brand", "")`, and `updateAll()` / `deleteAll()`. **`updateAll()` and `deleteAll()` with such a condition now change or delete those rows, where in 4.1 they touched nothing.**
+
+**What doesn't change:**
+
+- The unquoted `NULL` keyword: `col IS NULL` and `col IS NOT NULL` work as before. To match NULL, use them or `whereNull()` / `whereNotNull()`.
+- An empty value compared with a number, date or boolean column still matches nothing, since such a column can't hold `''`.
+- On Oracle, which stores `''` as NULL, an empty-string comparison still matches no rows.
+
+To find affected code, search `app/` for `= ''`, `<> ''`, `!= ''` and for `where` strings that interpolate a value that may be empty, especially in `updateAll()` and `deleteAll()` calls.
+
 ### `LocalDisk` storage keys are checked per segment
 
 `LocalDisk` now validates an object key one path segment at a time ([#3912](https://github.com/wheels-dev/wheels/issues/3912)):
