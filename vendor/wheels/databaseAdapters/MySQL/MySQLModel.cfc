@@ -1,5 +1,38 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	/**
+	 * Internal function. This database converts a high-precision decimal sent as text exactly,
+	 * in an insert and in a comparison (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "cf_sql_varchar";
+	}
+
+	/**
+	 * Internal function. MySQL compares a multi-element IN list of text values with a DECIMAL
+	 * column as doubles, so a high-precision decimal also binds inside an exact cast (#4172).
+	 */
+	public struct function $wideDecimalCastLimits() {
+		return {precision = 65, scale = 30};
+	}
+
+	/**
+	 * Internal function. Casts high-precision decimal params exactly before running the query.
+	 */
+	public struct function $performQuery(
+		required array sql,
+		required boolean parameterize,
+		numeric limit = 0,
+		numeric offset = 0,
+		string dataSource = variables.dataSource,
+		string $primaryKey = "",
+		string $debugName = "query",
+		boolean $captureResult = true
+	) {
+		$castWideDecimalParams(args = arguments);
+		return super.$performQuery(argumentCollection = arguments);
+	}
+
 	variables.mysqlTypeMap = {
 		"bigint": "cf_sql_bigint",
 		"binary": "cf_sql_binary",
