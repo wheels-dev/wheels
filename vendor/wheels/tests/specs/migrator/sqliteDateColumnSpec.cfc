@@ -23,6 +23,7 @@ component extends="wheels.WheelsTest" {
 		variables.newTable = "c_o_r_e_sqlitedatecols";
 		variables.textTable = "c_o_r_e_sqlitetextdatecols";
 		variables.ds = application.wo.get("dataSourceName");
+		variables.isBoxLang = application.wo.$engineAdapter().isBoxLang();
 		if (!variables.applies) {
 			return;
 		}
@@ -138,10 +139,11 @@ component extends="wheels.WheelsTest" {
 			// raw SQL or another tool. Writes now store ISO text, so the upgrade note gives a recipe to
 			// convert the old integers first; this pins that the recipe works.
 			// What happens to a record whose old epoch-millisecond values haven't been converted yet.
-			// Wheels updates only the columns that changed, so an unrelated save works and leaves the
-			// old integers alone; writing a new value to a date column stores ISO text, which is what
-			// mixes formats in the column until the recipe runs.
-			it("saves a record with unconverted legacy values, leaving them as integers until a date column is written", () => {
+			// On BoxLang the integers read back as numbers, fail the date check, and block every save.
+			// On Lucee and Adobe they read back as dates, and Wheels updates only the columns that
+			// changed: an unrelated save works and leaves the integers, and writing a date column
+			// stores ISO text, which mixes formats until the recipe runs. Either way: convert first.
+			it("handles a record with unconverted legacy values per engine (BoxLang rejects the save)", () => {
 				if (!variables.applies) {
 					skip("SQLite only.");
 				}
@@ -160,15 +162,22 @@ component extends="wheels.WheelsTest" {
 						skip("This engine and driver stored the old DATE binding as #before.dk#, not epoch milliseconds.");
 					}
 					StructDelete(application.wheels.models, "SqliteLegacyDateRow");
-					// 1. An unrelated change saves, and the old integers stay as they are.
 					var rec = model("SqliteLegacyDateRow").findByKey(1);
 					rec.label = "after";
+					if (variables.isBoxLang) {
+						// BoxLang: the save is rejected on the date columns the user never touched.
+						expect(rec.save(transaction = "commit")).toBeFalse("BoxLang saved a record with unconverted legacy values");
+						expect(ArrayLen(rec.errorsOn("d"))).toBeGT(0, "no error on d");
+						expect(ArrayLen(rec.errorsOn("t"))).toBeGT(0, "no error on t");
+						return;
+					}
+					// Lucee / Adobe 1. An unrelated change saves, and the old integers stay as they are.
 					expect(rec.save(transaction = "commit")).toBeTrue("save failed: " & SerializeJSON(rec.allErrors()));
 					var stored = QueryExecute("SELECT typeof(d) AS dk, typeof(t) AS tk, label FROM #legacy#", [], {datasource = variables.ds});
 					expect(stored.label).toBe("after");
 					expect(stored.dk).toBe("integer", "an unrelated save must not rewrite the date column");
 					expect(stored.tk).toBe("integer", "an unrelated save must not rewrite the time column");
-					// 2. Writing the date column stores ISO text, so the column now mixes formats.
+					// Lucee / Adobe 2. Writing the date column stores ISO text, so the column now mixes formats.
 					rec = model("SqliteLegacyDateRow").findByKey(1);
 					rec.d = "2026-10-03";
 					expect(rec.save(transaction = "commit")).toBeTrue("save failed: " & SerializeJSON(rec.allErrors()));
