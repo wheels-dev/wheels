@@ -1,0 +1,1 @@
+- Route matching scans only the routes that can match a request: those allowing its HTTP method whose first two path segments match the request's, plus routes keyed less specifically, in declaration order. Which route matches is unchanged. On RustCFML this also keeps an app with more than about 256 routes from recompiling a regex per route on every dynamic-route request.
