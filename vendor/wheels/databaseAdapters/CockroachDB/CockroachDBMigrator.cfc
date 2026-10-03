@@ -17,6 +17,8 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator" {
 	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
 	variables.sqlTypes['char'] = {name = 'CHAR', limit = 1};
 	variables.sqlTypes['uuid'] = {name = 'UUID'};
+	variables.sqlTypes['uniqueidentifier'] = {name = 'UUID'};
+	variables.uuidDefaultSQL = 'gen_random_uuid()';
 
 	/**
 	 * name of database adapter
