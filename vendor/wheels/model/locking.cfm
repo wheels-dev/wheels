@@ -29,7 +29,7 @@
 	 * @callback A function or closure to execute while holding the lock. Its return value is returned by this method.
 	 * @transaction When `true`, acquire the lock, run the callback, and release the lock on one connection pinned by a transaction, so the lock genuinely covers the callback's own queries (#4198). On PostgreSQL the lock is transaction-scoped and auto-releases when the transaction ends; on MySQL and SQL Server it is a session lock released before the transaction closes. The callback then runs inside a transaction: its writes commit or roll back together, and a `transaction()` inside it nests. Recommended for short critical sections; avoid for long-running callbacks, which would hold their row locks and a pooled connection — and block PostgreSQL VACUUM — for the whole call. Supported on PostgreSQL, MySQL, and SQL Server; `true` on any other database throws. Defaults to `false` (the session-scoped behaviour).
 	 *
-	 * Do NOT `abort`, `redirectTo()`, or `cflocation` inside the callback (on any path, `transaction` true or false): an abort bypasses the release, and on MySQL and SQL Server — whose locks are session-scoped — the database lock then stays held on that pooled connection until the connection closes. PostgreSQL in `transaction = true` mode is the one exception: the transaction's rollback releases its lock even on abort. Return from the callback (optionally a value) and redirect afterwards.
+	 * The lock is always released, including when the callback ends the request with `abort`, `redirectTo()` or `cflocation`: the release runs in a `finally`, which executes on those paths (measured on Lucee, Adobe and BoxLang). The one case not covered is a request killed without running its `finally` — the engine's request-timeout cutting the request off, or a JVM crash — after which a session-scoped lock (MySQL / SQL Server) frees only when its pooled connection is closed; a PostgreSQL transaction-scoped lock still frees when that connection's transaction is rolled back on return to the pool.
 	 */
 	public any function withAdvisoryLock(
 		required string name,
@@ -174,58 +174,74 @@
 
 	/**
 	 * Internal function. Opens a transaction, acquires the lock on its pinned connection, runs the
-	 * callback and releases the lock (#4198). A session-scoped lock (MySQL) is released explicitly in
-	 * a finally-style step before the block commits or rolls back; a transaction-scoped lock
-	 * (PostgreSQL / SQL Server) auto-releases at transaction end, so its release step is a no-op. A
-	 * callback failure rolls the transaction back and rethrows; a release that fails during that
-	 * failure is logged, never allowed to replace the callback's own error.
+	 * callback and releases the lock in a `finally` INSIDE the transaction block, so the release runs
+	 * before the transaction closes on every exit — normal return, a thrown error, AND a callback that
+	 * ends the request via abort / cflocation (a `finally` runs on abort and cflocation on Lucee,
+	 * Adobe and BoxLang — measured). A session-scoped lock (MySQL / SQL Server) is released there; a
+	 * transaction-scoped lock (PostgreSQL) auto-releases at transaction end, so its release step is a
+	 * no-op (#4198).
+	 *
+	 * The `failed` flag defaults to true and is set false only in the try body after the callback
+	 * returns, so nothing is written in a catch (a catch-scope write would not persist on BoxLang —
+	 * invariant 11). A release is loud only on success; on a callback failure or abort it is quiet, so
+	 * it never masks the callback's own error and never throws during an abort.
 	 */
 	public any function $runAdvisoryLockInNewTransaction(required any adapter, required string name, required numeric timeout, required any callback) {
-		local.ctx = {hasResult = false, result = ""};
+		var state = {failed = true, hasResult = false, result = ""};
 		transaction {
 			arguments.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
 			try {
 				local.cbResult = arguments.callback();
+				state.failed = false;
 				if (StructKeyExists(local, "cbResult")) {
-					local.ctx.hasResult = true;
-					local.ctx.result = local.cbResult;
+					state.hasResult = true;
+					state.result = local.cbResult;
 				}
 			} catch (any e) {
-				$releaseTransactionalAdvisoryLockQuietly(adapter = arguments.adapter, name = arguments.name);
 				transaction action="rollback";
 				rethrow;
+			} finally {
+				if (state.failed) {
+					$releaseTransactionalAdvisoryLockQuietly(adapter = arguments.adapter, name = arguments.name);
+				} else {
+					$releaseTransactionalAdvisoryLock(adapter = arguments.adapter, name = arguments.name);
+				}
 			}
-			$releaseTransactionalAdvisoryLock(adapter = arguments.adapter, name = arguments.name);
 		}
-		if (local.ctx.hasResult) {
-			return local.ctx.result;
+		if (state.hasResult) {
+			return state.result;
 		}
 	}
 
 	/**
 	 * Internal function. Acquires the lock on the connection of an already-open transaction and runs
-	 * the callback without opening a second transaction (#4198). A transaction-scoped lock
-	 * (PostgreSQL / SQL Server) is NOT released here: it belongs to the OUTER transaction and is held
-	 * until that owner commits or rolls back. A session-scoped lock (MySQL) is released at call end,
-	 * since the outer transaction keeps running. A callback failure rethrows; the session-scoped lock
-	 * is released first (logged on failure) so it is not leaked onto the still-open outer transaction.
+	 * the callback without opening a second transaction (#4198). The release is in a `finally`, so a
+	 * session-scoped lock (MySQL / SQL Server) is released at call end on every exit — normal return, a
+	 * thrown error, or an abort / cflocation. A transaction-scoped lock (PostgreSQL) is NOT released
+	 * here (the release step is a no-op for it): it belongs to the OUTER transaction and is held until
+	 * that owner commits or rolls back. No catch is needed — an exception propagates to the outer
+	 * owner, which manages its own rollback. The `failed` flag follows the same try-body-only rule as
+	 * $runAdvisoryLockInNewTransaction so a release is loud only on success.
 	 */
 	public any function $runAdvisoryLockInOpenTransaction(required any adapter, required string name, required numeric timeout, required any callback) {
 		arguments.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
-		local.ctx = {hasResult = false, result = ""};
+		var state = {failed = true, hasResult = false, result = ""};
 		try {
 			local.cbResult = arguments.callback();
+			state.failed = false;
 			if (StructKeyExists(local, "cbResult")) {
-				local.ctx.hasResult = true;
-				local.ctx.result = local.cbResult;
+				state.hasResult = true;
+				state.result = local.cbResult;
 			}
-		} catch (any e) {
-			$releaseTransactionalAdvisoryLockQuietly(adapter = arguments.adapter, name = arguments.name);
-			rethrow;
+		} finally {
+			if (state.failed) {
+				$releaseTransactionalAdvisoryLockQuietly(adapter = arguments.adapter, name = arguments.name);
+			} else {
+				$releaseTransactionalAdvisoryLock(adapter = arguments.adapter, name = arguments.name);
+			}
 		}
-		$releaseTransactionalAdvisoryLock(adapter = arguments.adapter, name = arguments.name);
-		if (local.ctx.hasResult) {
-			return local.ctx.result;
+		if (state.hasResult) {
+			return state.result;
 		}
 	}
 
