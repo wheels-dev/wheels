@@ -1,0 +1,1 @@
+- On Oracle, whole-number `NUMBER` columns with a precision of 11 or more, including `NUMBER(38)` (Oracle's `INTEGER`, common for identity ids), are now bound as 64-bit integers. They were bound as 32-bit, so an id above 2,147,483,647 was clamped or wrapped and a find, update or delete by it could act on a different row (#4089)
