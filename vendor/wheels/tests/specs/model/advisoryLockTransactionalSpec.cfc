@@ -1,10 +1,11 @@
 /**
  * withAdvisoryLock(transaction = true) pins acquire + callback + release to one connection by
- * running them in a transaction, so the lock genuinely covers the callback's queries and, on
- * PostgreSQL / SQL Server, auto-releases at transaction end (4198). MySQL's GET_LOCK is
- * session-scoped and is released explicitly before the transaction closes. CockroachDB, SQLite,
- * H2 and Oracle do not support it, so an opt-in transaction = true throws rather than silently
- * running session-scoped.
+ * running them in a Wheels-owned transaction, so the lock genuinely covers the callback's queries
+ * (4198). On PostgreSQL the lock is transaction-scoped (pg_advisory_xact_lock) and auto-releases at
+ * transaction end; on MySQL (GET_LOCK) and SQL Server (sp_getapplock @LockOwner = 'Session') it is
+ * session-scoped and released explicitly, after the commit, before the transaction block closes.
+ * CockroachDB, SQLite, H2 and Oracle do not support it, so an opt-in transaction = true throws
+ * rather than silently running session-scoped.
  *
  * Exclusion is verified uniformly (a holder thread keeps a second caller out until it finishes);
  * DB-level acquire and auto-release are asserted precisely on PostgreSQL / MySQL, whose advisory
@@ -220,17 +221,16 @@ component extends="wheels.WheelsTest" {
 		describe("withAdvisoryLock(transaction = true) inside an already-open transaction", () => {
 
 			beforeEach(() => {
-				if (!variables.introspectable) {
-					skip("Outer-transaction join is asserted on PostgreSQL / MySQL (DB-level introspection).");
+				if (!variables.applies) {
+					skip("Transaction-scoped advisory locks: PostgreSQL, MySQL, SQL Server.");
 				}
 			});
 
-			// A transaction-scoped lock (PostgreSQL) joins the outer transaction and is held until the
-			// OUTER transaction ends, not when the call returns. MySQL's session-scoped lock is released
-			// at call end, so this assertion is PostgreSQL-only.
-			it("holds a transaction-scoped lock until the outer transaction ends", () => {
+			// PostgreSQL: the transaction-scoped lock joins the outer transaction and is held until the
+			// OUTER transaction ends, not when the call returns.
+			it("holds a PostgreSQL transaction-scoped lock until the outer transaction ends", () => {
 				if (variables.adapterName != "PostgreSQLModel") {
-					skip("Transaction-scoped (outer-held) release is PostgreSQL here; MySQL is session-scoped.");
+					skip("Transaction-scoped (outer-held) join is PostgreSQL; session-scoped adapters throw.");
 				}
 				var name = lockName();
 				var author = variables.g.model("author");
@@ -247,24 +247,28 @@ component extends="wheels.WheelsTest" {
 				expect(isHeld(name)).toBeFalse("the lock must be released once the outer transaction ends");
 			});
 
-			// The session-scoped contrast: MySQL releases its lock at CALL end, so inside the outer
-			// transaction the lock is already free after the call returns (SQL Server shares this
-			// session-scoped code path; it is not introspectable here, so it is asserted on MySQL).
-			it("releases a session-scoped lock at call end, before the outer transaction ends", () => {
-				if (variables.adapterName != "MySQLModel") {
-					skip("Session-scoped call-end release is introspectable on MySQL; PostgreSQL is tx-scoped.");
+			// Session-scoped adapters (MySQL / SQL Server) cannot release before the outer transaction
+			// commits without exposing pre-commit state, so transaction = true inside an existing
+			// transaction is unsupported and throws (rather than releasing early).
+			it("throws for a session-scoped adapter inside an existing transaction", () => {
+				if (!variables.adapterName.listFindNoCase("MySQLModel,MicrosoftSQLServerModel")) {
+					skip("Session-scoped throw-inside-outer-tx is MySQL / SQL Server; PostgreSQL joins.");
 				}
 				var name = lockName();
 				var author = variables.g.model("author");
-				var ctx = {heldAfterCall = true};
+				var state = {entered = false, type = ""};
 				transaction {
-					author.withAdvisoryLock(name = name, transaction = true, callback = function() {
-						return true;
-					});
-					// Still inside the OUTER transaction, but the session lock is released at call end.
-					ctx.heldAfterCall = isHeld(name);
+					try {
+						author.withAdvisoryLock(name = name, transaction = true, callback = function() {
+							state.entered = true;
+							return true;
+						});
+					} catch (any e) {
+						state.type = e.type;
+					}
 				}
-				expect(ctx.heldAfterCall).toBeFalse("a session-scoped lock must be released at call end, not held to the outer transaction");
+				expect(state.entered).toBeFalse("the lock body must not run inside an existing transaction on a session-scoped adapter");
+				expect(state.type).toBe("Wheels.AdvisoryLockNotSupported");
 			});
 
 		});
@@ -296,26 +300,42 @@ component extends="wheels.WheelsTest" {
 
 		describe("re-entrancy: a nested same-name lock on the same session", () => {
 
-			// Session locks (MySQL GET_LOCK, SQL Server sp_getapplock) and the PG xact lock all count
-			// up/down on one session, and the app-server cflock is re-entrant for the same thread, so a
-			// nested same-name call runs its inner callback and leaves the lock fully released.
-			it("runs the nested callback and fully releases on the transaction path", () => {
+			// A nested transaction = true runs inside the OUTER lock's Wheels-owned transaction, so it
+			// takes the join path: PostgreSQL's transaction-scoped lock joins and the inner runs (both
+			// released when the outer transaction ends); a session-scoped adapter (MySQL / SQL Server)
+			// throws, because the inner could not release before the outer commits.
+			it("nested transaction = true: PostgreSQL joins and runs; session-scoped throws", () => {
 				if (!variables.applies) {
 					skip("Transaction-scoped advisory locks: PostgreSQL, MySQL, SQL Server.");
 				}
 				var name = lockName();
 				var author = variables.g.model("author");
-				var ctx = {inner = false};
-				author.withAdvisoryLock(name = name, timeout = 5, transaction = true, callback = function() {
+				if (variables.adapterName == "PostgreSQLModel") {
+					var ctx = {inner = false};
 					author.withAdvisoryLock(name = name, timeout = 5, transaction = true, callback = function() {
-						ctx.inner = true;
+						author.withAdvisoryLock(name = name, timeout = 5, transaction = true, callback = function() {
+							ctx.inner = true;
+							return true;
+						});
 						return true;
 					});
-					return true;
-				});
-				expect(ctx.inner).toBeTrue("the nested same-name callback must run");
-				if (variables.introspectable) {
-					expect(isHeld(name)).toBeFalse("both levels must release, leaving the lock free");
+					expect(ctx.inner).toBeTrue("PostgreSQL nested transaction = true joins the outer and runs the inner");
+					expect(isHeld(name)).toBeFalse("both levels are released once the outer transaction ends");
+				} else {
+					var ctx = {inner = false, type = ""};
+					try {
+						author.withAdvisoryLock(name = name, timeout = 5, transaction = true, callback = function() {
+							author.withAdvisoryLock(name = name, timeout = 5, transaction = true, callback = function() {
+								ctx.inner = true;
+								return true;
+							});
+							return true;
+						});
+					} catch (any e) {
+						ctx.type = e.type;
+					}
+					expect(ctx.inner).toBeFalse("a session-scoped nested transaction = true must not run the inner");
+					expect(ctx.type).toBe("Wheels.AdvisoryLockNotSupported");
 				}
 			});
 
@@ -339,6 +359,77 @@ component extends="wheels.WheelsTest" {
 				if (variables.introspectable) {
 					expect(isHeld(name)).toBeFalse("both levels must release on the default path");
 				}
+			});
+
+		});
+
+		// The lock transaction is a Wheels-OWNED transaction, so a model saved inside the callback
+		// joins it (same connection args) and its afterCommit/afterRollback callbacks resolve once at
+		// the lock transaction's outcome — not suppressed as a "foreign" raw transaction would be, and
+		// not fired early. The callback's writes are committed before the lock releases (data visible).
+		describe("model saved inside the lock transaction resolves its callbacks (owner bookkeeping)", () => {
+
+			beforeEach(() => {
+				if (!variables.applies) {
+					skip("Transaction-scoped advisory locks: PostgreSQL, MySQL, SQL Server.");
+				}
+				request.$acLog = [];
+				if (StructKeyExists(request, "wheels") && StructKeyExists(request.wheels, "$txnForeignWarned")) {
+					StructDelete(request.wheels, "$txnForeignWarned");
+				}
+				variables.g.model("tag").$registerCallback(type = "afterCommit", methods = "recordAfterCommit");
+				variables.g.model("tag").$registerCallback(type = "afterRollback", methods = "recordAfterRollback");
+			});
+
+			afterEach(() => {
+				variables.g.model("tag").$clearCallbacks(type = "afterCommit");
+				variables.g.model("tag").$clearCallbacks(type = "afterRollback");
+				variables.g.model("tag").deleteAll(
+					where = "name LIKE 'txncb-lock-%'",
+					instantiate = false,
+					callbacks = false,
+					transaction = "commit"
+				);
+			});
+
+			it("fires afterCommit exactly once and commits the write (visible after release)", () => {
+				var name = lockName();
+				variables.g.model("author").withAdvisoryLock(name = name, transaction = true, callback = function() {
+					variables.g.model("tag").new(name = "txncb-lock-commit").save();
+					return true;
+				});
+				expect(ArrayLen(request.$acLog)).toBe(1, "afterCommit must fire exactly once at the lock transaction's outcome");
+				expect(request.$acLog[1]).toBe("commit:txncb-lock-commit");
+				// commit-before-release: the write is committed and visible once the lock has released.
+				expect(variables.g.model("tag").count(where = "name = 'txncb-lock-commit'")).toBe(1, "the callback's write must be committed when the lock releases");
+			});
+
+			it("fires afterRollback exactly once (not afterCommit) when the callback throws, and the write is rolled back", () => {
+				var name = lockName();
+				var state = {type = ""};
+				try {
+					variables.g.model("author").withAdvisoryLock(name = name, transaction = true, callback = function() {
+						variables.g.model("tag").new(name = "txncb-lock-rb").save();
+						Throw(type = "Wheels.SpecCallbackFailure", message = "fail after the save");
+					});
+				} catch (any e) {
+					state.type = e.type;
+				}
+				expect(state.type).toBe("Wheels.SpecCallbackFailure");
+				expect(ArrayLen(request.$acLog)).toBe(1, "exactly one callback must fire");
+				expect(request.$acLog[1]).toBe("rollback:txncb-lock-rb", "afterRollback fires, not afterCommit");
+				expect(variables.g.model("tag").count(where = "name = 'txncb-lock-rb'")).toBe(0, "the write must be rolled back");
+			});
+
+			it("cleans up the owner marker so a later write in the same request still commits", () => {
+				var name = lockName();
+				variables.g.model("author").withAdvisoryLock(name = name, transaction = true, callback = function() {
+					variables.g.model("tag").new(name = "txncb-lock-first").save();
+					return true;
+				});
+				// A later independent write must still commit (the open-transaction marker was cleared).
+				variables.g.model("tag").new(name = "txncb-lock-second").save(transaction = "commit");
+				expect(variables.g.model("tag").count(where = "name = 'txncb-lock-second'")).toBe(1, "a later write must commit after the lock transaction cleaned up");
 			});
 
 		});

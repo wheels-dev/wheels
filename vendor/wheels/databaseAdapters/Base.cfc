@@ -1002,9 +1002,10 @@ component output=false extends="wheels.Global"{
 	 * (where the lock is transaction-scoped) auto-releases when that transaction ends.
 	 *
 	 * Distinct from `$supportsAdvisoryLocks()`, which reports standalone (session) support. An
-	 * adapter may support one and not the other: SQL Server supports only the transaction-scoped
-	 * form (`sp_getapplock @LockOwner = 'Transaction'` needs an open transaction), so it leaves
-	 * `$supportsAdvisoryLocks()` false but overrides this to true.
+	 * adapter may support one and not the other: SQL Server reports `$supportsAdvisoryLocks()` false
+	 * (its standalone `sp_getapplock @LockOwner = 'Transaction'` needs an open transaction) but
+	 * overrides this to true, taking a session-owned `sp_getapplock @LockOwner = 'Session'` lock on
+	 * the transaction-pinned connection.
 	 */
 	public boolean function $supportsTransactionalAdvisoryLock() {
 		return false;
@@ -1013,11 +1014,11 @@ component output=false extends="wheels.Global"{
 	/**
 	 * Internal function. Reports whether this adapter's transaction-scoped lock is actually
 	 * session-scoped and so must be released explicitly before the transaction closes (#4198).
-	 * MySQL's `GET_LOCK` is session- not transaction-scoped: pinning it to the transaction's
-	 * connection still guards the callback, but it does not auto-release at transaction end, so the
-	 * caller releases it with `$releaseAdvisoryLockTransactional()` first. PostgreSQL
-	 * (`pg_advisory_xact_lock`) and SQL Server (`@LockOwner = 'Transaction'`) auto-release and
-	 * leave this false.
+	 * MySQL's `GET_LOCK` and SQL Server's `sp_getapplock @LockOwner = 'Session'` are session- not
+	 * transaction-scoped: pinning them to the transaction's connection still guards the callback, but
+	 * they do not auto-release at transaction end, so the caller releases them with
+	 * `$releaseAdvisoryLockTransactional()` first. PostgreSQL (`pg_advisory_xact_lock`) auto-releases
+	 * at transaction end and leaves this false.
 	 */
 	public boolean function $transactionalAdvisoryLockIsSessionScoped() {
 		return false;
@@ -1040,8 +1041,8 @@ component output=false extends="wheels.Global"{
 
 	/**
 	 * Internal function. Releases a transaction-scoped advisory lock before the transaction closes
-	 * (#4198). Only session-scoped locks (MySQL) need this; transaction-scoped locks auto-release at
-	 * transaction end, so the default is a no-op.
+	 * (#4198). Only session-scoped locks (MySQL, SQL Server) need this; a transaction-scoped lock
+	 * (PostgreSQL) auto-releases at transaction end, so the default is a no-op.
 	 */
 	public void function $releaseAdvisoryLockTransactional(required string name) {
 	}

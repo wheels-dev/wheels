@@ -143,9 +143,21 @@
 	 * Internal function. The transaction-scoped path for withAdvisoryLock(transaction = true) (#4198).
 	 * Pins acquire + callback + release to one connection by running them in a transaction, so the
 	 * lock genuinely covers the callback's own queries. An unsupported database throws rather than
-	 * falling back silently: the opt-in asks for a guarantee this adapter can't give. When a
-	 * transaction is already open on this connection the lock joins it (no second transaction), so a
-	 * transaction-scoped lock is held until that OUTER transaction ends.
+	 * falling back silently: the opt-in asks for a guarantee this adapter can't give.
+	 *
+	 * The new-transaction case runs through Wheels' own `invokeWithTransaction`, so the lock
+	 * transaction is a fully Wheels-OWNED transaction: a model save inside the callback joins it (the
+	 * open marker), its afterCommit/afterRollback callbacks queue and resolve once at the lock
+	 * transaction's outcome, and the Adobe nested-isolation retry applies — none of which a raw
+	 * `transaction {}` would get (a raw block is seen as foreign and its callbacks are suppressed).
+	 *
+	 * When a transaction is already open on this connection the lock joins it. A transaction-scoped
+	 * lock (PostgreSQL) is held until that OUTER transaction ends — supported. A session-scoped lock
+	 * (MySQL / SQL Server) would have to release at call end, before the outer transaction commits,
+	 * exposing pre-commit state to the next holder (and deferring to the outer afterCommit releases on
+	 * a pooled connection, not the holder) — so it is unsupported inside an existing transaction and
+	 * throws. (A raw outer transaction is undetectable on RustCFML, which supports none of these
+	 * adapters anyway.)
 	 */
 	public any function $runWithAdvisoryLockTransactional(required string name, required numeric timeout, required any callback) {
 		local.adapter = variables.wheels.class.adapter;
@@ -157,6 +169,13 @@
 			);
 		}
 		if ($transactionIsOpen($hashedConnectionArgs())) {
+			if (local.adapter.$transactionalAdvisoryLockIsSessionScoped()) {
+				Throw(
+					type = "Wheels.AdvisoryLockNotSupported",
+					message = "withAdvisoryLock(transaction = true) is not supported inside an existing transaction on this database.",
+					extendedInfo = "A session-scoped advisory lock (MySQL, SQL Server) would release before the outer transaction commits, exposing pre-commit state. Take the lock outside the transaction, or use transaction = false. PostgreSQL supports this (its lock is held until the outer transaction ends)."
+				);
+			}
 			return $runAdvisoryLockInOpenTransaction(
 				adapter = local.adapter,
 				name = arguments.name,
@@ -164,53 +183,61 @@
 				callback = arguments.callback
 			);
 		}
-		return $runAdvisoryLockInNewTransaction(
-			adapter = local.adapter,
+		// Run the lock body as a Wheels-owned transaction. The body must return a boolean (the
+		// transaction outcome is driven by throw / no-throw, not the callback's own return), so the
+		// callback's actual result is carried back through the shared `state` struct.
+		local.state = {callbackSucceeded = false, hasResult = false, result = ""};
+		invokeWithTransaction(
+			method = "$advisoryLockTransactionBody",
 			name = arguments.name,
 			timeout = arguments.timeout,
-			callback = arguments.callback
+			callback = arguments.callback,
+			state = local.state
 		);
+		if (local.state.hasResult) {
+			return local.state.result;
+		}
 	}
 
 	/**
-	 * Internal function. Opens a transaction, acquires the lock on its pinned connection, runs the
-	 * callback and releases the lock in a `finally` INSIDE the transaction block, so the release runs
-	 * before the transaction closes on every exit — normal return, a thrown error, AND a callback that
-	 * ends the request via abort / cflocation (a `finally` runs on abort and cflocation on Lucee,
-	 * Adobe and BoxLang — measured). A session-scoped lock (MySQL / SQL Server) is released there; a
-	 * transaction-scoped lock (PostgreSQL) auto-releases at transaction end, so its release step is a
-	 * no-op (#4198).
+	 * Internal function. The body of the Wheels-owned lock transaction, run by invokeWithTransaction
+	 * (#4198). Acquires the lock on the pinned connection, runs the callback, commits BEFORE the
+	 * release so the committed writes are visible to the next holder (rev1-r1), then releases a
+	 * session-scoped lock on the same pinned connection in a `finally` — which also runs on a callback
+	 * that aborts / cflocations. PostgreSQL's transaction-scoped lock auto-releases at that commit, so
+	 * its release step is a no-op.
 	 *
-	 * The `failed` flag defaults to true and is set false only in the try body after the callback
-	 * returns, so nothing is written in a catch (a catch-scope write would not persist on BoxLang —
-	 * invariant 11). A release is loud only on success; on a callback failure or abort it is quiet, so
-	 * it never masks the callback's own error and never throws during an abort.
+	 * Returns `true` unconditionally: invokeWithTransaction rolls back on a `false` return, but here a
+	 * `false` is a legitimate callback result, not a failure — a genuine failure throws, and
+	 * invokeWithTransaction then rolls back and fires afterRollback. The callback's real result is
+	 * written into the shared `state` struct in the try body only (nothing written in a catch —
+	 * BoxLang invariant 11). `success` likewise flips only after the callback returns, so the finally
+	 * releases quietly on a failure / abort (never masking the callback's error) and loudly on success.
 	 */
-	public any function $runAdvisoryLockInNewTransaction(required any adapter, required string name, required numeric timeout, required any callback) {
-		var state = {failed = true, hasResult = false, result = ""};
-		transaction {
-			arguments.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
-			try {
-				local.cbResult = arguments.callback();
-				state.failed = false;
-				if (StructKeyExists(local, "cbResult")) {
-					state.hasResult = true;
-					state.result = local.cbResult;
-				}
-			} catch (any e) {
-				transaction action="rollback";
-				rethrow;
-			} finally {
-				if (state.failed) {
-					$releaseTransactionalAdvisoryLockQuietly(adapter = arguments.adapter, name = arguments.name);
-				} else {
-					$releaseTransactionalAdvisoryLock(adapter = arguments.adapter, name = arguments.name);
-				}
+	public boolean function $advisoryLockTransactionBody(required string name, required numeric timeout, required any callback, required struct state) {
+		local.adapter = variables.wheels.class.adapter;
+		local.success = {flag = false};
+		local.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
+		try {
+			local.cbResult = arguments.callback();
+			local.success.flag = true;
+			arguments.state.callbackSucceeded = true;
+			if (StructKeyExists(local, "cbResult")) {
+				arguments.state.hasResult = true;
+				arguments.state.result = local.cbResult;
+			}
+			// Commit on the pinned connection BEFORE the release, so the next holder reads committed
+			// state. The transaction block stays open on the same connection for the release that
+			// follows; invokeWithTransaction's own block close then has nothing left to commit.
+			transaction action="commit";
+		} finally {
+			if (local.success.flag) {
+				$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
+			} else {
+				$releaseTransactionalAdvisoryLockQuietly(adapter = local.adapter, name = arguments.name);
 			}
 		}
-		if (state.hasResult) {
-			return state.result;
-		}
+		return true;
 	}
 
 	/**
