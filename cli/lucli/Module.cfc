@@ -500,9 +500,9 @@ component extends="modules.BaseModule" {
 
 	private any function testArgSpec() {
 		return new services.ArgSpec()
-			.option(name = "filter",    default = "", description = "What to run: a spec directory or one spec file, as a dotted path (tests.specs.models, tests.specs.models.UserSpec) or a bare name (models, UserSpec)")
+			.option(name = "filter",    default = "", description = "What to run: a spec directory or one spec file, as a path (tests/specs/models, tests/specs/models/UserSpec.cfc), a dotted path (tests.specs.models, tests.specs.models.UserSpec) or a bare name (models, UserSpec)")
 			.option(name = "directory", default = "", description = "Documented alias for --filter")
-			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format: simple, json, or tap")
+			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format")
 			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
 			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT. On the terminal use --test-timeout=<seconds>: it works on every LuCLI runtime, while a plain --timeout only reaches this command on LuCLI builds that include the module-timeout fix (LuCLI ##130)")
@@ -846,11 +846,56 @@ component extends="modules.BaseModule" {
 
 		var help = "wheels " & lCase(trim(arguments.subcommand)) & nl & nl;
 		help &= "  " & hint & nl & nl;
+		// Options come from the command's own ArgSpec (`<command>ArgSpec()`),
+		// the declaration the parser and the MCP schema already share (#3962).
+		var optionLines = $commandOptionLines(fnName);
+		if (arrayLen(optionLines)) {
+			help &= "Options:" & nl & arrayToList(optionLines, nl) & nl & nl;
+		}
+		var examples = $commandExamples(fnName);
+		if (arrayLen(examples)) {
+			help &= "Examples:" & nl & arrayToList(examples, nl) & nl & nl;
+		}
 		help &= "Run 'wheels help' for the full command list." & nl;
 		help &= "More info: https://guides.wheels.dev";
 		return help;
 	}
 
+
+	/**
+	 * The Options lines for `wheels <command> --help`, rendered from the
+	 * command's `<command>ArgSpec()` when it has one; empty otherwise. Help
+	 * must always render, so a spec that fails to build yields no options.
+	 */
+	private array function $commandOptionLines(required string fnName) {
+		var specFnName = arguments.fnName & "ArgSpec";
+		if (!structKeyExists(variables, specFnName) || !isCustomFunction(variables[specFnName])) {
+			return [];
+		}
+		try {
+			var specFn = variables[specFnName];
+			return specFn().toHelpLines();
+		} catch (any e) {
+			return [];
+		}
+	}
+
+	/** Worked examples for `wheels <command> --help`, where a command has them. */
+	private array function $commandExamples(required string fnName) {
+		switch (arguments.fnName) {
+			case "test":
+				return [
+					"  wheels test                                  Run every spec under tests/specs",
+					"  wheels test tests.specs.models               Run one folder (a dotted path)",
+					"  wheels test tests/specs/models               Run one folder (a path)",
+					"  wheels test --filter=UserSpec                Run one spec file, by name",
+					"  wheels test tests/specs/models/UserSpec.cfc  Run one spec file, by path",
+					"  wheels test --reporter=json                  Print the raw JSON result"
+				];
+			default:
+				return [];
+		}
+	}
 
 	/**
 	 * Dry-run-aware write for generator paths inside Module.cfc (the
@@ -1532,7 +1577,14 @@ component extends="modules.BaseModule" {
 		// CLI normalizes here so `--filter=browser` does what the user
 		// expects. Onboarding finding #2. A bare spec name resolves to the one
 		// spec file it names, so it runs as a single bundle (issue 3759).
+		var requested = filter;
 		filter = $resolveTestFilter(filter, coreTests);
+		// Refuse a scope that would not run as asked, before anything runs
+		// (issues 3963, 3893): no full-suite fallback, no "0 bundles" afterwards.
+		var scopeProblem = $testScopeProblem(filter, coreTests, requested);
+		if (len(scopeProblem)) {
+			throw(type = "Wheels.TestScopeNotFound", message = scopeProblem);
+		}
 
 		return runTests(
 			filter, reporter, format, verboseOutput, coreTests,
@@ -1614,6 +1666,86 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Why a resolved test scope cannot run, or "" when it can (issues 3963,
+	 * 3893). The default scope (empty) always can. Otherwise the scope must
+	 * be a form the runner accepts AND name a folder or spec file that exists
+	 * in this project: the runner falls back to the full default suite for a
+	 * scope it rejects, and reports "no test bundles ran" for one that matches
+	 * nothing, so both are refused here, before anything runs. The message is
+	 * self-contained because MCP clients see only the exception message.
+	 */
+	public string function $testScopeProblem(
+		required string scope,
+		boolean coreTests = false,
+		string requested = ""
+	) {
+		var s = trim(arguments.scope);
+		if (!len(s)) {
+			return "";
+		}
+		var shown = len(trim(arguments.requested)) ? trim(arguments.requested) : s;
+		var accepted = arguments.coreTests
+			? "Pass a folder or spec file under vendor/wheels/tests/specs as a path (model, model/FooSpec.cfc) or dotted path (wheels.tests.specs.model), or a spec name (--filter=FooSpec)."
+			: "Pass a folder or spec file under tests/specs as a path (tests/specs/models, tests/specs/models/BookSpec.cfc) or dotted path (tests.specs.models), or a spec name (--filter=BookSpec).";
+		var pattern = arguments.coreTests
+			? "^(wheels\.tests|vendor\.[a-z0-9][a-z0-9\-]*\.tests)(\.[a-zA-Z0-9_]+)*$"
+			: "^tests(\.[a-zA-Z0-9_]+)*$";
+		if (!reFindNoCase(pattern, s)) {
+			return "'#shown#' is not a test scope wheels test can run (resolved to '#s#'). #accepted# Nothing was run.";
+		}
+		var rel = replace(s, ".", "/", "all");
+		if (arguments.coreTests && reFindNoCase("^wheels/", rel)) {
+			rel = "vendor/" & rel;
+		}
+		var target = variables.projectRoot & "/" & rel;
+		if (directoryExists(target) || fileExists(target & ".cfc")) {
+			return "";
+		}
+		return "No test folder or spec file matches '#shown#' (looked for #rel#/ and #rel#.cfc). #accepted# Nothing was run.";
+	}
+
+	/**
+	 * Turn a filesystem-style test scope into the dotted form the runner takes
+	 * (issue 3963). Input that is not path-like (no `/` or `\`, no `.cfc`
+	 * suffix) is returned unchanged. A leading `./`, trailing slashes and a
+	 * `.cfc` suffix are dropped; a path under the project root may be absolute.
+	 *
+	 * App mode: `tests/...` maps as written; anything else is taken relative
+	 * to tests/specs (`models/BookSpec.cfc` → `tests.specs.models.BookSpec`).
+	 * Core mode: `vendor/wheels/tests/...` → `wheels.tests...`,
+	 * `vendor/<pkg>/tests/...` → `vendor.<pkg>.tests...`; anything else is
+	 * taken relative to vendor/wheels/tests/specs.
+	 */
+	public string function $testPathToScope(required string filter, boolean coreTests = false) {
+		var f = trim(arguments.filter);
+		if (!len(f) || !reFind("[/\\]|\.[cC][fF][cC]$", f)) {
+			return f;
+		}
+		f = replace(f, "\", "/", "all");
+		var root = reReplace(replace(variables.projectRoot, "\", "/", "all"), "/+$", "");
+		if (len(root) && len(f) > len(root) && compare(left(f, len(root) + 1), root & "/") == 0) {
+			f = mid(f, len(root) + 2, len(f));
+		}
+		f = reReplace(f, "^(\./)+", "");
+		f = reReplace(f, "/+$", "");
+		f = reReplace(f, "\.[cC][fF][cC]$", "");
+		f = reReplace(f, "/{2,}", "/", "all");
+		if (!len(f)) {
+			return "";
+		}
+		if (arguments.coreTests) {
+			if (reFind("^vendor/wheels/tests(/|$)", f)) {
+				f = mid(f, len("vendor/") + 1, len(f));
+			} else if (!reFind("^(wheels/tests|vendor/[a-z0-9][a-z0-9\-]*/tests)(/|$)", f)) {
+				f = "wheels/tests/specs/" & f;
+			}
+		} else if (!reFind("^tests(/|$)", f)) {
+			f = "tests/specs/" & f;
+		}
+		return replace(f, "/", ".", "all");
+	}
+
+	/**
 	 * Normalize a short filter name to a path the test runner's directory
 	 * regex will accept. App mode prepends `tests.specs.`; core mode
 	 * prepends `wheels.tests.specs.`. Already-qualified inputs pass through
@@ -1626,12 +1758,13 @@ component extends="modules.BaseModule" {
 	 *   "tests.specs.browser" → "tests.specs.browser"
 	 *   "wheels.tests.specs.model" → "wheels.tests.specs.model"
 	 *   "vendor.wheels-sentry.tests" → "vendor.wheels-sentry.tests"
+	 *   "tests/specs/models/BookSpec.cfc" → "tests.specs.models.BookSpec" (a path, issue 3963)
 	 */
 	public string function $normalizeTestFilter(
 		required string filter,
 		boolean coreTests = false
 	) {
-		var f = trim(arguments.filter);
+		var f = $testPathToScope(trim(arguments.filter), arguments.coreTests);
 		if (!len(f)) return "";
 
 		if (arguments.coreTests) {
@@ -1670,8 +1803,12 @@ component extends="modules.BaseModule" {
 		boolean coreTests = false
 	) {
 		var raw = trim(arguments.filter);
+		// A bare spec file name ("BookSpec.cfc") is looked up like "BookSpec".
+		if (reFind("^[^/\\]+\.[cC][fF][cC]$", raw)) {
+			raw = left(raw, len(raw) - 4);
+		}
 		var normalized = $normalizeTestFilter(raw, arguments.coreTests);
-		if (!len(raw) || find(".", raw)) {
+		if (!len(raw) || reFind("[./\\]", raw)) {
 			return normalized;
 		}
 		var specRoot = variables.projectRoot & (arguments.coreTests ? "/vendor/wheels/tests/specs" : "/tests/specs");
@@ -1723,6 +1860,9 @@ component extends="modules.BaseModule" {
 	 * already be canonical. The comparison is exact (Compare) and qualified by
 	 * a separator boundary, so `/srv/App-extra` is not inside `/srv/App`.
 	 * Mirrors wheels.PathGuard.pathWithinExact(), which the CLI does not load.
+	 * Keep the two in sync: a change to either belongs in both. The only
+	 * intended differences are the optional `separator` argument here and
+	 * $nativeSeparator() being public.
 	 * Public for specs; $-prefixed, so hidden from MCP.
 	 *
 	 * @separator The platform separator; empty means $nativeSeparator(). Specs
@@ -1750,8 +1890,8 @@ component extends="modules.BaseModule" {
 	/**
 	 * The platform's native path separator. Prefers java.io.File.separator; falls
 	 * back to the OS name; defaults to the POSIX "/". It is never inferred from
-	 * seeing a backslash in a path. Mirrors wheels.PathGuard.$nativeSeparator().
-	 * Public for specs.
+	 * seeing a backslash in a path. Mirrors wheels.PathGuard.$nativeSeparator();
+	 * keep the two in sync. Public for specs.
 	 */
 	public string function $nativeSeparator() {
 		try {
@@ -8880,7 +9020,12 @@ component extends="modules.BaseModule" {
 	 * sweep. bundlesDiscovered is read with structKeyExists — Lucee's
 	 * Elvis treats 0 as empty, which would hide the exact 0-bundle case.
 	 */
-	public boolean function $cliTestResultFailed(required struct result, numeric specsFailedToLoad = 0) {
+	public boolean function $cliTestResultFailed(
+		required struct result,
+		numeric specsFailedToLoad = 0,
+		boolean defaultScope = false,
+		boolean coreTests = false
+	) {
 		// The runner's failure envelope (app-runner.cfm: a failed test-db
 		// populate, a missing runner) is {success: false, error, message} with
 		// no test counts at all. A result document never carries `success`.
@@ -8906,13 +9051,51 @@ component extends="modules.BaseModule" {
 		if (structKeyExists(arguments.result, "directoryRejected") && arguments.result.directoryRejected) {
 			return true;
 		}
-		if (structKeyExists(arguments.result, "bundlesDiscovered") && arguments.result.bundlesDiscovered == 0) {
+		// No bundles is a failure for a scope the user asked for, but not for the
+		// default scope of an app that has no spec files yet (issue 3921). Spec
+		// files on disk that the runner did not discover (a broken mapping, the
+		// wrong webroot) stay a failure, with the runner's warning shown.
+		if (
+			structKeyExists(arguments.result, "bundlesDiscovered")
+			&& arguments.result.bundlesDiscovered == 0
+			&& !(arguments.defaultScope && !$specRootHasSpecFiles(arguments.coreTests))
+		) {
 			return true;
 		}
 		if (arguments.specsFailedToLoad > 0) {
 			return true;
 		}
 		return ((arguments.result.totalFail ?: 0) + (arguments.result.totalError ?: 0)) > 0;
+	}
+
+	/**
+	 * True when a run of the DEFAULT scope (no --filter / --directory / path)
+	 * discovered no spec bundles, the spec root has no .cfc files on disk, and
+	 * nothing else went wrong: an app with no specs yet, such as a fresh
+	 * `wheels new` app (issue 3921). Reported as a notice with exit 0. Public
+	 * for specs; hidden from MCP via the $-prefix sweep.
+	 */
+	public boolean function $isEmptyDefaultRun(
+		required any result,
+		boolean defaultScope = false,
+		boolean coreTests = false
+	) {
+		return arguments.defaultScope
+			&& isStruct(arguments.result)
+			&& structKeyExists(arguments.result, "bundlesDiscovered")
+			&& isNumeric(arguments.result.bundlesDiscovered)
+			&& arguments.result.bundlesDiscovered == 0
+			&& !$specRootHasSpecFiles(arguments.coreTests)
+			&& !$cliTestResultFailed(result = arguments.result, defaultScope = true, coreTests = arguments.coreTests);
+	}
+
+	/**
+	 * True when the default spec root (tests/specs, or vendor/wheels/tests/specs
+	 * with --core) holds any .cfc file, at any depth. Public for specs.
+	 */
+	public boolean function $specRootHasSpecFiles(boolean coreTests = false) {
+		var specRoot = variables.projectRoot & (arguments.coreTests ? "/vendor/wheels/tests/specs" : "/tests/specs");
+		return directoryExists(specRoot) && arrayLen(directoryList(specRoot, true, "path", "*.cfc")) > 0;
 	}
 
 	/**
@@ -8930,11 +9113,18 @@ component extends="modules.BaseModule" {
 	 * flushes. Composes $cliTestResultFailed. Public for specs; hidden
 	 * from MCP via the structural $-prefix sweep.
 	 */
-	public void function $throwIfCliTestsFailed(required struct result, numeric specsFailedToLoad = 0) {
+	public void function $throwIfCliTestsFailed(
+		required struct result,
+		numeric specsFailedToLoad = 0,
+		boolean defaultScope = false,
+		boolean coreTests = false
+	) {
 		if (
 			$cliTestResultFailed(
 				result = arguments.result,
-				specsFailedToLoad = arguments.specsFailedToLoad
+				specsFailedToLoad = arguments.specsFailedToLoad,
+				defaultScope = arguments.defaultScope,
+				coreTests = arguments.coreTests
 			)
 		) {
 			throw(type = "Wheels.TestsFailed", message = "Tests failed — see the report above.");
@@ -8977,6 +9167,24 @@ component extends="modules.BaseModule" {
 		return 0;
 	}
 
+	/**
+	 * What to tell someone whose `wheels test` found no running server for
+	 * this project (issue 3972). tools/test-local.sh exists only in the Wheels
+	 * framework repository, so it is suggested only there: an app vendors
+	 * vendor/wheels/tests/specs but never has tools/test-local.sh. Public for
+	 * specs; hidden from MCP via the $-prefix sweep.
+	 */
+	public array function $testServerHints() {
+		var hints = ["wheels test runs the specs on this project's own running server. Start it with: wheels start"];
+		if (
+			fileExists(variables.projectRoot & "/tools/test-local.sh")
+			&& directoryExists(variables.projectRoot & "/vendor/wheels/tests/specs")
+		) {
+			arrayAppend(hints, "Or, in the Wheels framework repository: bash tools/test-local.sh (starts and stops its own server)");
+		}
+		return hints;
+	}
+
 	private string function runTests(
 		string filter = "",
 		string reporter = "simple",
@@ -8990,10 +9198,7 @@ component extends="modules.BaseModule" {
 		string basePath = "",
 		numeric timeoutSeconds = 900
 	) {
-		var serverPort = $requireOwnRunningServer([
-			"Start one with: wheels start",
-			"Or use: bash tools/test-local.sh (auto-manages server)"
-		]);
+		var serverPort = $requireOwnRunningServer($testServerHints());
 
 		// Subfolder-mounted apps (`set(subpath="/myapp")`, #2985/#3026) serve the
 		// test runner under a URL prefix the rewrite layer expects — without it
@@ -9107,7 +9312,7 @@ component extends="modules.BaseModule" {
 							break;
 						case "simple":
 						default:
-							displayTestResults(result, verboseOutput, resolvedDir, ciMode);
+							displayTestResults(result, verboseOutput, resolvedDir, ciMode, !len(filter), coreTests);
 					}
 				}
 
@@ -9159,7 +9364,9 @@ component extends="modules.BaseModule" {
 		if (runState.hasResult) {
 			$throwIfCliTestsFailed(
 				result = runState.result,
-				specsFailedToLoad = runState.specsFailedToLoad
+				specsFailedToLoad = runState.specsFailedToLoad,
+				defaultScope = !len(arguments.filter),
+				coreTests = arguments.coreTests
 			);
 		}
 		// A crash during the HTTP/parse phase printed red but exited 0 — the
@@ -9304,7 +9511,9 @@ component extends="modules.BaseModule" {
 		required any result,
 		boolean verboseOutput = false,
 		string testDirectory = "",
-		boolean ciMode = false
+		boolean ciMode = false,
+		boolean defaultScope = false,
+		boolean coreTests = false
 	) {
 		if (!isStruct(result)) {
 			out(serializeJSON(result));
@@ -9329,7 +9538,8 @@ component extends="modules.BaseModule" {
 
 		if (specsFailedToLoad > 0) {
 			$printFailedToLoadWarning(specsFailedToLoad, unloadedSpecPaths, result);
-		} else {
+		} else if (!$isEmptyDefaultRun(result, arguments.defaultScope, arguments.coreTests)) {
+			// An app with no specs yet gets the summary notice, not the runner warnings.
 			$printTestResultDiagnostics(result);
 		}
 
@@ -9340,7 +9550,7 @@ component extends="modules.BaseModule" {
 
 		// Summary line
 		var duration = totalDuration > 0 ? " (#numberFormat(totalDuration / 1000, '0.00')#s)" : "";
-		$printTestSummaryAndDetails(result, arguments.verboseOutput, totalPass, totalFail, totalError, duration, specsFailedToLoad);
+		$printTestSummaryAndDetails(result, arguments.verboseOutput, totalPass, totalFail, totalError, duration, specsFailedToLoad, arguments.defaultScope, arguments.coreTests);
 
 		// CI mode (--ci): emit GitHub Actions-style error annotations so each
 		// failure/error surfaces inline in CI logs and PR-check annotations.
@@ -9500,7 +9710,9 @@ component extends="modules.BaseModule" {
 		required numeric totalFail,
 		required numeric totalError,
 		required string duration,
-		required numeric specsFailedToLoad
+		required numeric specsFailedToLoad,
+		boolean defaultScope = false,
+		boolean coreTests = false
 	) {
 		var summary = $testSummaryLine(
 			result = arguments.result,
@@ -9508,7 +9720,9 @@ component extends="modules.BaseModule" {
 			totalFail = arguments.totalFail,
 			totalError = arguments.totalError,
 			duration = arguments.duration,
-			specsFailedToLoad = arguments.specsFailedToLoad
+			specsFailedToLoad = arguments.specsFailedToLoad,
+			defaultScope = arguments.defaultScope,
+			coreTests = arguments.coreTests
 		);
 		out(summary.text, summary.color);
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
@@ -9549,7 +9763,9 @@ component extends="modules.BaseModule" {
 		required numeric totalFail,
 		required numeric totalError,
 		required string duration,
-		required numeric specsFailedToLoad
+		required numeric specsFailedToLoad,
+		boolean defaultScope = false,
+		boolean coreTests = false
 	) {
 		if (arguments.totalFail > 0 || arguments.totalError > 0) {
 			var failedToLoadStr = arguments.specsFailedToLoad > 0 ? ", #arguments.specsFailedToLoad# failed to load" : "";
@@ -9561,6 +9777,12 @@ component extends="modules.BaseModule" {
 		if (arguments.specsFailedToLoad > 0) {
 			return {
 				text = "#arguments.totalPass# passed, #arguments.specsFailedToLoad# failed to load#arguments.duration#",
+				color = "yellow"
+			};
+		}
+		if ($isEmptyDefaultRun(arguments.result, arguments.defaultScope, arguments.coreTests)) {
+			return {
+				text = "No specs yet: tests/specs has no spec files, so there was nothing to run. Add one with: wheels generate test model <Name>",
 				color = "yellow"
 			};
 		}

@@ -559,6 +559,25 @@ if phase 3 "Server boot + sqlite-jdbc shim (formula simulation)"; then
         fail "homepage returns $CODE (expected 200) — sqlite-jdbc may not be loading"
         grep -iE "BundleException|sqlite-jdbc|sqlite\.JDBC" <<<"$BODY" | head -3 | sed 's/^/      /'
     fi
+
+    # Issue #3921: a fresh app has no spec files yet (phase 4 scaffolds some),
+    # so the default `wheels test` run is a notice that exits 0, not a
+    # "no test bundles ran" failure.
+    if [ -z "$(find "$APP_DIR/tests/specs" -name '*.cfc' 2>/dev/null | head -1)" ]; then
+        EMPTY_TEST_LOG="$TMPDIR/wheels-test-no-specs.log"
+        if (cd "$APP_DIR" && "$WHEELS_CMD" test) > "$EMPTY_TEST_LOG" 2>&1; then
+            if grep -q "No specs yet" "$EMPTY_TEST_LOG"; then
+                pass "wheels test on a fresh app exits 0 with a no-specs notice (#3921)"
+            else
+                fail "wheels test on a fresh app exited 0 without the no-specs notice — review $EMPTY_TEST_LOG"
+            fi
+        else
+            fail "wheels test on a fresh app exited non-zero (#3921)"
+            head -5 "$EMPTY_TEST_LOG" | sed 's/^/      | /'
+        fi
+    else
+        skip "the fresh app already has spec files, so the no-specs check (#3921) does not apply"
+    fi
 fi
 
 # ══════════════════════════════════════════════════

@@ -1704,16 +1704,11 @@ component output="false" {
 		} catch (any e) {
 			return true;
 		}
-		local.pkg = Replace(local.canonPkg, "\", "/", "all");
-		local.resolved = Replace(local.canonResolved, "\", "/", "all");
-		if (Right(local.pkg, 1) != "/") {
-			local.pkg &= "/";
-		}
-		local.pkgRoot = Left(local.pkg, Len(local.pkg) - 1);
-		if (local.resolved == local.pkgRoot) {
-			return false;
-		}
-		return Left(local.resolved & "/", Len(local.pkg)) != local.pkg;
+		// Exact, separator-qualified containment of the two canonical paths. The old
+		// `==` / `Left(..) != ..` compares are case-insensitive in CFML, so a mapping
+		// resolving into a case-distinct sibling of the package was treated as inside it.
+		local.guard = new wheels.PathGuard();
+		return !local.guard.pathWithinExact(root = local.canonPkg, candidate = local.canonResolved);
 	}
 
 	/**

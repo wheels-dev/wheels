@@ -35,6 +35,10 @@ component {
 	public any function init() {
 		variables.positionals = [];
 		variables.named = {};
+		// Declaration order of the named options: variables.named is a struct,
+		// whose iteration order on Lucee is not insertion order, and help lists
+		// options in the order the command declares them.
+		variables.namedOrder = [];
 		// Keys parse() accepts without declaring or advertising them. `offline`
 		// is the one documented GLOBAL flag ("applies to every command",
 		// command-line-tools guide); commands that act on it read it through
@@ -77,6 +81,7 @@ component {
 		boolean default = false,
 		string description = ""
 	) {
+		$rememberOrder(arguments.name);
 		variables.named[arguments.name] = {
 			"default" = arguments.default,
 			"type" = "boolean",
@@ -99,6 +104,7 @@ component {
 		string description = "",
 		string choices = ""
 	) {
+		$rememberOrder(arguments.name);
 		variables.named[arguments.name] = {
 			"default" = arguments.default,
 			"type" = arguments.type,
@@ -415,6 +421,82 @@ component {
 		}
 
 		return result;
+	}
+
+	/**
+	 * The options section of `wheels <cmd> --help` (issue 3962): one entry per
+	 * positional and named option, in declaration order, with its description,
+	 * accepted values and default, wrapped to `width` columns. Keys added with
+	 * accept() are not listed, as they are not in the MCP schema either.
+	 */
+	public array function toHelpLines(numeric width = 100) {
+		var entries = [];
+		for (var p in variables.positionals) {
+			arrayAppend(entries, {label = "<" & p.name & ">", text = $helpText(p.description, p.choices, p["default"], p.type)});
+		}
+		for (var optName in variables.namedOrder) {
+			var spec = variables.named[optName];
+			var label = "--" & optName & "=<value>";
+			var text = $helpText(spec.description, spec.choices, spec["default"], spec.type);
+			if (spec.type == "boolean") {
+				var onByDefault = isBoolean(spec["default"]) && spec["default"];
+				label = onByDefault ? "--[no-]" & optName : "--" & optName;
+				if (onByDefault) {
+					text &= (len(text) ? " " : "") & "(on by default)";
+				}
+			}
+			arrayAppend(entries, {label = label, text = text});
+		}
+		var labelWidth = 0;
+		for (var entry in entries) {
+			labelWidth = max(labelWidth, len(entry.label));
+		}
+		labelWidth = min(labelWidth, 26);
+		var indent = 2 + labelWidth + 2;
+		var lines = [];
+		for (var entry in entries) {
+			var head = "  " & entry.label;
+			var words = listToArray(entry.text, " ");
+			var current = len(head) >= indent ? head : head & repeatString(" ", indent - len(head));
+			if (len(head) >= indent) {
+				arrayAppend(lines, head);
+				current = repeatString(" ", indent);
+			}
+			var fresh = true;
+			for (var word in words) {
+				if (!fresh && len(current) + 1 + len(word) > arguments.width) {
+					arrayAppend(lines, current);
+					current = repeatString(" ", indent) & word;
+				} else {
+					current &= (fresh ? "" : " ") & word;
+				}
+				fresh = false;
+			}
+			arrayAppend(lines, reReplace(current, "\s+$", ""));
+		}
+		return lines;
+	}
+
+	private string function $helpText(
+		required string description,
+		required array choices,
+		required any default,
+		required string type
+	) {
+		var text = trim(arguments.description);
+		if (arrayLen(arguments.choices)) {
+			text &= (len(text) ? " " : "") & "[" & arrayToList(arguments.choices, ", ") & "]";
+		}
+		if (arguments.type != "boolean" && isSimpleValue(arguments.default) && len(trim(toString(arguments.default)))) {
+			text &= (len(text) ? " " : "") & "(default: " & toString(arguments.default) & ")";
+		}
+		return text;
+	}
+
+	private void function $rememberOrder(required string name) {
+		if (!arrayFindNoCase(variables.namedOrder, arguments.name)) {
+			arrayAppend(variables.namedOrder, arguments.name);
+		}
 	}
 
 	/**

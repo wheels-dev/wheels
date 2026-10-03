@@ -1,11 +1,13 @@
 component extends="wheels.databaseAdapters.Abstract" {
 
 	variables.sqlTypes = {};
-	variables.sqlTypes['biginteger'] = {name = 'BIGINT UNSIGNED'};
+	// Signed, like every other adapter (#4121); pass unsigned = true for an UNSIGNED column.
+	variables.sqlTypes['biginteger'] = {name = 'BIGINT'};
 	variables.sqlTypes['binary'] = {name = 'BLOB'};
 	// BIT(1), not TINYINT(1): a DSN with tinyInt1isBit=false reports TINYINT(1) as a
 	// plain integer, so the model validated booleans as numbers (#3897).
 	variables.sqlTypes['boolean'] = {name = 'BIT', limit = 1};
+	variables.sqlTypes['char'] = {name = 'CHAR', limit = 1};
 	variables.sqlTypes['date'] = {name = 'DATE'};
 	variables.sqlTypes['datetime'] = {name = 'DATETIME'};
 	variables.sqlTypes['decimal'] = {name = 'DECIMAL'};
@@ -18,6 +20,69 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['time'] = {name = 'TIME'};
 	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
 	variables.sqlTypes['uuid'] = {name = 'VARBINARY', limit = 16};
+	variables.sqlTypes['uniqueidentifier'] = {name = 'CHAR', limit = 36};
+	// An expression default needs MySQL 8.0.13+ (MariaDB 10.2+); Migration.init() turns it
+	// off for older servers (#4094).
+	variables.uuidDefaultSQL = '(UUID())';
+
+	/**
+	 * Adds UNSIGNED to an integer or biginteger column when `unsigned = true` is passed (#4121).
+	 */
+	public string function typeToSQL(required string type, struct options = {}) {
+		local.sql = super.typeToSQL(argumentCollection = arguments);
+		if (
+			ListFindNoCase("integer,biginteger", arguments.type)
+			&& StructKeyExists(arguments.options, "unsigned")
+			&& IsBoolean(arguments.options.unsigned)
+			&& arguments.options.unsigned
+		) {
+			local.sql &= " UNSIGNED";
+		}
+		return local.sql;
+	}
+
+	/**
+	 * Generates SQL to change an existing column. Without an explicit `unsigned`, an integer or
+	 * biginteger column keeps its current signedness (#4121): MySQL refuses to change the
+	 * signedness of a column in a foreign key, and columns created by earlier versions are
+	 * BIGINT UNSIGNED.
+	 */
+	public string function changeColumnInTable(required string name, required any column) {
+		if (!StructKeyExists(arguments.column, "unsigned") && ListFindNoCase("integer,biginteger", arguments.column.type)) {
+			arguments.column.unsigned = $isUnsignedColumn(tableName = arguments.name, columnName = arguments.column.name);
+		}
+		return super.changeColumnInTable(argumentCollection = arguments);
+	}
+
+	/**
+	 * Internal function. True when an existing column is declared UNSIGNED, read from
+	 * information_schema. A missing column or an unreadable catalog read as signed.
+	 */
+	public boolean function $isUnsignedColumn(required string tableName, required string columnName) {
+		var rv = {unsigned = false};
+		try {
+			local.creds = $migratorDataSourceCredentials();
+			local.queryOptions = {datasource = $migratorDataSource()};
+			if (Len(local.creds.username)) {
+				local.queryOptions.username = local.creds.username;
+				local.queryOptions.password = local.creds.password;
+			}
+			local.info = QueryExecute(
+				"SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(:tableName) AND LOWER(COLUMN_NAME) = LOWER(:columnName)",
+				{
+					tableName = {value = arguments.tableName, cfsqltype = "cf_sql_varchar"},
+					columnName = {value = arguments.columnName, cfsqltype = "cf_sql_varchar"}
+				},
+				local.queryOptions
+			);
+			if (local.info.recordCount && FindNoCase("unsigned", local.info.COLUMN_TYPE)) {
+				rv.unsigned = true;
+			}
+		} catch (any e) {
+			// keep the default: read as signed
+		}
+		return rv.unsigned;
+	}
 
 	/**
 	 * name of database adapter

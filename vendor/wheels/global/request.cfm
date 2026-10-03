@@ -222,6 +222,10 @@
 				local.rv.path_info = ListFirst(local.rv.redirect_url, "?");
 			}
 
+			// Under a subfolder (script_name "/app1/index.cfm") these fallbacks carry the
+			// subfolder, which the router would read as a controller name (#3948).
+			local.rv.path_info = $stripScriptDirectory(pathInfo = local.rv.path_info, scriptName = local.rv.script_name);
+
 			// finally lets remove the index.cfm because some of the custom cgi variables don't bring it back
 			// like this it means at the root we are working with / instead of /index.cfm
 			if (Len(local.rv.path_info) >= 10 && Right(local.rv.path_info, 10) == "/index.cfm") {
@@ -243,6 +247,34 @@
 		return local.rv;
 	}
 
+
+	/**
+	 * Internal function. Removes the front controller's directory (`/app1` for a
+	 * script name of `/app1/index.cfm`) from the start of a request path, so a path
+	 * taken from `request_uri` or a rewrite header under a subfolder install becomes
+	 * app-relative (#3948). Paths outside that directory, and root installs, are
+	 * returned unchanged; the directory itself becomes "/".
+	 */
+	public string function $stripScriptDirectory(required string pathInfo, required string scriptName) {
+		local.directory = ReReplace(arguments.scriptName, "/[^/]*$", "");
+		if (!Len(local.directory) || !Len(arguments.pathInfo)) {
+			return arguments.pathInfo;
+		}
+		if (CompareNoCase(arguments.pathInfo, local.directory) == 0) {
+			return "/";
+		}
+		local.prefixLength = Len(local.directory) + 1;
+		if (
+			Len(arguments.pathInfo) > local.prefixLength
+			&& CompareNoCase(Left(arguments.pathInfo, local.prefixLength), local.directory & "/") == 0
+		) {
+			return Mid(arguments.pathInfo, local.prefixLength, Len(arguments.pathInfo));
+		}
+		if (CompareNoCase(arguments.pathInfo, local.directory & "/") == 0) {
+			return "/";
+		}
+		return arguments.pathInfo;
+	}
 
 	/**
 	 * Internal function. Returns whether the application has opted into trusting
@@ -363,7 +395,20 @@
 		// the join produces a single boundary slash. Anchored to the start so
 		// it never touches interior path separators.
 		local.relative = ReReplace(arguments.template, "^/+", "");
-		return local.base & local.relative;
+		local.rv = local.base & local.relative;
+		// The production call shape (no webPath): when the subfolder maps to the app's
+		// public/ folder (an IIS virtual directory or a Tomcat context), the prefixed
+		// path does not exist but the `/wheels` mapping resolves, so keep the plain
+		// path (#3948).
+		if (
+			!StructKeyExists(arguments, "webPath")
+			&& local.base != "/"
+			&& !FileExists(ExpandPath(local.rv))
+			&& FileExists(ExpandPath("/" & local.relative))
+		) {
+			local.rv = "/" & local.relative;
+		}
+		return local.rv;
 	}
 
 
@@ -386,7 +431,8 @@
 		string pathInfo = "",
 		string queryString = "",
 		string webPath,
-		string rewriteFile
+		string rewriteFile,
+		string urlRewriting
 	) {
 		// Resolve webPath/rewriteFile from application scope unless overridden.
 		// No runtime default-arg expressions (some engines evaluate those
@@ -419,7 +465,16 @@
 		if (Len(arguments.queryString)) {
 			local.rv &= "?" & arguments.queryString;
 		}
-		if (Len(local.resolvedRewriteFile)) {
+		if (StructKeyExists(arguments, "urlRewriting")) {
+			local.resolvedUrlRewriting = arguments.urlRewriting;
+		} else if (IsDefined("application.wheels.URLRewriting")) {
+			local.resolvedUrlRewriting = application.wheels.URLRewriting;
+		} else {
+			local.resolvedUrlRewriting = "";
+		}
+		// Partial rewriting routes only through the front controller, so the link keeps
+		// it (/app1/index.cfm/posts?reload=); without it the link 404s (#3948).
+		if (Len(local.resolvedRewriteFile) && CompareNoCase(local.resolvedUrlRewriting, "Partial") != 0) {
 			local.rv = ReplaceNoCase(local.rv, "/" & local.resolvedRewriteFile, "");
 		}
 		local.reloadTokens = "development,testing,maintenance,production,true";
@@ -439,6 +494,90 @@
 		}
 		local.rv &= "reload=";
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. Prefixes the app's `webPath` onto the redirect-after-reload URL,
+	 * which is built from the app-relative `cgi.path_info`, so a reload under a subfolder
+	 * returns to `/app1/widgets` instead of `/widgets` (#3948). URLs already under the
+	 * subfolder, root installs and absolute URLs are returned unchanged.
+	 */
+	public string function $prefixWebPath(required string path, string webPath) {
+		if (StructKeyExists(arguments, "webPath")) {
+			local.wp = arguments.webPath;
+		} else if (IsDefined("application.wheels.webPath")) {
+			local.wp = application.wheels.webPath;
+		} else {
+			local.wp = "";
+		}
+		local.base = ReReplace(local.wp, "/+$", "");
+		if (!Len(local.base) || Left(arguments.path, 1) != "/" || Left(arguments.path, 2) == "//") {
+			return arguments.path;
+		}
+		local.pathOnly = ListFirst(arguments.path, "?");
+		if (
+			CompareNoCase(local.pathOnly, local.base) == 0
+			|| (Len(local.pathOnly) > Len(local.base) && CompareNoCase(Left(local.pathOnly, Len(local.base) + 1), local.base & "/") == 0)
+		) {
+			return arguments.path;
+		}
+		return local.base & arguments.path;
+	}
+
+	/**
+	 * Internal function. Where the redirect after a reload goes: the request's app-relative
+	 * path with any leading run of slashes, backslashes, spaces and control characters
+	 * collapsed to a single `/` (browsers drop tab, CR and LF from a URL), so the location is
+	 * always a path on this site, then prefixed with the app's `webPath`.
+	 */
+	public string function $reloadRedirectPath(required string path, string webPath) {
+		local.len = Len(arguments.path);
+		local.i = 1;
+		while (local.i <= local.len) {
+			local.code = Asc(Mid(arguments.path, local.i, 1));
+			if (local.code == 47 || local.code == 92 || local.code <= 32 || local.code == 127) {
+				local.i++;
+			} else {
+				break;
+			}
+		}
+		if (local.i == 1) {
+			local.cleanPath = arguments.path;
+		} else if (local.i > local.len) {
+			local.cleanPath = "/";
+		} else {
+			local.cleanPath = "/" & Mid(arguments.path, local.i, local.len - local.i + 1);
+		}
+		local.args = {path = local.cleanPath};
+		if (StructKeyExists(arguments, "webPath")) {
+			local.args.webPath = arguments.webPath;
+		}
+		return $prefixWebPath(argumentCollection = local.args);
+	}
+
+	/**
+	 * Internal function. The URL of a page in the offline docs bundle, which is served
+	 * by the `docsBundle` route: the app's `webPath`, the front controller unless URL
+	 * rewriting is fully on, then `wheels-docs/<path>`. A hard-coded `/wheels-docs/`
+	 * link 404s under a subfolder install (#3948).
+	 */
+	public string function $debugDocsUrl(
+		string path = "",
+		string webPath,
+		string rewriteFile,
+		string urlRewriting
+	) {
+		local.wp = StructKeyExists(arguments, "webPath") ? arguments.webPath : (IsDefined("application.wheels.webPath") ? application.wheels.webPath : "/");
+		local.file = StructKeyExists(arguments, "rewriteFile") ? arguments.rewriteFile : (IsDefined("application.wheels.rewriteFile") ? application.wheels.rewriteFile : "");
+		local.mode = StructKeyExists(arguments, "urlRewriting") ? arguments.urlRewriting : (IsDefined("application.wheels.URLRewriting") ? application.wheels.URLRewriting : "On");
+		local.rv = Len(local.wp) ? local.wp : "/";
+		if (Right(local.rv, 1) != "/") {
+			local.rv &= "/";
+		}
+		if (CompareNoCase(local.mode, "On") != 0 && Len(local.file)) {
+			local.rv &= local.file & "/";
+		}
+		return local.rv & "wheels-docs/" & ReReplace(arguments.path, "^/+", "");
 	}
 
 

@@ -239,11 +239,11 @@ if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels
 		panels like the others, because the docs bring their own navigation —
 		wrapping Starlight in a debug panel would fight it. --->
 	<cfif $get("enablePublicComponent")>
-	<button class="wdb-tab" onclick="window.open('/wheels-docs/guides/', '_blank')" id="wdb-tab-guides" title="Read the guides offline">
+	<button class="wdb-tab" onclick="window.open('#EncodeForJavaScript($debugDocsUrl('guides/'))#', '_blank')" id="wdb-tab-guides" title="Read the guides offline">
 		<svg viewBox="0 0 448 512"><path d="M96 0C43 0 0 43 0 96v320c0 53 43 96 96 96h320c17.7 0 32-14.3 32-32s-14.3-32-32-32H96c-17.7 0-32-14.3-32-32h352c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H96z"/></svg>
 		Guides
 	</button>
-	<button class="wdb-tab" onclick="window.open('/wheels-docs/api/', '_blank')" id="wdb-tab-apidocs" title="Read the API reference offline">
+	<button class="wdb-tab" onclick="window.open('#EncodeForJavaScript($debugDocsUrl('api/'))#', '_blank')" id="wdb-tab-apidocs" title="Read the API reference offline">
 		<svg viewBox="0 0 384 512"><path d="M64 0C28.7 0 0 28.7 0 64v384c0 35.3 28.7 64 64 64h256c35.3 0 64-28.7 64-64V160H256c-17.7 0-32-14.3-32-32V0H64zm192 0v128h128L256 0zM112 256h160c8.8 0 16 7.2 16 16s-7.2 16-16 16H112c-8.8 0-16-7.2-16-16s7.2-16 16-16z"/></svg>
 		API
 	</button>
@@ -701,7 +701,7 @@ window.wdbPackages = {
 		<div class="wdb-section">
 			<div class="wdb-section-title">Inspect this application</div>
 			<div class="wdb-link-grid">
-				<a href="/wheels-docs/api/" class="wdb-link-card" target="_blank">
+				<a href="#EncodeForHTMLAttribute($debugDocsUrl("api/"))#" class="wdb-link-card" target="_blank">
 					<svg viewBox="0 0 384 512"><path d="M64 0C28.7 0 0 28.7 0 64v384c0 35.3 28.7 64 64 64h256c35.3 0 64-28.7 64-64V160H256c-17.7 0-32-14.3-32-32V0H64zm192 0v128h128L256 0zM112 256h160c8.8 0 16 7.2 16 16s-7.2 16-16 16H112c-8.8 0-16-7.2-16-16s7.2-16 16-16z"/></svg>
 					API Reference
 				</a>
@@ -723,7 +723,7 @@ window.wdbPackages = {
 		<div class="wdb-section">
 			<div class="wdb-section-title">Elsewhere</div>
 			<div class="wdb-link-grid">
-				<a href="/wheels-docs/guides/" class="wdb-link-card" target="_blank">
+				<a href="#EncodeForHTMLAttribute($debugDocsUrl("guides/"))#" class="wdb-link-card" target="_blank">
 					<svg viewBox="0 0 448 512"><path d="M96 0C43 0 0 43 0 96v320c0 53 43 96 96 96h320c17.7 0 32-14.3 32-32s-14.3-32-32-32H96c-17.7 0-32-14.3-32-32h352c17.7 0 32-14.3 32-32V32c0-17.7-14.3-32-32-32H96z"/></svg>
 					Guides <span class="wdb-card-note" title="Opens guides.wheels.dev in a new tab">&##8599;</span>
 				</a>

@@ -1,0 +1,1 @@
+- When no server is running, `wheels test` (and the MCP `test` tool) now says it needs the project server and to start it with `wheels start`. It suggests `bash tools/test-local.sh` only inside the Wheels framework repository, the one place that script exists (#3972).

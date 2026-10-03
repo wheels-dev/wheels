@@ -13,6 +13,9 @@ component extends="Base" {
 			if (dbType == "Oracle") {
 				this.adapter.$setNativeBoolean($oracleSupportsNativeBoolean());
 			}
+			if (!$serverSupportsUuidDefault(dbType)) {
+				this.adapter.$setUuidDefaultSupported(false);
+			}
 		}
 		return this;
 	}

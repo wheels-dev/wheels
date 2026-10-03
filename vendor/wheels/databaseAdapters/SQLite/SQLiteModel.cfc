@@ -5,9 +5,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $getType(required string type, string scale, string details) {
 		switch (LCase(arguments.type)) {
+			// A column declared BIGINT / INT8 holds 64-bit values, so bind it as one (#4086).
+			// Wheels' own migrator declares biginteger columns as INTEGER, which stays
+			// cf_sql_integer here: SQLite reports only the declared type.
+			case "bigint":
+			case "int8":
+				local.rv = "cf_sql_bigint";
+				break;
+
 			case "integer":
 			case "int":
-			case "bigint":
 			case "mediumint":
 			case "smallint":
 			case "tinyint":
@@ -42,20 +49,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				break;
 
 			case "date":
-				local.rv = "cf_sql_date";
-				break;
-
 			case "datetime":
 			case "timestamp":
-				// SQLite stores datetimes as TEXT (see SQLiteMigrator's
-				// sqlTypes mapping). Bind as varchar; date objects are
-				// pre-formatted to ISO-8601 in $buildQueryParamValues
-				// before they reach the bind layer.
-				local.rv = "cf_sql_varchar";
-				break;
-
 			case "time":
-				local.rv = "cf_sql_time";
+				// SQLite stores all date types as TEXT. Bind as varchar; date values are
+				// pre-formatted to ISO-8601 in $buildQueryParamValues before they reach the bind layer.
+				// Binding DATE / TIME as cf_sql_date / cf_sql_time made the driver store them
+				// as epoch milliseconds (#4093).
+				local.rv = "cf_sql_varchar";
 				break;
 
 			default:

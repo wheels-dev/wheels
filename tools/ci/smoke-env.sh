@@ -3,12 +3,12 @@
 # Boots nothing itself: point it at an already-running app via BASE_URL.
 # SMOKE_ENV is a log label only; all probes assume a non-development environment.
 #
-#   BASE_URL=http://localhost:60007 SMOKE_ENV=production bash tools/ci/smoke-env.sh
+#   BASE_URL=http://localhost:30007 SMOKE_ENV=production bash tools/ci/smoke-env.sh
 #
 # Exit 0 = all probes pass. Non-zero = at least one probe failed; every
 # failure prints PROBE/EXPECTED/GOT lines for the CI log.
 set -u
-BASE_URL="${BASE_URL:-http://localhost:60007}"
+BASE_URL="${BASE_URL:-http://localhost:30007}"
 SMOKE_ENV="${SMOKE_ENV:-production}"
 FAILURES=0
 

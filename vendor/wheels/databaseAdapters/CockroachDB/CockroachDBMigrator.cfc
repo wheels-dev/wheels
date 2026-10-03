@@ -9,12 +9,16 @@ component extends="wheels.databaseAdapters.PostgreSQL.PostgreSQLMigrator" {
 	variables.sqlTypes['decimal'] = {name = 'DECIMAL'};
 	variables.sqlTypes['float'] = {name = 'FLOAT8'};
 	variables.sqlTypes['integer'] = {name = 'INT'};
-	variables.sqlTypes['string'] = {name = 'STRING', limit = 255};
+	// VARCHAR(n) is CockroachDB's alias of STRING(n), but only VARCHAR reports its length
+	// over JDBC; STRING(n) reads back as `text` with no size, so length validation is lost (#4101).
+	variables.sqlTypes['string'] = {name = 'VARCHAR', limit = 255};
 	variables.sqlTypes['text'] = {name = 'STRING'};
 	variables.sqlTypes['time'] = {name = 'TIME'};
 	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
 	variables.sqlTypes['char'] = {name = 'CHAR', limit = 1};
 	variables.sqlTypes['uuid'] = {name = 'UUID'};
+	variables.sqlTypes['uniqueidentifier'] = {name = 'UUID'};
+	variables.uuidDefaultSQL = 'gen_random_uuid()';
 
 	/**
 	 * name of database adapter

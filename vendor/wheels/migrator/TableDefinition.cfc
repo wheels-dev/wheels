@@ -149,7 +149,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function bigInteger(string columnNames, numeric limit, default, boolean allowNull) {
+	public any function bigInteger(string columnNames, numeric limit, default, boolean allowNull, boolean unsigned) {
 		return $addTypedColumns(columnType = "biginteger", args = arguments);
 	}
 
@@ -223,7 +223,7 @@ component extends="Base" {
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function integer(string columnNames, numeric limit, default, boolean allowNull) {
+	public any function integer(string columnNames, numeric limit, default, boolean allowNull, boolean unsigned) {
 		return $addTypedColumns(columnType = "integer", args = arguments);
 	}
 
@@ -271,9 +271,8 @@ component extends="Base" {
 	 * [category: Table Definition Functions]
 	 */
 	public any function uniqueidentifier(string columnNames, default = "newid()", boolean allowNull) {
-		// NOTE: the default="newid()" parameter default is MSSQL syntax — this
-		// helper is only registered by the MicrosoftSQLServer adapter, so the
-		// outlier default is preserved as-is.
+		// The default="newid()" is SQL Server syntax; ColumnDefinition swaps it for each
+		// adapter's own UUID generator (#4094).
 		return $addTypedColumns(columnType = "uniqueidentifier", args = arguments);
 	}
 

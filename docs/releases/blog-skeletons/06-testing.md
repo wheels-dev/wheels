@@ -119,7 +119,7 @@ wheels browser setup
 
 The DSL lands with roughly 60 methods across the shape you want for realistic specs: navigation (`visit`, `visitRoute`, `back`, `refresh`), interaction (`click`, `fill`, `type`, `select`, `check`, `attach`, `dragAndDrop`), keyboard (`press`, `pressEnter`, `pressTab`), waiting (`waitFor`, `waitForText`, `waitForUrl`), scoping (`within(selector, callback)`), cookies, authentication helpers (`loginAs`, `logout`), dialog handling, viewport resize for mobile/tablet/desktop shapes, screenshots, and a text-and-visibility-and-URL-and-form assertion set that covers the common ground. The shape shipped across #2113, #2115, #2116, #2121, and #2122.
 
-CI runs browser specs in both `pr.yml` and `snapshot.yml`. Playwright JARs and Chromium are cached keyed on the hash of `browser-manifest.json`, so the download cost lands once per manifest change rather than once per run. The environment variable `WHEELS_BROWSER_TEST_BASE_URL=http://localhost:60007` is set automatically.
+CI runs browser specs in both `pr.yml` and `snapshot.yml`. Playwright JARs and Chromium are cached keyed on the hash of `browser-manifest.json`, so the download cost lands once per manifest change rather than once per run. The environment variable `WHEELS_BROWSER_TEST_BASE_URL=http://localhost:30007` is set automatically.
 
 Chromium is the only engine at 4.0 launch. Firefox and WebKit are on the roadmap — the DSL is already shaped to accept them; the work is in the installer and the cross-engine behavior smoothing, not the test code you write.
 

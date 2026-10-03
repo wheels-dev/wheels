@@ -39,6 +39,8 @@ This will start:
 
 Then visit http://localhost:3000 in your browser.
 
+The UI is published on `127.0.0.1` only, and only with the `ui` profile (a bare `docker compose up` does not start it). Its Docker proxy forwards just the calls the UI makes (list containers, container logs, stop, restart and engine info); every other Docker API path returns 403.
+
 #### Development Mode
 
 ```bash

@@ -16,6 +16,7 @@ component output=false extends="wheels.Global"{
 		local.args     = arguments;
 		local.sqlArray = args.sql;
 		local.sqlLen   = arrayLen(sqlArray);
+		$assertBoundParameterCount(sql = args.sql, parameterize = args.parameterize);
 
 		// Build query
 		cfquery(attributeCollection = args.queryAttributes) {
@@ -621,6 +622,72 @@ component output=false extends="wheels.Global"{
 			local.pos = local.closeIdx + 1;
 		}
 		return local.out.toString();
+	}
+
+	/**
+	 * The most values one IN list may hold on this database, or 0 for no limit. A
+	 * longer list is split into OR-joined (IN) or AND-joined (NOT IN) groups by
+	 * $splitLongInLists in the model (#3906).
+	 */
+	public numeric function $maxInListSize() {
+		return 0;
+	}
+
+	/**
+	 * The most parameters one statement may bind on this database, or 0 for no
+	 * limit (#3906).
+	 */
+	public numeric function $maxBoundParameters() {
+		return 0;
+	}
+
+	/**
+	 * The integer values a key column of this cf_sql type can store, as {min, max}
+	 * integer strings, or an empty struct when the type has no range here. The signed
+	 * ranges; adapters override a type whose range differs (#4087). A key outside the
+	 * range can't be an existing row. Inside it, binding can still fail: Adobe ColdFusion
+	 * binds CF_SQL_TINYINT only from 0 to 255.
+	 */
+	public struct function $integerKeyRange(required string sqlType) {
+		switch (arguments.sqlType) {
+			case "cf_sql_tinyint":
+				return {min = "-128", max = "127"};
+			case "cf_sql_smallint":
+				return {min = "-32768", max = "32767"};
+			case "":
+			case "cf_sql_integer":
+				return {min = "-2147483648", max = "2147483647"};
+			case "cf_sql_bigint":
+				return {min = "-9223372036854775808", max = "9223372036854775807"};
+		}
+		return {};
+	}
+
+	/**
+	 * Throws Wheels.TooManyParameters before a parameterized statement runs when it
+	 * would bind more parameters than the database accepts. Every value of an IN
+	 * list binds as its own parameter; a NULL is written inline and not counted.
+	 */
+	public void function $assertBoundParameterCount(required array sql, required boolean parameterize) {
+		local.limit = $maxBoundParameters();
+		if (!arguments.parameterize || local.limit <= 0) {
+			return;
+		}
+		local.count = 0;
+		for (local.part in arguments.sql) {
+			if (!IsStruct(local.part) || (StructKeyExists(local.part, "null") && local.part.null)) {
+				continue;
+			}
+			local.isList = StructKeyExists(local.part, "list") && local.part.list && StructKeyExists(local.part, "value");
+			local.count += local.isList ? ListLen(local.part.value, ",") : 1;
+		}
+		if (local.count > local.limit) {
+			Throw(
+				type = "Wheels.TooManyParameters",
+				message = "This query would bind #local.count# parameters, but the database accepts at most #local.limit# per statement.",
+				extendedInfo = "Each value of an IN list (whereIn(), whereNotIn() or a hand-written IN (...)) binds as its own parameter. Query the values in batches of fewer than #local.limit#, or select them with a join or a subquery instead of a long list."
+			);
+		}
 	}
 
 	/**

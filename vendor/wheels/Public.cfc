@@ -555,9 +555,13 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		if (!Len(Trim(arguments.output))) {
 			return "";
 		}
+		local.guard = new wheels.PathGuard();
 		try {
 			local.canonicalRoot = CreateObject("java", "java.io.File").init(ExpandPath("/")).getCanonicalPath();
-			local.separator = CreateObject("java", "java.io.File").separator;
+			// Route the separator through PathGuard so it stays defined on the JVM-free
+			// RustCFML runtime (whose java.io.File shim may not expose `.separator`); it
+			// falls back to the OS name, then "/".
+			local.separator = local.guard.$nativeSeparator();
 			// Join in CFML instead of the java.io.File(parent, child)
 			// constructor: RustCFML's java.io.File shim ignores the child
 			// argument, so the two-argument form resolves to the parent
@@ -572,12 +576,17 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		// shim does not canonicalize traversal (RustCFML). Both sides are
 		// normalized the same way, so the check is equivalent on JVM engines
 		// (whose getCanonicalPath() already produced canonical paths).
-		local.normalizedTarget = $normalizeZipPath(Replace(local.canonicalTarget, "\", "/", "all"));
-		local.normalizedRoot = $normalizeZipPath(Replace(local.canonicalRoot, "\", "/", "all"));
+		// $normalizeZipPath folds only the native separator, so a backslash that is a POSIX
+		// filename byte is preserved (not turned into a path separator) before the exact check.
+		local.normalizedTarget = $normalizeZipPath(local.canonicalTarget);
+		local.normalizedRoot = $normalizeZipPath(local.canonicalRoot);
 		if (Right(local.normalizedRoot, 1) != "/") {
 			local.normalizedRoot &= "/";
 		}
-		if (CompareNoCase(Left(local.normalizedTarget, Len(local.normalizedRoot)), local.normalizedRoot) != 0) {
+		// Exact, separator-qualified containment (both sides already canonicalised +
+		// normalized the same way). CompareNoCase folded a case-distinct sibling
+		// (/srv/app vs /srv/App) into the root on a case-sensitive filesystem.
+		if (!local.guard.pathWithinExact(root = local.normalizedRoot, candidate = local.normalizedTarget)) {
 			return "";
 		}
 		return local.canonicalTarget;
@@ -1103,35 +1112,48 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 
+	/**
+	 * Resolve a GitBook guide-image filename to its canonical path inside the docs
+	 * assets dir, or "" when the name is missing, mistyped, escaping, or absent.
+	 * Extracted from guideImage() so the containment decision is testable by return
+	 * value — guideImage() itself only writes the HTTP response. Mirrors
+	 * $resolveDevAssetPath()'s canonicalize-and-confine shape.
+	 */
+	public string function $resolveGuideImagePath(required string file) {
+		local.name = GetFileFromPath(arguments.file);
+		if (!Len(local.name) || Find("..", local.name) || ReFind("[/\\]", local.name)) {
+			return "";
+		}
+		local.assetsDir = ExpandPath("/wheels/docs/src/.gitbook/assets/");
+		local.assetPath = local.assetsDir & local.name;
+		try {
+			local.canonicalAssets = CreateObject("java", "java.io.File").init(local.assetsDir).getCanonicalPath();
+			local.canonicalPath = CreateObject("java", "java.io.File").init(local.assetPath).getCanonicalPath();
+		} catch (any e) {
+			return "";
+		}
+		// Exact, separator-qualified containment. CompareNoCase folded a case-distinct
+		// sibling into the assets root, and the un-qualified Left() prefix also admitted
+		// a same-case "assets-extra" prefix sibling — pathWithinExact fixes both.
+		local.guard = new wheels.PathGuard();
+		if (!FileExists(local.assetPath) || !local.guard.pathWithinExact(root = local.canonicalAssets, candidate = local.canonicalPath)) {
+			return "";
+		}
+		return local.canonicalPath;
+	}
+
 	function guideImage() {
 		$blockInProduction();
 		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
 
-		file = GetFileFromPath(file);
-		if (!Len(file) || Find("..", file) || ReFind("[/\\]", file)) {
+		var assetPath = $resolveGuideImagePath(file);
+		if (!Len(assetPath)) {
 			cfheader(statusCode = 404);
 			WriteOutput("Image not found");
 			return;
 		}
 
-		var assetsDir = ExpandPath("/wheels/docs/src/.gitbook/assets/");
-		var assetPath = assetsDir & file;
-
-		try {
-			var canonicalAssets = CreateObject("java", "java.io.File").init(assetsDir).getCanonicalPath();
-			var canonicalPath = CreateObject("java", "java.io.File").init(assetPath).getCanonicalPath();
-		} catch (any e) {
-			cfheader(statusCode = 404);
-			WriteOutput("Image not found");
-			return;
-		}
-		if (!FileExists(assetPath) || CompareNoCase(Left(canonicalPath, Len(canonicalAssets)), canonicalAssets) != 0) {
-			cfheader(statusCode = 404);
-			WriteOutput("Image not found");
-			return;
-		}
-
-		var ext = LCase(ListLast(file, "."));
+		var ext = LCase(ListLast(GetFileFromPath(assetPath), "."));
 		var mime = "application/octet-stream";
 		switch (ext) {
 			case "png":
@@ -1216,11 +1238,15 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		} catch (any e) {
 			return "";
 		}
-		var separator = CreateObject("java", "java.io.File").separator;
+		var guard = new wheels.PathGuard();
+		// Route the separator through PathGuard so it stays defined on the JVM-free
+		// RustCFML runtime (whose java.io.File shim may not expose `.separator`); it
+		// falls back to the OS name, then "/".
+		var separator = guard.$nativeSeparator();
 		if (Right(canonicalAssets, 1) != separator) {
 			canonicalAssets &= separator;
 		}
-		if (CompareNoCase(Left(canonicalPath, Len(canonicalAssets)), canonicalAssets) != 0) {
+		if (!guard.pathWithinExact(root = canonicalAssets, candidate = canonicalPath)) {
 			return "";
 		}
 		if (!FileExists(canonicalPath)) {
@@ -1367,11 +1393,15 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		} catch (any e) {
 			return "";
 		}
-		var separator = CreateObject("java", "java.io.File").separator;
+		var guard = new wheels.PathGuard();
+		// Route the separator through PathGuard so it stays defined on the JVM-free
+		// RustCFML runtime (whose java.io.File shim may not expose `.separator`); it
+		// falls back to the OS name, then "/".
+		var separator = guard.$nativeSeparator();
 		if (Right(canonicalSite, 1) != separator) {
 			canonicalSite &= separator;
 		}
-		if (CompareNoCase(Left(canonicalTarget, Len(canonicalSite)), canonicalSite) != 0) {
+		if (!guard.pathWithinExact(root = canonicalSite, candidate = canonicalTarget)) {
 			return "";
 		}
 		return FileExists(canonicalTarget) ? canonicalTarget : "";

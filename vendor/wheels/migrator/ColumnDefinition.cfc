@@ -1,7 +1,7 @@
 component extends="Base" {
 
 	public ColumnDefinition function init(required any adapter, required string name, required string type) {
-		local.args = "adapter,name,type,limit,precision,scale,default,allowNull,autoIncrement,afterColumn";
+		local.args = "adapter,name,type,limit,precision,scale,default,allowNull,autoIncrement,afterColumn,unsigned";
 		local.argsArray = ListToArray(local.args);
 		local.iEnd = ArrayLen(local.argsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -32,7 +32,7 @@ component extends="Base" {
 
 	public string function sqlType() {
 		local.options = {};
-		local.optionalArguments = "limit,precision,scale";
+		local.optionalArguments = "limit,precision,scale,unsigned";
 		local.optionalArgumentsArray = ListToArray(local.optionalArguments);
 		local.iEnd = ArrayLen(local.optionalArgumentsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -54,6 +54,16 @@ component extends="Base" {
 			local.argumentName = local.optionalArgumentsArray[local.i];
 			if (StructKeyExists(this, local.argumentName)) {
 				local.options[local.argumentName] = this[local.argumentName];
+			}
+		}
+		// `newid()` is SQL Server's UUID generator; use the adapter's own (#4094).
+		if (
+			StructKeyExists(local.options, "type") && local.options.type == "uniqueidentifier"
+			&& StructKeyExists(local.options, "default") && local.options.default == "newid()"
+		) {
+			local.options.default = this.adapter.$uuidDefaultSQL();
+			if (!Len(local.options.default)) {
+				StructDelete(local.options, "default");
 			}
 		}
 		arguments.sql = this.adapter.addColumnOptions(sql = arguments.sql, options = local.options);

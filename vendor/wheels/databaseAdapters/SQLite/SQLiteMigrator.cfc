@@ -5,8 +5,12 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['biginteger'] = { name = 'INTEGER' };
 	variables.sqlTypes['binary'] = { name = 'BLOB' };
 	variables.sqlTypes['boolean'] = { name = 'BOOLEAN' }; // NUMERIC affinity, stores 0/1; declared name lets SQLiteModel.$getType map it to cf_sql_bit
-	variables.sqlTypes['date'] = { name = 'TEXT' };
-	variables.sqlTypes['datetime'] = { name = 'TEXT' };
+	variables.sqlTypes['char'] = { name = 'CHAR', limit = 1 }; // TEXT affinity; declared name lets SQLiteModel.$getType map it
+	// Date types declare their own names so the model can tell them from plain text and
+	// validate them as dates (#4093). The names give NUMERIC affinity, but Wheels writes
+	// ISO-8601 strings, which aren't numeric, so SQLite still stores them as TEXT.
+	variables.sqlTypes['date'] = { name = 'DATE' };
+	variables.sqlTypes['datetime'] = { name = 'DATETIME' };
 	// NUMERIC keeps the declared type distinct from REAL so the model layer binds
 	// decimal values via cf_sql_decimal (BigDecimal) instead of cf_sql_float.
 	// REAL is SQLite's 8-byte floating point storage: Lucee binds it as a 32-bit
@@ -20,9 +24,12 @@ component extends="wheels.databaseAdapters.Abstract" {
 	variables.sqlTypes['text'] = { name = 'TEXT' };
 	variables.sqlTypes['mediumtext'] = { name = 'TEXT' };
 	variables.sqlTypes['longtext'] = { name = 'TEXT' };
-	variables.sqlTypes['time'] = { name = 'TEXT' };
-	variables.sqlTypes['timestamp'] = { name = 'TEXT' };
+	variables.sqlTypes['time'] = { name = 'TIME' };
+	variables.sqlTypes['timestamp'] = { name = 'TIMESTAMP' };
 	variables.sqlTypes['uuid'] = { name = 'TEXT', limit = 36 };
+	variables.sqlTypes['uniqueidentifier'] = { name = 'CHAR', limit = 36 };
+	// SQLite has no UUID function; this builds a version 4 UUID from random bytes (#4094).
+	variables.uuidDefaultSQL = '(lower(hex(randomblob(4)) || ''-'' || hex(randomblob(2)) || ''-4'' || substr(hex(randomblob(2)), 2) || ''-'' || substr(''89ab'', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || ''-'' || hex(randomblob(6))))';
 
 	/**
 	 * name of database adapter

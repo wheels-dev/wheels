@@ -172,10 +172,11 @@ component extends="wheels.WheelsTest" {
 
 			describe("nested struct keys above 2^31", () => {
 
-				// The 19-digit end-to-end specs need an adapter that reports BIGINT as
-				// cf_sql_bigint. SQLite and Oracle report it as cf_sql_integer (a separate
-				// adapter limitation), so there the key is still read as a new row (fail
-				// closed) and binding a 19-digit fixture id as an integer is refused by Adobe.
+				// The 19-digit end-to-end specs need the fixture's BIGINT key column to report
+				// cf_sql_bigint, which every adapter does since #4086. The guard stays for a
+				// column that reports cf_sql_integer, such as an INTEGER column on SQLite: there
+				// the key is still read as a new row (fail closed) and binding a 19-digit id
+				// as an integer is refused by Adobe.
 				var bigintAware = g.model("bigKeyPost").$nestedKeyColumnSqlType(model = g.model("bigKeyPost"), column = "id") == "cf_sql_bigint"
 
 				it(title = "updates the parent's own join rows through a 19-digit composite key", skip = !bigintAware, body = () => {
@@ -222,6 +223,42 @@ component extends="wheels.WheelsTest" {
 					expect(m.$isNewNestedCollectionKey(collectionKey = "-2147483648", value = {})).toBeFalse()
 					// A stale GetTickCount-style key on a 32-bit column is still a new row.
 					expect(m.$isNewNestedCollectionKey(collectionKey = "1696262400000", value = {})).toBeTrue()
+				})
+
+				it("reads SMALLINT and TINYINT keys against the adapter's range for them (##4087)", () => {
+					var m = g.model("postWithTagCheckboxes")
+					var adapterName = g.get("adapterName")
+					// The range a key can be stored in and bound with. SQL Server's SMALLINT is
+					// signed and its TINYINT unsigned; MySQL columns may be either, so MySQL takes
+					// both ranges; the other adapters use the signed ranges. Outside the range a
+					// key cannot be an existing row, and binding it throws on Adobe.
+					var small = {type = "cf_sql_smallint", min = "-32768", below = "-32769", max = "32767", above = "32768"}
+					var tiny = {type = "cf_sql_tinyint", min = "-128", below = "-129", max = "127", above = "128"}
+					if (adapterName == "MicrosoftSQLServerModel") {
+						tiny.min = "0"
+						tiny.below = "-1"
+						tiny.max = "255"
+						tiny.above = "256"
+					} else if (FindNoCase("MySQL", adapterName)) {
+						small.max = "65535"
+						small.above = "65536"
+						tiny.max = "255"
+						tiny.above = "256"
+					}
+					var checks = [small, tiny]
+					for (var c in checks) {
+						expect(m.$integerStringExceedsSqlType(value = c.max, sqlType = c.type)).toBeFalse("#c.type# max #c.max#")
+						expect(m.$integerStringExceedsSqlType(value = c.min, sqlType = c.type)).toBeFalse("#c.type# min #c.min#")
+						expect(m.$integerStringExceedsSqlType(value = c.above, sqlType = c.type)).toBeTrue("#c.type# above #c.above#")
+						expect(m.$integerStringExceedsSqlType(value = c.below, sqlType = c.type)).toBeTrue("#c.type# below #c.below#")
+						expect(m.$integerStringExceedsSqlType(value = "1696262400000", sqlType = c.type)).toBeTrue("#c.type# tick count")
+						expect(m.$integerStringExceedsSqlType(value = "0", sqlType = c.type)).toBeFalse("#c.type# 0")
+					}
+					// The issue's case: 40000 is out of range for a signed SMALLINT key.
+					expect(m.$integerStringExceedsSqlType(value = "40000", sqlType = "cf_sql_smallint")).toBe(small.max == "32767")
+					// INTEGER and BIGINT keep their ranges.
+					expect(m.$integerStringExceedsSqlType(value = "2147483647", sqlType = "cf_sql_integer")).toBeFalse()
+					expect(m.$integerStringExceedsSqlType(value = "2147483648", sqlType = "cf_sql_integer")).toBeTrue()
 				})
 
 			})

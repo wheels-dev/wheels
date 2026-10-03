@@ -85,5 +85,5 @@ Fixtures at `cli/lucli/tests/_fixtures/deploy/configs/` (`minimal.yml`, `full.ym
 
 ## Reference docs
 
-- User guides: `web/sites/guides/src/content/docs/v4-0-0/deployment/` (first-deploy, production-config, accessories, secrets, hooks, migrating-from-kamal, security-hardening, docker-deployment)
+- User guides: `web/sites/guides/src/content/docs/v4-2-0/deployment/` (first-deploy, production-config, accessories, secrets, hooks, migrating-from-kamal, security-hardening, docker-deployment)
 - In-source CLI docs: `cli/lucli/services/deploy/cli/docs/` (per-verb)
