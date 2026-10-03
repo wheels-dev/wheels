@@ -9,13 +9,11 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 
-		// "vertex", "index" and "half" are left out: their plural rules refer back to a regex group
-		// that does not take part in the match, which errors on BoxLang with or without the cache.
 		corpus = [
 			"item", "items", "product", "category", "categories", "person", "people", "man", "men",
 			"child", "children", "sex", "move", "moves", "cow", "zombie", "quiz", "quizzes", "ox", "oxen",
-			"mouse", "mice", "matrix", "matrices", "box", "boxes", "church", "class",
-			"wish", "fly", "flies", "query", "queries", "hive", "wife", "wives", "halves", "analysis",
+			"mouse", "mice", "matrix", "matrices", "vertex", "index", "box", "boxes", "church", "class",
+			"wish", "fly", "flies", "query", "queries", "hive", "wife", "wives", "half", "halves", "analysis",
 			"analyses", "datum", "data", "buffalo", "tomato", "potato", "hero", "bus", "buses", "alias",
 			"status", "statuses", "octopus", "virus", "axis", "testis", "crisis", "news", "series", "species",
 			"fish", "sheep", "rice", "equipment", "information", "software", "feedback", "address", "shoe",
@@ -77,7 +75,21 @@ component extends="wheels.WheelsTest" {
 				expect(g.pluralize("zork4150")).toBe("zork4150s")
 			})
 
-			it("follows a change made to the irregulars struct directly", () => {
+			it("follows a set() that changes an existing irregular's plural", () => {
+				var saved = Duplicate(settings.irregulars)
+				try {
+					expect(g.pluralize("person")).toBe("people")
+					var irregulars = Duplicate(saved)
+					irregulars["person"] = "persons"
+					g.set(irregulars = irregulars)
+					expect(g.pluralize("person")).toBe("persons")
+				} finally {
+					g.set(irregulars = saved)
+				}
+				expect(g.pluralize("person")).toBe("people")
+			})
+
+			it("follows a word added to the irregulars struct directly", () => {
 				var probe = g.pluralize("glorp4150")
 				expect(probe).toBe("glorp4150s")
 				var state = {added = false}
