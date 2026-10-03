@@ -126,7 +126,7 @@
 			case "MicrosoftSQLServer":
 				return "date";
 			case "SQLite":
-				return "TEXT";
+				return "DATE"; // declared type since #4093; stored as ISO-8601 text
 			default:
 				return "`adddate()` not supported for " & migration.adapter.adapterName();
 		}
@@ -142,7 +142,7 @@
 			case "PostgreSQL":
 				return "TIMESTAMP";
 			case "SQLite":
-				return "TEXT";
+				return "DATETIME"; // declared type since #4093; stored as ISO-8601 text
 			default:
 				return "`adddatetime()` not supported for " & migration.adapter.adapterName();
 		}
@@ -232,7 +232,7 @@
 			case "PostgreSQL":
 				return "TIME";
 			case "SQLite":
-				return "TEXT";
+				return "TIME"; // declared type since #4093; stored as ISO-8601 text
 			default:
 				return "`addtime()` not supported for " & migration.adapter.adapterName();
 		}
@@ -249,7 +249,7 @@
 			case "PostgreSQL":
 				return "TIMESTAMP";
 			case "SQLite":
-				return "TEXT";
+				return "DATETIME"; // declared type since #4093; stored as ISO-8601 text
 			default:
 				return "`addtimestamp()` not supported for " & migration.adapter.adapterName();
 		}

@@ -49,20 +49,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				break;
 
 			case "date":
-				local.rv = "cf_sql_date";
-				break;
-
 			case "datetime":
 			case "timestamp":
-				// SQLite stores datetimes as TEXT (see SQLiteMigrator's
-				// sqlTypes mapping). Bind as varchar; date objects are
-				// pre-formatted to ISO-8601 in $buildQueryParamValues
-				// before they reach the bind layer.
-				local.rv = "cf_sql_varchar";
-				break;
-
 			case "time":
-				local.rv = "cf_sql_time";
+				// SQLite stores all date types as TEXT. Bind as varchar; date values are
+				// pre-formatted to ISO-8601 in $buildQueryParamValues before they reach the bind layer.
+				// Binding DATE / TIME as cf_sql_date / cf_sql_time made the driver store them
+				// as epoch milliseconds (#4093).
+				local.rv = "cf_sql_varchar";
 				break;
 
 			default:

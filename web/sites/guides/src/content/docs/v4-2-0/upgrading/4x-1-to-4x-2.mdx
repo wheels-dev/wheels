@@ -115,6 +115,10 @@ On MySQL, `t.boolean()` and `addColumn(columnType="boolean")` now create `BIT(1)
 
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
 
+### SQLite date columns are validated as dates
+
+On SQLite, new `t.date()`, `t.datetime()`, `t.time()` and `t.timestamp()` columns are declared `DATE`, `DATETIME` and `TIME` instead of `TEXT` ([#4093](https://github.com/wheels-dev/wheels/issues/4093)). The model validates them as dates, so automatic validations now reject a value such as `"not a date"` that earlier releases stored. Values are still stored as ISO-8601 text, exactly as before. Existing `TEXT` date columns are unchanged: they keep the old check, which treats a `TEXT` column as a date only when its name is a word such as `created`, `updated` or `date`, so a column like `publishedAt` gets no date check. To give an existing column the new behaviour, convert it in a migration with `changeColumn(columnType="datetime")` (or `"date"`). The stored text is kept.
+
 ### `LocalDisk` storage keys are checked per segment
 
 `LocalDisk` now validates an object key one path segment at a time ([#3912](https://github.com/wheels-dev/wheels/issues/3912)):

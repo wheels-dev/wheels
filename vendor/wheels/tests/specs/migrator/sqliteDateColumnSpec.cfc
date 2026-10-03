@@ -63,7 +63,7 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
-			it("declares DATE, DATETIME, TIME and TIMESTAMP", () => {
+			it("declares DATE, DATETIME and TIME (t.timestamp() is DATETIME)", () => {
 				if (!variables.applies) {
 					skip("SQLite only.");
 				}
@@ -75,7 +75,8 @@ component extends="wheels.WheelsTest" {
 				expect(declared.startsOn).toBe("DATE");
 				expect(declared.startsAt).toBe("DATETIME");
 				expect(declared.alarmAt).toBe("TIME");
-				expect(declared.stampedAt).toBe("TIMESTAMP");
+				// t.timestamp() defaults to columnType="datetime" on every adapter.
+				expect(declared.stampedAt).toBe("DATETIME");
 			});
 
 			it("gives every date column the datetime validation type", () => {
@@ -113,7 +114,7 @@ component extends="wheels.WheelsTest" {
 				);
 				expect(rec.save(transaction = "commit")).toBeTrue("save failed: " & SerializeJSON(rec.allErrors()));
 				var stored = QueryExecute(
-					"SELECT typeof(startsOn) AS d, typeof(startsAt) AS dt, typeof(alarmAt) AS t, typeof(stampedAt) AS ts, startsOn, alarmAt FROM #variables.newTable#",
+					"SELECT typeof(startsOn) AS d, typeof(startsAt) AS dt, typeof(alarmAt) AS t, typeof(stampedAt) AS ts, startsOn || '' AS rawDate, alarmAt || '' AS rawTime, startsOn, alarmAt FROM #variables.newTable#",
 					[],
 					{datasource = variables.ds}
 				);
@@ -121,8 +122,11 @@ component extends="wheels.WheelsTest" {
 				expect(stored.dt).toBe("text", "datetime storage class");
 				expect(stored.t).toBe("text", "time storage class");
 				expect(stored.ts).toBe("text", "timestamp storage class");
-				expect(Left(stored.startsOn, 10)).toBe("2026-10-02");
-				expect(stored.alarmAt).toInclude("09:30:00");
+				// The stored text keeps the values; reading the typed column returns a date.
+				expect(Left(stored.rawDate, 10)).toBe("2026-10-02");
+				expect(stored.rawTime).toInclude("09:30:00");
+				expect(DateFormat(stored.startsOn, "yyyy-mm-dd")).toBe("2026-10-02");
+				expect(TimeFormat(stored.alarmAt, "HH:mm:ss")).toBe("09:30:00");
 			});
 
 		});
@@ -136,6 +140,36 @@ component extends="wheels.WheelsTest" {
 				var props = model("SqliteTextDateCol").$classData().properties;
 				expect(props.created.validationtype).toBe("datetime");
 				expect(props.notes.validationtype).toBe("string");
+			});
+
+			// The upgrade note tells apps to convert an existing TEXT column with changeColumn().
+			it("converts a TEXT date column with changeColumn, keeping its value", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				QueryExecute(
+					"INSERT INTO #variables.textTable# (created, notes) VALUES ('2026-10-02 09:30:00', 'kept')",
+					[],
+					{datasource = variables.ds}
+				);
+				variables.migration.changeColumn(table = variables.textTable, columnName = "created", columnType = "datetime");
+				var info = QueryExecute("PRAGMA table_info(#variables.textTable#)", [], {datasource = variables.ds});
+				var declared = "";
+				for (var row in info) {
+					if (row.name == "created") {
+						declared = UCase(row.type);
+					}
+				}
+				expect(declared).toBe("DATETIME");
+				var stored = QueryExecute(
+					"SELECT typeof(created) AS kind, created || '' AS raw FROM #variables.textTable#",
+					[],
+					{datasource = variables.ds}
+				);
+				expect(stored.kind).toBe("text");
+				expect(stored.raw).toBe("2026-10-02 09:30:00");
+				StructDelete(application.wheels.models, "SqliteTextDateCol");
+				expect(model("SqliteTextDateCol").$classData().properties.created.validationtype).toBe("datetime");
 			});
 
 		});
