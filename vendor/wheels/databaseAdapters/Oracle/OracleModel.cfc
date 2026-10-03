@@ -38,6 +38,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	public string function $getType(required string type, string scale, string details, string precision = "") {
+		// Oracle has no BIGINT column type, but a calculated property's dataType is a portable
+		// name, which every other adapter maps (#4089).
+		if (ListFindNoCase("bigint,int8", arguments.type)) {
+			return "cf_sql_bigint";
+		}
 		switch (arguments.type) {
 			case "blob":
 			case "bfile":
