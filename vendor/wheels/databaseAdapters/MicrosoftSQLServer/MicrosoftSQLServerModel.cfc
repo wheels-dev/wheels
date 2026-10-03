@@ -9,6 +9,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return 2097;
 	}
 
+	/**
+	 * SQL Server's TINYINT is unsigned, 0 to 255 (#4087).
+	 */
+	public struct function $integerKeyRange(required string sqlType) {
+		if (arguments.sqlType == "cf_sql_tinyint") {
+			return {min = "0", max = "255"};
+		}
+		return super.$integerKeyRange(argumentCollection = arguments);
+	}
+
 	variables.mssqlTypeMap = {
 		"bigint": "cf_sql_bigint",
 		"binary": "cf_sql_binary",

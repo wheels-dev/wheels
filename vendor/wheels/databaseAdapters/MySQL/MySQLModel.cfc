@@ -42,6 +42,21 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	};
 
 	/**
+	 * A MySQL TINYINT or SMALLINT column may be signed or UNSIGNED, and both map to
+	 * the same cf_sql type, so the range covers both: TINYINT -128 to 255, SMALLINT
+	 * -32768 to 65535 (#4087).
+	 */
+	public struct function $integerKeyRange(required string sqlType) {
+		if (arguments.sqlType == "cf_sql_tinyint") {
+			return {min = "-128", max = "255"};
+		}
+		if (arguments.sqlType == "cf_sql_smallint") {
+			return {min = "-32768", max = "65535"};
+		}
+		return super.$integerKeyRange(argumentCollection = arguments);
+	}
+
+	/**
 	 * Map database types to the ones used in CFML.
 	 */
 	public string function $getType(required string type, string scale, string details) {
