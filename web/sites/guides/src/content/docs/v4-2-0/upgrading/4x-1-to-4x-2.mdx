@@ -165,6 +165,8 @@ Some clients send their requests to the live application:
 
 For a test server on another host name, set `testClientBaseUrl` or use `$testClient()`. To address the live application from a spec on purpose, pass `testContext=false` to `$testClient()` or to `new wheels.wheelstest.TestClient()`.
 
+If a `TestClient` subclass or a test helper in your app sets the `X-Wheels-Test-Context` header or the `WHEELS_TEST_CONTEXT` cookie itself (a pattern from 4.1), delete those lines. `TestClient` and `$testClient()` now send the test context for you, and a value set by hand replaces theirs, so the requests reach the live application and its primary datasource (errors such as a missing table).
+
 ### `findAll(returnAs="structs")` returns an array
 
 `findAll()` has always documented `returnAs="structs"` (and `"struct"`) as an array of structs, but through 4.1 it returned a struct keyed by row number: `{1: {...}, 2: {...}}`. From 4.2 it returns the documented array ([#4035](https://github.com/wheels-dev/wheels/pull/4035)). `findInBatches(returnAs="structs")` hands its callback the same array.

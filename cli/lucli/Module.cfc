@@ -8207,11 +8207,6 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Build the upgrade-check definitions for the given current/target major
-	 * version pair. Each entry may set `severity` to "breaking" (default,
-	 * gated by major-version-bump scenarios) or "advisory" (runs regardless).
-	 */
-	/**
 	 * True when this CLI's own version is older than the target (#4154), so its
 	 * checks and bundled template can't know what the target release changed.
 	 * Compares MAJOR.MINOR.PATCH only (a `-dev` or snapshot suffix doesn't
@@ -8231,6 +8226,11 @@ component extends="modules.BaseModule" {
 		}
 	}
 
+	/**
+	 * Build the upgrade-check definitions for the given current/target major
+	 * version pair. Each entry may set `severity` to "breaking" (default,
+	 * gated by major-version-bump scenarios) or "advisory" (runs regardless).
+	 */
 	private array function $upgradeBuildChecks(required numeric currentMajor, required numeric targetMajor, string target = "") {
 		var checks = [];
 
