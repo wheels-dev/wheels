@@ -65,7 +65,7 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(upgrade).notToInclude("deliberately does nothing");
 
 				var packages = mod.showHelp("packages");
-				expect(packages).toInclude("verb is `add`, not `install`");
+				expect(packages).toInclude("`install` is an alias of `add`");
 				expect(packages).notToInclude("chapter 8");
 			});
 

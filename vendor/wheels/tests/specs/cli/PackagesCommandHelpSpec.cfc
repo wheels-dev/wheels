@@ -1,14 +1,12 @@
 /**
- * Regression: `wheels --help` advertises the `packages` command with the
- * summary "Install, update, search Wheels packages." Users naturally try
- * `wheels packages install <name>` next, which is intercepted by LuCLI's
- * built-in extension installer before dispatch reaches Module.cfc — they
- * see `[INFO] No git or extension dependencies to install`, exit 0, and
- * nothing actually installs. The canonical verb is `wheels packages add`.
+ * The `packages` help leads with the canonical verb, `add`.
  *
- * Issue #2706. The help summary line must stop leading with the broken
- * `Install` verb and point at `add` (the same trap that earlier renamed
- * `wheels browser install` to `wheels browser setup`).
+ * Issue #2706: `wheels --help` summarised `packages` as "Install, update,
+ * search Wheels packages", so users typed `wheels packages install <name>`.
+ * On the CLIs of the time LuCLI's built-in extension installer took that
+ * verb before Module.cfc, and nothing installed. Since #4206 `install` is
+ * an alias of `add` in Wheels 4.2; `add` stays the documented verb because
+ * it works on every 4.x CLI.
  */
 component extends="wheels.WheelsTest" {
 
@@ -26,15 +24,14 @@ component extends="wheels.WheelsTest" {
 				expect(fileExists(ctx.modulePath)).toBeTrue("Missing file: " & ctx.modulePath);
 			});
 
-			it("showHelp() summary line no longer leads with the broken `Install` verb", () => {
+			it("showHelp() summary line leads with `Add`, not `Install`", () => {
 				var source = fileRead(ctx.modulePath);
 
-				// The legacy phrasing leads with "Install" — the exact verb
-				// users will then try to type, which LuCLI intercepts.
+				// The legacy phrasing led with "Install", the verb older CLIs
+				// did not deliver to the module (#2706).
 				expect(source contains "packages            Install, update, search Wheels packages").toBeFalse(
 					"showHelp() still summarises `wheels packages` with `Install, update, search ...`. "
-					& "The verb users will try (`wheels packages install`) is intercepted by LuCLI's "
-					& "built-in extension installer and silently no-ops. Lead with `Add` (the canonical verb) instead."
+					& "Lead with `Add`, the canonical verb, which works on every 4.x CLI."
 				);
 			});
 
@@ -57,26 +54,22 @@ component extends="wheels.WheelsTest" {
 
 					expect(reFindNoCase("\badd\b", summaryLine) > 0).toBeTrue(
 						"The `packages` summary line in showHelp() should mention `add` — the "
-						& "canonical install verb — so users don't reach for the intercepted "
-						& "`install` verb. Current line: " & summaryLine
+						& "canonical install verb. Current line: " & summaryLine
 					);
 				}
 			});
 
-			it("packages() hint metadata leads with `Add`, not the intercepted `Install` verb", () => {
+			it("packages() hint metadata leads with `Add`, not `Install`", () => {
 				var source = fileRead(ctx.modulePath);
 
-				// LuCLI surfaces the `hint:` javadoc on the packages() function
-				// in auto-introspected help. Leading with "Install" nudges
-				// users toward `wheels packages install`, which never reaches
-				// this module.
+				// `wheels packages --help` prints the packages() `hint:` line.
+				// It leads with `Add`, the documented verb, to match showHelp().
 				expect(source contains "hint: Install, update, and list Wheels packages").toBeFalse(
 					"packages() hint still leads with `Install`. Lead with `Add` "
 					& "(the canonical verb) so auto-introspected help matches showHelp()."
 				);
 				expect(source contains "hint: Add, update, and list Wheels packages").toBeTrue(
-					"packages() hint should lead with `Add, update, and list ...` "
-					& "and mention that the verb is `add`, not `install`."
+					"packages() hint should lead with `Add, update, and list ...`."
 				);
 			});
 
@@ -86,8 +79,8 @@ component extends="wheels.WheelsTest" {
 				expect(source contains "Unknown packages subcommand").toBeTrue(
 					"Expected the packages() default branch to throw an unknown-subcommand error."
 				);
-				expect(source contains "The install verb is `add` (not `install`): wheels packages add <name>").toBeTrue(
-					"The unknown-subcommand error should tell users the install verb is `add`."
+				expect(source contains "To install a package: wheels packages add <name>").toBeTrue(
+					"The unknown-subcommand error should point users at `wheels packages add`."
 				);
 			});
 
