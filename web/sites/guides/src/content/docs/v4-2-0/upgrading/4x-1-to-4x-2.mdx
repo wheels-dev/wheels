@@ -50,6 +50,52 @@ The `onError` minimal fallback now tells an error raised once the application is
 
 **Fails safe:** without it, `wheels reload` against a RustCFML server fails every other run; Lucee, Adobe CF and BoxLang are unaffected. Copy the header-mapping block from the template.
 
+### Reload redirect keeps the subfolder (4.2.0)
+
+When an app runs under a subfolder (`set(subpath="/app1")`, or an IIS application at `/app1`), `?reload=true` on a running app restarts it and redirects from `public/Application.cfc`'s `$buildRedirectUrl()`. That function built the target from `cgi.path_info` alone, so `/app1/widgets?reload=true` came back to `/widgets`, outside the app ([#3948](https://github.com/wheels-dev/wheels/issues/3948)). The 4.2 template passes the path through the framework's `$reloadRedirectPath()`, which puts the subfolder back. The same function is used by the framework's own reload redirect.
+
+Replace the `return local.redirectPath;` at the end of `$buildRedirectUrl()` with the block below, and add `$normaliseRedirectPath()` after it. The fallback keeps the function working with a `vendor/wheels/` that doesn't have the helper yet.
+
+```cfm title="public/Application.cfc"
+		local.redirectPathResolved = false;
+		try {
+			if (StructKeyExists(application, "wo")) {
+				local.redirectPath = application.wo.$reloadRedirectPath(path = local.redirectPath);
+				local.redirectPathResolved = true;
+			}
+		} catch (any e) {
+			// No such helper (an older vendor/wheels): use the fallback below.
+		}
+		if (!local.redirectPathResolved) {
+			local.redirectPath = this.$normaliseRedirectPath(local.redirectPath);
+		}
+
+		return local.redirectPath;
+	}
+
+	public string function $normaliseRedirectPath(required string path) {
+		local.len = Len(arguments.path);
+		local.i = 1;
+		while (local.i <= local.len) {
+			local.code = Asc(Mid(arguments.path, local.i, 1));
+			if (local.code == 47 || local.code == 92 || local.code <= 32 || local.code == 127) {
+				local.i++;
+			} else {
+				break;
+			}
+		}
+		if (local.i == 1) {
+			return arguments.path;
+		}
+		if (local.i > local.len) {
+			return "/";
+		}
+		return "/" & Mid(arguments.path, local.i, local.len - local.i + 1);
+	}
+```
+
+**Fails safe at the site root:** nothing changes for an app served at `/`. **Does not fail safe under a subfolder:** the app restarts, but the browser is redirected to a path outside it.
+
 ### Event templates without leading whitespace (4.2.0)
 
 The `app/events/*.cfm` templates (`onrequeststart.cfm`, `onrequestend.cfm`, `onsessionstart.cfm` and their siblings) are included straight into the response buffer, where a bare `cfscript` block and a trailing newline put blank lines before every response ([#3882](https://github.com/wheels-dev/wheels/issues/3882)). New apps wrap them in `cfsilent` with no trailing newline.
@@ -127,6 +173,21 @@ t.bigInteger(columnNames = "accountId", unsigned = true);
 
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
 
+### SQLite date columns are validated as dates
+
+On SQLite, new `t.date()`, `t.datetime()`, `t.time()` and `t.timestamp()` columns are declared `DATE`, `DATETIME` and `TIME` instead of `TEXT` ([#4093](https://github.com/wheels-dev/wheels/issues/4093)). The model validates them as dates, so automatic validations now reject a value such as `"not a date"` that earlier releases stored. Values are still stored as ISO-8601 text, exactly as before. Existing `TEXT` date columns are unchanged: they keep the old check, which treats a `TEXT` column as a date only when its name is a word such as `created`, `updated` or `date`, so a column like `publishedAt` gets no date check. To give an existing column the new behaviour, convert it in a migration with `changeColumn(columnType="datetime")` (or `"date"`). The stored text is kept.
+
+**Columns declared `DATE` or `TIME` by raw SQL or another tool.** Before 4.2, Wheels bound a SQLite column *declared* `DATE` as `cf_sql_date` and one declared `TIME` as `cf_sql_time`, and the driver stored those values as epoch-millisecond integers. Wheels now writes ISO-8601 text to them, so a column with old rows would mix integers and text, which breaks comparisons and sorting. Migrator-created columns aren't affected: they were `TEXT` before 4.2. To check a table, run `SELECT typeof(col), count(*) FROM tbl GROUP BY 1;`. If any rows are `integer`, convert them before writing with 4.2:
+
+```sql
+UPDATE tbl SET dateCol = strftime('%Y-%m-%d', dateCol / 1000, 'unixepoch', 'localtime') WHERE typeof(dateCol) = 'integer';
+UPDATE tbl SET timeCol = strftime('%H:%M:%S', timeCol / 1000, 'unixepoch', 'localtime') WHERE typeof(timeCol) = 'integer';
+```
+
+Keep `'localtime'`: the old values are midnight (or the time of day) in the server's timezone, and without it a server east of UTC converts each date to the previous day. Run the conversion with the same timezone as the app server.
+
+**Convert before you upgrade.** If you don't, what happens depends on the engine. On BoxLang, a record holding an unconverted value fails validation on that column ("is invalid") even when the save doesn't touch it, so the record can't be saved. On Lucee and Adobe ColdFusion the record saves and keeps its integers, because Wheels updates only the columns that changed, but the first new value the app writes to such a column is stored as text, and the column mixes formats until you convert. The recipe changes only `integer` rows, so it's safe to run more than once. Run it again after every app process is on 4.2: processes still on 4.1 keep writing integers.
+
 ### An empty string in `where` matches empty strings
 
 An empty-string value in a `where` condition now binds as a real `''` ([#4055](https://github.com/wheels-dev/wheels/issues/4055)). Through 4.1 it bound as SQL NULL after your operator, so `col = ''`, `col <> ''` and `col != ''` all compared against NULL and matched no rows.
@@ -142,7 +203,7 @@ An empty-string value in a `where` condition now binds as a real `''` ([#4055](h
 **What doesn't change:**
 
 - The unquoted `NULL` keyword: `col IS NULL` and `col IS NOT NULL` work as before. To match NULL, use them or `whereNull()` / `whereNotNull()`.
-- An empty value whose column binds as a number, date, time or boolean still matches nothing, since such a column can't hold `''`. What counts is the type Wheels binds the column with: SQLite stores datetimes as text and binds them as strings, so on SQLite an empty value compared with a datetime column follows the new behaviour (`createdAt <> ''` matches every non-empty, non-NULL datetime).
+- An empty value whose column binds as a number, date, time or boolean still matches nothing, since such a column can't hold `''`. What counts is the type Wheels binds the column with: SQLite stores date and time values as text and binds every date and time column as a string, so on SQLite an empty value compared with a date, datetime or time column follows the new behaviour (`createdAt <> ''` matches every non-empty, non-NULL datetime).
 - On Oracle, which stores `''` as NULL, an empty-string comparison still matches no rows.
 
 To find affected code, search `app/` for `= ''`, `<> ''`, `!= ''`, for `where` strings that interpolate a value that may be empty (especially `params.*` values and `updateAll()` / `deleteAll()` calls), and for dynamic finders (`findOneBy…`, `findAllBy…`) called with request values.

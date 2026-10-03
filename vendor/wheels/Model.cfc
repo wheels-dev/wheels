@@ -351,8 +351,15 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		} else {
 			variables.wheels.class.properties[local.property].label = humanize(local.property);
 		}
-		// Detect datetime-like columns for SQLite, without changing the DB type
+		// SQLite date columns the migrator declares as DATE / DATETIME / TIME / TIMESTAMP are
+		// dates for validation (#4093). Binding is unchanged: SQLiteModel maps them as before.
 		if (
+			get("adapterName") eq "SQLiteModel"
+			&& ListFindNoCase("DATE,DATETIME,TIME,TIMESTAMP", variables.wheels.class.properties[local.property].datatype)
+		) {
+			variables.wheels.class.properties[local.property].validationtype = "datetime";
+		// Detect datetime-like TEXT columns for SQLite (apps created before #4093), without changing the DB type
+		} else if (
 			variables.wheels.class.properties[local.property].datatype eq "TEXT"
 			&& variables.wheels.class.properties[local.property].type eq "cf_sql_varchar"
 			&& ReFindNoCase("\b(date|time|dob|birthday|birthTime|created|updated)\b", variables.wheels.class.properties[local.property].column)

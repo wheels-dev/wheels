@@ -956,7 +956,48 @@ component output="false" {
 			}
 		}
 
+		// Keep the redirect a path on this app and put the subfolder back on a subpath
+		// install, as the framework's own reload redirect does. Fall back to normalising
+		// the path here when the framework helper isn't available (an older vendor/wheels,
+		// or a partial application scope).
+		local.redirectPathResolved = false;
+		try {
+			if (StructKeyExists(application, "wo")) {
+				local.redirectPath = application.wo.$reloadRedirectPath(path = local.redirectPath);
+				local.redirectPathResolved = true;
+			}
+		} catch (any e) {
+			// No such helper (an older vendor/wheels): use the fallback below.
+		}
+		if (!local.redirectPathResolved) {
+			local.redirectPath = this.$normaliseRedirectPath(local.redirectPath);
+		}
+
 		return local.redirectPath;
+	}
+
+	/**
+	 * Fallback for $buildRedirectUrl(): reduces the path's leading run of slashes,
+	 * backslashes, spaces and control characters to a single "/".
+	 */
+	public string function $normaliseRedirectPath(required string path) {
+		local.len = Len(arguments.path);
+		local.i = 1;
+		while (local.i <= local.len) {
+			local.code = Asc(Mid(arguments.path, local.i, 1));
+			if (local.code == 47 || local.code == 92 || local.code <= 32 || local.code == 127) {
+				local.i++;
+			} else {
+				break;
+			}
+		}
+		if (local.i == 1) {
+			return arguments.path;
+		}
+		if (local.i > local.len) {
+			return "/";
+		}
+		return "/" & Mid(arguments.path, local.i, local.len - local.i + 1);
 	}
 
 	/**

@@ -44,7 +44,7 @@ These steps are assembled from the community-verified Windows setup in [discussi
              <conditions logicalGrouping="MatchAll">
                <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
                <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
-               <add input="{REQUEST_URI}" pattern="^/(files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots\.txt|favicon\.ico|sitemap\.xml|index\.cfm|CFIDE|jakarta|lucee)" negate="true" />
+               <add input="{REQUEST_URI}" pattern="^/(files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots\.txt|favicon\.ico|sitemap\.xml|index\.cfm|CFIDE|jakarta|lucee)(/|\?|$)" negate="true" />
              </conditions>
              <action type="Rewrite" url="index.cfm/{R:1}" />
            </rule>
