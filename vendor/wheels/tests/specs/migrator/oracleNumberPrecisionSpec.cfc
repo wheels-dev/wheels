@@ -3,9 +3,9 @@
  * typeToSQL() applied only the `limit` default from its type map, so
  * t.integer(), t.bigInteger(), t.boolean() and the id primary key were all
  * created as a bare NUMBER, which binds as cf_sql_numeric and validates as a
- * float. changeColumn() keeps emitting a bare NUMBER unless a precision is
- * passed: Oracle refuses to narrow a populated column (ORA-01440), and
- * changeColumn() is how existing apps change a default or allowNull.
+ * float. Without a precision, changeColumn() keeps a column's current precision:
+ * Oracle refuses to narrow a populated column (ORA-01440), and changeColumn() is
+ * how existing apps change a default or allowNull, so it must not re-type one.
  */
 component extends="wheels.WheelsTest" {
 
@@ -54,7 +54,7 @@ component extends="wheels.WheelsTest" {
 				expect(variables.oracle.typeToSQL(type = "decimal", options = {precision = 8, scale = 2})).toBe("NUMBER(8,2)");
 			});
 
-			it("keeps a bare NUMBER in changeColumn() unless a precision is passed", () => {
+			it("emits a bare NUMBER in changeColumn() for a column with no current precision, unless one is passed", () => {
 				var column = CreateObject("component", "wheels.migrator.ColumnDefinition").init(adapter = variables.oracle, name = "qty", type = "integer");
 				var sqlText = variables.oracle.changeColumnInTable(name = "orders", column = column);
 				expect(sqlText).toInclude("MODIFY");
@@ -72,6 +72,7 @@ component extends="wheels.WheelsTest" {
 				var t = variables.migration.createTable(name = variables.table, force = true);
 				t.integer(columnNames = "qty");
 				t.bigInteger(columnNames = "total");
+				t.decimal(columnNames = "price", precision = 8, scale = 2);
 				t.create();
 				reloadOraNumber(variables.table);
 			});
@@ -94,6 +95,36 @@ component extends="wheels.WheelsTest" {
 				var props = model("OraNumber").$classData().properties;
 				expect(props.qty.type).toBe("cf_sql_integer");
 				expect(props.total.type).toBe("cf_sql_bigint");
+			});
+
+			// changeColumn() is how a migration changes a default; it must not re-type the column.
+			it("keeps NUMBER(10) and NUMBER(8,2) when changeColumn() changes only a default", () => {
+				if (!variables.isOracle) {
+					skip("NUMBER precision is Oracle-only, not `#variables.migration.adapter.adapterName()#`.");
+				}
+				variables.migration.changeColumn(table = variables.table, columnName = "qty", columnType = "integer", default = 0);
+				variables.migration.changeColumn(table = variables.table, columnName = "price", columnType = "decimal", default = 0);
+
+				expect(declaredPrecision(variables.table, "qty")).toBe(10);
+				expect(declaredPrecision(variables.table, "price")).toBe(8);
+				var scale = QueryExecute(
+					"SELECT data_scale FROM user_tab_columns WHERE table_name = UPPER('#variables.table#') AND column_name = 'PRICE'",
+					[],
+					{datasource = application.wo.get("dataSourceName")}
+				);
+				expect(scale.data_scale).toBe(2);
+				reloadOraNumber(variables.table);
+				expect(model("OraNumber").$classData().properties.qty.validationtype).toBe("integer");
+			});
+
+			// The guide's in-place conversion for a legacy column that holds no data.
+			it("moves an empty legacy bare NUMBER column to NUMBER(10) when a precision is passed", () => {
+				if (!variables.isOracle) {
+					skip("Bare NUMBER columns are Oracle-only, not `#variables.migration.adapter.adapterName()#`.");
+				}
+				variables.migration.execute("ALTER TABLE #variables.table# ADD emptycount NUMBER");
+				variables.migration.changeColumn(table = variables.table, columnName = "emptycount", columnType = "integer", precision = 10);
+				expect(declaredPrecision(variables.table, "emptycount")).toBe(10);
 			});
 
 			// An app upgrading from an earlier version has populated bare NUMBER columns.

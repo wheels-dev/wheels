@@ -288,13 +288,61 @@ component extends="wheels.databaseAdapters.Abstract" {
         required string name,
         required any column
     ) {
-        // Without an explicit precision, keep emitting a bare NUMBER: Oracle cannot narrow a
-        // populated column (ORA-01440), and changeColumn() is how a migration changes a
-        // default or allowNull on a column created by an earlier version (#4097).
-        if (!StructKeyExists(arguments.column, "precision")) {
-            arguments.column.precision = 0;
+        // Without an explicit precision, a NUMBER column keeps the precision it has now
+        // (#4097): a bare NUMBER from an earlier version stays bare, because Oracle cannot
+        // narrow a populated column (ORA-01440), and a NUMBER(10) stays NUMBER(10) instead
+        // of falling back to the type map's default. changeColumn() is how a migration
+        // changes a default or allowNull, so it must not re-type the column.
+        if (!StructKeyExists(arguments.column, "precision") && $isNumberColumnType(arguments.column.type)) {
+            local.current = $currentNumberPrecision(tableName = arguments.name, columnName = arguments.column.name);
+            arguments.column.precision = local.current.precision;
+            if (local.current.precision > 0 && local.current.scale > 0 && !StructKeyExists(arguments.column, "scale")) {
+                arguments.column.scale = local.current.scale;
+            }
         }
         return "ALTER TABLE #quoteTableName(arguments.name)# MODIFY #arguments.column.toSQL()#";
+    }
+
+    /**
+     * Internal function. True when a logical column type is declared as an Oracle NUMBER.
+     */
+    public boolean function $isNumberColumnType(required string type) {
+        if (arguments.type == "boolean" && variables.nativeBoolean) {
+            return false;
+        }
+        return StructKeyExists(variables.sqlTypes, arguments.type) && variables.sqlTypes[arguments.type].name == "NUMBER";
+    }
+
+    /**
+     * Internal function. The current precision and scale of an existing NUMBER column, read
+     * from USER_TAB_COLUMNS. A bare NUMBER, a missing column or an unreadable catalog give
+     * precision 0, which typeToSQL() renders as a bare NUMBER.
+     */
+    public struct function $currentNumberPrecision(required string tableName, required string columnName) {
+        var rv = {precision = 0, scale = 0};
+        try {
+            local.creds = $migratorDataSourceCredentials();
+            local.queryOptions = {datasource = $migratorDataSource()};
+            if (Len(local.creds.username)) {
+                local.queryOptions.username = local.creds.username;
+                local.queryOptions.password = local.creds.password;
+            }
+            local.info = QueryExecute(
+                "SELECT data_precision, data_scale FROM user_tab_columns WHERE UPPER(table_name) = UPPER(:tableName) AND UPPER(column_name) = UPPER(:columnName)",
+                {
+                    tableName = {value = arguments.tableName, cfsqltype = "cf_sql_varchar"},
+                    columnName = {value = arguments.columnName, cfsqltype = "cf_sql_varchar"}
+                },
+                local.queryOptions
+            );
+            if (local.info.recordCount && IsNumeric(local.info.data_precision)) {
+                rv.precision = local.info.data_precision;
+                rv.scale = IsNumeric(local.info.data_scale) ? local.info.data_scale : 0;
+            }
+        } catch (any e) {
+            rv.precision = 0;
+        }
+        return rv;
     }
 
     /**
