@@ -19,7 +19,7 @@ component {
 		// accepted-and-ignored (##3088).
 		variables.allowedKeys = [
 			"service", "image", "servers", "registry", "builder", "env",
-			"ssh", "proxy", "boot", "accessories", "volumes"
+			"ssh", "proxy", "boot", "accessories", "volumes", "migrate"
 		];
 		// Pre-build a case-insensitive struct lookup so the hot path doesn't
 		// depend on arrayContainsNoCase (not available on every engine).
@@ -81,6 +81,7 @@ component {
 		$validateServers(arguments.parsed.servers, arguments.filePath);
 		$validateVolumes(arguments.parsed, arguments.filePath);
 		$validateBoot(arguments.parsed, arguments.filePath);
+		$validateMigrate(arguments.parsed, arguments.filePath);
 		if (structKeyExists(arguments.parsed, "accessories") && isStruct(arguments.parsed.accessories)) {
 			for (var accName in arguments.parsed.accessories) {
 				$validateAccessory(arguments.parsed.accessories[accName], accName, arguments.filePath);
@@ -266,6 +267,35 @@ component {
 		if (!isStruct(boot)) return;
 		if (structKeyExists(boot, "limit")) $validateBootNumber(boot.limit, "boot.limit", arguments.filePath);
 		if (structKeyExists(boot, "wait")) $validateBootNumber(boot.wait, "boot.wait", arguments.filePath);
+	}
+
+	/**
+	 * Validate the `migrate:` block (#4063): true/false, or a block with an
+	 * optional `host` (a valid host) and `timeout` (positive seconds). Whether
+	 * the host belongs to a proxy-fronted role is checked at deploy time, where
+	 * the roles are resolved.
+	 */
+	public void function $validateMigrate(required struct parsed, required string filePath) {
+		if (!structKeyExists(arguments.parsed, "migrate")) return;
+		var migrate = arguments.parsed.migrate;
+		if (isSimpleValue(migrate) && isBoolean(migrate)) return;
+		if (!isStruct(migrate)) {
+			$raise(arguments.filePath, "migrate must be true, false, or a block with host and timeout");
+		}
+		for (var key in migrate) {
+			if (!listFindNoCase("host,timeout", key)) {
+				$raise(arguments.filePath, "unknown key: migrate.#key# (allowed migrate keys: host, timeout)");
+			}
+		}
+		if (structKeyExists(migrate, "host")) {
+			if (!isSimpleValue(migrate.host) || !len(trim(migrate.host))) {
+				$raise(arguments.filePath, "migrate.host must be a host name or address");
+			}
+			$validateHost(trim(migrate.host), arguments.filePath);
+		}
+		if (structKeyExists(migrate, "timeout") && !(isNumeric(migrate.timeout) && migrate.timeout > 0)) {
+			$raise(arguments.filePath, "migrate.timeout must be a positive number of seconds");
+		}
 	}
 
 	public void function $validateBootNumber(required any value, required string key, required string filePath) {
