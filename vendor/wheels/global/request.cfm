@@ -525,6 +525,19 @@
 	}
 
 	/**
+	 * Internal function. Where the redirect after a reload goes: the request's app-relative
+	 * path with any leading run of slashes or backslashes collapsed to a single `/`, so the
+	 * location is always a path on this site, then prefixed with the app's `webPath`.
+	 */
+	public string function $reloadRedirectPath(required string path, string webPath) {
+		local.args = {path = ReReplace(arguments.path, "^[/\\]+", "/")};
+		if (StructKeyExists(arguments, "webPath")) {
+			local.args.webPath = arguments.webPath;
+		}
+		return $prefixWebPath(argumentCollection = local.args);
+	}
+
+	/**
 	 * Internal function. The URL of a page in the offline docs bundle, which is served
 	 * by the `docsBundle` route: the app's `webPath`, the front controller unless URL
 	 * rewriting is fully on, then `wheels-docs/<path>`. A hard-coded `/wheels-docs/`
