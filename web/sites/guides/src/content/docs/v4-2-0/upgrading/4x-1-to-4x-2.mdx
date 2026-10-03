@@ -111,6 +111,18 @@ A bare property or method name in a `condition` or `unless` expression now means
 
 On MySQL, `t.boolean()` and `addColumn(columnType="boolean")` now create `BIT(1)` instead of `TINYINT(1)` ([#3897](https://github.com/wheels-dev/wheels/issues/3897)). Existing columns are unchanged. If your DSN sets `tinyInt1isBit=false`, existing `TINYINT(1)` booleans read as plain integers and fail validation as "is not a number": drop that DSN option, or convert the column with `changeColumn(columnType="boolean")`. `BIT(1)` values read back as `1` on Lucee and Adobe CF and as `true` on BoxLang; both are truthy and compare equal in CFML.
 
+### MySQL `t.bigInteger()` columns are signed
+
+On MySQL, `t.bigInteger()` now creates a signed `BIGINT` instead of `BIGINT UNSIGNED` ([#4121](https://github.com/wheels-dev/wheels/issues/4121)). The new columns accept negative values and validate as integers. Existing `BIGINT UNSIGNED` columns are unchanged, and `changeColumn()` keeps a column's current signedness unless you pass `unsigned`.
+
+MySQL requires both sides of a foreign key to have the same signedness. A new `t.bigInteger()` or `t.integer()` column that references an id created by an earlier version (`BIGINT UNSIGNED`) therefore fails with "Referencing column … and referenced column … are incompatible". Declare it unsigned:
+
+```cfm
+t.bigInteger(columnNames = "accountId", unsigned = true);
+```
+
+`unsigned` is ignored on databases without unsigned types.
+
 ### Oracle integer columns carry a precision
 
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
