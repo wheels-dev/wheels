@@ -21,7 +21,7 @@ component extends="wheels.WheelsTest" {
 		variables.isAdobe = application.wo.$engineAdapter().isAdobe();
 		var t = variables.migration.createTable(name = variables.table, force = true);
 		t.string(columnNames = "requiredName", limit = 20, allowNull = false);
-		// No t.char() column yet: it creates an untyped column on SQLite, H2, MySQL and Oracle (#4092).
+		t.char(columnNames = "shortCode", limit = 3); // untyped on four adapters before #4092
 		t.text(columnNames = "notes");
 		t.integer(columnNames = "quantity");
 		t.bigInteger(columnNames = "bigCount");
@@ -99,9 +99,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects a fraction in an integer column", () => {
-				if (variables.adapterName == "Oracle") {
-					skip("Oracle migrator integer columns are a bare NUMBER, which the model treats as a float (##4097).");
-				}
 				var props = $validProperties();
 				props.quantity = "1.5";
 				$expectRejectedOn(props, "quantity");
@@ -157,6 +154,7 @@ component extends="wheels.WheelsTest" {
 	public struct function $validProperties() {
 		return {
 			requiredName = "widget",
+			shortCode = "ABC",
 			notes = "some notes",
 			quantity = 3,
 			bigCount = 123456,

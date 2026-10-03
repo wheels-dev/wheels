@@ -500,9 +500,9 @@ component extends="modules.BaseModule" {
 
 	private any function testArgSpec() {
 		return new services.ArgSpec()
-			.option(name = "filter",    default = "", description = "What to run: a spec directory or one spec file, as a dotted path (tests.specs.models, tests.specs.models.UserSpec) or a bare name (models, UserSpec)")
+			.option(name = "filter",    default = "", description = "What to run: a spec directory or one spec file, as a path (tests/specs/models, tests/specs/models/UserSpec.cfc), a dotted path (tests.specs.models, tests.specs.models.UserSpec) or a bare name (models, UserSpec)")
 			.option(name = "directory", default = "", description = "Documented alias for --filter")
-			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format: simple, json, or tap")
+			.option(name = "reporter",  default = "simple", choices = "simple,json,tap", description = "Output format")
 			.option(name = "db",        default = "sqlite", choices = "sqlite,h2,mysql,postgres,sqlserver,sqlserver_cicd,oracle,cockroachdb", description = "--core only: the database the framework core suite runs against. The app suite ignores it and uses the app's test datasource")
 			.option(name = "base-path", default = "", description = "URL prefix the app is mounted under (e.g. /myapp). Auto-derived from WHEELS_SUBPATH or set(subpath=...) when omitted.")
 			.option(name = "timeout",   default = "", description = "Seconds to wait for the suite to finish (default 900). Also settable with WHEELS_TEST_TIMEOUT. On the terminal use --test-timeout=<seconds>: it works on every LuCLI runtime, while a plain --timeout only reaches this command on LuCLI builds that include the module-timeout fix (LuCLI ##130)")
@@ -846,11 +846,56 @@ component extends="modules.BaseModule" {
 
 		var help = "wheels " & lCase(trim(arguments.subcommand)) & nl & nl;
 		help &= "  " & hint & nl & nl;
+		// Options come from the command's own ArgSpec (`<command>ArgSpec()`),
+		// the declaration the parser and the MCP schema already share (#3962).
+		var optionLines = $commandOptionLines(fnName);
+		if (arrayLen(optionLines)) {
+			help &= "Options:" & nl & arrayToList(optionLines, nl) & nl & nl;
+		}
+		var examples = $commandExamples(fnName);
+		if (arrayLen(examples)) {
+			help &= "Examples:" & nl & arrayToList(examples, nl) & nl & nl;
+		}
 		help &= "Run 'wheels help' for the full command list." & nl;
 		help &= "More info: https://guides.wheels.dev";
 		return help;
 	}
 
+
+	/**
+	 * The Options lines for `wheels <command> --help`, rendered from the
+	 * command's `<command>ArgSpec()` when it has one; empty otherwise. Help
+	 * must always render, so a spec that fails to build yields no options.
+	 */
+	private array function $commandOptionLines(required string fnName) {
+		var specFnName = arguments.fnName & "ArgSpec";
+		if (!structKeyExists(variables, specFnName) || !isCustomFunction(variables[specFnName])) {
+			return [];
+		}
+		try {
+			var specFn = variables[specFnName];
+			return specFn().toHelpLines();
+		} catch (any e) {
+			return [];
+		}
+	}
+
+	/** Worked examples for `wheels <command> --help`, where a command has them. */
+	private array function $commandExamples(required string fnName) {
+		switch (arguments.fnName) {
+			case "test":
+				return [
+					"  wheels test                                  Run every spec under tests/specs",
+					"  wheels test tests.specs.models               Run one folder (a dotted path)",
+					"  wheels test tests/specs/models               Run one folder (a path)",
+					"  wheels test --filter=UserSpec                Run one spec file, by name",
+					"  wheels test tests/specs/models/UserSpec.cfc  Run one spec file, by path",
+					"  wheels test --reporter=json                  Print the raw JSON result"
+				];
+			default:
+				return [];
+		}
+	}
 
 	/**
 	 * Dry-run-aware write for generator paths inside Module.cfc (the

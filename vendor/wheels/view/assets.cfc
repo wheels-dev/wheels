@@ -330,18 +330,10 @@ component {
 		try {
 			local.child = CreateObject("java", "java.io.File").init(arguments.childPath).getCanonicalPath();
 			local.parent = CreateObject("java", "java.io.File").init(arguments.parentPath).getCanonicalPath();
-			local.sep = CreateObject("java", "java.io.File").separator;
-			if (CompareNoCase(local.child, local.parent) == 0) {
-				state.ok = true;
-			} else {
-				local.prefix = local.parent;
-				if (Right(local.prefix, 1) != local.sep) {
-					local.prefix &= local.sep;
-				}
-				if (Len(local.child) >= Len(local.prefix) && CompareNoCase(Left(local.child, Len(local.prefix)), local.prefix) == 0) {
-					state.ok = true;
-				}
-			}
+			// Exact, separator-qualified containment. CompareNoCase folded a case-distinct
+			// sibling into the parent on a case-sensitive filesystem.
+			var guard = new wheels.PathGuard();
+			state.ok = guard.pathWithinExact(root = local.parent, candidate = local.child);
 		} catch (any e) {
 			state.ok = false;
 		}

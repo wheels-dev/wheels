@@ -14,7 +14,7 @@
 #
 # Usage:
 #   bash tools/test-tutorial-e2e.sh
-#   PORT=60107 bash tools/test-tutorial-e2e.sh
+#   PORT=30107 bash tools/test-tutorial-e2e.sh
 #   LUCLI_BIN=/path/to/raw-lucli bash tools/test-tutorial-e2e.sh
 #
 # Requirements: a raw LuCLI binary (generic `lucli` in CI, or the brew
@@ -24,7 +24,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${PORT:-60107}"
+PORT="${PORT:-30107}"
 SHUTDOWN_PORT="$((PORT + 1))"
 APP_NAME="tutorial-e2e"
 TMPDIR=$(mktemp -d -t wheels-e2e.XXXXXX)
