@@ -111,6 +111,10 @@ A bare property or method name in a `condition` or `unless` expression now means
 
 On MySQL, `t.boolean()` and `addColumn(columnType="boolean")` now create `BIT(1)` instead of `TINYINT(1)` ([#3897](https://github.com/wheels-dev/wheels/issues/3897)). Existing columns are unchanged. If your DSN sets `tinyInt1isBit=false`, existing `TINYINT(1)` booleans read as plain integers and fail validation as "is not a number": drop that DSN option, or convert the column with `changeColumn(columnType="boolean")`. `BIT(1)` values read back as `1` on Lucee and Adobe CF and as `true` on BoxLang; both are truthy and compare equal in CFML.
 
+### Oracle integer columns carry a precision
+
+On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
+
 ### `LocalDisk` storage keys are checked per segment
 
 `LocalDisk` now validates an object key one path segment at a time ([#3912](https://github.com/wheels-dev/wheels/issues/3912)):
