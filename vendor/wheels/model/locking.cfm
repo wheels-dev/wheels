@@ -185,8 +185,9 @@
 		}
 		// Run the lock body as a Wheels-owned transaction. The body must return a boolean (the
 		// transaction outcome is driven by throw / no-throw, not the callback's own return), so the
-		// callback's actual result is carried back through the shared `state` struct.
-		local.state = {callbackSucceeded = false, hasResult = false, result = ""};
+		// callback's actual result — and a release failure to surface — are carried back through the
+		// shared `state` struct.
+		local.state = {hasResult = false, result = ""};
 		invokeWithTransaction(
 			method = "$advisoryLockTransactionBody",
 			name = arguments.name,
@@ -194,6 +195,16 @@
 			callback = arguments.callback,
 			state = local.state
 		);
+		// A release that failed AFTER a successful commit is surfaced here — once the wrapper has
+		// committed, fired afterCommit, and cleared ownership — so the committed outcome is preserved
+		// and the lock failure is still reported loudly (rev1-r2 / orch1).
+		if (StructKeyExists(local.state, "releaseError")) {
+			Throw(
+				type = "Wheels.AdvisoryLockReleaseFailed",
+				message = "Advisory lock '#arguments.name#' could not be released after its transaction committed.",
+				extendedInfo = local.state.releaseError.message
+			);
+		}
 		if (local.state.hasResult) {
 			return local.state.result;
 		}
@@ -208,34 +219,58 @@
 	 * its release step is a no-op.
 	 *
 	 * Returns `true` unconditionally: invokeWithTransaction rolls back on a `false` return, but here a
-	 * `false` is a legitimate callback result, not a failure — a genuine failure throws, and
-	 * invokeWithTransaction then rolls back and fires afterRollback. The callback's real result is
-	 * written into the shared `state` struct in the try body only (nothing written in a catch —
-	 * BoxLang invariant 11). `success` likewise flips only after the callback returns, so the finally
-	 * releases quietly on a failure / abort (never masking the callback's error) and loudly on success.
+	 * `false` is a legitimate callback result, not a failure — a genuine failure (callback or commit)
+	 * throws, and invokeWithTransaction then rolls back and fires afterRollback. The callback's real
+	 * result is written into the shared `state` struct in the try body only (nothing written in a
+	 * catch — BoxLang invariant 11). `committed` flips only after a clean commit.
+	 *
+	 * A release failure must never reach invokeWithTransaction's rollback handler (which would fire
+	 * afterRollback on already-committed data and suppress afterCommit). So the release runs in its own
+	 * try/catch inside the finally: after a successful commit the failure is captured and handed back
+	 * through `state.releaseError` for the dispatcher to surface AFTER the wrapper has fired afterCommit
+	 * and cleared ownership; on a failed callback or a failed commit the release failure is only logged,
+	 * so the original (callback / commit) error stays the one that propagates.
 	 */
 	public boolean function $advisoryLockTransactionBody(required string name, required numeric timeout, required any callback, required struct state) {
 		local.adapter = variables.wheels.class.adapter;
-		local.success = {flag = false};
+		local.committed = {flag = false};
+		var release = {error = ""};
 		local.adapter.$acquireAdvisoryLockTransactional(name = arguments.name, timeout = arguments.timeout);
 		try {
 			local.cbResult = arguments.callback();
-			local.success.flag = true;
-			arguments.state.callbackSucceeded = true;
 			if (StructKeyExists(local, "cbResult")) {
 				arguments.state.hasResult = true;
 				arguments.state.result = local.cbResult;
 			}
 			// Commit on the pinned connection BEFORE the release, so the next holder reads committed
-			// state. The transaction block stays open on the same connection for the release that
-			// follows; invokeWithTransaction's own block close then has nothing left to commit.
+			// state. The block stays open on the same connection for the release that follows;
+			// invokeWithTransaction's own block close then has nothing left to commit. `committed` flips
+			// only AFTER a clean commit, so a failing commit takes the failure path (rollback).
 			transaction action="commit";
+			local.committed.flag = true;
 		} finally {
-			if (local.success.flag) {
-				$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
-			} else {
-				$releaseTransactionalAdvisoryLockQuietly(adapter = local.adapter, name = arguments.name);
+			// On a failure / abort, resolve the transaction to rolled-back BEFORE the release, so a
+			// callback that aborts never leaves an open transaction the engine could commit at block
+			// exit — which would reopen the pre-commit window after the lock has already been freed.
+			// Harmless on the throw path, where invokeWithTransaction also rolls back afterwards.
+			if (!local.committed.flag) {
+				transaction action="rollback";
 			}
+			try {
+				$releaseTransactionalAdvisoryLock(adapter = local.adapter, name = arguments.name);
+			} catch (any releaseErr) {
+				// Unscoped struct write so it persists out of the catch on BoxLang (invariant 11).
+				if (local.committed.flag) {
+					release.error = releaseErr;
+				} else {
+					WriteLog(type = "error", file = "wheels", text = "withAdvisoryLock(transaction=true): release after a failed callback/commit also failed: " & releaseErr.message);
+				}
+			}
+		}
+		// Reached only on the committed path (a callback / commit failure propagates past here). Hand a
+		// release failure to the dispatcher to surface AFTER invokeWithTransaction has fired afterCommit.
+		if (!IsSimpleValue(release.error)) {
+			arguments.state.releaseError = release.error;
 		}
 		return true;
 	}

@@ -251,7 +251,7 @@ component extends="wheels.WheelsTest" {
 			// commits without exposing pre-commit state, so transaction = true inside an existing
 			// transaction is unsupported and throws (rather than releasing early).
 			it("throws for a session-scoped adapter inside an existing transaction", () => {
-				if (!variables.adapterName.listFindNoCase("MySQLModel,MicrosoftSQLServerModel")) {
+				if (!ListFindNoCase("MySQLModel,MicrosoftSQLServerModel", variables.adapterName)) {
 					skip("Session-scoped throw-inside-outer-tx is MySQL / SQL Server; PostgreSQL joins.");
 				}
 				var name = lockName();
@@ -430,6 +430,38 @@ component extends="wheels.WheelsTest" {
 				// A later independent write must still commit (the open-transaction marker was cleared).
 				variables.g.model("tag").new(name = "txncb-lock-second").save(transaction = "commit");
 				expect(variables.g.model("tag").count(where = "name = 'txncb-lock-second'")).toBe(1, "a later write must commit after the lock transaction cleaned up");
+			});
+
+			// A release failure AFTER a successful commit must preserve the committed outcome (the write
+			// stays committed, afterCommit fires once — not afterRollback) and still surface the release
+			// error, rather than letting invokeWithTransaction fire afterRollback on committed data.
+			// Session-scoped only: PostgreSQL's release step is a no-op (the xact lock auto-released).
+			it("surfaces a release failure after commit but keeps the committed outcome and afterCommit", () => {
+				if (!ListFindNoCase("MySQLModel,MicrosoftSQLServerModel", variables.adapterName)) {
+					skip("A release step that can fail is session-scoped: MySQL, SQL Server.");
+				}
+				var adapter = variables.g.model("author").$classData().adapter;
+				prepareMock(adapter);
+				adapter.$(method = "$releaseAdvisoryLockTransactional", throwException = true, throwType = "Wheels.AdvisoryLockReleaseFailed", throwMessage = "injected release failure");
+				var name = lockName();
+				var state = {type = ""};
+				try {
+					try {
+						variables.g.model("author").withAdvisoryLock(name = name, transaction = true, callback = function() {
+							variables.g.model("tag").new(name = "txncb-lock-relfail").save();
+							return true;
+						});
+					} catch (any e) {
+						state.type = e.type;
+					}
+				} finally {
+					adapter.$reset();
+				}
+				expect(state.type).toBe("Wheels.AdvisoryLockReleaseFailed", "the release failure must surface after the wrapper completes");
+				// The committed outcome is preserved despite the release failure.
+				expect(variables.g.model("tag").count(where = "name = 'txncb-lock-relfail'")).toBe(1, "the write must stay committed despite the release failure");
+				expect(ArrayLen(request.$acLog)).toBe(1, "afterCommit must fire once, not afterRollback");
+				expect(request.$acLog[1]).toBe("commit:txncb-lock-relfail", "the committed callback fires afterCommit, not afterRollback");
 			});
 
 		});
