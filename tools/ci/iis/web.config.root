@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  UNVERIFIED ON IIS: drafted from docs and the Tuckey/rewrite.config rules; needs review on a real IIS box.
+  Checked on IIS by the 'IIS (Windows)' workflow (.github/workflows/iis-windows.yml):
+  IIS + URL Rewrite 2.1 + BonCode + Lucee 7, on windows-latest. See tools/ci/iis/README.md.
 
-  Wheels 4.1.x, app at the SITE ROOT.
+  Wheels 4.x, app at the SITE ROOT.
   Save as public\web.config. The IIS site's physical path must be the app's public\ folder.
   Needs the IIS URL Rewrite module. Keep set(URLRewriting="On") in config/settings.cfm.
 
   Sources: the inline rule in deployment/iis-and-windows.mdx, public/urlrewrite.xml (Tuckey)
   from wheels-base-template-4.1.2, and cli/lucli/templates/app/rewrite.config.
-  The same rule logic was run on Adobe ColdFusion 2025 with Tomcat's RewriteValve
-  standing in for IIS. That shows how Wheels behaves with rewriting on.
-  It does NOT show how IIS behaves.
 -->
 <configuration>
   <system.webServer>

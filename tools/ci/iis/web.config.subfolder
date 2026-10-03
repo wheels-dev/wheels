@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  UNVERIFIED ON IIS: drafted from docs and the Tuckey/rewrite.config rules; needs review on a real IIS box.
+  Checked on IIS by the 'IIS (Windows)' workflow (.github/workflows/iis-windows.yml):
+  IIS + URL Rewrite 2.1 + BonCode + Lucee 7, on windows-latest. See tools/ci/iis/README.md.
 
-  Wheels 4.1.x, app served at /app1 inside an existing IIS site.
+  Wheels 4.x, app served at /app1 inside an existing IIS site.
   Layout this assumes:
     - In IIS Manager, add an Application (or Virtual Directory) with alias "app1" whose physical
       path is the app's public\ folder, for example C:\inetpub\wheels-apps\app1\public.
