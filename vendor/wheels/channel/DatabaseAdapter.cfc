@@ -462,52 +462,104 @@ component {
 		if (!Len(local.seqDDL)) {
 			return "id";
 		}
-
-		var probe = {hasSeq = false};
-		try {
-			queryExecute("SELECT seq FROM wheels_events WHERE 1=0", {}, {datasource: variables.$datasource});
-			probe.hasSeq = true;
-		} catch (any e) {
-			// Column missing — add it below.
-		}
-		if (probe.hasSeq) {
+		if ($seqColumnExists()) {
 			return "seq";
 		}
 
-		// Oracle spells ADD with the column def in parentheses; the others take it bare.
+		// The upgrade is capability-based, not engine-name-based: $detectDatabaseType()
+		// reports CockroachDB as "postgresql" (pg wire), so rather than sniff the version
+		// string we just try each ADD shape and keep whichever actually produces the
+		// column. Each attempt's outcome is NOT trusted on its own — concurrent instances
+		// race the ALTER and a loser throws "column already exists" though seq now exists,
+		// so a re-probe after each attempt is authoritative (also prevents a race loser
+		// sticking on the id fallback until restart).
+		var errs = {identity = "", sequence = ""};
+
+		// Attempt 1: the standard identity ALTER. Works on SQL Server, MySQL, Oracle, H2
+		// and real PostgreSQL. Oracle spells ADD with the column def in parentheses.
 		local.alter = (arguments.dbType == "oracle")
 			? "ALTER TABLE wheels_events ADD (#local.seqDDL#)"
 			: "ALTER TABLE wheels_events ADD #local.seqDDL#";
-
-		// Attempt the add, but DON'T trust its own outcome: concurrent instances race
-		// this ALTER, and a loser throws "column already exists" even though seq now
-		// exists. The re-probe below is authoritative, so a race loser does not stick
-		// on the id fallback until restart (M2).
 		try {
 			queryExecute(local.alter, {}, {datasource: variables.$datasource});
-		} catch (any alterError) {
-			// Ignored — the re-probe decides whether seq now exists (ours or a peer's).
+		} catch (any identityError) {
+			errs.identity = identityError.message;
+		}
+		if ($seqColumnExists()) {
+			return "seq";
 		}
 
-		var added = {ok = false};
+		// Attempt 2: a Postgres-wire sequence-backed column, for a pg-wire engine that
+		// implements sequences but NOT ALTER ADD ... GENERATED AS IDENTITY on an existing
+		// table (CockroachDB). CockroachDB also cannot ADD a column whose DEFAULT is a
+		// sequence to a POPULATED table in one step — nextval() can't be evaluated during a
+		// schema backfill (crdb #42508) — so build it in stages that each avoid a
+		// backfill-time sequence call:
+		//   1. create the sequence (default CACHE 1 -> monotonic across nodes),
+		//   2. add the column nullable (no DEFAULT -> no backfill expression),
+		//   3. point its DEFAULT at the sequence (new rows now get values),
+		//   4. backfill existing rows with a plain UPDATE (DML, not a schema backfill).
+		// The DEFAULT is set (3) BEFORE the backfill (4), so new publishes are covered even
+		// if the backfill is interrupted; steps are idempotent (IF NOT EXISTS /
+		// WHERE seq IS NULL) so a concurrent or retried run converges. Gated to the
+		// postgresql family because nextval('name') is pg-specific. Fresh CockroachDB
+		// CREATE already succeeds with GENERATED AS IDENTITY (no rows to backfill); both
+		// yield a monotonic INT8 seq, so fresh and upgraded tables order identically.
+		if (arguments.dbType == "postgresql") {
+			try {
+				queryExecute(
+					"CREATE SEQUENCE IF NOT EXISTS wheels_events_seq",
+					{},
+					{datasource: variables.$datasource}
+				);
+				queryExecute(
+					"ALTER TABLE wheels_events ADD COLUMN seq INT8",
+					{},
+					{datasource: variables.$datasource}
+				);
+				queryExecute(
+					"ALTER TABLE wheels_events ALTER COLUMN seq SET DEFAULT nextval('wheels_events_seq')",
+					{},
+					{datasource: variables.$datasource}
+				);
+				queryExecute(
+					"UPDATE wheels_events SET seq = nextval('wheels_events_seq') WHERE seq IS NULL",
+					{},
+					{datasource: variables.$datasource}
+				);
+			} catch (any sequenceError) {
+				errs.sequence = sequenceError.message;
+			}
+			if ($seqColumnExists()) {
+				return "seq";
+			}
+		}
+
+		// Both shapes failed: degrade to createdAt+id ordering, recording the real reason
+		// from each attempt (not the generic probe error) so the limitation is diagnosable.
+		local.identityReason = Len(errs.identity) ? errs.identity : "n/a";
+		local.sequenceReason = Len(errs.sequence) ? errs.sequence : "n/a";
+		writeLog(
+			text="Could not add a seq column to wheels_events on #arguments.dbType# (identity ALTER: #local.identityReason#; sequence ALTER: #local.sequenceReason#); ordering falls back to createdAt+id, so events sharing a timestamp tick may order arbitrarily.",
+			type="warning",
+			file="wheels_channels"
+		);
+		return "id";
+	}
+
+	/**
+	 * True when the wheels_events table currently has a seq column. A cheap WHERE 1=0
+	 * probe used to decide whether the monotonic column needs adding and, after each
+	 * ALTER attempt, whether it now exists (authoritative over the ALTER's own result,
+	 * which is unreliable when instances race the add).
+	 */
+	private boolean function $seqColumnExists() {
 		try {
 			queryExecute("SELECT seq FROM wheels_events WHERE 1=0", {}, {datasource: variables.$datasource});
-			added.ok = true;
-		} catch (any probeError) {
-			writeLog(
-				text="Could not add a seq column to wheels_events on #arguments.dbType# (#probeError.message#); ordering falls back to createdAt+id, so events sharing a timestamp tick may order arbitrarily.",
-				type="warning",
-				file="wheels_channels"
-			);
+			return true;
+		} catch (any e) {
+			return false;
 		}
-		if (added.ok) {
-			writeLog(
-				text="Monotonic seq column present on wheels_events (#arguments.dbType#)",
-				type="information",
-				file="wheels_channels"
-			);
-		}
-		return added.ok ? "seq" : "id";
 	}
 
 	/**
