@@ -53,6 +53,23 @@ component extends="wheels.WheelsTest" {
 		StructDelete(application.wheels.models, "SqliteTextDateCol");
 	}
 
+	function seedOdbcDates(required array values) {
+		QueryExecute("DROP TABLE IF EXISTS c_o_r_e_sqliteodbcdates", [], {datasource = variables.ds});
+		QueryExecute("CREATE TABLE c_o_r_e_sqliteodbcdates (id INTEGER PRIMARY KEY AUTOINCREMENT, created TEXT)", [], {datasource = variables.ds});
+		for (var v in arguments.values) {
+			QueryExecute("INSERT INTO c_o_r_e_sqliteodbcdates (created) VALUES (?)", [{value = v, cfsqltype = "cf_sql_varchar"}], {datasource = variables.ds});
+		}
+	}
+
+	function odbcRawValues() {
+		var q = QueryExecute("SELECT created || '' AS raw FROM c_o_r_e_sqliteodbcdates ORDER BY id", [], {datasource = variables.ds});
+		var out = [];
+		for (var row in q) {
+			ArrayAppend(out, row.raw);
+		}
+		return out;
+	}
+
 	function run() {
 
 		describe("SQLite migrator date columns", () => {
@@ -129,6 +146,49 @@ component extends="wheels.WheelsTest" {
 				expect(DateFormat(stored.startsOn, "yyyy-mm-dd")).toBe("2026-10-02");
 				expect(TimeFormat(stored.alarmAt, "HH:mm:ss")).toBe("09:30:00");
 			});
+
+		});
+
+		// updateAll() built its SET params itself and skipped the ISO-8601 formatting save() applies,
+		// so a date object was stored as CFML's "{ts '...'}" text, which a DATETIME column then
+		// fails to read back (##4147).
+		describe("Updating SQLite date columns", () => {
+
+			afterEach(() => {
+				if (variables.applies) {
+					QueryExecute("DELETE FROM #variables.newTable#", [], {datasource = variables.ds});
+				}
+			});
+
+			var paths = ["updateAll", "updateAll with instantiate", "updateByKey", "updateOne"];
+			for (var path in paths) {
+				it("stores ISO-8601 text and reads it back through #path#", (data) => {
+					if (!variables.applies) {
+						skip("SQLite only.");
+					}
+					var rec = model("SqliteDateCol").create(startsAt = "2026-01-01 00:00:00");
+					var when = CreateDateTime(2026, 10, 3, 4, 29, 57);
+					switch (data.path) {
+						case "updateAll":
+							model("SqliteDateCol").updateAll(where = "id = #rec.key()#", startsAt = when, callbacks = false);
+							break;
+						case "updateAll with instantiate":
+							model("SqliteDateCol").updateAll(where = "id = #rec.key()#", startsAt = when, instantiate = true);
+							break;
+						case "updateByKey":
+							model("SqliteDateCol").updateByKey(key = rec.key(), startsAt = when);
+							break;
+						case "updateOne":
+							model("SqliteDateCol").updateOne(where = "id = #rec.key()#", startsAt = when);
+							break;
+					}
+					var stored = QueryExecute("SELECT startsAt || '' AS raw FROM #variables.newTable# WHERE id = #rec.key()#", [], {datasource = variables.ds});
+					expect(stored.raw).notToInclude("{ts");
+					expect(stored.raw).toBe("2026-10-03 04:29:57");
+					var reloaded = model("SqliteDateCol").findByKey(rec.key());
+					expect(DateFormat(reloaded.startsAt, "yyyy-mm-dd") & " " & TimeFormat(reloaded.startsAt, "HH:mm:ss")).toBe("2026-10-03 04:29:57");
+				}, [], false, {path = path});
+			}
 
 		});
 
@@ -276,6 +336,100 @@ component extends="wheels.WheelsTest" {
 				expect(stored.raw).toBe("2026-10-02 09:30:00");
 				StructDelete(application.wheels.models, "SqliteTextDateCol");
 				expect(model("SqliteTextDateCol").$classData().properties.created.validationtype).toBe("datetime");
+			});
+
+		});
+
+		// Earlier versions' updateAll() could store a date as a CFML ODBC literal ({ts '...'};
+		// {d '...'} and {t '...'} are the other shapes CFML produces). A DATETIME column fails to
+		// read those, so the upgrade note gives a repair query and changeColumn() converts them (##4147).
+		// Earlier versions' updateAll() could store a date as a CFML ODBC literal ({ts '...'};
+		// {d '...'} and {t '...'} are the other shapes CFML produces). A DATETIME column fails to
+		// read those, so the upgrade note gives a repair query and changeColumn() converts them (##4147).
+		describe("SQLite TEXT date columns holding ODBC date literals", () => {
+
+			afterEach(() => {
+				if (variables.applies) {
+					QueryExecute("DROP TABLE IF EXISTS c_o_r_e_sqliteodbcdates", [], {datasource = variables.ds});
+					StructDelete(application.wheels.models, "SqliteOdbcDate");
+				}
+			});
+
+			// The exact check and repair the 4.1 to 4.2 upgrade note documents, then the documented
+			// changeColumn(), then a read through a model.
+			it("are found and repaired by the documented queries, and read back as dates", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				seedOdbcDates([
+					"{ts '2026-10-03 04:29:57'}",
+					"{ts '2026-10-03 04:29:57.123'}",
+					"{d '2026-10-02'}",
+					"{t '09:30:00'}",
+					"2026-01-05 10:00:00",
+					"{x 'not a date literal'}"
+				]);
+				var found = QueryExecute("SELECT COUNT(*) AS n FROM c_o_r_e_sqliteodbcdates WHERE created LIKE char(123) || 'ts ''%''' || char(125) OR created LIKE char(123) || 'd ''%''' || char(125) OR created LIKE char(123) || 't ''%''' || char(125)", [], {datasource = variables.ds});
+				expect(found.n).toBe(4);
+				QueryExecute("UPDATE c_o_r_e_sqliteodbcdates SET created = CASE WHEN created LIKE char(123) || 'ts ''%''' || char(125) THEN substr(created, instr(created, '''') + 1, length(created) - instr(created, '''') - 2) WHEN created LIKE char(123) || 'd ''%''' || char(125) THEN substr(created, instr(created, '''') + 1, length(created) - instr(created, '''') - 2) || ' 00:00:00' WHEN created LIKE char(123) || 't ''%''' || char(125) THEN '1899-12-30 ' || substr(created, instr(created, '''') + 1, length(created) - instr(created, '''') - 2) ELSE created END WHERE created LIKE char(123) || 'ts ''%''' || char(125) OR created LIKE char(123) || 'd ''%''' || char(125) OR created LIKE char(123) || 't ''%''' || char(125)", [], {datasource = variables.ds});
+				expect(odbcRawValues()).toBe([
+					"2026-10-03 04:29:57",
+					"2026-10-03 04:29:57.123",
+					"2026-10-02 00:00:00",
+					"1899-12-30 09:30:00",
+					"2026-01-05 10:00:00",
+					"{x 'not a date literal'}"
+				]);
+				// A value that is no date at all is the app's to fix; drop it before converting.
+				QueryExecute("DELETE FROM c_o_r_e_sqliteodbcdates WHERE created LIKE char(123) || 'x%'", [], {datasource = variables.ds});
+				variables.migration.changeColumn(table = "c_o_r_e_sqliteodbcdates", columnName = "created", columnType = "datetime");
+				StructDelete(application.wheels.models, "SqliteOdbcDate");
+				var rows = model("SqliteOdbcDate").findAll(order = "id");
+				var read = [];
+				for (var row in rows) {
+					ArrayAppend(read, DateFormat(row.created, "yyyy-mm-dd") & " " & TimeFormat(row.created, "HH:mm:ss"));
+				}
+				expect(read).toBe([
+					"2026-10-03 04:29:57",
+					"2026-10-03 04:29:57",
+					"2026-10-02 00:00:00",
+					"1899-12-30 09:30:00",
+					"2026-01-05 10:00:00"
+				]);
+			});
+
+			it("are converted by changeColumn() to datetime, which then reads every row", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				seedOdbcDates([
+					"{ts '2026-10-03 04:29:57'}",
+					"{ts '2026-10-03 04:29:57.123'}",
+					"2026-01-05 10:00:00"
+				]);
+				variables.migration.changeColumn(table = "c_o_r_e_sqliteodbcdates", columnName = "created", columnType = "datetime");
+				expect(odbcRawValues()).toBe([
+					"2026-10-03 04:29:57",
+					"2026-10-03 04:29:57.123",
+					"2026-01-05 10:00:00"
+				]);
+				StructDelete(application.wheels.models, "SqliteOdbcDate");
+				var rows = model("SqliteOdbcDate").findAll(order = "id");
+				expect(rows.recordCount).toBe(3);
+				expect(DateFormat(rows.created[2], "yyyy-mm-dd") & " " & TimeFormat(rows.created[2], "HH:mm:ss")).toBe("2026-10-03 04:29:57");
+			});
+
+			it("are converted by changeColumn() to date, including bare date-only text", () => {
+				if (!variables.applies) {
+					skip("SQLite only.");
+				}
+				seedOdbcDates(["{d '2026-10-02'}", "2026-01-05"]);
+				variables.migration.changeColumn(table = "c_o_r_e_sqliteodbcdates", columnName = "created", columnType = "date");
+				expect(odbcRawValues()).toBe(["2026-10-02 00:00:00", "2026-01-05 00:00:00"]);
+				StructDelete(application.wheels.models, "SqliteOdbcDate");
+				var rows = model("SqliteOdbcDate").findAll(order = "id");
+				expect(DateFormat(rows.created[1], "yyyy-mm-dd")).toBe("2026-10-02");
+				expect(DateFormat(rows.created[2], "yyyy-mm-dd")).toBe("2026-01-05");
 			});
 
 		});

@@ -321,6 +321,28 @@
 	/**
 	 * Internal function.
 	 */
+	/**
+	 * Internal function. SQLite stores dates as TEXT and Wheels binds them as varchar. CFML's
+	 * default string for a date object is "{ts '...'}", which would be stored verbatim and then
+	 * fail to read from a DATETIME column, so a date-shaped value is written as ISO-8601 text.
+	 * Shared by every path that binds a property value: save() ($buildQueryParamValues),
+	 * updateAll() and key WHERE clauses (#4147). Idempotent for already-clean strings.
+	 */
+	public any function $sqliteDateParamValue(required any value, required string type, required boolean isNull) {
+		if (
+			$get("adapterName") eq "SQLiteModel"
+			&& arguments.type eq "cf_sql_varchar"
+			&& !arguments.isNull
+			&& IsSimpleValue(arguments.value)
+			&& Len(arguments.value)
+			&& IsDate(arguments.value)
+			&& !IsNumeric(arguments.value)
+		) {
+			return DateFormat(arguments.value, "yyyy-mm-dd") & " " & TimeFormat(arguments.value, "HH:mm:ss");
+		}
+		return arguments.value;
+	}
+
 	public struct function $buildQueryParamValues(required string property) {
 		local.rv = {};
 		local.rv.value = this[arguments.property];
@@ -329,23 +351,7 @@
 		local.rv.scale = variables.wheels.class.properties[arguments.property].scale;
 		local.rv.null = (!Len(this[arguments.property]) && variables.wheels.class.properties[arguments.property].nullable);
 
-		// SQLite stores datetimes as TEXT and binds as varchar. CFML's default
-		// toString of a date object is "{ts '...'}" — that string gets stored
-		// verbatim in the TEXT column, breaking DateFormat() and direct DB
-		// inspection on read. Pre-format any date-shaped value as ISO-8601 so
-		// the column ends up with clean human-readable values. The format is
-		// idempotent for already-clean strings, so re-running is safe.
-		if (
-			$get("adapterName") eq "SQLiteModel"
-			&& local.rv.type eq "cf_sql_varchar"
-			&& !local.rv.null
-			&& IsSimpleValue(local.rv.value)
-			&& Len(local.rv.value)
-			&& IsDate(local.rv.value)
-			&& !IsNumeric(local.rv.value)
-		) {
-			local.rv.value = DateFormat(local.rv.value, "yyyy-mm-dd") & " " & TimeFormat(local.rv.value, "HH:mm:ss");
-		}
+		local.rv.value = $sqliteDateParamValue(value = local.rv.value, type = local.rv.type, isNull = local.rv.null);
 
 		// Convert date strings to proper date for datetime types (engine-specific parsing)
 		if ($engineAdapter().isBoxLang() && (Len(local.rv.value) && !local.rv.null && 

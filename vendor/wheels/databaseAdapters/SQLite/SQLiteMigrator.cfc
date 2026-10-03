@@ -221,8 +221,14 @@ component extends="wheels.databaseAdapters.Abstract" {
 
 		// Build the column list for INSERT ... SELECT data copy.
 		local.quotedColList = [];
+		local.selectList = [];
 		for (local.colName in local.allColumnNames) {
 			ArrayAppend(local.quotedColList, quoteColumnName(local.colName));
+			if (local.colName == local.changedColumnName && ListFindNoCase("date,datetime,time,timestamp", arguments.column.type)) {
+				ArrayAppend(local.selectList, $sqliteOdbcDateLiteralToText(quoteColumnName(local.colName)));
+			} else {
+				ArrayAppend(local.selectList, quoteColumnName(local.colName));
+			}
 		}
 		local.columnList = ArrayToList(local.quotedColList, ", ");
 
@@ -252,7 +258,7 @@ component extends="wheels.databaseAdapters.Abstract" {
 		ArrayAppend(local.statements, local.createSQL);
 		ArrayAppend(
 			local.statements,
-			"INSERT INTO #local.quotedTempTable# (#local.columnList#) SELECT #local.columnList# FROM #local.quotedTable#"
+			"INSERT INTO #local.quotedTempTable# (#local.columnList#) SELECT #ArrayToList(local.selectList, ", ")# FROM #local.quotedTable#"
 		);
 		ArrayAppend(local.statements, "DROP TABLE #local.quotedTable#");
 		ArrayAppend(local.statements, "ALTER TABLE #local.quotedTempTable# RENAME TO #quoteTableName(local.tableName)#");
@@ -268,6 +274,23 @@ component extends="wheels.databaseAdapters.Abstract" {
 			ArrayAppend(local.statements, "PRAGMA foreign_keys = ON");
 		}
 		return local.statements;
+	}
+
+	/**
+	 * Internal function. SQL that converts a CFML ODBC date literal stored as text
+	 * ({ts 'yyyy-mm-dd HH:mm:ss'}, {d 'yyyy-mm-dd'} or {t 'HH:mm:ss'}), or bare date-only /
+	 * time-only text, to the full yyyy-mm-dd HH:mm:ss text save() writes, and leaves every
+	 * other value unchanged. Earlier versions could store such
+	 * literals in a TEXT date column (#4147); a DATETIME column fails to read them, so a
+	 * changeColumn() to a date type converts them while copying the table.
+	 */
+	public string function $sqliteOdbcDateLiteralToText(required string quotedColumn) {
+		local.c = arguments.quotedColumn;
+		// char(123) / char(125) are { and }: a literal brace in the SQL text is read by the JDBC
+		// driver as an escape sequence ({ts ...}, {d ...}, {t ...}) and rewritten. Values become
+		// the full yyyy-mm-dd HH:mm:ss form save() writes; the driver can't read date-only or
+		// time-only text from a date column.
+		return "CASE WHEN #local.c# LIKE char(123) || 'ts ''%''' || char(125) THEN substr(#local.c#, instr(#local.c#, '''') + 1, length(#local.c#) - instr(#local.c#, '''') - 2) WHEN #local.c# LIKE char(123) || 'd ''%''' || char(125) THEN substr(#local.c#, instr(#local.c#, '''') + 1, length(#local.c#) - instr(#local.c#, '''') - 2) || ' 00:00:00' WHEN #local.c# LIKE char(123) || 't ''%''' || char(125) THEN '1899-12-30 ' || substr(#local.c#, instr(#local.c#, '''') + 1, length(#local.c#) - instr(#local.c#, '''') - 2) WHEN #local.c# GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' THEN #local.c# || ' 00:00:00' WHEN #local.c# GLOB '[0-9][0-9]:[0-9][0-9]:[0-9][0-9]' THEN '1899-12-30 ' || #local.c# ELSE #local.c# END";
 	}
 
 	/**

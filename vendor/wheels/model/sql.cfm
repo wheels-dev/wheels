@@ -224,7 +224,7 @@
 				local.null = true;
 			}
 			local.param = {
-				value = local.value,
+				value = $sqliteDateParamValue(value = local.value, type = variables.wheels.class.properties[local.key].type, isNull = local.null),
 				type = variables.wheels.class.properties[local.key].type,
 				dataType = variables.wheels.class.properties[local.key].dataType,
 				scale = variables.wheels.class.properties[local.key].scale,
