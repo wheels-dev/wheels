@@ -1,0 +1,1 @@
+- `wheels packages` help and messages no longer say `wheels packages install` doesn't work. `install` is an alias of `add`, and the help now says so; `add` stays the documented verb.

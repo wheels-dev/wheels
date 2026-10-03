@@ -8,7 +8,9 @@
  *
  * Issue #2706. The help summary line must stop leading with the broken
  * `Install` verb and point at `add` (the same trap that earlier renamed
- * `wheels browser install` to `wheels browser setup`).
+ * `wheels browser install` to `wheels browser setup`). Since #4206 the
+ * current runtime passes `install` through as an alias of `add`; `add`
+ * stays the documented verb because older CLIs still intercept it.
  */
 component extends="wheels.WheelsTest" {
 
@@ -75,8 +77,7 @@ component extends="wheels.WheelsTest" {
 					& "(the canonical verb) so auto-introspected help matches showHelp()."
 				);
 				expect(source contains "hint: Add, update, and list Wheels packages").toBeTrue(
-					"packages() hint should lead with `Add, update, and list ...` "
-					& "and mention that the verb is `add`, not `install`."
+					"packages() hint should lead with `Add, update, and list ...`."
 				);
 			});
 
@@ -86,8 +87,8 @@ component extends="wheels.WheelsTest" {
 				expect(source contains "Unknown packages subcommand").toBeTrue(
 					"Expected the packages() default branch to throw an unknown-subcommand error."
 				);
-				expect(source contains "The install verb is `add` (not `install`): wheels packages add <name>").toBeTrue(
-					"The unknown-subcommand error should tell users the install verb is `add`."
+				expect(source contains "To install a package: wheels packages add <name>").toBeTrue(
+					"The unknown-subcommand error should point users at `wheels packages add`."
 				);
 			});
 

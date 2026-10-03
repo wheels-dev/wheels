@@ -1,10 +1,9 @@
 /**
  * Tests `wheels packages help` / `wheels packages --help` via Module.cfc.
  *
- * Issue #2713: the help output must document `add` (not `install`) as the
- * canonical install verb, and must explain why `install` does not work
- * (LuCLI's built-in extension installer intercepts the literal verb before
- * dispatch reaches this module).
+ * Issue #2713: the help output documents `add` as the canonical install
+ * verb. Issue #4206: `install` is an alias of `add` that works on the CLI
+ * too, so the help says so instead of warning that it is intercepted.
  */
 component extends="wheels.wheelstest.system.BaseSpec" {
 
@@ -60,6 +59,28 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 
 		});
 
+		// `help` returns the module-owned text before any registry call, so this
+		// block runs in every environment, unlike the skipped one below (#4206).
+		describe("wheels packages help — `install` is an alias of `add`", () => {
+
+			it("says so in `wheels packages help`, without the old intercept warning", () => {
+				mod.__arguments = ["help"];
+				var out = mod.packages();
+				expect(out).toInclude("wheels packages add");
+				expect(out).toInclude("`install` is an alias of `add`");
+				expect(REFindNoCase("intercept", out)).toBe(0);
+				expect(out).notToInclude("NOT `install`");
+			});
+
+			it("does not warn against `install` in the command or global help", () => {
+				var commandHelp = mod.showHelp("packages");
+				expect(commandHelp).toInclude("`install` is an alias of `add`");
+				expect(commandHelp).notToInclude("not `install`");
+				expect(mod.showHelp()).notToInclude("not `install`");
+			});
+
+		});
+
 		xdescribe("wheels packages help", () => {
 
 			it("treats `help` positional as a help request (no network call)", () => {
@@ -89,19 +110,19 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				expect(out).toInclude("wheels packages add");
 			});
 
-			it("does not advertise `install <name>` as a working verb", () => {
+			it("lists `add`, not `install`, as the subcommand row", () => {
 				mod.__arguments = ["help"];
 				var out = mod.packages();
-				// The historic help row "install <name> [--force]   Install a package"
-				// must not appear — it advertises a verb that LuCLI intercepts.
+				// `add` is the documented verb; `install` appears only as its alias.
 				expect(REFindNoCase("install[[:space:]]+<name>[[:space:]]+\[--force\][[:space:]]+Install a package", out)).toBe(0);
 			});
 
-			it("explains that `install` is intercepted by LuCLI", () => {
+			it("says `install` is an alias of `add`, not that it is intercepted", () => {
 				mod.__arguments = ["help"];
 				var out = mod.packages();
-				expect(out).toInclude("LuCLI");
-				expect(REFindNoCase("intercept", out)).toBeGT(0);
+				expect(out).toInclude("`install` is an alias of `add`");
+				expect(REFindNoCase("intercept", out)).toBe(0);
+				expect(out).notToInclude("NOT `install`");
 			});
 
 			it("lists every canonical sub-verb", () => {

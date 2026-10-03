@@ -4,13 +4,12 @@ component extends="wheels.WheelsTest" {
 
 		describe("Generated app templates — package install verb", () => {
 
-			// Regression guard for issue #2610: `wheels packages install <name>`
-			// is intercepted by LuCLI's built-in extension installer and never
-			// reaches Module.cfc, so it prints "No git or extension
-			// dependencies to install" and exits without installing anything.
-			// The canonical install verb is `wheels packages add`. Templates
-			// that ship with every new app (via `wheels new`) must not
-			// advertise the broken verb.
+			// Regression guard for issue #2610: on older LuCLI runtimes
+			// `wheels packages install <name>` is intercepted by the built-in
+			// extension installer and never reaches Module.cfc. The current
+			// runtime passes it through as an alias of `add` (#4206), but
+			// `wheels packages add` works on every CLI version, so templates
+			// that ship with every new app (via `wheels new`) advertise `add`.
 
 			it("the generated app's _gitignore does not reference `wheels install`", () => {
 				var path = ExpandPath("/cli/lucli/templates/app/_gitignore");
