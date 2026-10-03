@@ -4,6 +4,8 @@ component extends="wheels.WheelsTest" {
 
 		g = application.wo
 		var _isCockroachDB = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "CockroachDB";
+		// SQLite INTEGER ids bind as cf_sql_bigint: the rowid is 64-bit (#4142).
+		var idSqlType = CreateObject("component", "wheels.migrator.Migration").init().adapter.adapterName() == "SQLite" ? "cf_sql_bigint" : "cf_sql_integer";
 
 		// Calculate the expected WHERE column reference length dynamically based on quoting
 		// result[2] from $whereClause is: quotedTable.quotedColumn + " " + operator
@@ -25,21 +27,21 @@ component extends="wheels.WheelsTest" {
 
 					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
-					expect(result[3].type).toBe("cf_sql_integer")
+					expect(result[3].type).toBe(idSqlType)
 					expect(Right(result[2], Len(i))).toBe(i)
 
 					result = g.model("author").$whereClause(where = "id#i# 11")
 
 					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
-					expect(result[3].type).toBe("cf_sql_integer")
+					expect(result[3].type).toBe(idSqlType)
 					expect(Right(result[2], Len(i))).toBe(i)
 
 					result = g.model("author").$whereClause(where = "id #i#999")
 
 					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
-					expect(result[3].type).toBe("cf_sql_integer")
+					expect(result[3].type).toBe(idSqlType)
 					expect(Right(result[2], Len(i))).toBe(i)
 				}
 			})

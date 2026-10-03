@@ -5,16 +5,17 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $getType(required string type, string scale, string details) {
 		switch (LCase(arguments.type)) {
-			// A column declared BIGINT / INT8 holds 64-bit values, so bind it as one (#4086).
-			// Wheels' own migrator declares biginteger columns as INTEGER, which stays
-			// cf_sql_integer here: SQLite reports only the declared type.
+			// SQLite stores every integer in up to 64 bits, and an INTEGER PRIMARY KEY id is the
+			// 64-bit rowid, so INTEGER binds as cf_sql_bigint (#4142). As cf_sql_integer, a value
+			// above 2^31 was rejected (Adobe), clamped (Lucee) or wrapped (BoxLang), and a
+			// lookup by such an id could hit a different row. Columns declared smaller stay 32-bit.
 			case "bigint":
 			case "int8":
+			case "integer":
+			case "int":
 				local.rv = "cf_sql_bigint";
 				break;
 
-			case "integer":
-			case "int":
 			case "mediumint":
 			case "smallint":
 			case "tinyint":
@@ -68,9 +69,6 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
-	 * Prepare query arguments before execution (SQLite has simpler syntax).
-	 */
-	/**
 	 * Internal function. A cf_sql_bigint param whose values all fit in 32 bits binds as
 	 * cf_sql_integer (#4089). BoxLang binds cf_sql_bigint to SQLite as TEXT
 	 * (https://github.com/ortus-boxlang/BoxLang/issues/642), and SQLite only
@@ -117,6 +115,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return true;
 	}
 
+	/**
+	 * Prepare query arguments before execution (SQLite has simpler syntax).
+	 */
 	public struct function $querySetup(
 		required array sql,
 		numeric limit = 0,

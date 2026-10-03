@@ -23,9 +23,10 @@ component extends="wheels.WheelsTest" {
 				expect(sqlite.$getType(type = "int8")).toBe("cf_sql_bigint")
 			})
 
-			it("keeps SQLite INTEGER as cf_sql_integer", () => {
-				expect(sqlite.$getType(type = "integer")).toBe("cf_sql_integer")
-				expect(sqlite.$getType(type = "int")).toBe("cf_sql_integer")
+			it("types SQLite INTEGER as cf_sql_bigint, the 64-bit rowid width (##4142)", () => {
+				expect(sqlite.$getType(type = "integer")).toBe("cf_sql_bigint")
+				expect(sqlite.$getType(type = "int")).toBe("cf_sql_bigint")
+				expect(sqlite.$getType(type = "smallint")).toBe("cf_sql_integer")
 			})
 
 			it("maps the portable bigint name on Oracle, as a calculated property's dataType", () => {
