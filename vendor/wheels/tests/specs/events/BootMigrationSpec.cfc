@@ -110,6 +110,19 @@ component extends="wheels.WheelsTest" {
 				expect(IsSimpleValue(events.$bootMigrationEnvValue())).toBeTrue();
 			});
 
+			// The read $bootMigrationEnvValue() uses must see a real process
+			// variable on every engine, or `wheels deploy`'s per-host
+			// WHEELS_MIGRATE_ON_BOOT=false would be ignored there (#4063 review).
+			it("reads a real process environment variable on this engine", () => {
+				var events = newEvents();
+				expect(Len(events.$readEnvironmentVariable("PATH"))).toBeGT(0, "PATH must be readable through $readEnvironmentVariable on this engine");
+			});
+
+			it("returns an empty string for a variable that is not set", () => {
+				var events = newEvents();
+				expect(events.$readEnvironmentVariable("WHEELS_NO_SUCH_VARIABLE_4063")).toBe("");
+			});
+
 		});
 
 	}

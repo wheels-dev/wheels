@@ -688,16 +688,25 @@ component {
 
 	/**
 	 * The WHEELS_MIGRATE_ON_BOOT environment variable, or "" when it is not set.
-	 * Read the same way as WHEELS_SUBPATH: `server.system.environment` is the
-	 * cross-engine-safe read (Lucee's getSystemSetting() is not portable).
 	 */
 	public string function $bootMigrationEnvValue() {
+		return $readEnvironmentVariable("WHEELS_MIGRATE_ON_BOOT");
+	}
+
+	/**
+	 * A process environment variable, or "" when it is not set. Read the same way
+	 * as WHEELS_SUBPATH and env(): `server.system.environment`, which Lucee, BoxLang
+	 * and Adobe ColdFusion 2023/2025 all populate (Lucee's getSystemSetting() is
+	 * not portable). BootMigrationSpec reads PATH through this function on every
+	 * engine in the compat matrix.
+	 */
+	public string function $readEnvironmentVariable(required string name) {
 		if (
 			StructKeyExists(server, "system")
 			&& StructKeyExists(server.system, "environment")
-			&& StructKeyExists(server.system.environment, "WHEELS_MIGRATE_ON_BOOT")
+			&& StructKeyExists(server.system.environment, arguments.name)
 		) {
-			return server.system.environment.WHEELS_MIGRATE_ON_BOOT;
+			return server.system.environment[arguments.name];
 		}
 		return "";
 	}
