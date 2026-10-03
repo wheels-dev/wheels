@@ -9,6 +9,31 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	}
 
 	/**
+	 * Internal function. SQL Server converts a text value to the column's DECIMAL type, rounding
+	 * it to the column's scale, so a high-precision decimal also binds inside an exact cast (#4172).
+	 */
+	public struct function $wideDecimalCastLimits() {
+		return {precision = 38, scale = 38};
+	}
+
+	/**
+	 * Internal function. Casts high-precision decimal params exactly before running the query.
+	 */
+	public struct function $performQuery(
+		required array sql,
+		required boolean parameterize,
+		numeric limit = 0,
+		numeric offset = 0,
+		string dataSource = variables.dataSource,
+		string $primaryKey = "",
+		string $debugName = "query",
+		boolean $captureResult = true
+	) {
+		$castWideDecimalParams(args = arguments);
+		return super.$performQuery(argumentCollection = arguments);
+	}
+
+	/**
 	 * SQL Server accepts at most 2100 parameters in one request, and the JDBC drivers use some of them
 	 * themselves: mssql-jdbc (Lucee, BoxLang) runs 2098 bound values and fails at 2099, Adobe's
 	 * driver runs 2097 and fails at 2098. 2097 is the highest count that runs on every engine (#3906).

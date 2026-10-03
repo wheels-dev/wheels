@@ -72,6 +72,76 @@ component extends="wheels.WheelsTest" {
 				}
 			});
 
+			// SQL Server rounds a text value to the column's scale and MySQL compares a text IN list
+			// as doubles, so a wide value binds inside a CAST to its own scale there.
+			it("is a CAST to the value's own scale on MySQL and SQL Server", () => {
+				for (var name in ["MySQL", "MicrosoftSQLServer"]) {
+					var adapter = CreateObject("component", "wheels.databaseAdapters.#name#.#name#Model");
+					var p = name == "MySQL" ? 65 : 38;
+					var args = {parameterize = true, sql = ["SELECT 1 FROM t WHERE wide IN", {type = "cf_sql_decimal", value = "1.50,1234567890123456789.1234567890", list = true, scale = 10}]};
+					adapter.$castWideDecimalParams(args = args);
+					expect(ArrayLen(args.sql)).toBe(7, name);
+					expect(args.sql[2]).toBe("(CAST(", name);
+					expect(args.sql[3].value).toBe("1.50", name);
+					expect(StructKeyExists(args.sql[3], "list")).toBeFalse(name);
+					expect(args.sql[4]).toBe(" AS DECIMAL(#p#, 1))", name);
+					expect(args.sql[5]).toBe(", CAST(", name);
+					expect(adapter.$queryParams(args.sql[6]).cfsqltype).toBe("cf_sql_varchar", name);
+					expect(args.sql[7]).toBe(" AS DECIMAL(#p#, 9)))", name);
+					var single = {parameterize = true, sql = ["SELECT 1 FROM t WHERE whole =", {type = "cf_sql_decimal", value = "123456789012345678901234567", scale = 0}]};
+					adapter.$castWideDecimalParams(args = single);
+					expect(ArrayLen(single.sql)).toBe(4, name);
+					expect(single.sql[2]).toBe("CAST(", name);
+					expect(single.sql[4]).toBe(" AS DECIMAL(#p#, 0))", name);
+				}
+			});
+
+			it("leaves out of an IN list a value the database can't store while another remains", () => {
+				var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
+				var limits = mysql.$wideDecimalCastLimits();
+				var tooFine = "1." & RepeatString("1", 31);
+				var tooLong = RepeatString("9", 66);
+				expect(mysql.$storableDecimalValues(values = ["1.5", tooFine, tooLong, " 1234567890123456789.1234567890 "], limits = limits)).toBe(["1.5", "1234567890123456789.1234567890"]);
+				expect(ArrayLen(mysql.$storableDecimalValues(values = [tooFine, tooLong], limits = limits))).toBe(0);
+				var args = {parameterize = true, sql = ["SELECT 1 FROM t WHERE wide IN", {type = "cf_sql_decimal", value = "1.5,#tooFine#,1234567890123456789.1234567890", list = true, scale = 10}]};
+				mysql.$castWideDecimalParams(args = args);
+				expect(ArrayLen(args.sql)).toBe(7);
+				var mssql = CreateObject("component", "wheels.databaseAdapters.MicrosoftSQLServer.MicrosoftSQLServerModel");
+				var tooLong38 = RepeatString("9", 39);
+				var only = {parameterize = true, sql = ["SELECT 1 FROM t WHERE whole IN", {type = "cf_sql_decimal", value = "#tooLong38#,#tooLong38#1", list = true, scale = 0}]};
+				mssql.$castWideDecimalParams(args = only);
+				expect(ArrayLen(only.sql)).toBe(2);
+				expect(only.sql[2].list).toBeTrue();
+				var one = {parameterize = true, sql = ["SELECT 1 FROM t WHERE whole =", {type = "cf_sql_decimal", value = tooLong38, scale = 0}]};
+				mssql.$castWideDecimalParams(args = one);
+				expect(ArrayLen(one.sql)).toBe(2);
+			});
+
+			it("leaves ordinary values, inline SQL and other adapters uncast", () => {
+				var mysql = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
+				var args = {parameterize = true, sql = ["SELECT 1 FROM t WHERE amount IN", {type = "cf_sql_decimal", value = "1.50,2.25", list = true, scale = 2}, "AND amount =", {type = "cf_sql_decimal", value = "12345.67", scale = 2}]};
+				mysql.$castWideDecimalParams(args = args);
+				expect(ArrayLen(args.sql)).toBe(4);
+				var wide = {type = "cf_sql_decimal", value = "1.5,1234567890123456789.1234567890", list = true, scale = 10};
+				var inline = {parameterize = false, sql = ["SELECT 1 FROM t WHERE wide IN", wide]};
+				mysql.$castWideDecimalParams(args = inline);
+				expect(ArrayLen(inline.sql)).toBe(2);
+				for (var name in ["PostgreSQL", "CockroachDB", "SQLite", "H2", "Oracle"]) {
+					var adapter = CreateObject("component", "wheels.databaseAdapters.#name#.#name#Model");
+					var other = {parameterize = true, sql = ["SELECT 1 FROM t WHERE wide IN", Duplicate(wide)]};
+					adapter.$castWideDecimalParams(args = other);
+					expect(ArrayLen(other.sql)).toBe(2, name);
+				}
+			});
+
+			it("counts a value's integer and fraction digits", () => {
+				var adapter = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
+				expect(adapter.$fractionDigitCount("120")).toBe(0);
+				expect(adapter.$fractionDigitCount("1.12345678900")).toBe(9);
+				expect(adapter.$integerDigitCount("-000123.45")).toBe(3);
+				expect(adapter.$integerDigitCount("0.5")).toBe(0);
+			});
+
 			it("counts significant digits without leading zeros or a fraction's trailing zeros", () => {
 				var adapter = CreateObject("component", "wheels.databaseAdapters.MySQL.MySQLModel");
 				expect(adapter.$significantDigitCount("0.10")).toBe(1);
@@ -92,6 +162,7 @@ component extends="wheels.WheelsTest" {
 				var t = variables.migration.createTable(name = "c_o_r_e_decamounts", force = true);
 				t.decimal(columnNames = "amount", precision = 10, scale = 2);
 				t.decimal(columnNames = "wide", precision = 38, scale = 10);
+				t.decimal(columnNames = "whole", precision = 38, scale = 0);
 				t.create();
 				StructDelete(application.wheels.models, "DecAmount");
 			});
@@ -127,6 +198,30 @@ component extends="wheels.WheelsTest" {
 				expect(model("DecAmount").count(where = "wide = 1234567890123456789.1234567890")).toBe(1);
 				expect(model("DecAmount").count(where = "wide = 1234567890123456789.1234567891")).toBe(0);
 				expect(model("DecAmount").count(where = "wide IN (1.5, 1234567890123456789.1234567890)")).toBe(1);
+				expect(model("DecAmount").count(where = "wide IN (1.5, 1234567890123456789.1234567891)")).toBe(0);
+				expect(model("DecAmount").count(where = "wide IN (1234567890123456789.1234567891, 1234567890123456789.1234567892)")).toBe(0);
+			});
+
+			// The comparison is exact for each column scale: an element with more fraction digits
+			// than the column is not rounded onto a stored value it doesn't equal.
+			it("matches = and IN exactly against scale-0 and scale-10 columns", () => {
+				if (!variables.applies) {
+					skip("High-precision binds are adapter-specific; not `#variables.adapterName#`.");
+				}
+				QueryExecute("INSERT INTO c_o_r_e_decamounts (amount, wide, whole) VALUES (3.00, 1234567890123456789.1234567890, 123456789012345678901234567)", [], {datasource = variables.ds});
+				expect(model("DecAmount").count(where = "whole = 123456789012345678901234567")).toBe(1);
+				expect(model("DecAmount").count(where = "whole = 123456789012345678901234568")).toBe(0);
+				expect(model("DecAmount").count(where = "whole = 123456789012345678901234567.4")).toBe(0);
+				expect(model("DecAmount").count(where = "whole <> 123456789012345678901234567.4")).toBe(1);
+				expect(model("DecAmount").count(where = "wide = 1234567890123456789.12345678900")).toBe(1);
+				expect(model("DecAmount").count(where = "wide = 1234567890123456789.12345678904")).toBe(0);
+				expect(model("DecAmount").count(where = "whole IN (1.5, 123456789012345678901234567)")).toBe(1);
+				expect(model("DecAmount").count(where = "whole NOT IN (1.5, 123456789012345678901234567.4)")).toBe(1);
+				expect(model("DecAmount").count(where = "whole IN (1.5, 123456789012345678901234568)")).toBe(0);
+				expect(model("DecAmount").count(where = "whole IN (1.5, 123456789012345678901234567.4)")).toBe(0);
+				expect(model("DecAmount").count(where = "wide IN (1.5, 1234567890123456789.12345678900)")).toBe(1);
+				expect(model("DecAmount").count(where = "wide IN (1.5, 1234567890123456789.12345678904)")).toBe(0);
+				expect(model("DecAmount").count(where = "wide NOT IN (1.5, 1234567890123456789.12345678904)")).toBe(1);
 			});
 
 		});

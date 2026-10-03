@@ -854,6 +854,129 @@ component output=false extends="wheels.Global"{
 	}
 
 	/**
+	 * Internal function. Rewrites each high-precision decimal param that $applyWideDecimalBind()
+	 * rebinds as text into `CAST(? AS DECIMAL(p, s))` (#4172), for databases that would otherwise
+	 * compare that text inexactly: SQL Server rounds it to the column's scale, and MySQL compares
+	 * a text IN list as doubles. `s` is the value's own fraction digits, never the column's: a
+	 * cast to a smaller scale would round the value onto a stored value it doesn't equal.
+	 *
+	 * A value the database can't store in any DECIMAL equals no stored value, so it is left out
+	 * of an IN list while another value remains (IN and NOT IN are unchanged). A single such
+	 * value, or a list of only such values, keeps its text bind. Values written into the SQL text
+	 * (parameterize=false) are decimal literals and already compare exactly. Adapters opt in via
+	 * $wideDecimalCastLimits().
+	 */
+	public void function $castWideDecimalParams(required struct args) {
+		local.limits = $wideDecimalCastLimits();
+		if (!arguments.args.parameterize || StructIsEmpty(local.limits)) {
+			return;
+		}
+		local.rv = [];
+		for (local.part in arguments.args.sql) {
+			// Adobe CF passes arrays by value, so the parts are returned and appended here.
+			if ($isWideDecimalParam(local.part)) {
+				local.parts = $castDecimalParts(part = local.part, limits = local.limits);
+			} else {
+				local.parts = [local.part];
+			}
+			for (local.item in local.parts) {
+				ArrayAppend(local.rv, local.item);
+			}
+		}
+		arguments.args.sql = local.rv;
+	}
+
+	/**
+	 * Internal function. The largest DECIMAL precision and scale an adapter casts a high-precision
+	 * decimal param to; an empty struct (the default) leaves the param uncast (#4172).
+	 */
+	public struct function $wideDecimalCastLimits() {
+		return {};
+	}
+
+	/**
+	 * Internal function. True for a decimal / numeric param, one value or an IN list, that
+	 * $applyWideDecimalBind() rebinds as text.
+	 */
+	public boolean function $isWideDecimalParam(required any part) {
+		if (
+			!IsStruct(arguments.part)
+			|| !StructKeyExists(arguments.part, "type")
+			|| !StructKeyExists(arguments.part, "value")
+			|| !ListFindNoCase("cf_sql_decimal,cf_sql_numeric", arguments.part.type)
+		) {
+			return false;
+		}
+		local.qp = $queryParams(arguments.part);
+		return !(StructKeyExists(local.qp, "null") && local.qp.null) && local.qp.cfsqltype == $wideDecimalBindType();
+	}
+
+	/**
+	 * Internal function. The SQL parts for a high-precision decimal param as `CAST(? AS DECIMAL(p, s))`,
+	 * or for an IN list as `(CAST(...), CAST(...))` with one single-value param per value. A param
+	 * with no value the database can store is returned unchanged.
+	 */
+	public array function $castDecimalParts(required struct part, required struct limits) {
+		local.qp = $queryParams(arguments.part);
+		local.isList = StructKeyExists(local.qp, "list") && local.qp.list;
+		local.values = $storableDecimalValues(
+			values = local.isList ? ListToArray(local.qp.value, Chr(7)) : [local.qp.value],
+			limits = arguments.limits
+		);
+		if (!ArrayLen(local.values)) {
+			return [arguments.part];
+		}
+		local.rv = [];
+		local.iEnd = ArrayLen(local.values);
+		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.param = StructCopy(arguments.part);
+			StructDelete(local.param, "list");
+			local.param.value = local.values[local.i];
+			ArrayAppend(local.rv, (local.i == 1 ? (local.isList ? "(" : "") : ", ") & "CAST(");
+			ArrayAppend(local.rv, local.param);
+			ArrayAppend(
+				local.rv,
+				" AS DECIMAL(#arguments.limits.precision#, #$fractionDigitCount(local.values[local.i])#))"
+				& (local.isList && local.i == local.iEnd ? ")" : "")
+			);
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The trimmed values a DECIMAL within the adapter's limits can hold: at
+	 * most `limits.scale` fraction digits and `limits.precision` digits in all.
+	 */
+	public array function $storableDecimalValues(required array values, required struct limits) {
+		local.rv = [];
+		for (local.value in arguments.values) {
+			local.value = Trim(local.value);
+			local.fraction = $fractionDigitCount(local.value);
+			if (local.fraction <= arguments.limits.scale && $integerDigitCount(local.value) + local.fraction <= arguments.limits.precision) {
+				ArrayAppend(local.rv, local.value);
+			}
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function. The fraction digits of a plain decimal literal, trailing zeros dropped.
+	 */
+	public numeric function $fractionDigitCount(required string value) {
+		if (!Find(".", arguments.value)) {
+			return 0;
+		}
+		return Len(ReReplace(ListLast(arguments.value, "."), "0+$", ""));
+	}
+
+	/**
+	 * Internal function. The integer digits of a plain decimal literal, leading zeros dropped.
+	 */
+	public numeric function $integerDigitCount(required string value) {
+		return Len(ReReplace(ListFirst(ReReplace(arguments.value, "^-", ""), "."), "^0+", ""));
+	}
+
+	/**
 	 * Get information about the table using cfdbinfo.
 	 * Individual database adapters will override when necessary.
 	 */
