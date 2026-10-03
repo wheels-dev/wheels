@@ -1,44 +1,125 @@
 /**
- * #4195: the auto-detected TestClient/BrowserTest base URL should target the server's local listen
- * port. $detectBaseUrlFromServletPort(cgiScope, localPort, localScheme) is the seam:
- *   - mapping detected (localPort != cgi.server_port) -> <localScheme>://127.0.0.1:<localPort>
- *   - no mapping / no servlet port -> "" (so the existing cgi step runs, byte-identical)
- * The scheme comes from the servlet request's getScheme() (http behind a TLS-terminating proxy,
- * https if the container serves TLS). The real getLocalPort()/getScheme() can't differ from the
- * request's Host values in one process, so both are injected here.
+ * #4195: the auto-detected TestClient/BrowserTest base URL should target the server's actual local
+ * listener, but a local/Host port mismatch alone does NOT prove a usable HTTP loopback endpoint
+ * (AJP front ends expose the AJP port; getScheme() is the logical scheme, not the listener
+ * transport). So the resolver builds loopback candidates (http first, then https) and probes them,
+ * selecting the first that answers as HTTP and otherwise falling back to the existing cgi step.
+ *
+ * The pure pieces ($servletLoopbackCandidates, $selectAnsweringCandidate) are tested directly with
+ * an injected probe, so the mapped/AJP/TLS cases are covered without a live server. Explicit
+ * overrides are checked at the resolver level for both WheelsTest and BrowserTest.
+ *
+ * cgi-shaped structs are hoisted to variables before each call: an inline struct literal passed as a
+ * positional argument (`func({server_port = 443}, 8080)`) is a compile error on Adobe CF, which
+ * mis-reads the struct key as a named argument (invariant 16 family).
  */
 component extends="wheels.WheelsTest" {
 
 	function run() {
 		g = application.wo;
 
-		describe("TestClient base URL honours the server local listen port (4195)", () => {
+		describe("TestClient/BrowserTest base URL probes the local listener (4195)", () => {
 
-			it("mapping detected, http listener -> http loopback + localPort", () => {
-				expect($detectBaseUrlFromServletPort({server_port = 8080}, 60007, "http")).toBe("http://127.0.0.1:60007");
+			// --- candidate generation (pure) ---
+			it("builds http-first then https candidates when a port mapping is present", () => {
+				var cgiScope = {server_port = 443};
+				var expected = ["http://127.0.0.1:8080", "https://127.0.0.1:8080"];
+				expect($servletLoopbackCandidates(cgiScope, 8080)).toBe(expected);
 			});
 
-			it("mapping detected, https listener -> https loopback + localPort", () => {
-				expect($detectBaseUrlFromServletPort({server_port = 8443}, 60007, "https")).toBe("https://127.0.0.1:60007");
+			it("returns no candidates when unmapped (localPort == server_port)", () => {
+				var cgiScope = {server_port = 60007};
+				expect($servletLoopbackCandidates(cgiScope, 60007)).toBe([]);
 			});
 
-			it("unmapped (localPort == server_port) -> defers to the cgi step", () => {
-				expect($detectBaseUrlFromServletPort({server_port = 60007}, 60007, "http")).toBe("");
+			it("returns no candidates when there is no servlet port", () => {
+				var cgiScope = {server_port = 8080};
+				expect($servletLoopbackCandidates(cgiScope, 0)).toBe([]);
 			});
 
-			it("no servlet port available (0) -> defers", () => {
-				expect($detectBaseUrlFromServletPort({server_port = 8080}, 0, "http")).toBe("");
+			it("returns no candidates when server_port is missing", () => {
+				var cgiScope = {};
+				expect($servletLoopbackCandidates(cgiScope, 60007)).toBe([]);
 			});
 
-			it("missing server_port -> defers", () => {
-				expect($detectBaseUrlFromServletPort({}, 60007, "http")).toBe("");
+			// --- selection with an injected probe (no live server) ---
+			it("TLS-terminated external 443 / internal HTTP 8080: http answers first -> http loopback", () => {
+				var cgiScope = {server_port = 443};
+				var httpAnswers = function(candidate) { return Find("https://", candidate) == 0; };
+				var candidates = $servletLoopbackCandidates(cgiScope, 8080);
+				expect($selectAnsweringCandidate(candidates, httpAnswers)).toBe("http://127.0.0.1:8080");
 			});
 
-			it("BrowserTest has the same mapping-gated behaviour (both schemes)", () => {
+			it("genuine internal TLS: only https answers -> https loopback", () => {
+				var cgiScope = {server_port = 80};
+				var httpsOnly = function(candidate) { return Find("https://", candidate) > 0; };
+				var candidates = $servletLoopbackCandidates(cgiScope, 8443);
+				expect($selectAnsweringCandidate(candidates, httpsOnly)).toBe("https://127.0.0.1:8443");
+			});
+
+			it("AJP / nothing answers -> empty, so resolution falls back to cgi", () => {
+				var cgiScope = {server_port = 80};
+				var noneAnswer = function(candidate) { return false; };
+				var candidates = $servletLoopbackCandidates(cgiScope, 8009);
+				expect($selectAnsweringCandidate(candidates, noneAnswer)).toBe("");
+			});
+
+			it("no candidates -> empty regardless of probe", () => {
+				var always = function(candidate) { return true; };
+				var empty = [];
+				expect($selectAnsweringCandidate(empty, always)).toBe("");
+			});
+
+			// --- real probe falls back (no server on the candidate) ---
+			it("$probeHttpEndpoint returns false for a dead endpoint (never blocks)", () => {
+				expect($probeHttpEndpoint("http://127.0.0.1:1")).toBeFalse();
+			});
+
+			// The AJP shape: a listener ACCEPTS the TCP handshake (kernel backlog) but never sends an
+			// HTTP status line, so the probe must end on the READ timeout and still return false within
+			// bound (not hang ~30s). Distinct from a dead port, which fails at connect. Skipped by
+			// CAPABILITY (CreateObject("java") unavailable) rather than engine name, so a future
+			// non-JVM Java shim doesn't silently drop this coverage.
+			it("$probeHttpEndpoint returns false within its timeout for a socket that accepts but never answers HTTP", () => {
+				var serverSocket = "";
+				try {
+					var inet = CreateObject("java", "java.net.InetAddress").getByName("127.0.0.1");
+					serverSocket = CreateObject("java", "java.net.ServerSocket").init(JavaCast("int", 0), JavaCast("int", 1), inet);
+				} catch (any e) {
+					return; // java.net unavailable on this engine — capability skip
+				}
+				var state = {result = true, elapsed = 0};
+				try {
+					var port = serverSocket.getLocalPort();
+					var started = GetTickCount();
+					state.result = $probeHttpEndpoint("http://127.0.0.1:" & port);
+					state.elapsed = GetTickCount() - started;
+				} finally {
+					serverSocket.close();
+				}
+				expect(state.result).toBeFalse("a socket that accepts but never sends an HTTP status must not be selected");
+				expect(state.elapsed).toBeLT(15000, "probe must honour its short timeout (~1-2s), not hang on the read");
+			});
+
+			// --- resolver-level: explicit overrides still win (both resolvers) ---
+			it("WheelsTest: an explicit testClientBaseUrl wins over the probe step", () => {
+				var saved = this.testClientBaseUrl ?: "";
+				this.testClientBaseUrl = "http://override.example:9999";
+				try {
+					expect($getTestBaseUrl()).toBe("http://override.example:9999");
+				} finally {
+					this.testClientBaseUrl = saved;
+				}
+			});
+
+			it("BrowserTest: an explicit baseUrl wins, and it inherits the probe seams", () => {
 				var bt = new wheels.wheelstest.BrowserTest();
-				expect(bt.$detectBaseUrlFromServletPort({server_port = 8080}, 60007, "http")).toBe("http://127.0.0.1:60007");
-				expect(bt.$detectBaseUrlFromServletPort({server_port = 8443}, 60007, "https")).toBe("https://127.0.0.1:60007");
-				expect(bt.$detectBaseUrlFromServletPort({server_port = 60007}, 60007, "http")).toBe("");
+				bt.baseUrl = "http://bt.override:9999";
+				expect(bt.$resolveBaseUrl()).toBe("http://bt.override:9999");
+				// inherited seam works on BrowserTest too
+				var cgiScope = {server_port = 443};
+				var expected = ["http://127.0.0.1:8080", "https://127.0.0.1:8080"];
+				expect(bt.$servletLoopbackCandidates(cgiScope, 8080)).toBe(expected);
 			});
 		});
 	}

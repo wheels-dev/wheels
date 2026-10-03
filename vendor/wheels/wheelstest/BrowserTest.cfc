@@ -309,10 +309,11 @@ component extends="wheels.WheelsTest" {
      *   2. get("browserTestBaseUrl")          — Wheels setting
      *   3. -Dwheels.browserTest.baseUrl=...   — JVM system property
      *   4. WHEELS_BROWSER_TEST_BASE_URL env   — CI / shell
-     *   5. servlet local listen port          — loopback + the actual listen
-     *                                            port/scheme when the request's
-     *                                            local port differs from its
-     *                                            Host port (a port mapping)
+     *   5. probed servlet local listen port   — when the request's local port
+     *                                            differs from its Host port,
+     *                                            probe the loopback candidate
+     *                                            (http then https) and use the
+     *                                            one that answers as HTTP
      *   6. $detectBaseUrlFromCgi(cgi)         — derived from the in-flight
      *                                            test-runner request
      *   7. "http://localhost:8080" default    — bare LuCLI port
@@ -342,12 +343,10 @@ component extends="wheels.WheelsTest" {
         }
 
         try {
-            var endpoint = $servletLocalEndpoint();
-            var mapped = $detectBaseUrlFromServletPort(cgi, endpoint.port, endpoint.scheme);
+            var mapped = $resolveServletLoopbackBaseUrl(cgi);
             if (len(mapped)) return mapped;
         } catch (any e) {
-            // Servlet request unavailable (e.g. a non-servlet engine) — fall
-            // through to cgi detection.
+            // Servlet request unavailable or probe failed — fall through to cgi.
         }
 
         try {

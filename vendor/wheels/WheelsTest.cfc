@@ -182,10 +182,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
      *   2. get("testClientBaseUrl")           — Wheels setting
      *   3. -Dwheels.testClient.baseUrl=...    — JVM system property
      *   4. WHEELS_TEST_CLIENT_BASE_URL env    — CI / shell
-     *   5. servlet local listen port          — when the request's local port
+     *   5. probed servlet local listen port   — when the request's local port
      *                                            differs from its Host port (a
-     *                                            port mapping), loopback + the
-     *                                            actual listen port/scheme
+     *                                            port mapping), probe the loopback
+     *                                            candidate (http then https) and
+     *                                            use the one that answers as HTTP;
+     *                                            skip when none answers (AJP, TLS
+     *                                            mismatch) so the cgi step runs
      *   6. $detectTestBaseUrlFromCgi(cgi)     — scheme/host/port of the
      *                                            in-flight test-runner request
      *   7. "http://localhost:8080" default    — bare LuCLI port
@@ -219,14 +222,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
         }
 
         try {
-            var endpoint = $servletLocalEndpoint();
-            var mapped = $detectBaseUrlFromServletPort(cgi, endpoint.port, endpoint.scheme);
+            var mapped = $resolveServletLoopbackBaseUrl(cgi);
             if (len(mapped)) {
                 return mapped;
             }
         } catch (any e) {
-            // Servlet request unavailable (e.g. a non-servlet engine) — fall
-            // through to cgi detection.
+            // Servlet request unavailable or probe failed — fall through to
+            // cgi detection (never block a test run on the probe).
         }
 
         try {
@@ -259,54 +261,131 @@ component extends="wheels.wheelstest.system.BaseSpec" {
     }
 
     /**
-     * When the in-flight request's local listen port differs from its Host port
-     * (i.e. a port mapping is in play), the Host name + port is not a reliable
-     * loopback target, so return a loopback URL on the actual listen port and
-     * scheme. Returns "" when there is no mapping (unmapped stays byte-identical
-     * via the cgi step) or no servlet port is available. Public seam for specs.
-     *
-     * @cgiScope      The cgi scope (or a struct with server_port) of the request.
-     * @localPort     The servlet request's local listen port (0 when unavailable).
-     * @localScheme   The servlet request's scheme ("http"/"https").
+     * Resolve a loopback base URL from the server's actual local listen port,
+     * but only when it is a usable HTTP(S) endpoint. A local/Host port mismatch
+     * alone does NOT prove a direct loopback HTTP endpoint: behind an AJP front
+     * end (IIS+BonCode, mod_jk) the local port is the AJP port, and getScheme()
+     * is the logical request scheme (a TLS-terminating HTTP connector can report
+     * https on a plain-HTTP socket). So we probe the candidate(s) — http first,
+     * then https — and return the first that answers as HTTP. Returns "" when
+     * there is no mapping, no servlet port, or nothing answers, so the caller
+     * falls through to cgi detection (today's behaviour). Shared by WheelsTest
+     * and BrowserTest. Public so the parallel resolver can call it.
      */
-    public string function $detectBaseUrlFromServletPort(required any cgiScope, required numeric localPort, string localScheme = "http") {
-        if (arguments.localPort <= 0 || !structKeyExists(arguments.cgiScope, "server_port")) {
-            return "";
-        }
-        if (val(arguments.cgiScope.server_port) == arguments.localPort) {
-            return "";
-        }
-        var scheme = len(arguments.localScheme) ? arguments.localScheme : "http";
-        return scheme & "://127.0.0.1:" & arguments.localPort;
+    public string function $resolveServletLoopbackBaseUrl(required any cgiScope) {
+        var candidates = $servletLoopbackCandidates(arguments.cgiScope, $servletLocalPort());
+        var probe = (candidate) => $probeHttpEndpointCached(candidate);
+        return $selectAnsweringCandidate(candidates, probe);
     }
 
     /**
-     * Best-effort read of the in-flight servlet request's local listen port and
-     * scheme. Returns {port = 0, scheme = "http"} when the servlet request is
-     * unavailable (e.g. a non-servlet engine such as RustCFML), so callers fall
-     * through to cgi detection. Private; the pure mapping logic lives in
-     * $detectBaseUrlFromServletPort for testability.
+     * Candidate loopback base URLs to probe, http first then https, or [] when
+     * there is no port mapping (local port == Host port, or no local port). Pure
+     * and public for specs. The scheme is decided empirically by the probe, not
+     * taken from getScheme().
      */
-    private struct function $servletLocalEndpoint() {
-        var endpoint = {port = 0, scheme = "http"};
+    public array function $servletLoopbackCandidates(required any cgiScope, required numeric localPort) {
+        if (arguments.localPort <= 0 || !structKeyExists(arguments.cgiScope, "server_port")) {
+            return [];
+        }
+        if (val(arguments.cgiScope.server_port) == arguments.localPort) {
+            return [];
+        }
+        return ["http://127.0.0.1:" & arguments.localPort, "https://127.0.0.1:" & arguments.localPort];
+    }
+
+    /**
+     * Return the first candidate URL for which probe(url) is true, or "" when
+     * none answers. Pure logic with an injected probe so specs can exercise the
+     * mapped-answers, only-https-answers, and nothing-answers (AJP/fallback)
+     * cases without a live server. Public for specs.
+     */
+    public string function $selectAnsweringCandidate(required array candidates, required any probe) {
+        var probeFn = arguments.probe;
+        for (var candidate in arguments.candidates) {
+            if (probeFn(candidate)) {
+                return candidate;
+            }
+        }
+        return "";
+    }
+
+    /**
+     * The in-flight servlet request's local listen port, or 0 when unavailable
+     * (e.g. a non-servlet engine such as RustCFML, which then skips the whole
+     * step). Private; the pure candidate logic lives in $servletLoopbackCandidates.
+     */
+    private numeric function $servletLocalPort() {
         try {
             if (getFunctionList().keyExists("getPageContext")) {
                 var req = getPageContext().getRequest();
                 if (!isNull(req)) {
                     var p = req.getLocalPort();
                     if (!isNull(p) && val(p) > 0) {
-                        endpoint.port = val(p);
-                    }
-                    var s = req.getScheme();
-                    if (!isNull(s) && len(s)) {
-                        endpoint.scheme = lCase(s);
+                        return val(p);
                     }
                 }
             }
         } catch (any e) {
-            // Non-servlet engine or restricted request — leave defaults.
+            // Non-servlet engine or restricted request.
         }
-        return endpoint;
+        return 0;
+    }
+
+    /**
+     * $probeHttpEndpoint memoized per candidate URL (scheme+port) in the
+     * application scope, so a fallback app pays the probe timeout at most once
+     * rather than on every $testClient() call. Negative results are cached too.
+     * Lock-free: the read/write is a cheap struct op and the probe (which waits)
+     * runs outside any lock; concurrent first-use probes are idempotent.
+     */
+    private boolean function $probeHttpEndpointCached(required string candidate) {
+        var cacheKey = "$testClientLoopbackProbe";
+        try {
+            var appScope = application[$appKey()];
+            if (!structKeyExists(appScope, cacheKey)) {
+                appScope[cacheKey] = {};
+            }
+            if (structKeyExists(appScope[cacheKey], arguments.candidate)) {
+                return appScope[cacheKey][arguments.candidate];
+            }
+            var answered = $probeHttpEndpoint(arguments.candidate);
+            appScope[cacheKey][arguments.candidate] = answered;
+            return answered;
+        } catch (any e) {
+            // If the cache scope is unavailable, probe directly (uncached).
+            return $probeHttpEndpoint(arguments.candidate);
+        }
+    }
+
+    /**
+     * True when a loopback candidate answers as HTTP. A bare GET (no test-context
+     * header, so it never recurses into the isolated-app binding) to a cheap
+     * framework endpoint, with redirects disabled and a short timeout. ANY HTTP
+     * status (200/302/404/...) means the transport works; a transport failure
+     * (connection refused, timeout, AJP speaking a non-HTTP protocol, TLS
+     * mismatch) means it does not. Any error is swallowed as "no" so a probe
+     * never blocks a test run. Public for specs.
+     */
+    public boolean function $probeHttpEndpoint(required string candidate) {
+        try {
+            cfhttp(
+                method = "GET",
+                url = arguments.candidate & "/wheels/info",
+                redirect = false,
+                timeout = 1,
+                throwonerror = false,
+                result = "local.probeResult"
+            );
+            // "Answers as HTTP" means the server actually sent a status line + headers.
+            // The raw `header` field is populated on any real HTTP response (200/302/404/...),
+            // and empty on a connect failure or a read timeout (AJP speaking a non-HTTP
+            // protocol, TLS mismatch) — where cfhttp synthesizes a 408/502 status_code with
+            // no header, so status_code alone cannot be trusted.
+            return len(trim(local.probeResult.header ?: "")) > 0;
+        } catch (any e) {
+            return false;
+        }
     }
 
 }
