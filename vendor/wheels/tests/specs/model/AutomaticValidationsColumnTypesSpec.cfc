@@ -134,18 +134,12 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects a non-date in a date column", () => {
-				if (variables.adapterName == "SQLite") {
-					skip("SQLite migrator date columns are TEXT, so the model sees a string and adds no date check (##4093).");
-				}
 				var props = $validProperties();
 				props.startsOn = "not a date";
 				$expectRejectedOn(props, "startsOn");
 			});
 
 			it("rejects a non-date in a datetime column", () => {
-				if (variables.adapterName == "SQLite") {
-					skip("SQLite migrator date columns are TEXT, so the model sees a string and adds no date check (##4093).");
-				}
 				var props = $validProperties();
 				props.startsAt = "not a date";
 				$expectRejectedOn(props, "startsAt");

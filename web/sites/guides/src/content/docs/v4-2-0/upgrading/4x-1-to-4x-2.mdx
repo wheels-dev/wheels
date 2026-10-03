@@ -173,6 +173,21 @@ t.bigInteger(columnNames = "accountId", unsigned = true);
 
 On Oracle, new `t.integer()`, `t.references()` and `id` columns are `NUMBER(10)`, new `t.bigInteger()` columns are `NUMBER(19)`, and new `t.boolean()` columns before Oracle 23ai are `NUMBER(1)` ([#4097](https://github.com/wheels-dev/wheels/issues/4097)). Earlier releases created a bare `NUMBER`, which binds as a decimal and validates as a float. The new columns validate as integers, so a fractional value such as `1.5` now fails automatic validation instead of being stored. Existing columns are unchanged and keep their current typing, and `changeColumn()` without a `precision` argument keeps a column's current precision, so it never re-types one. To convert one, see [Integer columns on Oracle](/v4-2-0/basics/migrations/).
 
+### SQLite date columns are validated as dates
+
+On SQLite, new `t.date()`, `t.datetime()`, `t.time()` and `t.timestamp()` columns are declared `DATE`, `DATETIME` and `TIME` instead of `TEXT` ([#4093](https://github.com/wheels-dev/wheels/issues/4093)). The model validates them as dates, so automatic validations now reject a value such as `"not a date"` that earlier releases stored. Values are still stored as ISO-8601 text, exactly as before. Existing `TEXT` date columns are unchanged: they keep the old check, which treats a `TEXT` column as a date only when its name is a word such as `created`, `updated` or `date`, so a column like `publishedAt` gets no date check. To give an existing column the new behaviour, convert it in a migration with `changeColumn(columnType="datetime")` (or `"date"`). The stored text is kept.
+
+**Columns declared `DATE` or `TIME` by raw SQL or another tool.** Before 4.2, Wheels bound a SQLite column *declared* `DATE` as `cf_sql_date` and one declared `TIME` as `cf_sql_time`, and the driver stored those values as epoch-millisecond integers. Wheels now writes ISO-8601 text to them, so a column with old rows would mix integers and text, which breaks comparisons and sorting. Migrator-created columns aren't affected: they were `TEXT` before 4.2. To check a table, run `SELECT typeof(col), count(*) FROM tbl GROUP BY 1;`. If any rows are `integer`, convert them before writing with 4.2:
+
+```sql
+UPDATE tbl SET dateCol = strftime('%Y-%m-%d', dateCol / 1000, 'unixepoch', 'localtime') WHERE typeof(dateCol) = 'integer';
+UPDATE tbl SET timeCol = strftime('%H:%M:%S', timeCol / 1000, 'unixepoch', 'localtime') WHERE typeof(timeCol) = 'integer';
+```
+
+Keep `'localtime'`: the old values are midnight (or the time of day) in the server's timezone, and without it a server east of UTC converts each date to the previous day. Run the conversion with the same timezone as the app server.
+
+**Convert before you upgrade.** If you don't, what happens depends on the engine. On BoxLang, a record holding an unconverted value fails validation on that column ("is invalid") even when the save doesn't touch it, so the record can't be saved. On Lucee and Adobe ColdFusion the record saves and keeps its integers, because Wheels updates only the columns that changed, but the first new value the app writes to such a column is stored as text, and the column mixes formats until you convert. The recipe changes only `integer` rows, so it's safe to run more than once. Run it again after every app process is on 4.2: processes still on 4.1 keep writing integers.
+
 ### `LocalDisk` storage keys are checked per segment
 
 `LocalDisk` now validates an object key one path segment at a time ([#3912](https://github.com/wheels-dev/wheels/issues/3912)):
