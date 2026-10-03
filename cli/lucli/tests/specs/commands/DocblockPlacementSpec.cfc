@@ -31,12 +31,13 @@ component extends="wheels.wheelstest.system.BaseSpec" {
 				var offenders = [];
 				for (var tree in ["cli/lucli", "vendor/wheels"]) {
 					var root = expandPath("/" & tree);
-					for (var path in directoryList(root, true, "path", "*.cfc")) {
+					for (var path in directoryList(root, true, "path", "*.cfc|*.cfm")) {
 						var source = fileRead(path);
 						var at = reFind("\*/[ \t]*\r?\n[ \t]*/\*\*", source);
-						if (at > 0) {
+						while (at > 0) {
 							var lineNumber = listLen(left(source, at), chr(10), true);
 							arrayAppend(offenders, replace(path, root, tree) & ":" & lineNumber);
+							at = reFind("\*/[ \t]*\r?\n[ \t]*/\*\*", source, at + 2);
 						}
 					}
 				}
