@@ -3,9 +3,9 @@
  * 1000 values in one IN list (ORA-01795), so Wheels splits a longer list into
  * parenthesised groups: OR-joined for IN, AND-joined for NOT IN, every value still
  * bound. Oracle 23ai has no such limit, but the split runs there too, which is how
- * these specs exercise it. SQL Server accepts at most 2100 bound parameters per
- * statement, so a query that would bind more is refused with Wheels.TooManyParameters
- * before it runs.
+ * these specs exercise it. SQL Server accepts at most 2100 parameters per request,
+ * a few of which the driver uses itself, so a query that would bind more than the
+ * adapter's limit (2097) is refused with Wheels.TooManyParameters before it runs.
  */
 component extends="wheels.WheelsTest" {
 
@@ -58,7 +58,7 @@ component extends="wheels.WheelsTest" {
 
 			it("returns the right rows for a split IN list next to another condition", () => {
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					skip("Under SQL Server's 2100-parameter limit this list is not split.");
+					skip("SQL Server does not split IN lists.");
 				}
 				var keys = paddedKeys(1500);
 				var first = g.model("author").findByKey(realIds[1]);
@@ -70,7 +70,7 @@ component extends="wheels.WheelsTest" {
 
 			it("keeps NOT IN's NULL behaviour when the list is split", () => {
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
-					skip("Under SQL Server's 2100-parameter limit this list is not split.");
+					skip("SQL Server does not split IN lists.");
 				}
 				var state = {split = -1, single = -1};
 				transaction {
@@ -89,21 +89,77 @@ component extends="wheels.WheelsTest" {
 				expect(g.model("author").whereNotIn("id", []).count()).toBe(g.model("author").count());
 			});
 
-			it("runs 2000 keys and refuses 2101 on SQL Server before the query runs", () => {
-				if (g.get("adapterName") != "MicrosoftSQLServerModel") {
-					skip("SQL Server's 2100-parameter limit.");
+			it("splits a quoted-string list at a group boundary without breaking its values", () => {
+				// Values with commas and apostrophes, and real names either side of the
+				// 1000-value boundary, so a split inside a value would lose a match.
+				var names = [];
+				var authors = g.model("author").findAll(select = "firstName", returnAs = "query");
+				for (var i = 1; i <= 998; i++) {
+					ArrayAppend(names, "pad, it's #i#");
 				}
-				expect(g.model("author").whereIn("id", paddedKeys(2000)).count()).toBe(ArrayLen(realIds));
+				for (var r = 1; r <= authors.recordCount; r++) {
+					ArrayAppend(names, authors.firstName[r]);
+				}
+				for (var i = 999; ArrayLen(names) < 1500; i++) {
+					ArrayAppend(names, "pad, it's #i#");
+				}
+				expect(g.model("author").whereIn("firstName", names).count()).toBe(authors.recordCount);
+				expect(g.model("author").whereNotIn("firstName", names).count()).toBe(0);
+			});
+
+			it("returns the right rows for a split list with parameterize=false", () => {
+				var keys = paddedKeys(1500);
+				var rows = g.model("author").findAll(where = "id IN (#ArrayToList(keys)#)", parameterize = false, returnAs = "query");
+				expect(rows.recordCount).toBe(ArrayLen(realIds));
+				var names = [];
+				var authors = g.model("author").findAll(select = "firstName", returnAs = "query");
+				for (var r = 1; r <= authors.recordCount; r++) {
+					ArrayAppend(names, "'" & Replace(authors.firstName[r], "'", "''", "all") & "'");
+				}
+				for (var i = 1; ArrayLen(names) < 1500; i++) {
+					ArrayAppend(names, "'pad, it''s #i#'");
+				}
+				var named = g.model("author").findAll(where = "firstName IN (#ArrayToList(names)#)", parameterize = false, returnAs = "query");
+				expect(named.recordCount).toBe(authors.recordCount);
+			});
+
+			it("runs the adapter's limit and refuses one more on SQL Server before the query runs", () => {
+				if (g.get("adapterName") != "MicrosoftSQLServerModel") {
+					skip("SQL Server's bound-parameter limit.");
+				}
+				var adapter = g.model("author").$classData().adapter;
+				var limit = adapter.$maxBoundParameters();
+				expect(g.model("author").whereIn("id", paddedKeys(limit)).count()).toBe(ArrayLen(realIds));
 				var state = {type = "", message = ""};
 				try {
-					g.model("author").whereIn("id", paddedKeys(2101)).count();
+					g.model("author").whereIn("id", paddedKeys(limit + 1)).count();
 				} catch (any e) {
 					state.type = e.type;
 					state.message = e.message;
 				}
 				expect(state.type).toBe("Wheels.TooManyParameters");
-				expect(state.message).toInclude("2101");
-				expect(state.message).toInclude("2100");
+				expect(state.message).toInclude("#limit + 1#");
+				expect(state.message).toInclude("#limit#");
+			});
+
+			it("counts a scalar parameter alongside a list against SQL Server's limit", () => {
+				if (g.get("adapterName") != "MicrosoftSQLServerModel") {
+					skip("SQL Server's bound-parameter limit.");
+				}
+				var adapter = g.model("author").$classData().adapter;
+				var limit = adapter.$maxBoundParameters();
+				var first = g.model("author").findByKey(realIds[1]);
+				var expected = g.model("author").findAll(where = "firstName = '#Replace(first.firstName, "'", "''", "all")#'", returnAs = "query");
+				expect(g.model("author").whereIn("id", paddedKeys(limit - 1)).where("firstName", first.firstName).count()).toBe(expected.recordCount);
+				var state = {type = "", message = ""};
+				try {
+					g.model("author").whereIn("id", paddedKeys(limit)).where("firstName", first.firstName).count();
+				} catch (any e) {
+					state.type = e.type;
+					state.message = e.message;
+				}
+				expect(state.type).toBe("Wheels.TooManyParameters");
+				expect(state.message).toInclude("#limit + 1#");
 			});
 
 		});

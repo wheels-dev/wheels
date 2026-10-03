@@ -52,8 +52,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("parses a 5000-key whereIn", () => {
-				// SQL Server binds at most 2100 parameters per statement, so the query is
-				// refused with a clear error before it runs (#3906). Oracle splits the list
+				// SQL Server binds at most about 2100 parameters per statement, so the query
+				// is refused with a clear error before it runs (#3906). Oracle splits the list
 				// into groups of 1000 and runs it.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
 					expectTooManyParameters(() => {
@@ -65,8 +65,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("parses a 5000-key whereNotIn", () => {
-				// SQL Server binds at most 2100 parameters per statement, so the query is
-				// refused with a clear error before it runs (#3906). Oracle splits the list
+				// SQL Server binds at most about 2100 parameters per statement, so the query
+				// is refused with a clear error before it runs (#3906). Oracle splits the list
 				// into groups of 1000 and runs it.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
 					expectTooManyParameters(() => {
@@ -78,8 +78,8 @@ component extends="wheels.WheelsTest" {
 			})
 
 			it("parses a 5000-key IN list in a hand-written where string", () => {
-				// SQL Server binds at most 2100 parameters per statement, so the query is
-				// refused with a clear error before it runs (#3906). Oracle splits the list
+				// SQL Server binds at most about 2100 parameters per statement, so the query
+				// is refused with a clear error before it runs (#3906). Oracle splits the list
 				// into groups of 1000 and runs it.
 				if (g.get("adapterName") == "MicrosoftSQLServerModel") {
 					expectTooManyParameters(() => {
@@ -113,7 +113,8 @@ component extends="wheels.WheelsTest" {
 			state.message = e.message;
 		}
 		expect(state.type).toBe("Wheels.TooManyParameters");
-		expect(state.message).toInclude("2100");
+		var adapter = g.model("author").$classData().adapter;
+		expect(state.message).toInclude("#adapter.$maxBoundParameters()#");
 		expect(state.message).toInclude("5000");
 	}
 
