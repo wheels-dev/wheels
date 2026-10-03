@@ -17,8 +17,6 @@ component extends="wheels.WheelsTest" {
 	function beforeAll() {
 		variables.migration = CreateObject("component", "wheels.migrator.Migration").init();
 		variables.table = "c_o_r_e_autovalidatedtypes";
-		variables.adapterName = variables.migration.adapter.adapterName();
-		variables.isAdobe = application.wo.$engineAdapter().isAdobe();
 		var t = variables.migration.createTable(name = variables.table, force = true);
 		t.string(columnNames = "requiredName", limit = 20, allowNull = false);
 		t.char(columnNames = "shortCode", limit = 3); // untyped on four adapters before #4092
@@ -105,9 +103,6 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("stores a value above the 32-bit range in a bigInteger column", () => {
-				if (variables.isAdobe && variables.adapterName == "SQLite") {
-					skip("SQLite migrator bigInteger columns are INTEGER, which binds as CF_SQL_INTEGER; Adobe rejects values above 2147483647 (##4089).");
-				}
 				var props = $validProperties();
 				props.bigCount = 9000000000;
 				var rec = model("AutoValidatedType").new(props);
