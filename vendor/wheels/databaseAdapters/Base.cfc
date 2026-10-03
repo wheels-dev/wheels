@@ -786,7 +786,71 @@ component output=false extends="wheels.Global"{
 			local.rv.separator = Chr(7);
 			local.rv.value = $cleanInStatementValue(local.rv.value);
 		}
+		$applyWideDecimalBind(local.rv);
 		return local.rv;
+	}
+
+	/**
+	 * Internal function. Rebinds a decimal / numeric param whose value has more significant
+	 * digits than a double holds exactly (more than 15) in the adapter's exact form (#4172).
+	 * Lucee and BoxLang bind cf_sql_decimal / cf_sql_numeric through a double, so such a value
+	 * was stored, or matched, as a different number. Values with up to 15 significant digits
+	 * (money and quantity amounts) keep their bind. Adapters opt in via $wideDecimalBindType().
+	 */
+	public void function $applyWideDecimalBind(required struct param) {
+		if (
+			!ListFindNoCase("cf_sql_decimal,cf_sql_numeric", arguments.param.cfsqltype)
+			|| (StructKeyExists(arguments.param, "null") && arguments.param.null)
+		) {
+			return;
+		}
+		local.wideType = $wideDecimalBindType();
+		if (Len(local.wideType) && $hasWideDecimalValue(arguments.param)) {
+			arguments.param.cfsqltype = local.wideType;
+		}
+	}
+
+	/**
+	 * Internal function. The cf_sql type an adapter binds a high-precision decimal in, exactly;
+	 * "" keeps the decimal bind. Overridden per adapter (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "";
+	}
+
+	/**
+	 * Internal function. True when every value of a param (one value, or each element of an IN
+	 * list) is a plain decimal literal (an optional "-", digits, an optional fraction; no
+	 * exponent or grouping) and at least one has more than 15 significant digits.
+	 */
+	public boolean function $hasWideDecimalValue(required struct param) {
+		local.values = StructKeyExists(arguments.param, "list") && arguments.param.list
+			? ListToArray(arguments.param.value, arguments.param.separator)
+			: [arguments.param.value];
+		local.state = {wide = false};
+		for (local.value in local.values) {
+			if (!IsSimpleValue(local.value) || !ReFind("^-?[0-9]+(\.[0-9]+)?$", Trim(local.value))) {
+				return false;
+			}
+			if ($significantDigitCount(Trim(local.value)) > 15) {
+				local.state.wide = true;
+			}
+		}
+		return local.state.wide;
+	}
+
+	/**
+	 * Internal function. The number of significant digits in a plain decimal literal: leading
+	 * zeros and a fraction's trailing zeros don't count.
+	 */
+	public numeric function $significantDigitCount(required string value) {
+		local.digits = ReReplace(arguments.value, "^-", "");
+		if (Find(".", local.digits)) {
+			local.digits = ReReplace(local.digits, "0+$", "");
+			local.digits = ReReplace(local.digits, "\.$", "");
+		}
+		local.digits = ReReplace(Replace(local.digits, ".", ""), "^0+", "");
+		return Len(local.digits);
 	}
 
 	/**

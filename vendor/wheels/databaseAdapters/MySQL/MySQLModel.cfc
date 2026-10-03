@@ -1,5 +1,13 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
+	/**
+	 * Internal function. This database converts a high-precision decimal sent as text exactly,
+	 * in an insert and in a comparison (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "cf_sql_varchar";
+	}
+
 	variables.mysqlTypeMap = {
 		"bigint": "cf_sql_bigint",
 		"binary": "cf_sql_binary",

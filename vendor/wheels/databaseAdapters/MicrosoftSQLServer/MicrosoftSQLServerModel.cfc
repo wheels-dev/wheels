@@ -1,6 +1,14 @@
 component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
+	 * Internal function. This database converts a high-precision decimal sent as text exactly,
+	 * in an insert and in a comparison (#4172).
+	 */
+	public string function $wideDecimalBindType() {
+		return "cf_sql_varchar";
+	}
+
+	/**
 	 * SQL Server accepts at most 2100 parameters in one request, and the JDBC drivers use some of them
 	 * themselves: mssql-jdbc (Lucee, BoxLang) runs 2098 bound values and fails at 2099, Adobe's
 	 * driver runs 2097 and fails at 2098. 2097 is the highest count that runs on every engine (#3906).
